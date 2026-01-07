@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const [membership, setMembership] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false); // Chargement des données utilisateur
 
   // ===========================================================================
   // CHARGEMENT DES DONNÉES UTILISATEUR
@@ -29,13 +30,14 @@ export function AuthProvider({ children }) {
    * Charge le profil et l'organisation de l'utilisateur
    */
   const loadUserData = useCallback(async (userId) => {
+    setDataLoading(true);
     try {
       // Charger le profil
       const { profile: userProfile } = await authService.getProfile(userId);
       setProfile(userProfile);
 
       // Charger l'organisation
-      const { organization: userOrg, membership: userMembership } = 
+      const { organization: userOrg, membership: userMembership } =
         await authService.getUserOrganization(userId);
       setOrganization(userOrg);
       setMembership(userMembership);
@@ -47,6 +49,8 @@ export function AuthProvider({ children }) {
       });
     } catch (error) {
       console.error('[AuthContext] Erreur chargement données:', error);
+    } finally {
+      setDataLoading(false);
     }
   }, []);
 
@@ -250,6 +254,7 @@ export function AuthProvider({ children }) {
     membership,
     loading,
     initialized,
+    dataLoading,
 
     // Computed
     isAuthenticated,

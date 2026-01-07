@@ -21,20 +21,21 @@ export default function ProtectedRoute({
   requireOrganization = true,
 }) {
   const location = useLocation();
-  const { 
-    user, 
+  const {
+    user,
     membership,
     organization,
-    loading, 
+    loading,
     initialized,
+    dataLoading,
   } = useAuth();
 
   // ===========================================================================
   // LOADING STATE
   // ===========================================================================
 
-  // Afficher un loader pendant l'initialisation
-  if (!initialized || loading) {
+  // Afficher un loader pendant l'initialisation ou le chargement des données
+  if (!initialized || loading || dataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary-50">
         <div className="text-center">
@@ -132,11 +133,11 @@ export function TeamLeaderRoute({ children }) {
  * Route publique qui redirige vers le dashboard si déjà connecté
  */
 export function PublicOnlyRoute({ children }) {
-  const { user, initialized, loading } = useAuth();
+  const { user, initialized, loading, dataLoading } = useAuth();
   const location = useLocation();
 
-  // Loader pendant l'initialisation
-  if (!initialized || loading) {
+  // Loader pendant l'initialisation ou le chargement des données
+  if (!initialized || loading || dataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary-50">
         <div className="text-center">
