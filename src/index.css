@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-secondary-50 text-secondary-900 font-sans;
+  }
+
+  /* Scrollbar personnalisée */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-secondary-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-secondary-400;
+  }
+}
+
+/* =============================================================================
+   COMPONENT STYLES
+   ============================================================================= */
+
+@layer components {
+  /* Boutons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 
+           font-medium rounded-lg transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white 
+           hover:bg-primary-700 
+           focus:ring-primary-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary-100 text-secondary-700 
+           hover:bg-secondary-200 
+           focus:ring-secondary-500;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white 
+           hover:bg-red-700 
+           focus:ring-red-500;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-secondary-600 
+           hover:bg-secondary-100 
+           focus:ring-secondary-500;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-lg;
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full px-3 py-2 
+           bg-white border border-secondary-300 rounded-lg
+           text-secondary-900 placeholder-secondary-400
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+           disabled:bg-secondary-100 disabled:cursor-not-allowed
+           transition-colors duration-200;
+  }
+
+  .input-error {
+    @apply input border-red-500 focus:ring-red-500;
+  }
+
+  /* Labels */
+  .label {
+    @apply block text-sm font-medium text-secondary-700 mb-1;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-xl shadow-card p-6;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-card-hover transition-shadow duration-200;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 
+           rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-800;
+  }
+
+  .badge-success {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-100 text-amber-800;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-info {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  /* Tables */
+  .table {
+    @apply w-full text-sm text-left;
+  }
+
+  .table thead {
+    @apply bg-secondary-50 text-secondary-600 uppercase text-xs tracking-wider;
+  }
+
+  .table th {
+    @apply px-4 py-3 font-semibold;
+  }
+
+  .table td {
+    @apply px-4 py-3 border-t border-secondary-100;
+  }
+
+  .table tbody tr:hover {
+    @apply bg-secondary-50;
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm
+           flex items-center justify-center p-4 z-50
+           animate-fade-in;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-xl shadow-modal w-full max-w-lg
+           max-h-[90vh] overflow-y-auto
+           animate-slide-up;
+  }
+}
+
+/* =============================================================================
+   FULLCALENDAR OVERRIDES
+   ============================================================================= */
+
+.fc {
+  @apply font-sans;
+}
+
+.fc .fc-toolbar-title {
+  @apply text-xl font-semibold text-secondary-900;
+}
+
+.fc .fc-button {
+  @apply bg-primary-600 border-primary-600 text-white
+         hover:bg-primary-700 hover:border-primary-700
+         focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+}
+
+.fc .fc-button:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  @apply bg-primary-700 border-primary-700;
+}
+
+.fc .fc-daygrid-day-number {
+  @apply text-secondary-700 font-medium;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+  @apply bg-primary-50;
+}
+
+.fc .fc-event {
+  @apply rounded-md border-0 px-2 py-1 text-xs font-medium cursor-pointer;
+}
+
+.fc .fc-timegrid-slot {
+  @apply border-secondary-100;
+}
+
+.fc .fc-col-header-cell {
+  @apply bg-secondary-50 text-secondary-600 font-semibold text-xs uppercase;
+}
+
+/* =============================================================================
+   UTILITIES
+   ============================================================================= */
+
+@layer utilities {
+  /* Truncate multi-line */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
