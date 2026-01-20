@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@lib/supabaseClient';
 import { authService } from '@services/auth.service';
 
@@ -20,7 +20,12 @@ export function AuthProvider({ children }) {
   const [membership, setMembership] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  const [dataLoading, setDataLoading] = useState(false); // Chargement des données utilisateur
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Refs pour éviter les rechargements inutiles
+  const currentUserIdRef = useRef(null);
+  const isLoadingDataRef = useRef(false);
+  const dataLoadedRef = useRef(false);
 
   // ===========================================================================
   // CHARGEMENT DES DONNÉES UTILISATEUR
@@ -29,18 +34,54 @@ export function AuthProvider({ children }) {
   /**
    * Charge le profil et l'organisation de l'utilisateur
    */
-  const loadUserData = useCallback(async (userId) => {
+  const loadUserData = useCallback(async (userId, force = false) => {
+    if (!userId) {
+      console.warn('[AuthContext] loadUserData appelé sans userId');
+      return;
+    }
+
+    // Éviter les rechargements si déjà en cours
+    if (isLoadingDataRef.current) {
+      console.log('[AuthContext] Chargement déjà en cours, ignoré');
+      return;
+    }
+
+    // Éviter de recharger si les données sont déjà présentes pour cet utilisateur
+    if (!force && currentUserIdRef.current === userId && dataLoadedRef.current) {
+      console.log('[AuthContext] Données déjà chargées pour cet utilisateur, ignoré');
+      return;
+    }
+
+    isLoadingDataRef.current = true;
+    currentUserIdRef.current = userId;
     setDataLoading(true);
+
     try {
+      console.log('[AuthContext] Début chargement données pour userId:', userId);
+      
       // Charger le profil
-      const { profile: userProfile } = await authService.getProfile(userId);
-      setProfile(userProfile);
+      const { profile: userProfile, error: profileError } = await authService.getProfile(userId);
+      
+      if (profileError) {
+        console.error('[AuthContext] Erreur getProfile:', profileError);
+      } else {
+        setProfile(userProfile);
+        console.log('[AuthContext] Profil chargé:', userProfile?.full_name);
+      }
 
       // Charger l'organisation
-      const { organization: userOrg, membership: userMembership } =
+      const { organization: userOrg, membership: userMembership, error: orgError } =
         await authService.getUserOrganization(userId);
-      setOrganization(userOrg);
-      setMembership(userMembership);
+
+      if (orgError) {
+        console.error('[AuthContext] Erreur getUserOrganization:', orgError);
+      } else {
+        setOrganization(userOrg);
+        setMembership(userMembership);
+        console.log('[AuthContext] Organisation chargée:', userOrg?.name);
+      }
+
+      dataLoadedRef.current = true;
 
       console.log('[AuthContext] Données utilisateur chargées:', {
         profile: userProfile?.full_name,
@@ -50,9 +91,11 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('[AuthContext] Erreur chargement données:', error);
     } finally {
+      isLoadingDataRef.current = false;
       setDataLoading(false);
+      console.log('[AuthContext] Fin chargement données, dataLoading = false');
     }
-  }, []);
+  }, []); // Pas de dépendances - utilise les refs
 
   /**
    * Réinitialise l'état
@@ -62,6 +105,9 @@ export function AuthProvider({ children }) {
     setProfile(null);
     setOrganization(null);
     setMembership(null);
+    currentUserIdRef.current = null;
+    isLoadingDataRef.current = false;
+    dataLoadedRef.current = false;
   }, []);
 
   // ===========================================================================
@@ -74,15 +120,29 @@ export function AuthProvider({ children }) {
     // Initialisation
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthContext] Début initialisation...');
+        
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('[AuthContext] Erreur getSession:', error);
+        }
+
+        const session = data?.session;
 
         if (mounted) {
           if (session?.user) {
+            console.log('[AuthContext] Session trouvée, user:', session.user.email);
             setUser(session.user);
-            await loadUserData(session.user.id);
+            loadUserData(session.user.id, true).catch(err => {
+              console.error('[AuthContext] Erreur loadUserData dans initAuth:', err);
+            });
+          } else {
+            console.log('[AuthContext] Aucune session trouvée');
           }
           setLoading(false);
           setInitialized(true);
+          console.log('[AuthContext] Initialisation terminée');
         }
       } catch (error) {
         console.error('[AuthContext] Erreur initialisation:', error);
@@ -102,28 +162,46 @@ export function AuthProvider({ children }) {
 
         if (!mounted) return;
 
+        // Ignorer INITIAL_SESSION car déjà géré par initAuth
+        if (event === 'INITIAL_SESSION') {
+          console.log('[AuthContext] INITIAL_SESSION ignoré');
+          return;
+        }
+
         switch (event) {
           case 'SIGNED_IN':
+            console.log('[AuthContext] SIGNED_IN event');
             if (session?.user) {
+              const isSameUser = currentUserIdRef.current === session.user.id;
               setUser(session.user);
-              await loadUserData(session.user.id);
+              
+              // Ne recharger que si nouvel utilisateur ou données pas encore chargées
+              if (!isSameUser || !dataLoadedRef.current) {
+                await loadUserData(session.user.id, !isSameUser);
+              } else {
+                console.log('[AuthContext] Même utilisateur, pas de rechargement');
+              }
             }
             break;
 
           case 'SIGNED_OUT':
+            console.log('[AuthContext] SIGNED_OUT event');
             resetState();
             break;
 
           case 'TOKEN_REFRESHED':
+            console.log('[AuthContext] TOKEN_REFRESHED - ignoré');
+            // Ne rien faire, les données sont déjà chargées
             if (session?.user) {
               setUser(session.user);
             }
             break;
 
           case 'USER_UPDATED':
+            console.log('[AuthContext] USER_UPDATED event');
             if (session?.user) {
               setUser(session.user);
-              await loadUserData(session.user.id);
+              await loadUserData(session.user.id, true);
             }
             break;
 
@@ -144,9 +222,6 @@ export function AuthProvider({ children }) {
   // ACTIONS
   // ===========================================================================
 
-  /**
-   * Connexion
-   */
   const signIn = async (email, password) => {
     setLoading(true);
     const result = await authService.signIn(email, password);
@@ -154,9 +229,6 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  /**
-   * Inscription
-   */
   const signUp = async (email, password, metadata = {}) => {
     setLoading(true);
     const result = await authService.signUp(email, password, metadata);
@@ -164,9 +236,6 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  /**
-   * Déconnexion
-   */
   const signOut = async () => {
     setLoading(true);
     const result = await authService.signOut();
@@ -177,30 +246,18 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  /**
-   * Connexion Google
-   */
   const signInWithGoogle = async () => {
     return authService.signInWithGoogle();
   };
 
-  /**
-   * Réinitialisation mot de passe
-   */
   const resetPassword = async (email) => {
     return authService.resetPassword(email);
   };
 
-  /**
-   * Mise à jour mot de passe
-   */
   const updatePassword = async (newPassword) => {
     return authService.updatePassword(newPassword);
   };
 
-  /**
-   * Mise à jour du profil
-   */
   const updateProfile = async (updates) => {
     if (!user) return { profile: null, error: new Error('Non connecté') };
 
@@ -211,24 +268,17 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  /**
-   * Rejoindre une organisation
-   */
   const joinOrganization = async (inviteCode) => {
     const result = await authService.joinOrganization(inviteCode);
     if (!result.error && user) {
-      // Recharger les données organisation
-      await loadUserData(user.id);
+      await loadUserData(user.id, true);
     }
     return result;
   };
 
-  /**
-   * Rafraîchir les données utilisateur
-   */
   const refreshUserData = async () => {
     if (user) {
-      await loadUserData(user.id);
+      await loadUserData(user.id, true);
     }
   };
 
@@ -247,7 +297,6 @@ export function AuthProvider({ children }) {
   // ===========================================================================
 
   const value = {
-    // État
     user,
     profile,
     organization,
@@ -255,15 +304,11 @@ export function AuthProvider({ children }) {
     loading,
     initialized,
     dataLoading,
-
-    // Computed
     isAuthenticated,
     hasOrganization,
     isOrgAdmin,
     isTeamLeader,
     isTeamLeaderOrAbove,
-
-    // Actions
     signIn,
     signUp,
     signOut,
@@ -297,4 +342,3 @@ export function useAuth() {
 }
 
 export default AuthContext;
-    

@@ -15,12 +15,20 @@ export default defineConfig({
       '@lib': path.resolve(__dirname, './src/lib'),
       '@services': path.resolve(__dirname, './src/shared/services'),
       '@hooks': path.resolve(__dirname, './src/shared/hooks'),
+      '@hooksPipeline': path.resolve(__dirname, './src/hooks/pipeline'),
       '@apps': path.resolve(__dirname, './src/apps'),
     },
   },
   server: {
     port: 5173,
     open: true,
+    hmr: {
+      overlay: false,      // Désactive l'overlay d'erreur
+      timeout: 60000,      // Timeout plus long (60s)
+    },
+    watch: {
+      usePolling: false,   // Désactive le polling agressif
+    },
   },
   build: {
     outDir: 'dist',

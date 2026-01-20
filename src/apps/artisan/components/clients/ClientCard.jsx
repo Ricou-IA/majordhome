@@ -2,7 +2,9 @@
  * ClientCard.jsx - Majord'home Artisan
  * ============================================================================
  * Carte compacte affichant un client dans la liste.
- * Affiche : nom, adresse, statut contrat, téléphone, prochain entretien.
+ * Format fixe 4 lignes : Nom/Contrat, Adresse, Téléphone, Email
+ * 
+ * v2.0.0 - Format fixe avec placeholders pour hauteur uniforme
  * 
  * @example
  * <ClientCard 
@@ -18,95 +20,56 @@ import {
   MapPin, 
   Phone, 
   Mail, 
-  Calendar, 
-  Wrench,
-  FileText,
-  ChevronRight,
-  AlertCircle,
-  CheckCircle2,
-  Clock
+  ChevronRight
 } from 'lucide-react';
 
 // ============================================================================
-// UTILITAIRES
+// SOUS-COMPOSANTS
 // ============================================================================
-
-/**
- * Formate une date en français
- * @param {string} dateString - Date ISO
- * @returns {string} Date formatée
- */
-const formatDate = (dateString) => {
-  if (!dateString) return null;
-  
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Calcule le statut de l'entretien
- * @param {string} nextMaintenanceDate - Date du prochain entretien
- * @returns {Object} { status, label, color }
- */
-const getMaintenanceStatus = (nextMaintenanceDate) => {
-  if (!nextMaintenanceDate) {
-    return { status: 'none', label: 'Non planifié', color: 'text-gray-400' };
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const maintenanceDate = new Date(nextMaintenanceDate);
-  maintenanceDate.setHours(0, 0, 0, 0);
-  
-  const diffDays = Math.ceil((maintenanceDate - today) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) {
-    return { status: 'overdue', label: 'En retard', color: 'text-red-600', icon: AlertCircle };
-  } else if (diffDays <= 30) {
-    return { status: 'upcoming', label: 'À venir', color: 'text-amber-600', icon: Clock };
-  } else {
-    return { status: 'scheduled', label: 'Planifié', color: 'text-green-600', icon: CheckCircle2 };
-  }
-};
 
 /**
  * Badge de statut contrat
  */
-const ContractBadge = ({ status }) => {
-  const config = {
-    active: { 
-      label: 'Contrat actif', 
-      className: 'bg-green-100 text-green-700 border-green-200' 
-    },
-    pending: { 
-      label: 'En attente', 
-      className: 'bg-amber-100 text-amber-700 border-amber-200' 
-    },
-    expired: { 
-      label: 'Expiré', 
-      className: 'bg-red-100 text-red-700 border-red-200' 
-    },
-    none: { 
-      label: 'Sans contrat', 
-      className: 'bg-gray-100 text-gray-500 border-gray-200' 
-    },
-  };
-
-  const { label, className } = config[status] || config.none;
-
+const ContractBadge = ({ hasContract }) => {
+  if (hasContract) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border bg-green-100 text-green-700 border-green-200">
+        Contrat actif
+      </span>
+    );
+  }
+  
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${className}`}>
-      {label}
+    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border bg-gray-100 text-gray-500 border-gray-200">
+      Sans contrat
     </span>
+  );
+};
+
+/**
+ * Ligne d'information avec icône
+ */
+const InfoLine = ({ icon: Icon, children, onClick, isLink = false }) => {
+  const content = children || '-';
+  const isEmpty = !children;
+  
+  if (isLink && !isEmpty && onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline truncate w-full text-left"
+      >
+        <Icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <span className="truncate">{content}</span>
+      </button>
+    );
+  }
+  
+  return (
+    <div className={`flex items-center gap-2 text-sm truncate ${isEmpty ? 'text-gray-400' : 'text-gray-600'}`}>
+      <Icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+      <span className="truncate">{content}</span>
+    </div>
   );
 };
 
@@ -115,44 +78,44 @@ const ContractBadge = ({ status }) => {
 // ============================================================================
 
 /**
- * Carte client pour la liste
+ * Carte client pour la liste - Format fixe 4 lignes
  * 
  * @param {Object} props
  * @param {Object} props.client - Données du client
  * @param {Function} [props.onClick] - Callback au clic
  * @param {boolean} [props.selected] - Client sélectionné
- * @param {boolean} [props.compact] - Mode compact (moins d'infos)
  */
 export function ClientCard({ 
   client, 
   onClick, 
-  selected = false,
-  compact = false 
+  selected = false
 }) {
   if (!client) return null;
 
   const {
     id,
     name,
+    first_name,
+    last_name,
     address,
     postal_code,
     city,
     phone,
     email,
+    has_contrat,
     contract_status,
-    next_maintenance_date,
-    equipments_count,
   } = client;
 
-  // Statut de l'entretien
-  const maintenanceStatus = getMaintenanceStatus(next_maintenance_date);
-  const MaintenanceIcon = maintenanceStatus.icon || Calendar;
+  // Détermine si contrat actif
+  const hasContract = has_contrat === true || contract_status === 'active';
+
+  // Nom affiché : soit name, soit "last_name first_name"
+  const displayName = name || `${last_name || ''} ${first_name || ''}`.trim() || 'Client sans nom';
 
   // Adresse formatée
   const fullAddress = [address, postal_code, city].filter(Boolean).join(', ');
-  const shortAddress = city ? `${postal_code || ''} ${city}`.trim() : null;
 
-  // Handler de clic
+  // Handler de clic sur la carte
   const handleClick = () => {
     if (onClick) {
       onClick(client);
@@ -179,84 +142,51 @@ export function ClientCard({
     <div
       onClick={handleClick}
       className={`
-        group relative bg-white rounded-lg border transition-all duration-200
+        group relative bg-white rounded-lg border p-4 transition-all duration-200
         ${onClick ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''}
         ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'}
-        ${compact ? 'p-3' : 'p-4'}
       `}
     >
-      {/* En-tête : Nom + Badge contrat */}
-      <div className="flex items-start justify-between gap-3 mb-2">
+      {/* Ligne 1 : Nom + Badge contrat */}
+      <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
             <User className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-gray-900 truncate">
-              {name || 'Client sans nom'}
-            </h3>
-          </div>
+          <h3 className="font-medium text-gray-900 truncate">
+            {displayName}
+          </h3>
         </div>
-        
-        <ContractBadge status={contract_status} />
+        <ContractBadge hasContract={hasContract} />
       </div>
 
-      {/* Adresse */}
-      {(shortAddress || fullAddress) && (
-        <div className="flex items-start gap-2 text-sm text-gray-600 mb-2">
-          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-          <span className="truncate">
-            {compact ? shortAddress : (fullAddress || shortAddress)}
-          </span>
-        </div>
-      )}
+      {/* Ligne 2 : Adresse */}
+      <div className="mb-2">
+        <InfoLine icon={MapPin}>
+          {fullAddress}
+        </InfoLine>
+      </div>
 
-      {/* Ligne contact : Téléphone + Email */}
-      {!compact && (phone || email) && (
-        <div className="flex items-center gap-4 text-sm mb-2">
-          {phone && (
-            <button
-              onClick={handlePhoneClick}
-              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              <span>{phone}</span>
-            </button>
-          )}
-          {email && (
-            <button
-              onClick={handleEmailClick}
-              className="flex items-center gap-1.5 text-gray-600 hover:text-gray-800 hover:underline truncate"
-            >
-              <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate">{email}</span>
-            </button>
-          )}
-        </div>
-      )}
+      {/* Ligne 3 : Téléphone */}
+      <div className="mb-2">
+        <InfoLine 
+          icon={Phone} 
+          isLink={!!phone}
+          onClick={handlePhoneClick}
+        >
+          {phone}
+        </InfoLine>
+      </div>
 
-      {/* Ligne infos : Équipements + Prochain entretien */}
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-        {/* Équipements */}
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Wrench className="w-3.5 h-3.5" />
-          <span>
-            {equipments_count || 0} équipement{(equipments_count || 0) !== 1 ? 's' : ''}
-          </span>
-        </div>
-
-        {/* Prochain entretien */}
-        {contract_status === 'active' && (
-          <div className={`flex items-center gap-1.5 text-xs ${maintenanceStatus.color}`}>
-            <MaintenanceIcon className="w-3.5 h-3.5" />
-            <span>
-              {next_maintenance_date 
-                ? formatDate(next_maintenance_date)
-                : 'Non planifié'
-              }
-            </span>
-          </div>
-        )}
+      {/* Ligne 4 : Email */}
+      <div>
+        <InfoLine 
+          icon={Mail}
+          isLink={!!email}
+          onClick={handleEmailClick}
+        >
+          {email}
+        </InfoLine>
       </div>
 
       {/* Indicateur de clic */}
@@ -279,7 +209,8 @@ export function ClientCard({
 export function ClientCardCompact({ client, onClick, selected = false }) {
   if (!client) return null;
 
-  const { name, city, postal_code, contract_status } = client;
+  const { name, city, postal_code, has_contrat, contract_status } = client;
+  const hasContract = has_contrat === true || contract_status === 'active';
 
   return (
     <div
@@ -307,7 +238,7 @@ export function ClientCardCompact({ client, onClick, selected = false }) {
         </div>
       </div>
 
-      <ContractBadge status={contract_status} />
+      <ContractBadge hasContract={hasContract} />
     </div>
   );
 }
@@ -319,36 +250,34 @@ export function ClientCardCompact({ client, onClick, selected = false }) {
 /**
  * Skeleton de la carte client (état de chargement)
  */
-export function ClientCardSkeleton({ compact = false }) {
+export function ClientCardSkeleton() {
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 animate-pulse ${compact ? 'p-3' : 'p-4'}`}>
-      {/* En-tête */}
-      <div className="flex items-start justify-between gap-3 mb-3">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
+      {/* Ligne 1 : Nom + Badge */}
+      <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gray-200 rounded-full" />
-          <div className="h-5 w-32 bg-gray-200 rounded" />
+          <div className="h-5 w-36 bg-gray-200 rounded" />
         </div>
         <div className="h-5 w-20 bg-gray-200 rounded-full" />
       </div>
 
-      {/* Adresse */}
+      {/* Ligne 2 : Adresse */}
       <div className="flex items-center gap-2 mb-2">
         <div className="w-4 h-4 bg-gray-200 rounded" />
         <div className="h-4 w-48 bg-gray-200 rounded" />
       </div>
 
-      {/* Contact */}
-      {!compact && (
-        <div className="flex items-center gap-4 mb-3">
-          <div className="h-4 w-28 bg-gray-200 rounded" />
-          <div className="h-4 w-36 bg-gray-200 rounded" />
-        </div>
-      )}
+      {/* Ligne 3 : Téléphone */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-4 h-4 bg-gray-200 rounded" />
+        <div className="h-4 w-32 bg-gray-200 rounded" />
+      </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-        <div className="h-4 w-24 bg-gray-200 rounded" />
-        <div className="h-4 w-20 bg-gray-200 rounded" />
+      {/* Ligne 4 : Email */}
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 bg-gray-200 rounded" />
+        <div className="h-4 w-40 bg-gray-200 rounded" />
       </div>
     </div>
   );

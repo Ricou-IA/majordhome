@@ -62,19 +62,19 @@ export default function ProtectedRoute({
   }
 
   // ===========================================================================
-  // ORGANIZATION CHECK
+  // ORGANIZATION CHECK - DÉSACTIVÉ TEMPORAIREMENT
   // ===========================================================================
 
-  // Pas d'organisation et requise → redirection vers page d'onboarding
-  if (requireOrganization && !organization) {
-    return (
-      <Navigate 
-        to="/join-organization" 
-        state={{ from: location.pathname }} 
-        replace 
-      />
-    );
-  }
+  // TODO: Réactiver quand le système d'organisation sera fonctionnel
+  // if (requireOrganization && !organization) {
+  //   return (
+  //     <Navigate 
+  //       to="/join-organization" 
+  //       state={{ from: location.pathname }} 
+  //       replace 
+  //     />
+  //   );
+  // }
 
   // ===========================================================================
   // ROLE CHECK

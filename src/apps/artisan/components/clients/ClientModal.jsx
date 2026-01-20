@@ -1,8 +1,13 @@
 /**
  * ClientModal.jsx - Majord'home Artisan
  * ============================================================================
- * Modale fiche client complète.
+ * Modale fiche client complète avec système de verrouillage.
  * Onglets : Informations / Équipements / Historique
+ * 
+ * v2.2.0 - Ajout Nom/Prénom séparés + Fix sauvegarde complète
+ * v2.1.1 - Fix LockOpen → Unlock (compatibilité lucide-react)
+ * v2.1.0 - PhoneInput formatage auto + fix Historique
+ * v2.0.0 - Ajout système cadenas (lecture seule par défaut)
  * 
  * @example
  * <ClientModal 
@@ -14,7 +19,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   X, 
   User, 
@@ -34,7 +39,9 @@ import {
   Ruler,
   Leaf,
   ExternalLink,
-  Archive
+  Archive,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { useClient, useClientEquipments } from '@/shared/hooks/useClients';
 import { CLIENT_STATUSES, LEAD_SOURCES, CONTRACT_FREQUENCIES } from '@/shared/services/clients.service';
@@ -92,22 +99,44 @@ const formatDateFR = (dateString) => {
 };
 
 /**
- * Formate une date/heure en français
+ * Formate un numéro de téléphone en XX XX XX XX XX
+ * @param {string} value - Valeur brute
+ * @returns {string} Numéro formaté
  */
-const formatDateTimeFR = (dateString) => {
-  if (!dateString) return '-';
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '-';
+const formatPhoneNumber = (value) => {
+  if (!value) return '';
+  
+  // Garder uniquement les chiffres
+  const digits = value.replace(/\D/g, '');
+  
+  // Limiter à 10 chiffres
+  const limited = digits.slice(0, 10);
+  
+  // Formater en XX XX XX XX XX
+  const parts = [];
+  for (let i = 0; i < limited.length; i += 2) {
+    parts.push(limited.slice(i, i + 2));
   }
+  
+  return parts.join(' ');
+};
+
+/**
+ * Parse le nom complet en nom/prénom
+ * Format attendu: "NOM PRENOM" ou "NOM PRENOM1 PRENOM2"
+ */
+const parseFullName = (fullName) => {
+  if (!fullName) return { lastName: '', firstName: '' };
+  
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return { lastName: '', firstName: '' };
+  if (parts.length === 1) return { lastName: parts[0], firstName: '' };
+  
+  // Premier mot = nom, reste = prénom
+  const lastName = parts[0];
+  const firstName = parts.slice(1).join(' ');
+  
+  return { lastName, firstName };
 };
 
 // ============================================================================
@@ -134,27 +163,70 @@ const FormField = ({ label, children, required = false, error = null }) => (
 );
 
 /**
- * Input texte
+ * Input texte avec support disabled
  */
-const TextInput = ({ value, onChange, placeholder, type = 'text', ...props }) => (
+const TextInput = ({ value, onChange, placeholder, type = 'text', disabled = false, ...props }) => (
   <input
     type={type}
     value={value || ''}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+    disabled={disabled}
+    className={`
+      w-full px-3 py-2 border rounded-lg outline-none transition-colors
+      ${disabled 
+        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed' 
+        : 'bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+      }
+    `}
     {...props}
   />
 );
 
 /**
- * Select
+ * Input téléphone avec formatage automatique XX XX XX XX XX
  */
-const SelectInput = ({ value, onChange, options, placeholder }) => (
+const PhoneInput = ({ value, onChange, placeholder = "06 12 34 56 78", disabled = false }) => {
+  const handleChange = (e) => {
+    const rawValue = e.target.value;
+    const formatted = formatPhoneNumber(rawValue);
+    onChange(formatted);
+  };
+
+  return (
+    <input
+      type="tel"
+      value={value || ''}
+      onChange={handleChange}
+      placeholder={placeholder}
+      disabled={disabled}
+      maxLength={14} // XX XX XX XX XX = 14 caractères
+      className={`
+        w-full px-3 py-2 border rounded-lg outline-none transition-colors
+        ${disabled 
+          ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed' 
+          : 'bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+        }
+      `}
+    />
+  );
+};
+
+/**
+ * Select avec support disabled
+ */
+const SelectInput = ({ value, onChange, options, placeholder, disabled = false }) => (
   <select
     value={value || ''}
     onChange={(e) => onChange(e.target.value || null)}
-    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors bg-white"
+    disabled={disabled}
+    className={`
+      w-full px-3 py-2 border rounded-lg outline-none transition-colors
+      ${disabled 
+        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed' 
+        : 'bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+      }
+    `}
   >
     {placeholder && <option value="">{placeholder}</option>}
     {options.map(opt => (
@@ -164,15 +236,22 @@ const SelectInput = ({ value, onChange, options, placeholder }) => (
 );
 
 /**
- * Textarea
+ * Textarea avec support disabled
  */
-const TextArea = ({ value, onChange, placeholder, rows = 3 }) => (
+const TextArea = ({ value, onChange, placeholder, rows = 3, disabled = false }) => (
   <textarea
     value={value || ''}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
     rows={rows}
-    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors resize-none"
+    disabled={disabled}
+    className={`
+      w-full px-3 py-2 border rounded-lg outline-none transition-colors resize-none
+      ${disabled 
+        ? 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed' 
+        : 'bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+      }
+    `}
   />
 );
 
@@ -192,13 +271,14 @@ const StatusBadge = ({ status }) => {
 
 /**
  * Carte intervention (historique)
+ * Utilise scheduled_date et report_notes (noms réels des colonnes DB)
  */
 const InterventionCard = ({ intervention }) => {
   const {
     intervention_type,
-    intervention_date,
+    scheduled_date,
     technician_name,
-    description,
+    report_notes,
     status,
   } = intervention;
 
@@ -232,13 +312,13 @@ const InterventionCard = ({ intervention }) => {
             </span>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            {formatDateFR(intervention_date)}
+            {formatDateFR(scheduled_date)}
             {technician_name && ` • ${technician_name}`}
           </p>
         </div>
       </div>
-      {description && (
-        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{description}</p>
+      {report_notes && (
+        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{report_notes}</p>
       )}
     </div>
   );
@@ -248,7 +328,7 @@ const InterventionCard = ({ intervention }) => {
 // ONGLET INFORMATIONS
 // ============================================================================
 
-const TabInfo = ({ formData, setFormData, errors }) => {
+const TabInfo = ({ formData, setFormData, errors, isLocked }) => {
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -261,12 +341,21 @@ const TabInfo = ({ formData, setFormData, errors }) => {
           <User className="w-4 h-4 text-gray-500" />
           Identité
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Nom du client" required error={errors.name}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField label="Nom" required error={errors.lastName}>
             <TextInput
-              value={formData.name}
-              onChange={(v) => updateField('name', v)}
-              placeholder="M. / Mme Dupont"
+              value={formData.lastName}
+              onChange={(v) => updateField('lastName', v.toUpperCase())}
+              placeholder="DUPONT"
+              disabled={isLocked}
+            />
+          </FormField>
+          <FormField label="Prénom">
+            <TextInput
+              value={formData.firstName}
+              onChange={(v) => updateField('firstName', v)}
+              placeholder="Jean"
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="Statut">
@@ -275,6 +364,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               onChange={(v) => updateField('status', v)}
               options={CLIENT_STATUSES}
               placeholder="Sélectionner..."
+              disabled={isLocked}
             />
           </FormField>
         </div>
@@ -292,6 +382,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               value={formData.address}
               onChange={(v) => updateField('address', v)}
               placeholder="12 rue des Lilas"
+              disabled={isLocked}
             />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
@@ -300,6 +391,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
                 value={formData.postalCode}
                 onChange={(v) => updateField('postalCode', v)}
                 placeholder="40100"
+                disabled={isLocked}
               />
             </FormField>
             <FormField label="Ville">
@@ -307,6 +399,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
                 value={formData.city}
                 onChange={(v) => updateField('city', v)}
                 placeholder="Dax"
+                disabled={isLocked}
               />
             </FormField>
           </div>
@@ -321,11 +414,10 @@ const TabInfo = ({ formData, setFormData, errors }) => {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Téléphone">
-            <TextInput
+            <PhoneInput
               value={formData.phone}
               onChange={(v) => updateField('phone', v)}
-              placeholder="06 12 34 56 78"
-              type="tel"
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="Email">
@@ -334,6 +426,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               onChange={(v) => updateField('email', v)}
               placeholder="client@email.com"
               type="email"
+              disabled={isLocked}
             />
           </FormField>
         </div>
@@ -352,6 +445,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               onChange={(v) => updateField('housingType', v)}
               options={HOUSING_TYPES}
               placeholder="Sélectionner..."
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="Surface (m²)">
@@ -360,6 +454,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               onChange={(v) => updateField('surface', v)}
               placeholder="120"
               type="number"
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="N° DPE ADEME">
@@ -368,6 +463,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
                 value={formData.dpeNumber}
                 onChange={(v) => updateField('dpeNumber', v)}
                 placeholder="2341E0000000X"
+                disabled={isLocked}
               />
               {formData.dpeNumber && (
                 <a
@@ -394,14 +490,13 @@ const TabInfo = ({ formData, setFormData, errors }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField label="Statut contrat">
             <SelectInput
-              value={formData.contractStatus}
-              onChange={(v) => updateField('contractStatus', v)}
+              value={formData.hasContrat ? 'active' : 'none'}
+              onChange={(v) => updateField('hasContrat', v === 'active')}
               options={[
                 { value: 'none', label: 'Sans contrat' },
-                { value: 'active', label: 'Actif' },
-                { value: 'pending', label: 'En attente' },
-                { value: 'expired', label: 'Expiré' },
+                { value: 'active', label: 'Avec contrat' },
               ]}
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="Fréquence">
@@ -410,6 +505,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               onChange={(v) => updateField('contractFrequency', v)}
               options={CONTRACT_FREQUENCIES}
               placeholder="Sélectionner..."
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="Prochain entretien">
@@ -417,6 +513,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               value={formatDateForInput(formData.nextMaintenanceDate)}
               onChange={(v) => updateField('nextMaintenanceDate', v)}
               type="date"
+              disabled={isLocked}
             />
           </FormField>
         </div>
@@ -435,6 +532,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
               onChange={(v) => updateField('leadSource', v)}
               options={LEAD_SOURCES}
               placeholder="Sélectionner..."
+              disabled={isLocked}
             />
           </FormField>
           <FormField label="Date de création">
@@ -456,6 +554,7 @@ const TabInfo = ({ formData, setFormData, errors }) => {
           onChange={(v) => updateField('notes', v)}
           placeholder="Notes et informations complémentaires..."
           rows={4}
+          disabled={isLocked}
         />
       </div>
     </div>
@@ -548,7 +647,7 @@ const TabHistory = ({ interventions = [], loading = false }) => {
 // ============================================================================
 
 /**
- * Modale fiche client
+ * Modale fiche client avec système de verrouillage
  * 
  * @param {Object} props
  * @param {string} props.clientId - ID du client (null pour création)
@@ -568,47 +667,110 @@ export function ClientModal({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isLocked, setIsLocked] = useState(true);
+
+  // Ref pour stocker les données originales
+  const originalDataRef = useRef({});
+  
+  // Ref pour la position de scroll
+  const contentRef = useRef(null);
 
   // Hooks données
   const { client, loading, updateClient } = useClient(clientId, { autoLoad: !!clientId });
 
+  /**
+   * Crée l'objet formData à partir du client
+   */
+  const buildFormData = useCallback((clientData) => {
+    // Parser nom/prénom depuis first_name/last_name ou depuis name
+    let firstName = clientData.first_name || '';
+    let lastName = clientData.last_name || '';
+    
+    // Si pas de first_name/last_name, parser depuis name
+    if (!firstName && !lastName && clientData.name) {
+      const parsed = parseFullName(clientData.name);
+      firstName = parsed.firstName;
+      lastName = parsed.lastName;
+    }
+
+    return {
+      firstName,
+      lastName,
+      status: clientData.status || 'active',
+      address: clientData.address || '',
+      postalCode: clientData.postal_code || '',
+      city: clientData.city || '',
+      phone: clientData.phone || '',
+      email: clientData.email || '',
+      housingType: clientData.housing_type || '',
+      surface: clientData.surface || '',
+      dpeNumber: clientData.dpe_number || '',
+      hasContrat: clientData.has_contrat || false,
+      contractFrequency: clientData.contract_frequency || '',
+      nextMaintenanceDate: clientData.next_maintenance_date || '',
+      leadSource: clientData.lead_source || '',
+      notes: clientData.description || '',
+      createdAt: clientData.created_at,
+    };
+  }, []);
+
   // Initialiser le formulaire quand le client est chargé
   useEffect(() => {
     if (client) {
-      setFormData({
-        name: client.name || '',
-        status: client.status || 'lead',
-        address: client.address || '',
-        postalCode: client.postal_code || '',
-        city: client.city || '',
-        phone: client.phone || '',
-        email: client.email || '',
-        housingType: client.housing_type || '',
-        surface: client.surface || '',
-        dpeNumber: client.dpe_number || '',
-        contractStatus: client.contract_status || 'none',
-        contractFrequency: client.contract_frequency || '',
-        nextMaintenanceDate: client.next_maintenance_date || '',
-        leadSource: client.identity?.lead_source || '',
-        notes: client.notes || '',
-        createdAt: client.created_at,
-      });
+      const data = buildFormData(client);
+      setFormData(data);
+      originalDataRef.current = data;
     }
-  }, [client]);
+  }, [client, buildFormData]);
 
-  // Reset au changement de client
+  // Reset au changement de client ou à l'ouverture
   useEffect(() => {
-    setActiveTab('info');
-    setErrors({});
-    setSaveSuccess(false);
-  }, [clientId]);
+    if (isOpen) {
+      setActiveTab('info');
+      setErrors({});
+      setSaveSuccess(false);
+      setIsLocked(true); // Toujours verrouillé à l'ouverture
+    }
+  }, [clientId, isOpen]);
+
+  /**
+   * Vérifie si des modifications ont été faites
+   */
+  const hasUnsavedChanges = useCallback(() => {
+    const original = originalDataRef.current;
+    
+    const fieldsToCompare = [
+      'firstName', 'lastName', 'status', 'address', 'postalCode', 'city',
+      'phone', 'email', 'housingType', 'surface', 'dpeNumber',
+      'hasContrat', 'contractFrequency', 'nextMaintenanceDate',
+      'leadSource', 'notes'
+    ];
+
+    return fieldsToCompare.some(field => {
+      const originalValue = original[field] ?? '';
+      const currentValue = formData[field] ?? '';
+      return String(originalValue) !== String(currentValue);
+    });
+  }, [formData]);
+
+  /**
+   * Toggle verrouillage
+   */
+  const handleToggleLock = useCallback(() => {
+    if (!isLocked) {
+      // On verrouille → reset aux données originales
+      setFormData({ ...originalDataRef.current });
+      setErrors({});
+    }
+    setIsLocked(!isLocked);
+  }, [isLocked]);
 
   // Validation
   const validate = useCallback(() => {
     const newErrors = {};
     
-    if (!formData.name?.trim()) {
-      newErrors.name = 'Le nom est requis';
+    if (!formData.lastName?.trim()) {
+      newErrors.lastName = 'Le nom est requis';
     }
 
     setErrors(newErrors);
@@ -623,8 +785,10 @@ export function ClientModal({
     setSaveSuccess(false);
 
     try {
+      // Envoyer tous les champs au service
       const updates = {
-        name: formData.name,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         status: formData.status,
         address: formData.address,
         postalCode: formData.postalCode,
@@ -632,41 +796,65 @@ export function ClientModal({
         phone: formData.phone,
         email: formData.email,
         housingType: formData.housingType,
-        surface: formData.surface ? parseFloat(formData.surface) : null,
+        surface: formData.surface,
         dpeNumber: formData.dpeNumber,
-        contractStatus: formData.contractStatus,
+        hasContrat: formData.hasContrat,
         contractFrequency: formData.contractFrequency,
         nextMaintenanceDate: formData.nextMaintenanceDate || null,
+        leadSource: formData.leadSource,
         notes: formData.notes,
-        identity: {
-          ...client?.identity,
-          lead_source: formData.leadSource,
-        },
       };
 
-      const { error } = await updateClient(updates);
+      console.log('[ClientModal] Saving updates:', updates);
+
+      const { data, error } = await updateClient(updates);
 
       if (error) throw error;
 
+      console.log('[ClientModal] Save successful:', data);
+
+      // Mettre à jour les données originales après sauvegarde réussie
+      originalDataRef.current = { ...formData };
+
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
       
-      onSaved?.();
+      // Ne pas appeler onSaved immédiatement pour éviter le refresh
+      // qui recharge les données et fait remonter le scroll
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 2000);
+      
     } catch (error) {
-      console.error('Erreur sauvegarde:', error);
-      setErrors({ general: 'Erreur lors de la sauvegarde' });
+      console.error('[ClientModal] Erreur sauvegarde:', error);
+      setErrors({ general: 'Erreur lors de la sauvegarde: ' + (error.message || 'Erreur inconnue') });
     } finally {
       setSaving(false);
     }
   };
 
   // Fermer la modale
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
+    // Si déverrouillé et modifications non sauvegardées → confirmation
+    if (!isLocked && hasUnsavedChanges()) {
+      const confirmed = window.confirm(
+        'Vous avez des modifications non enregistrées.\n\nVoulez-vous vraiment fermer et perdre ces modifications ?'
+      );
+      if (!confirmed) return;
+    }
+    
+    // Appeler onSaved si des modifications ont été enregistrées
+    if (saveSuccess) {
+      onSaved?.();
+    }
+    
     onClose();
-  };
+  }, [isLocked, hasUnsavedChanges, onClose, onSaved, saveSuccess]);
 
   // Si modale fermée
   if (!isOpen) return null;
+
+  // Nom complet pour l'affichage
+  const displayName = `${formData.lastName || ''} ${formData.firstName || ''}`.trim() || 'Nouveau client';
 
   return (
     <>
@@ -686,7 +874,7 @@ export function ClientModal({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {loading ? 'Chargement...' : (formData.name || 'Nouveau client')}
+                {loading ? 'Chargement...' : displayName}
               </h2>
               {client && (
                 <div className="flex items-center gap-2 mt-0.5">
@@ -696,12 +884,34 @@ export function ClientModal({
             </div>
           </div>
 
-          <button
-            onClick={handleClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Bouton Cadenas */}
+            <button
+              onClick={handleToggleLock}
+              className={`
+                p-2 rounded-lg transition-colors
+                ${isLocked 
+                  ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100' 
+                  : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+                }
+              `}
+              title={isLocked ? 'Déverrouiller pour modifier' : 'Verrouiller (annule les modifications)'}
+            >
+              {isLocked ? (
+                <Lock className="w-5 h-5" />
+              ) : (
+                <Unlock className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Bouton Fermer */}
+            <button
+              onClick={handleClose}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Onglets */}
@@ -735,7 +945,7 @@ export function ClientModal({
         </div>
 
         {/* Contenu */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
@@ -747,6 +957,7 @@ export function ClientModal({
                   formData={formData} 
                   setFormData={setFormData} 
                   errors={errors}
+                  isLocked={isLocked}
                 />
               )}
               {activeTab === 'equipments' && (
@@ -774,6 +985,12 @@ export function ClientModal({
                 Modifications enregistrées
               </p>
             )}
+            {!isLocked && !errors.general && !saveSuccess && (
+              <p className="text-sm text-amber-600 flex items-center gap-1">
+                <Unlock className="w-4 h-4" />
+                Mode édition actif
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -784,7 +1001,8 @@ export function ClientModal({
               Fermer
             </button>
             
-            {activeTab === 'info' && (
+            {/* Bouton Enregistrer visible seulement si déverrouillé et sur l'onglet info */}
+            {!isLocked && activeTab === 'info' && (
               <button
                 onClick={handleSave}
                 disabled={saving}

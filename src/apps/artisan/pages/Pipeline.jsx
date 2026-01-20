@@ -1,89 +1,101 @@
-import { Kanban } from 'lucide-react';
+import { useMemo } from 'react';
+import { useAuth } from '@contexts/AuthContext';
+import { useDashboardFilters } from '@hooksPipeline/useDashboardFilters';
+import { useDashboardData } from '@hooksPipeline/useDashboardData';
+import { DashboardFilters } from '@components/pipeline/dashboard/DashboardFilters';
+import { DashboardCards } from '@components/pipeline/dashboard/DashboardCards';
+import { SourcesTable } from '@components/pipeline/dashboard/SourcesTable';
+import { ConversionFunnel } from '@components/pipeline/dashboard/ConversionFunnel';
+import { CostComparisonChart } from '@components/pipeline/dashboard/CostComparisonChart';
+import { MonthlyTrendsChart } from '@components/pipeline/dashboard/MonthlyTrendsChart';
 
-// =============================================================================
-// PAGE PIPELINE (Placeholder)
-// =============================================================================
+// Helper to get role from membership
+const getRole = (membership) => {
+  if (!membership) return null;
+  // Map Majordhome roles to mayer-energie roles
+  // For now, we'll use org_admin as Admin, others as Commercial
+  // You may need to adjust this based on your actual role mapping
+  return membership.role === 'org_admin' ? 'Admin' : 'Commercial';
+};
+
+// Helper to get profile for dashboard
+const getProfileForDashboard = (profile, membership) => {
+  if (!profile) return null;
+  const role = getRole(membership);
+  return {
+    id: profile.id || profile.user_id,
+    role: role || 'Commercial',
+  };
+};
 
 export default function Pipeline() {
-  // Colonnes du Kanban
-  const columns = [
-    {
-      id: 'lead',
-      title: 'Leads',
-      color: 'bg-status-lead',
-      count: 5,
-    },
-    {
-      id: 'prospect',
-      title: 'Prospects',
-      color: 'bg-status-prospect',
-      count: 3,
-    },
-    {
-      id: 'quote_sent',
-      title: 'Devis envoyé',
-      color: 'bg-status-quote',
-      count: 4,
-    },
-    {
-      id: 'accepted',
-      title: 'Accepté',
-      color: 'bg-status-accepted',
-      count: 2,
-    },
-  ];
+  const { profile, membership, loading: authLoading } = useAuth();
+  
+  // Mémoriser dashboardProfile pour éviter les rechargements inutiles
+  // Utiliser une clé stable basée sur les valeurs primitives
+  const dashboardProfile = useMemo(() => {
+    if (!profile) return null;
+    return getProfileForDashboard(profile, membership);
+  }, [
+    profile?.id ?? profile?.user_id, // Utiliser l'ID ou user_id comme clé
+    membership?.role,
+    // Ne pas inclure profile ou membership directement pour éviter les changements de référence
+  ]);
+  const {
+    filters,
+    updatePeriod,
+    updateSourceIds,
+    updateCommercialId,
+    resetFilters,
+  } = useDashboardFilters();
+  const { data, loading } = useDashboardData(filters, dashboardProfile);
+
+  if (authLoading || loading || !dashboardProfile) {
+    return (
+      <div className="p-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-1/4"></div>
+          <div className="h-20 bg-muted rounded"></div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const isAdmin = dashboardProfile.role === 'Admin';
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="p-4 md:p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-secondary-900">Pipeline</h1>
-        <p className="text-secondary-600">
-          Suivez vos opportunités commerciales
+        <h1 className="text-3xl font-bold mb-2">Pipeline</h1>
+        <p className="text-muted-foreground">
+          Analyse complète de vos performances commerciales
         </p>
       </div>
 
-      {/* Kanban placeholder */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {columns.map((column) => (
-          <div key={column.id} className="bg-secondary-100 rounded-lg p-4">
-            {/* Header colonne */}
-            <div className="flex items-center gap-2 mb-4">
-              <div className={`w-3 h-3 rounded-full ${column.color}`} />
-              <h3 className="font-medium text-secondary-900">{column.title}</h3>
-              <span className="ml-auto text-sm text-secondary-500">
-                {column.count}
-              </span>
-            </div>
+      <DashboardFilters
+        filters={filters}
+        onUpdatePeriod={updatePeriod}
+        onUpdateSourceIds={updateSourceIds}
+        onUpdateCommercialId={updateCommercialId}
+        onReset={resetFilters}
+        isAdmin={isAdmin}
+      />
 
-            {/* Cartes placeholder */}
-            <div className="space-y-3">
-              {[...Array(column.count)].map((_, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-lg p-3 shadow-sm border border-secondary-200"
-                >
-                  <div className="h-4 bg-secondary-200 rounded w-3/4 mb-2" />
-                  <div className="h-3 bg-secondary-100 rounded w-1/2" />
-                </div>
-              ))}
-            </div>
+      <DashboardCards data={data} isAdmin={isAdmin} />
 
-            {/* Bouton ajouter */}
-            <button className="mt-3 w-full py-2 text-sm text-secondary-500 hover:text-secondary-700 hover:bg-secondary-200 rounded-lg transition-colors">
-              + Ajouter
-            </button>
-          </div>
-        ))}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <ConversionFunnel data={data} />
+        {isAdmin && <CostComparisonChart sourceMetrics={data.sourceMetrics} />}
       </div>
 
-      {/* Info Sprint */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-sm text-blue-800">
-          <strong>Sprint 3 :</strong> Cette page sera complétée avec le Kanban interactif,
-          le drag & drop entre colonnes, et les cartes de devis détaillées.
-        </p>
-      </div>
+      <MonthlyTrendsChart data={data} isAdmin={isAdmin} />
+
+      <SourcesTable sourceMetrics={data.sourceMetrics} isAdmin={isAdmin} />
     </div>
   );
 }

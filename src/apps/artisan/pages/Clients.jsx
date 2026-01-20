@@ -4,6 +4,8 @@
  * Page liste des clients avec recherche, filtres et pagination.
  * Ouvre la modale ClientModal au clic sur une carte.
  * 
+ * v2.0.0 - Suppression filtre secteur (sera dans Planning)
+ * 
  * @example
  * // Dans routes.jsx
  * <Route path="/clients" element={<Clients />} />
@@ -22,7 +24,6 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
-  MapPin,
   CheckCircle2,
   SlidersHorizontal
 } from 'lucide-react';
@@ -35,17 +36,6 @@ import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
 // ============================================================================
 // CONSTANTES
 // ============================================================================
-
-/**
- * Filtres par code postal (Landes + alentours)
- */
-const POSTAL_CODE_FILTERS = [
-  { value: '', label: 'Tous les secteurs' },
-  { value: '40', label: 'Landes (40)' },
-  { value: '64', label: 'Pyrénées-Atlantiques (64)' },
-  { value: '33', label: 'Gironde (33)' },
-  { value: '32', label: 'Gers (32)' },
-];
 
 /**
  * Options de tri
@@ -257,14 +247,13 @@ const ErrorState = ({ error, onRetry }) => (
  */
 export function Clients() {
   // Auth context pour récupérer l'org_id
-  const { profile } = useAuth();
-  const orgId = profile?.org_id;
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   // État local
   const [searchInput, setSearchInput] = useState('');
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
   // Hook clients
   const {
@@ -333,10 +322,6 @@ export function Clients() {
   if (filters.status) {
     const statusLabel = CLIENT_STATUSES.find(s => s.value === filters.status)?.label;
     activeFilters.push({ key: 'status', label: statusLabel });
-  }
-  if (filters.postalCode) {
-    const cpLabel = POSTAL_CODE_FILTERS.find(p => p.value === filters.postalCode)?.label;
-    activeFilters.push({ key: 'postalCode', label: cpLabel });
   }
   if (filters.hasContract !== null) {
     activeFilters.push({ 
@@ -425,14 +410,6 @@ export function Clients() {
                 ...CLIENT_STATUSES,
               ]}
               onChange={(v) => setFilters({ status: v || null })}
-            />
-
-            <FilterDropdown
-              label="Secteur"
-              icon={MapPin}
-              value={filters.postalCode || ''}
-              options={POSTAL_CODE_FILTERS}
-              onChange={(v) => setFilters({ postalCode: v || null })}
             />
 
             <FilterDropdown
