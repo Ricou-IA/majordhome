@@ -54,7 +54,16 @@ const navigation = [
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, profile, organization, membership, signOut } = useAuth();
+  const { user, profile, organization, membership, canAccessPipeline, appRole, businessRole } = useAuth();
+
+  // Debug: log pour vérifier les valeurs
+  console.log('[AppLayout] Debug Pipeline access:', {
+    hasProfile: !!profile,
+    appRole,
+    businessRole,
+    canAccessPipeline,
+    profileAppRole: profile?.app_role,
+  });
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -141,7 +150,15 @@ export default function AppLayout() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        {navigation.map((item) => (
+        {navigation
+          .filter((item) => {
+            // Masquer Pipeline si le profil n'a pas les droits (basés sur core.profiles)
+            if (item.name === 'Pipeline' && !canAccessPipeline) {
+              return false;
+            }
+            return true;
+          })
+          .map((item) => (
           <NavLink
             key={item.name}
             to={item.href}

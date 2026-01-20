@@ -23,6 +23,7 @@ export default function ProtectedRoute({
   const location = useLocation();
   const {
     user,
+    profile,
     membership,
     organization,
     loading,
@@ -82,7 +83,10 @@ export default function ProtectedRoute({
 
   // Vérification des rôles si spécifiés
   if (allowedRoles && allowedRoles.length > 0) {
-    const userRole = membership?.role;
+    // Priorité au rôle applicatif venant de core.profiles (app_role)
+    const appRole = profile?.app_role;
+    const membershipRole = membership?.role;
+    const userRole = appRole || membershipRole;
     
     if (!userRole || !allowedRoles.includes(userRole)) {
       // Pas le bon rôle → redirection vers page d'accès refusé ou dashboard

@@ -288,9 +288,35 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = !!user;
   const hasOrganization = !!organization;
-  const isOrgAdmin = authService.isOrgAdmin(membership);
+
+  // Rôles applicatifs basés PRIORITAIREMENT sur core.profiles
+  const appRole = profile?.app_role || null;
+  const businessRole = profile?.business_role || null;
+
+  const isOrgAdminFromProfile = appRole === 'org_admin';
+  const isCommercialBusiness =
+    businessRole && typeof businessRole === 'string' && businessRole.toLowerCase() === 'commercial';
+
+  // Compatibilité : on garde les helpers basés sur membership,
+  // mais on fait de core.profiles la source de vérité pour l'admin app
+  const isOrgAdmin = isOrgAdminFromProfile || authService.isOrgAdmin(membership);
   const isTeamLeader = authService.hasRole(membership, 'team_leader');
   const isTeamLeaderOrAbove = authService.isTeamLeaderOrAbove(membership);
+
+  // Permissions métier dérivées
+  // - Accès pipeline si org_admin (app_role) OU business_role = Commercial
+  const canAccessPipeline = isOrgAdminFromProfile || isCommercialBusiness;
+
+  // Debug: log pour vérifier les valeurs
+  if (profile && !canAccessPipeline && appRole) {
+    console.log('[AuthContext] Debug Pipeline access:', {
+      appRole,
+      businessRole,
+      isOrgAdminFromProfile,
+      isCommercialBusiness,
+      canAccessPipeline,
+    });
+  }
 
   // ===========================================================================
   // CONTEXT VALUE
@@ -304,11 +330,22 @@ export function AuthProvider({ children }) {
     loading,
     initialized,
     dataLoading,
+
+    // Computed
     isAuthenticated,
     hasOrganization,
     isOrgAdmin,
     isTeamLeader,
     isTeamLeaderOrAbove,
+
+    // Rôles & permissions basés sur core.profiles
+    appRole,
+    businessRole,
+    isOrgAdminFromProfile,
+    isCommercialBusiness,
+    canAccessPipeline,
+
+    // Actions
     signIn,
     signUp,
     signOut,

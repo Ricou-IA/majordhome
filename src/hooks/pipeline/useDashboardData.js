@@ -279,6 +279,17 @@ export const useDashboardData = (filters, profile) => {
     }
 
     if (!profile) {
+      // Si pas de profil, initialiser avec des données vides et arrêter le chargement
+      setData({
+        totalLeads: 0,
+        appointments: 0,
+        sales: 0,
+        revenue: 0,
+        expenses: 0,
+        roi: 0,
+        sourceMetrics: [],
+        monthlyTrends: [],
+      });
       setLoading(false);
       prevFiltersRef.current = null;
       prevProfileRef.current = null;
