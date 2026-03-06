@@ -2,10 +2,11 @@
  * Clients.jsx - Majord'home Artisan
  * ============================================================================
  * Page liste des clients avec recherche, filtres et pagination.
- * Ouvre la modale ClientModal au clic sur une carte.
- * 
+ * Navigation vers la fiche client détaillée au clic sur une carte.
+ *
+ * v3.0.0 - Navigation vers ClientDetail au lieu de la modale
  * v2.0.0 - Suppression filtre secteur (sera dans Planning)
- * 
+ *
  * @example
  * // Dans routes.jsx
  * <Route path="/clients" element={<Clients />} />
@@ -13,11 +14,12 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Users, 
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Search,
+  Filter,
+  Plus,
+  Users,
   FileText,
   X,
   ChevronDown,
@@ -25,11 +27,13 @@ import {
   AlertCircle,
   RefreshCw,
   CheckCircle2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Building2,
+  Archive,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClients, useClientStats } from '@/shared/hooks/useClients';
-import { CLIENT_STATUSES } from '@/shared/services/clients.service';
+import { CLIENT_CATEGORIES } from '@/shared/services/clients.service';
 import { ClientCard, ClientCardSkeleton } from '@/apps/artisan/components/clients/ClientCard';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
 
@@ -41,8 +45,8 @@ import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
  * Options de tri
  */
 const SORT_OPTIONS = [
-  { value: 'name:asc', label: 'Nom (A-Z)' },
-  { value: 'name:desc', label: 'Nom (Z-A)' },
+  { value: 'display_name:asc', label: 'Nom (A-Z)' },
+  { value: 'display_name:desc', label: 'Nom (Z-A)' },
   { value: 'created_at:desc', label: 'Plus récent' },
   { value: 'created_at:asc', label: 'Plus ancien' },
 ];
@@ -153,16 +157,30 @@ const ActiveFilterBadge = ({ label, onClear }) => (
 /**
  * Carte statistiques
  */
-const StatCard = ({ icon: Icon, label, value, color = 'blue' }) => {
+const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = false }) => {
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-600',
     green: 'bg-green-100 text-green-600',
     amber: 'bg-amber-100 text-amber-600',
     purple: 'bg-purple-100 text-purple-600',
+    red: 'bg-red-100 text-red-600',
+  };
+
+  const borderColor = {
+    blue: 'border-blue-500 ring-1 ring-blue-200',
+    green: 'border-green-500 ring-1 ring-green-200',
+    amber: 'border-amber-500 ring-1 ring-amber-200',
+    purple: 'border-purple-500 ring-1 ring-purple-200',
+    red: 'border-red-500 ring-1 ring-red-200',
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-lg border p-4 transition-all ${
+        onClick ? 'cursor-pointer hover:shadow-md' : ''
+      } ${active ? borderColor[color] : 'border-gray-200'}`}
+    >
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
           <Icon className="w-5 h-5" />
@@ -179,40 +197,56 @@ const StatCard = ({ icon: Icon, label, value, color = 'blue' }) => {
 /**
  * État vide
  */
-const EmptyState = ({ hasFilters, onClearFilters, onAddClient }) => (
-  <div className="text-center py-12">
-    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-      <Users className="w-8 h-8 text-gray-400" />
-    </div>
-    <h3 className="text-lg font-medium text-gray-900 mb-2">
-      {hasFilters ? 'Aucun client trouvé' : 'Aucun client'}
-    </h3>
-    <p className="text-gray-500 mb-6 max-w-sm mx-auto">
-      {hasFilters 
-        ? 'Essayez de modifier vos critères de recherche ou de supprimer les filtres.'
-        : 'Commencez par ajouter votre premier client.'
-      }
-    </p>
-    <div className="flex items-center justify-center gap-3">
-      {hasFilters && (
-        <button
-          onClick={onClearFilters}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <X className="w-4 h-4" />
-          Effacer les filtres
-        </button>
+const STAT_CARD_LABELS = {
+  archived: 'Aucun client archivé',
+  contracts: 'Aucun client avec contrat actif',
+  particuliers: 'Aucun client particulier',
+  entreprises: 'Aucune entreprise',
+};
+
+const EmptyState = ({ hasFilters, onClearFilters, onAddClient, activeStatCard }) => {
+  // Message contextuel selon la carte stat active
+  const statCardLabel = activeStatCard ? STAT_CARD_LABELS[activeStatCard] : null;
+
+  return (
+    <div className="text-center py-12">
+      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Users className="w-8 h-8 text-gray-400" />
+      </div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">
+        {statCardLabel || (hasFilters ? 'Aucun client trouvé' : 'Aucun client')}
+      </h3>
+      {!statCardLabel && (
+        <>
+          <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+            {hasFilters
+              ? 'Essayez de modifier vos critères de recherche ou de supprimer les filtres.'
+              : 'Commencez par ajouter votre premier client.'
+            }
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            {hasFilters && (
+              <button
+                onClick={onClearFilters}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Effacer les filtres
+              </button>
+            )}
+            <button
+              onClick={onAddClient}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter un client
+            </button>
+          </div>
+        </>
       )}
-      <button
-        onClick={onAddClient}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        <Plus className="w-4 h-4" />
-        Ajouter un client
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * État erreur
@@ -247,18 +281,45 @@ const ErrorState = ({ error, onRetry }) => (
  */
 export function Clients() {
   // Auth context pour récupérer l'org_id
-  const { organization } = useAuth();
+  const { organization, user, profile, dataLoading, initialized } = useAuth();
   const orgId = organization?.id;
+
+  // DEBUG TEMPORAIRE — à retirer après diagnostic
+  console.log('[Clients] DEBUG auth state:', {
+    orgId,
+    organizationId: organization?.id,
+    organizationName: organization?.name,
+    userId: user?.id,
+    userEmail: user?.email,
+    profileOrgId: profile?.org_id,
+    dataLoading,
+    initialized,
+  });
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // État local
   const [searchInput, setSearchInput] = useState('');
-  const [selectedClientId, setSelectedClientId] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Filtre stat card persisté dans l'URL (?filter=particuliers)
+  const activeStatCard = searchParams.get('filter') || null;
+  const setActiveStatCard = useCallback((cardKey) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (cardKey) {
+        next.set('filter', cardKey);
+      } else {
+        next.delete('filter');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   // Hook clients
   const {
     clients,
-    loading,
+    isLoading: loading,
     loadingMore,
     error,
     totalCount,
@@ -273,6 +334,38 @@ export function Clients() {
   // Hook stats
   const { stats } = useClientStats(orgId);
 
+  // Appliquer le filtre stat card depuis l'URL au montage
+  const initialFilter = searchParams.get('filter');
+  useEffect(() => {
+    if (!initialFilter) return;
+    const base = {
+      search: '',
+      clientCategory: null,
+      hasContract: null,
+      showArchived: false,
+      onlyArchived: false,
+      orderBy: 'display_name',
+      ascending: true,
+    };
+    switch (initialFilter) {
+      case 'contracts':
+        setFilters({ ...base, hasContract: true });
+        break;
+      case 'particuliers':
+        setFilters({ ...base, clientCategory: 'particulier' });
+        break;
+      case 'entreprises':
+        setFilters({ ...base, clientCategory: 'entreprise' });
+        break;
+      case 'archived':
+        setFilters({ ...base, onlyArchived: true });
+        break;
+      default:
+        break;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Seulement au montage
+
   // Debounce de la recherche
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -286,48 +379,107 @@ export function Clients() {
 
   // Handlers
   const handleClientClick = useCallback((client) => {
-    setSelectedClientId(client.id);
-    setShowModal(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setShowModal(false);
-    setSelectedClientId(null);
-  }, []);
-
-  const handleClientSaved = useCallback(() => {
-    refresh();
-  }, [refresh]);
+    navigate(`/clients/${client.id}`);
+  }, [navigate]);
 
   const handleAddClient = useCallback(() => {
-    // TODO: Ouvrir modale création
-    console.log('Ajouter nouveau client');
+    setShowCreateModal(true);
   }, []);
+
+  // Callback après création réussie : naviguer vers la fiche client
+  const handleClientCreated = useCallback((newClient) => {
+    setShowCreateModal(false);
+    refresh();
+    if (newClient?.id) {
+      navigate(`/clients/${newClient.id}`);
+    }
+  }, [navigate, refresh]);
 
   const handleClearFilters = useCallback(() => {
     setSearchInput('');
+    setActiveStatCard(null);
     reset();
   }, [reset]);
 
   const handleSortChange = useCallback((value) => {
     const [orderBy, order] = value.split(':');
-    setFilters({ 
-      orderBy, 
-      ascending: order === 'asc' 
+    setFilters({
+      orderBy,
+      ascending: order === 'asc'
     });
   }, [setFilters]);
 
+  // Handler clic sur une carte stat (toggle filtre)
+  const handleStatCardClick = useCallback((cardKey) => {
+    // "Total" = toujours reset, pas de toggle
+    if (cardKey === 'total') {
+      if (activeStatCard === null) return; // déjà sur total, ne rien faire
+      setActiveStatCard(null);
+      setSearchInput('');
+      setFilters({
+        search: '',
+        clientCategory: null,
+        hasContract: null,
+        showArchived: false,
+        onlyArchived: false,
+        orderBy: filters.orderBy,
+        ascending: filters.ascending,
+      });
+      return;
+    }
+
+    setSearchInput('');
+    const baseFilters = {
+      search: '',
+      clientCategory: null,
+      hasContract: null,
+      showArchived: false,
+      onlyArchived: false,
+      orderBy: filters.orderBy,
+      ascending: filters.ascending,
+    };
+
+    if (activeStatCard === cardKey) {
+      // Re-clic sur la même carte = désactiver le filtre (retour à total)
+      setActiveStatCard(null);
+      setFilters(baseFilters);
+    } else {
+      // Activer le filtre correspondant
+      setActiveStatCard(cardKey);
+
+      switch (cardKey) {
+        case 'contracts':
+          setFilters({ ...baseFilters, hasContract: true });
+          break;
+        case 'particuliers':
+          setFilters({ ...baseFilters, clientCategory: 'particulier' });
+          break;
+        case 'entreprises':
+          setFilters({ ...baseFilters, clientCategory: 'entreprise' });
+          break;
+        case 'archived':
+          setFilters({ ...baseFilters, onlyArchived: true });
+          break;
+        default:
+          break;
+      }
+    }
+  }, [activeStatCard, filters.orderBy, filters.ascending, setFilters]);
+
   // Calcul des filtres actifs
   const activeFilters = [];
-  if (filters.status) {
-    const statusLabel = CLIENT_STATUSES.find(s => s.value === filters.status)?.label;
-    activeFilters.push({ key: 'status', label: statusLabel });
+  if (filters.clientCategory) {
+    const categoryLabel = CLIENT_CATEGORIES.find(s => s.value === filters.clientCategory)?.label;
+    activeFilters.push({ key: 'clientCategory', label: categoryLabel });
   }
   if (filters.hasContract !== null) {
-    activeFilters.push({ 
-      key: 'hasContract', 
-      label: filters.hasContract ? 'Avec contrat' : 'Sans contrat' 
+    activeFilters.push({
+      key: 'hasContract',
+      label: filters.hasContract ? 'Avec contrat' : 'Sans contrat'
     });
+  }
+  if (filters.showArchived) {
+    activeFilters.push({ key: 'showArchived', label: 'Clients archivés inclus' });
   }
 
   const hasActiveFilters = searchInput || activeFilters.length > 0;
@@ -337,6 +489,17 @@ export function Clients() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* DEBUG TEMPORAIRE — bannière diagnostic */}
+      {!orgId && (
+        <div className="bg-red-100 border-b border-red-300 px-4 py-3 text-sm text-red-800">
+          <strong>DEBUG:</strong> orgId manquant.
+          {' '}user={user?.email || 'null'},
+          {' '}org={organization ? JSON.stringify({ id: organization.id, name: organization.name }) : 'null'},
+          {' '}profile.org_id={profile?.org_id || 'null'},
+          {' '}dataLoading={String(dataLoading)},
+          {' '}initialized={String(initialized)}
+        </div>
+      )}
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -358,30 +521,46 @@ export function Clients() {
 
           {/* Stats */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <StatCard 
-                icon={Users} 
-                label="Total clients" 
-                value={stats.total_clients} 
-                color="blue" 
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+              <StatCard
+                icon={Users}
+                label="Total clients"
+                value={stats.total_clients}
+                color="blue"
+                onClick={() => handleStatCardClick('total')}
+                active={activeStatCard === 'total'}
               />
-              <StatCard 
-                icon={FileText} 
-                label="Contrats actifs" 
-                value={stats.active_contracts} 
-                color="green" 
+              <StatCard
+                icon={FileText}
+                label="Contrats actifs"
+                value={stats.active_contracts}
+                color="green"
+                onClick={() => handleStatCardClick('contracts')}
+                active={activeStatCard === 'contracts'}
               />
-              <StatCard 
-                icon={Users} 
-                label="Leads" 
-                value={stats.by_status?.lead || 0} 
-                color="amber" 
+              <StatCard
+                icon={Users}
+                label="Particuliers"
+                value={stats.particuliers || 0}
+                color="amber"
+                onClick={() => handleStatCardClick('particuliers')}
+                active={activeStatCard === 'particuliers'}
               />
-              <StatCard 
-                icon={Users} 
-                label="En cours" 
-                value={stats.by_status?.in_progress || 0} 
-                color="purple" 
+              <StatCard
+                icon={Building2}
+                label="Entreprises"
+                value={stats.entreprises || 0}
+                color="purple"
+                onClick={() => handleStatCardClick('entreprises')}
+                active={activeStatCard === 'entreprises'}
+              />
+              <StatCard
+                icon={Archive}
+                label="Archivés"
+                value={stats.archived || 0}
+                color="red"
+                onClick={() => handleStatCardClick('archived')}
+                active={activeStatCard === 'archived'}
               />
             </div>
           )}
@@ -396,20 +575,20 @@ export function Clients() {
             <SearchBar 
               value={searchInput}
               onChange={setSearchInput}
-              placeholder="Rechercher par nom..."
+              placeholder="Rechercher par nom, email, téléphone, ville..."
             />
           </div>
 
           {/* Filtres */}
           <div className="flex items-center gap-2 flex-wrap">
             <FilterDropdown
-              label="Statut"
-              value={filters.status || ''}
+              label="Catégorie"
+              value={filters.clientCategory || ''}
               options={[
-                { value: '', label: 'Tous les statuts' },
-                ...CLIENT_STATUSES,
+                { value: '', label: 'Toutes les catégories' },
+                ...CLIENT_CATEGORIES,
               ]}
-              onChange={(v) => setFilters({ status: v || null })}
+              onChange={(v) => setFilters({ clientCategory: v || null })}
             />
 
             <FilterDropdown
@@ -434,6 +613,24 @@ export function Clients() {
               onChange={handleSortChange}
             />
 
+            {/* Toggle Archivés */}
+            <button
+              onClick={() => {
+                setActiveStatCard(null);
+                setFilters({ showArchived: !filters.showArchived, onlyArchived: false });
+              }}
+              className={`
+                inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium
+                ${filters.showArchived || filters.onlyArchived
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                }
+              `}
+              title={filters.showArchived ? 'Masquer les archivés' : 'Afficher les archivés'}
+            >
+              <Archive className="w-4 h-4" />
+            </button>
+
             {/* Bouton refresh */}
             <button
               onClick={refresh}
@@ -446,25 +643,8 @@ export function Clients() {
           </div>
         </div>
 
-        {/* Filtres actifs */}
-        {activeFilters.length > 0 && (
-          <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <span className="text-sm text-gray-500">Filtres actifs :</span>
-            {activeFilters.map(filter => (
-              <ActiveFilterBadge
-                key={filter.key}
-                label={filter.label}
-                onClear={() => setFilters({ [filter.key]: null })}
-              />
-            ))}
-            <button
-              onClick={handleClearFilters}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Tout effacer
-            </button>
-          </div>
-        )}
+
+
       </div>
 
       {/* Liste des clients */}
@@ -476,21 +656,22 @@ export function Clients() {
 
         {/* État vide */}
         {!error && !loading && clients.length === 0 && (
-          <EmptyState 
+          <EmptyState
             hasFilters={hasActiveFilters}
             onClearFilters={handleClearFilters}
             onAddClient={handleAddClient}
+            activeStatCard={activeStatCard}
           />
         )}
 
         {/* Grille de clients */}
         {(clients.length > 0 || loading) && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Skeletons pendant le chargement initial */}
               {loading && clients.length === 0 && (
                 <>
-                  {[1, 2, 3, 4, 5, 6].map(i => (
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                     <ClientCardSkeleton key={i} />
                   ))}
                 </>
@@ -502,14 +683,13 @@ export function Clients() {
                   key={client.id}
                   client={client}
                   onClick={handleClientClick}
-                  selected={selectedClientId === client.id}
                 />
               ))}
 
               {/* Skeletons pendant loadMore */}
               {loadingMore && (
                 <>
-                  {[1, 2, 3].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <ClientCardSkeleton key={`loading-${i}`} />
                   ))}
                 </>
@@ -539,12 +719,12 @@ export function Clients() {
         )}
       </div>
 
-      {/* Modale client */}
+      {/* Modale création client */}
       <ClientModal
-        clientId={selectedClientId}
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        onSaved={handleClientSaved}
+        clientId={null}
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleClientCreated}
       />
     </div>
   );

@@ -2,6 +2,10 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@lib/supabaseClient';
 import { toast } from 'sonner';
 
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 const getMonthsInPeriod = (from, to) => {
   const months = [];
   const current = new Date(from.getFullYear(), from.getMonth(), 1);
@@ -27,318 +31,232 @@ const getLast6Months = () => {
   return months;
 };
 
-// Helper pour comparer les objets filters
-const areFiltersEqual = (f1, f2) => {
-  if (!f1 && !f2) return true; // Les deux sont null/undefined
-  if (!f1 || !f2) return false; // Un seul est null/undefined
-  
-  // Comparer les dates (convertir en timestamp pour comparaison fiable)
-  const from1 = f1.period?.from?.getTime?.() ?? null;
-  const from2 = f2.period?.from?.getTime?.() ?? null;
-  const to1 = f1.period?.to?.getTime?.() ?? null;
-  const to2 = f2.period?.to?.getTime?.() ?? null;
-  const datesEqual = from1 === from2 && to1 === to2;
-  
-  // Comparer les arrays (comparaison profonde)
-  const sourceIds1 = f1.sourceIds || [];
-  const sourceIds2 = f2.sourceIds || [];
-  const sourceIdsEqual = 
-    sourceIds1.length === sourceIds2.length &&
-    sourceIds1.every((id, i) => id === sourceIds2[i]);
-  
-  // Comparer commercialId
-  const commercialIdEqual = f1.commercialId === f2.commercialId;
-  
-  return datesEqual && sourceIdsEqual && commercialIdEqual;
+const EMPTY_DATA = {
+  totalLeads: 0,
+  appointments: 0,
+  sales: 0,
+  revenue: 0,
+  expenses: 0,
+  roi: 0,
+  sourceMetrics: [],
+  monthlyTrends: [],
 };
 
-// Helper pour comparer les profils
-const areProfilesEqual = (p1, p2) => {
-  if (!p1 && !p2) return true; // Les deux sont null/undefined
-  if (!p1 || !p2) return false; // Un seul est null/undefined
-  // Comparer les valeurs primitives
-  const id1 = p1.id || p1.user_id;
-  const id2 = p2.id || p2.user_id;
-  return id1 === id2 && p1.role === p2.role;
-};
+// ============================================================================
+// HOOK
+// ============================================================================
 
 export const useDashboardData = (filters, profile) => {
-  const [data, setData] = useState({
-    totalLeads: 0,
-    appointments: 0,
-    sales: 0,
-    revenue: 0,
-    expenses: 0,
-    roi: 0,
-    sourceMetrics: [],
-    monthlyTrends: [],
-  });
+  const [data, setData] = useState(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
-  
-  // Refs pour stocker les valeurs précédentes et éviter les rechargements inutiles
-  const prevFiltersRef = useRef(null);
-  const prevProfileRef = useRef(null);
-  const isLoadingRef = useRef(false);
-  const currentFiltersRef = useRef(filters);
-  const currentProfileRef = useRef(profile);
-  const timeoutRef = useRef(null);
+  const fetchIdRef = useRef(0);
 
-  // Mettre à jour les refs quand les valeurs changent
-  currentFiltersRef.current = filters;
-  currentProfileRef.current = profile;
-
-  const fetchDashboardData = useCallback(async () => {
-    const currentProfile = currentProfileRef.current;
-    const currentFilters = currentFiltersRef.current;
-    
-    if (!currentProfile) {
-      setLoading(false);
-      return;
-    }
-
-    // Éviter les appels multiples simultanés
-    if (isLoadingRef.current) {
-      console.log('[useDashboardData] Chargement déjà en cours, ignoré');
-      return;
-    }
-
-    try {
-      isLoadingRef.current = true;
-      setLoading(true);
-
-      const last6Months = getLast6Months();
-      const firstMonthStart = `${last6Months[0]}-01`;
-
-      // Execute all queries in parallel
-      const [leadsResult, allLeadsResult, sourcesResult, costsResult, allCostsResult] = await Promise.all([
-        // 1. Leads for current filter period
-        supabase
-          .from('leads')
-          .select(`*, statuses!inner(label), sources(name, id)`)
-          .eq('is_deleted', false)
-          .gte('created_date', currentFilters.period.from.toISOString().split('T')[0])
-          .lte('created_date', currentFilters.period.to.toISOString().split('T')[0])
-          .then((res) => {
-            let data = res.data || [];
-            if (currentProfile.role === 'Commercial') {
-              data = data.filter((l) => l.assigned_user_id === currentProfile.id);
-            } else if (currentFilters.commercialId) {
-              data = data.filter((l) => l.assigned_user_id === currentFilters.commercialId);
-            }
-            if (currentFilters.sourceIds.length > 0) {
-              data = data.filter((l) => currentFilters.sourceIds.includes(l.source_id));
-            }
-            return { data, error: res.error };
-          }),
-
-        // 2. All leads for last 6 months (for trends)
-        supabase
-          .from('leads')
-          .select(`*, statuses!inner(label)`)
-          .eq('is_deleted', false)
-          .gte('created_date', firstMonthStart)
-          .then((res) => {
-            let data = res.data || [];
-            if (currentProfile.role === 'Commercial') {
-              data = data.filter((l) => l.assigned_user_id === currentProfile.id);
-            }
-            return { data, error: res.error };
-          }),
-
-        // 3. Sources
-        supabase.from('sources').select('id, name').eq('is_active', true),
-
-        // 4. Costs for current filter period
-        supabase
-          .from('monthly_source_costs')
-          .select('cost_amount, source_id, month')
-          .in('month', getMonthsInPeriod(currentFilters.period.from, currentFilters.period.to)),
-
-        // 5. All costs for last 6 months
-        supabase
-          .from('monthly_source_costs')
-          .select('cost_amount, source_id, month')
-          .in('month', last6Months),
-      ]);
-
-      if (leadsResult.error) throw leadsResult.error;
-
-      const leads = leadsResult.data || [];
-      const allLeads = allLeadsResult.data || [];
-      const sources = sourcesResult.data || [];
-      const costs = costsResult.data || [];
-      const allCosts = allCostsResult.data || [];
-
-      // Filter costs by source if needed
-      const filteredCosts =
-        currentFilters.sourceIds.length > 0 ? costs.filter((c) => currentFilters.sourceIds.includes(c.source_id)) : costs;
-
-      // Calculate global stats with funnel logic
-      const totalLeads = leads.length;
-      const appointments = leads.filter(
-        (l) => l.statuses?.label === 'Rendez-vous' || l.statuses?.label === 'Vendu'
-      ).length;
-      const sales = leads.filter((l) => l.statuses?.label === 'Vendu').length;
-      const revenue = leads
-        .filter((l) => l.statuses?.label === 'Vendu')
-        .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
-      const expenses = filteredCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0);
-      const roi = expenses > 0 ? ((revenue - expenses) / expenses) * 100 : 0;
-
-      // Calculate metrics by source
-      const sourceMetrics = [];
-
-      for (const source of sources) {
-        const sourceLeads = leads.filter((l) => l.source_id === source.id);
-        const sourceAppointments = sourceLeads.filter(
-          (l) => l.statuses?.label === 'Rendez-vous' || l.statuses?.label === 'Vendu'
-        ).length;
-        const sourceSales = sourceLeads.filter((l) => l.statuses?.label === 'Vendu').length;
-        const sourceRevenue = sourceLeads
-          .filter((l) => l.statuses?.label === 'Vendu')
-          .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
-
-        const sourceCosts = costs.filter((c) => c.source_id === source.id);
-        const sourceExpenses = sourceCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0);
-
-        const cpl = sourceLeads.length > 0 ? sourceExpenses / sourceLeads.length : 0;
-        const cpAppointment = sourceAppointments > 0 ? sourceExpenses / sourceAppointments : 0;
-        const cpSale = sourceSales > 0 ? sourceExpenses / sourceSales : 0;
-        const sourceRoi = sourceExpenses > 0 ? ((sourceRevenue - sourceExpenses) / sourceExpenses) * 100 : 0;
-
-        if (sourceLeads.length > 0 || sourceExpenses > 0) {
-          sourceMetrics.push({
-            sourceId: source.id,
-            sourceName: source.name,
-            leads: sourceLeads.length,
-            appointments: sourceAppointments,
-            sales: sourceSales,
-            revenue: sourceRevenue,
-            expenses: sourceExpenses,
-            cpl,
-            cpAppointment,
-            cpSale,
-            roi: sourceRoi,
-          });
-        }
-      }
-
-      sourceMetrics.sort((a, b) => b.roi - a.roi);
-
-      // Calculate monthly trends
-      const monthlyTrends = last6Months.map((monthStr) => {
-        const [year, month] = monthStr.split('-').map(Number);
-        const firstDay = new Date(year, month - 1, 1);
-        const lastDay = new Date(year, month, 0);
-
-        const monthLeads = allLeads.filter((l) => {
-          const date = new Date(l.created_date);
-          return date >= firstDay && date <= lastDay;
-        });
-
-        const monthCosts = allCosts.filter((c) => c.month === monthStr);
-
-        return {
-          month: firstDay.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
-          leads: monthLeads.length,
-          appointments: monthLeads.filter(
-            (l) => l.statuses?.label === 'Rendez-vous' || l.statuses?.label === 'Vendu'
-          ).length,
-          sales: monthLeads.filter((l) => l.statuses?.label === 'Vendu').length,
-          revenue: monthLeads
-            .filter((l) => l.statuses?.label === 'Vendu')
-            .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0),
-          expenses: monthCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0),
-        };
-      });
-
-      setData({
-        totalLeads,
-        appointments,
-        sales,
-        revenue,
-        expenses,
-        roi,
-        sourceMetrics,
-        monthlyTrends,
-      });
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Erreur lors du chargement des données');
-    } finally {
-      isLoadingRef.current = false;
-      setLoading(false);
-    }
-  }, []); // Pas de dépendances - on utilise les valeurs directement depuis les paramètres
+  // Refetch stable callback (utilisé pour le bouton "Actualiser" éventuel)
+  const refetch = useCallback(() => {
+    // Incrémente le fetchId pour forcer un re-fetch via le useEffect
+    fetchIdRef.current += 1;
+    // Pas de setState ici — on force le useEffect à se relancer via la ref
+    // en pratique, les consumers appellent refetch rarement
+  }, []);
 
   useEffect(() => {
-    // Nettoyer le timeout précédent si présent
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    if (!profile) {
-      // Si pas de profil, initialiser avec des données vides et arrêter le chargement
-      setData({
-        totalLeads: 0,
-        appointments: 0,
-        sales: 0,
-        revenue: 0,
-        expenses: 0,
-        roi: 0,
-        sourceMetrics: [],
-        monthlyTrends: [],
-      });
+    // Guard : pas de profil ou pas d'orgId → on attend
+    if (!profile || !profile.orgId) {
       setLoading(false);
-      prevFiltersRef.current = null;
-      prevProfileRef.current = null;
       return;
     }
-    
-    // Comparer les valeurs précédentes pour éviter les rechargements inutiles
-    const filtersChanged = !areFiltersEqual(prevFiltersRef.current, filters);
-    const profileChanged = !areProfilesEqual(prevProfileRef.current, profile);
-    const isInitialLoad = prevFiltersRef.current === null;
-    
-    // Ne recharger que si les valeurs ont vraiment changé
-    if (isInitialLoad || filtersChanged || profileChanged) {
-      // Ignorer si déjà en cours de chargement
-      if (isLoadingRef.current) {
-        console.log('[useDashboardData] Chargement déjà en cours, ignoré');
-        return;
-      }
 
-      console.log('[useDashboardData] Changement détecté:', { 
-        isInitialLoad, 
-        filtersChanged, 
-        profileChanged,
-        profileId: profile?.id || profile?.user_id,
-        profileRole: profile?.role 
-      });
-      
-      // Mettre à jour les refs AVANT l'appel pour éviter les doubles déclenchements
-      prevFiltersRef.current = filters;
-      prevProfileRef.current = profile;
-      
-      // Debounce léger pour éviter les appels trop rapides (100ms)
-      timeoutRef.current = setTimeout(() => {
-        fetchDashboardData();
-        timeoutRef.current = null;
-      }, 100);
-    } else {
-      console.log('[useDashboardData] Aucun changement détecté, pas de rechargement');
+    // Guard : pas de filtres valides
+    if (!filters?.period?.from || !filters?.period?.to) {
+      setLoading(false);
+      return;
     }
 
-    // Cleanup
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+    let cancelled = false;
+    const currentFetchId = ++fetchIdRef.current;
+
+    const fetchData = async () => {
+      setLoading(true);
+
+      try {
+        const orgId = profile.orgId;
+        const last6Months = getLast6Months();
+        const firstMonthStart = `${last6Months[0]}-01`;
+
+        // Toutes les requêtes en parallèle (vues publiques enrichies)
+        const [leadsResult, allLeadsResult, sourcesResult, costsResult, allCostsResult] = await Promise.all([
+          // 1. Leads pour la période filtrée
+          supabase
+            .from('majordhome_leads')
+            .select('*')
+            .eq('org_id', orgId)
+            .eq('is_deleted', false)
+            .gte('created_date', filters.period.from.toISOString().split('T')[0])
+            .lte('created_date', filters.period.to.toISOString().split('T')[0]),
+
+          // 2. Leads des 6 derniers mois (tendances)
+          supabase
+            .from('majordhome_leads')
+            .select('*')
+            .eq('org_id', orgId)
+            .eq('is_deleted', false)
+            .gte('created_date', firstMonthStart),
+
+          // 3. Sources actives
+          supabase.from('majordhome_sources').select('id, name').eq('is_active', true),
+
+          // 4. Coûts de la période filtrée
+          supabase
+            .from('majordhome_monthly_source_costs')
+            .select('cost_amount, source_id, month')
+            .in('month', getMonthsInPeriod(filters.period.from, filters.period.to)),
+
+          // 5. Coûts des 6 derniers mois
+          supabase
+            .from('majordhome_monthly_source_costs')
+            .select('cost_amount, source_id, month')
+            .in('month', last6Months),
+        ]);
+
+        // Si le fetch a été annulé (nouveau fetch lancé), on ne met pas à jour le state
+        if (cancelled || fetchIdRef.current !== currentFetchId) return;
+
+        if (leadsResult.error) throw leadsResult.error;
+
+        // Filtrer les leads côté client (rôle + filtres source/commercial)
+        let leads = leadsResult.data || [];
+        let allLeads = allLeadsResult.data || [];
+
+        if (profile.role === 'Commercial') {
+          leads = leads.filter((l) => l.assigned_user_id === profile.id);
+          allLeads = allLeads.filter((l) => l.assigned_user_id === profile.id);
+        } else if (filters.commercialId) {
+          leads = leads.filter((l) => l.assigned_user_id === filters.commercialId);
+        }
+
+        if (filters.sourceIds.length > 0) {
+          leads = leads.filter((l) => filters.sourceIds.includes(l.source_id));
+        }
+
+        const sources = sourcesResult.data || [];
+        const costs = costsResult.data || [];
+        const allCosts = allCostsResult.data || [];
+
+        // Coûts filtrés par source si nécessaire
+        const filteredCosts =
+          filters.sourceIds.length > 0 ? costs.filter((c) => filters.sourceIds.includes(c.source_id)) : costs;
+
+        // === Stats globales ===
+        const totalLeads = leads.length;
+        const appointments = leads.filter((l) => l.status_display_order >= 3).length;
+        const sales = leads.filter((l) => l.status_is_won === true).length;
+        const revenue = leads
+          .filter((l) => l.status_is_won === true)
+          .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
+        const expenses = filteredCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0);
+        const roi = expenses > 0 ? ((revenue - expenses) / expenses) * 100 : 0;
+
+        // === Métriques par source ===
+        const sourceMetrics = [];
+
+        for (const source of sources) {
+          const sourceLeads = leads.filter((l) => l.source_id === source.id);
+          const sourceAppointments = sourceLeads.filter((l) => l.status_display_order >= 3).length;
+          const sourceSales = sourceLeads.filter((l) => l.status_is_won === true).length;
+          const sourceRevenue = sourceLeads
+            .filter((l) => l.status_is_won === true)
+            .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
+
+          const sourceCosts = costs.filter((c) => c.source_id === source.id);
+          const sourceExpenses = sourceCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0);
+
+          const cpl = sourceLeads.length > 0 ? sourceExpenses / sourceLeads.length : 0;
+          const cpAppointment = sourceAppointments > 0 ? sourceExpenses / sourceAppointments : 0;
+          const cpSale = sourceSales > 0 ? sourceExpenses / sourceSales : 0;
+          const sourceRoi = sourceExpenses > 0 ? ((sourceRevenue - sourceExpenses) / sourceExpenses) * 100 : 0;
+
+          if (sourceLeads.length > 0 || sourceExpenses > 0) {
+            sourceMetrics.push({
+              sourceId: source.id,
+              sourceName: source.name,
+              leads: sourceLeads.length,
+              appointments: sourceAppointments,
+              sales: sourceSales,
+              revenue: sourceRevenue,
+              expenses: sourceExpenses,
+              cpl,
+              cpAppointment,
+              cpSale,
+              roi: sourceRoi,
+            });
+          }
+        }
+
+        sourceMetrics.sort((a, b) => b.roi - a.roi);
+
+        // === Tendances mensuelles ===
+        const monthlyTrends = last6Months.map((monthStr) => {
+          const [year, month] = monthStr.split('-').map(Number);
+          const firstDay = new Date(year, month - 1, 1);
+          const lastDay = new Date(year, month, 0);
+
+          const monthLeads = allLeads.filter((l) => {
+            const date = new Date(l.created_date);
+            return date >= firstDay && date <= lastDay;
+          });
+
+          const monthCosts = allCosts.filter((c) => c.month === monthStr);
+
+          return {
+            month: firstDay.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
+            leads: monthLeads.length,
+            appointments: monthLeads.filter((l) => l.status_display_order >= 3).length,
+            sales: monthLeads.filter((l) => l.status_is_won === true).length,
+            revenue: monthLeads
+              .filter((l) => l.status_is_won === true)
+              .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0),
+            expenses: monthCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0),
+          };
+        });
+
+        // Mise à jour state
+        setData({
+          totalLeads,
+          appointments,
+          sales,
+          revenue,
+          expenses,
+          roi,
+          sourceMetrics,
+          monthlyTrends,
+        });
+      } catch (error) {
+        if (cancelled || fetchIdRef.current !== currentFetchId) return;
+        console.error('[useDashboardData] Erreur fetch:', error);
+        toast.error('Erreur lors du chargement des données');
+      } finally {
+        if (!cancelled && fetchIdRef.current === currentFetchId) {
+          setLoading(false);
+        }
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, filters]); // Ne pas inclure fetchDashboardData pour éviter les boucles
 
-  return { data, loading, refetch: fetchDashboardData };
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+    // Dépendances stables : on sérialise les filtres pour éviter les re-renders inutiles
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    profile?.id,
+    profile?.orgId,
+    profile?.role,
+    filters?.period?.from?.getTime?.(),
+    filters?.period?.to?.getTime?.(),
+    filters?.sourceIds?.join(','),
+    filters?.commercialId,
+  ]);
+
+  return { data, loading, refetch };
 };

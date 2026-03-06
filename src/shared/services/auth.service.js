@@ -226,7 +226,6 @@ export const authService = {
   async getProfile(userId) {
     try {
       const { data, error } = await supabase
-        .schema('core')
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -250,7 +249,6 @@ export const authService = {
   async updateProfile(userId, updates) {
     try {
       const { data, error } = await supabase
-        .schema('core')
         .from('profiles')
         .update({
           ...updates,
@@ -281,14 +279,10 @@ export const authService = {
    */
   async getUserOrganization(userId) {
     try {
-      // Récupérer le membership avec l'organisation
+      // Récupérer le membership via la vue enrichie (colonnes org_ jointes)
       const { data: membership, error: memberError } = await supabase
-        .schema('core')
         .from('organization_members')
-        .select(`
-          *,
-          organization:organizations(*)
-        `)
+        .select('*')
         .eq('user_id', userId)
         .eq('status', 'active')
         .single();
@@ -301,8 +295,23 @@ export const authService = {
         throw memberError;
       }
 
+      // Reconstruire l'objet organization depuis les colonnes plates org_*
+      const organization = membership.org_id
+        ? {
+            id: membership.org_id,
+            name: membership.org_name,
+            slug: membership.org_slug,
+            plan: membership.org_plan,
+            description: membership.org_description,
+            is_active: membership.org_is_active,
+            settings: membership.org_settings,
+            app_id: membership.org_app_id,
+            created_at: membership.org_created_at,
+          }
+        : null;
+
       return {
-        organization: membership.organization,
+        organization,
         membership: {
           id: membership.id,
           role: membership.role,

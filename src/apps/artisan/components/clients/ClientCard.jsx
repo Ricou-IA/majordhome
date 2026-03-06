@@ -15,12 +15,16 @@
  */
 
 import React from 'react';
-import { 
-  User, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  ChevronRight
+import {
+  User,
+  Users,
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  ChevronRight,
+  Archive,
+  FileText,
 } from 'lucide-react';
 
 // ============================================================================
@@ -28,23 +32,17 @@ import {
 // ============================================================================
 
 /**
- * Badge de statut contrat
+ * Icône contrat (vert = actif, gris = sans contrat)
  */
-const ContractBadge = ({ hasContract }) => {
-  if (hasContract) {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border bg-green-100 text-green-700 border-green-200">
-        Contrat actif
-      </span>
-    );
-  }
-  
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border bg-gray-100 text-gray-500 border-gray-200">
-      Sans contrat
-    </span>
-  );
-};
+const ContractIcon = ({ hasContract }) => (
+  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+    hasContract ? 'bg-green-100' : 'bg-gray-100'
+  }`}>
+    <FileText className={`w-3.5 h-3.5 ${
+      hasContract ? 'text-green-600' : 'text-gray-400'
+    }`} />
+  </div>
+);
 
 /**
  * Ligne d'information avec icône
@@ -94,7 +92,7 @@ export function ClientCard({
 
   const {
     id,
-    name,
+    display_name,
     first_name,
     last_name,
     address,
@@ -102,18 +100,29 @@ export function ClientCard({
     city,
     phone,
     email,
-    has_contrat,
-    contract_status,
+    has_active_contract,
+    is_archived,
+    client_category,
+    // Compat ancien format
+    name,
   } = client;
 
-  // Détermine si contrat actif
-  const hasContract = has_contrat === true || contract_status === 'active';
+  // Détermine si contrat actif (colonne calculée dans la vue)
+  const hasContract = has_active_contract === true;
+  const isArchived = is_archived === true;
+  const isEntreprise = client_category === 'entreprise';
 
-  // Nom affiché : soit name, soit "last_name first_name"
-  const displayName = name || `${last_name || ''} ${first_name || ''}`.trim() || 'Client sans nom';
+  // Icône selon catégorie
+  const CategoryIcon = isArchived ? Archive : isEntreprise ? Building2 : Users;
+  const iconBg = isArchived ? 'bg-amber-100' : isEntreprise ? 'bg-purple-100' : 'bg-amber-100';
+  const iconColor = isArchived ? 'text-amber-600' : isEntreprise ? 'text-purple-600' : 'text-amber-600';
 
-  // Adresse formatée
-  const fullAddress = [address, postal_code, city].filter(Boolean).join(', ');
+  // Nom affiché (compatible ancien et nouveau format)
+  const displayName = display_name || name || `${last_name || ''} ${first_name || ''}`.trim() || 'Client sans nom';
+
+  // Adresse formatée (rue séparée du CP + ville)
+  const streetAddress = address || null;
+  const cityLine = [postal_code, city].filter(Boolean).join(', ');
 
   // Handler de clic sur la carte
   const handleClick = () => {
@@ -142,29 +151,47 @@ export function ClientCard({
     <div
       onClick={handleClick}
       className={`
-        group relative bg-white rounded-lg border p-4 transition-all duration-200
+        group relative rounded-lg border p-4 transition-all duration-200
         ${onClick ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''}
         ${selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'}
+        ${isArchived ? 'bg-gray-50/80 opacity-60' : 'bg-white'}
       `}
     >
-      {/* Ligne 1 : Nom + Badge contrat */}
-      <div className="flex items-center justify-between gap-3 mb-3">
+      {/* Ligne 1 : Nom + Badges */}
+      <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 text-blue-600" />
+          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconBg}`}>
+            <CategoryIcon className={`w-4 h-4 ${iconColor}`} />
           </div>
           <h3 className="font-medium text-gray-900 truncate">
             {displayName}
           </h3>
         </div>
-        <ContractBadge hasContract={hasContract} />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isArchived && (
+            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border bg-amber-100 text-amber-700 border-amber-200">
+              Archivé
+            </span>
+          )}
+          {hasContract && <ContractIcon hasContract />}
+        </div>
       </div>
 
-      {/* Ligne 2 : Adresse */}
+      {/* Ligne 2 : Adresse (rue + CP/ville sur 2 lignes) */}
       <div className="mb-2">
-        <InfoLine icon={MapPin}>
-          {fullAddress}
-        </InfoLine>
+        <div className="flex items-start gap-2 text-sm">
+          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            {streetAddress ? (
+              <p className="text-gray-600 truncate">{streetAddress}</p>
+            ) : (
+              <p className="text-gray-400">-</p>
+            )}
+            {cityLine && (
+              <p className="text-gray-500 truncate">{cityLine}</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Ligne 3 : Téléphone */}
@@ -209,8 +236,9 @@ export function ClientCard({
 export function ClientCardCompact({ client, onClick, selected = false }) {
   if (!client) return null;
 
-  const { name, city, postal_code, has_contrat, contract_status } = client;
-  const hasContract = has_contrat === true || contract_status === 'active';
+  const { display_name, name, city, postal_code, has_active_contract } = client;
+  const hasContract = has_active_contract === true;
+  const clientName = display_name || name || 'Client sans nom';
 
   return (
     <div
@@ -229,7 +257,7 @@ export function ClientCardCompact({ client, onClick, selected = false }) {
           <User className="w-4 h-4 text-gray-600" />
         </div>
         <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{name}</p>
+          <p className="font-medium text-gray-900 truncate">{clientName}</p>
           {(city || postal_code) && (
             <p className="text-sm text-gray-500 truncate">
               {[postal_code, city].filter(Boolean).join(' ')}
@@ -238,7 +266,7 @@ export function ClientCardCompact({ client, onClick, selected = false }) {
         </div>
       </div>
 
-      <ContractBadge hasContract={hasContract} />
+      {hasContract && <ContractIcon hasContract />}
     </div>
   );
 }

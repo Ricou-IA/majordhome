@@ -54,16 +54,7 @@ const navigation = [
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, profile, organization, membership, canAccessPipeline, appRole, businessRole } = useAuth();
-
-  // Debug: log pour vérifier les valeurs
-  console.log('[AppLayout] Debug Pipeline access:', {
-    hasProfile: !!profile,
-    appRole,
-    businessRole,
-    canAccessPipeline,
-    profileAppRole: profile?.app_role,
-  });
+  const { user, profile, organization, membership, canAccessPipeline, signOut } = useAuth();
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);

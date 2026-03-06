@@ -41,10 +41,13 @@ import {
   ExternalLink,
   Archive,
   Lock,
-  Unlock
+  Unlock,
+  Plus
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import { useClient, useClientEquipments } from '@/shared/hooks/useClients';
-import { CLIENT_STATUSES, LEAD_SOURCES, CONTRACT_FREQUENCIES } from '@/shared/services/clients.service';
+import { clientsService, CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@/shared/services/clients.service';
 import { EquipmentList } from './EquipmentList';
 
 // ============================================================================
@@ -57,12 +60,7 @@ const TABS = [
   { id: 'history', label: 'Historique', icon: History },
 ];
 
-const HOUSING_TYPES = [
-  { value: 'house', label: 'Maison' },
-  { value: 'apartment', label: 'Appartement' },
-  { value: 'commercial', label: 'Local commercial' },
-  { value: 'other', label: 'Autre' },
-];
+// HOUSING_TYPES est importé depuis clients.service.js
 
 // ============================================================================
 // UTILITAIRES
@@ -258,10 +256,10 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, disabled = false }) 
 /**
  * Badge de statut pipeline
  */
-const StatusBadge = ({ status }) => {
-  const found = CLIENT_STATUSES.find(s => s.value === status);
+const CategoryBadge = ({ clientCategory }) => {
+  const found = CLIENT_CATEGORIES.find(s => s.value === clientCategory);
   if (!found) return null;
-  
+
   return (
     <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${found.color}`}>
       {found.label}
@@ -358,11 +356,11 @@ const TabInfo = ({ formData, setFormData, errors, isLocked }) => {
               disabled={isLocked}
             />
           </FormField>
-          <FormField label="Statut">
+          <FormField label="Catégorie">
             <SelectInput
-              value={formData.status}
-              onChange={(v) => updateField('status', v)}
-              options={CLIENT_STATUSES}
+              value={formData.clientCategory}
+              onChange={(v) => updateField('clientCategory', v)}
+              options={CLIENT_CATEGORIES}
               placeholder="Sélectionner..."
               disabled={isLocked}
             />
@@ -477,44 +475,6 @@ const TabInfo = ({ formData, setFormData, errors, isLocked }) => {
                 </a>
               )}
             </div>
-          </FormField>
-        </div>
-      </div>
-
-      {/* Section Contrat */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-500" />
-          Contrat d'entretien
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField label="Statut contrat">
-            <SelectInput
-              value={formData.hasContrat ? 'active' : 'none'}
-              onChange={(v) => updateField('hasContrat', v === 'active')}
-              options={[
-                { value: 'none', label: 'Sans contrat' },
-                { value: 'active', label: 'Avec contrat' },
-              ]}
-              disabled={isLocked}
-            />
-          </FormField>
-          <FormField label="Fréquence">
-            <SelectInput
-              value={formData.contractFrequency}
-              onChange={(v) => updateField('contractFrequency', v)}
-              options={CONTRACT_FREQUENCIES}
-              placeholder="Sélectionner..."
-              disabled={isLocked}
-            />
-          </FormField>
-          <FormField label="Prochain entretien">
-            <TextInput
-              value={formatDateForInput(formData.nextMaintenanceDate)}
-              onChange={(v) => updateField('nextMaintenanceDate', v)}
-              type="date"
-              disabled={isLocked}
-            />
           </FormField>
         </div>
       </div>
@@ -648,19 +608,27 @@ const TabHistory = ({ interventions = [], loading = false }) => {
 
 /**
  * Modale fiche client avec système de verrouillage
- * 
+ * Mode édition (clientId fourni) : chargement du client, cadenas, onglets
+ * Mode création (clientId=null) : formulaire vide, pas de cadenas, onglet info seulement
+ *
  * @param {Object} props
  * @param {string} props.clientId - ID du client (null pour création)
  * @param {boolean} props.isOpen - Modale ouverte
  * @param {Function} props.onClose - Callback fermeture
  * @param {Function} [props.onSaved] - Callback après sauvegarde
+ * @param {Function} [props.onCreated] - Callback après création (reçoit le client créé)
  */
-export function ClientModal({ 
-  clientId, 
-  isOpen, 
-  onClose, 
-  onSaved 
+export function ClientModal({
+  clientId,
+  isOpen,
+  onClose,
+  onSaved,
+  onCreated,
 }) {
+  const isCreateMode = !clientId;
+  const { organization, user } = useAuth();
+  const orgId = organization?.id;
+
   // État
   const [activeTab, setActiveTab] = useState('info');
   const [formData, setFormData] = useState({});
@@ -671,24 +639,24 @@ export function ClientModal({
 
   // Ref pour stocker les données originales
   const originalDataRef = useRef({});
-  
+
   // Ref pour la position de scroll
   const contentRef = useRef(null);
 
-  // Hooks données
-  const { client, loading, updateClient } = useClient(clientId, { autoLoad: !!clientId });
+  // Hooks données (désactivé en mode création)
+  const { client, isLoading: loading, updateClient } = useClient(clientId);
 
   /**
    * Crée l'objet formData à partir du client
    */
   const buildFormData = useCallback((clientData) => {
-    // Parser nom/prénom depuis first_name/last_name ou depuis name
+    // Les champs viennent directement de majordhome.clients (colonnes typées)
     let firstName = clientData.first_name || '';
     let lastName = clientData.last_name || '';
-    
-    // Si pas de first_name/last_name, parser depuis name
-    if (!firstName && !lastName && clientData.name) {
-      const parsed = parseFullName(clientData.name);
+
+    // Fallback : parser depuis display_name si pas de nom/prénom séparés
+    if (!firstName && !lastName && clientData.display_name) {
+      const parsed = parseFullName(clientData.display_name);
       firstName = parsed.firstName;
       lastName = parsed.lastName;
     }
@@ -696,7 +664,7 @@ export function ClientModal({
     return {
       firstName,
       lastName,
-      status: clientData.status || 'active',
+      clientCategory: clientData.client_category || 'particulier',
       address: clientData.address || '',
       postalCode: clientData.postal_code || '',
       city: clientData.city || '',
@@ -705,16 +673,13 @@ export function ClientModal({
       housingType: clientData.housing_type || '',
       surface: clientData.surface || '',
       dpeNumber: clientData.dpe_number || '',
-      hasContrat: clientData.has_contrat || false,
-      contractFrequency: clientData.contract_frequency || '',
-      nextMaintenanceDate: clientData.next_maintenance_date || '',
       leadSource: clientData.lead_source || '',
-      notes: clientData.description || '',
+      notes: clientData.notes || '',
       createdAt: clientData.created_at,
     };
   }, []);
 
-  // Initialiser le formulaire quand le client est chargé
+  // Initialiser le formulaire quand le client est chargé (mode édition)
   useEffect(() => {
     if (client) {
       const data = buildFormData(client);
@@ -729,9 +694,35 @@ export function ClientModal({
       setActiveTab('info');
       setErrors({});
       setSaveSuccess(false);
-      setIsLocked(true); // Toujours verrouillé à l'ouverture
+
+      if (isCreateMode) {
+        // Mode création : formulaire vide, déverrouillé
+        const emptyForm = {
+          firstName: '',
+          lastName: '',
+          clientCategory: 'particulier',
+          companyName: '',
+          address: '',
+          postalCode: '',
+          city: '',
+          phone: '',
+          phoneSecondary: '',
+          email: '',
+          housingType: '',
+          surface: '',
+          dpeNumber: '',
+          leadSource: '',
+          notes: '',
+          createdAt: null,
+        };
+        setFormData(emptyForm);
+        originalDataRef.current = emptyForm;
+        setIsLocked(false);
+      } else {
+        setIsLocked(true); // Toujours verrouillé à l'ouverture en mode édition
+      }
     }
-  }, [clientId, isOpen]);
+  }, [clientId, isOpen, isCreateMode]);
 
   /**
    * Vérifie si des modifications ont été faites
@@ -740,9 +731,8 @@ export function ClientModal({
     const original = originalDataRef.current;
     
     const fieldsToCompare = [
-      'firstName', 'lastName', 'status', 'address', 'postalCode', 'city',
+      'firstName', 'lastName', 'clientCategory', 'address', 'postalCode', 'city',
       'phone', 'email', 'housingType', 'surface', 'dpeNumber',
-      'hasContrat', 'contractFrequency', 'nextMaintenanceDate',
       'leadSource', 'notes'
     ];
 
@@ -777,7 +767,7 @@ export function ClientModal({
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
-  // Sauvegarde
+  // Sauvegarde (création ou mise à jour)
   const handleSave = async () => {
     if (!validate()) return;
 
@@ -785,45 +775,68 @@ export function ClientModal({
     setSaveSuccess(false);
 
     try {
-      // Envoyer tous les champs au service
-      const updates = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        status: formData.status,
-        address: formData.address,
-        postalCode: formData.postalCode,
-        city: formData.city,
-        phone: formData.phone,
-        email: formData.email,
-        housingType: formData.housingType,
-        surface: formData.surface,
-        dpeNumber: formData.dpeNumber,
-        hasContrat: formData.hasContrat,
-        contractFrequency: formData.contractFrequency,
-        nextMaintenanceDate: formData.nextMaintenanceDate || null,
-        leadSource: formData.leadSource,
-        notes: formData.notes,
-      };
+      if (isCreateMode) {
+        // --- MODE CRÉATION ---
+        if (!orgId) throw new Error('Organisation non disponible');
 
-      console.log('[ClientModal] Saving updates:', updates);
+        const { data: newClient, error } = await clientsService.createClient({
+          orgId,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          companyName: formData.companyName || null,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          phoneSecondary: formData.phoneSecondary || null,
+          address: formData.address || null,
+          postalCode: formData.postalCode || null,
+          city: formData.city || null,
+          housingType: formData.housingType || null,
+          surface: formData.surface || null,
+          dpeNumber: formData.dpeNumber || null,
+          clientCategory: formData.clientCategory || 'particulier',
+          leadSource: formData.leadSource || null,
+          notes: formData.notes || null,
+          createdBy: user?.id,
+        });
 
-      const { data, error } = await updateClient(updates);
+        if (error) throw error;
 
-      if (error) throw error;
+        toast.success('Client créé avec succès');
+        onCreated?.(newClient);
+        onClose();
+      } else {
+        // --- MODE ÉDITION ---
+        const updates = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          clientCategory: formData.clientCategory,
+          address: formData.address,
+          postalCode: formData.postalCode,
+          city: formData.city,
+          phone: formData.phone,
+          email: formData.email,
+          housingType: formData.housingType,
+          surface: formData.surface,
+          dpeNumber: formData.dpeNumber,
+          leadSource: formData.leadSource,
+          notes: formData.notes,
+        };
 
-      console.log('[ClientModal] Save successful:', data);
+        const { data, error } = await updateClient(updates);
 
-      // Mettre à jour les données originales après sauvegarde réussie
-      originalDataRef.current = { ...formData };
+        if (error) throw error;
 
-      setSaveSuccess(true);
-      
-      // Ne pas appeler onSaved immédiatement pour éviter le refresh
-      // qui recharge les données et fait remonter le scroll
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 2000);
-      
+        // Mettre à jour les données originales après sauvegarde réussie
+        originalDataRef.current = { ...formData };
+
+        setSaveSuccess(true);
+
+        // Ne pas appeler onSaved immédiatement pour éviter le refresh
+        // qui recharge les données et fait remonter le scroll
+        setTimeout(() => {
+          setSaveSuccess(false);
+        }, 2000);
+      }
     } catch (error) {
       console.error('[ClientModal] Erreur sauvegarde:', error);
       setErrors({ general: 'Erreur lors de la sauvegarde: ' + (error.message || 'Erreur inconnue') });
@@ -854,7 +867,9 @@ export function ClientModal({
   if (!isOpen) return null;
 
   // Nom complet pour l'affichage
-  const displayName = `${formData.lastName || ''} ${formData.firstName || ''}`.trim() || 'Nouveau client';
+  const displayName = isCreateMode
+    ? (`${formData.lastName || ''} ${formData.firstName || ''}`.trim() || 'Nouveau client')
+    : (`${formData.lastName || ''} ${formData.firstName || ''}`.trim() || 'Client');
 
   return (
     <>
@@ -869,40 +884,48 @@ export function ClientModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              isCreateMode ? 'bg-green-100' : 'bg-blue-100'
+            }`}>
+              {isCreateMode ? (
+                <Plus className="w-5 h-5 text-green-600" />
+              ) : (
+                <User className="w-5 h-5 text-blue-600" />
+              )}
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {loading ? 'Chargement...' : displayName}
+                {isCreateMode ? 'Nouveau client' : (loading ? 'Chargement...' : displayName)}
               </h2>
-              {client && (
+              {!isCreateMode && client && (
                 <div className="flex items-center gap-2 mt-0.5">
-                  <StatusBadge status={formData.status} />
+                  <CategoryBadge clientCategory={formData.clientCategory} />
                 </div>
               )}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Bouton Cadenas */}
-            <button
-              onClick={handleToggleLock}
-              className={`
-                p-2 rounded-lg transition-colors
-                ${isLocked 
-                  ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100' 
-                  : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
-                }
-              `}
-              title={isLocked ? 'Déverrouiller pour modifier' : 'Verrouiller (annule les modifications)'}
-            >
-              {isLocked ? (
-                <Lock className="w-5 h-5" />
-              ) : (
-                <Unlock className="w-5 h-5" />
-              )}
-            </button>
+            {/* Bouton Cadenas (mode édition seulement) */}
+            {!isCreateMode && (
+              <button
+                onClick={handleToggleLock}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${isLocked
+                    ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+                  }
+                `}
+                title={isLocked ? 'Déverrouiller pour modifier' : 'Verrouiller (annule les modifications)'}
+              >
+                {isLocked ? (
+                  <Lock className="w-5 h-5" />
+                ) : (
+                  <Unlock className="w-5 h-5" />
+                )}
+              </button>
+            )}
 
             {/* Bouton Fermer */}
             <button
@@ -914,7 +937,8 @@ export function ClientModal({
           </div>
         </div>
 
-        {/* Onglets */}
+        {/* Onglets (masqués en mode création) */}
+        {!isCreateMode && (
         <div className="flex border-b border-gray-200 px-6">
           {TABS.map(tab => {
             const Icon = tab.icon;
@@ -943,6 +967,7 @@ export function ClientModal({
             );
           })}
         </div>
+        )}
 
         {/* Contenu */}
         <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
@@ -985,7 +1010,7 @@ export function ClientModal({
                 Modifications enregistrées
               </p>
             )}
-            {!isLocked && !errors.general && !saveSuccess && (
+            {!isLocked && !errors.general && !saveSuccess && !isCreateMode && (
               <p className="text-sm text-amber-600 flex items-center gap-1">
                 <Unlock className="w-4 h-4" />
                 Mode édition actif
@@ -1001,22 +1026,26 @@ export function ClientModal({
               Fermer
             </button>
             
-            {/* Bouton Enregistrer visible seulement si déverrouillé et sur l'onglet info */}
+            {/* Bouton Enregistrer/Créer visible si déverrouillé et sur l'onglet info */}
             {!isLocked && activeTab === 'info' && (
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className={`inline-flex items-center gap-2 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                  isCreateMode
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 {saving ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Enregistrement...
+                    {isCreateMode ? 'Création...' : 'Enregistrement...'}
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
-                    Enregistrer
+                    {isCreateMode ? <Plus className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                    {isCreateMode ? 'Créer le client' : 'Enregistrer'}
                   </>
                 )}
               </button>

@@ -8,10 +8,8 @@ import { Loader2 } from 'lucide-react';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Planning = lazy(() => import('./pages/Planning'));
 const Clients = lazy(() => import('./pages/Clients'));
+const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const Pipeline = lazy(() => import('./pages/Pipeline'));
-const PipelineLeads = lazy(() => import('./pages/PipelineLeads'));
-const PipelineLeadNew = lazy(() => import('./pages/PipelineLeadNew'));
-const PipelineLeadDetail = lazy(() => import('./pages/PipelineLeadDetail'));
 const Entretiens = lazy(() => import('./pages/Entretiens'));
 const InterventionDetail = lazy(() => import('./pages/InterventionDetail'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -74,34 +72,18 @@ export const artisanRoutes = [
     ),
   },
   {
+    path: 'clients/:id',
+    element: (
+      <SuspenseWrapper>
+        <ClientDetail />
+      </SuspenseWrapper>
+    ),
+  },
+  {
     path: 'pipeline',
     element: (
       <SuspenseWrapper>
         <Pipeline />
-      </SuspenseWrapper>
-    ),
-  },
-  {
-    path: 'pipeline/leads',
-    element: (
-      <SuspenseWrapper>
-        <PipelineLeads />
-      </SuspenseWrapper>
-    ),
-  },
-  {
-    path: 'pipeline/leads/new',
-    element: (
-      <SuspenseWrapper>
-        <PipelineLeadNew />
-      </SuspenseWrapper>
-    ),
-  },
-  {
-    path: 'pipeline/leads/:id',
-    element: (
-      <SuspenseWrapper>
-        <PipelineLeadDetail />
       </SuspenseWrapper>
     ),
   },

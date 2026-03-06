@@ -14,8 +14,8 @@
  * ============================================================================
  */
 
-import React, { useState } from 'react';
-import { 
+import React, { useState, useMemo } from 'react';
+import {
   Wrench,
   Flame,
   Wind,
@@ -32,9 +32,13 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
-  MoreVertical
+  MoreVertical,
+  Link2,
+  Unlink,
 } from 'lucide-react';
-import { EQUIPMENT_TYPES, CONTRACT_FREQUENCIES } from '@/shared/services/clients.service';
+import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@/shared/services/clients.service';
+import { CONTRACT_FREQUENCIES } from '@/shared/services/contracts.service';
+import { usePricingEquipmentTypes } from '@/shared/hooks/useClients';
 
 // ============================================================================
 // UTILITAIRES
@@ -54,6 +58,8 @@ const getEquipmentIcon = (type) => {
     climatisation: Fan,
     vmc: Wind,
     chauffe_eau: Droplets,
+    chauffe_eau_thermo: Droplets,
+    ballon_ecs: Droplets,
     poele: Flame,
   };
   return icons[type] || Wrench;
@@ -73,6 +79,8 @@ const getEquipmentColor = (type) => {
     climatisation: 'bg-sky-100 text-sky-600',
     vmc: 'bg-indigo-100 text-indigo-600',
     chauffe_eau: 'bg-teal-100 text-teal-600',
+    chauffe_eau_thermo: 'bg-teal-100 text-teal-600',
+    ballon_ecs: 'bg-teal-100 text-teal-600',
     poele: 'bg-red-100 text-red-600',
   };
   return colors[type] || 'bg-gray-100 text-gray-600';
@@ -82,7 +90,9 @@ const getEquipmentColor = (type) => {
  * Label du type d'équipement
  */
 const getEquipmentLabel = (type) => {
-  const found = EQUIPMENT_TYPES.find(t => t.value === type);
+  // Chercher dans les types legacy puis dans les catégories DB
+  const found = EQUIPMENT_TYPES.find(t => t.value === type)
+    || EQUIPMENT_CATEGORIES.find(t => t.value === type);
   return found?.label || type || 'Équipement';
 };
 
@@ -199,12 +209,17 @@ const ContractStatusBadge = ({ status }) => {
 /**
  * Carte d'un équipement
  */
-const EquipmentCard = ({ 
-  equipment, 
-  onEdit, 
+const EquipmentCard = ({
+  equipment,
+  onEdit,
   onDelete,
+  onAddToContract,
+  onRemoveFromContract,
   expanded,
-  onToggleExpand 
+  onToggleExpand,
+  pricingTypesMap = {},
+  hasContract = false,
+  isLinkedToContract = false,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -230,7 +245,7 @@ const EquipmentCard = ({
   const hasWarranty = isWarrantyActive(warranty_end_date);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow">
+    <div className="bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow relative">
       {/* En-tête */}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
@@ -241,11 +256,18 @@ const EquipmentCard = ({
             </div>
             <div className="min-w-0">
               <h4 className="font-medium text-gray-900">
-                {getEquipmentLabel(equipment_type)}
+                {equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id]
+                  ? pricingTypesMap[equipment.equipment_type_id].label
+                  : getEquipmentLabel(equipment_type)}
               </h4>
-              {(brand || model) && (
+              {(brand || model || equipment.installation_year) && (
                 <p className="text-sm text-gray-600 truncate">
-                  {[brand, model].filter(Boolean).join(' - ')}
+                  {[brand, model, equipment.installation_year].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              {serial_number && (
+                <p className="text-xs text-gray-400 font-mono truncate">
+                  N° Série : {serial_number}
                 </p>
               )}
             </div>
@@ -253,7 +275,9 @@ const EquipmentCard = ({
 
           {/* Actions + Badge */}
           <div className="flex items-center gap-2">
-            <ContractStatusBadge status={contract_status} />
+            {hasContract && (
+              <ContractStatusBadge status={isLinkedToContract ? 'active' : 'none'} />
+            )}
             
             {/* Menu actions */}
             <div className="relative">
@@ -266,11 +290,11 @@ const EquipmentCard = ({
 
               {showMenu && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowMenu(false)} 
+                  <div
+                    className="fixed inset-0 z-[60]"
+                    onClick={() => setShowMenu(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[70] py-1">
                     <button
                       onClick={() => { onEdit?.(equipment); setShowMenu(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -278,6 +302,30 @@ const EquipmentCard = ({
                       <Pencil className="w-4 h-4" />
                       Modifier
                     </button>
+
+                    {/* Lier / Délier du contrat */}
+                    {hasContract && !isLinkedToContract && onAddToContract && (
+                      <button
+                        onClick={() => { onAddToContract(equipment); setShowMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-700 hover:bg-green-50"
+                      >
+                        <Link2 className="w-4 h-4" />
+                        Ajouter au contrat
+                      </button>
+                    )}
+                    {hasContract && isLinkedToContract && onRemoveFromContract && (
+                      <button
+                        onClick={() => { onRemoveFromContract(equipment); setShowMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50"
+                      >
+                        <Unlink className="w-4 h-4" />
+                        Retirer du contrat
+                      </button>
+                    )}
+
+                    {/* Séparateur */}
+                    <div className="border-t border-gray-100 my-1" />
+
                     <button
                       onClick={() => { onDelete?.(equipment); setShowMenu(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -294,8 +342,8 @@ const EquipmentCard = ({
 
         {/* Infos rapides */}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          {/* Prochain entretien */}
-          {contract_status === 'active' && (
+          {/* Prochain entretien (uniquement si une date existe) */}
+          {next_maintenance_date && (
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${maintenanceStatus.className}`}>
               <MaintenanceIcon className="w-3.5 h-3.5" />
               <span className="text-xs font-medium">
@@ -312,13 +360,6 @@ const EquipmentCard = ({
             </div>
           )}
 
-          {/* Fréquence */}
-          {contract_frequency && (
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <Calendar className="w-3.5 h-3.5" />
-              <span className="text-xs">{getFrequencyLabel(contract_frequency)}</span>
-            </div>
-          )}
         </div>
 
         {/* Bouton détails */}
@@ -329,12 +370,12 @@ const EquipmentCard = ({
           {expanded ? (
             <>
               <ChevronUp className="w-4 h-4" />
-              Masquer les détails
+              Masquer les notes
             </>
           ) : (
             <>
               <ChevronDown className="w-4 h-4" />
-              Voir les détails
+              Voir les notes
             </>
           )}
         </button>
@@ -342,16 +383,8 @@ const EquipmentCard = ({
 
       {/* Détails (expandable) */}
       {expanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-gray-100 bg-gray-50">
+        <div className="px-4 pb-4 pt-0 border-t border-gray-100 bg-gray-50 rounded-b-lg">
           <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-            {/* N° série */}
-            {serial_number && (
-              <div>
-                <span className="text-gray-500">N° série</span>
-                <p className="font-mono text-gray-900">{serial_number}</p>
-              </div>
-            )}
-
             {/* Date installation */}
             {installation_date && (
               <div>
@@ -417,15 +450,29 @@ const EquipmentCard = ({
  * @param {Function} [props.onDelete] - Callback suppression
  * @param {boolean} [props.readOnly] - Mode lecture seule
  */
-export function EquipmentList({ 
-  equipments = [], 
+export function EquipmentList({
+  equipments = [],
   loading = false,
   onAdd,
   onEdit,
   onDelete,
-  readOnly = false
+  onAddToContract,
+  onRemoveFromContract,
+  hasContract = false,
+  contractEquipmentIds = new Set(),
+  readOnly = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
+  const { equipmentTypes } = usePricingEquipmentTypes();
+
+  // Map pricing types par id pour lookup rapide des labels
+  const pricingTypesMap = useMemo(() => {
+    const map = {};
+    for (const t of equipmentTypes) {
+      map[t.id] = t;
+    }
+    return map;
+  }, [equipmentTypes]);
 
   const toggleExpand = (id) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -497,8 +544,13 @@ export function EquipmentList({
           equipment={equipment}
           onEdit={readOnly ? undefined : onEdit}
           onDelete={readOnly ? undefined : onDelete}
+          onAddToContract={readOnly ? undefined : onAddToContract}
+          onRemoveFromContract={readOnly ? undefined : onRemoveFromContract}
+          hasContract={hasContract}
+          isLinkedToContract={contractEquipmentIds.has(equipment.id)}
           expanded={expandedId === equipment.id}
           onToggleExpand={() => toggleExpand(equipment.id)}
+          pricingTypesMap={pricingTypesMap}
         />
       ))}
     </div>
@@ -513,6 +565,17 @@ export function EquipmentList({
  * Version compacte de la liste (pour affichage dans modale)
  */
 export function EquipmentListCompact({ equipments = [], onSelect }) {
+  const { equipmentTypes } = usePricingEquipmentTypes();
+
+  // Map pricing types par id pour lookup rapide des labels
+  const pricingTypesMap = useMemo(() => {
+    const map = {};
+    for (const t of equipmentTypes) {
+      map[t.id] = t;
+    }
+    return map;
+  }, [equipmentTypes]);
+
   if (equipments.length === 0) {
     return (
       <p className="text-sm text-gray-500 text-center py-4">
@@ -526,7 +589,7 @@ export function EquipmentListCompact({ equipments = [], onSelect }) {
       {equipments.map(equipment => {
         const Icon = getEquipmentIcon(equipment.equipment_type);
         const iconColor = getEquipmentColor(equipment.equipment_type);
-        
+
         return (
           <div
             key={equipment.id}
@@ -541,7 +604,9 @@ export function EquipmentListCompact({ equipments = [], onSelect }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
-                {getEquipmentLabel(equipment.equipment_type)}
+                {equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id]
+                  ? pricingTypesMap[equipment.equipment_type_id].label
+                  : getEquipmentLabel(equipment.equipment_type)}
               </p>
               {(equipment.brand || equipment.model) && (
                 <p className="text-xs text-gray-500 truncate">

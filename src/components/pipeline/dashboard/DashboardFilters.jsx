@@ -19,6 +19,7 @@ export const DashboardFilters = ({
   onUpdateCommercialId,
   onReset,
   isAdmin,
+  orgId,
 }) => {
   const [sources, setSources] = useState([]);
   const [commercials, setCommercials] = useState([]);
@@ -27,19 +28,32 @@ export const DashboardFilters = ({
 
   useEffect(() => {
     fetchData();
-  }, [isAdmin]);
+  }, [isAdmin, orgId]);
 
   const fetchData = async () => {
     const [sourcesRes, commercialsRes] = await Promise.all([
-      supabase.from('sources').select('id, name').eq('is_active', true).order('name'),
-      isAdmin
-        ? supabase.from('profiles').select('id, full_name').order('full_name')
+      supabase.from('majordhome_sources').select('id, name').eq('is_active', true).order('name'),
+      // Récupérer uniquement les membres de l'org courante (pas tous les profils Supabase)
+      isAdmin && orgId
+        ? supabase
+            .from('organization_members')
+            .select('user_id')
+            .eq('org_id', orgId)
+            .eq('status', 'active')
         : Promise.resolve({ data: null }),
     ]);
 
     setSources(sourcesRes.data || []);
-    if (commercialsRes.data) {
-      setCommercials(commercialsRes.data);
+
+    // Si on a des membres, récupérer leurs profils
+    if (commercialsRes.data && commercialsRes.data.length > 0) {
+      const userIds = commercialsRes.data.map((m) => m.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+        .order('full_name');
+      setCommercials(profiles || []);
     }
   };
 

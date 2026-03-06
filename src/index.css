@@ -7,6 +7,38 @@
    ============================================================================= */
 
 @layer base {
+  :root {
+    --background: 210 40% 98%;           /* secondary-50  #f8fafc */
+    --foreground: 222 84% 5%;            /* secondary-950 #020617 */
+
+    --card: 0 0% 100%;                   /* white */
+    --card-foreground: 222 84% 5%;       /* secondary-950 */
+
+    --popover: 0 0% 100%;               /* white */
+    --popover-foreground: 222 84% 5%;    /* secondary-950 */
+
+    --primary: 199 89% 48%;              /* primary-500  #0ea5e9 */
+    --primary-foreground: 0 0% 100%;     /* white */
+
+    --secondary: 210 40% 96%;            /* secondary-100 #f1f5f9 */
+    --secondary-foreground: 222 47% 11%; /* secondary-900 #0f172a */
+
+    --muted: 210 40% 96%;               /* secondary-100 */
+    --muted-foreground: 215 16% 47%;     /* secondary-500 #64748b */
+
+    --accent: 210 40% 96%;              /* secondary-100 */
+    --accent-foreground: 222 47% 11%;    /* secondary-900 */
+
+    --destructive: 0 84% 60%;            /* red-500 #ef4444 */
+    --destructive-foreground: 0 0% 100%; /* white */
+
+    --border: 214 32% 91%;              /* secondary-200 #e2e8f0 */
+    --input: 214 32% 91%;               /* secondary-200 */
+    --ring: 199 89% 48%;                /* primary-500 */
+
+    --radius: 0.5rem;
+  }
+
   html {
     @apply antialiased;
   }

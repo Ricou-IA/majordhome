@@ -1,24 +1,31 @@
 /**
  * useClients.js - Majord'home Artisan
  * ============================================================================
- * Hook React pour la gestion des clients.
- * Gère l'état, la pagination, les filtres et le cache.
- * 
- * @example
- * const { 
- *   clients, 
- *   loading, 
- *   error,
- *   filters,
- *   setFilters,
- *   loadMore,
- *   refresh 
- * } = useClients({ orgId: 'xxx' });
+ * Hooks React pour la gestion des clients.
+ * Utilise TanStack React Query pour le cache, la pagination et les mutations.
+ *
+ * @version 5.0.0 - Refonte avec React Query + table clients dédiée
  * ============================================================================
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@/shared/services/clients.service';
+
+// ============================================================================
+// CLÉS DE CACHE
+// ============================================================================
+
+export const clientKeys = {
+  all: ['clients'],
+  lists: () => [...clientKeys.all, 'list'],
+  list: (orgId, filters) => [...clientKeys.lists(), orgId, filters],
+  details: () => [...clientKeys.all, 'detail'],
+  detail: (id) => [...clientKeys.details(), id],
+  stats: (orgId) => [...clientKeys.all, 'stats', orgId],
+  search: (orgId, query) => [...clientKeys.all, 'search', orgId, query],
+  activities: (clientId) => [...clientKeys.all, 'activities', clientId],
+};
 
 // ============================================================================
 // CONSTANTES
@@ -28,198 +35,151 @@ const DEFAULT_LIMIT = 25;
 
 const DEFAULT_FILTERS = {
   search: '',
-  status: null,
+  clientCategory: null,
   postalCode: null,
+  city: null,
   hasContract: null,
-  orderBy: 'name',
+  equipmentCategory: null,
+  showArchived: false,
+  onlyArchived: false,
+  orderBy: 'display_name',
   ascending: true,
 };
 
 // ============================================================================
-// HOOK PRINCIPAL - useClients
+// HOOK PRINCIPAL - useClients (liste)
 // ============================================================================
 
 /**
  * Hook pour la liste des clients avec pagination et filtres
- * 
- * @param {Object} options - Options du hook
+ *
+ * @param {Object} options
  * @param {string} options.orgId - ID de l'organisation (requis)
- * @param {number} [options.limit=25] - Nombre d'éléments par page
- * @param {boolean} [options.autoLoad=true] - Charger automatiquement au montage
+ * @param {number} [options.limit=25] - Éléments par page
+ *
  * @returns {Object} État et méthodes
- * 
+ *
  * @example
- * const {
- *   clients,           // Liste des clients
- *   loading,           // Chargement en cours
- *   loadingMore,       // Chargement pagination
- *   error,             // Erreur éventuelle
- *   totalCount,        // Nombre total de clients
- *   hasMore,           // Plus de résultats disponibles
- *   filters,           // Filtres actuels
- *   setFilters,        // Modifier les filtres
- *   setSearch,         // Raccourci pour la recherche
- *   loadMore,          // Charger plus de résultats
- *   refresh,           // Rafraîchir la liste
- *   reset,             // Réinitialiser filtres et liste
- * } = useClients({ orgId: 'xxx' });
+ * const { clients, isLoading, filters, setFilters, loadMore, hasMore } = useClients({ orgId });
  */
-export function useClients({ orgId, limit = DEFAULT_LIMIT, autoLoad = true } = {}) {
-  // État principal
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(null);
-  const [totalCount, setTotalCount] = useState(0);
-  const [offset, setOffset] = useState(0);
-
-  // Filtres
+export function useClients({ orgId, limit = DEFAULT_LIMIT } = {}) {
   const [filters, setFiltersState] = useState(DEFAULT_FILTERS);
+  const [allClients, setAllClients] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Calculer si plus de résultats disponibles
-  const hasMore = useMemo(() => {
-    return clients.length < totalCount;
-  }, [clients.length, totalCount]);
-
-  // ==========================================================================
-  // CHARGEMENT DES DONNÉES
-  // ==========================================================================
-
-  /**
-   * Charge les clients (première page ou avec nouveaux filtres)
-   */
-  const fetchClients = useCallback(async (resetOffset = true) => {
-    if (!orgId) {
-      setError(new Error('orgId est requis'));
-      return;
-    }
-
-    const currentOffset = resetOffset ? 0 : offset;
-    
-    if (resetOffset) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
-    
-    setError(null);
-
-    try {
-      const { data, count, error: fetchError } = await clientsService.getClients({
+  // Query pour la première page
+  const {
+    data: queryData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: clientKeys.list(orgId, filters),
+    queryFn: () =>
+      clientsService.getClients({
         orgId,
         search: filters.search,
-        status: filters.status,
+        clientCategory: filters.clientCategory,
         postalCode: filters.postalCode,
+        city: filters.city,
         hasContract: filters.hasContract,
+        equipmentCategory: filters.equipmentCategory,
+        showArchived: filters.showArchived,
+        onlyArchived: filters.onlyArchived,
         orderBy: filters.orderBy,
         ascending: filters.ascending,
         limit,
-        offset: currentOffset,
+        offset: 0,
+      }),
+    enabled: !!orgId,
+    staleTime: 30_000, // 30s
+    select: (result) => result, // Garder le format { data, count, error }
+  });
+
+  // Synchroniser les résultats de la première page
+  useEffect(() => {
+    if (queryData?.data) {
+      setAllClients(queryData.data);
+      setTotalCount(queryData.count || 0);
+      setOffset(limit);
+    }
+  }, [queryData, limit]);
+
+  const hasMore = useMemo(() => allClients.length < totalCount, [allClients.length, totalCount]);
+
+  // Charger plus (pagination manuelle)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !orgId) return;
+
+    setLoadingMore(true);
+    try {
+      const { data } = await clientsService.getClients({
+        orgId,
+        search: filters.search,
+        clientCategory: filters.clientCategory,
+        postalCode: filters.postalCode,
+        city: filters.city,
+        hasContract: filters.hasContract,
+        equipmentCategory: filters.equipmentCategory,
+        showArchived: filters.showArchived,
+        onlyArchived: filters.onlyArchived,
+        orderBy: filters.orderBy,
+        ascending: filters.ascending,
+        limit,
+        offset,
       });
 
-      if (fetchError) throw fetchError;
-
-      if (resetOffset) {
-        setClients(data || []);
-        setOffset(limit);
-      } else {
-        setClients(prev => [...prev, ...(data || [])]);
-        setOffset(prev => prev + limit);
+      if (data) {
+        setAllClients((prev) => [...prev, ...data]);
+        setOffset((prev) => prev + limit);
       }
-
-      setTotalCount(count || 0);
     } catch (err) {
-      console.error('useClients.fetchClients error:', err);
-      setError(err);
+      console.error('[useClients] loadMore error:', err);
     } finally {
-      setLoading(false);
       setLoadingMore(false);
     }
-  }, [orgId, filters, limit, offset]);
+  }, [orgId, filters, limit, offset, loadingMore, hasMore]);
 
-  // ==========================================================================
-  // ACTIONS
-  // ==========================================================================
-
-  /**
-   * Modifie les filtres (déclenche un rechargement)
-   */
+  // Modifier les filtres (reset la pagination)
   const setFilters = useCallback((newFilters) => {
-    setFiltersState(prev => {
-      // Si c'est une fonction, l'appeler avec l'état précédent
-      const updated = typeof newFilters === 'function' 
-        ? newFilters(prev) 
-        : { ...prev, ...newFilters };
+    setFiltersState((prev) => {
+      const updated = typeof newFilters === 'function' ? newFilters(prev) : { ...prev, ...newFilters };
       return updated;
     });
     setOffset(0);
+    setAllClients([]);
   }, []);
 
-  /**
-   * Raccourci pour modifier uniquement la recherche
-   */
-  const setSearch = useCallback((search) => {
-    setFilters({ search });
-  }, [setFilters]);
+  // Raccourci recherche
+  const setSearch = useCallback(
+    (search) => {
+      setFilters((prev) => ({ ...prev, search }));
+    },
+    [setFilters]
+  );
 
-  /**
-   * Charge plus de résultats (pagination)
-   */
-  const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore) {
-      fetchClients(false);
-    }
-  }, [fetchClients, loadingMore, hasMore]);
-
-  /**
-   * Rafraîchit la liste (recharge depuis le début)
-   */
-  const refresh = useCallback(() => {
-    fetchClients(true);
-  }, [fetchClients]);
-
-  /**
-   * Réinitialise les filtres et la liste
-   */
+  // Réinitialiser filtres
   const reset = useCallback(() => {
     setFiltersState(DEFAULT_FILTERS);
     setOffset(0);
-    setClients([]);
+    setAllClients([]);
     setTotalCount(0);
   }, []);
 
-  // ==========================================================================
-  // EFFETS
-  // ==========================================================================
-
-  // Charger au montage et quand les filtres changent
-  useEffect(() => {
-    if (autoLoad && orgId) {
-      fetchClients(true);
-    }
-  }, [orgId, filters, autoLoad]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ==========================================================================
-  // RETOUR
-  // ==========================================================================
-
   return {
-    // Données
-    clients,
-    loading,
+    clients: allClients,
+    isLoading,
     loadingMore,
-    error,
+    error: queryData?.error || error,
     totalCount,
     hasMore,
-    
-    // Filtres
     filters,
     setFilters,
     setSearch,
-    
-    // Actions
     loadMore,
-    refresh,
+    refresh: refetch,
     reset,
   };
 }
@@ -230,92 +190,106 @@ export function useClients({ orgId, limit = DEFAULT_LIMIT, autoLoad = true } = {
 
 /**
  * Hook pour charger les détails d'un client
- * 
- * @param {string} clientId - ID du client
- * @param {Object} options - Options
- * @param {boolean} [options.autoLoad=true] - Charger automatiquement
+ *
+ * @param {string} clientId - UUID du client (majordhome.clients.id)
  * @returns {Object} État et méthodes
- * 
+ *
  * @example
- * const { client, loading, error, refresh } = useClient('xxx');
+ * const { client, isLoading, updateClient, refresh } = useClient(clientId);
  */
-export function useClient(clientId, { autoLoad = true } = {}) {
-  const [client, setClient] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export function useClient(clientId) {
+  const queryClient = useQueryClient();
 
-  /**
-   * Charge les détails du client
-   */
-  const fetchClient = useCallback(async () => {
-    if (!clientId) {
-      setClient(null);
-      return;
-    }
+  const {
+    data: queryData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: clientKeys.detail(clientId),
+    queryFn: () => clientsService.getClientById(clientId),
+    enabled: !!clientId,
+    staleTime: 30_000,
+    select: (result) => result?.data || null,
+  });
 
-    setLoading(true);
-    setError(null);
+  // Mutation de mise à jour
+  const updateMutation = useMutation({
+    mutationFn: (updates) => clientsService.updateClient(clientId, updates),
+    onSuccess: (result) => {
+      if (result?.data) {
+        // Mettre à jour le cache du détail
+        queryClient.setQueryData(clientKeys.detail(clientId), (old) => ({
+          ...old,
+          data: { ...(old?.data || {}), ...result.data },
+        }));
+        // Invalider la liste pour que les changements se reflètent
+        queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      }
+    },
+  });
 
+  // Mutation d'archivage
+  const archiveMutation = useMutation({
+    mutationFn: () => clientsService.archiveClient(clientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: clientKeys.stats() });
+    },
+  });
+
+  // Mutation de désarchivage
+  const unarchiveMutation = useMutation({
+    mutationFn: () => clientsService.unarchiveClient(clientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: clientKeys.stats() });
+    },
+  });
+
+  const updateClient = useCallback(
+    async (updates) => {
+      try {
+        const result = await updateMutation.mutateAsync(updates);
+        return result;
+      } catch (err) {
+        return { data: null, error: err };
+      }
+    },
+    [updateMutation]
+  );
+
+  const archiveClient = useCallback(async () => {
     try {
-      const { data, error: fetchError } = await clientsService.getClientById(clientId);
-
-      if (fetchError) throw fetchError;
-
-      setClient(data);
+      const result = await archiveMutation.mutateAsync();
+      return result;
     } catch (err) {
-      console.error('useClient.fetchClient error:', err);
-      setError(err);
-      setClient(null);
-    } finally {
-      setLoading(false);
+      return { success: false, error: err };
     }
-  }, [clientId]);
+  }, [archiveMutation]);
 
-  /**
-   * Met à jour le client
-   */
-  const updateClient = useCallback(async (updates) => {
-    if (!clientId) return { data: null, error: new Error('clientId requis') };
-
-    setLoading(true);
-    setError(null);
-
+  const unarchiveClient = useCallback(async () => {
     try {
-      const { data, error: updateError } = await clientsService.updateClient(clientId, updates);
-
-      if (updateError) throw updateError;
-
-      setClient(data);
-      return { data, error: null };
+      const result = await unarchiveMutation.mutateAsync();
+      return result;
     } catch (err) {
-      console.error('useClient.updateClient error:', err);
-      setError(err);
-      return { data: null, error: err };
-    } finally {
-      setLoading(false);
+      return { success: false, error: err };
     }
-  }, [clientId]);
-
-  /**
-   * Rafraîchit les données du client
-   */
-  const refresh = useCallback(() => {
-    fetchClient();
-  }, [fetchClient]);
-
-  // Charger au montage
-  useEffect(() => {
-    if (autoLoad && clientId) {
-      fetchClient();
-    }
-  }, [clientId, autoLoad, fetchClient]);
+  }, [unarchiveMutation]);
 
   return {
-    client,
-    loading,
-    error,
+    client: queryData,
+    isLoading,
+    error: error || queryData?.error,
     updateClient,
-    refresh,
+    isUpdating: updateMutation.isPending,
+    archiveClient,
+    isArchiving: archiveMutation.isPending,
+    unarchiveClient,
+    isUnarchiving: unarchiveMutation.isPending,
+    refresh: refetch,
   };
 }
 
@@ -325,127 +299,165 @@ export function useClient(clientId, { autoLoad = true } = {}) {
 
 /**
  * Hook pour gérer les équipements d'un client
- * 
- * @param {string} clientId - ID du client
+ *
+ * @param {string} clientId - UUID du client
  * @returns {Object} État et méthodes
- * 
- * @example
- * const { equipments, loading, addEquipment, updateEquipment, deleteEquipment } = useClientEquipments('xxx');
  */
 export function useClientEquipments(clientId) {
-  const [equipments, setEquipments] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
 
-  /**
-   * Charge les équipements
-   */
-  const fetchEquipments = useCallback(async () => {
-    if (!clientId) {
-      setEquipments([]);
-      return;
-    }
+  const {
+    data: equipments,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['client-equipments', clientId],
+    queryFn: async () => {
+      const { data, error } = await clientsService.getClientEquipments(clientId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!clientId,
+    staleTime: 60_000,
+  });
 
-    setLoading(true);
-    setError(null);
+  const addMutation = useMutation({
+    mutationFn: (equipmentData) => clientsService.addEquipment(clientId, equipmentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-equipments', clientId] });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      // Invalider aussi le cache contrats (liaison contract_equipments)
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+    },
+  });
 
-    try {
-      const { data, error: fetchError } = await clientsService.getClientEquipments(clientId);
+  const updateMutation = useMutation({
+    mutationFn: ({ equipmentId, updates }) => clientsService.updateEquipment(equipmentId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-equipments', clientId] });
+    },
+  });
 
-      if (fetchError) throw fetchError;
-
-      setEquipments(data || []);
-    } catch (err) {
-      console.error('useClientEquipments.fetchEquipments error:', err);
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [clientId]);
-
-  /**
-   * Ajoute un équipement
-   */
-  const addEquipment = useCallback(async (equipmentData) => {
-    if (!clientId) return { data: null, error: new Error('clientId requis') };
-
-    try {
-      const { data, error: addError } = await clientsService.addEquipment(clientId, equipmentData);
-
-      if (addError) throw addError;
-
-      // Ajouter au state local
-      setEquipments(prev => [data, ...prev]);
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('useClientEquipments.addEquipment error:', err);
-      return { data: null, error: err };
-    }
-  }, [clientId]);
-
-  /**
-   * Met à jour un équipement
-   */
-  const updateEquipment = useCallback(async (equipmentId, updates) => {
-    try {
-      const { data, error: updateError } = await clientsService.updateEquipment(equipmentId, updates);
-
-      if (updateError) throw updateError;
-
-      // Mettre à jour le state local
-      setEquipments(prev => prev.map(eq => 
-        eq.id === equipmentId ? data : eq
-      ));
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('useClientEquipments.updateEquipment error:', err);
-      return { data: null, error: err };
-    }
-  }, []);
-
-  /**
-   * Supprime un équipement
-   */
-  const deleteEquipment = useCallback(async (equipmentId) => {
-    try {
-      const { success, error: deleteError } = await clientsService.deleteEquipment(equipmentId);
-
-      if (deleteError) throw deleteError;
-
-      // Retirer du state local
-      setEquipments(prev => prev.filter(eq => eq.id !== equipmentId));
-
-      return { success, error: null };
-    } catch (err) {
-      console.error('useClientEquipments.deleteEquipment error:', err);
-      return { success: false, error: err };
-    }
-  }, []);
-
-  /**
-   * Rafraîchit la liste
-   */
-  const refresh = useCallback(() => {
-    fetchEquipments();
-  }, [fetchEquipments]);
-
-  // Charger au montage
-  useEffect(() => {
-    if (clientId) {
-      fetchEquipments();
-    }
-  }, [clientId, fetchEquipments]);
+  const deleteMutation = useMutation({
+    mutationFn: (equipmentId) => clientsService.deleteEquipment(equipmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-equipments', clientId] });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+    },
+  });
 
   return {
-    equipments,
-    loading,
+    equipments: equipments || [],
+    isLoading,
     error,
-    addEquipment,
-    updateEquipment,
-    deleteEquipment,
-    refresh,
+    addEquipment: addMutation.mutateAsync,
+    updateEquipment: (equipmentId, updates) => updateMutation.mutateAsync({ equipmentId, updates }),
+    deleteEquipment: deleteMutation.mutateAsync,
+    isAdding: addMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+    refresh: refetch,
+  };
+}
+
+// ============================================================================
+// HOOK - useEquipmentBrands (marques d'équipements)
+// ============================================================================
+
+/**
+ * Hook pour les marques d'équipements (données quasi-statiques)
+ * @returns {{ brands: Array, isLoading: boolean, error: Error|null }}
+ */
+export function useEquipmentBrands() {
+  const {
+    data,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['equipment-brands'],
+    queryFn: async () => {
+      const { data, error } = await clientsService.getBrands();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 min — données quasi-statiques
+  });
+
+  return { brands: data || [], isLoading, error };
+}
+
+// ============================================================================
+// HOOK - usePricingEquipmentTypes
+// ============================================================================
+
+/**
+ * Hook pour les types d'équipements pricing (grille tarifaire)
+ * Utilisé dans le formulaire d'ajout d'équipement pour le dropdown "Type"
+ *
+ * @returns {{ equipmentTypes: Array, isLoading: boolean, error: Error|null }}
+ */
+export function usePricingEquipmentTypes() {
+  const {
+    data,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['pricing-equipment-types'],
+    queryFn: async () => {
+      const { data, error } = await clientsService.getPricingEquipmentTypes();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 min — données quasi-statiques
+  });
+
+  return { equipmentTypes: data || [], isLoading, error };
+}
+
+// ============================================================================
+// HOOK - useClientActivities (timeline)
+// ============================================================================
+
+/**
+ * Hook pour la timeline d'un client
+ *
+ * @param {string} clientId - UUID du client
+ * @returns {Object} État et méthodes
+ */
+export function useClientActivities(clientId) {
+  const queryClient = useQueryClient();
+
+  const {
+    data: activities,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: clientKeys.activities(clientId),
+    queryFn: async () => {
+      const { data, error } = await clientsService.getClientActivities(clientId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!clientId,
+    staleTime: 15_000, // 15s - timeline change souvent
+  });
+
+  const addNoteMutation = useMutation({
+    mutationFn: (noteData) => clientsService.addClientNote({ clientId, ...noteData }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.activities(clientId) });
+    },
+  });
+
+  return {
+    activities: activities || [],
+    isLoading,
+    error,
+    addNote: addNoteMutation.mutateAsync,
+    isAddingNote: addNoteMutation.isPending,
+    refresh: refetch,
   };
 }
 
@@ -455,63 +467,32 @@ export function useClientEquipments(clientId) {
 
 /**
  * Hook pour les statistiques clients
- * 
+ *
  * @param {string} orgId - ID de l'organisation
  * @returns {Object} État et méthodes
- * 
- * @example
- * const { stats, loading, refresh } = useClientStats('xxx');
  */
 export function useClientStats(orgId) {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  /**
-   * Charge les statistiques
-   */
-  const fetchStats = useCallback(async () => {
-    if (!orgId) {
-      setStats(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data, error: fetchError } = await clientsService.getClientStats(orgId);
-
-      if (fetchError) throw fetchError;
-
-      setStats(data);
-    } catch (err) {
-      console.error('useClientStats.fetchStats error:', err);
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  /**
-   * Rafraîchit les stats
-   */
-  const refresh = useCallback(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  // Charger au montage
-  useEffect(() => {
-    if (orgId) {
-      fetchStats();
-    }
-  }, [orgId, fetchStats]);
+  const {
+    data: stats,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: clientKeys.stats(orgId),
+    queryFn: async () => {
+      const { data, error } = await clientsService.getClientStats(orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId,
+    staleTime: 60_000, // 1min
+  });
 
   return {
     stats,
-    loading,
+    isLoading,
     error,
-    refresh,
+    refresh: refetch,
   };
 }
 
@@ -521,78 +502,86 @@ export function useClientStats(orgId) {
 
 /**
  * Hook pour la recherche rapide de clients (autocomplete)
- * 
+ *
  * @param {string} orgId - ID de l'organisation
- * @param {Object} options - Options
+ * @param {Object} [options]
  * @param {number} [options.debounceMs=300] - Délai debounce
  * @param {number} [options.minChars=2] - Caractères minimum
- * @returns {Object} État et méthodes
- * 
- * @example
- * const { results, searching, search } = useClientSearch('xxx');
- * search('Dup'); // Déclenche la recherche
  */
 export function useClientSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  /**
-   * Effectue la recherche
-   */
-  const performSearch = useCallback(async (searchQuery) => {
-    if (!orgId || !searchQuery || searchQuery.length < minChars) {
-      setResults([]);
-      return;
-    }
-
-    setSearching(true);
-
-    try {
-      const { data, error } = await clientsService.searchClients(orgId, searchQuery);
-
-      if (error) throw error;
-
-      setResults(data || []);
-    } catch (err) {
-      console.error('useClientSearch.performSearch error:', err);
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [orgId, minChars]);
-
-  // Debounce de la recherche
+  // Debounce
   useEffect(() => {
-    const timer = setTimeout(() => {
-      performSearch(query);
-    }, debounceMs);
-
+    const timer = setTimeout(() => setDebouncedQuery(query), debounceMs);
     return () => clearTimeout(timer);
-  }, [query, debounceMs, performSearch]);
+  }, [query, debounceMs]);
 
-  /**
-   * Déclenche une recherche
-   */
-  const search = useCallback((newQuery) => {
-    setQuery(newQuery);
-  }, []);
+  const { data: results, isLoading: searching } = useQuery({
+    queryKey: clientKeys.search(orgId, debouncedQuery),
+    queryFn: async () => {
+      const { data, error } = await clientsService.searchClients(orgId, debouncedQuery);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!orgId && debouncedQuery.length >= minChars,
+    staleTime: 10_000,
+  });
 
-  /**
-   * Efface les résultats
-   */
+  const search = useCallback((newQuery) => setQuery(newQuery), []);
   const clear = useCallback(() => {
     setQuery('');
-    setResults([]);
+    setDebouncedQuery('');
   }, []);
 
   return {
     query,
-    results,
+    results: results || [],
     searching,
     search,
     clear,
   };
+}
+
+// ============================================================================
+// HOOK - useDuplicateCheck (détection doublons)
+// ============================================================================
+
+/**
+ * Hook pour la détection de doublons client par nom + code postal
+ * Utilisé lors de la création d'un nouveau client (CreateContractModal)
+ *
+ * @param {string} orgId - ID de l'organisation
+ * @param {string} lastName - Nom de famille à vérifier
+ * @param {string} postalCode - Code postal (optionnel, affine la recherche)
+ * @returns {{ duplicates: Array, isChecking: boolean }}
+ */
+export function useDuplicateCheck(orgId, lastName, postalCode) {
+  const [debouncedLastName, setDebouncedLastName] = useState('');
+  const [debouncedPostalCode, setDebouncedPostalCode] = useState('');
+
+  // Debounce 500ms pour éviter les requêtes pendant la frappe
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedLastName(lastName || '');
+      setDebouncedPostalCode(postalCode || '');
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [lastName, postalCode]);
+
+  const { data: duplicates, isLoading } = useQuery({
+    queryKey: [...clientKeys.all, 'duplicates', orgId, debouncedLastName, debouncedPostalCode],
+    queryFn: async () => {
+      const { data, error } = await clientsService.checkDuplicates(orgId, debouncedLastName, debouncedPostalCode);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && debouncedLastName.length >= 2,
+    staleTime: 15_000,
+  });
+
+  return { duplicates: duplicates || [], isChecking: isLoading };
 }
 
 // ============================================================================

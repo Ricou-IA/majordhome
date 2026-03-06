@@ -58,35 +58,41 @@ export function AuthProvider({ children }) {
 
     try {
       console.log('[AuthContext] Début chargement données pour userId:', userId);
-      
-      // Charger le profil
-      const { profile: userProfile, error: profileError } = await authService.getProfile(userId);
-      
+
+      // Charger le profil ET l'organisation en parallèle
+      const [profileResult, orgResult] = await Promise.all([
+        authService.getProfile(userId),
+        authService.getUserOrganization(userId),
+      ]);
+
+      const { profile: userProfile, error: profileError } = profileResult;
+      const { organization: userOrg, membership: userMembership, error: orgError } = orgResult;
+
       if (profileError) {
         console.error('[AuthContext] Erreur getProfile:', profileError);
       } else {
         setProfile(userProfile);
-        console.log('[AuthContext] Profil chargé:', userProfile?.full_name);
       }
-
-      // Charger l'organisation
-      const { organization: userOrg, membership: userMembership, error: orgError } =
-        await authService.getUserOrganization(userId);
 
       if (orgError) {
         console.error('[AuthContext] Erreur getUserOrganization:', orgError);
       } else {
         setOrganization(userOrg);
         setMembership(userMembership);
-        console.log('[AuthContext] Organisation chargée:', userOrg?.name);
       }
 
       dataLoadedRef.current = true;
 
-      console.log('[AuthContext] Données utilisateur chargées:', {
+      // DEBUG DÉTAILLÉ — à retirer après diagnostic
+      console.log('[AuthContext] DEBUG COMPLET loadUserData résultat:', {
         profile: userProfile?.full_name,
-        organization: userOrg?.name,
-        role: userMembership?.role,
+        profileOrgId: userProfile?.org_id,
+        organization: userOrg,
+        orgId: userOrg?.id,
+        orgName: userOrg?.name,
+        membership: userMembership,
+        orgError,
+        profileError,
       });
     } catch (error) {
       console.error('[AuthContext] Erreur chargement données:', error);

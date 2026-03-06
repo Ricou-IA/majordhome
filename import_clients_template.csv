@@ -1,0 +1,3 @@
+display_name,first_name,last_name,company_name,email,phone,phone_secondary,address,address_complement,postal_code,city,country,housing_type,surface,floor_count,construction_year,dpe_number,dpe_rating,access_instructions,client_category,lead_source,tags,is_reliable,notes,internal_notes
+Dupont Jean,Jean,Dupont,,jean.dupont@email.fr,06 12 34 56 78,,15 rue des Lilas,,81600,Gaillac,France,maison,120,2,1985,,,Portail code 1234,particulier,website,"chauffage,fidele",true,Client depuis 2020,
+SAS Martin Énergie,,,SAS Martin Énergie,contact@martin-energie.fr,05 63 00 00 00,05 63 00 00 01,Zone Artisanale Nord,Bât B,81000,Albi,France,local_commercial,350,1,2002,,,Accès livraison côté parking,entreprise,phone,"pro,prioritaire",true,,Gros compte - 3 sites
