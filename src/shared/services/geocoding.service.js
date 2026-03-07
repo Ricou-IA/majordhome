@@ -405,7 +405,8 @@ export function detectLeadZone(lat, lng) {
 }
 
 /**
- * Met à jour les coordonnées + zone d'une lead
+ * Met à jour les coordonnées + zone d'une lead via RPC
+ * (écriture directe sur majordhome.leads impossible — PostgREST n'expose pas ce schéma)
  * @param {string} leadId
  * @param {number} lat
  * @param {number} lng
@@ -413,16 +414,15 @@ export function detectLeadZone(lat, lng) {
  */
 export async function updateLeadCoordinates(leadId, lat, lng, zone) {
   try {
-    const { error } = await supabase
-      .schema('majordhome')
-      .from('leads')
-      .update({
+    const { error } = await supabase.rpc('update_majordhome_lead', {
+      p_id: leadId,
+      p_data: {
         latitude: lat,
         longitude: lng,
         geocoded_at: new Date().toISOString(),
         zone: zone,
-      })
-      .eq('id', leadId);
+      },
+    });
 
     if (error) throw error;
 
@@ -494,20 +494,18 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
 
     if (commercialId) {
       try {
-        // N'assigner que si pas déjà assigné
+        // N'assigner que si pas déjà assigné — lecture via vue publique
         const { data: lead } = await supabase
-          .schema('majordhome')
-          .from('leads')
+          .from('majordhome_leads')
           .select('assigned_user_id')
           .eq('id', leadId)
           .single();
 
         if (!lead?.assigned_user_id) {
-          await supabase
-            .schema('majordhome')
-            .from('leads')
-            .update({ assigned_user_id: commercialId })
-            .eq('id', leadId);
+          await supabase.rpc('update_majordhome_lead', {
+            p_id: leadId,
+            p_data: { assigned_user_id: commercialId },
+          });
 
           console.log(`[geocoding] Lead ${leadId} → zone ${zone} → commercial ${mapping.name}`);
         }
@@ -567,11 +565,10 @@ export async function batchGeocodeLeads(leads, onProgress) {
 
         if (commercialId && !lead.assigned_user_id) {
           try {
-            await supabase
-              .schema('majordhome')
-              .from('leads')
-              .update({ assigned_user_id: commercialId })
-              .eq('id', lead.id);
+            await supabase.rpc('update_majordhome_lead', {
+              p_id: lead.id,
+              p_data: { assigned_user_id: commercialId },
+            });
 
             results.assigned++;
             console.log(`[geocoding] Lead batch: ${lead.id} → zone ${zone} → ${mapping.name}`);
