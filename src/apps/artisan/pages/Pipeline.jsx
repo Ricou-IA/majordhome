@@ -57,7 +57,7 @@ const getProfileForDashboard = (profile, organization) => {
 // ============================================================================
 
 export default function Pipeline() {
-  const { profile, user, organization, loading: authLoading, dataLoading, canAccessPipeline, appRole, businessRole } =
+  const { profile, user, organization, loading: authLoading, canAccessPipeline, appRole, businessRole } =
     useAuth();
 
   // État modale lead
@@ -98,7 +98,7 @@ export default function Pipeline() {
   };
 
   // ======== Accès non autorisé ========
-  if (!authLoading && !dataLoading && !loading && profile && !canAccessPipeline) {
+  if (!authLoading && !loading && profile && !canAccessPipeline) {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold mb-2">Accès non autorisé</h1>
@@ -114,7 +114,7 @@ export default function Pipeline() {
 
   // ======== Loader initial ========
   // Attendre que l'auth ET les données utilisateur soient chargées
-  if (authLoading || dataLoading || !dashboardProfile || !dashboardProfile.orgId) {
+  if (authLoading || !dashboardProfile || !dashboardProfile.orgId) {
     return (
       <div className="p-8">
         <div className="animate-pulse space-y-4">

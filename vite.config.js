@@ -33,5 +33,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'mapbox-gl': ['mapbox-gl'],
+          'turf': ['@turf/turf'],
+        },
+      },
+    },
   },
 });

@@ -281,20 +281,8 @@ const ErrorState = ({ error, onRetry }) => (
  */
 export function Clients() {
   // Auth context pour récupérer l'org_id
-  const { organization, user, profile, dataLoading, initialized } = useAuth();
+  const { organization } = useAuth();
   const orgId = organization?.id;
-
-  // DEBUG TEMPORAIRE — à retirer après diagnostic
-  console.log('[Clients] DEBUG auth state:', {
-    orgId,
-    organizationId: organization?.id,
-    organizationName: organization?.name,
-    userId: user?.id,
-    userEmail: user?.email,
-    profileOrgId: profile?.org_id,
-    dataLoading,
-    initialized,
-  });
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -489,17 +477,6 @@ export function Clients() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* DEBUG TEMPORAIRE — bannière diagnostic */}
-      {!orgId && (
-        <div className="bg-red-100 border-b border-red-300 px-4 py-3 text-sm text-red-800">
-          <strong>DEBUG:</strong> orgId manquant.
-          {' '}user={user?.email || 'null'},
-          {' '}org={organization ? JSON.stringify({ id: organization.id, name: organization.name }) : 'null'},
-          {' '}profile.org_id={profile?.org_id || 'null'},
-          {' '}dataLoading={String(dataLoading)},
-          {' '}initialized={String(initialized)}
-        </div>
-      )}
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

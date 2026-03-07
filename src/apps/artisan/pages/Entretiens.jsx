@@ -147,7 +147,7 @@ const ErrorState = ({ error, onRetry }) => (
 // ============================================================================
 
 export default function Entretiens() {
-  const { organization, user, loading: authLoading, dataLoading } = useAuth();
+  const { organization, user, loading: authLoading } = useAuth();
   const orgId = organization?.id;
   const currentYear = new Date().getFullYear();
 
@@ -288,7 +288,7 @@ export default function Entretiens() {
   }, [setFilters, setActiveStatCard]);
 
   // Loader initial
-  if (authLoading || dataLoading || !orgId) {
+  if (authLoading || !orgId) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b border-gray-200">

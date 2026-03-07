@@ -1,6 +1,52 @@
 import { supabase } from '@lib/supabaseClient';
 
 // =============================================================================
+// HELPERS INTERNES
+// =============================================================================
+
+/**
+ * Détecte si une erreur est un AbortError (requête annulée)
+ * Cause typique : React 18 Strict Mode double-mount en dev
+ */
+function isAbortError(error) {
+  if (!error) return false;
+  return error.name === 'AbortError'
+    || error.message?.includes('abort')
+    || error.details?.includes('abort');
+}
+
+/**
+ * Exécute une fonction async avec retry automatique sur AbortError
+ * @param {Function} fn - Fonction async à exécuter
+ * @param {number} retries - Nombre de tentatives (défaut: 2)
+ * @param {number} delay - Délai entre tentatives en ms (défaut: 200)
+ */
+async function withAbortRetry(fn, retries = 2, delay = 200) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const result = await fn();
+      // Si pas d'erreur, retourner directement
+      if (!result.error) return result;
+      // Si AbortError et encore des tentatives, retry
+      if (isAbortError(result.error) && attempt < retries) {
+        console.warn(`[authService] AbortError détecté, retry ${attempt}/${retries - 1} dans ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      // Autre erreur ou dernière tentative — retourner tel quel
+      return result;
+    } catch (error) {
+      if (isAbortError(error) && attempt < retries) {
+        console.warn(`[authService] AbortError (thrown), retry ${attempt}/${retries - 1} dans ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+// =============================================================================
 // SERVICE D'AUTHENTIFICATION
 // =============================================================================
 
@@ -224,20 +270,22 @@ export const authService = {
    * @returns {Promise<{profile: Object|null, error: Error|null}>}
    */
   async getProfile(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    return withAbortRetry(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return { profile: data, error: null };
-    } catch (error) {
-      console.error('[authService] getProfile error:', error);
-      return { profile: null, error };
-    }
+        return { profile: data, error: null };
+      } catch (error) {
+        console.error('[authService] getProfile error:', error);
+        return { profile: null, error };
+      }
+    });
   },
 
   /**
@@ -278,52 +326,54 @@ export const authService = {
    * @returns {Promise<{organization: Object|null, membership: Object|null, error: Error|null}>}
    */
   async getUserOrganization(userId) {
-    try {
-      // Récupérer le membership via la vue enrichie (colonnes org_ jointes)
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .single();
+    return withAbortRetry(async () => {
+      try {
+        // Récupérer le membership via la vue enrichie (colonnes org_ jointes)
+        const { data: membership, error: memberError } = await supabase
+          .from('organization_members')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .single();
 
-      if (memberError) {
-        // Pas de membership trouvé = pas d'organisation
-        if (memberError.code === 'PGRST116') {
-          return { organization: null, membership: null, error: null };
-        }
-        throw memberError;
-      }
-
-      // Reconstruire l'objet organization depuis les colonnes plates org_*
-      const organization = membership.org_id
-        ? {
-            id: membership.org_id,
-            name: membership.org_name,
-            slug: membership.org_slug,
-            plan: membership.org_plan,
-            description: membership.org_description,
-            is_active: membership.org_is_active,
-            settings: membership.org_settings,
-            app_id: membership.org_app_id,
-            created_at: membership.org_created_at,
+        if (memberError) {
+          // Pas de membership trouvé = pas d'organisation
+          if (memberError.code === 'PGRST116') {
+            return { organization: null, membership: null, error: null };
           }
-        : null;
+          throw memberError;
+        }
 
-      return {
-        organization,
-        membership: {
-          id: membership.id,
-          role: membership.role,
-          status: membership.status,
-          joined_at: membership.joined_at,
-        },
-        error: null,
-      };
-    } catch (error) {
-      console.error('[authService] getUserOrganization error:', error);
-      return { organization: null, membership: null, error };
-    }
+        // Reconstruire l'objet organization depuis les colonnes plates org_*
+        const organization = membership.org_id
+          ? {
+              id: membership.org_id,
+              name: membership.org_name,
+              slug: membership.org_slug,
+              plan: membership.org_plan,
+              description: membership.org_description,
+              is_active: membership.org_is_active,
+              settings: membership.org_settings,
+              app_id: membership.org_app_id,
+              created_at: membership.org_created_at,
+            }
+          : null;
+
+        return {
+          organization,
+          membership: {
+            id: membership.id,
+            role: membership.role,
+            status: membership.status,
+            joined_at: membership.joined_at,
+          },
+          error: null,
+        };
+      } catch (error) {
+        console.error('[authService] getUserOrganization error:', error);
+        return { organization: null, membership: null, error };
+      }
+    });
   },
 
   /**

@@ -14,6 +14,7 @@ const Entretiens = lazy(() => import('./pages/Entretiens'));
 const InterventionDetail = lazy(() => import('./pages/InterventionDetail'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Territoire = lazy(() => import('./pages/Territoire'));
 
 // =============================================================================
 // LOADING COMPONENT
@@ -116,6 +117,14 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <Profile />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'territoire',
+    element: (
+      <SuspenseWrapper>
+        <Territoire />
       </SuspenseWrapper>
     ),
   },

@@ -48,7 +48,9 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClient, useClientEquipments } from '@/shared/hooks/useClients';
 import { clientsService, CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@/shared/services/clients.service';
+import { geocodeAndUpdateByProjectId } from '@/shared/services/geocoding.service';
 import { EquipmentList } from './EquipmentList';
+import { formatDateForInput, formatDateFR, formatPhoneNumber } from '@/lib/utils';
 
 // ============================================================================
 // CONSTANTES
@@ -59,65 +61,6 @@ const TABS = [
   { id: 'equipments', label: 'Équipements', icon: Wrench },
   { id: 'history', label: 'Historique', icon: History },
 ];
-
-// HOUSING_TYPES est importé depuis clients.service.js
-
-// ============================================================================
-// UTILITAIRES
-// ============================================================================
-
-/**
- * Formate une date pour l'input date
- */
-const formatDateForInput = (dateString) => {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  } catch {
-    return '';
-  }
-};
-
-/**
- * Formate une date en français
- */
-const formatDateFR = (dateString) => {
-  if (!dateString) return '-';
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
-};
-
-/**
- * Formate un numéro de téléphone en XX XX XX XX XX
- * @param {string} value - Valeur brute
- * @returns {string} Numéro formaté
- */
-const formatPhoneNumber = (value) => {
-  if (!value) return '';
-  
-  // Garder uniquement les chiffres
-  const digits = value.replace(/\D/g, '');
-  
-  // Limiter à 10 chiffres
-  const limited = digits.slice(0, 10);
-  
-  // Formater en XX XX XX XX XX
-  const parts = [];
-  for (let i = 0; i < limited.length; i += 2) {
-    parts.push(limited.slice(i, i + 2));
-  }
-  
-  return parts.join(' ');
-};
 
 /**
  * Parse le nom complet en nom/prénom
@@ -801,6 +744,12 @@ export function ClientModal({
 
         if (error) throw error;
 
+        // Auto-géocodage si adresse renseignée
+        if (formData.postalCode && formData.city && newClient?.project_id) {
+          geocodeAndUpdateByProjectId(newClient.project_id, formData.address, formData.postalCode, formData.city)
+            .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
+        }
+
         toast.success('Client créé avec succès');
         onCreated?.(newClient);
         onClose();
@@ -825,6 +774,12 @@ export function ClientModal({
         const { data, error } = await updateClient(updates);
 
         if (error) throw error;
+
+        // Auto-géocodage si adresse modifiée
+        if (formData.postalCode && formData.city && client?.project_id) {
+          geocodeAndUpdateByProjectId(client.project_id, formData.address, formData.postalCode, formData.city)
+            .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
+        }
 
         // Mettre à jour les données originales après sauvegarde réussie
         originalDataRef.current = { ...formData };

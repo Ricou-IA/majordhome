@@ -24,23 +24,7 @@ import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.ser
 import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
 import { Button } from '@components/ui/button';
-
-// ============================================================================
-// UTILITAIRES
-// ============================================================================
-
-const formatDateFR = (dateString) => {
-  if (!dateString) return '-';
-  try {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
-};
+import { formatDateFR } from '@/lib/utils';
 
 const formatEuro = (n) => {
   if (!n && n !== 0) return '-';

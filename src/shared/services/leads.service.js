@@ -44,20 +44,6 @@ export const LEAD_ACTIVITY_TYPES = {
 };
 
 /**
- * Labels d'activité en français
- */
-export const ACTIVITY_LABELS = {
-  lead_created: 'Lead créé',
-  status_changed: 'Statut modifié',
-  note: 'Note ajoutée',
-  lead_assigned: 'Lead assigné',
-  lead_converted: 'Converti en client',
-  phone_call: 'Appel téléphonique',
-  email_sent: 'Email envoyé',
-  email_received: 'Email reçu',
-};
-
-/**
  * Icônes/couleurs par type d'activité (pour la timeline)
  */
 export const ACTIVITY_CONFIG = {

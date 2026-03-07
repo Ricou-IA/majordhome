@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
+  MapPin,
   Kanban,
   Wrench,
   Settings,
@@ -37,6 +38,11 @@ const navigation = [
     icon: Users,
   },
   {
+    name: 'Territoire',
+    href: '/territoire',
+    icon: MapPin,
+  },
+  {
     name: 'Pipeline',
     href: '/pipeline',
     icon: Kanban,
@@ -54,7 +60,16 @@ const navigation = [
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, profile, organization, membership, canAccessPipeline, signOut } = useAuth();
+  const { user, profile, organization, membership, canAccessPipeline, appRole, businessRole, signOut } = useAuth();
+
+  // Debug: log pour vérifier les valeurs
+  console.log('[AppLayout] Debug Pipeline access:', {
+    hasProfile: !!profile,
+    appRole,
+    businessRole,
+    canAccessPipeline,
+    profileAppRole: profile?.app_role,
+  });
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);

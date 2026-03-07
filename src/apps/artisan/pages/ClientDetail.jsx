@@ -67,55 +67,7 @@ import { INTERVENTION_TYPES } from '@/shared/services/interventions.service';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-
-// ============================================================================
-// UTILITAIRES
-// ============================================================================
-
-const formatDateForInput = (dateString) => {
-  if (!dateString) return '';
-  try {
-    return new Date(dateString).toISOString().split('T')[0];
-  } catch {
-    return '';
-  }
-};
-
-const formatDateFR = (dateString) => {
-  if (!dateString) return '-';
-  try {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
-};
-
-const formatDateTimeFR = (dateString) => {
-  if (!dateString) return '-';
-  try {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '-';
-  }
-};
-
-const formatPhoneNumber = (value) => {
-  if (!value) return '';
-  const digits = value.replace(/\D/g, '').slice(0, 10);
-  const parts = [];
-  for (let i = 0; i < digits.length; i += 2) parts.push(digits.slice(i, i + 2));
-  return parts.join(' ');
-};
+import { formatDateForInput, formatDateFR, formatDateTimeFR, formatPhoneNumber } from '@/lib/utils';
 
 // ============================================================================
 // SOUS-COMPOSANTS FORMULAIRE

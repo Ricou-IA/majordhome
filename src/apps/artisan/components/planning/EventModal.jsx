@@ -57,6 +57,7 @@ import { leadsService } from '@/shared/services/leads.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { formatDateForInput } from '@/lib/utils';
 
 // ID du statut "RDV planifié" (table majordhome.statuses)
 const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
@@ -98,18 +99,6 @@ function computeDuration(startTime, endTime) {
   const [eh, em] = endTime.split(':').map(Number);
   const diff = (eh * 60 + em) - (sh * 60 + sm);
   return diff > 0 ? diff : 60;
-}
-
-/**
- * Formate une date pour l'input date
- */
-function formatDateForInput(dateStr) {
-  if (!dateStr) return '';
-  try {
-    return dateStr.split('T')[0];
-  } catch {
-    return '';
-  }
 }
 
 // ============================================================================
