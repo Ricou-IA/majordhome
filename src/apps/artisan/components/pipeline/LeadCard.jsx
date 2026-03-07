@@ -10,6 +10,7 @@
 
 import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { formatEuro } from '@/lib/utils';
 
 /**
  * Calcule le nombre de jours depuis une date
@@ -102,18 +103,6 @@ const SOURCE_SHORT_LABELS = {
   'Prospection directe': 'Prospection',
 };
 
-/**
- * Formate un montant en euros
- */
-function formatEur(amount) {
-  if (!amount && amount !== 0) return null;
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 /**
  * @param {Object} props
@@ -184,7 +173,7 @@ export function LeadCard({ lead, onClick, compact = false }) {
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
             <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-              {formatEur(amount)}
+              {formatEuro(amount)}
             </span>
           </div>
 
@@ -248,7 +237,7 @@ export function LeadCard({ lead, onClick, compact = false }) {
           )}
         </div>
         <span className={`text-sm font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-          {formatEur(amount)}
+          {formatEuro(amount)}
         </span>
       </div>
 

@@ -13,6 +13,7 @@
 
 import { Euro, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { formatEuro } from '@/lib/utils';
 
 // ============================================================================
 // SOUS-COMPOSANT : Info Card (non cliquable)
@@ -56,9 +57,6 @@ export function EntretiensDashboard({ stats, isLoading }) {
       </div>
     );
   }
-
-  const formatEuro = (n) =>
-    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 
   // Préparer les données du chart par fréquence
   const chartData = (stats.byType || [])

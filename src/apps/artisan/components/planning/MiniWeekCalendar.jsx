@@ -20,6 +20,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@/shared/services/appointments.service';
+import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================
 // CONSTANTES
@@ -51,15 +52,8 @@ function getMonday(date) {
   return d;
 }
 
-/**
- * Formate YYYY-MM-DD
- */
-function formatDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+// formatDate alias → formatDateForInput from utils (accepts Date objects)
+const formatDate = formatDateForInput;
 
 /**
  * Retourne le numéro de semaine ISO

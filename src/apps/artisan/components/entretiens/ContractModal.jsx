@@ -24,16 +24,7 @@ import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.ser
 import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
 import { Button } from '@components/ui/button';
-import { formatDateFR } from '@/lib/utils';
-
-const formatEuro = (n) => {
-  if (!n && n !== 0) return '-';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(n);
-};
+import { formatDateFR, formatEuro } from '@/lib/utils';
 
 // ============================================================================
 // SOUS-COMPOSANTS

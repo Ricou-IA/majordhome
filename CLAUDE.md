@@ -40,12 +40,13 @@ src/
 ├── hooks/pipeline/             # useDashboardData, useDashboardFilters
 ├── apps/artisan/
 │   ├── routes.jsx              # Routes lazy-loaded (11 routes)
-│   ├── pages/                  # Dashboard, Clients, ClientDetail, Pipeline, Planning, Entretiens, Territoire, InterventionDetail, Settings, Profile
+│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Entretiens, Territoire, InterventionDetail, Settings, Profile
 │   └── components/
-│       ├── clients/            # ClientCard, ClientModal, EquipmentList, EquipmentFormModal
-│       ├── entretiens/         # ContractCard, ContractModal, ContractsList, SectorGroupView, EntretiensDashboard, VisitBadge
-│       ├── pipeline/           # LeadModal, LeadKanban, LeadList, SchedulingPanel, dashboard/
-│       ├── planning/           # EventModal, TechnicianSelect, MiniWeekCalendar
+│       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
+│       ├── clients/            # ClientModal+Tabs, ClientCard, EquipmentList, EquipmentFormModal
+│       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
+│       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
+│       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
 │       └── territoire/         # TerritoireMap, MapControls, MapPopup, useMapZones, useTerritoireData
 └── shared/
     ├── services/               # auth, clients, contracts, entretiens, geocoding, territoire
@@ -107,6 +108,14 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - Tailwind (pas de CSS modules)
 - Toasts : `toast.success()`, `toast.error()`
 - Routes lazy-loaded dans `src/apps/artisan/routes.jsx`
+- **Composants formulaire partagés** : `src/apps/artisan/components/FormFields.jsx`
+  - `FormField`, `TextInput`, `PhoneInput`, `SelectInput`, `TextArea`, `SectionTitle`
+  - Exports : `inputClass`, `selectClass` (tokens `secondary-*`, `primary-*`)
+- **Utilitaires partagés** : `src/lib/utils.js`
+  - `formatDateForInput` (Date|string → YYYY-MM-DD, timezone-safe)
+  - `formatDateFR` (→ "1 janvier 2026"), `formatDateShortFR` (→ "1 janv. 2026")
+  - `formatDateTimeFR`, `formatPhoneNumber`, `formatEuro`
+  - `computeEndTime`, `computeDuration`
 
 ## Plan de Développement
 | Sprint | Titre | Statut |

@@ -39,6 +39,7 @@ import {
 import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@/shared/services/clients.service';
 import { CONTRACT_FREQUENCIES } from '@/shared/services/contracts.service';
 import { usePricingEquipmentTypes } from '@/shared/hooks/useClients';
+import { formatDateShortFR } from '@/lib/utils';
 
 // ============================================================================
 // UTILITAIRES
@@ -104,23 +105,8 @@ const getFrequencyLabel = (frequency) => {
   return found?.label || frequency || '-';
 };
 
-/**
- * Formate une date en français
- */
-const formatDate = (dateString) => {
-  if (!dateString) return '-';
-  
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return '-';
-  }
-};
+// formatDate alias → formatDateShortFR from utils
+const formatDate = formatDateShortFR;
 
 /**
  * Calcule le statut de maintenance
