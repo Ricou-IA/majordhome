@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   X, User, Wrench, History, Save, Loader2,
-  AlertCircle, CheckCircle, Lock, Unlock, Plus,
+  AlertCircle, CheckCircle, Lock, Unlock, Plus, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +22,7 @@ import { useClient } from '@/shared/hooks/useClients';
 import { clientsService } from '@/shared/services/clients.service';
 import { geocodeAndUpdateByProjectId } from '@/shared/services/geocoding.service';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
+import { TabContrat } from '../../pages/client-detail/TabContrat';
 
 // ============================================================================
 // CONSTANTES
@@ -29,6 +30,7 @@ import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModal
 
 const TABS = [
   { id: 'info', label: 'Informations', icon: User },
+  { id: 'contrat', label: 'Contrat', icon: FileText },
   { id: 'equipments', label: 'Équipements', icon: Wrench },
   { id: 'history', label: 'Historique', icon: History },
 ];
@@ -191,7 +193,11 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
         const { error } = await updateClient(updates);
         if (error) throw error;
 
-        if (formData.postalCode && formData.city && client?.project_id) {
+        const addressChanged =
+          formData.address !== originalDataRef.current?.address ||
+          formData.postalCode !== originalDataRef.current?.postalCode ||
+          formData.city !== originalDataRef.current?.city;
+        if (addressChanged && formData.postalCode && formData.city && client?.project_id) {
           geocodeAndUpdateByProjectId(client.project_id, formData.address, formData.postalCode, formData.city)
             .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
         }
@@ -317,6 +323,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
               {activeTab === 'info' && (
                 <TabInfo formData={formData} setFormData={setFormData} errors={errors} isLocked={isLocked} />
               )}
+              {activeTab === 'contrat' && <TabContrat clientId={clientId} orgId={orgId} userId={user?.id} />}
               {activeTab === 'equipments' && <TabEquipments clientId={clientId} />}
               {activeTab === 'history' && <TabHistory interventions={client?.interventions || []} />}
             </>

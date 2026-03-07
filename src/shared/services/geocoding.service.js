@@ -2,14 +2,17 @@
  * geocoding.service.js
  * Service de géocodage via api-adresse.data.gouv.fr (gratuit, illimité)
  * Utilisé pour :
- *  - Géocoder une adresse en lat/lng
+ *  - Géocoder une adresse en lat/lng (clients + leads)
  *  - Batch géocodage des clients existants
- *  - Auto-géocodage à la saisie dans ClientModal
+ *  - Auto-géocodage à la saisie dans ClientModal et LeadModal
+ *  - Détection zone + auto-assignation commercial pour les leads
  *
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { ZONE_COMMERCIAL_MAPPING } from '@/lib/territoire-config';
+import * as turf from '@turf/turf';
 
 const API_BASE = 'https://api-adresse.data.gouv.fr';
 
@@ -86,8 +89,7 @@ export async function geocodeAddress(address, postalCode, city) {
 export async function updateClientCoordinates(clientId, lat, lng) {
   try {
     const { error } = await supabase
-      .schema('majordhome')
-      .from('clients')
+      .from('majordhome_clients')
       .update({
         latitude: lat,
         longitude: lng,
@@ -133,8 +135,7 @@ export async function geocodeAndUpdateByProjectId(projectId, address, postalCode
 
   try {
     const { error } = await supabase
-      .schema('majordhome')
-      .from('clients')
+      .from('majordhome_clients')
       .update({
         latitude: result.lat,
         longitude: result.lng,
@@ -300,14 +301,317 @@ function parseCSVLine(line) {
 }
 
 // ============================================================================
+// GÉOCODAGE LEADS
+// ============================================================================
+
+/**
+ * Géocode par code postal uniquement (centroïde de commune)
+ * Utilisé quand seul le CP est connu (début de qualification lead)
+ * @param {string} postalCode
+ * @returns {{ lat: number, lng: number, score: number, label: string } | null}
+ */
+export async function geocodeByPostalCode(postalCode) {
+  try {
+    if (!postalCode || postalCode.length < 4) return null;
+
+    const params = new URLSearchParams({
+      q: postalCode,
+      type: 'municipality',
+      postcode: postalCode,
+      limit: '1',
+    });
+
+    const res = await fetch(`${API_BASE}/search/?${params}`);
+    if (!res.ok) {
+      console.warn('[geocoding] API error (CP):', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+
+    if (!data.features || data.features.length === 0) {
+      console.warn('[geocoding] Aucun résultat pour CP:', postalCode);
+      return null;
+    }
+
+    const feature = data.features[0];
+    const [lng, lat] = feature.geometry.coordinates;
+    const score = feature.properties.score;
+    const label = feature.properties.label;
+
+    if (score < 0.3) {
+      console.warn('[geocoding] Score CP trop faible:', score, 'pour', postalCode);
+      return null;
+    }
+
+    return { lat, lng, score, label };
+  } catch (error) {
+    console.error('[geocoding] Erreur geocodeByPostalCode:', error);
+    return null;
+  }
+}
+
+/**
+ * Géocode une lead : adresse complète si disponible, sinon par code postal
+ * @param {string|null} address
+ * @param {string|null} postalCode
+ * @param {string|null} city
+ * @returns {{ lat: number, lng: number, score: number, label: string } | null}
+ */
+export async function geocodeLeadAddress(address, postalCode, city) {
+  // Si adresse rue présente → géocodage précis
+  if (address && address.trim().length > 3) {
+    const result = await geocodeAddress(address, postalCode, city);
+    if (result) return result;
+  }
+  // Fallback : centroïde du code postal
+  if (postalCode) {
+    return geocodeByPostalCode(postalCode);
+  }
+  return null;
+}
+
+/**
+ * Détecte la zone commerciale (gaillac/pechbonnieu) à partir de coordonnées
+ * Utilise les polygones zones cachés dans localStorage par useMapZones
+ * @param {number} lat
+ * @param {number} lng
+ * @returns {'gaillac' | 'pechbonnieu' | null}
+ */
+export function detectLeadZone(lat, lng) {
+  try {
+    const cached = localStorage.getItem('mayer-territoire-zones-v8');
+    if (!cached) {
+      console.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
+      return null;
+    }
+
+    const zones = JSON.parse(cached);
+    const point = turf.point([lng, lat]);
+
+    // Vérifier Pechbonnieu en premier (plus petite, plus spécifique)
+    if (zones.zone_pechbonnieu && turf.booleanPointInPolygon(point, zones.zone_pechbonnieu)) {
+      return 'pechbonnieu';
+    }
+    if (zones.zone_gaillac && turf.booleanPointInPolygon(point, zones.zone_gaillac)) {
+      return 'gaillac';
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[geocoding] Erreur detectLeadZone:', error);
+    return null;
+  }
+}
+
+/**
+ * Met à jour les coordonnées + zone d'une lead
+ * @param {string} leadId
+ * @param {number} lat
+ * @param {number} lng
+ * @param {string|null} zone
+ */
+export async function updateLeadCoordinates(leadId, lat, lng, zone) {
+  try {
+    const { error } = await supabase
+      .schema('majordhome')
+      .from('leads')
+      .update({
+        latitude: lat,
+        longitude: lng,
+        geocoded_at: new Date().toISOString(),
+        zone: zone,
+      })
+      .eq('id', leadId);
+
+    if (error) throw error;
+
+    console.log('[geocoding] Lead coordonnées mises à jour:', leadId, '→ zone:', zone);
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('[geocoding] Erreur updateLeadCoordinates:', error);
+    return { success: false, error };
+  }
+}
+
+// Cache module-level pour les IDs commerciaux (ne change pas en session)
+const _commercialIdCache = {};
+
+/**
+ * Résout l'ID profil d'un commercial à partir de son email
+ * @param {string} email
+ * @returns {string|null} profile UUID
+ */
+export async function resolveCommercialId(email) {
+  if (_commercialIdCache[email]) return _commercialIdCache[email];
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (error || !data) {
+      console.warn('[geocoding] Commercial non trouvé pour:', email);
+      return null;
+    }
+
+    _commercialIdCache[email] = data.id;
+    return data.id;
+  } catch (error) {
+    console.error('[geocoding] Erreur resolveCommercialId:', error);
+    return null;
+  }
+}
+
+/**
+ * Géocode une lead + détecte zone + assigne commercial
+ * Fonction principale appelée en fire-and-forget par LeadModal
+ * @param {string} leadId
+ * @param {string|null} address
+ * @param {string|null} postalCode
+ * @param {string|null} city
+ */
+export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
+  // 1. Géocoder
+  const coords = await geocodeLeadAddress(address, postalCode, city);
+  if (!coords) {
+    console.log('[geocoding] Lead non géocodable:', leadId);
+    return;
+  }
+
+  // 2. Détecter zone
+  const zone = detectLeadZone(coords.lat, coords.lng);
+
+  // 3. Mettre à jour coordonnées + zone
+  await updateLeadCoordinates(leadId, coords.lat, coords.lng, zone);
+
+  // 4. Auto-assigner commercial si zone détectée
+  if (zone && ZONE_COMMERCIAL_MAPPING[zone]) {
+    const mapping = ZONE_COMMERCIAL_MAPPING[zone];
+    const commercialId = await resolveCommercialId(mapping.email);
+
+    if (commercialId) {
+      try {
+        // N'assigner que si pas déjà assigné
+        const { data: lead } = await supabase
+          .schema('majordhome')
+          .from('leads')
+          .select('assigned_user_id')
+          .eq('id', leadId)
+          .single();
+
+        if (!lead?.assigned_user_id) {
+          await supabase
+            .schema('majordhome')
+            .from('leads')
+            .update({ assigned_user_id: commercialId })
+            .eq('id', leadId);
+
+          console.log(`[geocoding] Lead ${leadId} → zone ${zone} → commercial ${mapping.name}`);
+        }
+      } catch (error) {
+        console.warn('[geocoding] Erreur auto-assignation:', error);
+      }
+    }
+  }
+}
+
+// ============================================================================
+// BATCH GÉOCODAGE LEADS
+// ============================================================================
+
+/**
+ * Géocode un batch de leads (par CP ou adresse complète) + détecte zone + assigne commercial
+ * @param {Array<{id: string, address: string|null, postal_code: string|null, city: string|null}>} leads
+ * @param {function} onProgress - Callback (processed, total)
+ * @returns {{ success: number, failed: number, assigned: number }}
+ */
+export async function batchGeocodeLeads(leads, onProgress) {
+  const results = { success: 0, failed: 0, assigned: 0 };
+  const DELAY_MS = 200; // Rate limit API adresse.data.gouv.fr
+
+  for (let i = 0; i < leads.length; i++) {
+    const lead = leads[i];
+
+    try {
+      // 1. Géocoder
+      const coords = await geocodeLeadAddress(
+        lead.address || null,
+        lead.postal_code || null,
+        lead.city || null,
+      );
+
+      if (!coords) {
+        results.failed++;
+        continue;
+      }
+
+      // 2. Détecter zone
+      const zone = detectLeadZone(coords.lat, coords.lng);
+
+      // 3. Mettre à jour coordonnées + zone
+      const { success } = await updateLeadCoordinates(lead.id, coords.lat, coords.lng, zone);
+      if (!success) {
+        results.failed++;
+        continue;
+      }
+
+      results.success++;
+
+      // 4. Auto-assigner commercial si zone détectée
+      if (zone && ZONE_COMMERCIAL_MAPPING[zone]) {
+        const mapping = ZONE_COMMERCIAL_MAPPING[zone];
+        const commercialId = await resolveCommercialId(mapping.email);
+
+        if (commercialId && !lead.assigned_user_id) {
+          try {
+            await supabase
+              .schema('majordhome')
+              .from('leads')
+              .update({ assigned_user_id: commercialId })
+              .eq('id', lead.id);
+
+            results.assigned++;
+            console.log(`[geocoding] Lead batch: ${lead.id} → zone ${zone} → ${mapping.name}`);
+          } catch (err) {
+            console.warn('[geocoding] Batch auto-assign failed:', err);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[geocoding] Batch lead error for ${lead.id}:`, error);
+      results.failed++;
+    }
+
+    if (onProgress) {
+      onProgress(i + 1, leads.length);
+    }
+
+    // Rate limit
+    if (i < leads.length - 1) {
+      await new Promise(r => setTimeout(r, DELAY_MS));
+    }
+  }
+
+  return results;
+}
+
+// ============================================================================
 // EXPORT SERVICE
 // ============================================================================
 
 export const geocodingService = {
   geocodeAddress,
+  geocodeByPostalCode,
+  geocodeLeadAddress,
+  geocodeAndAssignLead,
+  detectLeadZone,
   updateClientCoordinates,
   geocodeAndUpdateClient,
   batchGeocodeClients,
+  batchGeocodeLeads,
 };
 
 export default geocodingService;

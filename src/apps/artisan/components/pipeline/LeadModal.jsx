@@ -28,6 +28,7 @@ import { usePricingEquipmentTypes, useClientSearch } from '@/shared/hooks/useCli
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@/shared/services/appointments.service';
 import { formatDateForInput } from '@/lib/utils';
+import { geocodeAndAssignLead } from '@services/geocoding.service';
 
 // Sous-composants extraits
 import { getAllowedNextStatuses } from './LeadStatusConfig';
@@ -273,10 +274,12 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
     }
     try {
       const payload = buildPayload();
+      let savedLeadId = leadId;
       if (isEditing) {
         await updateLead(leadId, payload);
       } else {
-        await createLead({ orgId, userId, ...payload });
+        const result = await createLead({ orgId, userId, ...payload });
+        savedLeadId = result?.data?.id || null;
       }
       const synced = await syncClientFields();
       if (synced) {
@@ -284,6 +287,17 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
       } else {
         toast.success(isEditing ? 'Lead mis à jour' : 'Lead créé');
       }
+
+      // Fire-and-forget : géocoder + assigner zone/commercial
+      if (savedLeadId && (form.postal_code || form.address)) {
+        geocodeAndAssignLead(
+          savedLeadId,
+          form.address?.trim() || null,
+          form.postal_code?.trim() || null,
+          form.city?.trim() || null,
+        ).catch(err => console.warn('[LeadModal] Géocodage async échoué:', err));
+      }
+
       onSaved?.();
       onClose();
     } catch (err) {

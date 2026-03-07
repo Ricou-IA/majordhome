@@ -12,8 +12,9 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
-  // Seule ref nécessaire : éviter que SIGNED_IN double-charge pendant signIn()
-  const signInActiveRef = useRef(false);
+  // Refs de contrôle
+  const signInActiveRef = useRef(false);       // Éviter que SIGNED_IN double-charge pendant signIn()
+  const signOutTimerRef = useRef(null);        // Debounce SIGNED_OUT (protection alt-tab)
 
   // ===========================================================================
   // CHARGEMENT DES DONNÉES UTILISATEUR
@@ -89,40 +90,83 @@ export function AuthProvider({ children }) {
 
     initAuth();
 
+    // Helper : annuler un SIGNED_OUT en attente
+    const cancelPendingSignOut = () => {
+      if (signOutTimerRef.current) {
+        clearTimeout(signOutTimerRef.current);
+        signOutTimerRef.current = null;
+      }
+    };
+
+    // Helper : mettre à jour user SANS re-render si même utilisateur
+    const updateUserIfChanged = (sessionUser) => {
+      setUser(prev => {
+        if (prev?.id === sessionUser.id) return prev; // Même user → pas de re-render
+        return sessionUser;
+      });
+    };
+
+    // Helper : recharger profile/org SEULEMENT si manquants
+    const reloadIfNeeded = (userId) => {
+      setProfile(prev => {
+        setOrganization(prevOrg => {
+          if (!prev || !prevOrg) {
+            console.log('[AuthContext] reload needed (profile:', !!prev, 'org:', !!prevOrg, ')');
+            loadUserData(userId);
+          }
+          return prevOrg;
+        });
+        return prev;
+      });
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted || event === 'INITIAL_SESSION') return;
 
+        console.log('[AuthContext] onAuthStateChange:', event);
+
         switch (event) {
           case 'SIGNED_IN':
+            cancelPendingSignOut();
             if (session?.user) {
-              setUser(session.user);
-              // signIn() gère déjà loadUserData — ne pas doubler
-              if (!signInActiveRef.current) {
-                await loadUserData(session.user.id);
+              // signIn() explicite gère déjà loadUserData — ne pas doubler
+              if (signInActiveRef.current) {
+                setUser(session.user);
+              } else {
+                // Alt-tab / refresh : ne PAS re-render si données déjà présentes
+                updateUserIfChanged(session.user);
+                reloadIfNeeded(session.user.id);
               }
             }
             break;
 
           case 'SIGNED_OUT':
-            resetState();
+            // Protection alt-tab : Supabase peut fire SIGNED_OUT puis SIGNED_IN
+            // en rafale lors d'un refresh. On debounce 2s pour laisser le temps
+            // au SIGNED_IN de suivre et annuler le reset.
+            cancelPendingSignOut();
+            signOutTimerRef.current = setTimeout(() => {
+              if (mounted) {
+                console.log('[AuthContext] SIGNED_OUT confirmé — reset state');
+                resetState();
+              }
+              signOutTimerRef.current = null;
+            }, 2000);
             break;
 
           case 'TOKEN_REFRESHED':
+            cancelPendingSignOut();
             if (session?.user) {
-              setUser(session.user);
-              // Retry si les données manquent (le load initial a pu échouer avec un token expiré)
-              // On lit le state via les setters pour éviter les closures stales
-              setProfile(prev => {
-                if (!prev) loadUserData(session.user.id);
-                return prev;
-              });
+              updateUserIfChanged(session.user);
+              reloadIfNeeded(session.user.id);
             }
             break;
 
           case 'USER_UPDATED':
+            cancelPendingSignOut();
             if (session?.user) {
-              setUser(session.user);
+              setUser(session.user); // Force update — user data a changé
               await loadUserData(session.user.id);
             }
             break;
@@ -130,9 +174,23 @@ export function AuthProvider({ children }) {
       }
     );
 
+    // =========================================================================
+    // VISIBILITY CHANGE — filet de sécurité au retour d'alt-tab
+    // =========================================================================
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible' || !mounted) return;
+
+      // Annuler tout SIGNED_OUT en attente — on revient sur l'onglet
+      cancelPendingSignOut();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       mounted = false;
+      cancelPendingSignOut();
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [loadUserData, resetState]);
 

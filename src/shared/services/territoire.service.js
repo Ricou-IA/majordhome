@@ -21,26 +21,40 @@ export const territoireService = {
     try {
       if (!orgId) throw new Error('orgId requis');
 
-      const { data, error } = await supabase
-        .from('majordhome_clients')
-        .select(`
-          id, display_name, first_name, last_name,
-          address, postal_code, city,
-          latitude, longitude,
-          phone, email,
-          client_category, client_number,
-          has_active_contract, is_archived
-        `)
-        .eq('org_id', orgId)
-        .eq('is_archived', false)
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
+      // Supabase limite à 1000 lignes par défaut → paginer
+      const allData = [];
+      const PAGE_SIZE = 1000;
+      let offset = 0;
 
-      if (error) throw error;
+      while (true) {
+        const { data, error } = await supabase
+          .from('majordhome_clients')
+          .select(`
+            id, display_name, first_name, last_name,
+            address, postal_code, city,
+            latitude, longitude,
+            phone, email,
+            client_category, client_number,
+            has_active_contract, is_archived
+          `)
+          .eq('org_id', orgId)
+          .eq('is_archived', false)
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null)
+          .order('id')
+          .range(offset, offset + PAGE_SIZE - 1);
 
-      const points = (data || []).map(c => ({
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        allData.push(...data);
+        if (data.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+
+      const points = allData.map(c => ({
         id: c.id,
-        type: c.has_active_contract ? 'client_contrat' : 'client',
+        type: 'client',
         lat: Number(c.latitude),
         lng: Number(c.longitude),
         label: c.display_name || `${c.last_name || ''} ${c.first_name || ''}`.trim(),
@@ -61,53 +75,36 @@ export const territoireService = {
   },
 
   /**
-   * Leads géocodés (via coordonnées du client lié)
+   * Leads géocodés (coordonnées propres sur la table leads)
+   * Utilise la vue majordhome_leads (schéma public) pour fiabilité PostgREST
    */
   async getGeocodedLeads(orgId) {
     try {
       if (!orgId) throw new Error('orgId requis');
 
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('leads')
-        .select('id, first_name, last_name, company, address, postal_code, city, status, estimated_amount, source, client_id')
-        .eq('org_id', orgId);
+        .from('majordhome_leads')
+        .select('id, first_name, last_name, company_name, city, postal_code, status_id, estimated_amount, source_id, latitude, longitude, zone, assigned_user_id')
+        .eq('org_id', orgId)
+        .eq('is_deleted', false)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
 
       if (error) throw error;
 
-      const clientIds = (data || []).filter(l => l.client_id).map(l => l.client_id);
-
-      let clientCoords = {};
-      if (clientIds.length > 0) {
-        const { data: clients } = await supabase
-          .from('majordhome_clients')
-          .select('id, latitude, longitude')
-          .eq('org_id', orgId)
-          .in('id', clientIds)
-          .not('latitude', 'is', null);
-
-        if (clients) {
-          clientCoords = clients.reduce((acc, c) => {
-            acc[c.id] = { lat: Number(c.latitude), lng: Number(c.longitude) };
-            return acc;
-          }, {});
-        }
-      }
-
-      const points = (data || [])
-        .filter(l => l.client_id && clientCoords[l.client_id])
-        .map(l => ({
-          id: l.id,
-          type: 'lead',
-          lat: clientCoords[l.client_id].lat,
-          lng: clientCoords[l.client_id].lng,
-          label: `${l.last_name || ''} ${l.first_name || ''}`.trim() || l.company || 'Lead',
-          city: l.city,
-          postalCode: l.postal_code,
-          status: l.status,
-          amount: l.estimated_amount ? Number(l.estimated_amount) : undefined,
-          source: l.source,
-        }));
+      const points = (data || []).map(l => ({
+        id: l.id,
+        type: 'lead',
+        lat: Number(l.latitude),
+        lng: Number(l.longitude),
+        label: `${l.last_name || ''} ${l.first_name || ''}`.trim() || l.company_name || 'Lead',
+        city: l.city,
+        postalCode: l.postal_code,
+        status: l.status_id,
+        amount: l.estimated_amount ? Number(l.estimated_amount) : undefined,
+        source: l.source_id,
+        zone: l.zone,
+      }));
 
       return { data: points, error: null };
     } catch (error) {
@@ -130,13 +127,39 @@ export const territoireService = {
         .eq('is_archived', false)
         .is('latitude', null)
         .not('postal_code', 'is', null)
-        .not('city', 'is', null);
+        .not('city', 'is', null)
+        .not('address', 'is', null);
 
       if (error) throw error;
 
       return { data: data || [], count: count || 0, error: null };
     } catch (error) {
       console.error('[territoire] getUngeocodedClients error:', error);
+      return { data: null, count: null, error };
+    }
+  },
+
+  /**
+   * Leads NON géocodés (ont un postal_code mais pas de lat/lng)
+   * Utilise la vue majordhome_leads (schéma public) pour fiabilité PostgREST
+   */
+  async getUngeocodedLeads(orgId) {
+    try {
+      if (!orgId) throw new Error('orgId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_leads')
+        .select('id, address, postal_code, city, assigned_user_id')
+        .eq('org_id', orgId)
+        .eq('is_deleted', false)
+        .is('latitude', null)
+        .not('postal_code', 'is', null);
+
+      if (error) throw error;
+
+      return { data: data || [], count: data?.length || 0, error: null };
+    } catch (error) {
+      console.error('[territoire] getUngeocodedLeads error:', error);
       return { data: null, count: null, error };
     }
   },

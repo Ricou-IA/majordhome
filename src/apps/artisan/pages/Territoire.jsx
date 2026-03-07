@@ -3,8 +3,8 @@
  * Page carte interactive du territoire CRM
  */
 
-import { useState, useCallback } from 'react';
-import { Map, Loader2, AlertTriangle, Zap } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Map, Loader2, AlertTriangle, Zap, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -35,11 +35,27 @@ export default function Territoire() {
     invalidate: invalidateZones,
   } = useMapZones(MAPBOX_CONFIG.accessToken);
 
-  // État batch géocodage
+  // État batch géocodage clients
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState(null);
 
+  // État batch géocodage leads
+  const [leadBatchRunning, setLeadBatchRunning] = useState(false);
+  const [leadBatchProgress, setLeadBatchProgress] = useState(null);
+  const [ungeocodedLeadsCount, setUngeocodedLeadsCount] = useState(0);
+
   const ungeocodedCount = stats?.notGeocoded || 0;
+
+  // Charger le count de leads non géocodés
+  useEffect(() => {
+    if (!orgId) return;
+    territoireService.getUngeocodedLeads(orgId).then(({ count, error }) => {
+      if (error) {
+        console.error('[Territoire] getUngeocodedLeads error:', error);
+      }
+      setUngeocodedLeadsCount(count || 0);
+    });
+  }, [orgId, leadBatchRunning]);
 
   // ========================================================================
   // BATCH GÉOCODAGE
@@ -70,7 +86,7 @@ export default function Territoire() {
         `Géocodage terminé : ${results.success} réussis, ${results.failed} échoués`
       );
 
-      window.location.reload();
+      refetchPoints();
     } catch (error) {
       toast.error('Erreur lors du géocodage batch');
       console.error('[Territoire] batch geocode error:', error);
@@ -78,7 +94,47 @@ export default function Territoire() {
       setBatchRunning(false);
       setBatchProgress(null);
     }
-  }, [orgId]);
+  }, [orgId, refetchPoints]);
+
+  // ========================================================================
+  // BATCH GÉOCODAGE LEADS
+  // ========================================================================
+
+  const handleBatchGeocodeLeads = useCallback(async () => {
+    if (!orgId) return;
+    setLeadBatchRunning(true);
+    toast.info('Chargement des leads à géocoder...');
+
+    try {
+      const result = await territoireService.getUngeocodedLeads(orgId);
+
+      if (!result.data?.length) {
+        toast.info('Tous les leads sont déjà géocodés');
+        setLeadBatchRunning(false);
+        return;
+      }
+
+      setLeadBatchProgress({ current: 0, total: result.data.length });
+
+      const results = await geocodingService.batchGeocodeLeads(
+        result.data,
+        (current, total) => setLeadBatchProgress({ current, total })
+      );
+
+      const parts = [`${results.success} géocodés`];
+      if (results.assigned > 0) parts.push(`${results.assigned} assignés`);
+      if (results.failed > 0) parts.push(`${results.failed} échoués`);
+      toast.success(`Leads : ${parts.join(', ')}`);
+
+      refetchPoints();
+    } catch (error) {
+      toast.error('Erreur lors du géocodage des leads');
+      console.error('[Territoire] batch geocode leads error:', error);
+    } finally {
+      setLeadBatchRunning(false);
+      setLeadBatchProgress(null);
+    }
+  }, [orgId, refetchPoints]);
 
   // ========================================================================
   // HANDLERS
@@ -88,8 +144,8 @@ export default function Territoire() {
     console.log('[Territoire] Point cliqué:', point);
   }, []);
 
-  const handleZoneClick = useCallback((zone) => {
-    toast.info(`Zone ${zone === 'gaillac' ? 'Gaillac' : 'Pechbonnieu'} sélectionnée`);
+  const handleZoneClick = useCallback(() => {
+    // Pas de toast — clic zone silencieux
   }, []);
 
   // ========================================================================
@@ -112,30 +168,58 @@ export default function Territoire() {
           </div>
         </div>
 
-        {/* Bouton batch géocodage */}
-        <button
-          onClick={handleBatchGeocode}
-          disabled={batchRunning || ungeocodedCount === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors text-sm font-medium"
-        >
-          {batchRunning ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>
-                Géocodage {batchProgress?.current || 0}/{batchProgress?.total || '...'}...
-              </span>
-            </>
-          ) : (
-            <>
-              <Zap className="w-4 h-4" />
-              <span>
-                {ungeocodedCount > 0
-                  ? `Géocoder ${ungeocodedCount} clients`
-                  : 'Tous les clients sont géocodés'}
-              </span>
-            </>
-          )}
-        </button>
+        {/* Boutons batch géocodage */}
+        <div className="flex items-center gap-2">
+          {/* Clients */}
+          <button
+            onClick={handleBatchGeocode}
+            disabled={batchRunning || ungeocodedCount === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors text-sm font-medium"
+          >
+            {batchRunning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>
+                  Clients {batchProgress?.current || 0}/{batchProgress?.total || '...'}
+                </span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4" />
+                <span>
+                  {ungeocodedCount > 0
+                    ? `Géocoder ${ungeocodedCount} clients`
+                    : 'Clients géocodés ✓'}
+                </span>
+              </>
+            )}
+          </button>
+
+          {/* Leads */}
+          <button
+            onClick={handleBatchGeocodeLeads}
+            disabled={leadBatchRunning || ungeocodedLeadsCount === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors text-sm font-medium"
+          >
+            {leadBatchRunning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>
+                  Leads {leadBatchProgress?.current || 0}/{leadBatchProgress?.total || '...'}
+                </span>
+              </>
+            ) : (
+              <>
+                <MapPin className="w-4 h-4" />
+                <span>
+                  {ungeocodedLeadsCount > 0
+                    ? `Géocoder ${ungeocodedLeadsCount} leads`
+                    : 'Leads géocodés ✓'}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Info zones fallback (cercles approximatifs au lieu d'isochrones) */}

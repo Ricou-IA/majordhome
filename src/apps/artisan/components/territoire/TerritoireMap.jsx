@@ -11,13 +11,16 @@
  */
 
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
-import { TERRITOIRE_CONFIG, CRM_POINT_TYPES } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, CRM_POINT_TYPES, CONTRACT_COLOR } from '@/lib/territoire-config';
 import MapControls from './MapControls';
 import MapPopup from './MapPopup';
+import MapSearch from './MapSearch';
+import ClientModal from '../clients/ClientModal';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -36,6 +39,7 @@ export default function TerritoireMap({
   initialCenter,
   initialZoom = 9,
 }) {
+  const navigate = useNavigate();
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -44,38 +48,60 @@ export default function TerritoireMap({
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [visibleTypes, setVisibleTypes] = useState(Object.keys(CRM_POINT_TYPES));
   const [showZones, setShowZones] = useState(true);
+  const [focusedPointId, setFocusedPointId] = useState(null);
+  const [clientModalId, setClientModalId] = useState(null);
+  const [showContractsOnly, setShowContractsOnly] = useState(false);
+  const savedViewRef = useRef(null); // Pour restaurer la vue après focus
 
   // ========================================================================
   // DONNÉES GEOJSON
   // ========================================================================
 
   const geojsonPoints = useMemo(() => {
-    const filtered = points.filter(p => visibleTypes.includes(p.type));
+    let filtered = points.filter(p => visibleTypes.includes(p.type));
+
+    // Filtre contrats actifs : ne garder que les clients avec contrat
+    if (showContractsOnly) {
+      filtered = filtered.filter(p => p.type !== 'client' || p.hasContract);
+    }
+
+    // Mode focus : n'afficher que le point recherché
+    if (focusedPointId) {
+      filtered = filtered.filter(p => p.id === focusedPointId);
+    }
+
     return {
       type: 'FeatureCollection',
-      features: filtered.map(p => ({
-        type: 'Feature',
-        properties: {
-          id: p.id,
-          type: p.type,
-          label: p.label,
-          city: p.city || '',
-          postalCode: p.postalCode || '',
-          phone: p.phone || '',
-          email: p.email || '',
-          clientNumber: p.clientNumber || '',
-          hasContract: p.hasContract || false,
-          amount: p.amount || 0,
-          status: p.status || '',
-          color: CRM_POINT_TYPES[p.type]?.color || '#6b7280',
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: [p.lng, p.lat],
-        },
-      })),
+      features: filtered.map(p => {
+        // Clients avec contrat actif → violet, sinon couleur du type
+        const color = (p.type === 'client' && p.hasContract)
+          ? CONTRACT_COLOR
+          : (CRM_POINT_TYPES[p.type]?.color || '#6b7280');
+
+        return {
+          type: 'Feature',
+          properties: {
+            id: p.id,
+            type: p.type,
+            label: p.label,
+            city: p.city || '',
+            postalCode: p.postalCode || '',
+            phone: p.phone || '',
+            email: p.email || '',
+            clientNumber: p.clientNumber || '',
+            hasContract: p.hasContract || false,
+            amount: p.amount || 0,
+            status: p.status || '',
+            color,
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [p.lng, p.lat],
+          },
+        };
+      }),
     };
-  }, [points, visibleTypes]);
+  }, [points, visibleTypes, focusedPointId, showContractsOnly]);
 
   // ========================================================================
   // INITIALISATION MAP
@@ -170,16 +196,35 @@ export default function TerritoireMap({
     const map = mapRef.current;
 
     // Nettoyer les anciennes couches
-    ['zone-gaillac-fill', 'zone-gaillac-line', 'zone-pechbonnieu-fill', 'zone-pechbonnieu-line'].forEach(id => {
+    ['zone-principale-line', 'zone-gaillac-fill', 'zone-gaillac-line', 'zone-pechbonnieu-fill', 'zone-pechbonnieu-line'].forEach(id => {
       if (map.getLayer(id)) map.removeLayer(id);
     });
-    ['zone-gaillac', 'zone-pechbonnieu'].forEach(id => {
+    ['zone-principale', 'zone-gaillac', 'zone-pechbonnieu'].forEach(id => {
       if (map.getSource(id)) map.removeSource(id);
     });
 
     if (!zones || !showZones) return;
 
     const { centers } = TERRITOIRE_CONFIG;
+
+    // Zone principale (outline pointillé — périmètre global d'intervention)
+    if (zones.zone_principale) {
+      map.addSource('zone-principale', {
+        type: 'geojson',
+        data: zones.zone_principale,
+      });
+      map.addLayer({
+        id: 'zone-principale-line',
+        type: 'line',
+        source: 'zone-principale',
+        paint: {
+          'line-color': '#6b7280',
+          'line-width': 2,
+          'line-dasharray': [4, 3],
+          'line-opacity': 0.5,
+        },
+      });
+    }
 
     // Zone Gaillac
     if (zones.zone_gaillac) {
@@ -277,27 +322,15 @@ export default function TerritoireMap({
       clusterRadius: 50,
     });
 
-    // Clusters
+    // Clusters — taille fixe, couleur unique, support 3 chiffres
     map.addLayer({
       id: 'crm-clusters',
       type: 'circle',
       source: 'crm-points',
       filter: ['has', 'point_count'],
       paint: {
-        'circle-color': [
-          'step',
-          ['get', 'point_count'],
-          '#f97316', // orange < 10
-          10, '#ea580c', // dark orange < 50
-          50, '#c2410c', // darker > 50
-        ],
-        'circle-radius': [
-          'step',
-          ['get', 'point_count'],
-          18,
-          10, 24,
-          50, 32,
-        ],
+        'circle-color': '#6366f1', // indigo-500 (neutre, mélange client+lead)
+        'circle-radius': 22,
         'circle-stroke-width': 3,
         'circle-stroke-color': '#ffffff',
       },
@@ -312,7 +345,8 @@ export default function TerritoireMap({
       layout: {
         'text-field': ['get', 'point_count_abbreviated'],
         'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-        'text-size': 13,
+        'text-size': 12,
+        'text-allow-overlap': true,
       },
       paint: {
         'text-color': '#ffffff',
@@ -404,12 +438,45 @@ export default function TerritoireMap({
   }, []);
 
   const handleViewDetail = useCallback((point) => {
-    // Naviguer vers la fiche client (ou lead)
     if (point.type === 'lead') {
-      window.location.href = `/pipeline/leads/${point.id}`;
+      navigate('/pipeline');
     } else {
-      // Clients — utiliser le project_id ou client_id
-      window.location.href = `/clients?selected=${point.id}`;
+      setClientModalId(point.id);
+    }
+  }, [navigate]);
+
+  // Recherche — mode focus : n'afficher que le point sélectionné
+  const handleSearchSelect = useCallback((point) => {
+    if (!mapRef.current) return;
+
+    // Sauvegarder la vue courante pour la restaurer
+    savedViewRef.current = {
+      center: mapRef.current.getCenter().toArray(),
+      zoom: mapRef.current.getZoom(),
+    };
+
+    setFocusedPointId(point.id);
+    setSelectedPoint(point);
+
+    mapRef.current.flyTo({
+      center: [point.lng, point.lat],
+      zoom: 15,
+      duration: 1500,
+    });
+  }, []);
+
+  // Quitter le mode focus — restaurer la vue
+  const handleClearFocus = useCallback(() => {
+    setFocusedPointId(null);
+    setSelectedPoint(null);
+
+    if (mapRef.current && savedViewRef.current) {
+      mapRef.current.flyTo({
+        center: savedViewRef.current.center,
+        zoom: savedViewRef.current.zoom,
+        duration: 1000,
+      });
+      savedViewRef.current = null;
     }
   }, []);
 
@@ -439,6 +506,13 @@ export default function TerritoireMap({
       {/* Carte Mapbox */}
       <div ref={mapContainer} className="w-full h-full" />
 
+      {/* Recherche client */}
+      <MapSearch
+        points={points}
+        onSelect={handleSearchSelect}
+        onClear={handleClearFocus}
+      />
+
       {/* Panneau de contrôle */}
       <MapControls
         points={points}
@@ -449,13 +523,31 @@ export default function TerritoireMap({
         zonesLoading={zonesLoading}
         onRecalculateZones={onInvalidateZones}
         stats={stats}
+        showContractsOnly={showContractsOnly}
+        onToggleContracts={() => {
+          setShowContractsOnly(prev => {
+            const next = !prev;
+            // Activer automatiquement le type Client quand on active le filtre contrats
+            if (next && !visibleTypes.includes('client')) {
+              setVisibleTypes(v => [...v, 'client']);
+            }
+            return next;
+          });
+        }}
       />
 
       {/* Popup point sélectionné */}
       <MapPopup
         point={selectedPoint}
-        onClose={() => setSelectedPoint(null)}
+        onClose={handleClearFocus}
         onViewDetail={handleViewDetail}
+      />
+
+      {/* Modale fiche client */}
+      <ClientModal
+        clientId={clientModalId}
+        isOpen={!!clientModalId}
+        onClose={() => setClientModalId(null)}
       />
 
       {/* Loading overlay */}

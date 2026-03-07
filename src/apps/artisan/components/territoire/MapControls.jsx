@@ -4,8 +4,8 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, MapPin, Loader2 } from 'lucide-react';
-import { CRM_POINT_TYPES } from '@/lib/territoire-config';
+import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, MapPin, Loader2, FileCheck } from 'lucide-react';
+import { CRM_POINT_TYPES, CONTRACT_COLOR } from '@/lib/territoire-config';
 
 export default function MapControls({
   points = [],
@@ -16,6 +16,8 @@ export default function MapControls({
   zonesLoading = false,
   onRecalculateZones,
   stats = null,
+  showContractsOnly = false,
+  onToggleContracts,
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -25,6 +27,9 @@ export default function MapControls({
     countByType[type] = points.filter(p => p.type === type).length;
   }
   const totalVisible = points.filter(p => visibleTypes.includes(p.type)).length;
+
+  // Compteur contrats actifs (sous-ensemble des clients)
+  const contractCount = points.filter(p => p.type === 'client' && p.hasContract).length;
 
   if (collapsed) {
     return (
@@ -67,39 +72,67 @@ export default function MapControls({
           const isVisible = visibleTypes.includes(type);
 
           return (
-            <label
-              key={type}
-              className="flex items-center gap-3 cursor-pointer group"
-            >
-              <input
-                type="checkbox"
-                checked={isVisible}
-                onChange={() => onToggleType(type)}
-                className="sr-only"
-              />
-              <span
-                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                  isVisible
-                    ? 'border-transparent'
-                    : 'border-secondary-300 bg-white'
-                }`}
-                style={isVisible ? { backgroundColor: config.color, borderColor: config.color } : {}}
-              >
-                {isVisible && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </span>
-              <span className="flex-1 text-sm text-secondary-700 group-hover:text-secondary-900 transition-colors">
-                {config.label}
-              </span>
-              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                count > 0 ? 'bg-secondary-100 text-secondary-600' : 'text-secondary-300'
-              }`}>
-                {count}
-              </span>
-            </label>
+            <div key={type}>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={isVisible}
+                  onChange={() => onToggleType(type)}
+                  className="sr-only"
+                />
+                <span
+                  className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                    isVisible
+                      ? 'border-transparent'
+                      : 'border-secondary-300 bg-white'
+                  }`}
+                  style={isVisible ? { backgroundColor: config.color, borderColor: config.color } : {}}
+                >
+                  {isVisible && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+                <span className="flex-1 text-sm text-secondary-700 group-hover:text-secondary-900 transition-colors">
+                  {config.label}
+                </span>
+                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                  count > 0 ? 'bg-secondary-100 text-secondary-600' : 'text-secondary-300'
+                }`}>
+                  {count}
+                </span>
+              </label>
+
+              {/* Filtre contrats actifs (sous le type Client) */}
+              {type === 'client' && contractCount > 0 && (
+                <label className="flex items-center gap-2 ml-7 mt-1 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={showContractsOnly}
+                    onChange={onToggleContracts}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
+                      showContractsOnly
+                        ? 'border-transparent'
+                        : 'border-secondary-300 bg-white'
+                    }`}
+                    style={showContractsOnly ? { backgroundColor: CONTRACT_COLOR, borderColor: CONTRACT_COLOR } : {}}
+                  >
+                    {showContractsOnly && (
+                      <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="text-xs text-secondary-500 group-hover:text-secondary-700 transition-colors">
+                    Contrats actifs ({contractCount})
+                  </span>
+                </label>
+              )}
+            </div>
           );
         })}
       </div>

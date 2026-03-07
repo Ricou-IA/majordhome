@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-03-07
+> **Dernière MàJ** : 2026-03-09
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -43,11 +43,11 @@ src/
 │   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Entretiens, Territoire, InterventionDetail, Settings, Profile
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
-│       ├── clients/            # ClientModal+Tabs, ClientCard, EquipmentList, EquipmentFormModal
+│       ├── clients/            # ClientModal+Tabs (4 onglets: Info/Contrat/Équipements/Historique), ClientCard, EquipmentList, EquipmentFormModal
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
 │       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
 │       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
-│       └── territoire/         # TerritoireMap, MapControls, MapPopup, useMapZones, useTerritoireData
+│       └── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
 └── shared/
     ├── services/               # auth, clients, contracts, entretiens, geocoding, territoire
     └── hooks/                  # useClients, useContracts, useLeads, useAppointments, etc.

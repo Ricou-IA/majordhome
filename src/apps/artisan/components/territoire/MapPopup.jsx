@@ -4,12 +4,16 @@
  */
 
 import { X, Phone, Mail, MapPin, FileCheck, ExternalLink } from 'lucide-react';
-import { CRM_POINT_TYPES } from '@/lib/territoire-config';
+import { CRM_POINT_TYPES, CONTRACT_COLOR } from '@/lib/territoire-config';
 
 export default function MapPopup({ point, onClose, onViewDetail }) {
   if (!point) return null;
 
   const typeConfig = CRM_POINT_TYPES[point.type] || CRM_POINT_TYPES.client;
+  // Badge couleur : violet si contrat actif, sinon couleur du type
+  const badgeColor = (point.type === 'client' && point.hasContract)
+    ? CONTRACT_COLOR
+    : typeConfig.color;
 
   const formatPhone = (phone) => {
     if (!phone) return null;
@@ -27,7 +31,7 @@ export default function MapPopup({ point, onClose, onViewDetail }) {
         <div className="flex items-center gap-2">
           <span
             className="inline-block w-3 h-3 rounded-full"
-            style={{ backgroundColor: typeConfig.color }}
+            style={{ backgroundColor: badgeColor }}
           />
           <span className="text-xs font-medium text-secondary-500 uppercase tracking-wide">
             {typeConfig.label}

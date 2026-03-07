@@ -27,16 +27,23 @@ export function useTerritoireData() {
     setError(null);
 
     try {
-      const [clientsResult, leadsResult] = await Promise.all([
+      // Clients = critique, Leads = optionnel (erreur non-bloquante)
+      const [clientsResult, leadsResult] = await Promise.allSettled([
         territoireService.getGeocodedClients(orgId),
         territoireService.getGeocodedLeads(orgId),
       ]);
 
-      if (clientsResult.error) throw clientsResult.error;
-      if (leadsResult.error) throw leadsResult.error;
+      // Clients
+      const cResult = clientsResult.status === 'fulfilled' ? clientsResult.value : null;
+      if (cResult?.error) throw cResult.error;
+      setClients(cResult?.data || []);
 
-      setClients(clientsResult.data || []);
-      setLeads(leadsResult.data || []);
+      // Leads (non-bloquant)
+      const lResult = leadsResult.status === 'fulfilled' ? leadsResult.value : null;
+      if (lResult?.error) {
+        console.warn('[useTerritoireData] Leads non chargés:', lResult.error);
+      }
+      setLeads(lResult?.data || []);
     } catch (err) {
       console.error('[useTerritoireData] Error:', err);
       setError(err);
