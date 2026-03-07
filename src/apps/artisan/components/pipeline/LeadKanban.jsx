@@ -13,7 +13,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLeadStatuses, useLeadMutations } from '@/shared/hooks/useLeads';
+import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@/shared/hooks/useLeads';
 import { leadsService } from '@/shared/services/leads.service';
 import { LeadCard } from './LeadCard';
 
@@ -119,7 +119,7 @@ function MonthFilterDropdown({ value, onChange }) {
 /**
  * Colonne kanban pour un statut donné
  */
-function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver }) {
+function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver, commercialsMap }) {
   const count = leads.length;
   const totalAmount = leads.reduce(
     (sum, l) => sum + (Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0),
@@ -174,7 +174,7 @@ function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver }) 
                 {...dragProvided.dragHandleProps}
                 className={`${snapshot.isDragging ? 'opacity-90 rotate-1 shadow-lg' : ''}`}
               >
-                <LeadCard lead={lead} onClick={onLeadClick} compact />
+                <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
               </div>
             )}
           </Draggable>
@@ -207,7 +207,21 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const userId = user?.id;
 
   const { statuses } = useLeadStatuses();
+  const { commercials } = useLeadCommercials(orgId);
   const { updateLeadStatus } = useLeadMutations();
+
+  // Map { userId → { initials, name, colorIndex } } pour les badges
+  const commercialsMap = useMemo(() => {
+    const map = {};
+    commercials.forEach((c, i) => {
+      const parts = (c.full_name || '').trim().split(/\s+/);
+      const initials = parts.length >= 2
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        : (parts[0] || '?').substring(0, 2).toUpperCase();
+      map[c.id] = { initials, name: c.full_name, colorIndex: i };
+    });
+    return map;
+  }, [commercials]);
 
   const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -492,6 +506,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
                     onLeadClick={onLeadClick}
                     provided={provided}
                     isDraggingOver={snapshot.isDraggingOver}
+                    commercialsMap={commercialsMap}
                   />
                 )}
               </Droppable>

@@ -105,12 +105,27 @@ const SOURCE_SHORT_LABELS = {
 
 
 /**
+ * Couleurs pour les badges initiales commerciaux
+ */
+const COMMERCIAL_COLORS = [
+  'bg-indigo-100 text-indigo-700 ring-indigo-300',
+  'bg-teal-100 text-teal-700 ring-teal-300',
+  'bg-rose-100 text-rose-700 ring-rose-300',
+  'bg-amber-100 text-amber-700 ring-amber-300',
+];
+
+function getCommercialColor(index) {
+  return COMMERCIAL_COLORS[index % COMMERCIAL_COLORS.length];
+}
+
+/**
  * @param {Object} props
  * @param {Object} props.lead - Données lead avec statuses/sources jointures
  * @param {Function} props.onClick - Callback clic sur la carte
  * @param {boolean} props.compact - Mode compact pour le kanban
+ * @param {Object} props.commercialsMap - Map { id: { initials, name, colorIndex } }
  */
-export function LeadCard({ lead, onClick, compact = false }) {
+export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
   if (!lead) return null;
 
   const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Sans nom';
@@ -121,6 +136,9 @@ export function LeadCard({ lead, onClick, compact = false }) {
   const sourceColor = lead.sources?.color || '#6B7280';
   const amount = lead.order_amount_ht || lead.estimated_revenue || 0;
   const daysInStatus = daysSince(lead.updated_at);
+
+  // Commercial assigné (initiales)
+  const commercial = commercialsMap?.[lead.assigned_user_id];
 
   // Mode compact (kanban)
   if (compact) {
@@ -177,13 +195,21 @@ export function LeadCard({ lead, onClick, compact = false }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-1.5 mt-1.5">
             {sourceLabel && (
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium"
                 style={{ backgroundColor: sourceColor }}
               >
                 {sourceLabel}
+              </span>
+            )}
+            {commercial && (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${getCommercialColor(commercial.colorIndex)}`}
+                title={commercial.name}
+              >
+                {commercial.initials}
               </span>
             )}
             {daysInStatus !== null && (
@@ -274,12 +300,17 @@ export function LeadCard({ lead, onClick, compact = false }) {
             {daysInStatus === 0 ? "Aujourd'hui" : `${daysInStatus}j dans ce statut`}
           </span>
         )}
-        {lead.assigned_user_id && (
+        {commercial ? (
+          <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold ring-1 ${getCommercialColor(commercial.colorIndex)}`}>
+            <User className="h-3 w-3" />
+            {commercial.initials}
+          </span>
+        ) : lead.assigned_user_id ? (
           <span className="flex items-center gap-1">
             <User className="h-3 w-3" />
             Assigné
           </span>
-        )}
+        ) : null}
       </div>
     </button>
   );
