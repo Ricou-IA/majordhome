@@ -415,8 +415,8 @@ export function detectLeadZone(lat, lng) {
 export async function updateLeadCoordinates(leadId, lat, lng, zone) {
   try {
     const { error } = await supabase.rpc('update_majordhome_lead', {
-      p_id: leadId,
-      p_data: {
+      p_lead_id: leadId,
+      p_updates: {
         latitude: lat,
         longitude: lng,
         geocoded_at: new Date().toISOString(),
@@ -566,8 +566,8 @@ export async function batchGeocodeLeads(leads, onProgress) {
         if (commercialId && !lead.assigned_user_id) {
           try {
             await supabase.rpc('update_majordhome_lead', {
-              p_id: lead.id,
-              p_data: { assigned_user_id: commercialId },
+              p_lead_id: lead.id,
+              p_updates: { assigned_user_id: commercialId },
             });
 
             results.assigned++;
