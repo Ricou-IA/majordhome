@@ -330,6 +330,7 @@ export const SectionPipeline = ({
   orgId,
   handleConfirmScheduling,
   schedulingLoading,
+  canAssign = true,
 }) => (
   <>
     <SectionTitle>Pipeline</SectionTitle>
@@ -457,22 +458,24 @@ export const SectionPipeline = ({
       </div>
     </FormField>
 
-    <div className="grid grid-cols-2 gap-3 mt-3">
-      <FormField label="Commercial assigné">
-        <div className="relative">
-          <select
-            value={form.assigned_user_id}
-            onChange={(e) => setField('assigned_user_id', e.target.value)}
-            className={selectClass}
-          >
-            <option value="">— Non assigné —</option>
-            {commercials.map((c) => (
-              <option key={c.id} value={c.id}>{c.full_name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-        </div>
-      </FormField>
+    <div className={`grid ${canAssign ? 'grid-cols-2' : 'grid-cols-1'} gap-3 mt-3`}>
+      {canAssign && (
+        <FormField label="Commercial assigné">
+          <div className="relative">
+            <select
+              value={form.assigned_user_id}
+              onChange={(e) => setField('assigned_user_id', e.target.value)}
+              className={selectClass}
+            >
+              <option value="">— Non assigné —</option>
+              {commercials.map((c) => (
+                <option key={c.id} value={c.id}>{c.full_name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+        </FormField>
+      )}
 
       <FormField label="Probabilité (%)">
         <input

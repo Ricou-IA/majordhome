@@ -48,20 +48,4 @@ export const CRM_POINT_TYPES = {
 /** Couleur des clients avec contrat actif (distinction visuelle dans la même catégorie) */
 export const CONTRACT_COLOR = '#8b5cf6'; // violet-500
 
-/**
- * Mapping zone → commercial pour auto-assignation des leads
- * Clé = nom de zone (correspond aux clés de TERRITOIRE_CONFIG.centers)
- * email = utilisé pour retrouver le profile_id dans core.profiles
- */
-export const ZONE_COMMERCIAL_MAPPING = {
-  gaillac: {
-    name: 'Philippe Mazel',
-    email: 'philippe.mazel@mayer-energie.fr',
-  },
-  pechbonnieu: {
-    name: 'Michel Rieutord',
-    email: 'michel.rieutord@mayer-energie.fr',
-  },
-};
-
 export default TERRITOIRE_CONFIG;

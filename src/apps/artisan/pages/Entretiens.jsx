@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useContracts, useContractStats, useContractSectors } from '@hooks/useContracts';
 import { EntretiensDashboard } from '@apps/artisan/components/entretiens/EntretiensDashboard';
 import { ContractsList } from '@apps/artisan/components/entretiens/ContractsList';
@@ -148,7 +149,9 @@ const ErrorState = ({ error, onRetry }) => (
 
 export default function Entretiens() {
   const { organization, user, loading: authLoading } = useAuth();
+  const { can } = useCanAccess();
   const orgId = organization?.id;
+  const canCreateContract = can('entretiens', 'create');
   const currentYear = new Date().getFullYear();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -321,13 +324,15 @@ export default function Entretiens() {
                 {stats ? `${stats.totalContracts} contrats` : '...'} · Année {currentYear}
               </p>
             </div>
-            <button
-              onClick={() => setCreateModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              Nouveau contrat
-            </button>
+            {canCreateContract && (
+              <button
+                onClick={() => setCreateModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Nouveau contrat
+              </button>
+            )}
           </div>
 
           {/* Stat Cards */}

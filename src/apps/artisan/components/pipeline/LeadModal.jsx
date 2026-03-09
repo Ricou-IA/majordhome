@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCanAccess } from '@/shared/hooks/usePermissions';
 import {
   useLead,
   useLeadActivities,
@@ -55,6 +56,7 @@ import {
 export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
   const isEditing = !!leadId;
   const { organization, user } = useAuth();
+  const { can, canEdit, isOwner } = useCanAccess();
   const orgId = organization?.id;
   const userId = user?.id;
 
@@ -552,6 +554,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
                 orgId={orgId}
                 handleConfirmScheduling={handleConfirmScheduling}
                 schedulingLoading={schedulingLoading}
+                canAssign={can('pipeline', 'assign')}
               />
 
               {/* Suivi pipeline (uniquement en édition, order >= 2) */}

@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
+import { ROLE_LABELS } from '@lib/permissions';
 import {
   LayoutDashboard,
   Calendar,
   Users,
   MapPin,
   Kanban,
+  HardHat,
   Wrench,
   Settings,
   LogOut,
@@ -22,36 +25,13 @@ import {
 // =============================================================================
 
 const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'Planning',
-    href: '/planning',
-    icon: Calendar,
-  },
-  {
-    name: 'Clients',
-    href: '/clients',
-    icon: Users,
-  },
-  {
-    name: 'Territoire',
-    href: '/territoire',
-    icon: MapPin,
-  },
-  {
-    name: 'Pipeline',
-    href: '/pipeline',
-    icon: Kanban,
-  },
-  {
-    name: 'Entretiens',
-    href: '/entretiens',
-    icon: Wrench,
-  },
+  { name: 'Dashboard',  href: '/',           icon: LayoutDashboard, resource: 'dashboard' },
+  { name: 'Planning',   href: '/planning',   icon: Calendar,        resource: 'planning' },
+  { name: 'Clients',    href: '/clients',    icon: Users,           resource: 'clients' },
+  { name: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire' },
+  { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
+  { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
+  { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
 ];
 
 // =============================================================================
@@ -60,16 +40,8 @@ const navigation = [
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, profile, organization, membership, canAccessPipeline, appRole, businessRole, signOut } = useAuth();
-
-  // Debug: log pour vérifier les valeurs
-  console.log('[AppLayout] Debug Pipeline access:', {
-    hasProfile: !!profile,
-    appRole,
-    businessRole,
-    canAccessPipeline,
-    profileAppRole: profile?.app_role,
-  });
+  const { user, profile, organization, membership, effectiveRole, signOut } = useAuth();
+  const { can } = useCanAccess();
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -107,13 +79,14 @@ export default function AppLayout() {
   };
 
   const getRoleBadge = () => {
-    const role = membership?.role;
-    switch (role) {
+    switch (effectiveRole) {
       case 'org_admin':
         return { label: 'Admin', color: 'bg-purple-100 text-purple-700' };
       case 'team_leader':
         return { label: 'Responsable', color: 'bg-blue-100 text-blue-700' };
-      case 'user':
+      case 'commercial':
+        return { label: 'Commercial', color: 'bg-amber-100 text-amber-700' };
+      case 'technicien':
         return { label: 'Technicien', color: 'bg-green-100 text-green-700' };
       default:
         return null;
@@ -157,13 +130,7 @@ export default function AppLayout() {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {navigation
-          .filter((item) => {
-            // Masquer Pipeline si le profil n'a pas les droits (basés sur core.profiles)
-            if (item.name === 'Pipeline' && !canAccessPipeline) {
-              return false;
-            }
-            return true;
-          })
+          .filter((item) => can(item.resource, 'view'))
           .map((item) => (
           <NavLink
             key={item.name}
@@ -184,22 +151,24 @@ export default function AppLayout() {
       </nav>
 
       {/* Footer sidebar */}
-      <div className="px-4 py-4 border-t border-secondary-800">
-        <NavLink
-          to="/settings"
-          onClick={() => setSidebarOpen(false)}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isActive
-                ? 'bg-primary-600 text-white'
-                : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
-            }`
-          }
-        >
-          <Settings className="w-5 h-5" />
-          Paramètres
-        </NavLink>
-      </div>
+      {can('settings', 'view') && (
+        <div className="px-4 py-4 border-t border-secondary-800">
+          <NavLink
+            to="/settings"
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary-600 text-white'
+                  : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
+              }`
+            }
+          >
+            <Settings className="w-5 h-5" />
+            Paramètres
+          </NavLink>
+        </div>
+      )}
     </div>
   );
 

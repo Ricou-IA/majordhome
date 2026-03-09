@@ -1,6 +1,6 @@
 # SPRINT_LOG.md - Historique des sprints Majord'home
 
-> **Dernière MàJ** : 2026-03-04 — EventModal v2.0 (recherche unifiée clients+leads, contexte RDV, auto-création lead)
+> **Dernière MàJ** : 2026-03-10 — Sprint 6 Chantiers + Dashboard réel + Planning multi-select
 
 ---
 
@@ -588,11 +588,128 @@ L'EventModal avait des champs client en saisie libre (nom, téléphone, email, a
 
 ---
 
-## Sprint 6 — Portail Client ⬜
+## Sprint 6 — Chantiers + Dashboard réel + Planning multi-select ✅
+**Date** : 2026-03-10
+**Objectif** : Kanban post-vente (Gagné → Réalisé), dashboard avec données réelles, planning multi-sélection équipe
+
+### Phase 1 — Base de données (4 migrations Supabase)
+
+#### Migration 1 : `add_chantier_columns_to_leads`
+- 5 colonnes ajoutées sur `majordhome.leads` : `chantier_status` (CHECK 6 valeurs), `equipment_order_status` (na/commande/recu), `materials_order_status`, `estimated_date` (DATE), `chantier_notes` (TEXT)
+- Index `idx_leads_chantier_status` sur (org_id, chantier_status)
+
+#### Migration 2 : `add_intervention_chantier_columns`
+- Colonnes sur `majordhome.interventions` : `lead_id` (FK leads), `parent_id` (FK self), `slot_date`, `slot_start_time`, `slot_end_time`, `slot_notes`
+- Table `majordhome.intervention_technicians` (junction intervention↔team_members, RLS + policy)
+- 2 index : `idx_interventions_parent_id`, `idx_interventions_lead_id`
+
+#### Migration 3 : `create_chantier_views`
+- Vue `majordhome_chantiers` : leads WHERE chantier_status IS NOT NULL, JOIN `pricing_equipment_types` (label), JOIN intervention parent
+- Vue `majordhome_intervention_slots` : interventions enfants + techniciens agrégés JSON
+- Vue `majordhome_intervention_technicians`
+- Vue `majordhome_leads` recréée (ajout 5 colonnes chantier)
+- 3 RPCs recréées (CASCADE de la vue leads)
+
+#### Migration 4 : `add_planification_date_to_leads`
+- Colonne `planification_date DATE` sur `majordhome.leads`
+- Vue `majordhome_chantiers` recréée (DROP + CREATE) pour inclure `planification_date`
+
+### Phase 2 — Frontend : Chantiers (8 fichiers créés, 5 modifiés)
+
+#### `chantiers.service.js` — NOUVEAU
+- `CHANTIER_STATUSES` (6 colonnes Kanban), `CHANTIER_TRANSITIONS` (matrice de transitions)
+- `getChantierStatusConfig(status)` → { label, color, display_order }
+- `getChantiers({ orgId })` — depuis vue `majordhome_chantiers`
+- `updateChantierStatus(leadId, newStatus)` — via RPC `update_majordhome_lead`, auto-set `planification_date` pour transition vers `planification`
+- `updateOrderStatus(leadId, { equipment, materials })` — mise à jour + auto-transition vers `commande_recue`
+
+#### `useChantiers.js` — NOUVEAU
+- `chantierKeys` factory
+- `useChantiers(orgId)` — chargement kanban avec staleTime 15s
+- `useChantierMutations(orgId)` — updateStatus, updateOrderStatus, updateEstimatedDate
+
+#### `ChantierKanban.jsx` — NOUVEAU
+- Board 5 colonnes (facture masqué), recherche par nom, compteurs/colonne
+- Pas de DnD Phase 1 (transitions via boutons dans modale)
+
+#### `ChantierCard.jsx` — NOUVEAU
+- Bande date à gauche (won_date), nom client, CP, montant, OrderIndicator (Éq./Mat. en couleur), type équipement badge
+- Ligne dates : Estim. DD/MM/YY + Planif. DD/MM/YY quand disponible
+- Commercial initiales en pastille colorée
+
+#### `ChantierModal.jsx` — NOUVEAU
+- Orchestrateur modal : infos chantier, ChantierOrderSection, ChantierInterventionSection
+- Footer : boutons transition bidirectionnels (← retour gauche, → avancer droite)
+- Auto-transition `planification` quand intervention parent créée
+- Section intervention désactivée en statut `gagne`
+
+#### `ChantierOrderSection.jsx` — NOUVEAU
+- Selects équipement/matériaux (Non commandé / Commandé / Reçu / N/A)
+- Auto-transition `commande_recue` quand les deux = reçu ou NA
+
+#### `ChantierInterventionSection.jsx` — NOUVEAU
+- Création intervention parent + liste slots avec techniciens
+- Bouton créer/ajouter slot, date picker, TechnicianSelect réutilisé
+
+#### `Chantiers.jsx` — NOUVEAU
+- Page wrapper : header + ChantierKanban
+
+#### Fichiers modifiés
+- `leads.service.js` — auto-set `chantier_status: 'gagne'` quand lead passe en Gagné
+- `interventions.service.js` — méthodes createChantierIntervention, createInterventionSlot, setInterventionTechnicians, getInterventionsByLeadId
+- `useInterventions.js` — useInterventionSlots(parentId)
+- `AppLayout.jsx` — entrée nav `Chantiers` (icône HardHat, entre Pipeline et Entretiens)
+- `routes.jsx` — route lazy-loaded `/chantiers`
+
+### Phase 3 — Dashboard réel (1 fichier réécrit)
+
+#### `Dashboard.jsx` → v2.0 (RÉÉCRIT)
+- Hook interne `useDashboardHome(orgId)` : queries parallèles Supabase (KPIs leads + chantiers + planning jour)
+- 4 KPI cards : Nouveaux leads, Devis envoyés, Commandes à faire, À planifier
+- Clics naviguent vers `/pipeline?tab=kanban` ou `/chantiers`
+- Planning du jour réel depuis `majordhome_appointments`
+- Alertes dynamiques basées sur KPIs
+- Action rapide "Nouveau lead" avec LeadModal
+
+#### `Pipeline.jsx` — FIX
+- Lecture `?tab=` via `useSearchParams` pour onglet initial (KPI cards → Kanban directement)
+
+### Phase 4 — Planning multi-select (2 fichiers modifiés)
+
+#### `useAppointments.js` → v2.0
+- Filtre `technicianId` (single) → `memberIds[]` (multi-select)
+- Suppression filtrage côté service, remplacé par filtrage côté client
+- Batch query `majordhome_appointment_technicians` pour liens tech↔RDV
+- Filtrage : match tech via `techLinks` OU commercial via `assigned_commercial_id`
+
+#### `Planning.jsx` → v3.0
+- Import `useLeadCommercials` pour liste commerciaux
+- `teamList` unifié via `useMemo` : merge techniciens (roleLabel='Tech') + commerciaux (roleLabel='Com.')
+- `CalendarFilters` réécrit : dropdown multi-select avec checkboxes, pastilles couleur, labels rôle
+- Bouton "Équipe" affiche les prénoms sélectionnés
+
+### Phase 5 — Team members DB
+- Eric Mayer désactivé (`is_active = false`)
+- Antoine Verloo ajouté (technician, color #43A047 green)
+- Ludovic Robert ajouté (technician, color #FB8C00 orange)
+
+### Vérifications
+- ✅ Build production : 0 erreur
+- ✅ Transitions chantier bidirectionnelles fonctionnelles
+- ✅ Auto-transition commande_recue et planification
+- ✅ Dashboard données réelles + navigation KPI → Kanban
+- ✅ Planning multi-select tech + commerciaux
+
+---
+
+## Sprint 7 — Droits & Accès ⬜
+- Permissions granulaires par rôle (org_admin, team_leader, user/technicien)
+
+## Sprint 8 — Portail Client ⬜
 - Auth client, dashboard, factures/devis, équipements, historique
 
-## Sprint 7 — Intégration Pennylane ⬜
+## Sprint 9 — Intégration Pennylane ⬜
 - Sync API devis/factures
 
-## Sprint 8 — N8N Avancé ⬜
+## Sprint 10 — N8N Avancé ⬜
 - Facebook Ads leads, Slack bidirectionnel

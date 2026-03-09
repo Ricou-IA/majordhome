@@ -10,6 +10,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@/shared/services/appointments.service';
+import { supabase } from '@/lib/supabaseClient';
 
 // ============================================================================
 // CLÉS DE CACHE
@@ -45,38 +46,69 @@ export const appointmentKeys = {
 export function useAppointments({ orgId, startDate, endDate } = {}) {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({
-    technicianId: null,
+    memberIds: [],          // IDs sélectionnés (techniciens + commerciaux)
     appointmentType: null,
     status: null,
   });
 
-  // Query principale
+  // Query principale — récupère TOUS les RDV (filtrage membre côté client)
   const {
     data: appointments,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: appointmentKeys.list(orgId, { startDate, endDate }, filters),
+    queryKey: appointmentKeys.list(orgId, { startDate, endDate }, { appointmentType: filters.appointmentType, status: filters.status }),
     queryFn: () =>
       appointmentsService.getAppointments({
         coreOrgId: orgId,
         startDate,
         endDate,
-        technicianId: filters.technicianId,
         appointmentType: filters.appointmentType,
         status: filters.status,
       }),
     enabled: !!orgId && !!startDate && !!endDate,
-    staleTime: 15_000, // 15s — le planning change souvent
+    staleTime: 15_000,
     select: (result) => result?.data || [],
   });
 
-  // Convertir en events FullCalendar
+  // Récupérer les liens technicien ↔ RDV (pour filtrage multi-membres)
+  const appointmentIds = useMemo(() => (appointments || []).map(a => a.id), [appointments]);
+
+  const { data: techLinks } = useQuery({
+    queryKey: ['appointment-technicians', appointmentIds],
+    queryFn: async () => {
+      if (appointmentIds.length === 0) return [];
+      const { data } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('appointment_id, technician_id')
+        .in('appointment_id', appointmentIds);
+      return data || [];
+    },
+    enabled: appointmentIds.length > 0,
+    staleTime: 15_000,
+  });
+
+  // Convertir en events FullCalendar — avec filtrage multi-membres côté client
   const events = useMemo(() => {
     if (!appointments) return [];
-    return appointments.map(a => appointmentsService.toCalendarEvent(a));
-  }, [appointments]);
+
+    let filtered = appointments;
+
+    // Filtre multi-membres : techniciens (via techLinks) + commerciaux (via assigned_commercial_id)
+    if (filters.memberIds.length > 0 && techLinks) {
+      const memberSet = new Set(filters.memberIds);
+      // Appointments liés à un tech sélectionné
+      const techAppointmentIds = new Set(
+        techLinks.filter(t => memberSet.has(t.technician_id)).map(t => t.appointment_id)
+      );
+      filtered = filtered.filter(
+        a => techAppointmentIds.has(a.id) || memberSet.has(a.assigned_commercial_id)
+      );
+    }
+
+    return filtered.map(a => appointmentsService.toCalendarEvent(a));
+  }, [appointments, filters.memberIds, techLinks]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({

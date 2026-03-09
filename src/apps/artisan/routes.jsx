@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useCanAccess } from '@hooks/usePermissions';
 
 // =============================================================================
 // LAZY LOADING DES PAGES
@@ -15,6 +17,9 @@ const InterventionDetail = lazy(() => import('./pages/InterventionDetail'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Territoire = lazy(() => import('./pages/Territoire'));
+const Chantiers = lazy(() => import('./pages/Chantiers'));
+const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
+const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
 
 // =============================================================================
 // LOADING COMPONENT
@@ -41,6 +46,32 @@ function SuspenseWrapper({ children }) {
       {children}
     </Suspense>
   );
+}
+
+// =============================================================================
+// ROUTE GUARD — Vérifie la permission avant d'afficher la page
+// =============================================================================
+
+/**
+ * Garde de route basé sur les permissions DB.
+ * Redirige vers le dashboard si l'accès est refusé.
+ *
+ * @param {string} resource - Resource à vérifier (ex: 'pipeline', 'settings')
+ * @param {string} [action='view'] - Action à vérifier
+ */
+function RouteGuard({ resource, action = 'view', children }) {
+  const { can, permissionsLoading } = useCanAccess();
+
+  // Pendant le chargement des permissions, afficher le loader
+  if (permissionsLoading) {
+    return <PageLoader />;
+  }
+
+  if (!can(resource, action)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 }
 
 // =============================================================================
@@ -84,7 +115,9 @@ export const artisanRoutes = [
     path: 'pipeline',
     element: (
       <SuspenseWrapper>
-        <Pipeline />
+        <RouteGuard resource="pipeline">
+          <Pipeline />
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },
@@ -108,7 +141,29 @@ export const artisanRoutes = [
     path: 'settings',
     element: (
       <SuspenseWrapper>
-        <Settings />
+        <RouteGuard resource="settings">
+          <Settings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/team',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <TeamManagement />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/permissions',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <PermissionsEditor />
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },
@@ -125,6 +180,16 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <Territoire />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'chantiers',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="chantiers">
+          <Chantiers />
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },

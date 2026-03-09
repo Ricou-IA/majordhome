@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-03-09
+> **Dernière MàJ** : 2026-03-10
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -39,18 +39,19 @@ src/
 ├── layouts/AppLayout.jsx       # Sidebar + header
 ├── hooks/pipeline/             # useDashboardData, useDashboardFilters
 ├── apps/artisan/
-│   ├── routes.jsx              # Routes lazy-loaded (11 routes)
-│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Entretiens, Territoire, InterventionDetail, Settings, Profile
+│   ├── routes.jsx              # Routes lazy-loaded (12 routes)
+│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
 │       ├── clients/            # ClientModal+Tabs (4 onglets: Info/Contrat/Équipements/Historique), ClientCard, EquipmentList, EquipmentFormModal
+│       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierOrderSection, ChantierInterventionSection
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
 │       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
 │       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
 │       └── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
 └── shared/
-    ├── services/               # auth, clients, contracts, entretiens, geocoding, territoire
-    └── hooks/                  # useClients, useContracts, useLeads, useAppointments, etc.
+    ├── services/               # auth, clients, contracts, chantiers, entretiens, geocoding, territoire
+    └── hooks/                  # useClients, useContracts, useChantiers, useLeads, useAppointments, etc.
 ```
 
 ## Aliases (vite.config.js)
@@ -74,6 +75,7 @@ src/
 - `majordhome_clients` → clients + has_active_contract calculé
 - `majordhome_contracts` → contracts JOIN clients (client_name, client_address, etc.)
 - `majordhome_appointments` → appointments + client_first_name, assigned_commercial_id
+- `majordhome_chantiers` → leads filtrés (chantier_status IS NOT NULL) + JOIN equipment_type + intervention parent
 - `majordhome_equipments`, `majordhome_interventions`, `majordhome_maintenance_visits`
 - `profiles`, `organizations`, `organization_members` (vues core)
 
@@ -121,6 +123,8 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 | Sprint | Titre | Statut |
 |--------|-------|--------|
 | 0-5b | Auth, CRM, Planning, Terrain, Pipeline, Entretiens, Territoire | ✅ FAIT |
-| 6 | Portail Client | ⬜ À FAIRE |
-| 7 | Intégration Pennylane (devis/factures) | ⬜ À FAIRE |
-| 8 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⬜ À FAIRE |
+| 6 | Chantiers (Kanban post-vente, commandes, planification) + Dashboard réel + Planning multi-select | ✅ FAIT |
+| 7 | Droits & Accès (permissions granulaires par rôle) | ⬜ À FAIRE |
+| 8 | Portail Client | ⬜ À FAIRE |
+| 9 | Intégration Pennylane (devis/factures) | ⬜ À FAIRE |
+| 10 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⬜ À FAIRE |

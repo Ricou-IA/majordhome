@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@lib/supabaseClient';
 import { authService } from '@services/auth.service';
+import { computeEffectiveRole } from '@lib/permissions';
 
 const AuthContext = createContext(null);
 
@@ -272,6 +273,9 @@ export function AuthProvider({ children }) {
   const isTeamLeaderOrAbove = authService.isTeamLeaderOrAbove(membership);
   const canAccessPipeline = isOrgAdminFromProfile || isCommercialBusiness;
 
+  // Sprint 7 : rôle effectif unique (org_admin | team_leader | commercial | technicien)
+  const effectiveRole = computeEffectiveRole(profile, membership);
+
   // ===========================================================================
   // CONTEXT VALUE
   // ===========================================================================
@@ -282,6 +286,7 @@ export function AuthProvider({ children }) {
     isAuthenticated, hasOrganization,
     isOrgAdmin, isTeamLeader, isTeamLeaderOrAbove,
     appRole, businessRole, isOrgAdminFromProfile, isCommercialBusiness, canAccessPipeline,
+    effectiveRole,
     signIn, signUp, signOut, signInWithGoogle,
     resetPassword, updatePassword, updateProfile,
     joinOrganization, refreshUserData,

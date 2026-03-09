@@ -32,6 +32,7 @@ import {
   Archive,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCanAccess } from '@/shared/hooks/usePermissions';
 import { useClients, useClientStats } from '@/shared/hooks/useClients';
 import { CLIENT_CATEGORIES } from '@/shared/services/clients.service';
 import { ClientCard, ClientCardSkeleton } from '@/apps/artisan/components/clients/ClientCard';
@@ -282,8 +283,10 @@ const ErrorState = ({ error, onRetry }) => (
 export function Clients() {
   // Auth context pour récupérer l'org_id
   const { organization } = useAuth();
+  const { can } = useCanAccess();
   const orgId = organization?.id;
   const navigate = useNavigate();
+  const canCreateClient = can('clients', 'create');
   const [searchParams, setSearchParams] = useSearchParams();
 
   // État local
@@ -487,13 +490,15 @@ export function Clients() {
                 {totalCount} client{totalCount !== 1 ? 's' : ''} au total
               </p>
             </div>
-            <button
-              onClick={handleAddClient}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-5 h-5" />
-              Nouveau client
-            </button>
+            {canCreateClient && (
+              <button
+                onClick={handleAddClient}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" />
+                Nouveau client
+              </button>
+            )}
           </div>
 
           {/* Stats */}

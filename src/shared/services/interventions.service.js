@@ -612,6 +612,242 @@ export const interventionsService = {
   },
 
   // ==========================================================================
+  // CHANTIER — Intervention parent + Slots
+  // ==========================================================================
+
+  /**
+   * Crée une intervention parent pour un chantier (1 par lead gagné)
+   */
+  async createChantierIntervention({ leadId, projectId, equipmentId = null, createdBy = null }) {
+    if (!leadId || !projectId) throw new Error('[interventions] leadId et projectId requis');
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .insert({
+          project_id: projectId,
+          lead_id: leadId,
+          parent_id: null,
+          intervention_type: 'installation',
+          scheduled_date: today,
+          status: 'scheduled',
+          equipment_id: equipmentId || null,
+          created_by: createdBy || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[interventions] createChantierIntervention error:', error);
+        return { data: null, error };
+      }
+
+      return { data, error: null };
+    } catch (err) {
+      console.error('[interventions] createChantierIntervention error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Crée un slot (créneau) sous une intervention parent
+   */
+  async createInterventionSlot({ parentId, projectId, slotDate, slotStartTime = null, slotEndTime = null, slotNotes = null, technicianIds = [], createdBy = null }) {
+    if (!parentId || !projectId || !slotDate) {
+      throw new Error('[interventions] parentId, projectId et slotDate requis');
+    }
+
+    try {
+      // 1. Créer le slot (intervention enfant)
+      const { data: slot, error } = await supabase
+        .from('majordhome_interventions')
+        .insert({
+          project_id: projectId,
+          parent_id: parentId,
+          intervention_type: 'installation',
+          scheduled_date: slotDate,
+          slot_date: slotDate,
+          slot_start_time: slotStartTime || null,
+          slot_end_time: slotEndTime || null,
+          slot_notes: slotNotes || null,
+          status: 'scheduled',
+          created_by: createdBy || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[interventions] createInterventionSlot error:', error);
+        return { data: null, error };
+      }
+
+      // 2. Assigner les techniciens
+      if (technicianIds.length > 0) {
+        await this.setInterventionTechnicians(slot.id, technicianIds);
+      }
+
+      return { data: slot, error: null };
+    } catch (err) {
+      console.error('[interventions] createInterventionSlot error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Met à jour un slot existant
+   */
+  async updateInterventionSlot(slotId, { slotDate, slotStartTime, slotEndTime, slotNotes, technicianIds }) {
+    if (!slotId) throw new Error('[interventions] slotId requis');
+
+    try {
+      const updates = { updated_at: new Date().toISOString() };
+      if (slotDate !== undefined) {
+        updates.slot_date = slotDate;
+        updates.scheduled_date = slotDate;
+      }
+      if (slotStartTime !== undefined) updates.slot_start_time = slotStartTime;
+      if (slotEndTime !== undefined) updates.slot_end_time = slotEndTime;
+      if (slotNotes !== undefined) updates.slot_notes = slotNotes;
+
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .update(updates)
+        .eq('id', slotId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[interventions] updateInterventionSlot error:', error);
+        return { data: null, error };
+      }
+
+      // Mise à jour des techniciens si fournis
+      if (technicianIds !== undefined) {
+        await this.setInterventionTechnicians(slotId, technicianIds);
+      }
+
+      return { data, error: null };
+    } catch (err) {
+      console.error('[interventions] updateInterventionSlot error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Supprime un slot
+   */
+  async deleteInterventionSlot(slotId) {
+    if (!slotId) throw new Error('[interventions] slotId requis');
+
+    try {
+      const { error } = await supabase
+        .from('majordhome_interventions')
+        .delete()
+        .eq('id', slotId);
+
+      if (error) {
+        console.error('[interventions] deleteInterventionSlot error:', error);
+        return { error };
+      }
+
+      return { error: null };
+    } catch (err) {
+      console.error('[interventions] deleteInterventionSlot error:', err);
+      return { error: err };
+    }
+  },
+
+  /**
+   * Récupère les slots d'une intervention parent (vue majordhome_intervention_slots)
+   */
+  async getInterventionSlots(parentId) {
+    if (!parentId) return { data: [], error: null };
+
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_intervention_slots')
+        .select('*')
+        .eq('parent_id', parentId)
+        .order('slot_date', { ascending: true });
+
+      if (error) {
+        console.error('[interventions] getInterventionSlots error:', error);
+        return { data: null, error };
+      }
+
+      return { data: data || [], error: null };
+    } catch (err) {
+      console.error('[interventions] getInterventionSlots error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Récupère l'intervention parent d'un lead
+   */
+  async getChantierInterventionByLeadId(leadId) {
+    if (!leadId) return { data: null, error: null };
+
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .select('*')
+        .eq('lead_id', leadId)
+        .is('parent_id', null)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('[interventions] getChantierInterventionByLeadId error:', error);
+        return { data: null, error };
+      }
+
+      return { data: data || null, error: null };
+    } catch (err) {
+      console.error('[interventions] getChantierInterventionByLeadId error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Assigne des techniciens à une intervention (delete + insert pattern)
+   */
+  async setInterventionTechnicians(interventionId, technicianIds = []) {
+    if (!interventionId) throw new Error('[interventions] interventionId requis');
+
+    try {
+      // 1. Supprimer les assignations existantes
+      await supabase
+        .from('majordhome_intervention_technicians')
+        .delete()
+        .eq('intervention_id', interventionId);
+
+      // 2. Insérer les nouvelles
+      if (technicianIds.length > 0) {
+        const rows = technicianIds.map(tid => ({
+          intervention_id: interventionId,
+          technician_id: tid,
+        }));
+
+        const { error } = await supabase
+          .from('majordhome_intervention_technicians')
+          .insert(rows);
+
+        if (error) {
+          console.error('[interventions] setInterventionTechnicians insert error:', error);
+          return { error };
+        }
+      }
+
+      return { error: null };
+    } catch (err) {
+      console.error('[interventions] setInterventionTechnicians error:', err);
+      return { error: err };
+    }
+  },
+
+  // ==========================================================================
   // HELPERS
   // ==========================================================================
 

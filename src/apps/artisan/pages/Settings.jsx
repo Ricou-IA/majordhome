@@ -1,9 +1,11 @@
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
-import { 
-  Building2, 
-  Users, 
-  Bell, 
-  Palette, 
+import { ROLE_LABELS } from '@lib/permissions';
+import {
+  Building2,
+  Users,
+  Bell,
+  Palette,
   Shield,
   CreditCard,
   HelpCircle,
@@ -14,7 +16,7 @@ import {
 // =============================================================================
 
 export default function Settings() {
-  const { organization, membership, isOrgAdmin } = useAuth();
+  const { organization, effectiveRole, isOrgAdmin } = useAuth();
 
   const settingsSections = [
     {
@@ -27,8 +29,15 @@ export default function Settings() {
     {
       title: 'Équipe',
       icon: Users,
-      description: 'Gérer les membres et les invitations',
+      description: 'Gérer les membres et leurs rôles',
       href: '/settings/team',
+      adminOnly: true,
+    },
+    {
+      title: 'Droits d\'accès',
+      icon: Shield,
+      description: 'Configurer les permissions par rôle',
+      href: '/settings/permissions',
       adminOnly: true,
     },
     {
@@ -43,13 +52,6 @@ export default function Settings() {
       icon: Palette,
       description: 'Personnaliser l\'affichage de l\'application',
       href: '/settings/appearance',
-      adminOnly: false,
-    },
-    {
-      title: 'Sécurité',
-      icon: Shield,
-      description: 'Mot de passe et authentification',
-      href: '/settings/security',
       adminOnly: false,
     },
     {
@@ -87,8 +89,7 @@ export default function Settings() {
                 {organization.name}
               </h2>
               <p className="text-sm text-secondary-600">
-                Votre rôle : {membership?.role === 'org_admin' ? 'Administrateur' : 
-                             membership?.role === 'team_leader' ? 'Responsable' : 'Technicien'}
+                Votre rôle : {ROLE_LABELS[effectiveRole] || effectiveRole}
               </p>
             </div>
           </div>
@@ -98,9 +99,9 @@ export default function Settings() {
       {/* Settings sections */}
       <div className="grid sm:grid-cols-2 gap-4">
         {filteredSections.map((section) => (
-          <a
+          <NavLink
             key={section.title}
-            href={section.href}
+            to={section.href}
             className="card-hover flex items-start gap-4"
           >
             <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center flex-shrink-0">
@@ -114,7 +115,7 @@ export default function Settings() {
                 {section.description}
               </p>
             </div>
-          </a>
+          </NavLink>
         ))}
       </div>
 

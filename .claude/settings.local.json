@@ -41,7 +41,13 @@
       "Bash(npx vite build)",
       "Bash(netstat -ano)",
       "Bash(git add -A)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git checkout main)",
+      "Bash(git merge claude/fix-startup-loop-MGjbr --no-edit)",
+      "WebFetch(domain:odspcxgafcqxjzrarsqf.supabase.co)",
+      "Bash(python -c \":*)",
+      "Bash(python3 -c \":*)",
+      "Bash(python3 \"C:/Users/epude/.claude/projects/C--Dev-Frontend-Majordhome/a2420cde-258e-4740-88b2-556141c1b1ed/tool-results/parse_logs.py\")"
     ]
   }
 }

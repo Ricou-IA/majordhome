@@ -1,6 +1,6 @@
 # DATABASE.md - Schéma Supabase Majord'home
 
-> **Dernière MàJ** : 2026-02-23 — Import Excel base client + colonne siren + purge/reimport complet
+> **Dernière MàJ** : 2026-03-10 — Sprint 6 Chantiers (colonnes leads, vues, intervention_technicians)
 > Ce fichier documente toutes les tables du schéma `majordhome` et les tables clés de `core`.
 
 ## Organisation cible
@@ -24,6 +24,9 @@
 | `public.majordhome_interventions` | `majordhome.interventions` | `supabase.from('majordhome_interventions')` |
 | `public.majordhome_contracts` | `majordhome.contracts` JOIN `majordhome.clients` | `supabase.from('majordhome_contracts')` — vue enrichie avec client_name, client_address, client_postal_code, client_city, client_phone, client_email, client_project_id |
 | `public.majordhome_contract_equipments` | `majordhome.contract_equipments` | `supabase.from('majordhome_contract_equipments')` — pivot contrat↔équipement |
+| `public.majordhome_chantiers` | `majordhome.leads` (filtrés) + JOINs | `supabase.from('majordhome_chantiers')` — leads avec chantier_status IS NOT NULL + equipment_type_label + intervention parent |
+| `public.majordhome_intervention_slots` | `majordhome.interventions` (enfants) | `supabase.from('majordhome_intervention_slots')` — slots intervention + techniciens agrégés JSON |
+| `public.majordhome_intervention_technicians` | `majordhome.intervention_technicians` | `supabase.from('majordhome_intervention_technicians')` — junction intervention↔team_members |
 | `public.majordhome_maintenance_visits` | `majordhome.maintenance_visits` | `supabase.from('majordhome_maintenance_visits')` — visites de maintenance |
 | `public.projects` | `core.projects` | Legacy — ne plus utiliser pour les clients |
 | `public.profiles` | `core.profiles` | Profils utilisateurs |
@@ -229,15 +232,21 @@ EXISTS (SELECT 1 FROM majordhome.contracts c WHERE c.client_id = clients.id AND 
 | `notes` | text | |
 
 ### majordhome.interventions
-2411 rows. RLS activé. Historique interventions techniciens.
+2411 rows. RLS activé. Historique interventions techniciens + interventions chantier (Sprint 6).
 
 | Colonne clé | Type | Notes |
 |-------------|------|-------|
 | `id` | uuid | PK |
 | `project_id` | uuid | FK → core.projects |
 | `equipment_id` | uuid | FK → equipments (nullable) |
+| `lead_id` | uuid | FK → leads (nullable, Sprint 6) — lien chantier |
+| `parent_id` | uuid | FK → interventions self (nullable, Sprint 6) — slots enfants |
 | `intervention_type` | ENUM | maintenance, repair, installation, diagnostic, urgent |
 | `scheduled_date` | date | |
+| `slot_date` | date | Date du slot (Sprint 6) |
+| `slot_start_time` | time | Heure début slot (Sprint 6) |
+| `slot_end_time` | time | Heure fin slot (Sprint 6) |
+| `slot_notes` | text | Notes du slot (Sprint 6) |
 | `technician_id` | uuid | FK → auth.users |
 | `technician_name` | text | |
 | `status` | ENUM | scheduled, in_progress, completed, cancelled, no_show |
@@ -246,6 +255,8 @@ EXISTS (SELECT 1 FROM majordhome.contracts c WHERE c.client_id = clients.id AND 
 | `photo_before_url`, `photo_after_url` | text | |
 | `signature_url` | text | Signature client |
 | `duration_minutes` | int | |
+
+**Index Sprint 6** : `idx_interventions_parent_id` (parent_id), `idx_interventions_lead_id` (lead_id)
 
 ---
 
@@ -276,8 +287,17 @@ Table pivot appointments ↔ team_members.
 - `appointment_id` → appointments, `technician_id` → team_members
 - `google_event_id`, `notified`, `confirmed`, `actual_start/end_time`
 
+### majordhome.intervention_technicians
+Table pivot interventions ↔ team_members (Sprint 6 Chantiers).
+- `id` (uuid, PK)
+- `intervention_id` (uuid, FK → interventions ON DELETE CASCADE)
+- `technician_id` (uuid, FK → team_members ON DELETE CASCADE)
+- `created_at` (timestamptz)
+- Contrainte UNIQUE (intervention_id, technician_id)
+- RLS activé, 1 policy (`allow_authenticated`)
+
 ### majordhome.team_members
-1 row. Techniciens de l'organisation.
+3 rows (1 désactivé). Techniciens de l'organisation.
 - `org_id`, `first_name`, `last_name`, `display_name` (generated)
 - `role` (default 'technician'), `specialties` (text[])
 - `calendar_color`, `google_calendar_id`, `google_calendar_email`
@@ -289,13 +309,21 @@ Table pivot appointments ↔ team_members.
 ## Tables majordhome — Pipeline
 
 ### majordhome.leads
-27 rows. Pipeline CRM.
+27 rows. Pipeline CRM + Chantiers post-vente.
 - 30+ colonnes : identité, contact, adresse, source_id, status_id, assigned_user_id, project_id, client_id
 - `order_amount_ht`, `estimated_revenue`, `probability` (0-100)
 - `next_action`, `next_action_date`, `lost_reason`
 - `appointment_id` uuid FK nullable → majordhome.appointments (lien retour RDV planifié)
 - `appointment_date`, `quote_sent_date`, `won_date` (dates pipeline)
 - `external_id/source/data` (intégrations N8N)
+- **Colonnes chantier (Sprint 6)** :
+  - `chantier_status` TEXT CHECK (gagne, commande_a_faire, commande_recue, planification, realise, facture)
+  - `equipment_order_status` TEXT CHECK (na, commande, recu)
+  - `materials_order_status` TEXT CHECK (na, commande, recu)
+  - `estimated_date` DATE — date estimative pose
+  - `planification_date` DATE — date passage en planification (auto-set)
+  - `chantier_notes` TEXT
+- Index : `idx_leads_chantier_status` (org_id, chantier_status) WHERE chantier_status IS NOT NULL
 
 ### majordhome.sources (8 rows)
 id, name, description, color, is_active
@@ -339,6 +367,10 @@ Details logement. `project_id` (PK), `property_type`, `qr_code_id` (unique), `qr
 | ... | enrich_contracts_view_with_client_info | 2026-02-23 |
 | ... | fix_maintenance_visits_contract_id_to_uuid | 2026-02-23 |
 | ... | create_maintenance_visits_view | 2026-02-23 |
+| ... | add_chantier_columns_to_leads | 2026-03-10 |
+| ... | add_intervention_chantier_columns | 2026-03-10 |
+| ... | create_chantier_views | 2026-03-10 |
+| ... | add_planification_date_to_leads | 2026-03-10 |
 
 ## Notes RLS
 

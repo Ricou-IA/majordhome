@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Wrench } from 'lucide-react';
+import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectInterventions, useCreateIntervention } from '@/shared/hooks/useInterventions';
 import { INTERVENTION_TYPES } from '@/shared/services/interventions.service';
+import { chantiersService, getChantierStatusConfig } from '@/shared/services/chantiers.service';
 import { formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 
@@ -38,6 +39,75 @@ const InterventionCard = ({ intervention }) => {
       </div>
       {intervention.work_performed && <p className="text-sm text-secondary-600 mt-2 line-clamp-2">{intervention.work_performed}</p>}
       {intervention.report_notes && <p className="text-sm text-secondary-500 mt-1 line-clamp-2 italic">{intervention.report_notes}</p>}
+    </div>
+  );
+};
+
+/**
+ * Section chantier (lecture seule) - affiché si le client a un lead avec chantier_status
+ */
+const ChantierSummary = ({ clientId }) => {
+  const [chantier, setChantier] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) { setLoading(false); return; }
+    const load = async () => {
+      try {
+        const { data } = await chantiersService.getChantierByClientId(clientId);
+        setChantier(data);
+      } catch (err) {
+        console.error('[ChantierSummary] load error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [clientId]);
+
+  if (loading) return null;
+  if (!chantier) return null;
+
+  const statusConfig = getChantierStatusConfig(chantier.chantier_status);
+  const orderLabels = { na: 'N/A', commande: 'Commandé', recu: 'Reçu' };
+
+  return (
+    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+      <div className="flex items-center gap-2">
+        <HardHat className="w-4 h-4 text-amber-600" />
+        <h4 className="text-sm font-semibold text-amber-900">Chantier en cours</h4>
+        <span
+          className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium text-white"
+          style={{ backgroundColor: statusConfig.color }}
+        >
+          {statusConfig.label}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        {chantier.won_date && (
+          <p className="text-secondary-600">
+            <span className="text-secondary-400">Gagné le :</span> {formatDateFR(chantier.won_date)}
+          </p>
+        )}
+        {chantier.estimated_date && (
+          <p className="text-secondary-600">
+            <span className="text-secondary-400">Date estimée :</span> {formatDateFR(chantier.estimated_date)}
+          </p>
+        )}
+        {chantier.equipment_order_status && (
+          <p className="text-secondary-600">
+            <span className="text-secondary-400">Équipement :</span> {orderLabels[chantier.equipment_order_status] || '—'}
+          </p>
+        )}
+        {chantier.materials_order_status && (
+          <p className="text-secondary-600">
+            <span className="text-secondary-400">Matériaux :</span> {orderLabels[chantier.materials_order_status] || '—'}
+          </p>
+        )}
+      </div>
+      {chantier.chantier_notes && (
+        <p className="text-xs text-secondary-500 italic">{chantier.chantier_notes}</p>
+      )}
     </div>
   );
 };
@@ -90,6 +160,9 @@ export const TabInterventions = ({ projectId, clientId }) => {
 
   return (
     <div className="space-y-4">
+      {/* Section chantier (lecture seule) */}
+      <ChantierSummary clientId={clientId} />
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-secondary-500">
           {interventions.length > 0

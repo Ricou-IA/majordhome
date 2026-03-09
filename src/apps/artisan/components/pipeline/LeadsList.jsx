@@ -357,14 +357,16 @@ export function LeadsList({ onLeadClick, onNewLead }) {
             {totalCount} lead{totalCount !== 1 ? 's' : ''} au total
           </p>
         </div>
-        <button
-          onClick={onNewLead}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg
-                     hover:bg-blue-700 transition-colors shadow-sm min-h-[44px]"
-        >
-          <Plus className="w-5 h-5" />
-          Nouveau lead
-        </button>
+        {onNewLead && (
+          <button
+            onClick={onNewLead}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg
+                       hover:bg-blue-700 transition-colors shadow-sm min-h-[44px]"
+          >
+            <Plus className="w-5 h-5" />
+            Nouveau lead
+          </button>
+        )}
       </div>
 
       {/* Recherche + Filtres */}

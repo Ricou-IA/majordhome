@@ -12,9 +12,11 @@
  */
 
 import { useState, useMemo, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BarChart3, List, Columns3, Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useDashboardFilters } from '@hooksPipeline/useDashboardFilters';
 import { useDashboardData } from '@hooksPipeline/useDashboardData';
 import { DashboardFilters } from '@components/pipeline/dashboard/DashboardFilters';
@@ -31,20 +33,16 @@ import { LeadKanban } from '@apps/artisan/components/pipeline/LeadKanban';
 // HELPERS
 // ============================================================================
 
-const getRole = (profile) => {
-  if (profile?.app_role === 'org_admin') return 'Admin';
-  if (
-    typeof profile?.business_role === 'string' &&
-    profile.business_role.toLowerCase() === 'commercial'
-  ) {
-    return 'Commercial';
-  }
+const getRole = (profile, effectiveRole) => {
+  if (effectiveRole === 'org_admin') return 'Admin';
+  if (effectiveRole === 'commercial') return 'Commercial';
+  if (effectiveRole === 'team_leader') return 'Admin'; // TL sees analytics like admin
   return 'Technicien';
 };
 
-const getProfileForDashboard = (profile, organization) => {
+const getProfileForDashboard = (profile, organization, effectiveRole) => {
   if (!profile) return null;
-  const role = getRole(profile);
+  const role = getRole(profile, effectiveRole);
   return {
     id: profile.id || profile.user_id,
     role: role || 'Commercial',
@@ -57,21 +55,23 @@ const getProfileForDashboard = (profile, organization) => {
 // ============================================================================
 
 export default function Pipeline() {
-  const { profile, user, organization, loading: authLoading, canAccessPipeline, appRole, businessRole } =
+  const { profile, user, organization, loading: authLoading, effectiveRole } =
     useAuth();
+  const { can } = useCanAccess();
 
   // État modale lead
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Onglet actif
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Onglet actif (supporte ?tab=kanban depuis le dashboard)
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
 
   // Dashboard data
   const dashboardProfile = useMemo(
-    () => getProfileForDashboard(profile, organization),
-    [profile?.id ?? profile?.user_id, profile?.app_role, profile?.business_role, organization?.id],
+    () => getProfileForDashboard(profile, organization, effectiveRole),
+    [profile?.id ?? profile?.user_id, profile?.app_role, profile?.business_role, organization?.id, effectiveRole],
   );
   const { filters, updatePeriod, updateSourceIds, updateCommercialId, resetFilters } =
     useDashboardFilters();
@@ -97,21 +97,6 @@ export default function Pipeline() {
     setRefreshKey((k) => k + 1);
   };
 
-  // ======== Accès non autorisé ========
-  if (!authLoading && !loading && profile && !canAccessPipeline) {
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold mb-2">Accès non autorisé</h1>
-        <p className="text-muted-foreground">
-          Votre profil ne dispose pas des droits nécessaires pour accéder au pipeline commercial.
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          App Role: {appRole || 'non défini'} | Business Role: {businessRole || 'non défini'}
-        </p>
-      </div>
-    );
-  }
-
   // ======== Loader initial ========
   // Attendre que l'auth ET les données utilisateur soient chargées
   if (authLoading || !dashboardProfile || !dashboardProfile.orgId) {
@@ -134,7 +119,8 @@ export default function Pipeline() {
     id: user?.id || 'unknown',
     role: 'Commercial',
   };
-  const isAdmin = effectiveProfile.role === 'Admin';
+  const isAdmin = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
+  const canCreateLead = can('pipeline', 'create');
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -196,12 +182,12 @@ export default function Pipeline() {
 
         {/* ==================== TAB LEADS ==================== */}
         <TabsContent value="leads" className="mt-6">
-          <LeadsList onLeadClick={handleLeadClick} onNewLead={handleNewLead} />
+          <LeadsList onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} />
         </TabsContent>
 
         {/* ==================== TAB KANBAN ==================== */}
         <TabsContent value="kanban" className="mt-6">
-          <LeadKanban onLeadClick={handleLeadClick} onNewLead={handleNewLead} refreshTrigger={refreshKey} />
+          <LeadKanban onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} refreshTrigger={refreshKey} />
         </TabsContent>
       </Tabs>
 

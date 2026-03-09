@@ -162,7 +162,8 @@ export const leadsService = {
   },
 
   /**
-   * Récupère les commerciaux (profils) de l'organisation pour l'assignation
+   * Récupère les commerciaux de l'organisation pour l'assignation
+   * Source : table majordhome.commercials (vue majordhome_commercials)
    * @param {string} orgId - ID de l'organisation (core.organizations.id)
    */
   async getCommercials(orgId) {
@@ -172,28 +173,11 @@ export const leadsService = {
         return { data: [], error: null };
       }
 
-      // 1. Récupérer les user_id des membres actifs de l'org
-      const { data: members, error: membersError } = await supabase
-        .from('organization_members')
-        .select('user_id')
-        .eq('org_id', orgId)
-        .eq('status', 'active');
-
-      if (membersError) {
-        console.error('[leads] getCommercials members error:', membersError);
-        return { data: null, error: membersError };
-      }
-
-      if (!members || members.length === 0) {
-        return { data: [], error: null };
-      }
-
-      // 2. Récupérer les profils de ces membres uniquement
-      const userIds = members.map((m) => m.user_id);
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds)
+        .from('majordhome_commercials')
+        .select('id, full_name, email, zone, is_active')
+        .eq('org_id', orgId)
+        .eq('is_active', true)
         .order('full_name');
 
       if (error) {
@@ -466,6 +450,7 @@ export const leadsService = {
         updates.quote_sent_date = today;
       } else if (newStatusLabel === 'Gagné') {
         updates.won_date = today;
+        updates.chantier_status = 'gagne';
       }
 
       // Si perdu, enregistrer la raison

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCanAccess } from '@hooks/usePermissions';
 import { useClient } from '@/shared/hooks/useClients';
 import { clientsService } from '@/shared/services/clients.service';
 import { geocodeAndUpdateByProjectId } from '@/shared/services/geocoding.service';
@@ -65,7 +66,9 @@ const parseFullName = (fullName) => {
 export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   const isCreateMode = !clientId;
   const { organization, user } = useAuth();
+  const { can } = useCanAccess();
   const orgId = organization?.id;
+  const canEditClient = can('clients', 'edit');
 
   // State
   const [activeTab, setActiveTab] = useState('info');
@@ -261,7 +264,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {!isCreateMode && (
+            {!isCreateMode && canEditClient && (
               <button
                 onClick={handleToggleLock}
                 className={`p-2 rounded-lg transition-colors ${

@@ -1,6 +1,6 @@
 # COMPONENTS.md - Cartographie des composants Majord'home
 
-> **Dernière MàJ** : 2026-03-04 — EventModal v2.0 (recherche unifiée clients+leads, contexte RDV, auto-création lead)
+> **Dernière MàJ** : 2026-03-10 — Sprint 6 Chantiers + Dashboard réel + Planning multi-select
 
 ---
 
@@ -58,7 +58,7 @@ src/
 │
 ├── layouts/
 │   └── AppLayout.jsx                     # Sidebar + Header + main content
-│       Sidebar: nav links (Dashboard, Planning, Clients, Pipeline, Entretiens)
+│       Sidebar: nav links (Dashboard, Planning, Clients, Pipeline, Chantiers, Entretiens, Territoire)
 │       Header: org name, user avatar, profil/settings links
 │
 ├── hooks/pipeline/
@@ -66,20 +66,29 @@ src/
 │   └── useDashboardFilters.js            # Filtres dashboard (dates, sources, statuts)
 │
 ├── apps/artisan/
-│   ├── routes.jsx                        # 10 routes lazy-loaded
+│   ├── routes.jsx                        # 12 routes lazy-loaded
 │   │   Routes:
 │   │   - index → Dashboard
 │   │   - planning → Planning
 │   │   - clients → Clients
 │   │   - clients/:id → ClientDetail
 │   │   - pipeline → Pipeline
+│   │   - chantiers → Chantiers
 │   │   - entretiens → Entretiens
+│   │   - territoire → Territoire
 │   │   - intervention/:id → InterventionDetail
 │   │   - settings → Settings
 │   │   - profile → Profile
 │   │
 │   ├── pages/
-│   │   ├── Dashboard.jsx                 # KPIs, résumé activité
+│   │   ├── Dashboard.jsx                 # v2.0 — KPIs réels + planning du jour + alertes + action rapide
+│   │   │   Hook interne: useDashboardHome(orgId) — queries parallèles Supabase (KPIs + planning jour)
+│   │   │   4 KPI cards cliquables: Nouveaux leads, Devis envoyés, Commandes à faire, À planifier
+│   │   │   Clics: /pipeline?tab=kanban (leads/devis), /chantiers (commandes/planifier)
+│   │   │   Planning du jour depuis majordhome_appointments (filtre today + non annulés)
+│   │   │   Alertes dynamiques basées sur KPIs, action rapide "Nouveau lead" (LeadModal)
+│   │   │   Hooks: useAuth
+│   │   │
 │   │   ├── Clients.jsx                   # v4.0 — Liste clients avec stat cards cliquables + filtres URL
 │   │   │   Props internes: SearchBar, FilterDropdown, StatCard (×5 cliquables), EmptyState (contextuel), ErrorState
 │   │   │   5 stat cards : Total | Particuliers | Entreprises | Contrats actifs | Archivés (toggle filtre)
@@ -94,18 +103,27 @@ src/
 │   │   │   Lock/Unlock editing, onglet Contrat dédié (CRUD), client_number affiché
 │   │   │   Hooks: useClient(id), useClientContract(id), useClientEquipments(id), useClientActivities(id)
 │   │   │
-│   │   ├── Pipeline.jsx                  # v2.0 — 3 onglets: Dashboard | Leads | Kanban (Sprint 4)
+│   │   ├── Pipeline.jsx                  # v2.1 — 3 onglets: Dashboard | Leads | Kanban (Sprint 4)
 │   │   │   Onglets Radix Tabs: dashboard, leads, kanban
+│   │   │   **Tab initial** via useSearchParams (`?tab=kanban` depuis Dashboard KPI cards)
 │   │   │   LeadModal partagée entre les 3 onglets
 │   │   │   Hooks: useDashboardData, useDashboardFilters, useAuth
 │   │   │
-│   │   ├── Planning.jsx                  # v2.2 — FullCalendar interactif (Sprint 2, badge lead Sprint 4+)
-│   │   │   Sous-composants: CalendarToolbar, CalendarFilters, renderEventContent
+│   │   ├── Planning.jsx                  # v3.0 — FullCalendar + multi-select équipe (Sprint 2/6)
+│   │   │   Sous-composants: CalendarToolbar, CalendarFilters (multi-select checkboxes), renderEventContent
 │   │   │   Vues: timeGridWeek (défaut), timeGridDay, dayGridMonth
 │   │   │   Interactions: drag & drop, resize, select-to-create, clic-to-edit
 │   │   │   **Badge "P"** sur events avec lead_id (RDV créés depuis pipeline)
+│   │   │   **teamList unifié** : merge useTeamMembers (Tech) + useLeadCommercials (Com.) via useMemo
+│   │   │   **CalendarFilters** : dropdown multi-select checkboxes, pastilles couleur, labels rôle (Tech/Com.)
 │   │   │   Passe `userId` (de useAuth) à EventModal pour auto-création lead
-│   │   │   Hooks: useAppointments({ orgId, startDate, endDate }), useTeamMembers(orgId), useAuth
+│   │   │   Hooks: useAppointments, useTeamMembers, useLeadCommercials, useAuth
+│   │   │
+│   │   ├── Chantiers.jsx                 # v1.0 — Page chantiers post-vente (Sprint 6)
+│   │   │   Route: /artisan/chantiers
+│   │   │   Wrapper: header + ChantierKanban
+│   │   │   ChantierModal slide-over partagée
+│   │   │   Hooks: useChantiers(orgId), useChantierMutations(orgId), useAuth
 │   │   │
 │   │   ├── Entretiens.jsx                # v1.0 — 3 onglets: Dashboard | Contrats | Secteurs (Sprint 5)
 │   │   │   Onglets Radix Tabs: dashboard, contrats, secteurs
@@ -186,6 +204,33 @@ src/
 │       │       KanbanColumn interne: header (label, count, montant), LeadCard compact
 │       │       Optimistic update + rollback
 │       │
+│       ├── chantiers/                   # Composants page Chantiers (Sprint 6)
+│       │   ├── ChantierKanban.jsx      # Board 5 colonnes (facture masqué), recherche nom, compteurs
+│       │   │   Props: chantiers, onChantierClick, searchQuery
+│       │   │   5 colonnes: Gagné, Commande à faire, Commande reçue, Planification, Réalisé
+│       │   │   Pas de DnD Phase 1 (transitions via boutons dans modale)
+│       │   │
+│       │   ├── ChantierCard.jsx        # Carte chantier Kanban
+│       │   │   Props: chantier, onClick, commercialsMap
+│       │   │   Bande date gauche (won_date), nom, CP, montant, OrderIndicator (Éq./Mat.)
+│       │   │   Type équipement badge violet, dates Estim. + Planif., commercial initiales
+│       │   │
+│       │   ├── ChantierModal.jsx       # Modale orchestrateur au clic sur carte
+│       │   │   Props: chantier, isOpen, onClose, onUpdated
+│       │   │   Sections: infos, ChantierOrderSection, ChantierInterventionSection
+│       │   │   Footer bidirectionnel: ← retour (gauche), → avancer (droite)
+│       │   │   Auto-transition planification quand intervention parent créée
+│       │   │   Section intervention disabled quand status = gagne
+│       │   │
+│       │   ├── ChantierOrderSection.jsx # Selects commande équipement/matériaux
+│       │   │   Props: chantier, onUpdate
+│       │   │   Status: Non commandé / Commandé / Reçu / N/A
+│       │   │   Auto-transition commande_recue quand les 2 = reçu ou NA
+│       │   │
+│       │   └── ChantierInterventionSection.jsx # Gestion intervention parent + slots
+│       │       Props: chantier, disabled
+│       │       Création intervention parent, liste slots (date + TechnicianSelect + notes)
+│       │
 │       ├── entretiens/                  # Composants page Entretiens (Sprint 5)
 │       │   ├── EntretiensDashboard.jsx  # Stats cards + chart répartition par fréquence
 │       │   ├── ContractsList.jsx        # Liste contrats filtrable (status/frequency/search) + pagination
@@ -256,6 +301,14 @@ src/
     │   │             getContractById, getContractStats, getContractSectors (groupement CP),
     │   │             getContractVisits (maintenance_visits), upsertVisit, getContractEquipments
     │   │
+    │   ├── chantiers.service.js           # v1.0 — Service chantiers post-vente (Sprint 6)
+    │   │   Constantes exportées: CHANTIER_STATUSES (6), CHANTIER_TRANSITIONS (matrice transitions)
+    │   │   Helper: getChantierStatusConfig(status) → { label, color, display_order }
+    │   │   Méthodes: getChantiers({ orgId }), updateChantierStatus(leadId, newStatus),
+    │   │             updateOrderStatus(leadId, { equipment, materials })
+    │   │   Auto-set planification_date quand transition vers planification
+    │   │   Auto-transition commande_recue quand equipment+materials = reçu/NA
+    │   │
     │   ├── appointments.service.js       # v1.0 — Service planning RDV (Sprint 2)
     │   │   Constantes exportées: APPOINTMENT_TYPES (7), APPOINTMENT_STATUSES (6), PRIORITIES (4)
     │   │   Helper: getAppointmentTypeConfig(type) → { value, label, color, bgClass }
@@ -308,15 +361,23 @@ src/
         │   - useContractVisits(contractId) → { visits }
         │   - useContractMutations() → { upsertVisit, ... }
         │
-        ├── useAppointments.js            # v1.0 — Hooks planning React Query (Sprint 2)
+        ├── useChantiers.js                # v1.0 — Hooks chantiers React Query (Sprint 6)
+        │   Exports:
+        │   - chantierKeys (cache key factory)
+        │   - useChantiers(orgId) → { chantiers, isLoading, error, refresh }
+        │   - useChantierMutations(orgId) → { updateStatus, updateOrderStatus, updateEstimatedDate, isUpdating }
+        │
+        ├── useAppointments.js            # v2.0 — Hooks planning React Query (Sprint 2 + Sprint 6 multi-select)
         │   Exports:
         │   - appointmentKeys (cache key factory)
         │   - useAppointments({ orgId, startDate, endDate }) → { events, appointments, isLoading, error,
-        │       filters, setFilters, createAppointment, updateAppointment, moveAppointment,
+        │       filters (memberIds[], appointmentType, status), setFilters,
+        │       createAppointment, updateAppointment, moveAppointment,
         │       cancelAppointment, deleteAppointment, isCreating, isUpdating, isMoving, isCancelling,
         │       isDeleting, refresh }
         │   - useAppointment(appointmentId) → { appointment, isLoading, error, refresh }
         │   - useTeamMembers(orgId) → { members, isLoading, error, refresh }
+        │   NOTE: v2.0 — filtrage multi-membre côté client via batch query appointment_technicians
         │
         ├── useInterventions.js           # v1.0 — Hooks interventions React Query (Sprint 3)
         │   Exports:

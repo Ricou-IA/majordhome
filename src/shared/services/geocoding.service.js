@@ -11,7 +11,6 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { ZONE_COMMERCIAL_MAPPING } from '@/lib/territoire-config';
 import * as turf from '@turf/turf';
 
 const API_BASE = 'https://api-adresse.data.gouv.fr';
@@ -434,33 +433,35 @@ export async function updateLeadCoordinates(leadId, lat, lng, zone) {
   }
 }
 
-// Cache module-level pour les IDs commerciaux (ne change pas en session)
-const _commercialIdCache = {};
+// Cache module-level pour les commerciaux par zone (ne change pas en session)
+const _commercialZoneCache = {};
 
 /**
- * Résout l'ID profil d'un commercial à partir de son email
- * @param {string} email
- * @returns {string|null} profile UUID
+ * Résout le commercial assigné à une zone depuis la table majordhome.commercials
+ * @param {string} zone - Nom de zone ('gaillac', 'pechbonnieu', etc.)
+ * @returns {{ id: string, full_name: string } | null}
  */
-export async function resolveCommercialId(email) {
-  if (_commercialIdCache[email]) return _commercialIdCache[email];
+export async function resolveCommercialByZone(zone) {
+  if (!zone) return null;
+  if (_commercialZoneCache[zone]) return _commercialZoneCache[zone];
 
   try {
     const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', email)
+      .from('majordhome_commercials')
+      .select('id, full_name')
+      .eq('zone', zone)
+      .eq('is_active', true)
       .single();
 
     if (error || !data) {
-      console.warn('[geocoding] Commercial non trouvé pour:', email);
+      console.warn('[geocoding] Aucun commercial actif pour la zone:', zone);
       return null;
     }
 
-    _commercialIdCache[email] = data.id;
-    return data.id;
+    _commercialZoneCache[zone] = data;
+    return data;
   } catch (error) {
-    console.error('[geocoding] Erreur resolveCommercialId:', error);
+    console.error('[geocoding] Erreur resolveCommercialByZone:', error);
     return null;
   }
 }
@@ -487,12 +488,11 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
   // 3. Mettre à jour coordonnées + zone
   await updateLeadCoordinates(leadId, coords.lat, coords.lng, zone);
 
-  // 4. Auto-assigner commercial si zone détectée
-  if (zone && ZONE_COMMERCIAL_MAPPING[zone]) {
-    const mapping = ZONE_COMMERCIAL_MAPPING[zone];
-    const commercialId = await resolveCommercialId(mapping.email);
+  // 4. Auto-assigner commercial si zone détectée (depuis table commercials)
+  if (zone) {
+    const commercial = await resolveCommercialByZone(zone);
 
-    if (commercialId) {
+    if (commercial) {
       try {
         // N'assigner que si pas déjà assigné — lecture via vue publique
         const { data: lead } = await supabase
@@ -503,11 +503,11 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
 
         if (!lead?.assigned_user_id) {
           await supabase.rpc('update_majordhome_lead', {
-            p_id: leadId,
-            p_data: { assigned_user_id: commercialId },
+            p_lead_id: leadId,
+            p_updates: { assigned_user_id: commercial.id },
           });
 
-          console.log(`[geocoding] Lead ${leadId} → zone ${zone} → commercial ${mapping.name}`);
+          console.log(`[geocoding] Lead ${leadId} → zone ${zone} → commercial ${commercial.full_name}`);
         }
       } catch (error) {
         console.warn('[geocoding] Erreur auto-assignation:', error);
@@ -558,20 +558,19 @@ export async function batchGeocodeLeads(leads, onProgress) {
 
       results.success++;
 
-      // 4. Auto-assigner commercial si zone détectée
-      if (zone && ZONE_COMMERCIAL_MAPPING[zone]) {
-        const mapping = ZONE_COMMERCIAL_MAPPING[zone];
-        const commercialId = await resolveCommercialId(mapping.email);
+      // 4. Auto-assigner commercial si zone détectée (depuis table commercials)
+      if (zone) {
+        const commercial = await resolveCommercialByZone(zone);
 
-        if (commercialId && !lead.assigned_user_id) {
+        if (commercial && !lead.assigned_user_id) {
           try {
             await supabase.rpc('update_majordhome_lead', {
               p_lead_id: lead.id,
-              p_updates: { assigned_user_id: commercialId },
+              p_updates: { assigned_user_id: commercial.id },
             });
 
             results.assigned++;
-            console.log(`[geocoding] Lead batch: ${lead.id} → zone ${zone} → ${mapping.name}`);
+            console.log(`[geocoding] Lead batch: ${lead.id} → zone ${zone} → ${commercial.full_name}`);
           } catch (err) {
             console.warn('[geocoding] Batch auto-assign failed:', err);
           }

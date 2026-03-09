@@ -30,7 +30,9 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCanAccess } from '@/shared/hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@/shared/hooks/useAppointments';
+import { useLeadCommercials } from '@/shared/hooks/useLeads';
 import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@/shared/services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 
@@ -141,70 +143,102 @@ function CalendarToolbar({
           <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
 
-        <button
-          onClick={onAddEvent}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Nouveau RDV
-        </button>
+        {onAddEvent && (
+          <button
+            onClick={onAddEvent}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nouveau RDV
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 /**
- * Filtres technicien + type
+ * Filtres équipe (multi-sélection) + type
  */
-function CalendarFilters({ filters, setFilters, members, isLoadingMembers }) {
-  const [showTechDropdown, setShowTechDropdown] = useState(false);
+function CalendarFilters({ filters, setFilters, teamList }) {
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
-  const selectedTech = members.find(m => m.id === filters.technicianId);
+  const selectedCount = filters.memberIds?.length || 0;
   const selectedType = APPOINTMENT_TYPES.find(t => t.value === filters.appointmentType);
-  const hasFilters = filters.technicianId || filters.appointmentType;
+  const hasFilters = selectedCount > 0 || filters.appointmentType;
+
+  const toggleMember = (memberId) => {
+    setFilters(f => {
+      const current = f.memberIds || [];
+      const next = current.includes(memberId)
+        ? current.filter(id => id !== memberId)
+        : [...current, memberId];
+      return { ...f, memberIds: next };
+    });
+  };
+
+  // Label bouton : noms sélectionnés ou "Équipe"
+  const buttonLabel = useMemo(() => {
+    if (selectedCount === 0) return 'Équipe';
+    const names = teamList
+      .filter(m => (filters.memberIds || []).includes(m.id))
+      .map(m => m.display_name.split(' ')[0]);
+    return names.join(', ');
+  }, [selectedCount, teamList, filters.memberIds]);
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Filtre technicien */}
+      {/* Filtre équipe (multi-sélection) */}
       <div className="relative">
         <button
-          onClick={() => setShowTechDropdown(!showTechDropdown)}
+          onClick={() => setShowTeamDropdown(!showTeamDropdown)}
           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
-            filters.technicianId
+            selectedCount > 0
               ? 'bg-blue-50 border-blue-200 text-blue-700'
               : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
           }`}
         >
           <Users className="w-4 h-4" />
-          {selectedTech ? selectedTech.display_name : 'Technicien'}
-          <ChevronDown className={`w-3 h-3 transition-transform ${showTechDropdown ? 'rotate-180' : ''}`} />
+          {buttonLabel}
+          <ChevronDown className={`w-3 h-3 transition-transform ${showTeamDropdown ? 'rotate-180' : ''}`} />
         </button>
-        {showTechDropdown && (
+        {showTeamDropdown && (
           <>
-            <div className="fixed inset-0 z-10" onClick={() => setShowTechDropdown(false)} />
-            <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+            <div className="fixed inset-0 z-10" onClick={() => setShowTeamDropdown(false)} />
+            <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
               <button
-                onClick={() => { setFilters(f => ({ ...f, technicianId: null })); setShowTechDropdown(false); }}
-                className={`w-full flex items-center px-3 py-2 text-sm text-left ${!filters.technicianId ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                onClick={() => { setFilters(f => ({ ...f, memberIds: [] })); setShowTeamDropdown(false); }}
+                className={`w-full flex items-center px-3 py-2 text-sm text-left ${selectedCount === 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
               >
-                Tous les techniciens
+                Tous
               </button>
-              {members.map(member => (
-                <button
-                  key={member.id}
-                  onClick={() => { setFilters(f => ({ ...f, technicianId: member.id })); setShowTechDropdown(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left ${
-                    filters.technicianId === member.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <span
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: member.calendar_color || '#6B7280' }}
-                  />
-                  {member.display_name}
-                </button>
-              ))}
+              {teamList.map(member => {
+                const isSelected = (filters.memberIds || []).includes(member.id);
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => toggleMember(member.id)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left ${
+                      isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                        isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                      }`}
+                    >
+                      {isSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
+                    </span>
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: member.color || '#6B7280' }}
+                    />
+                    <span className="truncate">{member.display_name}</span>
+                    <span className="text-[10px] text-gray-400 ml-auto shrink-0">{member.roleLabel}</span>
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
@@ -254,7 +288,7 @@ function CalendarFilters({ filters, setFilters, members, isLoadingMembers }) {
       {/* Reset filtres */}
       {hasFilters && (
         <button
-          onClick={() => setFilters({ technicianId: null, appointmentType: null, status: null })}
+          onClick={() => setFilters({ memberIds: [], appointmentType: null, status: null })}
           className="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
           Effacer
@@ -299,9 +333,11 @@ function renderEventContent(eventInfo) {
 // ============================================================================
 
 export default function Planning() {
-  const { organization, user } = useAuth();
+  const { organization, user, effectiveRole } = useAuth();
+  const { can } = useCanAccess();
   const orgId = organization?.id;
   const calendarRef = useRef(null);
+  const canCreateAppointment = can('planning', 'create');
 
   // État local
   const [currentView, setCurrentView] = useState('timeGridWeek');
@@ -332,6 +368,33 @@ export default function Planning() {
   });
 
   const { members, isLoading: isLoadingMembers } = useTeamMembers(orgId);
+  const { commercials } = useLeadCommercials(orgId);
+
+  // Liste unifiée : techniciens + commerciaux (pour filtres + EventModal)
+  const teamList = useMemo(() => {
+    const list = [];
+    // Techniciens (depuis team_members)
+    (members || []).forEach(m => {
+      list.push({
+        id: m.id,
+        display_name: m.display_name || m.first_name || 'Tech',
+        color: m.color || '#6B7280',
+        roleLabel: 'Tech',
+      });
+    });
+    // Commerciaux (depuis majordhome_commercials)
+    const memberIdSet = new Set(list.map(m => m.id));
+    (commercials || []).forEach(c => {
+      if (memberIdSet.has(c.id)) return; // éviter les doublons
+      list.push({
+        id: c.id,
+        display_name: c.full_name || 'Commercial',
+        color: '#3B82F6',
+        roleLabel: 'Com.',
+      });
+    });
+    return list;
+  }, [members, commercials]);
 
   // ==========================================================================
   // HANDLERS FULLCALENDAR
@@ -532,15 +595,14 @@ export default function Planning() {
           currentView={currentView}
           onViewChange={handleViewChange}
           title={calendarTitle}
-          onAddEvent={() => setModalState({ open: true, mode: 'create', appointment: null, defaultDate: new Date().toISOString().split('T')[0], defaultTime: '09:00' })}
+          onAddEvent={canCreateAppointment ? () => setModalState({ open: true, mode: 'create', appointment: null, defaultDate: new Date().toISOString().split('T')[0], defaultTime: '09:00' }) : null}
           onRefresh={refresh}
           isLoading={isLoading}
         />
         <CalendarFilters
           filters={filters}
           setFilters={setFilters}
-          members={members}
-          isLoadingMembers={isLoadingMembers}
+          teamList={teamList}
         />
       </div>
 
@@ -573,9 +635,9 @@ export default function Planning() {
             events={events}
             eventContent={renderEventContent}
             // Interactions
-            editable={true}
-            selectable={true}
-            selectMirror={true}
+            editable={canCreateAppointment}
+            selectable={canCreateAppointment}
+            selectMirror={canCreateAppointment}
             dayMaxEvents={true}
             nowIndicator={true}
             // Callbacks
