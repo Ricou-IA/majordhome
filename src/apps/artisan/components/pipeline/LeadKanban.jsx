@@ -202,7 +202,7 @@ function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver, co
  * @param {Function} props.onNewLead - Callback nouveau lead
  */
 export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
-  const { organization, user } = useAuth();
+  const { organization, user, effectiveRole } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
 
@@ -228,12 +228,16 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Charger tous les leads (pas de pagination pour le kanban)
+  // Charger les leads (commercial = les siens uniquement)
   const fetchLeads = useCallback(async () => {
     if (!orgId) return;
     setIsLoading(true);
     try {
       const dateFilters = monthToDateRange(selectedMonth);
+      // Commercial : filtrer sur ses propres leads
+      if (effectiveRole === 'commercial' && userId) {
+        dateFilters.assignedUserId = userId;
+      }
       const { data, error } = await leadsService.getLeads({
         orgId,
         filters: dateFilters,
@@ -248,7 +252,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orgId, selectedMonth]);
+  }, [orgId, selectedMonth, effectiveRole, userId]);
 
   useEffect(() => {
     fetchLeads();
@@ -261,6 +265,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       if (!orgId) return;
       try {
         const dateFilters = monthToDateRange(selectedMonth);
+        if (effectiveRole === 'commercial' && userId) {
+          dateFilters.assignedUserId = userId;
+        }
         const { data, error } = await leadsService.getLeads({
           orgId,
           filters: dateFilters,
@@ -274,7 +281,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
     };
     refetch();
-  }, [refreshTrigger, orgId, selectedMonth]);
+  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, userId]);
 
   // Filtrer les leads côté client (instantané, pas d'appel API)
   const filteredLeads = useMemo(() => {

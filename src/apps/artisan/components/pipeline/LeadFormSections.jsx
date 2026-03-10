@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { FormField, SectionTitle, inputClass, selectClass } from '@/apps/artisan/components/FormFields';
 import { formatPhoneNumber } from '@/lib/utils';
 import { EQUIPMENT_CATEGORY_LABELS, LOST_REASONS } from './LeadStatusConfig';
-import { SchedulingPanel } from './SchedulingPanel';
+// SchedulingPanel déplacé dans LeadModal (overlay mode)
 import { LeadActivityTimeline } from './LeadActivityTimeline';
 
 // ============================================================================
@@ -424,19 +424,7 @@ export const SectionPipeline = ({
       </div>
     )}
 
-    {/* Panneau de planification RDV */}
-    {pendingRdvStatusId && (
-      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <SchedulingPanel
-          lead={lead || form}
-          orgId={orgId}
-          commercials={commercials}
-          onConfirm={handleConfirmScheduling}
-          onCancel={() => setPendingRdvStatusId(null)}
-          isLoading={schedulingLoading}
-        />
-      </div>
-    )}
+    {/* SchedulingPanel rendu en overlay dans LeadModal */}
 
     <FormField label="Équipement concerné" className="mt-3">
       <div className="relative">

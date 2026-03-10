@@ -241,8 +241,9 @@ const ErrorState = ({ error, onRetry }) => (
  * @param {Function} props.onNewLead - () => void — ouvre la modale en mode création
  */
 export function LeadsList({ onLeadClick, onNewLead }) {
-  const { organization } = useAuth();
+  const { organization, user, effectiveRole } = useAuth();
   const orgId = organization?.id;
+  const userId = user?.id;
 
   // État local recherche + mois
   const [searchInput, setSearchInput] = useState('');
@@ -262,6 +263,13 @@ export function LeadsList({ onLeadClick, onNewLead }) {
     loadMore,
     refresh,
   } = useLeads({ orgId, limit: 25 });
+
+  // Commercial : forcer le filtre sur ses propres leads
+  useEffect(() => {
+    if (effectiveRole === 'commercial' && userId && filters.assignedUserId !== userId) {
+      setFilters({ assignedUserId: userId });
+    }
+  }, [effectiveRole, userId, filters.assignedUserId, setFilters]);
 
   // Données de référence
   const { sources } = useLeadSources();
@@ -336,7 +344,7 @@ export function LeadsList({ onLeadClick, onNewLead }) {
     const s = sources.find((s) => s.id === filters.sourceId);
     activeFilters.push({ key: 'sourceId', label: s?.name || 'Source' });
   }
-  if (filters.assignedUserId) {
+  if (filters.assignedUserId && effectiveRole !== 'commercial') {
     const c = commercials.find((c) => c.id === filters.assignedUserId);
     activeFilters.push({ key: 'assignedUserId', label: c?.full_name || 'Assigné' });
   }
@@ -391,12 +399,15 @@ export function LeadsList({ onLeadClick, onNewLead }) {
             options={sourceOptions}
             onChange={(v) => setFilters({ sourceId: v || null })}
           />
-          <FilterDropdown
-            label="Assigné"
-            value={filters.assignedUserId || ''}
-            options={commercialOptions}
-            onChange={(v) => setFilters({ assignedUserId: v || null })}
-          />
+          {/* Filtre assigné masqué pour les commerciaux (voient uniquement les leurs) */}
+          {effectiveRole !== 'commercial' && (
+            <FilterDropdown
+              label="Assigné"
+              value={filters.assignedUserId || ''}
+              options={commercialOptions}
+              onChange={(v) => setFilters({ assignedUserId: v || null })}
+            />
+          )}
           <FilterDropdown
             label="Mois"
             icon={CalendarDays}

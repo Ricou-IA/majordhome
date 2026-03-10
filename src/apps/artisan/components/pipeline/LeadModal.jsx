@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,7 @@ import {
   SectionActions,
   SectionNotes,
 } from './LeadFormSections';
+import { SchedulingPanel } from './SchedulingPanel';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -478,21 +479,39 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-xl flex flex-col animate-in slide-in-from-right duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-white sticky top-0 z-10">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {isEditing ? 'Modifier le lead' : 'Nouveau lead'}
-            </h2>
-            {isEditing && currentStatus && (
-              <Badge
-                className="mt-1 text-xs text-white"
-                style={{ backgroundColor: currentStatus.color }}
+          <div className="flex items-center gap-3">
+            {pendingRdvStatusId && (
+              <button
+                onClick={() => setPendingRdvStatusId(null)}
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                {currentStatus.label}
-              </Badge>
+                <ArrowLeft className="h-4 w-4" />
+              </button>
             )}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {pendingRdvStatusId
+                  ? 'Planifier le RDV'
+                  : isEditing ? 'Modifier le lead' : 'Nouveau lead'
+                }
+              </h2>
+              {!pendingRdvStatusId && isEditing && currentStatus && (
+                <Badge
+                  className="mt-1 text-xs text-white"
+                  style={{ backgroundColor: currentStatus.color }}
+                >
+                  {currentStatus.label}
+                </Badge>
+              )}
+              {pendingRdvStatusId && (
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {form.first_name || ''} {form.last_name || ''}
+                </p>
+              )}
+            </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={pendingRdvStatusId ? () => setPendingRdvStatusId(null) : onClose}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X className="h-5 w-5" />
@@ -505,6 +524,16 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
+          ) : pendingRdvStatusId ? (
+            /* ── Mode planification RDV : overlay plein body ── */
+            <SchedulingPanel
+              lead={lead || form}
+              orgId={orgId}
+              commercials={commercials}
+              onConfirm={handleConfirmScheduling}
+              onCancel={() => setPendingRdvStatusId(null)}
+              isLoading={schedulingLoading}
+            />
           ) : (
             <>
               <SectionClientLinking
@@ -595,24 +624,26 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
           )}
         </div>
 
-        {/* Footer sticky */}
-        <div className="border-t bg-white px-6 py-4 flex items-center justify-between sticky bottom-0">
-          <Button variant="outline" onClick={onClose} className="min-h-[44px]">
-            Annuler
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="gap-2 min-h-[44px] bg-blue-600 hover:bg-blue-700"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {isEditing ? 'Enregistrer' : 'Créer le lead'}
-          </Button>
-        </div>
+        {/* Footer sticky — masqué en mode planification RDV */}
+        {!pendingRdvStatusId && (
+          <div className="border-t bg-white px-6 py-4 flex items-center justify-between sticky bottom-0">
+            <Button variant="outline" onClick={onClose} className="min-h-[44px]">
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="gap-2 min-h-[44px] bg-blue-600 hover:bg-blue-700"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {isEditing ? 'Enregistrer' : 'Créer le lead'}
+            </Button>
+          </div>
+        )}
       </div>
     </>
   );

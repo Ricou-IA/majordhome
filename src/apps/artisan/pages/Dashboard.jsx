@@ -205,7 +205,7 @@ export default function Dashboard() {
   // LeadModal state
   const [showLeadModal, setShowLeadModal] = useState(false);
 
-  // Alertes (placeholder — à enrichir)
+  // Alertes (scopées par rôle)
   const alerts = useMemo(() => {
     const list = [];
     if (kpis.nouveauLead > 0) {
@@ -215,7 +215,8 @@ export default function Dashboard() {
         message: `${kpis.nouveauLead} nouveau${kpis.nouveauLead > 1 ? 'x' : ''} lead${kpis.nouveauLead > 1 ? 's' : ''} à qualifier`,
       });
     }
-    if (kpis.commandeAFaire > 0) {
+    // Alerte commandes uniquement pour responsables (pas commerciaux)
+    if (kpis.commandeAFaire > 0 && effectiveRole !== 'commercial') {
       list.push({
         id: 'commandes',
         type: 'warning',
@@ -223,7 +224,7 @@ export default function Dashboard() {
       });
     }
     return list;
-  }, [kpis]);
+  }, [kpis, effectiveRole]);
 
   // ===========================================================================
   // RENDER
@@ -247,7 +248,8 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards — masquer pipeline KPIs pour technicien */}
-      <div className={`grid grid-cols-2 ${can('pipeline', 'view') ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
+      {/* Grid adapté : 4 cols admin/TL, 2 cols commercial (pipeline only), 2 cols technicien (chantiers only) */}
+      <div className={`grid grid-cols-2 ${can('pipeline', 'view') && effectiveRole !== 'commercial' ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
         {can('pipeline', 'view') && (
           <>
             <KpiCard
@@ -266,7 +268,8 @@ export default function Dashboard() {
             />
           </>
         )}
-        {can('chantiers', 'view') && (
+        {/* Chantiers KPIs : uniquement pour responsables (org_admin, team_leader) — pas les commerciaux */}
+        {can('chantiers', 'view') && effectiveRole !== 'commercial' && (
           <>
             <KpiCard
               label="Commandes à faire"
