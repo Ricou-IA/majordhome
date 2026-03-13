@@ -6,28 +6,30 @@ import { toast } from 'sonner';
 // HELPERS
 // ============================================================================
 
-const getMonthsInPeriod = (from, to) => {
-  const months = [];
-  const current = new Date(from.getFullYear(), from.getMonth(), 1);
-  const end = new Date(to.getFullYear(), to.getMonth(), 1);
+/** Retourne le 1er jour d'un mois 'YYYY-MM' → 'YYYY-MM-01' */
+const monthToStartDate = (m) => `${m}-01`;
 
-  while (current <= end) {
-    months.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`);
-    current.setMonth(current.getMonth() + 1);
-  }
+/** Retourne le dernier jour d'un mois 'YYYY-MM' → 'YYYY-MM-28/30/31' */
+const monthToEndDate = (m) => {
+  const [y, mo] = m.split('-').map(Number);
+  const lastDay = new Date(y, mo, 0).getDate();
+  return `${m}-${String(lastDay).padStart(2, '0')}`;
+};
 
-  return months;
+/** Vérifie si une date 'YYYY-MM-DD' appartient à un des mois sélectionnés */
+const isInSelectedMonths = (dateStr, months) => {
+  if (!dateStr) return false;
+  const prefix = dateStr.slice(0, 7); // 'YYYY-MM'
+  return months.includes(prefix);
 };
 
 const getLast6Months = () => {
   const months = [];
   const now = new Date();
-
   for (let i = 5; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
   }
-
   return months;
 };
 
@@ -36,10 +38,12 @@ const EMPTY_DATA = {
   appointments: 0,
   sales: 0,
   revenue: 0,
-  expenses: 0,
-  roi: 0,
+  ticketMoyen: 0,
+  conversionRdv: 0,
+  conversionVente: 0,
   sourceMetrics: [],
   monthlyTrends: [],
+  commercialMetrics: [],
 };
 
 // ============================================================================
@@ -51,23 +55,17 @@ export const useDashboardData = (filters, profile) => {
   const [loading, setLoading] = useState(true);
   const fetchIdRef = useRef(0);
 
-  // Refetch stable callback (utilisé pour le bouton "Actualiser" éventuel)
   const refetch = useCallback(() => {
-    // Incrémente le fetchId pour forcer un re-fetch via le useEffect
     fetchIdRef.current += 1;
-    // Pas de setState ici — on force le useEffect à se relancer via la ref
-    // en pratique, les consumers appellent refetch rarement
   }, []);
 
   useEffect(() => {
-    // Guard : pas de profil ou pas d'orgId → on attend
     if (!profile || !profile.orgId) {
       setLoading(false);
       return;
     }
 
-    // Guard : pas de filtres valides
-    if (!filters?.period?.from || !filters?.period?.to) {
+    if (!filters?.months || filters.months.length === 0) {
       setLoading(false);
       return;
     }
@@ -80,19 +78,25 @@ export const useDashboardData = (filters, profile) => {
 
       try {
         const orgId = profile.orgId;
+        const selectedMonths = filters.months;
         const last6Months = getLast6Months();
         const firstMonthStart = `${last6Months[0]}-01`;
 
-        // Toutes les requêtes en parallèle (vues publiques enrichies)
-        const [leadsResult, allLeadsResult, sourcesResult, costsResult, allCostsResult] = await Promise.all([
-          // 1. Leads pour la période filtrée
+        // Bornes min/max pour la requête SQL (fetch large, filtre exact côté client)
+        const sortedMonths = [...selectedMonths].sort();
+        const minDate = monthToStartDate(sortedMonths[0]);
+        const maxDate = monthToEndDate(sortedMonths[sortedMonths.length - 1]);
+
+        // Requêtes en parallèle
+        const [leadsResult, allLeadsResult, sourcesResult, membersResult] = await Promise.all([
+          // 1. Leads pour les mois sélectionnés (bornes larges)
           supabase
             .from('majordhome_leads')
             .select('*')
             .eq('org_id', orgId)
             .eq('is_deleted', false)
-            .gte('created_date', filters.period.from.toISOString().split('T')[0])
-            .lte('created_date', filters.period.to.toISOString().split('T')[0]),
+            .gte('created_date', minDate)
+            .lte('created_date', maxDate),
 
           // 2. Leads des 6 derniers mois (tendances)
           supabase
@@ -105,46 +109,45 @@ export const useDashboardData = (filters, profile) => {
           // 3. Sources actives
           supabase.from('majordhome_sources').select('id, name').eq('is_active', true),
 
-          // 4. Coûts de la période filtrée
+          // 4. Commerciaux (pour noms dans la section par commercial)
           supabase
-            .from('majordhome_monthly_source_costs')
-            .select('cost_amount, source_id, month')
-            .in('month', getMonthsInPeriod(filters.period.from, filters.period.to)),
-
-          // 5. Coûts des 6 derniers mois
-          supabase
-            .from('majordhome_monthly_source_costs')
-            .select('cost_amount, source_id, month')
-            .in('month', last6Months),
+            .from('majordhome_commercials')
+            .select('id, full_name')
+            .eq('org_id', orgId)
+            .eq('is_active', true),
         ]);
 
-        // Si le fetch a été annulé (nouveau fetch lancé), on ne met pas à jour le state
         if (cancelled || fetchIdRef.current !== currentFetchId) return;
-
         if (leadsResult.error) throw leadsResult.error;
 
-        // Filtrer les leads côté client (rôle + filtres source/commercial)
-        let leads = leadsResult.data || [];
+        // Map des noms commerciaux (assigned_user_id → majordhome.commercials.id)
+        const commercialsMap = {};
+        if (membersResult.data) {
+          for (const c of membersResult.data) {
+            commercialsMap[c.id] = c.full_name;
+          }
+        }
+
+        if (cancelled || fetchIdRef.current !== currentFetchId) return;
+
+        // Filtrer les leads par mois exact (la requête SQL utilise des bornes larges)
+        let leads = (leadsResult.data || []).filter((l) =>
+          isInSelectedMonths(l.created_date, selectedMonths),
+        );
         let allLeads = allLeadsResult.data || [];
 
+        // Commercial voit uniquement ses leads
         if (profile.role === 'Commercial') {
           leads = leads.filter((l) => l.assigned_user_id === profile.id);
           allLeads = allLeads.filter((l) => l.assigned_user_id === profile.id);
-        } else if (filters.commercialId) {
-          leads = leads.filter((l) => l.assigned_user_id === filters.commercialId);
         }
 
+        // Filtre source
         if (filters.sourceIds.length > 0) {
           leads = leads.filter((l) => filters.sourceIds.includes(l.source_id));
         }
 
         const sources = sourcesResult.data || [];
-        const costs = costsResult.data || [];
-        const allCosts = allCostsResult.data || [];
-
-        // Coûts filtrés par source si nécessaire
-        const filteredCosts =
-          filters.sourceIds.length > 0 ? costs.filter((c) => filters.sourceIds.includes(c.source_id)) : costs;
 
         // === Stats globales ===
         const totalLeads = leads.length;
@@ -153,8 +156,45 @@ export const useDashboardData = (filters, profile) => {
         const revenue = leads
           .filter((l) => l.status_is_won === true)
           .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
-        const expenses = filteredCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0);
-        const roi = expenses > 0 ? ((revenue - expenses) / expenses) * 100 : 0;
+        const ticketMoyen = sales > 0 ? revenue / sales : 0;
+        const conversionRdv = totalLeads > 0 ? (appointments / totalLeads) * 100 : 0;
+        const conversionVente = totalLeads > 0 ? (sales / totalLeads) * 100 : 0;
+
+        // === Métriques par commercial ===
+        const leadsForBreakdown = profile.role === 'Commercial'
+          ? leads
+          : (leadsResult.data || [])
+              .filter((l) => isInSelectedMonths(l.created_date, selectedMonths))
+              .filter((l) =>
+                filters.sourceIds.length > 0 ? filters.sourceIds.includes(l.source_id) : true,
+              );
+
+        const byUser = {};
+        for (const lead of leadsForBreakdown) {
+          const uid = lead.assigned_user_id;
+          if (!uid) continue;
+          if (!byUser[uid]) byUser[uid] = [];
+          byUser[uid].push(lead);
+        }
+
+        const commercialMetrics = Object.entries(byUser)
+          .map(([userId, userLeads]) => {
+            const uLeads = userLeads.length;
+            const uAppointments = userLeads.filter((l) => l.status_display_order >= 3).length;
+            const uSales = userLeads.filter((l) => l.status_is_won === true).length;
+            const uRevenue = userLeads
+              .filter((l) => l.status_is_won === true)
+              .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
+            return {
+              userId,
+              fullName: commercialsMap[userId] || 'Non assigné',
+              leads: uLeads,
+              appointments: uAppointments,
+              sales: uSales,
+              revenue: uRevenue,
+            };
+          })
+          .sort((a, b) => b.leads - a.leads);
 
         // === Métriques par source ===
         const sourceMetrics = [];
@@ -167,15 +207,7 @@ export const useDashboardData = (filters, profile) => {
             .filter((l) => l.status_is_won === true)
             .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0);
 
-          const sourceCosts = costs.filter((c) => c.source_id === source.id);
-          const sourceExpenses = sourceCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0);
-
-          const cpl = sourceLeads.length > 0 ? sourceExpenses / sourceLeads.length : 0;
-          const cpAppointment = sourceAppointments > 0 ? sourceExpenses / sourceAppointments : 0;
-          const cpSale = sourceSales > 0 ? sourceExpenses / sourceSales : 0;
-          const sourceRoi = sourceExpenses > 0 ? ((sourceRevenue - sourceExpenses) / sourceExpenses) * 100 : 0;
-
-          if (sourceLeads.length > 0 || sourceExpenses > 0) {
+          if (sourceLeads.length > 0) {
             sourceMetrics.push({
               sourceId: source.id,
               sourceName: source.name,
@@ -183,16 +215,11 @@ export const useDashboardData = (filters, profile) => {
               appointments: sourceAppointments,
               sales: sourceSales,
               revenue: sourceRevenue,
-              expenses: sourceExpenses,
-              cpl,
-              cpAppointment,
-              cpSale,
-              roi: sourceRoi,
             });
           }
         }
 
-        sourceMetrics.sort((a, b) => b.roi - a.roi);
+        sourceMetrics.sort((a, b) => b.revenue - a.revenue);
 
         // === Tendances mensuelles ===
         const monthlyTrends = last6Months.map((monthStr) => {
@@ -205,8 +232,6 @@ export const useDashboardData = (filters, profile) => {
             return date >= firstDay && date <= lastDay;
           });
 
-          const monthCosts = allCosts.filter((c) => c.month === monthStr);
-
           return {
             month: firstDay.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
             leads: monthLeads.length,
@@ -215,20 +240,20 @@ export const useDashboardData = (filters, profile) => {
             revenue: monthLeads
               .filter((l) => l.status_is_won === true)
               .reduce((sum, l) => sum + (Number(l.order_amount_ht) || 0), 0),
-            expenses: monthCosts.reduce((sum, c) => sum + Number(c.cost_amount), 0),
           };
         });
 
-        // Mise à jour state
         setData({
           totalLeads,
           appointments,
           sales,
           revenue,
-          expenses,
-          roi,
+          ticketMoyen,
+          conversionRdv,
+          conversionVente,
           sourceMetrics,
           monthlyTrends,
+          commercialMetrics,
         });
       } catch (error) {
         if (cancelled || fetchIdRef.current !== currentFetchId) return;
@@ -246,16 +271,13 @@ export const useDashboardData = (filters, profile) => {
     return () => {
       cancelled = true;
     };
-    // Dépendances stables : on sérialise les filtres pour éviter les re-renders inutiles
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     profile?.id,
     profile?.orgId,
     profile?.role,
-    filters?.period?.from?.getTime?.(),
-    filters?.period?.to?.getTime?.(),
+    filters?.months?.join(','),
     filters?.sourceIds?.join(','),
-    filters?.commercialId,
   ]);
 
   return { data, loading, refetch };

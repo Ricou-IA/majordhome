@@ -4,47 +4,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 
-export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
+export const SourcesTable = ({ sourceMetrics }) => {
   const exportToCSV = () => {
     if (sourceMetrics.length === 0) {
       toast.error('Aucune donnée à exporter');
       return;
     }
 
-    const headers = isAdmin
-      ? [
-          'Source',
-          'Leads',
-          'Rendez-vous',
-          'Ventes',
-          'CA HT (€)',
-          'Dépenses (€)',
-          'CPL (€)',
-          'CPRDV (€)',
-          'CPVente (€)',
-          'ROI (%)',
-        ]
-      : ['Source', 'Leads', 'Rendez-vous', 'Ventes', 'CA HT (€)'];
-
-    const rows = sourceMetrics.map((metric) =>
-      isAdmin
-        ? [
-            metric.sourceName,
-            metric.leads,
-            metric.appointments,
-            metric.sales,
-            metric.revenue.toFixed(2),
-            metric.expenses.toFixed(2),
-            metric.cpl.toFixed(2),
-            metric.cpAppointment.toFixed(2),
-            metric.cpSale.toFixed(2),
-            metric.roi.toFixed(2),
-          ]
-        : [metric.sourceName, metric.leads, metric.appointments, metric.sales, metric.revenue.toFixed(2)]
-    );
+    const headers = ['Source', 'Leads', 'Rendez-vous', 'Ventes', 'CA HT (€)'];
+    const rows = sourceMetrics.map((metric) => [
+      metric.sourceName,
+      metric.leads,
+      metric.appointments,
+      metric.sales,
+      metric.revenue.toFixed(2),
+    ]);
 
     const csvContent = [headers.join(';'), ...rows.map((row) => row.join(';'))].join('\n');
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -60,9 +36,9 @@ export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
 
   if (sourceMetrics.length === 0) {
     return (
-      <Card>
+      <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle>Comparatif par source</CardTitle>
+          <CardTitle className="text-base">Comparatif par source</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
@@ -74,9 +50,9 @@ export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
   }
 
   return (
-    <Card>
+    <Card className="border-0 shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <CardTitle className="text-base sm:text-lg">Comparatif par source</CardTitle>
+        <CardTitle className="text-base">Comparatif par source</CardTitle>
         <Button onClick={exportToCSV} size="sm" variant="outline" className="w-full sm:w-auto">
           <Download className="h-4 w-4 mr-2" />
           Exporter CSV
@@ -87,16 +63,7 @@ export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
         <div className="block sm:hidden space-y-3 p-4">
           {sourceMetrics.map((metric) => (
             <div key={metric.sourceId} className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{metric.sourceName}</span>
-                {isAdmin && (
-                  <span
-                    className={`text-sm font-medium ${metric.roi >= 0 ? 'text-success' : 'text-destructive'}`}
-                  >
-                    ROI: {metric.roi.toFixed(1)}%
-                  </span>
-                )}
-              </div>
+              <span className="font-medium">{metric.sourceName}</span>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div className="text-center">
                   <p className="text-muted-foreground text-xs">Leads</p>
@@ -115,18 +82,6 @@ export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
                 <span className="text-muted-foreground">CA HT</span>
                 <span className="font-medium">{metric.revenue.toLocaleString('fr-FR')} €</span>
               </div>
-              {isAdmin && (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Dépenses</span>
-                    <span>{metric.expenses.toLocaleString('fr-FR')} €</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">CPL</span>
-                    <span>{metric.cpl.toFixed(2)} €</span>
-                  </div>
-                </>
-              )}
             </div>
           ))}
         </div>
@@ -141,15 +96,6 @@ export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
                 <TableHead className="text-right">RDV</TableHead>
                 <TableHead className="text-right">Ventes</TableHead>
                 <TableHead className="text-right">CA HT</TableHead>
-                {isAdmin && (
-                  <>
-                    <TableHead className="text-right">Dépenses</TableHead>
-                    <TableHead className="text-right hidden lg:table-cell">CPL</TableHead>
-                    <TableHead className="text-right hidden xl:table-cell">CPRDV</TableHead>
-                    <TableHead className="text-right hidden xl:table-cell">CPVente</TableHead>
-                    <TableHead className="text-right">ROI</TableHead>
-                  </>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,27 +108,6 @@ export const SourcesTable = ({ sourceMetrics, isAdmin }) => {
                   <TableCell className="text-right whitespace-nowrap">
                     {metric.revenue.toLocaleString('fr-FR')} €
                   </TableCell>
-                  {isAdmin && (
-                    <>
-                      <TableCell className="text-right whitespace-nowrap">
-                        {metric.expenses.toLocaleString('fr-FR')} €
-                      </TableCell>
-                      <TableCell className="text-right hidden lg:table-cell">
-                        {metric.cpl.toFixed(2)} €
-                      </TableCell>
-                      <TableCell className="text-right hidden xl:table-cell">
-                        {metric.cpAppointment > 0 ? `${metric.cpAppointment.toFixed(2)} €` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right hidden xl:table-cell">
-                        {metric.cpSale > 0 ? `${metric.cpSale.toFixed(2)} €` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={metric.roi >= 0 ? 'text-success' : 'text-destructive'}>
-                          {metric.roi.toFixed(1)}%
-                        </span>
-                      </TableCell>
-                    </>
-                  )}
                 </TableRow>
               ))}
             </TableBody>

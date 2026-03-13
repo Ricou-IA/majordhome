@@ -53,7 +53,7 @@ function getContextualDate(lead) {
         date: lead.last_call_date,
         icon: PhoneCall,
         tooltip: lead.call_count > 1 ? `${lead.call_count} appels` : '1 appel',
-        extra: lead.call_count > 1 ? `×${lead.call_count}` : null,
+        extra: null,
       };
     case 'RDV planifié':
       return {
@@ -148,11 +148,13 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
     const isPerdu = lead.statuses?.label === 'Perdu';
 
     return (
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onClick?.(lead)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(lead); }}
         className="w-full text-left bg-white rounded-lg border hover:shadow-md transition-shadow
-                   focus:outline-none focus:ring-2 focus:ring-blue-500 flex"
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 flex cursor-pointer"
       >
         {/* Bande date à gauche */}
         <div
@@ -212,6 +214,11 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
                 {commercial.initials}
               </span>
             )}
+            {lead.statuses?.label === 'Contacté' && lead.call_count > 0 && (
+              <span className="text-xs flex items-center gap-0.5 text-amber-600" title={`${lead.call_count} appel${lead.call_count > 1 ? 's' : ''}`}>
+                <Phone className="h-3 w-3" />{lead.call_count}
+              </span>
+            )}
             {daysInStatus !== null && (
               <span className={`text-xs flex items-center gap-0.5 ${getDaysColor(daysInStatus)}`}>
                 <Clock className="h-3 w-3" />
@@ -226,7 +233,7 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
             </p>
           )}
         </div>
-      </button>
+      </div>
     );
   }
 

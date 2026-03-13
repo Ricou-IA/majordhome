@@ -12,6 +12,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
+import { useLeadCommercials } from '@hooks/useLeads';
 import { supabase } from '@lib/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -33,13 +34,16 @@ import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
 // HOOK — Données dashboard (KPIs + planning du jour)
 // =============================================================================
 
-function useDashboardHome(orgId, effectiveRole, userId) {
+function useDashboardHome(orgId, effectiveRole, userId, commercialId) {
   const today = new Date().toISOString().split('T')[0];
+
+  // ID à utiliser pour les filtres assigned_user_id (commercial = ID table commercials, sinon auth ID)
+  const filterUserId = effectiveRole === 'commercial' ? commercialId : userId;
 
   // KPIs : compteurs leads pipeline + chantiers
   // Scoping : commercial → ses propres leads/chantiers, technicien → uniquement chantiers
   const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['dashboard-kpis', orgId, effectiveRole, userId],
+    queryKey: ['dashboard-kpis', orgId, effectiveRole, filterUserId],
     queryFn: async () => {
       // Technicien : pas de KPIs pipeline, uniquement chantiers
       const showPipelineKpis = effectiveRole !== 'technicien';
@@ -53,9 +57,9 @@ function useDashboardHome(orgId, effectiveRole, userId) {
           .eq('is_deleted', false)
           .eq('status_is_final', false);
 
-        // Commercial : filtre sur ses propres leads
-        if (effectiveRole === 'commercial') {
-          leadsQuery = leadsQuery.eq('assigned_user_id', userId);
+        // Commercial : filtre via ID commercial (dual ID bridge)
+        if (effectiveRole === 'commercial' && filterUserId) {
+          leadsQuery = leadsQuery.eq('assigned_user_id', filterUserId);
         }
         // Team leader : filtre sur ses propres leads (dashboard = les siens)
         if (effectiveRole === 'team_leader') {
@@ -72,8 +76,8 @@ function useDashboardHome(orgId, effectiveRole, userId) {
         .select('chantier_status, assigned_user_id', { count: 'exact' })
         .eq('org_id', orgId);
 
-      if (effectiveRole === 'commercial') {
-        chantiersQuery = chantiersQuery.eq('assigned_user_id', userId);
+      if (effectiveRole === 'commercial' && filterUserId) {
+        chantiersQuery = chantiersQuery.eq('assigned_user_id', filterUserId);
       }
       if (effectiveRole === 'team_leader') {
         chantiersQuery = chantiersQuery.eq('assigned_user_id', userId);
@@ -89,7 +93,7 @@ function useDashboardHome(orgId, effectiveRole, userId) {
         aPlanifier: chantiers.filter((c) => c.chantier_status === 'commande_recue').length,
       };
     },
-    enabled: !!orgId && !!userId,
+    enabled: !!orgId && !!userId && (effectiveRole !== 'commercial' || !!commercialId),
     staleTime: 30_000,
   });
 
@@ -200,7 +204,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const orgId = organization?.id;
 
-  const { kpis, todayAppointments, isLoading } = useDashboardHome(orgId, effectiveRole, user?.id);
+  // Résoudre l'ID commercial depuis l'ID auth (dual ID bridge)
+  const { commercials } = useLeadCommercials(orgId);
+  const myCommercialId = useMemo(() => {
+    if (effectiveRole !== 'commercial' || !user?.id) return null;
+    return commercials.find(c => c.profile_id === user.id)?.id || null;
+  }, [effectiveRole, user?.id, commercials]);
+
+  const { kpis, todayAppointments, isLoading } = useDashboardHome(orgId, effectiveRole, user?.id, myCommercialId);
 
   // LeadModal state
   const [showLeadModal, setShowLeadModal] = useState(false);

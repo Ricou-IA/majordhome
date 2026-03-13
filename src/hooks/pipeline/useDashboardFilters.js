@@ -1,41 +1,36 @@
 import { useState } from 'react';
 
-export const useDashboardFilters = () => {
+// Format: 'YYYY-MM'
+const getCurrentMonth = () => {
   const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
 
+export const useDashboardFilters = () => {
   const [filters, setFilters] = useState({
-    period: { from: firstDay, to: lastDay },
+    months: [getCurrentMonth()],
     sourceIds: [],
-    commercialId: null,
   });
 
-  const updatePeriod = (period) => {
-    setFilters((prev) => ({ ...prev, period }));
+  const updateMonths = (months) => {
+    setFilters((prev) => ({ ...prev, months }));
   };
 
   const updateSourceIds = (sourceIds) => {
     setFilters((prev) => ({ ...prev, sourceIds }));
   };
 
-  const updateCommercialId = (commercialId) => {
-    setFilters((prev) => ({ ...prev, commercialId }));
-  };
-
   const resetFilters = () => {
     setFilters({
-      period: { from: firstDay, to: lastDay },
+      months: [getCurrentMonth()],
       sourceIds: [],
-      commercialId: null,
     });
   };
 
   return {
     filters,
-    updatePeriod,
+    updateMonths,
     updateSourceIds,
-    updateCommercialId,
     resetFilters,
   };
 };

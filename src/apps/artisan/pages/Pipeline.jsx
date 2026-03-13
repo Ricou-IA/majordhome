@@ -2,16 +2,15 @@
  * Pipeline.jsx - Majord'home Artisan
  * ============================================================================
  * Page Pipeline Commercial avec 3 onglets :
- *   1. Dashboard (analytics existant)
+ *   1. Dashboard (analytics)
  *   2. Leads (liste CRUD)
  *   3. Kanban (drag & drop)
  *
- * @version 2.0.0 - Sprint 4 — Ajout onglets Leads + Kanban
- * @version 1.0.0 - Sprint 1 — Dashboard analytics
+ * @version 3.0.0 - Redesign dashboard (KPIs enrichis, commerciaux inline)
  * ============================================================================
  */
 
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BarChart3, List, Columns3, Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -21,9 +20,9 @@ import { useDashboardFilters } from '@hooksPipeline/useDashboardFilters';
 import { useDashboardData } from '@hooksPipeline/useDashboardData';
 import { DashboardFilters } from '@components/pipeline/dashboard/DashboardFilters';
 import { DashboardCards } from '@components/pipeline/dashboard/DashboardCards';
+import { CommercialKpis } from '@components/pipeline/dashboard/CommercialKpis';
 import { SourcesTable } from '@components/pipeline/dashboard/SourcesTable';
 import { ConversionFunnel } from '@components/pipeline/dashboard/ConversionFunnel';
-import { CostComparisonChart } from '@components/pipeline/dashboard/CostComparisonChart';
 import { MonthlyTrendsChart } from '@components/pipeline/dashboard/MonthlyTrendsChart';
 import { LeadsList } from '@apps/artisan/components/pipeline/LeadsList';
 import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
@@ -36,7 +35,7 @@ import { LeadKanban } from '@apps/artisan/components/pipeline/LeadKanban';
 const getRole = (profile, effectiveRole) => {
   if (effectiveRole === 'org_admin') return 'Admin';
   if (effectiveRole === 'commercial') return 'Commercial';
-  if (effectiveRole === 'team_leader') return 'Admin'; // TL sees analytics like admin
+  if (effectiveRole === 'team_leader') return 'Admin';
   return 'Technicien';
 };
 
@@ -62,6 +61,7 @@ export default function Pipeline() {
   // État modale lead
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
+  const [autoSchedule, setAutoSchedule] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Onglet actif (supporte ?tab=kanban depuis le dashboard)
@@ -73,13 +73,14 @@ export default function Pipeline() {
     () => getProfileForDashboard(profile, organization, effectiveRole),
     [profile?.id ?? profile?.user_id, profile?.app_role, profile?.business_role, organization?.id, effectiveRole],
   );
-  const { filters, updatePeriod, updateSourceIds, updateCommercialId, resetFilters } =
+  const { filters, updateMonths, updateSourceIds, resetFilters } =
     useDashboardFilters();
   const { data, loading } = useDashboardData(filters, dashboardProfile);
 
   // Handlers modale
-  const handleLeadClick = (lead) => {
+  const handleLeadClick = (lead, options) => {
     setSelectedLeadId(lead.id);
+    setAutoSchedule(!!options?.autoSchedule);
     setModalOpen(true);
   };
 
@@ -91,6 +92,7 @@ export default function Pipeline() {
   const handleModalClose = () => {
     setModalOpen(false);
     setSelectedLeadId(null);
+    setAutoSchedule(false);
   };
 
   const handleModalSaved = () => {
@@ -98,15 +100,14 @@ export default function Pipeline() {
   };
 
   // ======== Loader initial ========
-  // Attendre que l'auth ET les données utilisateur soient chargées
   if (authLoading || !dashboardProfile || !dashboardProfile.orgId) {
     return (
       <div className="p-8">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-muted rounded w-1/4" />
           <div className="h-12 bg-muted rounded w-full" />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
               <div key={i} className="h-32 bg-muted rounded" />
             ))}
           </div>
@@ -115,10 +116,6 @@ export default function Pipeline() {
     );
   }
 
-  const effectiveProfile = dashboardProfile || {
-    id: user?.id || 'unknown',
-    role: 'Commercial',
-  };
   const isAdmin = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
   const canCreateLead = can('pipeline', 'create');
 
@@ -126,10 +123,7 @@ export default function Pipeline() {
     <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Pipeline</h1>
-        <p className="text-muted-foreground">
-          Gestion commerciale : analytics, leads et kanban
-        </p>
+        <h1 className="text-3xl font-bold">Pipeline</h1>
       </div>
 
       {/* Tabs */}
@@ -159,23 +153,23 @@ export default function Pipeline() {
             <>
               <DashboardFilters
                 filters={filters}
-                onUpdatePeriod={updatePeriod}
+                onUpdateMonths={updateMonths}
                 onUpdateSourceIds={updateSourceIds}
-                onUpdateCommercialId={updateCommercialId}
                 onReset={resetFilters}
-                isAdmin={isAdmin}
-                orgId={organization?.id}
               />
 
-              <DashboardCards data={data} isAdmin={isAdmin} />
+              <DashboardCards data={data} />
+
+              {isAdmin && data.commercialMetrics.length > 0 && (
+                <CommercialKpis commercialMetrics={data.commercialMetrics} />
+              )}
 
               <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
                 <ConversionFunnel data={data} />
-                {isAdmin && <CostComparisonChart sourceMetrics={data.sourceMetrics} />}
+                <MonthlyTrendsChart data={data} />
               </div>
 
-              <MonthlyTrendsChart data={data} isAdmin={isAdmin} />
-              <SourcesTable sourceMetrics={data.sourceMetrics} isAdmin={isAdmin} />
+              <SourcesTable sourceMetrics={data.sourceMetrics} />
             </>
           )}
         </TabsContent>
@@ -197,6 +191,7 @@ export default function Pipeline() {
         isOpen={modalOpen}
         onClose={handleModalClose}
         onSaved={handleModalSaved}
+        autoSchedule={autoSchedule}
       />
     </div>
   );

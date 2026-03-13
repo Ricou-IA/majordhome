@@ -1,69 +1,191 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@lib/supabaseClient';
 import { Button } from '@components/ui/button';
-import { Calendar } from '@components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@components/ui/select';
-import { CalendarIcon, X, Filter } from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight, X, Filter } from 'lucide-react';
 import { cn } from '@lib/utils';
 import { Checkbox } from '@components/ui/checkbox';
 import { Label } from '@components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@components/ui/collapsible';
 
+// ============================================================================
+// CONSTANTES
+// ============================================================================
+
+const MONTH_LABELS = [
+  'Janv.', 'Févr.', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.',
+];
+
+const MONTH_LABELS_LONG = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
+
+const toMonthKey = (year, month) =>
+  `${year}-${String(month + 1).padStart(2, '0')}`;
+
+const formatMonthsLabel = (months) => {
+  if (!months || months.length === 0) return 'Sélectionner';
+  if (months.length === 1) {
+    const [y, m] = months[0].split('-').map(Number);
+    return `${MONTH_LABELS_LONG[m - 1]} ${y}`;
+  }
+  // Trier et afficher un résumé
+  const sorted = [...months].sort();
+  const first = sorted[0].split('-').map(Number);
+  const last = sorted[sorted.length - 1].split('-').map(Number);
+  return `${MONTH_LABELS[first[1] - 1]} → ${MONTH_LABELS[last[1] - 1]} ${last[0]} (${months.length})`;
+};
+
+// ============================================================================
+// MONTH PICKER COMPOSANT
+// ============================================================================
+
+const MonthPicker = ({ selectedMonths, onChange }) => {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [dragStart, setDragStart] = useState(null);
+  const [dragEnd, setDragEnd] = useState(null);
+  const isDragging = dragStart !== null;
+
+  // Calcule la plage entre deux index de mois (gère les deux sens)
+  const getRange = (startIdx, endIdx) => {
+    const min = Math.min(startIdx, endIdx);
+    const max = Math.max(startIdx, endIdx);
+    const months = [];
+    for (let i = min; i <= max; i++) {
+      const isFuture =
+        year > now.getFullYear() ||
+        (year === now.getFullYear() && i > now.getMonth());
+      if (!isFuture) months.push(toMonthKey(year, i));
+    }
+    return months;
+  };
+
+  // Preview : mois dans la plage en cours de drag
+  const dragPreview = isDragging && dragEnd !== null
+    ? getRange(dragStart, dragEnd)
+    : [];
+
+  const handleMouseDown = (index, isFuture) => {
+    if (isFuture) return;
+    setDragStart(index);
+    setDragEnd(index);
+  };
+
+  const handleMouseEnter = (index) => {
+    if (!isDragging) return;
+    setDragEnd(index);
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+    const end = dragEnd ?? dragStart;
+    const range = getRange(dragStart, end);
+    if (range.length > 0) onChange(range.sort());
+    setDragStart(null);
+    setDragEnd(null);
+  };
+
+  // Clic simple (mouseDown + mouseUp sur le même mois sans drag)
+  const handleClick = (index, isFuture) => {
+    if (isFuture) return;
+    // Si on a dragué sur plusieurs mois, handleMouseUp a déjà géré
+    // Ce handler ne se déclenche que pour un clic simple (pas de drag)
+  };
+
+  return (
+    <div
+      className="w-[280px] select-none"
+      onMouseUp={handleMouseUp}
+      onMouseLeave={() => {
+        if (isDragging) handleMouseUp();
+      }}
+    >
+      {/* Year navigation */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setYear((y) => y - 1)}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm font-semibold text-secondary-900">{year}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setYear((y) => y + 1)}
+          disabled={year >= now.getFullYear()}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Month grid */}
+      <div className="grid grid-cols-4 gap-1.5">
+        {MONTH_LABELS.map((label, index) => {
+          const monthKey = toMonthKey(year, index);
+          const isSelected = selectedMonths.includes(monthKey);
+          const isInDragPreview = dragPreview.includes(monthKey);
+          const isFuture =
+            year > now.getFullYear() ||
+            (year === now.getFullYear() && index > now.getMonth());
+
+          return (
+            <button
+              key={monthKey}
+              disabled={isFuture}
+              onMouseDown={() => handleMouseDown(index, isFuture)}
+              onMouseEnter={() => handleMouseEnter(index)}
+              className={cn(
+                'px-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
+                isFuture && 'text-secondary-300 cursor-not-allowed',
+                !isFuture && !isSelected && !isInDragPreview && 'text-secondary-600 hover:bg-secondary-100',
+                isInDragPreview && 'bg-blue-400 text-white shadow-sm',
+                isSelected && !isInDragPreview && 'bg-blue-500 text-white hover:bg-blue-600 shadow-sm',
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-[10px] text-secondary-400 mt-2 px-1 text-center">
+        Clic = mois unique · Maintenir + glisser = période
+      </p>
+    </div>
+  );
+};
+
+// ============================================================================
+// DASHBOARD FILTERS
+// ============================================================================
+
 export const DashboardFilters = ({
   filters,
-  onUpdatePeriod,
+  onUpdateMonths,
   onUpdateSourceIds,
-  onUpdateCommercialId,
   onReset,
-  isAdmin,
-  orgId,
 }) => {
   const [sources, setSources] = useState([]);
-  const [commercials, setCommercials] = useState([]);
-  const [dateRange, setDateRange] = useState(filters.period);
   const [isOpen, setIsOpen] = useState(true);
 
   useEffect(() => {
-    fetchData();
-  }, [isAdmin, orgId]);
-
-  const fetchData = async () => {
-    const [sourcesRes, commercialsRes] = await Promise.all([
-      supabase.from('majordhome_sources').select('id, name').eq('is_active', true).order('name'),
-      // Récupérer uniquement les membres de l'org courante (pas tous les profils Supabase)
-      isAdmin && orgId
-        ? supabase
-            .from('organization_members')
-            .select('user_id')
-            .eq('org_id', orgId)
-            .eq('status', 'active')
-        : Promise.resolve({ data: null }),
-    ]);
-
-    setSources(sourcesRes.data || []);
-
-    // Si on a des membres, récupérer leurs profils
-    if (commercialsRes.data && commercialsRes.data.length > 0) {
-      const userIds = commercialsRes.data.map((m) => m.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds)
-        .order('full_name');
-      setCommercials(profiles || []);
-    }
-  };
-
-  const handleDateRangeChange = (range) => {
-    if (range.from && range.to) {
-      const newRange = { from: range.from, to: range.to };
-      setDateRange(newRange);
-      onUpdatePeriod(newRange);
-    }
-  };
+    const fetchSources = async () => {
+      const { data } = await supabase
+        .from('majordhome_sources')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      setSources(data || []);
+    };
+    fetchSources();
+  }, []);
 
   const toggleSource = (sourceId) => {
     const newSourceIds = filters.sourceIds.includes(sourceId)
@@ -72,10 +194,10 @@ export const DashboardFilters = ({
     onUpdateSourceIds(newSourceIds);
   };
 
-  const hasActiveFilters = filters.sourceIds.length > 0 || filters.commercialId !== null;
+  const hasActiveFilters = filters.sourceIds.length > 0;
 
   return (
-    <div className="bg-card rounded-lg border">
+    <div className="bg-white rounded-xl border border-secondary-200 shadow-sm">
       {/* Mobile: Collapsible filters */}
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="md:hidden">
         <CollapsibleTrigger asChild>
@@ -84,7 +206,7 @@ export const DashboardFilters = ({
               <Filter className="h-4 w-4" />
               <span className="font-medium">Filtres</span>
               {hasActiveFilters && (
-                <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
                   Actifs
                 </span>
               )}
@@ -93,52 +215,78 @@ export const DashboardFilters = ({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="p-4 pt-0 space-y-4">
-          <MobileFilters
-            dateRange={dateRange}
-            filters={filters}
-            sources={sources}
-            commercials={commercials}
-            isAdmin={isAdmin}
-            hasActiveFilters={hasActiveFilters}
-            onDateRangeChange={handleDateRangeChange}
-            onToggleSource={toggleSource}
-            onUpdateCommercialId={onUpdateCommercialId}
-            onReset={onReset}
-          />
+          {/* Période (mois) */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">Période</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start text-left font-normal text-sm">
+                  {formatMonthsLabel(filters.months)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3" align="start">
+                <MonthPicker selectedMonths={filters.months} onChange={onUpdateMonths} />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Sources */}
+          <div>
+            <Label className="text-sm font-medium mb-2 block">Sources</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">
+                  {filters.sourceIds.length === 0
+                    ? 'Toutes les sources'
+                    : `${filters.sourceIds.length} source(s) sélectionnée(s)`}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-4" align="start">
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {sources.map((source) => (
+                    <div key={source.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`mobile-${source.id}`}
+                        checked={filters.sourceIds.includes(source.id)}
+                        onCheckedChange={() => toggleSource(source.id)}
+                      />
+                      <Label htmlFor={`mobile-${source.id}`} className="flex-1 cursor-pointer">
+                        {source.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Reset */}
+          {hasActiveFilters && (
+            <Button variant="outline" onClick={onReset} className="w-full">
+              <X className="h-4 w-4 mr-2" />
+              Réinitialiser les filtres
+            </Button>
+          )}
         </CollapsibleContent>
       </Collapsible>
 
       {/* Desktop: Always visible */}
       <div className="hidden md:block p-4">
         <div className="flex flex-wrap items-end gap-4">
-          {/* Period Filter */}
-          <div className="flex-1 min-w-[180px] max-w-[280px]">
+          {/* Period Filter (mois) */}
+          <div className="flex-1 min-w-[200px] max-w-[300px]">
             <Label className="text-sm font-medium mb-2 block">Période</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn('w-full justify-start text-left font-normal text-sm', !dateRange && 'text-muted-foreground')}
+                  className="w-full justify-start text-left font-normal text-sm"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">
-                    {dateRange?.from
-                      ? dateRange.to
-                        ? `${format(dateRange.from, 'dd MMM', { locale: fr })} - ${format(dateRange.to, 'dd MMM yy', { locale: fr })}`
-                        : format(dateRange.from, 'dd MMM yyyy', { locale: fr })
-                      : 'Choisir une période'}
-                  </span>
+                  <span className="truncate">{formatMonthsLabel(filters.months)}</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={{ from: dateRange.from, to: dateRange.to }}
-                  onSelect={handleDateRangeChange}
-                  initialFocus
-                  locale={fr}
-                  className="pointer-events-auto"
-                />
+              <PopoverContent className="w-auto p-3" align="start">
+                <MonthPicker selectedMonths={filters.months} onChange={onUpdateMonths} />
               </PopoverContent>
             </Popover>
           </div>
@@ -175,29 +323,6 @@ export const DashboardFilters = ({
             </Popover>
           </div>
 
-          {/* Commercial Filter (Admin only) */}
-          {isAdmin && (
-            <div className="flex-1 min-w-[160px] max-w-[220px]">
-              <Label className="text-sm font-medium mb-2 block">Commercial</Label>
-              <Select
-                value={filters.commercialId || 'all'}
-                onValueChange={(value) => onUpdateCommercialId(value === 'all' ? null : value)}
-              >
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="Tous" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les commerciaux</SelectItem>
-                  {commercials.map((commercial) => (
-                    <SelectItem key={commercial.id} value={commercial.id}>
-                      {commercial.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           {/* Reset Button */}
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={onReset} className="shrink-0">
@@ -210,103 +335,3 @@ export const DashboardFilters = ({
     </div>
   );
 };
-
-// Mobile filters component
-const MobileFilters = ({
-  dateRange,
-  filters,
-  sources,
-  commercials,
-  isAdmin,
-  hasActiveFilters,
-  onDateRangeChange,
-  onToggleSource,
-  onUpdateCommercialId,
-  onReset,
-}) => (
-  <div className="space-y-4">
-    {/* Period */}
-    <div>
-      <Label className="text-sm font-medium mb-2 block">Période</Label>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="w-full justify-start text-left font-normal">
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {format(dateRange.from, 'dd MMM', { locale: fr })} - {format(dateRange.to, 'dd MMM yy', { locale: fr })}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="range"
-            selected={{ from: dateRange.from, to: dateRange.to }}
-            onSelect={onDateRangeChange}
-            initialFocus
-            locale={fr}
-            className="pointer-events-auto"
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-
-    {/* Sources */}
-    <div>
-      <Label className="text-sm font-medium mb-2 block">Sources</Label>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="w-full justify-start">
-            {filters.sourceIds.length === 0
-              ? 'Toutes les sources'
-              : `${filters.sourceIds.length} source(s) sélectionnée(s)`}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-full p-4" align="start">
-          <div className="space-y-2 max-h-[200px] overflow-y-auto">
-            {sources.map((source) => (
-              <div key={source.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`mobile-${source.id}`}
-                  checked={filters.sourceIds.includes(source.id)}
-                  onCheckedChange={() => onToggleSource(source.id)}
-                />
-                <Label htmlFor={`mobile-${source.id}`} className="flex-1 cursor-pointer">
-                  {source.name}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-
-    {/* Commercial (Admin only) */}
-    {isAdmin && (
-      <div>
-        <Label className="text-sm font-medium mb-2 block">Commercial</Label>
-        <Select
-          value={filters.commercialId || 'all'}
-          onValueChange={(value) => onUpdateCommercialId(value === 'all' ? null : value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Tous les commerciaux" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les commerciaux</SelectItem>
-            {commercials.map((commercial) => (
-              <SelectItem key={commercial.id} value={commercial.id}>
-                {commercial.full_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    )}
-
-    {/* Reset */}
-    {hasActiveFilters && (
-      <Button variant="outline" onClick={onReset} className="w-full">
-        <X className="h-4 w-4 mr-2" />
-        Réinitialiser les filtres
-      </Button>
-    )}
-  </div>
-);

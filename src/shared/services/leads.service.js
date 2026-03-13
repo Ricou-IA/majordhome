@@ -24,6 +24,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { clientsService } from '@/shared/services/clients.service';
+import { technicalVisitService } from '@/shared/services/technicalVisit.service';
 
 // ============================================================================
 // CONSTANTES
@@ -175,7 +176,7 @@ export const leadsService = {
 
       const { data, error } = await supabase
         .from('majordhome_commercials')
-        .select('id, full_name, email, zone, is_active')
+        .select('id, full_name, email, zone, profile_id, is_active')
         .eq('org_id', orgId)
         .eq('is_active', true)
         .order('full_name');
@@ -437,8 +438,9 @@ export const leadsService = {
       const today = now.split('T')[0];
 
       if (newStatusLabel === 'Contacté') {
-        updates.last_call_date = now;
+        updates.last_call_date = extra.callDate || now;
         updates.call_count = (currentLead?.call_count || 0) + 1;
+        if (extra.callResult) updates.last_call_result = extra.callResult;
       } else if (newStatusLabel === 'RDV planifié') {
         if (extra.appointmentDate) {
           updates.appointment_date = extra.appointmentDate;
@@ -447,10 +449,20 @@ export const leadsService = {
           updates.appointment_id = extra.appointmentId;
         }
       } else if (newStatusLabel === 'Devis envoyé') {
-        updates.quote_sent_date = today;
+        updates.quote_sent_date = extra.quoteSentDate || today;
+        if (extra.quoteAmount != null) updates.order_amount_ht = extra.quoteAmount;
       } else if (newStatusLabel === 'Gagné') {
         updates.won_date = today;
         updates.chantier_status = 'gagne';
+
+        // Verrouiller la fiche technique terrain (fire-and-forget)
+        technicalVisitService.getByLeadId(leadId).then(({ data: visit }) => {
+          if (visit?.id) {
+            technicalVisitService.lock(visit.id, userId).catch((err) =>
+              console.error('[leads] lock technical visit error:', err)
+            );
+          }
+        });
       }
 
       // Si perdu, enregistrer la raison
@@ -560,8 +572,12 @@ export const leadsService = {
   /**
    * Enregistre un appel (incrémente call_count, met à jour last_call_date, crée activité)
    */
-  async logCall(leadId, { orgId, userId, description = 'Appel téléphonique' }) {
+  async logCall(leadId, { orgId, userId, result, callDate, description }) {
     if (!leadId) throw new Error('[leads] leadId requis');
+
+    // Description auto selon le résultat
+    const resultLabels = { no_answer: 'Pas de réponse', callback: 'À rappeler' };
+    const desc = description || (result ? `Appel — ${resultLabels[result] || result}` : 'Appel téléphonique');
 
     try {
       // Récupérer call_count actuel via RPC
@@ -572,13 +588,16 @@ export const leadsService = {
       const current = Array.isArray(rawLead) ? rawLead[0] : rawLead;
 
       // Écriture via RPC
+      const updates = {
+        last_call_date: callDate ? `${callDate}T${new Date().toISOString().split('T')[1]}` : new Date().toISOString(),
+        call_count: (current?.call_count || 0) + 1,
+        updated_at: new Date().toISOString(),
+      };
+      if (result) updates.last_call_result = result;
+
       const { data, error } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
-        p_updates: {
-          last_call_date: new Date().toISOString(),
-          call_count: (current?.call_count || 0) + 1,
-          updated_at: new Date().toISOString(),
-        },
+        p_updates: updates,
       });
 
       if (error) {
@@ -594,7 +613,7 @@ export const leadsService = {
         orgId,
         userId,
         type: LEAD_ACTIVITY_TYPES.PHONE_CALL,
-        description,
+        description: desc,
       });
 
       return { data: enrichLead(updated), error: null };
@@ -804,6 +823,27 @@ export const leadsService = {
     } catch (error) {
       console.error('[leads] searchLeads:', error);
       return { data: null, error };
+    }
+  },
+
+  /**
+   * Réordonne les leads dans une colonne kanban (persiste sort_order)
+   * @param {string[]} leadIds - IDs dans l'ordre souhaité
+   */
+  async reorderLeads(leadIds) {
+    if (!leadIds?.length) return { error: null };
+    try {
+      const { error } = await supabase.rpc('reorder_leads', {
+        p_lead_ids: leadIds,
+      });
+      if (error) {
+        console.error('[leads] reorderLeads error:', error);
+        return { error };
+      }
+      return { error: null };
+    } catch (err) {
+      console.error('[leads] reorderLeads error:', err);
+      return { error: err };
     }
   },
 };

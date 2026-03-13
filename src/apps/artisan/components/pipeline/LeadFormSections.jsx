@@ -13,13 +13,19 @@
 
 import {
   Search, UserCircle, PenLine, Unlink, Link2, X,
-  Phone, Mail, MapPin, Euro, ChevronDown, CalendarDays,
+  Phone, PhoneOutgoing, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
   ArrowRightLeft, Target, UserCheck, Loader2,
+  FileText, ChevronRight, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { FormField, SectionTitle, inputClass, selectClass } from '@/apps/artisan/components/FormFields';
 import { formatPhoneNumber } from '@/lib/utils';
 import { EQUIPMENT_CATEGORY_LABELS, LOST_REASONS } from './LeadStatusConfig';
+import { FICHE_STATUS_CONFIG, computeVisitStatus } from './FicheTechniqueConfig';
+import { useTechnicalVisit } from '@/shared/hooks/useTechnicalVisit';
 // SchedulingPanel déplacé dans LeadModal (overlay mode)
 import { LeadActivityTimeline } from './LeadActivityTimeline';
 
@@ -514,30 +520,65 @@ export const SectionPipeline = ({
 // SUIVI PIPELINE (dates)
 // ============================================================================
 
-export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead }) => (
+export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLogCall, callActivities = [] }) => (
   <>
     <SectionTitle>Suivi pipeline</SectionTitle>
 
-    {/* Contacté : appels (lecture seule, auto-rempli) */}
+    {/* Contacté : liste appels + bouton ajouter + checkbox mail */}
     {currentStatus.display_order >= 2 && (
-      <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
-        <Phone className="h-4 w-4 text-amber-500 shrink-0" />
-        <div className="flex-1 text-sm">
-          <span className="font-medium text-gray-700">Appels :</span>
-          {' '}
-          {lead?.call_count > 0 ? (
-            <span className="text-gray-600">
-              {lead.call_count} appel{lead.call_count > 1 ? 's' : ''}
-              {lead?.last_call_date && (
-                <span className="text-gray-400">
-                  {' — dernier le '}
-                  {new Date(lead.last_call_date).toLocaleDateString('fr-FR')}
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-gray-400 italic">Aucun appel enregistré</span>
+      <div className="space-y-2">
+        {/* Header appels + bouton */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+            <Phone className="h-4 w-4 text-amber-500" />
+            Appels ({lead?.call_count || 0})
+          </span>
+          {onLogCall && (
+            <button
+              type="button"
+              onClick={onLogCall}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Appel
+            </button>
           )}
+        </div>
+
+        {/* Liste des appels */}
+        {callActivities.length > 0 ? (
+          <div className="space-y-1">
+            {callActivities.map((act) => {
+              const isNoAnswer = act.description?.includes('Pas de réponse');
+              const isCallback = act.description?.includes('rappeler');
+              return (
+                <div key={act.id} className="flex items-center gap-2 py-1.5 px-3 bg-gray-50 rounded-lg text-sm">
+                  <PhoneOutgoing className={`h-3.5 w-3.5 shrink-0 ${isNoAnswer ? 'text-red-400' : isCallback ? 'text-amber-500' : 'text-gray-400'}`} />
+                  <span className="text-gray-500 tabular-nums">
+                    {new Date(act.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                  </span>
+                  <span className={`font-medium ${isNoAnswer ? 'text-red-600' : isCallback ? 'text-amber-600' : 'text-gray-600'}`}>
+                    {isNoAnswer ? 'Pas de réponse' : isCallback ? 'À rappeler' : (act.description || 'Appel')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400 italic px-3">Aucun appel enregistré</p>
+        )}
+
+        {/* Checkbox mail envoyé */}
+        <div className="flex items-center gap-2 py-2 px-3 bg-gray-50 rounded-lg">
+          <Checkbox
+            id="email_sent"
+            checked={form.email_sent || false}
+            onCheckedChange={(checked) => setField('email_sent', !!checked)}
+          />
+          <Label htmlFor="email_sent" className="flex items-center gap-2 text-sm cursor-pointer">
+            <MailCheck className="h-4 w-4 text-blue-500" />
+            Mail envoyé
+          </Label>
         </div>
       </div>
     )}
@@ -722,28 +763,65 @@ export const SectionNotes = ({
   loadingActivities,
   handleAddNote,
   isAddingNote,
-}) => (
-  <>
-    <SectionTitle>Notes</SectionTitle>
+  leadId,
+  onOpenFicheTechnique,
+}) => {
+  // Charger le statut de la fiche technique (uniquement si lead existant)
+  const { visit } = useTechnicalVisit(isEditing ? leadId : null);
+  const ficheStatus = computeVisitStatus(visit);
+  const ficheConfig = FICHE_STATUS_CONFIG[ficheStatus];
 
-    <textarea
-      value={form.notes}
-      onChange={(e) => setField('notes', e.target.value)}
-      className={`${inputClass} min-h-[100px] resize-y`}
-      placeholder="Notes internes..."
-      rows={3}
-    />
+  return (
+    <>
+      {/* CTA Fiche technique terrain */}
+      {isEditing && (
+        <>
+          <SectionTitle>Fiche technique terrain</SectionTitle>
 
-    {isEditing && (
-      <>
-        <SectionTitle>Historique</SectionTitle>
-        <LeadActivityTimeline
-          activities={activities}
-          isLoading={loadingActivities}
-          onAddNote={handleAddNote}
-          isAddingNote={isAddingNote}
-        />
-      </>
-    )}
-  </>
-);
+          <button
+            type="button"
+            onClick={onOpenFicheTechnique}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 bg-white
+                       hover:border-blue-300 hover:bg-blue-50/50 transition-colors group text-left"
+          >
+            <FileText className="h-5 w-5 text-blue-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium text-gray-900 group-hover:text-blue-700">
+                Fiche technique terrain
+              </span>
+              {visit?.locked && (
+                <span className="text-xs text-amber-600 ml-2">Verrouillée</span>
+              )}
+            </div>
+            <Badge className={`${ficheConfig.color} text-xs shrink-0`}>
+              {ficheConfig.label}
+            </Badge>
+            <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500 shrink-0" />
+          </button>
+        </>
+      )}
+
+      <SectionTitle>Notes</SectionTitle>
+
+      <textarea
+        value={form.notes}
+        onChange={(e) => setField('notes', e.target.value)}
+        className={`${inputClass} min-h-[100px] resize-y`}
+        placeholder="Notes internes..."
+        rows={3}
+      />
+
+      {isEditing && (
+        <>
+          <SectionTitle>Historique</SectionTitle>
+          <LeadActivityTimeline
+            activities={activities}
+            isLoading={loadingActivities}
+            onAddNote={handleAddNote}
+            isAddingNote={isAddingNote}
+          />
+        </>
+      )}
+    </>
+  );
+};

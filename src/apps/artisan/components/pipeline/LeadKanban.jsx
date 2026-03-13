@@ -16,6 +16,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@/shared/hooks/useLeads';
 import { leadsService } from '@/shared/services/leads.service';
 import { LeadCard } from './LeadCard';
+import { CallModal } from './CallModal';
+import { QuoteModal } from './QuoteModal';
 
 // Transitions autorisées (identique LeadModal)
 const ALLOWED_TRANSITIONS = {
@@ -129,7 +131,7 @@ function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver, co
   return (
     <div
       className={`
-        flex flex-col bg-gray-50 rounded-xl min-w-0 flex-1
+        flex flex-col bg-gray-50 rounded-xl min-w-0 flex-1 basis-0
         border transition-colors
         ${isDraggingOver ? 'border-blue-300 bg-blue-50/50' : 'border-gray-200'}
       `}
@@ -223,6 +225,12 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     return map;
   }, [commercials]);
 
+  // Résoudre l'ID commercial depuis l'ID auth (dual ID bridge)
+  const myCommercialId = useMemo(() => {
+    if (effectiveRole !== 'commercial' || !userId) return null;
+    return commercials.find(c => c.profile_id === userId)?.id || null;
+  }, [effectiveRole, userId, commercials]);
+
   const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -231,12 +239,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   // Charger les leads (commercial = les siens uniquement)
   const fetchLeads = useCallback(async () => {
     if (!orgId) return;
+    // Attendre la résolution de l'ID commercial avant de filtrer
+    if (effectiveRole === 'commercial' && !myCommercialId) return;
     setIsLoading(true);
     try {
       const dateFilters = monthToDateRange(selectedMonth);
-      // Commercial : filtrer sur ses propres leads
-      if (effectiveRole === 'commercial' && userId) {
-        dateFilters.assignedUserId = userId;
+      // Commercial : filtrer sur ses propres leads via l'ID commercial (pas l'ID auth)
+      if (effectiveRole === 'commercial' && myCommercialId) {
+        dateFilters.assignedUserId = myCommercialId;
       }
       const { data, error } = await leadsService.getLeads({
         orgId,
@@ -252,7 +262,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orgId, selectedMonth, effectiveRole, userId]);
+  }, [orgId, selectedMonth, effectiveRole, myCommercialId]);
 
   useEffect(() => {
     fetchLeads();
@@ -265,8 +275,8 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       if (!orgId) return;
       try {
         const dateFilters = monthToDateRange(selectedMonth);
-        if (effectiveRole === 'commercial' && userId) {
-          dateFilters.assignedUserId = userId;
+        if (effectiveRole === 'commercial' && myCommercialId) {
+          dateFilters.assignedUserId = myCommercialId;
         }
         const { data, error } = await leadsService.getLeads({
           orgId,
@@ -281,7 +291,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
     };
     refetch();
-  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, userId]);
+  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId]);
 
   // Filtrer les leads côté client (instantané, pas d'appel API)
   const filteredLeads = useMemo(() => {
@@ -314,9 +324,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         map[lead.status_id].leads.push(lead);
       }
     }
-    // Trier les leads dans chaque colonne par date de mise à jour
+    // Trier les leads dans chaque colonne par sort_order (puis updated_at en fallback)
     for (const col of Object.values(map)) {
-      col.leads.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      col.leads.sort((a, b) => {
+        const oa = a.sort_order || 0;
+        const ob = b.sort_order || 0;
+        if (oa !== ob) return oa - ob;
+        return new Date(b.updated_at) - new Date(a.updated_at);
+      });
     }
     return map;
   }, [statuses, filteredLeads]);
@@ -332,6 +347,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const [lostReasonInput, setLostReasonInput] = useState('');
   const lostInputRef = useRef(null);
 
+  // État pour le prompt "Contacté" depuis le kanban
+  const [pendingContact, setPendingContact] = useState(null); // { leadId, newStatusId, oldStatusId }
+  const [contactLoading, setContactLoading] = useState(false);
+
+  // État pour le prompt "Devis envoyé" depuis le kanban
+  const [pendingQuote, setPendingQuote] = useState(null); // { leadId, newStatusId, oldStatusId, defaultAmount }
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
   // Drag & drop handler avec validation des transitions
   const handleDragEnd = useCallback(
     async (result) => {
@@ -343,7 +366,25 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       const newStatusId = destination.droppableId;
       const oldStatusId = source.droppableId;
 
-      // Valider la transition
+      // Réorganisation dans la même colonne — réordonner + persister
+      if (oldStatusId === newStatusId) {
+        setAllLeads((prev) => {
+          const colLeads = prev.filter((l) => l.status_id === oldStatusId);
+          const others = prev.filter((l) => l.status_id !== oldStatusId);
+          const [moved] = colLeads.splice(source.index, 1);
+          colLeads.splice(destination.index, 0, moved);
+          // Mettre à jour sort_order localement
+          const updated = colLeads.map((l, i) => ({ ...l, sort_order: i + 1 }));
+          // Persister en DB (fire-and-forget)
+          leadsService.reorderLeads(updated.map((l) => l.id)).catch((err) =>
+            console.error('[LeadKanban] reorder error:', err),
+          );
+          return [...others, ...updated];
+        });
+        return;
+      }
+
+      // Valider la transition inter-colonnes
       const oldStatus = statuses.find((s) => s.id === oldStatusId);
       const newStatus = statuses.find((s) => s.id === newStatusId);
       const allowed = ALLOWED_TRANSITIONS[oldStatus?.label] || [];
@@ -358,6 +399,31 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         setPendingLost({ leadId, newStatusId, oldStatusId });
         setLostReasonInput('');
         setTimeout(() => lostInputRef.current?.focus(), 100);
+        return;
+      }
+
+      // Si "Contacté", ouvrir la modale d'appel
+      if (newStatus?.label === 'Contacté') {
+        setPendingContact({ leadId, newStatusId, oldStatusId });
+        return;
+      }
+
+      // Si "RDV planifié", ouvrir la modale lead avec auto-scheduling
+      if (newStatus?.label === 'RDV planifié') {
+        const lead = allLeads.find((l) => l.id === leadId);
+        if (lead) onLeadClick(lead, { autoSchedule: true });
+        return;
+      }
+
+      // Si "Devis envoyé", ouvrir la modale devis
+      if (newStatus?.label === 'Devis envoyé') {
+        const lead = allLeads.find((l) => l.id === leadId);
+        setPendingQuote({
+          leadId,
+          newStatusId,
+          oldStatusId,
+          defaultAmount: lead?.order_amount_ht || lead?.estimated_revenue || '',
+        });
         return;
       }
 
@@ -409,6 +475,68 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       );
     }
   }, [pendingLost, lostReasonInput, updateLeadStatus, userId, fetchLeads]);
+
+  // Confirmer le passage en Contacté avec données d'appel
+  const handleConfirmContact = useCallback(async (callData) => {
+    if (!pendingContact) return;
+
+    const { leadId, newStatusId, oldStatusId } = pendingContact;
+    setContactLoading(true);
+
+    // Optimistic update
+    setAllLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status_id: newStatusId } : l)),
+    );
+    setPendingContact(null);
+
+    try {
+      await updateLeadStatus(leadId, newStatusId, userId, {
+        callResult: callData.result,
+        callDate: callData.date,
+      });
+      fetchLeads();
+      toast.success('Lead passé en "Contacté"');
+    } catch (err) {
+      console.error('[LeadKanban] contact status error:', err);
+      toast.error('Erreur lors du changement de statut');
+      setAllLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
+      );
+    } finally {
+      setContactLoading(false);
+    }
+  }, [pendingContact, updateLeadStatus, userId, fetchLeads]);
+
+  // Confirmer le passage en Devis envoyé avec montant + date
+  const handleConfirmQuote = useCallback(async (quoteData) => {
+    if (!pendingQuote) return;
+
+    const { leadId, newStatusId, oldStatusId } = pendingQuote;
+    setQuoteLoading(true);
+
+    // Optimistic update
+    setAllLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status_id: newStatusId } : l)),
+    );
+    setPendingQuote(null);
+
+    try {
+      await updateLeadStatus(leadId, newStatusId, userId, {
+        quoteSentDate: quoteData.date,
+        quoteAmount: quoteData.amount,
+      });
+      fetchLeads();
+      toast.success('Lead passé en "Devis envoyé"');
+    } catch (err) {
+      console.error('[LeadKanban] quote status error:', err);
+      toast.error('Erreur lors du changement de statut');
+      setAllLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
+      );
+    } finally {
+      setQuoteLoading(false);
+    }
+  }, [pendingQuote, updateLeadStatus, userId, fetchLeads]);
 
   if (isLoading) {
     return (
@@ -523,6 +651,23 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
           })}
         </div>
       </DragDropContext>
+
+      {/* Modale d'appel pour transition vers Contacté */}
+      <CallModal
+        isOpen={!!pendingContact}
+        onClose={() => setPendingContact(null)}
+        onConfirm={handleConfirmContact}
+        loading={contactLoading}
+      />
+
+      {/* Modale devis pour transition vers Devis envoyé */}
+      <QuoteModal
+        isOpen={!!pendingQuote}
+        onClose={() => setPendingQuote(null)}
+        onConfirm={handleConfirmQuote}
+        loading={quoteLoading}
+        defaultAmount={pendingQuote?.defaultAmount}
+      />
     </div>
   );
 }

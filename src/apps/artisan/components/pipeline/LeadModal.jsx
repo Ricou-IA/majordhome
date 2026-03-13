@@ -28,6 +28,7 @@ import {
 import { usePricingEquipmentTypes, useClientSearch } from '@/shared/hooks/useClients';
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@/shared/services/appointments.service';
+import { leadsService } from '@/shared/services/leads.service';
 import { formatDateForInput } from '@/lib/utils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
@@ -42,6 +43,9 @@ import {
   SectionNotes,
 } from './LeadFormSections';
 import { SchedulingPanel } from './SchedulingPanel';
+import { FicheTechniqueModal } from './FicheTechniqueModal';
+import { CallModal } from './CallModal';
+import { QuoteModal } from './QuoteModal';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -54,7 +58,7 @@ import { SchedulingPanel } from './SchedulingPanel';
  * @param {Function} props.onClose - Fermer
  * @param {Function} props.onSaved - Callback après save/create
  */
-export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
+export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false }) {
   const isEditing = !!leadId;
   const { organization, user } = useAuth();
   const { can, canEdit, isOwner } = useCanAccess();
@@ -84,6 +88,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
     probability: '50', next_action: '', next_action_date: '',
     notes: '', lost_reason: '',
     appointment_date: '', quote_sent_date: '', won_date: '',
+    email_sent: false,
   });
 
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
@@ -94,7 +99,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
   const [pendingLostStatusId, setPendingLostStatusId] = useState(null);
   const [lostReasonInput, setLostReasonInput] = useState('');
   const [pendingRdvStatusId, setPendingRdvStatusId] = useState(null);
+  const [pendingContactStatusId, setPendingContactStatusId] = useState(null);
+  const [callModalForLog, setCallModalForLog] = useState(false);
+  const [callLoading, setCallLoading] = useState(false);
+  const [pendingQuoteStatusId, setPendingQuoteStatusId] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
+  const [showFicheTechnique, setShowFicheTechnique] = useState(false);
 
   // Pré-remplir le formulaire en mode édition OU reset en mode création
   useEffect(() => {
@@ -161,6 +172,15 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isEditing, lead]);
+
+  // Auto-schedule : ouvrir directement le SchedulingPanel après chargement du lead
+  useEffect(() => {
+    if (!autoSchedule || !isOpen || !isEditing || !lead || !statuses.length) return;
+    const rdvStatus = statuses.find((s) => s.label === 'RDV planifié');
+    if (rdvStatus) {
+      setPendingRdvStatusId(rdvStatus.id);
+    }
+  }, [autoSchedule, isOpen, isEditing, lead, statuses]);
 
   // ========== HANDLERS ==========
 
@@ -267,6 +287,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
     appointment_date: form.appointment_date || null,
     quote_sent_date: form.quote_sent_date || null,
     won_date: form.won_date || null,
+    email_sent: form.email_sent || false,
     client_id: linkedClient?.id || null,
   }), [form, linkedClient]);
 
@@ -317,8 +338,16 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
       setLostReasonInput('');
       return;
     }
+    if (targetStatus?.label === 'Contacté') {
+      setPendingContactStatusId(newStatusId);
+      return;
+    }
     if (targetStatus?.label === 'RDV planifié') {
       setPendingRdvStatusId(newStatusId);
+      return;
+    }
+    if (targetStatus?.label === 'Devis envoyé') {
+      setPendingQuoteStatusId(newStatusId);
       return;
     }
     try {
@@ -416,6 +445,88 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
     }
   };
 
+  // Confirmer transition vers Contacté (depuis bouton statut)
+  const handleConfirmContact = async (callData) => {
+    if (!pendingContactStatusId) return;
+    setCallLoading(true);
+    try {
+      const payload = buildPayload();
+      await updateLead(leadId, payload);
+      await syncClientFields();
+      await updateLeadStatus(leadId, pendingContactStatusId, userId, {
+        callResult: callData.result,
+        callDate: callData.date,
+      });
+      setPendingContactStatusId(null);
+      toast.success('Lead passé en "Contacté"');
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      console.error('[LeadModal] Erreur passage contacté:', err);
+      toast.error('Erreur lors du changement de statut');
+    } finally {
+      setCallLoading(false);
+    }
+  };
+
+  // Confirmer transition vers Devis envoyé (depuis bouton statut)
+  const handleConfirmQuote = async (quoteData) => {
+    if (!pendingQuoteStatusId) return;
+    setQuoteLoading(true);
+    try {
+      const payload = buildPayload();
+      await updateLead(leadId, payload);
+      await syncClientFields();
+      const result = await updateLeadStatus(leadId, pendingQuoteStatusId, userId, {
+        quoteSentDate: quoteData.date,
+        quoteAmount: quoteData.amount,
+      });
+      setPendingQuoteStatusId(null);
+      if (result?.clientCreated) {
+        const clientName = result.clientCreated.display_name || result.clientCreated.client_number;
+        toast.success(`Lead passé en "Devis envoyé" — Fiche client créée : ${clientName}`, { duration: 5000 });
+      } else {
+        toast.success('Lead passé en "Devis envoyé"');
+      }
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      console.error('[LeadModal] Erreur passage devis:', err);
+      toast.error('Erreur lors du changement de statut');
+    } finally {
+      setQuoteLoading(false);
+    }
+  };
+
+  // Ajouter un appel supplémentaire (lead déjà en Contacté ou +)
+  const handleLogCall = async (callData) => {
+    setCallLoading(true);
+    try {
+      const result = await leadsService.logCall(leadId, {
+        orgId,
+        userId,
+        result: callData.result,
+        callDate: callData.date,
+      });
+      if (result?.data) {
+        setForm((prev) => ({
+          ...prev,
+          call_count: result.data.call_count ?? (prev.call_count || 0) + 1,
+          last_call_date: result.data.last_call_date || new Date().toISOString(),
+          last_call_result: callData.result,
+        }));
+      }
+      setCallModalForLog(false);
+      toast.success('Appel enregistré');
+      onSaved?.();
+    } catch (err) {
+      console.error('[LeadModal] Erreur logCall:', err);
+      toast.error('Erreur lors de l\'enregistrement de l\'appel');
+    } finally {
+      setCallLoading(false);
+    }
+  };
+
   const handleConvert = async () => {
     try {
       const payload = buildPayload();
@@ -482,7 +593,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
           <div className="flex items-center gap-3">
             {pendingRdvStatusId && (
               <button
-                onClick={() => setPendingRdvStatusId(null)}
+                onClick={() => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); }}
                 className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -511,7 +622,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
             </div>
           </div>
           <button
-            onClick={pendingRdvStatusId ? () => setPendingRdvStatusId(null) : onClose}
+            onClick={pendingRdvStatusId ? () => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); } : onClose}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X className="h-5 w-5" />
@@ -531,7 +642,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
               orgId={orgId}
               commercials={commercials}
               onConfirm={handleConfirmScheduling}
-              onCancel={() => setPendingRdvStatusId(null)}
+              onCancel={() => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); }}
               isLoading={schedulingLoading}
             />
           ) : (
@@ -594,6 +705,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
                   currentStatus={currentStatus}
                   isWon={isWon}
                   lead={lead}
+                  onLogCall={() => setCallModalForLog(true)}
+                  callActivities={activities?.filter(a => a.activity_type === 'phone_call') || []}
                 />
               )}
 
@@ -619,6 +732,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
                 loadingActivities={loadingActivities}
                 handleAddNote={handleAddNote}
                 isAddingNote={isAddingNote}
+                leadId={leadId}
+                onOpenFicheTechnique={() => setShowFicheTechnique(true)}
               />
             </>
           )}
@@ -645,6 +760,38 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved }) {
           </div>
         )}
       </div>
+
+      {/* Fiche technique terrain */}
+      <FicheTechniqueModal
+        lead={lead}
+        isOpen={showFicheTechnique}
+        onClose={() => setShowFicheTechnique(false)}
+      />
+
+      {/* Modale appel — transition vers Contacté */}
+      <CallModal
+        isOpen={!!pendingContactStatusId}
+        onClose={() => setPendingContactStatusId(null)}
+        onConfirm={handleConfirmContact}
+        loading={callLoading}
+      />
+
+      {/* Modale appel — ajout appel supplémentaire */}
+      <CallModal
+        isOpen={callModalForLog}
+        onClose={() => setCallModalForLog(false)}
+        onConfirm={handleLogCall}
+        loading={callLoading}
+      />
+
+      {/* Modale devis — transition vers Devis envoyé */}
+      <QuoteModal
+        isOpen={!!pendingQuoteStatusId}
+        onClose={() => setPendingQuoteStatusId(null)}
+        onConfirm={handleConfirmQuote}
+        loading={quoteLoading}
+        defaultAmount={form.order_amount_ht || form.estimated_revenue || ''}
+      />
     </>
   );
 }

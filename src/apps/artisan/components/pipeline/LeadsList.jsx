@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Search,
   Plus,
@@ -264,17 +264,23 @@ export function LeadsList({ onLeadClick, onNewLead }) {
     refresh,
   } = useLeads({ orgId, limit: 25 });
 
-  // Commercial : forcer le filtre sur ses propres leads
-  useEffect(() => {
-    if (effectiveRole === 'commercial' && userId && filters.assignedUserId !== userId) {
-      setFilters({ assignedUserId: userId });
-    }
-  }, [effectiveRole, userId, filters.assignedUserId, setFilters]);
-
   // Données de référence
   const { sources } = useLeadSources();
   const { statuses } = useLeadStatuses();
   const { commercials } = useLeadCommercials(orgId);
+
+  // Résoudre l'ID commercial depuis l'ID auth (dual ID bridge)
+  const myCommercialId = useMemo(() => {
+    if (effectiveRole !== 'commercial' || !userId) return null;
+    return commercials.find(c => c.profile_id === userId)?.id || null;
+  }, [effectiveRole, userId, commercials]);
+
+  // Commercial : forcer le filtre sur ses propres leads (via ID commercial, pas ID auth)
+  useEffect(() => {
+    if (effectiveRole === 'commercial' && myCommercialId && filters.assignedUserId !== myCommercialId) {
+      setFilters({ assignedUserId: myCommercialId });
+    }
+  }, [effectiveRole, myCommercialId, filters.assignedUserId, setFilters]);
 
   // Debounce de la recherche (300ms)
   useEffect(() => {
