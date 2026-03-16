@@ -12,23 +12,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contractsService } from '@/shared/services/contracts.service';
+import { savService } from '@/shared/services/sav.service';
 import { entretiensService } from '@/shared/services/entretiens.service';
 import { clientsService } from '@/shared/services/clients.service';
-import { clientKeys } from '@/shared/hooks/useClients';
-import { interventionKeys } from '@/shared/hooks/useInterventions';
+import { contractKeys, clientKeys, interventionKeys, entretienSavKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CLÉS DE CACHE
-// ============================================================================
-
-export const contractKeys = {
-  all: ['contracts'],
-  lists: () => [...contractKeys.all, 'list'],
-  detail: (contractId) => [...contractKeys.all, 'detail', contractId],
-  byClient: (clientId) => [...contractKeys.all, 'byClient', clientId],
-  equipments: (contractId) => [...contractKeys.all, 'equipments', contractId],
-  stats: (orgId, year) => [...contractKeys.all, 'stats', orgId, year],
-};
+// Re-export for backward compatibility
+export { contractKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useClientContract (contrat d'un client, 1:1)
@@ -211,7 +201,6 @@ export function useContracts({ orgId, initialFilters } = {}) {
   const [filters, setFiltersState] = useState(() => ({
     search: '',
     status: 'active',
-    frequency: '',
     visitStatus: '', // 'remaining' | 'done' | ''
     ...initialFilters,
   }));
@@ -268,7 +257,7 @@ export function useContracts({ orgId, initialFilters } = {}) {
   }, []);
 
   const resetFilters = useCallback(() => {
-    setFiltersState({ search: '', status: 'active', frequency: '', visitStatus: '' });
+    setFiltersState({ search: '', status: 'active', visitStatus: '' });
     setOffset(0);
   }, []);
 
@@ -522,6 +511,29 @@ export function useCreateContractWithClient() {
         throw new Error(contractResult.error.message || 'Erreur lors de la création du contrat');
       }
 
+      // Étape 3 : Créer l'entretien "à planifier" automatiquement
+      const contractId = contractResult.data?.id;
+      if (contractId) {
+        try {
+          // Récupérer le project_id du client (nécessaire pour l'entretien)
+          const clientData = contractResult.data?.client_project_id
+            || (existingClientId ? null : null); // project_id est sur le client, pas le contrat write
+          
+          await savService.createEntretien({
+            orgId,
+            clientId,
+            contractId,
+            projectId: null, // sera résolu par savService si nécessaire
+            scheduledDate: null,
+            createdBy: userId,
+          });
+          console.log('[useCreateContractWithClient] Entretien à planifier créé');
+        } catch (entretienErr) {
+          // Non bloquant : le contrat est créé même si l'entretien échoue
+          console.warn('[useCreateContractWithClient] Erreur création entretien:', entretienErr);
+        }
+      }
+
       return {
         client: clientId,
         contract: contractResult.data,
@@ -531,6 +543,7 @@ export function useCreateContractWithClient() {
       // Invalider tous les caches liés
       queryClient.invalidateQueries({ queryKey: contractKeys.all });
       queryClient.invalidateQueries({ queryKey: clientKeys.all });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
     },
   });
 

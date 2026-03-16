@@ -11,17 +11,10 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@/shared/services/chantiers.service';
 import { interventionsService } from '@/shared/services/interventions.service';
-import { interventionKeys } from '@/shared/hooks/useInterventions';
+import { chantierKeys, interventionKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CLÉS DE CACHE
-// ============================================================================
-
-export const chantierKeys = {
-  all: ['chantiers'],
-  lists: () => [...chantierKeys.all, 'list'],
-  list: (orgId) => [...chantierKeys.lists(), orgId],
-};
+// Re-export for backward compatibility
+export { chantierKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useChantiers (liste pour le Kanban)

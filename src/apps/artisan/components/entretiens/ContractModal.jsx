@@ -18,9 +18,12 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   X, User, MapPin, Phone, Mail, Wrench, Euro, Calendar, Clock,
   CheckCircle2, FileText, History, ExternalLink, Loader2, AlertCircle,
+  Download, Globe,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useContract, useContractVisits, useContractMutations } from '@hooks/useContracts';
-import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
+import { entretiensService } from '@services/entretiens.service';
+import { CONTRACT_STATUSES } from '@services/contracts.service';
 import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
 import { Button } from '@components/ui/button';
@@ -74,6 +77,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const [visitDate, setVisitDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [visitNotes, setVisitNotes] = useState('');
   const [showRecordForm, setShowRecordForm] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Reset state quand le contrat change
   useEffect(() => {
@@ -125,6 +129,37 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     }
   }, [contract, organization, visitDate, visitNotes, user, recordVisit]);
 
+  const handleGeneratePdf = useCallback(async () => {
+    if (!contract || generatingPdf) return;
+    setGeneratingPdf(true);
+    try {
+      if (contract.contract_pdf_path) {
+        // PDF exists — download it
+        const { url, error } = await entretiensService.getContractPdfUrl(contract.contract_pdf_path);
+        if (url) {
+          window.open(url, '_blank');
+        } else {
+          console.error('[ContractModal] getContractPdfUrl error:', error);
+          toast.error('Impossible de récupérer le PDF');
+        }
+      } else {
+        // Generate PDF via N8N
+        const { success, error } = await entretiensService.triggerContractPdf(contract);
+        if (success) {
+          toast.success('Génération du contrat PDF lancée — le PDF sera disponible dans quelques instants');
+        } else {
+          console.error('[ContractModal] triggerContractPdf error:', error);
+          toast.error('Erreur lors de la génération du PDF');
+        }
+      }
+    } catch (err) {
+      console.error('[ContractModal] PDF error:', err);
+      toast.error('Erreur lors de la génération du PDF');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }, [contract, generatingPdf]);
+
   if (!isOpen) return null;
 
   const isLoading = loadingContract || (!contract && !!contractId);
@@ -136,10 +171,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     : false;
   const visitStatus = isVisitDone ? 'completed' : 'pending';
 
-  // Labels fréquence et statut
-  const frequencyLabel = contract
-    ? (CONTRACT_FREQUENCIES.find(f => f.value === contract.frequency)?.label || contract.frequency || '-')
-    : '-';
+  // Label statut
   const statusLabel = contract
     ? (CONTRACT_STATUSES.find(s => s.value === contract.status)?.label || contract.status || '-')
     : '-';
@@ -204,7 +236,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
 
               {/* Section Contrat */}
               <Section title="Contrat" icon={FileText}>
-                <InfoRow label="Fréquence" value={frequencyLabel} />
                 <InfoRow label="Tarif" value={formatEuro(contract.amount)} />
                 <InfoRow label="Début" value={formatDateFR(contract.start_date)} />
                 <InfoRow label="Fin" value={formatDateFR(contract.end_date)} />
@@ -231,6 +262,39 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                     </p>
                   </div>
                 )}
+                {contract.source === 'web' && (
+                  <div className="flex items-center justify-between gap-4 mt-2">
+                    <span className="text-sm text-gray-500">Source</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
+                      <Globe className="w-3 h-3" />
+                      Site internet
+                    </span>
+                  </div>
+                )}
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleGeneratePdf}
+                    disabled={generatingPdf}
+                  >
+                    {generatingPdf ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        {contract.contract_pdf_path ? 'Ouverture...' : 'Génération...'}
+                      </>
+                    ) : (
+                      <>
+                        {contract.contract_pdf_path ? (
+                          <><Download className="h-4 w-4 mr-1.5" />Télécharger le contrat PDF</>
+                        ) : (
+                          <><FileText className="h-4 w-4 mr-1.5" />Générer le contrat PDF</>
+                        )}
+                      </>
+                    )}
+                  </Button>
+                </div>
               </Section>
 
               {/* Section Visite en cours */}

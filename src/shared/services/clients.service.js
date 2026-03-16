@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { cleanPhone, formatPhoneForSearch } from '@/lib/phoneUtils';
 
 // ============================================================================
 // CONSTANTES
@@ -85,32 +86,8 @@ export const LEAD_SOURCES = [
 const DEFAULT_LIMIT = 25;
 
 // ============================================================================
-// HELPERS
+// HELPERS — Phone utilities imported from @/lib/phoneUtils
 // ============================================================================
-
-/**
- * Nettoie un numéro de téléphone (garde chiffres + espaces)
- */
-function cleanPhone(phone) {
-  if (!phone) return null;
-  return phone.replace(/[^\d\s+]/g, '').trim() || null;
-}
-
-/**
- * Formate un terme de recherche en version "téléphone avec espaces"
- * Ex: "0675740138" → "06 75 74 01 38", "0675" → "06 75"
- * Retourne null si le terme n'est pas un numéro de téléphone
- */
-function formatPhoneForSearch(term) {
-  const digits = term.replace(/\s/g, '');
-  if (!/^[+]?\d{2,}$/.test(digits)) return null;
-  // Formater en paires avec espaces
-  const hasPlus = digits.startsWith('+');
-  const raw = hasPlus ? digits.slice(1) : digits;
-  const pairs = raw.match(/.{1,2}/g) || [];
-  const spaced = (hasPlus ? '+' : '') + pairs.join(' ');
-  return spaced;
-}
 
 // ============================================================================
 // SERVICE PRINCIPAL

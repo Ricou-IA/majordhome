@@ -12,8 +12,7 @@
  * ============================================================================
  */
 
-import { FileCheck, Clock, Archive, MapPin, Phone, Wrench, ChevronRight } from 'lucide-react';
-import { CONTRACT_FREQUENCIES } from '@services/contracts.service';
+import { FileCheck, Clock, Archive, MapPin, Phone, ChevronRight, Globe } from 'lucide-react';
 import { VisitBadge } from './VisitBadge';
 
 // ============================================================================
@@ -66,18 +65,15 @@ export function ContractCard({ contract, onClick, selected = false }) {
     client_postal_code,
     client_city,
     client_phone,
-    frequency,
     amount,
     status,
+    source,
     next_maintenance_date,
   } = contract;
 
   // Adresse formatée (rue séparée du CP + ville)
   const streetAddress = client_address || null;
   const cityLine = [client_postal_code, client_city].filter(Boolean).join(', ');
-
-  // Label fréquence
-  const frequencyLabel = CONTRACT_FREQUENCIES.find((f) => f.value === frequency)?.label || frequency || '-';
 
   // Statut visite calculé depuis next_maintenance_date
   const visitStatus =
@@ -112,6 +108,12 @@ export function ContractCard({ contract, onClick, selected = false }) {
           <h3 className="font-medium text-gray-900 truncate">{client_name || 'Sans nom'}</h3>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {source === 'web' && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-indigo-100 text-indigo-700">
+              <Globe className="w-2.5 h-2.5" />
+              Web
+            </span>
+          )}
           <VisitBadge status={visitStatus} />
         </div>
       </div>
@@ -136,16 +138,12 @@ export function ContractCard({ contract, onClick, selected = false }) {
         <InfoLine icon={Phone}>{client_phone}</InfoLine>
       </div>
 
-      {/* Ligne 4 : Fréquence + Tarif */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Wrench className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          <span className="text-sm text-gray-600 truncate">{frequencyLabel}</span>
-        </div>
-        {amount ? (
+      {/* Ligne 4 : Tarif */}
+      {amount ? (
+        <div className="flex items-center justify-end gap-2">
           <span className="text-sm font-medium text-blue-700 flex-shrink-0">{formatAmount(amount)}</span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {/* Hover chevron */}
       {onClick && (

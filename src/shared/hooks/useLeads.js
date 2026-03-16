@@ -10,22 +10,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@/shared/services/leads.service';
+import { leadKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CLÉS DE CACHE
-// ============================================================================
-
-export const leadKeys = {
-  all: ['leads'],
-  lists: () => [...leadKeys.all, 'list'],
-  list: (orgId, filters) => [...leadKeys.lists(), orgId, filters],
-  detail: (id) => [...leadKeys.all, 'detail', id],
-  activities: (leadId) => [...leadKeys.all, 'activities', leadId],
-  sources: () => [...leadKeys.all, 'sources'],
-  statuses: () => [...leadKeys.all, 'statuses'],
-  commercials: (orgId) => [...leadKeys.all, 'commercials', orgId],
-  search: (orgId, query) => [...leadKeys.all, 'search', orgId, query],
-};
+// Re-export for backward compatibility
+export { leadKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useLeads (liste paginée avec filtres)

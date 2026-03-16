@@ -1,26 +1,25 @@
 /**
- * Entretiens.jsx - Page Entretiens & Contrats
+ * Entretiens.jsx - Page Entretiens & SAV
  * ============================================================================
- * Layout harmonisé avec Clients.jsx :
- *   - Header blanc avec stat cards cliquables (filtres toggle)
- *   - Bouton CTA "Nouveau contrat" → CreateContractModal
- *   - Indicateur année civile en cours
- *   - 3 onglets Radix Tabs restylés (Dashboard | Contrats | Secteurs)
- *   - Filtres persistés en URL via useSearchParams
+ * Module unifié Entretien (visites annuelles) & SAV (réparations).
  *
- * @version 3.0.0 - Harmonisation UI + CreateContractModal + stat cards filtres
- * @version 2.0.0 - Sprint 5 — Page complète
+ * 4 onglets :
+ *   - Kanban (défaut) : board unifié EntretienSAVKanban
+ *   - Contrats : liste contrats existante
+ *   - Programmation : vue secteurs avec CTA « Planifier »
+ *   - Dashboard : KPIs contrats + SAV
+ *
+ * Header : 4 stat cards workflow (Entretiens à planifier, SAV en cours,
+ * Planifiés, Réalisés) basées sur useEntretienSAVStats.
+ *
+ * @version 4.0.0 - Sprint 8 Entretien & SAV (Kanban unifié, KPIs SAV)
  * ============================================================================
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  FileText,
-  FileCheck,
-  XCircle,
-  Clock,
-  Check,
   Plus,
   BarChart3,
   List,
@@ -28,11 +27,21 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  Columns3,
+  Clock,
+  Wrench,
+  Calendar,
+  CheckCircle2,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useContracts, useContractStats, useContractSectors } from '@hooks/useContracts';
+import { useEntretienSAVStats, entretienSavKeys } from '@hooks/useEntretienSAV';
+import { savService } from '@services/sav.service';
+import { supabase } from '@/lib/supabaseClient';
+import { EntretienSAVKanban } from '@apps/artisan/components/entretiens/EntretienSAVKanban';
 import { EntretiensDashboard } from '@apps/artisan/components/entretiens/EntretiensDashboard';
 import { ContractsList } from '@apps/artisan/components/entretiens/ContractsList';
 import { SectorGroupView } from '@apps/artisan/components/entretiens/SectorGroupView';
@@ -44,34 +53,27 @@ import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateC
 // ============================================================================
 
 /**
- * Carte statistiques (identique à Clients.jsx)
+ * Carte statistique (lecture seule, pas de toggle)
  */
-const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = false }) => {
+const StatCard = ({ icon: Icon, label, value, color = 'blue' }) => {
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-600',
     green: 'bg-green-100 text-green-600',
     amber: 'bg-amber-100 text-amber-600',
     emerald: 'bg-emerald-100 text-emerald-600',
     red: 'bg-red-100 text-red-600',
-  };
-
-  const borderColor = {
-    blue: 'border-blue-500 ring-1 ring-blue-200',
-    green: 'border-green-500 ring-1 ring-green-200',
-    amber: 'border-amber-500 ring-1 ring-amber-200',
-    emerald: 'border-emerald-500 ring-1 ring-emerald-200',
-    red: 'border-red-500 ring-1 ring-red-200',
+    orange: 'bg-orange-100 text-orange-600',
+    violet: 'bg-violet-100 text-violet-600',
   };
 
   return (
-    <div
-      onClick={onClick}
-      className={`bg-white rounded-lg border p-4 transition-all ${
-        onClick ? 'cursor-pointer hover:shadow-md' : ''
-      } ${active ? borderColor[color] : 'border-gray-200'}`}
-    >
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[color]}`}>
+        <div
+          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+            colorClasses[color] || colorClasses.blue
+          }`}
+        >
           <Icon className="w-5 h-5" />
         </div>
         <div>
@@ -79,44 +81,6 @@ const StatCard = ({ icon: Icon, label, value, color = 'blue', onClick, active = 
           <p className="text-sm text-gray-500">{label}</p>
         </div>
       </div>
-    </div>
-  );
-};
-
-/**
- * Labels contextuels pour l'EmptyState quand un filtre stat card est actif
- */
-const STAT_CARD_LABELS = {
-  actifs: 'Aucun contrat actif',
-  clos: 'Aucun contrat clos',
-  'visites-restantes': 'Aucune visite restante',
-  'visites-faites': 'Aucune visite réalisée',
-};
-
-/**
- * État vide
- */
-const EmptyState = ({ hasFilters, onClearFilters, activeStatCard }) => {
-  const statCardLabel = activeStatCard ? STAT_CARD_LABELS[activeStatCard] : null;
-
-  return (
-    <div className="text-center py-12">
-      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <FileText className="w-8 h-8 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
-        {statCardLabel || (hasFilters ? 'Aucun contrat trouvé' : 'Aucun contrat')}
-      </h3>
-      {!statCardLabel && hasFilters && (
-        <div className="mt-4">
-          <button
-            onClick={onClearFilters}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Effacer les filtres
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -153,48 +117,51 @@ export default function Entretiens() {
   const orgId = organization?.id;
   const canCreateContract = can('entretiens', 'create');
   const currentYear = new Date().getFullYear();
+  const queryClient = useQueryClient();
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  // ---------- URL / Tab ----------
+  const [searchParams] = useSearchParams();
+
+  // Tab par défaut : kanban (backward compat : si ?filter= → onglet contrats)
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab) return tab;
+    const filter = new URLSearchParams(window.location.search).get('filter');
+    return filter ? 'contrats' : 'kanban';
+  });
+
+  // Backward compat : lire le filtre stat card depuis l'URL
+  const activeStatCard = searchParams.get('filter') || null;
+
+  // ---------- Modales ----------
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // Onglet initial : si filtre URL → "contrats", sinon "dashboard"
-  const [activeTab, setActiveTab] = useState(() => {
-    const filter = new URLSearchParams(window.location.search).get('filter');
-    return filter ? 'contrats' : 'dashboard';
-  });
-
-  // Filtres initiaux calculés depuis l'URL (une seule fois au montage)
-  // Évite la race condition : useContracts démarre directement avec les bons filtres
+  // ---------- Filtres contrats (backward compat URL) ----------
   const [initialFilters] = useState(() => {
     const filter = new URLSearchParams(window.location.search).get('filter');
-    const base = { search: '', status: '', frequency: '', visitStatus: '' };
+    const base = { search: '', status: '', visitStatus: '' };
     switch (filter) {
-      case 'actifs': return { ...base, status: 'active' };
-      case 'clos': return { ...base, status: 'cancelled' };
-      case 'visites-restantes': return { ...base, visitStatus: 'remaining' };
-      case 'visites-faites': return { ...base, visitStatus: 'done' };
-      case 'archives': return { ...base, status: 'archived' };
-      default: return { ...base, status: 'active' };
+      case 'actifs':
+        return { ...base, status: 'active' };
+      case 'clos':
+        return { ...base, status: 'cancelled' };
+      case 'visites-restantes':
+        return { ...base, visitStatus: 'remaining' };
+      case 'visites-faites':
+        return { ...base, visitStatus: 'done' };
+      default:
+        return { ...base, status: 'active' };
     }
   });
 
-  // Filtre stat card persisté dans l'URL (?filter=actifs|clos|visites-restantes|visites-faites)
-  const activeStatCard = searchParams.get('filter') || null;
-  const setActiveStatCard = useCallback((cardKey) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (cardKey) {
-        next.set('filter', cardKey);
-      } else {
-        next.delete('filter');
-      }
-      return next;
-    }, { replace: true });
-  }, [setSearchParams]);
+  // ---------- Hooks données ----------
 
-  // Hook contrats (liste paginée avec filtres)
+  // Stats SAV/Entretien pour les KPIs header
+  const { stats: savStats, isLoading: savStatsLoading } = useEntretienSAVStats(orgId);
+
+  // Contrats (onglet Contrats)
   const {
     contracts,
     totalCount,
@@ -209,53 +176,34 @@ export default function Entretiens() {
     refresh,
   } = useContracts({ orgId, initialFilters });
 
-  // Hook stats dashboard
-  const { stats, isLoading: statsLoading } = useContractStats(orgId, currentYear);
+  // Stats contrats (onglet Dashboard)
+  const { stats: contractStats, isLoading: contractStatsLoading } =
+    useContractStats(orgId, currentYear);
 
-  // Hook secteurs
+  // Secteurs (onglet Programmation)
   const { sectors, isLoading: sectorsLoading } = useContractSectors(orgId);
 
-  // Handler clic sur une carte stat (toggle filtre)
-  const handleStatCardClick = useCallback((cardKey) => {
-    const base = { search: '', status: '', frequency: '', visitStatus: '' };
+  // Contrats ayant déjà un entretien actif (pour désactiver le bouton Planifier)
+  const { data: plannedContractIds } = useQuery({
+    queryKey: [...entretienSavKeys.all, 'planned-contracts', orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('majordhome_entretien_sav')
+        .select('contract_id')
+        .eq('org_id', orgId)
+        .eq('intervention_type', 'entretien')
+        .neq('workflow_status', 'realise');
+      return new Set((data || []).map(r => r.contract_id).filter(Boolean));
+    },
+    enabled: !!orgId,
+    staleTime: 30_000,
+  });
 
-    // "Total" = toujours reset
-    if (cardKey === 'total') {
-      if (activeStatCard === null) return;
-      setActiveStatCard(null);
-      setFilters({ ...base, status: 'active' }); // défaut = actifs
-      return;
-    }
+  // ---------- Planning state ----------
+  const [isPlanning, setIsPlanning] = useState(false);
 
-    if (activeStatCard === cardKey) {
-      // Re-clic = désactiver le filtre (retour à défaut)
-      setActiveStatCard(null);
-      setFilters({ ...base, status: 'active' });
-    } else {
-      // Activer le filtre + basculer sur onglet Contrats
-      setActiveStatCard(cardKey);
-      setActiveTab('contrats');
+  // ---------- Handlers ----------
 
-      switch (cardKey) {
-        case 'actifs':
-          setFilters({ ...base, status: 'active' });
-          break;
-        case 'clos':
-          setFilters({ ...base, status: 'cancelled' });
-          break;
-        case 'visites-restantes':
-          setFilters({ ...base, visitStatus: 'remaining' });
-          break;
-        case 'visites-faites':
-          setFilters({ ...base, visitStatus: 'done' });
-          break;
-        default:
-          break;
-      }
-    }
-  }, [activeStatCard, setFilters, setActiveStatCard]);
-
-  // Ouvrir modale contrat (consultation)
   const handleContractClick = useCallback((contract) => {
     setSelectedContractId(contract.id);
     setModalOpen(true);
@@ -266,201 +214,282 @@ export default function Entretiens() {
     setSelectedContractId(null);
   }, []);
 
-  // Création contrat réussie → rafraîchir la liste
   const handleCreateSuccess = useCallback(() => {
     refresh();
   }, [refresh]);
 
   const handleClearFilters = useCallback(() => {
-    setActiveStatCard(null);
     resetFilters();
-  }, [resetFilters, setActiveStatCard]);
+  }, [resetFilters]);
 
-  // Toggle mode archivés (bouton ContractsList)
-  const handleToggleArchived = useCallback((showArchived) => {
-    if (showArchived) {
-      // Activer le mode archivés
-      setFilters({ search: '', status: 'archived', frequency: '', visitStatus: '' });
-      setActiveStatCard('archives');
-      setActiveTab('contrats');
-    } else {
-      // Retour aux actifs
-      setFilters({ search: '', status: 'active', frequency: '', visitStatus: '' });
-      setActiveStatCard(null);
-    }
-  }, [setFilters, setActiveStatCard]);
+  const handleToggleArchived = useCallback(
+    (showArchived) => {
+      if (showArchived) {
+        setFilters({ search: '', status: 'archived', visitStatus: '' });
+      } else {
+        setFilters({ search: '', status: 'active', visitStatus: '' });
+      }
+    },
+    [setFilters],
+  );
 
-  // Loader initial
+  // Planifier un contrat → créer entretien « à planifier »
+  const handlePlanContract = useCallback(
+    async (contract) => {
+      console.log('[Entretiens] handlePlanContract called', {
+        contract_id: contract.id,
+        client_id: contract.client_id,
+        client_project_id: contract.client_project_id,
+        orgId,
+        userId: user?.id,
+      });
+
+      if (!contract.client_project_id) {
+        toast.error('Projet client introuvable — impossible de programmer');
+        return;
+      }
+      setIsPlanning(true);
+      try {
+        const result = await savService.createEntretien({
+          orgId,
+          clientId: contract.client_id,
+          contractId: contract.id,
+          projectId: contract.client_project_id,
+          scheduledDate: null,
+          createdBy: user?.id,
+        });
+        console.log('[Entretiens] createEntretien result:', result);
+        if (result.error) {
+          console.error('[Entretiens] createEntretien error:', result.error);
+          toast.error(`Erreur : ${result.error.message || 'programmation échouée'}`);
+        } else {
+          toast.success('Entretien programmé');
+          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+        }
+      } catch (err) {
+        console.error('[Entretiens] handlePlanContract error:', err);
+        toast.error(`Erreur : ${err.message || 'programmation échouée'}`);
+      } finally {
+        setIsPlanning(false);
+      }
+    },
+    [orgId, user?.id, queryClient],
+  );
+
+  // Planifier tout un secteur (bulk)
+  const handlePlanSector = useCallback(
+    async (sector) => {
+      console.log('[Entretiens] handlePlanSector called', {
+        sector: sector.codePostal,
+        contractCount: sector.contracts.length,
+        orgId,
+        userId: user?.id,
+      });
+
+      setIsPlanning(true);
+      let created = 0;
+      let errors = 0;
+      try {
+        for (const contract of sector.contracts) {
+          if (!contract.client_project_id) {
+            console.warn('[Entretiens] Skipping contract without project_id:', contract.id);
+            errors++;
+            continue;
+          }
+          const result = await savService.createEntretien({
+            orgId,
+            clientId: contract.client_id,
+            contractId: contract.id,
+            projectId: contract.client_project_id,
+            scheduledDate: null,
+            createdBy: user?.id,
+          });
+          if (result.error) {
+            console.error('[Entretiens] createEntretien error for contract:', contract.id, result.error);
+            errors++;
+          } else {
+            created++;
+          }
+        }
+        if (created > 0) {
+          toast.success(
+            `${created} entretien${created > 1 ? 's' : ''} programmé${created > 1 ? 's' : ''}`,
+          );
+          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+        }
+        if (errors > 0) {
+          toast.error(`${errors} erreur${errors > 1 ? 's' : ''} de programmation`);
+        }
+        if (created === 0 && errors === 0) {
+          toast.info('Aucun contrat à programmer dans ce secteur');
+        }
+      } catch (err) {
+        console.error('[Entretiens] handlePlanSector error:', err);
+        toast.error(`Erreur : ${err.message || 'programmation échouée'}`);
+      } finally {
+        setIsPlanning(false);
+      }
+    },
+    [orgId, user?.id, queryClient],
+  );
+
+  // ---------- Loader initial ----------
+
   if (authLoading || !orgId) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-gray-200 rounded w-1/4" />
-              <div className="h-5 bg-gray-200 rounded w-1/3" />
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-20 bg-gray-200 rounded-lg" />
-                ))}
-              </div>
-            </div>
+      <div className="p-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-1/4" />
+          <div className="h-12 bg-muted rounded w-full" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 bg-muted rounded" />
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ===== HEADER BLANC ===== */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Titre + CTA */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Entretiens</h1>
-              <p className="text-gray-500 mt-1">
-                {stats ? `${stats.totalContracts} contrats` : '...'} · Année {currentYear}
-              </p>
-            </div>
-            {canCreateContract && (
-              <button
-                onClick={() => setCreateModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                <Plus className="w-5 h-5" />
-                Nouveau contrat
-              </button>
-            )}
-          </div>
+  const totalRealises =
+    (savStats?.entretien_realise ?? 0) + (savStats?.sav_realise ?? 0);
 
-          {/* Stat Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-            <StatCard
-              icon={FileText}
-              label="Total contrats"
-              value={stats?.totalContracts}
-              color="blue"
-              onClick={() => handleStatCardClick('total')}
-              active={activeStatCard === null}
-            />
-            <StatCard
-              icon={FileCheck}
-              label="Actifs"
-              value={stats?.openContracts}
-              color="green"
-              onClick={() => handleStatCardClick('actifs')}
-              active={activeStatCard === 'actifs'}
-            />
-            <StatCard
-              icon={XCircle}
-              label="Clos"
-              value={stats?.closedContracts}
-              color="red"
-              onClick={() => handleStatCardClick('clos')}
-              active={activeStatCard === 'clos'}
-            />
-            <StatCard
-              icon={Clock}
-              label="Visites restantes"
-              value={stats?.visitesRestantes}
-              color="amber"
-              onClick={() => handleStatCardClick('visites-restantes')}
-              active={activeStatCard === 'visites-restantes'}
-            />
-            <StatCard
-              icon={Check}
-              label="Visites faites"
-              value={stats?.visitsDone}
-              color="emerald"
-              onClick={() => handleStatCardClick('visites-faites')}
-              active={activeStatCard === 'visites-faites'}
-            />
-          </div>
+  return (
+    <div className="p-4 md:p-8 space-y-6">
+      {/* ===== HEADER ===== */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Entretiens & SAV</h1>
+          <p className="text-gray-500 mt-1">
+            {contractStats
+              ? `${contractStats.openContracts} contrats actifs`
+              : '...'}{' '}
+            · Année {currentYear}
+          </p>
         </div>
+        {canCreateContract && (
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Nouveau contrat
+          </button>
+        )}
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={Calendar}
+          label="Entretiens à planifier"
+          value={savStatsLoading ? '...' : (savStats?.entretien_a_planifier ?? 0)}
+          color="blue"
+        />
+        <StatCard
+          icon={Wrench}
+          label="SAV en cours"
+          value={savStatsLoading ? '...' : (savStats?.sav_en_cours ?? 0)}
+          color="orange"
+        />
+        <StatCard
+          icon={Clock}
+          label="Planifiés"
+          value={savStatsLoading ? '...' : (savStats?.total_planifie ?? 0)}
+          color="violet"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Réalisés"
+          value={savStatsLoading ? '...' : totalRealises}
+          color="emerald"
+        />
       </div>
 
       {/* ===== TABS ===== */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-auto inline-flex gap-1 bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
-            <TabsTrigger
-              value="dashboard"
-              className="gap-2 px-4 py-2 rounded-md text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-none text-gray-600 hover:text-gray-900"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger
-              value="contrats"
-              className="gap-2 px-4 py-2 rounded-md text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-none text-gray-600 hover:text-gray-900"
-            >
-              <List className="h-4 w-4" />
-              Contrats
-              {totalCount > 0 && (
-                <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                  {totalCount}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="secteurs"
-              className="gap-2 px-4 py-2 rounded-md text-sm font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-none text-gray-600 hover:text-gray-900"
-            >
-              <Map className="h-4 w-4" />
-              Secteurs
-            </TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full justify-start gap-1 bg-gray-100/80 p-1">
+          <TabsTrigger value="kanban" className="gap-2 data-[state=active]:bg-white">
+            <Columns3 className="h-4 w-4" />
+            Kanban
+          </TabsTrigger>
+          <TabsTrigger value="contrats" className="gap-2 data-[state=active]:bg-white">
+            <List className="h-4 w-4" />
+            Contrats
+            {totalCount > 0 && (
+              <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                {totalCount}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="programmation" className="gap-2 data-[state=active]:bg-white">
+            <Map className="h-4 w-4" />
+            Programmation
+          </TabsTrigger>
+          <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+        </TabsList>
 
-          {/* ===== CONTENU ONGLET ===== */}
-          <div className="pb-8">
-            {/* TAB DASHBOARD */}
-            <TabsContent value="dashboard" className="mt-6">
-              <EntretiensDashboard stats={stats} isLoading={statsLoading} />
-            </TabsContent>
+        {/* TAB KANBAN */}
+        <TabsContent value="kanban" className="mt-6">
+          <EntretienSAVKanban />
+        </TabsContent>
 
-            {/* TAB CONTRATS */}
-            <TabsContent value="contrats" className="mt-6">
-              <ContractsList
-                contracts={contracts}
-                totalCount={totalCount}
-                isLoading={contractsLoading}
-                loadingMore={loadingMore}
-                hasMore={hasMore}
-                filters={filters}
-                setFilters={setFilters}
-                setSearch={setSearch}
-                resetFilters={handleClearFilters}
-                loadMore={loadMore}
-                onContractClick={handleContractClick}
-                activeStatCard={activeStatCard}
-                onToggleArchived={handleToggleArchived}
-              />
-            </TabsContent>
+        {/* TAB CONTRATS */}
+        <TabsContent value="contrats" className="mt-6">
+          <ContractsList
+            contracts={contracts}
+            totalCount={totalCount}
+            isLoading={contractsLoading}
+            loadingMore={loadingMore}
+            hasMore={hasMore}
+            filters={filters}
+            setFilters={setFilters}
+            setSearch={setSearch}
+            resetFilters={handleClearFilters}
+            loadMore={loadMore}
+            onContractClick={handleContractClick}
+            activeStatCard={activeStatCard}
+            onToggleArchived={handleToggleArchived}
+          />
+        </TabsContent>
 
-            {/* TAB SECTEURS */}
-            <TabsContent value="secteurs" className="mt-6">
-              <SectorGroupView
-                sectors={sectors}
-                isLoading={sectorsLoading}
-                onContractClick={handleContractClick}
-              />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
+        {/* TAB PROGRAMMATION */}
+        <TabsContent value="programmation" className="mt-6">
+          <SectorGroupView
+            sectors={sectors}
+            isLoading={sectorsLoading}
+            onContractClick={handleContractClick}
+            onPlanContract={handlePlanContract}
+            onPlanSector={handlePlanSector}
+            isPlanningDisabled={isPlanning}
+            canPlan={canCreateContract}
+            plannedContractIds={plannedContractIds}
+          />
+        </TabsContent>
+
+        {/* TAB DASHBOARD */}
+        <TabsContent value="dashboard" className="mt-6">
+          <EntretiensDashboard
+            stats={contractStats}
+            savStats={savStats}
+            isLoading={contractStatsLoading || savStatsLoading}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* ===== MODALES ===== */}
 
-      {/* Modale consultation contrat (slide-over existante) */}
+      {/* Modale consultation contrat */}
       <ContractModal
         contractId={selectedContractId}
         isOpen={modalOpen}
         onClose={handleModalClose}
       />
 
-      {/* Modale création contrat (centrée, 2 étapes) */}
+      {/* Modale création contrat */}
       <CreateContractModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}

@@ -299,7 +299,7 @@ export default function ClientDetail() {
       {/* Contenu des onglets */}
       <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
         {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} />}
-        {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} />}
+        {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
         {activeTab === 'equipments' && <TabEquipments clientId={id} />}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
         {activeTab === 'timeline' && <TabTimeline clientId={id} orgId={organization?.id} userId={user?.id} />}

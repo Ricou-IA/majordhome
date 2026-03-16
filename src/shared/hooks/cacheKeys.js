@@ -1,0 +1,125 @@
+/**
+ * cacheKeys.js — Factories de clés de cache React Query centralisées
+ * ============================================================================
+ * Source unique pour toutes les clés de cache TanStack React Query.
+ * Élimine les imports croisés entre hooks et garantit la cohérence.
+ * ============================================================================
+ */
+
+// --- Clients ---
+export const clientKeys = {
+  all: ['clients'],
+  lists: () => [...clientKeys.all, 'list'],
+  list: (orgId, filters) => [...clientKeys.lists(), orgId, filters],
+  details: () => [...clientKeys.all, 'detail'],
+  detail: (id) => [...clientKeys.details(), id],
+  stats: (orgId) => [...clientKeys.all, 'stats', orgId],
+  search: (orgId, query) => [...clientKeys.all, 'search', orgId, query],
+  activities: (clientId) => [...clientKeys.all, 'activities', clientId],
+  equipments: (clientId) => [...clientKeys.all, 'equipments', clientId],
+  brands: () => [...clientKeys.all, 'brands'],
+  pricingTypes: () => [...clientKeys.all, 'pricing-types'],
+  duplicates: (orgId, name, postal) => [...clientKeys.all, 'duplicates', orgId, name, postal],
+};
+
+// --- Contracts ---
+export const contractKeys = {
+  all: ['contracts'],
+  lists: () => [...contractKeys.all, 'list'],
+  detail: (contractId) => [...contractKeys.all, 'detail', contractId],
+  byClient: (clientId) => [...contractKeys.all, 'byClient', clientId],
+  equipments: (contractId) => [...contractKeys.all, 'equipments', contractId],
+  stats: (orgId, year) => [...contractKeys.all, 'stats', orgId, year],
+};
+
+// --- Leads ---
+export const leadKeys = {
+  all: ['leads'],
+  lists: () => [...leadKeys.all, 'list'],
+  list: (orgId, filters) => [...leadKeys.lists(), orgId, filters],
+  detail: (id) => [...leadKeys.all, 'detail', id],
+  activities: (leadId) => [...leadKeys.all, 'activities', leadId],
+  sources: () => [...leadKeys.all, 'sources'],
+  statuses: () => [...leadKeys.all, 'statuses'],
+  commercials: (orgId) => [...leadKeys.all, 'commercials', orgId],
+  search: (orgId, query) => [...leadKeys.all, 'search', orgId, query],
+};
+
+// --- Appointments ---
+export const appointmentKeys = {
+  all: ['appointments'],
+  lists: () => [...appointmentKeys.all, 'list'],
+  list: (orgId, dateRange, filters) => [...appointmentKeys.lists(), orgId, dateRange, filters],
+  detail: (id) => [...appointmentKeys.all, 'detail', id],
+  teamMembers: (orgId) => ['team-members', orgId],
+  technicians: (appointmentIds) => [...appointmentKeys.all, 'technicians', appointmentIds],
+};
+
+// --- Interventions ---
+export const interventionKeys = {
+  all: ['interventions'],
+  detail: (id) => [...interventionKeys.all, 'detail', id],
+  fileUrls: (id) => [...interventionKeys.all, 'files', id],
+  byProject: (projectId) => [...interventionKeys.all, 'project', projectId],
+  slots: (parentId) => [...interventionKeys.all, 'slots', parentId],
+};
+
+// --- Chantiers ---
+export const chantierKeys = {
+  all: ['chantiers'],
+  lists: () => [...chantierKeys.all, 'list'],
+  list: (orgId) => [...chantierKeys.lists(), orgId],
+};
+
+// --- Prospects ---
+export const prospectKeys = {
+  all: ['prospects'],
+  lists: () => [...prospectKeys.all, 'list'],
+  list: (orgId, module, filters) => [...prospectKeys.lists(), orgId, module, filters],
+  details: () => [...prospectKeys.all, 'detail'],
+  detail: (id) => [...prospectKeys.details(), id],
+  interactions: (id) => [...prospectKeys.all, 'interactions', id],
+  stats: (orgId, module) => [...prospectKeys.all, 'stats', orgId, module],
+  sirens: (orgId, module) => [...prospectKeys.all, 'sirens', orgId, module],
+};
+
+// --- Pricing ---
+export const pricingKeys = {
+  all: ['pricing'],
+  zones: () => [...pricingKeys.all, 'zones'],
+  equipmentTypes: () => [...pricingKeys.all, 'equipmentTypes'],
+  rates: () => [...pricingKeys.all, 'rates'],
+  ratesByZone: (zoneId) => [...pricingKeys.all, 'rates', zoneId],
+  discounts: () => [...pricingKeys.all, 'discounts'],
+  extras: () => [...pricingKeys.all, 'extras'],
+  allData: () => [...pricingKeys.all, 'allData'],
+  contractItems: (contractId) => [...pricingKeys.all, 'contractItems', contractId],
+};
+
+// --- Permissions ---
+export const permissionKeys = {
+  all: ['permissions'],
+  org: (orgId) => [...permissionKeys.all, orgId],
+  members: (orgId) => [...permissionKeys.all, 'members', orgId],
+};
+
+// --- Entretien SAV ---
+export const entretienSavKeys = {
+  all: ['entretien-sav'],
+  lists: () => [...entretienSavKeys.all, 'list'],
+  list: (orgId) => [...entretienSavKeys.lists(), orgId],
+  stats: (orgId) => [...entretienSavKeys.all, 'stats', orgId],
+};
+
+// --- Technical Visit ---
+export const technicalVisitKeys = {
+  all: ['technical-visits'],
+  byLead: (leadId) => [...technicalVisitKeys.all, 'lead', leadId],
+  photos: (visitId) => [...technicalVisitKeys.all, 'photos', visitId],
+};
+
+// --- Certificats ---
+export const certificatKeys = {
+  all: ['certificats'],
+  byIntervention: (interventionId) => [...certificatKeys.all, 'intervention', interventionId],
+};

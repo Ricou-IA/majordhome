@@ -12,17 +12,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { interventionsService } from '@/shared/services/interventions.service';
+import { interventionKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CLÉS DE CACHE
-// ============================================================================
-
-export const interventionKeys = {
-  all: ['interventions'],
-  detail: (id) => [...interventionKeys.all, 'detail', id],
-  fileUrls: (id) => [...interventionKeys.all, 'files', id],
-  byProject: (projectId) => [...interventionKeys.all, 'project', projectId],
-};
+// Re-export for backward compatibility
+export { interventionKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useProjectInterventions (liste par projet/client)

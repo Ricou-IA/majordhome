@@ -9,11 +9,14 @@ import {
 } from 'lucide-react';
 import { useClientContract, useContractEquipments, useContractVisits, useContractMutations } from '@/shared/hooks/useContracts';
 import { usePricingEquipmentTypes, clientKeys } from '@/shared/hooks/useClients';
-import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES, MAINTENANCE_MONTHS } from '@/shared/services/contracts.service';
+import { CONTRACT_STATUSES, MAINTENANCE_MONTHS } from '@/shared/services/contracts.service';
 import { EQUIPMENT_TYPES } from '@/shared/services/clients.service';
 import { formatDateForInput, formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { CreateContractModal } from '@/apps/artisan/components/entretiens/CreateContractModal';
+import { ContractPricingSection } from './ContractPricingSection';
+import { ContractPdfSection } from './ContractPdfSection';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -320,7 +323,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export const TabContrat = ({ clientId, orgId, userId }) => {
+export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const {
     contract,
     isLoading,
@@ -335,11 +338,11 @@ export const TabContrat = ({ clientId, orgId, userId }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [contractForm, setContractForm] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const initForm = useCallback((c) => {
     setContractForm({
       status: c?.status || 'active',
-      frequency: c?.frequency || 'annuel',
       startDate: c?.start_date || '',
       endDate: c?.end_date || '',
       maintenanceMonth: c?.maintenance_month || '',
@@ -364,20 +367,26 @@ export const TabContrat = ({ clientId, orgId, userId }) => {
         <p className="mt-4 text-secondary-700 font-medium">Aucun contrat d'entretien</p>
         <p className="mt-1 text-sm text-secondary-500">Ce client n'a pas encore de contrat.</p>
         <button
-          onClick={async () => {
-            const result = await createContract({ orgId, status: 'active', frequency: 'annuel' });
-            if (result?.error) {
-              toast.error('Erreur lors de la création du contrat');
-            } else {
-              toast.success('Contrat créé');
-            }
-          }}
-          disabled={isCreating}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+          onClick={() => setShowCreateModal(true)}
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
-          {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          <Plus className="w-4 h-4" />
           Créer un contrat
         </button>
+        <CreateContractModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          preSelectedClient={client ? {
+            id: client.id,
+            last_name: client.last_name,
+            first_name: client.first_name,
+            address: client.address,
+            postal_code: client.postal_code,
+            city: client.city,
+            display_name: client.display_name,
+            has_active_contract: false,
+          } : null}
+        />
       </div>
     );
   }
@@ -385,7 +394,6 @@ export const TabContrat = ({ clientId, orgId, userId }) => {
   const handleSaveContract = async () => {
     const result = await updateContract(contract.id, {
       status: contractForm.status,
-      frequency: contractForm.frequency,
       startDate: contractForm.startDate || null,
       endDate: contractForm.endDate || null,
       maintenanceMonth: contractForm.maintenanceMonth || null,
@@ -525,6 +533,8 @@ export const TabContrat = ({ clientId, orgId, userId }) => {
       )}
 
       {!isEditing && <ContractEquipmentsSection contractId={contract.id} />}
+      {!isEditing && <ContractPricingSection contractId={contract.id} contract={contract} client={client} />}
+      {!isEditing && <ContractPdfSection contract={contract} clientId={clientId} client={client} />}
       {!isEditing && <ContractVisitsSection contract={contract} orgId={orgId} userId={userId} />}
 
       {!isEditing && (

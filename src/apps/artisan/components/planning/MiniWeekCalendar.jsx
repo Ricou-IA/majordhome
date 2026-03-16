@@ -229,7 +229,10 @@ export function MiniWeekCalendar({
   }, [monday, onWeekChange]);
 
   const goToThisWeek = useCallback(() => {
-    onWeekChange(getMonday(new Date()));
+    const now = new Date();
+    // Dimanche : Lun-Sam déjà passés, avancer au lundi suivant
+    if (now.getDay() === 0) now.setDate(now.getDate() + 1);
+    onWeekChange(getMonday(now));
   }, [onWeekChange]);
 
   // ---- Drag handlers ----
@@ -297,7 +300,7 @@ export function MiniWeekCalendar({
           <span className="text-xs text-gray-500">
             ({formatWeekRange(monday)})
           </span>
-          {formatDate(getMonday(new Date())) !== formatDate(monday) && (
+          {(() => { const n = new Date(); if (n.getDay() === 0) n.setDate(n.getDate() + 1); return formatDate(getMonday(n)); })() !== formatDate(monday) && (
             <button
               type="button"
               onClick={goToThisWeek}

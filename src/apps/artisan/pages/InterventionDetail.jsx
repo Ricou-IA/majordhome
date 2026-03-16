@@ -24,6 +24,7 @@ import {
   Save,
   Send,
   Lock,
+  Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -39,6 +40,8 @@ import {
   useInterventionDraft,
 } from '@/shared/hooks/useInterventions';
 import { FILE_TYPES } from '@/shared/services/interventions.service';
+import { PermissionGate } from '@/components/PermissionGate';
+import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
 import { InterventionHeader } from '../components/interventions/InterventionHeader';
 import { PhotoCapture } from '../components/interventions/PhotoCapture';
 import { SignaturePad } from '../components/interventions/SignaturePad';
@@ -73,6 +76,9 @@ export default function InterventionDetail() {
   // État PDF
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfError, setPdfError] = useState(null);
+
+  // État modal SAV
+  const [createSAVOpen, setCreateSAVOpen] = useState(false);
 
   // Onglet actif
   const [activeTab, setActiveTab] = useState('summary');
@@ -531,6 +537,30 @@ export default function InterventionDetail() {
               {draft.lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
             </p>
           )}
+
+          {/* CTA Créer un SAV — visible seulement pour admin/team_leader */}
+          <PermissionGate resource="sav" action="create">
+            <div className="border-t border-gray-200 pt-4 mt-2">
+              <div className="bg-orange-50 rounded-lg border border-orange-200 p-4 space-y-2">
+                <h4 className="text-sm font-semibold text-orange-900 flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-orange-600" />
+                  Signaler un problème
+                </h4>
+                <p className="text-xs text-orange-700">
+                  Si un problème nécessite une intervention SAV, créez une demande directement depuis cette fiche.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateSAVOpen(true)}
+                  className="w-full min-h-[44px] text-sm gap-2 border-orange-300 text-orange-700 hover:bg-orange-100"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Créer un SAV
+                </Button>
+              </div>
+            </div>
+          </PermissionGate>
         </TabsContent>
 
         {/* ================================================================ */}
@@ -672,6 +702,29 @@ export default function InterventionDetail() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Modal création SAV depuis l'intervention */}
+      <CreateSAVModal
+        isOpen={createSAVOpen}
+        onClose={() => setCreateSAVOpen(false)}
+        onCreated={() => {
+          setCreateSAVOpen(false);
+          toast.success('Demande SAV créée depuis l\'intervention');
+        }}
+        prefillClient={client ? {
+          id: client.id,
+          display_name: client.display_name,
+          first_name: client.first_name,
+          last_name: client.last_name,
+          address: client.address,
+          postal_code: client.postal_code,
+          city: client.city,
+          phone: client.phone,
+          email: client.email,
+        } : null}
+        prefillContractId={intervention?.contract_id || null}
+        savOrigin="entretien"
+      />
     </div>
   );
 }

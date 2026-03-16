@@ -74,11 +74,6 @@ export const entretiensService = {
         query = query.neq('status', 'archived');
       }
 
-      // Filtre fréquence
-      if (filters.frequency) {
-        query = query.eq('frequency', filters.frequency);
-      }
-
       // Filtre recherche textuelle (nom client, commune, code postal)
       if (filters.search && filters.search.trim()) {
         const term = `%${filters.search.trim()}%`;
@@ -478,6 +473,166 @@ export const entretiensService = {
     } catch (error) {
       console.error('[entretiensService] updateVisitStatus exception:', error);
       return { data: null, error };
+    }
+    },
+
+  // ==========================================================================
+  // CONTRAT PDF — Génération via N8N
+  // ==========================================================================
+
+  /**
+   * Déclenche la génération du PDF contrat via N8N
+   * Formate les données du contrat au format attendu par le webhook "Mayer - Entretien Contrat"
+   * (nom, prenom, email, details[], estimationTTC, zone, etc.)
+   * Le workflow N8N génère le HTML via l'API LP, convertit en PDF, l'envoie par email au client.
+   *
+   * @param {Object} contractData - Objet contrat depuis la vue majordhome_contracts
+   * @returns {{ success, error }}
+   */
+  async triggerContractPdf(contractData) {
+    if (!contractData?.id) throw new Error('[entretiensService] contractData requis');
+
+    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_CONTRACT_PDF;
+    if (!webhookUrl) {
+      console.error('[entretiensService] VITE_N8N_WEBHOOK_CONTRACT_PDF non configuré');
+      return { success: false, error: new Error('Webhook contrat PDF non configuré') };
+    }
+
+    try {
+      // Charger les équipements liés au contrat
+      const { data: links } = await supabase
+        .from('majordhome_contract_equipments')
+        .select('equipment_id')
+        .eq('contract_id', contractData.id);
+
+      let details = [];
+      if (links?.length > 0) {
+        const equipmentIds = links.map((l) => l.equipment_id);
+        const { data: equipments } = await supabase
+          .from('majordhome_equipments')
+          .select('equipment_type_id')
+          .in('id', equipmentIds);
+
+        // Charger les types d'équipements pour les labels
+        const { data: equipTypes } = await supabase
+          .from('majordhome_pricing_equipment_types')
+          .select('id, label, has_unit_pricing, included_units, unit_label')
+          .eq('is_active', true);
+
+        // Charger les tarifs pour la zone du contrat
+        const zoneId = contractData.zone_id;
+        let rateMap = {};
+        if (zoneId) {
+          const { data: rates } = await supabase
+            .from('majordhome_pricing_rates')
+            .select('equipment_type_id, price, unit_price')
+            .eq('zone_id', zoneId);
+          for (const r of rates || []) {
+            rateMap[r.equipment_type_id] = r;
+          }
+        }
+
+        const typeMap = {};
+        for (const et of equipTypes || []) typeMap[et.id] = et;
+
+        // Grouper par equipment_type_id + calculer prix
+        const grouped = {};
+        for (const eq of equipments || []) {
+          const etId = eq.equipment_type_id;
+          if (!etId) continue;
+          if (!grouped[etId]) grouped[etId] = { typeId: etId, quantity: 0 };
+          grouped[etId].quantity += 1;
+        }
+
+        details = Object.values(grouped).map((g) => {
+          const et = typeMap[g.typeId];
+          const rate = rateMap[g.typeId];
+          const basePrice = rate ? parseFloat(rate.price) || 0 : 0;
+          const unitPrice = rate ? parseFloat(rate.unit_price) || 0 : 0;
+          let lineTotal = basePrice;
+          if (et?.has_unit_pricing) {
+            const extraUnits = Math.max(0, g.quantity - (et.included_units || 0));
+            lineTotal = basePrice + extraUnits * unitPrice;
+          }
+          return {
+            label: et?.label || 'Équipement',
+            price: lineTotal,
+            quantity: g.quantity,
+          };
+        });
+      }
+
+      // Extraire nom / prénom depuis client_name ("PRENOM NOM")
+      const nameParts = (contractData.client_name || '').trim().split(/\s+/);
+      const prenom = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : '';
+      const nom = nameParts.length > 0 ? nameParts[nameParts.length - 1] : '';
+
+      // Remise label
+      const discountPct = parseFloat(contractData.discount_percent) || 0;
+      const discountLabel = discountPct > 0
+        ? `Remise multi-équipements (-${discountPct}%)`
+        : '';
+
+      // Payload au format webhook N8N "Mayer - Entretien Contrat"
+      const payload = {
+        nom,
+        prenom,
+        email: contractData.client_email || '',
+        telephone: contractData.client_phone || '',
+        adresse: contractData.client_address || '',
+        codePostal: contractData.client_postal_code || '',
+        ville: contractData.client_city || '',
+        details,
+        estimationTTC: parseFloat(contractData.amount) || 0,
+        zone: '',
+        discountLabel,
+        message: contractData.notes || '',
+        service: "Contrat d'entretien",
+        requestType: 'entretien',
+        contract_id: contractData.id,
+        source: contractData.source || 'app',
+      };
+
+      console.log('[entretiensService] triggerContractPdf → payload', payload);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[entretiensService] triggerContractPdf HTTP error:', response.status, errorText);
+        return { success: false, error: new Error(`HTTP ${response.status}: ${errorText}`) };
+      }
+
+      const result = await response.json();
+      return { success: result.success !== false, error: null };
+    } catch (err) {
+      console.error('[entretiensService] triggerContractPdf error:', err);
+      return { success: false, error: err };
+    }
+  },
+
+  /**
+   * Récupère l'URL signée du PDF contrat depuis Supabase Storage
+   * @param {string} pdfPath - Chemin dans le bucket 'contracts'
+   * @returns {{ url, error }}
+   */
+  async getContractPdfUrl(pdfPath) {
+    if (!pdfPath) return { url: null, error: new Error('pdfPath requis') };
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('contracts')
+        .createSignedUrl(pdfPath, 3600); // 1h
+
+      if (error) throw error;
+      return { url: data.signedUrl, error: null };
+    } catch (error) {
+      console.error('[entretiensService] getContractPdfUrl error:', error);
+      return { url: null, error };
     }
   },
 };

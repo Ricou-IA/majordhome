@@ -9,16 +9,10 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { technicalVisitService } from '@services/technicalVisit.service';
+import { technicalVisitKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CACHE KEYS
-// ============================================================================
-
-export const technicalVisitKeys = {
-  all: ['technical-visits'],
-  detail: (leadId) => [...technicalVisitKeys.all, 'detail', leadId],
-  photos: (visitId) => [...technicalVisitKeys.all, 'photos', visitId],
-};
+// Re-export for backward compatibility
+export { technicalVisitKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK PRINCIPAL — Fiche technique d'un lead
@@ -30,7 +24,7 @@ export const technicalVisitKeys = {
  */
 export function useTechnicalVisit(leadId) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: technicalVisitKeys.detail(leadId),
+    queryKey: technicalVisitKeys.byLead(leadId),
     queryFn: () => technicalVisitService.getByLeadId(leadId),
     enabled: !!leadId,
     staleTime: 30_000,
@@ -84,7 +78,7 @@ export function useTechnicalVisitMutations() {
   }, [queryClient]);
 
   const invalidateDetail = useCallback((leadId) => {
-    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.detail(leadId) });
+    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.byLead(leadId) });
   }, [queryClient]);
 
   const invalidatePhotos = useCallback((visitId) => {
@@ -126,7 +120,7 @@ export function useTechnicalVisitMutations() {
     if (result.error) throw result.error;
     // Mettre à jour le cache optimistiquement
     if (leadId) {
-      queryClient.setQueryData(technicalVisitKeys.detail(leadId), (old) => {
+      queryClient.setQueryData(technicalVisitKeys.byLead(leadId), (old) => {
         if (!old?.data) return old;
         return { ...old, data: { ...old.data, [field]: value } };
       });

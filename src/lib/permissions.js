@@ -30,6 +30,8 @@ export const RESOURCES = [
   { key: 'planning',   label: 'Planning' },
   { key: 'entretiens', label: 'Entretiens' },
   { key: 'territoire', label: 'Territoire' },
+  { key: 'cedants',    label: 'Cédants' },
+  { key: 'prospection_commerciale', label: 'Prospection' },
   { key: 'settings',   label: 'Paramètres' },
 ];
 

@@ -131,6 +131,7 @@ export const contractsService = {
     zoneId = null,
     subtotal = null,
     discountPercent = null,
+    source = 'app',
   } = {}) {
     try {
       if (!orgId || !clientId) throw new Error('[contractsService] orgId et clientId requis');
@@ -152,6 +153,7 @@ export const contractsService = {
           zone_id: zoneId || null,
           subtotal: subtotal ? parseFloat(subtotal) : null,
           discount_percent: discountPercent ? parseFloat(discountPercent) : null,
+          source: source || 'app',
         })
         .select()
         .single();
@@ -300,6 +302,39 @@ export const contractsService = {
     } catch (error) {
       console.error('[contractsService] removeEquipmentFromContract:', error);
       return { success: false, error };
+    }
+  },
+  // ==========================================================================
+  // SIGNATURE
+  // ==========================================================================
+
+  /**
+   * Enregistre la signature client sur un contrat + met à jour le PDF path
+   */
+  async signContract(contractId, signatureBase64, signataireNom, pdfPath = null) {
+    try {
+      if (!contractId) throw new Error('[contractsService] contractId requis');
+
+      const updateData = {
+        signature_client_base64: signatureBase64,
+        signature_client_nom: signataireNom,
+        signed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (pdfPath) updateData.contract_pdf_path = pdfPath;
+
+      const { data, error } = await supabase
+        .from('majordhome_contracts_write')
+        .update(updateData)
+        .eq('id', contractId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[contractsService] signContract:', error);
+      return { data: null, error };
     }
   },
 };

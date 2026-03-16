@@ -21,6 +21,16 @@ const Chantiers = lazy(() => import('./pages/Chantiers'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
 const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
 
+// Certificat
+const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
+
+// Contrat signature
+const ContractSign = lazy(() => import('./pages/ContractSign'));
+
+// Prospection
+const CedantsPipeline = lazy(() => import('@apps/prospection/cedants/CedantsPipeline'));
+const CommercialPipeline = lazy(() => import('@apps/prospection/commercial/CommercialPipeline'));
+
 // =============================================================================
 // LOADING COMPONENT
 // =============================================================================
@@ -138,6 +148,22 @@ export const artisanRoutes = [
     ),
   },
   {
+    path: 'certificat/:interventionId',
+    element: (
+      <SuspenseWrapper>
+        <CertificatEntretien />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'clients/:clientId/contrat/signer',
+    element: (
+      <SuspenseWrapper>
+        <ContractSign />
+      </SuspenseWrapper>
+    ),
+  },
+  {
     path: 'settings',
     element: (
       <SuspenseWrapper>
@@ -189,6 +215,26 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="chantiers">
           <Chantiers />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'cedants',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="cedants">
+          <CedantsPipeline />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'prospection',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="prospection_commerciale">
+          <CommercialPipeline />
         </RouteGuard>
       </SuspenseWrapper>
     ),

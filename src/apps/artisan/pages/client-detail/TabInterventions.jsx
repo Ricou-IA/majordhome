@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays, FileText } from 'lucide-react';
+import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays } from 'lucide-react';
+import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectInterventions, useCreateIntervention } from '@/shared/hooks/useInterventions';
 import { INTERVENTION_TYPES } from '@/shared/services/interventions.service';
+import { getStatusConfig } from '@services/sav.service';
 import { chantiersService, getChantierStatusConfig } from '@/shared/services/chantiers.service';
 import { formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
@@ -22,20 +24,49 @@ const InterventionCard = ({ intervention }) => {
 
   const statusInfo = statusConfig[intervention.status] || statusConfig.scheduled;
 
+  // Déterminer si cette intervention donne accès au certificat
+  const hasEntretien = intervention.intervention_type === 'entretien'
+    || (intervention.intervention_type === 'sav' && intervention.includes_entretien);
+  const showCertificat = hasEntretien
+    && ['planifie', 'realise'].includes(intervention.workflow_status);
+  const isRealise = intervention.workflow_status === 'realise';
+
   return (
     <div className="p-4 bg-white rounded-lg border border-secondary-200 hover:border-secondary-300 transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
+            {/* Badge workflow pour interventions entretien/sav */}
+            {(intervention.intervention_type === 'entretien' || intervention.intervention_type === 'sav') &&
+              intervention.workflow_status && (() => {
+                const wfConfig = getStatusConfig(intervention.intervention_type, intervention.workflow_status);
+                return wfConfig ? (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full font-medium text-white"
+                    style={{ backgroundColor: wfConfig.color }}
+                  >
+                    {wfConfig.label}
+                  </span>
+                ) : null;
+              })()}
           </div>
           <p className="text-sm text-secondary-500 mt-1">
             {formatDateFR(intervention.scheduled_date)}
             {intervention.technician_name && ` • ${intervention.technician_name}`}
           </p>
         </div>
-        {intervention.duration_minutes && <span className="text-xs text-secondary-500">{intervention.duration_minutes} min</span>}
+        <div className="flex items-center gap-2 shrink-0">
+          {intervention.duration_minutes && <span className="text-xs text-secondary-500">{intervention.duration_minutes} min</span>}
+          {showCertificat && (
+            <CertificatLink
+              interventionId={intervention.id}
+              isRealise={isRealise}
+              label={isRealise ? 'Certificat' : 'Remplir'}
+            />
+          )}
+        </div>
       </div>
       {intervention.work_performed && <p className="text-sm text-secondary-600 mt-2 line-clamp-2">{intervention.work_performed}</p>}
       {intervention.report_notes && <p className="text-sm text-secondary-500 mt-1 line-clamp-2 italic">{intervention.report_notes}</p>}

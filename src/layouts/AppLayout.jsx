@@ -18,6 +18,8 @@ import {
   ChevronDown,
   Building2,
   User,
+  Factory,
+  Target,
 } from 'lucide-react';
 
 // =============================================================================
@@ -32,6 +34,8 @@ const navigation = [
   { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
+  { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
+  { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
 ];
 
 // =============================================================================

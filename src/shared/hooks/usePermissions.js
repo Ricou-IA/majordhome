@@ -16,16 +16,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { permissionsService } from '@services/permissions.service';
 import { buildPermissionMap, hasPermission } from '@lib/permissions';
+import { permissionKeys } from '@/shared/hooks/cacheKeys';
 
-// =============================================================================
-// CACHE KEYS
-// =============================================================================
-
-export const permissionKeys = {
-  all: ['permissions'],
-  org: (orgId) => [...permissionKeys.all, orgId],
-  members: (orgId) => [...permissionKeys.all, 'members', orgId],
-};
+// Re-export for backward compatibility
+export { permissionKeys } from '@/shared/hooks/cacheKeys';
 
 // =============================================================================
 // HOOKS

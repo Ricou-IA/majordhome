@@ -1,6 +1,6 @@
 # COMPONENTS.md - Cartographie des composants Majord'home
 
-> **Dernière MàJ** : 2026-03-10 — Sprint 6 Chantiers + Dashboard réel + Planning multi-select
+> **Dernière MàJ** : 2026-03-15 — Refactoring architecture (cacheKeys, usePaginatedList, KanbanBoard, shared components)
 
 ---
 
@@ -13,7 +13,11 @@ src/
 │
 ├── lib/
 │   ├── supabaseClient.js                 # createClient Supabase
-│   └── utils.js                          # cn() — clsx + twMerge
+│   ├── utils.js                          # cn(), formatDateFR, formatEuro, formatPhoneNumber, etc.
+│   ├── permissions.js                    # computeEffectiveRole, buildPermissionMap, hasPermission
+│   ├── constants.js                      # DEFAULT_PAGE_SIZE (25), LARGE_PAGE_SIZE (50), KANBAN_PAGE_SIZE (200)
+│   ├── serviceHelpers.js                 # withErrorHandling, extractRpcResult, getMajordhomeOrgId
+│   └── phoneUtils.js                     # cleanPhone, formatPhoneForSearch
 │
 ├── contexts/
 │   └── AuthContext.jsx                   # Provider + useAuth()
@@ -141,6 +145,22 @@ src/
 │   │   └── Profile.jsx                   # Profil utilisateur
 │   │
 │   └── components/
+│       ├── shared/                       # Composants partagés (Refactoring 2026-03-15)
+│       │   ├── KanbanBoard.jsx          # Board Kanban générique avec DnD optionnel (@hello-pangea/dnd)
+│       │   │   Props: items, columns, groupBy, renderCard, onCardClick, onDragEnd,
+│       │   │          searchFilter, columnAmount, emptyMessage, isLoading
+│       │   │   Composants internes: KanbanColumn, ColumnHeader
+│       │   │   Utilisable par: LeadKanban, ChantierKanban, EntretienSAVKanban
+│       │   │
+│       │   ├── SearchBar.jsx            # Barre de recherche réutilisable (icône + clear)
+│       │   │   Props: value, onChange, placeholder, className
+│       │   │
+│       │   ├── ColumnHeader.jsx         # En-tête de colonne Kanban (pastille + label + count + montant)
+│       │   │   Props: label, color, count, amount, extra
+│       │   │
+│       │   └── CardSkeleton.jsx         # Skeleton cards pour chargement
+│       │       Exports: CardSkeleton({ lines, className }), CardSkeletonGrid({ count })
+│       │
 │       ├── clients/
 │       │   ├── ClientCard.jsx            # v2.0 — Carte client redesignée
 │       │   │   Exports: ClientCard, ClientCardCompact, ClientCardSkeleton
@@ -282,6 +302,10 @@ src/
 └── shared/
     ├── services/
     │   ├── auth.service.js               # signIn, signUp, signOut, getProfile, isOrgAdmin, etc.
+    │   ├── storage.service.js            # v1.0 — Service Storage Supabase centralisé (Refactoring 2026-03-15)
+    │   │   Méthodes: getSignedUrl, getSignedUrls, uploadFile, deleteFile, deleteFiles
+    │   │   Remplace le code Storage dupliqué dans interventions, technicalVisit, sav, certificats
+    │   │
     │   ├── clients.service.js            # v7.0 — Service clients CRM (+ onlyArchived filter)
     │   │   Constantes exportées: CLIENT_CATEGORIES, EQUIPMENT_TYPES, HOUSING_TYPES, LEAD_SOURCES
     │   │   Méthodes: getClients (params: search, showArchived, onlyArchived, hasContract, clientCategory, orderBy),
@@ -339,9 +363,27 @@ src/
     │       Accès: .schema('majordhome').from('leads') — pas de vue publique. searchLeads utilise vue majordhome_leads
     │
     └── hooks/
-        ├── useClients.js                 # v6.0 — Hooks React Query (+ onlyArchived filter)
+        ├── cacheKeys.js                  # v1.0 — Cache key factories centralisées (Refactoring 2026-03-15)
+        │   Exports: clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys,
+        │            chantierKeys, prospectKeys, pricingKeys, permissionKeys, entretienSavKeys,
+        │            technicalVisitKeys, certificatKeys
+        │   NOTE: Chaque hook re-exporte ses keys pour rétrocompatibilité
+        │
+        ├── usePaginatedList.js           # v1.0 — Hook pagination générique (Refactoring 2026-03-15)
+        │   Export: usePaginatedList({ queryKeyFn, fetchFn, enabled, defaultFilters, limit, staleTime })
+        │   Retourne: { items, totalCount, isLoading, loadingMore, hasMore, filters, setFilters, setSearch, loadMore, refresh, reset }
+        │   Consommateurs: useClients, useProspects
+        │
+        ├── useDebounce.js                # v1.0 — Hook debounce (Refactoring 2026-03-15)
+        │   Export: useDebounce(value, delay = 300) → debouncedValue
+        │   Consommateurs: useClients (search, duplicateCheck)
+        │
+        ├── useModalManager.js            # v1.0 — Gestion centralisée des modales (Refactoring 2026-03-15)
+        │   Export: useModalManager() → { open(name, data), close(name), closeAll(), isOpen(name), getData(name) }
+        │
+        ├── useClients.js                 # v7.0 — Hooks React Query (refactoré: usePaginatedList + useDebounce + cacheKeys)
         │   Exports:
-        │   - clientKeys (cache key factory)
+        │   - clientKeys (re-export depuis cacheKeys.js)
         │   - useClients({ orgId, limit }) → { clients, isLoading, loadingMore, hasMore, filters, setFilters, loadMore, refresh }
         │   - useClient(clientId) → { client, isLoading, updateClient, isUpdating, refresh }
         │   - useClientEquipments(clientId) → { equipments, addEquipment, updateEquipment, deleteEquipment, ... }
@@ -417,30 +459,51 @@ export const clientsService = {
 };
 ```
 
-### Pattern hook React Query
+### Pattern hook React Query (avec usePaginatedList)
 ```js
-export function useClients({ orgId, limit = 25 } = {}) {
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: clientKeys.list(orgId, filters),
-    queryFn: () => clientsService.getClients({ orgId, ...filters }),
-    enabled: !!orgId,
-    staleTime: 30_000,
-  });
-  // ... pagination manuelle avec loadMore
+// Pour les listes paginées — utiliser usePaginatedList (refactoring 2026-03-15)
+import { usePaginatedList } from '@/shared/hooks/usePaginatedList';
+import { clientKeys } from '@/shared/hooks/cacheKeys';
+
+export function useClients({ orgId, limit = DEFAULT_PAGE_SIZE } = {}) {
+  const { items, totalCount, isLoading, loadingMore, hasMore, filters, setFilters, setSearch, loadMore, refresh, reset } =
+    usePaginatedList({
+      queryKeyFn: (filters) => clientKeys.list(orgId, filters),
+      fetchFn: (filters, limit, offset) => clientsService.getClients({ orgId, ...filters, limit, offset }),
+      enabled: !!orgId,
+      defaultFilters: DEFAULT_FILTERS,
+      limit,
+      staleTime: 30_000,
+    });
+  return { clients: items, totalCount, isLoading, loadingMore, hasMore, filters, setFilters, setSearch, loadMore, refresh, reset };
 }
 ```
 
-### Cache keys factory
+### Cache keys — centralisées dans `cacheKeys.js`
 ```js
+// src/shared/hooks/cacheKeys.js — source unique de vérité
 export const clientKeys = {
   all: ['clients'],
   lists: () => [...clientKeys.all, 'list'],
   list: (orgId, filters) => [...clientKeys.lists(), orgId, filters],
   detail: (id) => [...clientKeys.all, 'detail', id],
   stats: (orgId) => [...clientKeys.all, 'stats', orgId],
-  search: (orgId, query) => [...clientKeys.all, 'search', orgId, query],
-  activities: (clientId) => [...clientKeys.all, 'activities', clientId],
+  // ...
 };
+
+// Chaque hook re-exporte pour compatibilité :
+// export { clientKeys } from '@/shared/hooks/cacheKeys';
+```
+
+### Pattern service helpers
+```js
+import { withErrorHandling } from '@/lib/serviceHelpers';
+
+// Remplace le try/catch { data, error } dupliqué dans 16 services
+const result = await withErrorHandling(
+  () => supabase.from('table').select('*').eq('org_id', orgId),
+  'getItems'
+);
 ```
 
 ### Pattern navigation

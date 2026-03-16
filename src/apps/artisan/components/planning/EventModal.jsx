@@ -14,7 +14,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
+import { X, Save, Loader2, Trash2, Ban, CalendarDays, ClipboardCheck } from 'lucide-react';
+import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { getAppointmentTypeConfig } from '@/shared/services/appointments.service';
 import { useClientSearch } from '@/shared/hooks/useClients';
 import { useLeadSearch, useLeadSources, useLeadCommercials, leadKeys } from '@/shared/hooks/useLeads';
@@ -111,6 +112,36 @@ export function EventModal({
 
   const isEdit = mode === 'edit';
   const isCancelled = appointment?.status === 'cancelled';
+
+  // Recherche intervention entretien/SAV liée (pour CTA certificat)
+  const [entretienId, setEntretienId] = useState(null);
+  const [entretienStatus, setEntretienStatus] = useState(null);
+  useEffect(() => {
+    setEntretienId(null);
+    setEntretienStatus(null);
+    if (!isOpen || !isEdit || !appointment?.client_id) return;
+    if (!['maintenance', 'service'].includes(appointment?.appointment_type)) return;
+
+    async function lookupEntretien() {
+      // Chercher d'abord un entretien pur, puis un SAV avec entretien inclus
+      const { data } = await supabase
+        .from('majordhome_entretien_sav')
+        .select('id, workflow_status, intervention_type, includes_entretien')
+        .eq('client_id', appointment.client_id)
+        .in('workflow_status', ['planifie', 'a_planifier', 'realise'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // Priorité : entretien pur > SAV avec entretien inclus
+      const match = data?.find(d => d.intervention_type === 'entretien')
+        || data?.find(d => d.intervention_type === 'sav' && d.includes_entretien);
+      if (match) {
+        setEntretienId(match.id);
+        setEntretienStatus(match.workflow_status);
+      }
+    }
+    lookupEntretien();
+  }, [isOpen, isEdit, appointment?.client_id, appointment?.appointment_type]);
 
   // --------------------------------------------------------------------------
   // Initialiser le formulaire
@@ -570,6 +601,7 @@ export function EventModal({
                 formData={formData}
                 updateField={updateField}
                 commercials={commercials}
+                members={members}
                 isCancelled={isCancelled}
               />
 
@@ -578,6 +610,30 @@ export function EventModal({
                 updateField={updateField}
                 isCancelled={isCancelled}
               />
+
+              {/* CTA Certificat d'entretien */}
+              {isEdit && entretienId && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
+                <div className={`${entretienStatus === 'realise' ? 'bg-green-50 border-green-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-4`}>
+                  <CertificatLink
+                    interventionId={entretienId}
+                    isRealise={entretienStatus === 'realise'}
+                    onClick={onClose}
+                    className="flex items-center gap-3 w-full text-left"
+                  >
+                    <div className={`w-10 h-10 rounded-full ${entretienStatus === 'realise' ? 'bg-green-600' : 'bg-[#1B4F72]'} flex items-center justify-center shrink-0`}>
+                      <ClipboardCheck className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {entretienStatus === 'realise' ? 'Voir le certificat d\'entretien' : 'Remplir le certificat d\'entretien'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {entretienStatus === 'realise' ? 'Certificat d\'entretien complété' : 'Formulaire réglementaire obligatoire'}
+                      </p>
+                    </div>
+                  </CertificatLink>
+                </div>
+              )}
             </div>
           )}
         </div>

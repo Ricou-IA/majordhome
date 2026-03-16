@@ -23,6 +23,9 @@
 
 import { supabase } from '@/lib/supabaseClient';
 
+// Re-export zone detection par temps de trajet (Phase unification contrats)
+export { detectZoneForAddress, detectZoneByDuration } from '@/lib/zoneDetection';
+
 // ============================================================================
 // CONSTANTES
 // ============================================================================

@@ -15,6 +15,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 
 // ============================================================================
 // CONSTANTES
@@ -63,35 +64,8 @@ export function getAppointmentTypeConfig(type) {
 }
 
 // ============================================================================
-// CACHE ORG ID MAPPING
+// ORG ID MAPPING — imported from @/lib/serviceHelpers
 // ============================================================================
-
-let orgIdCache = {};
-
-/**
- * Résout core.organizations.id → majordhome.organizations.id
- * Les tables appointments et team_members utilisent majordhome.organizations.org_id
- */
-async function getMajordhomeOrgId(coreOrgId) {
-  if (!coreOrgId) throw new Error('[appointments] coreOrgId requis');
-
-  // Cache hit
-  if (orgIdCache[coreOrgId]) return orgIdCache[coreOrgId];
-
-  const { data, error } = await supabase
-    .from('majordhome_organizations')
-    .select('id')
-    .eq('core_org_id', coreOrgId)
-    .single();
-
-  if (error || !data) {
-    console.error('[appointments] Impossible de résoudre org_id:', error);
-    throw new Error('Organisation majordhome introuvable pour cet org_id');
-  }
-
-  orgIdCache[coreOrgId] = data.id;
-  return data.id;
-}
 
 // ============================================================================
 // SERVICE

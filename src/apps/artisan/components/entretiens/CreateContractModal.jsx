@@ -79,7 +79,7 @@ const StepIndicator = ({ current, total }) => (
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function CreateContractModal({ isOpen, onClose, onSuccess }) {
+export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -107,13 +107,25 @@ export function CreateContractModal({ isOpen, onClose, onSuccess }) {
 
   // Pricing
   const pricingData = usePricingData();
-  const clientPostalCode = useMemo(() => {
-    if (clientMode === 'search' && selectedClient) return selectedClient.postal_code || '';
-    if (clientMode === 'create') return newClientData.postalCode || '';
-    return '';
-  }, [clientMode, selectedClient, newClientData.postalCode]);
+  const clientAddress = useMemo(() => {
+    if (clientMode === 'search' && selectedClient) {
+      return {
+        address: selectedClient.address || '',
+        postalCode: selectedClient.postal_code || '',
+        city: selectedClient.city || '',
+      };
+    }
+    if (clientMode === 'create') {
+      return {
+        address: newClientData.address || '',
+        postalCode: newClientData.postalCode || '',
+        city: newClientData.city || '',
+      };
+    }
+    return { address: '', postalCode: '', city: '' };
+  }, [clientMode, selectedClient, newClientData.address, newClientData.postalCode, newClientData.city]);
 
-  const calculator = usePricingCalculator(pricingData, clientPostalCode);
+  const calculator = usePricingCalculator(pricingData, clientAddress);
 
   // ========== Refs ==========
   const searchInputRef = useRef(null);
@@ -123,16 +135,24 @@ export function CreateContractModal({ isOpen, onClose, onSuccess }) {
   // Reset à l'ouverture
   useEffect(() => {
     if (isOpen) {
-      setStep(0);
-      setClientMode('search');
-      setSelectedClient(null);
+      if (preSelectedClient) {
+        setSelectedClient(preSelectedClient);
+        setClientMode('search');
+        setStep(1); // Skip étape client
+      } else {
+        setStep(0);
+        setClientMode('search');
+        setSelectedClient(null);
+      }
       setNewClientData(INITIAL_CLIENT_DATA);
       setContractData(INITIAL_CONTRACT_DATA);
       setDuplicateAcknowledged(false);
       setSearchQuery('');
       clearSearch();
       calculator.reset();
-      setTimeout(() => searchInputRef.current?.focus(), 100);
+      if (!preSelectedClient) {
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -309,7 +329,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess }) {
               <Step2Equipment
                 pricingData={pricingData}
                 calculator={calculator}
-                clientPostalCode={clientPostalCode}
+                clientAddress={clientAddress}
               />
             )}
 
@@ -353,11 +373,11 @@ export function CreateContractModal({ isOpen, onClose, onSuccess }) {
               <>
                 <button
                   type="button"
-                  onClick={() => setStep(0)}
+                  onClick={() => preSelectedClient ? onClose() : setStep(0)}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Retour
+                  {preSelectedClient ? 'Annuler' : 'Retour'}
                 </button>
                 <div className="flex items-center gap-3">
                   {calculator.hasItems && (

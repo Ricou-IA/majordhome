@@ -11,31 +11,19 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   pricingService,
   detectZoneFromPostalCode,
+  detectZoneForAddress,
   calculateLineTotal,
   calculateContractTotal,
 } from '@/shared/services/pricing.service';
-import { contractKeys } from '@/shared/hooks/useContracts';
+import { contractKeys, pricingKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CLÉS DE CACHE
-// ============================================================================
-
-export const pricingKeys = {
-  all: ['pricing'],
-  zones: () => [...pricingKeys.all, 'zones'],
-  equipmentTypes: () => [...pricingKeys.all, 'equipmentTypes'],
-  rates: () => [...pricingKeys.all, 'rates'],
-  ratesByZone: (zoneId) => [...pricingKeys.all, 'rates', zoneId],
-  discounts: () => [...pricingKeys.all, 'discounts'],
-  extras: () => [...pricingKeys.all, 'extras'],
-  allData: () => [...pricingKeys.all, 'allData'],
-  contractItems: (contractId) => [...pricingKeys.all, 'contractItems', contractId],
-};
+// Re-export for backward compatibility
+export { pricingKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - usePricingData (données de référence)
@@ -141,24 +129,63 @@ export function useContractPricing(contractId) {
  * State machine pour la sélection d'équipements et le calcul de prix
  * en temps réel dans le formulaire de création/édition de contrat.
  *
- * @param {Object} pricingData - { zones, equipmentTypes, rates, discounts }
- * @param {string} clientPostalCode - Code postal du client pour auto-détection zone
- * @returns {Object} State + actions
+ * Accepte soit un code postal (string) pour rétrocompatibilité,
+ * soit un objet { address, postalCode, city } pour la détection par temps de trajet.
  *
- * @example
- * const calculator = usePricingCalculator(pricingData, '81600');
- * calculator.addItem('pac_air_air', 2);   // PAC avec 2 splits
- * calculator.removeItem(0);               // Retirer la 1ère ligne
- * console.log(calculator.total);          // Montant total
+ * @param {Object} pricingData - { zones, equipmentTypes, rates, discounts }
+ * @param {string|Object} clientAddressOrPostalCode - Code postal ou { address, postalCode, city }
+ * @returns {Object} State + actions
  */
-export function usePricingCalculator(pricingData, clientPostalCode) {
+export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
   const { zones, equipmentTypes, rates, discounts } = pricingData || {};
 
-  // Auto-détection de la zone depuis le code postal
-  const detectedZone = useMemo(
-    () => detectZoneFromPostalCode(clientPostalCode, zones),
-    [clientPostalCode, zones]
+  // Normaliser l'entrée : string (legacy) ou objet { address, postalCode, city }
+  const clientAddress = useMemo(() => {
+    if (typeof clientAddressOrPostalCode === 'string') {
+      return { address: '', postalCode: clientAddressOrPostalCode, city: '' };
+    }
+    return clientAddressOrPostalCode || { address: '', postalCode: '', city: '' };
+  }, [clientAddressOrPostalCode]);
+
+  // Détection sync instantanée (fallback département)
+  const syncZone = useMemo(
+    () => detectZoneFromPostalCode(clientAddress.postalCode, zones),
+    [clientAddress.postalCode, zones]
   );
+
+  // Détection async par temps de trajet Mapbox
+  const [asyncZone, setAsyncZone] = useState(null);
+  const [isDetectingZone, setIsDetectingZone] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState(null);
+  const detectAbortRef = useRef(null);
+
+  useEffect(() => {
+    const { address, postalCode, city } = clientAddress;
+    if (!postalCode || !zones?.length) {
+      setAsyncZone(null);
+      setDurationMinutes(null);
+      return;
+    }
+
+    // Debounce 600ms pour éviter les appels pendant la saisie
+    const timer = setTimeout(async () => {
+      setIsDetectingZone(true);
+      try {
+        const result = await detectZoneForAddress(address, postalCode, city, zones);
+        setAsyncZone(result.zone);
+        setDurationMinutes(result.durationMinutes);
+      } catch (err) {
+        console.warn('[usePricingCalculator] Zone detection error:', err);
+      } finally {
+        setIsDetectingZone(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [clientAddress.address, clientAddress.postalCode, clientAddress.city, zones]);
+
+  // Zone effective : async (Mapbox) > sync (département) > manual override
+  const detectedZone = asyncZone || syncZone;
 
   // Zone sélectionnée (auto-détectée par défaut, overridable)
   const [selectedZoneId, setSelectedZoneId] = useState(null);
@@ -258,6 +285,24 @@ export function usePricingCalculator(pricingData, clientPostalCode) {
   }, []);
 
   /**
+   * Initialise le calculator avec des items existants (édition contrat)
+   * @param {Array} existingItems - Items depuis majordhome_contract_pricing_items
+   * @param {string} existingZoneId - UUID de la zone du contrat
+   */
+  const initializeItems = useCallback((existingItems, existingZoneId = null) => {
+    if (!existingItems?.length) return;
+    const mapped = existingItems.map((item) => ({
+      equipmentTypeId: item.equipment_type_id,
+      equipmentTypeCode: item.equipment_type_code || '',
+      quantity: item.quantity || 1,
+    }));
+    setSelectedItems(mapped);
+    if (existingZoneId) {
+      setSelectedZoneId(existingZoneId);
+    }
+  }, []);
+
+  /**
    * Prépare les lignes pour l'envoi au service (format DB)
    */
   const getItemsForSave = useCallback(() => {
@@ -279,6 +324,8 @@ export function usePricingCalculator(pricingData, clientPostalCode) {
     items: computedItems,
     pricing, // { subtotal, discountPercent, discountAmount, total }
     hasItems: computedItems.length > 0,
+    isDetectingZone,
+    durationMinutes,
 
     // Actions
     addItem,
@@ -286,6 +333,7 @@ export function usePricingCalculator(pricingData, clientPostalCode) {
     updateItemQuantity,
     setZone,
     reset,
+    initializeItems,
     getItemsForSave,
   };
 }

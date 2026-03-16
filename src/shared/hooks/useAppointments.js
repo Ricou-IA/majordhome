@@ -11,18 +11,10 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@/shared/services/appointments.service';
 import { supabase } from '@/lib/supabaseClient';
+import { appointmentKeys } from '@/shared/hooks/cacheKeys';
 
-// ============================================================================
-// CLÉS DE CACHE
-// ============================================================================
-
-export const appointmentKeys = {
-  all: ['appointments'],
-  lists: () => [...appointmentKeys.all, 'list'],
-  list: (orgId, dateRange, filters) => [...appointmentKeys.lists(), orgId, dateRange, filters],
-  detail: (id) => [...appointmentKeys.all, 'detail', id],
-  teamMembers: (orgId) => ['team-members', orgId],
-};
+// Re-export for backward compatibility
+export { appointmentKeys } from '@/shared/hooks/cacheKeys';
 
 // ============================================================================
 // HOOK PRINCIPAL - useAppointments (calendrier)
@@ -93,21 +85,29 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   const events = useMemo(() => {
     if (!appointments) return [];
 
-    let filtered = appointments;
+    // Enrichir chaque appointment avec ses technician_ids
+    const techMap = new Map();
+    if (techLinks) {
+      techLinks.forEach(t => {
+        if (!techMap.has(t.appointment_id)) techMap.set(t.appointment_id, []);
+        techMap.get(t.appointment_id).push(t.technician_id);
+      });
+    }
+
+    let enriched = appointments.map(a => ({
+      ...a,
+      technician_ids: techMap.get(a.id) || [],
+    }));
 
     // Filtre multi-membres : techniciens (via techLinks) + commerciaux (via assigned_commercial_id)
     if (filters.memberIds.length > 0 && techLinks) {
       const memberSet = new Set(filters.memberIds);
-      // Appointments liés à un tech sélectionné
-      const techAppointmentIds = new Set(
-        techLinks.filter(t => memberSet.has(t.technician_id)).map(t => t.appointment_id)
-      );
-      filtered = filtered.filter(
-        a => techAppointmentIds.has(a.id) || memberSet.has(a.assigned_commercial_id)
+      enriched = enriched.filter(
+        a => a.technician_ids.some(id => memberSet.has(id)) || memberSet.has(a.assigned_commercial_id)
       );
     }
 
-    return filtered.map(a => appointmentsService.toCalendarEvent(a));
+    return enriched.map(a => appointmentsService.toCalendarEvent(a));
   }, [appointments, filters.memberIds, techLinks]);
 
   // Mutation : créer un RDV

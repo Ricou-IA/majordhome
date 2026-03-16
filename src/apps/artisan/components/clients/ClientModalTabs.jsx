@@ -10,9 +10,10 @@
  */
 
 import {
-  User, MapPin, Phone, Home, FileText, Building2,
-  History, ExternalLink,
+  User, MapPin, Phone, Home, Building2,
+  History, ExternalLink, ClipboardCheck, Wrench,
 } from 'lucide-react';
+import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@/shared/services/clients.service';
 import { useClientEquipments } from '@/shared/hooks/useClients';
 import { formatDateFR } from '@/lib/utils';
@@ -34,30 +35,51 @@ export function CategoryBadge({ clientCategory }) {
 }
 
 function InterventionCard({ intervention }) {
-  const { intervention_type, scheduled_date, technician_name, report_notes, status } = intervention;
+  const { intervention_type, scheduled_date, technician_name, report_notes, status, workflow_status, id, contract_number } = intervention;
 
   const typeLabels = {
     maintenance: 'Entretien',
     repair: 'Dépannage',
     installation: 'Installation',
     inspection: 'Visite technique',
+    entretien: 'Entretien',
+    sav: 'SAV',
     other: 'Autre',
   };
 
+  const typeIcons = {
+    entretien: ClipboardCheck,
+    sav: Wrench,
+  };
+
+  // Support both legacy status and workflow_status
   const statusConfig = {
     completed: { label: 'Terminé', className: 'bg-green-100 text-green-700' },
     scheduled: { label: 'Planifié', className: 'bg-blue-100 text-blue-700' },
     cancelled: { label: 'Annulé', className: 'bg-gray-100 text-gray-700' },
     in_progress: { label: 'En cours', className: 'bg-amber-100 text-amber-700' },
+    // Workflow statuses (entretien/sav)
+    a_planifier: { label: 'À planifier', className: 'bg-amber-100 text-amber-700' },
+    planifie: { label: 'Planifié', className: 'bg-blue-100 text-blue-700' },
+    realise: { label: 'Réalisé', className: 'bg-green-100 text-green-700' },
+    demande: { label: 'Demande', className: 'bg-red-100 text-red-700' },
+    devis_envoye: { label: 'Devis envoyé', className: 'bg-indigo-100 text-indigo-700' },
+    pieces_commandees: { label: 'Pièces commandées', className: 'bg-purple-100 text-purple-700' },
   };
 
-  const statusInfo = statusConfig[status] || statusConfig.completed;
+  const effectiveStatus = workflow_status || status;
+  const statusInfo = statusConfig[effectiveStatus] || { label: effectiveStatus, className: 'bg-gray-100 text-gray-700' };
+
+  const isEntretienRealise = intervention_type === 'entretien' && workflow_status === 'realise';
+  const isEntretienPlanifie = intervention_type === 'entretien' && workflow_status === 'planifie';
+  const TypeIcon = typeIcons[intervention_type] || null;
 
   return (
     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
+            {TypeIcon && <TypeIcon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
             <span className="font-medium text-gray-900">
               {typeLabels[intervention_type] || intervention_type}
             </span>
@@ -68,8 +90,26 @@ function InterventionCard({ intervention }) {
           <p className="text-sm text-gray-500 mt-0.5">
             {formatDateFR(scheduled_date)}
             {technician_name && ` • ${technician_name}`}
+            {contract_number && ` • ${contract_number}`}
           </p>
         </div>
+        {/* Lien certificat pour entretiens réalisés ou planifiés */}
+        {isEntretienRealise && (
+          <CertificatLink
+            interventionId={id}
+            isRealise={true}
+            label="Certificat"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors flex-shrink-0 disabled:opacity-70"
+          />
+        )}
+        {isEntretienPlanifie && (
+          <CertificatLink
+            interventionId={id}
+            isRealise={false}
+            label="Remplir"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors flex-shrink-0 disabled:opacity-70"
+          />
+        )}
       </div>
       {report_notes && (
         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{report_notes}</p>

@@ -28,6 +28,8 @@ export const INTERVENTION_TYPES = [
   { value: 'installation', label: 'Installation', color: '#8B5CF6', bgClass: 'bg-violet-100 text-violet-700', icon: 'Package' },
   { value: 'diagnostic', label: 'Diagnostic', color: '#3B82F6', bgClass: 'bg-blue-100 text-blue-700', icon: 'Search' },
   { value: 'urgent', label: 'Urgence', color: '#F59E0B', bgClass: 'bg-amber-100 text-amber-700', icon: 'Zap' },
+  { value: 'entretien', label: 'Entretien', color: '#3B82F6', bgClass: 'bg-blue-100 text-blue-700', icon: 'Calendar' },
+  { value: 'sav', label: 'SAV', color: '#F97316', bgClass: 'bg-orange-100 text-orange-700', icon: 'Wrench' },
   { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-100 text-gray-700', icon: 'MoreHorizontal' },
 ];
 

@@ -20,12 +20,11 @@ import {
   CheckCircle2,
   Loader2,
   FileText,
-  SlidersHorizontal,
   RefreshCw,
   Archive,
 } from 'lucide-react';
 import { ContractCard, ContractCardSkeleton } from './ContractCard';
-import { CONTRACT_FREQUENCIES, CONTRACT_STATUSES } from '@services/entretiens.service';
+import { CONTRACT_STATUSES } from '@services/entretiens.service';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -207,16 +206,6 @@ export function ContractsList({
                 onChange={(v) => setFilters({ status: v, visitStatus: '' })}
               />
 
-              <FilterDropdown
-                label="Fréquence"
-                icon={SlidersHorizontal}
-                value={filters.frequency || ''}
-                options={[
-                  { value: '', label: 'Toutes fréquences' },
-                  ...CONTRACT_FREQUENCIES.map((f) => ({ value: f.value, label: f.label })),
-                ]}
-                onChange={(v) => setFilters({ frequency: v })}
-              />
             </>
           )}
         </div>
@@ -249,7 +238,7 @@ export function ContractsList({
                   : 'Aucun contrat'
             }
           </h3>
-          {(searchInput || filters.frequency) && (
+          {searchInput && (
             <div className="mt-4">
               <button
                 onClick={handleResetFilters}

@@ -37,7 +37,6 @@ import {
   Unlink,
 } from 'lucide-react';
 import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@/shared/services/clients.service';
-import { CONTRACT_FREQUENCIES } from '@/shared/services/contracts.service';
 import { usePricingEquipmentTypes } from '@/shared/hooks/useClients';
 import { formatDateShortFR } from '@/lib/utils';
 
@@ -95,14 +94,6 @@ const getEquipmentLabel = (type) => {
   const found = EQUIPMENT_TYPES.find(t => t.value === type)
     || EQUIPMENT_CATEGORIES.find(t => t.value === type);
   return found?.label || type || 'Équipement';
-};
-
-/**
- * Label de la fréquence de contrat
- */
-const getFrequencyLabel = (frequency) => {
-  const found = CONTRACT_FREQUENCIES.find(f => f.value === frequency);
-  return found?.label || frequency || '-';
 };
 
 // formatDate alias → formatDateShortFR from utils
@@ -218,7 +209,6 @@ const EquipmentCard = ({
     installation_date,
     warranty_end_date,
     contract_status,
-    contract_frequency,
     last_maintenance_date,
     next_maintenance_date,
     notes,

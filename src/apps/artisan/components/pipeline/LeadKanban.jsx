@@ -483,9 +483,15 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     const { leadId, newStatusId, oldStatusId } = pendingContact;
     setContactLoading(true);
 
-    // Optimistic update
+    // Optimistic update — inclut les données d'appel pour affichage immédiat
     setAllLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status_id: newStatusId } : l)),
+      prev.map((l) => (l.id === leadId ? {
+        ...l,
+        status_id: newStatusId,
+        call_count: (l.call_count || 0) + 1,
+        last_call_date: callData.date || new Date().toISOString(),
+        last_call_result: callData.result,
+      } : l)),
     );
     setPendingContact(null);
 
@@ -514,9 +520,15 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     const { leadId, newStatusId, oldStatusId } = pendingQuote;
     setQuoteLoading(true);
 
-    // Optimistic update
+    // Optimistic update — inclut le montant + date pour affichage immédiat sur la carte
     setAllLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status_id: newStatusId } : l)),
+      prev.map((l) => (l.id === leadId ? {
+        ...l,
+        status_id: newStatusId,
+        order_amount_ht: quoteData.amount || l.order_amount_ht,
+        estimated_revenue: quoteData.amount || l.estimated_revenue,
+        quote_sent_date: quoteData.date || l.quote_sent_date,
+      } : l)),
     );
     setPendingQuote(null);
 

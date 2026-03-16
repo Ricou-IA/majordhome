@@ -24,9 +24,9 @@ import { EQUIPMENT_TYPE_CATEGORIES } from '@services/pricing.service';
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function Step2Equipment({ pricingData, calculator, clientPostalCode }) {
+export function Step2Equipment({ pricingData, calculator, clientAddress }) {
   const { equipmentTypes, zones, isLoading: loadingPricing, error: pricingError } = pricingData;
-  const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity } = calculator;
+  const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity, isDetectingZone, durationMinutes } = calculator;
 
   // Grouper les types d'équipements par catégorie
   const groupedTypes = useMemo(() => {
@@ -71,19 +71,25 @@ export function Step2Equipment({ pricingData, calculator, clientPostalCode }) {
 
   return (
     <div className="space-y-5">
-      {/* Zone tarifaire — lecture seule, calculée depuis le code postal */}
+      {/* Zone tarifaire — calculée depuis le temps de trajet */}
       <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0" />
+        {isDetectingZone && (
+          <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />
+        )}
         <span className="text-sm text-blue-800">
           {activeZone ? (
             <>
               <strong>{activeZone.label}</strong>
               <span className="text-blue-600 ml-1">
-                (CP {clientPostalCode}{activeZone.supplement > 0 ? ` · +${parseFloat(activeZone.supplement).toFixed(0)}€ déplacement` : ''})
+                {durationMinutes != null
+                  ? `(~${durationMinutes} min depuis Gaillac${activeZone.supplement > 0 ? ` · +${parseFloat(activeZone.supplement).toFixed(0)}€ déplacement` : ''})`
+                  : `(CP ${clientAddress?.postalCode || ''}${activeZone.supplement > 0 ? ` · +${parseFloat(activeZone.supplement).toFixed(0)}€ déplacement` : ''})`
+                }
               </span>
             </>
           ) : (
-            <span className="text-amber-700">Code postal non renseigné — zone par défaut appliquée</span>
+            <span className="text-amber-700">Adresse non renseignée — zone par défaut appliquée</span>
           )}
         </span>
       </div>

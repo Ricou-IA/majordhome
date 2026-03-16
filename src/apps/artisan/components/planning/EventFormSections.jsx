@@ -11,7 +11,7 @@
  */
 
 import {
-  Clock, User, UserCircle, Tag, FileText,
+  Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2, Ban,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
@@ -19,6 +19,7 @@ import {
   APPOINTMENT_TYPES,
   APPOINTMENT_STATUSES,
 } from '@/shared/services/appointments.service';
+import { TechnicianSelect } from './TechnicianSelect';
 
 const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
@@ -442,23 +443,46 @@ export const SectionClient = ({
 // SECTION COMMERCIAL
 // ============================================================================
 
-export const SectionCommercial = ({ formData, updateField, commercials, isCancelled }) => (
-  <div>
-    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-      <User className="w-4 h-4 text-gray-500" />
-      Commercial assigné
-    </h3>
-    <SelectInput
-      value={formData.assigned_commercial_id || ''}
-      onChange={(v) => updateField('assigned_commercial_id', v)}
-      options={[
-        { value: '', label: '— Non assigné —' },
-        ...commercials.map(c => ({ value: c.id, label: c.full_name })),
-      ]}
-      disabled={isCancelled}
-    />
-  </div>
-);
+const TECHNICIAN_TYPES = ['maintenance', 'service'];
+
+export const SectionCommercial = ({ formData, updateField, commercials, members, isCancelled }) => {
+  const isTechnicianType = TECHNICIAN_TYPES.includes(formData.appointment_type);
+
+  if (isTechnicianType) {
+    return (
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-gray-500" />
+          Technicien assigné
+        </h3>
+        <TechnicianSelect
+          selectedIds={formData.technicianIds || []}
+          onChange={(ids) => updateField('technicianIds', ids)}
+          members={members || []}
+          placeholder="Sélectionner un technicien..."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <User className="w-4 h-4 text-gray-500" />
+        Commercial assigné
+      </h3>
+      <SelectInput
+        value={formData.assigned_commercial_id || ''}
+        onChange={(v) => updateField('assigned_commercial_id', v)}
+        options={[
+          { value: '', label: '— Non assigné —' },
+          ...commercials.map(c => ({ value: c.id, label: c.full_name })),
+        ]}
+        disabled={isCancelled}
+      />
+    </div>
+  );
+};
 
 // ============================================================================
 // SECTION NOTES
