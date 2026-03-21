@@ -15,7 +15,9 @@ const CALL_RESULTS = [
   { value: 'callback', label: 'À rappeler', icon: PhoneForwarded, color: 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100' },
 ];
 
-export const CallModal = ({ isOpen, onClose, onConfirm, loading = false }) => {
+export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title = 'Enregistrer un appel', variant = 'call' }) => {
+  const isFollowup = variant === 'followup';
+  const accentColor = isFollowup ? 'purple' : 'amber';
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [result, setResult] = useState('');
 
@@ -42,10 +44,10 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false }) => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Phone className="h-4 w-4 text-amber-600" />
+            <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${isFollowup ? 'bg-purple-100' : 'bg-amber-100'}`}>
+              <Phone className={`h-4 w-4 ${isFollowup ? 'text-purple-600' : 'text-amber-600'}`} />
             </div>
-            <h3 className="text-base font-semibold text-gray-900">Enregistrer un appel</h3>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
           </div>
           <button
             onClick={handleClose}

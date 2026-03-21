@@ -13,7 +13,7 @@
 
 import {
   Search, UserCircle, PenLine, Unlink, Link2, X,
-  Phone, PhoneOutgoing, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
+  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
   ArrowRightLeft, Target, UserCheck, Loader2,
   FileText, ChevronRight, Plus,
 } from 'lucide-react';
@@ -520,7 +520,7 @@ export const SectionPipeline = ({
 // SUIVI PIPELINE (dates)
 // ============================================================================
 
-export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLogCall, callActivities = [] }) => (
+export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLogCall, onLogFollowup, callActivities = [], followupActivities = [] }) => (
   <>
     <SectionTitle>Suivi pipeline</SectionTitle>
 
@@ -611,6 +611,46 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
           />
         </div>
       </FormField>
+    )}
+
+    {/* Devis envoyé : suivi relances */}
+    {currentStatus.display_order >= 4 && !isWon && (
+      <div className="space-y-2 mt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+            <PhoneForwarded className="h-4 w-4 text-purple-500" />
+            Relances ({lead?.followup_count || 0})
+          </span>
+          {onLogFollowup && (
+            <button
+              type="button"
+              onClick={onLogFollowup}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Relance
+            </button>
+          )}
+        </div>
+
+        {followupActivities.length > 0 ? (
+          <div className="space-y-1">
+            {followupActivities.map((act) => (
+              <div key={act.id} className="flex items-center gap-2 py-1.5 px-3 bg-gray-50 rounded-lg text-sm">
+                <PhoneForwarded className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+                <span className="text-gray-500 tabular-nums">
+                  {new Date(act.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                </span>
+                <span className="font-medium text-gray-600 truncate">
+                  {act.description || 'Relance'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400 italic px-3">Aucune relance enregistrée</p>
+        )}
+      </div>
     )}
 
     {/* Gagné : date de signature */}

@@ -102,6 +102,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [pendingContactStatusId, setPendingContactStatusId] = useState(null);
   const [callModalForLog, setCallModalForLog] = useState(false);
   const [callLoading, setCallLoading] = useState(false);
+  const [followupModalOpen, setFollowupModalOpen] = useState(false);
+  const [followupLoading, setFollowupLoading] = useState(false);
   const [pendingQuoteStatusId, setPendingQuoteStatusId] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
@@ -527,6 +529,34 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     }
   };
 
+  // Enregistrer une relance (suivi devis envoyé)
+  const handleLogFollowup = async (callData) => {
+    setFollowupLoading(true);
+    try {
+      const result = await leadsService.logFollowup(leadId, {
+        orgId,
+        userId,
+        result: callData.result,
+        callDate: callData.date,
+      });
+      if (result?.data) {
+        setForm((prev) => ({
+          ...prev,
+          followup_count: result.data.followup_count ?? (prev.followup_count || 0) + 1,
+          last_followup_date: result.data.last_followup_date || new Date().toISOString(),
+        }));
+      }
+      setFollowupModalOpen(false);
+      toast.success('Relance enregistrée');
+      onSaved?.();
+    } catch (err) {
+      console.error('[LeadModal] Erreur logFollowup:', err);
+      toast.error('Erreur lors de l\'enregistrement de la relance');
+    } finally {
+      setFollowupLoading(false);
+    }
+  };
+
   const handleConvert = async () => {
     try {
       const payload = buildPayload();
@@ -706,7 +736,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                   isWon={isWon}
                   lead={lead}
                   onLogCall={() => setCallModalForLog(true)}
+                  onLogFollowup={() => setFollowupModalOpen(true)}
                   callActivities={activities?.filter(a => a.activity_type === 'phone_call') || []}
+                  followupActivities={activities?.filter(a => a.activity_type === 'followup') || []}
                 />
               )}
 
@@ -782,6 +814,16 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         onClose={() => setCallModalForLog(false)}
         onConfirm={handleLogCall}
         loading={callLoading}
+      />
+
+      {/* Modale relance — suivi devis envoyé */}
+      <CallModal
+        isOpen={followupModalOpen}
+        onClose={() => setFollowupModalOpen(false)}
+        onConfirm={handleLogFollowup}
+        loading={followupLoading}
+        title="Enregistrer une relance"
+        variant="followup"
       />
 
       {/* Modale devis — transition vers Devis envoyé */}

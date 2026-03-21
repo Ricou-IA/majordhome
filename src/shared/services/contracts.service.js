@@ -309,17 +309,47 @@ export const contractsService = {
   // ==========================================================================
 
   /**
+   * Invalide la signature d’un contrat (après changement d’équipements).
+   * Remet signed_at, signature et PDF à null pour forcer une re-signature.
+   */
+  async resetContractSignature(contractId) {
+    try {
+      if (!contractId) throw new Error('[contractsService] contractId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_contracts_write')
+        .update({
+          signed_at: null,
+          signature_client_base64: null,
+          signature_client_nom: null,
+          contract_pdf_path: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', contractId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[contractsService] resetContractSignature:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
    * Enregistre la signature client sur un contrat + met à jour le PDF path
    */
   async signContract(contractId, signatureBase64, signataireNom, pdfPath = null) {
     try {
       if (!contractId) throw new Error('[contractsService] contractId requis');
 
+      const now = new Date().toISOString();
       const updateData = {
         signature_client_base64: signatureBase64,
         signature_client_nom: signataireNom,
-        signed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        signed_at: now,
+        updated_at: now,
       };
       if (pdfPath) updateData.contract_pdf_path = pdfPath;
 

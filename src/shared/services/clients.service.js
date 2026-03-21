@@ -220,9 +220,9 @@ export const clientsService = {
 
       // Requêtes en parallèle
       const [clientResult, equipResult, interResult, activitiesResult] = await Promise.all([
-        // 1. Client
+        // 1. Client (majordhome_clients_all inclut les drafts web)
         supabase
-          .from('majordhome_clients')
+          .from('majordhome_clients_all')
           .select('*')
           .eq('id', clientId)
           .single(),
@@ -335,6 +335,7 @@ export const clientsService = {
     leadSource = null,
     notes = null,
     createdBy = null,
+    isWebDraft = false,
   } = {}) {
     try {
       if (!orgId) throw new Error('[clientsService] orgId est requis');
@@ -377,9 +378,9 @@ export const clientsService = {
 
       if (projectError) throw projectError;
 
-      // 2. Créer le client dans majordhome.clients (via vue publique)
+      // 2. Créer le client dans majordhome.clients (via vue _all pour supporter is_web_draft)
       const { data: client, error: clientError } = await supabase
-        .from('majordhome_clients')
+        .from('majordhome_clients_all')
         .insert({
           project_id: project.id,
           org_id: orgId,
@@ -401,6 +402,7 @@ export const clientsService = {
           lead_source: leadSource,
           notes,
           created_by: createdBy,
+          is_web_draft: isWebDraft,
         })
         .select()
         .single();
@@ -424,6 +426,27 @@ export const clientsService = {
     } catch (error) {
       console.error('[clientsService] createClient:', error);
       return { data: null, error };
+    }
+  },
+
+  /**
+   * Confirme un client web draft (is_web_draft → false)
+   * Appelé lors de la complétion de fiche ou planification d'entretien
+   */
+  async confirmWebDraft(clientId) {
+    try {
+      if (!clientId) throw new Error('[clientsService] clientId requis');
+
+      const { error } = await supabase
+        .from('majordhome_clients_all')
+        .update({ is_web_draft: false })
+        .eq('id', clientId);
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[clientsService] confirmWebDraft:', error);
+      return { error };
     }
   },
 
@@ -456,7 +479,7 @@ export const clientsService = {
         if (currentFirst !== null || currentLast !== null) {
           if (currentFirst === null || currentLast === null) {
             const { data: current } = await supabase
-              .from('majordhome_clients')
+              .from('majordhome_clients_all')
               .select('first_name, last_name')
               .eq('id', clientId)
               .single();
@@ -505,9 +528,12 @@ export const clientsService = {
         updateData.archived_at = updates.isArchived ? new Date().toISOString() : null;
       }
 
-      // Mise à jour dans majordhome.clients (via vue publique)
+      // Toute modification confirme automatiquement un draft web
+      updateData.is_web_draft = false;
+
+      // Mise à jour dans majordhome.clients (via vue _all pour inclure les drafts)
       const { data, error } = await supabase
-        .from('majordhome_clients')
+        .from('majordhome_clients_all')
         .update(updateData)
         .eq('id', clientId)
         .select()

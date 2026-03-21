@@ -120,6 +120,16 @@ export function EntretienSAVCard({ item, onClick }) {
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${config.bgClass}`}>
               {config.label}
             </span>
+            {item.tags?.includes('Web') && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">
+                Web
+              </span>
+            )}
+            {item.tags?.includes('Contrat') && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                Contrat
+              </span>
+            )}
             {type === 'sav' && item.includes_entretien && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
                 Entretien à faire

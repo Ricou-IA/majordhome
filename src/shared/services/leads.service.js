@@ -40,6 +40,7 @@ export const LEAD_ACTIVITY_TYPES = {
   LEAD_ASSIGNED: 'lead_assigned',
   LEAD_CONVERTED: 'lead_converted',
   PHONE_CALL: 'phone_call',
+  FOLLOWUP: 'followup',
   EMAIL_SENT: 'email_sent',
   EMAIL_RECEIVED: 'email_received',
 };
@@ -54,6 +55,7 @@ export const ACTIVITY_CONFIG = {
   lead_assigned: { icon: 'UserPlus', color: 'bg-violet-100 text-violet-700' },
   lead_converted: { icon: 'CheckCircle', color: 'bg-emerald-100 text-emerald-700' },
   phone_call: { icon: 'Phone', color: 'bg-amber-100 text-amber-700' },
+  followup: { icon: 'PhoneForwarded', color: 'bg-purple-100 text-purple-700' },
   email_sent: { icon: 'Mail', color: 'bg-blue-100 text-blue-700' },
   email_received: { icon: 'MailOpen', color: 'bg-blue-100 text-blue-700' },
 };
@@ -619,6 +621,55 @@ export const leadsService = {
       return { data: enrichLead(updated), error: null };
     } catch (err) {
       console.error('[leads] logCall error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Enregistrer une relance (suivi devis envoyé)
+   */
+  async logFollowup(leadId, { orgId, userId, result, callDate, description }) {
+    if (!leadId) throw new Error('[leads] leadId requis');
+
+    const resultLabels = { no_answer: 'Pas de réponse', callback: 'À rappeler', reached: 'Joint' };
+    const desc = description || (result ? `Relance — ${resultLabels[result] || result}` : 'Relance téléphonique');
+
+    try {
+      const { data: rawLead } = await supabase.rpc('get_majordhome_lead_raw', {
+        p_lead_id: leadId,
+      });
+
+      const current = Array.isArray(rawLead) ? rawLead[0] : rawLead;
+
+      const updates = {
+        last_followup_date: callDate ? `${callDate}T${new Date().toISOString().split('T')[1]}` : new Date().toISOString(),
+        followup_count: (current?.followup_count || 0) + 1,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: leadId,
+        p_updates: updates,
+      });
+
+      if (error) {
+        console.error('[leads] logFollowup error:', error);
+        return { data: null, error };
+      }
+
+      const updated = Array.isArray(data) ? data[0] : data;
+
+      await this._createActivity({
+        leadId,
+        orgId,
+        userId,
+        type: LEAD_ACTIVITY_TYPES.FOLLOWUP,
+        description: desc,
+      });
+
+      return { data: enrichLead(updated), error: null };
+    } catch (err) {
+      console.error('[leads] logFollowup error:', err);
       return { data: null, error: err };
     }
   },

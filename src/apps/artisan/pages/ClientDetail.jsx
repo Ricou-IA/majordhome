@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History,
@@ -40,8 +40,9 @@ export default function ClientDetail() {
   const { id } = useParams();
   const { organization, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'info');
   const [isLocked, setIsLocked] = useState(true);
   const [formData, setFormData] = useState({});
   const [initialData, setInitialData] = useState({});

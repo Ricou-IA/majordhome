@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,16 +18,7 @@ import { leadsService } from '@/shared/services/leads.service';
 import { LeadCard } from './LeadCard';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
-
-// Transitions autorisées (identique LeadModal)
-const ALLOWED_TRANSITIONS = {
-  'Nouveau': ['Contacté', 'RDV planifié', 'Perdu'],
-  'Contacté': ['RDV planifié', 'Perdu'],
-  'RDV planifié': ['Devis envoyé', 'Perdu'],
-  'Devis envoyé': ['Gagné', 'Perdu'],
-  'Gagné': [],
-  'Perdu': [],
-};
+import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
 
 // ============================================================================
 // HELPERS
@@ -157,6 +148,7 @@ function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver, co
             style: 'currency',
             currency: 'EUR',
             minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
           }).format(totalAmount)}
         </p>
       </div>
@@ -344,8 +336,8 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
 
   // État pour le prompt "Perdu" depuis le kanban
   const [pendingLost, setPendingLost] = useState(null); // { leadId, newStatusId, oldStatusId }
-  const [lostReasonInput, setLostReasonInput] = useState('');
-  const lostInputRef = useRef(null);
+  const [lostReasonSelect, setLostReasonSelect] = useState('');
+  const [lostReasonCustom, setLostReasonCustom] = useState('');
 
   // État pour le prompt "Contacté" depuis le kanban
   const [pendingContact, setPendingContact] = useState(null); // { leadId, newStatusId, oldStatusId }
@@ -394,11 +386,11 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Si "Perdu", ouvrir le prompt de motif
+      // Si "Perdu", ouvrir la modale de motif
       if (newStatus?.label === 'Perdu') {
         setPendingLost({ leadId, newStatusId, oldStatusId });
-        setLostReasonInput('');
-        setTimeout(() => lostInputRef.current?.focus(), 100);
+        setLostReasonSelect('');
+        setLostReasonCustom('');
         return;
       }
 
@@ -448,8 +440,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
 
   // Confirmer le passage en Perdu avec motif
   const handleConfirmLost = useCallback(async () => {
-    if (!pendingLost || !lostReasonInput.trim()) {
-      toast.error('Veuillez saisir un motif de perte');
+    const reason = lostReasonSelect === 'Autre' ? lostReasonCustom.trim() : lostReasonSelect;
+    if (!pendingLost || !reason) {
+      toast.error('Veuillez sélectionner un motif de perte');
       return;
     }
 
@@ -463,7 +456,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
 
     try {
       await updateLeadStatus(leadId, newStatusId, userId, {
-        lostReason: lostReasonInput.trim(),
+        lostReason: reason,
       });
       fetchLeads();
       toast.success('Lead marqué comme perdu');
@@ -474,7 +467,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
       );
     }
-  }, [pendingLost, lostReasonInput, updateLeadStatus, userId, fetchLeads]);
+  }, [pendingLost, lostReasonSelect, lostReasonCustom, updateLeadStatus, userId, fetchLeads]);
 
   // Confirmer le passage en Contacté avec données d'appel
   const handleConfirmContact = useCallback(async (callData) => {
@@ -608,36 +601,70 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         </div>
       </div>
 
-      {/* Prompt motif de perte (affiché au-dessus du kanban) */}
+      {/* Modale motif de perte */}
       {pendingLost && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-2">
-            <span className="text-sm font-medium text-red-800 whitespace-nowrap">Motif de perte :</span>
-            <input
-              ref={lostInputRef}
-              type="text"
-              value={lostReasonInput}
-              onChange={(e) => setLostReasonInput(e.target.value)}
-              className="flex-1 px-3 py-1.5 border border-red-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-              placeholder="Ex: Trop cher, Concurrent retenu..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); handleConfirmLost(); }
-                if (e.key === 'Escape') setPendingLost(null);
-              }}
-            />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setPendingLost(null);
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Motif de perte</h3>
+              <button
+                onClick={() => setPendingLost(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <select
+                value={lostReasonSelect}
+                onChange={(e) => setLostReasonSelect(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                autoFocus
+              >
+                <option value="">Sélectionner un motif...</option>
+                {LOST_REASONS.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+                <option value="Autre">Autre (préciser)</option>
+              </select>
+
+              {lostReasonSelect === 'Autre' && (
+                <input
+                  type="text"
+                  value={lostReasonCustom}
+                  onChange={(e) => setLostReasonCustom(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                  placeholder="Précisez le motif..."
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleConfirmLost(); }
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setPendingLost(null)}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmLost}
+                disabled={!lostReasonSelect || (lostReasonSelect === 'Autre' && !lostReasonCustom.trim())}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirmer
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleConfirmLost}
-            className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Confirmer
-          </button>
-          <button
-            onClick={() => setPendingLost(null)}
-            className="p-1.5 text-red-400 hover:text-red-600 rounded transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       )}
 

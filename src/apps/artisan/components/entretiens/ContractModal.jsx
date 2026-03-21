@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X, User, MapPin, Phone, Mail, Wrench, Euro, Calendar, Clock,
   CheckCircle2, FileText, History, ExternalLink, Loader2, AlertCircle,
@@ -69,6 +70,7 @@ function InfoRow({ label, value, isLink = false, href = null }) {
 // ============================================================================
 
 export function ContractModal({ contractId, isOpen, onClose }) {
+  const navigate = useNavigate();
   const { contract, isLoading: loadingContract } = useContract(contractId);
   const { visits, isLoading: loadingVisits } = useContractVisits(contractId);
   const { recordVisit, isRecordingVisit } = useContractMutations();
@@ -424,7 +426,8 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                     size="sm"
                     className="w-full"
                     onClick={() => {
-                      window.location.href = `/clients/${contract.client_id}`;
+                      onClose();
+                      navigate(`/clients/${contract.client_id}`);
                     }}
                   >
                     <ExternalLink className="h-4 w-4 mr-1.5" />

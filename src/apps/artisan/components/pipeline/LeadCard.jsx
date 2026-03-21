@@ -200,8 +200,9 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
           <div className="flex items-center gap-1.5 mt-1.5">
             {sourceLabel && (
               <span
-                className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium"
+                className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium truncate max-w-[100px]"
                 style={{ backgroundColor: sourceColor }}
+                title={sourceLabel}
               >
                 {sourceLabel}
               </span>
@@ -217,6 +218,11 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
             {lead.statuses?.label === 'Contacté' && lead.call_count > 0 && (
               <span className="text-xs flex items-center gap-0.5 text-amber-600" title={`${lead.call_count} appel${lead.call_count > 1 ? 's' : ''}`}>
                 <Phone className="h-3 w-3" />{lead.call_count}
+              </span>
+            )}
+            {lead.statuses?.label === 'Devis envoyé' && lead.followup_count > 0 && (
+              <span className="text-xs flex items-center gap-0.5 text-purple-600" title={`${lead.followup_count} relance${lead.followup_count > 1 ? 's' : ''}`}>
+                <Phone className="h-3 w-3" />{lead.followup_count}
               </span>
             )}
             {daysInStatus !== null && (

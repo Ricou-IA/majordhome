@@ -419,6 +419,7 @@ export const entretiensService = {
                   technician_id: technicianId || null,
                   technician_name: technicianName || null,
                   created_by: userId || null,
+                  tags: ['Contrat'],
                 })
                 .select('id')
                 .single();

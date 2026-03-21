@@ -363,6 +363,12 @@ export function EntretienSAVKanban() {
       // 3. Transition workflow → planifié
       await updateWorkflowStatus(item.id, 'planifie');
 
+      // 4. Confirmer le client draft si contact web
+      if (item.client_id && item.tags?.includes('Web')) {
+        const { clientsService } = await import('@services/clients.service');
+        await clientsService.confirmWebDraft(item.client_id);
+      }
+
       toast.success('RDV planifié avec succès');
       setPendingTransition(null);
       refresh();

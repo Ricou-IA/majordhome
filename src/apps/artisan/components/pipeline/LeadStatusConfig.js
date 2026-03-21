@@ -34,8 +34,8 @@ export const LOST_REASONS = [
  * Gagné / Perdu → terminaux (pas de transition)
  */
 export const ALLOWED_TRANSITIONS = {
-  'Nouveau': ['Contacté', 'RDV planifié', 'Perdu'],
-  'Contacté': ['RDV planifié', 'Perdu'],
+  'Nouveau': ['Contacté', 'RDV planifié', 'Devis envoyé', 'Perdu'],
+  'Contacté': ['RDV planifié', 'Devis envoyé', 'Perdu'],
   'RDV planifié': ['Devis envoyé', 'Perdu'],
   'Devis envoyé': ['Gagné', 'Perdu'],
   'Gagné': [],

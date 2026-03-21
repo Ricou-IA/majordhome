@@ -454,8 +454,9 @@ export function useCreateContractWithClient() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async ({ orgId, existingClientId, newClientData, contractData, userId }) => {
+    mutationFn: async ({ orgId, existingClientId, newClientData, contractData, userId, source }) => {
       let clientId = existingClientId;
+      const isWeb = source === 'web';
 
       // Étape 1 : Créer le client si besoin
       if (!clientId && newClientData) {
@@ -470,6 +471,8 @@ export function useCreateContractWithClient() {
           postalCode: newClientData.postalCode,
           city: newClientData.city,
           clientCategory: newClientData.clientCategory || 'particulier',
+          leadSource: isWeb ? 'web' : null,
+          isWebDraft: isWeb,
           createdBy: userId,
         });
 

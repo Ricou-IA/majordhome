@@ -20,10 +20,11 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
-  User, MapPin, Phone, ClipboardCheck, Wrench, Mail,
-  ExternalLink, Calendar, Check,
+  User, MapPin, Phone, ClipboardCheck, Wrench, Mail, FileText,
+  ExternalLink, Calendar, Check, UserPlus,
 } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { toast } from 'sonner';
@@ -37,6 +38,7 @@ import {
   KANBAN_COLUMNS,
 } from '@services/sav.service';
 import { appointmentsService } from '@services/appointments.service';
+import { clientsService } from '@services/clients.service';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
@@ -58,6 +60,7 @@ const TYPE_LABELS = {
 // ============================================================================
 
 export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpenClient }) {
+  const navigate = useNavigate();
   const { organization } = useAuth();
   const { can } = useCanAccess();
   const orgId = organization?.id;
@@ -103,6 +106,22 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
         }
       });
   }, [item?.client_id]);
+
+  // Charger les équipements du contrat
+  const [contractEquipments, setContractEquipments] = useState([]);
+  useEffect(() => {
+    if (!item?.contract_id) return;
+
+    supabase
+      .from('majordhome_contract_pricing_items')
+      .select('quantity, equipment_type_label')
+      .eq('contract_id', item.contract_id)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setContractEquipments(data);
+        }
+      });
+  }, [item?.contract_id]);
 
   if (!item) return null;
 
@@ -192,6 +211,11 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
 
       // Enregistrer la date planifiée sur l'intervention
       await updateFields(item.id, { scheduled_date: schedulingData.date });
+
+      // Confirmer le client draft si c'est un contact web
+      if (item.client_id && item.tags?.includes('Web')) {
+        await clientsService.confirmWebDraft(item.client_id);
+      }
 
       toast.success('RDV planifié avec succès');
       onUpdated?.();
@@ -302,10 +326,15 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     });
   };
 
-  // Ouvrir fiche client
-  const handleOpenClient = () => {
+  // Ouvrir fiche client — confirme le draft si besoin puis navigue
+  const handleOpenClient = async () => {
     if (item.client_id) {
-      onOpenClient?.(item.client_id);
+      // Confirmer le client draft (le rend visible dans la liste clients)
+      if (item.tags?.includes('Web')) {
+        await clientsService.confirmWebDraft(item.client_id);
+      }
+      onClose();
+      navigate(`/clients/${item.client_id}`);
     }
   };
 
@@ -404,7 +433,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                   <User className="w-4 h-4 text-gray-400" />
                   <span>{name}</span>
                   {/* Lien vers la fiche client */}
-                  {item.client_id && onOpenClient && (
+                  {item.client_id && (
                     <button
                       type="button"
                       onClick={handleOpenClient}
@@ -446,6 +475,21 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                   </div>
                 )}
 
+                {/* Équipements du contrat */}
+                {contractEquipments.length > 0 && (
+                  <div className="flex items-start gap-2 text-sm text-gray-500">
+                    <Wrench className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {contractEquipments.map((eq, i) => (
+                        <span key={i} className="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-medium">
+                          {eq.equipment_type_label || 'Équipement'}
+                          {eq.quantity > 1 && ` ×${eq.quantity}`}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Date du dernier entretien */}
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Calendar className="w-4 h-4 text-gray-400" />
@@ -460,6 +504,18 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                     )}
                   </span>
                 </div>
+
+                {/* CTA Compléter fiche client (contacts Web) */}
+                {item.tags?.includes('Web') && item.client_id && (
+                  <button
+                    type="button"
+                    onClick={handleOpenClient}
+                    className="mt-1 w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Compléter la fiche client
+                  </button>
+                )}
 
                 {/* Toggle Réaliser Entretien (SAV uniquement) */}
                 {type === 'sav' && canEditSAV && (

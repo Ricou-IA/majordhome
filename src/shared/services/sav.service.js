@@ -218,6 +218,7 @@ export const savService = {
           scheduled_date: scheduledDate || null,
           status: 'scheduled',
           created_by: createdBy || null,
+          tags: ['Contrat'],
         })
         .select()
         .single();

@@ -56,6 +56,7 @@ export const TabEquipments = ({ clientId }) => {
       if (hasContract && equipmentId) {
         try {
           await contractsService.addEquipmentToContract(contract.id, equipmentId);
+          await resetSignatureIfNeeded();
           invalidateAll();
           toast.success('Équipement ajouté et lié au contrat');
         } catch (linkError) {
@@ -98,6 +99,10 @@ export const TabEquipments = ({ clientId }) => {
     if (!deletingEquipment) return;
     setIsDeleting(true);
     try {
+      // Si l’équipement supprimé était lié au contrat, invalider la signature
+      if (hasContract && contractEquipmentIds.has(deletingEquipment.id)) {
+        await resetSignatureIfNeeded();
+      }
       await deleteEquipment(deletingEquipment.id);
       invalidateAll();
       toast.success('Équipement supprimé');
@@ -110,10 +115,19 @@ export const TabEquipments = ({ clientId }) => {
     }
   };
 
+  // Si le contrat est signé et qu’on modifie les équipements, invalider la signature
+  const resetSignatureIfNeeded = async () => {
+    if (contract?.signed_at) {
+      await contractsService.resetContractSignature(contract.id);
+      toast.info('Le contrat doit être re-signé car les équipements ont changé.');
+    }
+  };
+
   const handleAddToContract = async (equipment) => {
     if (!hasContract) return;
     try {
       await contractsService.addEquipmentToContract(contract.id, equipment.id);
+      await resetSignatureIfNeeded();
       invalidateAll();
       toast.success('Équipement ajouté au contrat');
     } catch (error) {
@@ -126,6 +140,7 @@ export const TabEquipments = ({ clientId }) => {
     if (!hasContract) return;
     try {
       await contractsService.removeEquipmentFromContract(contract.id, equipment.id);
+      await resetSignatureIfNeeded();
       invalidateAll();
       toast.success('Équipement retiré du contrat');
     } catch (error) {

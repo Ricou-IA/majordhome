@@ -22,6 +22,7 @@ export function CertificatSignaturePad({
   disabled = false,
   isSaving = false,
   existingSignature = null,
+  disclaimerText = null,
 }) {
   const sigCanvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -101,8 +102,7 @@ export function CertificatSignaturePad({
     <div className="space-y-4">
       {/* Texte légal */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-        En signant, le client confirme avoir reçu ce certificat d'entretien
-        conformément à l'arrêté du 15/09/2009, art. 8.
+        {disclaimerText || "En signant, le client confirme avoir reçu ce certificat d'entretien conformément à l'arrêté du 15/09/2009, art. 8."}
       </div>
 
       {/* Nom du signataire */}

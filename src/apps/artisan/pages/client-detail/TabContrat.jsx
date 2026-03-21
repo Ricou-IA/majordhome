@@ -516,8 +516,12 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Date début</p>
+            <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Date historique</p>
             <p className="mt-1 text-sm text-secondary-900">{formatDateFR(contract.start_date)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Date signature contrat</p>
+            <p className="mt-1 text-sm text-secondary-900">{contract.signed_at ? formatDateFR(contract.signed_at) : '-'}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Date fin</p>
