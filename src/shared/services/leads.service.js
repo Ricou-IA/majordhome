@@ -18,7 +18,7 @@
  * Le schéma majordhome n'est PAS exposé dans PostgREST,
  * donc .schema('majordhome') provoque des erreurs 406.
  *
- * @version 3.0.0 - Lead→Client auto-conversion sur "Devis envoyé"
+ * @version 3.1.0 - Lead→Client auto-conversion sur "Gagné" (validation devis)
  * ============================================================================
  */
 
@@ -508,10 +508,9 @@ export const leadsService = {
         newStatusId,
       });
 
-      // Auto-conversion lead → client sur "Devis envoyé" (si pas déjà lié)
+      // Auto-conversion lead → client (désactivé ici — déclenché lors de la validation du devis)
       let clientCreated = null;
-      if (newStatusLabel === 'Devis envoyé' && !currentLead?.client_id) {
-        console.log('[leads] updateLeadStatus: auto-conversion lead → client (Devis envoyé)');
+      if (false && !currentLead?.client_id) {
         const convResult = await this.convertLeadToClient(
           leadId,
           updatedLead?.org_id || currentLead?.org_id,
@@ -734,8 +733,8 @@ export const leadsService = {
 
   /**
    * Convertit un lead en client CRM via clientsService.createClient
-   * Appelé automatiquement sur "Devis envoyé" si pas de client_id,
-   * ou manuellement via le bouton "Convertir en client" (si Gagné).
+   * Appelé automatiquement sur "Gagné" si pas de client_id,
+   * ou manuellement via le bouton "Convertir en client".
    * Si client_id existe déjà → skip (retourne skipped: true).
    */
   async convertLeadToClient(leadId, orgId, userId) {

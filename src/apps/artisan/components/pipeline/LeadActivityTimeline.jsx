@@ -183,6 +183,9 @@ export function LeadActivityTimeline({
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
+                      {activity.user_full_name && (
+                        <span className="ml-1.5 text-gray-300">— {activity.user_full_name}</span>
+                      )}
                     </p>
                   </div>
                 </div>

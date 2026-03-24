@@ -341,56 +341,21 @@ export const SectionPipeline = ({
   <>
     <SectionTitle>Pipeline</SectionTitle>
 
-    <div className="grid grid-cols-2 gap-3">
-      <FormField label="Source">
-        <div className="relative">
-          <select
-            value={form.source_id}
-            onChange={(e) => setField('source_id', e.target.value)}
-            className={selectClass}
-          >
-            <option value="">— Source —</option>
-            {sources.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-        </div>
-      </FormField>
-
-      <FormField label="Statut">
-        {isEditing ? (
-          <div
-            className="px-3 py-2.5 border rounded-lg text-sm font-medium min-h-[44px] flex items-center gap-2"
-            style={{
-              borderColor: `${currentStatus?.color}40`,
-              backgroundColor: `${currentStatus?.color}10`,
-              color: currentStatus?.color,
-            }}
-          >
-            <span
-              className="w-2.5 h-2.5 rounded-full shrink-0"
-              style={{ backgroundColor: currentStatus?.color }}
-            />
-            {currentStatus?.label || '—'}
-          </div>
-        ) : (
-          <div className="relative">
-            <select
-              value={form.status_id}
-              onChange={(e) => setField('status_id', e.target.value)}
-              className={selectClass}
-            >
-              <option value="">— Choisir un statut —</option>
-              {statuses.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-          </div>
-        )}
-      </FormField>
-    </div>
+    <FormField label="Source">
+      <div className="relative">
+        <select
+          value={form.source_id}
+          onChange={(e) => setField('source_id', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">— Source —</option>
+          {sources.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+      </div>
+    </FormField>
 
     {/* Formulaire motif de perte (inline quand passage en Perdu) */}
     {pendingLostStatusId && (
@@ -728,66 +693,7 @@ export const SectionActions = ({
       </div>
     )}
 
-    {/* Actions lead */}
-    {isEditing && (
-      <>
-        <SectionTitle>Actions</SectionTitle>
-        <div className="flex flex-wrap gap-2">
-          {isWon && !lead?.client_id && !lead?.converted_date && (
-            <>
-              {showConvertConfirm ? (
-                <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg w-full">
-                  <UserCheck className="h-5 w-5 text-emerald-600 shrink-0" />
-                  <span className="text-sm text-emerald-800 flex-1">
-                    Créer un client à partir de ce lead ?
-                  </span>
-                  <Button
-                    size="sm"
-                    onClick={handleConvert}
-                    disabled={isConverting}
-                    className="bg-emerald-600 hover:bg-emerald-700 min-h-[36px]"
-                  >
-                    {isConverting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmer'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setShowConvertConfirm(false)}
-                    className="min-h-[36px]"
-                  >
-                    Annuler
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowConvertConfirm(true)}
-                  className="gap-1 min-h-[40px] border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  <UserCheck className="h-4 w-4" />
-                  Convertir en client
-                </Button>
-              )}
-            </>
-          )}
-
-          {(lead?.converted_date || lead?.client_id) && (
-            <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5 px-3 py-2 bg-emerald-50 rounded-lg">
-              <UserCheck className="h-4 w-4" />
-              {lead?.converted_date
-                ? `Converti le ${new Date(lead.converted_date).toLocaleDateString('fr-FR')}`
-                : 'Client lié'}
-              {lead?.client_display_name && (
-                <span className="text-emerald-500 ml-1">
-                  — {lead.client_display_name}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </>
-    )}
+    {/* Bloc "Actions" supprimé — conversion auto lors de l'acceptation du devis */}
   </>
 );
 
@@ -805,6 +711,7 @@ export const SectionNotes = ({
   isAddingNote,
   leadId,
   onOpenFicheTechnique,
+  devisSlot,
 }) => {
   // Charger le statut de la fiche technique (uniquement si lead existant)
   const { visit } = useTechnicalVisit(isEditing ? leadId : null);
@@ -816,7 +723,7 @@ export const SectionNotes = ({
       {/* CTA Fiche technique terrain */}
       {isEditing && (
         <>
-          <SectionTitle>Fiche technique terrain</SectionTitle>
+          <SectionTitle>Information chiffrage</SectionTitle>
 
           <button
             type="button"
@@ -841,6 +748,9 @@ export const SectionNotes = ({
         </>
       )}
 
+      {/* Devis (injecté entre fiche technique et notes) */}
+      {devisSlot}
+
       <SectionTitle>Notes</SectionTitle>
 
       <textarea
@@ -857,11 +767,16 @@ export const SectionNotes = ({
           <LeadActivityTimeline
             activities={activities}
             isLoading={loadingActivities}
-            onAddNote={handleAddNote}
-            isAddingNote={isAddingNote}
+            disabled
           />
         </>
       )}
     </>
   );
 };
+
+// ============================================================================
+// DEVIS (QUOTES)
+// ============================================================================
+
+// SectionDevis extrait dans ../devis/SectionDevis.jsx

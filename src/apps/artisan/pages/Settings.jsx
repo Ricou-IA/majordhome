@@ -9,6 +9,7 @@ import {
   Shield,
   CreditCard,
   HelpCircle,
+  Truck,
 } from 'lucide-react';
 
 // =============================================================================
@@ -53,6 +54,13 @@ export default function Settings() {
       description: 'Personnaliser l\'affichage de l\'application',
       href: '/settings/appearance',
       adminOnly: false,
+    },
+    {
+      title: 'Fournisseurs',
+      icon: Truck,
+      description: 'Gérer les fournisseurs et catalogues produits',
+      href: '/settings/suppliers',
+      adminOnly: true,
     },
     {
       title: 'Facturation',

@@ -42,10 +42,14 @@ import {
   SectionActions,
   SectionNotes,
 } from './LeadFormSections';
+import SectionDevis from '../devis/SectionDevis';
 import { SchedulingPanel } from './SchedulingPanel';
 import { FicheTechniqueModal } from './FicheTechniqueModal';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
+import CreateDevisModal from '../devis/CreateDevisModal';
+import DevisModal from '../devis/DevisModal';
+import { devisService } from '@services/devis.service';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -108,6 +112,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showFicheTechnique, setShowFicheTechnique] = useState(false);
+  const [showCreateDevis, setShowCreateDevis] = useState(false);
+  const [openDevisId, setOpenDevisId] = useState(null);
 
   // Pré-remplir le formulaire en mode édition OU reset en mode création
   useEffect(() => {
@@ -302,6 +308,20 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       const payload = buildPayload();
       let savedLeadId = leadId;
       if (isEditing) {
+        // Détecter changement de commercial assigné
+        const oldCommercialId = lead?.assigned_user_id || null;
+        const newCommercialId = form.assigned_user_id || null;
+        if (oldCommercialId !== newCommercialId && newCommercialId) {
+          const oldName = commercials?.find((c) => c.id === oldCommercialId)?.name || 'Non assigné';
+          const newName = commercials?.find((c) => c.id === newCommercialId)?.name || '?';
+          leadsService._createActivity({
+            leadId,
+            orgId,
+            userId,
+            type: 'lead_assigned',
+            description: `Commercial assigné : ${oldName} → ${newName}`,
+          }).catch((err) => console.warn('[LeadModal] Activity commercial:', err));
+        }
         await updateLead(leadId, payload);
       } else {
         const result = await createLead({ orgId, userId, ...payload });
@@ -497,6 +517,40 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       toast.error('Erreur lors du changement de statut');
     } finally {
       setQuoteLoading(false);
+    }
+  };
+
+  // Envoyer le devis (marquer brouillons comme envoyés + transition lead → Devis envoyé)
+  const handleSendDevis = async () => {
+    try {
+      // 1. Marquer tous les devis brouillon comme envoyés
+      const { data: quotes } = await devisService.getQuotesByLead(leadId);
+      const brouillons = (quotes || []).filter((q) => q.status === 'brouillon');
+      for (const q of brouillons) {
+        await devisService.sendQuote(q.id);
+      }
+
+      // 2. Calculer le montant total des devis envoyés
+      const totalHt = brouillons.reduce((sum, q) => sum + (parseFloat(q.total_ht) || 0), 0);
+
+      // 3. Passer le lead en "Devis envoyé"
+      const devisEnvoyeStatus = statuses.find((s) => s.label === 'Devis envoyé');
+      if (devisEnvoyeStatus) {
+        const payload = buildPayload();
+        await updateLead(leadId, payload);
+        await syncClientFields();
+        await updateLeadStatus(leadId, devisEnvoyeStatus.id, userId, {
+          quoteSentDate: new Date().toISOString().split('T')[0],
+          quoteAmount: totalHt || null,
+        });
+      }
+
+      toast.success('Devis envoyé — lead mis à jour');
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      console.error('[LeadModal] handleSendDevis:', err);
+      toast.error('Erreur lors de l\'envoi du devis');
     }
   };
 
@@ -742,6 +796,27 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 />
               )}
 
+              <SectionNotes
+                form={form}
+                setField={setField}
+                isEditing={isEditing}
+                activities={activities}
+                loadingActivities={loadingActivities}
+                handleAddNote={handleAddNote}
+                isAddingNote={isAddingNote}
+                leadId={leadId}
+                onOpenFicheTechnique={() => setShowFicheTechnique(true)}
+                devisSlot={
+                  <SectionDevis
+                    leadId={leadId}
+                    isEditing={isEditing}
+                    onCreateDevis={() => setShowCreateDevis(true)}
+                    onOpenDevis={(id) => setOpenDevisId(id)}
+                    onSendDevis={handleSendDevis}
+                  />
+                }
+              />
+
               <SectionActions
                 isEditing={isEditing}
                 allowedNext={allowedNext}
@@ -754,18 +829,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 setShowConvertConfirm={setShowConvertConfirm}
                 handleConvert={handleConvert}
                 isConverting={isConverting}
-              />
-
-              <SectionNotes
-                form={form}
-                setField={setField}
-                isEditing={isEditing}
-                activities={activities}
-                loadingActivities={loadingActivities}
-                handleAddNote={handleAddNote}
-                isAddingNote={isAddingNote}
-                leadId={leadId}
-                onOpenFicheTechnique={() => setShowFicheTechnique(true)}
               />
             </>
           )}
@@ -834,6 +897,25 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         loading={quoteLoading}
         defaultAmount={form.order_amount_ht || form.estimated_revenue || ''}
       />
+
+      {/* Création devis fournisseur */}
+      {showCreateDevis && (
+        <CreateDevisModal
+          lead={lead}
+          onClose={() => setShowCreateDevis(false)}
+          onCreated={() => setShowCreateDevis(false)}
+        />
+      )}
+
+      {/* Détail devis fournisseur */}
+      {openDevisId && (
+        <DevisModal
+          quoteId={openDevisId}
+          leadId={leadId}
+          onClose={() => setOpenDevisId(null)}
+          onStatusChange={() => {}}
+        />
+      )}
     </>
   );
 }

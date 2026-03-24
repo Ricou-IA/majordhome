@@ -20,6 +20,7 @@ const Territoire = lazy(() => import('./pages/Territoire'));
 const Chantiers = lazy(() => import('./pages/Chantiers'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
 const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
+const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
 
 // Certificat
 const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
@@ -189,6 +190,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <PermissionsEditor />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/suppliers',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <SupplierManagement />
         </RouteGuard>
       </SuspenseWrapper>
     ),

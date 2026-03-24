@@ -10,6 +10,7 @@ import {
 import { useClientContract, useContractEquipments, useContractVisits, useContractMutations } from '@/shared/hooks/useContracts';
 import { usePricingEquipmentTypes, clientKeys } from '@/shared/hooks/useClients';
 import { CONTRACT_STATUSES, MAINTENANCE_MONTHS } from '@/shared/services/contracts.service';
+import { formatEuro } from '@/lib/utils';
 import { EQUIPMENT_TYPES } from '@/shared/services/clients.service';
 import { formatDateForInput, formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
@@ -17,6 +18,9 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CreateContractModal } from '@/apps/artisan/components/entretiens/CreateContractModal';
 import { ContractPricingSection } from './ContractPricingSection';
 import { ContractPdfSection } from './ContractPdfSection';
+import { useDevisByClient } from '@/shared/hooks/useDevis';
+import DevisStatusBadge from '@/apps/artisan/components/devis/DevisStatusBadge';
+import DevisModal from '@/apps/artisan/components/devis/DevisModal';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -339,6 +343,8 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const [contractForm, setContractForm] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [openDevisId, setOpenDevisId] = useState(null);
+  const { quotes: clientQuotes, isLoading: loadingQuotes } = useDevisByClient(clientId);
 
   const initForm = useCallback((c) => {
     setContractForm({
@@ -500,7 +506,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
           <div>
             <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Montant</p>
             <p className="mt-1 text-sm text-secondary-900">
-              {contract.amount ? `${Number(contract.amount).toFixed(2)} €` : '-'}
+              {contract.amount ? formatEuro(contract.amount) : '-'}
             </p>
           </div>
           <div>
@@ -552,6 +558,44 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             Supprimer le contrat
           </button>
         </div>
+      )}
+
+      {/* Section Devis */}
+      {clientQuotes.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <ClipboardList className="w-4 h-4" />
+            Devis ({clientQuotes.length})
+          </h3>
+          <div className="space-y-2">
+            {clientQuotes.map((quote) => (
+              <button
+                key={quote.id}
+                onClick={() => setOpenDevisId(quote.id)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-secondary-200 bg-white hover:border-primary-300 hover:bg-primary-50/50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="w-4 h-4 text-primary-500" />
+                  <div>
+                    <span className="text-sm font-medium text-secondary-900">{quote.quote_number}</span>
+                    {quote.subject && <p className="text-xs text-secondary-500 truncate max-w-[200px]">{quote.subject}</p>}
+                  </div>
+                  <DevisStatusBadge status={quote.status} />
+                </div>
+                <span className="text-sm font-medium text-secondary-900">{formatEuro(quote.total_ttc)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal détail devis */}
+      {openDevisId && (
+        <DevisModal
+          quoteId={openDevisId}
+          onClose={() => setOpenDevisId(null)}
+          onStatusChange={() => {}}
+        />
       )}
 
       <ConfirmDialog

@@ -309,6 +309,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
     if (!activeZone) return [];
     return computedItems.map((item) => ({
       equipmentTypeId: item.equipmentTypeId,
+      equipmentTypeCode: item.equipmentTypeCode,
       zoneId: activeZone.id,
       quantity: item.quantity,
       basePrice: item.basePrice,

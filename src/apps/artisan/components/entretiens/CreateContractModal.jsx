@@ -30,6 +30,7 @@ import { useClientSearch, useDuplicateCheck } from '@hooks/useClients';
 import { useCreateContractWithClient } from '@hooks/useContracts';
 import { usePricingData, usePricingCalculator } from '@hooks/usePricing';
 import { pricingService } from '@services/pricing.service';
+import { contractsService } from '@services/contracts.service';
 import { Step1Client } from './ContractStepClient';
 import { Step2Equipment } from './ContractStepEquipment';
 import { Step3Contract } from './ContractStepSummary';
@@ -252,11 +253,23 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
     // Sauvegarder les lignes tarifaires
     const contractId = result.data?.contract?.id;
+    const resolvedClientId = result.data?.client || result.data?.contract?.client_id;
+
     if (contractId && calculator.hasItems) {
       const itemsToSave = calculator.getItemsForSave();
       const saveResult = await pricingService.saveContractPricingItems(contractId, itemsToSave);
       if (saveResult.error) {
         console.warn('[CreateContractModal] Erreur sauvegarde pricing items:', saveResult.error);
+      }
+
+      // Créer les équipements réels + liens contract_equipments
+      if (resolvedClientId) {
+        const eqResult = await contractsService.createEquipmentsFromPricingItems(
+          contractId, resolvedClientId, itemsToSave
+        );
+        if (eqResult.error) {
+          console.warn('[CreateContractModal] Erreur création équipements:', eqResult.error);
+        }
       }
     }
 

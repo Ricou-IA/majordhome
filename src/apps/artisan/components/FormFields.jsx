@@ -120,7 +120,7 @@ export function TextArea({ value, onChange, placeholder, rows = 3, disabled = fa
  */
 export function SectionTitle({ children }) {
   return (
-    <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider mt-6 mb-3 first:mt-0">
+    <h3 className="text-xs font-bold text-secondary-400 uppercase tracking-widest mt-8 mb-3 pt-4 border-t border-secondary-200 first:mt-0 first:pt-0 first:border-t-0">
       {children}
     </h3>
   );

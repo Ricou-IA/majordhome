@@ -32,6 +32,7 @@ export const RESOURCES = [
   { key: 'territoire', label: 'Territoire' },
   { key: 'cedants',    label: 'Cédants' },
   { key: 'prospection_commerciale', label: 'Prospection' },
+  { key: 'devis',      label: 'Devis' },
   { key: 'settings',   label: 'Paramètres' },
 ];
 

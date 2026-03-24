@@ -123,3 +123,25 @@ export const certificatKeys = {
   all: ['certificats'],
   byIntervention: (interventionId) => [...certificatKeys.all, 'intervention', interventionId],
 };
+
+// --- Suppliers ---
+export const supplierKeys = {
+  all: ['suppliers'],
+  lists: () => [...supplierKeys.all, 'list'],
+  list: (orgId) => [...supplierKeys.lists(), orgId],
+  detail: (id) => [...supplierKeys.all, 'detail', id],
+  products: (supplierId) => [...supplierKeys.all, 'products', supplierId],
+  allProducts: (orgId) => [...supplierKeys.all, 'all-products', orgId],
+  searchProducts: (orgId, query) => [...supplierKeys.all, 'search-products', orgId, query],
+};
+
+// --- Devis (Quotes) ---
+export const devisKeys = {
+  all: ['devis'],
+  lists: () => [...devisKeys.all, 'list'],
+  list: (orgId, filters) => [...devisKeys.lists(), orgId, filters],
+  detail: (id) => [...devisKeys.all, 'detail', id],
+  lines: (quoteId) => [...devisKeys.all, 'lines', quoteId],
+  byLead: (leadId) => [...devisKeys.all, 'byLead', leadId],
+  byClient: (clientId) => [...devisKeys.all, 'byClient', clientId],
+};

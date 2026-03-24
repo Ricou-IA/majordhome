@@ -76,11 +76,14 @@ export function formatPhoneNumber(value) {
 // 1234.5 → "1 235 €"
 export function formatEuro(amount) {
   if (!amount && amount !== 0) return '-';
+  const n = parseFloat(amount);
+  const hasDecimals = n % 1 !== 0;
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(amount);
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0,
+  }).format(n);
 }
 
 // "09:00" + 60 → "10:00"

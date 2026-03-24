@@ -304,12 +304,79 @@ export const contractsService = {
       return { success: false, error };
     }
   },
+  /**
+   * Crée les équipements réels + liens contract_equipments à partir des pricing items sélectionnés.
+   * Appelé après création du contrat pour alimenter la section "Équipements sous contrat".
+   * @param {string} contractId
+   * @param {string} clientId
+   * @param {Array} pricingItems - [{ equipmentTypeId, equipmentTypeCode, label, quantity }]
+   */
+  async createEquipmentsFromPricingItems(contractId, clientId, pricingItems) {
+    try {
+      if (!contractId || !clientId || !pricingItems?.length) return { data: null, error: null };
+
+      // Récupérer project_id du client
+      const { data: client, error: clientError } = await supabase
+        .from('majordhome_clients')
+        .select('project_id, org_id')
+        .eq('id', clientId)
+        .single();
+
+      if (clientError) throw clientError;
+
+      const equipmentIds = [];
+
+      for (const item of pricingItems) {
+        const qty = item.quantity || 1;
+        for (let i = 0; i < qty; i++) {
+          // Créer l'équipement
+          const { data: eq, error: eqError } = await supabase
+            .from('majordhome_equipments')
+            .insert({
+              project_id: client.project_id,
+              category: item.equipmentTypeCode || null,
+              equipment_type_id: item.equipmentTypeId || null,
+              contract_status: 'active',
+            })
+            .select('id')
+            .single();
+
+          if (eqError) {
+            console.warn('[contractsService] createEquipmentsFromPricingItems - equipment insert:', eqError);
+            continue;
+          }
+          equipmentIds.push(eq.id);
+        }
+      }
+
+      // Créer les liens contract_equipments
+      if (equipmentIds.length > 0) {
+        const links = equipmentIds.map((eqId) => ({
+          contract_id: contractId,
+          equipment_id: eqId,
+        }));
+        const { error: linkError } = await supabase
+          .from('majordhome_contract_equipments')
+          .insert(links);
+
+        if (linkError) {
+          console.warn('[contractsService] createEquipmentsFromPricingItems - links insert:', linkError);
+        }
+      }
+
+      return { data: equipmentIds, error: null };
+    } catch (error) {
+      console.error('[contractsService] createEquipmentsFromPricingItems:', error);
+      return { data: null, error };
+    }
+  },
+
   // ==========================================================================
   // SIGNATURE
   // ==========================================================================
 
   /**
-   * Invalide la signature d’un contrat (après changement d’équipements).
+   * Invalide la signature d'un contrat (après changement d'équipements).
    * Remet signed_at, signature et PDF à null pour forcer une re-signature.
    */
   async resetContractSignature(contractId) {
@@ -333,6 +400,36 @@ export const contractsService = {
       return { data, error: null };
     } catch (error) {
       console.error('[contractsService] resetContractSignature:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Enregistre un contrat signé papier (upload scan/photo) — met à jour le PDF path + signed_at
+   */
+  async uploadSignedContract(contractId, pdfPath, signataireNom = null) {
+    try {
+      if (!contractId) throw new Error('[contractsService] contractId requis');
+
+      const now = new Date().toISOString();
+      const updateData = {
+        contract_pdf_path: pdfPath,
+        signed_at: now,
+        updated_at: now,
+      };
+      if (signataireNom) updateData.signature_client_nom = signataireNom;
+
+      const { data, error } = await supabase
+        .from('majordhome_contracts_write')
+        .update(updateData)
+        .eq('id', contractId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[contractsService] uploadSignedContract:', error);
       return { data: null, error };
     }
   },
