@@ -32,6 +32,7 @@ import {
   Wrench,
   Calendar,
   CheckCircle2,
+  Archive,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -179,6 +180,12 @@ export default function Entretiens() {
   // Stats contrats (onglet Dashboard)
   const { stats: contractStats, isLoading: contractStatsLoading } =
     useContractStats(orgId, currentYear);
+
+  // Nombre de contrats clos (cancelled)
+  const cancelledCount = useMemo(() => {
+    if (!contractStats) return null;
+    return contractStats.closedContracts ?? 0;
+  }, [contractStats]);
 
   // Secteurs (onglet Programmation)
   const { sectors, isLoading: sectorsLoading } = useContractSectors(orgId);
@@ -351,8 +358,7 @@ export default function Entretiens() {
     );
   }
 
-  const totalRealises =
-    (savStats?.entretien_realise ?? 0) + (savStats?.sav_realise ?? 0);
+  // (removed — stats are now direct from savStats)
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -382,26 +388,26 @@ export default function Entretiens() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           icon={Calendar}
-          label="Entretiens à planifier"
-          value={savStatsLoading ? '...' : (savStats?.entretien_a_planifier ?? 0)}
+          label="Entretiens à faire"
+          value={savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0)}
           color="blue"
         />
         <StatCard
           icon={Wrench}
-          label="SAV en cours"
+          label="SAV gérés"
           value={savStatsLoading ? '...' : (savStats?.sav_en_cours ?? 0)}
           color="orange"
         />
         <StatCard
           icon={Clock}
           label="Planifiés"
-          value={savStatsLoading ? '...' : (savStats?.total_planifie ?? 0)}
+          value={savStatsLoading ? '...' : (savStats?.entretien_planifie ?? 0)}
           color="violet"
         />
         <StatCard
           icon={CheckCircle2}
           label="Réalisés"
-          value={savStatsLoading ? '...' : totalRealises}
+          value={savStatsLoading ? '...' : (savStats?.entretien_realise ?? 0)}
           color="emerald"
         />
       </div>
@@ -429,6 +435,23 @@ export default function Entretiens() {
           <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
             <BarChart3 className="h-4 w-4" />
             Dashboard
+          </TabsTrigger>
+          <TabsTrigger
+            value="clos"
+            className="gap-2 data-[state=active]:bg-white"
+            onClick={(e) => {
+              e.preventDefault();
+              setFilters({ search: '', status: 'cancelled', visitStatus: '' });
+              setActiveTab('contrats');
+            }}
+          >
+            <Archive className="h-4 w-4" />
+            Clos
+            {cancelledCount != null && (
+              <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                {cancelledCount}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 

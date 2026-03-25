@@ -68,16 +68,15 @@ export function ContractCard({ contract, onClick, selected = false }) {
     amount,
     status,
     source,
-    next_maintenance_date,
+    current_year_visit_status,
   } = contract;
 
   // Adresse formatée (rue séparée du CP + ville)
   const streetAddress = client_address || null;
   const cityLine = [client_postal_code, client_city].filter(Boolean).join(', ');
 
-  // Statut visite calculé depuis next_maintenance_date
-  const visitStatus =
-    next_maintenance_date && new Date(next_maintenance_date) > new Date() ? 'completed' : 'pending';
+  // Statut visite basé sur current_year_visit_status (visite année en cours)
+  const visitStatus = current_year_visit_status === 'completed' ? 'completed' : 'pending';
 
   const formatAmount = (n) => {
     if (!n && n !== 0) return null;

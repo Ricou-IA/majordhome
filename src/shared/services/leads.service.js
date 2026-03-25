@@ -178,7 +178,7 @@ export const leadsService = {
 
       const { data, error } = await supabase
         .from('majordhome_commercials')
-        .select('id, full_name, email, zone, profile_id, is_active')
+        .select('id, full_name, email, zone, profile_id, is_active, app_role')
         .eq('org_id', orgId)
         .eq('is_active', true)
         .order('full_name');

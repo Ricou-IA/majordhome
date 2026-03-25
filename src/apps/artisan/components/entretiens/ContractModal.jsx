@@ -167,10 +167,8 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const isLoading = loadingContract || (!contract && !!contractId);
   const currentYear = new Date().getFullYear();
 
-  // Statut visite calculé depuis next_maintenance_date
-  const isVisitDone = contract?.next_maintenance_date
-    ? new Date(contract.next_maintenance_date) > new Date()
-    : false;
+  // Statut visite basé sur current_year_visit_status (visite année en cours)
+  const isVisitDone = contract?.current_year_visit_status === 'completed';
   const visitStatus = isVisitDone ? 'completed' : 'pending';
 
   // Label statut

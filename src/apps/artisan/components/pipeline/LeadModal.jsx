@@ -64,7 +64,7 @@ import { devisService } from '@services/devis.service';
  */
 export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false }) {
   const isEditing = !!leadId;
-  const { organization, user } = useAuth();
+  const { organization, user, effectiveRole } = useAuth();
   const { can, canEdit, isOwner } = useCanAccess();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -94,6 +94,22 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     appointment_date: '', quote_sent_date: '', won_date: '',
     email_sent: false,
   });
+
+  // Commercial par défaut à la création :
+  // - Commercial/team_leader → lui-même (match profile_id)
+  // - Admin → le team_leader (responsable commercial)
+  const defaultCommercialId = useMemo(() => {
+    if (!commercials.length || !userId) return '';
+    // Si le user est dans la liste des commerciaux → lui-même
+    const self = commercials.find((c) => c.profile_id === userId);
+    if (self) return self.id;
+    // Admin : assigner au team_leader (responsable)
+    if (effectiveRole === 'org_admin') {
+      const leader = commercials.find((c) => c.app_role === 'team_leader');
+      if (leader) return leader.id;
+    }
+    return '';
+  }, [commercials, userId, effectiveRole]);
 
   const [showConvertConfirm, setShowConvertConfirm] = useState(false);
   const [linkedClient, setLinkedClient] = useState(null);
@@ -171,7 +187,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         first_name: '', last_name: '', company_name: '',
         email: '', phone: '', phone_secondary: '',
         address: '', address_complement: '', postal_code: '', city: '',
-        source_id: '', status_id: defaultStatus?.id || '', assigned_user_id: '',
+        source_id: '', status_id: defaultStatus?.id || '', assigned_user_id: defaultCommercialId,
         equipment_type_id: '', order_amount_ht: '', estimated_revenue: '',
         probability: '50', next_action: '', next_action_date: '',
         notes: '', lost_reason: '',
@@ -180,6 +196,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isEditing, lead]);
+
+  // Appliquer le commercial par défaut quand la liste se charge (mode création uniquement)
+  useEffect(() => {
+    if (isOpen && !isEditing && defaultCommercialId && !form.assigned_user_id) {
+      setForm((prev) => ({ ...prev, assigned_user_id: defaultCommercialId }));
+    }
+  }, [isOpen, isEditing, defaultCommercialId]);
 
   // Auto-schedule : ouvrir directement le SchedulingPanel après chargement du lead
   useEffect(() => {

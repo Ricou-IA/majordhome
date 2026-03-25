@@ -133,41 +133,73 @@ export const savService = {
     if (!orgId) throw new Error('[sav] orgId requis');
 
     try {
-      const { data, error } = await supabase
+      // 1) Contrats actifs avec statut visite année en cours
+      const { data: contracts, error: contractsError } = await supabase
+        .from('majordhome_contracts')
+        .select('id, current_year_visit_status')
+        .eq('org_id', orgId)
+        .eq('status', 'active');
+
+      if (contractsError) {
+        console.error('[sav] getStats contracts error:', contractsError);
+        return { data: null, error: contractsError };
+      }
+
+      // 2) Interventions kanban (entretiens + SAV) pour l'année en cours
+      const { data: interventions, error: intError } = await supabase
         .from('majordhome_entretien_sav')
-        .select('intervention_type, workflow_status')
+        .select('intervention_type, workflow_status, contract_id')
         .eq('org_id', orgId);
 
-      if (error) {
-        console.error('[sav] getStats error:', error);
-        return { data: null, error };
+      if (intError) {
+        console.error('[sav] getStats interventions error:', intError);
+        return { data: null, error: intError };
       }
 
-      const items = data || [];
-      const stats = {
-        entretien_a_planifier: 0,
-        entretien_planifie: 0,
-        entretien_realise: 0,
-        sav_demande: 0,
-        sav_pieces_commandees: 0,
-        sav_devis_envoye: 0,
-        sav_planifie: 0,
-        sav_realise: 0,
-        sav_en_cours: 0, // total SAV non réalisés
-        total_planifie: 0, // entretien + SAV planifiés
-      };
+      const items = interventions || [];
+      const allContracts = contracts || [];
+
+      // Set des contrats ayant un entretien planifié (non réalisé) dans le kanban
+      const plannedContractIds = new Set();
+      let savCount = 0;
+      let entretienPlanifie = 0;
 
       for (const item of items) {
-        const key = `${item.intervention_type}_${item.workflow_status}`;
-        if (key in stats) stats[key]++;
-
-        if (item.intervention_type === 'sav' && item.workflow_status !== 'realise') {
-          stats.sav_en_cours++;
+        if (item.intervention_type === 'sav') {
+          // Tout SAV dans le kanban compte (géré cette année)
+          savCount++;
         }
-        if (item.workflow_status === 'planifie') {
-          stats.total_planifie++;
+        if (item.intervention_type === 'entretien' && item.workflow_status === 'planifie') {
+          entretienPlanifie++;
+          if (item.contract_id) plannedContractIds.add(item.contract_id);
+        }
+        if (item.intervention_type === 'entretien' && item.workflow_status === 'a_planifier') {
+          if (item.contract_id) plannedContractIds.add(item.contract_id);
         }
       }
+
+      // Compteurs basés sur les contrats
+      let entretienRealise = 0;
+      let entretienAFaire = 0;
+
+      for (const c of allContracts) {
+        if (c.current_year_visit_status === 'completed') {
+          entretienRealise++;
+        } else {
+          // Pas de visite cette année → à faire
+          // Si pas dans le kanban → "à faire" (non planifié)
+          if (!plannedContractIds.has(c.id)) {
+            entretienAFaire++;
+          }
+        }
+      }
+
+      const stats = {
+        entretien_a_faire: entretienAFaire,       // Contrats sans visite ET sans entretien planifié
+        entretien_planifie: entretienPlanifie,     // Entretiens dans le kanban en statut planifié
+        entretien_realise: entretienRealise,       // Contrats avec visite complétée cette année
+        sav_en_cours: savCount,                    // Nombre total de SAV gérés cette année
+      };
 
       return { data: stats, error: null };
     } catch (err) {

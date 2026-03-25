@@ -279,9 +279,8 @@ export const entretiensService = {
         sectors[cp].contracts.push(contract);
         sectors[cp].totalContracts++;
 
-        // Basé sur next_maintenance_date : passé = à faire, futur = fait
-        const nextDate = contract.next_maintenance_date;
-        if (nextDate && new Date(nextDate) > new Date()) {
+        // Basé sur current_year_visit_status : visite enregistrée cette année = fait
+        if (contract.current_year_visit_status === 'completed') {
           sectors[cp].visitsDone++;
         } else {
           sectors[cp].visitsPending++;

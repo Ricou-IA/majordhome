@@ -144,10 +144,9 @@ function SectorContracts({
         {contracts.map((contract) => {
           const isAlreadyPlanned = plannedContractIds?.has(contract.id) ?? false;
 
-          // Statut visite calculé depuis next_maintenance_date
+          // Statut visite : basé sur current_year_visit_status (visite année en cours)
           const visitStatus =
-            contract.next_maintenance_date &&
-            new Date(contract.next_maintenance_date) > new Date()
+            contract.current_year_visit_status === 'completed'
               ? 'completed'
               : 'pending';
 
@@ -254,9 +253,7 @@ export function SectorGroupView({
           (c) => c.maintenance_month === monthValue,
         );
         const visitsDone = filtered.filter(
-          (c) =>
-            c.next_maintenance_date &&
-            new Date(c.next_maintenance_date) > new Date(),
+          (c) => c.current_year_visit_status === 'completed',
         ).length;
 
         return {
