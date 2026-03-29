@@ -19,7 +19,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getAppointmentTypeConfig } from '@/shared/services/appointments.service';
+import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================

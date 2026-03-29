@@ -10,7 +10,7 @@
 
 import { MapPin, Calendar } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
-import { getChantierStatusConfig } from '@/shared/services/chantiers.service';
+import { getChantierStatusConfig } from '@services/chantiers.service';
 
 function formatShortDate(dateStr) {
   if (!dateStr) return null;

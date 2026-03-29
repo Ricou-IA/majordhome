@@ -141,7 +141,6 @@ export default function Territoire() {
   // ========================================================================
 
   const handlePointClick = useCallback((point) => {
-    console.log('[Territoire] Point cliqué:', point);
   }, []);
 
   const handleZoneClick = useCallback(() => {

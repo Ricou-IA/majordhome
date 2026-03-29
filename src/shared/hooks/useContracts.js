@@ -11,14 +11,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { contractsService } from '@/shared/services/contracts.service';
-import { savService } from '@/shared/services/sav.service';
-import { entretiensService } from '@/shared/services/entretiens.service';
-import { clientsService } from '@/shared/services/clients.service';
-import { contractKeys, clientKeys, interventionKeys, entretienSavKeys } from '@/shared/hooks/cacheKeys';
+import { contractsService } from '@services/contracts.service';
+import { savService } from '@services/sav.service';
+import { entretiensService } from '@services/entretiens.service';
+import { clientsService } from '@services/clients.service';
+import { contractKeys, clientKeys, interventionKeys, entretienSavKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { contractKeys } from '@/shared/hooks/cacheKeys';
+export { contractKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useClientContract (contrat d'un client, 1:1)
@@ -72,6 +72,17 @@ export function useClientContract(clientId) {
     },
   });
 
+  // Mutation clôture
+  const closeMutation = useMutation({
+    mutationFn: ({ contractId: cId, reason }) => contractsService.closeContract(cId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(clientId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+    },
+  });
+
   // Mutation suppression
   const deleteMutation = useMutation({
     mutationFn: (contractId) => contractsService.deleteContract(contractId),
@@ -118,6 +129,18 @@ export function useClientContract(clientId) {
     [deleteMutation]
   );
 
+  const closeContract = useCallback(
+    async (contractId, reason) => {
+      try {
+        const result = await closeMutation.mutateAsync({ contractId, reason });
+        return result;
+      } catch (err) {
+        return { data: null, error: err };
+      }
+    },
+    [closeMutation]
+  );
+
   return {
     contract,
     isLoading,
@@ -126,6 +149,8 @@ export function useClientContract(clientId) {
     isCreating: createMutation.isPending,
     updateContract,
     isUpdating: updateMutation.isPending,
+    closeContract,
+    isClosing: closeMutation.isPending,
     deleteContract,
     isDeleting: deleteMutation.isPending,
     refresh: refetch,
@@ -401,7 +426,7 @@ export function useContractMutations() {
       queryClient.invalidateQueries({ queryKey: contractKeys.stats(variables.orgId, variables.year) });
       // Cascade crée une intervention → invalider le cache interventions
       queryClient.invalidateQueries({ queryKey: interventionKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all });
     },
   });
 
@@ -460,7 +485,6 @@ export function useCreateContractWithClient() {
 
       // Étape 1 : Créer le client si besoin
       if (!clientId && newClientData) {
-        console.log('[useCreateContractWithClient] Création nouveau client...');
         const clientResult = await clientsService.createClient({
           orgId,
           lastName: newClientData.lastName,
@@ -484,7 +508,6 @@ export function useCreateContractWithClient() {
         }
 
         clientId = clientResult.data.id;
-        console.log('[useCreateContractWithClient] Client créé:', clientId);
       }
 
       if (!clientId) {
@@ -492,7 +515,6 @@ export function useCreateContractWithClient() {
       }
 
       // Étape 2 : Créer le contrat
-      console.log('[useCreateContractWithClient] Création contrat pour client:', clientId);
       const contractResult = await contractsService.createContract({
         orgId,
         clientId,
@@ -530,10 +552,8 @@ export function useCreateContractWithClient() {
             scheduledDate: null,
             createdBy: userId,
           });
-          console.log('[useCreateContractWithClient] Entretien à planifier créé');
         } catch (entretienErr) {
           // Non bloquant : le contrat est créé même si l'entretien échoue
-          console.warn('[useCreateContractWithClient] Erreur création entretien:', entretienErr);
         }
       }
 

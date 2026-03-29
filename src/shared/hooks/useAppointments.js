@@ -9,12 +9,12 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { appointmentsService } from '@/shared/services/appointments.service';
+import { appointmentsService } from '@services/appointments.service';
 import { supabase } from '@/lib/supabaseClient';
-import { appointmentKeys } from '@/shared/hooks/cacheKeys';
+import { appointmentKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { appointmentKeys } from '@/shared/hooks/cacheKeys';
+export { appointmentKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK PRINCIPAL - useAppointments (calendrier)

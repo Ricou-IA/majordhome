@@ -1,4 +1,4 @@
-import { CLIENT_CATEGORIES } from '@/shared/services/clients.service';
+import { CLIENT_CATEGORIES } from '@services/clients.service';
 
 export const ClientCategoryBadge = ({ clientCategory }) => {
   const found = CLIENT_CATEGORIES.find((t) => t.value === clientCategory);

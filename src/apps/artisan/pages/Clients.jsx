@@ -32,9 +32,9 @@ import {
   Archive,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCanAccess } from '@/shared/hooks/usePermissions';
-import { useClients, useClientStats } from '@/shared/hooks/useClients';
-import { CLIENT_CATEGORIES } from '@/shared/services/clients.service';
+import { useCanAccess } from '@hooks/usePermissions';
+import { useClients, useClientStats } from '@hooks/useClients';
+import { CLIENT_CATEGORIES } from '@services/clients.service';
 import { ClientCard, ClientCardSkeleton } from '@/apps/artisan/components/clients/ClientCard';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
 

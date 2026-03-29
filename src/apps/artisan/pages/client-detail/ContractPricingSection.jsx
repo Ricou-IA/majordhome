@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useContractEquipments } from '@hooks/useContracts';
 import { usePricingData } from '@hooks/usePricing';
-import { contractKeys } from '@/shared/hooks/cacheKeys';
+import { contractKeys } from '@hooks/cacheKeys';
 import {
   calculateLineTotal,
   calculateContractTotal,

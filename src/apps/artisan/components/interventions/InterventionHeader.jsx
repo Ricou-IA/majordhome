@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import {
   getInterventionTypeConfig,
   getInterventionStatusConfig,
-} from '@/shared/services/interventions.service';
+} from '@services/interventions.service';
 
 /**
  * @param {Object} props

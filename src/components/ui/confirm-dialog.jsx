@@ -32,6 +32,7 @@ export function ConfirmDialog({
   variant = 'destructive', // 'destructive' | 'default'
   onConfirm,
   loading = false,
+  children,
 }) {
   const confirmButtonClass = variant === 'destructive'
     ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
@@ -57,9 +58,14 @@ export function ConfirmDialog({
           <AlertDialogPrimitive.Title className="text-lg font-semibold text-gray-900">
             {title}
           </AlertDialogPrimitive.Title>
-          <AlertDialogPrimitive.Description className="mt-2 text-sm text-gray-500 leading-relaxed">
-            {description}
-          </AlertDialogPrimitive.Description>
+          {description && (
+            <AlertDialogPrimitive.Description className="mt-2 text-sm text-gray-500 leading-relaxed">
+              {description}
+            </AlertDialogPrimitive.Description>
+          )}
+          {!description && <AlertDialogPrimitive.Description className="sr-only">Confirmation</AlertDialogPrimitive.Description>}
+
+          {children}
 
           <div className="mt-6 flex items-center justify-end gap-3">
             <AlertDialogPrimitive.Cancel

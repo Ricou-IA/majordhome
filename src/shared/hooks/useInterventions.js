@@ -11,11 +11,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { interventionsService } from '@/shared/services/interventions.service';
-import { interventionKeys } from '@/shared/hooks/cacheKeys';
+import { interventionsService } from '@services/interventions.service';
+import { interventionKeys, clientKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { interventionKeys } from '@/shared/hooks/cacheKeys';
+export { interventionKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useProjectInterventions (liste par projet/client)
@@ -72,7 +72,7 @@ export function useCreateIntervention() {
         queryKey: interventionKeys.byProject(variables.projectId),
       });
       // Invalider le détail client (il charge aussi les interventions)
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all });
     },
   });
 
@@ -144,7 +144,11 @@ export function useInterventionFileUrls(intervention) {
     refetch,
   } = useQuery({
     queryKey: interventionKeys.fileUrls(intervention?.id),
-    queryFn: () => interventionsService.getInterventionFileUrls(intervention),
+    queryFn: async () => {
+      const { data, error } = await interventionsService.getInterventionFileUrls(intervention);
+      if (error) throw error;
+      return data;
+    },
     enabled: !!intervention?.id,
     staleTime: 55 * 60 * 1000, // 55min (URLs signées valables 1h)
   });

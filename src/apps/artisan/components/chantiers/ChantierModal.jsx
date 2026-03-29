@@ -17,10 +17,10 @@ import {
   CHANTIER_STATUSES,
   CHANTIER_TRANSITIONS,
   getChantierStatusConfig,
-} from '@/shared/services/chantiers.service';
-import { interventionsService } from '@/shared/services/interventions.service';
-import { useChantierMutations, useInterventionSlots } from '@/shared/hooks/useChantiers';
-import { useTeamMembers } from '@/shared/hooks/useAppointments';
+} from '@services/chantiers.service';
+import { interventionsService } from '@services/interventions.service';
+import { useChantierMutations, useInterventionSlots } from '@hooks/useChantiers';
+import { useTeamMembers } from '@hooks/useAppointments';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
 import { ChantierOrderSection } from './ChantierOrderSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';

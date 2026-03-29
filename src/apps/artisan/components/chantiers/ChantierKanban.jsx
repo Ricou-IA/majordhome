@@ -1,85 +1,29 @@
 /**
  * ChantierKanban.jsx - Majord'home Artisan
  * ============================================================================
- * Board kanban 5 colonnes pour le suivi des chantiers.
- * Pas de drag & drop en Phase 1 (transitions via boutons dans la modale).
+ * Board kanban pour le suivi des chantiers.
+ * Utilise le composant générique KanbanBoard.
  *
- * @version 1.1.0 - Sprint 6 Chantiers
+ * @version 2.0.0 - Refactoring KanbanBoard
  * ============================================================================
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { Loader2, RefreshCw, Search, X } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
-import { useChantiers } from '@/shared/hooks/useChantiers';
-import { useLeadCommercials } from '@/shared/hooks/useLeads';
-import { CHANTIER_STATUSES } from '@/shared/services/chantiers.service';
+import { useChantiers } from '@hooks/useChantiers';
+import { useLeadCommercials } from '@hooks/useLeads';
+import { CHANTIER_STATUSES } from '@services/chantiers.service';
+import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { ChantierCard } from './ChantierCard';
 import { ChantierModal } from './ChantierModal';
 
 // ============================================================================
-// SOUS-COMPOSANTS
-// ============================================================================
-
-function KanbanColumn({ status, chantiers, onChantierClick, commercialsMap }) {
-  const count = chantiers.length;
-  const totalAmount = chantiers.reduce(
-    (sum, c) => sum + (Number(c.order_amount_ht) || Number(c.estimated_revenue) || 0),
-    0,
-  );
-
-  return (
-    <div className="flex flex-col bg-gray-50 rounded-xl min-w-0 flex-1 border border-gray-200">
-      {/* Header colonne */}
-      <div className="px-3 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: status.color }}
-            />
-            <h3 className="font-semibold text-sm text-gray-800 truncate">
-              {status.label}
-            </h3>
-          </div>
-          <span className="text-xs font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-            {count}
-          </span>
-        </div>
-        <p className={`text-xs mt-1 ${totalAmount > 0 ? 'text-gray-500' : 'text-gray-300'}`}>
-          {new Intl.NumberFormat('fr-FR', {
-            style: 'currency',
-            currency: 'EUR',
-            minimumFractionDigits: 0,
-          }).format(totalAmount)}
-        </p>
-      </div>
-
-      {/* Liste cartes */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px] max-h-[calc(100vh-280px)]">
-        {chantiers.map((chantier) => (
-          <ChantierCard
-            key={chantier.id}
-            chantier={chantier}
-            onClick={onChantierClick}
-            commercialsMap={commercialsMap}
-          />
-        ))}
-
-        {count === 0 && (
-          <p className="text-xs text-gray-400 text-center py-6 italic">
-            Aucun chantier
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
+
+const TECHNICIEN_STATUSES = ['planification', 'realise'];
 
 export function ChantierKanban() {
   const { organization, user } = useAuth();
@@ -102,83 +46,50 @@ export function ChantierKanban() {
     return map;
   }, [commercials]);
 
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedChantier, setSelectedChantier] = useState(null);
-
-  // Permissions : can edit chantiers (pas edit_own seulement)
   const canEdit = can('chantiers', 'edit');
 
-  // Technicien : voit seulement planification + réalisé
-  const TECHNICIEN_STATUSES = ['planification', 'realise'];
-
   // Colonnes visibles selon le rôle
-  const visibleStatuses = useMemo(() => {
-    if (effectiveRole === 'technicien') {
-      return CHANTIER_STATUSES.filter(
-        (s) => TECHNICIEN_STATUSES.includes(s.value),
-      );
-    }
-    // Tous les autres rôles voient toutes les colonnes (sauf facture, déjà filtré)
-    return CHANTIER_STATUSES.filter((s) => s.value !== 'facture');
+  const visibleColumns = useMemo(() => {
+    const statuses = effectiveRole === 'technicien'
+      ? CHANTIER_STATUSES.filter((s) => TECHNICIEN_STATUSES.includes(s.value))
+      : CHANTIER_STATUSES.filter((s) => s.value !== 'facture');
+    return statuses.map((s) => ({ id: s.value, label: s.label, color: s.color }));
   }, [effectiveRole]);
 
-  // Filtrer côté client : scope par rôle + recherche texte
-  const filteredChantiers = useMemo(() => {
+  // Filtrer par rôle avant de passer au KanbanBoard
+  const roleFilteredChantiers = useMemo(() => {
     let result = chantiers;
-
-    // Commercial : voir uniquement ses propres chantiers
     if (effectiveRole === 'commercial' && user?.id) {
       result = result.filter((c) => c.assigned_user_id === user.id);
     }
-
-    // Technicien : voir uniquement planification + réalisé
     if (effectiveRole === 'technicien') {
       result = result.filter((c) => TECHNICIEN_STATUSES.includes(c.chantier_status));
     }
-
-    // Recherche texte
-    if (searchTerm.trim()) {
-      const term = searchTerm.trim().toLowerCase();
-      result = result.filter((c) => {
-        const fields = [
-          c.first_name,
-          c.last_name,
-          c.postal_code,
-          c.city,
-          c.equipment_type_label,
-        ];
-        return fields.some((f) => f && f.toLowerCase().includes(term));
-      });
-    }
-
     return result;
-  }, [chantiers, searchTerm, effectiveRole, user?.id]);
+  }, [chantiers, effectiveRole, user?.id]);
 
-  // Grouper par statut
-  const columnData = useMemo(() => {
-    const map = {};
-    for (const status of CHANTIER_STATUSES) {
-      map[status.value] = [];
-    }
-    for (const chantier of filteredChantiers) {
-      if (map[chantier.chantier_status]) {
-        map[chantier.chantier_status].push(chantier);
-      }
-    }
-    return map;
-  }, [filteredChantiers]);
-
-  const handleChantierClick = useCallback((chantier) => {
-    setSelectedChantier(chantier);
+  const searchFilter = useCallback((chantier, query) => {
+    const term = query.toLowerCase();
+    const fields = [
+      chantier.first_name, chantier.last_name,
+      chantier.postal_code, chantier.city,
+      chantier.equipment_type_label,
+    ];
+    return fields.some((f) => f && f.toLowerCase().includes(term));
   }, []);
 
-  const handleModalClose = useCallback(() => {
-    setSelectedChantier(null);
-  }, []);
+  const columnAmount = useCallback((items) =>
+    items.reduce((sum, c) => sum + (Number(c.order_amount_ht) || Number(c.estimated_revenue) || 0), 0),
+  []);
 
-  const handleUpdated = useCallback(() => {
-    refresh();
-  }, [refresh]);
+  const renderCard = useCallback((chantier) => (
+    <ChantierCard
+      chantier={chantier}
+      onClick={setSelectedChantier}
+      commercialsMap={commercialsMap}
+    />
+  ), [commercialsMap]);
 
   if (isLoading) {
     return (
@@ -189,68 +100,36 @@ export function ChantierKanban() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {searchTerm.trim()
-            ? `${filteredChantiers.length} / ${chantiers.length} chantier${chantiers.length !== 1 ? 's' : ''}`
-            : `${chantiers.length} chantier${chantiers.length !== 1 ? 's' : ''}`}
-        </p>
-        <div className="flex items-center gap-2">
-          {/* Recherche */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-[220px] pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors min-h-[40px]"
-              placeholder="Rechercher un chantier..."
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          <button
-            onClick={refresh}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Rafraîchir"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Board kanban */}
-      <div className="flex gap-3 pb-4">
-        {visibleStatuses.map((status) => (
-          <KanbanColumn
-            key={status.value}
-            status={status}
-            chantiers={columnData[status.value] || []}
-            onChantierClick={handleChantierClick}
-            commercialsMap={commercialsMap}
-          />
-        ))}
-      </div>
-
-      {/* Modale chantier */}
+    <KanbanBoard
+      items={roleFilteredChantiers}
+      columns={visibleColumns}
+      groupBy="chantier_status"
+      renderCard={renderCard}
+      onCardClick={setSelectedChantier}
+      searchPlaceholder="Rechercher un chantier..."
+      searchFilter={searchFilter}
+      columnAmount={columnAmount}
+      emptyMessage="Aucun chantier"
+      headerRight={
+        <button
+          onClick={refresh}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Rafraîchir"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
+      }
+    >
       {selectedChantier && (
         <ChantierModal
           chantier={selectedChantier}
-          onClose={handleModalClose}
-          onUpdated={handleUpdated}
+          onClose={() => setSelectedChantier(null)}
+          onUpdated={refresh}
           effectiveRole={effectiveRole}
           canEditAll={canEdit}
         />
       )}
-    </div>
+    </KanbanBoard>
   );
 }
 

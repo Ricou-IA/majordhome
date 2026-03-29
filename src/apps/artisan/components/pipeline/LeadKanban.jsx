@@ -1,20 +1,20 @@
 /**
  * LeadKanban.jsx - Majord'home Artisan
  * ============================================================================
- * Vue kanban des leads par statut avec drag & drop (@hello-pangea/dnd).
- * Chaque colonne = un statut du pipeline.
+ * Vue kanban des leads par statut avec drag & drop.
+ * Utilise le composant générique KanbanBoard.
  *
- * @version 1.0.0 - Sprint 4 Pipeline Commercial
+ * @version 2.0.0 - Refactored to use KanbanBoard
  * ============================================================================
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, Search } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@/shared/hooks/useLeads';
-import { leadsService } from '@/shared/services/leads.service';
+import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@hooks/useLeads';
+import { leadsService } from '@services/leads.service';
+import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LeadCard } from './LeadCard';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
@@ -106,87 +106,6 @@ function MonthFilterDropdown({ value, onChange }) {
 }
 
 // ============================================================================
-// SOUS-COMPOSANTS
-// ============================================================================
-
-/**
- * Colonne kanban pour un statut donné
- */
-function KanbanColumn({ status, leads, onLeadClick, provided, isDraggingOver, commercialsMap }) {
-  const count = leads.length;
-  const totalAmount = leads.reduce(
-    (sum, l) => sum + (Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0),
-    0,
-  );
-
-  return (
-    <div
-      className={`
-        flex flex-col bg-gray-50 rounded-xl min-w-0 flex-1 basis-0
-        border transition-colors
-        ${isDraggingOver ? 'border-blue-300 bg-blue-50/50' : 'border-gray-200'}
-      `}
-    >
-      {/* Header colonne */}
-      <div className="px-3 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: status.color }}
-            />
-            <h3 className="font-semibold text-sm text-gray-800 truncate">
-              {status.label}
-            </h3>
-          </div>
-          <span className="text-xs font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-            {count}
-          </span>
-        </div>
-        <p className={`text-xs mt-1 ${totalAmount > 0 ? 'text-gray-500' : 'text-gray-300'}`}>
-          {new Intl.NumberFormat('fr-FR', {
-            style: 'currency',
-            currency: 'EUR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-          }).format(totalAmount)}
-        </p>
-      </div>
-
-      {/* Zone droppable */}
-      <div
-        ref={provided.innerRef}
-        {...provided.droppableProps}
-        className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px] max-h-[calc(100vh-280px)]"
-      >
-        {leads.map((lead, index) => (
-          <Draggable key={lead.id} draggableId={lead.id} index={index}>
-            {(dragProvided, snapshot) => (
-              <div
-                ref={dragProvided.innerRef}
-                {...dragProvided.draggableProps}
-                {...dragProvided.dragHandleProps}
-                className={`${snapshot.isDragging ? 'opacity-90 rotate-1 shadow-lg' : ''}`}
-              >
-                <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
-              </div>
-            )}
-          </Draggable>
-        ))}
-        {provided.placeholder}
-
-        {/* État vide */}
-        {count === 0 && (
-          <p className="text-xs text-gray-400 text-center py-6 italic">
-            Aucun lead
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
@@ -204,7 +123,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const { commercials } = useLeadCommercials(orgId);
   const { updateLeadStatus } = useLeadMutations();
 
-  // Map { userId → { initials, name, colorIndex } } pour les badges
+  // Map { userId -> { initials, name, colorIndex } } pour les badges
   const commercialsMap = useMemo(() => {
     const map = {};
     commercials.forEach((c, i) => {
@@ -217,7 +136,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     return map;
   }, [commercials]);
 
-  // Résoudre l'ID commercial depuis l'ID auth (dual ID bridge)
+  // Resoudre l'ID commercial depuis l'ID auth (dual ID bridge)
   const myCommercialId = useMemo(() => {
     if (effectiveRole !== 'commercial' || !userId) return null;
     return commercials.find(c => c.profile_id === userId)?.id || null;
@@ -226,12 +145,11 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
 
   // Charger les leads (commercial = les siens uniquement)
   const fetchLeads = useCallback(async () => {
     if (!orgId) return;
-    // Attendre la résolution de l'ID commercial avant de filtrer
+    // Attendre la resolution de l'ID commercial avant de filtrer
     if (effectiveRole === 'commercial' && !myCommercialId) return;
     setIsLoading(true);
     try {
@@ -260,7 +178,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     fetchLeads();
   }, [fetchLeads]);
 
-  // Refetch dédié quand la modale sauvegarde un changement de statut
+  // Refetch dedie quand la modale sauvegarde un changement de statut
   useEffect(() => {
     if (refreshTrigger === 0) return;
     const refetch = async () => {
@@ -285,65 +203,56 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     refetch();
   }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId]);
 
-  // Filtrer les leads côté client (instantané, pas d'appel API)
-  const filteredLeads = useMemo(() => {
-    if (!searchTerm.trim()) return allLeads;
-    const term = searchTerm.trim().toLowerCase();
-    return allLeads.filter((lead) => {
-      const fields = [
-        lead.first_name,
-        lead.last_name,
-        lead.company_name,
-        lead.email,
-        lead.phone,
-        lead.city,
-      ];
-      return fields.some((f) => f && f.toLowerCase().includes(term));
+  // Pre-sort leads by sort_order then updated_at (KanbanBoard preserves order)
+  const sortedLeads = useMemo(() => {
+    return [...allLeads].sort((a, b) => {
+      const oa = a.sort_order || 0;
+      const ob = b.sort_order || 0;
+      if (oa !== ob) return oa - ob;
+      return new Date(b.updated_at) - new Date(a.updated_at);
     });
-  }, [allLeads, searchTerm]);
+  }, [allLeads]);
 
-  // Grouper les leads filtrés par status_id
-  const columnData = useMemo(() => {
-    const map = {};
-    for (const status of statuses) {
-      map[status.id] = {
-        status,
-        leads: [],
-      };
-    }
-    for (const lead of filteredLeads) {
-      if (map[lead.status_id]) {
-        map[lead.status_id].leads.push(lead);
-      }
-    }
-    // Trier les leads dans chaque colonne par sort_order (puis updated_at en fallback)
-    for (const col of Object.values(map)) {
-      col.leads.sort((a, b) => {
-        const oa = a.sort_order || 0;
-        const ob = b.sort_order || 0;
-        if (oa !== ob) return oa - ob;
-        return new Date(b.updated_at) - new Date(a.updated_at);
-      });
-    }
-    return map;
-  }, [statuses, filteredLeads]);
-
-  // Colonnes ordonnées par display_order
-  const orderedStatuses = useMemo(
-    () => [...statuses].sort((a, b) => a.display_order - b.display_order),
+  // Colonnes ordonnees par display_order, mappees au format KanbanBoard
+  const columns = useMemo(
+    () => [...statuses]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ id: s.id, label: s.label, color: s.color })),
     [statuses],
   );
 
-  // État pour le prompt "Perdu" depuis le kanban
+  // Search filter callback for KanbanBoard
+  const searchFilter = useCallback((lead, query) => {
+    const term = query.toLowerCase();
+    const fields = [
+      lead.first_name,
+      lead.last_name,
+      lead.company_name,
+      lead.email,
+      lead.phone,
+      lead.city,
+    ];
+    return fields.some((f) => f && f.toLowerCase().includes(term));
+  }, []);
+
+  // Column amount: sum of order_amount_ht or estimated_revenue
+  const columnAmount = useCallback((items) => {
+    return items.reduce(
+      (sum, l) => sum + (Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0),
+      0,
+    );
+  }, []);
+
+  // Etat pour le prompt "Perdu" depuis le kanban
   const [pendingLost, setPendingLost] = useState(null); // { leadId, newStatusId, oldStatusId }
   const [lostReasonSelect, setLostReasonSelect] = useState('');
   const [lostReasonCustom, setLostReasonCustom] = useState('');
 
-  // État pour le prompt "Contacté" depuis le kanban
+  // Etat pour le prompt "Contacte" depuis le kanban
   const [pendingContact, setPendingContact] = useState(null); // { leadId, newStatusId, oldStatusId }
   const [contactLoading, setContactLoading] = useState(false);
 
-  // État pour le prompt "Devis envoyé" depuis le kanban
+  // Etat pour le prompt "Devis envoye" depuis le kanban
   const [pendingQuote, setPendingQuote] = useState(null); // { leadId, newStatusId, oldStatusId, defaultAmount }
   const [quoteLoading, setQuoteLoading] = useState(false);
 
@@ -358,14 +267,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       const newStatusId = destination.droppableId;
       const oldStatusId = source.droppableId;
 
-      // Réorganisation dans la même colonne — réordonner + persister
+      // Reorganisation dans la meme colonne — reordonner + persister
       if (oldStatusId === newStatusId) {
         setAllLeads((prev) => {
           const colLeads = prev.filter((l) => l.status_id === oldStatusId);
           const others = prev.filter((l) => l.status_id !== oldStatusId);
           const [moved] = colLeads.splice(source.index, 1);
           colLeads.splice(destination.index, 0, moved);
-          // Mettre à jour sort_order localement
+          // Mettre a jour sort_order localement
           const updated = colLeads.map((l, i) => ({ ...l, sort_order: i + 1 }));
           // Persister en DB (fire-and-forget)
           leadsService.reorderLeads(updated.map((l) => l.id)).catch((err) =>
@@ -382,7 +291,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       const allowed = ALLOWED_TRANSITIONS[oldStatus?.label] || [];
 
       if (!allowed.includes(newStatus?.label)) {
-        toast.error(`Transition non autorisée : ${oldStatus?.label} → ${newStatus?.label}`);
+        toast.error(`Transition non autorisee : ${oldStatus?.label} → ${newStatus?.label}`);
         return;
       }
 
@@ -394,20 +303,20 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Si "Contacté", ouvrir la modale d'appel
+      // Si "Contacte", ouvrir la modale d'appel
       if (newStatus?.label === 'Contacté') {
         setPendingContact({ leadId, newStatusId, oldStatusId });
         return;
       }
 
-      // Si "RDV planifié", ouvrir la modale lead avec auto-scheduling
+      // Si "RDV planifie", ouvrir la modale lead avec auto-scheduling
       if (newStatus?.label === 'RDV planifié') {
         const lead = allLeads.find((l) => l.id === leadId);
         if (lead) onLeadClick(lead, { autoSchedule: true });
         return;
       }
 
-      // Si "Devis envoyé", ouvrir la modale devis
+      // Si "Devis envoye", ouvrir la modale devis
       if (newStatus?.label === 'Devis envoyé') {
         const lead = allLeads.find((l) => l.id === leadId);
         setPendingQuote({
@@ -429,20 +338,20 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         fetchLeads();
       } catch (err) {
         console.error('[LeadKanban] drag status error:', err);
-        toast.error('Erreur lors du déplacement');
+        toast.error('Erreur lors du deplacement');
         setAllLeads((prev) =>
           prev.map((l) => (l.id === leadId ? { ...l, status_id: oldStatusId } : l)),
         );
       }
     },
-    [updateLeadStatus, userId, fetchLeads, statuses],
+    [updateLeadStatus, userId, fetchLeads, statuses, allLeads, onLeadClick],
   );
 
   // Confirmer le passage en Perdu avec motif
   const handleConfirmLost = useCallback(async () => {
     const reason = lostReasonSelect === 'Autre' ? lostReasonCustom.trim() : lostReasonSelect;
     if (!pendingLost || !reason) {
-      toast.error('Veuillez sélectionner un motif de perte');
+      toast.error('Veuillez selectionner un motif de perte');
       return;
     }
 
@@ -459,7 +368,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         lostReason: reason,
       });
       fetchLeads();
-      toast.success('Lead marqué comme perdu');
+      toast.success('Lead marque comme perdu');
     } catch (err) {
       console.error('[LeadKanban] lost status error:', err);
       toast.error('Erreur lors du changement de statut');
@@ -469,14 +378,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     }
   }, [pendingLost, lostReasonSelect, lostReasonCustom, updateLeadStatus, userId, fetchLeads]);
 
-  // Confirmer le passage en Contacté avec données d'appel
+  // Confirmer le passage en Contacte avec donnees d'appel
   const handleConfirmContact = useCallback(async (callData) => {
     if (!pendingContact) return;
 
     const { leadId, newStatusId, oldStatusId } = pendingContact;
     setContactLoading(true);
 
-    // Optimistic update — inclut les données d'appel pour affichage immédiat
+    // Optimistic update — inclut les donnees d'appel pour affichage immediat
     setAllLeads((prev) =>
       prev.map((l) => (l.id === leadId ? {
         ...l,
@@ -494,7 +403,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         callDate: callData.date,
       });
       fetchLeads();
-      toast.success('Lead passé en "Contacté"');
+      toast.success('Lead passe en "Contacte"');
     } catch (err) {
       console.error('[LeadKanban] contact status error:', err);
       toast.error('Erreur lors du changement de statut');
@@ -506,14 +415,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     }
   }, [pendingContact, updateLeadStatus, userId, fetchLeads]);
 
-  // Confirmer le passage en Devis envoyé avec montant + date
+  // Confirmer le passage en Devis envoye avec montant + date
   const handleConfirmQuote = useCallback(async (quoteData) => {
     if (!pendingQuote) return;
 
     const { leadId, newStatusId, oldStatusId } = pendingQuote;
     setQuoteLoading(true);
 
-    // Optimistic update — inclut le montant + date pour affichage immédiat sur la carte
+    // Optimistic update — inclut le montant + date pour affichage immediat sur la carte
     setAllLeads((prev) =>
       prev.map((l) => (l.id === leadId ? {
         ...l,
@@ -531,7 +440,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         quoteAmount: quoteData.amount,
       });
       fetchLeads();
-      toast.success('Lead passé en "Devis envoyé"');
+      toast.success('Lead passe en "Devis envoye"');
     } catch (err) {
       console.error('[LeadKanban] quote status error:', err);
       toast.error('Erreur lors du changement de statut');
@@ -552,40 +461,30 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <KanbanBoard
+      items={sortedLeads}
+      columns={columns}
+      groupBy="status_id"
+      renderCard={(lead) => (
+        <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
+      )}
+      onDragEnd={handleDragEnd}
+      searchPlaceholder="Rechercher un lead..."
+      searchFilter={searchFilter}
+      columnAmount={columnAmount}
+      emptyMessage="Aucun lead"
+      headerLeft={
         <p className="text-sm text-gray-500">
-          {searchTerm.trim()
-            ? `${filteredLeads.length} / ${allLeads.length} lead${allLeads.length !== 1 ? 's' : ''}`
-            : `${allLeads.length} lead${allLeads.length !== 1 ? 's' : ''} actif${allLeads.length !== 1 ? 's' : ''}`
-          }
+          {allLeads.length} lead{allLeads.length !== 1 ? 's' : ''} actif{allLeads.length !== 1 ? 's' : ''}
         </p>
-        <div className="flex items-center gap-2">
-          {/* Recherche leads */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-[220px] pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors min-h-[40px]"
-              placeholder="Rechercher un lead..."
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+      }
+      headerRight={
+        <>
           <MonthFilterDropdown value={selectedMonth} onChange={setSelectedMonth} />
           <button
             onClick={fetchLeads}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Rafraîchir"
+            title="Rafraichir"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -598,9 +497,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
               Nouveau lead
             </button>
           )}
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {/* Modale motif de perte */}
       {pendingLost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -627,11 +526,11 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
                 autoFocus
               >
-                <option value="">Sélectionner un motif...</option>
+                <option value="">Selectionner un motif...</option>
                 {LOST_REASONS.map((r) => (
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
-                <option value="Autre">Autre (préciser)</option>
+                <option value="Autre">Autre (preciser)</option>
               </select>
 
               {lostReasonSelect === 'Autre' && (
@@ -640,7 +539,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
                   value={lostReasonCustom}
                   onChange={(e) => setLostReasonCustom(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                  placeholder="Précisez le motif..."
+                  placeholder="Precisez le motif..."
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') { e.preventDefault(); handleConfirmLost(); }
@@ -668,30 +567,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         </div>
       )}
 
-      {/* Board kanban (scroll horizontal) */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-3 pb-4">
-          {orderedStatuses.map((status) => {
-            const col = columnData[status.id] || { status, leads: [] };
-            return (
-              <Droppable key={status.id} droppableId={status.id}>
-                {(provided, snapshot) => (
-                  <KanbanColumn
-                    status={col.status}
-                    leads={col.leads}
-                    onLeadClick={onLeadClick}
-                    provided={provided}
-                    isDraggingOver={snapshot.isDraggingOver}
-                    commercialsMap={commercialsMap}
-                  />
-                )}
-              </Droppable>
-            );
-          })}
-        </div>
-      </DragDropContext>
-
-      {/* Modale d'appel pour transition vers Contacté */}
+      {/* Modale d'appel pour transition vers Contacte */}
       <CallModal
         isOpen={!!pendingContact}
         onClose={() => setPendingContact(null)}
@@ -699,7 +575,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         loading={contactLoading}
       />
 
-      {/* Modale devis pour transition vers Devis envoyé */}
+      {/* Modale devis pour transition vers Devis envoye */}
       <QuoteModal
         isOpen={!!pendingQuote}
         onClose={() => setPendingQuote(null)}
@@ -707,7 +583,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         loading={quoteLoading}
         defaultAmount={pendingQuote?.defaultAmount}
       />
-    </div>
+    </KanbanBoard>
   );
 }
 

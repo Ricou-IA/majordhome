@@ -19,13 +19,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { technicalVisitService } from '@/shared/services/technicalVisit.service';
+import { technicalVisitService } from '@services/technicalVisit.service';
 import {
   useTechnicalVisit,
   useTechnicalVisitPhotos,
   useTechnicalVisitMutations,
-} from '@/shared/hooks/useTechnicalVisit';
-import { useLeadCommercials } from '@/shared/hooks/useLeads';
+} from '@hooks/useTechnicalVisit';
+import { useLeadCommercials } from '@hooks/useLeads';
 import {
   FICHE_STATUS_CONFIG,
   computeVisitStatus,

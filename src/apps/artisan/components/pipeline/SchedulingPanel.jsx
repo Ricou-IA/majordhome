@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { MiniWeekCalendar } from '@apps/artisan/components/planning/MiniWeekCalendar';
 import { TechnicianSelect } from '@apps/artisan/components/planning/TechnicianSelect';
-import { useAppointments } from '@/shared/hooks/useAppointments';
+import { useAppointments } from '@hooks/useAppointments';
 
 // ============================================================================
 // CONSTANTES (défauts pour le mode pipeline)

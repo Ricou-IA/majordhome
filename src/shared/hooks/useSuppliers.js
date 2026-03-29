@@ -7,11 +7,11 @@
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { suppliersService } from '@/shared/services/suppliers.service';
-import { supplierKeys } from '@/shared/hooks/cacheKeys';
+import { suppliersService } from '@services/suppliers.service';
+import { supplierKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { supplierKeys } from '@/shared/hooks/cacheKeys';
+export { supplierKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // FOURNISSEURS

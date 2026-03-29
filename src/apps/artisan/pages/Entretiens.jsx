@@ -243,14 +243,6 @@ export default function Entretiens() {
   // Planifier un contrat → créer entretien « à planifier »
   const handlePlanContract = useCallback(
     async (contract) => {
-      console.log('[Entretiens] handlePlanContract called', {
-        contract_id: contract.id,
-        client_id: contract.client_id,
-        client_project_id: contract.client_project_id,
-        orgId,
-        userId: user?.id,
-      });
-
       if (!contract.client_project_id) {
         toast.error('Projet client introuvable — impossible de programmer');
         return;
@@ -265,7 +257,6 @@ export default function Entretiens() {
           scheduledDate: null,
           createdBy: user?.id,
         });
-        console.log('[Entretiens] createEntretien result:', result);
         if (result.error) {
           console.error('[Entretiens] createEntretien error:', result.error);
           toast.error(`Erreur : ${result.error.message || 'programmation échouée'}`);
@@ -286,13 +277,6 @@ export default function Entretiens() {
   // Planifier tout un secteur (bulk)
   const handlePlanSector = useCallback(
     async (sector) => {
-      console.log('[Entretiens] handlePlanSector called', {
-        sector: sector.codePostal,
-        contractCount: sector.contracts.length,
-        orgId,
-        userId: user?.id,
-      });
-
       setIsPlanning(true);
       let created = 0;
       let errors = 0;

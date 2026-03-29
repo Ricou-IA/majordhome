@@ -38,8 +38,8 @@ import {
   useInterventionFileUrls,
   useInterventionMutations,
   useInterventionDraft,
-} from '@/shared/hooks/useInterventions';
-import { FILE_TYPES } from '@/shared/services/interventions.service';
+} from '@hooks/useInterventions';
+import { FILE_TYPES } from '@services/interventions.service';
 import { PermissionGate } from '@/components/PermissionGate';
 import { CreateSAVModal } from '../components/entretiens/CreateSAVModal';
 import { InterventionHeader } from '../components/interventions/InterventionHeader';

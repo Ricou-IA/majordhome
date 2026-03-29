@@ -62,7 +62,6 @@ async function fetchPostalCodeContours() {
     const res = await fetch(TERRITOIRE_CONFIG.postalCodesUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     _postalCodesCache = await res.json();
-    console.log(`[useMapZones] ${_postalCodesCache.features.length} codes postaux chargés`);
     return _postalCodesCache;
   } catch (e) {
     console.error('[useMapZones] Chargement contours CP échoué:', e);
@@ -156,7 +155,6 @@ function cleanupZone(zone, clipTo) {
     const polygons = geom.coordinates.map(coords => turf.polygon(coords));
     if (polygons.length <= 1) return zone;
 
-    console.log(`[useMapZones] cleanupZone: ${polygons.length} polygones à fusionner`);
 
     // Buffer +500m chaque polygone pour créer des overlaps
     const buffered = polygons
@@ -185,7 +183,6 @@ function cleanupZone(zone, clipTo) {
     // Simplifier
     merged = turf.simplify(merged, { tolerance: 0.001, highQuality: true });
 
-    console.log(`[useMapZones] cleanupZone → ${merged?.geometry?.type}`);
     return merged || zone;
   } catch (e) {
     console.warn('[useMapZones] cleanupZone échoué:', e);
@@ -228,7 +225,6 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
     }
   }
 
-  console.log(`[useMapZones] ${overlapCPs.length} codes postaux dans l'overlap`);
 
   if (overlapCPs.length === 0) {
     return { zoneP: clippedIsoP };
@@ -256,7 +252,6 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
     // Égalité ou erreur → Gaillac (siège, défaut)
   }
 
-  console.log(`[useMapZones] Overlap: ${overlapCPs.length - pechbonnieuCPs.length} CP → Gaillac, ${pechbonnieuCPs.length} CP → Pechbonnieu`);
 
   // 5. Construire la zone Pechbonnieu = exclusive P + CPs assignés à P
   // Zone exclusive Pechbonnieu = clippedIsoP - overlap

@@ -10,10 +10,10 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { certificatsService } from '@services/certificats.service';
-import { certificatKeys } from '@/shared/hooks/cacheKeys';
+import { certificatKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { certificatKeys } from '@/shared/hooks/cacheKeys';
+export { certificatKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // QUERY : Certificat par intervention

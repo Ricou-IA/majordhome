@@ -12,7 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { leadsService } from '@/shared/services/leads.service';
+import { leadsService } from '@services/leads.service';
 
 // ============================================================================
 // CONSTANTES

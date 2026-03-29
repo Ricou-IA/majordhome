@@ -5,20 +5,20 @@ import {
   FileText, Loader2, Save, Plus, X, Settings, Zap,
   ClipboardList, CalendarCheck, CalendarX2,
   Flame, Wind, Thermometer, Fan, Wrench,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, Ban,
 } from 'lucide-react';
-import { useClientContract, useContractEquipments, useContractVisits, useContractMutations } from '@/shared/hooks/useContracts';
-import { usePricingEquipmentTypes, clientKeys } from '@/shared/hooks/useClients';
-import { CONTRACT_STATUSES, MAINTENANCE_MONTHS } from '@/shared/services/contracts.service';
+import { useClientContract, useContractEquipments, useContractVisits, useContractMutations } from '@hooks/useContracts';
+import { usePricingEquipmentTypes, clientKeys } from '@hooks/useClients';
+import { CONTRACT_STATUSES, MAINTENANCE_MONTHS } from '@services/contracts.service';
 import { formatEuro } from '@/lib/utils';
-import { EQUIPMENT_TYPES } from '@/shared/services/clients.service';
+import { EQUIPMENT_TYPES } from '@services/clients.service';
 import { formatDateForInput, formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CreateContractModal } from '@/apps/artisan/components/entretiens/CreateContractModal';
 import { ContractPricingSection } from './ContractPricingSection';
 import { ContractPdfSection } from './ContractPdfSection';
-import { useDevisByClient } from '@/shared/hooks/useDevis';
+import { useDevisByClient } from '@hooks/useDevis';
 import DevisStatusBadge from '@/apps/artisan/components/devis/DevisStatusBadge';
 import DevisModal from '@/apps/artisan/components/devis/DevisModal';
 
@@ -327,6 +327,17 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
+const CANCELLATION_REASONS = [
+  { value: 'demenagement', label: 'Déménagement' },
+  { value: 'concurrent', label: 'Parti chez un concurrent' },
+  { value: 'prix', label: 'Raison tarifaire' },
+  { value: 'insatisfaction', label: 'Insatisfaction service' },
+  { value: 'plus_equipement', label: "N'a plus l'équipement" },
+  { value: 'deces', label: 'Décès' },
+  { value: 'archivage_client', label: 'Client archivé' },
+  { value: 'autre', label: 'Autre' },
+];
+
 export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const {
     contract,
@@ -335,6 +346,8 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
     isCreating,
     updateContract,
     isUpdating,
+    closeContract,
+    isClosing,
     deleteContract,
     isDeleting,
   } = useClientContract(clientId);
@@ -342,6 +355,9 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [contractForm, setContractForm] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeReason, setCloseReason] = useState('');
+  const [closeReasonDetail, setCloseReasonDetail] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [openDevisId, setOpenDevisId] = useState(null);
   const { quotes: clientQuotes, isLoading: loadingQuotes } = useDevisByClient(clientId);
@@ -539,6 +555,17 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
               <p className="mt-1 text-sm text-secondary-600">{contract.notes}</p>
             </div>
           )}
+          {contract.status === 'cancelled' && contract.cancellation_reason && (
+            <div className="md:col-span-3">
+              <p className="text-xs font-medium text-red-500 uppercase tracking-wider">Raison de clôture</p>
+              <p className="mt-1 text-sm text-red-700">
+                {CANCELLATION_REASONS.find((r) => r.value === contract.cancellation_reason)?.label || contract.cancellation_reason}
+                {contract.cancelled_at && (
+                  <span className="text-secondary-500 ml-2">— le {formatDateFR(contract.cancelled_at)}</span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -548,7 +575,17 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
       {!isEditing && <ContractVisitsSection contract={contract} orgId={orgId} userId={userId} />}
 
       {!isEditing && (
-        <div className="pt-4 border-t border-secondary-200">
+        <div className="pt-4 border-t border-secondary-200 flex items-center gap-3">
+          {contract.status !== 'cancelled' && (
+            <button
+              onClick={() => { setCloseReason(''); setCloseReasonDetail(''); setShowCloseModal(true); }}
+              disabled={isClosing}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isClosing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+              Clore le contrat
+            </button>
+          )}
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}
@@ -608,6 +645,60 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
         onConfirm={handleDeleteContract}
         loading={isDeleting}
       />
+
+      {/* Modale clôture contrat */}
+      <ConfirmDialog
+        open={showCloseModal}
+        onOpenChange={setShowCloseModal}
+        title="Clore le contrat"
+        description=""
+        confirmLabel="Clore le contrat"
+        variant="destructive"
+        onConfirm={async () => {
+          const reason = closeReason === 'autre' && closeReasonDetail
+            ? closeReasonDetail
+            : closeReason;
+          if (!reason) {
+            toast.error('Veuillez sélectionner une raison de clôture');
+            return;
+          }
+          const result = await closeContract(contract.id, reason);
+          if (result?.error) {
+            toast.error('Erreur lors de la clôture');
+          } else {
+            toast.success('Contrat clos');
+            setShowCloseModal(false);
+          }
+        }}
+        loading={isClosing}
+      >
+        <div className="space-y-3 mt-2">
+          <p className="text-sm text-secondary-600">
+            Le contrat sera marqué comme clos. Sélectionnez la raison :
+          </p>
+          <div className="space-y-2">
+            {CANCELLATION_REASONS.map((r) => (
+              <label key={r.value} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="close-reason"
+                  checked={closeReason === r.value}
+                  onChange={() => setCloseReason(r.value)}
+                  className="w-4 h-4 text-primary-600 border-secondary-300 focus:ring-primary-500"
+                />
+                <span className="text-sm text-secondary-700">{r.label}</span>
+              </label>
+            ))}
+          </div>
+          {closeReason === 'autre' && (
+            <TextInput
+              value={closeReasonDetail}
+              onChange={(v) => setCloseReasonDetail(v)}
+              placeholder="Précisez la raison..."
+            />
+          )}
+        </div>
+      </ConfirmDialog>
     </div>
   );
 };

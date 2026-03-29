@@ -1,6 +1,6 @@
 import { User, Phone, MapPin, Home, FileText, ExternalLink } from 'lucide-react';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
-import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@/shared/services/clients.service';
+import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/clients.service';
 
 export const TabInfo = ({ formData, setFormData, isLocked }) => {
   const u = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));

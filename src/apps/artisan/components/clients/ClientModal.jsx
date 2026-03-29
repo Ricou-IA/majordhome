@@ -19,9 +19,9 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
-import { useClient } from '@/shared/hooks/useClients';
-import { clientsService } from '@/shared/services/clients.service';
-import { geocodeAndUpdateByProjectId } from '@/shared/services/geocoding.service';
+import { useClient } from '@hooks/useClients';
+import { clientsService } from '@services/clients.service';
+import { geocodeAndUpdateByProjectId } from '@services/geocoding.service';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
 import { TabContrat } from '../../pages/client-detail/TabContrat';
 

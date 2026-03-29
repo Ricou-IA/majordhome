@@ -28,7 +28,7 @@ import {
   useLeadSources,
   useLeadStatuses,
   useLeadCommercials,
-} from '@/shared/hooks/useLeads';
+} from '@hooks/useLeads';
 import { LeadCard, LeadCardSkeleton } from './LeadCard';
 
 // ============================================================================

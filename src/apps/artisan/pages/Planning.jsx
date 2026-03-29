@@ -30,10 +30,10 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCanAccess } from '@/shared/hooks/usePermissions';
-import { useAppointments, useTeamMembers } from '@/shared/hooks/useAppointments';
-import { useLeadCommercials } from '@/shared/hooks/useLeads';
-import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@/shared/services/appointments.service';
+import { useCanAccess } from '@hooks/usePermissions';
+import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
+import { useLeadCommercials } from '@hooks/useLeads';
+import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 
 // ============================================================================

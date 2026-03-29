@@ -18,7 +18,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@/shared/services/contracts.service';
+import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 
 // ============================================================================
 // RÉEXPORT DES CONSTANTES (pour backward-compat des imports)
@@ -46,7 +46,6 @@ export const entretiensService = {
    */
   async getContracts({ orgId, filters = {}, limit = 50, offset = 0 }) {
     try {
-      console.log('[entretiensService] getContracts', { orgId, filters, limit, offset });
 
       let query = supabase
         .from('majordhome_contracts')
@@ -102,7 +101,6 @@ export const entretiensService = {
    */
   async getContractById(contractId) {
     try {
-      console.log('[entretiensService] getContractById', contractId);
 
       const { data, error } = await supabase
         .from('majordhome_contracts')
@@ -131,7 +129,6 @@ export const entretiensService = {
    */
   async updateContract(contractId, updates) {
     try {
-      console.log('[entretiensService] updateContract', contractId, updates);
 
       const updateData = {};
       if (updates.status !== undefined) updateData.status = updates.status;
@@ -173,7 +170,6 @@ export const entretiensService = {
    */
   async getStats(orgId, year) {
     try {
-      console.log('[entretiensService] getStats', { orgId, year });
 
       // Tous les contrats de l'org SAUF archivés (vue enrichie avec current_year_visit_status)
       const { data: contracts, error: contractsError } = await supabase
@@ -236,7 +232,6 @@ export const entretiensService = {
    */
   async getContractsBySector(orgId, { status = 'active' } = {}) {
     try {
-      console.log('[entretiensService] getContractsBySector', { orgId, status });
 
       let query = supabase
         .from('majordhome_contracts')
@@ -308,7 +303,6 @@ export const entretiensService = {
    */
   async getVisitsForContract(contractId) {
     try {
-      console.log('[entretiensService] getVisitsForContract', contractId);
 
       const { data, error } = await supabase
         .from('majordhome_maintenance_visits')
@@ -338,7 +332,6 @@ export const entretiensService = {
    */
   async recordVisit({ contractId, orgId, year, visitDate, status, technicianId, technicianName, notes, userId }) {
     try {
-      console.log('[entretiensService] recordVisit', { contractId, year, visitDate });
 
       // Vérifier si une visite existe déjà pour ce contrat + année
       const { data: existing } = await supabase
@@ -365,7 +358,6 @@ export const entretiensService = {
 
       if (existing?.id) {
         // Mise à jour de la visite existante
-        console.log('[entretiensService] recordVisit → update existing', existing.id);
         ({ data, error } = await supabase
           .from('majordhome_maintenance_visits')
           .update(visitData)
@@ -374,7 +366,6 @@ export const entretiensService = {
           .single());
       } else {
         // Création nouvelle visite
-        console.log('[entretiensService] recordVisit → insert new');
         ({ data, error } = await supabase
           .from('majordhome_maintenance_visits')
           .insert(visitData)
@@ -390,7 +381,6 @@ export const entretiensService = {
       // Cascade : créer automatiquement une intervention si visite "completed"
       if ((status === 'completed') && data) {
         try {
-          console.log('[entretiensService] recordVisit → cascade intervention creation');
 
           // Récupérer project_id via contrat → client
           const { data: contract } = await supabase
@@ -429,7 +419,6 @@ export const entretiensService = {
                   .from('majordhome_maintenance_visits')
                   .update({ intervention_id: intervention.id })
                   .eq('id', data.id);
-                console.log('[entretiensService] cascade → intervention', intervention.id, 'liée à visite', data.id);
               }
             }
           }
@@ -451,7 +440,6 @@ export const entretiensService = {
    */
   async updateVisitStatus(visitId, status, notes) {
     try {
-      console.log('[entretiensService] updateVisitStatus', { visitId, status });
 
       const { data, error } = await supabase
         .from('majordhome_maintenance_visits')
@@ -474,7 +462,7 @@ export const entretiensService = {
       console.error('[entretiensService] updateVisitStatus exception:', error);
       return { data: null, error };
     }
-    },
+  },
 
   // ==========================================================================
   // CONTRAT PDF — Génération via N8N
@@ -593,7 +581,6 @@ export const entretiensService = {
         source: contractData.source || 'app',
       };
 
-      console.log('[entretiensService] triggerContractPdf → payload', payload);
 
       const response = await fetch(webhookUrl, {
         method: 'POST',

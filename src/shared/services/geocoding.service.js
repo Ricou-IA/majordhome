@@ -98,7 +98,6 @@ export async function updateClientCoordinates(clientId, lat, lng) {
 
     if (error) throw error;
 
-    console.log('[geocoding] Coordonnées mises à jour pour client:', clientId);
     return { success: true, error: null };
   } catch (error) {
     console.error('[geocoding] Erreur updateClientCoordinates:', error);
@@ -144,7 +143,6 @@ export async function geocodeAndUpdateByProjectId(projectId, address, postalCode
 
     if (error) throw error;
 
-    console.log('[geocoding] Coordonnées mises à jour via project_id:', projectId);
     return { success: true, error: null };
   } catch (error) {
     console.error('[geocoding] Erreur geocodeAndUpdateByProjectId:', error);
@@ -179,7 +177,6 @@ export async function batchGeocodeClients(clients, onProgress) {
 
       if (!batchOk) {
         // Fallback : géocodage unitaire
-        console.log('[geocoding] CSV échoué, fallback unitaire pour', batch.length, 'clients');
         await fallbackUnitaire(batch, results);
       }
     } catch (error) {
@@ -425,7 +422,6 @@ export async function updateLeadCoordinates(leadId, lat, lng, zone) {
 
     if (error) throw error;
 
-    console.log('[geocoding] Lead coordonnées mises à jour:', leadId, '→ zone:', zone);
     return { success: true, error: null };
   } catch (error) {
     console.error('[geocoding] Erreur updateLeadCoordinates:', error);
@@ -478,7 +474,6 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
   // 1. Géocoder
   const coords = await geocodeLeadAddress(address, postalCode, city);
   if (!coords) {
-    console.log('[geocoding] Lead non géocodable:', leadId);
     return;
   }
 
@@ -507,7 +502,6 @@ export async function geocodeAndAssignLead(leadId, address, postalCode, city) {
             p_updates: { assigned_user_id: commercial.id },
           });
 
-          console.log(`[geocoding] Lead ${leadId} → zone ${zone} → commercial ${commercial.full_name}`);
         }
       } catch (error) {
         console.warn('[geocoding] Erreur auto-assignation:', error);
@@ -570,7 +564,6 @@ export async function batchGeocodeLeads(leads, onProgress) {
             });
 
             results.assigned++;
-            console.log(`[geocoding] Lead batch: ${lead.id} → zone ${zone} → ${commercial.full_name}`);
           } catch (err) {
             console.warn('[geocoding] Batch auto-assign failed:', err);
           }

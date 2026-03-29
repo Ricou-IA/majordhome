@@ -16,10 +16,10 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
-import { entretienSavKeys } from '@/shared/hooks/cacheKeys';
+import { entretienSavKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { entretienSavKeys } from '@/shared/hooks/cacheKeys';
+export { entretienSavKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK : LISTE ITEMS (KANBAN)

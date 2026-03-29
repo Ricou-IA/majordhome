@@ -206,6 +206,37 @@ export const contractsService = {
   },
 
   // ==========================================================================
+  // CLÔTURE
+  // ==========================================================================
+
+  /**
+   * Clôturer un contrat (passe en cancelled avec raison)
+   */
+  async closeContract(contractId, reason) {
+    try {
+      if (!contractId) throw new Error('[contractsService] contractId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_contracts_write')
+        .update({
+          status: 'cancelled',
+          cancellation_reason: reason || null,
+          cancelled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', contractId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[contractsService] closeContract:', error);
+      return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
   // SUPPRESSION
   // ==========================================================================
 

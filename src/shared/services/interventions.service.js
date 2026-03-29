@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { withErrorHandling } from '@/lib/serviceHelpers';
 
 // ============================================================================
 // CONSTANTES
@@ -119,7 +120,7 @@ export const interventionsService = {
   async getInterventionById(interventionId) {
     if (!interventionId) throw new Error('[interventions] interventionId requis');
 
-    try {
+    return withErrorHandling(async () => {
       // 1. Charger l'intervention
       const { data: intervention, error } = await supabase
         .from('majordhome_interventions')
@@ -127,10 +128,7 @@ export const interventionsService = {
         .eq('id', interventionId)
         .single();
 
-      if (error) {
-        console.error('[interventions] getInterventionById error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       // 2. Charger client + équipement en parallèle
       const [clientResult, equipmentResult] = await Promise.all([
@@ -152,17 +150,11 @@ export const interventionsService = {
       ]);
 
       return {
-        data: {
-          intervention,
-          client: clientResult.data || null,
-          equipment: equipmentResult.data || null,
-        },
-        error: null,
+        intervention,
+        client: clientResult.data || null,
+        equipment: equipmentResult.data || null,
       };
-    } catch (err) {
-      console.error('[interventions] getInterventionById error:', err);
-      return { data: null, error: err };
-    }
+    }, 'interventions.getInterventionById');
   },
 
   /**
@@ -171,7 +163,7 @@ export const interventionsService = {
   async getInterventionsByProject(projectId, { limit = 50 } = {}) {
     if (!projectId) throw new Error('[interventions] projectId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_interventions')
         .select('*')
@@ -179,16 +171,9 @@ export const interventionsService = {
         .order('scheduled_date', { ascending: false })
         .limit(limit);
 
-      if (error) {
-        console.error('[interventions] getInterventionsByProject error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] getInterventionsByProject error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'interventions.getInterventionsByProject');
   },
 
   // ==========================================================================
@@ -226,9 +211,7 @@ export const interventionsService = {
     if (!interventionType) throw new Error('[interventions] interventionType requis');
     if (!scheduledDate) throw new Error('[interventions] scheduledDate requis');
 
-    try {
-      console.log('[interventions] createIntervention', { projectId, interventionType, scheduledDate });
-
+    return withErrorHandling(async () => {
       const insertData = {
         project_id: projectId,
         intervention_type: interventionType,
@@ -248,16 +231,9 @@ export const interventionsService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('[interventions] createIntervention error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] createIntervention error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'interventions.createIntervention');
   },
 
   // ==========================================================================
@@ -272,7 +248,7 @@ export const interventionsService = {
   async updateIntervention(interventionId, updates = {}) {
     if (!interventionId) throw new Error('[interventions] interventionId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const updateData = {};
 
       // Rapport
@@ -309,16 +285,9 @@ export const interventionsService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('[interventions] updateIntervention error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] updateIntervention error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'interventions.updateIntervention');
   },
 
   /**
@@ -335,7 +304,7 @@ export const interventionsService = {
       throw new Error(`[interventions] Statut invalide: ${status}`);
     }
 
-    try {
+    return withErrorHandling(async () => {
       const updates = {
         status,
         updated_at: new Date().toISOString(),
@@ -353,16 +322,9 @@ export const interventionsService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('[interventions] updateInterventionStatus error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] updateInterventionStatus error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'interventions.updateInterventionStatus');
   },
 
   // ==========================================================================
@@ -375,14 +337,14 @@ export const interventionsService = {
    * @param {string} interventionId - UUID de l'intervention
    * @param {File|Blob} file - Fichier à uploader
    * @param {string} fileType - Type de fichier (FILE_TYPES)
-   * @returns {{ path, url, error }}
+   * @returns {{ data: { path, url }, error }}
    */
   async uploadFile(projectId, interventionId, file, fileType) {
     if (!projectId || !interventionId || !file || !fileType) {
       throw new Error('[interventions] projectId, interventionId, file et fileType requis');
     }
 
-    try {
+    return withErrorHandling(async () => {
       const extension = getFileExtension(file);
       const path = buildStoragePath(projectId, interventionId, fileType, extension);
 
@@ -394,10 +356,7 @@ export const interventionsService = {
           contentType: file.type || 'image/jpeg',
         });
 
-      if (error) {
-        console.error('[interventions] uploadFile error:', error);
-        return { path: null, url: null, error };
-      }
+      if (error) throw error;
 
       // Générer l'URL signée (valable 1h)
       const { data: urlData } = await supabase.storage
@@ -407,49 +366,38 @@ export const interventionsService = {
       return {
         path: data.path,
         url: urlData?.signedUrl || null,
-        error: null,
       };
-    } catch (err) {
-      console.error('[interventions] uploadFile error:', err);
-      return { path: null, url: null, error: err };
-    }
+    }, 'interventions.uploadFile');
   },
 
   /**
    * Récupère une URL signée pour un fichier Storage
    * @param {string} path - Chemin du fichier dans le bucket
    * @param {number} expiresIn - Durée de validité en secondes (défaut 1h)
-   * @returns {{ url, error }}
+   * @returns {{ data: string|null, error }}
    */
   async getFileUrl(path, expiresIn = 3600) {
-    if (!path) return { url: null, error: null };
+    if (!path) return { data: null, error: null };
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase.storage
         .from('interventions')
         .createSignedUrl(path, expiresIn);
 
-      if (error) {
-        console.error('[interventions] getFileUrl error:', error);
-        return { url: null, error };
-      }
-
-      return { url: data?.signedUrl || null, error: null };
-    } catch (err) {
-      console.error('[interventions] getFileUrl error:', err);
-      return { url: null, error: err };
-    }
+      if (error) throw error;
+      return data?.signedUrl || null;
+    }, 'interventions.getFileUrl');
   },
 
   /**
    * Récupère les URLs signées pour toutes les photos/fichiers d'une intervention
    * @param {Object} intervention - L'objet intervention avec les paths
-   * @returns {{ photoBeforeUrl, photoAfterUrl, photosExtraUrls, signatureUrl, error }}
+   * @returns {{ data: { photoBeforeUrl, photoAfterUrl, photosExtraUrls, signatureUrl }, error }}
    */
   async getInterventionFileUrls(intervention) {
-    if (!intervention) return { error: new Error('intervention requis') };
+    if (!intervention) return { data: null, error: new Error('intervention requis') };
 
-    try {
+    return withErrorHandling(async () => {
       const urlPromises = [];
       const keys = [];
 
@@ -481,8 +429,8 @@ export const interventionsService = {
       };
 
       results.forEach((result, index) => {
-        if (result.url) {
-          urls[keys[index]] = result.url;
+        if (result.data) {
+          urls[keys[index]] = result.data;
         }
       });
 
@@ -492,21 +440,12 @@ export const interventionsService = {
           intervention.photos_extra.map(path => this.getFileUrl(path))
         );
         urls.photosExtraUrls = extraResults
-          .filter(r => r.url)
-          .map(r => r.url);
+          .filter(r => r.data)
+          .map(r => r.data);
       }
 
-      return { ...urls, error: null };
-    } catch (err) {
-      console.error('[interventions] getInterventionFileUrls error:', err);
-      return {
-        photoBeforeUrl: null,
-        photoAfterUrl: null,
-        photosExtraUrls: [],
-        signatureUrl: null,
-        error: err,
-      };
-    }
+      return urls;
+    }, 'interventions.getInterventionFileUrls');
   },
 
   /**
@@ -514,23 +453,16 @@ export const interventionsService = {
    * @param {string} path - Chemin du fichier
    */
   async deleteFile(path) {
-    if (!path) return { error: null };
+    if (!path) return { data: null, error: null };
 
-    try {
+    return withErrorHandling(async () => {
       const { error } = await supabase.storage
         .from('interventions')
         .remove([path]);
 
-      if (error) {
-        console.error('[interventions] deleteFile error:', error);
-        return { error };
-      }
-
-      return { error: null };
-    } catch (err) {
-      console.error('[interventions] deleteFile error:', err);
-      return { error: err };
-    }
+      if (error) throw error;
+      return null;
+    }, 'interventions.deleteFile');
   },
 
   // ==========================================================================
@@ -541,18 +473,17 @@ export const interventionsService = {
    * Déclenche la génération du PV d'intervention via N8N
    * N8N reçoit l'ID, récupère les données, génère le PDF, l'uploade dans Storage
    * @param {string} interventionId
-   * @returns {{ success, pdfPath, error }}
+   * @returns {{ data: { success, pdfPath }, error }}
    */
   async triggerPdfGeneration(interventionId) {
     if (!interventionId) throw new Error('[interventions] interventionId requis');
 
     const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_PDF;
     if (!webhookUrl) {
-      console.error('[interventions] VITE_N8N_WEBHOOK_PDF non configuré');
-      return { success: false, pdfPath: null, error: new Error('Webhook PDF non configuré') };
+      return { data: null, error: new Error('Webhook PDF non configuré') };
     }
 
-    try {
+    return withErrorHandling(async () => {
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -561,8 +492,7 @@ export const interventionsService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[interventions] triggerPdfGeneration HTTP error:', response.status, errorText);
-        return { success: false, pdfPath: null, error: new Error(`HTTP ${response.status}: ${errorText}`) };
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
@@ -570,30 +500,25 @@ export const interventionsService = {
       return {
         success: true,
         pdfPath: result.pdf_path || null,
-        error: null,
       };
-    } catch (err) {
-      console.error('[interventions] triggerPdfGeneration error:', err);
-      return { success: false, pdfPath: null, error: err };
-    }
+    }, 'interventions.triggerPdfGeneration');
   },
 
   /**
    * Déclenche l'envoi du rapport signé au client via N8N
    * N8N récupère le PDF signé + données client, envoie l'email
    * @param {string} interventionId
-   * @returns {{ success, error }}
+   * @returns {{ data: { success }, error }}
    */
   async triggerSignedReport(interventionId) {
     if (!interventionId) throw new Error('[interventions] interventionId requis');
 
     const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_SIGNED;
     if (!webhookUrl) {
-      console.error('[interventions] VITE_N8N_WEBHOOK_SIGNED non configuré');
-      return { success: false, error: new Error('Webhook rapport signé non configuré') };
+      return { data: null, error: new Error('Webhook rapport signé non configuré') };
     }
 
-    try {
+    return withErrorHandling(async () => {
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -602,15 +527,11 @@ export const interventionsService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[interventions] triggerSignedReport HTTP error:', response.status, errorText);
-        return { success: false, error: new Error(`HTTP ${response.status}: ${errorText}`) };
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      return { success: true, error: null };
-    } catch (err) {
-      console.error('[interventions] triggerSignedReport error:', err);
-      return { success: false, error: err };
-    }
+      return { success: true };
+    }, 'interventions.triggerSignedReport');
   },
 
   // ==========================================================================
@@ -623,7 +544,7 @@ export const interventionsService = {
   async createChantierIntervention({ leadId, projectId, equipmentId = null, createdBy = null }) {
     if (!leadId || !projectId) throw new Error('[interventions] leadId et projectId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const today = new Date().toISOString().split('T')[0];
 
       const { data, error } = await supabase
@@ -641,16 +562,9 @@ export const interventionsService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('[interventions] createChantierIntervention error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] createChantierIntervention error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'interventions.createChantierIntervention');
   },
 
   /**
@@ -661,7 +575,7 @@ export const interventionsService = {
       throw new Error('[interventions] parentId, projectId et slotDate requis');
     }
 
-    try {
+    return withErrorHandling(async () => {
       // 1. Créer le slot (intervention enfant)
       const { data: slot, error } = await supabase
         .from('majordhome_interventions')
@@ -680,21 +594,15 @@ export const interventionsService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('[interventions] createInterventionSlot error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       // 2. Assigner les techniciens
       if (technicianIds.length > 0) {
         await this.setInterventionTechnicians(slot.id, technicianIds);
       }
 
-      return { data: slot, error: null };
-    } catch (err) {
-      console.error('[interventions] createInterventionSlot error:', err);
-      return { data: null, error: err };
-    }
+      return slot;
+    }, 'interventions.createInterventionSlot');
   },
 
   /**
@@ -703,7 +611,7 @@ export const interventionsService = {
   async updateInterventionSlot(slotId, { slotDate, slotStartTime, slotEndTime, slotNotes, technicianIds }) {
     if (!slotId) throw new Error('[interventions] slotId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const updates = { updated_at: new Date().toISOString() };
       if (slotDate !== undefined) {
         updates.slot_date = slotDate;
@@ -720,21 +628,15 @@ export const interventionsService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('[interventions] updateInterventionSlot error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       // Mise à jour des techniciens si fournis
       if (technicianIds !== undefined) {
         await this.setInterventionTechnicians(slotId, technicianIds);
       }
 
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] updateInterventionSlot error:', err);
-      return { data: null, error: err };
-    }
+      return data;
+    }, 'interventions.updateInterventionSlot');
   },
 
   /**
@@ -743,22 +645,15 @@ export const interventionsService = {
   async deleteInterventionSlot(slotId) {
     if (!slotId) throw new Error('[interventions] slotId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const { error } = await supabase
         .from('majordhome_interventions')
         .delete()
         .eq('id', slotId);
 
-      if (error) {
-        console.error('[interventions] deleteInterventionSlot error:', error);
-        return { error };
-      }
-
-      return { error: null };
-    } catch (err) {
-      console.error('[interventions] deleteInterventionSlot error:', err);
-      return { error: err };
-    }
+      if (error) throw error;
+      return null;
+    }, 'interventions.deleteInterventionSlot');
   },
 
   /**
@@ -767,23 +662,16 @@ export const interventionsService = {
   async getInterventionSlots(parentId) {
     if (!parentId) return { data: [], error: null };
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_intervention_slots')
         .select('*')
         .eq('parent_id', parentId)
         .order('slot_date', { ascending: true });
 
-      if (error) {
-        console.error('[interventions] getInterventionSlots error:', error);
-        return { data: null, error };
-      }
-
-      return { data: data || [], error: null };
-    } catch (err) {
-      console.error('[interventions] getInterventionSlots error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data || [];
+    }, 'interventions.getInterventionSlots');
   },
 
   /**
@@ -792,7 +680,7 @@ export const interventionsService = {
   async getChantierInterventionByLeadId(leadId) {
     if (!leadId) return { data: null, error: null };
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_interventions')
         .select('*')
@@ -800,16 +688,11 @@ export const interventionsService = {
         .is('parent_id', null)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('[interventions] getChantierInterventionByLeadId error:', error);
-        return { data: null, error };
-      }
+      // PGRST116 = "not found" — not an error, just means no parent intervention yet
+      if (error && error.code !== 'PGRST116') throw error;
 
-      return { data: data || null, error: null };
-    } catch (err) {
-      console.error('[interventions] getChantierInterventionByLeadId error:', err);
-      return { data: null, error: err };
-    }
+      return data || null;
+    }, 'interventions.getChantierInterventionByLeadId');
   },
 
   /**
@@ -818,7 +701,7 @@ export const interventionsService = {
   async setInterventionTechnicians(interventionId, technicianIds = []) {
     if (!interventionId) throw new Error('[interventions] interventionId requis');
 
-    try {
+    return withErrorHandling(async () => {
       // 1. Supprimer les assignations existantes
       await supabase
         .from('majordhome_intervention_technicians')
@@ -836,17 +719,11 @@ export const interventionsService = {
           .from('majordhome_intervention_technicians')
           .insert(rows);
 
-        if (error) {
-          console.error('[interventions] setInterventionTechnicians insert error:', error);
-          return { error };
-        }
+        if (error) throw error;
       }
 
-      return { error: null };
-    } catch (err) {
-      console.error('[interventions] setInterventionTechnicians error:', err);
-      return { error: err };
-    }
+      return null;
+    }, 'interventions.setInterventionTechnicians');
   },
 
   // ==========================================================================
@@ -860,23 +737,16 @@ export const interventionsService = {
   async getEquipmentById(equipmentId) {
     if (!equipmentId) return { data: null, error: null };
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_equipments')
         .select('*')
         .eq('id', equipmentId)
         .single();
 
-      if (error) {
-        console.error('[interventions] getEquipmentById error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[interventions] getEquipmentById error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'interventions.getEquipmentById');
   },
 };
 

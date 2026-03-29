@@ -17,7 +17,7 @@ import {
   Archive, ArchiveRestore,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClient } from '@/shared/hooks/useClients';
+import { useClient } from '@hooks/useClients';
 import { formatDateFR } from '@/lib/utils';
 
 // Sous-composants extraits
@@ -127,7 +127,7 @@ export default function ClientDetail() {
 
   const handleArchive = async () => {
     const result = await archiveClient();
-    if (result?.success) {
+    if (result?.data && !result?.error) {
       toast.success('Client archivé');
       setShowArchiveConfirm(false);
       navigate('/clients');
@@ -138,7 +138,7 @@ export default function ClientDetail() {
 
   const handleUnarchive = async () => {
     const result = await unarchiveClient();
-    if (result?.success) {
+    if (result?.data && !result?.error) {
       toast.success('Client désarchivé');
       refresh();
     } else {

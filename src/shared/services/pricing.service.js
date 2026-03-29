@@ -127,7 +127,6 @@ export const pricingService = {
    */
   async getZones() {
     try {
-      console.log('[pricingService] getZones...');
       const { data, error } = await supabase
         .from('majordhome_pricing_zones')
         .select('*')
@@ -135,7 +134,6 @@ export const pricingService = {
         .order('sort_order');
 
       if (error) throw error;
-      console.log('[pricingService] getZones OK:', data?.length, 'zones');
       return { data: data || [], error: null };
     } catch (error) {
       console.error('[pricingService] getZones ERREUR:', error);
@@ -148,7 +146,6 @@ export const pricingService = {
    */
   async getEquipmentTypes() {
     try {
-      console.log('[pricingService] getEquipmentTypes...');
       const { data, error } = await supabase
         .from('majordhome_pricing_equipment_types')
         .select('*')
@@ -156,7 +153,6 @@ export const pricingService = {
         .order('sort_order');
 
       if (error) throw error;
-      console.log('[pricingService] getEquipmentTypes OK:', data?.length, 'types');
       return { data: data || [], error: null };
     } catch (error) {
       console.error('[pricingService] getEquipmentTypes ERREUR:', error);
@@ -169,13 +165,11 @@ export const pricingService = {
    */
   async getRates() {
     try {
-      console.log('[pricingService] getRates...');
       const { data, error } = await supabase
         .from('majordhome_pricing_rates')
         .select('*');
 
       if (error) throw error;
-      console.log('[pricingService] getRates OK:', data?.length, 'tarifs');
       return { data: data || [], error: null };
     } catch (error) {
       console.error('[pricingService] getRates ERREUR:', error);
@@ -246,7 +240,6 @@ export const pricingService = {
    */
   async getAllPricingData() {
     try {
-      console.log('[pricingService] getAllPricingData - chargement...');
       const [zonesResult, typesResult, ratesResult, discountsResult, extrasResult] =
         await Promise.all([
           this.getZones(),
@@ -265,14 +258,6 @@ export const pricingService = {
         console.error('[pricingService] getAllPricingData - erreurs:', errors);
         throw errors[0];
       }
-
-      console.log('[pricingService] getAllPricingData OK:', {
-        zones: zonesResult.data.length,
-        types: typesResult.data.length,
-        rates: ratesResult.data.length,
-        discounts: discountsResult.data.length,
-        extras: extrasResult.data.length,
-      });
 
       return {
         data: {

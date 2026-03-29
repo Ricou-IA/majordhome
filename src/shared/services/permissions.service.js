@@ -72,7 +72,6 @@ export const permissionsService = {
 
       if (error) throw error;
 
-      console.log(`[permissionsService] Permission updated: ${role}:${resource}:${action} = ${allowed}`);
       return { data, error: null };
     } catch (error) {
       console.error('[permissionsService] updatePermission error:', error);
@@ -105,7 +104,6 @@ export const permissionsService = {
 
       if (error) throw error;
 
-      console.log(`[permissionsService] Bulk update: ${rows.length} permissions`);
       return { data, error: null };
     } catch (error) {
       console.error('[permissionsService] bulkUpdatePermissions error:', error);
@@ -193,7 +191,6 @@ export const permissionsService = {
       // L'Edge Function retourne { error: "..." } dans le body en cas d'erreur métier
       if (data?.error) throw new Error(data.error);
 
-      console.log(`[permissionsService] Member invited: ${email} as ${effectiveRole}`);
       return { data, error: null };
     } catch (error) {
       console.error('[permissionsService] inviteMember error:', error);
@@ -222,7 +219,6 @@ export const permissionsService = {
 
       if (error) throw error;
 
-      console.log(`[permissionsService] Role updated for ${userId}: ${appRole}/${businessRole}/${membershipRole}`);
       return { error: null };
     } catch (error) {
       console.error('[permissionsService] updateMemberRole error:', error);

@@ -19,11 +19,11 @@ import {
   detectZoneForAddress,
   calculateLineTotal,
   calculateContractTotal,
-} from '@/shared/services/pricing.service';
-import { contractKeys, pricingKeys } from '@/shared/hooks/cacheKeys';
+} from '@services/pricing.service';
+import { contractKeys, pricingKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { pricingKeys } from '@/shared/hooks/cacheKeys';
+export { pricingKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - usePricingData (données de référence)

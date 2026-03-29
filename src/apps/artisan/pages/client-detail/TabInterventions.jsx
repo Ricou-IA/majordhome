@@ -3,10 +3,10 @@ import { toast } from 'sonner';
 import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProjectInterventions, useCreateIntervention } from '@/shared/hooks/useInterventions';
-import { INTERVENTION_TYPES } from '@/shared/services/interventions.service';
+import { useProjectInterventions, useCreateIntervention } from '@hooks/useInterventions';
+import { INTERVENTION_TYPES } from '@services/interventions.service';
 import { getStatusConfig } from '@services/sav.service';
-import { chantiersService, getChantierStatusConfig } from '@/shared/services/chantiers.service';
+import { chantiersService, getChantierStatusConfig } from '@services/chantiers.service';
 import { formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 

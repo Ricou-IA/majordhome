@@ -6,7 +6,7 @@ import { formatDateFR, formatEuro } from '@/lib/utils';
 import { toast } from 'sonner';
 import { storageService } from '@services/storage.service';
 import { contractsService } from '@services/contracts.service';
-import { contractKeys } from '@/shared/hooks/cacheKeys';
+import { contractKeys } from '@hooks/cacheKeys';
 import { useContractEquipments } from '@hooks/useContracts';
 import { usePricingData } from '@hooks/usePricing';
 import {

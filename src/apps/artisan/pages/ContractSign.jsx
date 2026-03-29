@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 
 import { useClientContract, useContractEquipments } from '@hooks/useContracts';
 import { usePricingData } from '@hooks/usePricing';
-import { contractKeys } from '@/shared/hooks/cacheKeys';
+import { contractKeys } from '@hooks/cacheKeys';
 import { contractsService } from '@services/contracts.service';
 import { storageService } from '@services/storage.service';
 import {
@@ -101,7 +101,6 @@ async function sendContractEmail(contract, client, pdfPath) {
       source: 'app',
     };
 
-    console.log('[ContractSign] sendContractEmail payload:', payload);
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

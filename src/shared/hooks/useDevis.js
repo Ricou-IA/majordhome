@@ -7,11 +7,11 @@
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { devisService } from '@/shared/services/devis.service';
-import { devisKeys, leadKeys } from '@/shared/hooks/cacheKeys';
+import { devisService } from '@services/devis.service';
+import { devisKeys, leadKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { devisKeys } from '@/shared/hooks/cacheKeys';
+export { devisKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // LECTURE

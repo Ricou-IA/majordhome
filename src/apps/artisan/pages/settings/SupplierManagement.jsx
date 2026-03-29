@@ -368,8 +368,6 @@ function parseExcelRows(worksheet) {
     }
   }
 
-  console.log('[Import Excel] Colonnes mappées:', Object.fromEntries(Object.entries(headerMap).map(([k, v]) => [k, v])));
-  if (unmapped.length) console.log('[Import Excel] Colonnes ignorées:', unmapped);
 
   if (Object.keys(headerMap).length === 0) {
     console.error('[Import Excel] Aucune colonne reconnue. Colonnes trouvées:', Object.keys(firstRow));

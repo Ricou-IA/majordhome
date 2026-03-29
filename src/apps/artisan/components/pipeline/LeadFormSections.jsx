@@ -25,7 +25,7 @@ import { FormField, SectionTitle, inputClass, selectClass } from '@/apps/artisan
 import { formatPhoneNumber } from '@/lib/utils';
 import { EQUIPMENT_CATEGORY_LABELS, LOST_REASONS } from './LeadStatusConfig';
 import { FICHE_STATUS_CONFIG, computeVisitStatus } from './FicheTechniqueConfig';
-import { useTechnicalVisit } from '@/shared/hooks/useTechnicalVisit';
+import { useTechnicalVisit } from '@hooks/useTechnicalVisit';
 // SchedulingPanel déplacé dans LeadModal (overlay mode)
 import { LeadActivityTimeline } from './LeadActivityTimeline';
 

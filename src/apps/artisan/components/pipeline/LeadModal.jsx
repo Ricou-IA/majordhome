@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCanAccess } from '@/shared/hooks/usePermissions';
+import { useCanAccess } from '@hooks/usePermissions';
 import {
   useLead,
   useLeadActivities,
@@ -24,11 +24,11 @@ import {
   useLeadSources,
   useLeadCommercials,
   useLeadMutations,
-} from '@/shared/hooks/useLeads';
-import { usePricingEquipmentTypes, useClientSearch } from '@/shared/hooks/useClients';
+} from '@hooks/useLeads';
+import { usePricingEquipmentTypes, useClientSearch } from '@hooks/useClients';
 import { supabase } from '@/lib/supabaseClient';
-import { appointmentsService } from '@/shared/services/appointments.service';
-import { leadsService } from '@/shared/services/leads.service';
+import { appointmentsService } from '@services/appointments.service';
+import { leadsService } from '@services/leads.service';
 import { formatDateForInput } from '@/lib/utils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
@@ -343,7 +343,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
             userId,
             type: 'lead_assigned',
             description: `Commercial assigné : ${oldName} → ${newName}`,
-          }).catch((err) => console.warn('[LeadModal] Activity commercial:', err));
+          }).catch(() => {});
         }
         await updateLead(leadId, payload);
       } else {
@@ -364,7 +364,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           form.address?.trim() || null,
           form.postal_code?.trim() || null,
           form.city?.trim() || null,
-        ).catch(err => console.warn('[LeadModal] Géocodage async échoué:', err));
+        ).catch(() => {});
       }
 
       onSaved?.();

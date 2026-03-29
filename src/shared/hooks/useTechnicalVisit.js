@@ -9,10 +9,10 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { technicalVisitService } from '@services/technicalVisit.service';
-import { technicalVisitKeys } from '@/shared/hooks/cacheKeys';
+import { technicalVisitKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { technicalVisitKeys } from '@/shared/hooks/cacheKeys';
+export { technicalVisitKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK PRINCIPAL — Fiche technique d'un lead

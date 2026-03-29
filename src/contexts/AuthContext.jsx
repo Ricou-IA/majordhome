@@ -112,7 +112,6 @@ export function AuthProvider({ children }) {
       setProfile(prev => {
         setOrganization(prevOrg => {
           if (!prev || !prevOrg) {
-            console.log('[AuthContext] reload needed (profile:', !!prev, 'org:', !!prevOrg, ')');
             loadUserData(userId);
           }
           return prevOrg;
@@ -125,7 +124,6 @@ export function AuthProvider({ children }) {
       async (event, session) => {
         if (!mounted || event === 'INITIAL_SESSION') return;
 
-        console.log('[AuthContext] onAuthStateChange:', event);
 
         switch (event) {
           case 'SIGNED_IN':
@@ -149,7 +147,6 @@ export function AuthProvider({ children }) {
             cancelPendingSignOut();
             signOutTimerRef.current = setTimeout(() => {
               if (mounted) {
-                console.log('[AuthContext] SIGNED_OUT confirmé — reset state');
                 resetState();
               }
               signOutTimerRef.current = null;

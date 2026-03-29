@@ -70,7 +70,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Connexion réussie:', data.user?.email);
       return { data, error: null };
     } catch (error) {
       console.error('[authService] signIn error:', error);
@@ -101,7 +100,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Inscription réussie:', data.user?.email);
       return { data, error: null };
     } catch (error) {
       console.error('[authService] signUp error:', error);
@@ -118,7 +116,6 @@ export const authService = {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      console.log('[authService] Déconnexion réussie');
       return { error: null };
     } catch (error) {
       console.error('[authService] signOut error:', error);
@@ -176,7 +173,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Email de réinitialisation envoyé');
       return { data, error: null };
     } catch (error) {
       console.error('[authService] resetPassword error:', error);
@@ -197,7 +193,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Mot de passe mis à jour');
       return { data, error: null };
     } catch (error) {
       console.error('[authService] updatePassword error:', error);
@@ -252,7 +247,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Utilisateur mis à jour');
       return { data, error: null };
     } catch (error) {
       console.error('[authService] updateUser error:', error);
@@ -308,7 +302,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Profil mis à jour');
       return { profile: data, error: null };
     } catch (error) {
       console.error('[authService] updateProfile error:', error);
@@ -390,7 +383,6 @@ export const authService = {
 
       if (error) throw error;
 
-      console.log('[authService] Organisation rejointe');
       return { organization: data, error: null };
     } catch (error) {
       console.error('[authService] joinOrganization error:', error);

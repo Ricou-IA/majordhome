@@ -14,8 +14,8 @@ import {
   History, ExternalLink, ClipboardCheck, Wrench,
 } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
-import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@/shared/services/clients.service';
-import { useClientEquipments } from '@/shared/hooks/useClients';
+import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/clients.service';
+import { useClientEquipments } from '@hooks/useClients';
 import { formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '../FormFields';
 import { EquipmentList } from './EquipmentList';
@@ -334,8 +334,8 @@ export function TabEquipments({ clientId }) {
     <EquipmentList
       equipments={equipments}
       loading={loading}
-      onAdd={() => console.log('Ajouter équipement')}
-      onEdit={(eq) => console.log('Éditer équipement', eq)}
+      onAdd={() => {}}
+      onEdit={() => {}}
       onDelete={handleDelete}
     />
   );

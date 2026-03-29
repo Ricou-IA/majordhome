@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ACTIVITY_CONFIG } from '@/shared/services/leads.service';
+import { ACTIVITY_CONFIG } from '@services/leads.service';
 
 // Map des icônes (Lucide)
 const ICON_MAP = {

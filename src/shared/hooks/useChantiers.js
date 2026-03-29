@@ -9,12 +9,12 @@
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { chantiersService } from '@/shared/services/chantiers.service';
-import { interventionsService } from '@/shared/services/interventions.service';
-import { chantierKeys, interventionKeys } from '@/shared/hooks/cacheKeys';
+import { chantiersService } from '@services/chantiers.service';
+import { interventionsService } from '@services/interventions.service';
+import { chantierKeys, interventionKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { chantierKeys } from '@/shared/hooks/cacheKeys';
+export { chantierKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useChantiers (liste pour le Kanban)
@@ -98,7 +98,7 @@ export function useChantierMutations() {
     onSuccess: (_, variables) => {
       invalidateChantiers();
       queryClient.invalidateQueries({
-        queryKey: ['intervention-slots', variables.parentId],
+        queryKey: interventionKeys.slots(variables.parentId),
       });
     },
   });
@@ -109,7 +109,7 @@ export function useChantierMutations() {
       interventionsService.deleteInterventionSlot(slotId),
     onSuccess: () => {
       invalidateChantiers();
-      queryClient.invalidateQueries({ queryKey: ['intervention-slots'] });
+      queryClient.invalidateQueries({ queryKey: interventionKeys.all });
     },
   });
 
@@ -159,7 +159,7 @@ export function useChantierMutations() {
 
 export function useInterventionSlots(parentId) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['intervention-slots', parentId],
+    queryKey: interventionKeys.slots(parentId),
     queryFn: async () => {
       const { data, error } = await interventionsService.getInterventionSlots(parentId);
       if (error) throw error;

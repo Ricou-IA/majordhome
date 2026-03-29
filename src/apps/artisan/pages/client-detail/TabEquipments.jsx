@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useClientEquipments } from '@/shared/hooks/useClients';
-import { useClientContract, useContractEquipments } from '@/shared/hooks/useContracts';
-import { contractsService } from '@/shared/services/contracts.service';
+import { useClientEquipments, clientKeys } from '@hooks/useClients';
+import { useClientContract, useContractEquipments, contractKeys } from '@hooks/useContracts';
+import { contractsService } from '@services/contracts.service';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -29,10 +29,10 @@ export const TabEquipments = ({ clientId }) => {
   }, [contractEquipments]);
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['contracts'] });
-    queryClient.invalidateQueries({ queryKey: ['client-equipments', clientId] });
+    queryClient.invalidateQueries({ queryKey: contractKeys.all });
+    queryClient.invalidateQueries({ queryKey: clientKeys.equipments(clientId) });
     if (contract?.id) {
-      queryClient.invalidateQueries({ queryKey: ['contract-equipments', contract.id] });
+      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(contract.id) });
     }
   };
 

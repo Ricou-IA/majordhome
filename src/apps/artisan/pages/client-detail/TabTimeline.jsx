@@ -5,7 +5,7 @@ import {
   Calendar, Wrench, Zap, ChevronRight, Clock, Pin, History,
   Loader2, Save,
 } from 'lucide-react';
-import { useClientActivities } from '@/shared/hooks/useClients';
+import { useClientActivities } from '@hooks/useClients';
 import { formatDateTimeFR } from '@/lib/utils';
 
 const ACTIVITY_ICONS = {

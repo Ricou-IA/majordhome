@@ -9,11 +9,11 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { leadsService } from '@/shared/services/leads.service';
-import { leadKeys } from '@/shared/hooks/cacheKeys';
+import { leadsService } from '@services/leads.service';
+import { leadKeys, clientKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
-export { leadKeys } from '@/shared/hooks/cacheKeys';
+export { leadKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // HOOK - useLeads (liste paginée avec filtres)
@@ -307,7 +307,7 @@ export function useLeadMutations() {
     onSuccess: () => {
       invalidateLeads();
       // Invalider aussi le cache clients
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all });
     },
   });
 

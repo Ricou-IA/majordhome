@@ -10,13 +10,13 @@
 
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { clientsService } from '@/shared/services/clients.service';
-import { clientKeys } from '@/shared/hooks/cacheKeys';
-import { usePaginatedList } from '@/shared/hooks/usePaginatedList';
-import { useDebounce } from '@/shared/hooks/useDebounce';
+import { clientsService } from '@services/clients.service';
+import { clientKeys, contractKeys } from '@hooks/cacheKeys';
+import { usePaginatedList } from '@hooks/usePaginatedList';
+import { useDebounce } from '@hooks/useDebounce';
 
 // Re-export for backward compatibility
-export { clientKeys } from '@/shared/hooks/cacheKeys';
+export { clientKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // CONSTANTES
@@ -237,7 +237,7 @@ export function useClientEquipments(clientId) {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
       // Invalider aussi le cache contrats (liaison contract_equipments)
-      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all });
     },
   });
 

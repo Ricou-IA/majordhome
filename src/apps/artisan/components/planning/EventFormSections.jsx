@@ -18,7 +18,7 @@ import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/comp
 import {
   APPOINTMENT_TYPES,
   APPOINTMENT_STATUSES,
-} from '@/shared/services/appointments.service';
+} from '@services/appointments.service';
 import { TechnicianSelect } from './TechnicianSelect';
 
 const DURATION_OPTIONS = [

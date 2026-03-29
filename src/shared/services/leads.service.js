@@ -9,29 +9,30 @@
  * - majordhome_statuses
  * - majordhome_lead_activities (enrichie avec old/new status labels)
  *
- * Utilise des RPC SECURITY DEFINER pour les ÉCRITURES :
+ * Utilise des RPC SECURITY DEFINER pour les ECRITURES :
  * - update_majordhome_lead(p_lead_id, p_updates)
  * - get_majordhome_lead_raw(p_lead_id)
  * - create_majordhome_lead(p_data)
  * - create_majordhome_lead_activity(p_data)
  *
- * Le schéma majordhome n'est PAS exposé dans PostgREST,
+ * Le schema majordhome n'est PAS expose dans PostgREST,
  * donc .schema('majordhome') provoque des erreurs 406.
  *
- * @version 3.1.0 - Lead→Client auto-conversion sur "Gagné" (validation devis)
+ * @version 3.2.0 - withErrorHandling refactor
  * ============================================================================
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { clientsService } from '@/shared/services/clients.service';
-import { technicalVisitService } from '@/shared/services/technicalVisit.service';
+import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
+import { clientsService } from '@services/clients.service';
+import { technicalVisitService } from '@services/technicalVisit.service';
 
 // ============================================================================
 // CONSTANTES
 // ============================================================================
 
 /**
- * Types d'activité pour lead_activities
+ * Types d'activite pour lead_activities
  */
 export const LEAD_ACTIVITY_TYPES = {
   LEAD_CREATED: 'lead_created',
@@ -46,7 +47,7 @@ export const LEAD_ACTIVITY_TYPES = {
 };
 
 /**
- * Icônes/couleurs par type d'activité (pour la timeline)
+ * Icones/couleurs par type d'activite (pour la timeline)
  */
 export const ACTIVITY_CONFIG = {
   lead_created: { icon: 'Plus', color: 'bg-emerald-100 text-emerald-700' },
@@ -65,14 +66,14 @@ export const ACTIVITY_CONFIG = {
 // ============================================================================
 
 /**
- * Transforme un lead brut (vue plate) en objet structuré avec `statuses` et `sources`
- * pour compatibilité avec les composants existants (LeadCard, LeadKanban, etc.)
+ * Transforme un lead brut (vue plate) en objet structure avec `statuses` et `sources`
+ * pour compatibilite avec les composants existants (LeadCard, LeadKanban, etc.)
  */
 function enrichLead(row) {
   if (!row) return null;
   return {
     ...row,
-    // Objet imbriqué `statuses` pour compat composants
+    // Objet imbrique `statuses` pour compat composants
     statuses: {
       id: row.status_id,
       label: row.status_label,
@@ -81,7 +82,7 @@ function enrichLead(row) {
       is_final: row.status_is_final,
       is_won: row.status_is_won,
     },
-    // Objet imbriqué `sources` pour compat composants
+    // Objet imbrique `sources` pour compat composants
     sources: row.source_id ? {
       id: row.source_id,
       name: row.source_name,
@@ -91,7 +92,7 @@ function enrichLead(row) {
 }
 
 /**
- * Transforme une activité brute (vue plate) avec old/new status objets
+ * Transforme une activite brute (vue plate) avec old/new status objets
  */
 function enrichActivity(row) {
   if (!row) return null;
@@ -116,66 +117,52 @@ function enrichActivity(row) {
 
 export const leadsService = {
   // ==========================================================================
-  // DONNÉES DE RÉFÉRENCE (vues publiques, lecture seule)
+  // DONNEES DE REFERENCE (vues publiques, lecture seule)
   // ==========================================================================
 
   /**
-   * Récupère les sources d'acquisition actives
+   * Recupere les sources d'acquisition actives
    */
   async getSources() {
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_sources')
         .select('id, name, description, color, is_active')
         .eq('is_active', true)
         .order('name');
 
-      if (error) {
-        console.error('[leads] getSources error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[leads] getSources error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'leads.getSources');
   },
 
   /**
-   * Récupère les statuts du pipeline ordonnés
+   * Recupere les statuts du pipeline ordonnes
    */
   async getStatuses() {
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_statuses')
         .select('id, label, description, display_order, color, is_final, is_won')
         .order('display_order');
 
-      if (error) {
-        console.error('[leads] getStatuses error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[leads] getStatuses error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'leads.getStatuses');
   },
 
   /**
-   * Récupère les commerciaux de l'organisation pour l'assignation
+   * Recupere les commerciaux de l'organisation pour l'assignation
    * Source : table majordhome.commercials (vue majordhome_commercials)
    * @param {string} orgId - ID de l'organisation (core.organizations.id)
    */
   async getCommercials(orgId) {
-    try {
-      if (!orgId) {
-        console.warn('[leads] getCommercials: orgId manquant, retour vide');
-        return { data: [], error: null };
-      }
+    if (!orgId) {
+      console.warn('[leads] getCommercials: orgId manquant, retour vide');
+      return { data: [], error: null };
+    }
 
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_commercials')
         .select('id, full_name, email, zone, profile_id, is_active, app_role')
@@ -183,16 +170,9 @@ export const leadsService = {
         .eq('is_active', true)
         .order('full_name');
 
-      if (error) {
-        console.error('[leads] getCommercials error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[leads] getCommercials error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'leads.getCommercials');
   },
 
   // ==========================================================================
@@ -200,13 +180,13 @@ export const leadsService = {
   // ==========================================================================
 
   /**
-   * Récupère la liste des leads avec filtres et pagination
-   * La vue majordhome_leads inclut déjà les colonnes status_label, source_name, etc.
+   * Recupere la liste des leads avec filtres et pagination
+   * La vue majordhome_leads inclut deja les colonnes status_label, source_name, etc.
    */
   async getLeads({ orgId, filters = {}, limit = 25, offset = 0 }) {
     if (!orgId) throw new Error('[leads] orgId requis');
 
-    try {
+    return withErrorHandlingCount(async () => {
       let query = supabase
         .from('majordhome_leads')
         .select('*', { count: 'exact' })
@@ -223,7 +203,7 @@ export const leadsService = {
         query = query.eq('source_id', filters.sourceId);
       }
 
-      // Filtre par commercial assigné
+      // Filtre par commercial assigne
       if (filters.assignedUserId) {
         query = query.eq('assigned_user_id', filters.assignedUserId);
       }
@@ -236,7 +216,7 @@ export const leadsService = {
         );
       }
 
-      // Filtre par date de création
+      // Filtre par date de creation
       if (filters.dateFrom) {
         query = query.gte('created_date', filters.dateFrom);
       }
@@ -254,53 +234,40 @@ export const leadsService = {
 
       const { data, count, error } = await query;
 
-      if (error) {
-        console.error('[leads] getLeads error:', error);
-        return { data: null, count: 0, error };
-      }
+      if (error) throw error;
 
-      // Enrichir avec objets statuses/sources imbriqués
+      // Enrichir avec objets statuses/sources imbriques
       const enriched = (data || []).map(enrichLead);
-      return { data: enriched, count: count || 0, error: null };
-    } catch (err) {
-      console.error('[leads] getLeads error:', err);
-      return { data: null, count: 0, error: err };
-    }
+      return { data: enriched, count: count || 0 };
+    }, 'leads.getLeads');
   },
 
   /**
-   * Récupère un lead par ID (vue enrichie)
+   * Recupere un lead par ID (vue enrichie)
    */
   async getLeadById(leadId) {
     if (!leadId) throw new Error('[leads] leadId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_leads')
         .select('*')
         .eq('id', leadId)
         .single();
 
-      if (error) {
-        console.error('[leads] getLeadById error:', error);
-        return { data: null, error };
-      }
-
-      return { data: enrichLead(data), error: null };
-    } catch (err) {
-      console.error('[leads] getLeadById error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return enrichLead(data);
+    }, 'leads.getLeadById');
   },
 
   /**
-   * Crée un nouveau lead via RPC create_majordhome_lead
-   * La RPC insère dans majordhome.leads et retourne la vue enrichie
+   * Cree un nouveau lead via RPC create_majordhome_lead
+   * La RPC insere dans majordhome.leads et retourne la vue enrichie
    */
   async createLead({ orgId, userId, ...leadData }) {
     if (!orgId) throw new Error('[leads] orgId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const insertData = {
         org_id: orgId,
         ...leadData,
@@ -311,40 +278,34 @@ export const leadsService = {
         p_data: insertData,
       });
 
-      if (error) {
-        console.error('[leads] createLead error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       // La RPC retourne un array (SETOF), prendre le premier
       const created = Array.isArray(data) ? data[0] : data;
 
-      // Créer l'activité "lead_created"
+      // Creer l'activite "lead_created"
       if (created) {
         await this._createActivity({
           leadId: created.id,
           orgId,
           userId,
           type: LEAD_ACTIVITY_TYPES.LEAD_CREATED,
-          description: `Lead créé : ${created.first_name || ''} ${created.last_name || ''}`.trim(),
+          description: `Lead cree : ${created.first_name || ''} ${created.last_name || ''}`.trim(),
         });
       }
 
-      return { data: enrichLead(created), error: null };
-    } catch (err) {
-      console.error('[leads] createLead error:', err);
-      return { data: null, error: err };
-    }
+      return enrichLead(created);
+    }, 'leads.createLead');
   },
 
   /**
-   * Met à jour un lead via RPC update_majordhome_lead
-   * La RPC écrit dans majordhome.leads et retourne la vue enrichie
+   * Met a jour un lead via RPC update_majordhome_lead
+   * La RPC ecrit dans majordhome.leads et retourne la vue enrichie
    */
   async updateLead(leadId, updates = {}) {
     if (!leadId) throw new Error('[leads] leadId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
         p_updates: {
@@ -353,18 +314,12 @@ export const leadsService = {
         },
       });
 
-      if (error) {
-        console.error('[leads] updateLead error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       // La RPC retourne un array (SETOF), prendre le premier
       const updated = Array.isArray(data) ? data[0] : data;
-      return { data: enrichLead(updated), error: null };
-    } catch (err) {
-      console.error('[leads] updateLead error:', err);
-      return { data: null, error: err };
-    }
+      return enrichLead(updated);
+    }, 'leads.updateLead');
   },
 
   /**
@@ -373,7 +328,7 @@ export const leadsService = {
   async softDeleteLead(leadId) {
     if (!leadId) throw new Error('[leads] leadId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
         p_updates: {
@@ -382,17 +337,11 @@ export const leadsService = {
         },
       });
 
-      if (error) {
-        console.error('[leads] softDeleteLead error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       const updated = Array.isArray(data) ? data[0] : data;
-      return { data: updated, error: null };
-    } catch (err) {
-      console.error('[leads] softDeleteLead error:', err);
-      return { data: null, error: err };
-    }
+      return updated;
+    }, 'leads.softDeleteLead');
   },
 
   // ==========================================================================
@@ -400,27 +349,27 @@ export const leadsService = {
   // ==========================================================================
 
   /**
-   * Change le statut d'un lead et crée une activité
-   * Utilise get_majordhome_lead_raw pour lire les données brutes,
-   * et update_majordhome_lead pour écrire
+   * Change le statut d'un lead et cree une activite
+   * Utilise get_majordhome_lead_raw pour lire les donnees brutes,
+   * et update_majordhome_lead pour ecrire
+   *
+   * NOTE: Returns { data, error, clientCreated } — extra property for consumer compat
    */
   async updateLeadStatus(leadId, newStatusId, userId, extra = {}) {
     if (!leadId || !newStatusId) throw new Error('[leads] leadId et newStatusId requis');
 
-    try {
-      // Récupérer l'ancien statut + call_count via RPC (lecture directe table)
+    const result = await withErrorHandling(async () => {
+      // Recuperer l'ancien statut + call_count via RPC (lecture directe table)
       const { data: rawLead, error: rawError } = await supabase.rpc('get_majordhome_lead_raw', {
         p_lead_id: leadId,
       });
 
-      if (rawError) {
-        console.error('[leads] updateLeadStatus get_raw error:', rawError);
-      }
+      if (rawError) throw rawError;
 
       const currentLead = Array.isArray(rawLead) ? rawLead[0] : rawLead;
       const oldStatusId = currentLead?.status_id;
 
-      // Récupérer le label du nouveau statut (vue publique, lecture OK)
+      // Recuperer le label du nouveau statut (vue publique, lecture OK)
       const { data: newStatus } = await supabase
         .from('majordhome_statuses')
         .select('label')
@@ -429,7 +378,7 @@ export const leadsService = {
 
       const newStatusLabel = newStatus?.label;
 
-      // Préparer les updates
+      // Preparer les updates
       const updates = {
         status_id: newStatusId,
         updated_at: new Date().toISOString(),
@@ -439,21 +388,21 @@ export const leadsService = {
       const now = new Date().toISOString();
       const today = now.split('T')[0];
 
-      if (newStatusLabel === 'Contacté') {
+      if (newStatusLabel === 'Contact\u00e9') {
         updates.last_call_date = extra.callDate || now;
         updates.call_count = (currentLead?.call_count || 0) + 1;
         if (extra.callResult) updates.last_call_result = extra.callResult;
-      } else if (newStatusLabel === 'RDV planifié') {
+      } else if (newStatusLabel === 'RDV planifi\u00e9') {
         if (extra.appointmentDate) {
           updates.appointment_date = extra.appointmentDate;
         }
         if (extra.appointmentId) {
           updates.appointment_id = extra.appointmentId;
         }
-      } else if (newStatusLabel === 'Devis envoyé') {
+      } else if (newStatusLabel === 'Devis envoy\u00e9') {
         updates.quote_sent_date = extra.quoteSentDate || today;
         if (extra.quoteAmount != null) updates.order_amount_ht = extra.quoteAmount;
-      } else if (newStatusLabel === 'Gagné') {
+      } else if (newStatusLabel === 'Gagn\u00e9') {
         updates.won_date = today;
         updates.chantier_status = 'gagne';
 
@@ -472,20 +421,17 @@ export const leadsService = {
         updates.lost_reason = extra.lostReason;
       }
 
-      // Mettre à jour via RPC
+      // Mettre a jour via RPC
       const { data, error: updateError } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
         p_updates: updates,
       });
 
-      if (updateError) {
-        console.error('[leads] updateLeadStatus error:', updateError);
-        return { data: null, error: updateError };
-      }
+      if (updateError) throw updateError;
 
       const updatedLead = Array.isArray(data) ? data[0] : data;
 
-      // Récupérer le label de l'ancien statut pour la description de l'activité
+      // Recuperer le label de l'ancien statut pour la description de l'activite
       let oldLabel = '?';
       if (oldStatusId) {
         const { data: oldStatus } = await supabase
@@ -497,18 +443,18 @@ export const leadsService = {
       }
       const newLabel = newStatusLabel || '?';
 
-      // Créer l'activité
+      // Creer l'activite
       await this._createActivity({
         leadId,
         orgId: updatedLead?.org_id || currentLead?.org_id,
         userId,
         type: LEAD_ACTIVITY_TYPES.STATUS_CHANGED,
-        description: `Statut : ${oldLabel} → ${newLabel}${extra.lostReason ? ` (${extra.lostReason})` : ''}`,
+        description: `Statut : ${oldLabel} \u2192 ${newLabel}${extra.lostReason ? ` (${extra.lostReason})` : ''}`,
         oldStatusId,
         newStatusId,
       });
 
-      // Auto-conversion lead → client (désactivé ici — déclenché lors de la validation du devis)
+      // Auto-conversion lead -> client (desactive ici -- declenche lors de la validation du devis)
       let clientCreated = null;
       if (false && !currentLead?.client_id) {
         const convResult = await this.convertLeadToClient(
@@ -521,20 +467,25 @@ export const leadsService = {
         }
       }
 
-      return { data: enrichLead(updatedLead), error: null, clientCreated };
-    } catch (err) {
-      console.error('[leads] updateLeadStatus error:', err);
-      return { data: null, error: err };
-    }
+      return { lead: enrichLead(updatedLead), clientCreated };
+    }, 'leads.updateLeadStatus');
+
+    // Spread clientCreated to top-level for consumer compat
+    // (LeadModal accesses result.clientCreated directly)
+    return {
+      data: result.data?.lead ?? null,
+      error: result.error,
+      clientCreated: result.data?.clientCreated ?? null,
+    };
   },
 
   /**
-   * Assigne un lead à un commercial via RPC
+   * Assigne un lead a un commercial via RPC
    */
   async assignLead(leadId, assignedUserId, currentUserId) {
     if (!leadId) throw new Error('[leads] leadId requis');
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
         p_updates: {
@@ -543,14 +494,11 @@ export const leadsService = {
         },
       });
 
-      if (error) {
-        console.error('[leads] assignLead error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       const updated = Array.isArray(data) ? data[0] : data;
 
-      // Activité
+      // Activite
       if (updated) {
         await this._createActivity({
           leadId,
@@ -558,37 +506,34 @@ export const leadsService = {
           userId: currentUserId,
           type: LEAD_ACTIVITY_TYPES.LEAD_ASSIGNED,
           description: assignedUserId
-            ? `Lead assigné à un commercial`
-            : 'Lead désassigné',
+            ? `Lead assigne a un commercial`
+            : 'Lead desassigne',
         });
       }
 
-      return { data: enrichLead(updated), error: null };
-    } catch (err) {
-      console.error('[leads] assignLead error:', err);
-      return { data: null, error: err };
-    }
+      return enrichLead(updated);
+    }, 'leads.assignLead');
   },
 
   /**
-   * Enregistre un appel (incrémente call_count, met à jour last_call_date, crée activité)
+   * Enregistre un appel (incremente call_count, met a jour last_call_date, cree activite)
    */
   async logCall(leadId, { orgId, userId, result, callDate, description }) {
     if (!leadId) throw new Error('[leads] leadId requis');
 
-    // Description auto selon le résultat
-    const resultLabels = { no_answer: 'Pas de réponse', callback: 'À rappeler' };
-    const desc = description || (result ? `Appel — ${resultLabels[result] || result}` : 'Appel téléphonique');
+    // Description auto selon le resultat
+    const resultLabels = { no_answer: 'Pas de r\u00e9ponse', callback: '\u00c0 rappeler' };
+    const desc = description || (result ? `Appel \u2014 ${resultLabels[result] || result}` : 'Appel t\u00e9l\u00e9phonique');
 
-    try {
-      // Récupérer call_count actuel via RPC
+    return withErrorHandling(async () => {
+      // Recuperer call_count actuel via RPC
       const { data: rawLead } = await supabase.rpc('get_majordhome_lead_raw', {
         p_lead_id: leadId,
       });
 
       const current = Array.isArray(rawLead) ? rawLead[0] : rawLead;
 
-      // Écriture via RPC
+      // Ecriture via RPC
       const updates = {
         last_call_date: callDate ? `${callDate}T${new Date().toISOString().split('T')[1]}` : new Date().toISOString(),
         call_count: (current?.call_count || 0) + 1,
@@ -601,14 +546,11 @@ export const leadsService = {
         p_updates: updates,
       });
 
-      if (error) {
-        console.error('[leads] logCall error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       const updated = Array.isArray(data) ? data[0] : data;
 
-      // Créer activité phone_call
+      // Creer activite phone_call
       await this._createActivity({
         leadId,
         orgId,
@@ -617,23 +559,20 @@ export const leadsService = {
         description: desc,
       });
 
-      return { data: enrichLead(updated), error: null };
-    } catch (err) {
-      console.error('[leads] logCall error:', err);
-      return { data: null, error: err };
-    }
+      return enrichLead(updated);
+    }, 'leads.logCall');
   },
 
   /**
-   * Enregistrer une relance (suivi devis envoyé)
+   * Enregistrer une relance (suivi devis envoye)
    */
   async logFollowup(leadId, { orgId, userId, result, callDate, description }) {
     if (!leadId) throw new Error('[leads] leadId requis');
 
-    const resultLabels = { no_answer: 'Pas de réponse', callback: 'À rappeler', reached: 'Joint' };
-    const desc = description || (result ? `Relance — ${resultLabels[result] || result}` : 'Relance téléphonique');
+    const resultLabels = { no_answer: 'Pas de r\u00e9ponse', callback: '\u00c0 rappeler', reached: 'Joint' };
+    const desc = description || (result ? `Relance \u2014 ${resultLabels[result] || result}` : 'Relance t\u00e9l\u00e9phonique');
 
-    try {
+    return withErrorHandling(async () => {
       const { data: rawLead } = await supabase.rpc('get_majordhome_lead_raw', {
         p_lead_id: leadId,
       });
@@ -651,10 +590,7 @@ export const leadsService = {
         p_updates: updates,
       });
 
-      if (error) {
-        console.error('[leads] logFollowup error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
       const updated = Array.isArray(data) ? data[0] : data;
 
@@ -666,24 +602,21 @@ export const leadsService = {
         description: desc,
       });
 
-      return { data: enrichLead(updated), error: null };
-    } catch (err) {
-      console.error('[leads] logFollowup error:', err);
-      return { data: null, error: err };
-    }
+      return enrichLead(updated);
+    }, 'leads.logFollowup');
   },
 
   // ==========================================================================
-  // ACTIVITÉS (TIMELINE)
+  // ACTIVITES (TIMELINE)
   // ==========================================================================
 
   /**
-   * Récupère les activités d'un lead (vue enrichie avec old/new status)
+   * Recupere les activites d'un lead (vue enrichie avec old/new status)
    */
   async getLeadActivities(leadId, { limit = 50 } = {}) {
     if (!leadId) return { data: [], error: null };
 
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_lead_activities')
         .select('*')
@@ -691,27 +624,21 @@ export const leadsService = {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error) {
-        console.error('[leads] getLeadActivities error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
 
-      // Enrichir avec objets old_status/new_status imbriqués
+      // Enrichir avec objets old_status/new_status imbriques
       const enriched = (data || []).map(enrichActivity);
-      return { data: enriched, error: null };
-    } catch (err) {
-      console.error('[leads] getLeadActivities error:', err);
-      return { data: null, error: err };
-    }
+      return enriched;
+    }, 'leads.getLeadActivities');
   },
 
   /**
-   * Ajoute une note à un lead
+   * Ajoute une note a un lead
    */
   async addLeadNote(leadId, { orgId, userId, description }) {
     if (!leadId || !description) throw new Error('[leads] leadId et description requis');
 
-    try {
+    return withErrorHandling(async () => {
       const result = await this._createActivity({
         leadId,
         orgId,
@@ -720,38 +647,35 @@ export const leadsService = {
         description,
       });
 
-      return result;
-    } catch (err) {
-      console.error('[leads] addLeadNote error:', err);
-      return { data: null, error: err };
-    }
+      if (result.error) throw result.error;
+      return result.data;
+    }, 'leads.addLeadNote');
   },
 
   // ==========================================================================
-  // CONVERSION LEAD → CLIENT
+  // CONVERSION LEAD -> CLIENT
   // ==========================================================================
 
   /**
    * Convertit un lead en client CRM via clientsService.createClient
-   * Appelé automatiquement sur "Gagné" si pas de client_id,
+   * Appele automatiquement sur "Gagne" si pas de client_id,
    * ou manuellement via le bouton "Convertir en client".
-   * Si client_id existe déjà → skip (retourne skipped: true).
+   * Si client_id existe deja -> skip (retourne skipped: true).
    */
   async convertLeadToClient(leadId, orgId, userId) {
     if (!leadId || !orgId) throw new Error('[leads] leadId et orgId requis');
 
-    try {
-      // 1. Récupérer le lead (vue enrichie, lecture OK)
+    return withErrorHandling(async () => {
+      // 1. Recuperer le lead (vue enrichie, lecture OK)
       const { data: lead, error: leadError } = await this.getLeadById(leadId);
       if (leadError || !lead) throw leadError || new Error('Lead introuvable');
 
-      // 2. Si déjà lié à un client → skip
+      // 2. Si deja lie a un client -> skip
       if (lead.client_id) {
-        console.log('[leads] convertLeadToClient: client_id déjà présent, skip');
-        return { data: { lead, client: null, skipped: true }, error: null };
+        return { lead, client: null, skipped: true };
       }
 
-      // 3. Créer le client via clientsService (crée core.projects + majordhome.clients + activité)
+      // 3. Creer le client via clientsService (cree core.projects + majordhome.clients + activite)
       const clientCategory = lead.company_name ? 'entreprise' : 'particulier';
       const { data: client, error: clientError } = await clientsService.createClient({
         orgId,
@@ -771,12 +695,9 @@ export const leadsService = {
         createdBy: userId,
       });
 
-      if (clientError) {
-        console.error('[leads] convertLeadToClient - createClient error:', clientError);
-        return { data: null, error: clientError };
-      }
+      if (clientError) throw clientError;
 
-      // 4. Mettre à jour le lead avec client_id + converted_date + project_id
+      // 4. Mettre a jour le lead avec client_id + converted_date + project_id
       await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
         p_updates: {
@@ -787,7 +708,7 @@ export const leadsService = {
         },
       });
 
-      // 5. Créer l'activité lead_converted
+      // 5. Creer l'activite lead_converted
       const clientName = client.display_name || `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
       await this._createActivity({
         leadId,
@@ -798,11 +719,8 @@ export const leadsService = {
         metadata: { client_id: client.id },
       });
 
-      return { data: { lead, client, skipped: false }, error: null };
-    } catch (err) {
-      console.error('[leads] convertLeadToClient error:', err);
-      return { data: null, error: err };
-    }
+      return { lead, client, skipped: false };
+    }, 'leads.convertLeadToClient');
   },
 
   // ==========================================================================
@@ -810,11 +728,11 @@ export const leadsService = {
   // ==========================================================================
 
   /**
-   * Crée une entrée dans lead_activities via RPC
+   * Cree une entree dans lead_activities via RPC
    * @private
    */
   async _createActivity({ leadId, orgId, userId, type, description, oldStatusId, newStatusId, metadata }) {
-    try {
+    return withErrorHandling(async () => {
       const activityData = {
         lead_id: leadId,
         org_id: orgId || null,
@@ -831,27 +749,20 @@ export const leadsService = {
         p_data: activityData,
       });
 
-      if (error) {
-        console.error('[leads] _createActivity error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[leads] _createActivity error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'leads._createActivity');
   },
 
   // ============================================================================
-  // Recherche légère de leads (pour EventModal / recherche unifiée)
+  // Recherche legere de leads (pour EventModal / recherche unifiee)
   // ============================================================================
   async searchLeads(orgId, query, limit = 10) {
-    try {
-      if (!orgId || !query || query.length < 2) {
-        return { data: [], error: null };
-      }
+    if (!orgId || !query || query.length < 2) {
+      return { data: [], error: null };
+    }
 
+    return withErrorHandling(async () => {
       const term = `%${query}%`;
       const { data, error } = await supabase
         .from('majordhome_leads')
@@ -869,32 +780,24 @@ export const leadsService = {
         display_name: `${l.last_name || ''} ${l.first_name || ''}`.trim(),
       }));
 
-      return { data: results, error: null };
-    } catch (error) {
-      console.error('[leads] searchLeads:', error);
-      return { data: null, error };
-    }
+      return results;
+    }, 'leads.searchLeads');
   },
 
   /**
-   * Réordonne les leads dans une colonne kanban (persiste sort_order)
-   * @param {string[]} leadIds - IDs dans l'ordre souhaité
+   * Reordonne les leads dans une colonne kanban (persiste sort_order)
+   * @param {string[]} leadIds - IDs dans l'ordre souhaite
    */
   async reorderLeads(leadIds) {
     if (!leadIds?.length) return { error: null };
-    try {
+
+    return withErrorHandling(async () => {
       const { error } = await supabase.rpc('reorder_leads', {
         p_lead_ids: leadIds,
       });
-      if (error) {
-        console.error('[leads] reorderLeads error:', error);
-        return { error };
-      }
-      return { error: null };
-    } catch (err) {
-      console.error('[leads] reorderLeads error:', err);
-      return { error: err };
-    }
+      if (error) throw error;
+      return null;
+    }, 'leads.reorderLeads');
   },
 };
 

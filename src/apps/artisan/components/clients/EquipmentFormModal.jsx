@@ -36,7 +36,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
-import { useEquipmentBrands, usePricingEquipmentTypes } from '@/shared/hooks/useClients';
+import { useEquipmentBrands, usePricingEquipmentTypes } from '@hooks/useClients';
 
 // ============================================================================
 // UTILITAIRES

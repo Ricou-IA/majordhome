@@ -177,9 +177,7 @@ export function CertificatWizard({
       type_document: getTypeDocument(formData.equipement_type),
     };
 
-    console.log('[CertificatWizard] doSave payload:', { intervention_id: payload.intervention_id, client_id: payload.client_id, org_id: payload.org_id, equipement_type: payload.equipement_type });
     const result = await saveDraft(payload);
-    console.log('[CertificatWizard] doSave result:', result);
     if (result?.error) {
       console.error('[CertificatWizard] doSave ERROR:', result.error);
       toast.error('Erreur sauvegarde certificat: ' + (result.error?.message || JSON.stringify(result.error)));
@@ -240,7 +238,6 @@ export function CertificatWizard({
       }
     } catch {
       // Non-bloquant : la signature est capturée côté client
-      console.warn('[CertificatWizard] DB save failed, signature kept locally');
     }
 
     toast.success('Signature enregistrée');
@@ -270,7 +267,6 @@ export function CertificatWizard({
     if (Object.keys(updates).length === 0) return; // Rien à mettre à jour
 
     try {
-      console.log('[CertificatWizard] syncEquipmentBack →', eqId, updates);
       await clientsService.updateEquipment(eqId, updates);
     } catch (err) {
       // Non-bloquant : la sync est best-effort

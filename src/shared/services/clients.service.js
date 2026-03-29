@@ -7,12 +7,14 @@
  * majordhome_clients. Les équipements et interventions restent liés via
  * project_id (FK vers core.projects).
  *
- * @version 5.0.0 - Refonte complète : table clients dédiée
+ * @version 6.0.0 - withErrorHandling + extraction equipments.service
  * ============================================================================
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
 import { cleanPhone, formatPhoneForSearch } from '@/lib/phoneUtils';
+import { equipmentsService } from '@services/equipments.service';
 
 // ============================================================================
 // CONSTANTES
@@ -117,7 +119,7 @@ export const clientsService = {
     limit = DEFAULT_LIMIT,
     offset = 0,
   } = {}) {
-    try {
+    return withErrorHandlingCount(async () => {
       if (!orgId) throw new Error('[clientsService] orgId est requis');
 
       let query = supabase
@@ -199,11 +201,8 @@ export const clientsService = {
         }
       }
 
-      return { data: clients, count, error: null };
-    } catch (error) {
-      console.error('[clientsService] getClients:', error);
-      return { data: null, count: null, error };
-    }
+      return { data: clients, count };
+    }, 'clients.getClients');
   },
 
   // ==========================================================================
@@ -215,7 +214,7 @@ export const clientsService = {
    * @param {string} clientId - UUID du client (majordhome.clients.id)
    */
   async getClientById(clientId) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId est requis');
 
       // Requêtes en parallèle
@@ -269,7 +268,7 @@ export const clientsService = {
 
       if (clientResult.error) throw clientResult.error;
 
-      const client = {
+      return {
         ...clientResult.data,
         equipments: equipResult.data || [],
         interventions: interResult.data || [],
@@ -278,19 +277,14 @@ export const clientsService = {
         interventions_count: interResult.data?.length || 0,
         active_contracts: (equipResult.data || []).filter(e => e.contract_status === 'active').length,
       };
-
-      return { data: client, error: null };
-    } catch (error) {
-      console.error('[clientsService] getClientById:', error);
-      return { data: null, error };
-    }
+    }, 'clients.getClientById');
   },
 
   /**
    * Récupère un client par son project_id (pour compatibilité)
    */
   async getClientByProjectId(projectId) {
-    try {
+    return withErrorHandling(async () => {
       if (!projectId) throw new Error('[clientsService] projectId est requis');
 
       const { data, error } = await supabase
@@ -300,11 +294,8 @@ export const clientsService = {
         .single();
 
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] getClientByProjectId:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'clients.getClientByProjectId');
   },
 
   // ==========================================================================
@@ -337,7 +328,7 @@ export const clientsService = {
     createdBy = null,
     isWebDraft = false,
   } = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!orgId) throw new Error('[clientsService] orgId est requis');
 
       // Construire le nom affiché (forcer majuscules)
@@ -350,7 +341,7 @@ export const clientsService = {
       const slug = name
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
+        .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
 
@@ -422,11 +413,8 @@ export const clientsService = {
           created_by: createdBy,
         });
 
-      return { data: client, error: null };
-    } catch (error) {
-      console.error('[clientsService] createClient:', error);
-      return { data: null, error };
-    }
+      return client;
+    }, 'clients.createClient');
   },
 
   /**
@@ -434,7 +422,7 @@ export const clientsService = {
    * Appelé lors de la complétion de fiche ou planification d'entretien
    */
   async confirmWebDraft(clientId) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId requis');
 
       const { error } = await supabase
@@ -443,11 +431,8 @@ export const clientsService = {
         .eq('id', clientId);
 
       if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      console.error('[clientsService] confirmWebDraft:', error);
-      return { error };
-    }
+      return true;
+    }, 'clients.confirmWebDraft');
   },
 
   // ==========================================================================
@@ -459,7 +444,7 @@ export const clientsService = {
    * Synchronise également core.projects.identity pour compatibilité
    */
   async updateClient(clientId, updates = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId est requis');
 
       // Construire les données de mise à jour
@@ -571,11 +556,8 @@ export const clientsService = {
         }
       }
 
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] updateClient:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'clients.updateClient');
   },
 
   // ==========================================================================
@@ -586,8 +568,28 @@ export const clientsService = {
    * Archive un client (soft delete)
    */
   async archiveClient(clientId) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId est requis');
+
+      // Clore automatiquement le contrat actif s'il existe
+      const { data: activeContract } = await supabase
+        .from('majordhome_contracts')
+        .select('id, status')
+        .eq('client_id', clientId)
+        .in('status', ['active', 'pending'])
+        .maybeSingle();
+
+      if (activeContract) {
+        await supabase
+          .from('majordhome_contracts_write')
+          .update({
+            status: 'cancelled',
+            cancellation_reason: 'archivage_client',
+            cancelled_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', activeContract.id);
+      }
 
       const { error } = await supabase
         .from('majordhome_clients')
@@ -598,18 +600,15 @@ export const clientsService = {
         .eq('id', clientId);
 
       if (error) throw error;
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('[clientsService] archiveClient:', error);
-      return { success: false, error };
-    }
+      return true;
+    }, 'clients.archiveClient');
   },
 
   /**
    * Désarchive un client
    */
   async unarchiveClient(clientId) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId est requis');
 
       const { error } = await supabase
@@ -621,168 +620,18 @@ export const clientsService = {
         .eq('id', clientId);
 
       if (error) throw error;
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('[clientsService] unarchiveClient:', error);
-      return { success: false, error };
-    }
+      return true;
+    }, 'clients.unarchiveClient');
   },
 
   // ==========================================================================
-  // ÉQUIPEMENTS
+  // ÉQUIPEMENTS (délégués à equipmentsService — rétrocompatibilité)
   // ==========================================================================
 
-  /**
-   * Récupère les équipements d'un client via son project_id
-   */
-  async getClientEquipments(clientId) {
-    try {
-      if (!clientId) throw new Error('[clientsService] clientId est requis');
-
-      // Récupérer le project_id
-      const { data: client, error: clientError } = await supabase
-        .from('majordhome_clients')
-        .select('project_id')
-        .eq('id', clientId)
-        .single();
-
-      if (clientError) throw clientError;
-
-      const { data, error } = await supabase
-        .from('majordhome_equipments')
-        .select('*')
-        .eq('project_id', client.project_id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] getClientEquipments:', error);
-      return { data: null, error };
-    }
-  },
-
-  /**
-   * Ajoute un équipement à un client
-   */
-  async addEquipment(clientId, equipmentData = {}) {
-    try {
-      if (!clientId) throw new Error('[clientsService] clientId est requis');
-
-      // Récupérer le project_id
-      const { data: client, error: clientError } = await supabase
-        .from('majordhome_clients')
-        .select('project_id, org_id')
-        .eq('id', clientId)
-        .single();
-
-      if (clientError) throw clientError;
-
-      const { data, error } = await supabase
-        .from('majordhome_equipments')
-        .insert({
-          project_id: client.project_id,
-          category: equipmentData.category,
-          equipment_type_id: equipmentData.equipmentTypeId || null,
-          brand: equipmentData.brand,
-          model: equipmentData.model,
-          serial_number: equipmentData.serialNumber,
-          install_date: equipmentData.installDate,
-          warranty_end_date: equipmentData.warrantyEndDate,
-          maintenance_frequency_months: equipmentData.maintenanceFrequency,
-          contract_type: equipmentData.contractType,
-          contract_tarif: equipmentData.contractTarif,
-          contract_start_date: equipmentData.contractStartDate,
-          contract_status: equipmentData.contractStatus || 'none',
-          installation_year: equipmentData.installationYear ? parseInt(equipmentData.installationYear) : null,
-          notes: equipmentData.notes,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Ajouter activité timeline
-      await supabase
-        .from('majordhome_client_activities')
-        .insert({
-          client_id: clientId,
-          org_id: client.org_id,
-          activity_type: 'equipment_added',
-          title: 'Équipement ajouté',
-          description: `${equipmentData.brand || ''} ${equipmentData.model || ''} (${equipmentData.category || ''})`.trim(),
-          reference_type: 'equipment',
-          reference_id: data.id,
-          is_system: true,
-        });
-
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] addEquipment:', error);
-      return { data: null, error };
-    }
-  },
-
-  /**
-   * Met à jour un équipement
-   */
-  async updateEquipment(equipmentId, updates = {}) {
-    try {
-      if (!equipmentId) throw new Error('[clientsService] equipmentId est requis');
-
-      const updateData = {};
-      if (updates.category !== undefined) updateData.category = updates.category;
-      if (updates.equipmentTypeId !== undefined) updateData.equipment_type_id = updates.equipmentTypeId || null;
-      if (updates.brand !== undefined) updateData.brand = updates.brand;
-      if (updates.model !== undefined) updateData.model = updates.model;
-      if (updates.serialNumber !== undefined) updateData.serial_number = updates.serialNumber;
-      if (updates.installDate !== undefined) updateData.install_date = updates.installDate;
-      if (updates.warrantyEndDate !== undefined) updateData.warranty_end_date = updates.warrantyEndDate;
-      if (updates.maintenanceFrequency !== undefined) updateData.maintenance_frequency_months = updates.maintenanceFrequency;
-      if (updates.lastMaintenanceDate !== undefined) updateData.last_maintenance_date = updates.lastMaintenanceDate;
-      if (updates.nextMaintenanceDue !== undefined) updateData.next_maintenance_due = updates.nextMaintenanceDue;
-      if (updates.contractType !== undefined) updateData.contract_type = updates.contractType;
-      if (updates.contractTarif !== undefined) updateData.contract_tarif = updates.contractTarif;
-      if (updates.contractStartDate !== undefined) updateData.contract_start_date = updates.contractStartDate;
-      if (updates.contractStatus !== undefined) updateData.contract_status = updates.contractStatus;
-      if (updates.installationYear !== undefined) updateData.installation_year = updates.installationYear ? parseInt(updates.installationYear) : null;
-      if (updates.notes !== undefined) updateData.notes = updates.notes;
-      if (updates.status !== undefined) updateData.status = updates.status;
-
-      const { data, error } = await supabase
-        .from('majordhome_equipments')
-        .update(updateData)
-        .eq('id', equipmentId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] updateEquipment:', error);
-      return { data: null, error };
-    }
-  },
-
-  /**
-   * Supprime un équipement
-   */
-  async deleteEquipment(equipmentId) {
-    try {
-      if (!equipmentId) throw new Error('[clientsService] equipmentId est requis');
-
-      const { error } = await supabase
-        .from('majordhome_equipments')
-        .delete()
-        .eq('id', equipmentId);
-
-      if (error) throw error;
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('[clientsService] deleteEquipment:', error);
-      return { success: false, error };
-    }
-  },
+  getClientEquipments: (...args) => equipmentsService.getClientEquipments(...args),
+  addEquipment: (...args) => equipmentsService.addEquipment(...args),
+  updateEquipment: (...args) => equipmentsService.updateEquipment(...args),
+  deleteEquipment: (...args) => equipmentsService.deleteEquipment(...args),
 
   // ==========================================================================
   // INTERVENTIONS
@@ -792,7 +641,7 @@ export const clientsService = {
    * Récupère les interventions d'un client
    */
   async getClientInterventions(clientId, { limit = 50 } = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId est requis');
 
       const { data: client, error: clientError } = await supabase
@@ -811,11 +660,8 @@ export const clientsService = {
         .limit(limit);
 
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] getClientInterventions:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'clients.getClientInterventions');
   },
 
   // ==========================================================================
@@ -826,7 +672,7 @@ export const clientsService = {
    * Récupère les activités d'un client (timeline)
    */
   async getClientActivities(clientId, { limit = 50 } = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[clientsService] clientId est requis');
 
       const { data, error } = await supabase
@@ -837,11 +683,8 @@ export const clientsService = {
         .limit(limit);
 
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] getClientActivities:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'clients.getClientActivities');
   },
 
   /**
@@ -856,7 +699,7 @@ export const clientsService = {
     isPinned = false,
     createdBy = null,
   } = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId || !orgId) throw new Error('[clientsService] clientId et orgId requis');
       if (!title) throw new Error('[clientsService] title est requis');
 
@@ -876,11 +719,8 @@ export const clientsService = {
         .single();
 
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[clientsService] addClientNote:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'clients.addClientNote');
   },
 
   // ==========================================================================
@@ -891,7 +731,7 @@ export const clientsService = {
    * Récupère les statistiques clients
    */
   async getClientStats(orgId) {
-    try {
+    return withErrorHandling(async () => {
       if (!orgId) throw new Error('[clientsService] orgId est requis');
 
       // Requêtes count en parallèle (pas de limit, juste les comptages)
@@ -938,19 +778,13 @@ export const clientsService = {
       if (totalResult.error) throw totalResult.error;
 
       return {
-        data: {
-          total_clients: totalResult.count || 0,
-          active_contracts: contractResult.count || 0,
-          particuliers: particulierResult.count || 0,
-          entreprises: entrepriseResult.count || 0,
-          archived: archivedResult.count || 0,
-        },
-        error: null,
+        total_clients: totalResult.count || 0,
+        active_contracts: contractResult.count || 0,
+        particuliers: particulierResult.count || 0,
+        entreprises: entrepriseResult.count || 0,
+        archived: archivedResult.count || 0,
       };
-    } catch (error) {
-      console.error('[clientsService] getClientStats:', error);
-      return { data: null, error };
-    }
+    }, 'clients.getClientStats');
   },
 
   // ==========================================================================
@@ -962,7 +796,7 @@ export const clientsService = {
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
   async getBrands() {
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_equipment_brands')
         .select('*')
@@ -970,11 +804,8 @@ export const clientsService = {
         .order('display_order');
 
       if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('[clientsService] getBrands:', error);
-      return { data: [], error };
-    }
+      return data || [];
+    }, 'clients.getBrands');
   },
 
   /**
@@ -983,7 +814,7 @@ export const clientsService = {
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
   async getPricingEquipmentTypes() {
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_pricing_equipment_types')
         .select('*')
@@ -991,11 +822,8 @@ export const clientsService = {
         .order('sort_order');
 
       if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('[clientsService] getPricingEquipmentTypes:', error);
-      return { data: [], error };
-    }
+      return data || [];
+    }, 'clients.getPricingEquipmentTypes');
   },
 
   // ==========================================================================
@@ -1011,12 +839,10 @@ export const clientsService = {
    * @returns {{ data: Array, error: null|Error }}
    */
   async checkDuplicates(orgId, lastName, postalCode) {
-    try {
+    return withErrorHandling(async () => {
       if (!orgId || !lastName || lastName.trim().length < 2) {
-        return { data: [], error: null };
+        return [];
       }
-
-      console.log('[clientsService] checkDuplicates', { orgId, lastName, postalCode });
 
       let query = supabase
         .from('majordhome_clients')
@@ -1031,25 +857,18 @@ export const clientsService = {
 
       const { data, error } = await query.limit(5);
 
-      if (error) {
-        console.error('[clientsService] checkDuplicates error:', error);
-        return { data: [], error };
-      }
-
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('[clientsService] checkDuplicates exception:', error);
-      return { data: [], error };
-    }
+      if (error) throw error;
+      return data || [];
+    }, 'clients.checkDuplicates');
   },
 
   /**
    * Recherche rapide pour autocomplete
    */
   async searchClients(orgId, query, limit = 10) {
-    try {
+    return withErrorHandling(async () => {
       if (!orgId || !query || query.length < 2) {
-        return { data: [], error: null };
+        return [];
       }
 
       const { data, error } = await supabase
@@ -1074,16 +893,11 @@ export const clientsService = {
 
       if (error) throw error;
 
-      const results = (data || []).map(c => ({
+      return (data || []).map(c => ({
         ...c,
         display: `${c.display_name}${c.city ? ` - ${c.city}` : ''}`,
       }));
-
-      return { data: results, error: null };
-    } catch (error) {
-      console.error('[clientsService] searchClients:', error);
-      return { data: null, error };
-    }
+    }, 'clients.searchClients');
   },
 };
 

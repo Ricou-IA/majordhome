@@ -36,8 +36,8 @@ import {
   Link2,
   Unlink,
 } from 'lucide-react';
-import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@/shared/services/clients.service';
-import { usePricingEquipmentTypes } from '@/shared/hooks/useClients';
+import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@services/clients.service';
+import { usePricingEquipmentTypes } from '@hooks/useClients';
 import { formatDateShortFR } from '@/lib/utils';
 
 // ============================================================================

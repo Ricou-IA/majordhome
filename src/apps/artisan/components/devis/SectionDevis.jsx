@@ -7,7 +7,7 @@
  */
 
 import { Component } from 'react';
-import { useDevisByLead } from '@/shared/hooks/useDevis';
+import { useDevisByLead } from '@hooks/useDevis';
 
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import { FileText, Plus, ChevronRight, Loader2, Send } from 'lucide-react';

@@ -8,12 +8,12 @@
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { prospectsService } from '@/shared/services/prospects.service';
-import { prospectKeys } from '@/shared/hooks/cacheKeys';
-import { usePaginatedList } from '@/shared/hooks/usePaginatedList';
+import { prospectsService } from '@services/prospects.service';
+import { prospectKeys, clientKeys } from '@hooks/cacheKeys';
+import { usePaginatedList } from '@hooks/usePaginatedList';
 
 // Re-export pour les consumers existants
-export { prospectKeys } from '@/shared/hooks/cacheKeys';
+export { prospectKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // CONSTANTES
@@ -231,7 +231,7 @@ export function useProspectMutations() {
     onSuccess: () => {
       invalidateAll();
       // Invalider aussi la liste clients
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all });
     },
   });
 

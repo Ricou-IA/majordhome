@@ -11,8 +11,8 @@
  */
 
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
-import { geocodeAddress } from '@/shared/services/geocoding.service';
-import { detectZoneFromPostalCode } from '@/shared/services/pricing.service';
+import { geocodeAddress } from '@services/geocoding.service';
+import { detectZoneFromPostalCode } from '@services/pricing.service';
 
 // Coordonnées du siège (Gaillac)
 const HQ_LNG = MAPBOX_CONFIG.defaultCenter[0]; // 1.8898
