@@ -20,6 +20,7 @@ import {
   User,
   Factory,
   Target,
+  Grid3x3,
 } from 'lucide-react';
 
 // =============================================================================
@@ -36,6 +37,7 @@ const navigation = [
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
+  { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
 ];
 
 // =============================================================================

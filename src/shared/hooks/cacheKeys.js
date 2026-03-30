@@ -135,6 +135,15 @@ export const supplierKeys = {
   searchProducts: (orgId, query) => [...supplierKeys.all, 'search-products', orgId, query],
 };
 
+// --- GeoGrid ---
+export const geogridKeys = {
+  all: ['geogrid'],
+  lists: () => [...geogridKeys.all, 'list'],
+  list: (orgId) => [...geogridKeys.lists(), orgId],
+  detail: (scanId) => [...geogridKeys.all, 'detail', scanId],
+  results: (scanId) => [...geogridKeys.all, 'results', scanId],
+};
+
 // --- Devis (Quotes) ---
 export const devisKeys = {
   all: ['devis'],

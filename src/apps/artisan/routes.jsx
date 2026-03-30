@@ -18,6 +18,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Territoire = lazy(() => import('./pages/Territoire'));
 const Chantiers = lazy(() => import('./pages/Chantiers'));
+const GeoGrid = lazy(() => import('./pages/GeoGrid'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
 const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
 const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
@@ -217,6 +218,16 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <Territoire />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'geogrid',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <GeoGrid />
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },
