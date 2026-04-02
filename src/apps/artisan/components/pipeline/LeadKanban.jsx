@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@hooks/useLeads';
@@ -106,6 +106,69 @@ function MonthFilterDropdown({ value, onChange }) {
 }
 
 // ============================================================================
+// FILTRE COMMERCIAL
+// ============================================================================
+
+function CommercialFilterDropdown({ value, onChange, commercials }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = commercials.find((c) => c.id === value);
+  const hasValue = !!value;
+
+  const options = [
+    { value: '', label: 'Tous les commerciaux' },
+    ...commercials.map((c) => ({ value: c.id, label: c.full_name })),
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`
+          inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors min-h-[40px]
+          ${hasValue
+            ? 'bg-blue-50 border-blue-200 text-blue-700'
+            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+          }
+        `}
+      >
+        <UserCircle className="w-4 h-4" />
+        <span className="text-sm font-medium truncate max-w-[140px]">
+          {selected?.full_name || 'Commercial'}
+        </span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+            {options.map((option) => (
+              <button
+                key={option.value ?? 'all'}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
+                  ${option.value === value
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                  }
+                `}
+              >
+                <span>{option.label}</span>
+                {option.value === value && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
@@ -145,6 +208,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const [allLeads, setAllLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedCommercialId, setSelectedCommercialId] = useState('');
+
+  const canFilterCommercial = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
 
   // Charger les leads (commercial = les siens uniquement)
   const fetchLeads = useCallback(async () => {
@@ -157,6 +223,10 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       // Commercial : filtrer sur ses propres leads via l'ID commercial (pas l'ID auth)
       if (effectiveRole === 'commercial' && myCommercialId) {
         dateFilters.assignedUserId = myCommercialId;
+      }
+      // Admin/team_leader : filtre commercial optionnel
+      if (canFilterCommercial && selectedCommercialId) {
+        dateFilters.assignedUserId = selectedCommercialId;
       }
       const { data, error } = await leadsService.getLeads({
         orgId,
@@ -172,7 +242,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orgId, selectedMonth, effectiveRole, myCommercialId]);
+  }, [orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId]);
 
   useEffect(() => {
     fetchLeads();
@@ -188,6 +258,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         if (effectiveRole === 'commercial' && myCommercialId) {
           dateFilters.assignedUserId = myCommercialId;
         }
+        if (canFilterCommercial && selectedCommercialId) {
+          dateFilters.assignedUserId = selectedCommercialId;
+        }
         const { data, error } = await leadsService.getLeads({
           orgId,
           filters: dateFilters,
@@ -201,7 +274,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
     };
     refetch();
-  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId]);
+  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId]);
 
   // Pre-sort leads by sort_order then updated_at (KanbanBoard preserves order)
   const sortedLeads = useMemo(() => {
@@ -480,6 +553,13 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
       headerRight={
         <>
+          {canFilterCommercial && (
+            <CommercialFilterDropdown
+              value={selectedCommercialId}
+              onChange={setSelectedCommercialId}
+              commercials={commercials}
+            />
+          )}
           <MonthFilterDropdown value={selectedMonth} onChange={setSelectedMonth} />
           <button
             onClick={fetchLeads}

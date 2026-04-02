@@ -193,6 +193,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           className={inputClass}
           placeholder="Prénom"
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </FormField>
       <FormField label="Nom" required>
@@ -203,6 +204,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           className={inputClass}
           placeholder="Nom *"
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </FormField>
     </div>
@@ -215,6 +217,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
         className={inputClass}
         placeholder="Optionnel — rempli si B2B"
         disabled={contactFieldsDisabled}
+        autoComplete="off"
       />
     </FormField>
 
@@ -229,6 +232,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
             className={`${inputClass} pl-9`}
             placeholder="06 00 00 00 00"
             disabled={contactFieldsDisabled}
+            autoComplete="off"
           />
         </div>
       </FormField>
@@ -240,6 +244,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           className={inputClass}
           placeholder="Optionnel"
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </FormField>
     </div>
@@ -254,6 +259,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           className={`${inputClass} pl-9`}
           placeholder="email@exemple.fr"
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </div>
     </FormField>
@@ -268,6 +274,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           className={`${inputClass} pl-9`}
           placeholder="Adresse"
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </div>
     </FormField>
@@ -279,6 +286,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
       className={`${inputClass} mt-2`}
       placeholder="Complément d'adresse"
       disabled={contactFieldsDisabled}
+      autoComplete="off"
     />
 
     <div className="grid grid-cols-3 gap-3 mt-2">
@@ -291,6 +299,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           placeholder="81600"
           maxLength={5}
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </FormField>
       <FormField label="Ville" className="col-span-2">
@@ -301,6 +310,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
           className={inputClass}
           placeholder="Gaillac"
           disabled={contactFieldsDisabled}
+          autoComplete="off"
         />
       </FormField>
     </div>

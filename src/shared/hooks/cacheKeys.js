@@ -144,6 +144,16 @@ export const geogridKeys = {
   results: (scanId) => [...geogridKeys.all, 'results', scanId],
 };
 
+// --- Tasks ---
+export const taskKeys = {
+  all: ['tasks'],
+  lists: () => [...taskKeys.all, 'list'],
+  list: (orgId) => [...taskKeys.lists(), orgId],
+  archived: (orgId) => [...taskKeys.all, 'archived', orgId],
+  detail: (id) => [...taskKeys.all, 'detail', id],
+  notes: (taskId) => [...taskKeys.all, 'notes', taskId],
+};
+
 // --- Devis (Quotes) ---
 export const devisKeys = {
   all: ['devis'],

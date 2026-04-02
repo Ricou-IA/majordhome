@@ -268,6 +268,10 @@ export const leadsService = {
     if (!orgId) throw new Error('[leads] orgId requis');
 
     return withErrorHandling(async () => {
+      // Normalize name casing
+      if (leadData.last_name) leadData.last_name = leadData.last_name.toUpperCase();
+      if (leadData.first_name) leadData.first_name = leadData.first_name.toUpperCase();
+
       const insertData = {
         org_id: orgId,
         ...leadData,
@@ -290,7 +294,7 @@ export const leadsService = {
           orgId,
           userId,
           type: LEAD_ACTIVITY_TYPES.LEAD_CREATED,
-          description: `Lead cree : ${created.first_name || ''} ${created.last_name || ''}`.trim(),
+          description: `Lead cree : ${created.last_name || ''} ${created.first_name || ''}`.trim(),
         });
       }
 
@@ -306,6 +310,10 @@ export const leadsService = {
     if (!leadId) throw new Error('[leads] leadId requis');
 
     return withErrorHandling(async () => {
+      // Normalize name casing
+      if (updates.last_name) updates.last_name = updates.last_name.toUpperCase();
+      if (updates.first_name) updates.first_name = updates.first_name.toUpperCase();
+
       const { data, error } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: leadId,
         p_updates: {

@@ -47,7 +47,7 @@ export function FormField({ label, required = false, error = null, className = '
 /**
  * TextInput — input contrôlé (text, date, number, email)
  */
-export function TextInput({ value, onChange, placeholder, type = 'text', disabled = false, ...props }) {
+export function TextInput({ value, onChange, placeholder, type = 'text', disabled = false, autoComplete = 'off', ...props }) {
   return (
     <input
       type={type}
@@ -55,6 +55,7 @@ export function TextInput({ value, onChange, placeholder, type = 'text', disable
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
+      autoComplete={autoComplete}
       className={`${baseClass} ${disabled ? disabledClass : enabledClass}`}
       {...props}
     />
@@ -72,6 +73,7 @@ export function PhoneInput({ value, onChange, placeholder = '06 12 34 56 78', di
       onChange={(e) => onChange(formatPhoneNumber(e.target.value))}
       placeholder={placeholder}
       disabled={disabled}
+      autoComplete="off"
       maxLength={14}
       className={`${baseClass} ${disabled ? disabledClass : enabledClass}`}
     />

@@ -29,6 +29,9 @@ const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
 // Contrat signature
 const ContractSign = lazy(() => import('./pages/ContractSign'));
 
+// Tasks
+const Tasks = lazy(() => import('./pages/Tasks'));
+
 // Prospection
 const CedantsPipeline = lazy(() => import('@apps/prospection/cedants/CedantsPipeline'));
 const CommercialPipeline = lazy(() => import('@apps/prospection/commercial/CommercialPipeline'));
@@ -237,6 +240,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="chantiers">
           <Chantiers />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'tasks',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="tasks">
+          <Tasks />
         </RouteGuard>
       </SuspenseWrapper>
     ),

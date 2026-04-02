@@ -33,6 +33,7 @@ export const RESOURCES = [
   { key: 'cedants',    label: 'Cédants' },
   { key: 'prospection_commerciale', label: 'Prospection' },
   { key: 'devis',      label: 'Devis' },
+  { key: 'tasks',      label: 'Tâches' },
   { key: 'settings',   label: 'Paramètres' },
 ];
 

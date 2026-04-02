@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
+import { useOrgMembers } from '@hooks/usePermissions';
+import { useTaskMutations } from '@hooks/useTasks';
 import { ROLE_LABELS } from '@lib/permissions';
+import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
 import {
+  Plus,
   LayoutDashboard,
   Calendar,
   Users,
@@ -21,6 +26,7 @@ import {
   Factory,
   Target,
   Grid3x3,
+  ListTodo,
 } from 'lucide-react';
 
 // =============================================================================
@@ -35,6 +41,7 @@ const navigation = [
   { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
+  { name: 'Tâches',     href: '/tasks',      icon: ListTodo,        resource: 'tasks' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
@@ -53,6 +60,26 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // État dropdown utilisateur
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  // État modal nouvelle tâche (header global)
+  const [showTaskCreate, setShowTaskCreate] = useState(false);
+
+  const orgId = organization?.id;
+  const { members } = useOrgMembers(orgId);
+  const { createTask } = useTaskMutations();
+
+  const taskMembersList = (members || []).map((m) => ({
+    user_id: m.user_id,
+    full_name: m.profile?.full_name || m.full_name || m.display_name || m.email || '—',
+    email: m.profile?.email || m.email,
+  }));
+
+  const handleCreateTask = useCallback(
+    async (data) => {
+      const result = await createTask({ orgId, ...data });
+      if (result?.error) throw result.error;
+    },
+    [createTask, orgId]
+  );
 
   // ===========================================================================
   // HANDLERS
@@ -222,6 +249,19 @@ export default function AppLayout() {
             {/* Spacer */}
             <div className="flex-1" />
 
+            {/* Quick task button */}
+            {can('tasks', 'create') && (
+              <button
+                onClick={() => setShowTaskCreate(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 mr-3 text-sm font-medium text-white
+                  bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                title="Nouvelle tâche"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Nouvelle tâche</span>
+              </button>
+            )}
+
             {/* User menu */}
             <div className="relative">
               <button
@@ -300,6 +340,15 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Global task create modal */}
+      {showTaskCreate && (
+        <TaskCreateModal
+          onClose={() => setShowTaskCreate(false)}
+          onCreate={handleCreateTask}
+          members={taskMembersList}
+        />
+      )}
     </div>
   );
 }

@@ -128,7 +128,7 @@ function getCommercialColor(index) {
 export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
   if (!lead) return null;
 
-  const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Sans nom';
+  const name = `${lead.last_name || ''} ${lead.first_name || ''}`.trim() || 'Sans nom';
   const statusLabel = lead.statuses?.label || '—';
   const statusColor = lead.statuses?.color || '#6B7280';
   const sourceRaw = lead.sources?.name || null;
