@@ -862,6 +862,85 @@ export const clientsService = {
     }, 'clients.checkDuplicates');
   },
 
+  // ==========================================================================
+  // CLIENTS LIÉS (Propriétaire / Locataire)
+  // ==========================================================================
+
+  /**
+   * Récupère les clients liés (propriétaire et/ou locataires)
+   * @returns {{ owner: object|null, tenants: object[] }}
+   */
+  async getLinkedClients(clientId, orgId) {
+    return withErrorHandling(async () => {
+      if (!clientId || !orgId) return { owner: null, tenants: [] };
+
+      const selectCols = 'id, display_name, city, postal_code, phone, email, client_number, client_category, has_active_contract, address';
+
+      // 1. Récupérer owner_client_id du client courant
+      const { data: self } = await supabase
+        .from('majordhome_clients_all')
+        .select('owner_client_id')
+        .eq('id', clientId)
+        .single();
+
+      // 2. En parallèle : propriétaire (si locataire) + locataires (si propriétaire)
+      const [ownerResult, tenantsResult] = await Promise.all([
+        self?.owner_client_id
+          ? supabase.from('majordhome_clients').select(selectCols).eq('id', self.owner_client_id).single()
+          : Promise.resolve({ data: null }),
+        supabase.from('majordhome_clients').select(selectCols).eq('org_id', orgId).eq('owner_client_id', clientId),
+      ]);
+
+      return {
+        owner: ownerResult.data || null,
+        tenants: tenantsResult.data || [],
+      };
+    }, 'clients.getLinkedClients');
+  },
+
+  /**
+   * Lie un client comme locataire d'un propriétaire
+   * @param {string} tenantClientId - Le client locataire
+   * @param {string} ownerClientId - Le client propriétaire
+   */
+  async linkClientAsOwner(tenantClientId, ownerClientId) {
+    return withErrorHandling(async () => {
+      if (!tenantClientId || !ownerClientId) throw new Error('IDs requis');
+      if (tenantClientId === ownerClientId) throw new Error('Un client ne peut pas être son propre propriétaire');
+
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('clients')
+        .update({ owner_client_id: ownerClientId })
+        .eq('id', tenantClientId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }, 'clients.linkClientAsOwner');
+  },
+
+  /**
+   * Supprime le lien propriétaire d'un client (le délie)
+   */
+  async unlinkClient(clientId) {
+    return withErrorHandling(async () => {
+      if (!clientId) throw new Error('clientId requis');
+
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('clients')
+        .update({ owner_client_id: null })
+        .eq('id', clientId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }, 'clients.unlinkClient');
+  },
+
   /**
    * Recherche rapide pour autocomplete
    */

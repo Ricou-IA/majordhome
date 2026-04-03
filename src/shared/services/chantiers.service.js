@@ -13,6 +13,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { leadsService } from '@services/leads.service';
+import { storageService } from '@services/storage.service';
 
 // ============================================================================
 // CONSTANTES
@@ -23,7 +24,7 @@ export const CHANTIER_STATUSES = [
   { value: 'commande_a_faire', label: 'Commande à faire', color: '#F59E0B', display_order: 2 },
   { value: 'commande_recue', label: 'À planifier', color: '#3B82F6', display_order: 3 },
   { value: 'planification', label: 'Planification', color: '#8B5CF6', display_order: 4 },
-  { value: 'realise', label: 'Réalisé', color: '#6B7280', display_order: 5 },
+  { value: 'realise', label: 'Réceptionné', color: '#6B7280', display_order: 5 },
   { value: 'facture', label: 'Facturé', color: '#0D9488', display_order: 6 },
 ];
 
@@ -219,6 +220,51 @@ export const chantiersService = {
     return leadsService.updateLead(leadId, {
       chantier_notes: notes || null,
     });
+  },
+
+  // ==========================================================================
+  // PV DE RÉCEPTION
+  // ==========================================================================
+
+  /**
+   * Upload le PV de réception et enregistre le chemin sur le lead
+   */
+  async uploadPvReception(leadId, file) {
+    if (!leadId || !file) throw new Error('[chantiers] leadId et file requis');
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+    const storagePath = `pv-reception/${leadId}/PV_Reception_${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await storageService.uploadFile(
+      'interventions',
+      storagePath,
+      file,
+      { upsert: true, contentType: file.type },
+    );
+    if (uploadError) return { data: null, error: uploadError };
+
+    const result = await leadsService.updateLead(leadId, {
+      pv_reception_path: storagePath,
+    });
+    return result;
+  },
+
+  /**
+   * Met à jour uniquement le chemin PV (utilisé par la page de signature)
+   */
+  async updatePvReceptionPath(leadId, storagePath) {
+    if (!leadId) throw new Error('[chantiers] leadId requis');
+    return leadsService.updateLead(leadId, {
+      pv_reception_path: storagePath,
+    });
+  },
+
+  /**
+   * Retourne une URL signée pour le PV de réception
+   */
+  async getPvReceptionUrl(pdfPath) {
+    if (!pdfPath) return { url: null, error: null };
+    return storageService.getSignedUrl('interventions', pdfPath);
   },
 };
 

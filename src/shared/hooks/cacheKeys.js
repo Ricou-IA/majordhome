@@ -20,6 +20,7 @@ export const clientKeys = {
   brands: () => [...clientKeys.all, 'brands'],
   pricingTypes: () => [...clientKeys.all, 'pricing-types'],
   duplicates: (orgId, name, postal) => [...clientKeys.all, 'duplicates', orgId, name, postal],
+  linked: (clientId) => [...clientKeys.all, 'linked', clientId],
 };
 
 // --- Contracts ---
@@ -133,6 +134,8 @@ export const supplierKeys = {
   products: (supplierId) => [...supplierKeys.all, 'products', supplierId],
   allProducts: (orgId) => [...supplierKeys.all, 'all-products', orgId],
   searchProducts: (orgId, query) => [...supplierKeys.all, 'search-products', orgId, query],
+  productDocuments: (productId) => [...supplierKeys.all, 'product-documents', productId],
+  productDocumentsByIds: (ids) => [...supplierKeys.all, 'product-documents-batch', ...(ids || [])],
 };
 
 // --- GeoGrid ---

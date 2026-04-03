@@ -36,7 +36,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
-import { useEquipmentBrands, usePricingEquipmentTypes } from '@hooks/useClients';
+import { usePricingEquipmentTypes } from '@hooks/useClients';
+import { useSuppliers, useAllProducts } from '@hooks/useSuppliers';
 
 // ============================================================================
 // UTILITAIRES
@@ -76,6 +77,8 @@ const INITIAL_FORM = {
   model: '',
   serialNumber: '',
   installationYear: '',
+  installationType: '',
+  supplierProductId: '',
   notes: '',
 };
 
@@ -89,10 +92,18 @@ export function EquipmentFormModal({
   onSubmit,
   isSubmitting = false,
   equipment = null, // null = ajout, objet = édition
+  orgId = null,
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
-  const { brands, isLoading: brandsLoading } = useEquipmentBrands();
+  const { suppliers, isLoading: suppliersLoading } = useSuppliers(orgId);
   const { equipmentTypes, isLoading: typesLoading } = usePricingEquipmentTypes();
+  const { products: allProducts } = useAllProducts(orgId);
+
+  // Produits du fournisseur (marque) sélectionné
+  const supplierProducts = useMemo(() => {
+    if (!form.brand || !allProducts.length) return [];
+    return allProducts.filter(p => p.supplier_id === form.brand);
+  }, [form.brand, allProducts]);
 
   // Mode édition ou ajout
   const isEditMode = !!equipment;
@@ -112,25 +123,38 @@ export function EquipmentFormModal({
   useEffect(() => {
     if (isOpen) {
       if (equipment) {
-        // Mode édition : pré-remplir avec les données existantes
+        // Retrouver le supplier_id depuis le supplier_product_id
+        const linkedProduct = equipment.supplier_product_id
+          ? allProducts.find(p => p.id === equipment.supplier_product_id)
+          : null;
+
         setForm({
           equipmentTypeId: equipment.equipment_type_id || '',
-          brand: equipment.brand || '',
-          model: equipment.model || '',
+          brand: linkedProduct?.supplier_id || '',
+          model: equipment.supplier_product_id || '',
           serialNumber: equipment.serial_number || '',
           installationYear: equipment.installation_year ? String(equipment.installation_year) : '',
+          installationType: equipment.installation_type || '',
+          supplierProductId: equipment.supplier_product_id || '',
           notes: equipment.notes || '',
         });
       } else {
-        // Mode ajout : formulaire vide
         setForm(INITIAL_FORM);
       }
     }
-  }, [isOpen, equipment]);
+  }, [isOpen, equipment, allProducts]);
 
   // Mise à jour d'un champ
   const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      // Reset modèle et référence si la marque change
+      if (field === 'brand') {
+        next.model = '';
+        next.supplierProductId = '';
+      }
+      return next;
+    });
   };
 
   // Soumission : on envoie l'equipmentTypeId + le category ENUM dérivé
@@ -142,13 +166,19 @@ export function EquipmentFormModal({
     const selectedType = equipmentTypes.find(t => t.id === form.equipmentTypeId);
     const category = selectedType?.equipment_category || null;
 
+    // Résoudre les noms texte depuis les IDs (fournisseur + produit)
+    const selectedSupplier = suppliers.find(s => s.id === form.brand);
+    const selectedProduct = allProducts.find(p => p.id === form.model);
+
     await onSubmit({
       equipmentTypeId: form.equipmentTypeId,
-      category, // ENUM DB dérivé automatiquement
-      brand: form.brand || null,
-      model: form.model || null,
+      category,
+      brand: selectedSupplier?.name || null,
+      model: selectedProduct?.name || null,
       serialNumber: form.serialNumber || null,
       installationYear: form.installationYear || null,
+      installationType: form.installationType || null,
+      supplierProductId: form.model || null, // model = product ID
       notes: form.notes || null,
     });
   };
@@ -220,7 +250,7 @@ export function EquipmentFormModal({
             </select>
           </div>
 
-          {/* Marque */}
+          {/* Marque (= fournisseur) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Marque
@@ -228,28 +258,34 @@ export function EquipmentFormModal({
             <select
               value={form.brand}
               onChange={(e) => handleChange('brand', e.target.value)}
-              disabled={brandsLoading}
+              disabled={suppliersLoading}
               className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-gray-50 disabled:text-gray-400"
             >
               <option value="">Sélectionner une marque...</option>
-              {brands.map(brand => (
-                <option key={brand.id} value={brand.name}>{brand.name}</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>
 
-          {/* Modèle */}
+          {/* Modèle (= produit fournisseur) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Modèle
             </label>
-            <input
-              type="text"
+            <select
               value={form.model}
               onChange={(e) => handleChange('model', e.target.value)}
-              placeholder="Ex: i630 T"
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
-            />
+              disabled={!form.brand}
+              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="">{form.brand ? 'Sélectionner un modèle...' : 'Choisir d\'abord une marque'}</option>
+              {supplierProducts.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.reference ? ` (${p.reference})` : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* N° Série */}
@@ -280,6 +316,22 @@ export function EquipmentFormModal({
               {YEARS.map(year => (
                 <option key={year} value={year}>{year}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Type de pose */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Type de pose
+            </label>
+            <select
+              value={form.installationType}
+              onChange={(e) => handleChange('installationType', e.target.value)}
+              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+            >
+              <option value="">Non renseigné</option>
+              <option value="ventouse">Pose ventouse</option>
+              <option value="verticale">Pose verticale</option>
             </select>
           </div>
 

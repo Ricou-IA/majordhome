@@ -29,6 +29,9 @@ const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
 // Contrat signature
 const ContractSign = lazy(() => import('./pages/ContractSign'));
 
+// PV de Réception
+const PvReceptionSign = lazy(() => import('./pages/PvReceptionSign'));
+
 // Tasks
 const Tasks = lazy(() => import('./pages/Tasks'));
 
@@ -240,6 +243,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="chantiers">
           <Chantiers />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'chantiers/:leadId/pv-reception',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="chantiers">
+          <PvReceptionSign />
         </RouteGuard>
       </SuspenseWrapper>
     ),

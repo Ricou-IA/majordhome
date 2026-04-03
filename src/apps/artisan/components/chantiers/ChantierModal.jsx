@@ -9,7 +9,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -17,6 +18,7 @@ import {
   CHANTIER_STATUSES,
   CHANTIER_TRANSITIONS,
   getChantierStatusConfig,
+  chantiersService,
 } from '@services/chantiers.service';
 import { interventionsService } from '@services/interventions.service';
 import { useChantierMutations, useInterventionSlots } from '@hooks/useChantiers';
@@ -27,6 +29,7 @@ import { ChantierInterventionSection } from './ChantierInterventionSection';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
   const { organization, user } = useAuth();
+  const navigate = useNavigate();
   const orgId = organization?.id;
 
   const {
@@ -51,6 +54,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [estimatedDate, setEstimatedDate] = useState(chantier?.estimated_date || '');
   const [notes, setNotes] = useState(chantier?.chantier_notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+  // PV de réception
+  const [pvPath] = useState(chantier?.pv_reception_path || null);
 
   // Intervention parent
   const [parentIntervention, setParentIntervention] = useState(null);
@@ -161,7 +167,26 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     }
   };
 
+  const handleViewPv = async () => {
+    const { url, error } = await chantiersService.getPvReceptionUrl(pvPath);
+    if (error || !url) {
+      toast.error('Impossible de charger le PV');
+      return;
+    }
+    window.open(url, '_blank');
+  };
+
+  const handleSignPv = () => {
+    onClose();
+    navigate(`/chantiers/${chantier.id}/pv-reception`);
+  };
+
   const handleTransition = async (newStatus) => {
+    // Bloquer transition vers réceptionné sans PV
+    if (newStatus === 'realise' && !pvPath) {
+      toast.error('Veuillez d\'abord téléverser le PV de réception');
+      return;
+    }
     try {
       await updateChantierStatus(chantier.id, newStatus);
       toast.success(`Statut mis à jour`);
@@ -297,6 +322,57 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             />
           )}
 
+          {/* PV de réception — visible dès planification */}
+          {['planification', 'realise', 'facture'].includes(chantier.chantier_status) && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                PV de Réception
+              </h3>
+
+              {pvPath ? (
+                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+                  <span className="text-sm text-green-800 font-medium flex-1">PV signé</span>
+                  <button
+                    type="button"
+                    onClick={handleViewPv}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-green-300 text-green-700 hover:bg-green-100 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Voir le PV
+                  </button>
+                  {canEditChantier && (
+                    <button
+                      type="button"
+                      onClick={handleSignPv}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                      <PenTool className="w-3.5 h-3.5" />
+                      Refaire
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 mb-3">
+                    Le PV de réception signé est requis pour passer en « Réceptionné ».
+                  </p>
+                  {canEditChantier && (
+                    <button
+                      type="button"
+                      onClick={handleSignPv}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-green-300 text-green-700 hover:bg-green-50 bg-green-50 transition-colors"
+                    >
+                      <PenTool className="w-4 h-4" />
+                      Signer le PV de réception
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
@@ -376,13 +452,15 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                   );
                 }
                 const config = getChantierStatusConfig(targetStatus);
+                const needsPv = targetStatus === 'realise' && !pvPath;
                 return (
                   <button
                     key={targetStatus}
                     type="button"
                     onClick={() => handleTransition(targetStatus)}
-                    disabled={isUpdatingStatus}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors hover:shadow-sm disabled:opacity-50"
+                    disabled={isUpdatingStatus || needsPv}
+                    title={needsPv ? 'PV de réception requis' : undefined}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       borderColor: config.color,
                       color: config.color,

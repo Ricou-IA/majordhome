@@ -35,8 +35,11 @@ import {
   MoreVertical,
   Link2,
   Unlink,
+  FileText,
+  Download,
 } from 'lucide-react';
 import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@services/clients.service';
+import { storageService } from '@services/storage.service';
 import { usePricingEquipmentTypes } from '@hooks/useClients';
 import { formatDateShortFR } from '@/lib/utils';
 
@@ -197,6 +200,7 @@ const EquipmentCard = ({
   pricingTypesMap = {},
   hasContract = false,
   isLinkedToContract = false,
+  productDocuments = [],
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -236,9 +240,9 @@ const EquipmentCard = ({
                   ? pricingTypesMap[equipment.equipment_type_id].label
                   : getEquipmentLabel(equipment_type)}
               </h4>
-              {(brand || model || equipment.installation_year) && (
+              {(brand || model || equipment.installation_year || equipment.installation_type) && (
                 <p className="text-sm text-gray-600 truncate">
-                  {[brand, model, equipment.installation_year].filter(Boolean).join(' · ')}
+                  {[brand, model, equipment.installation_year, equipment.installation_type === 'ventouse' ? 'Pose ventouse' : equipment.installation_type === 'verticale' ? 'Pose verticale' : null].filter(Boolean).join(' · ')}
                 </p>
               )}
               {serial_number && (
@@ -405,6 +409,30 @@ const EquipmentCard = ({
               <p className="text-sm text-gray-700 mt-1">{notes}</p>
             </div>
           )}
+
+          {/* Documentation produit */}
+          {productDocuments.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <span className="text-sm text-gray-500">Documentation</span>
+              <div className="mt-2 space-y-1.5">
+                {productDocuments.map(doc => (
+                  <button
+                    key={doc.id}
+                    onClick={async () => {
+                      const { url, error } = await storageService.getSignedUrl('product-documents', doc.storage_path, 3600);
+                      if (!error && url) window.open(url, '_blank');
+                    }}
+                    className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-white transition-colors text-left group"
+                  >
+                    <FileText className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 group-hover:text-indigo-600 truncate flex-1">{doc.file_name}</span>
+                    <span className="text-xs text-gray-400 flex-shrink-0">{doc.document_type}</span>
+                    <Download className="w-3.5 h-3.5 text-gray-300 group-hover:text-indigo-500 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -436,6 +464,7 @@ export function EquipmentList({
   onRemoveFromContract,
   hasContract = false,
   contractEquipmentIds = new Set(),
+  productDocumentsMap = {},
   readOnly = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -527,6 +556,7 @@ export function EquipmentList({
           expanded={expandedId === equipment.id}
           onToggleExpand={() => toggleExpand(equipment.id)}
           pricingTypesMap={pricingTypesMap}
+          productDocuments={productDocumentsMap[equipment.supplier_product_id] || []}
         />
       ))}
     </div>

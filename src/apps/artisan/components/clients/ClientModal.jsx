@@ -181,7 +181,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
             .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
         }
         toast.success('Client créé avec succès');
-        onCreated?.(newClient);
+        await onCreated?.(newClient);
         onClose();
       } else {
         const updates = {

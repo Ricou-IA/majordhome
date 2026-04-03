@@ -28,9 +28,11 @@ import {
   Loader2,
   Upload,
   FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { ProductDocumentsPanel } from './ProductDocumentsPanel';
 
 // =============================================================================
 // MODAL FOURNISSEUR
@@ -408,6 +410,7 @@ function ProductCatalog({ supplier, orgId, onBack }) {
   const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [docsProduct, setDocsProduct] = useState(null);
   const fileInputRef = useRef(null);
   const searchTimerRef = useRef(null);
 
@@ -589,6 +592,13 @@ function ProductCatalog({ supplier, orgId, onBack }) {
                   <td className="py-2 text-right">
                     <div className="flex gap-1 justify-end">
                       <button
+                        onClick={() => setDocsProduct(product)}
+                        className="p-1.5 hover:bg-indigo-50 rounded"
+                        title="Documents"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                      </button>
+                      <button
                         onClick={() => { setEditProduct(product); setShowModal(true); }}
                         className="p-1.5 hover:bg-secondary-100 rounded"
                         title="Modifier"
@@ -644,6 +654,14 @@ function ProductCatalog({ supplier, orgId, onBack }) {
           isSaving={isCreating || isUpdating}
         />
       )}
+
+      <ProductDocumentsPanel
+        isOpen={!!docsProduct}
+        onClose={() => setDocsProduct(null)}
+        productId={docsProduct?.id}
+        productName={docsProduct?.name}
+        orgId={orgId}
+      />
     </div>
   );
 }

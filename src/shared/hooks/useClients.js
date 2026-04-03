@@ -478,6 +478,59 @@ export function useDuplicateCheck(orgId, lastName, postalCode) {
 }
 
 // ============================================================================
+// HOOK - useLinkedClients (propriétaire / locataire)
+// ============================================================================
+
+/**
+ * Hook pour récupérer et gérer les clients liés (propriétaire / locataire)
+ *
+ * @param {string} clientId - UUID du client
+ * @param {string} orgId - UUID de l'organisation
+ * @returns {{ owner, tenants, isLoading, linkClient, unlinkClient }}
+ */
+export function useLinkedClients(clientId, orgId) {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: clientKeys.linked(clientId),
+    queryFn: async () => {
+      const { data, error } = await clientsService.getLinkedClients(clientId, orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clientId && !!orgId,
+    staleTime: 30_000,
+  });
+
+  const invalidateLinked = useCallback((ids) => {
+    ids.forEach(id => {
+      if (id) queryClient.invalidateQueries({ queryKey: clientKeys.linked(id) });
+    });
+    queryClient.invalidateQueries({ queryKey: clientKeys.details() });
+  }, [queryClient]);
+
+  const linkMutation = useMutation({
+    mutationFn: ({ tenantId, ownerId }) => clientsService.linkClientAsOwner(tenantId, ownerId),
+    onSuccess: (_, { tenantId, ownerId }) => invalidateLinked([tenantId, ownerId]),
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (targetClientId) => clientsService.unlinkClient(targetClientId),
+    onSuccess: () => invalidateLinked([clientId, data?.owner?.id]),
+  });
+
+  return {
+    owner: data?.owner || null,
+    tenants: data?.tenants || [],
+    isLoading,
+    linkClient: linkMutation.mutateAsync,
+    unlinkClient: unlinkMutation.mutateAsync,
+    isLinking: linkMutation.isPending,
+    isUnlinking: unlinkMutation.isPending,
+  };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 

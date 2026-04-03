@@ -113,6 +113,13 @@ export function useChantierMutations() {
     },
   });
 
+  // Mutation : upload PV de réception
+  const pvMutation = useMutation({
+    mutationFn: ({ leadId, file }) =>
+      chantiersService.uploadPvReception(leadId, file),
+    onSuccess: invalidateChantiers,
+  });
+
   return {
     updateChantierStatus: useCallback(
       (leadId, newStatus) => statusMutation.mutateAsync({ leadId, newStatus }),
@@ -142,12 +149,17 @@ export function useChantierMutations() {
       (slotId) => deleteSlotMutation.mutateAsync(slotId),
       [deleteSlotMutation]
     ),
+    uploadPvReception: useCallback(
+      (leadId, file) => pvMutation.mutateAsync({ leadId, file }),
+      [pvMutation]
+    ),
 
     // États
     isUpdatingStatus: statusMutation.isPending,
     isUpdatingOrder: orderMutation.isPending,
     isCreatingIntervention: createInterventionMutation.isPending,
     isCreatingSlot: createSlotMutation.isPending,
+    isUploadingPv: pvMutation.isPending,
 
     invalidate: invalidateChantiers,
   };

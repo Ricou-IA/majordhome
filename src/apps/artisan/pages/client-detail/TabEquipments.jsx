@@ -1,14 +1,19 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useAuth } from '@contexts/AuthContext';
 import { useClientEquipments, clientKeys } from '@hooks/useClients';
 import { useClientContract, useContractEquipments, contractKeys } from '@hooks/useContracts';
+import { useProductDocumentsByProductIds } from '@hooks/useSuppliers';
 import { contractsService } from '@services/contracts.service';
+import { storageService } from '@services/storage.service';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export const TabEquipments = ({ clientId }) => {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const [showModal, setShowModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [deletingEquipment, setDeletingEquipment] = useState(null);
@@ -27,6 +32,22 @@ export const TabEquipments = ({ clientId }) => {
   const contractEquipmentIds = useMemo(() => {
     return new Set((contractEquipments || []).map(e => e.id));
   }, [contractEquipments]);
+
+  // Récupérer les docs des produits liés aux équipements
+  const linkedProductIds = useMemo(() => {
+    return [...new Set(equipments.filter(e => e.supplier_product_id).map(e => e.supplier_product_id))];
+  }, [equipments]);
+  const { documents: allProductDocs } = useProductDocumentsByProductIds(linkedProductIds);
+
+  // Map productId → documents[]
+  const productDocumentsMap = useMemo(() => {
+    const map = {};
+    for (const doc of allProductDocs) {
+      if (!map[doc.supplier_product_id]) map[doc.supplier_product_id] = [];
+      map[doc.supplier_product_id].push(doc);
+    }
+    return map;
+  }, [allProductDocs]);
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: contractKeys.all });
@@ -49,6 +70,8 @@ export const TabEquipments = ({ clientId }) => {
         model: formData.model,
         serialNumber: formData.serialNumber,
         installationYear: formData.installationYear,
+        installationType: formData.installationType,
+        supplierProductId: formData.supplierProductId,
         notes: formData.notes,
       });
 
@@ -82,6 +105,8 @@ export const TabEquipments = ({ clientId }) => {
         model: formData.model,
         serialNumber: formData.serialNumber,
         installationYear: formData.installationYear,
+        installationType: formData.installationType,
+        supplierProductId: formData.supplierProductId,
         notes: formData.notes,
       });
       toast.success('Équipement mis à jour');
@@ -161,12 +186,14 @@ export const TabEquipments = ({ clientId }) => {
         onRemoveFromContract={hasContract ? handleRemoveFromContract : undefined}
         hasContract={hasContract}
         contractEquipmentIds={contractEquipmentIds}
+        productDocumentsMap={productDocumentsMap}
       />
       <EquipmentFormModal
         isOpen={showModal}
         onClose={handleCloseModal}
         onSubmit={editingEquipment ? handleEdit : handleAdd}
         isSubmitting={editingEquipment ? isUpdating : isAdding}
+        orgId={orgId}
         equipment={editingEquipment}
       />
       <ConfirmDialog

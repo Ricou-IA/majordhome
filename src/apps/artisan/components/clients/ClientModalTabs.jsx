@@ -10,7 +10,7 @@
  */
 
 import {
-  User, MapPin, Phone, Home, Building2,
+  User, MapPin, Phone, Home, Building2, FileText,
   History, ExternalLink, ClipboardCheck, Wrench,
 } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';

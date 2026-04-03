@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { storageService } from '@services/storage.service';
 
 // ============================================================================
 // CONSTANTES
@@ -518,6 +519,109 @@ export const suppliersService = {
     } catch (error) {
       console.error('[suppliersService] deactivateProduct:', error);
       return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
+  // DOCUMENTS PRODUITS
+  // ==========================================================================
+
+  async getProductDocuments(productId) {
+    try {
+      if (!productId) throw new Error('[suppliersService] productId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_product_documents')
+        .select('*')
+        .eq('supplier_product_id', productId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[suppliersService] getProductDocuments:', error);
+      return { data: [], error };
+    }
+  },
+
+  async getDocumentsByProductIds(productIds) {
+    try {
+      if (!productIds?.length) return { data: [], error: null };
+
+      const { data, error } = await supabase
+        .from('majordhome_product_documents')
+        .select('*')
+        .in('supplier_product_id', productIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[suppliersService] getDocumentsByProductIds:', error);
+      return { data: [], error };
+    }
+  },
+
+  async uploadProductDocument({ orgId, productId, file, documentType, userId }) {
+    try {
+      if (!orgId || !productId || !file) {
+        throw new Error('[suppliersService] orgId, productId et file requis');
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const storagePath = `${orgId}/${productId}/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await storageService.uploadFile(
+        'product-documents',
+        storagePath,
+        file,
+        { contentType: file.type }
+      );
+
+      if (uploadError) throw uploadError;
+
+      const { data, error } = await supabase
+        .from('majordhome_product_documents_write')
+        .insert({
+          supplier_product_id: productId,
+          org_id: orgId,
+          document_type: documentType || 'Manuel',
+          file_name: file.name,
+          storage_path: storagePath,
+          file_size: file.size,
+          mime_type: file.type,
+          uploaded_by: userId || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[suppliersService] uploadProductDocument:', error);
+      return { data: null, error };
+    }
+  },
+
+  async deleteProductDocument(documentId, storagePath) {
+    try {
+      if (!documentId) throw new Error('[suppliersService] documentId requis');
+
+      // Supprimer le fichier storage d'abord
+      if (storagePath) {
+        await storageService.deleteFile('product-documents', storagePath);
+      }
+
+      const { error } = await supabase
+        .from('majordhome_product_documents_write')
+        .delete()
+        .eq('id', documentId);
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[suppliersService] deleteProductDocument:', error);
+      return { error };
     }
   },
 };

@@ -17,7 +17,7 @@ import {
   Archive, ArchiveRestore,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClient } from '@hooks/useClients';
+import { useClient, useLinkedClients } from '@hooks/useClients';
 import { formatDateFR } from '@/lib/utils';
 
 // Sous-composants extraits
@@ -53,6 +53,10 @@ export default function ClientDetail() {
     client, isLoading, error, updateClient, isUpdating,
     archiveClient, isArchiving, unarchiveClient, isUnarchiving, refresh,
   } = useClient(id);
+
+  const { owner, tenants } = useLinkedClients(id, organization?.id);
+  const isOwner = tenants.length > 0;
+  const isTenant = !!owner;
 
   // Initialiser le formulaire quand le client est chargé
   if (client && !hasInitialized) {
@@ -212,6 +216,12 @@ export default function ClientDetail() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-secondary-900">{displayName}</h1>
               <ClientCategoryBadge clientCategory={client.client_category} />
+              {isOwner && (
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 border border-blue-200">Propriétaire</span>
+              )}
+              {isTenant && (
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 border border-orange-200">Locataire</span>
+              )}
               {client.has_active_contract && (
                 <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 border border-green-200">Contrat actif</span>
               )}
@@ -299,7 +309,7 @@ export default function ClientDetail() {
 
       {/* Contenu des onglets */}
       <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
-        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} />}
+        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} />}
         {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
         {activeTab === 'equipments' && <TabEquipments clientId={id} />}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}

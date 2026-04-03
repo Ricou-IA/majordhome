@@ -215,3 +215,64 @@ export function useProductMutations(orgId, supplierId) {
     isUpdating: updateMutation.isPending,
   };
 }
+
+// =============================================================================
+// DOCUMENTS PRODUITS
+// =============================================================================
+
+export function useProductDocuments(productId) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: supplierKeys.productDocuments(productId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getProductDocuments(productId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!productId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return { documents: data || [], isLoading, error, refetch };
+}
+
+export function useProductDocumentsByProductIds(productIds) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: supplierKeys.productDocumentsByIds(productIds),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getDocumentsByProductIds(productIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!productIds?.length,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return { documents: data || [], isLoading, error };
+}
+
+export function useProductDocumentMutations(orgId, productId) {
+  const queryClient = useQueryClient();
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productDocuments(productId) });
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ file, documentType, userId }) =>
+      suppliersService.uploadProductDocument({ orgId, productId, file, documentType, userId }),
+    onSuccess: invalidate,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ documentId, storagePath }) =>
+      suppliersService.deleteProductDocument(documentId, storagePath),
+    onSuccess: invalidate,
+  });
+
+  return {
+    uploadDocument: uploadMutation.mutateAsync,
+    deleteDocument: deleteMutation.mutateAsync,
+    isUploading: uploadMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+  };
+}
