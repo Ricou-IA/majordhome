@@ -237,6 +237,12 @@ export function ContractModal({ contractId, isOpen, onClose }) {
               {/* Section Contrat */}
               <Section title="Contrat" icon={FileText}>
                 <InfoRow label="Tarif" value={formatEuro(contract.amount)} />
+                <InfoRow
+                  label="Tps estimé"
+                  value={contract.estimated_time
+                    ? `${Math.round(Number(contract.estimated_time) * 60)} min`
+                    : '—'}
+                />
                 <InfoRow label="Début" value={formatDateFR(contract.start_date)} />
                 <InfoRow label="Fin" value={formatDateFR(contract.end_date)} />
                 {contract.renewal_date && (

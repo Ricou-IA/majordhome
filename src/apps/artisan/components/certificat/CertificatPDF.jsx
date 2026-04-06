@@ -23,6 +23,7 @@ import {
   SECTIONS_PAR_EQUIPEMENT,
   getNettoyageItems,
 } from './constants';
+import logoMayer from '@/assets/logo-mayer.png';
 
 // ============================================================================
 // COULEURS
@@ -47,12 +48,15 @@ const C = {
 const s = StyleSheet.create({
   page: { padding: 24, paddingBottom: 40, fontSize: 7, fontFamily: 'Helvetica', color: C.noir },
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, borderBottom: `2px solid ${C.bleu}`, paddingBottom: 5 },
-  title: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: C.bleu },
-  subtitle: { fontSize: 7.5, color: C.gris, marginTop: 1 },
+  header: { flexDirection: 'column', alignItems: 'center', marginBottom: 10, borderBottom: `2px solid ${C.bleu}`, paddingBottom: 6 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+  headerCenter: { alignItems: 'center', marginTop: 4 },
+  logo: { width: 50, height: 50 },
+  title: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.bleu, textAlign: 'center' },
+  subtitle: { fontSize: 8, color: C.gris, marginTop: 2, textAlign: 'center' },
   reference: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.orange },
   // Section
-  sectionTitle: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.bleu, marginTop: 6, marginBottom: 2, borderBottom: `0.5px solid ${C.bleuClair}`, paddingBottom: 1 },
+  sectionTitle: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.bleu, marginTop: 10, marginBottom: 3, borderBottom: `0.5px solid ${C.bleuClair}`, paddingBottom: 1 },
   // Layout
   row2: { flexDirection: 'row', gap: 8 },
   col: { flex: 1 },
@@ -140,13 +144,16 @@ function CertificatDocument({ data }) {
       <Page size="A4" style={s.page}>
         {/* EN-TETE */}
         <View style={s.header}>
-          <View>
+          <View style={s.headerTop}>
+            <Image src={logoMayer} style={s.logo} />
+            <View style={{ alignItems: 'flex-end' }}>
+              {data.reference ? <Text style={s.reference}>{data.reference}</Text> : null}
+              <Text style={s.subtitle}>{data.date_intervention || ' '}</Text>
+            </View>
+          </View>
+          <View style={s.headerCenter}>
             <Text style={s.title}>MAYER ENERGIE</Text>
             <Text style={s.subtitle}>CERTIFICAT D'ENTRETIEN{config.showRamonage ? ' & RAMONAGE' : ''}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            {data.reference ? <Text style={s.reference}>{data.reference}</Text> : null}
-            <Text style={s.subtitle}>{data.date_intervention || ' '}</Text>
           </View>
         </View>
 
@@ -290,26 +297,17 @@ function CertificatDocument({ data }) {
             <Field label="Recommandations" value={data.recommandations} />
           </View>
         )}
-        <View style={{ marginTop: 1 }}>
-          <Field label="TVA" value={`${data.tva_taux} %`} />
-        </View>
+        {/* TVA retirée du certificat — information contractuelle, pas technique */}
 
-        {/* SIGNATURES */}
+        {/* SIGNATURE TECHNICIEN */}
         <View style={s.signatureZone}>
           <View style={s.signatureBlock}>
             <Text style={s.signatureLabel}>Technicien</Text>
-            <Text style={s.signatureName}>{data.technicien_nom || '-'}</Text>
-            <Text style={s.signatureDate}>{data.date_intervention}</Text>
-          </View>
-          <View style={s.signatureBlock}>
-            <Text style={s.signatureLabel}>Client</Text>
             {data.signature_client_base64 ? (
               <Image style={s.signatureImage} src={data.signature_client_base64} />
-            ) : (
-              <Text style={{ fontSize: 6.5, color: C.gris }}>Non signe</Text>
-            )}
-            <Text style={s.signatureName}>{data.signature_client_nom || '-'}</Text>
-            <Text style={s.signatureDate}>{data.signed_at ? new Date(data.signed_at).toLocaleDateString('fr-FR') : ' '}</Text>
+            ) : null}
+            <Text style={s.signatureName}>{data.technicien_nom || '-'}</Text>
+            <Text style={s.signatureDate}>{data.date_intervention}</Text>
           </View>
         </View>
 

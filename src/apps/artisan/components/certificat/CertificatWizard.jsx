@@ -18,7 +18,8 @@ import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useCertificatMutations } from '@hooks/useCertificats';
-import { savService } from '@services/sav.service';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@contexts/AuthContext';
 import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
 import { generatePdfBlob } from './CertificatPDF';
@@ -74,6 +75,7 @@ export function CertificatWizard({
   assignedTechnician = '',
 }) {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { saveDraft, signCertificat, uploadPdf, updatePdfInfo, getSignedUrl, isSaving, isSigning } = useCertificatMutations();
   const saveTimeoutRef = useRef(null);
 
@@ -121,6 +123,9 @@ export function CertificatWizard({
         };
       }
     }
+
+    // Nom du technicien : assignedTechnician (planning) > user connecté
+    initial.technicien_nom = assignedTechnician || profile?.full_name || '';
 
     return initial;
   });
@@ -318,10 +323,16 @@ export function CertificatWizard({
         setPdfUrl(url);
       }
 
-      // Transition → réalisé
-      await savService.updateWorkflowStatus(intervention.id, 'realise');
+      // Transition → réalisé (workflow + status)
+      await supabase
+        .from('majordhome_interventions')
+        .update({ workflow_status: 'realise', status: 'completed' })
+        .eq('id', intervention.id);
 
       toast.success('Certificat généré — entretien marqué réalisé');
+
+      // Retour à la page précédente (modale entretien)
+      navigate(-1);
     } catch (err) {
       console.error('[CertificatWizard] PDF generation error:', err);
       setPdfError(err.message || 'Erreur de génération');

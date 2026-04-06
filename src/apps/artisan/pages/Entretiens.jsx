@@ -56,7 +56,7 @@ import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateC
 /**
  * Carte statistique (lecture seule, pas de toggle)
  */
-const StatCard = ({ icon: Icon, label, value, color = 'blue' }) => {
+const StatCard = ({ icon: Icon, label, value, subtitle, color = 'blue' }) => {
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-600',
     green: 'bg-green-100 text-green-600',
@@ -69,18 +69,23 @@ const StatCard = ({ icon: Icon, label, value, color = 'blue' }) => {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-            colorClasses[color] || colorClasses.blue
-          }`}
-        >
-          <Icon className="w-5 h-5" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              colorClasses[color] || colorClasses.blue
+            }`}
+          >
+            <Icon className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-2xl font-semibold text-gray-900">{value ?? '—'}</p>
+            <p className="text-sm text-gray-500">{label}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-2xl font-semibold text-gray-900">{value ?? '—'}</p>
-          <p className="text-sm text-gray-500">{label}</p>
-        </div>
+        {subtitle && (
+          <p className="text-xs font-medium text-gray-400 whitespace-nowrap">{subtitle}</p>
+        )}
       </div>
     </div>
   );
@@ -374,6 +379,7 @@ export default function Entretiens() {
           icon={Calendar}
           label="Entretiens à faire"
           value={savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0)}
+          subtitle={!savStatsLoading && savStats?.ca_a_faire != null ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €` : null}
           color="blue"
         />
         <StatCard
@@ -392,6 +398,7 @@ export default function Entretiens() {
           icon={CheckCircle2}
           label="Réalisés"
           value={savStatsLoading ? '...' : (savStats?.entretien_realise ?? 0)}
+          subtitle={!savStatsLoading && savStats?.ca_realise != null ? `CA : ${Math.round(savStats.ca_realise).toLocaleString('fr-FR')} €` : null}
           color="emerald"
         />
       </div>

@@ -25,7 +25,7 @@ export function StepSignature({
   pdfError,
 }) {
   const [signatureBase64, setSignatureBase64] = useState(formData.signature_client_base64 || null);
-  const [signataireNom, setSignataireNom] = useState(formData.signature_client_nom || client?.display_name || '');
+  const [signataireNom, setSignataireNom] = useState(formData.signature_client_nom || formData.technicien_nom || '');
   const [showPad, setShowPad] = useState(!formData.signature_client_base64);
 
   const hasPdf = !!pdfUrl;
@@ -105,7 +105,7 @@ export function StepSignature({
       {/* Signature capturée — aperçu + refaire */}
       {!hasPdf && hasSignature && !showPad && (
         <div className="space-y-3">
-          <SectionTitle>Signature client</SectionTitle>
+          <SectionTitle>Signature technicien</SectionTitle>
           <div className="border border-gray-200 rounded-lg p-4 bg-white">
             <img src={signatureBase64} alt="Signature" className="max-h-[150px] mx-auto" />
             <p className="text-center text-sm text-gray-500 mt-2">Signé par {signataireNom}</p>

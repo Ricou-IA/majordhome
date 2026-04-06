@@ -117,6 +117,7 @@ export const entretienSavKeys = {
   lists: () => [...entretienSavKeys.all, 'list'],
   list: (orgId) => [...entretienSavKeys.lists(), orgId],
   stats: (orgId) => [...entretienSavKeys.all, 'stats', orgId],
+  children: (parentId) => [...entretienSavKeys.all, 'children', parentId],
 };
 
 // --- Technical Visit ---

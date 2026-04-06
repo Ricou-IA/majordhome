@@ -102,19 +102,19 @@ export function CertificatSignaturePad({
     <div className="space-y-4">
       {/* Texte légal */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-        {disclaimerText || "En signant, le client confirme avoir reçu ce certificat d'entretien conformément à l'arrêté du 15/09/2009, art. 8."}
+        {disclaimerText || "En signant, le technicien certifie avoir effectué l'entretien conformément à l'arrêté du 15/09/2009, art. 8."}
       </div>
 
       {/* Nom du signataire */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Nom du signataire <span className="text-red-500">*</span>
+          Nom du technicien <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={signataireNom || ''}
           onChange={(e) => onSignataireNomChange?.(e.target.value)}
-          placeholder="Nom et prénom du client"
+          placeholder="Nom du technicien"
           disabled={disabled || isSaving}
           className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
         />
@@ -123,7 +123,7 @@ export function CertificatSignaturePad({
       {/* Zone de signature */}
       <div ref={containerRef} className="relative">
         <p className="text-sm font-medium text-gray-700 mb-1">
-          Signature du client <span className="text-red-500">*</span>
+          Signature du technicien <span className="text-red-500">*</span>
         </p>
         <div
           className={`border-2 rounded-lg bg-white ${

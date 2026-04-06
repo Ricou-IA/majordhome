@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays } from 'lucide-react';
+import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays, Ban } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectInterventions, useCreateIntervention } from '@hooks/useInterventions';
@@ -8,10 +8,14 @@ import { INTERVENTION_TYPES } from '@services/interventions.service';
 import { getStatusConfig } from '@services/sav.service';
 import { chantiersService, getChantierStatusConfig } from '@services/chantiers.service';
 import { formatDateFR } from '@/lib/utils';
+import { EQUIPMENT_CATEGORY_LABELS } from '@/apps/artisan/components/certificat/constants';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 
-const InterventionCard = ({ intervention }) => {
+const InterventionCard = ({ intervention, hasChildren = false }) => {
   const typeConfig = INTERVENTION_TYPES.find(t => t.value === intervention.intervention_type) || INTERVENTION_TYPES[INTERVENTION_TYPES.length - 1];
+  const isChild = !!intervention.parent_id;
+  const isNeant = isChild && intervention.status === 'cancelled' && intervention.workflow_status === 'realise';
+  const isParentWithChildren = !isChild && hasChildren;
 
   const statusConfig = {
     completed: { label: 'Terminé', className: 'bg-green-100 text-green-700' },
@@ -22,40 +26,88 @@ const InterventionCard = ({ intervention }) => {
     no_show: { label: 'Absent', className: 'bg-red-100 text-red-700' },
   };
 
-  const statusInfo = statusConfig[intervention.status] || statusConfig.scheduled;
+  const statusInfo = isNeant
+    ? { label: 'Néant', className: 'bg-gray-100 text-gray-500' }
+    : (statusConfig[intervention.status] || statusConfig.scheduled);
 
-  // Déterminer si cette intervention donne accès au certificat
+  // Le certificat s'affiche uniquement sur les enfants (pas le parent qui a des enfants)
   const hasEntretien = intervention.intervention_type === 'entretien'
     || (intervention.intervention_type === 'sav' && intervention.includes_entretien);
-  const showCertificat = hasEntretien
+  const showCertificat = isChild && hasEntretien && !isNeant
     && ['planifie', 'realise'].includes(intervention.workflow_status);
   const isRealise = intervention.workflow_status === 'realise';
 
+  // Equipment label for child interventions
+  const equipmentLabel = isChild && intervention.equipment_category
+    ? (EQUIPMENT_CATEGORY_LABELS[intervention.equipment_category] || intervention.equipment_category)
+    : null;
+  const equipmentDetail = isChild
+    ? [intervention.equipment_brand, intervention.equipment_model].filter(Boolean).join(' ')
+    : null;
+
+  // Parent avec enfants : affichage compact (les détails sont dans les enfants)
+  if (isParentWithChildren) {
+    const wfConfig = getStatusConfig(intervention.intervention_type, intervention.workflow_status);
+    return (
+      <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
+            {wfConfig && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: wfConfig.color }}>
+                {wfConfig.label}
+              </span>
+            )}
+            <span className="text-xs text-gray-500">{formatDateFR(intervention.scheduled_date || intervention.created_at)}</span>
+          </div>
+          {intervention.report_notes && (
+            <span className="text-xs text-gray-400 italic truncate max-w-[200px]">{intervention.report_notes}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 bg-white rounded-lg border border-secondary-200 hover:border-secondary-300 transition-colors">
+    <div className={`p-4 bg-white rounded-lg border transition-colors ${
+      isChild
+        ? 'ml-6 border-l-2 border-l-blue-300 border-gray-200 hover:border-gray-300'
+        : 'border-secondary-200 hover:border-secondary-300'
+    } ${isNeant ? 'opacity-60' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
+            {isChild ? (
+              <>
+                {equipmentLabel && (
+                  <span className="text-sm font-medium text-gray-900">{equipmentLabel}</span>
+                )}
+                {equipmentDetail && (
+                  <span className="text-xs text-gray-500">{equipmentDetail}</span>
+                )}
+              </>
+            ) : (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
+            )}
             <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
-            {/* Badge workflow pour interventions entretien/sav */}
-            {(intervention.intervention_type === 'entretien' || intervention.intervention_type === 'sav') &&
+            {isNeant && <Ban className="w-3 h-3 text-gray-400" />}
+            {/* Badge workflow pour interventions sans enfants */}
+            {!isChild && !hasChildren && (intervention.intervention_type === 'entretien' || intervention.intervention_type === 'sav') &&
               intervention.workflow_status && (() => {
                 const wfConfig = getStatusConfig(intervention.intervention_type, intervention.workflow_status);
                 return wfConfig ? (
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full font-medium text-white"
-                    style={{ backgroundColor: wfConfig.color }}
-                  >
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: wfConfig.color }}>
                     {wfConfig.label}
                   </span>
                 ) : null;
               })()}
           </div>
-          <p className="text-sm text-secondary-500 mt-1">
-            {formatDateFR(intervention.scheduled_date)}
-            {intervention.technician_name && ` • ${intervention.technician_name}`}
-          </p>
+          {!isChild && (
+            <p className="text-sm text-secondary-500 mt-1">
+              {formatDateFR(intervention.scheduled_date)}
+              {intervention.technician_name && ` • ${intervention.technician_name}`}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {intervention.duration_minutes && <span className="text-xs text-secondary-500">{intervention.duration_minutes} min</span>}
@@ -69,7 +121,7 @@ const InterventionCard = ({ intervention }) => {
         </div>
       </div>
       {intervention.work_performed && <p className="text-sm text-secondary-600 mt-2 line-clamp-2">{intervention.work_performed}</p>}
-      {intervention.report_notes && <p className="text-sm text-secondary-500 mt-1 line-clamp-2 italic">{intervention.report_notes}</p>}
+      {intervention.report_notes && !isParentWithChildren && <p className="text-sm text-secondary-500 mt-1 line-clamp-2 italic">{intervention.report_notes}</p>}
     </div>
   );
 };
@@ -196,9 +248,12 @@ export const TabInterventions = ({ projectId, clientId }) => {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-secondary-500">
-          {interventions.length > 0
-            ? `${interventions.length} intervention${interventions.length !== 1 ? 's' : ''}`
-            : ''}
+          {(() => {
+            const parentCount = interventions.filter((i) => !i.parent_id).length;
+            return parentCount > 0
+              ? `${parentCount} intervention${parentCount !== 1 ? 's' : ''}`
+              : '';
+          })()}
         </p>
         {!showForm && (
           <button
@@ -269,9 +324,33 @@ export const TabInterventions = ({ projectId, clientId }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {interventions.map((i) => (
-            <InterventionCard key={i.id} intervention={i} />
-          ))}
+          {/* Trier : parents d'abord, enfants juste après leur parent */}
+          {(() => {
+            const parents = interventions.filter((i) => !i.parent_id);
+            const childrenByParent = {};
+            for (const i of interventions) {
+              if (i.parent_id) {
+                if (!childrenByParent[i.parent_id]) childrenByParent[i.parent_id] = [];
+                childrenByParent[i.parent_id].push(i);
+              }
+            }
+            const sorted = [];
+            for (const p of parents) {
+              sorted.push({ ...p, _hasChildren: !!childrenByParent[p.id]?.length });
+              if (childrenByParent[p.id]) {
+                sorted.push(...childrenByParent[p.id]);
+              }
+            }
+            // Ajouter les orphelins (enfants dont le parent n'est pas dans la liste)
+            for (const i of interventions) {
+              if (i.parent_id && !parents.find((p) => p.id === i.parent_id)) {
+                sorted.push(i);
+              }
+            }
+            return sorted.map((i) => (
+              <InterventionCard key={i.id} intervention={i} hasChildren={i._hasChildren} />
+            ));
+          })()}
         </div>
       )}
     </div>

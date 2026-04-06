@@ -378,52 +378,62 @@ export const entretiensService = {
         return { data: null, error };
       }
 
-      // Cascade : créer automatiquement une intervention si visite "completed"
+      // Cascade : créer une intervention legacy uniquement si pas d'entretien parent existant
+      // (le workflow certificat multi-équipements gère ses propres interventions)
       if ((status === 'completed') && data) {
         try {
+          // Vérifier si un entretien parent existe déjà pour ce contrat
+          const { data: existingEntretien } = await supabase
+            .from('majordhome_interventions')
+            .select('id')
+            .eq('contract_id', contractId)
+            .eq('intervention_type', 'entretien')
+            .is('parent_id', null)
+            .limit(1)
+            .maybeSingle();
 
-          // Récupérer project_id via contrat → client
-          const { data: contract } = await supabase
-            .from('majordhome_contracts')
-            .select('client_id')
-            .eq('id', contractId)
-            .single();
-
-          if (contract?.client_id) {
-            const { data: client } = await supabase
-              .from('majordhome_clients')
-              .select('project_id')
-              .eq('id', contract.client_id)
+          // Si un entretien parent existe, pas de cascade legacy
+          if (!existingEntretien) {
+            const { data: contract } = await supabase
+              .from('majordhome_contracts')
+              .select('client_id')
+              .eq('id', contractId)
               .single();
 
-            if (client?.project_id) {
-              const { data: intervention } = await supabase
-                .from('majordhome_interventions')
-                .insert({
-                  project_id: client.project_id,
-                  intervention_type: 'maintenance',
-                  scheduled_date: visitDate || new Date().toISOString().split('T')[0],
-                  status: 'completed',
-                  report_notes: notes || null,
-                  technician_id: technicianId || null,
-                  technician_name: technicianName || null,
-                  created_by: userId || null,
-                  tags: ['Contrat'],
-                })
-                .select('id')
+            if (contract?.client_id) {
+              const { data: client } = await supabase
+                .from('majordhome_clients')
+                .select('project_id')
+                .eq('id', contract.client_id)
                 .single();
 
-              // Lier l'intervention à la visite
-              if (intervention?.id) {
-                await supabase
-                  .from('majordhome_maintenance_visits')
-                  .update({ intervention_id: intervention.id })
-                  .eq('id', data.id);
+              if (client?.project_id) {
+                const { data: intervention } = await supabase
+                  .from('majordhome_interventions')
+                  .insert({
+                    project_id: client.project_id,
+                    intervention_type: 'maintenance',
+                    scheduled_date: visitDate || new Date().toISOString().split('T')[0],
+                    status: 'completed',
+                    report_notes: notes || null,
+                    technician_id: technicianId || null,
+                    technician_name: technicianName || null,
+                    created_by: userId || null,
+                    tags: ['Contrat'],
+                  })
+                  .select('id')
+                  .single();
+
+                if (intervention?.id) {
+                  await supabase
+                    .from('majordhome_maintenance_visits')
+                    .update({ intervention_id: intervention.id })
+                    .eq('id', data.id);
+                }
               }
             }
           }
         } catch (cascadeErr) {
-          // Non-bloquant : la visite est enregistrée, la cascade est best-effort
           console.error('[entretiensService] cascade intervention creation error:', cascadeErr);
         }
       }
@@ -535,13 +545,11 @@ export const entretiensService = {
         details = Object.values(grouped).map((g) => {
           const et = typeMap[g.typeId];
           const rate = rateMap[g.typeId];
+          // Chaque équipement = 1 unité complète au prix unitaire
           const basePrice = rate ? parseFloat(rate.price) || 0 : 0;
           const unitPrice = rate ? parseFloat(rate.unit_price) || 0 : 0;
-          let lineTotal = basePrice;
-          if (et?.has_unit_pricing) {
-            const extraUnits = Math.max(0, g.quantity - (et.included_units || 0));
-            lineTotal = basePrice + extraUnits * unitPrice;
-          }
+          const pricePerUnit = basePrice > 0 ? basePrice : unitPrice;
+          const lineTotal = g.quantity * pricePerUnit;
           return {
             label: et?.label || 'Équipement',
             price: lineTotal,

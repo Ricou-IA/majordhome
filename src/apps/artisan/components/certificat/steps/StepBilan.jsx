@@ -96,27 +96,7 @@ export function StepBilan({ formData, onChange }) {
         </div>
       )}
 
-      {/* TVA */}
-      <SectionTitle>TVA applicable</SectionTitle>
-
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-1">
-        <p><strong>Règle TVA :</strong></p>
-        <p>• 5,5 % — PAC air-eau, poêle haute performance (QualiBois)</p>
-        <p>• 10 % — Ramonage seul, ECS, chaudière gaz/fioul</p>
-        <p>• 20 % — Climatisation, autres</p>
-        <p className="mt-2">
-          <strong>Type actuel :</strong> {EQUIPMENT_CATEGORY_LABELS[formData.equipement_type] || '—'} →{' '}
-          <strong>TVA par défaut : {config.tvaDefaut} %</strong>
-        </p>
-      </div>
-
-      <FormField label="Taux de TVA">
-        <SelectInput
-          value={String(formData.tva_taux)}
-          onChange={(val) => onChange('tva_taux', parseFloat(val))}
-          options={TVA_OPTIONS.map(o => ({ value: String(o.value), label: o.label }))}
-        />
-      </FormField>
+      {/* TVA retirée — information contractuelle, pas technique */}
     </div>
   );
 }

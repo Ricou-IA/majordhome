@@ -274,7 +274,7 @@ export function getEmptyFormData() {
     anomalies_detail: '',
     action_corrective: '',
     recommandations: '',
-    prochaine_intervention: '',
+    prochaine_intervention: `${new Date().getFullYear() + 1}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
     tva_taux: 5.5,
 
     // Date

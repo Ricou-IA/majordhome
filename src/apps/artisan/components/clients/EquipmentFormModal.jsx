@@ -73,8 +73,9 @@ const CATEGORY_LABELS = {
  */
 const INITIAL_FORM = {
   equipmentTypeId: '', // UUID du pricing_equipment_type
-  brand: '',
-  model: '',
+  quantity: 1,
+  brand: '',           // Texte libre (nom marque) — peut matcher un supplier
+  model: '',           // Texte libre (nom modèle) — peut matcher un product
   serialNumber: '',
   installationYear: '',
   installationType: '',
@@ -99,11 +100,17 @@ export function EquipmentFormModal({
   const { equipmentTypes, isLoading: typesLoading } = usePricingEquipmentTypes();
   const { products: allProducts } = useAllProducts(orgId);
 
-  // Produits du fournisseur (marque) sélectionné
+  // Trouver le supplier correspondant à la saisie marque (match exact par nom)
+  const matchedSupplier = useMemo(() => {
+    if (!form.brand) return null;
+    return suppliers.find(s => s.name.toLowerCase() === form.brand.toLowerCase()) || null;
+  }, [form.brand, suppliers]);
+
+  // Produits du fournisseur matché (si la marque correspond à un fournisseur connu)
   const supplierProducts = useMemo(() => {
-    if (!form.brand || !allProducts.length) return [];
-    return allProducts.filter(p => p.supplier_id === form.brand);
-  }, [form.brand, allProducts]);
+    if (!matchedSupplier || !allProducts.length) return [];
+    return allProducts.filter(p => p.supplier_id === matchedSupplier.id);
+  }, [matchedSupplier, allProducts]);
 
   // Mode édition ou ajout
   const isEditMode = !!equipment;
@@ -123,15 +130,10 @@ export function EquipmentFormModal({
   useEffect(() => {
     if (isOpen) {
       if (equipment) {
-        // Retrouver le supplier_id depuis le supplier_product_id
-        const linkedProduct = equipment.supplier_product_id
-          ? allProducts.find(p => p.id === equipment.supplier_product_id)
-          : null;
-
         setForm({
           equipmentTypeId: equipment.equipment_type_id || '',
-          brand: linkedProduct?.supplier_id || '',
-          model: equipment.supplier_product_id || '',
+          brand: equipment.brand || '',
+          model: equipment.model || '',
           serialNumber: equipment.serial_number || '',
           installationYear: equipment.installation_year ? String(equipment.installation_year) : '',
           installationType: equipment.installation_type || '',
@@ -142,19 +144,42 @@ export function EquipmentFormModal({
         setForm(INITIAL_FORM);
       }
     }
-  }, [isOpen, equipment, allProducts]);
+  }, [isOpen, equipment]);
+
+  // Type sélectionné (pour afficher le champ quantité si has_unit_pricing)
+  const selectedEquipType = useMemo(() => {
+    if (!form.equipmentTypeId) return null;
+    return equipmentTypes.find(t => t.id === form.equipmentTypeId) || null;
+  }, [form.equipmentTypeId, equipmentTypes]);
+
+  const showQuantity = selectedEquipType?.has_unit_pricing;
+  const unitLabel = selectedEquipType?.unit_label || 'unité(s)';
 
   // Mise à jour d'un champ
   const handleChange = (field, value) => {
     setForm(prev => {
       const next = { ...prev, [field]: value };
       // Reset modèle et référence si la marque change
-      if (field === 'brand') {
+      if (field === 'brand' && value !== prev.brand) {
         next.model = '';
         next.supplierProductId = '';
       }
+      // Reset quantité si le type change
+      if (field === 'equipmentTypeId') {
+        next.quantity = 1;
+      }
       return next;
     });
+  };
+
+  // Sélection d'un produit depuis la datalist modèle
+  const handleModelSelect = (value) => {
+    const product = supplierProducts.find(p => p.name === value || `${p.name} (${p.reference})` === value);
+    setForm(prev => ({
+      ...prev,
+      model: value,
+      supplierProductId: product?.id || '',
+    }));
   };
 
   // Soumission : on envoie l'equipmentTypeId + le category ENUM dérivé
@@ -166,19 +191,16 @@ export function EquipmentFormModal({
     const selectedType = equipmentTypes.find(t => t.id === form.equipmentTypeId);
     const category = selectedType?.equipment_category || null;
 
-    // Résoudre les noms texte depuis les IDs (fournisseur + produit)
-    const selectedSupplier = suppliers.find(s => s.id === form.brand);
-    const selectedProduct = allProducts.find(p => p.id === form.model);
-
     await onSubmit({
       equipmentTypeId: form.equipmentTypeId,
       category,
-      brand: selectedSupplier?.name || null,
-      model: selectedProduct?.name || null,
+      quantity: form.quantity || 1,
+      brand: form.brand || null,
+      model: form.model || null,
       serialNumber: form.serialNumber || null,
       installationYear: form.installationYear || null,
       installationType: form.installationType || null,
-      supplierProductId: form.model || null, // model = product ID
+      supplierProductId: form.supplierProductId || null,
       notes: form.notes || null,
     });
   };
@@ -250,42 +272,77 @@ export function EquipmentFormModal({
             </select>
           </div>
 
-          {/* Marque (= fournisseur) */}
+          {/* Quantité — visible pour les types à tarification unitaire */}
+          {showQuantity && !isEditMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Quantité ({unitLabel})
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleChange('quantity', Math.max(1, form.quantity - 1))}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors text-lg font-medium"
+                >
+                  −
+                </button>
+                <span className="text-lg font-semibold text-gray-900 w-8 text-center">{form.quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => handleChange('quantity', Math.min(20, form.quantity + 1))}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors text-lg font-medium"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Marque (combobox : suggestions fournisseurs + saisie libre) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Marque
             </label>
-            <select
+            <input
+              type="text"
+              list="brand-suggestions"
               value={form.brand}
               onChange={(e) => handleChange('brand', e.target.value)}
               disabled={suppliersLoading}
+              placeholder="Saisir ou sélectionner une marque..."
+              autoComplete="off"
               className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-gray-50 disabled:text-gray-400"
-            >
-              <option value="">Sélectionner une marque...</option>
+            />
+            <datalist id="brand-suggestions">
               {suppliers.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.name} />
               ))}
-            </select>
+            </datalist>
           </div>
 
-          {/* Modèle (= produit fournisseur) */}
+          {/* Modèle (combobox : suggestions produits fournisseur + saisie libre) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Modèle
             </label>
-            <select
+            <input
+              type="text"
+              list="model-suggestions"
               value={form.model}
-              onChange={(e) => handleChange('model', e.target.value)}
-              disabled={!form.brand}
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm disabled:bg-gray-50 disabled:text-gray-400"
-            >
-              <option value="">{form.brand ? 'Sélectionner un modèle...' : 'Choisir d\'abord une marque'}</option>
-              {supplierProducts.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.reference ? ` (${p.reference})` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={(e) => handleModelSelect(e.target.value)}
+              placeholder={form.brand ? 'Saisir ou sélectionner un modèle...' : 'Saisir un modèle...'}
+              autoComplete="off"
+              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+            />
+            {supplierProducts.length > 0 && (
+              <datalist id="model-suggestions">
+                {supplierProducts.map(p => (
+                  <option key={p.id} value={p.name}>
+                    {p.reference ? `Réf: ${p.reference}` : ''}
+                  </option>
+                ))}
+              </datalist>
+            )}
           </div>
 
           {/* N° Série */}

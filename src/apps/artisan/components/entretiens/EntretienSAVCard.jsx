@@ -9,9 +9,9 @@
  * ============================================================================
  */
 
-import { MapPin, Calendar, Wrench, ClipboardCheck } from 'lucide-react';
-import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
+import { MapPin, Calendar, Wrench, ClipboardCheck, CheckSquare } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
+import { savService } from '@services/sav.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 
 // ============================================================================
@@ -56,7 +56,7 @@ function PartsOrderBadge({ status }) {
 // COMPOSANT
 // ============================================================================
 
-export function EntretienSAVCard({ item, onClick }) {
+export function EntretienSAVCard({ item, onClick, onRefresh }) {
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
 
@@ -147,22 +147,25 @@ export function EntretienSAVCard({ item, onClick }) {
             </div>
           )}
 
-          {/* Bouton certificat (entretien ou SAV+entretien : planifié → remplir, réalisé → voir) */}
+          {/* Badge certificat (planifié) / Bouton facturé (réalisé) */}
           {(type === 'entretien' || (type === 'sav' && item.includes_entretien)) && item.workflow_status === 'planifie' && (
-            <CertificatLink
-              interventionId={item.id}
-              isRealise={false}
-              label="Remplir certificat"
-              className="inline-flex items-center gap-1 mt-1 px-2 py-1.5 bg-[#1B4F72] text-white text-[11px] font-medium rounded-md hover:bg-[#154360] transition-colors disabled:opacity-70"
-            />
+            <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-[#1B4F72] text-white text-[10px] font-medium rounded-md">
+              <ClipboardCheck className="w-3 h-3" />
+              Certificat à faire
+            </span>
           )}
           {(type === 'entretien' || (type === 'sav' && item.includes_entretien)) && item.workflow_status === 'realise' && (
-            <CertificatLink
-              interventionId={item.id}
-              isRealise={true}
-              label="Voir certificat"
-              className="inline-flex items-center gap-1 mt-1 px-2 py-1.5 bg-green-600 text-white text-[11px] font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-70"
-            />
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                await savService.updateWorkflowStatus(item.id, 'facture');
+                onRefresh?.();
+              }}
+              className="inline-flex items-center gap-1 mt-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
+            >
+              <CheckSquare className="w-3 h-3" />
+              Valider facturation
+            </button>
           )}
         </div>
       </div>

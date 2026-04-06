@@ -15,7 +15,7 @@
  * ============================================================================
  */
 
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -104,6 +104,7 @@ function useAssignedTechnician(clientId, scheduledDate) {
 
 export default function CertificatEntretien() {
   const { interventionId } = useParams();
+  const navigate = useNavigate();
   const { organization, user } = useAuth();
   const orgId = organization?.id;
 
@@ -133,6 +134,26 @@ export default function CertificatEntretien() {
     }
     loadContract();
   }, [intervention?.contract_id]);
+
+  // Si enfant (parent_id set) et pas de scheduled_date → récupérer la date du parent
+  const [parentDate, setParentDate] = useState(null);
+  useEffect(() => {
+    if (!intervention?.parent_id || intervention?.scheduled_date) return;
+    async function loadParentDate() {
+      const { data } = await supabase
+        .from('majordhome_interventions')
+        .select('scheduled_date')
+        .eq('id', intervention.parent_id)
+        .single();
+      if (data?.scheduled_date) setParentDate(data.scheduled_date);
+    }
+    loadParentDate();
+  }, [intervention?.parent_id, intervention?.scheduled_date]);
+
+  // Intervention enrichie avec la date du parent si nécessaire
+  const enrichedIntervention = intervention
+    ? { ...intervention, scheduled_date: intervention.scheduled_date || parentDate }
+    : intervention;
 
   // Regénérer une URL signée fraîche quand le certificat a un pdf_storage_path
   const [freshPdfUrl, setFreshPdfUrl] = useState(null);
@@ -169,9 +190,9 @@ export default function CertificatEntretien() {
         <p className="text-sm text-red-700">
           {errorIntervention?.message || 'Intervention introuvable.'}
         </p>
-        <Link to="/entretiens" className="text-sm text-blue-600 hover:underline">
-          Retour aux entretiens
-        </Link>
+        <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline">
+          Retour
+        </button>
       </div>
     );
   }
@@ -182,9 +203,9 @@ export default function CertificatEntretien() {
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Link to="/entretiens" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </Link>
+          </button>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Certificat d'entretien</h1>
             <p className="text-sm text-gray-500">{certificat.reference}</p>
@@ -211,9 +232,9 @@ export default function CertificatEntretien() {
         </div>
 
         <div className="text-center">
-          <Link to="/entretiens" className="text-sm text-blue-600 hover:underline">
-            Retour aux entretiens
-          </Link>
+          <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline">
+            Retour
+          </button>
         </div>
       </div>
     );
@@ -224,9 +245,9 @@ export default function CertificatEntretien() {
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to="/entretiens" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-600" />
-        </Link>
+        </button>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Certificat d'entretien</h1>
           <p className="text-sm text-gray-500">
@@ -238,7 +259,7 @@ export default function CertificatEntretien() {
 
       {/* Wizard */}
       <CertificatWizard
-        intervention={intervention}
+        intervention={enrichedIntervention}
         client={client}
         equipment={equipment}
         contract={contract}

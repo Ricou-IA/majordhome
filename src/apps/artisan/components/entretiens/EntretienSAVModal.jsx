@@ -19,14 +19,13 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
   User, MapPin, Phone, ClipboardCheck, Wrench, Mail, FileText,
   ExternalLink, Calendar, Check, UserPlus,
 } from 'lucide-react';
-import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -45,6 +44,9 @@ import { FormField, TextArea } from '@apps/artisan/components/FormFields';
 import { SchedulingPanel } from '@apps/artisan/components/pipeline/SchedulingPanel';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
+import { CertificatEquipmentRow } from './CertificatEquipmentRow';
+import { contractsService } from '@services/contracts.service';
+import { useCertificatChildren, useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
 
 // ============================================================================
 // CONSTANTES
@@ -59,7 +61,7 @@ const TYPE_LABELS = {
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpenClient }) {
+export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpenClient, onOpenCertificats }) {
   const navigate = useNavigate();
   const { organization } = useAuth();
   const { can } = useCanAccess();
@@ -88,24 +90,59 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
   const [showScheduling, setShowScheduling] = useState(false);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
 
-  // Charger la date du dernier entretien réalisé pour ce client
+  // --- Certificats multi-équipements (intégré dans la modale) ---
+  const isEntretien = item?.intervention_type === 'entretien';
+  const showCertificatsSection = isEntretien && item?.contract_id;
+
+  const { children: certChildren, isLoading: certChildrenLoading, refetch: refetchChildren } = useCertificatChildren(showCertificatsSection ? item?.id : null);
+  const { createChildren, markNeant, unmarkNeant, isCreating: certCreating } = useCertificatEntretienMutations();
+  const [certEquipments, setCertEquipments] = useState([]);
+  const [certEquipmentsLoading, setCertEquipmentsLoading] = useState(false);
+  const [certMutatingId, setCertMutatingId] = useState(null);
+  const certCreatingRef = useRef(false);
+
+  // Charger les équipements pour la section certificats
   useEffect(() => {
-    if (!item?.client_id) return;
+    if (!showCertificatsSection) return;
+    setCertEquipmentsLoading(true);
+    contractsService.getContractEquipments(item.contract_id).then(({ data }) => {
+      setCertEquipments(data || []);
+      setCertEquipmentsLoading(false);
+    });
+  }, [showCertificatsSection, item?.contract_id]);
+
+  // Lazy create children
+  useEffect(() => {
+    if (certCreatingRef.current || certChildrenLoading || certEquipmentsLoading || certChildren.length > 0 || certEquipments.length === 0 || !item) return;
+    certCreatingRef.current = true;
+    createChildren(item.id, certEquipments, {
+      projectId: item.project_id || item.client_project_id,
+      clientId: item.client_id,
+      contractId: item.contract_id,
+    }).then(() => refetchChildren());
+  }, [certChildrenLoading, certEquipmentsLoading, certChildren.length, certEquipments.length, item, createChildren, refetchChildren]);
+
+  const certChildByEquipId = Object.fromEntries(certChildren.map((c) => [c.equipment_id, c]));
+  const certDoneCount = certChildren.filter((c) => c.workflow_status === 'realise').length;
+  const certTotalCount = certChildren.length;
+
+  // Charger la date du dernier entretien réalisé via maintenance_visits (source de vérité)
+  useEffect(() => {
+    if (!item?.contract_id) return;
 
     supabase
-      .from('majordhome_entretien_sav')
-      .select('updated_at')
-      .eq('client_id', item.client_id)
-      .eq('intervention_type', 'entretien')
-      .eq('workflow_status', 'realise')
-      .order('updated_at', { ascending: false })
+      .from('majordhome_maintenance_visits')
+      .select('visit_date')
+      .eq('contract_id', item.contract_id)
+      .eq('status', 'completed')
+      .order('visit_date', { ascending: false })
       .limit(1)
       .then(({ data }) => {
-        if (data && data.length > 0) {
-          setLastEntretienDate(data[0].updated_at);
+        if (data && data.length > 0 && data[0].visit_date) {
+          setLastEntretienDate(data[0].visit_date);
         }
       });
-  }, [item?.client_id]);
+  }, [item?.contract_id]);
 
   // Charger les équipements du contrat
   const [contractEquipments, setContractEquipments] = useState([]);
@@ -348,14 +385,17 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
 
   const backTransitions = allTransitions.filter((t) => {
     const col = KANBAN_COLUMNS.find(c => c.value === t);
-    return col ? KANBAN_COLUMNS.indexOf(col) < currentOrder : false;
+    if (!col) return false; // Pas de retour vers des statuts hors-Kanban
+    return KANBAN_COLUMNS.indexOf(col) < currentOrder;
   });
 
   const forwardTransitions = allTransitions.filter((t) => {
     // Bloquer transition → réalisé pour entretiens (certificat obligatoire)
     if (type === 'entretien' && t === 'realise') return false;
     const col = KANBAN_COLUMNS.find(c => c.value === t);
-    return col ? KANBAN_COLUMNS.indexOf(col) > currentOrder : false;
+    // Statut hors-Kanban (ex: facturé) = toujours forward
+    if (!col) return true;
+    return KANBAN_COLUMNS.indexOf(col) > currentOrder;
   });
 
   // Afficher le bouton certificat si entretien (ou SAV+entretien) planifié ou réalisé
@@ -582,33 +622,56 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
                   <FileText className="w-4 h-4" />
-                  Notes
+                  Notes internes
                 </h3>
+                <p className="text-xs text-gray-400">Visibles dans la fiche client (Notes internes)</p>
                 <FormField>
                   <TextArea
                     value={notes}
                     onChange={canEditSAV ? setNotes : undefined}
-                    placeholder="Notes..."
+                    placeholder="Notes internes..."
                     rows={3}
                     disabled={!canEditSAV}
                   />
                 </FormField>
               </div>
 
-              {/* CTA Créer SAV (entretien uniquement, admin/team_leader) */}
-              {type === 'entretien' && canCreateSAV && item.workflow_status === 'realise' && (
-                <div className="pt-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={handleCreateSAVFromEntretien}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
-                  >
-                    <Wrench className="w-4 h-4" />
-                    Créer un SAV
-                  </button>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Crée une demande SAV rattachée au même client
-                  </p>
+              {/* Section certificats multi-équipements (entretien uniquement) */}
+              {showCertificatsSection && !certEquipmentsLoading && certEquipments.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4" />
+                    Certificats
+                  </h3>
+                  {/* Barre de progression */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          certDoneCount === certTotalCount ? 'bg-green-500' : 'bg-blue-500'
+                        }`}
+                        style={{ width: `${certTotalCount > 0 ? (certDoneCount / certTotalCount) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500">{certDoneCount}/{certTotalCount}</span>
+                  </div>
+                  {certEquipments.map((eq) => (
+                    <CertificatEquipmentRow
+                      key={eq.id}
+                      equipment={eq}
+                      childIntervention={certChildByEquipId[eq.id] || null}
+                      onMarkNeant={async (childId) => {
+                        setCertMutatingId(childId);
+                        try { await markNeant(childId, item.id); } finally { setCertMutatingId(null); }
+                      }}
+                      onUnmarkNeant={async (childId) => {
+                        setCertMutatingId(childId);
+                        try { await unmarkNeant(childId, item.id); } finally { setCertMutatingId(null); }
+                      }}
+                      isLoading={certMutatingId === certChildByEquipId[eq.id]?.id}
+                      onCloseModal={onClose}
+                    />
+                  ))}
                 </div>
               )}
             </>
@@ -641,19 +704,17 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
               </div>
             )}
 
-            {/* Bouton certificat entretien (planifié → remplir, réalisé → voir) */}
-            {showCertificatButton && (
+            {/* CTA Envoyer par mail (entretien réalisé avec email client) */}
+            {isEntretien && item.workflow_status === 'realise' && item.client_email && (
               <div className="flex items-center justify-center">
-                <CertificatLink
-                  interventionId={item.id}
-                  isRealise={item.workflow_status === 'realise'}
-                  label={item.workflow_status === 'realise' ? 'Voir le certificat' : "Remplir le certificat d'entretien"}
-                  className={`inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors shadow-sm disabled:opacity-70 ${
-                    item.workflow_status === 'realise'
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-[#1B4F72] text-white hover:bg-[#154360]'
-                  }`}
-                />
+                <button
+                  type="button"
+                  onClick={() => toast.info('Envoi par mail — fonctionnalité à connecter avec N8N')}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  Envoyer par mail
+                </button>
               </div>
             )}
 
@@ -662,7 +723,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
               <div className="flex items-center gap-2 flex-wrap pt-1">
                 {/* Retour arrière à gauche */}
                 {backTransitions.map((targetStatus) => {
-                  const col = KANBAN_COLUMNS.find(c => c.value === targetStatus);
+                  const col = KANBAN_COLUMNS.find(c => c.value === targetStatus)
+                    || getStatusConfig(type, targetStatus);
                   if (!col) return null;
                   return (
                     <button
@@ -682,7 +744,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
 
                 {/* Avancer à droite */}
                 {forwardTransitions.map((targetStatus) => {
-                  const col = KANBAN_COLUMNS.find(c => c.value === targetStatus);
+                  const col = KANBAN_COLUMNS.find(c => c.value === targetStatus)
+                    || getStatusConfig(type, targetStatus);
                   if (!col) return null;
                   return (
                     <button

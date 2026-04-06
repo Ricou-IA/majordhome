@@ -24,6 +24,7 @@ import { ClientModal } from '../clients/ClientModal';
 import { SAVQuoteModal } from './SAVQuoteModal';
 import { AcceptQuoteModal } from './AcceptQuoteModal';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
+// CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -244,8 +245,8 @@ export function EntretienSAVKanban() {
   // =========================================================================
 
   const renderCard = useCallback((item) => (
-    <EntretienSAVCard item={item} onClick={setSelectedItem} />
-  ), []);
+    <EntretienSAVCard item={item} onClick={setSelectedItem} onRefresh={refresh} />
+  ), [refresh]);
 
   if (isLoading) {
     return (

@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { entretiensService } from './entretiens.service';
 
 // ============================================================================
 // CONSTANTES — STATUTS & TRANSITIONS
@@ -23,6 +24,7 @@ export const ENTRETIEN_STATUSES = [
   { value: 'a_planifier', label: 'À planifier', color: '#3B82F6', display_order: 1 },
   { value: 'planifie',    label: 'Planifié',    color: '#8B5CF6', display_order: 2 },
   { value: 'realise',     label: 'Réalisé',     color: '#10B981', display_order: 3 },
+  { value: 'facture',     label: 'Facturé',     color: '#6366F1', display_order: 4 },
 ];
 
 export const SAV_STATUSES = [
@@ -50,7 +52,8 @@ export const KANBAN_COLUMNS = [
 export const ENTRETIEN_TRANSITIONS = {
   a_planifier: ['planifie'],
   planifie:    ['realise', 'a_planifier'],
-  realise:     [],
+  realise:     ['facture'],
+  facture:     ['realise'],
 };
 
 export const SAV_TRANSITIONS = {
@@ -136,7 +139,7 @@ export const savService = {
       // 1) Contrats actifs avec statut visite année en cours
       const { data: contracts, error: contractsError } = await supabase
         .from('majordhome_contracts')
-        .select('id, current_year_visit_status')
+        .select('id, current_year_visit_status, amount')
         .eq('org_id', orgId)
         .eq('status', 'active');
 
@@ -181,15 +184,20 @@ export const savService = {
       // Compteurs basés sur les contrats
       let entretienRealise = 0;
       let entretienAFaire = 0;
+      let caAFaire = 0;
+      let caRealise = 0;
 
       for (const c of allContracts) {
+        const amt = Number(c.amount) || 0;
         if (c.current_year_visit_status === 'completed') {
           entretienRealise++;
+          caRealise += amt;
         } else {
           // Pas de visite cette année → à faire
           // Si pas dans le kanban → "à faire" (non planifié)
           if (!plannedContractIds.has(c.id)) {
             entretienAFaire++;
+            caAFaire += amt;
           }
         }
       }
@@ -199,6 +207,8 @@ export const savService = {
         entretien_planifie: entretienPlanifie,     // Entretiens dans le kanban en statut planifié
         entretien_realise: entretienRealise,       // Contrats avec visite complétée cette année
         sav_en_cours: savCount,                    // Nombre total de SAV gérés cette année
+        ca_a_faire: caAFaire,                      // CA théorique des entretiens à faire
+        ca_realise: caRealise,                     // CA théorique des entretiens réalisés
       };
 
       return { data: stats, error: null };
@@ -475,6 +485,213 @@ export const savService = {
       return { data, error: error || null };
     } catch (err) {
       console.error('[sav] updateFields error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  // ==========================================================================
+  // CERTIFICATS MULTI-ÉQUIPEMENTS (interventions enfants)
+  // ==========================================================================
+
+  /**
+   * Récupérer les interventions enfants d'un parent + données équipement
+   */
+  async getChildInterventions(parentId) {
+    try {
+      const { data: children, error } = await supabase
+        .from('majordhome_interventions')
+        .select('id, parent_id, equipment_id, workflow_status, status, created_at')
+        .eq('parent_id', parentId)
+        .order('created_at');
+
+      if (error) {
+        console.error('[sav] getChildInterventions error:', error);
+        return { data: null, error };
+      }
+
+      if (!children || children.length === 0) {
+        return { data: [], error: null };
+      }
+
+      // Fetch equipment details for all children in one query
+      const equipmentIds = children
+        .map((c) => c.equipment_id)
+        .filter(Boolean);
+
+      let equipmentMap = {};
+      if (equipmentIds.length > 0) {
+        const { data: equipments } = await supabase
+          .from('majordhome_equipments')
+          .select('id, category, brand, model, serial_number, equipment_type_id')
+          .in('id', equipmentIds);
+
+        if (equipments) {
+          equipmentMap = Object.fromEntries(equipments.map((e) => [e.id, e]));
+        }
+      }
+
+      const enriched = children.map((child) => ({
+        ...child,
+        equipment: equipmentMap[child.equipment_id] || null,
+      }));
+
+      return { data: enriched, error: null };
+    } catch (err) {
+      console.error('[sav] getChildInterventions error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Créer les interventions enfants (1 par équipement du contrat)
+   * @param {string} parentId - ID de l'intervention parent
+   * @param {Array} equipments - Liste d'équipements [{ id, ... }]
+   * @param {Object} ctx - { projectId, clientId, contractId }
+   */
+  async createChildInterventions(parentId, equipments, { projectId, clientId, contractId }) {
+    try {
+      const rows = equipments.map((eq) => ({
+        parent_id: parentId,
+        equipment_id: eq.id,
+        project_id: projectId,
+        client_id: clientId,
+        contract_id: contractId,
+        intervention_type: 'entretien',
+        workflow_status: 'planifie',
+        status: 'scheduled',
+      }));
+
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .insert(rows)
+        .select('id, equipment_id, workflow_status, status');
+
+      if (error) {
+        console.error('[sav] createChildInterventions error:', error);
+      }
+
+      return { data, error: error || null };
+    } catch (err) {
+      console.error('[sav] createChildInterventions error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Marquer un enfant comme NÉANT (pas d'intervention sur cet équipement)
+   */
+  async markChildNeant(childId) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .update({ workflow_status: 'realise', status: 'cancelled' })
+        .eq('id', childId)
+        .select()
+        .single();
+
+      if (error) console.error('[sav] markChildNeant error:', error);
+      return { data, error: error || null };
+    } catch (err) {
+      console.error('[sav] markChildNeant error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Annuler le NÉANT sur un enfant (revient à « à faire »)
+   */
+  async unmarkChildNeant(childId) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .update({ workflow_status: 'planifie', status: 'scheduled' })
+        .eq('id', childId)
+        .select()
+        .single();
+
+      if (error) console.error('[sav] unmarkChildNeant error:', error);
+      return { data, error: error || null };
+    } catch (err) {
+      console.error('[sav] unmarkChildNeant error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Vérifier si tous les enfants sont traités et clôturer le parent
+   * - Transition parent → realise
+   * - Insert maintenance_visit (chaînage annuel)
+   * - Sauvegarde report_notes du parent
+   */
+  async completeParentEntretien(parentId, orgId, reportNotes) {
+    try {
+      // 1) Vérifier tous les enfants
+      const { data: children, error: childErr } = await supabase
+        .from('majordhome_interventions')
+        .select('id, workflow_status')
+        .eq('parent_id', parentId);
+
+      if (childErr) {
+        console.error('[sav] completeParentEntretien childErr:', childErr);
+        return { data: null, error: childErr };
+      }
+
+      const allDone = children && children.length > 0 &&
+        children.every((c) => c.workflow_status === 'realise');
+
+      if (!allDone) {
+        return { data: { allDone: false }, error: null };
+      }
+
+      // 2) Lire le parent pour récupérer scheduled_date + infos technicien
+      const { data: parent } = await supabase
+        .from('majordhome_interventions')
+        .select('contract_id, scheduled_date, technician_id, technician_name, created_by')
+        .eq('id', parentId)
+        .single();
+
+      // Date d'intervention = scheduled_date du parent (planification) ou date du jour
+      const today = new Date().toISOString().split('T')[0];
+      const visitDate = parent?.scheduled_date || today;
+
+      // 3) Transition parent → realise + notes + scheduled_date cohérente
+      const updates = {
+        workflow_status: 'realise',
+        status: 'completed',
+        report_notes: reportNotes || null,
+        scheduled_date: visitDate,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: parentErr } = await supabase
+        .from('majordhome_interventions')
+        .update(updates)
+        .eq('id', parentId);
+
+      if (parentErr) {
+        console.error('[sav] completeParentEntretien parentErr:', parentErr);
+        return { data: null, error: parentErr };
+      }
+
+      // 4) Insert maintenance_visit (chaînage annuel) avec la bonne date
+      if (parent?.contract_id) {
+        const currentYear = new Date().getFullYear();
+        await entretiensService.recordVisit({
+          contractId: parent.contract_id,
+          orgId,
+          year: currentYear,
+          visitDate,
+          status: 'completed',
+          technicianId: parent.technician_id,
+          technicianName: parent.technician_name,
+          notes: reportNotes || null,
+          userId: parent.created_by,
+        });
+      }
+
+      return { data: { allDone: true }, error: null };
+    } catch (err) {
+      console.error('[sav] completeParentEntretien error:', err);
       return { data: null, error: err };
     }
   },

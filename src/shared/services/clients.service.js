@@ -274,7 +274,7 @@ export const clientsService = {
         interventions: interResult.data || [],
         activities: activitiesResult.data || [],
         equipments_count: equipResult.data?.length || 0,
-        interventions_count: interResult.data?.length || 0,
+        interventions_count: (interResult.data || []).filter(i => !i.parent_id).length,
         active_contracts: (equipResult.data || []).filter(e => e.contract_status === 'active').length,
       };
     }, 'clients.getClientById');
@@ -482,6 +482,7 @@ export const clientsService = {
       if (updates.email !== undefined) updateData.email = updates.email || null;
       if (updates.phone !== undefined) updateData.phone = cleanPhone(updates.phone);
       if (updates.phoneSecondary !== undefined) updateData.phone_secondary = cleanPhone(updates.phoneSecondary);
+      if (updates.mailOptin !== undefined) updateData.mail_optin = updates.mailOptin;
 
       // Adresse
       if (updates.address !== undefined) updateData.address = updates.address || null;

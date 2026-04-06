@@ -151,7 +151,7 @@ export function StepInfosGenerales({ formData, onChange, client }) {
         <TextInput
           type="date"
           value={formData.date_intervention}
-          disabled
+          onChange={(val) => onChange('date_intervention', val)}
         />
       </FormField>
     </div>

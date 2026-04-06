@@ -83,7 +83,9 @@ export const certificatsService = {
         anomalies_detail: formData.anomalies_detail || null,
         action_corrective: formData.action_corrective || null,
         recommandations: formData.recommandations || null,
-        prochaine_intervention: formData.prochaine_intervention || null,
+        prochaine_intervention: formData.prochaine_intervention
+          ? (formData.prochaine_intervention.length === 7 ? `${formData.prochaine_intervention}-01` : formData.prochaine_intervention)
+          : null,
         tva_taux: formData.tva_taux ?? 5.5,
 
         // Technicien
