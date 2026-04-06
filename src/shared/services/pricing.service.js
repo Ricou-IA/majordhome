@@ -71,12 +71,12 @@ export function calculateLineTotal(rate, equipType, quantity = 1) {
   if (!rate) return 0;
 
   const basePrice = parseFloat(rate.price) || 0;
-  const unitPrice = parseFloat(rate.unit_price) || 0;
 
   if (equipType?.has_unit_pricing) {
-    const includedUnits = equipType.included_units || 0;
-    const extraUnits = Math.max(0, quantity - includedUnits);
-    return basePrice + extraUnits * unitPrice;
+    const unitPrice = parseFloat(rate.unit_price) || 0;
+    const included = equipType.included_units || 0;
+    const extra = Math.max(0, quantity - included);
+    return basePrice + extra * unitPrice;
   }
 
   return basePrice;
@@ -95,11 +95,13 @@ export function calculateContractTotal(items, discounts = []) {
     return sum + (parseFloat(val) || 0);
   }, 0);
 
-  // Nombre d'équipements distincts (exclure items à prix 0, ex: panneaux seuls)
-  const equipmentCount = items.filter((item) => {
-    const val = item.basePrice ?? item.base_price ?? 0;
-    return parseFloat(val) > 0;
-  }).length;
+  // Nombre total d'équipements (quantité, exclure items à prix 0)
+  const equipmentCount = items.reduce((count, item) => {
+    const val = item.lineTotal ?? item.line_total ?? 0;
+    if (parseFloat(val) <= 0) return count;
+    const qty = item.quantity ?? item.qty ?? 1;
+    return count + qty;
+  }, 0);
 
   // Trouver la remise applicable (plus grande remise dont le seuil est atteint)
   const applicableDiscount = discounts

@@ -224,6 +224,16 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
             />
           </FormField>
         </div>
+        <label className="flex items-center gap-2 mt-3 text-sm text-gray-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={formData.mailOptin !== false}
+            onChange={(e) => updateField('mailOptin', e.target.checked)}
+            disabled={isLocked}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+          />
+          Accepte de recevoir des emails (optin mailing)
+        </label>
       </div>
 
       {/* Section Habitat */}

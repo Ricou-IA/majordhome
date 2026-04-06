@@ -365,8 +365,8 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const initForm = useCallback((c) => {
     setContractForm({
       status: c?.status || 'active',
-      startDate: c?.start_date || '',
-      endDate: c?.end_date || '',
+      startDate: formatDateForInput(c?.start_date) || '',
+      endDate: formatDateForInput(c?.end_date) || '',
       maintenanceMonth: c?.maintenance_month || '',
       amount: c?.amount || '',
       estimatedTime: c?.estimated_time || '',
@@ -491,10 +491,10 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             <TextInput value={contractForm.amount} onChange={(v) => setContractForm((p) => ({ ...p, amount: v }))} placeholder="0.00" type="number" />
           </FormField>
           <FormField label="Date début">
-            <TextInput value={formatDateForInput(contractForm.startDate)} onChange={(v) => setContractForm((p) => ({ ...p, startDate: v }))} type="date" />
+            <TextInput value={contractForm.startDate} onChange={(v) => setContractForm((p) => ({ ...p, startDate: v }))} type="date" />
           </FormField>
           <FormField label="Date fin">
-            <TextInput value={formatDateForInput(contractForm.endDate)} onChange={(v) => setContractForm((p) => ({ ...p, endDate: v }))} type="date" />
+            <TextInput value={contractForm.endDate} onChange={(v) => setContractForm((p) => ({ ...p, endDate: v }))} type="date" />
           </FormField>
           <FormField label="Mois d'entretien">
             <select

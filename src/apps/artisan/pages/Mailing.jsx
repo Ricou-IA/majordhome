@@ -19,6 +19,7 @@ FROM majordhome.clients c
 INNER JOIN majordhome.contracts co ON co.client_id = c.id
 WHERE co.status = 'active'
   AND c.is_archived = false
+  AND c.mail_optin = true
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
 ORDER BY c.last_name`,
@@ -31,6 +32,7 @@ FROM majordhome.clients c
 INNER JOIN majordhome.contracts co ON co.client_id = c.id
 WHERE co.status IN ('cancelled', 'archived')
   AND c.is_archived = false
+  AND c.mail_optin = true
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
   AND c.id NOT IN (
@@ -44,6 +46,7 @@ ORDER BY c.last_name`,
     sql: `SELECT c.id, c.first_name, c.last_name, c.display_name, c.email
 FROM majordhome.clients c
 WHERE c.is_archived = false
+  AND c.mail_optin = true
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
   AND c.id NOT IN (
@@ -57,6 +60,7 @@ ORDER BY c.last_name`,
     sql: `SELECT c.id, c.first_name, c.last_name, c.display_name, c.email
 FROM majordhome.clients c
 WHERE c.is_archived = false
+  AND c.mail_optin = true
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
 ORDER BY c.last_name`,

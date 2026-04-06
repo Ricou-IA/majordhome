@@ -195,15 +195,22 @@ export function ContractsList({
             <>
               <FilterDropdown
                 label="Statut"
-                value={filters.status || ''}
+                value={filters.visitStatus === 'done' ? '_realise' : (filters.status || '')}
                 options={[
                   { value: '', label: 'Tous statuts' },
                   ...CONTRACT_STATUSES.filter((s) => s.value !== 'archived').map((s) => ({
                     value: s.value,
                     label: s.label,
                   })),
+                  { value: '_realise', label: 'Réalisé' },
                 ]}
-                onChange={(v) => setFilters({ status: v, visitStatus: '' })}
+                onChange={(v) => {
+                  if (v === '_realise') {
+                    setFilters({ status: '', visitStatus: 'done' });
+                  } else {
+                    setFilters({ status: v, visitStatus: '' });
+                  }
+                }}
               />
 
             </>

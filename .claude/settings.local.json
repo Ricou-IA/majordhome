@@ -83,7 +83,9 @@
       "Bash(git push:*)",
       "Bash(find /c/Dev/Frontend-Majordhome -type f -name *.sql)",
       "Bash(grep -A 50 \"CREATE OR REPLACE FUNCTION.*create_majordhome\\\\|CREATE OR REPLACE FUNCTION.*update_majordhome\" /c/Dev/Frontend-Majordhome/sql/*.sql)",
-      "Bash(grep -n \"CREATE OR REPLACE FUNCTION\\\\|CREATE FUNCTION\" /c/Dev/Frontend-Majordhome/sql/*.sql)"
+      "Bash(grep -n \"CREATE OR REPLACE FUNCTION\\\\|CREATE FUNCTION\" /c/Dev/Frontend-Majordhome/sql/*.sql)",
+      "Bash(del \"C:\\\\Dev\\\\Frontend-Majordhome\\\\.git\\\\index.lock\")",
+      "Bash(cmd //c \"del C:\\\\Dev\\\\Frontend-Majordhome\\\\.git\\\\index.lock\")"
     ]
   }
 }

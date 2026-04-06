@@ -337,6 +337,16 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId }) =>
             <TextInput value={formData.email} onChange={(v) => u('email', v)} placeholder="client@email.com" type="email" disabled={isLocked} />
           </FormField>
         </div>
+        <label className="flex items-center gap-2 mt-3 text-sm text-secondary-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={formData.mailOptin !== false}
+            onChange={(e) => u('mailOptin', e.target.checked)}
+            disabled={isLocked}
+            className="rounded border-secondary-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+          />
+          Accepte de recevoir des emails (optin mailing)
+        </label>
       </section>
 
       {/* Adresse */}

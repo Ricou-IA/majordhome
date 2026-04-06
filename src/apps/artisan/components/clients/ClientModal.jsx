@@ -39,7 +39,7 @@ const TABS = [
 const EMPTY_FORM = {
   firstName: '', lastName: '', clientCategory: 'particulier',
   companyName: '', address: '', postalCode: '', city: '',
-  phone: '', phoneSecondary: '', email: '',
+  phone: '', phoneSecondary: '', email: '', mailOptin: true,
   housingType: '', surface: '', dpeNumber: '',
   leadSource: '', notes: '', createdAt: null,
 };
@@ -97,7 +97,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
       firstName, lastName,
       clientCategory: c.client_category || 'particulier',
       address: c.address || '', postalCode: c.postal_code || '', city: c.city || '',
-      phone: c.phone || '', email: c.email || '',
+      phone: c.phone || '', email: c.email || '', mailOptin: c.mail_optin !== false,
       housingType: c.housing_type || '', surface: c.surface || '',
       dpeNumber: c.dpe_number || '', leadSource: c.lead_source || '',
       notes: c.notes || '', createdAt: c.created_at,
@@ -188,7 +188,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           firstName: formData.firstName, lastName: formData.lastName,
           clientCategory: formData.clientCategory,
           address: formData.address, postalCode: formData.postalCode, city: formData.city,
-          phone: formData.phone, email: formData.email,
+          phone: formData.phone, email: formData.email, mailOptin: formData.mailOptin,
           housingType: formData.housingType, surface: formData.surface,
           dpeNumber: formData.dpeNumber, leadSource: formData.leadSource,
           notes: formData.notes,

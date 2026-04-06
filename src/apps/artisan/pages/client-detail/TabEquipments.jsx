@@ -63,7 +63,8 @@ export const TabEquipments = ({ clientId }) => {
 
   const handleAdd = async (formData) => {
     try {
-      const result = await addEquipment({
+      const qty = formData.quantity || 1;
+      const basePayload = {
         category: formData.category,
         equipmentTypeId: formData.equipmentTypeId,
         brand: formData.brand,
@@ -73,21 +74,33 @@ export const TabEquipments = ({ clientId }) => {
         installationType: formData.installationType,
         supplierProductId: formData.supplierProductId,
         notes: formData.notes,
-      });
+      };
 
-      const equipmentId = result?.data?.id || result?.id;
-      if (hasContract && equipmentId) {
+      // Créer N enregistrements (1 par unité)
+      const createdIds = [];
+      for (let i = 0; i < qty; i++) {
+        const payload = { ...basePayload };
+        // N° série unique seulement pour le premier
+        if (i > 0) payload.serialNumber = null;
+        const result = await addEquipment(payload);
+        const eqId = result?.data?.id || result?.id;
+        if (eqId) createdIds.push(eqId);
+      }
+
+      if (hasContract && createdIds.length > 0) {
         try {
-          await contractsService.addEquipmentToContract(contract.id, equipmentId);
+          for (const eqId of createdIds) {
+            await contractsService.addEquipmentToContract(contract.id, eqId);
+          }
           await resetSignatureIfNeeded();
           invalidateAll();
-          toast.success('Équipement ajouté et lié au contrat');
+          toast.success(`${qty > 1 ? qty + ' équipements ajoutés' : 'Équipement ajouté'} et lié${qty > 1 ? 's' : ''} au contrat`);
         } catch (linkError) {
           console.error('[TabEquipments] Erreur liaison contrat:', linkError);
-          toast.success('Équipement ajouté (liaison contrat échouée)');
+          toast.success(`${qty > 1 ? qty + ' équipements ajoutés' : 'Équipement ajouté'} (liaison contrat échouée)`);
         }
       } else {
-        toast.success('Équipement ajouté');
+        toast.success(qty > 1 ? `${qty} équipements ajoutés` : 'Équipement ajouté');
       }
       handleCloseModal();
     } catch (error) {

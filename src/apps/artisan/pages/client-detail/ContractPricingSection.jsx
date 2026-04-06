@@ -79,16 +79,19 @@ export function ContractPricingSection({ contractId, contract, client }) {
       grouped[etId].quantity += 1;
     }
 
-    // Calculer les lignes
+    // Calculer les lignes — chaque équipement = 1 unité complète
     const items = Object.values(grouped).map((group) => {
       const rate = rateIndex[`${activeZone.id}_${group.equipmentTypeId}`] || null;
       const equipType = equipTypeMap[group.equipmentTypeId] || null;
-      const lineTotal = calculateLineTotal(rate, equipType, group.quantity);
+      const basePrice = rate ? parseFloat(rate.price) || 0 : 0;
+      const unitPrice = rate ? parseFloat(rate.unit_price) || 0 : 0;
+      const pricePerUnit = basePrice > 0 ? basePrice : unitPrice;
+      const lineTotal = group.quantity * pricePerUnit;
       return {
         equipmentTypeId: group.equipmentTypeId,
         label: equipType?.label || 'Équipement',
         quantity: group.quantity,
-        basePrice: rate ? parseFloat(rate.price) : 0,
+        basePrice: pricePerUnit,
         lineTotal,
       };
     });
