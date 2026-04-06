@@ -212,6 +212,44 @@ Utilise la RPC `public.exec_sql(query_text)` pour exécuter un COUNT(*) sur le s
 - Gestion erreurs/bounces dans mailing_logs (status: bounced, failed)
 - Skip tracking en mode test dans N8n
 
+## Module Certificats d'entretien (multi-équipements)
+
+### Architecture
+- **1 certificat par équipement** : interventions enfants (`parent_id` + `equipment_id`)
+- **Parent** = carte Kanban (1 par contrat/client), **enfants** = 1 par équipement du contrat
+- **Vue `majordhome_entretien_sav`** filtrée `parent_id IS NULL` (enfants exclus du Kanban et des stats)
+- **Lazy create** : les enfants sont créés à la première ouverture de la modale si absents
+
+### Composants
+| Fichier | Rôle |
+|---------|------|
+| `CertificatEquipmentRow.jsx` | Ligne équipement : statut (À faire/Rempli/Néant) + CTA Remplir/Voir/Néant |
+| `CertificatsEntretienModal.jsx` | Modale standalone (non utilisée, section intégrée dans EntretienSAVModal) |
+| `useCertificatEntretien.js` | Hook React Query : `useCertificatChildren` + `useCertificatEntretienMutations` |
+
+### Workflow
+```
+planifie → [Remplir certificats équipements] → realise → facture (hors Kanban)
+```
+- Transition `realise` automatique quand tous les enfants sont traités (rempli ou néant)
+- `completeParentEntretien()` : transition parent + insert `maintenance_visit` (chaînage annuel)
+- Bouton "Valider facturation" sur carte Kanban → carte disparaît
+- `client_comment` (colonne `interventions`) : message pour le mail client
+
+### PDF Certificat
+- Logo Mayer Énergie + titre centré
+- Signature technicien (nom = user connecté, non modifiable)
+- TVA retirée, prochaine intervention en mois/année FR
+
+### Fiche équipement
+- Combobox marque/modèle : saisie libre + suggestions fournisseurs (`<input>` + `<datalist>`)
+
+### Service methods (`sav.service.js`)
+- `getChildInterventions(parentId)` — enfants + JOIN équipements
+- `createChildInterventions(parentId, equipments, ctx)` — batch insert
+- `markChildNeant(childId)` / `unmarkChildNeant(childId)` — NÉANT toggle
+- `completeParentEntretien(parentId, orgId, reportNotes)` — clôture + maintenance_visit
+
 ## Plan de Développement
 | Sprint | Titre | Statut |
 |--------|-------|--------|
