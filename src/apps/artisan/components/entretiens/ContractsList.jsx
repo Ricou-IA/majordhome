@@ -129,7 +129,7 @@ export function ContractsList({
   activeStatCard = null,
   onToggleArchived,
 }) {
-  const isArchivedMode = filters.status === 'archived';
+  const isArchivedMode = filters.status === 'cancelled';
   const [searchInput, setSearchInput] = useState(filters.search || '');
   const debounceRef = useRef(null);
 
@@ -181,10 +181,10 @@ export function ContractsList({
                 : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }
             `}
-            title={isArchivedMode ? 'Masquer les archivés' : 'Voir les archivés'}
+            title={isArchivedMode ? 'Masquer les clos' : 'Voir les clos'}
           >
             <Archive className="w-4 h-4" />
-            <span>Archivés</span>
+            <span>Clos</span>
           </button>
 
           {/* Séparateur visuel */}
@@ -225,7 +225,7 @@ export function ContractsList({
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             {isArchivedMode
-              ? 'Aucun contrat archivé'
+              ? 'Aucun contrat clos'
               : activeStatCard
                 ? {
                     actifs: 'Aucun contrat actif',

@@ -84,6 +84,13 @@ export const prospectKeys = {
   sirens: (orgId, module) => [...prospectKeys.all, 'sirens', orgId, module],
 };
 
+// --- Mailing ---
+export const mailingKeys = {
+  all: ['mailing'],
+  byClient: (clientId) => [...mailingKeys.all, 'client', clientId],
+  byLead: (leadId) => [...mailingKeys.all, 'lead', leadId],
+};
+
 // --- Pricing ---
 export const pricingKeys = {
   all: ['pricing'],

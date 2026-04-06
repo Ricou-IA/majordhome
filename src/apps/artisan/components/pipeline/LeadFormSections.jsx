@@ -495,12 +495,12 @@ export const SectionPipeline = ({
 // SUIVI PIPELINE (dates)
 // ============================================================================
 
-export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLogCall, onLogFollowup, callActivities = [], followupActivities = [] }) => (
+export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLogCall, onLogFollowup, callActivities = [], followupActivities = [], mailingCampaigns = [] }) => (
   <>
     <SectionTitle>Suivi pipeline</SectionTitle>
 
-    {/* Contacté : liste appels + bouton ajouter + checkbox mail */}
-    {currentStatus.display_order >= 2 && (
+    {/* Contacté uniquement : liste appels + bouton ajouter + checkbox mail */}
+    {currentStatus.display_order === 2 && (
       <div className="space-y-2">
         {/* Header appels + bouton */}
         <div className="flex items-center justify-between">
@@ -543,7 +543,7 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
           <p className="text-xs text-gray-400 italic px-3">Aucun appel enregistré</p>
         )}
 
-        {/* Checkbox mail envoyé */}
+        {/* Checkbox mail envoyé (manuel par le commercial) */}
         <div className="flex items-center gap-2 py-2 px-3 bg-gray-50 rounded-lg">
           <Checkbox
             id="email_sent"
@@ -555,6 +555,20 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
             Mail envoyé
           </Label>
         </div>
+
+      </div>
+    )}
+
+    {/* Tag mailing relance contacté (statut Contacté uniquement) */}
+    {currentStatus.display_order === 2 && mailingCampaigns.filter(mc => mc.campaign_name?.includes('Contacté')).length > 0 && (
+      <div className="space-y-1 mt-2">
+        {mailingCampaigns.filter(mc => mc.campaign_name?.includes('Contacté')).map((mc, i) => (
+          <div key={i} className="flex items-center gap-2 py-2 px-3 bg-indigo-50 rounded-lg">
+            <Mail className="h-4 w-4 text-indigo-500" />
+            <span className="text-sm text-indigo-700 font-medium">Mailing Relance</span>
+            <span className="text-xs text-indigo-400">{new Date(mc.sent_at).toLocaleDateString('fr-FR')}</span>
+          </div>
+        ))}
       </div>
     )}
 
@@ -625,6 +639,19 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
         ) : (
           <p className="text-xs text-gray-400 italic px-3">Aucune relance enregistrée</p>
         )}
+      </div>
+    )}
+
+    {/* Tag mailing relance devis (après relances tel, statut Devis envoyé) */}
+    {currentStatus.display_order === 4 && mailingCampaigns.filter(mc => mc.campaign_name?.includes('Devis')).length > 0 && (
+      <div className="space-y-1 mt-2">
+        {mailingCampaigns.filter(mc => mc.campaign_name?.includes('Devis')).map((mc, i) => (
+          <div key={i} className="flex items-center gap-2 py-2 px-3 bg-amber-50 rounded-lg">
+            <Mail className="h-4 w-4 text-amber-500" />
+            <span className="text-sm text-amber-700 font-medium">Mailing Relance Devis</span>
+            <span className="text-xs text-amber-400">{new Date(mc.sent_at).toLocaleDateString('fr-FR')}</span>
+          </div>
+        ))}
       </div>
     )}
 

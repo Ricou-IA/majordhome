@@ -27,6 +27,7 @@ import {
   Target,
   Grid3x3,
   ListTodo,
+  Mail,
 } from 'lucide-react';
 
 // =============================================================================
@@ -45,6 +46,7 @@ const navigation = [
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
+  { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
 ];
 
 // =============================================================================

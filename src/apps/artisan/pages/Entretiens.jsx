@@ -232,7 +232,7 @@ export default function Entretiens() {
   const handleToggleArchived = useCallback(
     (showArchived) => {
       if (showArchived) {
-        setFilters({ search: '', status: 'archived', visitStatus: '' });
+        setFilters({ search: '', status: 'cancelled', visitStatus: '' });
       } else {
         setFilters({ search: '', status: 'active', visitStatus: '' });
       }

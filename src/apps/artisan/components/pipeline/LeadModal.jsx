@@ -130,6 +130,21 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [showFicheTechnique, setShowFicheTechnique] = useState(false);
   const [showCreateDevis, setShowCreateDevis] = useState(false);
   const [openDevisId, setOpenDevisId] = useState(null);
+  const [mailingCampaigns, setMailingCampaigns] = useState([]);
+
+  // Charger les mailings envoyés au lead
+  useEffect(() => {
+    if (!isOpen || !isEditing || !leadId) {
+      setMailingCampaigns([]);
+      return;
+    }
+    supabase
+      .from('majordhome_mailing_logs')
+      .select('campaign_name, sent_at')
+      .eq('lead_id', leadId)
+      .order('sent_at', { ascending: false })
+      .then(({ data }) => setMailingCampaigns(data || []));
+  }, [isOpen, isEditing, leadId]);
 
   // Pré-remplir le formulaire en mode édition OU reset en mode création
   useEffect(() => {
@@ -161,6 +176,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         appointment_date: formatDateForInput(lead.appointment_date) || '',
         quote_sent_date: formatDateForInput(lead.quote_sent_date) || '',
         won_date: formatDateForInput(lead.won_date) || '',
+        email_sent: lead.email_sent || false,
       });
       setEditClientMode(false);
       setShowLinkSearch(false);
@@ -816,6 +832,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                   onLogFollowup={() => setFollowupModalOpen(true)}
                   callActivities={activities?.filter(a => a.activity_type === 'phone_call') || []}
                   followupActivities={activities?.filter(a => a.activity_type === 'followup') || []}
+                  mailingCampaigns={mailingCampaigns}
                 />
               )}
 

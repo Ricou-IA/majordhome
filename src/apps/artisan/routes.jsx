@@ -39,6 +39,9 @@ const Tasks = lazy(() => import('./pages/Tasks'));
 const CedantsPipeline = lazy(() => import('@apps/prospection/cedants/CedantsPipeline'));
 const CommercialPipeline = lazy(() => import('@apps/prospection/commercial/CommercialPipeline'));
 
+// Mailing
+const Mailing = lazy(() => import('./pages/Mailing'));
+
 // =============================================================================
 // LOADING COMPONENT
 // =============================================================================
@@ -283,6 +286,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="prospection_commerciale">
           <CommercialPipeline />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'mailing',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <Mailing />
         </RouteGuard>
       </SuspenseWrapper>
     ),

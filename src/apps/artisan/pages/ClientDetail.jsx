@@ -12,7 +12,7 @@ import { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, User, FileText, Wrench, History,
+  ArrowLeft, User, FileText, Wrench, History, Mail,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
   Archive, ArchiveRestore,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ import { TabEquipments } from './client-detail/TabEquipments';
 import { TabInterventions } from './client-detail/TabInterventions';
 import { TabTimeline } from './client-detail/TabTimeline';
 import { TabContrat } from './client-detail/TabContrat';
+import { TabMailings } from './client-detail/TabMailings';
 
 const TABS = [
   { id: 'info', label: 'Informations', icon: User },
@@ -34,6 +35,7 @@ const TABS = [
   { id: 'equipments', label: 'Équipements', icon: Wrench },
   { id: 'interventions', label: 'Interventions', icon: Wrench },
   { id: 'timeline', label: 'Timeline', icon: History },
+  { id: 'mailings', label: 'Mailings', icon: Mail },
 ];
 
 export default function ClientDetail() {
@@ -314,6 +316,7 @@ export default function ClientDetail() {
         {activeTab === 'equipments' && <TabEquipments clientId={id} />}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
         {activeTab === 'timeline' && <TabTimeline clientId={id} orgId={organization?.id} userId={user?.id} />}
+        {activeTab === 'mailings' && <TabMailings clientId={id} />}
       </div>
 
       {/* Modale confirmation archivage */}

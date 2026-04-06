@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-03-15 — Refactoring architecture (cacheKeys, usePaginatedList, KanbanBoard, serviceHelpers)
+> **Dernière MàJ** : 2026-04-04 — Mailing : configurateur campagnes + table mailing_logs + onglet Mailings fiche client
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -39,12 +39,13 @@ src/
 ├── layouts/AppLayout.jsx       # Sidebar + header
 ├── hooks/pipeline/             # useDashboardData, useDashboardFilters
 ├── apps/artisan/
-│   ├── routes.jsx              # Routes lazy-loaded (14 routes)
-│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile
+│   ├── routes.jsx              # Routes lazy-loaded (15 routes)
+│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile, Mailing
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
 │       ├── shared/             # KanbanBoard, SearchBar, ColumnHeader, CardSkeleton (composants génériques)
 │       ├── clients/            # ClientModal+Tabs (4 onglets: Info/Contrat/Équipements/Historique), ClientCard, EquipmentList, EquipmentFormModal
+│       # Note : ClientDetail a 6 onglets : Info/Contrat/Équipements/Interventions/Timeline/Mailings
 │       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierOrderSection, ChantierInterventionSection
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
 │       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
@@ -86,6 +87,7 @@ src/
 - `majordhome_chantiers` → leads filtrés (chantier_status IS NOT NULL) + JOIN equipment_type + intervention parent
 - `majordhome_prospects` → prospects JOIN profiles (created_by_name, assigned_to_name)
 - `majordhome_prospect_interactions` → interactions JOIN profiles (created_by_name)
+- `majordhome_mailing_logs` → historique des emails envoyés par campagne (client_id, campaign_name, subject, email_to, sent_at, status)
 - `majordhome_equipments`, `majordhome_interventions`, `majordhome_maintenance_visits`
 - `profiles`, `organizations`, `organization_members` (vues core)
 
@@ -117,6 +119,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - TanStack React Query v5
 - **Cache keys centralisées** : `src/shared/hooks/cacheKeys.js` — source unique pour toutes les query keys
   - Import : `import { clientKeys } from '@/shared/hooks/cacheKeys'`
+  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys
   - Re-exports depuis chaque hook pour rétrocompatibilité
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
 - **`useDebounce`** : Hook utilitaire de debounce (remplace les implémentations manuelles)
@@ -143,6 +146,72 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - `computeEndTime`, `computeDuration`
 - **Constantes** : `src/lib/constants.js` — `DEFAULT_PAGE_SIZE`, `LARGE_PAGE_SIZE`, `KANBAN_PAGE_SIZE`
 
+## Module Mailing
+
+### Architecture
+- **Page** : `src/apps/artisan/pages/Mailing.jsx` — Configurateur de campagnes (admin only, `RouteGuard resource="settings"`)
+- **Onglet client** : `src/apps/artisan/pages/client-detail/TabMailings.jsx` — Historique des mails envoyés à un client
+- **Table** : `majordhome.mailing_logs` (client_id, lead_id, org_id, campaign_name, subject, email_to, sent_at, status)
+- **Vue** : `public.majordhome_mailing_logs`
+- **Cache keys** : `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
+- **Env** : `VITE_N8N_WEBHOOK_MAILING` → webhook N8n `POST /webhook/mayer-mailing`
+
+### Workflow N8n : "Mayer - Mailing" (id: 1COgLUuiMtSq2sUq)
+Moteur d'emailing générique piloté par webhook POST. Payload attendu :
+```json
+{
+  "subject": "Objet du mail",
+  "html_body": "<html>...{{SALUTATION}}...</html>",
+  "segment_sql": "SELECT id, first_name, last_name, display_name, email FROM ...",
+  "campaign_name": "Nom de la campagne",
+  "org_id": "uuid",
+  "recipient_type": "client|lead",
+  "batch_size": 400,
+  "test_email": "optionnel@test.fr"
+}
+```
+- Le placeholder `{{SALUTATION}}` est remplacé par "Bonjour Prénom Nom," automatiquement
+- En mode test (`test_email` rempli) : LIMIT 1 sur le SQL, envoi redirigé vers l'email de test
+- `recipient_type` : `client` (défaut) ou `lead` — détermine si l'INSERT va dans `client_id` ou `lead_id`
+- Noeud 7 fait un INSERT dans `majordhome.mailing_logs` après chaque envoi
+
+### Templates campagnes (7)
+| Template | Cible | Objet |
+|----------|-------|-------|
+| `mail_a` | Clients contrat actif | Information — Mayer Energie reprend le suivi |
+| `mail_b` | Clients sans contrat | Offre Exclusive — reprise Econhome |
+| `mail_c` | Clients contrat clos | Reconquête Info — ancien contrat |
+| `mail_d` | Clients contrat clos | Offre Reconquête — retour client |
+| `mail_e` | Leads Contacté | Relance Contacté — rappel à bon souvenir |
+| `mail_f` | Leads Devis envoyé | Relance Devis — suivi devis + aides + prix |
+| `mail_g` | Leads Perdu | Remerciement — ressources site web |
+
+### Segments de ciblage pré-chargés
+| Segment | Description | Exclusion |
+|---------|-------------|-----------|
+| `clients_contrat` | Clients avec contrat actif | déjà mailé (tout mailing_logs) |
+| `clients_contrat_clos` | Clients contrat clos, sans contrat actif | déjà mailé |
+| `clients_sans_contrat` | Clients sans aucun contrat (jamais eu) | déjà mailé |
+| `clients_tous` | Tous les clients | déjà mailé |
+| `leads_contacte` | Leads au statut "Contacté" | déjà mailé campagne Contacté |
+| `leads_devis` | Leads au statut "Devis envoyé" | déjà mailé campagne Devis |
+| `leads_perdu` | Leads au statut "Perdu" | déjà mailé campagne Perdu |
+
+### Tags mailing dans fiche lead
+- Statut **Contacté** (display_order 2) : tag indigo "Mailing Relance" si campagne Contacté envoyée
+- Statut **Devis envoyé** (display_order 4) : tag ambre "Mailing Relance Devis" si campagne Devis envoyée
+- Tags en lecture seule, chargés depuis `mailing_logs` via `lead_id`
+- La checkbox "Mail envoyé" reste manuelle (usage commercial)
+
+### Compteur destinataires
+Utilise la RPC `public.exec_sql(query_text)` pour exécuter un COUNT(*) sur le segment SQL sélectionné. Le résultat s'affiche en badge à côté du sélecteur de ciblage. Le toast et la confirmation utilisent le nombre réel de destinataires.
+
+### Évolutions prévues
+- Migration Gmail → Resend (tracking ouverture/clic/bounce natif)
+- Tracking avancé (pixel ouverture, redirect clic CTA)
+- Gestion erreurs/bounces dans mailing_logs (status: bounced, failed)
+- Skip tracking en mode test dans N8n
+
 ## Plan de Développement
 | Sprint | Titre | Statut |
 |--------|-------|--------|
@@ -150,6 +219,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 | 6 | Chantiers (Kanban post-vente, commandes, planification) + Dashboard réel + Planning multi-select | ✅ FAIT |
 | 7 | Droits & Accès (permissions granulaires par rôle) | ✅ FAIT |
 | P | Prospection (Cédants + Commercial, Screener SIRENE, Pipeline, Drawer) | ✅ FAIT |
+| M | Mailing (Configurateur campagnes, mailing_logs, onglet Mailings fiche client) | ✅ FAIT |
 | 8 | Portail Client | ⬜ À FAIRE |
 | 9 | Intégration Pennylane (devis/factures) | ⬜ À FAIRE |
 | 10 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⬜ À FAIRE |
