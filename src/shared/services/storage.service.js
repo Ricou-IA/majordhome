@@ -19,20 +19,12 @@ export const storageService = {
    */
   async getSignedUrl(bucket, path, expiresIn = 3600) {
     if (!path) return { url: null, error: null };
-
     try {
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, expiresIn);
-
-      if (error) {
-        console.error(`[storage] getSignedUrl error (${bucket}):`, error);
-        return { url: null, error };
-      }
-
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
+      if (error) return { url: null, error };
       return { url: data?.signedUrl || null, error: null };
     } catch (err) {
-      console.error(`[storage] getSignedUrl error (${bucket}):`, err);
+      console.error(`[storage] getSignedUrl (${bucket}):`, err);
       return { url: null, error: err };
     }
   },
@@ -71,31 +63,17 @@ export const storageService = {
    */
   async uploadFile(bucket, path, file, options = {}) {
     try {
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, file, {
-          cacheControl: options.cacheControl || '3600',
-          upsert: options.upsert || false,
-          contentType: options.contentType || file.type || 'application/octet-stream',
-        });
+      const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: options.cacheControl || '3600',
+        upsert: options.upsert || false,
+        contentType: options.contentType || file.type || 'application/octet-stream',
+      });
+      if (error) return { path: null, url: null, error };
 
-      if (error) {
-        console.error(`[storage] uploadFile error (${bucket}):`, error);
-        return { path: null, url: null, error };
-      }
-
-      // Générer l'URL signée
-      const { data: urlData } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(data.path, 3600);
-
-      return {
-        path: data.path,
-        url: urlData?.signedUrl || null,
-        error: null,
-      };
+      const { data: urlData } = await supabase.storage.from(bucket).createSignedUrl(data.path, 3600);
+      return { path: data.path, url: urlData?.signedUrl || null, error: null };
     } catch (err) {
-      console.error(`[storage] uploadFile error (${bucket}):`, err);
+      console.error(`[storage] uploadFile (${bucket}):`, err);
       return { path: null, url: null, error: err };
     }
   },
@@ -108,20 +86,12 @@ export const storageService = {
    */
   async deleteFile(bucket, path) {
     if (!path) return { error: null };
-
     try {
-      const { error } = await supabase.storage
-        .from(bucket)
-        .remove([path]);
-
-      if (error) {
-        console.error(`[storage] deleteFile error (${bucket}):`, error);
-        return { error };
-      }
-
+      const { error } = await supabase.storage.from(bucket).remove([path]);
+      if (error) return { error };
       return { error: null };
     } catch (err) {
-      console.error(`[storage] deleteFile error (${bucket}):`, err);
+      console.error(`[storage] deleteFile (${bucket}):`, err);
       return { error: err };
     }
   },
@@ -134,20 +104,12 @@ export const storageService = {
    */
   async deleteFiles(bucket, paths) {
     if (!paths?.length) return { error: null };
-
     try {
-      const { error } = await supabase.storage
-        .from(bucket)
-        .remove(paths);
-
-      if (error) {
-        console.error(`[storage] deleteFiles error (${bucket}):`, error);
-        return { error };
-      }
-
+      const { error } = await supabase.storage.from(bucket).remove(paths);
+      if (error) return { error };
       return { error: null };
     } catch (err) {
-      console.error(`[storage] deleteFiles error (${bucket}):`, err);
+      console.error(`[storage] deleteFiles (${bucket}):`, err);
       return { error: err };
     }
   },

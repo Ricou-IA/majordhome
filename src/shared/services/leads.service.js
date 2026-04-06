@@ -462,20 +462,7 @@ export const leadsService = {
         newStatusId,
       });
 
-      // Auto-conversion lead -> client (desactive ici -- declenche lors de la validation du devis)
-      let clientCreated = null;
-      if (false && !currentLead?.client_id) {
-        const convResult = await this.convertLeadToClient(
-          leadId,
-          updatedLead?.org_id || currentLead?.org_id,
-          userId,
-        );
-        if (convResult?.data?.client && !convResult.data.skipped) {
-          clientCreated = convResult.data.client;
-        }
-      }
-
-      return { lead: enrichLead(updatedLead), clientCreated };
+      return { lead: enrichLead(updatedLead), clientCreated: null };
     }, 'leads.updateLeadStatus');
 
     // Spread clientCreated to top-level for consumer compat

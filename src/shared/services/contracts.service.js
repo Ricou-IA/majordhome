@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { withErrorHandling } from '@lib/serviceHelpers';
 
 // ============================================================================
 // CONSTANTES
@@ -71,42 +72,32 @@ export const contractsService = {
    * @param {string} clientId - UUID du client
    */
   async getContractByClientId(clientId) {
-    try {
+    return withErrorHandling(async () => {
       if (!clientId) throw new Error('[contractsService] clientId requis');
-
       const { data, error } = await supabase
         .from('majordhome_contracts')
         .select('*')
         .eq('client_id', clientId)
         .maybeSingle();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] getContractByClientId:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.getContractByClientId');
   },
 
   /**
    * Récupère un contrat par ID
    */
   async getContractById(contractId) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
-
       const { data, error } = await supabase
         .from('majordhome_contracts')
         .select('*')
         .eq('id', contractId)
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] getContractById:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.getContractById');
   },
 
   // ==========================================================================
@@ -133,9 +124,8 @@ export const contractsService = {
     discountPercent = null,
     source = 'app',
   } = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!orgId || !clientId) throw new Error('[contractsService] orgId et clientId requis');
-
       const { data, error } = await supabase
         .from('majordhome_contracts_write')
         .insert({
@@ -157,13 +147,9 @@ export const contractsService = {
         })
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] createContract:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.createContract');
   },
 
   // ==========================================================================
@@ -174,7 +160,7 @@ export const contractsService = {
    * Met à jour un contrat
    */
   async updateContract(contractId, updates = {}) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
 
       const updateData = {};
@@ -187,7 +173,6 @@ export const contractsService = {
       if (updates.amount !== undefined) updateData.amount = updates.amount ? parseFloat(updates.amount) : null;
       if (updates.estimatedTime !== undefined) updateData.estimated_time = updates.estimatedTime ? parseFloat(updates.estimatedTime) : null;
       if (updates.notes !== undefined) updateData.notes = updates.notes || null;
-
       updateData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
@@ -196,13 +181,9 @@ export const contractsService = {
         .eq('id', contractId)
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] updateContract:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.updateContract');
   },
 
   // ==========================================================================
@@ -213,9 +194,8 @@ export const contractsService = {
    * Clôturer un contrat (passe en cancelled avec raison)
    */
   async closeContract(contractId, reason) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
-
       const { data, error } = await supabase
         .from('majordhome_contracts_write')
         .update({
@@ -227,13 +207,9 @@ export const contractsService = {
         .eq('id', contractId)
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] closeContract:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.closeContract');
   },
 
   // ==========================================================================
@@ -244,20 +220,15 @@ export const contractsService = {
    * Supprime un contrat
    */
   async deleteContract(contractId) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
-
       const { error } = await supabase
         .from('majordhome_contracts_write')
         .delete()
         .eq('id', contractId);
-
       if (error) throw error;
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('[contractsService] deleteContract:', error);
-      return { success: false, error };
-    }
+      return { success: true };
+    }, 'contracts.deleteContract');
   },
 
   // ==========================================================================
@@ -268,16 +239,15 @@ export const contractsService = {
    * Récupère les équipements liés à un contrat
    */
   async getContractEquipments(contractId) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
 
       const { data: links, error: linksError } = await supabase
         .from('majordhome_contract_equipments')
         .select('equipment_id')
         .eq('contract_id', contractId);
-
       if (linksError) throw linksError;
-      if (!links || links.length === 0) return { data: [], error: null };
+      if (!links || links.length === 0) return [];
 
       const equipmentIds = links.map(l => l.equipment_id);
       const { data, error } = await supabase
@@ -285,55 +255,41 @@ export const contractsService = {
         .select('*')
         .in('id', equipmentIds)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('[contractsService] getContractEquipments:', error);
-      return { data: null, error };
-    }
+      return data || [];
+    }, 'contracts.getContractEquipments');
   },
 
   /**
    * Ajoute un équipement au contrat
    */
   async addEquipmentToContract(contractId, equipmentId) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId || !equipmentId) throw new Error('[contractsService] contractId et equipmentId requis');
-
       const { data, error } = await supabase
         .from('majordhome_contract_equipments')
         .insert({ contract_id: contractId, equipment_id: equipmentId })
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] addEquipmentToContract:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.addEquipmentToContract');
   },
 
   /**
    * Retire un équipement du contrat
    */
   async removeEquipmentFromContract(contractId, equipmentId) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId || !equipmentId) throw new Error('[contractsService] contractId et equipmentId requis');
-
       const { error } = await supabase
         .from('majordhome_contract_equipments')
         .delete()
         .eq('contract_id', contractId)
         .eq('equipment_id', equipmentId);
-
       if (error) throw error;
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('[contractsService] removeEquipmentFromContract:', error);
-      return { success: false, error };
-    }
+      return { success: true };
+    }, 'contracts.removeEquipmentFromContract');
   },
   /**
    * Crée les équipements réels + liens contract_equipments à partir des pricing items sélectionnés.
@@ -343,24 +299,20 @@ export const contractsService = {
    * @param {Array} pricingItems - [{ equipmentTypeId, equipmentTypeCode, label, quantity }]
    */
   async createEquipmentsFromPricingItems(contractId, clientId, pricingItems) {
-    try {
-      if (!contractId || !clientId || !pricingItems?.length) return { data: null, error: null };
+    if (!contractId || !clientId || !pricingItems?.length) return { data: null, error: null };
 
-      // Récupérer project_id du client
+    return withErrorHandling(async () => {
       const { data: client, error: clientError } = await supabase
         .from('majordhome_clients')
         .select('project_id, org_id')
         .eq('id', clientId)
         .single();
-
       if (clientError) throw clientError;
 
       const equipmentIds = [];
-
       for (const item of pricingItems) {
         const qty = item.quantity || 1;
         for (let i = 0; i < qty; i++) {
-          // Créer l'équipement
           const { data: eq, error: eqError } = await supabase
             .from('majordhome_equipments')
             .insert({
@@ -371,35 +323,19 @@ export const contractsService = {
             })
             .select('id')
             .single();
-
-          if (eqError) {
-            console.warn('[contractsService] createEquipmentsFromPricingItems - equipment insert:', eqError);
-            continue;
-          }
+          if (eqError) { console.warn('[contracts] equipment insert skipped:', eqError); continue; }
           equipmentIds.push(eq.id);
         }
       }
 
-      // Créer les liens contract_equipments
       if (equipmentIds.length > 0) {
-        const links = equipmentIds.map((eqId) => ({
-          contract_id: contractId,
-          equipment_id: eqId,
-        }));
-        const { error: linkError } = await supabase
-          .from('majordhome_contract_equipments')
-          .insert(links);
-
-        if (linkError) {
-          console.warn('[contractsService] createEquipmentsFromPricingItems - links insert:', linkError);
-        }
+        const links = equipmentIds.map((eqId) => ({ contract_id: contractId, equipment_id: eqId }));
+        const { error: linkError } = await supabase.from('majordhome_contract_equipments').insert(links);
+        if (linkError) console.warn('[contracts] links insert error:', linkError);
       }
 
-      return { data: equipmentIds, error: null };
-    } catch (error) {
-      console.error('[contractsService] createEquipmentsFromPricingItems:', error);
-      return { data: null, error };
-    }
+      return equipmentIds;
+    }, 'contracts.createEquipmentsFromPricingItems');
   },
 
   // ==========================================================================
@@ -411,9 +347,8 @@ export const contractsService = {
    * Remet signed_at, signature et PDF à null pour forcer une re-signature.
    */
   async resetContractSignature(contractId) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
-
       const { data, error } = await supabase
         .from('majordhome_contracts_write')
         .update({
@@ -426,28 +361,19 @@ export const contractsService = {
         .eq('id', contractId)
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] resetContractSignature:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.resetContractSignature');
   },
 
   /**
    * Enregistre un contrat signé papier (upload scan/photo) — met à jour le PDF path + signed_at
    */
   async uploadSignedContract(contractId, pdfPath, signataireNom = null) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
-
       const now = new Date().toISOString();
-      const updateData = {
-        contract_pdf_path: pdfPath,
-        signed_at: now,
-        updated_at: now,
-      };
+      const updateData = { contract_pdf_path: pdfPath, signed_at: now, updated_at: now };
       if (signataireNom) updateData.signature_client_nom = signataireNom;
 
       const { data, error } = await supabase
@@ -456,22 +382,17 @@ export const contractsService = {
         .eq('id', contractId)
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] uploadSignedContract:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.uploadSignedContract');
   },
 
   /**
    * Enregistre la signature client sur un contrat + met à jour le PDF path
    */
   async signContract(contractId, signatureBase64, signataireNom, pdfPath = null) {
-    try {
+    return withErrorHandling(async () => {
       if (!contractId) throw new Error('[contractsService] contractId requis');
-
       const now = new Date().toISOString();
       const updateData = {
         signature_client_base64: signatureBase64,
@@ -487,13 +408,9 @@ export const contractsService = {
         .eq('id', contractId)
         .select()
         .single();
-
       if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('[contractsService] signContract:', error);
-      return { data: null, error };
-    }
+      return data;
+    }, 'contracts.signContract');
   },
 };
 

@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { withErrorHandling } from '@lib/serviceHelpers';
 import { leadsService } from '@services/leads.service';
 import { storageService } from '@services/storage.service';
 
@@ -72,26 +73,17 @@ export const chantiersService = {
    * Récupère tous les chantiers d'une organisation (vue majordhome_chantiers)
    */
   async getChantiers({ orgId, limit = 200 }) {
-    if (!orgId) throw new Error('[chantiers] orgId requis');
-
-    try {
+    return withErrorHandling(async () => {
+      if (!orgId) throw new Error('[chantiers] orgId requis');
       const { data, error } = await supabase
         .from('majordhome_chantiers')
         .select('*')
         .eq('org_id', orgId)
         .order('won_date', { ascending: false })
         .limit(limit);
-
-      if (error) {
-        console.error('[chantiers] getChantiers error:', error);
-        return { data: null, error };
-      }
-
-      return { data: data || [], error: null };
-    } catch (err) {
-      console.error('[chantiers] getChantiers error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data || [];
+    }, 'chantiers.getChantiers');
   },
 
   /**
@@ -99,25 +91,16 @@ export const chantiersService = {
    */
   async getChantierByClientId(clientId) {
     if (!clientId) return { data: null, error: null };
-
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_chantiers')
         .select('*')
         .eq('client_id', clientId)
         .limit(1)
         .maybeSingle();
-
-      if (error) {
-        console.error('[chantiers] getChantierByClientId error:', error);
-        return { data: null, error };
-      }
-
-      return { data, error: null };
-    } catch (err) {
-      console.error('[chantiers] getChantierByClientId error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'chantiers.getChantierByClientId');
   },
 
   // ==========================================================================
@@ -129,31 +112,18 @@ export const chantiersService = {
    */
   async updateChantierStatus(leadId, newStatus) {
     if (!leadId || !newStatus) throw new Error('[chantiers] leadId et newStatus requis');
-
     const validStatuses = CHANTIER_STATUSES.map(s => s.value);
-    if (!validStatuses.includes(newStatus)) {
-      throw new Error(`[chantiers] Statut invalide: ${newStatus}`);
-    }
+    if (!validStatuses.includes(newStatus)) throw new Error(`[chantiers] Statut invalide: ${newStatus}`);
 
-    try {
+    return withErrorHandling(async () => {
       const updates = { chantier_status: newStatus };
-
-      // Auto-set planification_date au passage en planification
       if (newStatus === 'planification') {
         updates.planification_date = new Date().toISOString().split('T')[0];
       }
-
       const result = await leadsService.updateLead(leadId, updates);
-
-      if (result.error) {
-        console.error('[chantiers] updateChantierStatus error:', result.error);
-      }
-
-      return result;
-    } catch (err) {
-      console.error('[chantiers] updateChantierStatus error:', err);
-      return { data: null, error: err };
-    }
+      if (result.error) throw result.error;
+      return result.data;
+    }, 'chantiers.updateChantierStatus');
   },
 
   /**
@@ -163,41 +133,27 @@ export const chantiersService = {
   async updateOrderStatus(leadId, { equipmentOrderStatus, materialsOrderStatus, currentChantierStatus }) {
     if (!leadId) throw new Error('[chantiers] leadId requis');
 
-    try {
-      const updates = {};
+    const updates = {};
+    if (equipmentOrderStatus !== undefined) updates.equipment_order_status = equipmentOrderStatus;
+    if (materialsOrderStatus !== undefined) updates.materials_order_status = materialsOrderStatus;
 
-      if (equipmentOrderStatus !== undefined) {
-        updates.equipment_order_status = equipmentOrderStatus;
-      }
-      if (materialsOrderStatus !== undefined) {
-        updates.materials_order_status = materialsOrderStatus;
-      }
+    const effectiveEquip = equipmentOrderStatus ?? null;
+    const effectiveMat = materialsOrderStatus ?? null;
+    let autoTransitioned = false;
 
-      // Auto-transitions basées sur l'état des commandes
-      const effectiveEquip = equipmentOrderStatus ?? null;
-      const effectiveMat = materialsOrderStatus ?? null;
-      let autoTransitioned = false;
+    const allReceived = effectiveEquip && effectiveMat &&
+      shouldAutoTransitionToCommandeRecue(effectiveEquip, effectiveMat);
 
-      const allReceived = effectiveEquip && effectiveMat &&
-        shouldAutoTransitionToCommandeRecue(effectiveEquip, effectiveMat);
-
-      if (currentChantierStatus === 'commande_a_faire' && allReceived) {
-        // Forward : commande_a_faire → commande_recue
-        updates.chantier_status = 'commande_recue';
-        autoTransitioned = true;
-      } else if (currentChantierStatus === 'commande_recue' && !allReceived) {
-        // Retour arrière : commande_recue → commande_a_faire
-        updates.chantier_status = 'commande_a_faire';
-        autoTransitioned = true;
-      }
-
-      const result = await leadsService.updateLead(leadId, updates);
-
-      return { ...result, autoTransitioned };
-    } catch (err) {
-      console.error('[chantiers] updateOrderStatus error:', err);
-      return { data: null, error: err, autoTransitioned: false };
+    if (currentChantierStatus === 'commande_a_faire' && allReceived) {
+      updates.chantier_status = 'commande_recue';
+      autoTransitioned = true;
+    } else if (currentChantierStatus === 'commande_recue' && !allReceived) {
+      updates.chantier_status = 'commande_a_faire';
+      autoTransitioned = true;
     }
+
+    const result = await leadsService.updateLead(leadId, updates);
+    return { ...result, autoTransitioned };
   },
 
   /**
