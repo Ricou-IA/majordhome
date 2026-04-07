@@ -115,8 +115,12 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
   const startYear = contract.start_date
     ? new Date(contract.start_date).getFullYear()
     : currentYear;
+  const endYear = contract.end_date
+    ? new Date(contract.end_date).getFullYear()
+    : currentYear;
+  const maxYear = Math.min(endYear, currentYear);
   const years = [];
-  for (let y = currentYear; y >= startYear; y--) {
+  for (let y = maxYear; y >= startYear; y--) {
     years.push(y);
   }
 
