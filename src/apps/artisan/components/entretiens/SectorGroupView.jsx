@@ -50,7 +50,7 @@ const MONTHS = [
 // ============================================================================
 
 function SectorHeader({ sector, isExpanded, onToggle, canPlan, onPlanSector, isPlanningDisabled, plannableCount }) {
-  const { codePostal, commune, totalContracts, visitsDone, visitsPending } = sector;
+  const { codePostal, totalContracts, visitsDone, visitsPending } = sector;
   const completionPct =
     totalContracts > 0 ? Math.round((visitsDone / totalContracts) * 100) : 0;
 
@@ -69,13 +69,10 @@ function SectorHeader({ sector, isExpanded, onToggle, canPlan, onPlanSector, isP
           )}
         </div>
 
-        {/* Code postal + commune */}
+        {/* Code postal */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <MapPin className="h-4 w-4 text-blue-500 flex-shrink-0" />
           <span className="font-semibold text-gray-900">{codePostal}</span>
-          {commune && (
-            <span className="text-sm text-gray-500 truncate">— {commune}</span>
-          )}
         </div>
 
         {/* Stats */}

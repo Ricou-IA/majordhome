@@ -16,6 +16,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { contractsService } from '@services/contracts.service';
+import { equipmentsService } from '@services/equipments.service';
 import { useCertificatChildren, useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
 import { CertificatEquipmentRow } from './CertificatEquipmentRow';
 
@@ -39,17 +40,23 @@ export function CertificatsSection({ item, onCloseModal }) {
   const [mutatingId, setMutatingId] = useState(null);
   const creatingRef = useRef(false);
 
-  // --- Charger les équipements du contrat ---
+  // --- Charger les équipements du contrat (fallback: équipements du client) ---
   useEffect(() => {
     if (!item?.contract_id) {
       setEquipmentsLoading(false);
       return;
     }
-    contractsService.getContractEquipments(item.contract_id).then(({ data }) => {
-      setEquipments(data || []);
+    contractsService.getContractEquipments(item.contract_id).then(async ({ data }) => {
+      if (data && data.length > 0) {
+        setEquipments(data);
+      } else if (item.client_id) {
+        // Fallback : contrats legacy sans contract_equipments
+        const fallback = await equipmentsService.getClientEquipments(item.client_id);
+        setEquipments(fallback.data || []);
+      }
       setEquipmentsLoading(false);
     });
-  }, [item?.contract_id]);
+  }, [item?.contract_id, item?.client_id]);
 
   // --- Lazy create children si absents ---
   useEffect(() => {
