@@ -165,6 +165,12 @@ export const taskKeys = {
   notes: (taskId) => [...taskKeys.all, 'notes', taskId],
 };
 
+// --- Google Calendar ---
+export const googleCalendarKeys = {
+  all: ['google-calendar'],
+  status: (orgId) => [...googleCalendarKeys.all, 'status', orgId],
+};
+
 // --- Devis (Quotes) ---
 export const devisKeys = {
   all: ['devis'],

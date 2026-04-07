@@ -16,6 +16,8 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
+import { googleCalendarService } from '@services/googleCalendar.service';
+
 
 // ============================================================================
 // CONSTANTES
@@ -25,14 +27,23 @@ import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
  * Types de RDV avec couleurs FullCalendar
  */
 export const APPOINTMENT_TYPES = [
-  { value: 'rdv_agency', label: 'RDV Agence', color: '#F59E0B', bgClass: 'bg-amber-500' },
-  { value: 'rdv_technical', label: 'RDV Technique', color: '#3B82F6', bgClass: 'bg-blue-500' },
+  { value: 'rdv_agency', label: 'RDV Commercial', color: '#F59E0B', bgClass: 'bg-amber-500' },
+  { value: 'rdv_technical', label: 'Visite Technique', color: '#3B82F6', bgClass: 'bg-blue-500' },
   { value: 'installation', label: 'Installation', color: '#8B5CF6', bgClass: 'bg-violet-500' },
   { value: 'maintenance', label: 'Entretien', color: '#10B981', bgClass: 'bg-emerald-500' },
   { value: 'service', label: 'SAV', color: '#EF4444', bgClass: 'bg-red-500' },
-  { value: 'intervention', label: 'Intervention', color: '#6366F1', bgClass: 'bg-indigo-500' },
   { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-500' },
 ];
+
+/**
+ * Règles d'assignation par type de RDV
+ * - commercial: Responsable + Commercial (multi-select 1-2)
+ * - technician: Techniciens (multi-select 1-2)
+ * - all: Tous les membres (multi-select illimité)
+ */
+export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical'];
+export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
+// 'other' → all members
 
 /**
  * Statuts de RDV
@@ -203,6 +214,13 @@ export const appointmentsService = {
           .insert(techRows);
       }
 
+      // Fire-and-forget Google Calendar sync
+      googleCalendarService.syncAppointment('create', appointment, {
+        technicianIds,
+        assignedCommercialId: appointmentData.assigned_commercial_id,
+        orgId: coreOrgId,
+      }).catch(() => {});
+
       return { data: { ...appointment, technician_ids: technicianIds }, error: null };
     } catch (err) {
       console.error('[appointments] createAppointment error:', err);
@@ -251,6 +269,23 @@ export const appointmentsService = {
         }
       }
 
+      // Fire-and-forget Google Calendar sync
+      // For drag & drop (moveAppointment), technicianIds is undefined — load existing ones
+      let syncTechIds = technicianIds;
+      if (syncTechIds === undefined) {
+        const { data: existingTechs } = await supabase
+          .from('majordhome_appointment_technicians')
+          .select('technician_id')
+          .eq('appointment_id', appointmentId);
+        syncTechIds = existingTechs?.map(t => t.technician_id) || [];
+      }
+
+      googleCalendarService.syncAppointment('update', appointment, {
+        technicianIds: syncTechIds,
+        assignedCommercialId: updates.assigned_commercial_id || appointment.assigned_commercial_id,
+        orgId: appointment.org_id,
+      }).catch(() => {});
+
       return { data: { ...appointment, technician_ids: technicianIds }, error: null };
     } catch (err) {
       console.error('[appointments] updateAppointment error:', err);
@@ -288,6 +323,24 @@ export const appointmentsService = {
     if (!appointmentId) throw new Error('[appointments] appointmentId requis');
 
     try {
+      // Load appointment + technicians BEFORE deleting (needed for Google Calendar sync)
+      const { data: appointment } = await supabase
+        .from('majordhome_appointments')
+        .select('*')
+        .eq('id', appointmentId)
+        .single();
+
+      const { data: techs } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('technician_id')
+        .eq('appointment_id', appointmentId);
+
+      // Load sync records BEFORE delete (CASCADE will remove them)
+      const { data: syncRecords } = await supabase
+        .from('majordhome_google_calendar_sync')
+        .select('user_id, google_event_id, google_calendar_id')
+        .eq('appointment_id', appointmentId);
+
       // Supprimer les techniciens d'abord (FK)
       await supabase
         .from('majordhome_appointment_technicians')
@@ -302,6 +355,17 @@ export const appointmentsService = {
       if (error) {
         console.error('[appointments] deleteAppointment error:', error);
         return { error };
+      }
+
+      // Fire-and-forget Google Calendar sync (delete event)
+      // Pass sync records since CASCADE already deleted them from DB
+      if (appointment && syncRecords?.length) {
+        googleCalendarService.syncAppointment('delete', appointment, {
+          technicianIds: techs?.map(t => t.technician_id) || [],
+          assignedCommercialId: appointment.assigned_commercial_id,
+          orgId: appointment.org_id,
+          existingSyncRecords: syncRecords,
+        }).catch(() => {});
       }
 
       return { error: null };

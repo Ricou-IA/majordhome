@@ -18,6 +18,8 @@ import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/comp
 import {
   APPOINTMENT_TYPES,
   APPOINTMENT_STATUSES,
+  COMMERCIAL_TYPES,
+  TECHNICIAN_TYPES,
 } from '@services/appointments.service';
 import { TechnicianSelect } from './TechnicianSelect';
 
@@ -42,7 +44,6 @@ export const SectionType = ({
   isEdit,
   isCancelled,
   selectedLead,
-  leadSources,
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -67,41 +68,12 @@ export const SectionType = ({
         />
       </FormField>
     </div>
-    {/* Contexte RDV (mode création uniquement) */}
-    {!isEdit && (
-      <div className="mt-4">
-        <div className={`grid ${formData.rdv_context === 'prospect' && !selectedLead ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-          <FormField label="Contexte du RDV">
-            <SelectInput
-              value={formData.rdv_context}
-              onChange={(v) => updateField('rdv_context', v)}
-              options={[
-                { value: 'prospect', label: '🟣 Nouveau prospect' },
-                { value: 'entretien', label: '🔧 Entretien / Maintenance' },
-                { value: 'autre', label: 'Autre' },
-              ]}
-              disabled={isCancelled}
-            />
-          </FormField>
-          {formData.rdv_context === 'prospect' && !selectedLead && (
-            <FormField label="Source du lead">
-              <SelectInput
-                value={formData.source_id}
-                onChange={(v) => updateField('source_id', v)}
-                options={leadSources.map(s => ({ value: s.id, label: s.name }))}
-                placeholder="— Source —"
-                disabled={isCancelled}
-              />
-            </FormField>
-          )}
-        </div>
-        {formData.rdv_context === 'prospect' && !selectedLead && (
-          <p className="text-xs text-violet-600 mt-2 flex items-center gap-1">
-            <Link2 className="w-3 h-3" />
-            Un lead sera créé automatiquement dans le pipeline au statut "RDV planifié"
-          </p>
-        )}
-      </div>
+    {/* Info auto-lead pour les types commerciaux */}
+    {!isEdit && COMMERCIAL_TYPES.includes(formData.appointment_type) && !selectedLead && (
+      <p className="text-xs text-violet-600 mt-4 flex items-center gap-1">
+        <Link2 className="w-3 h-3" />
+        Un lead sera créé automatiquement dans le pipeline au statut "RDV planifié"
+      </p>
     )}
     {isEdit && (
       <div className="mt-4">
@@ -443,42 +415,54 @@ export const SectionClient = ({
 // SECTION COMMERCIAL
 // ============================================================================
 
-const TECHNICIAN_TYPES = ['maintenance', 'service'];
+/**
+ * SectionAssignee — Assignation dynamique selon le type de RDV
+ * - COMMERCIAL_TYPES → commerciaux (Responsable + Commercial) via multi-select
+ * - TECHNICIAN_TYPES → techniciens via multi-select
+ * - other → tous les membres via multi-select
+ */
+/**
+ * SectionAssignee — Assignation dynamique selon le type de RDV
+ * Tous les IDs sont des team_members.id (table pivot planning).
+ * - COMMERCIAL_TYPES → team_members avec role commercial/admin (Responsable + Commercial)
+ * - TECHNICIAN_TYPES → team_members avec role technician
+ * - other → tous les team_members actifs
+ */
+export const SectionAssignee = ({ formData, updateField, allTeamMembers, isCancelled }) => {
+  const type = formData.appointment_type;
+  const isCommercialType = COMMERCIAL_TYPES.includes(type);
+  const isTechnicianType = TECHNICIAN_TYPES.includes(type);
 
-export const SectionCommercial = ({ formData, updateField, commercials, members, isCancelled }) => {
-  const isTechnicianType = TECHNICIAN_TYPES.includes(formData.appointment_type);
+  let selectMembers, label, icon, placeholder;
 
-  if (isTechnicianType) {
-    return (
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-gray-500" />
-          Technicien assigné
-        </h3>
-        <TechnicianSelect
-          selectedIds={formData.technicianIds || []}
-          onChange={(ids) => updateField('technicianIds', ids)}
-          members={members || []}
-          placeholder="Sélectionner un technicien..."
-        />
-      </div>
-    );
+  if (isCommercialType) {
+    selectMembers = (allTeamMembers || []).filter(m => ['commercial', 'admin'].includes(m.role));
+    label = 'Commercial assigné';
+    icon = <User className="w-4 h-4 text-gray-500" />;
+    placeholder = 'Sélectionner un commercial...';
+  } else if (isTechnicianType) {
+    selectMembers = (allTeamMembers || []).filter(m => m.role === 'technician');
+    label = 'Technicien assigné';
+    icon = <Wrench className="w-4 h-4 text-gray-500" />;
+    placeholder = 'Sélectionner un technicien...';
+  } else {
+    selectMembers = allTeamMembers || [];
+    label = 'Personne(s) assignée(s)';
+    icon = <User className="w-4 h-4 text-gray-500" />;
+    placeholder = 'Sélectionner des personnes...';
   }
 
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-        <User className="w-4 h-4 text-gray-500" />
-        Commercial assigné
+        {icon}
+        {label}
       </h3>
-      <SelectInput
-        value={formData.assigned_commercial_id || ''}
-        onChange={(v) => updateField('assigned_commercial_id', v)}
-        options={[
-          { value: '', label: '— Non assigné —' },
-          ...commercials.map(c => ({ value: c.id, label: c.full_name })),
-        ]}
-        disabled={isCancelled}
+      <TechnicianSelect
+        selectedIds={formData.technicianIds || []}
+        onChange={(ids) => updateField('technicianIds', ids)}
+        members={selectMembers}
+        placeholder={placeholder}
       />
     </div>
   );

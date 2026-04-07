@@ -16,9 +16,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Loader2, Trash2, Ban, CalendarDays, ClipboardCheck } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
-import { getAppointmentTypeConfig } from '@services/appointments.service';
+import { getAppointmentTypeConfig, COMMERCIAL_TYPES } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
-import { useLeadSearch, useLeadSources, useLeadCommercials, leadKeys } from '@hooks/useLeads';
+import { useLeadSearch, leadKeys } from '@hooks/useLeads';
 import { leadsService } from '@services/leads.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
@@ -29,7 +29,7 @@ import {
   SectionType,
   SectionDateTime,
   SectionClient,
-  SectionCommercial,
+  SectionAssignee,
   SectionNotes,
 } from './EventFormSections';
 
@@ -105,10 +105,16 @@ export function EventModal({
     clear: clearLeadSearch,
   } = useLeadSearch(orgId);
 
-  // Commerciaux pour le dropdown "Commercial assigné"
-  const { commercials = [] } = useLeadCommercials(orgId);
-  const { sources: leadSources } = useLeadSources();
   const queryClient = useQueryClient();
+
+  // Tous les team_members actifs (techniciens + commerciaux + admin)
+  // `members` prop = team_members from Planning.jsx, mais ne contient que les techniciens
+  // On charge tous les team_members pour l'assignation dynamique par type
+  const allTeamMembers = useMemo(() => {
+    // members prop already contains all active team_members from useTeamMembers
+    // which queries majordhome_team_members WHERE is_active = true
+    return members || [];
+  }, [members]);
 
   const isEdit = mode === 'edit';
   const isCancelled = appointment?.status === 'cancelled';
@@ -174,8 +180,6 @@ export function EventModal({
         internal_notes: appointment.internal_notes || '',
         technicianIds: appointment.technician_ids || [],
         assigned_commercial_id: appointment.assigned_commercial_id || '',
-        rdv_context: 'autre',
-        source_id: null,
       });
 
       // Restaurer le client lié
@@ -229,8 +233,6 @@ export function EventModal({
         internal_notes: '',
         technicianIds: [],
         assigned_commercial_id: '',
-        rdv_context: 'autre',
-        source_id: DEFAULT_SOURCE_BOUCHE_A_OREILLE,
       });
       setSelectedClient(null);
       setSelectedLead(null);
@@ -279,7 +281,7 @@ export function EventModal({
 
     if (!formData.scheduled_date) newErrors.scheduled_date = 'Date requise';
     if (!formData.scheduled_start) newErrors.scheduled_start = 'Heure de début requise';
-    if (!formData.client_name?.trim()) newErrors.client_name = 'Nom requis';
+    if (formData.appointment_type !== 'other' && !formData.client_name?.trim()) newErrors.client_name = 'Nom requis';
     if (!formData.appointment_type) newErrors.appointment_type = 'Type requis';
 
     setErrors(newErrors);
@@ -368,7 +370,6 @@ export function EventModal({
       client_address: lead.address || '',
       client_postal_code: lead.postal_code || '',
       client_city: lead.city || '',
-      rdv_context: 'prospect',
     }));
 
     // Si le lead est lié à un client, set aussi selectedClient
@@ -406,8 +407,8 @@ export function EventModal({
 
     let leadId = selectedLead?.id || null;
 
-    // Auto-création lead pour les prospects walk-in (contexte "prospect" sans lead existant)
-    if (!isEdit && formData.rdv_context === 'prospect' && !selectedLead) {
+    // Auto-création lead pour les RDV commerciaux sans lead existant
+    if (!isEdit && COMMERCIAL_TYPES.includes(formData.appointment_type) && !selectedLead) {
       try {
         const result = await leadsService.createLead({
           orgId,
@@ -419,7 +420,7 @@ export function EventModal({
           address: formData.client_address || null,
           postal_code: formData.client_postal_code || null,
           city: formData.client_city || null,
-          source_id: formData.source_id || DEFAULT_SOURCE_BOUCHE_A_OREILLE,
+          source_id: DEFAULT_SOURCE_BOUCHE_A_OREILLE,
           status_id: RDV_PLANIFIE_STATUS_ID,
           client_id: selectedClient?.id || null,
           notes: `Lead auto-créé depuis le Planning — RDV du ${formData.scheduled_date}`,
@@ -564,7 +565,6 @@ export function EventModal({
                 isEdit={isEdit}
                 isCancelled={isCancelled}
                 selectedLead={selectedLead}
-                leadSources={leadSources}
               />
 
               <SectionDateTime
@@ -574,34 +574,35 @@ export function EventModal({
                 isCancelled={isCancelled}
               />
 
-              <SectionClient
-                formData={formData}
-                updateField={updateField}
-                errors={errors}
-                isCancelled={isCancelled}
-                selectedClient={selectedClient}
-                selectedLead={selectedLead}
-                navigate={navigate}
-                handleUnlinkClient={handleUnlinkClient}
-                handleUnlinkLead={handleUnlinkLead}
-                clientSearchQuery={clientSearchQuery}
-                searchClient={searchClient}
-                searchLead={searchLead}
-                showClientDropdown={showClientDropdown}
-                setShowClientDropdown={setShowClientDropdown}
-                clientSearching={clientSearching}
-                leadSearching={leadSearching}
-                clientSearchResults={clientSearchResults}
-                leadSearchResults={leadSearchResults}
-                handleSelectClient={handleSelectClient}
-                handleSelectLead={handleSelectLead}
-              />
+              {formData.appointment_type !== 'other' && (
+                <SectionClient
+                  formData={formData}
+                  updateField={updateField}
+                  errors={errors}
+                  isCancelled={isCancelled}
+                  selectedClient={selectedClient}
+                  selectedLead={selectedLead}
+                  navigate={navigate}
+                  handleUnlinkClient={handleUnlinkClient}
+                  handleUnlinkLead={handleUnlinkLead}
+                  clientSearchQuery={clientSearchQuery}
+                  searchClient={searchClient}
+                  searchLead={searchLead}
+                  showClientDropdown={showClientDropdown}
+                  setShowClientDropdown={setShowClientDropdown}
+                  clientSearching={clientSearching}
+                  leadSearching={leadSearching}
+                  clientSearchResults={clientSearchResults}
+                  leadSearchResults={leadSearchResults}
+                  handleSelectClient={handleSelectClient}
+                  handleSelectLead={handleSelectLead}
+                />
+              )}
 
-              <SectionCommercial
+              <SectionAssignee
                 formData={formData}
                 updateField={updateField}
-                commercials={commercials}
-                members={members}
+                allTeamMembers={allTeamMembers}
                 isCancelled={isCancelled}
               />
 

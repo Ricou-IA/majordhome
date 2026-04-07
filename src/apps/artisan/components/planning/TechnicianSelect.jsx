@@ -53,7 +53,7 @@ export function TechnicianSelect({ selectedIds, onChange, members, placeholder =
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
             {members.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-gray-500">Aucun technicien disponible</p>
+              <p className="px-3 py-2 text-sm text-gray-500">Aucun membre disponible</p>
             ) : (
               members.map(member => (
                 <button

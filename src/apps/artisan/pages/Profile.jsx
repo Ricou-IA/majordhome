@@ -1,6 +1,135 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
-import { User, Mail, Phone, Camera, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, Mail, Phone, Camera, Loader2, CheckCircle, AlertCircle, Calendar, Link2, Unlink, RefreshCw } from 'lucide-react';
+import { useGoogleCalendarStatus, useGoogleCalendarConnection } from '@hooks/useGoogleCalendar';
+import { toast } from 'sonner';
+
+// =============================================================================
+// GOOGLE CALENDAR SECTION
+// =============================================================================
+
+function GoogleCalendarSection() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { isConnected, googleEmail, isLoading, refetch } = useGoogleCalendarStatus(orgId);
+  const { connect, disconnect, isConnecting, isDisconnecting } = useGoogleCalendarConnection(orgId);
+
+  // Handle OAuth redirect back from Google → ?gcal=success or ?gcal=error
+  useEffect(() => {
+    const gcalResult = searchParams.get('gcal');
+    if (!gcalResult) return;
+
+    if (gcalResult === 'success') {
+      const email = searchParams.get('gcal_email') || '';
+      toast.success(email ? `Google Calendar connecté (${email})` : 'Google Calendar connecté');
+      refetch();
+    } else if (gcalResult === 'error') {
+      const errorDetail = searchParams.get('gcal_error') || 'Erreur inconnue';
+      toast.error(`Connexion Google échouée : ${errorDetail}`);
+    }
+
+    // Clean URL params
+    searchParams.delete('gcal');
+    searchParams.delete('gcal_email');
+    searchParams.delete('gcal_error');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, refetch]);
+
+  const handleConnect = async () => {
+    try {
+      await connect();
+      refetch();
+    } catch (err) {
+      toast.error(err.message || 'Erreur de connexion Google');
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await disconnect();
+      toast.success('Google Calendar déconnecté');
+    } catch (err) {
+      toast.error(err.message || 'Erreur de déconnexion');
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+          <Calendar className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-secondary-900">
+            Google Calendar
+          </h2>
+          <p className="text-sm text-secondary-500">
+            Synchronisez vos RDV avec votre calendrier Google
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-secondary-500">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Vérification...
+        </div>
+      ) : isConnected ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-green-800">Connecté</p>
+              <p className="text-sm text-green-600 truncate">{googleEmail}</p>
+            </div>
+            <button
+              onClick={() => refetch()}
+              className="p-1.5 text-green-600 hover:bg-green-100 rounded"
+              title="Vérifier la connexion"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-secondary-500">
+            Les nouveaux RDV et modifications sont automatiquement synchronisés vers votre Google Calendar.
+          </p>
+          <button
+            onClick={handleDisconnect}
+            disabled={isDisconnecting}
+            className="btn-secondary text-sm"
+          >
+            {isDisconnecting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Déconnexion...</>
+            ) : (
+              <><Unlink className="w-4 h-4" /> Déconnecter Google Calendar</>
+            )}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-secondary-600">
+            Connectez votre compte Google pour voir vos RDV Majord'home directement dans Google Calendar.
+            Idéal pour consulter votre planning sur mobile sans ouvrir l'application.
+          </p>
+          <button
+            onClick={handleConnect}
+            disabled={isConnecting}
+            className="btn-primary text-sm"
+          >
+            {isConnecting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Connexion en cours...</>
+            ) : (
+              <><Link2 className="w-4 h-4" /> Connecter Google Calendar</>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // =============================================================================
 // PAGE PROFILE
@@ -187,6 +316,9 @@ export default function Profile() {
           </div>
         </form>
       </div>
+
+      {/* Google Calendar */}
+      <GoogleCalendarSection />
 
       {/* Sécurité */}
       <div className="card">
