@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { withErrorHandling } from '@/lib/serviceHelpers';
 import { entretiensService } from './entretiens.service';
 
 // ============================================================================
@@ -495,30 +496,23 @@ export const savService = {
 
   /**
    * Récupérer les interventions enfants d'un parent + données équipement
+   * @param {string} parentId - ID de l'intervention parent
+   * @returns {Promise<{ data: Array|null, error: Error|null }>}
    */
   async getChildInterventions(parentId) {
-    try {
+    return withErrorHandling(async () => {
       const { data: children, error } = await supabase
         .from('majordhome_interventions')
         .select('id, parent_id, equipment_id, workflow_status, status, created_at')
         .eq('parent_id', parentId)
         .order('created_at');
 
-      if (error) {
-        console.error('[sav] getChildInterventions error:', error);
-        return { data: null, error };
-      }
+      if (error) throw error;
+      if (!children || children.length === 0) return [];
 
-      if (!children || children.length === 0) {
-        return { data: [], error: null };
-      }
-
-      // Fetch equipment details for all children in one query
-      const equipmentIds = children
-        .map((c) => c.equipment_id)
-        .filter(Boolean);
-
+      const equipmentIds = children.map((c) => c.equipment_id).filter(Boolean);
       let equipmentMap = {};
+
       if (equipmentIds.length > 0) {
         const { data: equipments } = await supabase
           .from('majordhome_equipments')
@@ -530,26 +524,22 @@ export const savService = {
         }
       }
 
-      const enriched = children.map((child) => ({
+      return children.map((child) => ({
         ...child,
         equipment: equipmentMap[child.equipment_id] || null,
       }));
-
-      return { data: enriched, error: null };
-    } catch (err) {
-      console.error('[sav] getChildInterventions error:', err);
-      return { data: null, error: err };
-    }
+    }, 'sav.getChildInterventions');
   },
 
   /**
    * Créer les interventions enfants (1 par équipement du contrat)
    * @param {string} parentId - ID de l'intervention parent
    * @param {Array} equipments - Liste d'équipements [{ id, ... }]
-   * @param {Object} ctx - { projectId, clientId, contractId }
+   * @param {Object} ctx - Contexte { projectId, clientId, contractId }
+   * @returns {Promise<{ data: Array|null, error: Error|null }>}
    */
   async createChildInterventions(parentId, equipments, { projectId, clientId, contractId }) {
-    try {
+    return withErrorHandling(async () => {
       const rows = equipments.map((eq) => ({
         parent_id: parentId,
         equipment_id: eq.id,
@@ -566,22 +556,38 @@ export const savService = {
         .insert(rows)
         .select('id, equipment_id, workflow_status, status');
 
-      if (error) {
-        console.error('[sav] createChildInterventions error:', error);
-      }
+      if (error) throw error;
+      return data;
+    }, 'sav.createChildInterventions');
+  },
 
-      return { data, error: error || null };
-    } catch (err) {
-      console.error('[sav] createChildInterventions error:', err);
-      return { data: null, error: err };
-    }
+  /**
+   * Marquer une intervention comme réalisée (workflow_status + status)
+   * Utilisé par le CertificatWizard après génération du PDF.
+   * @param {string} interventionId - ID de l'intervention
+   * @returns {Promise<{ data: Object|null, error: Error|null }>}
+   */
+  async markRealise(interventionId) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .update({ workflow_status: 'realise', status: 'completed' })
+        .eq('id', interventionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }, 'sav.markRealise');
   },
 
   /**
    * Marquer un enfant comme NÉANT (pas d'intervention sur cet équipement)
+   * @param {string} childId - ID de l'intervention enfant
+   * @returns {Promise<{ data: Object|null, error: Error|null }>}
    */
   async markChildNeant(childId) {
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_interventions')
         .update({ workflow_status: 'realise', status: 'cancelled' })
@@ -589,19 +595,18 @@ export const savService = {
         .select()
         .single();
 
-      if (error) console.error('[sav] markChildNeant error:', error);
-      return { data, error: error || null };
-    } catch (err) {
-      console.error('[sav] markChildNeant error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'sav.markChildNeant');
   },
 
   /**
    * Annuler le NÉANT sur un enfant (revient à « à faire »)
+   * @param {string} childId - ID de l'intervention enfant
+   * @returns {Promise<{ data: Object|null, error: Error|null }>}
    */
   async unmarkChildNeant(childId) {
-    try {
+    return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_interventions')
         .update({ workflow_status: 'planifie', status: 'scheduled' })
@@ -609,39 +614,36 @@ export const savService = {
         .select()
         .single();
 
-      if (error) console.error('[sav] unmarkChildNeant error:', error);
-      return { data, error: error || null };
-    } catch (err) {
-      console.error('[sav] unmarkChildNeant error:', err);
-      return { data: null, error: err };
-    }
+      if (error) throw error;
+      return data;
+    }, 'sav.unmarkChildNeant');
   },
 
   /**
-   * Vérifier si tous les enfants sont traités et clôturer le parent
+   * Vérifie si tous les enfants sont traités et clôture le parent.
    * - Transition parent → realise
    * - Insert maintenance_visit (chaînage annuel)
    * - Sauvegarde report_notes du parent
+   *
+   * @param {string} parentId - ID de l'intervention parent
+   * @param {string} orgId - ID de l'organisation (core)
+   * @param {string} [reportNotes] - Notes internes
+   * @returns {Promise<{ data: { allDone: boolean }|null, error: Error|null }>}
    */
   async completeParentEntretien(parentId, orgId, reportNotes) {
-    try {
+    return withErrorHandling(async () => {
       // 1) Vérifier tous les enfants
       const { data: children, error: childErr } = await supabase
         .from('majordhome_interventions')
         .select('id, workflow_status')
         .eq('parent_id', parentId);
 
-      if (childErr) {
-        console.error('[sav] completeParentEntretien childErr:', childErr);
-        return { data: null, error: childErr };
-      }
+      if (childErr) throw childErr;
 
       const allDone = children && children.length > 0 &&
         children.every((c) => c.workflow_status === 'realise');
 
-      if (!allDone) {
-        return { data: { allDone: false }, error: null };
-      }
+      if (!allDone) return { allDone: false };
 
       // 2) Lire le parent pour récupérer scheduled_date + infos technicien
       const { data: parent } = await supabase
@@ -650,36 +652,29 @@ export const savService = {
         .eq('id', parentId)
         .single();
 
-      // Date d'intervention = scheduled_date du parent (planification) ou date du jour
       const today = new Date().toISOString().split('T')[0];
       const visitDate = parent?.scheduled_date || today;
 
-      // 3) Transition parent → realise + notes + scheduled_date cohérente
-      const updates = {
-        workflow_status: 'realise',
-        status: 'completed',
-        report_notes: reportNotes || null,
-        scheduled_date: visitDate,
-        updated_at: new Date().toISOString(),
-      };
-
+      // 3) Transition parent → realise
       const { error: parentErr } = await supabase
         .from('majordhome_interventions')
-        .update(updates)
+        .update({
+          workflow_status: 'realise',
+          status: 'completed',
+          report_notes: reportNotes || null,
+          scheduled_date: visitDate,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', parentId);
 
-      if (parentErr) {
-        console.error('[sav] completeParentEntretien parentErr:', parentErr);
-        return { data: null, error: parentErr };
-      }
+      if (parentErr) throw parentErr;
 
-      // 4) Insert maintenance_visit (chaînage annuel) avec la bonne date
+      // 4) Insert maintenance_visit (chaînage annuel)
       if (parent?.contract_id) {
-        const currentYear = new Date().getFullYear();
         await entretiensService.recordVisit({
           contractId: parent.contract_id,
           orgId,
-          year: currentYear,
+          year: new Date().getFullYear(),
           visitDate,
           status: 'completed',
           technicianId: parent.technician_id,
@@ -689,11 +684,8 @@ export const savService = {
         });
       }
 
-      return { data: { allDone: true }, error: null };
-    } catch (err) {
-      console.error('[sav] completeParentEntretien error:', err);
-      return { data: null, error: err };
-    }
+      return { allDone: true };
+    }, 'sav.completeParentEntretien');
   },
 };
 

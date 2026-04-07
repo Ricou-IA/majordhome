@@ -18,7 +18,7 @@ import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useCertificatMutations } from '@hooks/useCertificats';
-import { supabase } from '@/lib/supabaseClient';
+import { savService } from '@services/sav.service';
 import { useAuth } from '@contexts/AuthContext';
 import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
@@ -324,10 +324,7 @@ export function CertificatWizard({
       }
 
       // Transition → réalisé (workflow + status)
-      await supabase
-        .from('majordhome_interventions')
-        .update({ workflow_status: 'realise', status: 'completed' })
-        .eq('id', intervention.id);
+      await savService.markRealise(intervention.id);
 
       toast.success('Certificat généré — entretien marqué réalisé');
 

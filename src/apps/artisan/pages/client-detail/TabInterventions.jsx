@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays, Ban } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
@@ -199,6 +199,40 @@ export const TabInterventions = ({ projectId, clientId }) => {
   const { user } = useAuth();
   const { interventions, isLoading } = useProjectInterventions(projectId);
   const { createIntervention, isCreating } = useCreateIntervention();
+  // Tri parent/enfants : parents d'abord, enfants indentés juste après
+  const sortedInterventions = useMemo(() => {
+    const parents = interventions.filter((i) => !i.parent_id);
+    const childrenByParent = {};
+    const parentIds = new Set(parents.map((p) => p.id));
+
+    for (const i of interventions) {
+      if (i.parent_id) {
+        if (!childrenByParent[i.parent_id]) childrenByParent[i.parent_id] = [];
+        childrenByParent[i.parent_id].push(i);
+      }
+    }
+
+    const sorted = [];
+    for (const p of parents) {
+      sorted.push({ ...p, _hasChildren: !!childrenByParent[p.id]?.length });
+      if (childrenByParent[p.id]) {
+        sorted.push(...childrenByParent[p.id]);
+      }
+    }
+    // Orphelins (enfants dont le parent n'est pas dans la liste)
+    for (const i of interventions) {
+      if (i.parent_id && !parentIds.has(i.parent_id)) {
+        sorted.push(i);
+      }
+    }
+    return sorted;
+  }, [interventions]);
+
+  const parentCount = useMemo(
+    () => interventions.filter((i) => !i.parent_id).length,
+    [interventions],
+  );
+
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     interventionType: 'maintenance',
@@ -248,12 +282,7 @@ export const TabInterventions = ({ projectId, clientId }) => {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-secondary-500">
-          {(() => {
-            const parentCount = interventions.filter((i) => !i.parent_id).length;
-            return parentCount > 0
-              ? `${parentCount} intervention${parentCount !== 1 ? 's' : ''}`
-              : '';
-          })()}
+          {parentCount > 0 ? `${parentCount} intervention${parentCount !== 1 ? 's' : ''}` : ''}
         </p>
         {!showForm && (
           <button
@@ -324,33 +353,9 @@ export const TabInterventions = ({ projectId, clientId }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Trier : parents d'abord, enfants juste après leur parent */}
-          {(() => {
-            const parents = interventions.filter((i) => !i.parent_id);
-            const childrenByParent = {};
-            for (const i of interventions) {
-              if (i.parent_id) {
-                if (!childrenByParent[i.parent_id]) childrenByParent[i.parent_id] = [];
-                childrenByParent[i.parent_id].push(i);
-              }
-            }
-            const sorted = [];
-            for (const p of parents) {
-              sorted.push({ ...p, _hasChildren: !!childrenByParent[p.id]?.length });
-              if (childrenByParent[p.id]) {
-                sorted.push(...childrenByParent[p.id]);
-              }
-            }
-            // Ajouter les orphelins (enfants dont le parent n'est pas dans la liste)
-            for (const i of interventions) {
-              if (i.parent_id && !parents.find((p) => p.id === i.parent_id)) {
-                sorted.push(i);
-              }
-            }
-            return sorted.map((i) => (
-              <InterventionCard key={i.id} intervention={i} hasChildren={i._hasChildren} />
-            ));
-          })()}
+          {sortedInterventions.map((i) => (
+            <InterventionCard key={i.id} intervention={i} hasChildren={i._hasChildren} />
+          ))}
         </div>
       )}
     </div>

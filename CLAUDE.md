@@ -223,8 +223,8 @@ Utilise la RPC `public.exec_sql(query_text)` pour exécuter un COUNT(*) sur le s
 ### Composants
 | Fichier | Rôle |
 |---------|------|
+| `CertificatsSection.jsx` | Section certificats extraite de EntretienSAVModal (equipments, lazy create, progress bar, liste) |
 | `CertificatEquipmentRow.jsx` | Ligne équipement : statut (À faire/Rempli/Néant) + CTA Remplir/Voir/Néant |
-| `CertificatsEntretienModal.jsx` | Modale standalone (non utilisée, section intégrée dans EntretienSAVModal) |
 | `useCertificatEntretien.js` | Hook React Query : `useCertificatChildren` + `useCertificatEntretienMutations` |
 
 ### Workflow

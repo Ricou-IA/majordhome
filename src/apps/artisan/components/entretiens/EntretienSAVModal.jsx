@@ -19,7 +19,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
@@ -44,9 +44,7 @@ import { FormField, TextArea } from '@apps/artisan/components/FormFields';
 import { SchedulingPanel } from '@apps/artisan/components/pipeline/SchedulingPanel';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
-import { CertificatEquipmentRow } from './CertificatEquipmentRow';
-import { contractsService } from '@services/contracts.service';
-import { useCertificatChildren, useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
+import { CertificatsSection } from './CertificatsSection';
 
 // ============================================================================
 // CONSTANTES
@@ -90,41 +88,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
   const [showScheduling, setShowScheduling] = useState(false);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
 
-  // --- Certificats multi-équipements (intégré dans la modale) ---
+  // --- Certificats multi-équipements ---
   const isEntretien = item?.intervention_type === 'entretien';
   const showCertificatsSection = isEntretien && item?.contract_id;
-
-  const { children: certChildren, isLoading: certChildrenLoading, refetch: refetchChildren } = useCertificatChildren(showCertificatsSection ? item?.id : null);
-  const { createChildren, markNeant, unmarkNeant, isCreating: certCreating } = useCertificatEntretienMutations();
-  const [certEquipments, setCertEquipments] = useState([]);
-  const [certEquipmentsLoading, setCertEquipmentsLoading] = useState(false);
-  const [certMutatingId, setCertMutatingId] = useState(null);
-  const certCreatingRef = useRef(false);
-
-  // Charger les équipements pour la section certificats
-  useEffect(() => {
-    if (!showCertificatsSection) return;
-    setCertEquipmentsLoading(true);
-    contractsService.getContractEquipments(item.contract_id).then(({ data }) => {
-      setCertEquipments(data || []);
-      setCertEquipmentsLoading(false);
-    });
-  }, [showCertificatsSection, item?.contract_id]);
-
-  // Lazy create children
-  useEffect(() => {
-    if (certCreatingRef.current || certChildrenLoading || certEquipmentsLoading || certChildren.length > 0 || certEquipments.length === 0 || !item) return;
-    certCreatingRef.current = true;
-    createChildren(item.id, certEquipments, {
-      projectId: item.project_id || item.client_project_id,
-      clientId: item.client_id,
-      contractId: item.contract_id,
-    }).then(() => refetchChildren());
-  }, [certChildrenLoading, certEquipmentsLoading, certChildren.length, certEquipments.length, item, createChildren, refetchChildren]);
-
-  const certChildByEquipId = Object.fromEntries(certChildren.map((c) => [c.equipment_id, c]));
-  const certDoneCount = certChildren.filter((c) => c.workflow_status === 'realise').length;
-  const certTotalCount = certChildren.length;
 
   // Charger la date du dernier entretien réalisé via maintenance_visits (source de vérité)
   useEffect(() => {
@@ -637,42 +603,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
               </div>
 
               {/* Section certificats multi-équipements (entretien uniquement) */}
-              {showCertificatsSection && !certEquipmentsLoading && certEquipments.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
-                    <ClipboardCheck className="w-4 h-4" />
-                    Certificats
-                  </h3>
-                  {/* Barre de progression */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          certDoneCount === certTotalCount ? 'bg-green-500' : 'bg-blue-500'
-                        }`}
-                        style={{ width: `${certTotalCount > 0 ? (certDoneCount / certTotalCount) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-500">{certDoneCount}/{certTotalCount}</span>
-                  </div>
-                  {certEquipments.map((eq) => (
-                    <CertificatEquipmentRow
-                      key={eq.id}
-                      equipment={eq}
-                      childIntervention={certChildByEquipId[eq.id] || null}
-                      onMarkNeant={async (childId) => {
-                        setCertMutatingId(childId);
-                        try { await markNeant(childId, item.id); } finally { setCertMutatingId(null); }
-                      }}
-                      onUnmarkNeant={async (childId) => {
-                        setCertMutatingId(childId);
-                        try { await unmarkNeant(childId, item.id); } finally { setCertMutatingId(null); }
-                      }}
-                      isLoading={certMutatingId === certChildByEquipId[eq.id]?.id}
-                      onCloseModal={onClose}
-                    />
-                  ))}
-                </div>
+              {showCertificatsSection && (
+                <CertificatsSection item={item} onCloseModal={onClose} />
               )}
             </>
           )}
