@@ -347,6 +347,16 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId }) =>
           />
           Accepte de recevoir des emails (optin mailing)
         </label>
+        <label className="flex items-center gap-2 mt-2 text-sm text-secondary-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={formData.smsOptin !== false}
+            onChange={(e) => u('smsOptin', e.target.checked)}
+            disabled={isLocked}
+            className="rounded border-secondary-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+          />
+          Accepte de recevoir des SMS
+        </label>
       </section>
 
       {/* Adresse */}

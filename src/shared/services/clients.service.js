@@ -483,6 +483,7 @@ export const clientsService = {
       if (updates.phone !== undefined) updateData.phone = cleanPhone(updates.phone);
       if (updates.phoneSecondary !== undefined) updateData.phone_secondary = cleanPhone(updates.phoneSecondary);
       if (updates.mailOptin !== undefined) updateData.mail_optin = updates.mailOptin;
+      if (updates.smsOptin !== undefined) updateData.sms_optin = updates.smsOptin;
 
       // Adresse
       if (updates.address !== undefined) updateData.address = updates.address || null;

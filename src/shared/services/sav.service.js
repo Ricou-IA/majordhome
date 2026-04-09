@@ -687,6 +687,55 @@ export const savService = {
       return { allDone: true };
     }, 'sav.completeParentEntretien');
   },
+
+  /**
+   * Envoie une demande d'avis client (WhatsApp + fallback SMS) via N8N
+   */
+  async sendAvisRequest({ interventionId, clientId, clientFirstName, clientPhone, orgId }) {
+    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_SMS_AVIS;
+    if (!webhookUrl) {
+      console.error('[sav] VITE_N8N_WEBHOOK_SMS_AVIS non configuré');
+      return { data: null, error: new Error('Webhook SMS non configuré') };
+    }
+
+    if (!clientPhone) {
+      return { data: null, error: new Error('Le client n\'a pas de numéro de téléphone') };
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          intervention_id: interventionId,
+          client_id: clientId,
+          client_first_name: clientFirstName,
+          client_phone: clientPhone,
+          org_id: orgId,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error(`Webhook error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return { data, error: null };
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        // Timeout = N8N traite en background, considéré comme succès
+        return { data: { success: true, timeout: true }, error: null };
+      }
+      console.error('[sav] sendAvisRequest error:', err);
+      return { data: null, error: err };
+    }
+  },
 };
 
 export default savService;

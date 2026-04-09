@@ -9,7 +9,9 @@
  * ============================================================================
  */
 
-import { MapPin, Calendar, Wrench, ClipboardCheck, CheckSquare } from 'lucide-react';
+import { useState } from 'react';
+import { MapPin, Calendar, Wrench, ClipboardCheck, CheckSquare, MessageSquare, Loader2, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
@@ -56,7 +58,9 @@ function PartsOrderBadge({ status }) {
 // COMPOSANT
 // ============================================================================
 
-export function EntretienSAVCard({ item, onClick, onRefresh }) {
+export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
+  const [smsLoading, setSmsLoading] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
 
@@ -155,17 +159,49 @@ export function EntretienSAVCard({ item, onClick, onRefresh }) {
             </span>
           )}
           {(type === 'entretien' || (type === 'sav' && item.includes_entretien)) && item.workflow_status === 'realise' && (
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                await savService.updateWorkflowStatus(item.id, 'facture');
-                onRefresh?.();
-              }}
-              className="inline-flex items-center gap-1 mt-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
-            >
-              <CheckSquare className="w-3 h-3" />
-              Valider facturation
-            </button>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await savService.updateWorkflowStatus(item.id, 'facture');
+                  onRefresh?.();
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
+              >
+                <CheckSquare className="w-3 h-3" />
+                Facturation
+              </button>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (smsSent) return;
+                  setSmsLoading(true);
+                  const { error } = await savService.sendAvisRequest({
+                    interventionId: item.id,
+                    clientId: item.client_id,
+                    clientFirstName: item.client_first_name,
+                    clientPhone: item.client_phone,
+                    orgId,
+                  });
+                  setSmsLoading(false);
+                  if (error) {
+                    toast.error(error.message || 'Erreur envoi demande d\'avis');
+                  } else {
+                    setSmsSent(true);
+                    toast.success('Demande d\'avis envoyée');
+                  }
+                }}
+                disabled={smsLoading || smsSent}
+                className={`inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border transition-colors ${
+                  smsSent
+                    ? 'border-green-300 text-green-600 bg-green-50'
+                    : 'border-gray-300 text-gray-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
+                } disabled:opacity-60`}
+              >
+                {smsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : smsSent ? <Check className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
+                {smsSent ? 'Avis envoyé' : 'Demander avis'}
+              </button>
+            </div>
           )}
         </div>
       </div>

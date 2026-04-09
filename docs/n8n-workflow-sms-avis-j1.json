@@ -1,0 +1,226 @@
+{
+  "name": "Mayer - SMS Avis Client",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mayer-sms-avis",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook SMS Avis",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "mayer-sms-avis"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Données reçues du frontend\nconst body = $input.first().json.body;\nconst { intervention_id, client_id, client_first_name, client_phone, org_id } = body;\n\nconst REDIRECT_BASE = 'https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/avis-redirect';\n\n// Formater le numéro FR pour Twilio (+33...)\nlet phone = (client_phone || '').replace(/[\\s.-]/g, '');\nif (phone.startsWith('0')) {\n  phone = '+33' + phone.substring(1);\n} else if (phone.startsWith('33')) {\n  phone = '+' + phone;\n} else if (!phone.startsWith('+')) {\n  phone = '+33' + phone;\n}\n\n// Prénom formaté\nconst prenom = client_first_name\n  ? client_first_name.charAt(0).toUpperCase() + client_first_name.slice(1).toLowerCase()\n  : '';\nconst salutation = prenom ? `Bonjour ${prenom}` : 'Bonjour';\n\n// Lien placeholder (sera remplacé après pre-log)\nconst trackingPlaceholder = `${REDIRECT_BASE}?log_id=PENDING`;\n\nreturn [{\n  json: {\n    intervention_id,\n    client_id,\n    org_id,\n    phone_formatted: phone,\n    salutation,\n    whatsapp_body: `${salutation},\\n\\nMerci pour votre confiance ! L'équipe Mayer Énergie espère que notre intervention s'est bien passée.\\n\\nVotre avis compte beaucoup pour nous et nous aide à progresser :\\n${trackingPlaceholder}\\n\\nÀ bientôt !\\nL'équipe Mayer Énergie`,\n    sms_body: `${salutation}, merci pour votre confiance ! Votre avis compte : ${trackingPlaceholder} - Mayer Énergie`,\n    channel: 'whatsapp'\n  }\n}];"
+      },
+      "id": "format-data",
+      "name": "Formater données",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO majordhome.sms_logs (org_id, client_id, intervention_id, phone_to, message, campaign_name, channel, status)\nVALUES (\n  '{{ $json.org_id }}',\n  '{{ $json.client_id }}',\n  '{{ $json.intervention_id }}',\n  '{{ $json.phone_formatted }}',\n  '{{ $json.whatsapp_body }}',\n  'avis_j1',\n  'whatsapp',\n  'pending'\n)\nRETURNING id;",
+        "options": {}
+      },
+      "id": "postgres-pre-log",
+      "name": "Pre-log en DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [660, 300],
+      "credentials": {
+        "postgres": {
+          "id": "VOTRE_CREDENTIAL_POSTGRES_ID",
+          "name": "Supabase Mayer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Injecter le log_id dans le lien de tracking\nconst items = $input.all();\nconst REDIRECT_BASE = 'https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/avis-redirect';\n\nfor (const item of items) {\n  const logId = item.json.id;\n  const prevData = $('Formater données').item.json;\n  \n  item.json.whatsapp_body = prevData.whatsapp_body.replace(/log_id=PENDING/g, `log_id=${logId}`);\n  item.json.sms_body = prevData.sms_body.replace(/log_id=PENDING/g, `log_id=${logId}`);\n  item.json.phone_formatted = prevData.phone_formatted;\n  item.json.channel = prevData.channel;\n  item.json.log_id = logId;\n}\n\nreturn items;"
+      },
+      "id": "inject-tracking",
+      "name": "Injecter lien tracking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+VOTRE_NUMERO_TWILIO_WHATSAPP",
+        "to": "=whatsapp:{{ $json.phone_formatted }}",
+        "message": "={{ $json.whatsapp_body }}"
+      },
+      "id": "twilio-whatsapp",
+      "name": "Envoyer WhatsApp",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1100, 300],
+      "credentials": {
+        "twilioApi": {
+          "id": "VOTRE_CREDENTIAL_TWILIO_ID",
+          "name": "Twilio Mayer"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-whatsapp-ok",
+              "leftValue": "={{ $json.errorCode }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-whatsapp-ok",
+      "name": "WhatsApp OK ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE majordhome.sms_logs\nSET status = 'sent',\n    channel = 'whatsapp',\n    provider_sid = '{{ $('Envoyer WhatsApp').item.json.sid }}',\n    sent_at = now()\nWHERE id = '{{ $('Injecter lien tracking').item.json.log_id }}';",
+        "options": {}
+      },
+      "id": "postgres-log-whatsapp",
+      "name": "Log WhatsApp OK",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1540, 200],
+      "credentials": {
+        "postgres": {
+          "id": "VOTRE_CREDENTIAL_POSTGRES_ID",
+          "name": "Supabase Mayer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "Mayer - SAV",
+        "to": "={{ $('Injecter lien tracking').item.json.phone_formatted }}",
+        "message": "={{ $('Injecter lien tracking').item.json.sms_body }}"
+      },
+      "id": "twilio-sms-fallback",
+      "name": "Fallback SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1540, 400],
+      "credentials": {
+        "twilioApi": {
+          "id": "VOTRE_CREDENTIAL_TWILIO_ID",
+          "name": "Twilio Mayer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE majordhome.sms_logs\nSET status = 'sent',\n    channel = 'sms',\n    message = '{{ $('Injecter lien tracking').item.json.sms_body }}',\n    provider_sid = '{{ $json.sid || \"\" }}',\n    sent_at = now()\nWHERE id = '{{ $('Injecter lien tracking').item.json.log_id }}';",
+        "options": {}
+      },
+      "id": "postgres-log-sms",
+      "name": "Log SMS Fallback",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1760, 400],
+      "credentials": {
+        "postgres": {
+          "id": "VOTRE_CREDENTIAL_POSTGRES_ID",
+          "name": "Supabase Mayer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseData": "={{ JSON.stringify({ success: true, channel: $('WhatsApp OK ?').item.json.errorCode ? 'sms' : 'whatsapp' }) }}"
+        }
+      },
+      "id": "respond-webhook",
+      "name": "Répondre au webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 300]
+    }
+  ],
+  "connections": {
+    "Webhook SMS Avis": {
+      "main": [
+        [{ "node": "Formater données", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formater données": {
+      "main": [
+        [{ "node": "Pre-log en DB", "type": "main", "index": 0 }]
+      ]
+    },
+    "Pre-log en DB": {
+      "main": [
+        [{ "node": "Injecter lien tracking", "type": "main", "index": 0 }]
+      ]
+    },
+    "Injecter lien tracking": {
+      "main": [
+        [{ "node": "Envoyer WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Envoyer WhatsApp": {
+      "main": [
+        [{ "node": "WhatsApp OK ?", "type": "main", "index": 0 }]
+      ]
+    },
+    "WhatsApp OK ?": {
+      "main": [
+        [{ "node": "Log WhatsApp OK", "type": "main", "index": 0 }],
+        [{ "node": "Fallback SMS", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log WhatsApp OK": {
+      "main": [
+        [{ "node": "Répondre au webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fallback SMS": {
+      "main": [
+        [{ "node": "Log SMS Fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log SMS Fallback": {
+      "main": [
+        [{ "node": "Répondre au webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "SMS" },
+    { "name": "WhatsApp" },
+    { "name": "Mayer" }
+  ]
+}

@@ -245,8 +245,8 @@ export function EntretienSAVKanban() {
   // =========================================================================
 
   const renderCard = useCallback((item) => (
-    <EntretienSAVCard item={item} onClick={setSelectedItem} onRefresh={refresh} />
-  ), [refresh]);
+    <EntretienSAVCard item={item} onClick={setSelectedItem} onRefresh={refresh} orgId={orgId} />
+  ), [refresh, orgId]);
 
   if (isLoading) {
     return (

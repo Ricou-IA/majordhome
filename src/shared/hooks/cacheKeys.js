@@ -91,6 +91,13 @@ export const mailingKeys = {
   byLead: (leadId) => [...mailingKeys.all, 'lead', leadId],
 };
 
+// --- SMS ---
+export const smsKeys = {
+  all: ['sms'],
+  byClient: (clientId) => [...smsKeys.all, 'client', clientId],
+  byIntervention: (interventionId) => [...smsKeys.all, 'intervention', interventionId],
+};
+
 // --- Pricing ---
 export const pricingKeys = {
   all: ['pricing'],

@@ -12,7 +12,7 @@ import { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, User, FileText, Wrench, History, Mail,
+  ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
   Archive, ArchiveRestore,
 } from 'lucide-react';
@@ -28,6 +28,7 @@ import { TabInterventions } from './client-detail/TabInterventions';
 import { TabTimeline } from './client-detail/TabTimeline';
 import { TabContrat } from './client-detail/TabContrat';
 import { TabMailings } from './client-detail/TabMailings';
+import { TabSms } from './client-detail/TabSms';
 
 const TABS = [
   { id: 'info', label: 'Informations', icon: User },
@@ -36,6 +37,7 @@ const TABS = [
   { id: 'interventions', label: 'Interventions', icon: Wrench },
   { id: 'timeline', label: 'Timeline', icon: History },
   { id: 'mailings', label: 'Mailings', icon: Mail },
+  { id: 'sms', label: 'SMS', icon: MessageSquare },
 ];
 
 export default function ClientDetail() {
@@ -71,6 +73,7 @@ export default function ClientDetail() {
       phoneSecondary: client.phone_secondary || '',
       email: client.email || '',
       mailOptin: client.mail_optin !== false,
+      smsOptin: client.sms_optin !== false,
       address: client.address || '',
       addressComplement: client.address_complement || '',
       postalCode: client.postal_code || '',
@@ -110,6 +113,7 @@ export default function ClientDetail() {
       phoneSecondary: formData.phoneSecondary,
       email: formData.email,
       mailOptin: formData.mailOptin,
+      smsOptin: formData.smsOptin,
       address: formData.address,
       addressComplement: formData.addressComplement,
       postalCode: formData.postalCode,
@@ -319,6 +323,7 @@ export default function ClientDetail() {
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
         {activeTab === 'timeline' && <TabTimeline clientId={id} orgId={organization?.id} userId={user?.id} />}
         {activeTab === 'mailings' && <TabMailings clientId={id} />}
+        {activeTab === 'sms' && <TabSms clientId={id} />}
       </div>
 
       {/* Modale confirmation archivage */}
