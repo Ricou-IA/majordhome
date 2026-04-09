@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Calendar, Wrench, ClipboardCheck, CheckSquare, MessageSquare, Loader2, Check } from 'lucide-react';
+import { MapPin, Calendar, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
@@ -168,8 +168,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
               >
-                <CheckSquare className="w-3 h-3" />
-                Facturation
+                <Euro className="w-3 h-3" />
               </button>
               <button
                 onClick={async (e) => {
@@ -199,7 +198,6 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                 } disabled:opacity-60`}
               >
                 {smsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : smsSent ? <Check className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
-                {smsSent ? 'Avis envoyé' : 'Demander avis'}
               </button>
             </div>
           )}
