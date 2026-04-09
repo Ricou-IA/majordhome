@@ -25,6 +25,7 @@ import {
   Map,
 } from 'lucide-react';
 import { VisitBadge } from './VisitBadge';
+import { SearchBar } from '../shared/SearchBar';
 
 // ============================================================================
 // CONSTANTES
@@ -236,19 +237,40 @@ export function SectorGroupView({
 }) {
   const [expandedSectors, setExpandedSectors] = useState(new Set());
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Filtrer par mois de référence
+  // Filtrer par mois de référence + recherche full-text
   const filteredSectors = useMemo(() => {
     if (!sectors) return [];
-    if (!selectedMonth) return sectors;
 
-    const monthValue = parseInt(selectedMonth, 10);
+    const monthValue = selectedMonth ? parseInt(selectedMonth, 10) : null;
+    const query = searchQuery.trim().toLowerCase();
 
     return sectors
       .map((sector) => {
-        const filtered = sector.contracts.filter(
-          (c) => c.maintenance_month === monthValue,
-        );
+        let filtered = sector.contracts;
+
+        if (monthValue) {
+          filtered = filtered.filter((c) => c.maintenance_month === monthValue);
+        }
+
+        if (query) {
+          filtered = filtered.filter((c) => {
+            const haystack = [
+              c.client_name,
+              c.client_first_name,
+              c.client_phone,
+              c.client_email,
+              c.client_address,
+              c.contract_number,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase();
+            return haystack.includes(query);
+          });
+        }
+
         const visitsDone = filtered.filter(
           (c) => c.current_year_visit_status === 'completed',
         ).length;
@@ -262,7 +284,7 @@ export function SectorGroupView({
         };
       })
       .filter((s) => s.contracts.length > 0);
-  }, [sectors, selectedMonth]);
+  }, [sectors, selectedMonth, searchQuery]);
 
   const toggleSector = (codePostal) => {
     setExpandedSectors((prev) => {
@@ -311,8 +333,21 @@ export function SectorGroupView({
   const totalDone = filteredSectors.reduce((s, sec) => s + sec.visitsDone, 0);
   const totalPending = filteredSectors.reduce((s, sec) => s + sec.visitsPending, 0);
 
+  // Auto-expand tous les secteurs quand une recherche est active
+  const effectiveExpanded = searchQuery.trim()
+    ? new Set(filteredSectors.map((s) => s.codePostal))
+    : expandedSectors;
+
   return (
     <div className="space-y-4">
+      {/* Barre de recherche */}
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Rechercher par nom, prénom, téléphone, email, adresse..."
+        className="max-w-xl"
+      />
+
       {/* Header stats + filtre mois + actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4 text-sm text-gray-600">
@@ -371,13 +406,18 @@ export function SectorGroupView({
         </div>
       </div>
 
-      {/* Message si filtre mois actif et aucun résultat */}
-      {selectedMonth && filteredSectors.length === 0 && (
+      {/* Message si filtre actif et aucun résultat */}
+      {(selectedMonth || searchQuery.trim()) && filteredSectors.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
           <Calendar className="h-8 w-8 text-gray-300 mx-auto mb-2" />
           <p className="text-gray-500 text-sm">
-            Aucun contrat avec le mois de référence{' '}
-            <strong>{MONTHS.find((m) => m.value === parseInt(selectedMonth))?.label}</strong>
+            Aucun contrat trouvé
+            {selectedMonth && (
+              <> pour le mois <strong>{MONTHS.find((m) => m.value === parseInt(selectedMonth))?.label}</strong></>
+            )}
+            {searchQuery.trim() && (
+              <> correspondant à « <strong>{searchQuery.trim()}</strong> »</>
+            )}
           </p>
         </div>
       )}
@@ -386,7 +426,7 @@ export function SectorGroupView({
       {filteredSectors.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
           {filteredSectors.map((sector) => {
-            const isExpanded = expandedSectors.has(sector.codePostal);
+            const isExpanded = effectiveExpanded.has(sector.codePostal);
             // Nombre de contrats planifiables (pas encore dans le workflow)
             const plannableCount = sector.contracts.filter(
               (c) => !plannedContractIds?.has(c.id),

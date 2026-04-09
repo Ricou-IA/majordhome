@@ -347,8 +347,10 @@ export const appointmentsService = {
         .delete()
         .eq('appointment_id', appointmentId);
 
+      // Use direct table (not the joined view which doesn't support DELETE)
       const { error } = await supabase
-        .from('majordhome_appointments')
+        .schema('majordhome')
+        .from('appointments')
         .delete()
         .eq('id', appointmentId);
 

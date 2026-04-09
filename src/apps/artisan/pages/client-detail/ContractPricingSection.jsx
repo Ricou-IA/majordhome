@@ -19,7 +19,6 @@ import { contractKeys } from '@hooks/cacheKeys';
 import {
   calculateLineTotal,
   calculateContractTotal,
-  detectZoneFromPostalCode,
   pricingService,
 } from '@services/pricing.service';
 import { formatEuro } from '@/lib/utils';
@@ -30,16 +29,17 @@ export function ContractPricingSection({ contractId, contract, client }) {
   const { zones, rates, discounts, equipmentTypes, isLoading: loadingPricing } = usePricingData();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Déterminer la zone tarifaire (contrat > détection CP)
+  // Déterminer la zone tarifaire (contrat > fallback zone par défaut)
   const activeZone = useMemo(() => {
     if (contract?.zone_id && zones?.length) {
       return zones.find((z) => z.id === contract.zone_id) || null;
     }
-    if (client?.postal_code && zones?.length) {
-      return detectZoneFromPostalCode(client.postal_code, zones);
+    // Fallback : zone par défaut (Hors Zone) pour contrats importés sans zone_id
+    if (zones?.length) {
+      return zones.find((z) => z.is_default && z.is_active) || null;
     }
     return null;
-  }, [contract?.zone_id, zones, client?.postal_code]);
+  }, [contract?.zone_id, zones]);
 
   // Index tarifs : zone_id + equipment_type_id → rate
   const rateIndex = useMemo(() => {
