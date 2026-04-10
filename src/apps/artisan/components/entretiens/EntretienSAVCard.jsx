@@ -175,7 +175,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                   e.stopPropagation();
                   if (smsSent) return;
                   setSmsLoading(true);
-                  const { error } = await savService.sendAvisRequest({
+                  const { data, error } = await savService.sendAvisRequest({
                     interventionId: item.id,
                     clientId: item.client_id,
                     clientFirstName: item.client_first_name,
@@ -188,7 +188,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                     toast.error(error.message || 'Erreur envoi demande d\'avis');
                   } else {
                     setSmsSent(true);
-                    toast.success('Demande d\'avis envoyée');
+                    const count = data?.sentCount || 1;
+                    toast.success(count > 1 ? `${count} demandes d'avis envoyées` : 'Demande d\'avis envoyée');
                   }
                 }}
                 disabled={smsLoading || smsSent}

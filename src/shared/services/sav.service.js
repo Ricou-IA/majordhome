@@ -705,54 +705,78 @@ export const savService = {
       return /^0[67]\d{8}$/.test(cleaned) || /^(?:\+33|0033|33)[67]\d{8}$/.test(cleaned);
     };
 
-    // Choisir le mobile en priorité : primaire si mobile, sinon secondaire si mobile
-    let phoneToUse = null;
-    if (isMobileFR(clientPhone)) {
-      phoneToUse = clientPhone;
-    } else if (isMobileFR(clientPhoneSecondary)) {
-      phoneToUse = clientPhoneSecondary;
-    }
+    // Normaliser pour dédupliquer les doublons (ex: "06 12..." et "0612...")
+    const normalize = (phone) => String(phone || '').replace(/[\s.-]/g, '');
 
-    if (!phoneToUse) {
+    // Collecter tous les mobiles uniques (primaire + secondaire)
+    const mobiles = [];
+    const seen = new Set();
+    [clientPhone, clientPhoneSecondary].forEach((p) => {
+      if (isMobileFR(p)) {
+        const key = normalize(p);
+        if (!seen.has(key)) {
+          seen.add(key);
+          mobiles.push(p);
+        }
+      }
+    });
+
+    if (mobiles.length === 0) {
       if (!clientPhone && !clientPhoneSecondary) {
         return { data: null, error: new Error('Le client n\'a pas de numéro de téléphone') };
       }
       return { data: null, error: new Error('Aucun numéro mobile (06/07) disponible pour ce client') };
     }
 
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+    // Envoyer un SMS par mobile trouvé (Mr + Mme = 2 chances d'avis)
+    const results = await Promise.allSettled(
+      mobiles.map(async (phone) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
 
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          intervention_id: interventionId,
-          client_id: clientId,
-          client_first_name: clientFirstName,
-          client_phone: phoneToUse,
-          org_id: orgId,
-        }),
-        signal: controller.signal,
-      });
+        try {
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              intervention_id: interventionId,
+              client_id: clientId,
+              client_first_name: clientFirstName,
+              client_phone: phone,
+              org_id: orgId,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
 
-      clearTimeout(timeout);
+          if (!response.ok) {
+            throw new Error(`Webhook error: ${response.status}`);
+          }
+          return await response.json();
+        } catch (err) {
+          clearTimeout(timeout);
+          if (err.name === 'AbortError') {
+            // Timeout = N8N traite en background, considéré comme succès
+            return { success: true, timeout: true };
+          }
+          throw err;
+        }
+      })
+    );
 
-      if (!response.ok) {
-        throw new Error(`Webhook error: ${response.status}`);
-      }
+    const successCount = results.filter((r) => r.status === 'fulfilled').length;
+    const failCount = results.length - successCount;
 
-      const data = await response.json();
-      return { data, error: null };
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        // Timeout = N8N traite en background, considéré comme succès
-        return { data: { success: true, timeout: true }, error: null };
-      }
-      console.error('[sav] sendAvisRequest error:', err);
-      return { data: null, error: err };
+    if (successCount === 0) {
+      const firstError = results.find((r) => r.status === 'rejected')?.reason;
+      console.error('[sav] sendAvisRequest all failed:', firstError);
+      return { data: null, error: firstError || new Error('Échec de l\'envoi') };
     }
+
+    return {
+      data: { success: true, sentCount: successCount, failCount, total: results.length },
+      error: null,
+    };
   },
 };
 
