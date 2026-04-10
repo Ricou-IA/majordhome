@@ -728,53 +728,53 @@ export const savService = {
       return { data: null, error: new Error('Aucun numéro mobile (06/07) disponible pour ce client') };
     }
 
-    // Envoyer un SMS par mobile trouvé (Mr + Mme = 2 chances d'avis)
-    const results = await Promise.allSettled(
-      mobiles.map(async (phone) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+    // Envoyer un SMS par mobile trouvé — séquentiellement pour éviter les collisions N8N
+    // (Mr + Mme = 2 chances d'avis)
+    let successCount = 0;
+    let firstError = null;
 
-        try {
-          const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              intervention_id: interventionId,
-              client_id: clientId,
-              client_first_name: clientFirstName,
-              client_phone: phone,
-              org_id: orgId,
-            }),
-            signal: controller.signal,
-          });
-          clearTimeout(timeout);
+    for (const phone of mobiles) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-          if (!response.ok) {
-            throw new Error(`Webhook error: ${response.status}`);
-          }
-          return await response.json();
-        } catch (err) {
-          clearTimeout(timeout);
-          if (err.name === 'AbortError') {
-            // Timeout = N8N traite en background, considéré comme succès
-            return { success: true, timeout: true };
-          }
-          throw err;
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            intervention_id: interventionId,
+            client_id: clientId,
+            client_first_name: clientFirstName,
+            client_phone: phone,
+            org_id: orgId,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          throw new Error(`Webhook error: ${response.status}`);
         }
-      })
-    );
-
-    const successCount = results.filter((r) => r.status === 'fulfilled').length;
-    const failCount = results.length - successCount;
+        await response.json();
+        successCount++;
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err.name === 'AbortError') {
+          // Timeout = N8N traite en background, considéré comme succès
+          successCount++;
+        } else {
+          console.error(`[sav] sendAvisRequest error for ${phone}:`, err);
+          if (!firstError) firstError = err;
+        }
+      }
+    }
 
     if (successCount === 0) {
-      const firstError = results.find((r) => r.status === 'rejected')?.reason;
-      console.error('[sav] sendAvisRequest all failed:', firstError);
       return { data: null, error: firstError || new Error('Échec de l\'envoi') };
     }
 
     return {
-      data: { success: true, sentCount: successCount, failCount, total: results.length },
+      data: { success: true, sentCount: successCount, failCount: mobiles.length - successCount, total: mobiles.length },
       error: null,
     };
   },
