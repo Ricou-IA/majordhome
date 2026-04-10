@@ -60,7 +60,7 @@ function PartsOrderBadge({ status }) {
 
 export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [smsLoading, setSmsLoading] = useState(false);
-  const [smsSent, setSmsSent] = useState(false);
+  const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
 
