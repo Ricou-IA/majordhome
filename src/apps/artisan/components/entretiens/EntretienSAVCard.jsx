@@ -180,6 +180,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                     clientId: item.client_id,
                     clientFirstName: item.client_first_name,
                     clientPhone: item.client_phone,
+                    clientPhoneSecondary: item.client_phone_secondary,
                     orgId,
                   });
                   setSmsLoading(false);

@@ -691,15 +691,33 @@ export const savService = {
   /**
    * Envoie une demande d'avis client (WhatsApp + fallback SMS) via N8N
    */
-  async sendAvisRequest({ interventionId, clientId, clientFirstName, clientPhone, orgId }) {
+  async sendAvisRequest({ interventionId, clientId, clientFirstName, clientPhone, clientPhoneSecondary, orgId }) {
     const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_SMS_AVIS;
     if (!webhookUrl) {
       console.error('[sav] VITE_N8N_WEBHOOK_SMS_AVIS non configuré');
       return { data: null, error: new Error('Webhook SMS non configuré') };
     }
 
-    if (!clientPhone) {
-      return { data: null, error: new Error('Le client n\'a pas de numéro de téléphone') };
+    // Détection mobile FR : 06/07 au format national ou international
+    const isMobileFR = (phone) => {
+      if (!phone) return false;
+      const cleaned = String(phone).replace(/[\s.-]/g, '');
+      return /^0[67]\d{8}$/.test(cleaned) || /^(?:\+33|0033|33)[67]\d{8}$/.test(cleaned);
+    };
+
+    // Choisir le mobile en priorité : primaire si mobile, sinon secondaire si mobile
+    let phoneToUse = null;
+    if (isMobileFR(clientPhone)) {
+      phoneToUse = clientPhone;
+    } else if (isMobileFR(clientPhoneSecondary)) {
+      phoneToUse = clientPhoneSecondary;
+    }
+
+    if (!phoneToUse) {
+      if (!clientPhone && !clientPhoneSecondary) {
+        return { data: null, error: new Error('Le client n\'a pas de numéro de téléphone') };
+      }
+      return { data: null, error: new Error('Aucun numéro mobile (06/07) disponible pour ce client') };
     }
 
     try {
@@ -713,7 +731,7 @@ export const savService = {
           intervention_id: interventionId,
           client_id: clientId,
           client_first_name: clientFirstName,
-          client_phone: clientPhone,
+          client_phone: phoneToUse,
           org_id: orgId,
         }),
         signal: controller.signal,
