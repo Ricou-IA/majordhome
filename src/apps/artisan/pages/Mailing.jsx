@@ -20,6 +20,7 @@ INNER JOIN majordhome.contracts co ON co.client_id = c.id
 WHERE co.status = 'active'
   AND c.is_archived = false
   AND c.mail_optin = true
+  AND c.email_unsubscribed_at IS NULL
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
 ORDER BY c.last_name`,
@@ -33,6 +34,7 @@ INNER JOIN majordhome.contracts co ON co.client_id = c.id
 WHERE co.status IN ('cancelled', 'archived')
   AND c.is_archived = false
   AND c.mail_optin = true
+  AND c.email_unsubscribed_at IS NULL
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
   AND c.id NOT IN (
@@ -47,6 +49,7 @@ ORDER BY c.last_name`,
 FROM majordhome.clients c
 WHERE c.is_archived = false
   AND c.mail_optin = true
+  AND c.email_unsubscribed_at IS NULL
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
   AND c.id NOT IN (
@@ -61,6 +64,7 @@ ORDER BY c.last_name`,
 FROM majordhome.clients c
 WHERE c.is_archived = false
   AND c.mail_optin = true
+  AND c.email_unsubscribed_at IS NULL
   AND c.email IS NOT NULL AND c.email != ''
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL)
 ORDER BY c.last_name`,
@@ -71,6 +75,7 @@ ORDER BY c.last_name`,
     sql: `SELECT l.id, l.first_name, l.last_name, l.first_name AS display_name, l.email
 FROM majordhome.leads l
 WHERE l.status_id = '4b1b967d-1c70-4510-8095-60a27e20e244'
+  AND l.email_unsubscribed_at IS NULL
   AND l.email IS NOT NULL AND l.email != ''
   AND l.id NOT IN (SELECT lead_id FROM majordhome.mailing_logs WHERE lead_id IS NOT NULL AND campaign_name ILIKE '%Contacté%')
 ORDER BY l.last_name`,
@@ -81,6 +86,7 @@ ORDER BY l.last_name`,
     sql: `SELECT l.id, l.first_name, l.last_name, l.first_name AS display_name, l.email
 FROM majordhome.leads l
 WHERE l.status_id = '47937391-5ffa-4804-9b5d-72f3fec6f4fe'
+  AND l.email_unsubscribed_at IS NULL
   AND l.email IS NOT NULL AND l.email != ''
   AND l.id NOT IN (SELECT lead_id FROM majordhome.mailing_logs WHERE lead_id IS NOT NULL AND campaign_name ILIKE '%Devis%')
 ORDER BY l.last_name`,
@@ -91,9 +97,33 @@ ORDER BY l.last_name`,
     sql: `SELECT l.id, l.first_name, l.last_name, l.first_name AS display_name, l.email
 FROM majordhome.leads l
 WHERE l.status_id = 'e0419cea-d0fe-4be5-aba4-56197b2fd4fb'
+  AND l.email_unsubscribed_at IS NULL
   AND l.email IS NOT NULL AND l.email != ''
   AND l.id NOT IN (SELECT lead_id FROM majordhome.mailing_logs WHERE lead_id IS NOT NULL AND campaign_name ILIKE '%Perdu%')
 ORDER BY l.last_name`,
+  },
+  // Segment pour la campagne Offre Combustible TotalEnergies (Mail H)
+  // Retourne la colonne lien_pellets pour substitution dans le template.
+  // IMPORTANT : le workflow N8N "Mayer - Mailing" doit remplacer {{lien_pellets}}
+  //             par item.json.lien_pellets dans le nœud "Personnaliser HTML"
+  //             (tweak documenté dans le commit de la campagne).
+  clients_offre_combustible: {
+    label: 'Clients — Offre Combustible TotalEnergies',
+    family: 'Clients',
+    sql: `SELECT c.id, c.first_name, c.last_name, c.display_name, c.email,
+       'https://www.mayer-energie.fr/offre-pellets?token=' || c.pellets_total_token AS lien_pellets
+FROM majordhome.clients c
+WHERE c.is_archived = false
+  AND c.mail_optin = true
+  AND c.email_unsubscribed_at IS NULL
+  AND c.email IS NOT NULL AND c.email != ''
+  AND c.pellets_total_token IS NOT NULL
+  AND c.id NOT IN (
+    SELECT client_id FROM majordhome.mailing_logs
+    WHERE client_id IS NOT NULL
+      AND campaign_name ILIKE '%Offre Combustible%'
+  )
+ORDER BY c.last_name`,
   },
 };
 
@@ -461,6 +491,252 @@ const TEMPLATES = {
 <p style="margin:0 0 5px 0;">\ud83d\udce7 <a href="mailto:contact@mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">contact@mayer-energie.fr</a></p>
 <p style="margin:0 0 5px 0;">\ud83c\udf10 <a href="https://www.mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">www.mayer-energie.fr</a></p>
 <p style="margin:10px 0 0 0;color:#999999;font-size:11px;">26 Route des Pyr\u00e9n\u00e9es \u2013 81600 Gaillac</p>
+<p style="margin:12px 0 0 0;color:#bbbbbb;font-size:10px;">Si vous ne souhaitez plus recevoir nos communications, <a href="mailto:contact@mayer-energie.fr?subject=D\u00e9sabonnement" style="color:#bbbbbb;text-decoration:underline;">cliquez ici pour vous d\u00e9sabonner</a>.</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`,
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Mail H — Offre Combustible TotalEnergies + Parrainage (fid\u00e9lit\u00e9)
+  // ──────────────────────────────────────────────────────────────────────────
+  // N\u00e9cessite le segment clients_offre_combustible qui retourne la colonne
+  // lien_pellets, ET un tweak du workflow N8N pour substituer {{lien_pellets}}
+  // par item.json.lien_pellets dans le n\u0153ud "Personnaliser HTML".
+  mail_h_offre_combustible: {
+    label: 'Mail H — Offre Combustible + Parrainage',
+    subject: '\ud83c\udf81 Votre cadeau de fid\u00e9lit\u00e9 + une offre exclusive qu\u2019on a n\u00e9goci\u00e9e pour vous',
+    tracking_type_value: 'offre_combustible',
+    default_segment: 'clients_offre_combustible',
+    html_body: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
+<!-- Preheader (texte de preview masqu\u00e9 dans l'inbox) -->
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Un cadeau de fid\u00e9lit\u00e9, une offre pellets n\u00e9goci\u00e9e avec TotalEnergies et une palette offerte en parrainage.</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f4f4;">
+<tr><td align="center" style="padding:20px 0;">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+<tr><td style="background-color:#ffffff;padding:30px 40px 0 40px;text-align:center;">
+<img src="https://www.mayer-energie.fr/images/logo-email.png" alt="Mayer Energie" width="220" style="display:block;margin:0 auto;max-width:220px;height:auto;" />
+</td></tr>
+<tr><td style="background-color:#1E4D8C;padding:12px 40px;text-align:center;">
+<p style="color:#ffffff;margin:0;font-size:14px;">Votre confort, toute l\u2019ann\u00e9e</p>
+</td></tr>
+<tr><td style="padding:30px 40px 10px 40px;color:#333333;font-size:15px;line-height:1.7;text-align:justify;">
+
+<p style="margin:0 0 20px 0;">{{SALUTATION}}</p>
+
+<p style="margin:0 0 28px 0;">Vous faites partie de nos clients fid\u00e8les, et on a travaill\u00e9 ce mois-ci pour vous le prouver concr\u00e8tement.</p>
+
+<!-- Section 1 : Offre pellets TotalEnergies -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#fff7ed;border:1px solid #fed7aa;border-radius:8px;margin:0 0 28px 0;">
+<tr><td style="padding:22px 24px;">
+<p style="margin:0 0 10px 0;font-size:17px;color:#ea580c;"><strong>\u26a1 NOUVEAUT\u00c9 \u2014 L\u2019offre pellets TotalEnergies, r\u00e9serv\u00e9e \u00e0 nos clients</strong></p>
+<p style="margin:0 0 14px 0;">On a n\u00e9goci\u00e9 directement avec TotalEnergies un acc\u00e8s exclusif \u00e0 leurs pellets au <strong>meilleur prix du march\u00e9</strong> \u2014 c\u2019est leur engagement, et le n\u00f4tre. Impossible de trouver moins cher ailleurs.</p>
+<p style="margin:0 0 8px 0;"><strong>Comment \u00e7a marche :</strong></p>
+<ul style="margin:0 0 16px 18px;padding:0;">
+<li style="margin-bottom:4px;">Vous cliquez sur le lien ci-dessous</li>
+<li style="margin-bottom:4px;">Vous validez votre inscription en 2 minutes</li>
+<li style="margin-bottom:4px;">TotalEnergies vous contacte directement pour la livraison et le paiement</li>
+</ul>
+<p style="margin:0 0 18px 0;">Rien de plus simple.</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;"><tr><td align="center">
+<a href="{{lien_pellets}}" style="display:inline-block;background-color:#ea580c;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:6px;">\ud83d\udc49 Je profite de l\u2019offre pellets TotalEnergies</a>
+</td></tr></table>
+</td></tr>
+</table>
+
+<!-- Section 2 : Plan PAC + aides -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px 0;">
+<tr><td style="border-left:4px solid #1E4D8C;padding:4px 0 4px 18px;">
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83d\udca1 Le gouvernement veut 1 million de pompes \u00e0 chaleur. Les aides sont l\u00e0. Maintenant.</strong></p>
+<p style="margin:0 0 12px 0;">Le plan national PAC est en marche et les dispositifs d\u2019aide n\u2019ont jamais \u00e9t\u00e9 aussi accessibles :</p>
+<ul style="margin:0 0 14px 18px;padding:0;">
+<li style="margin-bottom:6px;"><strong>MaPrimeR\u00e9nov\u2019</strong> \u2014 jusqu\u2019\u00e0 70\u00a0% du co\u00fbt des travaux selon vos revenus</li>
+<li style="margin-bottom:6px;"><strong>CEE</strong> \u2014 une prime suppl\u00e9mentaire financ\u00e9e par les fournisseurs d\u2019\u00e9nergie</li>
+<li style="margin-bottom:6px;"><strong>Financement \u00e0 taux z\u00e9ro</strong> \u2014 pour \u00e9taler sans surco\u00fbt</li>
+</ul>
+<p style="margin:0;">Une pompe \u00e0 chaleur, un po\u00eale \u00e0 bois, une climatisation : aujourd\u2019hui, le reste \u00e0 charge peut \u00eatre proche de z\u00e9ro. On monte le dossier avec vous, de A \u00e0 Z. Vous n\u2019avez rien \u00e0 g\u00e9rer.</p>
+</td></tr>
+</table>
+
+<!-- Section 3 : Parrainage -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin:0 0 28px 0;">
+<tr><td style="padding:22px 24px;">
+<p style="margin:0 0 10px 0;font-size:17px;color:#059669;"><strong>\ud83e\udd1d Parrainez \u2014 et on vous offre une palette de pellets</strong></p>
+<p style="margin:0 0 12px 0;">Vous connaissez quelqu\u2019un \u2014 un voisin, un ami, un membre de la famille \u2014 qui envisage de passer au chauffage renouvelable ou d\u2019installer une climatisation\u00a0?</p>
+<p style="margin:0 0 12px 0;">Parlez-leur de nous. Si votre filleul signe un devis pour l\u2019installation d\u2019un po\u00eale \u00e0 bois, d\u2019une climatisation ou d\u2019une pompe \u00e0 chaleur\u00a0:</p>
+<p style="margin:0 0 6px 0;">\u2192 <strong>Vous recevez 1\u00a0palette de pellets offerte</strong> (valeur 385\u00a0\u20ac, livr\u00e9e chez vous)</p>
+<p style="margin:0 0 14px 0;">\u2192 <strong>Votre filleul b\u00e9n\u00e9ficie de la mise en service gratuite</strong> (valeur 350\u00a0\u20ac)</p>
+<p style="margin:0;font-style:italic;color:#065f46;">Sans limite \u2014 chaque parrainage abouti vous rapporte une palette.</p>
+</td></tr>
+</table>
+
+<!-- Section 4 : Offre directe client -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 28px 0;">
+<tr><td style="padding:22px 24px;">
+<p style="margin:0 0 10px 0;font-size:17px;color:#1E4D8C;"><strong>\ud83c\udfe0 Vous avez un projet pour vous\u00a0?</strong></p>
+<p style="margin:0 0 12px 0;">Pas besoin de parrainer qui que ce soit. Contactez-nous pour votre propre installation et b\u00e9n\u00e9ficiez du package complet :</p>
+<p style="margin:0 0 6px 0;">\u2192 <strong>1\u00a0palette de pellets offerte</strong> (valeur 385\u00a0\u20ac)</p>
+<p style="margin:0 0 14px 0;">\u2192 <strong>Mise en service gratuite</strong> (valeur 350\u00a0\u20ac)</p>
+<p style="margin:0 0 18px 0;">Parce qu\u2019un client qui nous fait confiance m\u00e9rite qu\u2019on lui en donne une raison suppl\u00e9mentaire.</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;"><tr><td align="center">
+<a href="https://www.mayer-energie.fr/contact?utm_source=emailing&utm_campaign=offre_combustible&utm_medium=email" style="display:inline-block;background-color:#1E4D8C;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:6px;">\ud83d\udc49 Je contacte Mayer \u00c9nergie</a>
+</td></tr></table>
+<p style="margin:14px 0 0 0;text-align:center;font-size:14px;">\ud83d\udcde <a href="tel:+33563332314" style="color:#1E4D8C;text-decoration:none;"><strong>05\u00a063\u00a033\u00a023\u00a014</strong></a></p>
+</td></tr>
+</table>
+
+<!-- Mentions l\u00e9gales offres -->
+<p style="margin:0 0 18px 0;font-size:12px;color:#666666;font-style:italic;">Offre valable pour tout devis sign\u00e9 avant le 30\u00a0juin\u00a02026. Palette remise \u00e0 la signature du devis parrain\u00e9. Offre pellets TotalEnergies sous r\u00e9serve des conditions en vigueur.</p>
+
+<!-- Signature -->
+<p style="margin:20px 0 5px 0;">\u00c0 tr\u00e8s bient\u00f4t,</p>
+<p style="margin:0;"><strong>L\u2019\u00e9quipe Mayer \u00c9nergie</strong></p>
+
+</td></tr>
+<tr><td style="background-color:#f8f9fa;padding:20px 40px;text-align:center;font-size:13px;color:#666666;border-top:1px solid #e9ecef;">
+<p style="margin:0 0 5px 0;">\ud83d\udcde <a href="tel:+33563332314" style="color:#1E4D8C;text-decoration:none;">05 63 33 23 14</a></p>
+<p style="margin:0 0 5px 0;">\ud83d\udce7 <a href="mailto:contact@mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">contact@mayer-energie.fr</a></p>
+<p style="margin:0 0 5px 0;">\ud83c\udf10 <a href="https://www.mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">www.mayer-energie.fr</a></p>
+<p style="margin:10px 0 0 0;color:#999999;font-size:11px;">\ud83d\udccd 26 Route des Pyr\u00e9n\u00e9es \u2013 81600 Gaillac</p>
+<p style="margin:4px 0 0 0;color:#999999;font-size:11px;">\ud83c\udfc5 RGE QualiPAC \u00b7 QualiBois \u00b7 QualiPV</p>
+<p style="margin:12px 0 0 0;color:#bbbbbb;font-size:10px;">Si vous ne souhaitez plus recevoir nos communications, <a href="mailto:contact@mayer-energie.fr?subject=D\u00e9sabonnement" style="color:#bbbbbb;text-decoration:underline;">cliquez ici pour vous d\u00e9sabonner</a>.</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`,
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Mail I — Newsletter (base r\u00e9utilisable)
+  // ──────────────────────────────────────────────────────────────────────────
+  // Template g\u00e9n\u00e9rique pour les newsletters mensuelles.
+  // \u00c9dite le contenu dans les blocs marqu\u00e9s <!-- BLOC X -->, les placeholders
+  // [ENTRE CROCHETS] doivent \u00eatre remplac\u00e9s par le contenu r\u00e9el du mois.
+  //
+  // Structure :
+  //   - Intro : phrase d'accroche
+  //   - BLOC 1 : Offre du mois (carte orange + CTA)
+  //   - BLOC 2 : News / Nouveaut\u00e9 (carte grise + optionnel lien)
+  //   - BLOC 3 : Info utile / Conseil \u00e9ditorial (lis\u00e9r\u00e9 bleu)
+  //   - BLOC 4 : CTA contact commercial (carte bleue + bouton)
+  //
+  // Tous les blocs sont optionnels \u2014 supprime ceux que tu n'utilises pas ce mois-ci.
+  // Le segment par d\u00e9faut est "Tous les clients", change-le dans l'UI avant envoi.
+  mail_i_newsletter: {
+    label: 'Mail I — Newsletter (base r\u00e9utilisable)',
+    subject: '[OBJET NEWSLETTER — ex: Vos nouveaut\u00e9s Mayer \u00c9nergie de [MOIS]]',
+    tracking_type_value: 'newsletter',
+    default_segment: 'clients_tous',
+    html_body: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
+<!-- Preheader : texte de preview affich\u00e9 dans l'inbox, ~100 caract\u00e8res max -->
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">[PREHEADER \u2014 ex: L'offre du mois, une nouveaut\u00e9 et un conseil pour votre confort]</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f4f4;">
+<tr><td align="center" style="padding:20px 0;">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+
+<!-- HEADER : logo Mayer + bande bleue (ne pas modifier) -->
+<tr><td style="background-color:#ffffff;padding:30px 40px 0 40px;text-align:center;">
+<img src="https://www.mayer-energie.fr/images/logo-email.png" alt="Mayer Energie" width="220" style="display:block;margin:0 auto;max-width:220px;height:auto;" />
+</td></tr>
+<tr><td style="background-color:#1E4D8C;padding:12px 40px;text-align:center;">
+<p style="color:#ffffff;margin:0;font-size:14px;">Votre confort, toute l\u2019ann\u00e9e</p>
+</td></tr>
+
+<!-- CORPS -->
+<tr><td style="padding:30px 40px 10px 40px;color:#333333;font-size:15px;line-height:1.7;text-align:justify;">
+
+<p style="margin:0 0 20px 0;">{{SALUTATION}}</p>
+
+<!-- INTRO : 1 ou 2 phrases d'accroche pour poser le contexte du mois -->
+<p style="margin:0 0 28px 0;">[INTRO \u2014 ex: Ce mois-ci chez Mayer \u00c9nergie, on vous partage une offre n\u00e9goci\u00e9e, une nouveaut\u00e9 dans nos services, et un conseil pratique pour votre confort.]</p>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- BLOC 1 : OFFRE DU MOIS (carte orange)                                     -->
+<!-- Supprime ce bloc enti\u00e8rement si pas d'offre ce mois-ci                    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#fff7ed;border:1px solid #fed7aa;border-radius:8px;margin:0 0 28px 0;">
+<tr><td style="padding:22px 24px;">
+<p style="margin:0 0 10px 0;font-size:17px;color:#ea580c;"><strong>\ud83c\udf81 [TITRE DE L\u2019OFFRE DU MOIS]</strong></p>
+<p style="margin:0 0 14px 0;">[DESCRIPTION DE L\u2019OFFRE \u2014 2 ou 3 phrases qui expliquent l\u2019avantage concret pour le client. Utilise <strong>texte en gras</strong> pour mettre en valeur les mots-cl\u00e9s.]</p>
+<p style="margin:0 0 18px 0;">[\u00c9VENTUEL D\u00c9TAIL \u2014 liste \u00e0 puces, conditions, ou phrase de conclusion avant le CTA.]</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;"><tr><td align="center">
+<a href="[URL_CTA_OFFRE]" style="display:inline-block;background-color:#ea580c;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:6px;">\ud83d\udc49 [LIBELL\u00c9 CTA \u2014 ex: J\u2019en profite]</a>
+</td></tr></table>
+</td></tr>
+</table>
+<!-- FIN BLOC 1 -->
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- BLOC 2 : NEWS / NOUVEAUT\u00c9 (carte grise claire)                            -->
+<!-- Pour annoncer un nouveau service, un \u00e9v\u00e9nement, un recrutement, etc.      -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;margin:0 0 28px 0;">
+<tr><td style="padding:22px 24px;">
+<p style="margin:0 0 10px 0;font-size:17px;color:#1f2937;"><strong>\ud83c\udd95 [TITRE DE LA NOUVEAUT\u00c9]</strong></p>
+<p style="margin:0 0 10px 0;">[DESCRIPTION DE LA NOUVEAUT\u00c9 \u2014 2 ou 3 phrases. Exemple : nouveau technicien dans l\u2019\u00e9quipe, nouvelle prestation propos\u00e9e, nouveau partenariat, etc.]</p>
+<p style="margin:0;">[OPTIONNEL : lien <a href="[URL]" style="color:#1E4D8C;">En savoir plus</a> si tu as une page d\u00e9di\u00e9e.]</p>
+</td></tr>
+</table>
+<!-- FIN BLOC 2 -->
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- BLOC 3 : INFO UTILE / CONSEIL \u00c9DITORIAL (lis\u00e9r\u00e9 bleu \u00e0 gauche)             -->
+<!-- Pour un conseil pratique, une info r\u00e9glementaire, un point technique    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px 0;">
+<tr><td style="border-left:4px solid #1E4D8C;padding:4px 0 4px 18px;">
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83d\udca1 [TITRE DU CONSEIL]</strong></p>
+<p style="margin:0 0 12px 0;">[INTRO DU CONSEIL \u2014 pose le contexte ou le probl\u00e8me.]</p>
+<ul style="margin:0 0 12px 18px;padding:0;">
+<li style="margin-bottom:6px;"><strong>[Point 1]</strong> \u2014 [explication courte]</li>
+<li style="margin-bottom:6px;"><strong>[Point 2]</strong> \u2014 [explication courte]</li>
+<li style="margin-bottom:6px;"><strong>[Point 3]</strong> \u2014 [explication courte]</li>
+</ul>
+<p style="margin:0;">[CONCLUSION \u2014 1 phrase qui ram\u00e8ne vers l\u2019action ou l\u2019expertise Mayer.]</p>
+</td></tr>
+</table>
+<!-- FIN BLOC 3 -->
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- BLOC 4 : CTA CONTACT COMMERCIAL (carte bleue)                             -->
+<!-- Appel \u00e0 contacter Mayer pour un projet d\u2019installation                    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 28px 0;">
+<tr><td style="padding:22px 24px;">
+<p style="margin:0 0 10px 0;font-size:17px;color:#1E4D8C;"><strong>\ud83c\udfe0 Un projet en cours\u00a0?</strong></p>
+<p style="margin:0 0 18px 0;">[PHRASE D\u2019ACCROCHE \u2014 ex: Pompe \u00e0 chaleur, po\u00eale, climatisation, photovolta\u00efque : contactez-nous pour un devis gratuit et sans engagement. Notre \u00e9quipe vous accompagne de A \u00e0 Z, du montage du dossier d\u2019aides \u00e0 la mise en service.]</p>
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;"><tr><td align="center">
+<a href="https://www.mayer-energie.fr/contact?utm_source=emailing&utm_campaign=newsletter&utm_medium=email" style="display:inline-block;background-color:#1E4D8C;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:6px;">\ud83d\udc49 Je contacte Mayer \u00c9nergie</a>
+</td></tr></table>
+<p style="margin:14px 0 0 0;text-align:center;font-size:14px;">\ud83d\udcde <a href="tel:+33563332314" style="color:#1E4D8C;text-decoration:none;"><strong>05\u00a063\u00a033\u00a023\u00a014</strong></a></p>
+</td></tr>
+</table>
+<!-- FIN BLOC 4 -->
+
+<!-- Signature -->
+<p style="margin:20px 0 5px 0;">\u00c0 tr\u00e8s bient\u00f4t,</p>
+<p style="margin:0;"><strong>L\u2019\u00e9quipe Mayer \u00c9nergie</strong></p>
+
+</td></tr>
+
+<!-- FOOTER (ne pas modifier) -->
+<tr><td style="background-color:#f8f9fa;padding:20px 40px;text-align:center;font-size:13px;color:#666666;border-top:1px solid #e9ecef;">
+<p style="margin:0 0 5px 0;">\ud83d\udcde <a href="tel:+33563332314" style="color:#1E4D8C;text-decoration:none;">05 63 33 23 14</a></p>
+<p style="margin:0 0 5px 0;">\ud83d\udce7 <a href="mailto:contact@mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">contact@mayer-energie.fr</a></p>
+<p style="margin:0 0 5px 0;">\ud83c\udf10 <a href="https://www.mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">www.mayer-energie.fr</a></p>
+<p style="margin:10px 0 0 0;color:#999999;font-size:11px;">\ud83d\udccd 26 Route des Pyr\u00e9n\u00e9es \u2013 81600 Gaillac</p>
+<p style="margin:4px 0 0 0;color:#999999;font-size:11px;">\ud83c\udfc5 RGE QualiPAC \u00b7 QualiBois \u00b7 QualiPV</p>
 <p style="margin:12px 0 0 0;color:#bbbbbb;font-size:10px;">Si vous ne souhaitez plus recevoir nos communications, <a href="mailto:contact@mayer-energie.fr?subject=D\u00e9sabonnement" style="color:#bbbbbb;text-decoration:underline;">cliquez ici pour vous d\u00e9sabonner</a>.</p>
 </td></tr>
 </table>
