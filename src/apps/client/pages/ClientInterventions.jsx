@@ -10,29 +10,9 @@ import { useAuth } from '@contexts/AuthContext';
 import { useProjectInterventions } from '@hooks/useInterventions';
 import {
   ClipboardList, Calendar, User, ChevronRight, Loader2,
-  CheckCircle2, Clock, AlertCircle, XCircle,
 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
-
-const STATUS_CONFIG = {
-  scheduled: { label: 'Planifiée', color: 'text-blue-700 bg-blue-50', icon: Clock },
-  planifie: { label: 'Planifiée', color: 'text-blue-700 bg-blue-50', icon: Clock },
-  in_progress: { label: 'En cours', color: 'text-amber-700 bg-amber-50', icon: Clock },
-  completed: { label: 'Terminée', color: 'text-green-700 bg-green-50', icon: CheckCircle2 },
-  realise: { label: 'Terminée', color: 'text-green-700 bg-green-50', icon: CheckCircle2 },
-  cancelled: { label: 'Annulée', color: 'text-red-700 bg-red-50', icon: XCircle },
-  on_hold: { label: 'En attente', color: 'text-gray-500 bg-gray-100', icon: AlertCircle },
-};
-
-const TYPE_LABELS = {
-  maintenance: 'Entretien',
-  entretien: 'Entretien',
-  repair: 'Réparation',
-  sav: 'SAV',
-  installation: 'Installation',
-  diagnostic: 'Diagnostic',
-  ramonage: 'Ramonage',
-};
+import { INTERVENTION_STATUS_CONFIG as STATUS_CONFIG, INTERVENTION_TYPE_LABELS as TYPE_LABELS } from '../constants';
 
 export default function ClientInterventions() {
   const { clientProjectId } = useAuth();

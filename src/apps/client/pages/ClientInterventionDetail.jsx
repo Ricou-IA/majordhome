@@ -15,26 +15,12 @@ import {
   CheckCircle2, Download, Loader2, Image as ImageIcon,
 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
+import { INTERVENTION_STATUS_CONFIG, INTERVENTION_TYPE_LABELS as TYPE_LABELS } from '../constants';
 
-const STATUS_LABELS = {
-  scheduled: 'Planifiée',
-  planifie: 'Planifiée',
-  in_progress: 'En cours',
-  completed: 'Terminée',
-  realise: 'Terminée',
-  cancelled: 'Annulée',
-  on_hold: 'En attente',
-};
-
-const TYPE_LABELS = {
-  maintenance: 'Entretien',
-  entretien: 'Entretien',
-  repair: 'Réparation',
-  sav: 'SAV',
-  installation: 'Installation',
-  diagnostic: 'Diagnostic',
-  ramonage: 'Ramonage',
-};
+// Extraction labels simples depuis la config (rétrocompat)
+const STATUS_LABELS = Object.fromEntries(
+  Object.entries(INTERVENTION_STATUS_CONFIG).map(([k, v]) => [k, v.label])
+);
 
 export default function ClientInterventionDetail() {
   const { id } = useParams();
@@ -69,8 +55,8 @@ export default function ClientInterventionDetail() {
       const { url, error } = await certificatsService.getSignedUrl(certificat.pdf_path);
       if (error || !url) throw error || new Error('URL non disponible');
       window.open(url, '_blank');
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error('[ClientInterventionDetail] PDF download error:', err);
     } finally {
       setDownloadingPdf(false);
     }

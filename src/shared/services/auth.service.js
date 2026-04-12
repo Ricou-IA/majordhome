@@ -200,6 +200,38 @@ export const authService = {
     }
   },
 
+  /**
+   * Change le mot de passe d'un client via l'Edge Function (admin API).
+   * Contourne la restriction GoTrue "Secure password change".
+   * @param {string} newPassword - Nouveau mot de passe (min 6 caractères)
+   * @returns {Promise<{data: Object|null, error: Error|null}>}
+   */
+  async clientChangePassword(newPassword) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Session invalide');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/client-change-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ password: newPassword }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Erreur serveur');
+
+      return { data: result, error: null };
+    } catch (error) {
+      console.error('[authService] clientChangePassword error:', error);
+      return { data: null, error };
+    }
+  },
+
   // ===========================================================================
   // SESSION & UTILISATEUR
   // ===========================================================================

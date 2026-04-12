@@ -9,24 +9,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useClientEquipments } from '@hooks/useClients';
 import { Wrench, Calendar, Tag, Loader2 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
-
-const CATEGORY_LABELS = {
-  pac_air_air: 'PAC Air/Air',
-  pac_air_eau: 'PAC Air/Eau',
-  pac_eau_eau: 'PAC Eau/Eau',
-  pac_hybride: 'PAC Hybride',
-  chaudiere_gaz: 'Chaudière Gaz',
-  chaudiere_fioul: 'Chaudière Fioul',
-  chaudiere_granule: 'Chaudière Granulé',
-  poele_granule: 'Poêle Granulé',
-  poele_bois: 'Poêle Bois',
-  insert: 'Insert',
-  climatisation: 'Climatisation',
-  chauffe_eau: 'Chauffe-eau',
-  ballon_thermo: 'Ballon Thermodynamique',
-  vmc: 'VMC',
-  autre: 'Autre',
-};
+import { EQUIPMENT_CATEGORY_LABELS as CATEGORY_LABELS } from '../constants';
 
 export default function ClientEquipements() {
   const { clientId } = useAuth();

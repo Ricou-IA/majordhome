@@ -8,23 +8,10 @@
 import { useAuth } from '@contexts/AuthContext';
 import { useClientContract, useContractEquipments } from '@hooks/useContracts';
 import {
-  FileText, CheckCircle2, XCircle, Clock, Wrench, Calendar, Loader2,
+  FileText, Wrench, Calendar, Loader2,
 } from 'lucide-react';
 import { formatDateFR, formatEuro } from '@/lib/utils';
-
-const STATUS_CONFIG = {
-  active: { label: 'Actif', color: 'text-green-700 bg-green-50', icon: CheckCircle2 },
-  pending: { label: 'En attente', color: 'text-amber-700 bg-amber-50', icon: Clock },
-  cancelled: { label: 'Résilié', color: 'text-red-700 bg-red-50', icon: XCircle },
-  archived: { label: 'Archivé', color: 'text-gray-500 bg-gray-100', icon: XCircle },
-};
-
-const FREQUENCY_LABELS = {
-  annual: 'Annuelle',
-  biannual: 'Semestrielle',
-  quarterly: 'Trimestrielle',
-  monthly: 'Mensuelle',
-};
+import { CONTRACT_STATUS_CONFIG as STATUS_CONFIG, FREQUENCY_LABELS } from '../constants';
 
 export default function ClientContrat() {
   const { clientId } = useAuth();
