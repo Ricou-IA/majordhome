@@ -35,13 +35,13 @@ export default function ClientChangePassword() {
 
     setLoading(true);
     try {
-      const { error } = await updatePassword(password);
-      if (error) throw error;
-
-      // Retirer le flag must_change_password
-      await supabase.auth.updateUser({
+      // Changer le mot de passe ET retirer le flag en un seul appel
+      const { error } = await supabase.auth.updateUser({
+        password: password,
         data: { must_change_password: false },
       });
+
+      if (error) throw error;
 
       toast.success('Mot de passe mis à jour !');
 
