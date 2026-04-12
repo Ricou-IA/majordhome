@@ -10,6 +10,7 @@ const ClientContrat = lazy(() => import('./pages/ClientContrat'));
 const ClientEquipements = lazy(() => import('./pages/ClientEquipements'));
 const ClientInterventions = lazy(() => import('./pages/ClientInterventions'));
 const ClientInterventionDetail = lazy(() => import('./pages/ClientInterventionDetail'));
+const ClientMotDePasse = lazy(() => import('./pages/ClientMotDePasse'));
 
 // =============================================================================
 // SUSPENSE WRAPPER
@@ -53,5 +54,9 @@ export const clientRoutes = [
   {
     path: 'interventions/:id',
     element: <SuspenseWrapper><ClientInterventionDetail /></SuspenseWrapper>,
+  },
+  {
+    path: 'mot-de-passe',
+    element: <SuspenseWrapper><ClientMotDePasse /></SuspenseWrapper>,
   },
 ];

@@ -10,7 +10,7 @@ import { useState, lazy, Suspense } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import {
-  Home, FileText, Wrench, ClipboardList, LogOut, Menu, X, Loader2,
+  Home, FileText, Wrench, ClipboardList, LogOut, Menu, X, Loader2, KeyRound,
 } from 'lucide-react';
 import logoMayer from '@/assets/logo-mayer.png';
 
@@ -82,9 +82,20 @@ export default function ClientLayout() {
               </nav>
             </div>
 
-            {/* Desktop: user + logout */}
+            {/* Desktop: user + actions */}
             <div className="hidden md:flex items-center gap-4">
               <span className="text-sm text-gray-600">{displayName}</span>
+              <NavLink
+                to="/client/mot-de-passe"
+                className={({ isActive }) =>
+                  `inline-flex items-center gap-1.5 text-sm transition-colors ${
+                    isActive ? 'text-primary-600' : 'text-gray-500 hover:text-gray-700'
+                  }`
+                }
+              >
+                <KeyRound className="w-4 h-4" />
+                Mot de passe
+              </NavLink>
               <button
                 onClick={handleSignOut}
                 className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -130,6 +141,18 @@ export default function ClientLayout() {
               ))}
               <div className="pt-2 mt-2 border-t border-gray-100">
                 <div className="px-3 py-1 text-xs text-gray-400">{user?.email}</div>
+                <NavLink
+                  to="/client/mot-de-passe"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      isActive ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-gray-50'
+                    }`
+                  }
+                >
+                  <KeyRound className="w-4 h-4" />
+                  Mot de passe
+                </NavLink>
                 <button
                   onClick={handleSignOut}
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"

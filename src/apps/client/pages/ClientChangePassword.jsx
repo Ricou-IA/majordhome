@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import logoMayer from '@/assets/logo-mayer.png';
 
 export default function ClientChangePassword() {
-  const { user, updatePassword, refreshUserData } = useAuth();
+  const { refreshUserData } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,17 +35,27 @@ export default function ClientChangePassword() {
 
     setLoading(true);
     try {
-      // Changer le mot de passe ET retirer le flag en un seul appel
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-        data: { must_change_password: false },
-      });
-
-      if (error) throw error;
+      // Appeler l'Edge Function qui utilise admin.updateUserById()
+      // (contourne la restriction GoTrue "Secure password change")
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/client-change-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ password }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Erreur serveur');
 
       toast.success('Mot de passe mis à jour !');
 
-      // Recharger pour que le flag soit à jour
+      // Rafraîchir la session pour récupérer les metadata à jour
+      await supabase.auth.refreshSession();
       await refreshUserData();
     } catch (err) {
       console.error('[ChangePassword] error:', err);

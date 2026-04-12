@@ -264,7 +264,11 @@ export function AuthProvider({ children }) {
   };
 
   const refreshUserData = async () => {
-    if (user) await loadUserData(user.id);
+    if (!user) return;
+    // Rafraîchir le user object depuis la session (metadata à jour)
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    if (freshUser) setUser(freshUser);
+    await loadUserData(freshUser?.id || user.id);
   };
 
   // ===========================================================================

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
+import { supabase } from '@lib/supabaseClient';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 
 // =============================================================================
@@ -94,14 +95,35 @@ export default function ResetPassword() {
         throw new Error('Le mot de passe doit contenir au moins 6 caractères');
       }
 
+      // Tenter updateUser standard (fonctionne pour artisans + recovery mode)
       const { error } = await updatePassword(formData.password);
 
       if (error) {
-        throw error;
+        // Fallback Edge Function pour les clients (contourne le 403 GoTrue)
+        const { data: { session } } = await supabase.auth.getSession();
+        const isClient = session?.user?.user_metadata?.client_id;
+
+        if (isClient && session?.access_token) {
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/client-change-password`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ password: formData.password }),
+            }
+          );
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || 'Erreur serveur');
+        } else {
+          throw error;
+        }
       }
 
       setSuccess('Mot de passe mis à jour avec succès !');
-      
+
       // Rediriger vers la page de connexion après 2 secondes
       setTimeout(() => {
         navigate('/login');

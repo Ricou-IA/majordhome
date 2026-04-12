@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-04-04 — Mailing : configurateur campagnes + table mailing_logs + onglet Mailings fiche client
+> **Dernière MàJ** : 2026-04-11 — Mailing : désabonnement opt-out complet (edge function mailing-unsubscribe + List-Unsubscribe RFC 8058 + auto-unsubscribe sur spam + auto-cleanup + auto-archive)
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -87,7 +87,8 @@ src/
 - `majordhome_chantiers` → leads filtrés (chantier_status IS NOT NULL) + JOIN equipment_type + intervention parent
 - `majordhome_prospects` → prospects JOIN profiles (created_by_name, assigned_to_name)
 - `majordhome_prospect_interactions` → interactions JOIN profiles (created_by_name)
-- `majordhome_mailing_logs` → historique des emails envoyés par campagne (client_id, campaign_name, subject, email_to, sent_at, status)
+- `majordhome_mailing_logs` → historique des emails envoyés par campagne (client_id, lead_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
+- `majordhome_mailing_events` → audit log complet des events webhook Resend (1 ligne par event reçu, dédupliqué par svix_id)
 - `majordhome_equipments`, `majordhome_interventions`, `majordhome_maintenance_visits`
 - `profiles`, `organizations`, `organization_members` (vues core)
 
@@ -150,11 +151,16 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 
 ### Architecture
 - **Page** : `src/apps/artisan/pages/Mailing.jsx` — Configurateur de campagnes (admin only, `RouteGuard resource="settings"`)
-- **Onglet client** : `src/apps/artisan/pages/client-detail/TabMailings.jsx` — Historique des mails envoyés à un client
-- **Table** : `majordhome.mailing_logs` (client_id, lead_id, org_id, campaign_name, subject, email_to, sent_at, status)
-- **Vue** : `public.majordhome_mailing_logs`
+- **Onglet client** : `src/apps/artisan/pages/client-detail/TabMailings.jsx` — Historique des mails + badges status + timeline events + compteurs opens/clics (polling 30s)
+- **Tables** :
+  - `majordhome.mailing_logs` (client_id, lead_id, org_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
+  - `majordhome.mailing_events` (audit log complet, 1 ligne par event webhook reçu, dédupliqué par `svix_id` UNIQUE)
+- **Vues** : `public.majordhome_mailing_logs`, `public.majordhome_mailing_events`
 - **Cache keys** : `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
 - **Env** : `VITE_N8N_WEBHOOK_MAILING` → webhook N8n `POST /webhook/mayer-mailing`
+- **Provider email** : Resend (API `https://api.resend.com/emails`) — bascule depuis Gmail le 2026-04-11
+- **Edge function webhook** : `supabase/functions/resend-webhook/` (verify_jwt: false, Svix HMAC SHA256 via Web Crypto API, RPC atomique)
+- **Edge function unsubscribe** : `supabase/functions/mailing-unsubscribe/` (verify_jwt: false, token HMAC SHA256 signé avec `RESEND_WEBHOOK_SECRET`, GET = page HTML confirmation + POST = one-click RFC 8058)
 
 ### Workflow N8n : "Mayer - Mailing" (id: 1COgLUuiMtSq2sUq)
 Moteur d'emailing générique piloté par webhook POST. Payload attendu :
@@ -173,7 +179,105 @@ Moteur d'emailing générique piloté par webhook POST. Payload attendu :
 - Le placeholder `{{SALUTATION}}` est remplacé par "Bonjour Prénom Nom," automatiquement
 - En mode test (`test_email` rempli) : LIMIT 1 sur le SQL, envoi redirigé vers l'email de test
 - `recipient_type` : `client` (défaut) ou `lead` — détermine si l'INSERT va dans `client_id` ou `lead_id`
-- Noeud 7 fait un INSERT dans `majordhome.mailing_logs` après chaque envoi
+- Noeud 6 `Resend Send` = HTTP Request POST `https://api.resend.com/emails` (credential `Header Auth` avec `Authorization: Bearer <RESEND_API_KEY>`), from = `Mayer Energie - Econ'Home <contact@mayer-energie.fr>`, reply_to identique
+- Noeud 7 fait un INSERT dans `majordhome.mailing_logs` après chaque envoi, incluant `provider_id` (ID Resend) et `error_message` (si échec Resend). Si Resend renvoie un `id` → `status='sent'`, sinon `status='failed'`
+- `onError: continueRegularOutput` sur le noeud 6 : la boucle ne casse pas en cas d'échec d'un destinataire, chaque échec est loggé avec son message
+
+### Webhook Resend — tracking delivered / opened / clicked / bounced
+
+Pipeline de tracking post-envoi alimenté par les events webhook Resend.
+
+**Prérequis Resend Dashboard** :
+- Domain `mayer-energie.fr` → Configuration → **Click Tracking** ON + **Open Tracking** ON
+- Webhooks → Add Endpoint :
+  - URL : `https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/resend-webhook`
+  - Events : `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained`, `email.failed`, `email.delivery_delayed`
+- Signing Secret `whsec_...` → Supabase → Edge Functions → Secrets → `RESEND_WEBHOOK_SECRET`
+
+**Edge function `resend-webhook`** (`supabase/functions/resend-webhook/index.ts`) :
+- `verify_jwt: false` — Resend ne passe pas de JWT, on valide par signature Svix
+- **Vérification signature Svix** : HMAC SHA256 via Web Crypto API, format `{svix_id}.{svix_timestamp}.{body}`, tolérance timestamp 5 min (anti-replay), support rotation de secret (multiple v1 signatures)
+- **Extraction timestamp event** : privilégie `data.open.timestamp` / `data.click.timestamp` / `data.bounce.timestamp` (date réelle de l'event) avant de fallback sur `data.created_at` (date d'envoi)
+- Appelle la RPC `public.resend_apply_webhook_event(provider_id, event_type, event_at, svix_id, payload)` qui fait tout en 1 aller-retour DB
+
+**RPC `public.resend_apply_webhook_event`** (PL/pgSQL, SECURITY DEFINER) :
+- INSERT dans `mailing_events` (idempotent via `svix_id` UNIQUE → retries Resend sans effet de bord)
+- UPDATE `mailing_logs` avec règles de priorité statut :
+  - `sent` (1) < `delivered` (2) < `opened` (3) < `clicked` (4)
+  - `bounced` / `complained` / `failed` = 100 (terminal, override tout)
+  - Un event ne rétrograde jamais un statut supérieur
+- `opened_at` / `clicked_at` via COALESCE (premier event seulement)
+- `open_count` / `click_count` incrémentés à chaque event reçu
+- `error_message` extrait de `payload->bounce->reason` / `payload->failed->reason`
+
+**Flow complet** :
+```
+N8n (envoi) → INSERT mailing_logs (status='sent', provider_id)
+              ↓
+Resend      → email.sent, email.delivered (~1s)
+              → webhook POST /functions/v1/resend-webhook
+                → verify Svix signature
+                → RPC resend_apply_webhook_event
+                  → INSERT mailing_events (audit)
+                  → UPDATE mailing_logs (status, delivered_at, last_event_at)
+              ↓
+User ouvre  → email.opened → opened_at, open_count++
+User clique → email.clicked → clicked_at, click_count++
+(ou Safe Links prefetch → counters peuvent être > 1 pour un seul vrai clic)
+```
+
+**Important — counters et Outlook/Hotmail** :
+- Outlook/Hotmail Safe Links pré-fetch chaque lien pour scan de sécurité → chaque scan génère un `email.clicked`
+- `click_count` peut atteindre 10-20+ pour un seul vrai clic utilisateur
+- Afficher le compteur tel quel ou calculer un "unique click" via `mailing_events` (GROUP BY user agent / ip) selon le besoin
+- Open Tracking marqué "Not Recommended" par Resend : faux négatifs (clients bloquant les images) + faux positifs (prefetching Apple Mail Privacy Protection)
+
+**Idempotence** : chaque webhook Resend a un header `svix-id` UNIQUE stocké dans `mailing_events`. Les retries Resend (jusqu'à 5 tentatives sur 3 jours) sont dédupliqués naturellement.
+
+### Désabonnement (opt-out RGPD)
+
+Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
+
+**Colonnes DB** (sur `majordhome.clients` et `majordhome.leads`) :
+- `email_unsubscribed_at TIMESTAMPTZ` — timestamp du désabonnement
+- `email_unsubscribe_reason TEXT` — `user_request` | `list_unsubscribe_header` | `spam_complaint` | `manual`
+
+**Edge function `mailing-unsubscribe`** (`supabase/functions/mailing-unsubscribe/index.ts`) :
+- URL : `https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/mailing-unsubscribe`
+- `verify_jwt: false`
+- **GET `?token=xxx`** : page HTML de confirmation (design Mayer Énergie, responsive)
+- **POST `?token=xxx`** : one-click RFC 8058 silencieux (body form-urlencoded supporté aussi)
+- **Token signé HMAC SHA256** avec `RESEND_WEBHOOK_SECRET` (même secret que webhook, économie de config)
+  - Format : `{rt}.{rid}.{exp}.{base64url_sig}` où `rt=c|l`, `rid=UUID`, `exp=epoch`
+  - Expiration : 90 jours
+  - Validation timestamp stricte pour éviter replay
+
+**RPC `public.mailing_apply_unsubscribe(rt, rid, reason, ts)`** (PL/pgSQL, SECURITY DEFINER) :
+- Update `clients.email_unsubscribed_at` (ou `leads.email_unsubscribed_at`)
+- Idempotent : si déjà désabonné, retourne `already_unsubscribed=true` sans toucher au timestamp
+- Retour JSON : `{ already_unsubscribed, rows_updated, recipient_type, recipient_id }`
+
+**Workflow N8n** — génération du token dans le noeud `5. Personnaliser HTML` :
+- Utilise `crypto.createHmac('sha256', keyBytes)` avec `$env.RESEND_WEBHOOK_SECRET` décodé depuis `whsec_<base64>`
+- Remplace automatiquement le lien `mailto:?subject=Désabonnement` du footer HTML par l'URL edge function (regex sur les templates, aucune modif des templates)
+- Expose `unsubscribeUrl` dans l'output pour le noeud 6
+
+**Headers dans le noeud `6. Resend Send`** :
+```json
+"headers": {
+  "List-Unsubscribe": "<https://.../mailing-unsubscribe?token=xxx>, <mailto:contact@mayer-energie.fr?subject=Désabonnement>",
+  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+}
+```
+→ Gmail / Outlook / Yahoo / Apple Mail affichent automatiquement le bouton natif "Se désabonner" en haut de l'email. Click = POST one-click vers l'edge function.
+
+**Variable d'environnement N8n requise** : `RESEND_WEBHOOK_SECRET` (même valeur que le secret Supabase Edge Functions).
+
+**Auto-unsubscribe sur spam complaint** : quand qqn clique "Signaler comme spam" dans Gmail/Outlook, Resend envoie `email.complained` → RPC `resend_apply_webhook_event` marque automatiquement `email_unsubscribed_at = NOW()` + `reason='spam_complaint'`. Respect immédiat du souhait utilisateur.
+
+**Exclusion dans les segments** : les 7 segments de `Mailing.jsx` ont tous `AND email_unsubscribed_at IS NULL` (en plus du `mail_optin=true` manuel et du `email IS NOT NULL`). Triple filtre : opt-out manuel CRM + opt-out automatique webhook + email valide.
+
+**UI fiche client** : bandeau orange "Client désabonné" en haut de `TabMailings.jsx` si `email_unsubscribed_at` est set. Affiche la date + la raison (lien, bouton natif, spam, manuel). Le client reste dans la base, juste exclu des campagnes.
 
 ### Templates campagnes (7)
 | Template | Cible | Objet |
@@ -207,10 +311,17 @@ Moteur d'emailing générique piloté par webhook POST. Payload attendu :
 Utilise la RPC `public.exec_sql(query_text)` pour exécuter un COUNT(*) sur le segment SQL sélectionné. Le résultat s'affiche en badge à côté du sélecteur de ciblage. Le toast et la confirmation utilisent le nombre réel de destinataires.
 
 ### Évolutions prévues
-- Migration Gmail → Resend (tracking ouverture/clic/bounce natif)
-- Tracking avancé (pixel ouverture, redirect clic CTA)
-- Gestion erreurs/bounces dans mailing_logs (status: bounced, failed)
-- Skip tracking en mode test dans N8n
+- ~~Migration Gmail → Resend~~ ✅ FAIT (2026-04-11)
+- ~~Gestion erreurs/bounces dans mailing_logs~~ ✅ FAIT (colonnes `provider_id` + `error_message` + `status='failed'`)
+- ~~Webhook Resend (ouvertures, clics, bounces, complaints)~~ ✅ FAIT (2026-04-11) — edge function `resend-webhook` + RPC atomique + table `mailing_events` + vérification Svix HMAC SHA256
+- ~~TabMailings enrichi (badges, timeline, compteurs)~~ ✅ FAIT (2026-04-11) — 7 statuts avec icônes Lucide, timeline chronologique des events, stats header, polling 30s
+- ~~Auto-cleanup email sur bounce Permanent~~ ✅ FAIT (2026-04-11) — RPC webhook vide `clients.email` sur hard bounce, ré-envois bloqués
+- ~~Auto-archive clients injoignables~~ ✅ FAIT (2026-04-11) — si bounce Permanent + pas de phone + pas de contrat actif + pas d'intervention en cours
+- ~~Désabonnement opt-out complet (List-Unsubscribe RFC 8058)~~ ✅ FAIT (2026-04-11) — edge function `mailing-unsubscribe`, bouton natif Gmail/Outlook, auto-unsubscribe sur spam complaint, bandeau UI fiche client
+- Dashboard stats mailing (taux d'ouverture/clic/bounce par campagne) — nécessite requêtes d'agrégation sur `mailing_logs`
+- "Unique click" : déduplication des clics via `mailing_events` (GROUP BY user_agent/ip) pour filtrer Safe Links Outlook
+- Bouton "Désabonner manuellement" sur fiche client (UI-driven) — actuel : il faut passer par un UPDATE SQL ou attendre un event automatique
+- Bouton "Réabonner" (undo) sur fiche client désabonnée — pour les cas où un client se désinscrit par erreur et veut revenir
 
 ## Module Certificats d'entretien (multi-équipements)
 
