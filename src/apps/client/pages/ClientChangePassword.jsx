@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@contexts/AuthContext';
+import { supabase } from '@lib/supabaseClient';
 import { Lock, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import logoMayer from '@/assets/logo-mayer.png';
@@ -38,7 +39,6 @@ export default function ClientChangePassword() {
       if (error) throw error;
 
       // Retirer le flag must_change_password
-      const { supabase } = await import('@lib/supabaseClient');
       await supabase.auth.updateUser({
         data: { must_change_password: false },
       });
