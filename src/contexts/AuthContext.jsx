@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [organization, setOrganization] = useState(null);
   const [membership, setMembership] = useState(null);
+  const [clientRecord, setClientRecord] = useState(null); // Portail client
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
@@ -41,11 +42,24 @@ export function AuthProvider({ children }) {
         userMembership = retry.membership || userMembership;
       }
 
+      // Client portal : si pas d'org, vérifier si c'est un client
+      let isClientUser = false;
+      if (!userOrg) {
+        const clientResult = await authService.getClientRecord(userId);
+        if (clientResult.clientRecord) {
+          setClientRecord(clientResult.clientRecord);
+          isClientUser = true;
+        }
+      }
+
       if (userProfile) setProfile(userProfile);
       if (userOrg) setOrganization(userOrg);
       if (userMembership) setMembership(userMembership);
+
+      return { isClient: isClientUser };
     } catch (error) {
       console.error('[AuthContext] loadUserData error:', error);
+      return { isClient: false };
     }
   }, []);
 
@@ -54,6 +68,7 @@ export function AuthProvider({ children }) {
     setProfile(null);
     setOrganization(null);
     setMembership(null);
+    setClientRecord(null);
   }, []);
 
   // ===========================================================================
@@ -205,7 +220,8 @@ export function AuthProvider({ children }) {
 
       if (!result.error && result.data?.user) {
         setUser(result.data.user);
-        await loadUserData(result.data.user.id);
+        const loadResult = await loadUserData(result.data.user.id);
+        result.isClient = loadResult?.isClient || false;
       }
 
       return result;
@@ -273,6 +289,11 @@ export function AuthProvider({ children }) {
   // Sprint 7 : rôle effectif unique (org_admin | team_leader | commercial | technicien)
   const effectiveRole = computeEffectiveRole(profile, membership);
 
+  // Portail client
+  const isClient = !!clientRecord;
+  const clientId = clientRecord?.id || null;
+  const clientProjectId = clientRecord?.project_id || null;
+
   // ===========================================================================
   // CONTEXT VALUE
   // ===========================================================================
@@ -284,6 +305,7 @@ export function AuthProvider({ children }) {
     isOrgAdmin, isTeamLeader, isTeamLeaderOrAbove,
     appRole, businessRole, isOrgAdminFromProfile, isCommercialBusiness, canAccessPipeline,
     effectiveRole,
+    isClient, clientId, clientProjectId, clientRecord,
     signIn, signUp, signOut, signInWithGoogle,
     resetPassword, updatePassword, updateProfile,
     joinOrganization, refreshUserData,

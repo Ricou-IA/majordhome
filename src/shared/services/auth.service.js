@@ -391,6 +391,33 @@ export const authService = {
   },
 
   // ===========================================================================
+  // CLIENT PORTAL
+  // ===========================================================================
+
+  /**
+   * Charge le client record lié à un auth user (portail client)
+   * Appelé uniquement quand pas d'org membership → zéro impact artisan
+   * @param {string} userId - ID auth user
+   * @returns {Promise<{clientRecord: Object|null, error: Error|null}>}
+   */
+  async getClientRecord(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_clients')
+        .select('id, first_name, last_name, display_name, email, project_id, org_id')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      return { clientRecord: data || null, error: null };
+    } catch (error) {
+      console.error('[authService] getClientRecord error:', error);
+      return { clientRecord: null, error };
+    }
+  },
+
+  // ===========================================================================
   // HELPERS
   // ===========================================================================
 

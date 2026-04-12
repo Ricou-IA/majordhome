@@ -28,6 +28,7 @@ export default function ProtectedRoute({
     organization,
     loading,
     initialized,
+    isClient,
   } = useAuth();
 
   // ===========================================================================
@@ -61,16 +62,24 @@ export default function ProtectedRoute({
   }
 
   // ===========================================================================
+  // CLIENT REDIRECT — un client ne doit pas accéder aux routes artisan
+  // ===========================================================================
+
+  if (isClient) {
+    return <Navigate to="/client" replace />;
+  }
+
+  // ===========================================================================
   // ORGANIZATION CHECK - DÉSACTIVÉ TEMPORAIREMENT
   // ===========================================================================
 
   // TODO: Réactiver quand le système d'organisation sera fonctionnel
   // if (requireOrganization && !organization) {
   //   return (
-  //     <Navigate 
-  //       to="/join-organization" 
-  //       state={{ from: location.pathname }} 
-  //       replace 
+  //     <Navigate
+  //       to="/join-organization"
+  //       state={{ from: location.pathname }}
+  //       replace
   //     />
   //   );
   // }
@@ -132,10 +141,10 @@ export function TeamLeaderRoute({ children }) {
 }
 
 /**
- * Route publique qui redirige vers le dashboard si déjà connecté
+ * Route réservée aux clients du portail
  */
-export function PublicOnlyRoute({ children }) {
-  const { user, initialized, loading } = useAuth();
+export function ClientRoute({ children }) {
+  const { user, isClient, initialized, loading } = useAuth();
   const location = useLocation();
 
   if (!initialized || loading) {
@@ -149,8 +158,38 @@ export function PublicOnlyRoute({ children }) {
     );
   }
 
-  // Déjà connecté → rediriger vers la page d'origine ou le dashboard
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  if (!isClient) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+/**
+ * Route publique qui redirige vers le dashboard si déjà connecté
+ */
+export function PublicOnlyRoute({ children }) {
+  const { user, isClient, initialized, loading } = useAuth();
+  const location = useLocation();
+
+  if (!initialized || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-secondary-50">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-primary-600 animate-spin mx-auto" />
+          <p className="mt-4 text-secondary-600">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Déjà connecté → rediriger vers le portail client ou le dashboard artisan
   if (user) {
+    if (isClient) return <Navigate to="/client" replace />;
     const from = location.state?.from || '/';
     return <Navigate to={from} replace />;
   }

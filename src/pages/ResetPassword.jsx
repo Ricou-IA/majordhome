@@ -22,9 +22,9 @@ export default function ResetPassword() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Formulaire
+  // Formulaire — pré-remplir l'email depuis l'URL si présent
   const [formData, setFormData] = useState({
-    email: '',
+    email: searchParams.get('email') || '',
     password: '',
     confirmPassword: '',
   });

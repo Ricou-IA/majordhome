@@ -1,4 +1,6 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 // Layouts
 import AppLayout from '@layouts/AppLayout';
@@ -8,10 +10,14 @@ import Login from '@pages/Login';
 import ResetPassword from '@pages/ResetPassword';
 
 // Components
-import ProtectedRoute, { PublicOnlyRoute } from '@components/ProtectedRoute';
+import ProtectedRoute, { PublicOnlyRoute, ClientRoute } from '@components/ProtectedRoute';
 
 // Routes module Artisan
 import { artisanRoutes } from '@apps/artisan/routes';
+
+// Routes module Client (portail)
+import { clientRoutes } from '@apps/client/routes';
+const ClientLayout = lazy(() => import('@apps/client/layouts/ClientLayout'));
 
 // Pages utilitaires
 import NotFound from '@pages/NotFound';
@@ -85,6 +91,36 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* ===================================================================
+          PORTAIL CLIENT (auth + client record requis)
+          =================================================================== */}
+
+      <Route
+        path="/client"
+        element={
+          <ClientRoute>
+            <Suspense
+              fallback={
+                <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                  <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
+                </div>
+              }
+            >
+              <ClientLayout />
+            </Suspense>
+          </ClientRoute>
+        }
+      >
+        {clientRoutes.map((route, index) => (
+          <Route
+            key={index}
+            index={route.index}
+            path={route.path}
+            element={route.element}
+          />
+        ))}
+      </Route>
 
       {/* ===================================================================
           ROUTES PROTÉGÉES (auth + organisation requises)

@@ -21,6 +21,7 @@ import { useClient, useLinkedClients } from '@hooks/useClients';
 import { formatDateFR } from '@/lib/utils';
 
 // Sous-composants extraits
+import { InviteClientButton } from '../components/clients/InviteClientButton';
 import { ClientCategoryBadge } from './client-detail/ClientCategoryBadge';
 import { TabInfo } from './client-detail/TabInfo';
 import { TabEquipments } from './client-detail/TabEquipments';
@@ -251,6 +252,9 @@ export default function ClientDetail() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Portail client */}
+          <InviteClientButton client={client} />
+
           {!isArchived && isLocked && (
             <button
               onClick={() => setShowArchiveConfirm(true)}
