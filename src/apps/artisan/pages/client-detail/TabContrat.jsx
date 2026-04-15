@@ -83,12 +83,20 @@ const ContractEquipmentsSection = ({ contractId }) => {
           {equipments.map((eq) => {
             const Icon = getEquipmentIcon(eq.equipment_type || eq.category);
             const typeLabel = getLabel(eq);
+            const unitCount = eq.unit_count || 1;
+            const pricingType = eq.equipment_type_id && pricingTypesMap[eq.equipment_type_id];
+            const unitLabel = pricingType?.unit_label || 'unité';
             const details = [eq.brand, eq.model, eq.serial_number].filter(v => v && v !== 'À renseigner');
             return (
               <div key={eq.id} className="flex items-center gap-3 px-3 py-2.5 bg-secondary-50 rounded-lg">
                 <Icon className="w-4 h-4 text-secondary-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-secondary-900">{typeLabel}</span>
+                  {unitCount > 1 && (
+                    <span className="inline-flex items-center ml-1.5 px-1.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                      {unitCount} {unitLabel}{unitCount > 1 ? 's' : ''}
+                    </span>
+                  )}
                   {details.length > 0 && (
                     <span className="text-sm text-secondary-500 ml-2">
                       — {details.join(' · ')}
