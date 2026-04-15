@@ -8,16 +8,42 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, FileText, Send, User, MapPin, Phone, Euro } from 'lucide-react';
+import { Loader2, AlertCircle, FileText, CheckCircle2, Archive, Clock, MapPin, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { contractKeys } from '@hooks/cacheKeys';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { supabase } from '@/lib/supabaseClient';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
+
+// ============================================================================
+// STAT CARD (léger, inline)
+// ============================================================================
+
+const STAT_COLORS = {
+  green:  'bg-green-50 text-green-600',
+  amber:  'bg-amber-50 text-amber-600',
+  gray:   'bg-gray-50 text-gray-500',
+  blue:   'bg-blue-50 text-blue-600',
+};
+
+function StatCard({ icon: Icon, label, value, color = 'blue' }) {
+  const c = STAT_COLORS[color] || STAT_COLORS.blue;
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${c}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <p className="text-sm text-gray-500">{label}</p>
+      </div>
+    </div>
+  );
+}
 
 // ============================================================================
 // CONSTANTES
@@ -27,6 +53,39 @@ const PIPELINE_COLUMNS = [
   { id: 'pending',       label: 'En attente',          color: '#F59E0B' },
   { id: 'proposal_sent', label: 'Proposition envoyée', color: '#3B82F6' },
 ];
+
+// ============================================================================
+// HOOK : STATS CONTRATS (compteurs globaux)
+// ============================================================================
+
+function useContractStats(orgId) {
+  const [stats, setStats] = useState({ active: 0, pending: 0, cancelled: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!orgId) return;
+    (async () => {
+      try {
+        const [activeRes, pendingRes, cancelledRes] = await Promise.all([
+          supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'active'),
+          supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).in('status', ['pending', 'proposal_sent']),
+          supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'cancelled'),
+        ]);
+        setStats({
+          active: activeRes.count || 0,
+          pending: pendingRes.count || 0,
+          cancelled: cancelledRes.count || 0,
+        });
+      } catch (err) {
+        console.error('[PipelineContrats] stats error:', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [orgId]);
+
+  return { stats, loading };
+}
 
 // ============================================================================
 // HOOK : CONTRATS PIPELINE (pending + proposal_sent)
@@ -144,6 +203,7 @@ export default function PipelineContrats() {
   const orgId = organization?.id;
   const navigate = useNavigate();
   const { contracts, loading, error, refetch, updateStatus } = useContractsPipeline(orgId);
+  const { stats: contractStats, loading: statsLoading } = useContractStats(orgId);
 
   // Drag & drop : transition entre colonnes
   const handleDragEnd = useCallback(async (result) => {
@@ -206,6 +266,28 @@ export default function PipelineContrats() {
             {loading ? '...' : `${contracts.length} contrat${contracts.length !== 1 ? 's' : ''} en cours de traitement`}
           </p>
         </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatCard
+          icon={CheckCircle2}
+          label="Contrats actifs"
+          value={statsLoading ? '...' : contractStats.active}
+          color="green"
+        />
+        <StatCard
+          icon={Clock}
+          label="En attente"
+          value={statsLoading ? '...' : contractStats.pending}
+          color="amber"
+        />
+        <StatCard
+          icon={Archive}
+          label="Clos"
+          value={statsLoading ? '...' : contractStats.cancelled}
+          color="gray"
+        />
       </div>
 
       {loading ? (

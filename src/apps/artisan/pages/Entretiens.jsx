@@ -375,13 +375,7 @@ export default function Entretiens() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard
-          icon={FileText}
-          label="Contrats en attente"
-          value={savStatsLoading ? '...' : (savStats?.contrats_en_attente ?? 0)}
-          color="amber"
-        />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           icon={Calendar}
           label="Entretiens à faire"
