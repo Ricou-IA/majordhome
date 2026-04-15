@@ -575,7 +575,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
 
       {!isEditing && <ContractEquipmentsSection contractId={contract.id} />}
       {!isEditing && <ContractPricingSection contractId={contract.id} contract={contract} client={client} />}
-      {!isEditing && <ContractPdfSection contract={contract} clientId={clientId} client={client} />}
+      {!isEditing && <ContractPdfSection contract={contract} clientId={clientId} client={client} orgId={orgId} />}
       {!isEditing && <ContractVisitsSection contract={contract} orgId={orgId} userId={userId} />}
 
       {!isEditing && (

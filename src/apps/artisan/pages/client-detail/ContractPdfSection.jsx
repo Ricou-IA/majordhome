@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { FileText, Download, Loader2, PenTool, Printer, Upload, CheckCircle2, Send, Mail, X } from 'lucide-react';
-import { useAuth } from '@contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDateFR, formatEuro } from '@/lib/utils';
@@ -21,10 +20,9 @@ const ACCEPTED_FILE_TYPES = '.pdf,.jpg,.jpeg,.png';
 const MAX_FILE_SIZE_MB = 10;
 const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_MAILING;
 
-export function ContractPdfSection({ contract, clientId, client }) {
+export function ContractPdfSection({ contract, clientId, client, orgId }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { organization } = useAuth();
   const fileInputRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -249,7 +247,7 @@ export function ContractPdfSection({ contract, clientId, client }) {
         html_body: htmlBody,
         segment_sql: `SELECT id, first_name, last_name, display_name, email FROM majordhome.clients WHERE id = '${clientId}' AND email IS NOT NULL AND email_unsubscribed_at IS NULL LIMIT 1;`,
         campaign_name: 'Proposition Contrat',
-        org_id: organization?.id,
+        org_id: orgId,
         recipient_type: 'client',
         batch_size: 1,
       };
@@ -277,7 +275,7 @@ export function ContractPdfSection({ contract, clientId, client }) {
     } finally {
       setIsSending(false);
     }
-  }, [contract, client, clientId, organization, computedPricing, isSending, buildPdfData]);
+  }, [contract, client, clientId, orgId, computedPricing, isSending, buildPdfData]);
 
   const isSigned = !!contract.signed_at;
   const hasPdf = !!contract.contract_pdf_path;
