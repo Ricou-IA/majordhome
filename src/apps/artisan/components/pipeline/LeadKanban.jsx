@@ -181,7 +181,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const { organization, user, effectiveRole } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
-  const navigate = useNavigate();
+
 
   const { statuses } = useLeadStatuses();
   const { commercials } = useLeadCommercials(orgId);
