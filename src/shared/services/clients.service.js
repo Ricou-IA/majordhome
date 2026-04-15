@@ -73,6 +73,7 @@ export const HOUSING_TYPES = [
  * Sources de lead
  */
 export const LEAD_SOURCES = [
+  { value: 'appointment_legacy', label: 'Rdv ancien' },
   { value: 'website', label: 'Site internet' },
   { value: 'phone', label: 'Appel entrant' },
   { value: 'walk_in', label: 'Visite agence' },
