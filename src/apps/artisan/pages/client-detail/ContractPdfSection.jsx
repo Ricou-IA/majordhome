@@ -209,10 +209,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const pdfData = buildPdfData();
       const blob = await generateContractPdfBlob(pdfData);
 
-      // 2. Upload vers Supabase Storage
+      // 2. Upload vers Supabase Storage (nom simple = contract number only)
       const contractNum = contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`;
-      const safeName = (client.display_name || client.last_name || 'Client').replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').replace(/\s+/g, '_');
-      const storagePath = `propositions/Proposition_${contractNum}_${safeName}.pdf`;
+      const storagePath = `Proposition_${contractNum}.pdf`;
 
       const { path: uploadedPath, error: uploadError } = await storageService.uploadFile(
         'contracts',
