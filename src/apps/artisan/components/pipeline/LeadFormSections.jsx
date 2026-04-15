@@ -14,7 +14,7 @@
 import {
   Search, UserCircle, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
-  ArrowRightLeft, Target, UserCheck, Loader2,
+  ArrowRightLeft, Target, UserCheck, Loader2, Wrench,
   FileText, ChevronRight, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -688,6 +688,9 @@ export const SectionActions = ({
   setShowConvertConfirm,
   handleConvert,
   isConverting,
+  onRequalifyEntretien,
+  isRequalifying,
+  currentStatus,
 }) => (
   <>
     {/* Action suivante (transitions) */}
@@ -719,6 +722,23 @@ export const SectionActions = ({
               </button>
             );
           })}
+
+          {/* Requalifier → Entretien (visible sur leads Nouveau) */}
+          {onRequalifyEntretien && currentStatus?.label === 'Nouveau' && (
+            <button
+              type="button"
+              onClick={onRequalifyEntretien}
+              disabled={isRequalifying}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px] bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              {isRequalifying ? (
+                <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
+              ) : (
+                <Wrench className="h-4 w-4 inline mr-1" />
+              )}
+              → Entretien
+            </button>
+          )}
         </div>
       </>
     )}

@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Save, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,8 @@ import { usePricingEquipmentTypes, useClientSearch } from '@hooks/useClients';
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@services/appointments.service';
 import { leadsService } from '@services/leads.service';
+import { clientsService } from '@services/clients.service';
+import { contractsService } from '@services/contracts.service';
 import { formatDateForInput } from '@/lib/utils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
@@ -66,8 +69,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const isEditing = !!leadId;
   const { organization, user, effectiveRole } = useAuth();
   const { can, canEdit, isOwner } = useCanAccess();
+  const navigate = useNavigate();
   const orgId = organization?.id;
   const userId = user?.id;
+  const [isRequalifying, setIsRequalifying] = useState(false);
 
   // Données
   const { lead, isLoading: loadingLead } = useLead(isEditing ? leadId : null);
@@ -689,6 +694,63 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     return groups;
   }, [equipmentTypes]);
 
+  // Requalifier lead → Entretien (crée client + contrat pending)
+  const requalifieStatusId = useMemo(() => {
+    return statuses.find(s => s.label === 'Requalifié')?.id || null;
+  }, [statuses]);
+
+  const handleRequalifyEntretien = useCallback(async () => {
+    if (isRequalifying || !orgId || !lead) return;
+    setIsRequalifying(true);
+    try {
+      let clientId = lead.client_id;
+
+      // 1. Créer le client si pas encore lié
+      if (!clientId) {
+        const { data: newClient, error: clientError } = await clientsService.createClient({
+          orgId,
+          lastName: form.last_name || form.company_name || 'Client',
+          firstName: form.first_name || '',
+          email: form.email || null,
+          phone: form.phone || null,
+          address: form.address || null,
+          postalCode: form.postal_code || null,
+          city: form.city || null,
+          clientCategory: 'particulier',
+          leadSource: 'appointment_legacy',
+        });
+        if (clientError) throw clientError;
+        clientId = newClient?.id;
+        if (!clientId) throw new Error('Client non créé');
+      }
+
+      // 2. Créer le contrat pending
+      await contractsService.createContract({
+        orgId,
+        clientId,
+        status: 'pending',
+        frequency: 'annuel',
+        startDate: new Date().toISOString().split('T')[0],
+        source: 'lead',
+        notes: form.notes || null,
+      });
+
+      // 3. Passer le lead en "Requalifié"
+      if (requalifieStatusId) {
+        await updateLeadStatus(lead.id, requalifieStatusId, userId);
+      }
+
+      toast.success('Lead requalifié → contrat créé');
+      onClose();
+      navigate(`/clients/${clientId}?tab=contract`);
+    } catch (err) {
+      console.error('[LeadModal] requalify error:', err);
+      toast.error(`Erreur : ${err.message || 'Requalification échouée'}`);
+    } finally {
+      setIsRequalifying(false);
+    }
+  }, [orgId, userId, lead, form, requalifieStatusId, isRequalifying, updateLeadStatus, navigate, onClose]);
+
   const currentStatus = statuses.find((s) => s.id === form.status_id);
   const isWon = currentStatus?.is_won === true;
   const isFinal = currentStatus?.is_final === true;
@@ -869,6 +931,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 setShowConvertConfirm={setShowConvertConfirm}
                 handleConvert={handleConvert}
                 isConverting={isConverting}
+                currentStatus={currentStatus}
+                onRequalifyEntretien={handleRequalifyEntretien}
+                isRequalifying={isRequalifying}
               />
             </>
           )}

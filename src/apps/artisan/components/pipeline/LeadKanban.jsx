@@ -9,14 +9,11 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle, Wrench } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@hooks/useLeads';
 import { leadsService } from '@services/leads.service';
-import { clientsService } from '@services/clients.service';
-import { contractsService } from '@services/contracts.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LeadCard } from './LeadCard';
 import { CallModal } from './CallModal';
@@ -189,7 +186,6 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const { statuses } = useLeadStatuses();
   const { commercials } = useLeadCommercials(orgId);
   const { updateLeadStatus } = useLeadMutations();
-  const [requalifying, setRequalifying] = useState(null); // lead.id en cours
 
   // Map { userId -> { initials, name, colorIndex } } pour les badges
   const commercialsMap = useMemo(() => {
@@ -530,71 +526,6 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     }
   }, [pendingQuote, updateLeadStatus, userId, fetchLeads]);
 
-  // ID du statut "Nouveau" pour afficher le bouton requalification
-  const nouveauStatusId = useMemo(() => {
-    const s = statuses.find(s => s.label === 'Nouveau');
-    return s?.id || null;
-  }, [statuses]);
-
-  // ID du statut "Requalifié" (terminal)
-  const requalifieStatusId = useMemo(() => {
-    const s = statuses.find(s => s.label === 'Requalifié');
-    return s?.id || null;
-  }, [statuses]);
-
-  // Requalifier un lead "Nouveau" → créer client + contrat pending → rediriger
-  const handleRequalifyEntretien = useCallback(async (lead, e) => {
-    e.stopPropagation();
-    if (requalifying || !orgId) return;
-    setRequalifying(lead.id);
-    try {
-      let clientId = lead.client_id;
-
-      // 1. Créer le client si pas encore lié
-      if (!clientId) {
-        const { data: newClient, error: clientError } = await clientsService.createClient(orgId, {
-          lastName: lead.last_name || lead.company_name || 'Client',
-          firstName: lead.first_name || '',
-          email: lead.email || null,
-          phone: lead.phone || null,
-          address: lead.address || null,
-          postalCode: lead.postal_code || null,
-          city: lead.city || null,
-          clientCategory: 'particulier',
-          leadSource: 'appointment_legacy',
-        });
-        if (clientError) throw clientError;
-        clientId = newClient?.id;
-        if (!clientId) throw new Error('Client non créé');
-      }
-
-      // 2. Créer le contrat pending
-      const { data: newContract, error: contractError } = await contractsService.createContract({
-        orgId,
-        clientId,
-        status: 'pending',
-        frequency: 'annuel',
-        startDate: new Date().toISOString().split('T')[0],
-        source: 'lead',
-        notes: lead.notes || null,
-      });
-      if (contractError) throw contractError;
-
-      // 3. Passer le lead en "Requalifié"
-      if (requalifieStatusId) {
-        await updateLeadStatus(lead.id, requalifieStatusId, userId);
-      }
-
-      toast.success('Lead requalifié → contrat créé');
-      navigate(`/clients/${clientId}?tab=contract`);
-    } catch (err) {
-      console.error('[LeadKanban] requalify error:', err);
-      toast.error(`Erreur : ${err.message || 'Requalification échouée'}`);
-    } finally {
-      setRequalifying(null);
-    }
-  }, [orgId, userId, requalifieStatusId, requalifying, updateLeadStatus, navigate]);
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -609,23 +540,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       columns={columns}
       groupBy="status_id"
       renderCard={(lead) => (
-        <div className="relative group">
-          <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
-          {lead.status_id === nouveauStatusId && (
-            <button
-              onClick={(e) => handleRequalifyEntretien(lead, e)}
-              disabled={requalifying === lead.id}
-              title="Requalifier → Entretien"
-              className="absolute top-1.5 right-1.5 p-1 rounded text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
-            >
-              {requalifying === lead.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
-              ) : (
-                <Wrench className="w-3.5 h-3.5" />
-              )}
-            </button>
-          )}
-        </div>
+        <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
       )}
       onDragEnd={handleDragEnd}
       searchPlaceholder="Rechercher un lead..."
