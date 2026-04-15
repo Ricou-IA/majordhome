@@ -28,6 +28,7 @@ import {
   Grid3x3,
   ListTodo,
   Mail,
+  FileText,
 } from 'lucide-react';
 
 // =============================================================================
@@ -41,6 +42,7 @@ const navigation = [
   { name: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire' },
   { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
+  { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
   { name: 'Tâches',     href: '/tasks',      icon: ListTodo,        resource: 'tasks' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
