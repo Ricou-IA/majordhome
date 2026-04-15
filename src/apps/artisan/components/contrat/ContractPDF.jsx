@@ -417,7 +417,7 @@ function ContractDocument({ data }) {
           <View key={i} style={i % 2 === 1 ? s.tableRowEven : s.tableRow}>
             <View style={{ flex: 3 }}>
               <Text style={s.tableCell}>
-                {line.label}{line.quantity > 1 ? ` (×${line.quantity})` : ''}
+                {line.label}
               </Text>
               {line.reference && (
                 <Text style={{ fontSize: 8, color: C.gris, marginTop: 1 }}>

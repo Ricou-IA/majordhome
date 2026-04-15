@@ -66,7 +66,13 @@ export function ContractPdfSection({ contract, clientId, client }) {
       const equipType = etId ? equipTypeMap[etId] || null : null;
       const unitCount = eq.unit_count || 1;
       const lineTotal = calculateLineTotal(rate, equipType, unitCount);
-      const refParts = [eq.brand, eq.model, eq.serial_number].filter(Boolean);
+      const refParts = [
+        eq.brand,
+        eq.model,
+        eq.installation_year,
+        eq.installation_type === 'ventouse' ? 'Pose ventouse' : eq.installation_type === 'verticale' ? 'Pose verticale' : null,
+        unitCount > 1 && equipType?.unit_label ? `${unitCount} ${equipType.unit_label}s` : null,
+      ].filter(Boolean);
       return {
         equipmentTypeId: etId,
         label: equipType?.label || 'Équipement',
