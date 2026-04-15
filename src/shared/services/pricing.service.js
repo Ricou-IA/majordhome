@@ -95,12 +95,11 @@ export function calculateContractTotal(items, discounts = []) {
     return sum + (parseFloat(val) || 0);
   }, 0);
 
-  // Nombre total d'équipements (quantité, exclure items à prix 0)
+  // Nombre d'équipements (1 ligne = 1 équipement, splits/unités ne comptent PAS)
   const equipmentCount = items.reduce((count, item) => {
     const val = item.lineTotal ?? item.line_total ?? 0;
     if (parseFloat(val) <= 0) return count;
-    const qty = item.quantity ?? item.qty ?? 1;
-    return count + qty;
+    return count + 1;
   }, 0);
 
   // Trouver la remise applicable (plus grande remise dont le seuil est atteint)

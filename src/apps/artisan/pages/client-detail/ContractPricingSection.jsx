@@ -82,7 +82,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
       if (!grouped[etId]) {
         grouped[etId] = { equipmentTypeId: etId, quantity: 0, lineTotal: 0 };
       }
-      // quantity = nombre d'équipements (systèmes) pour ce type
+      // quantity = nombre d'équipements (systèmes) — splits ne comptent PAS pour la remise
       grouped[etId].quantity += 1;
       grouped[etId].lineTotal += eqTotal;
     }

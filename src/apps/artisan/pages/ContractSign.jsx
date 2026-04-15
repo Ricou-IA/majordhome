@@ -176,14 +176,15 @@ export default function ContractSign() {
       const etId = eq.equipment_type_id;
       const rate = etId ? rateIndex[`${activeZone.id}_${etId}`] || null : null;
       const equipType = etId ? equipTypeMap[etId] || null : null;
-      const lineTotal = calculateLineTotal(rate, equipType, 1);
+      const unitCount = eq.unit_count || 1;
+      const lineTotal = calculateLineTotal(rate, equipType, unitCount);
       // Référence : "Marque · Modèle · N° série"
       const refParts = [eq.brand, eq.model, eq.serial_number].filter(Boolean);
       return {
         equipmentTypeId: etId,
         label: equipType?.label || 'Équipement',
         reference: refParts.length > 0 ? refParts.join(' · ') : null,
-        quantity: 1,
+        quantity: unitCount,
         basePrice: rate ? parseFloat(rate.price) : 0,
         lineTotal,
       };
