@@ -178,6 +178,16 @@ export const googleCalendarKeys = {
   status: (orgId) => [...googleCalendarKeys.all, 'status', orgId],
 };
 
+// --- Pennylane ---
+export const pennylaneKeys = {
+  all: ['pennylane'],
+  sync: (entityType, localId) => [...pennylaneKeys.all, 'sync', entityType, localId],
+  syncByClient: (clientId) => [...pennylaneKeys.all, 'sync', 'client', clientId],
+  ledgerAccounts: () => [...pennylaneKeys.all, 'ledger-accounts'],
+  invoicesByClient: (clientId) => [...pennylaneKeys.all, 'invoices', clientId],
+  quotesByClient: (clientId) => [...pennylaneKeys.all, 'quotes', clientId],
+};
+
 // --- Devis (Quotes) ---
 export const devisKeys = {
   all: ['devis'],

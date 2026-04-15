@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
-  Archive, ArchiveRestore,
+  Archive, ArchiveRestore, Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClient, useLinkedClients } from '@hooks/useClients';
@@ -30,12 +30,16 @@ import { TabTimeline } from './client-detail/TabTimeline';
 import { TabContrat } from './client-detail/TabContrat';
 import { TabMailings } from './client-detail/TabMailings';
 import { TabSms } from './client-detail/TabSms';
+import { TabDevisPL } from './client-detail/TabDevisPL';
+import { TabFacturesPL } from './client-detail/TabFacturesPL';
 
 const TABS = [
   { id: 'info', label: 'Informations', icon: User },
   { id: 'contract', label: 'Contrat', icon: FileText },
   { id: 'equipments', label: 'Équipements', icon: Wrench },
   { id: 'interventions', label: 'Interventions', icon: Wrench },
+  { id: 'devis-pl', label: 'Devis', icon: Receipt },
+  { id: 'factures-pl', label: 'Factures', icon: Receipt },
   { id: 'timeline', label: 'Timeline', icon: History },
   { id: 'mailings', label: 'Mailings', icon: Mail },
   { id: 'sms', label: 'SMS', icon: MessageSquare },
@@ -236,7 +240,10 @@ export default function ClientDetail() {
               )}
             </div>
             <p className="text-secondary-500 mt-0.5">
-              {client.client_number && (
+              {client.pennylane_account_number && (
+                <span className="text-xs font-mono text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded mr-2" title="Code comptable Pennylane">{client.pennylane_account_number}</span>
+              )}
+              {client.client_number && !client.pennylane_account_number && (
                 <span className="text-xs font-mono text-secondary-400 mr-2">{client.client_number}</span>
               )}
               {[client.city, client.postal_code].filter(Boolean).join(' ')}
@@ -323,6 +330,22 @@ export default function ClientDetail() {
       <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
         {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} />}
         {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
+        {activeTab === 'devis-pl' && client.pennylane_account_number && <TabDevisPL clientId={id} orgId={organization?.id} />}
+        {activeTab === 'devis-pl' && !client.pennylane_account_number && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Receipt className="w-10 h-10 text-secondary-300 mb-3" />
+            <p className="text-sm font-medium text-secondary-600">Client non synchronise avec Pennylane</p>
+            <p className="text-xs text-secondary-400 mt-1">Ce client n'a pas encore de code comptable Pennylane</p>
+          </div>
+        )}
+        {activeTab === 'factures-pl' && client.pennylane_account_number && <TabFacturesPL clientId={id} orgId={organization?.id} />}
+        {activeTab === 'factures-pl' && !client.pennylane_account_number && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Receipt className="w-10 h-10 text-secondary-300 mb-3" />
+            <p className="text-sm font-medium text-secondary-600">Client non synchronisé avec Pennylane</p>
+            <p className="text-xs text-secondary-400 mt-1">Ce client n'a pas encore de code comptable Pennylane</p>
+          </div>
+        )}
         {activeTab === 'equipments' && <TabEquipments clientId={id} />}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
         {activeTab === 'timeline' && <TabTimeline clientId={id} orgId={organization?.id} userId={user?.id} />}
