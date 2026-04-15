@@ -89,6 +89,31 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     return { items, ...totals };
   }, [equipments, activeZone, rateIndex, equipTypeMap, discounts]);
 
+  // Helper : construire les données PDF (réutilisé par impression + envoi)
+  const buildPdfData = useCallback(() => {
+    return {
+      contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
+      startDate: new Date().toISOString(),
+      maintenanceMonth: contract.maintenance_month,
+      clientName: client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ') || '-',
+      clientAddress: client?.address || '-',
+      clientPostalCode: client?.postal_code || '',
+      clientCity: client?.city || '',
+      clientPhone: client?.phone || '-',
+      clientEmail: client?.email || '-',
+      equipmentLines: computedPricing?.items || [],
+      subtotal: computedPricing?.subtotal || 0,
+      discountPercent: computedPricing?.discountPercent || 0,
+      discountAmount: computedPricing?.discountAmount || 0,
+      total: computedPricing?.total || parseFloat(contract.amount) || 0,
+      zoneName: activeZone?.label || '-',
+      notes: contract.notes || null,
+      signatureBase64: null,
+      signataireNom: null,
+      signedAt: null,
+    };
+  }, [contract, client, computedPricing, activeZone]);
+
   // Télécharger le PDF signé existant
   const handleDownload = useCallback(async () => {
     if (!contract?.contract_pdf_path || isLoading) return;
@@ -173,31 +198,6 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       setIsUploading(false);
     }
   }, [contract, client, isUploading, queryClient]);
-
-  // Helper : construire les données PDF (réutilisé par impression + envoi)
-  const buildPdfData = useCallback(() => {
-    return {
-      contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
-      startDate: new Date().toISOString(),
-      maintenanceMonth: contract.maintenance_month,
-      clientName: client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ') || '-',
-      clientAddress: client?.address || '-',
-      clientPostalCode: client?.postal_code || '',
-      clientCity: client?.city || '',
-      clientPhone: client?.phone || '-',
-      clientEmail: client?.email || '-',
-      equipmentLines: computedPricing?.items || [],
-      subtotal: computedPricing?.subtotal || 0,
-      discountPercent: computedPricing?.discountPercent || 0,
-      discountAmount: computedPricing?.discountAmount || 0,
-      total: computedPricing?.total || parseFloat(contract.amount) || 0,
-      zoneName: activeZone?.label || '-',
-      notes: contract.notes || null,
-      signatureBase64: null,
-      signataireNom: null,
-      signedAt: null,
-    };
-  }, [contract, client, computedPricing, activeZone]);
 
   // Envoyer la proposition par email via N8N/Resend
   const handleSendProposal = useCallback(async () => {
