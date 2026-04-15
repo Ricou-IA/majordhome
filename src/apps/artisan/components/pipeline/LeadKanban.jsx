@@ -609,20 +609,20 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       columns={columns}
       groupBy="status_id"
       renderCard={(lead) => (
-        <div>
+        <div className="relative group">
           <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
           {lead.status_id === nouveauStatusId && (
             <button
               onClick={(e) => handleRequalifyEntretien(lead, e)}
               disabled={requalifying === lead.id}
-              className="w-full mt-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md transition-colors disabled:opacity-50"
+              title="Requalifier → Entretien"
+              className="absolute top-1.5 right-1.5 p-1 rounded text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
             >
               {requalifying === lead.id ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
               ) : (
-                <Wrench className="w-3 h-3" />
+                <Wrench className="w-3.5 h-3.5" />
               )}
-              Entretien
             </button>
           )}
         </div>
