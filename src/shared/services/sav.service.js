@@ -140,7 +140,7 @@ export const savService = {
       // 1) Contrats actifs avec statut visite année en cours
       const { data: contracts, error: contractsError } = await supabase
         .from('majordhome_contracts')
-        .select('id, current_year_visit_status, amount, signed_at')
+        .select('id, current_year_visit_status, amount')
         .eq('org_id', orgId)
         .eq('status', 'active');
 
@@ -203,8 +203,12 @@ export const savService = {
         }
       }
 
-      // Contrats en attente de signature (actifs mais non signés)
-      const contratsEnAttente = allContracts.filter(c => !c.signed_at).length;
+      // Contrats en attente (status = 'pending')
+      const { count: contratsEnAttente } = await supabase
+        .from('majordhome_contracts')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId)
+        .eq('status', 'pending');
 
       const stats = {
         entretien_a_faire: entretienAFaire,       // Contrats sans visite ET sans entretien planifié
@@ -213,7 +217,7 @@ export const savService = {
         sav_en_cours: savCount,                    // Nombre total de SAV gérés cette année
         ca_a_faire: caAFaire,                      // CA théorique des entretiens à faire
         ca_realise: caRealise,                     // CA théorique des entretiens réalisés
-        contrats_en_attente: contratsEnAttente,    // Contrats actifs non signés
+        contrats_en_attente: contratsEnAttente || 0, // Contrats en statut pending
       };
 
       return { data: stats, error: null };
