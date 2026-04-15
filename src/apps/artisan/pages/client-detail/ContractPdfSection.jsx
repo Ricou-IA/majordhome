@@ -467,68 +467,53 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
 
 function buildProposalEmailHtml(pdfUrl, equipRecap, totalStr) {
   return `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 0;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-
-  <!-- Header orange -->
-  <tr><td style="background:linear-gradient(135deg,#E8792B,#d4691e);padding:32px 40px;text-align:center;">
-    <img src="https://www.mayer-energie.fr/wp-content/uploads/2024/11/logo-mayer-energie-blanc.png" alt="Mayer Énergie" width="180" style="display:block;margin:0 auto 12px;">
-    <p style="color:rgba(255,255,255,0.9);font-size:14px;margin:0;">Chauffage, Climatisation & Énergies Renouvelables</p>
-  </td></tr>
-
-  <!-- Corps -->
-  <tr><td style="padding:40px;">
-    <p style="font-size:16px;color:#1a1a2e;margin:0 0 24px;">{{SALUTATION}}</p>
-
-    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">
-      Nous avons le plaisir de vous transmettre <strong>votre proposition de contrat d'entretien</strong> pour vos équipements.
-    </p>
-
-    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 24px;">
-      En souscrivant à ce contrat, vous bénéficiez d'une <strong>visite annuelle complète</strong> par nos techniciens qualifiés.
-      C'est l'assurance d'un fonctionnement optimal, d'économies d'énergie et de la conformité réglementaire de votre installation.
-    </p>
-
-    <!-- Récap -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef7f0;border:1px solid #fed7aa;border-radius:8px;margin:0 0 28px;">
-      <tr><td style="padding:20px;">
-        <p style="font-size:13px;color:#9a3412;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">Votre équipement</p>
-        <p style="font-size:15px;color:#1a1a2e;font-weight:600;margin:0 0 12px;">${equipRecap}</p>
-        <table width="100%" cellpadding="0" cellspacing="0"><tr>
-          <td style="border-top:1px solid #fed7aa;padding-top:12px;">
-            <p style="font-size:13px;color:#78716c;margin:0;">Montant annuel TTC</p>
-            <p style="font-size:24px;font-weight:700;color:#E8792B;margin:4px 0 0;">${totalStr}</p>
-          </td>
-        </tr></table>
-      </td></tr>
-    </table>
-
-    <!-- CTA -->
-    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 28px;">
-      <a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#E8792B;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px;">
-        Consulter ma proposition
-      </a>
-    </td></tr></table>
-
-    <p style="font-size:14px;color:#6b7280;line-height:1.6;margin:0 0 8px;">
-      Pour toute question ou pour souscrire, n'hésitez pas à nous contacter. Notre équipe se tient à votre disposition.
-    </p>
-  </td></tr>
-
-  <!-- Footer -->
-  <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 40px;">
-    <p style="font-size:13px;color:#6b7280;margin:0 0 4px;font-weight:600;">Mayer Énergie</p>
-    <p style="font-size:12px;color:#9ca3af;margin:0 0 2px;">26 Rue des Pyrénées — 81600 Gaillac</p>
-    <p style="font-size:12px;color:#9ca3af;margin:0 0 2px;">Tél : 05 63 33 23 14 — contact@mayer-energie.fr</p>
-    <p style="font-size:11px;color:#d1d5db;margin:12px 0 0;">
-      <a href="mailto:contact@mayer-energie.fr?subject=Désabonnement" style="color:#d1d5db;">Se désabonner</a>
-    </p>
-  </td></tr>
-
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f4f4;">
+<tr><td align="center" style="padding:20px 0;">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+<!-- HEADER : logo Mayer -->
+<tr><td style="background-color:#ffffff;padding:30px 40px 0 40px;text-align:center;">
+<img src="https://www.mayer-energie.fr/images/logo-email.png" alt="Mayer Energie" width="220" style="display:block;margin:0 auto;max-width:220px;height:auto;" />
+</td></tr>
+<!-- Bande bleue -->
+<tr><td style="background-color:#1E4D8C;padding:12px 40px;text-align:center;">
+<p style="color:#ffffff;margin:0;font-size:14px;">Votre confort, toute l'ann\u00e9e</p>
+</td></tr>
+<!-- Corps -->
+<tr><td style="padding:30px 40px;color:#333333;font-size:15px;line-height:1.7;text-align:justify;">
+<p style="margin:0 0 20px 0;">{{SALUTATION}}</p>
+<p style="margin:0 0 20px 0;">Nous avons le plaisir de vous transmettre <strong>votre proposition de contrat d'entretien</strong> pour vos \u00e9quipements.</p>
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\u2705 Un entretien annuel par nos techniciens qualifi\u00e9s</strong></p>
+<p style="margin:0 0 20px 0;">En souscrivant \u00e0 ce contrat, vous b\u00e9n\u00e9ficiez d'une <strong>visite annuelle compl\u00e8te</strong> de votre installation. C'est l'assurance d'un fonctionnement optimal, d'\u00e9conomies d'\u00e9nergie et de la conformit\u00e9 r\u00e9glementaire de vos \u00e9quipements.</p>
+<!-- Récap équipement -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;">
+<tr><td style="background-color:#f0f7ff;border:1px solid #d0e3f7;border-radius:6px;padding:16px 20px;">
+<p style="font-size:12px;color:#1E4D8C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px 0;">Votre \u00e9quipement</p>
+<p style="font-size:15px;color:#333333;font-weight:600;margin:0 0 10px 0;">${equipRecap}</p>
+<p style="border-top:1px solid #d0e3f7;padding-top:10px;margin:0;">
+<span style="font-size:13px;color:#666666;">Montant annuel TTC</span><br/>
+<span style="font-size:22px;font-weight:bold;color:#1E4D8C;">${totalStr}</span>
+</p>
+</td></tr>
+</table>
+<!-- CTA -->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:10px 0 25px 0;">
+<a href="${pdfUrl}" target="_blank" style="display:inline-block;background-color:#f97316;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:12px 28px;border-radius:6px;">Consulter ma proposition</a>
+</td></tr></table>
+<p style="margin:0 0 20px 0;">Pour toute question ou pour souscrire, n'h\u00e9sitez pas \u00e0 nous contacter. Notre \u00e9quipe se tient \u00e0 votre disposition.</p>
+<p style="margin:25px 0 5px 0;">\u00c0 tr\u00e8s bient\u00f4t,</p>
+<p style="margin:0 0 5px 0;"><strong>L'\u00e9quipe Mayer Energie</strong></p>
+</td></tr>
+<!-- Footer -->
+<tr><td style="background-color:#f8f9fa;padding:20px 40px;text-align:center;font-size:13px;color:#666666;border-top:1px solid #e9ecef;">
+<p style="margin:0 0 5px 0;">\ud83d\udcde <a href="tel:+33563332314" style="color:#1E4D8C;text-decoration:none;">05 63 33 23 14</a></p>
+<p style="margin:0 0 5px 0;">\ud83d\udce7 <a href="mailto:contact@mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">contact@mayer-energie.fr</a></p>
+<p style="margin:0 0 5px 0;">\ud83c\udf10 <a href="https://www.mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">www.mayer-energie.fr</a></p>
+<p style="margin:10px 0 0 0;color:#999999;font-size:11px;">26 Route des Pyr\u00e9n\u00e9es \u2013 81600 Gaillac</p>
+<p style="margin:12px 0 0 0;color:#bbbbbb;font-size:10px;">Si vous ne souhaitez plus recevoir nos communications, <a href="mailto:contact@mayer-energie.fr?subject=D\u00e9sabonnement" style="color:#bbbbbb;text-decoration:underline;">cliquez ici pour vous d\u00e9sabonner</a>.</p>
+</td></tr>
 </table>
 </td></tr>
 </table>
