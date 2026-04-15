@@ -80,6 +80,7 @@ export const equipmentsService = {
           installation_year: equipmentData.installationYear ? parseInt(equipmentData.installationYear) : null,
           installation_type: equipmentData.installationType || null,
           supplier_product_id: equipmentData.supplierProductId || null,
+          unit_count: equipmentData.unitCount ? parseInt(equipmentData.unitCount) : 1,
           notes: equipmentData.notes,
         })
         .select()
@@ -130,6 +131,7 @@ export const equipmentsService = {
       if (updates.installationYear !== undefined) updateData.installation_year = updates.installationYear ? parseInt(updates.installationYear) : null;
       if (updates.installationType !== undefined) updateData.installation_type = updates.installationType || null;
       if (updates.supplierProductId !== undefined) updateData.supplier_product_id = updates.supplierProductId || null;
+      if (updates.unitCount !== undefined) updateData.unit_count = updates.unitCount ? parseInt(updates.unitCount) : 1;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.status !== undefined) updateData.status = updates.status;
 

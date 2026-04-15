@@ -223,6 +223,9 @@ const EquipmentCard = ({
   const maintenanceStatus = getMaintenanceStatus(next_maintenance_date);
   const MaintenanceIcon = maintenanceStatus.icon || Calendar;
   const hasWarranty = isWarrantyActive(warranty_end_date);
+  const unitCount = equipment.unit_count || 1;
+  const pricingType = equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id];
+  const unitLabel = pricingType?.unit_label || 'unité';
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow relative">
@@ -235,11 +238,16 @@ const EquipmentCard = ({
               <Icon className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h4 className="font-medium text-gray-900">
-                {equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id]
-                  ? pricingTypesMap[equipment.equipment_type_id].label
-                  : getEquipmentLabel(equipment_type)}
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium text-gray-900">
+                  {pricingType ? pricingType.label : getEquipmentLabel(equipment_type)}
+                </h4>
+                {unitCount > 1 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
+                    {unitCount} {unitLabel}{unitCount > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
               {(brand || model || equipment.installation_year || equipment.installation_type) && (
                 <p className="text-sm text-gray-600 truncate">
                   {[brand, model, equipment.installation_year, equipment.installation_type === 'ventouse' ? 'Pose ventouse' : equipment.installation_type === 'verticale' ? 'Pose verticale' : null].filter(Boolean).join(' · ')}
@@ -609,11 +617,18 @@ export function EquipmentListCompact({ equipments = [], onSelect }) {
               <Icon className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id]
-                  ? pricingTypesMap[equipment.equipment_type_id].label
-                  : getEquipmentLabel(equipment.equipment_type)}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id]
+                    ? pricingTypesMap[equipment.equipment_type_id].label
+                    : getEquipmentLabel(equipment.equipment_type)}
+                </p>
+                {(equipment.unit_count || 1) > 1 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700 flex-shrink-0">
+                    {equipment.unit_count} {pricingTypesMap[equipment.equipment_type_id]?.unit_label || 'unité'}{equipment.unit_count > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
               {(equipment.brand || equipment.model) && (
                 <p className="text-xs text-gray-500 truncate">
                   {[equipment.brand, equipment.model].filter(Boolean).join(' ')}

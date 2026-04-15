@@ -132,6 +132,7 @@ export function EquipmentFormModal({
       if (equipment) {
         setForm({
           equipmentTypeId: equipment.equipment_type_id || '',
+          quantity: equipment.unit_count || 1,
           brand: equipment.brand || '',
           model: equipment.model || '',
           serialNumber: equipment.serial_number || '',
@@ -273,7 +274,7 @@ export function EquipmentFormModal({
           </div>
 
           {/* Quantité — visible pour les types à tarification unitaire */}
-          {showQuantity && !isEditMode && (
+          {showQuantity && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Quantité ({unitLabel})

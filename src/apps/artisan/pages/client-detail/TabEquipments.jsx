@@ -63,8 +63,7 @@ export const TabEquipments = ({ clientId }) => {
 
   const handleAdd = async (formData) => {
     try {
-      const qty = formData.quantity || 1;
-      const basePayload = {
+      const payload = {
         category: formData.category,
         equipmentTypeId: formData.equipmentTypeId,
         brand: formData.brand,
@@ -73,34 +72,25 @@ export const TabEquipments = ({ clientId }) => {
         installationYear: formData.installationYear,
         installationType: formData.installationType,
         supplierProductId: formData.supplierProductId,
+        unitCount: formData.quantity || 1,
         notes: formData.notes,
       };
 
-      // Créer N enregistrements (1 par unité)
-      const createdIds = [];
-      for (let i = 0; i < qty; i++) {
-        const payload = { ...basePayload };
-        // N° série unique seulement pour le premier
-        if (i > 0) payload.serialNumber = null;
-        const result = await addEquipment(payload);
-        const eqId = result?.data?.id || result?.id;
-        if (eqId) createdIds.push(eqId);
-      }
+      const result = await addEquipment(payload);
+      const eqId = result?.data?.id || result?.id;
 
-      if (hasContract && createdIds.length > 0) {
+      if (hasContract && eqId) {
         try {
-          for (const eqId of createdIds) {
-            await contractsService.addEquipmentToContract(contract.id, eqId);
-          }
+          await contractsService.addEquipmentToContract(contract.id, eqId);
           await resetSignatureIfNeeded();
           invalidateAll();
-          toast.success(`${qty > 1 ? qty + ' équipements ajoutés' : 'Équipement ajouté'} et lié${qty > 1 ? 's' : ''} au contrat`);
+          toast.success('Équipement ajouté et lié au contrat');
         } catch (linkError) {
           console.error('[TabEquipments] Erreur liaison contrat:', linkError);
-          toast.success(`${qty > 1 ? qty + ' équipements ajoutés' : 'Équipement ajouté'} (liaison contrat échouée)`);
+          toast.success('Équipement ajouté (liaison contrat échouée)');
         }
       } else {
-        toast.success(qty > 1 ? `${qty} équipements ajoutés` : 'Équipement ajouté');
+        toast.success('Équipement ajouté');
       }
       handleCloseModal();
     } catch (error) {
@@ -120,6 +110,7 @@ export const TabEquipments = ({ clientId }) => {
         installationYear: formData.installationYear,
         installationType: formData.installationType,
         supplierProductId: formData.supplierProductId,
+        unitCount: formData.quantity || 1,
         notes: formData.notes,
       });
       toast.success('Équipement mis à jour');

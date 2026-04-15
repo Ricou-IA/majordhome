@@ -64,7 +64,8 @@ export function ContractPricingSection({ contractId, contract, client }) {
   const computedPricing = useMemo(() => {
     if (!equipments?.length || !activeZone) return null;
 
-    // Grouper par equipment_type_id + compter
+    // Calculer le prix de chaque équipement individuellement (unit_count = nb splits/panneaux)
+    // puis regrouper par equipment_type_id pour l'affichage
     const grouped = {};
     let unmapped = 0;
     for (const eq of equipments) {
@@ -73,26 +74,26 @@ export function ContractPricingSection({ contractId, contract, client }) {
         unmapped++;
         continue;
       }
+      const rate = rateIndex[`${activeZone.id}_${etId}`] || null;
+      const equipType = equipTypeMap[etId] || null;
+      const unitCount = eq.unit_count || 1;
+      const eqTotal = calculateLineTotal(rate, equipType, unitCount);
+
       if (!grouped[etId]) {
-        grouped[etId] = { equipmentTypeId: etId, quantity: 0 };
+        grouped[etId] = { equipmentTypeId: etId, quantity: 0, lineTotal: 0 };
       }
+      // quantity = nombre d'équipements (systèmes) pour ce type
       grouped[etId].quantity += 1;
+      grouped[etId].lineTotal += eqTotal;
     }
 
-    // Calculer les lignes — chaque équipement = 1 unité complète
     const items = Object.values(grouped).map((group) => {
-      const rate = rateIndex[`${activeZone.id}_${group.equipmentTypeId}`] || null;
       const equipType = equipTypeMap[group.equipmentTypeId] || null;
-      const basePrice = rate ? parseFloat(rate.price) || 0 : 0;
-      const unitPrice = rate ? parseFloat(rate.unit_price) || 0 : 0;
-      const pricePerUnit = basePrice > 0 ? basePrice : unitPrice;
-      const lineTotal = group.quantity * pricePerUnit;
       return {
         equipmentTypeId: group.equipmentTypeId,
         label: equipType?.label || 'Équipement',
         quantity: group.quantity,
-        basePrice: pricePerUnit,
-        lineTotal,
+        lineTotal: group.lineTotal,
       };
     });
 
