@@ -32,6 +32,7 @@ import {
   Wrench,
   Calendar,
   CheckCircle2,
+  FileText,
   Archive,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -374,7 +375,13 @@ export default function Entretiens() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <StatCard
+          icon={FileText}
+          label="Contrats en attente"
+          value={savStatsLoading ? '...' : (savStats?.contrats_en_attente ?? 0)}
+          color="amber"
+        />
         <StatCard
           icon={Calendar}
           label="Entretiens à faire"

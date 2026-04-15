@@ -484,9 +484,16 @@ function buildProposalEmailHtml(pdfUrl, equipRecap, totalStr) {
 <!-- Corps -->
 <tr><td style="padding:30px 40px;color:#333333;font-size:15px;line-height:1.7;text-align:justify;">
 <p style="margin:0 0 20px 0;">{{SALUTATION}}</p>
-<p style="margin:0 0 20px 0;">Nous avons le plaisir de vous transmettre <strong>votre proposition de contrat d'entretien</strong> pour vos \u00e9quipements.</p>
-<p style="margin:0 0 10px 0;font-size:16px;"><strong>\u2705 Un entretien annuel par nos techniciens qualifi\u00e9s</strong></p>
-<p style="margin:0 0 20px 0;">En souscrivant \u00e0 ce contrat, vous b\u00e9n\u00e9ficiez d'une <strong>visite annuelle compl\u00e8te</strong> de votre installation. C'est l'assurance d'un fonctionnement optimal, d'\u00e9conomies d'\u00e9nergie et de la conformit\u00e9 r\u00e9glementaire de vos \u00e9quipements.</p>
+<p style="margin:0 0 20px 0;font-size:17px;"><strong>Prenez soin de vos \u00e9quipements, on s'occupe du reste.</strong></p>
+<p style="margin:0 0 20px 0;">Nous vous avons pr\u00e9par\u00e9 une proposition de contrat d'entretien adapt\u00e9e \u00e0 votre installation. En quelques mots, voici ce que cela vous apporte\u00a0:</p>
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83d\udd27 Un entretien annuel par nos techniciens</strong></p>
+<p style="margin:0 0 20px 0;">Ludovic et Antoine, plus de 15 ans d'exp\u00e9rience chacun, se d\u00e9placent chez vous pour v\u00e9rifier, nettoyer et optimiser vos \u00e9quipements. Un rendez-vous simple, planifi\u00e9 avec vous.</p>
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\u2705 La tranquillit\u00e9 toute l'ann\u00e9e</strong></p>
+<p style="margin:0 0 20px 0;">Un \u00e9quipement bien entretenu, c'est moins de pannes, une meilleure performance \u00e9nerg\u00e9tique et une dur\u00e9e de vie prolong\u00e9e. C'est aussi la conformit\u00e9 r\u00e9glementaire de votre installation.</p>
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83c\udfe0 Un interlocuteur de proximit\u00e9 pour tous vos besoins</strong></p>
+<p style="margin:0 0 20px 0;">Bas\u00e9s \u00e0 Gaillac, nous intervenons rapidement sur votre secteur. Au-del\u00e0 de l'entretien, notre \u00e9quipe est \u00e0 votre \u00e9coute pour tous vos projets\u00a0: chauffage, climatisation, \u00e9lectricit\u00e9, \u00e9nergies renouvelables. Un seul num\u00e9ro, une \u00e9quipe qui vous conna\u00eet.</p>
+<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83c\udf81 Des avantages r\u00e9serv\u00e9s \u00e0 nos clients</strong></p>
+<p style="margin:0 0 20px 0;">En rejoignant Mayer Energie, vous acc\u00e9dez \u00e0 des <strong>offres sp\u00e9ciales et tarifs pr\u00e9f\u00e9rentiels</strong> sur nos prestations et \u00e9quipements. Nos clients sont notre priorit\u00e9\u00a0: nous vous accompagnons dans la dur\u00e9e.</p>
 <!-- Récap équipement -->
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;">
 <tr><td style="background-color:#f0f7ff;border:1px solid #d0e3f7;border-radius:6px;padding:16px 20px;">
@@ -502,7 +509,7 @@ function buildProposalEmailHtml(pdfUrl, equipRecap, totalStr) {
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:10px 0 25px 0;">
 <a href="${pdfUrl}" target="_blank" style="display:inline-block;background-color:#f97316;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:12px 28px;border-radius:6px;">Consulter ma proposition</a>
 </td></tr></table>
-<p style="margin:0 0 20px 0;">Pour toute question ou pour souscrire, n'h\u00e9sitez pas \u00e0 nous contacter. Notre \u00e9quipe se tient \u00e0 votre disposition.</p>
+<p style="margin:0 0 20px 0;">Pour toute question ou pour souscrire, n'h\u00e9sitez pas \u00e0 nous appeler ou \u00e0 r\u00e9pondre directement \u00e0 cet email. Nous serons ravis d'\u00e9changer avec vous.</p>
 <p style="margin:25px 0 5px 0;">\u00c0 tr\u00e8s bient\u00f4t,</p>
 <p style="margin:0 0 5px 0;"><strong>L'\u00e9quipe Mayer Energie</strong></p>
 </td></tr>
