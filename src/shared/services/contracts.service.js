@@ -295,6 +295,28 @@ export const contractsService = {
     }, 'contracts.removeEquipmentFromContract');
   },
   /**
+   * Mappe un code pricing_equipment_types vers l'ENUM equipment_category.
+   * L'ENUM DB est : pac_air_air, pac_air_eau, chaudiere_gaz, chaudiere_fioul,
+   * chaudiere_bois, vmc, climatisation, chauffe_eau_thermo, ballon_ecs, poele, autre.
+   * Les codes pricing sont plus fins (ex: poele_granules_elec) → on regroupe sur l'ENUM le plus proche.
+   */
+  _pricingCodeToEquipmentCategory(code) {
+    if (!code) return 'autre';
+    const c = String(code).toLowerCase();
+    if (c.startsWith('poele')) return 'poele';
+    if (c === 'pac_air_air') return 'pac_air_air';
+    if (c === 'pac_air_eau') return 'pac_air_eau';
+    if (c === 'gainable') return 'climatisation';
+    if (c === 'chaudiere_gaz') return 'chaudiere_gaz';
+    if (c === 'chaudiere_fioul') return 'chaudiere_fioul';
+    if (c === 'chaudiere_bois' || c === 'chaudiere_granules') return 'chaudiere_bois';
+    if (c === 'vmc') return 'vmc';
+    if (c === 'ballon_thermo' || c === 'chauffe_eau_thermo') return 'chauffe_eau_thermo';
+    if (c === 'chauffe_eau_solaire' || c === 'ballon_ecs') return 'ballon_ecs';
+    return 'autre';
+  },
+
+  /**
    * Crée les équipements réels + liens contract_equipments à partir des pricing items sélectionnés.
    * Appelé après création du contrat pour alimenter la section "Équipements sous contrat".
    * @param {string} contractId
@@ -315,12 +337,13 @@ export const contractsService = {
       const equipmentIds = [];
       for (const item of pricingItems) {
         const qty = item.quantity || 1;
+        const category = this._pricingCodeToEquipmentCategory(item.equipmentTypeCode);
         for (let i = 0; i < qty; i++) {
           const { data: eq, error: eqError } = await supabase
             .from('majordhome_equipments')
             .insert({
               project_id: client.project_id,
-              category: item.equipmentTypeCode || null,
+              category,
               equipment_type_id: item.equipmentTypeId || null,
               contract_status: 'active',
             })
