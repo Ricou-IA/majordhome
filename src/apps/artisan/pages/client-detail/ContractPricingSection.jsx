@@ -61,13 +61,13 @@ export function ContractPricingSection({ contractId, contract, client }) {
   }, [equipmentTypes]);
 
   // Calcul pricing à partir des équipements sous contrat
+  // Chaque équipement = 1 item (pas de groupement) → 1 item = 1 équipement pour la remise
   const computedPricing = useMemo(() => {
     if (!equipments?.length || !activeZone) return null;
 
-    // Calculer le prix de chaque équipement individuellement (unit_count = nb splits/panneaux)
-    // puis regrouper par equipment_type_id pour l'affichage
-    const grouped = {};
     let unmapped = 0;
+    const items = [];
+
     for (const eq of equipments) {
       const etId = eq.equipment_type_id;
       if (!etId) {
@@ -77,25 +77,18 @@ export function ContractPricingSection({ contractId, contract, client }) {
       const rate = rateIndex[`${activeZone.id}_${etId}`] || null;
       const equipType = equipTypeMap[etId] || null;
       const unitCount = eq.unit_count || 1;
-      const eqTotal = calculateLineTotal(rate, equipType, unitCount);
+      const lineTotal = calculateLineTotal(rate, equipType, unitCount);
+      const refParts = [eq.brand, eq.model].filter(Boolean);
+      const unitLabel = unitCount > 1 && equipType?.unit_label ? ` (${unitCount} ${equipType.unit_label}s)` : '';
 
-      if (!grouped[etId]) {
-        grouped[etId] = { equipmentTypeId: etId, quantity: 0, lineTotal: 0 };
-      }
-      // quantity = nombre d'équipements (systèmes) — splits ne comptent PAS pour la remise
-      grouped[etId].quantity += 1;
-      grouped[etId].lineTotal += eqTotal;
+      items.push({
+        equipmentTypeId: etId,
+        label: (equipType?.label || 'Équipement') + unitLabel,
+        reference: refParts.length > 0 ? refParts.join(' ') : null,
+        quantity: 1,
+        lineTotal,
+      });
     }
-
-    const items = Object.values(grouped).map((group) => {
-      const equipType = equipTypeMap[group.equipmentTypeId] || null;
-      return {
-        equipmentTypeId: group.equipmentTypeId,
-        label: equipType?.label || 'Équipement',
-        quantity: group.quantity,
-        lineTotal: group.lineTotal,
-      };
-    });
 
     const totals = calculateContractTotal(items, discounts);
     return { items, unmapped, ...totals };
@@ -216,12 +209,12 @@ export function ContractPricingSection({ contractId, contract, client }) {
       </div>
 
       <div className="bg-secondary-50 rounded-lg p-4 space-y-1.5">
-        {computedPricing.items.map((item) => (
-          <div key={item.equipmentTypeId} className="flex items-center justify-between text-sm">
+        {computedPricing.items.map((item, idx) => (
+          <div key={idx} className="flex items-center justify-between text-sm">
             <span className="text-secondary-700">
               {item.label}
-              {item.quantity > 1 && (
-                <span className="text-secondary-400 ml-1">x{item.quantity}</span>
+              {item.reference && (
+                <span className="text-secondary-400 ml-1">— {item.reference}</span>
               )}
             </span>
             <span className="font-medium text-secondary-900 tabular-nums">
