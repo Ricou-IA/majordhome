@@ -65,21 +65,24 @@ export function detectZoneFromPostalCode(postalCode, zones) {
 }
 
 /**
- * Calcule le prix d'une ligne tarifaire
+ * Calcule le prix d'une ligne tarifaire.
+ * Le zoneSupplement (déplacement) est ajouté une fois par ligne d'équipement.
+ * Note : les splits (unit_pricing) comptent comme 1 seul équipement pour la remise.
  */
-export function calculateLineTotal(rate, equipType, quantity = 1) {
+export function calculateLineTotal(rate, equipType, quantity = 1, zoneSupplement = 0) {
   if (!rate) return 0;
 
   const basePrice = parseFloat(rate.price) || 0;
+  const supplement = parseFloat(zoneSupplement) || 0;
 
   if (equipType?.has_unit_pricing) {
     const unitPrice = parseFloat(rate.unit_price) || 0;
     const included = equipType.included_units || 0;
     const extra = Math.max(0, quantity - included);
-    return basePrice + extra * unitPrice;
+    return basePrice + extra * unitPrice + supplement;
   }
 
-  return basePrice;
+  return basePrice + supplement;
 }
 
 /**

@@ -60,8 +60,12 @@ export function ContractPricingSection({ contractId, contract, client }) {
     return map;
   }, [equipmentTypes]);
 
+  // Supplément zone (déplacement) — ajouté une fois par ligne d'équipement
+  const zoneSupplement = parseFloat(activeZone?.supplement || 0);
+
   // Calcul pricing à partir des équipements sous contrat
   // Chaque équipement = 1 item (pas de groupement) → 1 item = 1 équipement pour la remise
+  // Note : les splits (unit_pricing) comptent comme 1 seul équipement
   const computedPricing = useMemo(() => {
     if (!equipments?.length || !activeZone) return null;
 
@@ -77,7 +81,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
       const rate = rateIndex[`${activeZone.id}_${etId}`] || null;
       const equipType = equipTypeMap[etId] || null;
       const unitCount = eq.unit_count || 1;
-      const lineTotal = calculateLineTotal(rate, equipType, unitCount);
+      const lineTotal = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
       const refParts = [eq.brand, eq.model].filter(Boolean);
       const unitLabel = unitCount > 1 && equipType?.unit_label ? ` (${unitCount} ${equipType.unit_label}s)` : '';
 
@@ -92,7 +96,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
 
     const totals = calculateContractTotal(items, discounts);
     return { items, unmapped, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
 
   // Vérifier si le montant du contrat correspond au calcul
   const currentAmount = contract?.amount ? parseFloat(contract.amount) : 0;

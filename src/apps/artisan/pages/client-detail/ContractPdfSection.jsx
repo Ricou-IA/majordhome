@@ -61,6 +61,8 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     return map;
   }, [equipmentTypes]);
 
+  const zoneSupplement = parseFloat(activeZone?.supplement || 0);
+
   const computedPricing = useMemo(() => {
     if (!equipments?.length || !activeZone) return null;
     const items = equipments.map((eq) => {
@@ -68,7 +70,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const rate = etId ? rateIndex[`${activeZone.id}_${etId}`] || null : null;
       const equipType = etId ? equipTypeMap[etId] || null : null;
       const unitCount = eq.unit_count || 1;
-      const lineTotal = calculateLineTotal(rate, equipType, unitCount);
+      const lineTotal = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
       const refParts = [
         eq.brand,
         eq.model,
@@ -87,7 +89,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     });
     const totals = calculateContractTotal(items, discounts);
     return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
 
   // Helper : construire les données PDF (réutilisé par impression + envoi)
   const buildPdfData = useCallback(() => {

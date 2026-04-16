@@ -219,12 +219,13 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
   );
 
   // Recalculer les lignes quand la zone change
+  const zoneSupplement = parseFloat(activeZone?.supplement || 0);
   const computedItems = useMemo(() => {
     if (!activeZone) return selectedItems;
     return selectedItems.map((item) => {
       const rate = getRate(activeZone.id, item.equipmentTypeId);
       const equipType = equipmentTypes?.find((et) => et.id === item.equipmentTypeId);
-      const lineTotal = calculateLineTotal(rate, equipType, item.quantity);
+      const lineTotal = calculateLineTotal(rate, equipType, item.quantity, zoneSupplement);
       return {
         ...item,
         rate,
@@ -234,7 +235,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
         lineTotal,
       };
     });
-  }, [selectedItems, activeZone, getRate, equipmentTypes]);
+  }, [selectedItems, activeZone, getRate, equipmentTypes, zoneSupplement]);
 
   // Calcul total avec remises
   const pricing = useMemo(

@@ -27,6 +27,7 @@ import { EQUIPMENT_TYPE_CATEGORIES } from '@services/pricing.service';
 export function Step2Equipment({ pricingData, calculator, clientAddress }) {
   const { equipmentTypes, zones, isLoading: loadingPricing, error: pricingError } = pricingData;
   const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity, isDetectingZone, durationMinutes } = calculator;
+  const zoneSupplement = parseFloat(activeZone?.supplement || 0);
 
   // Grouper les types d'équipements par catégorie
   const groupedTypes = useMemo(() => {
@@ -189,10 +190,10 @@ export function Step2Equipment({ pricingData, calculator, clientAddress }) {
                       )}
                       <span className={`text-sm font-semibold tabular-nums ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
                         {isSelected && selectedItem
-                          ? `${selectedItem.lineTotal?.toFixed(0) || price.toFixed(0)}€`
+                          ? `${selectedItem.lineTotal?.toFixed(0) || (price + zoneSupplement).toFixed(0)}€`
                           : et.has_unit_pricing && et.included_units === 0
                             ? `${unitPrice.toFixed(0)}€/${et.unit_label}`
-                            : `${price.toFixed(0)}€`
+                            : `${(price + zoneSupplement).toFixed(0)}€`
                         }
                       </span>
                     </div>

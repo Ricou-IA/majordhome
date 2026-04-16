@@ -168,6 +168,9 @@ export default function ContractSign() {
     return map;
   }, [equipmentTypes]);
 
+  // -- Supplément zone --
+  const zoneSupplement = parseFloat(activeZone?.supplement || 0);
+
   // -- Calcul pricing — lignes individuelles par équipement (avec références) --
   const computedPricing = useMemo(() => {
     if (!equipments?.length || !activeZone) return null;
@@ -177,7 +180,7 @@ export default function ContractSign() {
       const rate = etId ? rateIndex[`${activeZone.id}_${etId}`] || null : null;
       const equipType = etId ? equipTypeMap[etId] || null : null;
       const unitCount = eq.unit_count || 1;
-      const lineTotal = calculateLineTotal(rate, equipType, unitCount);
+      const lineTotal = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
       // Référence : "Marque · Modèle · Année · Pose · N splits"
       const refParts = [
         eq.brand,
@@ -198,7 +201,7 @@ export default function ContractSign() {
 
     const totals = calculateContractTotal(items, discounts);
     return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
 
   // -- Signature callback --
   const handleSign = useCallback((dataUrl) => {
