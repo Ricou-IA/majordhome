@@ -30,19 +30,19 @@ export function ContractPricingSection({ contractId, contract, client }) {
   const { zones, rates, discounts, equipmentTypes, isLoading: loadingPricing } = usePricingData();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Déterminer la zone tarifaire depuis l'adresse client (auto-détection)
-  // Priorité : détection CP client > zone stockée sur contrat > zone par défaut
+  // Déterminer la zone tarifaire
+  // Si zone non-défaut stockée (set par wizard Mapbox) → la garder
+  // Si zone défaut (Hors Zone) ou null (contrats importés) → auto-détecter depuis CP
   const activeZone = useMemo(() => {
-    // Auto-détection depuis le code postal client (corrige les contrats importés)
+    if (contract?.zone_id && zones?.length) {
+      const stored = zones.find((z) => z.id === contract.zone_id);
+      if (stored && !stored.is_default) return stored;
+    }
+    // Auto-détection CP pour contrats importés (zone_id = défaut ou null)
     if (client?.postal_code && zones?.length) {
       const detected = detectZoneFromPostalCode(client.postal_code, zones);
-      if (detected && !detected.is_default) return detected;
+      if (detected) return detected;
     }
-    // Fallback : zone stockée sur le contrat
-    if (contract?.zone_id && zones?.length) {
-      return zones.find((z) => z.id === contract.zone_id) || null;
-    }
-    // Fallback ultime : zone par défaut
     if (zones?.length) {
       return zones.find((z) => z.is_default && z.is_active) || null;
     }

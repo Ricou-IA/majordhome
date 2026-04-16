@@ -138,14 +138,15 @@ export default function ContractSign() {
     }
   }, [client, signataireNom]);
 
-  // -- Zone tarifaire (auto-détection depuis CP client) --
+  // -- Zone tarifaire --
   const activeZone = useMemo(() => {
+    if (contract?.zone_id && zones?.length) {
+      const stored = zones.find((z) => z.id === contract.zone_id);
+      if (stored && !stored.is_default) return stored;
+    }
     if (client?.postal_code && zones?.length) {
       const detected = detectZoneFromPostalCode(client.postal_code, zones);
-      if (detected && !detected.is_default) return detected;
-    }
-    if (contract?.zone_id && zones?.length) {
-      return zones.find((z) => z.id === contract.zone_id) || null;
+      if (detected) return detected;
     }
     return null;
   }, [client?.postal_code, contract?.zone_id, zones]);
