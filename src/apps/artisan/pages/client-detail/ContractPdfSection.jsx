@@ -267,6 +267,12 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         clearTimeout(timeout);
       }
 
+      // 7. Passer le contrat en "proposal_sent" si encore pending
+      if (contract.status === 'pending') {
+        await contractsService.updateContract(contract.id, { status: 'proposal_sent' });
+        queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      }
+
       toast.success(`Proposition envoyée à ${client.email}`);
     } catch (err) {
       console.error('[ContractPdfSection] send proposal error:', err);
@@ -274,7 +280,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     } finally {
       setIsSending(false);
     }
-  }, [contract, client, clientId, orgId, computedPricing, isSending, buildPdfData]);
+  }, [contract, client, clientId, orgId, computedPricing, isSending, buildPdfData, queryClient]);
 
   const isSigned = !!contract.signed_at;
   const hasPdf = !!contract.contract_pdf_path;
