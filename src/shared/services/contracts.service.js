@@ -173,6 +173,7 @@ export const contractsService = {
       if (updates.amount !== undefined) updateData.amount = updates.amount ? parseFloat(updates.amount) : null;
       if (updates.estimatedTime !== undefined) updateData.estimated_time = updates.estimatedTime ? parseFloat(updates.estimatedTime) : null;
       if (updates.notes !== undefined) updateData.notes = updates.notes || null;
+      if (updates.workflow_status !== undefined) updateData.workflow_status = updates.workflow_status;
       updateData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase

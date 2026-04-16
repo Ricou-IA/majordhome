@@ -50,7 +50,7 @@ function StatCard({ icon: Icon, label, value, color = 'blue' }) {
 // ============================================================================
 
 const PIPELINE_COLUMNS = [
-  { id: 'pending',       label: 'En attente',          color: '#F59E0B' },
+  { id: 'nouveau',       label: 'Nouveau',             color: '#F59E0B' },
   { id: 'proposal_sent', label: 'Proposition envoyée', color: '#3B82F6' },
 ];
 
@@ -68,7 +68,7 @@ function useContractStats(orgId) {
       try {
         const [activeRes, pendingRes, cancelledRes] = await Promise.all([
           supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'active'),
-          supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).in('status', ['pending', 'proposal_sent']),
+          supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'pending'),
           supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'cancelled'),
         ]);
         setStats({
@@ -108,7 +108,7 @@ function useContractsPipeline(orgId) {
         .from('majordhome_contracts')
         .select('*')
         .eq('org_id', orgId)
-        .in('status', ['pending', 'proposal_sent'])
+        .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -125,17 +125,16 @@ function useContractsPipeline(orgId) {
   // Fetch initial
   useState(() => { fetchContracts(); });
 
-  const updateStatus = useCallback(async (contractId, newStatus) => {
+  const updateWorkflow = useCallback(async (contractId, newWorkflowStatus) => {
     try {
       const { error } = await supabase
         .from('majordhome_contracts')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ workflow_status: newWorkflowStatus, updated_at: new Date().toISOString() })
         .eq('id', contractId);
 
       if (error) throw error;
-      // Refresh local
       setContracts(prev => prev.map(c =>
-        c.id === contractId ? { ...c, status: newStatus } : c
+        c.id === contractId ? { ...c, workflow_status: newWorkflowStatus } : c
       ));
       queryClient.invalidateQueries({ queryKey: contractKeys.all });
       return { error: null };
@@ -145,7 +144,7 @@ function useContractsPipeline(orgId) {
     }
   }, [queryClient]);
 
-  return { contracts, loading, error: fetchError, refetch: fetchContracts, updateStatus };
+  return { contracts, loading, error: fetchError, refetch: fetchContracts, updateWorkflow };
 }
 
 // ============================================================================
@@ -202,7 +201,7 @@ export default function PipelineContrats() {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const navigate = useNavigate();
-  const { contracts, loading, error, refetch, updateStatus } = useContractsPipeline(orgId);
+  const { contracts, loading, error, refetch, updateWorkflow } = useContractsPipeline(orgId);
   const { stats: contractStats, loading: statsLoading } = useContractStats(orgId);
 
   // Drag & drop : transition entre colonnes
@@ -210,15 +209,15 @@ export default function PipelineContrats() {
     const { destination, source, draggableId } = result;
     if (!destination || destination.droppableId === source.droppableId) return;
 
-    const newStatus = destination.droppableId;
-    const { error } = await updateStatus(draggableId, newStatus);
+    const newWorkflow = destination.droppableId;
+    const { error } = await updateWorkflow(draggableId, newWorkflow);
     if (error) {
       toast.error('Erreur lors du changement de statut');
       refetch();
     } else {
-      toast.success(newStatus === 'proposal_sent' ? 'Proposition envoyée' : 'Statut mis à jour');
+      toast.success(newWorkflow === 'proposal_sent' ? 'Marqué proposition envoyée' : 'Statut mis à jour');
     }
-  }, [updateStatus, refetch]);
+  }, [updateWorkflow, refetch]);
 
   // Clic sur carte → fiche client onglet contrat
   const handleCardClick = useCallback((contract) => {
@@ -298,7 +297,7 @@ export default function PipelineContrats() {
         <KanbanBoard
           items={contracts}
           columns={PIPELINE_COLUMNS}
-          groupBy="status"
+          groupBy="workflow_status"
           renderCard={(contract) => <ContractPipelineCard contract={contract} />}
           onCardClick={handleCardClick}
           onDragEnd={handleDragEnd}

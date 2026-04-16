@@ -267,9 +267,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         clearTimeout(timeout);
       }
 
-      // 7. Passer le contrat en "proposal_sent" si encore pending
-      if (contract.status === 'pending') {
-        await contractsService.updateContract(contract.id, { status: 'proposal_sent' });
+      // 7. Marquer workflow_status = proposal_sent (le statut contractuel reste inchangé)
+      if (!contract.workflow_status || contract.workflow_status === 'nouveau') {
+        await contractsService.updateContract(contract.id, { workflow_status: 'proposal_sent' });
         queryClient.invalidateQueries({ queryKey: contractKeys.all });
       }
 
