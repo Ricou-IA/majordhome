@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -23,7 +23,10 @@ import {
 import { interventionsService } from '@services/interventions.service';
 import { useChantierMutations, useInterventionSlots } from '@hooks/useChantiers';
 import { useTeamMembers } from '@hooks/useAppointments';
+import { contractsService } from '@services/contracts.service';
+import { supabase } from '@/lib/supabaseClient';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
+import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierOrderSection } from './ChantierOrderSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 
@@ -57,6 +60,11 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   // PV de réception
   const [pvPath] = useState(chantier?.pv_reception_path || null);
+
+  // Proposition contrat d'entretien
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [clientForContract, setClientForContract] = useState(null);
+  const [loadingContract, setLoadingContract] = useState(false);
 
   // Intervention parent
   const [parentIntervention, setParentIntervention] = useState(null);
@@ -215,6 +223,38 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     onUpdated?.();
   };
 
+  const handleProposeContract = async () => {
+    if (!chantier.client_id) {
+      toast.error('Aucun client lié à ce chantier');
+      return;
+    }
+    setLoadingContract(true);
+    try {
+      // Vérifier si le client a déjà un contrat (UNIQUE constraint sur client_id)
+      const { data: existing } = await contractsService.getContractByClientId(chantier.client_id);
+      if (existing) {
+        toast.error('Ce client possède déjà un contrat');
+        return;
+      }
+      // Charger les données client (adresse, etc.) pour le pré-remplissage
+      const { data: client, error: clientErr } = await supabase
+        .from('majordhome_clients')
+        .select('id, display_name, first_name, last_name, address, postal_code, city, has_active_contract, project_id')
+        .eq('id', chantier.client_id)
+        .single();
+      if (clientErr || !client) {
+        toast.error('Impossible de charger les données client');
+        return;
+      }
+      setClientForContract(client);
+      setShowContractModal(true);
+    } catch {
+      toast.error('Erreur lors de la vérification');
+    } finally {
+      setLoadingContract(false);
+    }
+  };
+
   const handleAddSlot = async (slotData) => {
     await createSlot({
       parentId: parentIntervention.id,
@@ -237,6 +277,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -373,6 +414,34 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             </div>
           )}
 
+          {/* Proposition contrat d'entretien — visible au statut réceptionné */}
+          {chantier.chantier_status === 'realise' && !isTechnicien && canEditChantier && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
+                <ScrollText className="w-4 h-4" />
+                Contrat d'entretien
+              </h3>
+              <button
+                type="button"
+                onClick={handleProposeContract}
+                disabled={loadingContract}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50"
+              >
+                {loadingContract ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Vérification...
+                  </>
+                ) : (
+                  <>
+                    <ScrollText className="w-4 h-4" />
+                    Proposer un contrat d'entretien
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Notes */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
@@ -477,6 +546,22 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         })()}
       </div>
     </div>
+
+    {/* Modale création contrat (couche z-index supérieure) */}
+    {showContractModal && (
+      <CreateContractModal
+        isOpen={showContractModal}
+        onClose={() => setShowContractModal(false)}
+        onSuccess={() => {
+          setShowContractModal(false);
+          onUpdated?.();
+        }}
+        preSelectedClient={clientForContract}
+        preSelectedEquipmentTypeId={chantier.equipment_type_id || null}
+        contractDefaults={{ status: 'pending', workflowStatus: 'nouveau', source: 'chantier' }}
+      />
+    )}
+    </>
   );
 }
 

@@ -519,6 +519,7 @@ export function useCreateContractWithClient() {
         orgId,
         clientId,
         status: contractData.status || 'active',
+        workflowStatus: contractData.workflowStatus || null,
         frequency: contractData.frequency || 'annuel',
         startDate: contractData.startDate || null,
         endDate: contractData.endDate || null,
@@ -530,6 +531,7 @@ export function useCreateContractWithClient() {
         zoneId: contractData.zoneId || null,
         subtotal: contractData.subtotal || null,
         discountPercent: contractData.discountPercent || null,
+        source: contractData.source || 'app',
       });
 
       if (contractResult.error) {

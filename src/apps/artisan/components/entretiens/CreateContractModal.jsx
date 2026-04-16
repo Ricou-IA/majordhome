@@ -80,7 +80,7 @@ const StepIndicator = ({ current, total }) => (
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null }) {
+export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedClient = null, preSelectedEquipmentTypeId = null, contractDefaults = null }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -130,6 +130,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
   // ========== Refs ==========
   const searchInputRef = useRef(null);
+  const equipmentPreSelectedRef = useRef(false);
 
   // ========== Effects ==========
 
@@ -151,12 +152,27 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       setSearchQuery('');
       clearSearch();
       calculator.reset();
+      equipmentPreSelectedRef.current = false;
       if (!preSelectedClient) {
         setTimeout(() => searchInputRef.current?.focus(), 100);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Auto-add équipement pré-sélectionné (ex: depuis chantier)
+  useEffect(() => {
+    if (
+      isOpen &&
+      preSelectedEquipmentTypeId &&
+      pricingData.equipmentTypes?.length > 0 &&
+      !equipmentPreSelectedRef.current
+    ) {
+      calculator.addItem(preSelectedEquipmentTypeId);
+      equipmentPreSelectedRef.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, preSelectedEquipmentTypeId, pricingData.equipmentTypes]);
 
   // ========== Handlers ==========
 
@@ -222,7 +238,9 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       orgId,
       userId,
       contractData: {
-        status: 'active',
+        status: contractDefaults?.status || 'active',
+        workflowStatus: contractDefaults?.workflowStatus || null,
+        source: contractDefaults?.source || 'app',
         amount: calculator.pricing.total || null,
         subtotal: calculator.pricing.subtotal || null,
         discountPercent: calculator.pricing.discountPercent || null,
@@ -273,10 +291,11 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       }
     }
 
-    toast.success('Contrat créé avec succès');
+    const isPending = contractDefaults?.status === 'pending';
+    toast.success(isPending ? 'Proposition créée — visible dans Pipeline Contrats' : 'Contrat créé avec succès');
     onClose();
     onSuccess?.();
-  }, [isCreating, orgId, userId, calculator, contractData, clientMode, selectedClient, newClientData, createContractWithClient, onClose, onSuccess]);
+  }, [isCreating, orgId, userId, calculator, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess]);
 
   // ========== Render ==========
 
@@ -301,8 +320,10 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
           {/* ===== HEADER ===== */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Nouveau contrat</h2>
-              <StepIndicator current={step} total={3} />
+              <h2 className="text-lg font-semibold text-gray-900">
+                {contractDefaults?.status === 'pending' ? 'Proposition de contrat' : 'Nouveau contrat'}
+              </h2>
+              <StepIndicator current={step} total={preSelectedClient ? 2 : 3} />
             </div>
             <button
               type="button"
@@ -438,7 +459,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
                   ) : (
                     <>
                       <FileText className="w-4 h-4" />
-                      Créer le contrat
+                      {contractDefaults?.status === 'pending' ? 'Créer la proposition' : 'Créer le contrat'}
                     </>
                   )}
                 </button>
