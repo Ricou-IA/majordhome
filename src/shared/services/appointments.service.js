@@ -17,6 +17,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { googleCalendarService } from '@services/googleCalendar.service';
+import { leadsService } from '@services/leads.service';
 
 
 // ============================================================================
@@ -247,6 +248,13 @@ export const appointmentsService = {
         return { data: null, error };
       }
 
+      // Sync lead.appointment_date si la date a changé (drag&drop, édition modale)
+      if ('scheduled_date' in updates && appointment?.lead_id) {
+        leadsService
+          .updateLead(appointment.lead_id, { appointment_date: updates.scheduled_date })
+          .catch((err) => console.error('[appointments] sync lead.appointment_date error:', err));
+      }
+
       // Mettre à jour les techniciens si fournis
       if (technicianIds !== undefined) {
         // Supprimer les anciens
@@ -347,10 +355,10 @@ export const appointmentsService = {
         .delete()
         .eq('appointment_id', appointmentId);
 
-      // Use direct table (not the joined view which doesn't support DELETE)
+      // Le schéma majordhome n'est pas exposé via PostgREST → passer par la vue publique
+      // (auto-updatable car mirror 1:1 de majordhome.appointments, RLS DELETE OK)
       const { error } = await supabase
-        .schema('majordhome')
-        .from('appointments')
+        .from('majordhome_appointments')
         .delete()
         .eq('id', appointmentId);
 

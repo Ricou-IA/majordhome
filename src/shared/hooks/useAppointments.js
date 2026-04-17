@@ -11,7 +11,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
 import { supabase } from '@/lib/supabaseClient';
-import { appointmentKeys } from '@hooks/cacheKeys';
+import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
 export { appointmentKeys } from '@hooks/cacheKeys';
@@ -124,6 +124,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       appointmentsService.updateAppointment(appointmentId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all });
     },
   });
 
@@ -162,6 +163,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all });
     },
   });
 
@@ -179,6 +181,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: (appointmentId) => appointmentsService.deleteAppointment(appointmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all });
     },
   });
 
