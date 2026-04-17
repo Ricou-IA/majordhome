@@ -1,0 +1,125 @@
+{
+  "name": "Mayer - Meta Ads Budget Backfill (one-shot)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "mbb-0001-4a10-9000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Config : comptes Meta Ads à scanner.\n// Le backfill remonte l'Activity Log sur 2 ans max (Meta garde ~2 ans).\n\nconst ORG_ID = '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';\n\nconst accounts = [\n  { id: 'act_1147055617398773', name: 'Mayer Energie Clim' },\n  { id: 'act_1198344052455745', name: 'Mayer Energie Poêle' },\n];\n\nconst sinceDate = new Date();\nsinceDate.setFullYear(sinceDate.getFullYear() - 2);\nconst sinceUnix = Math.floor(sinceDate.getTime() / 1000);\nconst untilUnix = Math.floor(Date.now() / 1000);\n\nreturn accounts.map((acc) => ({\n  json: {\n    org_id: ORG_ID,\n    ad_account_id: acc.id,\n    ad_account_name: acc.name,\n    since: sinceUnix,\n    until: untilUnix,\n  },\n}));\n"
+      },
+      "id": "mbb-0002-4a10-9000-000000000002",
+      "name": "Build Account List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "mbb-0003-4a10-9000-000000000003",
+      "name": "Loop Accounts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://graph.facebook.com/v21.0/{{$json.ad_account_id}}/activities",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "event_type,event_time,actor_id,object_id,object_type,object_name,extra_data,translated_event_type" },
+            { "name": "since", "value": "={{$json.since}}" },
+            { "name": "until", "value": "={{$json.until}}" },
+            { "name": "limit", "value": "500" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mbb-0004-4a10-9000-000000000004",
+      "name": "Fetch Activity Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Activity Log Meta → events de budget campagne.\n// On garde uniquement les event_type qui modifient le daily_budget campagne.\n\nconst accountCtx = $('Loop Accounts').item.json;\nconst activities = $('Fetch Activity Log').first().json.data || [];\n\n// Event types Meta qui affectent le budget campagne\nconst RELEVANT_EVENT_TYPES = new Set([\n  'update_campaign_budget',\n  'update_campaign_duration',\n  'create_campaign',\n  // Variantes potentielles selon la version API\n  'ad_campaign_updated',\n]);\n\nconst parseExtraData = (raw) => {\n  if (!raw) return null;\n  if (typeof raw === 'object') return raw;\n  try { return JSON.parse(raw); } catch { return null; }\n};\n\nconst events = [];\nfor (const act of activities) {\n  if (act.object_type !== 'CAMPAIGN') continue;\n  if (!RELEVANT_EVENT_TYPES.has(act.event_type)) continue;\n\n  const extra = parseExtraData(act.extra_data) || {};\n  // Meta met typiquement { old_value, new_value } ou { daily_budget: { old, new } }\n  const newBudget = extra.new_value ?? extra.daily_budget?.new ?? extra.daily_budget ?? null;\n  const oldBudget = extra.old_value ?? extra.daily_budget?.old ?? null;\n\n  // Si new_value est absent, on skip (pas un event budget exploitable)\n  const newCents = newBudget == null ? null : parseInt(newBudget, 10);\n  if (newCents == null || isNaN(newCents) || newCents === 0) continue;\n\n  events.push({\n    campaign_id: act.object_id,\n    campaign_name: act.object_name,\n    event_time: act.event_time,\n    event_type: act.event_type,\n    new_budget_cents: newCents,\n    old_budget_cents: oldBudget == null ? null : (parseInt(oldBudget, 10) || null),\n    ad_account_id: accountCtx.ad_account_id,\n    translated: act.translated_event_type,\n  });\n}\n\nreturn [{ json: { events, ad_account_id: accountCtx.ad_account_id, count: events.length } }];\n"
+      },
+      "id": "mbb-0005-4a10-9000-000000000005",
+      "name": "Parse Budget Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://odspcxgafcqxjzrarsqf.supabase.co/rest/v1/rpc/meta_ads_backfill_campaign_budgets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_events: $json.events } }}",
+        "options": {}
+      },
+      "id": "mbb-0006-4a10-9000-000000000006",
+      "name": "Apply Backfill (RPC)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "notesInFlow": true,
+      "notes": "Appelle public.meta_ads_backfill_campaign_budgets(p_events jsonb). Credential Supabase service_role requis."
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Build Account List", "type": "main", "index": 0 }]]
+    },
+    "Build Account List": {
+      "main": [[{ "node": "Loop Accounts", "type": "main", "index": 0 }]]
+    },
+    "Loop Accounts": {
+      "main": [
+        [],
+        [{ "node": "Fetch Activity Log", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Activity Log": {
+      "main": [[{ "node": "Parse Budget Events", "type": "main", "index": 0 }]]
+    },
+    "Parse Budget Events": {
+      "main": [[{ "node": "Apply Backfill (RPC)", "type": "main", "index": 0 }]]
+    },
+    "Apply Backfill (RPC)": {
+      "main": [[{ "node": "Loop Accounts", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "triggerCount": 0
+}

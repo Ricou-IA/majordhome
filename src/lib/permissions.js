@@ -34,6 +34,7 @@ export const RESOURCES = [
   { key: 'prospection_commerciale', label: 'Prospection' },
   { key: 'devis',      label: 'Devis' },
   { key: 'tasks',      label: 'Tâches' },
+  { key: 'meta_ads',   label: 'Meta Ads' },
   { key: 'settings',   label: 'Paramètres' },
 ];
 

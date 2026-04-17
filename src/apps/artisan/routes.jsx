@@ -45,6 +45,9 @@ const PipelineContrats = lazy(() => import('./pages/PipelineContrats'));
 // Mailing
 const Mailing = lazy(() => import('./pages/Mailing'));
 
+// Meta Ads
+const MetaAds = lazy(() => import('./pages/MetaAds'));
+
 // =============================================================================
 // LOADING COMPONENT
 // =============================================================================
@@ -307,6 +310,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <Mailing />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'meta-ads',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="meta_ads">
+          <MetaAds />
         </RouteGuard>
       </SuspenseWrapper>
     ),

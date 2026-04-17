@@ -29,6 +29,7 @@ import {
   ListTodo,
   Mail,
   FileText,
+  Megaphone,
 } from 'lucide-react';
 
 // =============================================================================
@@ -49,6 +50,7 @@ const navigation = [
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
   { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
+  { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
 ];
 
 // =============================================================================

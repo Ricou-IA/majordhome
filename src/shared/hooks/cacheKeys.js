@@ -188,6 +188,15 @@ export const pennylaneKeys = {
   quotesByClient: (clientId) => [...pennylaneKeys.all, 'quotes', clientId],
 };
 
+// --- Meta Ads ---
+export const metaAdsKeys = {
+  all: ['meta-ads'],
+  stats: (orgId, range, level) => [...metaAdsKeys.all, 'stats', orgId, range, level],
+  attribution: (orgId, range, commercialId) => [...metaAdsKeys.all, 'attribution', orgId, range, commercialId || 'all'],
+  accounts: (orgId) => [...metaAdsKeys.all, 'accounts', orgId],
+  commercials: (orgId) => [...metaAdsKeys.all, 'commercials', orgId],
+};
+
 // --- Devis (Quotes) ---
 export const devisKeys = {
   all: ['devis'],
