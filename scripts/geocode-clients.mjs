@@ -22,7 +22,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://odspcxgafcqxjzrarsqf.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kc3BjeGdhZmNxeGp6cmFyc3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1ODcwNzUsImV4cCI6MjA3OTE2MzA3NX0.DKCg_EwasSi_SNto8D3rC5H7FaShuUra8cGQ6g9Q58g';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 const API_BASE = 'https://api-adresse.data.gouv.fr';
 const BATCH_SIZE = 50;     // Adresses par requête CSV
