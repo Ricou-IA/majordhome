@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-04-19 — Mailing : campagnes paramétrables via UI (table `mail_campaigns` + onglet Éditeur avec wizard 3 étapes + caisse à outils URLs Mayer injectée dans le prompt Claude)
+> **Dernière MàJ** : 2026-04-19 — Mailing : campagnes paramétrables via UI + auto-bienvenue leads Nouveau (segment `leads_nouveau` + cron N8n 10 min, doc `docs/n8n/LEAD_BIENVENUE_CRON_SETUP.md`)
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -315,9 +315,18 @@ Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
 | `clients_contrat_clos` | Clients contrat clos, sans contrat actif | déjà mailé |
 | `clients_sans_contrat` | Clients sans aucun contrat (jamais eu) | déjà mailé |
 | `clients_tous` | Tous les clients | déjà mailé |
+| `leads_nouveau` | Leads au statut "Nouveau" (bienvenue auto) | déjà mailé campagne `lead_bienvenue` |
 | `leads_contacte` | Leads au statut "Contacté" | déjà mailé campagne Contacté |
 | `leads_devis` | Leads au statut "Devis envoyé" | déjà mailé campagne Devis |
 | `leads_perdu` | Leads au statut "Perdu" | déjà mailé campagne Perdu |
+
+### Campagne automatique — Bienvenue nouveau lead
+- Campagne `lead_bienvenue` (à créer via l'Éditeur) ciblée sur segment `leads_nouveau`
+- **Cron N8n toutes les 10 min** : fetch campagne en DB → build payload → POST webhook `mayer-mailing` existant
+- Source unifiée : tous les leads passés en `Nouveau` avec email (saisie manuelle / formulaire web / Meta)
+- Idempotent via filtre `NOT IN mailing_logs` — pas de doublon
+- Skip silencieux si lead sans email, désinscrit, ou campagne non encore générée
+- Setup : `docs/n8n/LEAD_BIENVENUE_CRON_SETUP.md`
 
 ### Tags mailing dans fiche lead
 - Statut **Contacté** (display_order 2) : tag indigo "Mailing Relance" si campagne Contacté envoyée

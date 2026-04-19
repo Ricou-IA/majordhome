@@ -69,6 +69,17 @@ WHERE c.is_archived = false
   AND c.id NOT IN (SELECT client_id FROM majordhome.mailing_logs WHERE client_id IS NOT NULL AND campaign_name = '{{CAMPAIGN_NAME}}')
 ORDER BY c.last_name`,
   },
+  leads_nouveau: {
+    label: 'Leads — Nouveau (bienvenue)',
+    family: 'Leads',
+    sql: `SELECT l.id, l.first_name, l.last_name, l.first_name AS display_name, l.email
+FROM majordhome.leads l
+WHERE l.status_id = 'ea926b9a-521c-4012-a60b-85b6f7e5c09c'
+  AND l.email_unsubscribed_at IS NULL
+  AND l.email IS NOT NULL AND l.email != ''
+  AND l.id NOT IN (SELECT lead_id FROM majordhome.mailing_logs WHERE lead_id IS NOT NULL AND campaign_name = '{{CAMPAIGN_NAME}}')
+ORDER BY l.created_at ASC`,
+  },
   leads_contacte: {
     label: 'Leads — Contacté',
     family: 'Leads',

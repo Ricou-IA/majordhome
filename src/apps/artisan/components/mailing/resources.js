@@ -15,7 +15,7 @@
  *   - `key`    : identifiant snake_case (ex: avis_google, parrainage)
  *   - `label`  : nom court humain
  *   - `url`    : URL de base (sans UTM ni query param variable)
- *   - `category` : 'cta' | 'service' | 'info' | 'blog' | 'zone' | 'contact' | 'legal' | 'workflow' (workflow = exclu du prompt)
+ *   - `category` : 'cta' | 'service' | 'info' | 'blog' | 'zone' | 'contact' | 'legal' | 'asset' | 'workflow' (workflow = exclu du prompt)
  *   - `usage`  : quand l'IA doit utiliser cette ressource (1-2 phrases)
  *   - `notes`  : (optionnel) contraintes spécifiques (substitutions, auth, etc.)
  *
@@ -198,6 +198,16 @@ export const RESOURCES = {
   zone_mazamet: { label: 'Zone Mazamet', url: 'https://www.mayer-energie.fr/zone-intervention/mazamet', category: 'zone', usage: "Page locale Mazamet." },
 
   // ---------------------------------------------------------------------------
+  // Assets graphiques (images utilisées dans le HTML email)
+  // ---------------------------------------------------------------------------
+  logo_email: {
+    label: 'Logo Mayer Énergie (header email)',
+    url: 'https://www.mayer-energie.fr/images/logo-email.png',
+    category: 'asset',
+    usage: "URL officielle du logo Mayer à utiliser dans le <img> du header email (width 220px, centré). C'est l'asset standard de tous les templates — ne PAS inventer une autre URL.",
+  },
+
+  // ---------------------------------------------------------------------------
   // Pages institutionnelles
   // ---------------------------------------------------------------------------
   site: {
@@ -294,6 +304,7 @@ export function formatResourcesForPrompt() {
   }
 
   const CATEGORY_LABELS = {
+    asset: 'Assets graphiques (images email — logo, bannières)',
     cta: 'Boutons CTA (actions principales)',
     service: 'Pages services Mayer (offres détaillées)',
     blog: 'Articles de blog (contenus éditoriaux)',
@@ -304,7 +315,7 @@ export function formatResourcesForPrompt() {
   };
 
   // Ordre d'affichage stable
-  const order = ['cta', 'service', 'blog', 'zone', 'info', 'legal', 'contact'];
+  const order = ['asset', 'cta', 'service', 'blog', 'zone', 'info', 'legal', 'contact'];
   for (const cat of order) {
     const items = byCategory[cat];
     if (!items?.length) continue;
