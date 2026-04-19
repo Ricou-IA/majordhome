@@ -353,6 +353,33 @@ Details logement. `project_id` (PK), `property_type`, `qr_code_id` (unique), `qr
 
 ---
 
+## Tables majordhome — Mailing
+
+### majordhome.mailing_logs
+Historique des emails envoyés par campagne. Enrichi par les events Resend webhook.
+Colonnes : `id`, `org_id`, `client_id` (nullable), `lead_id` (nullable), `campaign_name`, `subject`, `email_to`, `sent_at`, `status` (sent/failed/delivered/opened/clicked/bounced/complained), `provider_id` (Resend), `error_message`, `delivered_at`, `opened_at`, `clicked_at`, `bounced_at`, `complained_at`, `last_event_at`, `open_count`, `click_count`.
+Vue : `public.majordhome_mailing_logs`.
+
+### majordhome.mailing_events
+Audit log complet des events webhook Resend (1 ligne par event reçu, déduplication via `svix_id` UNIQUE).
+Vue : `public.majordhome_mailing_events`.
+
+### majordhome.mail_campaigns ⭐ (2026-04-19)
+Campagnes mailing paramétrables — remplace les TEMPLATES en dur dans `Mailing.jsx`.
+Colonnes :
+- **Identité** : `id` (UUID), `org_id`, `key` (TEXT, UNIQUE per org), `label`, `subject`, `preheader`, `html_body`
+- **Ciblage** : `tracking_type_value`, `default_segment`, `allowed_segments[]`
+- **Carte d'identité éditoriale** : `purpose`, `audience`, `tone`, `trigger_description`, `notes`
+- **Structure** : `blocks` JSONB (contient `{ brief: "..." }` pour regénération IA)
+- **Gestion** : `is_archived`, `created_at`, `created_by`, `updated_at`
+- Trigger `trg_mail_campaigns_updated_at` met à jour `updated_at` automatiquement
+- RLS : 4 policies (select/insert/update/delete) via `core.organization_members` + service_role bypass
+
+Vue : `public.majordhome_mail_campaigns`.
+Seed initial : 9 campagnes (mail_a à mail_i_newsletter) appliqué le 2026-04-19.
+
+---
+
 ## Migrations appliquées (Majord'home)
 
 | Version | Nom | Date |
@@ -371,6 +398,7 @@ Details logement. `project_id` (PK), `property_type`, `qr_code_id` (unique), `qr
 | ... | add_intervention_chantier_columns | 2026-03-10 |
 | ... | create_chantier_views | 2026-03-10 |
 | ... | add_planification_date_to_leads | 2026-03-10 |
+| ... | mail_campaigns_schema | 2026-04-19 |
 
 ## Notes RLS
 

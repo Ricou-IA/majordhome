@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-04-11 — Mailing : désabonnement opt-out complet (edge function mailing-unsubscribe + List-Unsubscribe RFC 8058 + auto-unsubscribe sur spam + auto-cleanup + auto-archive)
+> **Dernière MàJ** : 2026-04-19 — Mailing : campagnes paramétrables via UI (table `mail_campaigns` + onglet Éditeur avec wizard 3 étapes + caisse à outils URLs Mayer injectée dans le prompt Claude)
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -150,17 +150,35 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 ## Module Mailing
 
 ### Architecture
-- **Page** : `src/apps/artisan/pages/Mailing.jsx` — Configurateur de campagnes (admin only, `RouteGuard resource="settings"`)
+- **Page** : `src/apps/artisan/pages/Mailing.jsx` — Wrapper 2 onglets : **Envoi** (tous rôles) + **Éditeur** (admin only)
+- **Onglet Envoi** : `src/apps/artisan/components/mailing/SendTab.jsx` — sélecteur campagne + ciblage + carte d'identité + preview + envoi N8n
+- **Onglet Éditeur** : `src/apps/artisan/components/mailing/EditorTab.jsx` — liste cards + actions (Éditer / Dupliquer / Archiver) + wizard `CampaignWizard.jsx`
 - **Onglet client** : `src/apps/artisan/pages/client-detail/TabMailings.jsx` — Historique des mails + badges status + timeline events + compteurs opens/clics (polling 30s)
 - **Tables** :
+  - `majordhome.mail_campaigns` (campagnes paramétrables : key, label, subject, preheader, html_body, tracking_type_value, default_segment, allowed_segments[], purpose, audience, tone, trigger_description, notes, blocks JSONB)
   - `majordhome.mailing_logs` (client_id, lead_id, org_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
   - `majordhome.mailing_events` (audit log complet, 1 ligne par event webhook reçu, dédupliqué par `svix_id` UNIQUE)
-- **Vues** : `public.majordhome_mailing_logs`, `public.majordhome_mailing_events`
-- **Cache keys** : `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
+- **Vues** : `public.majordhome_mail_campaigns`, `public.majordhome_mailing_logs`, `public.majordhome_mailing_events`
+- **Service** : `src/shared/services/mailCampaigns.service.js` (CRUD)
+- **Hook** : `src/shared/hooks/useMailCampaigns.js` (React Query + mutations create/update/archive/duplicate)
+- **Cache keys** : `mailCampaignKeys.list(orgId)`, `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
+- **Constantes shared** :
+  - `src/apps/artisan/components/mailing/segments.js` — 8 segments de ciblage SQL (constantes techniques)
+  - `src/apps/artisan/components/mailing/resources.js` — 📌 caisse à outils URLs Mayer (CTA, services, blog, zones, contact). Source de vérité pour l'IA — à mettre à jour à chaque nouvelle ressource
 - **Env** : `VITE_N8N_WEBHOOK_MAILING` → webhook N8n `POST /webhook/mayer-mailing`
 - **Provider email** : Resend (API `https://api.resend.com/emails`) — bascule depuis Gmail le 2026-04-11
 - **Edge function webhook** : `supabase/functions/resend-webhook/` (verify_jwt: false, Svix HMAC SHA256 via Web Crypto API, RPC atomique)
 - **Edge function unsubscribe** : `supabase/functions/mailing-unsubscribe/` (verify_jwt: false, token HMAC SHA256 signé avec `RESEND_WEBHOOK_SECRET`, GET = page HTML confirmation + POST = one-click RFC 8058)
+- **Edge function avis-redirect** : `https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/avis-redirect` — redirige vers fiche Google Reviews Mayer + tracke le clic via `?log_id=` (utilisée dans SMS et accessible aux mails)
+
+### Éditeur de campagne (wizard 3 étapes)
+1. **Identité** : libellé (clé technique auto-générée par slugify), Contexte (objectif, cible, notes), ton éditorial (5 choix + Autre), ciblage technique (segments autorisés)
+2. **Brief** : ligne éditoriale (textarea libre — l'IA structure les blocs elle-même), objet/preheader facultatifs (l'IA propose sinon)
+3. **Génération** : prompt système copiable (inclut carte d'identité + brief + caisse à outils URLs + types de blocs disponibles + contraintes techniques) + JSON structuré + textarea HTML final + bouton Prévisualiser (iframe overlay)
+
+**Workflow V1 (copier-coller)** : wizard → prompt copié → chat Claude → HTML généré → coller dans textarea (auto-extraction OBJET/PREHEADER depuis commentaire HTML en tête) → Sauvegarder. Validation : impossible de save/envoyer si subject vide.
+
+**Vdef prévue** : remplacer l'étape 3 par appel API direct Anthropic au lieu du copier-coller.
 
 ### Workflow N8n : "Mayer - Mailing" (id: 1COgLUuiMtSq2sUq)
 Moteur d'emailing générique piloté par webhook POST. Payload attendu :

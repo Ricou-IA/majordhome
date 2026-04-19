@@ -1,6 +1,6 @@
 # COMPONENTS.md - Cartographie des composants Majord'home
 
-> **Dernière MàJ** : 2026-03-15 — Refactoring architecture (cacheKeys, usePaginatedList, KanbanBoard, shared components)
+> **Dernière MàJ** : 2026-04-19 — Mailing : refactor TEMPLATES en dur → table `mail_campaigns` paramétrable + onglet Éditeur (wizard 3 étapes) + caisse à outils URLs Mayer
 
 ---
 
@@ -141,10 +141,30 @@ src/
 │   │   │   Auto-save brouillon localStorage 30s
 │   │   │   Hooks: useIntervention(id), useInterventionFileUrls, useInterventionMutations, useInterventionDraft
 │   │   │
+│   │   ├── Mailing.jsx                   # v2.0 — Wrapper 2 onglets : Envoi | Éditeur (admin only) — Sprint M (2026-04-19)
+│   │   │   Route: /artisan/mailing
+│   │   │   Délègue à SendTab + EditorTab
+│   │   │
 │   │   ├── Settings.jsx                  # Paramètres organisation
 │   │   └── Profile.jsx                   # Profil utilisateur
 │   │
 │   └── components/
+│       ├── mailing/                      # Module Mailing (refactor 2026-04-19, table mail_campaigns)
+│       │   ├── SendTab.jsx               # Onglet Envoi : sélecteur campagne + ciblage + carte d'identité + preview iframe + envoi N8n
+│       │   │   Hooks: useMailCampaigns(orgId), useAuth
+│       │   │   Validation : bloque envoi si subject vide
+│       │   ├── EditorTab.jsx             # Onglet Éditeur (admin only) : liste campagnes (cards) + actions Éditer/Dupliquer/Archiver + lance CampaignWizard
+│       │   ├── CampaignWizard.jsx        # Modal wizard 3 étapes : Identité → Brief → Génération
+│       │   │   Étape 1 : libellé (clé auto), Contexte (objectif/cible/notes), Ton éditorial (5 choix + Autre), Ciblage technique
+│       │   │   Étape 2 : ligne éditoriale (textarea libre — l'IA structure les blocs), objet/preheader facultatifs
+│       │   │   Étape 3 : prompt copiable (carte ID + brief + caisse à outils URLs + types blocs + contraintes) + textarea HTML + bouton Prévisualiser (iframe overlay) + Sauvegarder
+│       │   │   Auto-extraction OBJET/PREHEADER depuis commentaire HTML collé
+│       │   │   Validation : bloque save si subject vide
+│       │   ├── CampaignIdentityPanel.jsx # Panneau repliable affichant purpose/audience/tone/trigger/notes (utilisé dans SendTab)
+│       │   ├── segments.js               # 8 segments de ciblage SQL (clients_contrat, clients_tous, leads_contacte, etc.) — constantes techniques, pas DB
+│       │   └── resources.js              # 📌 SOURCE DE VÉRITÉ — URLs Mayer (CTA, services, blog, zones, contact). Injecté auto dans le prompt Claude. À mettre à jour à chaque nouvelle URL.
+│       │
+
 │       ├── shared/                       # Composants partagés (Refactoring 2026-03-15)
 │       │   ├── KanbanBoard.jsx          # Board Kanban générique avec DnD optionnel (@hello-pangea/dnd)
 │       │   │   Props: items, columns, groupBy, renderCard, onCardClick, onDragEnd,

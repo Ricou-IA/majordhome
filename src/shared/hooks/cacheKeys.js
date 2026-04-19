@@ -91,6 +91,14 @@ export const mailingKeys = {
   byLead: (leadId) => [...mailingKeys.all, 'lead', leadId],
 };
 
+// --- Mail Campaigns (templates paramétrables) ---
+export const mailCampaignKeys = {
+  all: ['mail-campaigns'],
+  lists: () => [...mailCampaignKeys.all, 'list'],
+  list: (orgId) => [...mailCampaignKeys.lists(), orgId],
+  detail: (id) => [...mailCampaignKeys.all, 'detail', id],
+};
+
 // --- SMS ---
 export const smsKeys = {
   all: ['sms'],

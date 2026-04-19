@@ -1,6 +1,6 @@
 # SPRINT_LOG.md - Historique des sprints Majord'home
 
-> **Dernière MàJ** : 2026-03-10 — Sprint 6 Chantiers + Dashboard réel + Planning multi-select
+> **Dernière MàJ** : 2026-04-19 — Mailing : campagnes paramétrables (table mail_campaigns + onglet Éditeur wizard 3 étapes + caisse à outils URLs Mayer)
 
 ---
 
@@ -713,3 +713,101 @@ L'EventModal avait des champs client en saisie libre (nom, téléphone, email, a
 
 ## Sprint 10 — N8N Avancé ⬜
 - Facebook Ads leads, Slack bidirectionnel
+
+---
+
+## Enrichissement Pipeline Contrats (2026-04-19) ✅
+
+**Objectif** : Tracer l'origine des contrats en attente (colonne "Nouveau") pour adapter la relance commerciale, et finaliser le flow Pipeline Leads → Entretien.
+
+### Base de données
+- Migration `contracts_source_tagging` :
+  - `UPDATE` 666 contrats `'app'` pré-import Excel → `'import'`, 48 post → `'manual'`
+  - `ALTER COLUMN source SET DEFAULT 'manual'`
+  - `CHECK CONSTRAINT` sur 5 valeurs : `chantier | pipeline | web | manual | import`
+- Migration `resync_client_number_sequence` : fix séquence désynchronisée (3411 vs max 3412) qui bloquait la création de client lors requalification
+
+### Code
+| Fichier | Modification |
+|---|---|
+| `contracts.service.js:126` | Default `'app'` → `'manual'` |
+| `CreateContractModal.jsx:243` | Fallback `'app'` → `'manual'` |
+| `LeadModal.jsx` | Restauration handleRequalifyEntretien avec `source='pipeline'`, remplace `updateLeadStatus('Requalifié')` par `leadsService.softDeleteLead` (le statut n'existait plus en DB) |
+| `LeadFormSections.jsx` | Bouton "→ Entretien" (icône Wrench, indigo) dans SectionActions, visible leads statut "Nouveau" |
+| `PipelineContrats.jsx` | `SOURCE_CONFIG` + tag emoji+label sur cartes + composant `SourceFilter` (pills toggle avec compteurs) + filteredContracts mémoïsés |
+
+### 4 points d'entrée taguant `contracts.source`
+| Source | Flow | État |
+|---|---|---|
+| 🔧 `chantier` | Bouton "Proposer un contrat" fin chantier | Existant (`ChantierModal.jsx:561`) |
+| 🎯 `pipeline` | Bouton "→ Entretien" sur lead Nouveau | Restauré (soft-delete du lead après) |
+| 🌐 `web` | Form `mayer-energie.fr/entretien` | Existant (RPC `process_web_entretien`) |
+| ✋ `manual` | Création directe UI | Nouveau défaut |
+
+### Bugs corrigés
+1. **Séquence `client_number_seq` décalée** — `setval` recalé après import Excel
+2. **Statut "Requalifié" inexistant en DB** — flow remplacé par soft-delete (`leads.is_deleted=true`)
+
+### Non fait (prochaine session)
+- Passage Kanban 2 → 5 colonnes (À relancer auto / Relance en cours / Négociation)
+- Enrichissement mail Proposition Contrat (prix visible dans le corps + CTA page web au lieu de PDF) — baseline 44% open / 3% CTR à battre
+- Dashboard stats mailing (taux ouverture/clic par campagne)
+
+---
+
+## Mailing — Campagnes paramétrables (2026-04-19) ✅
+
+**Objectif** : Sortir les 9 templates mail de `Mailing.jsx` (~1000 LOC en dur) vers une table DB éditable depuis l'UI, avec un éditeur wizard guidé par IA pour créer de nouvelles campagnes sans déploiement.
+
+### Base de données
+- Migration `mail_campaigns_schema` :
+  - Table `majordhome.mail_campaigns` (key UNIQUE per org, label, subject, preheader, html_body, tracking_type_value, default_segment, allowed_segments[], purpose, audience, tone, trigger_description, notes, blocks JSONB, is_archived, audit cols)
+  - 4 RLS policies (select/insert/update/delete via `core.organization_members`) + service_role bypass
+  - Trigger `trg_mail_campaigns_updated_at`
+  - Vue `public.majordhome_mail_campaigns`
+- Seed initial : 9 campagnes (mail_a à mail_i_newsletter) avec carte d'identité (purpose/audience/tone/trigger/notes) remplie
+
+### Code — refactor complet de Mailing.jsx (1221 LOC → 55 LOC)
+| Fichier | Rôle |
+|---|---|
+| `pages/Mailing.jsx` | Wrapper 2 onglets : Envoi (tous) / Éditeur (admin only) |
+| `components/mailing/SendTab.jsx` | Onglet Envoi (sélection + ciblage + preview + envoi N8n) |
+| `components/mailing/EditorTab.jsx` | Liste cards + actions (Éditer/Dupliquer/Archiver) + lance wizard |
+| `components/mailing/CampaignWizard.jsx` | Modal wizard 3 étapes : Identité → Brief → Génération |
+| `components/mailing/CampaignIdentityPanel.jsx` | Panneau repliable carte d'identité |
+| `components/mailing/segments.js` | 8 segments de ciblage SQL extraits (constantes techniques) |
+| `components/mailing/resources.js` | 📌 **SOURCE DE VÉRITÉ** caisse à outils URLs Mayer (32 entrées : CTA, services, blog, zones, contact). Injecté auto dans le prompt Claude. |
+| `shared/services/mailCampaigns.service.js` | CRUD Supabase (list/getById/create/update/archive/duplicate/remove) |
+| `shared/hooks/useMailCampaigns.js` | React Query (campaigns + 4 mutations + invalidation) |
+| `shared/hooks/cacheKeys.js` | Ajout `mailCampaignKeys` |
+
+### Workflow V1 (copier-coller)
+1. Onglet Éditeur → "Nouvelle campagne" → wizard
+2. **Étape 1 Identité** : libellé (clé auto-slugifiée), Contexte (objectif/cible/notes), Ton éditorial (5 choix + Autre), Ciblage technique (segments)
+3. **Étape 2 Brief** : ligne éditoriale (textarea libre — l'IA structure les blocs elle-même), objet/preheader facultatifs (l'IA propose)
+4. **Étape 3 Génération** : prompt système copiable (carte ID + brief + caisse à outils URLs + 4 types de blocs disponibles + contraintes techniques + UTM auto), JSON structuré, textarea HTML final, bouton Prévisualiser (iframe overlay)
+5. User colle le prompt dans Claude → reçoit le HTML → colle dans textarea (auto-extraction OBJET/PREHEADER depuis commentaire HTML) → **Sauvegarder**
+6. Validation : bloque save/envoi si subject vide
+
+### Caisse à outils URLs (resources.js — 32 ressources)
+| Catégorie | # | Détails |
+|---|---|---|
+| CTA | 7 | contact, dépannage SAV, entretien, espace client, simulateur aides, avis Google (edge function), parrainage |
+| Services | 7 | PAC, climatisation, poêle granulés, poêle bois, chaudière fioul, photovoltaïque, électricité |
+| Blog | 10 | comparatif poêles, prix PAC 2026, aides, DPE, confort thermique, etc. |
+| Zones | 10 | Gaillac, Albi, Toulouse, Montauban, Castres, Lavaur, Carmaux, Rabastens, Graulhet, Mazamet |
+| Info / Légal | 4 | site, à propos, mentions légales, RGPD |
+| Contact | 2 | tel, email |
+| Spécifique | 1 | offre pellets TotalEnergies (avec token) |
+
+### Ce qui change pour l'utilisateur
+- Plus de templates en dur dans le code → édition direct depuis l'UI
+- Un nouveau template = 3 écrans + 1 chat Claude + 1 paste, pas de redeploy
+- Carte d'identité visible (purpose, audience, tone…) → mémoire éditoriale préservée
+- Filtre `mailing_logs.campaign_name = ...` corrigé (un client peut recevoir A puis B sans être bloqué)
+- Bouton Prévisualiser dans le wizard (iframe overlay)
+
+### Vdef prévue
+- Remplacer l'étape 3 par appel API direct Anthropic (au lieu du copier-coller chat)
+- Migration `parrainage` URL quand la page sera publiée
+- Dashboard stats mailing (taux ouverture/clic par campagne)
