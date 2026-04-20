@@ -18,6 +18,7 @@ import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useCertificatMutations } from '@hooks/useCertificats';
+import { useTeamMembers } from '@hooks/useAppointments';
 import { savService } from '@services/sav.service';
 import { useAuth } from '@contexts/AuthContext';
 import { clientsService } from '@services/clients.service';
@@ -75,7 +76,9 @@ export function CertificatWizard({
   assignedTechnician = '',
 }) {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, effectiveRole, organization } = useAuth();
+  const canSelectTechnician = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
+  const { members: teamMembers = [] } = useTeamMembers(canSelectTechnician ? organization?.id : null);
   const { saveDraft, signCertificat, uploadPdf, updatePdfInfo, getSignedUrl, isSaving, isSigning } = useCertificatMutations();
   const saveTimeoutRef = useRef(null);
 
@@ -378,6 +381,8 @@ export function CertificatWizard({
             client={client}
             equipment={equipment}
             clientEquipments={clientEquipments}
+            technicians={teamMembers}
+            canSelectTechnician={canSelectTechnician}
           />
         ) : null}
       </div>

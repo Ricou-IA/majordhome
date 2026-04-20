@@ -17,10 +17,15 @@ import {
 // Certifications propres à Mayer Énergie (en dur)
 const CERTIFICATIONS_ENTREPRISE = ['QualiPAC', 'QualiBois'];
 
-export function StepInfosGenerales({ formData, onChange, client }) {
+export function StepInfosGenerales({ formData, onChange, client, technicians = [], canSelectTechnician = false }) {
   const config = SECTIONS_PAR_EQUIPEMENT[formData.equipement_type] || {};
   const showFluide = config.showFGaz;
   const showCombustible = config.showRamonage;
+
+  const technicianOptions = technicians.map((t) => ({
+    value: t.display_name || `${t.first_name || ''} ${t.last_name || ''}`.trim(),
+    label: t.display_name || `${t.first_name || ''} ${t.last_name || ''}`.trim(),
+  }));
 
   return (
     <div className="space-y-6">
@@ -45,10 +50,16 @@ export function StepInfosGenerales({ formData, onChange, client }) {
       <SectionTitle>Technicien</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField label="Nom du technicien" required>
-          <TextInput
-            value={formData.technicien_nom}
-            disabled
-          />
+          {canSelectTechnician ? (
+            <SelectInput
+              value={formData.technicien_nom || ''}
+              onChange={(val) => onChange('technicien_nom', val)}
+              options={technicianOptions}
+              placeholder="Sélectionner un technicien..."
+            />
+          ) : (
+            <TextInput value={formData.technicien_nom} disabled />
+          )}
         </FormField>
         <FormField label="Certifications">
           <div className="flex flex-wrap gap-2">
