@@ -694,18 +694,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     return groups;
   }, [equipmentTypes]);
 
-  // Requalifier lead → Entretien (crée client + contrat pending)
-  const requalifieStatusId = useMemo(() => {
-    return statuses.find(s => s.label === 'Requalifié')?.id || null;
-  }, [statuses]);
-
+  // Requalifier lead → Entretien : crée client + contrat pending, puis soft-delete du lead
   const handleRequalifyEntretien = useCallback(async () => {
     if (isRequalifying || !orgId || !lead) return;
     setIsRequalifying(true);
     try {
       let clientId = lead.client_id;
 
-      // 1. Créer le client si pas encore lié
       if (!clientId) {
         const { data: newClient, error: clientError } = await clientsService.createClient({
           orgId,
@@ -724,21 +719,19 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         if (!clientId) throw new Error('Client non créé');
       }
 
-      // 2. Créer le contrat pending
-      await contractsService.createContract({
+      const { error: contractError } = await contractsService.createContract({
         orgId,
         clientId,
         status: 'pending',
+        workflowStatus: 'nouveau',
         frequency: 'annuel',
         startDate: new Date().toISOString().split('T')[0],
-        source: 'lead',
+        source: 'pipeline',
         notes: form.notes || null,
       });
+      if (contractError) throw contractError;
 
-      // 3. Passer le lead en "Requalifié"
-      if (requalifieStatusId) {
-        await updateLeadStatus(lead.id, requalifieStatusId, userId);
-      }
+      await leadsService.softDeleteLead(lead.id);
 
       toast.success('Lead requalifié → contrat créé');
       onClose();
@@ -749,7 +742,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     } finally {
       setIsRequalifying(false);
     }
-  }, [orgId, userId, lead, form, requalifieStatusId, isRequalifying, updateLeadStatus, navigate, onClose]);
+  }, [orgId, lead, form, isRequalifying, navigate, onClose]);
 
   const currentStatus = statuses.find((s) => s.id === form.status_id);
   const isWon = currentStatus?.is_won === true;

@@ -123,7 +123,7 @@ export const contractsService = {
     zoneId = null,
     subtotal = null,
     discountPercent = null,
-    source = 'app',
+    source = 'manual',
   } = {}) {
     return withErrorHandling(async () => {
       if (!orgId || !clientId) throw new Error('[contractsService] orgId et clientId requis');
@@ -145,7 +145,7 @@ export const contractsService = {
           zone_id: zoneId || null,
           subtotal: subtotal ? parseFloat(subtotal) : null,
           discount_percent: discountPercent ? parseFloat(discountPercent) : null,
-          source: source || 'app',
+          source: source || 'manual',
         })
         .select()
         .single();

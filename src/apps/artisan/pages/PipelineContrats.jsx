@@ -54,6 +54,15 @@ const PIPELINE_COLUMNS = [
   { id: 'proposal_sent', label: 'Proposition envoyée', color: '#3B82F6' },
 ];
 
+const SOURCE_CONFIG = {
+  chantier: { label: 'Chantier', emoji: '🔧', color: '#10B981', bg: 'bg-emerald-50',  text: 'text-emerald-700',  ring: 'ring-emerald-200' },
+  pipeline: { label: 'Pipeline', emoji: '🎯', color: '#6366F1', bg: 'bg-indigo-50',   text: 'text-indigo-700',   ring: 'ring-indigo-200' },
+  web:      { label: 'Site web', emoji: '🌐', color: '#3B82F6', bg: 'bg-blue-50',     text: 'text-blue-700',     ring: 'ring-blue-200' },
+  manual:   { label: 'Manuel',   emoji: '✋', color: '#6B7280', bg: 'bg-gray-50',     text: 'text-gray-700',     ring: 'ring-gray-200' },
+};
+
+const SOURCE_ORDER = ['chantier', 'pipeline', 'web', 'manual'];
+
 // ============================================================================
 // HOOK : STATS CONTRATS (compteurs globaux)
 // ============================================================================
@@ -156,6 +165,7 @@ function ContractPipelineCard({ contract }) {
   const location = [contract.client_city, contract.client_postal_code].filter(Boolean).join(' ');
   const amount = contract.amount ? parseFloat(contract.amount) : 0;
   const createdDays = Math.floor((Date.now() - new Date(contract.created_at).getTime()) / (1000 * 60 * 60 * 24));
+  const sourceConfig = SOURCE_CONFIG[contract.source] || SOURCE_CONFIG.manual;
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow cursor-pointer">
@@ -176,11 +186,20 @@ function ContractPipelineCard({ contract }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-gray-400 font-mono">{contract.contract_number}</span>
-        <span className={`px-1.5 py-0.5 rounded-full ${createdDays > 7 ? 'bg-red-50 text-red-600' : createdDays > 3 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'}`}>
-          {createdDays === 0 ? "Aujourd'hui" : `${createdDays}j`}
-        </span>
+      <div className="flex items-center justify-between gap-2 text-xs mt-2">
+        <span className="text-gray-400 font-mono truncate">{contract.contract_number}</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span
+            title={`Source : ${sourceConfig.label}`}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ring-1 ${sourceConfig.bg} ${sourceConfig.text} ${sourceConfig.ring}`}
+          >
+            <span aria-hidden>{sourceConfig.emoji}</span>
+            <span className="font-medium">{sourceConfig.label}</span>
+          </span>
+          <span className={`px-1.5 py-0.5 rounded-full ${createdDays > 7 ? 'bg-red-50 text-red-600' : createdDays > 3 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'}`}>
+            {createdDays === 0 ? "Aujourd'hui" : `${createdDays}j`}
+          </span>
+        </div>
       </div>
 
       {contract.client_phone && (
@@ -189,6 +208,64 @@ function ContractPipelineCard({ contract }) {
           {contract.client_phone}
         </p>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// FILTRE SOURCE (pills toggle)
+// ============================================================================
+
+function SourceFilter({ contracts, activeSource, onChange }) {
+  const counts = useMemo(() => {
+    const c = { total: contracts.length };
+    for (const key of SOURCE_ORDER) c[key] = 0;
+    for (const contract of contracts) {
+      const k = SOURCE_CONFIG[contract.source] ? contract.source : 'manual';
+      c[k] = (c[k] || 0) + 1;
+    }
+    return c;
+  }, [contracts]);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-colors
+          ${activeSource === null
+            ? 'bg-gray-900 text-white ring-gray-900'
+            : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+          }`}
+      >
+        Toutes
+        <span className={`${activeSource === null ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
+          {counts.total}
+        </span>
+      </button>
+      {SOURCE_ORDER.map((key) => {
+        const cfg = SOURCE_CONFIG[key];
+        const active = activeSource === key;
+        const count = counts[key] || 0;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(active ? null : key)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-colors
+              ${active
+                ? `${cfg.bg} ${cfg.text} ${cfg.ring} ring-2`
+                : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+              }`}
+          >
+            <span aria-hidden>{cfg.emoji}</span>
+            {cfg.label}
+            <span className={`${active ? 'bg-white/60' : 'bg-gray-100 text-gray-600'} px-1.5 py-0.5 rounded-full tabular-nums`}>
+              {count}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -203,6 +280,12 @@ export default function PipelineContrats() {
   const navigate = useNavigate();
   const { contracts, loading, error, refetch, updateWorkflow } = useContractsPipeline(orgId);
   const { stats: contractStats, loading: statsLoading } = useContractStats(orgId);
+  const [activeSource, setActiveSource] = useState(null);
+
+  const filteredContracts = useMemo(() => {
+    if (!activeSource) return contracts;
+    return contracts.filter(c => (SOURCE_CONFIG[c.source] ? c.source : 'manual') === activeSource);
+  }, [contracts, activeSource]);
 
   // Drag & drop : transition entre colonnes
   const handleDragEnd = useCallback(async (result) => {
@@ -294,18 +377,25 @@ export default function PipelineContrats() {
           <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
         </div>
       ) : (
-        <KanbanBoard
-          items={contracts}
-          columns={PIPELINE_COLUMNS}
-          groupBy="workflow_status"
-          renderCard={(contract) => <ContractPipelineCard contract={contract} />}
-          onCardClick={handleCardClick}
-          onDragEnd={handleDragEnd}
-          searchPlaceholder="Rechercher un contrat..."
-          searchFilter={searchFilter}
-          columnAmount={columnAmount}
-          emptyMessage="Aucun contrat"
-        />
+        <>
+          <SourceFilter
+            contracts={contracts}
+            activeSource={activeSource}
+            onChange={setActiveSource}
+          />
+          <KanbanBoard
+            items={filteredContracts}
+            columns={PIPELINE_COLUMNS}
+            groupBy="workflow_status"
+            renderCard={(contract) => <ContractPipelineCard contract={contract} />}
+            onCardClick={handleCardClick}
+            onDragEnd={handleDragEnd}
+            searchPlaceholder="Rechercher un contrat..."
+            searchFilter={searchFilter}
+            columnAmount={columnAmount}
+            emptyMessage="Aucun contrat"
+          />
+        </>
       )}
     </div>
   );

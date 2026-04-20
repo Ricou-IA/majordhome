@@ -9,10 +9,10 @@ import { contractsService } from '@services/contracts.service';
 import { contractKeys } from '@hooks/cacheKeys';
 import { useContractEquipments } from '@hooks/useContracts';
 import { usePricingData } from '@hooks/usePricing';
+import { useContractZone } from '@hooks/useContractZone';
 import {
   calculateLineTotal,
   calculateContractTotal,
-  detectZoneFromPostalCode,
 } from '@services/pricing.service';
 import { generateContractPdfBlob } from '@apps/artisan/components/contrat/ContractPDF';
 
@@ -34,17 +34,8 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   const { equipments } = useContractEquipments(contract?.id);
   const { zones, rates, discounts, equipmentTypes } = usePricingData();
 
-  const activeZone = useMemo(() => {
-    if (contract?.zone_id && zones?.length) {
-      const stored = zones.find((z) => z.id === contract.zone_id);
-      if (stored && !stored.is_default) return stored;
-    }
-    if (client?.postal_code && zones?.length) {
-      const detected = detectZoneFromPostalCode(client.postal_code, zones);
-      if (detected) return detected;
-    }
-    return null;
-  }, [client?.postal_code, contract?.zone_id, zones]);
+  // Zone tarifaire : stockée → Mapbox (temps trajet) → fallback CP dept → défaut
+  const { activeZone } = useContractZone(client, contract, zones);
 
   const rateIndex = useMemo(() => {
     if (!rates) return {};
@@ -94,7 +85,28 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
 
   // Helper : construire les données PDF (réutilisé par impression + envoi)
+  // Si le montant est forcé (admin), on scale les lignes proportionnellement
+  // pour que la somme affichée match le montant forcé (sans mention "forcé" pour le client).
   const buildPdfData = useCallback(() => {
+    const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
+    const computedTotal = computedPricing?.total || 0;
+    const billableTotal = forcedAmount != null && !isNaN(forcedAmount)
+      ? forcedAmount
+      : (computedTotal || parseFloat(contract?.amount) || 0);
+
+    const scale = forcedAmount != null && computedTotal > 0 ? forcedAmount / computedTotal : 1;
+    const equipmentLines = (computedPricing?.items || []).map((item) => ({
+      ...item,
+      lineTotal: Math.round((item.lineTotal || 0) * scale * 100) / 100,
+    }));
+
+    const subtotalScaled = forcedAmount != null
+      ? Math.round((computedPricing?.subtotal || 0) * scale * 100) / 100
+      : (computedPricing?.subtotal || 0);
+    const discountAmountScaled = forcedAmount != null
+      ? Math.round((computedPricing?.discountAmount || 0) * scale * 100) / 100
+      : (computedPricing?.discountAmount || 0);
+
     return {
       contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
       startDate: new Date().toISOString(),
@@ -105,11 +117,11 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       clientCity: client?.city || '',
       clientPhone: client?.phone || '-',
       clientEmail: client?.email || '-',
-      equipmentLines: computedPricing?.items || [],
-      subtotal: computedPricing?.subtotal || 0,
+      equipmentLines,
+      subtotal: subtotalScaled,
       discountPercent: computedPricing?.discountPercent || 0,
-      discountAmount: computedPricing?.discountAmount || 0,
-      total: computedPricing?.total || parseFloat(contract.amount) || 0,
+      discountAmount: discountAmountScaled,
+      total: billableTotal,
       zoneName: activeZone?.label || '-',
       notes: contract.notes || null,
       signatureBase64: null,

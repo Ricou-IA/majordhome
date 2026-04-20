@@ -20,6 +20,41 @@ const HQ_LAT = MAPBOX_CONFIG.defaultCenter[1]; // 43.9119
 
 // Cache module-level pour éviter les appels Mapbox redondants
 const _drivingCache = new Map();
+// Cache des centroïdes de communes (clé = "city|postcode")
+const _communeCentroidCache = new Map();
+
+/**
+ * Récupère le centroïde d'une commune via api-adresse (data.gouv.fr)
+ * Permet d'uniformiser le temps de trajet sur toute la commune
+ * (évite les écarts entre adresses proches qui changeraient de zone)
+ */
+async function getCommuneCentroid(city, postalCode) {
+  if (!city || !postalCode) return null;
+  const cacheKey = `${city.trim().toUpperCase()}|${postalCode}`;
+  if (_communeCentroidCache.has(cacheKey)) {
+    return _communeCentroidCache.get(cacheKey);
+  }
+  try {
+    const params = new URLSearchParams({
+      q: city,
+      type: 'municipality',
+      postcode: postalCode,
+      limit: '1',
+    });
+    const res = await fetch(`https://api-adresse.data.gouv.fr/search/?${params}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const feat = data.features?.[0];
+    if (!feat) return null;
+    const [lng, lat] = feat.geometry.coordinates;
+    const coords = { lat, lng };
+    _communeCentroidCache.set(cacheKey, coords);
+    return coords;
+  } catch (err) {
+    console.warn('[zoneDetection] getCommuneCentroid error:', err);
+    return null;
+  }
+}
 
 /**
  * Calcule le temps de trajet en voiture entre des coordonnées et Gaillac
@@ -41,7 +76,7 @@ export async function getDrivingDuration(lat, lng) {
   }
 
   try {
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${lng},${lat};${HQ_LNG},${HQ_LAT}?overview=false&access_token=${token}`;
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${lng},${lat};${HQ_LNG},${HQ_LAT}?overview=false&access_token=${token}`;
     const res = await fetch(url);
 
     if (!res.ok) {
@@ -109,10 +144,13 @@ export async function detectZoneForAddress(address, postalCode, city, zones) {
   if (!postalCode && !city) return empty;
 
   try {
-    // 1. Géocoder l'adresse (API gratuite data.gouv.fr)
-    const coords = await geocodeAddress(address, postalCode, city);
+    // 1. Résoudre coords : centroïde de la commune (pour zone uniforme par ville),
+    //    fallback sur géocodage adresse exacte si commune introuvable
+    let coords = await getCommuneCentroid(city, postalCode);
     if (!coords) {
-      // Fallback département si géocodage échoue
+      coords = await geocodeAddress(address, postalCode, city);
+    }
+    if (!coords) {
       const fallback = detectZoneFromPostalCode(postalCode, zones);
       return { zone: fallback, durationMinutes: null, coords: null };
     }
@@ -120,7 +158,6 @@ export async function detectZoneForAddress(address, postalCode, city, zones) {
     // 2. Temps de trajet Mapbox
     const driving = await getDrivingDuration(coords.lat, coords.lng);
     if (!driving) {
-      // Fallback département si Mapbox échoue
       const fallback = detectZoneFromPostalCode(postalCode, zones);
       return { zone: fallback, durationMinutes: null, coords };
     }

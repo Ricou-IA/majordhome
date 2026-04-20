@@ -688,13 +688,13 @@ export const SectionActions = ({
   setShowConvertConfirm,
   handleConvert,
   isConverting,
+  currentStatus,
   onRequalifyEntretien,
   isRequalifying,
-  currentStatus,
 }) => (
   <>
     {/* Action suivante (transitions) */}
-    {isEditing && allowedNext.length > 0 && (
+    {isEditing && (allowedNext.length > 0 || (onRequalifyEntretien && currentStatus?.label === 'Nouveau')) && (
       <>
         <SectionTitle>Action suivante</SectionTitle>
         <div className="flex flex-wrap gap-2">
@@ -723,7 +723,6 @@ export const SectionActions = ({
             );
           })}
 
-          {/* Requalifier → Entretien (visible sur leads Nouveau) */}
           {onRequalifyEntretien && currentStatus?.label === 'Nouveau' && (
             <button
               type="button"

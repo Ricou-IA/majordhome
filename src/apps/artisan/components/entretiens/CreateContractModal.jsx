@@ -240,7 +240,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       contractData: {
         status: contractDefaults?.status || 'active',
         workflowStatus: contractDefaults?.workflowStatus || null,
-        source: contractDefaults?.source || 'app',
+        source: contractDefaults?.source || 'manual',
         amount: calculator.pricing.total || null,
         subtotal: calculator.pricing.subtotal || null,
         discountPercent: calculator.pricing.discountPercent || null,

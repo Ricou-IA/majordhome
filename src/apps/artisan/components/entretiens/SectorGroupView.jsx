@@ -148,6 +148,9 @@ function SectorContracts({
               ? 'completed'
               : 'pending';
 
+          // Traité pour l'année = entretien en cours OU visite effectuée
+          const isDone = isAlreadyPlanned || visitStatus === 'completed';
+
           // Mois de référence
           const monthLabel = contract.maintenance_month
             ? MONTHS.find((m) => m.value === contract.maintenance_month)?.label
@@ -157,7 +160,7 @@ function SectorContracts({
             <div
               key={contract.id}
               className={`flex items-center gap-3 px-4 py-2.5 pl-11 transition-colors group ${
-                isAlreadyPlanned
+                isDone
                   ? 'opacity-50 bg-gray-50'
                   : 'hover:bg-gray-100'
               }`}
@@ -191,14 +194,14 @@ function SectorContracts({
               {/* Badge visite */}
               <VisitBadge status={visitStatus} />
 
-              {/* CTA Planifier ou badge "Déjà planifié" */}
+              {/* CTA Planifier / badge Planifié / rien (si visite déjà effectuée) */}
               {canPlan && (
                 isAlreadyPlanned ? (
                   <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded flex-shrink-0">
                     <CheckCircle2 className="h-3 w-3" />
                     Planifié
                   </span>
-                ) : (
+                ) : visitStatus === 'completed' ? null : (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -427,9 +430,11 @@ export function SectorGroupView({
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
           {filteredSectors.map((sector) => {
             const isExpanded = effectiveExpanded.has(sector.codePostal);
-            // Nombre de contrats planifiables (pas encore dans le workflow)
+            // Nombre de contrats planifiables : pas dans le workflow ET visite année en cours non effectuée
             const plannableCount = sector.contracts.filter(
-              (c) => !plannedContractIds?.has(c.id),
+              (c) =>
+                !plannedContractIds?.has(c.id) &&
+                c.current_year_visit_status !== 'completed',
             ).length;
             return (
               <div key={sector.codePostal}>

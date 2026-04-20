@@ -351,8 +351,12 @@ export const pricingService = {
 
   /**
    * Met à jour le montant d'un contrat à partir de ses lignes tarifaires
+   * @param {string} contractId
+   * @param {object} pricing - { total, subtotal, discountPercent }
+   * @param {string} zoneId
+   * @param {boolean} forced - true = saisie manuelle admin (ne sera pas re-sync automatiquement)
    */
-  async updateContractAmount(contractId, pricing, zoneId) {
+  async updateContractAmount(contractId, pricing, zoneId, forced = false) {
     try {
       if (!contractId) throw new Error('[pricingService] contractId requis');
 
@@ -363,6 +367,7 @@ export const pricingService = {
           subtotal: pricing.subtotal,
           discount_percent: pricing.discountPercent,
           zone_id: zoneId,
+          amount_forced: forced,
           updated_at: new Date().toISOString(),
         })
         .eq('id', contractId)
