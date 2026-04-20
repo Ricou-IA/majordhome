@@ -169,7 +169,7 @@ export const suppliersService = {
   // PRODUITS — LECTURE
   // ==========================================================================
 
-  async getProducts(supplierId, { search = '', limit = 50, offset = 0 } = {}) {
+  async getProducts(supplierId, { search = '', kind = null, limit = 50, offset = 0 } = {}) {
     try {
       if (!supplierId) throw new Error('[suppliersService] supplierId requis');
 
@@ -182,6 +182,8 @@ export const suppliersService = {
         .order('name')
         .range(offset, offset + limit - 1);
 
+      if (kind) query = query.eq('product_kind', kind);
+
       if (search) {
         const term = `%${search.trim()}%`;
         query = query.or(`name.ilike.${term},reference.ilike.${term},code_ean.ilike.${term},code_famille.ilike.${term},gamme.ilike.${term}`);
@@ -193,6 +195,29 @@ export const suppliersService = {
     } catch (error) {
       console.error('[suppliersService] getProducts:', error);
       return { data: [], count: 0, error };
+    }
+  },
+
+  /**
+   * Retourne les accessoires compatibles avec un produit donné
+   * (c.à.d. accessoires dont compatible_with_ids contient productId)
+   */
+  async getAccessoriesForProduct(productId) {
+    try {
+      if (!productId) return { data: [], error: null };
+      const { data, error } = await supabase
+        .from('majordhome_supplier_products')
+        .select('*')
+        .eq('is_active', true)
+        .eq('product_kind', 'accessory')
+        .contains('compatible_with_ids', [productId])
+        .order('name');
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[suppliersService] getAccessoriesForProduct:', error);
+      return { data: [], error };
     }
   },
 
@@ -332,7 +357,16 @@ export const suppliersService = {
   // PRODUITS — ÉCRITURE
   // ==========================================================================
 
-  async createProduct({ supplierId, orgId, reference, name, description, category, purchasePriceHt, sellingPriceHt, defaultTvaRate, unit, codeFamille, gamme, codeEan, tarifPublic, tauxRemise, diametre }) {
+  async createProduct({
+    supplierId, orgId, reference, name, description, category,
+    purchasePriceHt, sellingPriceHt, defaultTvaRate, unit,
+    codeFamille, gamme, codeEan, tarifPublic, tauxRemise, diametre,
+    // Enrichissement
+    fuelType, brand, variantOf, variantLabel, imageUrl, imageSourceUrl,
+    specs, clientVisible,
+    // Type de produit & compatibilité
+    productKind, compatibleWithIds,
+  }) {
     try {
       if (!supplierId || !orgId || !name) throw new Error('[suppliersService] supplierId, orgId et name requis');
 
@@ -361,6 +395,16 @@ export const suppliersService = {
           tarif_public: tp || null,
           taux_remise: tr,
           diametre: diametre || null,
+          fuel_type: fuelType || null,
+          brand: brand || null,
+          variant_of: variantOf || null,
+          variant_label: variantLabel || null,
+          image_url: imageUrl || null,
+          image_source_url: imageSourceUrl || null,
+          specs: specs || {},
+          client_visible: clientVisible !== undefined ? clientVisible : true,
+          product_kind: productKind || 'main',
+          compatible_with_ids: compatibleWithIds || [],
         })
         .select()
         .single();
@@ -476,6 +520,17 @@ export const suppliersService = {
       if (updates.sellingPriceHt !== undefined) updateData.selling_price_ht = parseFloat(updates.sellingPriceHt) || 0;
       if (updates.defaultTvaRate !== undefined) updateData.default_tva_rate = parseFloat(updates.defaultTvaRate) || 20;
       if (updates.unit !== undefined) updateData.unit = updates.unit || 'pièce';
+      // Enrichissement
+      if (updates.fuelType !== undefined) updateData.fuel_type = updates.fuelType || null;
+      if (updates.brand !== undefined) updateData.brand = updates.brand || null;
+      if (updates.variantOf !== undefined) updateData.variant_of = updates.variantOf || null;
+      if (updates.variantLabel !== undefined) updateData.variant_label = updates.variantLabel || null;
+      if (updates.imageUrl !== undefined) updateData.image_url = updates.imageUrl || null;
+      if (updates.imageSourceUrl !== undefined) updateData.image_source_url = updates.imageSourceUrl || null;
+      if (updates.specs !== undefined) updateData.specs = updates.specs || {};
+      if (updates.clientVisible !== undefined) updateData.client_visible = !!updates.clientVisible;
+      if (updates.productKind !== undefined) updateData.product_kind = updates.productKind || 'main';
+      if (updates.compatibleWithIds !== undefined) updateData.compatible_with_ids = updates.compatibleWithIds || [];
 
       // Auto-calc purchase price from tarif + remise
       if (updates.tarifPublic !== undefined || updates.tauxRemise !== undefined) {
@@ -622,6 +677,161 @@ export const suppliersService = {
     } catch (error) {
       console.error('[suppliersService] deleteProductDocument:', error);
       return { error };
+    }
+  },
+
+  // ==========================================================================
+  // FICHE PRODUIT — DÉTAIL & VARIANTES
+  // ==========================================================================
+
+  async getProductById(productId) {
+    try {
+      if (!productId) throw new Error('[suppliersService] productId requis');
+      const { data, error } = await supabase
+        .from('majordhome_supplier_products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[suppliersService] getProductById:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Retourne les variantes liées à un produit parent.
+   * (G1 acier = parent, G1 pierre ollaire + G1 pierre blanche = variantes)
+   */
+  async getProductVariants(parentId) {
+    try {
+      if (!parentId) return { data: [], error: null };
+      const { data, error } = await supabase
+        .from('majordhome_supplier_products')
+        .select('*')
+        .eq('variant_of', parentId)
+        .eq('is_active', true)
+        .order('variant_label');
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('[suppliersService] getProductVariants:', error);
+      return { data: [], error };
+    }
+  },
+
+  // ==========================================================================
+  // IMAGE PRODUIT
+  // ==========================================================================
+
+  /**
+   * Upload une image depuis un File/Blob (bucket public product-images)
+   * et met à jour product.image_url.
+   */
+  async uploadProductImage({ orgId, productId, file }) {
+    try {
+      if (!orgId || !productId || !file) {
+        throw new Error('[suppliersService] orgId, productId et file requis');
+      }
+
+      const fileExt = (file.name || 'image').split('.').pop().toLowerCase();
+      const storagePath = `${orgId}/${productId}/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from('product-images')
+        .upload(storagePath, file, {
+          contentType: file.type || 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Récupérer l'URL publique (bucket public = accès direct)
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(storagePath);
+      const publicUrl = urlData?.publicUrl;
+
+      // Mettre à jour la ligne produit
+      const { data, error } = await supabase
+        .from('majordhome_supplier_products_write')
+        .update({ image_url: publicUrl, image_source_url: null, updated_at: new Date().toISOString() })
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[suppliersService] uploadProductImage:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Définit image_url depuis une URL externe (scrapée). Ne télécharge pas — stocke juste les URLs.
+   * Utilisé par l'enrichissement web.
+   */
+  async setProductImageFromUrl(productId, imageUrl, sourceUrl = null) {
+    try {
+      if (!productId) throw new Error('[suppliersService] productId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_supplier_products_write')
+        .update({
+          image_url: imageUrl || null,
+          image_source_url: sourceUrl || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[suppliersService] setProductImageFromUrl:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Supprime l'image produit (storage si hébergée localement + clear colonnes).
+   */
+  async clearProductImage(productId) {
+    try {
+      if (!productId) throw new Error('[suppliersService] productId requis');
+
+      // Récupérer l'image_url actuelle pour tenter la suppression storage
+      const { data: product } = await supabase
+        .from('majordhome_supplier_products')
+        .select('image_url')
+        .eq('id', productId)
+        .single();
+
+      // Si URL de notre bucket, extraire le path et supprimer
+      const url = product?.image_url;
+      if (url && url.includes('/product-images/')) {
+        const path = url.split('/product-images/')[1];
+        if (path) {
+          await supabase.storage.from('product-images').remove([path]).catch(() => null);
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('majordhome_supplier_products_write')
+        .update({ image_url: null, image_source_url: null, updated_at: new Date().toISOString() })
+        .eq('id', productId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[suppliersService] clearProductImage:', error);
+      return { data: null, error };
     }
   },
 };

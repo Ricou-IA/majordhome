@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ProductDocumentsPanel } from './ProductDocumentsPanel';
+import ProductDetailDrawer from './ProductDetailDrawer';
 
 // =============================================================================
 // MODAL FOURNISSEUR
@@ -402,13 +403,19 @@ function downloadTemplate() {
 function ProductCatalog({ supplier, orgId, onBack }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [kindFilter, setKindFilter] = useState('main');  // 'main' | 'accessory' | 'consumable'
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
-  const { products, totalCount, isLoading, refetch } = useSupplierProducts(supplier.id, { search: debouncedSearch, page, pageSize });
+  const { products, totalCount, isLoading, refetch } = useSupplierProducts(supplier.id, { search: debouncedSearch, kind: kindFilter, page, pageSize });
+  // Compteurs par type (rapide : COUNT séparé)
+  const { totalCount: mainCount } = useSupplierProducts(supplier.id, { kind: 'main', pageSize: 1 });
+  const { totalCount: accessoryCount } = useSupplierProducts(supplier.id, { kind: 'accessory', pageSize: 1 });
+  const { totalCount: consumableCount } = useSupplierProducts(supplier.id, { kind: 'consumable', pageSize: 1 });
   const { createProduct, updateProduct, deactivateProduct, isCreating, isUpdating } = useProductMutations(orgId, supplier.id);
   const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
+  const [detailProductId, setDetailProductId] = useState(null);
   const [importing, setImporting] = useState(false);
   const [docsProduct, setDocsProduct] = useState(null);
   const fileInputRef = useRef(null);
@@ -432,9 +439,10 @@ function ProductCatalog({ supplier, orgId, onBack }) {
         if (result?.error) throw result.error;
         toast.success('Produit mis à jour');
       } else {
-        const result = await createProduct(form);
+        // À la création, kind = onglet actif (Équipement/Accessoires/Consommables)
+        const result = await createProduct({ ...form, productKind: kindFilter });
         if (result?.error) throw result.error;
-        toast.success('Produit créé');
+        toast.success(kindFilter === 'accessory' ? 'Accessoire créé' : 'Produit créé');
       }
       setShowModal(false);
       setEditProduct(null);
@@ -516,7 +524,8 @@ function ProductCatalog({ supplier, orgId, onBack }) {
             Import Excel
           </button>
           <button onClick={() => { setEditProduct(null); setShowModal(true); }} className="btn-primary btn-sm">
-            <Plus className="w-4 h-4 mr-1" /> Produit
+            <Plus className="w-4 h-4 mr-1" />
+            {kindFilter === 'accessory' ? 'Accessoire' : kindFilter === 'consumable' ? 'Consommable' : 'Produit'}
           </button>
         </div>
       </div>
@@ -530,6 +539,31 @@ function ProductCatalog({ supplier, orgId, onBack }) {
         <button onClick={downloadTemplate} className="text-xs text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap ml-3">
           Télécharger template
         </button>
+      </div>
+
+      {/* Filtres par type */}
+      <div className="flex items-center gap-1 border-b border-secondary-200">
+        {[
+          { value: 'main', label: 'Équipement', count: mainCount },
+          { value: 'accessory', label: 'Accessoires', count: accessoryCount },
+          ...(consumableCount > 0 ? [{ value: 'consumable', label: 'Consommables', count: consumableCount }] : []),
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => { setKindFilter(tab.value); setPage(0); }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              kindFilter === tab.value
+                ? 'border-primary-500 text-primary-700'
+                : 'border-transparent text-secondary-500 hover:text-secondary-700'
+            }`}
+          >
+            {tab.label}
+            <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 text-xs bg-secondary-100 text-secondary-600 rounded">
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Search */}
@@ -577,12 +611,41 @@ function ProductCatalog({ supplier, orgId, onBack }) {
             </thead>
             <tbody>
               {products.map((product) => (
-                <tr key={product.id} className="border-b border-secondary-100 hover:bg-secondary-50">
+                <tr
+                  key={product.id}
+                  className="border-b border-secondary-100 hover:bg-secondary-50 cursor-pointer"
+                  onClick={(e) => {
+                    // Ne pas déclencher si clic sur un bouton d'action
+                    if (e.target.closest('button')) return;
+                    setDetailProductId(product.id);
+                  }}
+                >
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{categoryLabel(product.category)}</td>
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{product.code_famille || '—'}</td>
                   <td className="py-2 pr-3">
-                    <div className="font-medium text-secondary-900">{product.name}</div>
-                    {product.gamme && <div className="text-xs text-secondary-400">{product.gamme}</div>}
+                    <div className="flex items-center gap-2">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 bg-secondary-100" />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-secondary-100 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium text-secondary-900 flex items-center gap-1.5 flex-wrap">
+                          <span>{product.name}</span>
+                          {product.brand && (
+                            <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-secondary-100 text-secondary-600 rounded">
+                              {product.brand}
+                            </span>
+                          )}
+                          {product.fuel_type && (
+                            <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-amber-50 text-amber-700 rounded">
+                              {product.fuel_type}
+                            </span>
+                          )}
+                        </div>
+                        {product.gamme && <div className="text-xs text-secondary-400">{product.gamme}</div>}
+                      </div>
+                    </div>
                   </td>
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{product.reference || '—'}</td>
                   <td className="py-2 pr-3 text-right text-secondary-500">{product.tarif_public ? formatEuro(product.tarif_public) : '—'}</td>
@@ -592,18 +655,11 @@ function ProductCatalog({ supplier, orgId, onBack }) {
                   <td className="py-2 text-right">
                     <div className="flex gap-1 justify-end">
                       <button
-                        onClick={() => setDocsProduct(product)}
-                        className="p-1.5 hover:bg-indigo-50 rounded"
-                        title="Documents"
+                        onClick={() => setDetailProductId(product.id)}
+                        className="p-1.5 hover:bg-primary-50 rounded"
+                        title="Fiche produit"
                       >
-                        <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                      </button>
-                      <button
-                        onClick={() => { setEditProduct(product); setShowModal(true); }}
-                        className="p-1.5 hover:bg-secondary-100 rounded"
-                        title="Modifier"
-                      >
-                        <Pencil className="w-3.5 h-3.5 text-secondary-500" />
+                        <Pencil className="w-3.5 h-3.5 text-primary-500" />
                       </button>
                       <button
                         onClick={() => handleDelete(product)}
@@ -662,6 +718,15 @@ function ProductCatalog({ supplier, orgId, onBack }) {
         productName={docsProduct?.name}
         orgId={orgId}
       />
+
+      {detailProductId && (
+        <ProductDetailDrawer
+          productId={detailProductId}
+          supplierId={supplier.id}
+          orgId={orgId}
+          onClose={() => setDetailProductId(null)}
+        />
+      )}
     </div>
   );
 }

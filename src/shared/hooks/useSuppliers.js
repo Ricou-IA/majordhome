@@ -104,8 +104,9 @@ export function useSupplierMutations(orgId) {
 
 /**
  * Produits d'un fournisseur (paginé côté serveur)
+ * kind : 'main' | 'accessory' | 'consumable' (null = tous)
  */
-export function useSupplierProducts(supplierId, { search = '', page = 0, pageSize = 50 } = {}) {
+export function useSupplierProducts(supplierId, { search = '', kind = null, page = 0, pageSize = 50 } = {}) {
   const offset = page * pageSize;
 
   const {
@@ -114,9 +115,9 @@ export function useSupplierProducts(supplierId, { search = '', page = 0, pageSiz
     error,
     refetch,
   } = useQuery({
-    queryKey: [...supplierKeys.products(supplierId), search, page, pageSize],
+    queryKey: [...supplierKeys.products(supplierId), search, kind, page, pageSize],
     queryFn: async () => {
-      const result = await suppliersService.getProducts(supplierId, { search, limit: pageSize, offset });
+      const result = await suppliersService.getProducts(supplierId, { search, kind, limit: pageSize, offset });
       if (result.error) throw result.error;
       return { products: result.data, count: result.count };
     },
@@ -132,6 +133,23 @@ export function useSupplierProducts(supplierId, { search = '', page = 0, pageSiz
     error,
     refetch,
   };
+}
+
+/**
+ * Accessoires compatibles avec un produit donné
+ */
+export function useAccessoriesForProduct(productId) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [...supplierKeys.all, 'accessories-for', productId],
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getAccessoriesForProduct(productId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!productId,
+    staleTime: 30_000,
+  });
+  return { accessories: data || [], isLoading, error, refetch };
 }
 
 /**
@@ -213,6 +231,86 @@ export function useProductMutations(orgId, supplierId) {
     deactivateProduct,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
+  };
+}
+
+// =============================================================================
+// DÉTAIL PRODUIT + VARIANTES
+// =============================================================================
+
+/**
+ * Détail d'un produit (pour la fiche produit enrichie)
+ */
+export function useProductDetail(productId) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: supplierKeys.productDetail(productId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getProductById(productId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!productId,
+    staleTime: 30_000,
+  });
+
+  return { product: data, isLoading, error, refetch };
+}
+
+/**
+ * Variantes d'un produit parent (G1 acier → G1 pierre ollaire, G1 pierre blanche)
+ */
+export function useProductVariants(parentId) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: supplierKeys.productVariants(parentId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getProductVariants(parentId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!parentId,
+    staleTime: 30_000,
+  });
+
+  return { variants: data || [], isLoading, error, refetch };
+}
+
+/**
+ * Mutations image produit (upload depuis file, set depuis URL externe, clear)
+ */
+export function useProductImageMutations(orgId, productId, supplierId) {
+  const queryClient = useQueryClient();
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(productId) });
+    if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(supplierId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ file }) => suppliersService.uploadProductImage({ orgId, productId, file }),
+    onSuccess: invalidate,
+  });
+
+  const setFromUrlMutation = useMutation({
+    mutationFn: ({ imageUrl, sourceUrl }) =>
+      suppliersService.setProductImageFromUrl(productId, imageUrl, sourceUrl),
+    onSuccess: invalidate,
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => suppliersService.clearProductImage(productId),
+    onSuccess: invalidate,
+  });
+
+  return {
+    uploadImage: useCallback((file) => uploadMutation.mutateAsync({ file }), [uploadMutation]),
+    setImageFromUrl: useCallback(
+      (imageUrl, sourceUrl) => setFromUrlMutation.mutateAsync({ imageUrl, sourceUrl }),
+      [setFromUrlMutation]
+    ),
+    clearImage: useCallback(() => clearMutation.mutateAsync(), [clearMutation]),
+    isUploading: uploadMutation.isPending,
+    isClearing: clearMutation.isPending,
   };
 }
 

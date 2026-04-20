@@ -29,6 +29,130 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+/**
+ * Variante inline (sans wrapper drawer) pour intégration dans un tab.
+ */
+export function ProductDocumentsInline({ productId, orgId }) {
+  const { user } = useAuth();
+  const { documents, isLoading } = useProductDocuments(productId);
+  const { uploadDocument, deleteDocument, isUploading, isDeleting } = useProductDocumentMutations(orgId, productId);
+  const [file, setFile] = useState(null);
+  const [documentType, setDocumentType] = useState('Manuel');
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    try {
+      const { error } = await uploadDocument({ file, documentType: documentType || 'Manuel', userId: user?.id });
+      if (error) throw error;
+      toast.success('Document ajouté');
+      setFile(null);
+      setDocumentType('Manuel');
+    } catch (err) {
+      console.error('[ProductDocumentsInline] upload error:', err);
+      toast.error('Erreur lors de l\'upload');
+    }
+  };
+
+  const handleDelete = async (doc) => {
+    setDeletingId(doc.id);
+    try {
+      const { error } = await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
+      if (error) throw error;
+      toast.success('Document supprimé');
+    } catch (err) {
+      console.error('[ProductDocumentsInline] delete error:', err);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDownload = async (doc) => {
+    try {
+      const { url, error } = await storageService.getSignedUrl('product-documents', doc.storage_path, 3600);
+      if (error) throw error;
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('[ProductDocumentsInline] download error:', err);
+      toast.error('Erreur lors du téléchargement');
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Upload */}
+      <div className="border border-dashed border-secondary-300 rounded-lg p-3 space-y-2 bg-secondary-50">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={documentType}
+            onChange={(e) => setDocumentType(e.target.value)}
+            list="doc-type-suggestions-inline"
+            placeholder="Type (ex: Fiche technique)"
+            className="flex-1 px-3 py-2 text-sm bg-white border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+          />
+          <datalist id="doc-type-suggestions-inline">
+            {DOC_TYPE_SUGGESTIONS.map(t => <option key={t} value={t} />)}
+          </datalist>
+          <label className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-secondary-300 rounded-lg cursor-pointer hover:bg-secondary-100">
+            <Upload className="w-4 h-4 text-secondary-500" />
+            <span className="truncate text-secondary-700 max-w-[160px]">{file ? file.name : 'Fichier'}</span>
+            <input type="file" accept=".pdf,.PDF,.png,.jpg,.jpeg,.webp" onChange={(e) => setFile(e.target.files?.[0] || null)} className="hidden" />
+          </label>
+          <button
+            onClick={handleUpload}
+            disabled={!file || isUploading}
+            className="btn-primary btn-sm"
+          >
+            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ajouter'}
+          </button>
+        </div>
+      </div>
+
+      {/* Liste */}
+      {isLoading ? (
+        <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-secondary-400" /></div>
+      ) : documents.length === 0 ? (
+        <div className="text-center py-8 text-sm text-secondary-400 bg-secondary-50 rounded-lg">
+          <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          Aucun document. Ajoute manuels, fiches techniques, certificats CE...
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {documents.map(doc => (
+            <div key={doc.id} className="flex items-center gap-3 p-2.5 bg-white border border-secondary-200 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-4 h-4 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-secondary-900 truncate">{doc.file_name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-secondary-100 text-secondary-600 rounded">{doc.document_type}</span>
+                  {doc.file_size && <span className="text-xs text-secondary-400">{formatFileSize(doc.file_size)}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => handleDownload(doc)} className="p-1.5 text-secondary-400 hover:text-primary-600 hover:bg-primary-50 rounded" title="Télécharger">
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(doc)}
+                  disabled={isDeleting && deletingId === doc.id}
+                  className="p-1.5 text-secondary-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                  title="Supprimer"
+                >
+                  {isDeleting && deletingId === doc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProductDocumentsPanel({ isOpen, onClose, productId, productName, orgId }) {
   const { user } = useAuth();
   const { documents, isLoading } = useProductDocuments(productId);
