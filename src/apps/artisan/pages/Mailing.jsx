@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Mail, Send, Sparkles } from 'lucide-react';
+import { Mail, Send, Sparkles, Filter } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import SendTab from '@apps/artisan/components/mailing/SendTab';
 import EditorTab from '@apps/artisan/components/mailing/EditorTab';
+import SegmentsTab from '@apps/artisan/components/mailing/SegmentsTab';
 
 export default function Mailing() {
   const { isOrgAdmin } = useAuth();
@@ -16,9 +17,6 @@ export default function Mailing() {
           <Mail className="w-7 h-7 text-primary-600" />
           Mailing
         </h1>
-        <p className="text-secondary-500 mt-1">
-          Composer et envoyer des campagnes email via le workflow N8N
-        </p>
       </div>
 
       {/* Onglets */}
@@ -28,6 +26,10 @@ export default function Mailing() {
             <Send className="w-4 h-4 mr-2" />
             Envoi
           </TabButton>
+          <TabButton active={tab === 'segments'} onClick={() => setTab('segments')}>
+            <Filter className="w-4 h-4 mr-2" />
+            Segments
+          </TabButton>
           <TabButton active={tab === 'editor'} onClick={() => setTab('editor')}>
             <Sparkles className="w-4 h-4 mr-2" />
             Éditeur
@@ -36,6 +38,7 @@ export default function Mailing() {
       )}
 
       {tab === 'send' && <SendTab />}
+      {tab === 'segments' && isOrgAdmin && <SegmentsTab />}
       {tab === 'editor' && isOrgAdmin && <EditorTab />}
     </div>
   );

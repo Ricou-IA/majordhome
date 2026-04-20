@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-04-19 — Mailing : campagnes paramétrables via UI + auto-bienvenue leads Nouveau (segment `leads_nouveau` + cron N8n 10 min, doc `docs/n8n/LEAD_BIENVENUE_CRON_SETUP.md`)
+> **Dernière MàJ** : 2026-04-19 — Mailing : Segment Builder + Scheduler Campagnes Auto (catalogue `mail_segments` paramétrable + 1 cron N8n générique qui lit `mail_campaigns.is_automated`, `lead_bienvenue` migré comme 1ʳᵉ campagne). Docs : `docs/MAILING_SEGMENT_BUILDER.md` + `docs/n8n/MAILING_SCHEDULER_SETUP.md`.
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -150,20 +150,29 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 ## Module Mailing
 
 ### Architecture
-- **Page** : `src/apps/artisan/pages/Mailing.jsx` — Wrapper 2 onglets : **Envoi** (tous rôles) + **Éditeur** (admin only)
-- **Onglet Envoi** : `src/apps/artisan/components/mailing/SendTab.jsx` — sélecteur campagne + ciblage + carte d'identité + preview + envoi N8n
-- **Onglet Éditeur** : `src/apps/artisan/components/mailing/EditorTab.jsx` — liste cards + actions (Éditer / Dupliquer / Archiver) + wizard `CampaignWizard.jsx`
+- **Page** : `src/apps/artisan/pages/Mailing.jsx` — Wrapper 3 onglets : **Envoi** (tous rôles) + **Segments** (admin only) + **Éditeur** (admin only)
+- **Onglet Envoi** : `src/apps/artisan/components/mailing/SendTab.jsx` — sélecteur campagne + dropdown segment (depuis `mail_segments`) + carte d'identité + preview + envoi N8n
+- **Onglet Segments** : `src/apps/artisan/components/mailing/SegmentsTab.jsx` — catalogue de segments réutilisables (presets + perso) avec CRUD via `SegmentBuilderDrawer.jsx`
+- **Onglet Éditeur** : `src/apps/artisan/components/mailing/EditorTab.jsx` — liste cards + actions (Éditer / Dupliquer / Archiver) + wizard `CampaignWizard.jsx` (inclut bloc Automatisation)
 - **Onglet client** : `src/apps/artisan/pages/client-detail/TabMailings.jsx` — Historique des mails + badges status + timeline events + compteurs opens/clics (polling 30s)
 - **Tables** :
-  - `majordhome.mail_campaigns` (campagnes paramétrables : key, label, subject, preheader, html_body, tracking_type_value, default_segment, allowed_segments[], purpose, audience, tone, trigger_description, notes, blocks JSONB)
+  - `majordhome.mail_campaigns` (key, label, subject, preheader, html_body, purpose, audience, tone, trigger_description, notes, blocks JSONB, tracking_type_value, **is_automated**, **auto_segment_id** FK, **auto_cadence_days**, **auto_cadence_minutes**, **auto_time_of_day**, **last_run_at**, **next_run_at**). Colonnes legacy `default_segment` / `allowed_segments` conservées (nullables) mais non utilisées par l'UI.
+  - `majordhome.mail_segments` (catalogue de ciblages : name, description, audience='clients'|'leads', filters JSONB DSL, is_preset, is_archived). 7 presets seed : Tous / Contrat / Contrat actif / Contrat clos / Devis relance / Contacté relance / Nouveau bienvenue.
   - `majordhome.mailing_logs` (client_id, lead_id, org_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
   - `majordhome.mailing_events` (audit log complet, 1 ligne par event webhook reçu, dédupliqué par `svix_id` UNIQUE)
-- **Vues** : `public.majordhome_mail_campaigns`, `public.majordhome_mailing_logs`, `public.majordhome_mailing_events`
-- **Service** : `src/shared/services/mailCampaigns.service.js` (CRUD)
-- **Hook** : `src/shared/hooks/useMailCampaigns.js` (React Query + mutations create/update/archive/duplicate)
-- **Cache keys** : `mailCampaignKeys.list(orgId)`, `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
+- **Colonne leads** : `status_changed_at` (timestamptz) — horodatage du passage dans le statut courant, mis à jour par trigger `WHEN (OLD.status_id IS DISTINCT FROM NEW.status_id)`. Reset à chaque changement de statut ; immuable sur correction de fiche (nom, email, etc.)
+- **Vues** : `public.majordhome_mail_campaigns`, `public.majordhome_mail_segments`, `public.majordhome_mailing_logs`, `public.majordhome_mailing_events`
+- **Services** : `mailCampaigns.service.js`, `mailSegments.service.js` (CRUD + compile/count/preview)
+- **Hooks** : `useMailCampaigns`, `useMailSegments` (+ `useSegmentCount`, `useSegmentPreview`) via React Query
+- **Cache keys** : `mailCampaignKeys`, `mailSegmentKeys`, `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
+- **RPCs** :
+  - `public.mail_segment_compile(filters jsonb, campaign_name text, org_id uuid) RETURNS text` — compose le SELECT SQL depuis le DSL jsonb. SECURITY DEFINER, format() + quote_literal pour la safety.
+  - `public.mail_segment_count(filters, campaign_name, org_id) RETURNS integer` — exécute COUNT(*) sur le SQL compilé
+  - `public.mail_segment_preview(filters, campaign_name, org_id, limit) RETURNS TABLE(...)` — retourne les N premiers destinataires
+  - `public.mail_campaigns_due() RETURNS TABLE(...)` — campagnes `is_automated=true AND next_run_at <= NOW()`, consommée par le scheduler N8n
+  - `public.mail_campaign_mark_run(campaign_id) RETURNS timestamptz` — update `last_run_at=NOW()` + calcule `next_run_at` selon cadence
 - **Constantes shared** :
-  - `src/apps/artisan/components/mailing/segments.js` — 8 segments de ciblage SQL (constantes techniques)
+  - `src/apps/artisan/components/mailing/segmentBuilder.constants.js` — audiences/housing/DPE/order_by + `buildEmptyFilters()` + `updateFilters()` (immutable path update)
   - `src/apps/artisan/components/mailing/resources.js` — 📌 caisse à outils URLs Mayer (CTA, services, blog, zones, contact). Source de vérité pour l'IA — à mettre à jour à chaque nouvelle ressource
 - **Env** : `VITE_N8N_WEBHOOK_MAILING` → webhook N8n `POST /webhook/mayer-mailing`
 - **Provider email** : Resend (API `https://api.resend.com/emails`) — bascule depuis Gmail le 2026-04-11
@@ -171,8 +180,22 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - **Edge function unsubscribe** : `supabase/functions/mailing-unsubscribe/` (verify_jwt: false, token HMAC SHA256 signé avec `RESEND_WEBHOOK_SECRET`, GET = page HTML confirmation + POST = one-click RFC 8058)
 - **Edge function avis-redirect** : `https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/avis-redirect` — redirige vers fiche Google Reviews Mayer + tracke le clic via `?log_id=` (utilisée dans SMS et accessible aux mails)
 
+### Segment Builder (onglet Segments)
+Builder à facettes 4 blocs : **Population** (audience + base filters) / **Attributs** (géo, logement, équipement, source, Meta, tags, dates) / **Historique mailing** (exclure campagnes reçues, cooldown, engagement ouvert/cliqué) / **Preview** (count live + table 20 destinataires + tri/limite). Sauvegarde dans `mail_segments` avec jsonb filters. Voir DSL dans `docs/MAILING_SEGMENT_BUILDER.md` §3.
+
+### Scheduler Campagnes Auto (workflow N8n générique)
+1 workflow unique (toutes les 10 min) :
+1. `HTTP POST /rpc/mail_campaigns_due` → liste campagnes éligibles
+2. `Split In Batches` (1 à 1)
+3. `HTTP POST /rpc/mail_segment_compile` → SQL dynamique du segment
+4. `Code node` → build payload (+LIMIT 500 safety)
+5. `HTTP POST /webhook/mayer-mailing` → workflow d'envoi existant
+6. `HTTP POST /rpc/mail_campaign_mark_run` → update `last_run_at` + `next_run_at`
+
+Setup complet : `docs/n8n/MAILING_SCHEDULER_SETUP.md`. `lead_bienvenue` est la 1ʳᵉ campagne branchée (cadence `auto_cadence_minutes=10`, ancien workflow dédié à désactiver après validation 24h).
+
 ### Éditeur de campagne (wizard 3 étapes)
-1. **Identité** : libellé (clé technique auto-générée par slugify), Contexte (objectif, cible, notes), ton éditorial (5 choix + Autre), ciblage technique (segments autorisés)
+1. **Identité** : libellé (clé technique auto-générée par slugify), Contexte (objectif, cible, notes), ton éditorial (5 choix + Autre), **bloc Automatisation** (toggle + choix `auto_segment_id` dans le catalogue + cadence jours OU minutes + heure d'envoi)
 2. **Brief** : ligne éditoriale (textarea libre — l'IA structure les blocs elle-même), objet/preheader facultatifs (l'IA propose sinon)
 3. **Génération** : prompt système copiable (inclut carte d'identité + brief + caisse à outils URLs + types de blocs disponibles + contraintes techniques) + JSON structuré + textarea HTML final + bouton Prévisualiser (iframe overlay)
 
@@ -308,25 +331,26 @@ Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
 | `mail_f` | Leads Devis envoyé | Relance Devis — suivi devis + aides + prix |
 | `mail_g` | Leads Perdu | Remerciement — ressources site web |
 
-### Segments de ciblage pré-chargés
-| Segment | Description | Exclusion |
-|---------|-------------|-----------|
-| `clients_contrat` | Clients avec contrat actif | déjà mailé (tout mailing_logs) |
-| `clients_contrat_clos` | Clients contrat clos, sans contrat actif | déjà mailé |
-| `clients_sans_contrat` | Clients sans aucun contrat (jamais eu) | déjà mailé |
-| `clients_tous` | Tous les clients | déjà mailé |
-| `leads_nouveau` | Leads au statut "Nouveau" (bienvenue auto) | déjà mailé campagne `lead_bienvenue` |
-| `leads_contacte` | Leads au statut "Contacté" | déjà mailé campagne Contacté |
-| `leads_devis` | Leads au statut "Devis envoyé" | déjà mailé campagne Devis |
-| `leads_perdu` | Leads au statut "Perdu" | déjà mailé campagne Perdu |
+### Segments de ciblage (catalogue `mail_segments`, 8 presets seed)
+| Segment preset | Audience | Description |
+|----------------|----------|-------------|
+| Tous les clients | clients | Tous actifs avec email + opt-in |
+| Clients avec contrat (actif ou clos) | clients | ≥1 contrat `active` ou `cancelled` |
+| Clients contrat actif | clients | ≥1 contrat `status='active'` |
+| Clients contrat en attente | clients | ≥1 contrat `status='pending'` |
+| Clients contrat clos | clients | `status='cancelled'` et aucun actif |
+| Leads Devis envoyé — Relance | leads | Statut Devis envoyé, `quote_sent_date` entre 7-14j |
+| Leads Contacté — Relance | leads | Statut Contacté, `status_changed_at` entre 7-14j |
+| Leads Nouveau — Bienvenue | leads | Statut Nouveau (branché sur campagne `lead_bienvenue`) |
 
-### Campagne automatique — Bienvenue nouveau lead
-- Campagne `lead_bienvenue` (à créer via l'Éditeur) ciblée sur segment `leads_nouveau`
-- **Cron N8n toutes les 10 min** : fetch campagne en DB → build payload → POST webhook `mayer-mailing` existant
-- Source unifiée : tous les leads passés en `Nouveau` avec email (saisie manuelle / formulaire web / Meta)
-- Idempotent via filtre `NOT IN mailing_logs` — pas de doublon
-- Skip silencieux si lead sans email, désinscrit, ou campagne non encore générée
-- Setup : `docs/n8n/LEAD_BIENVENUE_CRON_SETUP.md`
+**Enum DB `contract_status`** : `active` / `pending` / `cancelled` (PAS d'`archived`).
+
+Filtres par défaut sur tous les segments : `email_unsubscribed_at IS NULL`, `email IS NOT NULL`, `c.mail_optin=true` (clients), `c.is_archived=false` (clients), `l.is_deleted=false` (leads), `NOT IN mailing_logs WHERE campaign_name = <current>` (exclusion campagne courante).
+
+L'utilisateur crée des segments personnalisés via **Mailing → Segments → Nouveau segment** (builder 4 blocs). Chaque segment est un jsonb DSL compilé en SQL par la RPC `mail_segment_compile`.
+
+### Campagne automatique — Workflow générique
+Toute campagne avec `is_automated = true` + `auto_segment_id` + cadence est déclenchée par le scheduler N8n "Mayer - Scheduler Campagnes Auto" (cron 10 min). `lead_bienvenue` est la 1ʳᵉ campagne (cadence `auto_cadence_minutes=10`, ancien workflow dédié à désactiver après validation 24h). Setup : `docs/n8n/MAILING_SCHEDULER_SETUP.md`.
 
 ### Tags mailing dans fiche lead
 - Statut **Contacté** (display_order 2) : tag indigo "Mailing Relance" si campagne Contacté envoyée
@@ -335,7 +359,7 @@ Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
 - La checkbox "Mail envoyé" reste manuelle (usage commercial)
 
 ### Compteur destinataires
-Utilise la RPC `public.exec_sql(query_text)` pour exécuter un COUNT(*) sur le segment SQL sélectionné. Le résultat s'affiche en badge à côté du sélecteur de ciblage. Le toast et la confirmation utilisent le nombre réel de destinataires.
+Utilise la RPC `public.mail_segment_count(filters, campaign_name, org_id)` qui compile puis COUNT(*) en un seul aller-retour. Le résultat s'affiche en badge à côté du sélecteur de segment. Le toast et la confirmation utilisent le nombre réel de destinataires.
 
 ### Évolutions prévues
 - ~~Migration Gmail → Resend~~ ✅ FAIT (2026-04-11)

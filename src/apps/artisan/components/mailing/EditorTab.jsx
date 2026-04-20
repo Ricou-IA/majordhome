@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { toast } from 'sonner';
-import { Plus, Edit, Copy, Archive, Loader2, Mail, Info } from 'lucide-react';
+import { Plus, Edit, Copy, Archive, Loader2, Mail, Info, Zap, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
-import { SEGMENTS } from './segments';
+import { useMailSegments } from '@hooks/useMailSegments';
 import CampaignWizard from './CampaignWizard';
 
 /**
@@ -14,6 +13,7 @@ import CampaignWizard from './CampaignWizard';
 export default function EditorTab() {
   const { organization } = useAuth();
   const { campaigns, isLoading, createCampaign, updateCampaign, duplicateCampaign, archiveCampaign, isMutating } = useMailCampaigns(organization?.id);
+  const { segments } = useMailSegments(organization?.id);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -44,6 +44,8 @@ export default function EditorTab() {
       // toast déjà affiché
     }
   };
+
+  const segmentById = Object.fromEntries((segments || []).map((s) => [s.id, s]));
 
   const handleArchive = async (campaign) => {
     if (!window.confirm(`Archiver "${campaign.label}" ? Elle disparaîtra du sélecteur d'envoi.`)) return;
@@ -94,6 +96,7 @@ export default function EditorTab() {
               <CampaignCard
                 key={c.id}
                 campaign={c}
+                segment={c.auto_segment_id ? segmentById[c.auto_segment_id] : null}
                 onEdit={() => openEdit(c)}
                 onDuplicate={() => handleDuplicate(c)}
                 onArchive={() => handleArchive(c)}
@@ -116,8 +119,12 @@ export default function EditorTab() {
   );
 }
 
-function CampaignCard({ campaign, onEdit, onDuplicate, onArchive, disabled }) {
-  const segmentLabel = SEGMENTS[campaign.default_segment]?.label || campaign.default_segment;
+function CampaignCard({ campaign, segment, onEdit, onDuplicate, onArchive, disabled }) {
+  const cadenceLabel = campaign.auto_cadence_minutes
+    ? `toutes les ${campaign.auto_cadence_minutes} min`
+    : campaign.auto_cadence_days
+      ? `tous les ${campaign.auto_cadence_days} j · ${(campaign.auto_time_of_day || '09:00').slice(0, 5)}`
+      : null;
   return (
     <div className="card p-4 flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
@@ -140,9 +147,22 @@ function CampaignCard({ campaign, onEdit, onDuplicate, onArchive, disabled }) {
       )}
 
       <div className="flex flex-wrap gap-1 mt-1">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-100 text-primary-700">
-          {segmentLabel}
-        </span>
+        {segment ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-100 text-primary-700">
+            <Filter className="w-3 h-3 mr-1" />
+            {segment.name}
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-secondary-500 italic">
+            pas de segment
+          </span>
+        )}
+        {campaign.is_automated && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 font-medium">
+            <Zap className="w-3 h-3 mr-1" />
+            Auto {cadenceLabel ? `· ${cadenceLabel}` : ''}
+          </span>
+        )}
         {campaign.tracking_type_value && (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700 font-mono">
             {campaign.tracking_type_value}

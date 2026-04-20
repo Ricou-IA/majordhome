@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, Check, Copy, Eye, Loader2, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Copy, Eye, Loader2, X, Sparkles, Zap, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
-import { SEGMENTS } from './segments';
+import { useAuth } from '@contexts/AuthContext';
+import { useMailSegments } from '@hooks/useMailSegments';
 import { formatResourcesForPrompt } from './resources';
 
 // Palette de tons éditoriaux (volontairement courte et tranchée)
@@ -34,22 +35,14 @@ function slugifyKey(text) {
  * Claude, récupère le HTML, et colle dans le textarea avant de sauvegarder.
  */
 export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
+  const { organization } = useAuth();
+  const { segments } = useMailSegments(organization?.id);
+
   // État du formulaire
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => buildInitialForm(initial));
 
   const update = useCallback((patch) => setForm((f) => ({ ...f, ...patch })), []);
-  const toggleSegment = useCallback((segKey) => {
-    setForm((f) => {
-      const exists = f.allowed_segments.includes(segKey);
-      return {
-        ...f,
-        allowed_segments: exists
-          ? f.allowed_segments.filter((k) => k !== segKey)
-          : [...f.allowed_segments, segKey],
-      };
-    });
-  }, []);
 
   const promptText = useMemo(() => buildPrompt(form), [form]);
   const jsonText = useMemo(() => JSON.stringify(buildJsonPayload(form), null, 2), [form]);
@@ -84,14 +77,21 @@ export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
       preheader: form.preheader.trim() || null,
       html_body: form.html_body,
       tracking_type_value: tracking,
-      default_segment: form.default_segment,
-      allowed_segments: form.allowed_segments,
+      default_segment: null,       // legacy, remplacé par auto_segment_id
+      allowed_segments: null,      // legacy, remplacé par auto_segment_id
       purpose: form.purpose.trim() || null,
       audience: form.audience.trim() || null,
       tone: form.tone.trim() || null,
       trigger_description: form.trigger_description.trim() || null,
       notes: form.notes.trim() || null,
       blocks: { brief: form.brief },
+      is_automated: !!form.is_automated,
+      auto_segment_id: form.auto_segment_id || null,
+      auto_cadence_days: form.auto_cadence_days ? Number(form.auto_cadence_days) : null,
+      auto_cadence_minutes: form.auto_cadence_minutes ? Number(form.auto_cadence_minutes) : null,
+      auto_time_of_day: form.auto_time_of_day || '09:00',
+      // Si activation fraîche de l'automatisation, on déclenche tout de suite à la prochaine tick du cron
+      next_run_at: form.is_automated && !initial?.is_automated ? new Date().toISOString() : initial?.next_run_at || null,
     };
     await onSave(payload);
   };
@@ -140,7 +140,7 @@ export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
 
         {/* Contenu */}
         <div className="flex-1 overflow-auto p-6">
-          {step === 1 && <StepIdentity form={form} update={update} toggleSegment={toggleSegment} />}
+          {step === 1 && <StepIdentity form={form} update={update} segments={segments} />}
           {step === 2 && <StepBrief form={form} update={update} />}
           {step === 3 && (
             <StepGenerate
@@ -184,8 +184,9 @@ export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
 // STEP 1 — Identité
 // =============================================================================
 
-function StepIdentity({ form, update, toggleSegment }) {
-  const segmentEntries = Object.entries(SEGMENTS);
+function StepIdentity({ form, update, segments }) {
+  const clientSegments = segments.filter((s) => s.audience === 'clients');
+  const leadSegments = segments.filter((s) => s.audience === 'leads');
   return (
     <div className="space-y-6">
       {/* Libellé en en-tête */}
@@ -211,7 +212,7 @@ function StepIdentity({ form, update, toggleSegment }) {
           />
         </Field>
 
-        <Field label="Cible souhaitée" required hint="Profil narratif pour l'IA — le filtre technique se définit plus bas">
+        <Field label="Cible souhaitée" required hint="Profil narratif pour l'IA — le ciblage technique est défini par le segment ci-dessous">
           <textarea
             value={form.audience}
             onChange={(e) => update({ audience: e.target.value })}
@@ -242,40 +243,93 @@ function StepIdentity({ form, update, toggleSegment }) {
         />
       </Section>
 
-      {/* Section Ciblage */}
-      <Section title="Ciblage technique" required>
+      {/* Section Automatisation */}
+      <Section title="Automatisation">
         <p className="text-xs text-secondary-500 -mt-1">
-          Segments dans lesquels cette campagne pourra être envoyée. Le premier coché sera proposé par défaut.
+          Active pour laisser le scheduler N8n envoyer cette campagne automatiquement à cadence régulière. Sinon, envoi manuel depuis l'onglet "Envoi".
         </p>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {segmentEntries.map(([key, seg]) => (
-            <label key={key} className="flex items-start gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer text-sm">
-              <input
-                type="checkbox"
-                checked={form.allowed_segments.includes(key)}
-                onChange={() => toggleSegment(key)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="font-medium">{seg.label}</span>
-                <span className="block text-xs text-secondary-500">{seg.family}</span>
-              </span>
-            </label>
-          ))}
-        </div>
+        <label className="flex items-center gap-2 text-sm text-secondary-700">
+          <input
+            type="checkbox"
+            checked={!!form.is_automated}
+            onChange={(e) => update({ is_automated: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          <Zap className="w-4 h-4 text-amber-500" />
+          Activer l'envoi automatique
+        </label>
 
-        {form.allowed_segments.length > 0 && (
-          <div className="mt-3">
-            <label className="block text-sm font-medium text-secondary-700 mb-1">Segment par défaut</label>
-            <select
-              value={form.default_segment}
-              onChange={(e) => update({ default_segment: e.target.value })}
-              className={inputClass}
-            >
-              {form.allowed_segments.map((k) => (
-                <option key={k} value={k}>{SEGMENTS[k]?.label || k}</option>
-              ))}
-            </select>
+        <Field label={form.is_automated ? 'Segment ciblé (obligatoire en auto)' : 'Segment par défaut (utilisé à l\'ouverture de l\'onglet Envoi)'} hint="Choisis un segment du catalogue">
+          <select
+            value={form.auto_segment_id || ''}
+            onChange={(e) => update({ auto_segment_id: e.target.value || null })}
+            className={inputClass}
+          >
+            <option value="">— Aucun —</option>
+            {clientSegments.length > 0 && (
+              <optgroup label="Clients">
+                {clientSegments.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {leadSegments.length > 0 && (
+              <optgroup label="Leads">
+                {leadSegments.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </Field>
+
+        {form.is_automated && (
+          <div className="space-y-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field label="Cadence (jours)" hint="Ex: 7 = une fois par semaine">
+                <input
+                  type="number"
+                  min={1}
+                  value={form.auto_cadence_days || ''}
+                  onChange={(e) => update({
+                    auto_cadence_days: e.target.value,
+                    auto_cadence_minutes: e.target.value ? null : form.auto_cadence_minutes,
+                  })}
+                  className={inputClass}
+                  placeholder="7"
+                />
+              </Field>
+              <Field label="Heure d'envoi">
+                <input
+                  type="time"
+                  value={form.auto_time_of_day || '09:00'}
+                  onChange={(e) => update({ auto_time_of_day: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+            <details className="text-xs text-secondary-600">
+              <summary className="cursor-pointer font-medium">Cadence sub-jour (avancé)</summary>
+              <div className="mt-2">
+                <Field label="Cadence (minutes)" hint="Surcharge la cadence en jours. Ex: 10 = toutes les 10 minutes (pour lead_bienvenue).">
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.auto_cadence_minutes || ''}
+                    onChange={(e) => update({
+                      auto_cadence_minutes: e.target.value,
+                      auto_cadence_days: e.target.value ? null : form.auto_cadence_days,
+                    })}
+                    className={inputClass}
+                    placeholder="Ex: 10"
+                  />
+                </Field>
+              </div>
+            </details>
+            <p className="text-xs text-amber-800">
+              <Filter className="w-3 h-3 inline mr-1" />
+              Le scheduler N8n lit les campagnes dont <code className="text-[10px]">next_run_at ≤ NOW()</code> toutes les 10 min et déclenche l'envoi.
+            </p>
           </div>
         )}
       </Section>
@@ -537,23 +591,29 @@ function buildInitialForm(initial) {
     preheader: initial?.preheader || '',
     html_body: initial?.html_body || '',
     tracking_type_value: initial?.tracking_type_value || 'newsletter',
-    default_segment: initial?.default_segment || 'clients_tous',
-    allowed_segments: initial?.allowed_segments?.length
-      ? initial.allowed_segments
-      : ['clients_tous'],
     purpose: initial?.purpose || '',
     audience: initial?.audience || '',
     tone: initial?.tone || '',
     trigger_description: initial?.trigger_description || '',
     notes: initial?.notes || '',
     brief: initial?.blocks?.brief || '',
+    // Automatisation
+    is_automated: !!initial?.is_automated,
+    auto_segment_id: initial?.auto_segment_id || null,
+    auto_cadence_days: initial?.auto_cadence_days || '',
+    auto_cadence_minutes: initial?.auto_cadence_minutes || '',
+    auto_time_of_day: initial?.auto_time_of_day || '09:00',
   };
 }
 
 function validateStep(step, form) {
   if (step === 1) {
     // Clé auto-générée au save → pas besoin de la valider ici
-    return !!(form.label && form.purpose && form.audience && form.allowed_segments.length > 0);
+    if (!form.label || !form.purpose || !form.audience) return false;
+    // Si campagne automatique, le segment est obligatoire
+    if (form.is_automated && !form.auto_segment_id) return false;
+    if (form.is_automated && !form.auto_cadence_days && !form.auto_cadence_minutes) return false;
+    return true;
   }
   if (step === 2) {
     return !!form.brief?.trim();

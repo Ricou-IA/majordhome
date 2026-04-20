@@ -4,22 +4,25 @@ import { Send, FlaskConical, Loader2, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useAuth } from '@contexts/AuthContext';
-import supabase from '@lib/supabaseClient';
-import { SEGMENTS } from './segments';
 import CampaignIdentityPanel from './CampaignIdentityPanel';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
+import { useMailSegments, useSegmentCount } from '@hooks/useMailSegments';
+import { mailSegmentsService } from '@services/mailSegments.service';
 
 /**
- * Onglet Envoi — sélection de campagne + ciblage + preview + envoi.
- * Les campagnes sont chargées depuis la DB (majordhome.mail_campaigns).
+ * Onglet Envoi — sélection de campagne + segment + preview + envoi.
+ * Campagnes et segments sont chargés depuis la DB (mail_campaigns + mail_segments).
  */
 export default function SendTab() {
   const { organization } = useAuth();
   const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_MAILING;
+  const orgId = organization?.id;
 
-  const { campaigns, isLoading: campaignsLoading } = useMailCampaigns(organization?.id);
+  const { campaigns, isLoading: campaignsLoading } = useMailCampaigns(orgId);
+  const { segments, isLoading: segmentsLoading } = useMailSegments(orgId);
 
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedSegmentId, setSelectedSegmentId] = useState(null);
   const [testEmail, setTestEmail] = useState('');
 
   useEffect(() => {
@@ -33,16 +36,22 @@ export default function SendTab() {
     [campaigns, selectedId]
   );
   const campaignLabel = campaign?.label || 'custom';
-  const allowedSegments = campaign?.allowed_segments || Object.keys(SEGMENTS);
 
-  const [segment, setSegment] = useState(null);
-
+  // Le segment par défaut vient de la campagne si renseigné, sinon premier segment disponible
   useEffect(() => {
-    if (!campaign) return;
-    if (!segment || !allowedSegments.includes(segment)) {
-      setSegment(campaign.default_segment);
+    if (!campaign || segments.length === 0) return;
+    const preferredId = campaign.auto_segment_id;
+    if (preferredId && segments.some((s) => s.id === preferredId)) {
+      setSelectedSegmentId(preferredId);
+    } else if (!selectedSegmentId || !segments.some((s) => s.id === selectedSegmentId)) {
+      setSelectedSegmentId(segments[0].id);
     }
-  }, [campaign, segment, allowedSegments]);
+  }, [campaign, segments, selectedSegmentId]);
+
+  const segment = useMemo(
+    () => segments.find((s) => s.id === selectedSegmentId) || null,
+    [segments, selectedSegmentId]
+  );
 
   const [subject, setSubject] = useState('');
   const [htmlBody, setHtmlBody] = useState('');
@@ -53,38 +62,13 @@ export default function SendTab() {
     setHtmlBody(campaign.html_body || '');
   }, [campaign]);
 
-  const segmentSql = segment && SEGMENTS[segment] ? SEGMENTS[segment].sql : '';
-
-  const [recipientCount, setRecipientCount] = useState(null);
-  const [countLoading, setCountLoading] = useState(false);
-
-  useEffect(() => {
-    if (!segmentSql) {
-      setRecipientCount(null);
-      return;
-    }
-    let cancelled = false;
-    const interpolated = segmentSql.replace(/\{\{CAMPAIGN_NAME\}\}/g, campaignLabel.replace(/'/g, "''"));
-    const cleanSql = interpolated.replace(/;?\s*$/, '').replace(/ORDER BY[^)]*$/i, '');
-    const countSql = `SELECT COUNT(*) as total FROM (${cleanSql}) sub`;
-
-    setCountLoading(true);
-    supabase.rpc('exec_sql', { query_text: countSql })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.warn('Mailing count error:', error);
-          setRecipientCount(null);
-        } else {
-          const rows = Array.isArray(data) ? data : [];
-          setRecipientCount(rows[0]?.total ?? null);
-        }
-      })
-      .catch(() => { if (!cancelled) setRecipientCount(null); })
-      .finally(() => { if (!cancelled) setCountLoading(false); });
-
-    return () => { cancelled = true; };
-  }, [segmentSql, campaignLabel]);
+  // Compteur live via RPC mail_segment_count
+  const { data: recipientCount, isLoading: countLoading } = useSegmentCount({
+    filters: segment?.filters,
+    campaignName: campaignLabel,
+    orgId,
+    enabled: !!segment && !!orgId,
+  });
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [sending, setSending] = useState(false);
@@ -99,23 +83,29 @@ export default function SendTab() {
     doc.close();
   }, [htmlBody]);
 
-  const buildPayload = useCallback((isTest = false) => {
-    const interpolated = segmentSql.replace(/\{\{CAMPAIGN_NAME\}\}/g, campaignLabel.replace(/'/g, "''"));
-    const sql = interpolated ? `${interpolated.replace(/;?\s*$/, '')};` : '';
-    const recipientType = SEGMENTS[segment]?.family === 'Leads' ? 'lead' : 'client';
+  const buildPayload = useCallback(async (isTest = false) => {
+    if (!segment) return null;
+    const { data: compiledSql, error } = await mailSegmentsService.compileSql({
+      filters: segment.filters,
+      campaignName: campaignLabel,
+      orgId,
+    });
+    if (error) throw error;
+    const sql = compiledSql ? `${String(compiledSql).replace(/;?\s*$/, '')};` : '';
+    const recipientType = segment.audience === 'leads' ? 'lead' : 'client';
     return {
       subject,
       html_body: htmlBody,
       segment_sql: sql,
       campaign_name: campaignLabel,
-      org_id: organization?.id,
+      org_id: orgId,
       recipient_type: recipientType,
       tracking_column: 'emailing_reprise_sent_at',
       tracking_type_column: 'emailing_reprise_type',
       tracking_type_value: campaign?.tracking_type_value || '',
       ...(isTest && testEmail ? { test_email: testEmail } : {}),
     };
-  }, [subject, htmlBody, segmentSql, segment, campaignLabel, organization, campaign, testEmail]);
+  }, [segment, subject, htmlBody, campaignLabel, orgId, campaign, testEmail]);
 
   const sendToWebhook = useCallback(async (isTest = false) => {
     if (!webhookUrl) {
@@ -130,10 +120,16 @@ export default function SendTab() {
       toast.error("L'objet du mail est vide — modifie-le ou édite la campagne pour le renseigner");
       return;
     }
+    if (!segment) {
+      toast.error('Sélectionne un segment de ciblage');
+      return;
+    }
 
     setSending(true);
     try {
-      const payload = buildPayload(isTest);
+      const payload = await buildPayload(isTest);
+      if (!payload) throw new Error('Payload invalide');
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
 
@@ -181,13 +177,13 @@ export default function SendTab() {
     } finally {
       setSending(false);
     }
-  }, [webhookUrl, testEmail, buildPayload, recipientCount]);
+  }, [webhookUrl, testEmail, buildPayload, recipientCount, subject, segment]);
 
-  if (campaignsLoading) {
+  if (campaignsLoading || segmentsLoading) {
     return (
       <div className="card p-8 flex items-center justify-center text-secondary-500">
         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-        Chargement des campagnes…
+        Chargement…
       </div>
     );
   }
@@ -199,6 +195,10 @@ export default function SendTab() {
       </div>
     );
   }
+
+  // Groupement segments par audience
+  const clientSegments = segments.filter((s) => s.audience === 'clients');
+  const leadSegments = segments.filter((s) => s.audience === 'leads');
 
   return (
     <>
@@ -223,43 +223,34 @@ export default function SendTab() {
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-1">
                   <Filter className="w-3.5 h-3.5 inline mr-1" />
-                  Ciblage
+                  Segment
                   {countLoading ? (
                     <Loader2 className="w-3 h-3 inline ml-2 animate-spin text-secondary-400" />
-                  ) : recipientCount !== null ? (
+                  ) : recipientCount !== null && recipientCount !== undefined ? (
                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-700">
                       {recipientCount} destinataire{recipientCount > 1 ? 's' : ''}
                     </span>
                   ) : null}
                 </label>
                 <select
-                  value={segment || ''}
-                  onChange={(e) => setSegment(e.target.value)}
+                  value={selectedSegmentId || ''}
+                  onChange={(e) => setSelectedSegmentId(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 >
-                  {(() => {
-                    const filtered = Object.entries(SEGMENTS).filter(([key]) => allowedSegments.includes(key));
-                    const clientEntries = filtered.filter(([, s]) => s.family === 'Clients');
-                    const leadEntries = filtered.filter(([, s]) => s.family === 'Leads');
-                    return (
-                      <>
-                        {clientEntries.length > 0 && (
-                          <optgroup label="Clients">
-                            {clientEntries.map(([key, s]) => (
-                              <option key={key} value={key}>{s.label}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {leadEntries.length > 0 && (
-                          <optgroup label="Leads">
-                            {leadEntries.map(([key, s]) => (
-                              <option key={key} value={key}>{s.label}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {clientSegments.length > 0 && (
+                    <optgroup label="Clients">
+                      {clientSegments.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {leadSegments.length > 0 && (
+                    <optgroup label="Leads">
+                      {leadSegments.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
             </div>
@@ -318,7 +309,7 @@ export default function SendTab() {
         open={showConfirm}
         onOpenChange={setShowConfirm}
         title="Lancer la campagne"
-        description={`Tu es sur le point d'envoyer la campagne "${campaignLabel}" au segment "${SEGMENTS[segment]?.label || '?'}" (${recipientCount ?? '?'} destinataires). Cette action est irréversible.`}
+        description={`Tu es sur le point d'envoyer la campagne "${campaignLabel}" au segment "${segment?.name || '?'}" (${recipientCount ?? '?'} destinataires). Cette action est irréversible.`}
         confirmLabel="Lancer l'envoi"
         variant="default"
         onConfirm={() => sendToWebhook(false)}

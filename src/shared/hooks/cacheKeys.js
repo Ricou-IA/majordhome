@@ -99,6 +99,16 @@ export const mailCampaignKeys = {
   detail: (id) => [...mailCampaignKeys.all, 'detail', id],
 };
 
+// --- Mail Segments (catalogue de ciblages réutilisables) ---
+export const mailSegmentKeys = {
+  all: ['mail-segments'],
+  lists: () => [...mailSegmentKeys.all, 'list'],
+  list: (orgId) => [...mailSegmentKeys.lists(), orgId],
+  detail: (id) => [...mailSegmentKeys.all, 'detail', id],
+  count: (filters, campaignName, orgId) => [...mailSegmentKeys.all, 'count', orgId, campaignName, filters],
+  preview: (filters, campaignName, orgId) => [...mailSegmentKeys.all, 'preview', orgId, campaignName, filters],
+};
+
 // --- SMS ---
 export const smsKeys = {
   all: ['sms'],
@@ -155,6 +165,8 @@ export const supplierKeys = {
   list: (orgId) => [...supplierKeys.lists(), orgId],
   detail: (id) => [...supplierKeys.all, 'detail', id],
   products: (supplierId) => [...supplierKeys.all, 'products', supplierId],
+  productDetail: (productId) => [...supplierKeys.all, 'product', productId],
+  productVariants: (parentId) => [...supplierKeys.all, 'variants', parentId],
   allProducts: (orgId) => [...supplierKeys.all, 'all-products', orgId],
   searchProducts: (orgId, query) => [...supplierKeys.all, 'search-products', orgId, query],
   productDocuments: (productId) => [...supplierKeys.all, 'product-documents', productId],
