@@ -151,14 +151,16 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             </div>
           )}
 
-          {/* Badge certificat (planifié) / Bouton facturé (réalisé) */}
+          {/* Badge "Certificat à faire" — entretien + SAV avec entretien inclus uniquement */}
           {(type === 'entretien' || (type === 'sav' && item.includes_entretien)) && item.workflow_status === 'planifie' && (
             <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-[#1B4F72] text-white text-[10px] font-medium rounded-md">
               <ClipboardCheck className="w-3 h-3" />
               Certificat à faire
             </span>
           )}
-          {(type === 'entretien' || (type === 'sav' && item.includes_entretien)) && item.workflow_status === 'realise' && (
+
+          {/* Boutons d'action (Facturer + SMS avis) — tout item réalisé, entretien ou SAV */}
+          {item.workflow_status === 'realise' && (
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               <button
                 onClick={async (e) => {
@@ -167,6 +169,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                   onRefresh?.();
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
+                title="Marquer comme facturé"
               >
                 <Euro className="w-3 h-3" />
               </button>
@@ -193,6 +196,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                   }
                 }}
                 disabled={smsLoading || smsSent}
+                title={smsSent ? 'Demande d\'avis déjà envoyée' : 'Envoyer une demande d\'avis au client'}
                 className={`inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border transition-colors ${
                   smsSent
                     ? 'border-green-300 text-green-600 bg-green-50'
