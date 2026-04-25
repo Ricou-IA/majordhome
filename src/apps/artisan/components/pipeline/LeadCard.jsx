@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle } from 'lucide-react';
+import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle, Hourglass } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatEuro } from '@/lib/utils';
 
@@ -124,8 +124,10 @@ function getCommercialColor(index) {
  * @param {Function} props.onClick - Callback clic sur la carte
  * @param {boolean} props.compact - Mode compact pour le kanban
  * @param {Object} props.commercialsMap - Map { id: { initials, name, colorIndex } }
+ * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche un bouton MT-LT
+ *   sur les cartes "Devis envoyé" si fourni
  */
-export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
+export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMoveToLongTerm }) {
   if (!lead) return null;
 
   const name = `${lead.last_name || ''} ${lead.first_name || ''}`.trim() || 'Sans nom';
@@ -230,6 +232,16 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap }) {
                 <Clock className="h-3 w-3" />
                 {daysInStatus}j
               </span>
+            )}
+            {onMoveToLongTerm && lead.statuses?.label === 'Devis envoyé' && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onMoveToLongTerm(lead); }}
+                className="ml-auto inline-flex items-center justify-center h-5 w-5 rounded-full text-purple-600 hover:bg-purple-100 transition-colors"
+                title="Passer en Projet MT-LT (sortir du pipeline)"
+              >
+                <Hourglass className="h-3.5 w-3.5" />
+              </button>
             )}
           </div>
 

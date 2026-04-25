@@ -13,11 +13,13 @@ import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, U
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@hooks/useLeads';
+import { useLongTermMutations } from '@hooks/useLeadInteractions';
 import { leadsService } from '@services/leads.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LeadCard } from './LeadCard';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
+import { MoveToLongTermModal } from './longTerm/MoveToLongTermModal';
 import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
 
 // ============================================================================
@@ -186,6 +188,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const { statuses } = useLeadStatuses();
   const { commercials } = useLeadCommercials(orgId);
   const { updateLeadStatus } = useLeadMutations();
+  const { moveToLongTerm, isMoving: isMovingToLongTerm } = useLongTermMutations();
 
   // Map { userId -> { initials, name, colorIndex } } pour les badges
   const commercialsMap = useMemo(() => {
@@ -229,6 +232,8 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       if (canFilterCommercial && selectedCommercialId) {
         dateFilters.assignedUserId = selectedCommercialId;
       }
+      // Exclure les leads MT-LT (Suivi long terme) du Kanban
+      dateFilters.excludeLongTerm = true;
       const { data, error } = await leadsService.getLeads({
         orgId,
         filters: dateFilters,
@@ -262,6 +267,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         if (canFilterCommercial && selectedCommercialId) {
           dateFilters.assignedUserId = selectedCommercialId;
         }
+        dateFilters.excludeLongTerm = true;
         const { data, error } = await leadsService.getLeads({
           orgId,
           filters: dateFilters,
@@ -329,6 +335,29 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   // Etat pour le prompt "Devis envoye" depuis le kanban
   const [pendingQuote, setPendingQuote] = useState(null); // { leadId, newStatusId, oldStatusId, defaultAmount }
   const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Etat pour le bascule en Projet MT-LT
+  const [pendingLongTerm, setPendingLongTerm] = useState(null); // lead complet
+
+  const handleOpenLongTerm = useCallback((lead) => {
+    setPendingLongTerm(lead);
+  }, []);
+
+  const handleConfirmLongTerm = useCallback(async (notes) => {
+    if (!pendingLongTerm) return;
+    const leadId = pendingLongTerm.id;
+    // Optimistic : retirer immédiatement la carte du Kanban
+    setAllLeads((prev) => prev.filter((l) => l.id !== leadId));
+    try {
+      await moveToLongTerm({ leadId, notes });
+      fetchLeads();
+    } catch (err) {
+      console.error('[LeadKanban] moveToLongTerm error:', err);
+      toast.error('Erreur lors du basculement');
+      fetchLeads();
+      throw err;
+    }
+  }, [pendingLongTerm, moveToLongTerm, fetchLeads]);
 
   // Drag & drop handler avec validation des transitions
   const handleDragEnd = useCallback(
@@ -540,7 +569,13 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       columns={columns}
       groupBy="status_id"
       renderCard={(lead) => (
-        <LeadCard lead={lead} onClick={onLeadClick} compact commercialsMap={commercialsMap} />
+        <LeadCard
+          lead={lead}
+          onClick={onLeadClick}
+          compact
+          commercialsMap={commercialsMap}
+          onMoveToLongTerm={handleOpenLongTerm}
+        />
       )}
       onDragEnd={handleDragEnd}
       searchPlaceholder="Rechercher un lead..."
@@ -663,6 +698,15 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         onConfirm={handleConfirmQuote}
         loading={quoteLoading}
         defaultAmount={pendingQuote?.defaultAmount}
+      />
+
+      {/* Modale Projet MT-LT */}
+      <MoveToLongTermModal
+        isOpen={!!pendingLongTerm}
+        lead={pendingLongTerm}
+        onClose={() => setPendingLongTerm(null)}
+        onConfirm={handleConfirmLongTerm}
+        loading={isMovingToLongTerm}
       />
     </KanbanBoard>
   );

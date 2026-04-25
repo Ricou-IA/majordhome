@@ -208,6 +208,13 @@ export const leadsService = {
         query = query.eq('assigned_user_id', filters.assignedUserId);
       }
 
+      // Filtre Long Term Project (3 modes : true / false / null=pas de filtre)
+      if (filters.isLongTermProject === true) {
+        query = query.eq('is_long_term_project', true);
+      } else if (filters.excludeLongTerm === true) {
+        query = query.eq('is_long_term_project', false);
+      }
+
       // Recherche textuelle
       if (filters.search) {
         const term = `%${filters.search}%`;
@@ -777,6 +784,55 @@ export const leadsService = {
 
       return results;
     }, 'leads.searchLeads');
+  },
+
+  // ==========================================================================
+  // LONG TERM PROJECT (MT-LT)
+  // ==========================================================================
+
+  /**
+   * Bascule un lead en Projet MT-LT
+   * Met le flag, horodate la mise en MT-LT et stocke les notes contextuelles
+   */
+  async moveToLongTerm(leadId, notes = null) {
+    if (!leadId) throw new Error('[leads] leadId requis');
+
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: leadId,
+        p_updates: {
+          is_long_term_project: true,
+          long_term_started_at: new Date().toISOString(),
+          long_term_notes: notes || '',
+          updated_at: new Date().toISOString(),
+        },
+      });
+
+      if (error) throw error;
+      const updated = Array.isArray(data) ? data[0] : data;
+      return enrichLead(updated);
+    }, 'leads.moveToLongTerm');
+  },
+
+  /**
+   * Sort un lead du suivi MT-LT (clear le flag, garde les notes en historique)
+   */
+  async reactivateFromLongTerm(leadId) {
+    if (!leadId) throw new Error('[leads] leadId requis');
+
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: leadId,
+        p_updates: {
+          is_long_term_project: false,
+          updated_at: new Date().toISOString(),
+        },
+      });
+
+      if (error) throw error;
+      const updated = Array.isArray(data) ? data[0] : data;
+      return enrichLead(updated);
+    }, 'leads.reactivateFromLongTerm');
   },
 
   /**

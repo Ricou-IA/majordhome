@@ -44,6 +44,13 @@ export const leadKeys = {
   statuses: () => [...leadKeys.all, 'statuses'],
   commercials: (orgId) => [...leadKeys.all, 'commercials', orgId],
   search: (orgId, query) => [...leadKeys.all, 'search', orgId, query],
+  longTerm: (orgId, filters) => [...leadKeys.all, 'longTerm', orgId, filters],
+};
+
+// --- Lead Interactions (timeline MT-LT) ---
+export const leadInteractionKeys = {
+  all: ['lead-interactions'],
+  byLead: (leadId) => [...leadInteractionKeys.all, 'byLead', leadId],
 };
 
 // --- Appointments ---

@@ -12,7 +12,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, List, Columns3, Loader2 } from 'lucide-react';
+import { BarChart3, List, Columns3, Hourglass, Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -27,6 +27,7 @@ import { MonthlyTrendsChart } from '@components/pipeline/dashboard/MonthlyTrends
 import { LeadsList } from '@apps/artisan/components/pipeline/LeadsList';
 import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
 import { LeadKanban } from '@apps/artisan/components/pipeline/LeadKanban';
+import { LongTermTab } from '@apps/artisan/components/pipeline/longTerm/LongTermTab';
 
 // ============================================================================
 // HELPERS
@@ -141,6 +142,10 @@ export default function Pipeline() {
             <Columns3 className="h-4 w-4" />
             Kanban
           </TabsTrigger>
+          <TabsTrigger value="long-term" className="gap-2 data-[state=active]:bg-white">
+            <Hourglass className="h-4 w-4" />
+            Suivi MT-LT
+          </TabsTrigger>
         </TabsList>
 
         {/* ==================== TAB DASHBOARD ==================== */}
@@ -182,6 +187,11 @@ export default function Pipeline() {
         {/* ==================== TAB KANBAN ==================== */}
         <TabsContent value="kanban" className="mt-6">
           <LeadKanban onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} refreshTrigger={refreshKey} />
+        </TabsContent>
+
+        {/* ==================== TAB SUIVI MT-LT ==================== */}
+        <TabsContent value="long-term" className="mt-6">
+          <LongTermTab />
         </TabsContent>
       </Tabs>
 
