@@ -273,19 +273,7 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
-          // Prochain client_number
-          const { data: maxNum } = await supabase
-            .from("majordhome_clients")
-            .select("client_number")
-            .eq("org_id", ORG_ID)
-            .order("client_number", { ascending: false })
-            .limit(1)
-            .single();
-
-          const nextSeq =
-            parseInt((maxNum?.client_number || "CLI-00000").replace("CLI-", ""), 10) + 1;
-          const clientNumber = `CLI-${String(nextSeq).padStart(5, "0")}`;
-
+          // client_number généré par la séquence DB (DEFAULT majordhome.client_number_seq)
           const { data: newClient, error: clientError } = await supabase
             .from("majordhome_clients")
             .insert({
@@ -299,11 +287,10 @@ Deno.serve(async (req: Request) => {
               address: billing.address || null,
               postal_code: billing.postal_code || null,
               city: billing.city || null,
-              client_number: clientNumber,
               client_category: isCompany ? "entreprise" : "particulier",
               pennylane_account_number: pl411,
             })
-            .select("id")
+            .select("id, client_number")
             .single();
 
           if (clientError) {
@@ -312,7 +299,7 @@ Deno.serve(async (req: Request) => {
           }
           clientId = newClient.id;
           clientsCreated++;
-          log.push(`[created] ${displayName} → ${clientNumber} (${pl411})`);
+          log.push(`[created] ${displayName} → ${newClient.client_number} (${pl411})`);
         }
 
         // Créer le mapping sync

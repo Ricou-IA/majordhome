@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useClient } from '@hooks/useClients';
+import { usePennylaneSyncClient } from '@hooks/usePennylane';
 import { clientsService } from '@services/clients.service';
 import { geocodeAndUpdateByProjectId } from '@services/geocoding.service';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
@@ -83,6 +84,9 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
 
   // Hook données (désactivé en mode création)
   const { client, isLoading: loading, updateClient } = useClient(clientId);
+
+  // Sync Pennylane (fire-and-forget après création)
+  const { syncClient: syncToPennylane } = usePennylaneSyncClient(orgId);
 
   // Construire formData depuis le client DB
   const buildFormData = useCallback((c) => {
@@ -179,6 +183,11 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
         if (formData.postalCode && formData.city && newClient?.project_id) {
           geocodeAndUpdateByProjectId(newClient.project_id, formData.address, formData.postalCode, formData.city)
             .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
+        }
+        // Sync Pennylane en background (ne bloque pas la UX si l'API PL est lente/indispo)
+        if (newClient?.id) {
+          syncToPennylane(newClient)
+            .catch(err => console.warn('[ClientModal] Pennylane sync failed:', err));
         }
         toast.success('Client créé avec succès');
         await onCreated?.(newClient);
