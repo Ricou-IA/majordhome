@@ -80,6 +80,9 @@ src/
 // TOUJOURS filtrer par org_id explicitement : .eq('org_id', orgId)
 ```
 
+### Gotchas DB
+- **Séquences PostgreSQL** : Ne JAMAIS calculer manuellement un ID/numéro via `SELECT MAX(col) + 1`. Toujours laisser le DEFAULT de la séquence DB (`nextval()`) générer la valeur — atomique, évite race conditions et désynchronisation. Exemple : `majordhome.client_number` utilise `majordhome.client_number_seq`, toute insertion doit omettre `client_number` pour que le DEFAULT s'applique.
+
 ### Vues publiques principales
 - `majordhome_clients` → clients + has_active_contract calculé
 - `majordhome_contracts` → contracts JOIN clients (client_name, client_address, etc.)
@@ -120,11 +123,12 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - TanStack React Query v5
 - **Cache keys centralisées** : `src/shared/hooks/cacheKeys.js` — source unique pour toutes les query keys
   - Import : `import { clientKeys } from '@/shared/hooks/cacheKeys'`
-  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys
+  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys
   - Re-exports depuis chaque hook pour rétrocompatibilité
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
 - **`useDebounce`** : Hook utilitaire de debounce (remplace les implémentations manuelles)
 - **`useModalManager`** : Gestion centralisée d'état de modales multiples
+- **`usePennylaneSyncClient`** : Sync client MDH→Pennylane (fire-and-forget, ne bloque pas UX). Le code 411 Pennylane est récupéré et stocké dans `clients.pennylane_account_number`. Erreurs loggées silencieusement (`console.warn`). Cron `pennylane-sync-cron` : ne calcule JAMAIS `client_number` manuellement, laisse la séquence DB le générer (cf. Gotchas DB).
 - Retournent : `{ data, isLoading, error, refetch, ...mutations }`
 
 ### Composants
