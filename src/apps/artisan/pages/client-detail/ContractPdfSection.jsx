@@ -84,6 +84,13 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     return { items, ...totals };
   }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
 
+  // Montant facturable : priorité au montant forcé (admin), sinon calculé, sinon DB
+  const billableTotal = useMemo(() => {
+    const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
+    if (forcedAmount != null && !isNaN(forcedAmount)) return forcedAmount;
+    return computedPricing?.total || parseFloat(contract?.amount) || 0;
+  }, [contract, computedPricing]);
+
   // Helper : construire les données PDF (réutilisé par impression + envoi)
   // Si le montant est forcé (admin), on scale les lignes proportionnellement
   // pour que la somme affichée match le montant forcé (sans mention "forcé" pour le client).
@@ -249,7 +256,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const equipRecap = (computedPricing?.items || [])
         .map(item => `${item.label}${item.reference ? ` (${item.reference})` : ''}`)
         .join(', ') || 'Vos équipements';
-      const totalStr = formatEuro(computedPricing?.total || parseFloat(contract.amount) || 0);
+      const totalStr = formatEuro(billableTotal);
 
       // 5. Template HTML email
       const htmlBody = buildProposalEmailHtml(pdfUrl, equipRecap, totalStr);
@@ -296,7 +303,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     } finally {
       setIsSending(false);
     }
-  }, [contract, client, clientId, orgId, computedPricing, isSending, buildPdfData, queryClient]);
+  }, [contract, client, clientId, orgId, computedPricing, billableTotal, isSending, buildPdfData, queryClient]);
 
   const isSigned = !!contract.signed_at;
   const hasPdf = !!contract.contract_pdf_path;
@@ -450,7 +457,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
                     <span className="font-medium text-gray-900">Client :</span> {client?.display_name || [client?.first_name, client?.last_name].filter(Boolean).join(' ')}
                   </p>
                   <p className="text-gray-600">
-                    <span className="font-medium text-gray-900">Montant :</span> {formatEuro(computedPricing?.total || parseFloat(contract.amount) || 0)} / an
+                    <span className="font-medium text-gray-900">Montant :</span> {formatEuro(billableTotal)} / an
                   </p>
                 </div>
                 <p className="text-sm text-gray-500">
