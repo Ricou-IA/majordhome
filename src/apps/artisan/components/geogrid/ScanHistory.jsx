@@ -55,9 +55,15 @@ export default function ScanHistory({ scans, isLoading, selectedScanId, onSelect
                     <span className="text-sm font-medium text-secondary-900 truncate">
                       {scan.keyword}
                     </span>
-                    <span className="text-xs text-secondary-400">
-                      {scan.grid_size}x{scan.grid_size}
-                    </span>
+                    {scan.scan_mode === 'cities' ? (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                        Tarn · {scan.total_points} villes
+                      </span>
+                    ) : (
+                      <span className="text-xs text-secondary-400">
+                        {scan.grid_size}x{scan.grid_size}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-xs text-secondary-500">
                     <Clock className="w-3 h-3" />
@@ -77,7 +83,7 @@ export default function ScanHistory({ scans, isLoading, selectedScanId, onSelect
 
               <div className="flex items-center justify-between mt-2">
                 <span className="text-xs text-secondary-500">
-                  {stats.found || 0}/{stats.total || 0} trouvé — Rayon {scan.radius_km}km
+                  {stats.found || 0}/{stats.total || 0} trouvé{scan.scan_mode === 'cities' ? '' : ` — Rayon ${scan.radius_km}km`}
                 </span>
                 <div className="flex items-center gap-1">
                   <button

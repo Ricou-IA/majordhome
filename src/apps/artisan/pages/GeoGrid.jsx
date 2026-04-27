@@ -77,7 +77,7 @@ export default function GeoGrid() {
       <div className="flex gap-4">
         {/* Sidebar */}
         <div className="w-80 flex-shrink-0 space-y-4">
-          <ScanConfigPanel onLaunch={handleLaunch} isScanning={launchScan.isPending} />
+          <ScanConfigPanel onLaunch={handleLaunch} isScanning={launchScan.isPending} orgId={orgId} />
           <ScanHistory
             scans={scans}
             isLoading={scansLoading}
@@ -93,6 +93,7 @@ export default function GeoGrid() {
             results={results}
             centerLat={selectedScan?.center_lat || 43.9016}
             centerLng={selectedScan?.center_lng || 1.8976}
+            scanMode={selectedScan?.scan_mode || 'grid'}
             isLoading={launchScan.isPending}
           />
         </div>

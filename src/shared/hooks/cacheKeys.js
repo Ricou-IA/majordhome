@@ -193,6 +193,7 @@ export const geogridKeys = {
   list: (orgId) => [...geogridKeys.lists(), orgId],
   detail: (scanId) => [...geogridKeys.all, 'detail', scanId],
   results: (scanId) => [...geogridKeys.all, 'results', scanId],
+  quota: (orgId) => [...geogridKeys.all, 'quota', orgId],
 };
 
 // --- Tasks ---

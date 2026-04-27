@@ -416,6 +416,27 @@ planifie → [Remplir certificats équipements] → realise → facture (hors Ka
 - `markChildNeant(childId)` / `unmarkChildNeant(childId)` — NÉANT toggle
 - `completeParentEntretien(parentId, orgId, reportNotes)` — clôture + maintenance_visit
 
+## Module GeoGrid Rank Tracker
+
+Suivi SEO local Google Maps via 2 modes de scan complémentaires :
+- **Mode `grid`** : grille géographique régulière N×N (5×5/7×7/9×9) autour d'un centre — pour le maillage local fin (Gaillac et environs)
+- **Mode `cities`** : 1 requête par commune du Tarn (filtrable par seuil population) — pour la visibilité départementale
+
+### Stack
+- **Edge function** : `supabase/functions/geogrid-scan/` (non versionnée localement, déployée seule via MCP). Accepte `mode: 'grid' | 'cities'` ; en mode cities reçoit un array `points: [{name, code, lat, lng}]`. Matching business utilise normalisation Unicode (lowercase + strip diacritiques)
+- **API Google** : Places API (New) — `places.googleapis.com/v1/places:searchText`
+- **Projet GCP** : `Towercontrol` (compte Google : `eric.pudebat@gmail.com`) — secret `GOOGLE_PLACES_API_KEY` côté Supabase Edge Functions
+- **API communes Tarn** : `https://geo.api.gouv.fr/departements/81/communes` (gratuit, sans auth, INSEE) — cache LocalStorage 7 jours dans `communesService.js`
+- **Free tier Google Places** : 5000 requêtes/mois UTC (reset 1er du mois 00:00 UTC). Au-delà : 27,75 €/1000 req (tranche 5k-100k)
+
+### DB
+- `majordhome.geogrid_scans` (colonnes : `scan_mode`, `keyword`, `business_name`, `place_id`, `center_lat/lng`, `radius_km`/`grid_size` nullables si mode='cities', `search_radius_m`, `stats` jsonb)
+- `majordhome.geogrid_results` (1 ligne/point ; en mode cities : `point_label`=nom commune, `point_code`=code INSEE)
+- Vue `public.majordhome_geogrid_scans` calcule `total_points` via COUNT des results — fonctionne quel que soit le mode
+
+### Garde-fou app
+`useGeoGridQuota(orgId)` calcule `SUM(total_points)` du mois courant en bornes UTC strictes (`Date.UTC(year, month, 1)`). Bouton "Lancer le scan" désactivé si projection > 5000 sauf override explicite via checkbox.
+
 ## Plan de Développement
 | Sprint | Titre | Statut |
 |--------|-------|--------|

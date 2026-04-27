@@ -17,7 +17,7 @@ function getRankLabel(rank) {
   return String(rank);
 }
 
-export default function GeoGridMap({ results, centerLat, centerLng, isLoading }) {
+export default function GeoGridMap({ results, centerLat, centerLng, isLoading, scanMode = 'grid' }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markersRef = useRef([]);
@@ -65,19 +65,26 @@ export default function GeoGridMap({ results, centerLat, centerLng, isLoading })
 
     if (!results?.length) return;
 
-    // Center marker
-    const centerEl = document.createElement('div');
-    centerEl.style.cssText = 'width:20px;height:20px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
-    const centerMarker = new mapboxgl.Marker({ element: centerEl })
-      .setLngLat([centerLng, centerLat])
-      .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML('<b>Centre du scan</b>'))
-      .addTo(map.current);
-    markersRef.current.push(centerMarker);
+    // Center marker (uniquement en mode 'grid' — en mode 'cities' le centroïde n'a pas d'intérêt visuel)
+    if (scanMode === 'grid') {
+      const centerEl = document.createElement('div');
+      centerEl.style.cssText = 'width:20px;height:20px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+      const centerMarker = new mapboxgl.Marker({ element: centerEl })
+        .setLngLat([centerLng, centerLat])
+        .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML('<b>Centre du scan</b>'))
+        .addTo(map.current);
+      markersRef.current.push(centerMarker);
+    }
 
     // Result markers
     results.forEach((point) => {
       const color = getRankColor(point.rank);
       const label = getRankLabel(point.rank);
+      const cityLabel = point.point_label;
+
+      // Wrapper conteneur (pastille + label ville dessous en mode cities)
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
 
       const el = document.createElement('div');
       el.style.cssText = `
@@ -89,9 +96,28 @@ export default function GeoGridMap({ results, centerLat, centerLng, isLoading })
         display: flex; align-items: center; justify-content: center;
         color: white; font-size: 11px; font-weight: 700;
         text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-        cursor: pointer;
       `;
       el.textContent = label;
+      wrapper.appendChild(el);
+
+      // Label ville (mode cities uniquement)
+      if (scanMode === 'cities' && cityLabel) {
+        const labelEl = document.createElement('div');
+        labelEl.style.cssText = `
+          margin-top: 2px;
+          padding: 1px 5px;
+          background: rgba(255,255,255,0.95);
+          border-radius: 3px;
+          font-size: 10px;
+          font-weight: 600;
+          color: #1f2937;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+          white-space: nowrap;
+          pointer-events: none;
+        `;
+        labelEl.textContent = cityLabel;
+        wrapper.appendChild(labelEl);
+      }
 
       // Build places list HTML
       const places = point.places || [];
@@ -106,8 +132,13 @@ export default function GeoGridMap({ results, centerLat, centerLng, isLoading })
           }).join('')
         : '<div style="color:#999;font-size:12px;padding:4px">Aucun résultat</div>';
 
+      const popupHeader = cityLabel
+        ? `<div style="font-weight:700;color:#1f2937;font-size:14px;margin-bottom:2px">${cityLabel}</div>`
+        : '';
+
       const popup = new mapboxgl.Popup({ offset: 15, maxWidth: '280px' }).setHTML(`
         <div style="font-size:13px">
+          ${popupHeader}
           <div style="font-weight:700;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee">
             Position : ${point.rank !== null && point.rank !== undefined ? '#' + point.rank : 'Absent'}
             <span style="color:#999;font-weight:400;font-size:11px;margin-left:6px">${point.total_results || 0} résultats</span>
@@ -116,7 +147,7 @@ export default function GeoGridMap({ results, centerLat, centerLng, isLoading })
         </div>
       `);
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new mapboxgl.Marker({ element: wrapper, anchor: 'top' })
         .setLngLat([point.lng, point.lat])
         .setPopup(popup)
         .addTo(map.current);
@@ -128,7 +159,7 @@ export default function GeoGridMap({ results, centerLat, centerLng, isLoading })
     const bounds = new mapboxgl.LngLatBounds();
     results.forEach((p) => bounds.extend([p.lng, p.lat]));
     map.current.fitBounds(bounds, { padding: 40 });
-  }, [results, mapLoaded, centerLat, centerLng]);
+  }, [results, mapLoaded, centerLat, centerLng, scanMode]);
 
   return (
     <div className="relative rounded-lg overflow-hidden border">
