@@ -160,12 +160,17 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
         const { data, error } = await geogridService.launchScan(params);
         if (error) throw error;
 
-        // Lier le scan au benchmark
+        // Lier le scan au benchmark — vérifie l'erreur pour éviter les silent failures
         if (data?.scanId) {
-          await supabase
+          const { error: linkError } = await supabase
             .from('majordhome_geogrid_scans_write')
             .update({ benchmark_id: benchmarkId })
             .eq('id', data.scanId);
+          if (linkError) {
+            console.warn(`[benchmark] scan ${data.scanId} non lié au benchmark : ${linkError.message}`);
+            errorsList.push({ keyword, error: `scan créé mais non lié : ${linkError.message}` });
+            setErrors([...errorsList]);
+          }
         }
 
         completedCount += 1;
