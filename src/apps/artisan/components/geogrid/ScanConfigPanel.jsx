@@ -36,21 +36,45 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
 
   const { data: quota } = useGeoGridQuota(orgId);
 
-  // Charge la liste des communes du Tarn quand on bascule en mode 'cities'
+  // Charge la liste des communes du Tarn au mount (utilisée par les deux modes)
   useEffect(() => {
-    if (mode !== 'cities' || communes) return;
+    if (communes) return;
     setLoadingCommunes(true);
     setCommunesError(null);
     fetchTarnCommunes()
       .then((data) => setCommunes(data))
       .catch((err) => setCommunesError(err.message))
       .finally(() => setLoadingCommunes(false));
-  }, [mode, communes]);
+  }, [communes]);
 
   const filteredCommunes = useMemo(
     () => (communes ? filterByPopulation(communes, minPopulation) : []),
     [communes, minPopulation]
   );
+
+  // Villes principales (≥ 10 000 hab) pour le sélecteur du mode grille
+  const bigCities = useMemo(
+    () => (communes ? filterByPopulation(communes, 10000) : []),
+    [communes]
+  );
+
+  // Détecte la ville actuelle selon les coordonnées (tolérance ~1 km)
+  const currentCityCode = useMemo(() => {
+    if (!bigCities.length) return 'custom';
+    const lat = parseFloat(config.centerLat);
+    const lng = parseFloat(config.centerLng);
+    const match = bigCities.find(
+      (c) => Math.abs(c.lat - lat) < 0.01 && Math.abs(c.lng - lng) < 0.01
+    );
+    return match?.code || 'custom';
+  }, [bigCities, config.centerLat, config.centerLng]);
+
+  const handleCityChange = (cityCode) => {
+    if (cityCode === 'custom') return;
+    const city = bigCities.find((c) => c.code === cityCode);
+    if (!city) return;
+    setConfig((prev) => ({ ...prev, centerLat: city.lat, centerLng: city.lng }));
+  };
 
   const handleChange = (field, value) => {
     setConfig((prev) => ({ ...prev, [field]: value }));
@@ -173,6 +197,27 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
       {/* Mode grille : config géométrique */}
       {mode === 'grid' && (
         <>
+          {/* Sélecteur ville principale (≥10 000 hab) */}
+          <div>
+            <label className="block text-xs font-medium text-secondary-600 mb-1">
+              Ville à analyser <span className="text-secondary-400">(maillage fin centré)</span>
+            </label>
+            <select
+              value={currentCityCode}
+              onChange={(e) => handleCityChange(e.target.value)}
+              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              disabled={loadingCommunes || !bigCities.length}
+            >
+              {loadingCommunes && <option>Chargement...</option>}
+              {bigCities.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name} ({c.population.toLocaleString('fr-FR')} hab)
+                </option>
+              ))}
+              <option value="custom">Personnalisé (lat/lng manuelle)</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-secondary-600 mb-1">Latitude centre</label>
