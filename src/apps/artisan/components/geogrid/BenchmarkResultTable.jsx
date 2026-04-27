@@ -28,18 +28,24 @@ function detectFamily(keyword) {
   if (/poele|pellet|insert|granul|cheminée|cheminee/.test(k)) return 'Poêle';
   if (/entretien|maintenance|nettoyage/.test(k)) return 'Entretien';
   if (/clim/.test(k)) return 'Climatisation';
-  if (/pac|pompe.{0,2}chaleur/.test(k)) return 'PAC';
+  // PAC : matche "pac" isolé OU "pompe ... chaleur" avec jusqu'à 8 chars entre (couvre "pompe a chaleur", "pompe à chaleur", "pompe de chaleur" etc.)
+  if (/\bpac\b|pompe.{0,8}chaleur/.test(k)) return 'PAC';
   if (/chauf|chaud|plomb/.test(k)) return 'Chauffage';
   return 'Autre';
 }
 
-function PositionCell({ value, total }) {
+function PositionCell({ value, total, threshold = 50 }) {
   const pct = total ? Math.round((value / total) * 100) : 0;
+  // Couleur du % selon performance : vert ≥50%, ambre 1-49%, gris 0%
+  const pctColor = pct === 0
+    ? 'text-secondary-300'
+    : pct >= threshold
+      ? 'text-green-600 font-semibold'
+      : 'text-amber-600 font-medium';
   return (
-    <div className="flex items-baseline gap-1.5 tabular-nums">
-      <span className="font-medium text-secondary-900">{value}</span>
-      <span className="text-secondary-400 text-xs">/{total}</span>
-      <span className="text-secondary-500 text-xs ml-auto">{pct}%</span>
+    <div className="flex items-baseline gap-2 tabular-nums">
+      <span className="font-medium text-secondary-900 w-12 text-right">{value}<span className="text-secondary-400 text-xs">/{total}</span></span>
+      <span className={`text-xs w-10 text-right ${pctColor}`}>{pct}%</span>
     </div>
   );
 }
@@ -237,9 +243,18 @@ export default function BenchmarkResultTable({ benchmark }) {
                     {groupBy === 'none' && (
                       <th className="text-left px-3 py-2 font-medium w-32">Famille</th>
                     )}
-                    <th className="text-left px-3 py-2 font-medium w-44">Top 3</th>
-                    <th className="text-left px-3 py-2 font-medium w-44">Top 10</th>
-                    <th className="text-left px-3 py-2 font-medium w-44">Trouvé (visibilité)</th>
+                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où Mayer ressort en position 1-3">
+                      <div>Top 3</div>
+                      <div className="text-[10px] font-normal opacity-60 normal-case">points / % couvert</div>
+                    </th>
+                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où Mayer ressort dans les 10 premiers résultats">
+                      <div>Top 10</div>
+                      <div className="text-[10px] font-normal opacity-60 normal-case">points / % couvert</div>
+                    </th>
+                    <th className="text-left px-3 py-2 font-medium w-32" title="Nb de points où Mayer apparaît dans les 20 premiers résultats Google Maps">
+                      <div>Visibilité totale</div>
+                      <div className="text-[10px] font-normal opacity-60 normal-case">trouvé sur 25 / % couvert</div>
+                    </th>
                     <th className="w-10"></th>
                   </tr>
                 </thead>
@@ -254,14 +269,14 @@ export default function BenchmarkResultTable({ benchmark }) {
                           </span>
                         </td>
                       )}
-                      <td className="px-3 py-2 w-44">
-                        <PositionCell value={s.stats.top3 || 0} total={s.stats.total} />
+                      <td className="px-3 py-2 w-32">
+                        <PositionCell value={s.stats.top3 || 0} total={s.stats.total} threshold={20} />
                       </td>
-                      <td className="px-3 py-2 w-44">
-                        <PositionCell value={s.stats.top10 || 0} total={s.stats.total} />
+                      <td className="px-3 py-2 w-32">
+                        <PositionCell value={s.stats.top10 || 0} total={s.stats.total} threshold={50} />
                       </td>
-                      <td className="px-3 py-2 w-44">
-                        <PositionCell value={s.stats.found || 0} total={s.stats.total} />
+                      <td className="px-3 py-2 w-32">
+                        <PositionCell value={s.stats.found || 0} total={s.stats.total} threshold={70} />
                       </td>
                       <td className="px-3 py-2 w-10 text-right">
                         <button
