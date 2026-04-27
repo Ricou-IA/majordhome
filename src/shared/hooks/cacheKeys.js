@@ -116,6 +116,12 @@ export const mailSegmentKeys = {
   preview: (filters, campaignName, orgId) => [...mailSegmentKeys.all, 'preview', orgId, campaignName, filters],
 };
 
+// --- Mail Campaign Stats (KPIs agrégés par campagne) ---
+export const mailCampaignStatsKeys = {
+  all: ['mail-campaign-stats'],
+  list: (orgId) => [...mailCampaignStatsKeys.all, 'list', orgId],
+};
+
 // --- SMS ---
 export const smsKeys = {
   all: ['sms'],

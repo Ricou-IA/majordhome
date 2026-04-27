@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Mail, Send, Sparkles, Filter } from 'lucide-react';
+import { Mail, Send, Sparkles, Filter, BarChart3 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import SendTab from '@apps/artisan/components/mailing/SendTab';
 import EditorTab from '@apps/artisan/components/mailing/EditorTab';
 import SegmentsTab from '@apps/artisan/components/mailing/SegmentsTab';
+import StatsTab from '@apps/artisan/components/mailing/StatsTab';
 
 export default function Mailing() {
   const { isOrgAdmin } = useAuth();
@@ -26,6 +27,10 @@ export default function Mailing() {
             <Send className="w-4 h-4 mr-2" />
             Envoi
           </TabButton>
+          <TabButton active={tab === 'stats'} onClick={() => setTab('stats')}>
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Stats
+          </TabButton>
           <TabButton active={tab === 'segments'} onClick={() => setTab('segments')}>
             <Filter className="w-4 h-4 mr-2" />
             Segments
@@ -38,6 +43,7 @@ export default function Mailing() {
       )}
 
       {tab === 'send' && <SendTab />}
+      {tab === 'stats' && isOrgAdmin && <StatsTab />}
       {tab === 'segments' && isOrgAdmin && <SegmentsTab />}
       {tab === 'editor' && isOrgAdmin && <EditorTab />}
     </div>
