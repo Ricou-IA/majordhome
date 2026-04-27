@@ -225,38 +225,17 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
                   {c.name} ({c.population.toLocaleString('fr-FR')} hab)
                 </option>
               ))}
-              <option value="custom">Personnalisé (lat/lng manuelle)</option>
             </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1">Latitude centre</label>
-              <input
-                type="number"
-                step="any"
-                value={config.centerLat}
-                onChange={(e) => handleChange('centerLat', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1">Longitude centre</label>
-              <input
-                type="number"
-                step="any"
-                value={config.centerLng}
-                onChange={(e) => handleChange('centerLng', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                required
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1">Rayon (km)</label>
+              <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
+                Rayon (km)
+                <span title="Demi-côté de la grille carrée. Rayon=5 → grille de 10×10 km autour du centre.">
+                  <Info className="w-3 h-3 text-secondary-400" />
+                </span>
+              </label>
               <input
                 type="number"
                 min="1"
@@ -267,7 +246,12 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1">Grille (NxN)</label>
+              <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
+                Grille (NxN)
+                <span title="Densité du maillage. 7×7 = 49 points = 49 requêtes Google. Plus dense = diagnostic plus fin mais plus de quota consommé.">
+                  <Info className="w-3 h-3 text-secondary-400" />
+                </span>
+              </label>
               <select
                 value={config.gridSize}
                 onChange={(e) => handleChange('gridSize', e.target.value)}
@@ -279,7 +263,12 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1">Rayon recherche (m)</label>
+              <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
+                Rayon recherche (m)
+                <span title="Profil utilisateur simulé à chaque point. Plus petit = client à pied (resto). Plus grand = client qui fait venir un pro (installateur, plombier). Pour Mayer : 1000-2000 m.">
+                  <Info className="w-3 h-3 text-secondary-400" />
+                </span>
+              </label>
               <input
                 type="number"
                 min="500"
