@@ -55,6 +55,7 @@ function MiniBar({ pct, color }) {
 export default function BenchmarkResultTable({ benchmark }) {
   const [groupBy, setGroupBy] = useState('family');
   const [sortBy, setSortBy] = useState('found');
+  const [selectedFamily, setSelectedFamily] = useState(null);
 
   const { data: scans, isLoading } = useBenchmarkScans(benchmark.id);
 
@@ -75,10 +76,17 @@ export default function BenchmarkResultTable({ benchmark }) {
   }, [scans, sortBy]);
 
   const groupedScans = useMemo(() => {
-    if (groupBy === 'none') return { 'Tous': enrichedScans };
+    if (groupBy === 'none') {
+      // Pas de groupement : on filtre quand même selon la famille sélectionnée
+      const list = selectedFamily
+        ? enrichedScans.filter((s) => s.family === selectedFamily)
+        : enrichedScans;
+      return { 'Tous': list };
+    }
     const groups = {};
     const order = ['Poêle', 'Ramonage', 'Climatisation', 'PAC', 'Chauffage', 'Entretien', 'Autre'];
     enrichedScans.forEach((s) => {
+      if (selectedFamily && s.family !== selectedFamily) return;
       if (!groups[s.family]) groups[s.family] = [];
       groups[s.family].push(s);
     });
@@ -86,7 +94,7 @@ export default function BenchmarkResultTable({ benchmark }) {
     order.forEach((f) => { if (groups[f]) sortedGroups[f] = groups[f]; });
     Object.keys(groups).forEach((f) => { if (!sortedGroups[f]) sortedGroups[f] = groups[f]; });
     return sortedGroups;
-  }, [enrichedScans, groupBy]);
+  }, [enrichedScans, groupBy, selectedFamily]);
 
   // Synthèse par famille avec 2 métriques
   const summary = useMemo(() => {
@@ -155,28 +163,57 @@ export default function BenchmarkResultTable({ benchmark }) {
         </div>
       </div>
 
-      {/* Cards synthèse par famille — 2 métriques claires */}
-      {groupBy === 'family' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+      {/* Cards synthèse par famille — toutes sur 1 ligne, cliquables pour filtrer */}
+      {groupBy === 'family' && Object.keys(summary).length > 0 && (
+        <div className="flex gap-2">
           {Object.entries(summary).map(([family, stats]) => {
             const top10Pct = stats.count ? Math.round((stats.keywordsInTop10 / stats.count) * 100) : 0;
             const coveragePct = stats.totalSum ? Math.round((stats.foundSum / stats.totalSum) * 100) : 0;
+            const isSelected = selectedFamily === family;
+            const isDimmed = selectedFamily !== null && !isSelected;
             return (
-              <div key={family} className={`rounded-lg p-3 border ${FAMILY_COLORS[family] || FAMILY_COLORS.Autre}`}>
-                <div className="text-xs font-bold mb-1">{family}</div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold tabular-nums">{stats.keywordsInTop10}</span>
-                  <span className="text-xs opacity-75">/ {stats.count}</span>
-                </div>
-                <div className="text-[10px] opacity-75 mb-2">keywords en top 10</div>
-                <div className="flex items-center gap-1.5 text-[10px] opacity-75">
-                  <span className="tabular-nums font-medium">{coveragePct}%</span>
-                  <span>couverture géo</span>
+              <button
+                key={family}
+                onClick={() => setSelectedFamily(isSelected ? null : family)}
+                className={`flex-1 min-w-0 text-left rounded-lg p-2.5 border transition-all ${
+                  FAMILY_COLORS[family] || FAMILY_COLORS.Autre
+                } ${
+                  isSelected ? 'ring-2 ring-secondary-900 shadow-md' : 'hover:shadow-sm hover:scale-[1.01]'
+                } ${
+                  isDimmed ? 'opacity-40' : ''
+                }`}
+                title={isSelected ? 'Cliquer pour désélectionner' : `Filtrer sur ${family}`}
+              >
+                <div className="text-[11px] font-bold uppercase tracking-wide truncate">{family}</div>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-xl font-bold tabular-nums leading-none">{stats.keywordsInTop10}</span>
+                  <span className="text-[10px] opacity-75">/{stats.count}</span>
+                  <span className="text-[9px] opacity-60 ml-auto">top10</span>
                 </div>
                 <MiniBar pct={top10Pct} color={FAMILY_BADGE_COLORS[family] || FAMILY_BADGE_COLORS.Autre} />
-              </div>
+                <div className="mt-1.5 text-[10px] opacity-75 flex items-center gap-1">
+                  <span className="tabular-nums font-medium">{coveragePct}%</span>
+                  <span className="truncate">couverture géo</span>
+                </div>
+              </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Indicateur de filtre actif */}
+      {selectedFamily && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-secondary-600">Filtre actif :</span>
+          <span className={`font-semibold px-2 py-0.5 rounded border ${FAMILY_COLORS[selectedFamily] || FAMILY_COLORS.Autre}`}>
+            {selectedFamily}
+          </span>
+          <button
+            onClick={() => setSelectedFamily(null)}
+            className="text-primary-600 hover:text-primary-700 underline"
+          >
+            voir tout
+          </button>
         </div>
       )}
 
