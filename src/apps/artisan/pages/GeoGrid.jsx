@@ -73,21 +73,12 @@ export default function GeoGrid() {
         </div>
       )}
 
-      {/* Main layout: sidebar + map */}
+      {/* Main layout: sidebar config + map */}
       <div className="flex gap-4">
-        {/* Sidebar */}
-        <div className="w-80 flex-shrink-0 space-y-4">
+        <div className="w-80 flex-shrink-0">
           <ScanConfigPanel onLaunch={handleLaunch} isScanning={launchScan.isPending} orgId={orgId} />
-          <ScanHistory
-            scans={scans}
-            isLoading={scansLoading}
-            selectedScanId={selectedScanId}
-            onSelect={setSelectedScanId}
-            onDelete={handleDelete}
-          />
         </div>
 
-        {/* Map */}
         <div className="flex-1">
           <GeoGridMap
             results={results}
@@ -98,6 +89,15 @@ export default function GeoGrid() {
           />
         </div>
       </div>
+
+      {/* Historique des scans en pleine largeur */}
+      <ScanHistory
+        scans={scans}
+        isLoading={scansLoading}
+        selectedScanId={selectedScanId}
+        onSelect={setSelectedScanId}
+        onDelete={handleDelete}
+      />
     </div>
   );
 }

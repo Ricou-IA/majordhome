@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin, ExternalLink } from 'lucide-react';
+import { useAuth } from '@contexts/AuthContext';
 import { useGeoGridQuota } from '@hooks/useGeoGrid';
 import { fetchTarnCommunes, filterByPopulation, centroidOf } from './communesService';
 
@@ -36,8 +37,21 @@ const SEARCH_PROFILES = [
 const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
 export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
+  const { organization } = useAuth();
+  const orgPlaceId = organization?.settings?.google_place_id || '';
+
   const [mode, setMode] = useState('grid'); // 'grid' | 'cities'
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [config, setConfig] = useState(() => ({
+    ...DEFAULT_CONFIG,
+    placeId: organization?.settings?.google_place_id || '',
+  }));
+
+  // Pré-remplit le placeId quand l'org se charge (cas où l'org n'était pas dispo au mount)
+  useEffect(() => {
+    if (orgPlaceId) {
+      setConfig((prev) => (prev.placeId ? prev : { ...prev, placeId: orgPlaceId }));
+    }
+  }, [orgPlaceId]);
   const [allowOverage, setAllowOverage] = useState(false);
   const [minPopulation, setMinPopulation] = useState(1000);
   const [citiesSearchRadius, setCitiesSearchRadius] = useState(2000);
@@ -179,15 +193,13 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
         </div>
         <div>
           <label className="text-xs font-medium text-secondary-600 mb-1 flex items-center justify-between gap-1">
-            <span>
-              Place ID <span className="text-secondary-400">(optionnel)</span>
-            </span>
+            <span>Place ID</span>
             <a
               href="https://developers.google.com/maps/documentation/places/web-service/place-id"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary-600 hover:text-primary-700 text-[11px] flex items-center gap-0.5"
-              title="Ouvre l'outil Google Place ID Finder. Cherche 'Mayer Energie' (pas l'adresse) et clique sur le pin du business."
+              title="Ouvre l'outil Google Place ID Finder. Cherche le business (pas l'adresse) et clique sur le pin."
             >
               Trouver
               <ExternalLink className="w-2.5 h-2.5" />
@@ -223,7 +235,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
           {/* Sélecteur ville principale (≥10 000 hab) */}
           <div>
             <label className="block text-xs font-medium text-secondary-600 mb-1">
-              Ville à analyser <span className="text-secondary-400">(maillage fin centré)</span>
+              Ville à analyser
             </label>
             <select
               value={currentCityCode}
@@ -240,14 +252,9 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
-                Rayon (km)
-                <span title="Demi-côté de la grille carrée. Rayon=5 → grille de 10×10 km autour du centre.">
-                  <Info className="w-3 h-3 text-secondary-400" />
-                </span>
-              </label>
+              <label className="block text-xs font-medium text-secondary-600 mb-1">Rayon (km)</label>
               <input
                 type="number"
                 min="1"
@@ -258,12 +265,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
-                Grille (NxN)
-                <span title="Densité du maillage. 7×7 = 49 points = 49 requêtes Google. Plus dense = diagnostic plus fin mais plus de quota consommé.">
-                  <Info className="w-3 h-3 text-secondary-400" />
-                </span>
-              </label>
+              <label className="block text-xs font-medium text-secondary-600 mb-1">Grille (NxN)</label>
               <select
                 value={config.gridSize}
                 onChange={(e) => handleChange('gridSize', e.target.value)}
@@ -274,23 +276,19 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
                 <option value={9}>9x9 (81 pts)</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
-                Rayon recherche (m)
-                <span title="Profil utilisateur simulé à chaque point. Plus petit = client à pied (resto). Plus grand = client qui fait venir un pro (installateur, plombier). Pour Mayer : 1000-2000 m.">
-                  <Info className="w-3 h-3 text-secondary-400" />
-                </span>
-              </label>
-              <input
-                type="number"
-                min="500"
-                max="5000"
-                step="100"
-                value={config.searchRadiusM}
-                onChange={(e) => handleChange('searchRadiusM', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-secondary-600 mb-1">Rayon recherche (m)</label>
+            <input
+              type="number"
+              min="500"
+              max="5000"
+              step="100"
+              value={config.searchRadiusM}
+              onChange={(e) => handleChange('searchRadiusM', e.target.value)}
+              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
           </div>
         </>
       )}
