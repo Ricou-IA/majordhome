@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin, ExternalLink } from 'lucide-react';
 import { useGeoGridQuota } from '@hooks/useGeoGrid';
 import { fetchTarnCommunes, filterByPopulation, centroidOf } from './communesService';
 
@@ -178,8 +178,20 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-secondary-600 mb-1">
-            Place ID <span className="text-secondary-400">(optionnel)</span>
+          <label className="text-xs font-medium text-secondary-600 mb-1 flex items-center justify-between gap-1">
+            <span>
+              Place ID <span className="text-secondary-400">(optionnel)</span>
+            </span>
+            <a
+              href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-600 hover:text-primary-700 text-[11px] flex items-center gap-0.5"
+              title="Ouvre l'outil Google Place ID Finder. Cherche 'Mayer Energie' (pas l'adresse) et clique sur le pin du business."
+            >
+              Trouver
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
           </label>
           <input
             type="text"
