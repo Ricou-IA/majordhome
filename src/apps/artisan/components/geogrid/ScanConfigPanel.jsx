@@ -22,6 +22,16 @@ const POPULATION_THRESHOLDS = [
   { value: 5000, label: '≥ 5000 hab' },
 ];
 
+// Profils de recherche simulée (biais Google `locationBias`)
+// Le radius indique à quel point Google privilégie la proximité géographique stricte.
+const SEARCH_PROFILES = [
+  { value: 500, label: 'Proximité piétonne (500 m)', hint: 'Resto, café, commerce — client à pied' },
+  { value: 1000, label: 'Proximité quartier (1 km)', hint: 'Coiffeur, pressing, boulangerie' },
+  { value: 2000, label: 'Recherche ville (2 km)', hint: 'Installateur, plombier, chauffagiste — le pro vient au client' },
+  { value: 3000, label: 'Recherche ville étendue (3 km)', hint: 'Service technique, prestation à domicile' },
+  { value: 5000, label: 'Recherche zone large (5 km)', hint: 'Concessionnaire, magasin spécialisé' },
+];
+
 // Pricing Google Places API Text Search Pro — tranche 5000-100000 req/mois
 const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
@@ -30,6 +40,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [allowOverage, setAllowOverage] = useState(false);
   const [minPopulation, setMinPopulation] = useState(1000);
+  const [citiesSearchRadius, setCitiesSearchRadius] = useState(2000);
   const [communes, setCommunes] = useState(null);
   const [loadingCommunes, setLoadingCommunes] = useState(false);
   const [communesError, setCommunesError] = useState(null);
@@ -101,7 +112,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
         keyword: config.keyword,
         centerLat: center.lat,
         centerLng: center.lng,
-        searchRadiusM: 500, // bias court pour SEO local fin sur centre-ville
+        searchRadiusM: citiesSearchRadius,
         points: filteredCommunes.map((c) => ({ name: c.name, code: c.code, lat: c.lat, lng: c.lng })),
       });
     }
@@ -283,21 +294,45 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
         </>
       )}
 
-      {/* Mode communes : sélecteur seuil pop */}
+      {/* Mode communes : sélecteur seuil pop + profil de recherche */}
       {mode === 'cities' && (
-        <div className="space-y-2">
-          <label className="block text-xs font-medium text-secondary-600">
-            Seuil de population (filtre les communes scannées)
-          </label>
-          <select
-            value={minPopulation}
-            onChange={(e) => setMinPopulation(parseInt(e.target.value))}
-            className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            {POPULATION_THRESHOLDS.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-secondary-600 mb-1">
+              Seuil de population <span className="text-secondary-400">(filtre les communes scannées)</span>
+            </label>
+            <select
+              value={minPopulation}
+              onChange={(e) => setMinPopulation(parseInt(e.target.value))}
+              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              {POPULATION_THRESHOLDS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-secondary-600 mb-1 flex items-center gap-1">
+              Profil de recherche simulé
+              <span title="Définit à quel point Google privilégie la proximité géographique stricte. Plus large = simule un client prêt à faire venir un pro de plus loin.">
+                <Info className="w-3 h-3 text-secondary-400" />
+              </span>
+            </label>
+            <select
+              value={citiesSearchRadius}
+              onChange={(e) => setCitiesSearchRadius(parseInt(e.target.value))}
+              className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              {SEARCH_PROFILES.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+            <div className="text-[11px] text-secondary-500 mt-1 italic">
+              {SEARCH_PROFILES.find((p) => p.value === citiesSearchRadius)?.hint}
+            </div>
+          </div>
+
           <div className="text-xs text-secondary-600 bg-secondary-50 rounded px-2 py-1.5">
             {loadingCommunes && <span>Chargement des communes du Tarn...</span>}
             {communesError && <span className="text-red-600">Erreur : {communesError}</span>}
