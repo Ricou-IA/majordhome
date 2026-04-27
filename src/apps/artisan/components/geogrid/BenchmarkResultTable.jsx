@@ -1,16 +1,25 @@
 import { useMemo, useState } from 'react';
 import { Loader2, Eye } from 'lucide-react';
 import { useBenchmarkScans } from '@hooks/useGeoGrid';
-import { Link } from 'react-router-dom';
 
 const FAMILY_COLORS = {
-  'Poêle': 'bg-amber-100 text-amber-700',
-  'Ramonage': 'bg-purple-100 text-purple-700',
-  'Climatisation': 'bg-blue-100 text-blue-700',
-  'PAC': 'bg-green-100 text-green-700',
-  'Chauffage': 'bg-red-100 text-red-700',
-  'Entretien': 'bg-pink-100 text-pink-700',
-  'Autre': 'bg-secondary-100 text-secondary-700',
+  'Poêle': 'bg-amber-100 text-amber-800 border-amber-200',
+  'Ramonage': 'bg-purple-100 text-purple-800 border-purple-200',
+  'Climatisation': 'bg-blue-100 text-blue-800 border-blue-200',
+  'PAC': 'bg-green-100 text-green-800 border-green-200',
+  'Chauffage': 'bg-red-100 text-red-800 border-red-200',
+  'Entretien': 'bg-pink-100 text-pink-800 border-pink-200',
+  'Autre': 'bg-secondary-100 text-secondary-800 border-secondary-200',
+};
+
+const FAMILY_BADGE_COLORS = {
+  'Poêle': 'bg-amber-500',
+  'Ramonage': 'bg-purple-500',
+  'Climatisation': 'bg-blue-500',
+  'PAC': 'bg-green-500',
+  'Chauffage': 'bg-red-500',
+  'Entretien': 'bg-pink-500',
+  'Autre': 'bg-secondary-500',
 };
 
 function detectFamily(keyword) {
@@ -24,25 +33,31 @@ function detectFamily(keyword) {
   return 'Autre';
 }
 
-function PositionBadge({ value, label, total, color }) {
+function PositionCell({ value, total }) {
   const pct = total ? Math.round((value / total) * 100) : 0;
   return (
-    <div className="flex items-center gap-1">
-      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
-        {value}/{total}
-      </span>
-      <span className="text-[10px] text-secondary-400">{pct}%</span>
+    <div className="flex items-baseline gap-1.5 tabular-nums">
+      <span className="font-medium text-secondary-900">{value}</span>
+      <span className="text-secondary-400 text-xs">/{total}</span>
+      <span className="text-secondary-500 text-xs ml-auto">{pct}%</span>
+    </div>
+  );
+}
+
+function MiniBar({ pct, color }) {
+  return (
+    <div className="h-1.5 bg-secondary-100 rounded-full overflow-hidden mt-1">
+      <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
 export default function BenchmarkResultTable({ benchmark }) {
-  const [groupBy, setGroupBy] = useState('family'); // 'family' | 'none'
-  const [sortBy, setSortBy] = useState('found'); // 'found' | 'top10' | 'top3' | 'keyword'
+  const [groupBy, setGroupBy] = useState('family');
+  const [sortBy, setSortBy] = useState('found');
 
   const { data: scans, isLoading } = useBenchmarkScans(benchmark.id);
 
-  // Enrichis les scans avec famille + tri
   const enrichedScans = useMemo(() => {
     if (!scans) return [];
     const enriched = scans.map((s) => ({
@@ -50,53 +65,48 @@ export default function BenchmarkResultTable({ benchmark }) {
       family: detectFamily(s.keyword),
       stats: s.stats || {},
     }));
-
-    // Tri
     enriched.sort((a, b) => {
       if (sortBy === 'keyword') return a.keyword.localeCompare(b.keyword);
       const aVal = a.stats[sortBy] || 0;
       const bVal = b.stats[sortBy] || 0;
       return bVal - aVal;
     });
-
     return enriched;
   }, [scans, sortBy]);
 
-  // Group by family
   const groupedScans = useMemo(() => {
     if (groupBy === 'none') return { 'Tous': enrichedScans };
     const groups = {};
+    const order = ['Poêle', 'Ramonage', 'Climatisation', 'PAC', 'Chauffage', 'Entretien', 'Autre'];
     enrichedScans.forEach((s) => {
       if (!groups[s.family]) groups[s.family] = [];
       groups[s.family].push(s);
     });
-    return groups;
+    const sortedGroups = {};
+    order.forEach((f) => { if (groups[f]) sortedGroups[f] = groups[f]; });
+    Object.keys(groups).forEach((f) => { if (!sortedGroups[f]) sortedGroups[f] = groups[f]; });
+    return sortedGroups;
   }, [enrichedScans, groupBy]);
 
-  // Synthèse globale
+  // Synthèse par famille avec 2 métriques
   const summary = useMemo(() => {
-    if (!enrichedScans.length) return null;
-    const total = enrichedScans.reduce((acc, s) => {
-      acc.top3 += s.stats.top3 || 0;
-      acc.top10 += s.stats.top10 || 0;
-      acc.found += s.stats.found || 0;
-      acc.total += s.stats.total || 0;
-      return acc;
-    }, { top3: 0, top10: 0, found: 0, total: 0 });
-
-    // Synthèse par famille
     const byFamily = {};
     enrichedScans.forEach((s) => {
-      if (!byFamily[s.family]) byFamily[s.family] = { count: 0, top3: 0, top10: 0, found: 0, total: 0 };
+      if (!byFamily[s.family]) byFamily[s.family] = {
+        count: 0,
+        top3Sum: 0, top10Sum: 0, foundSum: 0, totalSum: 0,
+        keywordsInTop10: 0, keywordsInTop3: 0,
+      };
       const f = byFamily[s.family];
       f.count += 1;
-      f.top3 += s.stats.top3 || 0;
-      f.top10 += s.stats.top10 || 0;
-      f.found += s.stats.found || 0;
-      f.total += s.stats.total || 0;
+      f.top3Sum += s.stats.top3 || 0;
+      f.top10Sum += s.stats.top10 || 0;
+      f.foundSum += s.stats.found || 0;
+      f.totalSum += s.stats.total || 0;
+      if ((s.stats.top10 || 0) > 0) f.keywordsInTop10 += 1;
+      if ((s.stats.top3 || 0) > 0) f.keywordsInTop3 += 1;
     });
-
-    return { total, byFamily };
+    return byFamily;
   }, [enrichedScans]);
 
   if (isLoading) {
@@ -117,8 +127,8 @@ export default function BenchmarkResultTable({ benchmark }) {
   }
 
   return (
-    <div className="bg-white rounded-lg border p-4 space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="bg-white rounded-lg border p-4 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h3 className="font-semibold text-secondary-900">Résultats du benchmark</h3>
           <p className="text-xs text-secondary-500 mt-0.5">{benchmark.list_name} · {enrichedScans.length} keywords scannés</p>
@@ -140,88 +150,98 @@ export default function BenchmarkResultTable({ benchmark }) {
             className="text-xs px-2 py-1 border rounded"
           >
             <option value="family">Grouper par famille</option>
-            <option value="none">Pas de groupement</option>
+            <option value="none">Tout afficher</option>
           </select>
         </div>
       </div>
 
-      {/* Synthèse cards par famille */}
-      {summary && groupBy === 'family' && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-          {Object.entries(summary.byFamily).map(([family, stats]) => {
-            const visiblePct = stats.total ? Math.round((stats.found / stats.total) * 100) : 0;
+      {/* Cards synthèse par famille — 2 métriques claires */}
+      {groupBy === 'family' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+          {Object.entries(summary).map(([family, stats]) => {
+            const top10Pct = stats.count ? Math.round((stats.keywordsInTop10 / stats.count) * 100) : 0;
+            const coveragePct = stats.totalSum ? Math.round((stats.foundSum / stats.totalSum) * 100) : 0;
             return (
-              <div key={family} className={`rounded p-2 ${FAMILY_COLORS[family] || FAMILY_COLORS.Autre}`}>
-                <div className="text-xs font-semibold">{family}</div>
-                <div className="text-2xl font-bold">{visiblePct}%</div>
-                <div className="text-[10px] opacity-75">visibilité ({stats.count} kw)</div>
+              <div key={family} className={`rounded-lg p-3 border ${FAMILY_COLORS[family] || FAMILY_COLORS.Autre}`}>
+                <div className="text-xs font-bold mb-1">{family}</div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold tabular-nums">{stats.keywordsInTop10}</span>
+                  <span className="text-xs opacity-75">/ {stats.count}</span>
+                </div>
+                <div className="text-[10px] opacity-75 mb-2">keywords en top 10</div>
+                <div className="flex items-center gap-1.5 text-[10px] opacity-75">
+                  <span className="tabular-nums font-medium">{coveragePct}%</span>
+                  <span>couverture géo</span>
+                </div>
+                <MiniBar pct={top10Pct} color={FAMILY_BADGE_COLORS[family] || FAMILY_BADGE_COLORS.Autre} />
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Tableau */}
-      {Object.entries(groupedScans).map(([family, items]) => (
-        <div key={family} className="space-y-1">
-          {groupBy === 'family' && (
-            <div className="flex items-center gap-2 mt-3">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${FAMILY_COLORS[family] || FAMILY_COLORS.Autre}`}>
-                {family}
-              </span>
-              <span className="text-xs text-secondary-400">{items.length} keywords</span>
+      {/* Tableaux par famille */}
+      <div className="space-y-4">
+        {Object.entries(groupedScans).map(([family, items]) => (
+          <div key={family} className="space-y-1">
+            {groupBy === 'family' && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${FAMILY_COLORS[family] || FAMILY_COLORS.Autre}`}>
+                  {family}
+                </span>
+                <span className="text-xs text-secondary-400">{items.length} keyword{items.length > 1 ? 's' : ''}</span>
+              </div>
+            )}
+            <div className="overflow-hidden rounded border border-secondary-200">
+              <table className="w-full text-sm">
+                <thead className="bg-secondary-50 text-secondary-600 text-xs">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium">Keyword</th>
+                    {groupBy === 'none' && (
+                      <th className="text-left px-3 py-2 font-medium w-32">Famille</th>
+                    )}
+                    <th className="text-left px-3 py-2 font-medium w-44">Top 3</th>
+                    <th className="text-left px-3 py-2 font-medium w-44">Top 10</th>
+                    <th className="text-left px-3 py-2 font-medium w-44">Trouvé (visibilité)</th>
+                    <th className="w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((s) => (
+                    <tr key={s.id} className="border-t border-secondary-100 hover:bg-secondary-50/60">
+                      <td className="px-3 py-2 font-mono text-xs text-secondary-900">{s.keyword}</td>
+                      {groupBy === 'none' && (
+                        <td className="px-3 py-2">
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${FAMILY_COLORS[s.family] || FAMILY_COLORS.Autre}`}>
+                            {s.family}
+                          </span>
+                        </td>
+                      )}
+                      <td className="px-3 py-2 w-44">
+                        <PositionCell value={s.stats.top3 || 0} total={s.stats.total} />
+                      </td>
+                      <td className="px-3 py-2 w-44">
+                        <PositionCell value={s.stats.top10 || 0} total={s.stats.total} />
+                      </td>
+                      <td className="px-3 py-2 w-44">
+                        <PositionCell value={s.stats.found || 0} total={s.stats.total} />
+                      </td>
+                      <td className="px-3 py-2 w-10 text-right">
+                        <button
+                          className="p-1 rounded hover:bg-primary-100 text-primary-600"
+                          title="Voir le scan détaillé (à venir)"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-          <table className="w-full text-sm">
-            <thead className="border-b bg-secondary-50 text-secondary-700 text-xs">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">Keyword</th>
-                {groupBy === 'none' && <th className="text-left px-3 py-2 font-medium">Famille</th>}
-                <th className="text-left px-3 py-2 font-medium">Top 3</th>
-                <th className="text-left px-3 py-2 font-medium">Top 10</th>
-                <th className="text-left px-3 py-2 font-medium">Trouvé</th>
-                <th className="text-right px-3 py-2 font-medium w-12"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((s) => (
-                <tr key={s.id} className="border-b last:border-0 hover:bg-secondary-50">
-                  <td className="px-3 py-2 font-mono text-xs text-secondary-900">{s.keyword}</td>
-                  {groupBy === 'none' && (
-                    <td className="px-3 py-2">
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${FAMILY_COLORS[s.family] || FAMILY_COLORS.Autre}`}>
-                        {s.family}
-                      </span>
-                    </td>
-                  )}
-                  <td className="px-3 py-2">
-                    <PositionBadge value={s.stats.top3 || 0} total={s.stats.total} color="bg-green-100 text-green-700" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <PositionBadge value={s.stats.top10 || 0} total={s.stats.total} color="bg-amber-100 text-amber-700" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <PositionBadge value={s.stats.found || 0} total={s.stats.total} color="bg-blue-100 text-blue-700" />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Link
-                      to="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        // TODO Phase 2: ouvrir scan détail dans modal/onglet "Scan unique"
-                      }}
-                      className="p-1 rounded hover:bg-primary-100 text-primary-600 inline-block"
-                      title="Voir le scan détaillé"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
