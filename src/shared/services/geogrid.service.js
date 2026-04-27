@@ -103,6 +103,149 @@ export const geogridService = {
       };
     }, 'geogrid.getMonthlyUsage');
   },
+
+  // ============================================================
+  // Listes de keywords (réutilisables pour les benchmarks)
+  // ============================================================
+
+  async getKeywordLists(orgId) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_keyword_lists')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    }, 'geogrid.getKeywordLists');
+  },
+
+  async createKeywordList(orgId, { name, description, keywords }) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_keyword_lists_write')
+        .insert({ org_id: orgId, name, description, keywords })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }, 'geogrid.createKeywordList');
+  },
+
+  async updateKeywordList(listId, { name, description, keywords, is_active }) {
+    return withErrorHandling(async () => {
+      const payload = { updated_at: new Date().toISOString() };
+      if (name !== undefined) payload.name = name;
+      if (description !== undefined) payload.description = description;
+      if (keywords !== undefined) payload.keywords = keywords;
+      if (is_active !== undefined) payload.is_active = is_active;
+
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_keyword_lists_write')
+        .update(payload)
+        .eq('id', listId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }, 'geogrid.updateKeywordList');
+  },
+
+  async deleteKeywordList(listId) {
+    return withErrorHandling(async () => {
+      const { error } = await supabase
+        .from('majordhome_geogrid_keyword_lists_write')
+        .delete()
+        .eq('id', listId);
+      if (error) throw error;
+      return true;
+    }, 'geogrid.deleteKeywordList');
+  },
+
+  // ============================================================
+  // Benchmarks (= run d'une liste = N scans liés)
+  // ============================================================
+
+  async getBenchmarks(orgId, { limit = 30 } = {}) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_benchmarks')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('started_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data;
+    }, 'geogrid.getBenchmarks');
+  },
+
+  async createBenchmark(orgId, params) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_benchmarks_write')
+        .insert({
+          org_id: orgId,
+          list_id: params.list_id,
+          scan_mode: params.scan_mode,
+          business_name: params.business_name,
+          place_id: params.place_id || null,
+          center_lat: params.center_lat,
+          center_lng: params.center_lng,
+          radius_km: params.radius_km || null,
+          grid_size: params.grid_size || null,
+          search_radius_m: params.search_radius_m || 1000,
+          city_min_population: params.city_min_population || null,
+          total_keywords: params.total_keywords,
+          status: 'running',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }, 'geogrid.createBenchmark');
+  },
+
+  async updateBenchmarkProgress(benchmarkId, { completed_keywords, status, error_message, completed_at }) {
+    return withErrorHandling(async () => {
+      const payload = {};
+      if (completed_keywords !== undefined) payload.completed_keywords = completed_keywords;
+      if (status !== undefined) payload.status = status;
+      if (error_message !== undefined) payload.error_message = error_message;
+      if (completed_at !== undefined) payload.completed_at = completed_at;
+
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_benchmarks_write')
+        .update(payload)
+        .eq('id', benchmarkId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }, 'geogrid.updateBenchmarkProgress');
+  },
+
+  async getBenchmarkScans(benchmarkId) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_geogrid_scans')
+        .select('*')
+        .eq('benchmark_id', benchmarkId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data;
+    }, 'geogrid.getBenchmarkScans');
+  },
+
+  async deleteBenchmark(benchmarkId) {
+    return withErrorHandling(async () => {
+      const { error } = await supabase
+        .from('majordhome_geogrid_benchmarks_write')
+        .delete()
+        .eq('id', benchmarkId);
+      if (error) throw error;
+      return true;
+    }, 'geogrid.deleteBenchmark');
+  },
 };
 
 export default geogridService;

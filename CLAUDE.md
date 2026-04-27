@@ -433,6 +433,10 @@ Suivi SEO local Google Maps via 2 modes de scan complémentaires :
 - `majordhome.geogrid_scans` (colonnes : `scan_mode`, `keyword`, `business_name`, `place_id`, `center_lat/lng`, `radius_km`/`grid_size` nullables si mode='cities', `search_radius_m`, `stats` jsonb)
 - `majordhome.geogrid_results` (1 ligne/point ; en mode cities : `point_label`=nom commune, `point_code`=code INSEE)
 - Vue `public.majordhome_geogrid_scans` calcule `total_points` via COUNT des results — fonctionne quel que soit le mode
+- `core.organizations.settings.google_place_id` — stocke le Place ID Google du business par org, pré-rempli dans `ScanConfigPanel` via `useAuth().organization.settings.google_place_id`
+
+### UI — Profils de recherche (mode cities)
+`ScanConfigPanel.jsx` expose un sélecteur `searchRadiusM` avec 5 profils métier : 500m (piéton), 1km (quartier), **2km (ville, default)**, 3km (ville étendue), 5km (zone large). Pilote le `locationBias` Google Places — définit à quel point Google privilégie la proximité géographique stricte. Default 2000m adapté aux installateurs/pros itinérants.
 
 ### Garde-fou app
 `useGeoGridQuota(orgId)` calcule `SUM(total_points)` du mois courant en bornes UTC strictes (`Date.UTC(year, month, 1)`). Bouton "Lancer le scan" désactivé si projection > 5000 sauf override explicite via checkbox.

@@ -99,4 +99,112 @@ export function useDeleteScan() {
   });
 }
 
+// =============================================================
+// Listes de keywords (curated, réutilisables pour benchmarks)
+// =============================================================
+
+export function useKeywordLists(orgId) {
+  return useQuery({
+    queryKey: geogridKeys.keywordLists(orgId),
+    queryFn: async () => {
+      const { data, error } = await geogridService.getKeywordLists(orgId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateKeywordList() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orgId, ...payload }) => geogridService.createKeywordList(orgId, payload),
+    onSuccess: (result, variables) => {
+      if (result.error) {
+        toast.error(`Erreur : ${result.error.message || result.error}`);
+        return;
+      }
+      toast.success('Liste créée');
+      queryClient.invalidateQueries({ queryKey: geogridKeys.keywordLists(variables.orgId) });
+    },
+  });
+}
+
+export function useUpdateKeywordList() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ listId, ...payload }) => geogridService.updateKeywordList(listId, payload),
+    onSuccess: (result, variables) => {
+      if (result.error) {
+        toast.error(`Erreur : ${result.error.message || result.error}`);
+        return;
+      }
+      toast.success('Liste mise à jour');
+      if (variables.orgId) {
+        queryClient.invalidateQueries({ queryKey: geogridKeys.keywordLists(variables.orgId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+      }
+    },
+  });
+}
+
+export function useDeleteKeywordList() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (listId) => geogridService.deleteKeywordList(listId),
+    onSuccess: (result) => {
+      if (result.error) {
+        toast.error(`Erreur : ${result.error.message || result.error}`);
+        return;
+      }
+      toast.success('Liste supprimée');
+      queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+    },
+  });
+}
+
+// =============================================================
+// Benchmarks (run d'une liste sur N keywords = N scans liés)
+// =============================================================
+
+export function useBenchmarks(orgId) {
+  return useQuery({
+    queryKey: geogridKeys.benchmarks(orgId),
+    queryFn: async () => {
+      const { data, error } = await geogridService.getBenchmarks(orgId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!orgId,
+  });
+}
+
+export function useBenchmarkScans(benchmarkId) {
+  return useQuery({
+    queryKey: geogridKeys.benchmarkScans(benchmarkId),
+    queryFn: async () => {
+      const { data, error } = await geogridService.getBenchmarkScans(benchmarkId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!benchmarkId,
+  });
+}
+
+export function useDeleteBenchmark() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (benchmarkId) => geogridService.deleteBenchmark(benchmarkId),
+    onSuccess: (result) => {
+      if (result.error) {
+        toast.error(`Erreur : ${result.error.message || result.error}`);
+        return;
+      }
+      toast.success('Benchmark supprimé');
+      queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+    },
+  });
+}
+
 export { FREE_TIER_LIMIT };
