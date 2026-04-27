@@ -8,12 +8,15 @@ const DEFAULT_CONFIG = {
   businessName: 'Mayer Energie',
   placeId: '',
   keyword: 'climatisation',
-  centerLat: 43.9016,
-  centerLng: 1.8976,
   radiusKm: 5,
   gridSize: 7,
   searchRadiusM: 1000,
 };
+
+// Code INSEE de Gaillac — ville par défaut au mount (en attendant le chargement des communes)
+const DEFAULT_CITY_CODE = '81099';
+const DEFAULT_CITY_LAT = 43.9016;
+const DEFAULT_CITY_LNG = 1.8976;
 
 const POPULATION_THRESHOLDS = [
   { value: 0, label: 'Toutes (314 communes)' },
@@ -38,26 +41,41 @@ const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
 export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const { organization } = useAuth();
+  const orgName = organization?.name || '';
   const orgPlaceId = organization?.settings?.google_place_id || '';
 
   const [mode, setMode] = useState('grid'); // 'grid' | 'cities'
-  const [config, setConfig] = useState(() => ({
-    ...DEFAULT_CONFIG,
-    placeId: organization?.settings?.google_place_id || '',
-  }));
-
-  // Pré-remplit le placeId quand l'org se charge (cas où l'org n'était pas dispo au mount)
-  useEffect(() => {
-    if (orgPlaceId) {
-      setConfig((prev) => (prev.placeId ? prev : { ...prev, placeId: orgPlaceId }));
-    }
-  }, [orgPlaceId]);
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [selectedCityCode, setSelectedCityCode] = useState(DEFAULT_CITY_CODE);
   const [allowOverage, setAllowOverage] = useState(false);
   const [minPopulation, setMinPopulation] = useState(1000);
   const [citiesSearchRadius, setCitiesSearchRadius] = useState(2000);
   const [communes, setCommunes] = useState(null);
   const [loadingCommunes, setLoadingCommunes] = useState(false);
   const [communesError, setCommunesError] = useState(null);
+
+  // Détecte si le businessName saisi correspond à l'org (insensible casse/espaces)
+  const isOrgBusiness = useMemo(() => {
+    const a = config.businessName?.toLowerCase().trim();
+    const b = orgName.toLowerCase().trim();
+    return a && b && a === b;
+  }, [config.businessName, orgName]);
+
+  // Synchronise le placeId avec le businessName :
+  // - Match org → remplit le placeId stocké
+  // - Plus de match ET le placeId actuel est celui de l'org → vide (laisse l'utilisateur saisir)
+  useEffect(() => {
+    if (!orgPlaceId) return;
+    setConfig((prev) => {
+      if (isOrgBusiness && prev.placeId !== orgPlaceId) {
+        return { ...prev, placeId: orgPlaceId };
+      }
+      if (!isOrgBusiness && prev.placeId === orgPlaceId) {
+        return { ...prev, placeId: '' };
+      }
+      return prev;
+    });
+  }, [isOrgBusiness, orgPlaceId]);
 
   const { data: quota } = useGeoGridQuota(orgId);
 
@@ -83,23 +101,23 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
     [communes]
   );
 
-  // Détecte la ville actuelle selon les coordonnées (tolérance ~1 km)
-  const currentCityCode = useMemo(() => {
-    if (!bigCities.length) return 'custom';
-    const lat = parseFloat(config.centerLat);
-    const lng = parseFloat(config.centerLng);
-    const match = bigCities.find(
-      (c) => Math.abs(c.lat - lat) < 0.01 && Math.abs(c.lng - lng) < 0.01
-    );
-    return match?.code || 'custom';
-  }, [bigCities, config.centerLat, config.centerLng]);
+  // Ville sélectionnée (source de vérité). bigCities peut être vide pendant le chargement
+  // → fallback sur les coordonnées de Gaillac codées en dur.
+  const selectedCity = useMemo(
+    () => bigCities.find((c) => c.code === selectedCityCode) || null,
+    [bigCities, selectedCityCode]
+  );
 
-  const handleCityChange = (cityCode) => {
-    if (cityCode === 'custom') return;
-    const city = bigCities.find((c) => c.code === cityCode);
-    if (!city) return;
-    setConfig((prev) => ({ ...prev, centerLat: city.lat, centerLng: city.lng }));
-  };
+  // Si la ville sélectionnée n'est plus dans la liste après chargement (edge case), fallback sur la 1ère
+  useEffect(() => {
+    if (bigCities.length && !bigCities.some((c) => c.code === selectedCityCode)) {
+      setSelectedCityCode(bigCities[0].code);
+    }
+  }, [bigCities, selectedCityCode]);
+
+  // Coordonnées effectives utilisées pour le scan en mode grille (toujours dérivées de la ville sélectionnée)
+  const gridCenterLat = selectedCity?.lat ?? DEFAULT_CITY_LAT;
+  const gridCenterLng = selectedCity?.lng ?? DEFAULT_CITY_LNG;
 
   const handleChange = (field, value) => {
     setConfig((prev) => ({ ...prev, [field]: value }));
@@ -111,8 +129,8 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
       onLaunch({
         ...config,
         mode: 'grid',
-        centerLat: parseFloat(config.centerLat),
-        centerLng: parseFloat(config.centerLng),
+        centerLat: gridCenterLat,
+        centerLng: gridCenterLng,
         radiusKm: parseFloat(config.radiusKm),
         gridSize: parseInt(config.gridSize),
         searchRadiusM: parseInt(config.searchRadiusM),
@@ -193,17 +211,26 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
         </div>
         <div>
           <label className="text-xs font-medium text-secondary-600 mb-1 flex items-center justify-between gap-1">
-            <span>Place ID</span>
-            <a
-              href="https://developers.google.com/maps/documentation/places/web-service/place-id"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-600 hover:text-primary-700 text-[11px] flex items-center gap-0.5"
-              title="Ouvre l'outil Google Place ID Finder. Cherche le business (pas l'adresse) et clique sur le pin."
-            >
-              Trouver
-              <ExternalLink className="w-2.5 h-2.5" />
-            </a>
+            <span className="flex items-center gap-1.5">
+              Place ID
+              {isOrgBusiness && orgPlaceId && (
+                <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-green-100 text-green-700" title={`Auto-rempli depuis ${orgName}`}>
+                  AUTO
+                </span>
+              )}
+            </span>
+            {!isOrgBusiness && (
+              <a
+                href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 hover:text-primary-700 text-[11px] flex items-center gap-0.5"
+                title="Ouvre l'outil Google Place ID Finder. Cherche le business (pas l'adresse) et clique sur le pin."
+              >
+                Trouver
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            )}
           </label>
           <input
             type="text"
@@ -238,8 +265,8 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
               Ville à analyser
             </label>
             <select
-              value={currentCityCode}
-              onChange={(e) => handleCityChange(e.target.value)}
+              value={selectedCityCode}
+              onChange={(e) => setSelectedCityCode(e.target.value)}
               className="w-full px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               disabled={loadingCommunes || !bigCities.length}
             >
@@ -250,6 +277,11 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
                 </option>
               ))}
             </select>
+            {selectedCity && (
+              <div className="text-[11px] text-secondary-500 mt-1">
+                Centre : {selectedCity.lat.toFixed(4)}, {selectedCity.lng.toFixed(4)}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
