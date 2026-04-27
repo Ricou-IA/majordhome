@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-04-19 — Mailing : Segment Builder + Scheduler Campagnes Auto (catalogue `mail_segments` paramétrable + 1 cron N8n générique qui lit `mail_campaigns.is_automated`, `lead_bienvenue` migré comme 1ʳᵉ campagne). Docs : `docs/MAILING_SEGMENT_BUILDER.md` + `docs/n8n/MAILING_SCHEDULER_SETUP.md`.
+> **Dernière MàJ** : 2026-04-27 — GeoGrid : Listes de keywords + Benchmarks (thermomètre SEO mensuel). 3 onglets : Scan unique / Listes / Benchmarks. Tables `geogrid_keyword_lists` + `geogrid_benchmarks` + colonne `benchmark_id` sur scans. Auto-tag par famille (Poêle/Ramonage/Clim/PAC/Chauffage/Entretien). Loop frontend séquentiel pour run benchmark. Master prompt SEO dans `docs/SEO_AUDIT_MASTER_PROMPT.md`.
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -40,7 +40,7 @@ src/
 ├── hooks/pipeline/             # useDashboardData, useDashboardFilters
 ├── apps/artisan/
 │   ├── routes.jsx              # Routes lazy-loaded (15 routes)
-│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile, Mailing
+│   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile, Mailing, GeoGrid
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
 │       ├── shared/             # KanbanBoard, SearchBar, ColumnHeader, CardSkeleton (composants génériques)
@@ -50,7 +50,8 @@ src/
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
 │       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
 │       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
-│       └── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
+│       ├── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
+│       └── geogrid/            # ScanTab, KeywordListsPanel, BenchmarksPanel, BenchmarkLauncher, BenchmarkResultTable, ScanConfigPanel, ScanHistory, GeoGridMap, communesService
 ├── apps/prospection/
 │   ├── _shared/
 │   │   ├── lib/               # sireneApi, scoringCedants, scoringCommercial
@@ -82,6 +83,7 @@ src/
 
 ### Gotchas DB
 - **Séquences PostgreSQL** : Ne JAMAIS calculer manuellement un ID/numéro via `SELECT MAX(col) + 1`. Toujours laisser le DEFAULT de la séquence DB (`nextval()`) générer la valeur — atomique, évite race conditions et désynchronisation. Exemple : `majordhome.client_number` utilise `majordhome.client_number_seq`, toute insertion doit omettre `client_number` pour que le DEFAULT s'applique.
+- **Vérifier l'erreur sur les mutations Supabase** : Toujours destructurer `{ error }` sur `update()` / `insert()` / `delete()`, même sur des opérations qu'on pense sûres. Triggers DB, RLS ou contraintes peuvent causer des échecs silencieux. Pattern : `const { data, error } = await supabase.from(...).update(...); if (error) { ... }`. Vu en pratique avec un trigger fantôme `set_geogrid_scans_updated_at` qui faisait échouer silencieusement les UPDATE de `benchmark_id`.
 
 ### Vues publiques principales
 - `majordhome_clients` → clients + has_active_contract calculé
@@ -93,6 +95,7 @@ src/
 - `majordhome_mailing_logs` → historique des emails envoyés par campagne (client_id, lead_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
 - `majordhome_mailing_events` → audit log complet des events webhook Resend (1 ligne par event reçu, dédupliqué par svix_id)
 - `majordhome_equipments`, `majordhome_interventions`, `majordhome_maintenance_visits`
+- `majordhome_geogrid_scans`, `majordhome_geogrid_results`, `majordhome_geogrid_keyword_lists`, `majordhome_geogrid_benchmarks`
 - `profiles`, `organizations`, `organization_members` (vues core)
 
 ### Org cible
@@ -123,7 +126,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - TanStack React Query v5
 - **Cache keys centralisées** : `src/shared/hooks/cacheKeys.js` — source unique pour toutes les query keys
   - Import : `import { clientKeys } from '@/shared/hooks/cacheKeys'`
-  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys
+  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys, geogridKeys
   - Re-exports depuis chaque hook pour rétrocompatibilité
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
 - **`useDebounce`** : Hook utilitaire de debounce (remplace les implémentations manuelles)
@@ -430,16 +433,31 @@ Suivi SEO local Google Maps via 2 modes de scan complémentaires :
 - **Free tier Google Places** : 5000 requêtes/mois UTC (reset 1er du mois 00:00 UTC). Au-delà : 27,75 €/1000 req (tranche 5k-100k)
 
 ### DB
-- `majordhome.geogrid_scans` (colonnes : `scan_mode`, `keyword`, `business_name`, `place_id`, `center_lat/lng`, `radius_km`/`grid_size` nullables si mode='cities', `search_radius_m`, `stats` jsonb)
+- `majordhome.geogrid_scans` (colonnes : `scan_mode`, `keyword`, `business_name`, `place_id`, `center_lat/lng`, `radius_km`/`grid_size` nullables si mode='cities', `search_radius_m`, `stats` jsonb, **`benchmark_id`** FK nullable vers geogrid_benchmarks)
 - `majordhome.geogrid_results` (1 ligne/point ; en mode cities : `point_label`=nom commune, `point_code`=code INSEE)
-- Vue `public.majordhome_geogrid_scans` calcule `total_points` via COUNT des results — fonctionne quel que soit le mode
+- `majordhome.geogrid_keyword_lists` (id, org_id, name, description, keywords JSONB array, keyword_count generated, is_active, created_at, updated_at)
+- `majordhome.geogrid_benchmarks` (id, org_id, list_id FK, scan_mode, business_name, place_id, center_lat/lng, radius_km/grid_size nullables, search_radius_m, city_min_population nullable, total_keywords, completed_keywords, status enum, error_message, started_at, completed_at)
+- Vues publiques : `majordhome_geogrid_scans` (calcule `total_points` via COUNT results), `majordhome_geogrid_keyword_lists`, `majordhome_geogrid_benchmarks` (+ JOIN list_name)
 - `core.organizations.settings.google_place_id` — stocke le Place ID Google du business par org, pré-rempli dans `ScanConfigPanel` via `useAuth().organization.settings.google_place_id`
 
 ### UI — Profils de recherche (mode cities)
 `ScanConfigPanel.jsx` expose un sélecteur `searchRadiusM` avec 5 profils métier : 500m (piéton), 1km (quartier), **2km (ville, default)**, 3km (ville étendue), 5km (zone large). Pilote le `locationBias` Google Places — définit à quel point Google privilégie la proximité géographique stricte. Default 2000m adapté aux installateurs/pros itinérants.
 
+### UI — Architecture 3 onglets (GeoGrid.jsx)
+- **Scan unique** (`ScanTab.jsx`) : scan ad-hoc 1 keyword, config + map + historique (filtré `benchmark_id IS NULL`)
+- **Listes de keywords** (`KeywordListsPanel.jsx`) : CRUD listes réutilisables (name, description, keywords array). Seed "Mayer SEO 2026" : 25 keywords prioritaires (8 Poêle + 5 Ramonage + 4 Clim + 2 PAC + 3 Chauffage + 3 Entretien)
+- **Benchmarks** (`BenchmarksPanel.jsx`) : historique des runs d'une liste (N scans liés). `BenchmarkLauncher` : loop frontend séquentiel (1 scan/keyword), progress bar, estimation coût/durée. `BenchmarkResultTable` : tableau consolidé groupé par famille (auto-tag par regex sur keyword)
+
+### Services & Hooks
+- `geogrid.service.js` : méthodes CRUD `getKeywordLists`, `createKeywordList`, `updateKeywordList`, `deleteKeywordList`, `getBenchmarks`, `createBenchmark`, `updateBenchmarkProgress`, `getBenchmarkScans`, `deleteBenchmark`
+- `useGeoGrid.js` : hooks `useKeywordLists`, `useCreateKeywordList`, `useUpdateKeywordList`, `useDeleteKeywordList`, `useBenchmarks`, `useBenchmarkScans`, `useDeleteBenchmark`
+- Cache keys : `geogridKeys.keywordLists(orgId)`, `geogridKeys.benchmarks(orgId)`, `geogridKeys.benchmarkScans(benchmarkId)`
+
+### Auto-tag famille keywords
+Regex dans `BenchmarkResultTable.jsx` : `detectFamily(keyword)` retourne Poêle / Ramonage / Climatisation / PAC / Chauffage / Entretien / Autre. Synthèse cards % visibilité par famille. Regex PAC : `\bpac\b|pompe.{0,8}chaleur` (matche "pompe a chaleur", "pompe à chaleur", "pompe de chaleur" avec jusqu'à 8 chars entre les mots).
+
 ### Garde-fou app
-`useGeoGridQuota(orgId)` calcule `SUM(total_points)` du mois courant en bornes UTC strictes (`Date.UTC(year, month, 1)`). Bouton "Lancer le scan" désactivé si projection > 5000 sauf override explicite via checkbox.
+`useGeoGridQuota(orgId)` calcule `SUM(total_points)` du mois courant en bornes UTC strictes (`Date.UTC(year, month, 1)`). Bouton "Lancer le scan" désactivé si projection > 5000 sauf override explicite via checkbox (partagé entre scan unique et benchmarks).
 
 ## Plan de Développement
 | Sprint | Titre | Statut |
