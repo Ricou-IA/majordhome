@@ -200,6 +200,13 @@ export const geogridKeys = {
   benchmarkScans: (benchmarkId) => [...geogridKeys.all, 'benchmark-scans', benchmarkId],
 };
 
+// --- GSC (Google Search Console) ---
+export const gscKeys = {
+  all: ['gsc'],
+  status: (orgId) => [...gscKeys.all, 'status', orgId],
+  metrics: (orgId, range, queries) => [...gscKeys.all, 'metrics', orgId, range, queries],
+};
+
 // --- Tasks ---
 export const taskKeys = {
   all: ['tasks'],

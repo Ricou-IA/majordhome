@@ -1,20 +1,26 @@
 import { useState } from 'react';
-import { Grid3x3, Search, ListChecks, BarChart3 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Grid3x3, Search, ListChecks, BarChart3, Globe } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import ScanTab from '../components/geogrid/ScanTab';
 import KeywordListsPanel from '../components/geogrid/KeywordListsPanel';
 import BenchmarksPanel from '../components/geogrid/BenchmarksPanel';
+import GscPanel from '../components/geogrid/GscPanel';
 
 const TABS = [
   { id: 'scan', label: 'Scan unique', icon: Search },
   { id: 'lists', label: 'Listes de keywords', icon: ListChecks },
   { id: 'benchmarks', label: 'Benchmarks', icon: BarChart3 },
+  { id: 'gsc', label: 'Search Console', icon: Globe },
 ];
 
 export default function GeoGrid() {
   const { organization } = useAuth();
   const orgId = organization?.id;
-  const [activeTab, setActiveTab] = useState('scan');
+  const location = useLocation();
+  // Auto-selection de l'onglet Search Console au retour OAuth (?gsc=connected)
+  const initialTab = new URLSearchParams(location.search).get('gsc') ? 'gsc' : 'scan';
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   return (
     <div className="space-y-4">
@@ -53,6 +59,7 @@ export default function GeoGrid() {
       {activeTab === 'scan' && <ScanTab orgId={orgId} />}
       {activeTab === 'lists' && <KeywordListsPanel orgId={orgId} />}
       {activeTab === 'benchmarks' && <BenchmarksPanel orgId={orgId} />}
+      {activeTab === 'gsc' && <GscPanel orgId={orgId} />}
     </div>
   );
 }
