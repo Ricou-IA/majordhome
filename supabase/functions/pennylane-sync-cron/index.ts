@@ -87,27 +87,60 @@ async function getLedgerNumber(ledgerAccountId: number): Promise<string | null> 
   }
 }
 
-async function getCustomerMaxQuoteHT(
-  customerId: number
-): Promise<{ amount: number; label: string | null }> {
-  try {
-    const json = await plGet(
-      `/quotes?limit=100&customer_id=${customerId}`
-    );
-    const quotes = json.items || [];
-    let maxAmount = 0;
-    let maxLabel = null;
-    for (const q of quotes) {
-      const ht = parseFloat(q.currency_amount_before_tax || "0");
-      if (ht > maxAmount) {
-        maxAmount = ht;
-        maxLabel = q.label || q.pdf_invoice_subject || null;
-      }
-    }
-    return { amount: maxAmount, label: maxLabel };
-  } catch {
-    return { amount: 0, label: null };
+// Fetch tous les devis Pennylane (paginé). L'API V2 ne supporte PAS filter[customer_id]
+// donc on récupère tout puis filtre côté client par customer.id.
+async function fetchAllPlQuotes(): Promise<any[]> {
+  const all: any[] = [];
+  let cursor: string | null = null;
+  let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 30; // safety pour timeout edge function
+
+  while (hasMore && pageCount < MAX_PAGES) {
+    let url = "/quotes?limit=100";
+    if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+    const json = await plGet(url);
+    all.push(...(json.items || []));
+    hasMore = json.has_more && !!json.next_cursor;
+    cursor = json.next_cursor || null;
+    pageCount++;
+    if (hasMore) await new Promise((r) => setTimeout(r, 250));
   }
+
+  return all;
+}
+
+// Indexe : customer.id → liste complète des devis (utilisé pour multi-devis par lead)
+function buildQuotesByCustomerMap(
+  quotes: any[]
+): Map<number, any[]> {
+  const map = new Map<number, any[]>();
+  for (const q of quotes) {
+    const customerId = q.customer?.id;
+    if (!customerId) continue;
+    const arr = map.get(customerId) || [];
+    arr.push(q);
+    map.set(customerId, arr);
+  }
+  return map;
+}
+
+// Trouve le devis le plus gros HT dans une liste (pour devis principal du lead)
+function pickMaxQuote(
+  customerQuotes: any[]
+): { amount: number; label: string | null; quote: any | null } {
+  let maxAmount = 0;
+  let maxLabel: string | null = null;
+  let maxQuote: any | null = null;
+  for (const q of customerQuotes) {
+    const ht = parseFloat(q.currency_amount_before_tax || "0");
+    if (ht > maxAmount) {
+      maxAmount = ht;
+      maxLabel = q.label || q.pdf_invoice_subject || null;
+      maxQuote = q;
+    }
+  }
+  return { amount: maxAmount, label: maxLabel, quote: maxQuote };
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +242,12 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: true, new_customers: 0, log });
     }
 
+    // 4. Fetch tous les devis PL une fois (l'API V2 ne supporte pas filter customer_id)
+    //    et indexe par customer.id → liste complète des quotes.
+    const allQuotes = await fetchAllPlQuotes();
+    const quotesByCustomer = buildQuotesByCustomerMap(allQuotes);
+    log.push(`PL quotes fetched: ${allQuotes.length}`);
+
     let clientsCreated = 0;
     let leadsCreated = 0;
     let leadsUpdated = 0;
@@ -225,81 +264,48 @@ Deno.serve(async (req: Request) => {
         // Récupérer le 411
         const pl411 = await getLedgerNumber(plCustomer.ledger_account?.id);
 
-        // Vérifier si client MDH existe déjà (par email ou display_name)
-        let existingClientId: string | null = null;
+        // Find or create via RPC : matching invulnérable (clients + leads),
+        // enrichissement automatique des champs vides, flag dedup_candidates si fuzzy match.
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          "find_or_create_client",
+          {
+            p_org_id: ORG_ID,
+            p_email: email,
+            p_phone: phone,
+            p_first_name: firstName,
+            p_last_name: lastName,
+            p_display_name: displayName,
+            p_company_name: isCompany ? displayName : null,
+            p_address: billing.address || null,
+            p_postal_code: billing.postal_code || null,
+            p_city: billing.city || null,
+            p_client_category: isCompany ? "entreprise" : "particulier",
+            p_pennylane_account_number: pl411,
+            p_source: "cron_pennylane",
+          }
+        );
 
-        if (email) {
-          const { data: byEmail } = await supabase
-            .from("majordhome_clients")
-            .select("id")
-            .eq("org_id", ORG_ID)
-            .ilike("email", email)
-            .limit(1)
-            .maybeSingle();
-          if (byEmail) existingClientId = byEmail.id;
+        if (rpcError || !rpcResult) {
+          log.push(
+            `[error] RPC find_or_create ${displayName}: ${rpcError?.message || "no result"}`
+          );
+          continue;
         }
 
-        if (!existingClientId) {
-          const { data: byName } = await supabase
-            .from("majordhome_clients")
-            .select("id")
-            .eq("org_id", ORG_ID)
-            .ilike("display_name", displayName)
-            .limit(1)
-            .maybeSingle();
-          if (byName) existingClientId = byName.id;
-        }
+        const clientId: string = (rpcResult as any).client_id;
+        const rpcAction: string = (rpcResult as any).action;
+        const fuzzyId: string | null = (rpcResult as any).fuzzy_candidate_id;
 
-        let clientId: string;
-
-        if (existingClientId) {
-          // Client existe → juste mettre à jour le 411
-          clientId = existingClientId;
-          if (pl411) {
-            await supabase
-              .from("majordhome_clients")
-              .update({ pennylane_account_number: pl411 })
-              .eq("id", clientId);
-          }
-          log.push(`[match] ${displayName} → existing client ${clientId}`);
-        } else {
-          // Créer le project + client
-          const projectId = crypto.randomUUID();
-          const { error: projError } = await supabase
-            .from("projects")
-            .insert({ id: projectId, org_id: ORG_ID, name: displayName });
-          if (projError) {
-            log.push(`[error] project insert ${displayName}: ${projError.message}`);
-            continue;
-          }
-
-          // client_number généré par la séquence DB (DEFAULT majordhome.client_number_seq)
-          const { data: newClient, error: clientError } = await supabase
-            .from("majordhome_clients")
-            .insert({
-              project_id: projectId,
-              org_id: ORG_ID,
-              display_name: displayName,
-              first_name: firstName.toUpperCase(),
-              last_name: lastName.toUpperCase(),
-              email: email,
-              phone: phone,
-              address: billing.address || null,
-              postal_code: billing.postal_code || null,
-              city: billing.city || null,
-              client_category: isCompany ? "entreprise" : "particulier",
-              pennylane_account_number: pl411,
-            })
-            .select("id, client_number")
-            .single();
-
-          if (clientError) {
-            log.push(`[error] ${displayName}: ${clientError.message}`);
-            continue;
-          }
-          clientId = newClient.id;
+        if (rpcAction === "matched_strict" || rpcAction === "matched_via_lead") {
+          log.push(`[match] ${displayName} → ${clientId} (${rpcAction})`);
+        } else if (rpcAction === "created" || rpcAction === "created_linked_lead") {
           clientsCreated++;
-          log.push(`[created] ${displayName} → ${newClient.client_number} (${pl411})`);
+          log.push(`[created] ${displayName} → ${clientId} (${rpcAction}, pl=${pl411})`);
+        }
+        if (fuzzyId) {
+          log.push(
+            `[fuzzy-flag] ${displayName} → dedup_candidate avec ${fuzzyId}`
+          );
         }
 
         // Créer le mapping sync
@@ -317,72 +323,70 @@ Deno.serve(async (req: Request) => {
           { onConflict: "org_id,entity_type,local_id" }
         );
 
-        // Vérifier si un lead est nécessaire (devis > 1000€)
-        const { amount: maxQuoteHT, label: quoteLabel } =
-          await getCustomerMaxQuoteHT(plCustomer.id);
+        // Vérifier si un lead est nécessaire (devis principal > 1000€) — lookup local (sans appel API)
+        const customerQuotes = quotesByCustomer.get(plCustomer.id) || [];
+        const { amount: maxQuoteHT, label: quoteLabel } = pickMaxQuote(customerQuotes);
 
         if (maxQuoteHT >= LEAD_THRESHOLD_HT) {
-          // Chercher un lead existant
-          const existingLead = await findLeadMatch(
-            supabase,
-            email,
-            phone,
-            displayName
+          // 1) RPC création/maj du lead avec le devis principal
+          const { data: leadResult, error: leadRpcError } = await supabase.rpc(
+            "upsert_pennylane_lead",
+            {
+              p_org_id: ORG_ID,
+              p_client_id: clientId,
+              p_email: email,
+              p_phone: phone,
+              p_first_name: firstName,
+              p_last_name: lastName,
+              p_company_name: isCompany ? displayName : null,
+              p_address: billing.address || null,
+              p_postal_code: billing.postal_code || null,
+              p_city: billing.city || null,
+              p_max_quote_ht: maxQuoteHT,
+              p_quote_label: quoteLabel,
+            }
           );
 
-          if (existingLead) {
-            // Ne pas rétrograder un lead déjà en Devis envoyé, Gagné ou Perdu
-            if (
-              existingLead.status_id !== STATUS_DEVIS_ENVOYE &&
-              existingLead.status_id !== "c717780c-0ba7-4bf1-9e1e-5f014c1e9e2f" &&
-              existingLead.status_id !== "e0419cea-d0fe-4be5-aba4-56197b2fd4fb"
-            ) {
-              const { error: updateErr } = await supabase
-                .schema("majordhome")
-                .from("leads")
-                .update({
-                  status_id: STATUS_DEVIS_ENVOYE,
-                  quote_sent_date: new Date().toISOString().split("T")[0],
-                  client_id: clientId,
-                  estimated_revenue: maxQuoteHT,
-                  notes: `[Sync PL] Devis ${quoteLabel || ""} - ${maxQuoteHT.toFixed(0)} EUR HT`,
-                })
-                .eq("id", existingLead.id);
-              if (updateErr) {
-                log.push(`[lead-update-error] ${displayName}: ${updateErr.message}`);
-              } else {
-                leadsUpdated++;
-                log.push(`[lead-updated] ${displayName} -> Devis envoye (${maxQuoteHT} EUR HT)`);
-              }
-            }
+          if (leadRpcError) {
+            log.push(`[lead-error] ${displayName}: ${leadRpcError.message}`);
           } else {
-            // Creer un lead via insert direct dans majordhome.leads
-            const { error: leadError } = await supabase
-              .schema("majordhome")
-              .from("leads")
-              .insert({
-                org_id: ORG_ID,
-                first_name: firstName.toUpperCase(),
-                last_name: lastName.toUpperCase(),
-                email: email,
-                phone: phone,
-                address: billing.address || null,
-                postal_code: billing.postal_code || null,
-                city: billing.city || null,
-                company_name: isCompany ? displayName : null,
-                status_id: STATUS_DEVIS_ENVOYE,
-                quote_sent_date: new Date().toISOString().split("T")[0],
-                client_id: clientId,
-                estimated_revenue: maxQuoteHT,
-                notes: `[Sync PL] Devis ${quoteLabel || ""} - ${maxQuoteHT.toFixed(0)} EUR HT`,
-                external_source: "pennylane",
-              });
-
-            if (leadError) {
-              log.push(`[lead-error] ${displayName}: ${leadError.message}`);
-            } else {
+            const leadAction: string = (leadResult as any).action;
+            const leadId: string | null = (leadResult as any).lead_id;
+            if (leadAction === "lead_created") {
               leadsCreated++;
-              log.push(`[lead-created] ${displayName} -> Devis envoye (${maxQuoteHT} EUR HT)`);
+              log.push(`[lead-created] ${displayName} -> Devis envoye (max ${maxQuoteHT} EUR HT)`);
+            } else if (leadAction === "lead_updated") {
+              leadsUpdated++;
+              log.push(`[lead-updated] ${displayName} -> Devis envoye (max ${maxQuoteHT} EUR HT)`);
+            } else if (leadAction === "lead_skipped_priority_status") {
+              log.push(`[lead-skipped] ${displayName} -> statut prioritaire conserve`);
+            }
+
+            // 2) Attacher TOUTES les quotes du customer à ce lead (variantes + autres projets,
+            //    l'utilisateur triera ensuite via UI / RPCs eject + assign).
+            if (leadId && customerQuotes.length > 0) {
+              let attached = 0;
+              for (const q of customerQuotes) {
+                const { error: assignErr } = await supabase.rpc(
+                  "assign_pennylane_quote_to_lead",
+                  {
+                    p_org_id: ORG_ID,
+                    p_quote_pl_id: q.id,
+                    p_target_lead_id: leadId,
+                    p_quote_data: {
+                      customer_id: plCustomer.id,
+                      amount_ht: parseFloat(q.currency_amount_before_tax || "0"),
+                      label: q.label || q.pdf_invoice_subject || null,
+                      date: q.date || null,
+                      status: q.status || null,
+                    },
+                  }
+                );
+                if (!assignErr) attached++;
+              }
+              log.push(
+                `[quotes-attached] ${displayName} -> ${attached}/${customerQuotes.length} devis lies au lead`
+              );
             }
           }
         } else {
