@@ -33,6 +33,19 @@ const TVA_MAPPING = {
   0: 'exempt',
 };
 
+const VAT_RATE_REVERSE = {
+  FR_200: 20,
+  FR_100: 10,
+  FR_055: 5.5,
+  exempt: 0,
+};
+
+function parseVatRate(plRate) {
+  if (plRate == null) return null;
+  if (typeof plRate === 'number') return plRate;
+  return VAT_RATE_REVERSE[plRate] ?? null;
+}
+
 const UNIT_MAPPING = {
   'pièce': 'piece',
   'h': 'hour',
@@ -358,23 +371,34 @@ async function getQuotesByClient(clientId, orgId) {
 
   const plCustomerId = syncRecord.pennylane_id;
 
-  // 2. Fetch TOUS les devis PL (l'API V2 ignore le filtre customer_id)
-  //    puis filtrer cote client par customer.id
+  // 2. Fetch les devis PL paginés (l'API V2 ne supporte pas filter[customer_id]
+  //    → renvoie 400) + safety MAX_PAGES pour éviter timeout edge function (~50s).
+  //    Filtre côté client par customer.id.
   const allQuotes = [];
   let cursor = null;
   let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
 
-  while (hasMore) {
+  while (hasMore && pageCount < MAX_PAGES) {
     let path = '/quotes?limit=100';
-    if (cursor) path += `&cursor=${cursor}`;
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
     const result = await apiCall('GET', path);
     const items = result?.items || [];
     allQuotes.push(...items);
     hasMore = result?.has_more && !!result?.next_cursor;
     cursor = result?.next_cursor || null;
+    pageCount++;
   }
 
-  // 3. Filtrer par customer.id
+  if (pageCount === MAX_PAGES && hasMore) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[pennylane.getQuotesByClient] reached MAX_PAGES=${MAX_PAGES}, some quotes may be missing for plCustomerId=${plCustomerId}`,
+    );
+  }
+
+  // 3. Filtrer par customer.id côté client
   const clientQuotes = allQuotes.filter(q => q.customer?.id === plCustomerId);
 
   // 4. Formater pour l'affichage
@@ -392,6 +416,117 @@ async function getQuotesByClient(clientId, orgId) {
     pdf_url: q.public_file_url || null,
     linked_invoices: q.linked_invoices || null,
   }));
+}
+
+/**
+ * Extrait un array depuis une valeur Pennylane V2 qui peut être :
+ *  - un array brut [...]
+ *  - un wrapper paginé { items: [...], has_more, next_cursor }
+ *  - null/undefined/autre → []
+ */
+function extractList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value.items)) return value.items;
+  if (Array.isArray(value.data)) return value.data;
+  return [];
+}
+
+async function fetchQuoteSubResource(pennylaneQuoteId, subPath) {
+  const all = [];
+  let cursor = null;
+  let hasMore = true;
+  while (hasMore) {
+    const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    const path = `/quotes/${pennylaneQuoteId}/${subPath}${qs}`;
+    const result = await apiCall('GET', path);
+    const items = extractList(result);
+    all.push(...items);
+    hasMore = !!result?.has_more && !!result?.next_cursor;
+    cursor = result?.next_cursor || null;
+  }
+  return all;
+}
+
+function formatQuoteLine(l) {
+  return {
+    id: l.id,
+    label: l.label || '',
+    description: l.description || null,
+    quantity: Number(l.quantity ?? 0),
+    unit: l.unit || 'piece',
+    unit_price_ht: Number(l.raw_currency_unit_price ?? l.unit_price ?? 0),
+    vat_rate: parseVatRate(l.vat_rate),
+    amount_ht: Number(l.currency_amount_before_tax ?? 0),
+    amount_ttc: Number(l.currency_amount ?? l.amount ?? 0),
+    section_rank: l.section_rank ?? null,
+    ledger_account_id: l.ledger_account_id ?? l.ledger_account?.id ?? null,
+  };
+}
+
+function formatQuoteSection(s, idx) {
+  return {
+    rank: s.rank ?? idx,
+    label: s.label || '',
+  };
+}
+
+/**
+ * Récupère les lignes d'un devis Pennylane (par pennylane_id du devis).
+ * Appelle GET /quotes/{id} pour les métadonnées, et fallback sur les
+ * sub-resources /invoice_lines + /invoice_line_sections si les listes
+ * ne sont pas embarquées dans le quote.
+ *
+ * @param {number|string} pennylaneQuoteId — pennylane_id du devis
+ * @returns {Promise<{ quote, sections, lines }>}
+ */
+async function getQuoteLines(pennylaneQuoteId) {
+  if (!pennylaneQuoteId) return { quote: null, sections: [], lines: [] };
+
+  // 3 appels en parallèle : quote (métadonnées) + lignes + sections
+  // Pennylane V2 ne renvoie pas les lignes dans /quotes/{id}, donc on hit
+  // directement les sub-resources sans attendre la métadonnée.
+  const [quote, linesResult, sectionsResult] = await Promise.all([
+    apiCall('GET', `/quotes/${pennylaneQuoteId}`),
+    fetchQuoteSubResource(pennylaneQuoteId, 'invoice_lines').catch(() => []),
+    fetchQuoteSubResource(pennylaneQuoteId, 'invoice_line_sections').catch(() => []),
+  ]);
+
+  if (!quote) return { quote: null, sections: [], lines: [] };
+
+  // Si les sub-resources renvoient vides, fallback sur le payload du quote
+  // (au cas où une autre version de l'API V2 embedde les lignes)
+  const rawLines = linesResult.length > 0
+    ? linesResult
+    : extractList(quote.invoice_lines).concat(
+        extractList(quote.lines),
+        extractList(quote.items),
+      );
+
+  const rawSections = sectionsResult.length > 0
+    ? sectionsResult
+    : extractList(quote.invoice_line_sections).concat(
+        extractList(quote.sections),
+      );
+
+  return {
+    quote: {
+      id: quote.id,
+      quote_number: quote.quote_number || quote.label || null,
+      label: quote.label || null,
+      subject: quote.pdf_invoice_subject || null,
+      date: quote.date || null,
+      deadline: quote.deadline || null,
+      status: quote.status || null,
+      pdf_url: quote.public_file_url || null,
+      amount_ht: quote.currency_amount_before_tax || null,
+      amount_ttc: quote.amount || quote.currency_amount || null,
+      tax: quote.tax || quote.currency_tax || null,
+      customer_id: quote.customer?.id || null,
+    },
+    sections: rawSections.map(formatQuoteSection),
+    lines: rawLines.map(formatQuoteLine),
+  };
 }
 
 // ============================================================================
@@ -461,23 +596,34 @@ async function getInvoicesByClient(clientId, orgId) {
 
   const plCustomerId = syncRecord.pennylane_id;
 
-  // 2. Fetch toutes les factures PL (l'API V2 ignore le filtre customer_id)
-  //    puis filtrer côté client par customer.id
+  // 2. Fetch les factures PL paginées (l'API V2 ne supporte pas filter[customer_id]
+  //    → renvoie 400) + safety MAX_PAGES pour éviter timeout edge function.
+  //    Filtre côté client par customer.id.
   const allInvoices = [];
   let cursor = null;
   let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
 
-  while (hasMore) {
+  while (hasMore && pageCount < MAX_PAGES) {
     let path = '/customer_invoices?limit=100';
-    if (cursor) path += `&cursor=${cursor}`;
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
     const result = await apiCall('GET', path);
     const items = result?.items || [];
     allInvoices.push(...items);
     hasMore = result?.has_more && !!result?.next_cursor;
     cursor = result?.next_cursor || null;
+    pageCount++;
   }
 
-  // 3. Filtrer par customer.id
+  if (pageCount === MAX_PAGES && hasMore) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[pennylane.getInvoicesByClient] reached MAX_PAGES=${MAX_PAGES}, some invoices may be missing for plCustomerId=${plCustomerId}`,
+    );
+  }
+
+  // 3. Filtrer par customer.id côté client
   const clientInvoices = allInvoices.filter(inv => inv.customer?.id === plCustomerId);
 
   // 4. Formater pour l'affichage
@@ -529,6 +675,7 @@ export const pennylaneService = {
   // Devis
   pushQuote: (quote, lines, client, orgId) => withErrorHandling(() => pushQuote(quote, lines, client, orgId), 'pennylane.pushQuote'),
   getQuotesByClient: (clientId, orgId) => withErrorHandling(() => getQuotesByClient(clientId, orgId), 'pennylane.getQuotesByClient'),
+  getQuoteLines: (pennylaneQuoteId) => withErrorHandling(() => getQuoteLines(pennylaneQuoteId), 'pennylane.getQuoteLines'),
 
   // Factures
   pullInvoices: (orgId, since) => withErrorHandling(() => pullInvoices(orgId, since), 'pennylane.pullInvoices'),

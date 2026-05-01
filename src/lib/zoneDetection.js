@@ -129,6 +129,32 @@ export function detectZoneByDuration(durationMinutes, zones) {
 }
 
 /**
+ * Calcule le temps/distance de trajet depuis une adresse vers le siège (Gaillac).
+ * Utilise la même logique de résolution de coords que detectZoneForAddress
+ * (centroïde commune en priorité, fallback géocodage adresse exacte) mais
+ * sans calcul de zone tarifaire — pour les écrans qui n'ont besoin que du
+ * trajet (ex: fiche chantier).
+ *
+ * @param {string} address - Rue
+ * @param {string} postalCode - Code postal
+ * @param {string} city - Ville
+ * @returns {Promise<{ durationMinutes: number|null, distanceKm: number|null, coords: {lat,lng}|null }>}
+ */
+export async function getDrivingFromAddress(address, postalCode, city) {
+  const empty = { durationMinutes: null, distanceKm: null, coords: null };
+  if (!postalCode && !city) return empty;
+
+  let coords = await getCommuneCentroid(city, postalCode);
+  if (!coords) coords = await geocodeAddress(address, postalCode, city);
+  if (!coords) return empty;
+
+  const driving = await getDrivingDuration(coords.lat, coords.lng);
+  if (!driving) return { ...empty, coords };
+
+  return { ...driving, coords };
+}
+
+/**
  * Détecte la zone tarifaire à partir d'une adresse complète
  * Compose : géocodage (api-adresse.data.gouv.fr) + temps trajet (Mapbox) + matching zone
  *

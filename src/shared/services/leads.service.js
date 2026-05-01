@@ -469,7 +469,26 @@ export const leadsService = {
         newStatusId,
       });
 
-      return { lead: enrichLead(updatedLead), clientCreated: null };
+      // Auto-conversion lead \u2192 client lors du passage en "Gagn\u00e9"
+      // (couvre tous les chemins : drag-and-drop Kanban, modal, LongTermDrawer)
+      let clientCreated = null;
+      if (newStatusLabel === 'Gagn\u00e9' && !currentLead?.client_id) {
+        try {
+          const conv = await this.convertLeadToClient(
+            leadId,
+            updatedLead?.org_id || currentLead?.org_id,
+            userId,
+          );
+          if (!conv?.error && !conv?.data?.skipped) {
+            clientCreated = conv.data?.client || null;
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[leads] auto-convert on Gagn\u00e9 failed:', e?.message);
+        }
+      }
+
+      return { lead: enrichLead(updatedLead), clientCreated };
     }, 'leads.updateLeadStatus');
 
     // Spread clientCreated to top-level for consumer compat

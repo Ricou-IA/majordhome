@@ -10,12 +10,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
+import { getDrivingFromAddress } from '@/lib/zoneDetection';
 import {
-  CHANTIER_STATUSES,
   CHANTIER_TRANSITIONS,
   getChantierStatusConfig,
   chantiersService,
@@ -23,11 +23,12 @@ import {
 import { interventionsService } from '@services/interventions.service';
 import { useChantierMutations, useInterventionSlots } from '@hooks/useChantiers';
 import { useTeamMembers } from '@hooks/useAppointments';
+import { usePennylaneQuoteLines } from '@hooks/usePennylane';
 import { contractsService } from '@services/contracts.service';
 import { supabase } from '@/lib/supabaseClient';
-import { FormField, TextArea } from '@apps/artisan/components/FormFields';
+import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFields';
 import { CreateContractModal } from '../entretiens/CreateContractModal';
-import { ChantierOrderSection } from './ChantierOrderSection';
+import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
@@ -37,14 +38,12 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   const {
     updateChantierStatus,
-    updateOrderStatus,
     updateEstimatedDate,
     updateChantierNotes,
     createChantierIntervention,
     createSlot,
     deleteSlot,
     isUpdatingStatus,
-    isUpdatingOrder,
     isCreatingIntervention,
     isCreatingSlot,
   } = useChantierMutations();
@@ -52,8 +51,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const { members } = useTeamMembers(orgId);
 
   // État local
-  const [equipmentOrder, setEquipmentOrder] = useState(chantier?.equipment_order_status || '');
-  const [materialsOrder, setMaterialsOrder] = useState(chantier?.materials_order_status || '');
   const [estimatedDate, setEstimatedDate] = useState(chantier?.estimated_date || '');
   const [notes, setNotes] = useState(chantier?.chantier_notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
@@ -69,6 +66,41 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   // Intervention parent
   const [parentIntervention, setParentIntervention] = useState(null);
   const [loadingParent, setLoadingParent] = useState(true);
+
+  // Devis Pennylane lié — pour récupérer le montant HT validé (cache partagé
+  // avec ChantierReceptionSection via React Query, donc 1 seul appel réseau)
+  const { quote: pennylaneQuote } = usePennylaneQuoteLines(chantier?.pennylane_quote_id);
+
+  // Trajet depuis le siège (Gaillac) — calcul Mapbox idempotent (cache module)
+  const [drivingInfo, setDrivingInfo] = useState(null);
+  const [isLoadingDriving, setIsLoadingDriving] = useState(false);
+
+  useEffect(() => {
+    if (!chantier?.postal_code && !chantier?.city) {
+      setDrivingInfo(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingDriving(true);
+    getDrivingFromAddress(
+      chantier.address || '',
+      chantier.postal_code || '',
+      chantier.city || ''
+    )
+      .then((result) => {
+        if (cancelled) return;
+        setDrivingInfo(result.durationMinutes != null ? result : null);
+      })
+      .catch(() => {
+        if (!cancelled) setDrivingInfo(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDriving(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chantier?.id, chantier?.address, chantier?.postal_code, chantier?.city]);
 
   // Charger l'intervention parent
   useEffect(() => {
@@ -109,48 +141,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       ? allTransitions
       : [];
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
-  const amount = Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
-
-  // Handlers
-  const handleOrderTransitionToast = (result) => {
-    if (!result?.autoTransitioned) return;
-    const newStatus = result?.data?.[0]?.chantier_status;
-    if (newStatus === 'commande_recue') {
-      toast.success('Commandes complètes — passage en "À planifier"');
-    } else if (newStatus === 'commande_a_faire') {
-      toast.info('Retour en "Commande à faire"');
-    }
-  };
-
-  const handleEquipmentChange = async (val) => {
-    setEquipmentOrder(val);
-    try {
-      const result = await updateOrderStatus(chantier.id, {
-        equipmentOrderStatus: val || null,
-        materialsOrderStatus: materialsOrder || null,
-        currentChantierStatus: chantier.chantier_status,
-      });
-      handleOrderTransitionToast(result);
-      onUpdated?.();
-    } catch {
-      toast.error('Erreur de mise à jour');
-    }
-  };
-
-  const handleMaterialsChange = async (val) => {
-    setMaterialsOrder(val);
-    try {
-      const result = await updateOrderStatus(chantier.id, {
-        equipmentOrderStatus: equipmentOrder || null,
-        materialsOrderStatus: val || null,
-        currentChantierStatus: chantier.chantier_status,
-      });
-      handleOrderTransitionToast(result);
-      onUpdated?.();
-    } catch {
-      toast.error('Erreur de mise à jour');
-    }
-  };
+  // Priorité au montant HT du devis Pennylane validé (source de vérité quand devis lié) ;
+  // sinon fallback sur estimation pipeline (order_amount_ht / estimated_revenue)
+  const amount = Number(pennylaneQuote?.amount_ht) || Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
 
   const handleEstimatedDateChange = async (val) => {
     setEstimatedDate(val);
@@ -283,7 +276,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[calc(100vh-4rem)] flex flex-col">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[calc(100vh-4rem)] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -318,10 +311,31 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                 </span>
               )}
             </div>
-            {(chantier.postal_code || chantier.city) && (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <MapPin className="w-4 h-4 text-gray-400" />
-                <span>{[chantier.postal_code, chantier.city].filter(Boolean).join(' ')}</span>
+            {(chantier.address || chantier.postal_code || chantier.city) && (
+              <div className="flex items-start gap-2 text-sm text-gray-500">
+                <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div>
+                    {[
+                      chantier.address,
+                      [chantier.postal_code, chantier.city].filter(Boolean).join(' '),
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </div>
+                  {isLoadingDriving && (
+                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Calcul du trajet…
+                    </div>
+                  )}
+                  {!isLoadingDriving && drivingInfo && (
+                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                      <Car className="w-3 h-3" />
+                      {drivingInfo.durationMinutes} min · {drivingInfo.distanceKm} km depuis Gaillac
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {chantier.equipment_type_label && (
@@ -331,17 +345,28 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             )}
           </div>
 
-          {/* Section commandes */}
+          {/* Section réception marchandise (devis Pennylane ligne par ligne) */}
           {!isTechnicien && (
-            <ChantierOrderSection
-              equipmentOrderStatus={equipmentOrder}
-              materialsOrderStatus={materialsOrder}
-              estimatedDate={estimatedDate}
-              onEquipmentChange={handleEquipmentChange}
-              onMaterialsChange={handleMaterialsChange}
-              onEstimatedDateChange={handleEstimatedDateChange}
-              disabled={isUpdatingOrder || !canEditChantier}
-            />
+            <>
+              <ChantierReceptionSection
+                chantier={chantier}
+                onUpdated={onUpdated}
+                disabled={!canEditChantier}
+              />
+
+              {/* Date estimative de réalisation (déconnectée des commandes) */}
+              <FormField label="Date estimative de réalisation">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                  <TextInput
+                    type="date"
+                    value={estimatedDate || ''}
+                    onChange={handleEstimatedDateChange}
+                    disabled={!canEditChantier}
+                  />
+                </div>
+              </FormField>
+            </>
           )}
 
           {/* Section intervention */}

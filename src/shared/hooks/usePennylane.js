@@ -164,6 +164,46 @@ export function usePennylaneQuotes(clientId, orgId) {
 }
 
 // ============================================================================
+// LIGNES D'UN DEVIS PL
+// ============================================================================
+
+/**
+ * Hook pour récupérer les lignes d'un devis Pennylane (par pennylane_id du devis).
+ * Retourne { quote, sections, lines } — voir pennylane.service.getQuoteLines.
+ *
+ * @param {number|string|null} pennylaneQuoteId
+ */
+export function usePennylaneQuoteLines(pennylaneQuoteId) {
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: pennylaneKeys.quoteLines(pennylaneQuoteId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getQuoteLines(pennylaneQuoteId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!pennylaneQuoteId,
+    // Lignes d'un devis signé = quasi-immuables. Cache long pour éviter les
+    // refetch inutiles quand on enchaîne les réceptions sur plusieurs chantiers.
+    staleTime: 60 * 60_000,  // 1h : pas de refetch pendant ce délai
+    gcTime: 60 * 60_000,     // 1h : garde en cache même après unmount du composant
+  });
+
+  return {
+    quote: data?.quote || null,
+    sections: data?.sections || [],
+    lines: data?.lines || [],
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+// ============================================================================
 // SYNC CLIENT (mutation ponctuelle)
 // ============================================================================
 
