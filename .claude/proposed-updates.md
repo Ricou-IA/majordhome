@@ -66,8 +66,9 @@ Est-ce que la stratégie fire-and-forget doit s'appliquer à d'autres services (
 ---
 
 ## [2026-04-27 23:50] Module Search Console (4ème onglet GeoGrid)
-**Statut** : PENDING
+**Statut** : RESOLU
 **Commit** : (à venir)
+**Décision** : Intégré 2026-05-01 — option (b) : résumé court inline dans CLAUDE.md (section Module Search Console après GeoGrid) + détails complets dans nouveau `docs/MODULE_SEARCH_CONSOLE.md` + gotcha PostgREST `majordhome` ajouté à Gotchas DB (utile bien au-delà de GSC).
 **Contexte** : Ajout d'un 4ème onglet "Search Console" dans GeoGrid Rank Tracker, complémentaire aux onglets Maps. Pipeline OAuth Google + sync API Search Analytics → table `majordhome.gsc_keyword_metrics`. 3 edge functions (`gsc-oauth-init`, `gsc-oauth-callback`, `gsc-sync`) + RPC `public.gsc_upsert_metrics` + composant `GscPanel.jsx`. Refresh_token stocké dans `core.organizations.settings.gsc_refresh_token`. UI affiche KPIs (impressions/clics/CTR/position) + tableau agrégé par requête + filtre famille + croisement avec liste "Mayer SEO 2026". Premier test 2026-04-27 : 370 lignes / 43 requêtes uniques sur 12 mois pour mayer-energie.fr.
 
 **Gotcha technique majeur** : `supabase-js` côté edge function ne peut PAS écrire directement dans `majordhome.*` via `.schema('majordhome')` — PostgREST renvoie "Invalid schema: majordhome". Pattern projet : passer par une RPC SECURITY DEFINER (cf. gotcha N8N → Supabase déjà documenté). En revanche `.schema('core')` fonctionne (le schema core est exposé). Asymétrie à connaître.

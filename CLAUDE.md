@@ -1,6 +1,6 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-04-27 — GeoGrid : Listes de keywords + Benchmarks (thermomètre SEO mensuel). 3 onglets : Scan unique / Listes / Benchmarks. Tables `geogrid_keyword_lists` + `geogrid_benchmarks` + colonne `benchmark_id` sur scans. Auto-tag par famille (Poêle/Ramonage/Clim/PAC/Chauffage/Entretien). Loop frontend séquentiel pour run benchmark. Master prompt SEO dans `docs/SEO_AUDIT_MASTER_PROMPT.md`.
+> **Dernière MàJ** : 2026-05-01 — Module Search Console (4ème onglet GeoGrid) : OAuth Google + sync API Search Analytics → `majordhome.gsc_keyword_metrics`. 3 edge functions (`gsc-oauth-init/callback/sync`) + RPC `gsc_upsert_metrics`. Détails : `docs/MODULE_SEARCH_CONSOLE.md`. Gotcha PostgREST `majordhome` documenté.
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -84,6 +84,7 @@ src/
 ### Gotchas DB
 - **Séquences PostgreSQL** : Ne JAMAIS calculer manuellement un ID/numéro via `SELECT MAX(col) + 1`. Toujours laisser le DEFAULT de la séquence DB (`nextval()`) générer la valeur — atomique, évite race conditions et désynchronisation. Exemple : `majordhome.client_number` utilise `majordhome.client_number_seq`, toute insertion doit omettre `client_number` pour que le DEFAULT s'applique.
 - **Vérifier l'erreur sur les mutations Supabase** : Toujours destructurer `{ error }` sur `update()` / `insert()` / `delete()`, même sur des opérations qu'on pense sûres. Triggers DB, RLS ou contraintes peuvent causer des échecs silencieux. Pattern : `const { data, error } = await supabase.from(...).update(...); if (error) { ... }`. Vu en pratique avec un trigger fantôme `set_geogrid_scans_updated_at` qui faisait échouer silencieusement les UPDATE de `benchmark_id`.
+- **Schema `majordhome` non exposé via PostgREST** : `supabase-js` côté edge function ne peut PAS écrire dans `majordhome.*` via `.schema('majordhome').from(...)` — PostgREST renvoie "Invalid schema: majordhome". Pattern obligatoire : RPC SECURITY DEFINER dans `public` avec `SET search_path = majordhome, public`. Le schema `core` est en revanche exposé (asymétrie). Même pattern déjà utilisé pour les écritures N8N → Supabase.
 
 ### Vues publiques principales
 - `majordhome_clients` → clients + has_active_contract calculé
@@ -458,6 +459,25 @@ Regex dans `BenchmarkResultTable.jsx` : `detectFamily(keyword)` retourne Poêle 
 
 ### Garde-fou app
 `useGeoGridQuota(orgId)` calcule `SUM(total_points)` du mois courant en bornes UTC strictes (`Date.UTC(year, month, 1)`). Bouton "Lancer le scan" désactivé si projection > 5000 sauf override explicite via checkbox (partagé entre scan unique et benchmarks).
+
+## Module Search Console (Google Search Console)
+
+2ème thermomètre SEO complémentaire à GeoGrid Maps : positions/impressions/clics du site mayer-energie.fr dans Google Search. Intégré comme 4ème onglet de GeoGrid.
+
+### Stack
+- OAuth Google : `refresh_token` dans `core.organizations.settings.gsc_refresh_token` + `gsc_site_url` (`sc-domain:mayer-energie.fr`)
+- API GSC : `searchconsole.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` (rowLimit 25k, paginé jusqu'à 200k)
+- Edge functions : `gsc-oauth-init` (verify_jwt:true), `gsc-oauth-callback` (verify_jwt:false), `gsc-sync` (verify_jwt:true)
+- DB : `majordhome.gsc_keyword_metrics` (UNIQUE org_id+site_url+date+query+page) + RPC `public.gsc_upsert_metrics(p_rows jsonb)` (SECURITY DEFINER)
+- Frontend : `gsc.service.js` + `useGsc.js` (`gscKeys` dans `cacheKeys.js`) + `GscPanel.jsx` (4ème onglet `GeoGrid.jsx`)
+
+### Sync
+Au retour OAuth (`?gsc=connected`), `useEffect` déclenche auto `triggerSync({ monthsBack: 16 })`. Bouton "Sync 16 mois" disponible aussi pour re-import manuel.
+
+### UI
+GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m/12m + filtre famille + toggle "Liste Mayer SEO 2026 uniquement" + 5 KPIs + tableau agrégé par requête avec étoile pour keywords curés).
+
+> Détails complets (edge functions, RLS, secrets GCP, etc.) : `docs/MODULE_SEARCH_CONSOLE.md`. Master prompt évolution : `docs/GSC_INTEGRATION_MASTER_PROMPT.md`.
 
 ## Plan de Développement
 | Sprint | Titre | Statut |
