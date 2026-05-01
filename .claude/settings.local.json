@@ -85,7 +85,18 @@
       "Bash(grep -A 50 \"CREATE OR REPLACE FUNCTION.*create_majordhome\\\\|CREATE OR REPLACE FUNCTION.*update_majordhome\" /c/Dev/Frontend-Majordhome/sql/*.sql)",
       "Bash(grep -n \"CREATE OR REPLACE FUNCTION\\\\|CREATE FUNCTION\" /c/Dev/Frontend-Majordhome/sql/*.sql)",
       "Bash(del \"C:\\\\Dev\\\\Frontend-Majordhome\\\\.git\\\\index.lock\")",
-      "Bash(cmd //c \"del C:\\\\Dev\\\\Frontend-Majordhome\\\\.git\\\\index.lock\")"
+      "Bash(cmd //c \"del C:\\\\Dev\\\\Frontend-Majordhome\\\\.git\\\\index.lock\")",
+      "Bash(git stash:*)",
+      "Bash(find /c/Dev/Frontend-Majordhome -name \"*.sql\" -exec grep -l \"pricing\\\\|zone\" {} \\\\;)",
+      "Bash(curl -s \"https://odspcxgafcqxjzrarsqf.supabase.co/rest/v1/\" -H \"apikey: sb_publishable_dummy\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(xargs -I {} git show --stat {})",
+      "PowerShell($claudePath = \\(Get-Command claude -ErrorAction SilentlyContinue\\); if \\($claudePath\\) { Write-Output \"FOUND: $\\($claudePath.Source\\)\" } else { Write-Output \"NOT FOUND in PATH\" }; Write-Output \"---\"; Write-Output \"USERPROFILE: $env:USERPROFILE\")",
+      "Bash(git diff *)",
+      "Bash(git fetch *)",
+      "mcp__supabase__get_edge_function",
+      "Bash(iconv -f UTF-16LE -t UTF-8 \"C:/Users/epude/Downloads/Keyword Stats 2026-04-27 at 11_56_19.csv\")",
+      "Read(//tmp/**)",
+      "Bash(python3)"
     ]
   }
 }
