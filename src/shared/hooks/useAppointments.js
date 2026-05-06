@@ -10,8 +10,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
+import { chantierSlotsService } from '@services/chantierSlots.service';
 import { supabase } from '@/lib/supabaseClient';
-import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
+import { appointmentKeys, leadKeys, chantierSlotKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
 export { appointmentKeys } from '@hooks/cacheKeys';
@@ -81,9 +82,24 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     staleTime: 15_000,
   });
 
-  // Convertir en events FullCalendar — avec filtrage multi-membres côté client
+  // Query parallèle : slots chantier (Phase 0 transitoire — supprimé en Phase 1
+  // quand les slots seront migrés vers appointments)
+  const { data: chantierSlots } = useQuery({
+    queryKey: chantierSlotKeys.list(orgId, { startDate, endDate }),
+    queryFn: () =>
+      chantierSlotsService.getChantierSlots({
+        coreOrgId: orgId,
+        startDate,
+        endDate,
+      }),
+    enabled: !!orgId && !!startDate && !!endDate,
+    staleTime: 15_000,
+    select: (result) => result?.data || [],
+  });
+
+  // Convertir en events FullCalendar — appointments + slots chantier mergés
   const events = useMemo(() => {
-    if (!appointments) return [];
+    if (!appointments && !chantierSlots) return [];
 
     // Enrichir chaque appointment avec ses technician_ids
     const techMap = new Map();
@@ -94,7 +110,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       });
     }
 
-    let enriched = appointments.map(a => ({
+    let enrichedAppointments = (appointments || []).map(a => ({
       ...a,
       technician_ids: techMap.get(a.id) || [],
     }));
@@ -102,13 +118,26 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     // Filtre multi-membres : techniciens (via techLinks) + commerciaux (via assigned_commercial_id)
     if (filters.memberIds.length > 0 && techLinks) {
       const memberSet = new Set(filters.memberIds);
-      enriched = enriched.filter(
+      enrichedAppointments = enrichedAppointments.filter(
         a => a.technician_ids.some(id => memberSet.has(id)) || memberSet.has(a.assigned_commercial_id)
       );
     }
 
-    return enriched.map(a => appointmentsService.toCalendarEvent(a));
-  }, [appointments, filters.memberIds, techLinks]);
+    const appointmentEvents = enrichedAppointments.map(a => appointmentsService.toCalendarEvent(a));
+
+    // Slots chantier — masqués si filtre type actif (chantier_jour n'a pas d'équivalent dans APPOINTMENT_TYPES)
+    let visibleSlots = chantierSlots || [];
+    if (filters.appointmentType) {
+      visibleSlots = [];
+    }
+    if (filters.memberIds.length > 0) {
+      const memberSet = new Set(filters.memberIds);
+      visibleSlots = visibleSlots.filter(s => (s.technician_ids || []).some(id => memberSet.has(id)));
+    }
+    const slotEvents = visibleSlots.map(s => chantierSlotsService.toCalendarEvent(s));
+
+    return [...appointmentEvents, ...slotEvents];
+  }, [appointments, chantierSlots, filters.memberIds, filters.appointmentType, techLinks]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
