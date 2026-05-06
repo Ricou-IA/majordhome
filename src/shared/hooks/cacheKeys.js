@@ -85,6 +85,13 @@ export const chantierReceptionKeys = {
   byChantier: (chantierId) => [...chantierReceptionKeys.all, 'byChantier', chantierId],
 };
 
+// --- Chantier Slots (Phase 0 transitoire — supprimé en Phase 1) ---
+export const chantierSlotKeys = {
+  all: ['chantier-slots'],
+  lists: () => [...chantierSlotKeys.all, 'list'],
+  list: (orgId, dateRange) => [...chantierSlotKeys.lists(), orgId, dateRange],
+};
+
 // --- Prospects ---
 export const prospectKeys = {
   all: ['prospects'],
@@ -238,6 +245,7 @@ export const pennylaneKeys = {
   invoicesByClient: (clientId) => [...pennylaneKeys.all, 'invoices', clientId],
   quotesByClient: (clientId) => [...pennylaneKeys.all, 'quotes', clientId],
   quoteLines: (pennylaneQuoteId) => [...pennylaneKeys.all, 'quote-lines', pennylaneQuoteId],
+  linkedQuotesByLead: (leadId) => [...pennylaneKeys.all, 'linked-quotes', leadId],
 };
 
 // --- Meta Ads ---
