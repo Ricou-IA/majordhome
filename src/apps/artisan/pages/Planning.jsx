@@ -35,6 +35,8 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useLeadCommercials } from '@hooks/useLeads';
 import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
+import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
+import { supabase } from '@/lib/supabaseClient';
 
 // ============================================================================
 // HELPERS
@@ -344,6 +346,8 @@ export default function Planning() {
   const [calendarTitle, setCalendarTitle] = useState('');
   const [dateRange, setDateRange] = useState(() => getDateRange(null));
   const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
+  const [selectedChantier, setSelectedChantier] = useState(null);
+  const [loadingChantier, setLoadingChantier] = useState(false);
 
   // Hooks données
   const {
@@ -426,12 +430,39 @@ export default function Planning() {
     calendarRef.current?.getApi().unselect();
   }, []);
 
-  // Clic sur un événement → éditer
-  const handleEventClick = useCallback((clickInfo) => {
+  // Clic sur un événement → éditer (RDV) OU ouvrir chantier (slot chantier Phase 0)
+  const handleEventClick = useCallback(async (clickInfo) => {
+    const props = clickInfo.event.extendedProps;
+
+    // Slot chantier : fetch + ouvrir ChantierModal
+    if (props.appointment_kind === 'chantier_slot') {
+      if (!props.parent_lead_id) {
+        toast.error('Chantier introuvable');
+        return;
+      }
+      setLoadingChantier(true);
+      try {
+        const { data, error } = await supabase
+          .from('majordhome_chantiers')
+          .select('*')
+          .eq('id', props.parent_lead_id)
+          .single();
+        if (error || !data) {
+          toast.error('Impossible de charger le chantier');
+          return;
+        }
+        setSelectedChantier(data);
+      } finally {
+        setLoadingChantier(false);
+      }
+      return;
+    }
+
+    // RDV classique : EventModal existante
     setModalState({
       open: true,
       mode: 'edit',
-      appointment: clickInfo.event.extendedProps,
+      appointment: props,
       defaultDate: null,
       defaultTime: null,
     });
@@ -680,6 +711,37 @@ export default function Planning() {
         onCancel={handleModalCancel}
         isSaving={isCreating || isUpdating}
       />
+
+      {/* Modale Chantier — clic sur slot chantier (Phase 0) */}
+      {selectedChantier && (
+        <ChantierModal
+          chantier={selectedChantier}
+          onClose={() => setSelectedChantier(null)}
+          onUpdated={() => {
+            refresh();
+            if (selectedChantier?.id) {
+              supabase
+                .from('majordhome_chantiers')
+                .select('*')
+                .eq('id', selectedChantier.id)
+                .single()
+                .then(({ data }) => data && setSelectedChantier(data));
+            }
+          }}
+          effectiveRole={effectiveRole}
+          canEditAll={can('chantiers', 'update')}
+        />
+      )}
+
+      {/* Loader pendant fetch du chantier */}
+      {loadingChantier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 pointer-events-none">
+          <div className="bg-white rounded-lg shadow-xl px-6 py-4 flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+            <span className="text-sm text-gray-700">Chargement du chantier…</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
