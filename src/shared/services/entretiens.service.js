@@ -18,6 +18,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 
 // ============================================================================
@@ -25,6 +26,162 @@ import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.ser
 // ============================================================================
 
 export { CONTRACT_STATUSES, CONTRACT_FREQUENCIES };
+
+// ============================================================================
+// HELPER INTERNE — Synchronisation Kanban + Planning depuis recordVisit
+// ============================================================================
+
+/**
+ * Garantit qu'une carte Kanban entretien (parent en `planifie`) et un RDV Planning
+ * existent pour le contrat à la date saisie. Crée ou met à jour selon le cas.
+ *
+ * Cas d'usage : le client appelle pour planifier (ou décaler) sa visite annuelle
+ * et l'utilisateur saisit la date directement depuis la fiche contrat.
+ *
+ * - Pas de carte → CREATE entretien parent (workflow_status='planifie') + appointment
+ * - Carte en planifie/a_planifier → UPDATE scheduled_date du parent + UPDATE/CREATE appointment
+ * - Carte en realise/facture → no-op (visite déjà clôturée, recordVisit fait juste l'UPSERT maintenance_visits)
+ */
+async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visitDate, notes, userId }) {
+  // Charger le contrat → client_id + estimated_time pour la durée du RDV
+  const { data: contract } = await supabase
+    .from('majordhome_contracts')
+    .select('client_id, estimated_time')
+    .eq('id', contractId)
+    .single();
+
+  if (!contract?.client_id) return;
+
+  // Charger les infos client (project_id obligatoire pour intervention)
+  const { data: client } = await supabase
+    .from('majordhome_clients')
+    .select('project_id, display_name, first_name, last_name, address, postal_code, city, phone, email')
+    .eq('id', contract.client_id)
+    .single();
+
+  if (!client?.project_id) return;
+
+  // 1) Entretien parent (carte Kanban)
+  const { data: existingParent } = await supabase
+    .from('majordhome_interventions')
+    .select('id, workflow_status, scheduled_date')
+    .eq('contract_id', contractId)
+    .eq('intervention_type', 'entretien')
+    .is('parent_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const parentClosed = existingParent?.workflow_status === 'realise'
+    || existingParent?.workflow_status === 'facture';
+
+  if (!existingParent) {
+    // CREATE entretien parent en planifie
+    const { error: insertErr } = await supabase
+      .from('majordhome_interventions')
+      .insert({
+        project_id: client.project_id,
+        client_id: contract.client_id,
+        contract_id: contractId,
+        intervention_type: 'entretien',
+        workflow_status: 'planifie',
+        scheduled_date: visitDate,
+        status: 'scheduled',
+        report_notes: notes || null,
+        created_by: userId || null,
+        tags: ['Contrat'],
+      });
+
+    if (insertErr) {
+      console.error('[entretiensService] CREATE entretien parent error:', insertErr);
+    }
+  } else if (!parentClosed && existingParent.scheduled_date !== visitDate) {
+    // UPDATE date du parent (cas : client décale son RDV)
+    const { error: updateErr } = await supabase
+      .from('majordhome_interventions')
+      .update({
+        scheduled_date: visitDate,
+        workflow_status: 'planifie',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingParent.id);
+
+    if (updateErr) {
+      console.error('[entretiensService] UPDATE entretien parent error:', updateErr);
+    }
+  }
+
+  // 2) Appointment Planning — uniquement si la carte n'est pas clôturée
+  if (parentClosed) return;
+
+  const visitYear = new Date(visitDate).getFullYear();
+  const yearStart = `${visitYear}-01-01`;
+  const yearEnd = `${visitYear}-12-31`;
+
+  // Cherche un RDV maintenance existant pour ce client sur l'année (anti-doublon décalage)
+  const { data: existingAppt } = await supabase
+    .from('majordhome_appointments')
+    .select('id, scheduled_date')
+    .eq('client_id', contract.client_id)
+    .eq('appointment_type', 'maintenance')
+    .gte('scheduled_date', yearStart)
+    .lte('scheduled_date', yearEnd)
+    .in('status', ['scheduled', 'confirmed'])
+    .order('scheduled_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingAppt?.id) {
+    if (existingAppt.scheduled_date !== visitDate) {
+      const { error: updateApptErr } = await supabase
+        .from('majordhome_appointments')
+        .update({ scheduled_date: visitDate, updated_at: new Date().toISOString() })
+        .eq('id', existingAppt.id);
+
+      if (updateApptErr) {
+        console.error('[entretiensService] UPDATE appointment error:', updateApptErr);
+      }
+    }
+    return;
+  }
+
+  // CREATE appointment
+  const majordhomeOrgId = await getMajordhomeOrgId(coreOrgId);
+  if (!majordhomeOrgId) {
+    console.warn('[entretiensService] majordhome org_id introuvable, skip appointment');
+    return;
+  }
+
+  const clientName = client.display_name
+    || [client.last_name, client.first_name].filter(Boolean).join(' ').trim()
+    || 'Client';
+
+  const { error: insertApptErr } = await supabase
+    .from('majordhome_appointments')
+    .insert({
+      org_id: majordhomeOrgId,
+      scheduled_date: visitDate,
+      scheduled_start: '09:00:00',
+      duration_minutes: contract.estimated_time || 60,
+      appointment_type: 'maintenance',
+      status: 'scheduled',
+      subject: `Entretien annuel — ${clientName}`,
+      client_id: contract.client_id,
+      client_name: clientName,
+      client_first_name: client.first_name || null,
+      client_phone: client.phone || null,
+      client_email: client.email || null,
+      address: client.address || null,
+      postal_code: client.postal_code || null,
+      city: client.city || null,
+      description: notes || null,
+      source: 'manual',
+    });
+
+  if (insertApptErr) {
+    console.error('[entretiensService] CREATE appointment error:', insertApptErr);
+  }
+}
 
 // ============================================================================
 // SERVICE
@@ -378,63 +535,21 @@ export const entretiensService = {
         return { data: null, error };
       }
 
-      // Cascade : créer une intervention legacy uniquement si pas d'entretien parent existant
-      // (le workflow certificat multi-équipements gère ses propres interventions)
-      if ((status === 'completed') && data) {
+      // Année courante + Passage réalisé → garnir le Kanban (carte planifie)
+      // et le Planning (RDV maintenance) pour récupérer le workflow normal.
+      // Année passée : pas de Kanban (chaînage annuel via maintenance_visits suffit).
+      const currentYear = new Date().getFullYear();
+      if (status === 'completed' && year === currentYear && data) {
         try {
-          // Vérifier si un entretien parent existe déjà pour ce contrat
-          const { data: existingEntretien } = await supabase
-            .from('majordhome_interventions')
-            .select('id')
-            .eq('contract_id', contractId)
-            .eq('intervention_type', 'entretien')
-            .is('parent_id', null)
-            .limit(1)
-            .maybeSingle();
-
-          // Si un entretien parent existe, pas de cascade legacy
-          if (!existingEntretien) {
-            const { data: contract } = await supabase
-              .from('majordhome_contracts')
-              .select('client_id')
-              .eq('id', contractId)
-              .single();
-
-            if (contract?.client_id) {
-              const { data: client } = await supabase
-                .from('majordhome_clients')
-                .select('project_id')
-                .eq('id', contract.client_id)
-                .single();
-
-              if (client?.project_id) {
-                const { data: intervention } = await supabase
-                  .from('majordhome_interventions')
-                  .insert({
-                    project_id: client.project_id,
-                    intervention_type: 'maintenance',
-                    scheduled_date: visitDate || new Date().toISOString().split('T')[0],
-                    status: 'completed',
-                    report_notes: notes || null,
-                    technician_id: technicianId || null,
-                    technician_name: technicianName || null,
-                    created_by: userId || null,
-                    tags: ['Contrat'],
-                  })
-                  .select('id')
-                  .single();
-
-                if (intervention?.id) {
-                  await supabase
-                    .from('majordhome_maintenance_visits')
-                    .update({ intervention_id: intervention.id })
-                    .eq('id', data.id);
-                }
-              }
-            }
-          }
+          await ensureKanbanAndAppointmentForVisit({
+            contractId,
+            coreOrgId: orgId,
+            visitDate: visitData.visit_date,
+            notes,
+            userId,
+          });
         } catch (cascadeErr) {
-          console.error('[entretiensService] cascade intervention creation error:', cascadeErr);
+          console.error('[entretiensService] Kanban/Planning sync error:', cascadeErr);
         }
       }
 

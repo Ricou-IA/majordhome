@@ -18,6 +18,7 @@ import { ClipboardCheck } from 'lucide-react';
 import { contractsService } from '@services/contracts.service';
 import { equipmentsService } from '@services/equipments.service';
 import { useCertificatChildren, useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
+import { useAuth } from '@/contexts/AuthContext';
 import { CertificatEquipmentRow } from './CertificatEquipmentRow';
 
 // ============================================================================
@@ -32,13 +33,15 @@ import { CertificatEquipmentRow } from './CertificatEquipmentRow';
 export function CertificatsSection({ item, onCloseModal }) {
   // --- Hooks certificats ---
   const { children, isLoading: childrenLoading, refetch } = useCertificatChildren(item?.id);
-  const { createChildren, markNeant, unmarkNeant } = useCertificatEntretienMutations();
+  const { createChildren, markNeant, unmarkNeant, completeParent } = useCertificatEntretienMutations();
+  const { organization } = useAuth();
 
   // --- State local ---
   const [equipments, setEquipments] = useState([]);
   const [equipmentsLoading, setEquipmentsLoading] = useState(true);
   const [mutatingId, setMutatingId] = useState(null);
   const creatingRef = useRef(false);
+  const selfHealRef = useRef(false);
 
   // --- Charger les équipements du contrat (fallback: équipements du client) ---
   useEffect(() => {
@@ -92,6 +95,30 @@ export function CertificatsSection({ item, onCloseModal }) {
   const childByEquipId = Object.fromEntries(children.map((c) => [c.equipment_id, c]));
   const doneCount = children.filter((c) => c.workflow_status === 'realise').length;
   const totalCount = children.length;
+
+  // --- Self-healing : si tous les enfants sont done mais le parent est encore planifie,
+  // déclencher la clôture automatique. Couvre les cas legacy où la transition manquait. ---
+  useEffect(() => {
+    if (selfHealRef.current) return;
+    if (childrenLoading || equipmentsLoading) return;
+    if (totalCount === 0 || doneCount !== totalCount) return;
+    if (!item || item.workflow_status !== 'planifie') return;
+    if (!organization?.id) return;
+
+    selfHealRef.current = true;
+    completeParent(item.id, organization.id).catch((err) => {
+      console.warn('[CertificatsSection] self-heal completeParent error:', err);
+      selfHealRef.current = false;
+    });
+  }, [
+    childrenLoading,
+    equipmentsLoading,
+    doneCount,
+    totalCount,
+    item,
+    organization?.id,
+    completeParent,
+  ]);
 
   // Ne rien afficher si pas encore chargé ou pas d'équipements
   if (equipmentsLoading || equipments.length === 0) return null;

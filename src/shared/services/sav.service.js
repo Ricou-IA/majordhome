@@ -96,6 +96,34 @@ export function getKanbanColumnConfig(columnValue) {
 }
 
 // ============================================================================
+// HELPER INTERNE — Auto-clôture du parent quand tous les enfants sont done
+// ============================================================================
+
+/**
+ * Vérifie si tous les enfants d'un parent sont en `realise` (rempli ou néant)
+ * et déclenche `completeParentEntretien` le cas échéant.
+ * Récupère l'org_id (core) via la vue `majordhome_entretien_sav`.
+ * Erreurs loggées silencieusement — ne propage jamais (fire-and-forget).
+ */
+async function maybeCompleteParent(parentId) {
+  try {
+    const { data: parentRow } = await supabase
+      .from('majordhome_entretien_sav')
+      .select('id, org_id, workflow_status')
+      .eq('id', parentId)
+      .maybeSingle();
+
+    if (!parentRow || !parentRow.org_id) return;
+    // Ne pas re-déclencher si parent déjà clôturé
+    if (parentRow.workflow_status === 'realise' || parentRow.workflow_status === 'facture') return;
+
+    await savService.completeParentEntretien(parentId, parentRow.org_id);
+  } catch (err) {
+    console.warn('[sav] maybeCompleteParent silent error:', err);
+  }
+}
+
+// ============================================================================
 // SERVICE PRINCIPAL
 // ============================================================================
 
@@ -581,10 +609,15 @@ export const savService = {
         .from('majordhome_interventions')
         .update({ workflow_status: 'realise', status: 'completed' })
         .eq('id', interventionId)
-        .select()
+        .select('id, parent_id')
         .single();
 
       if (error) throw error;
+
+      if (data?.parent_id) {
+        await maybeCompleteParent(data.parent_id);
+      }
+
       return data;
     }, 'sav.markRealise');
   },
@@ -600,10 +633,15 @@ export const savService = {
         .from('majordhome_interventions')
         .update({ workflow_status: 'realise', status: 'cancelled' })
         .eq('id', childId)
-        .select()
+        .select('id, parent_id')
         .single();
 
       if (error) throw error;
+
+      if (data?.parent_id) {
+        await maybeCompleteParent(data.parent_id);
+      }
+
       return data;
     }, 'sav.markChildNeant');
   },

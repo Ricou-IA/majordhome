@@ -15,7 +15,7 @@ import { contractsService } from '@services/contracts.service';
 import { savService } from '@services/sav.service';
 import { entretiensService } from '@services/entretiens.service';
 import { clientsService } from '@services/clients.service';
-import { contractKeys, clientKeys, interventionKeys, entretienSavKeys } from '@hooks/cacheKeys';
+import { contractKeys, clientKeys, interventionKeys, entretienSavKeys, appointmentKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
 export { contractKeys } from '@hooks/cacheKeys';
@@ -424,8 +424,10 @@ export function useContractMutations() {
       queryClient.invalidateQueries({ queryKey: [...contractKeys.all, 'visits', variables.contractId] });
       queryClient.invalidateQueries({ queryKey: contractKeys.detail(variables.contractId) });
       queryClient.invalidateQueries({ queryKey: contractKeys.stats(variables.orgId, variables.year) });
-      // Cascade crée une intervention → invalider le cache interventions
+      // Cascade Kanban (entretien parent) + Planning (appointment)
       queryClient.invalidateQueries({ queryKey: interventionKeys.all });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
       queryClient.invalidateQueries({ queryKey: clientKeys.all });
     },
   });
