@@ -55,6 +55,7 @@ const DEFAULT_SOURCE_BOUCHE_A_OREILLE = '3d945733-475a-46ee-891b-50acf9e2151d';
  * @param {Object|null} props.appointment - Données RDV (mode edit)
  * @param {string|null} props.defaultDate - Date par défaut (mode create, YYYY-MM-DD)
  * @param {string|null} props.defaultTime - Heure par défaut (mode create, HH:MM)
+ * @param {Object|null} props.prefillClient - Client à pré-lier (mode create) — pré-remplit les champs et lie le RDV au client
  * @param {Array} props.members - Liste des techniciens
  * @param {string} [props.orgId] - core org_id (pour recherche client/lead)
  * @param {string} [props.userId] - user id (pour création lead auto)
@@ -70,6 +71,7 @@ export function EventModal({
   appointment = null,
   defaultDate = null,
   defaultTime = null,
+  prefillClient = null,
   members = [],
   orgId,
   userId,
@@ -218,13 +220,13 @@ export function EventModal({
         appointment_type: 'rdv_technical',
         priority: 'normal',
         status: 'scheduled',
-        client_name: '',
-        client_first_name: '',
-        client_phone: '',
-        client_email: '',
-        client_address: '',
-        client_city: '',
-        client_postal_code: '',
+        client_name: prefillClient?.last_name || '',
+        client_first_name: prefillClient?.first_name || '',
+        client_phone: prefillClient?.phone || '',
+        client_email: prefillClient?.email || '',
+        client_address: prefillClient?.address || '',
+        client_city: prefillClient?.city || '',
+        client_postal_code: prefillClient?.postal_code || '',
         scheduled_date: defaultDate || new Date().toISOString().split('T')[0],
         scheduled_start: startTime,
         scheduled_end: computeEndTime(startTime, duration),
@@ -234,14 +236,24 @@ export function EventModal({
         technicianIds: [],
         assigned_commercial_id: '',
       });
-      setSelectedClient(null);
+      if (prefillClient?.id) {
+        setSelectedClient({
+          id: prefillClient.id,
+          display_name: prefillClient.display_name || [prefillClient.last_name, prefillClient.first_name].filter(Boolean).join(' '),
+          client_number: prefillClient.client_number || null,
+          phone: prefillClient.phone || null,
+          city: prefillClient.city || null,
+        });
+      } else {
+        setSelectedClient(null);
+      }
       setSelectedLead(null);
     }
 
     clearClientSearch();
     clearLeadSearch();
     setShowClientDropdown(false);
-  }, [isOpen, mode, appointment, defaultDate, defaultTime, isEdit, clearClientSearch, clearLeadSearch]);
+  }, [isOpen, mode, appointment, defaultDate, defaultTime, prefillClient, isEdit, clearClientSearch, clearLeadSearch]);
 
   // --------------------------------------------------------------------------
   // Mettre à jour un champ (avec auto-calcul heures)

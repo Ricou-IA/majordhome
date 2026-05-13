@@ -14,11 +14,16 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
-  Archive, ArchiveRestore, Receipt,
+  Archive, ArchiveRestore, Receipt, CalendarPlus,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClient, useLinkedClients } from '@hooks/useClients';
+import { useTeamMembers, appointmentKeys } from '@hooks/useAppointments';
+import { useCanAccess } from '@hooks/usePermissions';
+import { appointmentsService } from '@services/appointments.service';
 import { formatDateFR } from '@/lib/utils';
+import { EventModal } from '../components/planning/EventModal';
 
 // Sous-composants extraits
 import { InviteClientButton } from '../components/clients/InviteClientButton';
@@ -57,11 +62,19 @@ export default function ClientDetail() {
   const [initialData, setInitialData] = useState({});
   const [hasInitialized, setHasInitialized] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [appointmentModal, setAppointmentModal] = useState({ open: false });
+  const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
+
+  const { can } = useCanAccess();
+  const canCreateAppointment = can('planning', 'create');
+  const queryClient = useQueryClient();
 
   const {
     client, isLoading, error, updateClient, isUpdating,
     archiveClient, isArchiving, unarchiveClient, isUnarchiving, refresh,
   } = useClient(id);
+
+  const { members } = useTeamMembers(organization?.id);
 
   const { owner, tenants } = useLinkedClients(id, organization?.id);
   const isOwner = tenants.length > 0;
@@ -150,6 +163,29 @@ export default function ClientDetail() {
       navigate('/clients');
     } else {
       toast.error("Erreur lors de l'archivage");
+    }
+  };
+
+  const handleCreateAppointment = async (formDataRdv) => {
+    try {
+      setIsCreatingAppointment(true);
+      const { error: err } = await appointmentsService.createAppointment({
+        coreOrgId: organization?.id,
+        ...formDataRdv,
+      });
+      if (err) {
+        toast.error('Erreur lors de la création du RDV');
+        return false;
+      }
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      toast.success('RDV créé avec succès');
+      setAppointmentModal({ open: false });
+      return true;
+    } catch {
+      toast.error('Une erreur est survenue');
+      return false;
+    } finally {
+      setIsCreatingAppointment(false);
     }
   };
 
@@ -259,6 +295,18 @@ export default function ClientDetail() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Nouveau RDV */}
+          {canCreateAppointment && !isArchived && (
+            <button
+              onClick={() => setAppointmentModal({ open: true })}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+              title="Créer un nouveau RDV pour ce client"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              Nouveau RDV
+            </button>
+          )}
+
           {/* Portail client */}
           <InviteClientButton client={client} />
 
@@ -352,6 +400,24 @@ export default function ClientDetail() {
         {activeTab === 'mailings' && <TabMailings clientId={id} />}
         {activeTab === 'sms' && <TabSms clientId={id} />}
       </div>
+
+      {/* Modale création RDV (pré-remplie avec les infos du client) */}
+      <EventModal
+        isOpen={appointmentModal.open}
+        mode="create"
+        appointment={null}
+        defaultDate={null}
+        defaultTime={null}
+        prefillClient={client}
+        members={members}
+        orgId={organization?.id}
+        userId={user?.id}
+        onClose={() => setAppointmentModal({ open: false })}
+        onSave={handleCreateAppointment}
+        onDelete={() => {}}
+        onCancel={() => {}}
+        isSaving={isCreatingAppointment}
+      />
 
       {/* Modale confirmation archivage */}
       {showArchiveConfirm && (
