@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@lib/supabaseClient';
 import { authService } from '@services/auth.service';
 import { computeEffectiveRole } from '@lib/permissions';
@@ -6,6 +7,7 @@ import { computeEffectiveRole } from '@lib/permissions';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [organization, setOrganization] = useState(null);
@@ -69,7 +71,11 @@ export function AuthProvider({ children }) {
     setOrganization(null);
     setMembership(null);
     setClientRecord(null);
-  }, []);
+    // Sécurité multi-tenant : vider tout le cache React Query au reset
+    // (logout ou changement d'identité) pour éviter qu'un user voie les
+    // données du précédent via des cache keys qui n'incluent pas org_id.
+    queryClient.clear();
+  }, [queryClient]);
 
   // ===========================================================================
   // INITIALISATION & ÉCOUTE AUTH
