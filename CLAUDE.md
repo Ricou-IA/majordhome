@@ -124,7 +124,7 @@ src/
 │   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile, Mailing, GeoGrid
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
-│       ├── shared/             # KanbanBoard, SearchBar, CardSkeleton (composants génériques)
+│       ├── shared/             # KanbanBoard, SearchBar (composants génériques)
 │       ├── clients/            # ClientModal+Tabs (4 onglets: Info/Contrat/Équipements/Historique), ClientCard, EquipmentList, EquipmentFormModal
 │       # Note : ClientDetail a 6 onglets : Info/Contrat/Équipements/Interventions/Timeline/Mailings
 │       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierInterventionSection
@@ -244,7 +244,6 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - **Composants partagés** : `src/apps/artisan/components/shared/`
   - `KanbanBoard` : Board Kanban générique (DnD optionnel, colonnes configurables)
   - `SearchBar` : Barre de recherche avec icône et bouton clear
-  - `CardSkeleton` : Skeleton de carte pour états de chargement
 - **Utilitaires partagés** : `src/lib/utils.js`
   - `formatDateForInput` (Date|string → YYYY-MM-DD, timezone-safe)
   - `formatDateFR` (→ "1 janvier 2026"), `formatDateShortFR` (→ "1 janv. 2026")
