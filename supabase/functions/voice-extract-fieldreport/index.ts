@@ -9,61 +9,33 @@
 // Pas d'écriture DB ici — c'est la RPC `record_voice_memo_extraction` qui le fait
 // dans le workflow N8N en aval.
 //
-// Securite (P0.6) :
-//   - verify_jwt: false (appele par workflow N8n machine-to-machine)
-//   - Check `MDH_CRON_SECRET` partage en header Authorization Bearer
-//     (meme convention que pennylane-sync-cron + pennylane-backfill-quotes).
-//     Sans ce secret, l'edge etait publiquement appelable et exploitable
-//     pour brûler le quota Anthropic/OpenAI.
-//   - Quota daily user/org : reporte (cf. follow-up — necessite binding org
-//     dans le body + table voice_quotas).
+// Sécurité (P0.6 — 2026-05-21, refactor helper P0.25 — 2026-05-21) :
+//   - verify_jwt: false (appelé par workflow N8n machine-to-machine)
+//   - requireSharedSecret(MDH_CRON_SECRET) — défense unique contre invocation
+//     non autorisée. Sans ce secret, l'edge était publiquement appelable et
+//     exploitable pour brûler le quota Anthropic/OpenAI.
+//   - Quota daily user×org : enforced via RPC increment_voice_quota si le
+//     workflow N8n passe user_id + org_id dans le body (transition douce :
+//     skip check + warn si absents). Voir migration p0_6_voice_quotas.
 // ============================================================================
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  corsHeaders,
+  getAdminClient,
+  jsonResponse,
+  requireSharedSecret,
+} from "../_shared/auth.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const ANTHROPIC_MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-6";
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o";
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-// Comparaison timing-safe pour eviter les timing attacks sur le secret.
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-// P0.6 — Verifie le MDH_CRON_SECRET partage en header Authorization Bearer.
-// Code duplique avec pennylane-sync-cron / pennylane-backfill-quotes en
-// attendant la consolidation via le helper _shared/auth.ts (cf. helper deja
-// utilise par gsc-oauth-init). Retourne null si OK, Response 401/500 sinon.
-function checkSharedSecret(req: Request): Response | null {
-  if (!MDH_CRON_SECRET) {
-    return jsonResponse({ error: "MDH_CRON_SECRET not configured" }, 500);
-  }
-  const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token || !timingSafeEqual(token, MDH_CRON_SECRET)) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
-  }
-  return null;
-}
+const VOICE_DAILY_LIMIT = parseInt(
+  Deno.env.get("VOICE_DAILY_LIMIT") || "20",
+  10,
+);
 
 // ---------------------------------------------------------------------------
 // EQUIPMENT TYPE CODES — liste fermée (source : majordhome.pricing_equipment_types)
@@ -400,16 +372,24 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  // P0.6 — Auth shared secret (meme convention que crons Pennylane).
-  const authError = checkSharedSecret(req);
+  // P0.6 — Auth shared secret (même convention que crons Pennylane).
+  const authError = requireSharedSecret(req, MDH_CRON_SECRET, "MDH_CRON_SECRET");
   if (authError) return authError;
 
   const startTime = Date.now();
 
   try {
     const body = await req.json();
-    const { transcript, memo_type, duration_seconds } = body || {};
+    const {
+      transcript,
+      memo_type,
+      duration_seconds,
+      user_id,
+      org_id,
+    } = body || {};
 
+    // Validation transcript AVANT quota (un input invalide ne consomme pas
+    // un slot quota du user).
     if (!transcript || typeof transcript !== "string") {
       return jsonResponse({ error: "Missing required field: transcript (string)" }, 400);
     }
@@ -423,6 +403,53 @@ Deno.serve(async (req: Request) => {
     const type = memo_type || "rdv_terrain";
     if (!["rdv_terrain", "reunion", "note_libre"].includes(type)) {
       return jsonResponse({ error: `Invalid memo_type: ${type}` }, 400);
+    }
+
+    // P0.6 follow-up — Quota daily user×org. Enforced si user_id + org_id
+    // fournis par N8n. Transition douce : warn + skip si absents (le temps
+    // de mettre à jour le workflow N8n pour passer les 2 champs).
+    if (user_id && org_id) {
+      const supabase = getAdminClient();
+      const { data: quotaResult, error: quotaError } = await supabase.rpc(
+        "increment_voice_quota",
+        {
+          p_user_id: user_id,
+          p_org_id: org_id,
+          p_daily_limit: VOICE_DAILY_LIMIT,
+        },
+      );
+      if (quotaError) {
+        // Code Postgres P0001 = RAISE EXCEPTION dans la RPC → quota dépassé
+        if (
+          quotaError.code === "P0001" ||
+          /voice_quota_exceeded/i.test(quotaError.message)
+        ) {
+          console.warn(
+            `[voice-extract] quota exceeded user=${user_id} org=${org_id} limit=${VOICE_DAILY_LIMIT}`,
+          );
+          return jsonResponse(
+            {
+              success: false,
+              error: "Voice quota exceeded",
+              quota: { limit: VOICE_DAILY_LIMIT },
+            },
+            429,
+          );
+        }
+        // Autre erreur DB : on log mais on continue (ne pas casser le flow
+        // pour une panne de compteur).
+        console.error(
+          `[voice-extract] quota RPC error (non-blocking): ${quotaError.message}`,
+        );
+      } else {
+        console.log(
+          `[voice-extract] quota ok user=${user_id} org=${org_id} → ${JSON.stringify(quotaResult)}`,
+        );
+      }
+    } else {
+      console.warn(
+        "[voice-extract] no user_id/org_id in body — quota check skipped (update N8n workflow to enforce)",
+      );
     }
 
     let systemPrompt: string;

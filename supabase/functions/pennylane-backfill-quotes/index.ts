@@ -9,14 +9,22 @@
 //
 // Idempotent : déjà attachée à un lead → no-op (RPC retourne already_assigned).
 //
-// Appelé manuellement (one-shot). verify_jwt: false pour invocation simple.
+// Appelé manuellement (one-shot).
+//
+// Sécurité (P0.2 — 2026-05-21, refactor helper P0.25 — 2026-05-21) :
+//   - verify_jwt: false (job one-shot public)
+//   - requireSharedSecret(MDH_CRON_SECRET) — défense unique contre invocation
+//     non autorisée
 // ============================================================================
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  corsHeaders,
+  getAdminClient,
+  jsonResponse,
+  requireSharedSecret,
+} from "../_shared/auth.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
 const PENNYLANE_BASE_URL =
   Deno.env.get("PENNYLANE_BASE_URL") ||
@@ -26,44 +34,10 @@ const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
 const LEAD_THRESHOLD_HT = 1000;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, x-app-name, apikey, content-type",
-};
 const plHeaders = {
   Authorization: `Bearer ${PENNYLANE_API_TOKEN}`,
   Accept: "application/json",
 };
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-// P0.2 — Verifie le MDH_CRON_SECRET passe en header Authorization: Bearer <secret>.
-// verify_jwt:false (job one-shot public) → ce check est la seule defense contre
-// les invocations non autorisees.
-function checkCronAuth(req: Request): Response | null {
-  if (!MDH_CRON_SECRET) {
-    return jsonResponse({ error: "MDH_CRON_SECRET not configured" }, 500);
-  }
-  const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token || !timingSafeEqual(token, MDH_CRON_SECRET)) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
-  }
-  return null;
-}
 
 async function plGet(path: string) {
   const res = await fetch(`${PENNYLANE_BASE_URL}${path}`, { headers: plHeaders });
@@ -156,13 +130,13 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-  const authError = checkCronAuth(req);
+  const authError = requireSharedSecret(req, MDH_CRON_SECRET, "MDH_CRON_SECRET");
   if (authError) return authError;
   if (!PENNYLANE_API_TOKEN) {
     return jsonResponse({ error: "No PL token" }, 500);
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const supabase = getAdminClient();
   const log: string[] = [];
 
   try {
