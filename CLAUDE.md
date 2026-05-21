@@ -37,6 +37,7 @@ Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipelin
 - **Intégrations conditionnelles par org** : utiliser un flag dans `core.organizations.settings` (ex `{ pennylane: { enabled: true } }`) consommé via `orgSettingsFilter` de `requireOrgMembership`. Pattern à étendre pour Meta Ads, intégrations futures (P0.3)
 - **Cache keys React Query** : toutes les familles utilisent `all: (orgId) => [domain, orgId]` (convention pricingKeys-style). Détails dans l'en-tête de `cacheKeys.js` (P0.11)
 - **Toute valeur de branding** (nom, adresse, URL, certification, couleur, logo) DOIT passer par `core.organizations.settings` + helper `buildCompanyInfo(settings)` de `src/lib/orgBranding.js` plutôt que d'être hardcodée. Fallback Mayer accepté uniquement comme valeur par défaut dans le helper (P0.13-P0.20)
+- **Toute clé `localStorage`** doit être suffixée par `:${orgId}` (cache org-scoped) ou `:${userId}` (draft personnel) pour éviter fuite cross-org au switch d'organisation. Ex : `territoire-zones-v8:${orgId}` (`useMapZones`), `intervention-draft-${userId}_${id}` (`useInterventionDraft`) (P1.9)
 
 ## Stack
 - React 18 + Vite 5 + React Router 6
@@ -76,10 +77,10 @@ src/
 │   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile, Mailing, GeoGrid
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
-│       ├── shared/             # KanbanBoard, SearchBar, ColumnHeader, CardSkeleton (composants génériques)
+│       ├── shared/             # KanbanBoard, SearchBar, CardSkeleton (composants génériques)
 │       ├── clients/            # ClientModal+Tabs (4 onglets: Info/Contrat/Équipements/Historique), ClientCard, EquipmentList, EquipmentFormModal
 │       # Note : ClientDetail a 6 onglets : Info/Contrat/Équipements/Interventions/Timeline/Mailings
-│       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierOrderSection, ChantierInterventionSection
+│       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierInterventionSection
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
 │       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
 │       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
@@ -94,7 +95,7 @@ src/
 │   └── commercial/            # config, CommercialPipeline
 └── shared/
     ├── services/               # auth, clients, contracts, chantiers, entretiens, geocoding, territoire, prospects, storage
-    └── hooks/                  # cacheKeys, usePaginatedList, useDebounce, useModalManager + useClients, useContracts, useChantiers, useLeads, useAppointments, useProspects, etc.
+    └── hooks/                  # cacheKeys, usePaginatedList, useDebounce + useClients, useContracts, useChantiers, useLeads, useAppointments, useProspects, etc.
 ```
 
 ## Aliases (vite.config.js)
@@ -150,6 +151,8 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 // canAccessPipeline = isOrgAdmin OU business_role === 'Commercial'
 ```
 
+- **RPC `public.org_seed_permissions(p_org_id)`** (P1.8, 2026-05-21) — copie les permissions Mayer comme template pour provisioning d'une nouvelle org. SECURITY DEFINER, `service_role` only, idempotent.
+
 ## Conventions de Code
 
 ### Services (`src/shared/services/`)
@@ -168,7 +171,6 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - **Convention P0.11 (2026-05-21)** : toutes les keys prennent `orgId` en 1ᵉʳ paramètre (`all: (orgId) => [domain, orgId]`, sous-keys idem) — défense en profondeur multi-tenant. Détails dans l'en-tête de `cacheKeys.js`.
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
 - **`useDebounce`** : Hook utilitaire de debounce (remplace les implémentations manuelles)
-- **`useModalManager`** : Gestion centralisée d'état de modales multiples
 - **`usePennylaneSyncClient`** : Sync client MDH→Pennylane (fire-and-forget, ne bloque pas UX). Le code 411 Pennylane est récupéré et stocké dans `clients.pennylane_account_number`. Erreurs loggées silencieusement (`console.warn`). Cron `pennylane-sync-cron` : ne calcule JAMAIS `client_number` manuellement, laisse la séquence DB le générer (cf. Gotchas DB).
 - Retournent : `{ data, isLoading, error, refetch, ...mutations }`
 
@@ -177,8 +179,10 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - `verify_jwt:true` → `requireOrgMembership(req, { orgId?, orgSettingsFilter?, requiredRole? })` — valide JWT user + membership user × org dans `core.organization_members`. Retourne `{ ok, userId, orgId, membershipRole, supabase }` ou `{ ok:false, response }` 401/403/500 prête à renvoyer.
   - `verify_jwt:false` (crons N8n, jobs internes) → `requireSharedSecret(req, Deno.env.get("MDH_CRON_SECRET") || "", "MDH_CRON_SECRET")` — check Bearer secret timing-safe.
   - Webhooks tiers (Resend Svix, Pennylane callbacks) → garder leur propre vérification de signature.
-  - Exports : `corsHeaders`, `jsonResponse`, `getAdminClient`, `timingSafeEqual`.
+  - Exports : `corsHeaders`, `buildCorsHeaders(req)`, `jsonResponse(body, status, req?)`, `getAdminClient`, `timingSafeEqual`, `sanitizeError(err, fallback)`.
   - Pattern d'import : `import { requireOrgMembership } from "../_shared/auth.ts";` — le `name` du fichier dans le `files` array du MCP `deploy_edge_function` doit être `../_shared/auth.ts` pour que le bundler résolve correctement.
+- **Helpers P1** (2026-05-21) : `sanitizeError(err, fallback)` strip stack/Bearer/JWT/`*_SECRET=…` en prod (détecté via env `DENO_ENV=production` ou `ENVIRONMENT=production`) ; `buildCorsHeaders(req)` whitelist d'origines via env CSV `FRONTEND_ORIGINS` (fallback `*` si vide — dev local).
+- **`supabase/config.toml`** (P1.6, 2026-05-21) — versionne `verify_jwt` des 16 edges pour éviter drift prod/repo lors d'un redéploiement via MCP.
 - **Edges déjà migrées vers le helper** (2026-05-21) : `gsc-oauth-init`, `pennylane-proxy`, `pennylane-sync-cron`, `pennylane-backfill-quotes`, `voice-extract-fieldreport`. À migrer plus tard : `gsc-oauth-callback`, `gsc-sync`, `mailing-send`, `contract-signed-notify`, `mailing-unsubscribe`, `resend-webhook`, `invite-client`.
 - **`MDH_*` namespace** pour les env vars partagées entre apps cohabitantes (isolation Majord'home vs Pack Vendeur / Baikal / Arpet) : `MDH_CRON_SECRET`, etc.
 
@@ -193,7 +197,6 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - **Composants partagés** : `src/apps/artisan/components/shared/`
   - `KanbanBoard` : Board Kanban générique (DnD optionnel, colonnes configurables)
   - `SearchBar` : Barre de recherche avec icône et bouton clear
-  - `ColumnHeader` : En-tête colonne Kanban (pastille + label + count + montant)
   - `CardSkeleton` : Skeleton de carte pour états de chargement
 - **Utilitaires partagés** : `src/lib/utils.js`
   - `formatDateForInput` (Date|string → YYYY-MM-DD, timezone-safe)
@@ -202,6 +205,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - `computeEndTime`, `computeDuration`
 - **Branding multi-tenant** : `src/lib/orgBranding.js` — `buildCompanyInfo(settings)` construit l'objet `company` (nom, SIRET, adresse, RGE, etc.) depuis `core.organizations.settings`, avec fallback Mayer. Helpers `formatFullAddress(company)` + `buildLegalFooter(company)`. Consommé par les PDFs (`generateContractPdfBlob(data, company)`, idem Certificat/Devis/PvReception) et le wizard mailing.
 - **Constantes** : `src/lib/constants.js` — `DEFAULT_PAGE_SIZE`, `LARGE_PAGE_SIZE`, `KANBAN_PAGE_SIZE`
+- **Logger** : `src/lib/logger.js` (P1.7, 2026-05-21) — `logger.error/warn/info/log/debug/table/group/groupEnd`. En prod (`import.meta.env.PROD`), tout est no-op sauf `logger.error` (Sentry-like). Variant `logger.silent.error` pour muter aussi les erreurs. Migrer les nouveaux `console.*` vers `logger.*` au fil de l'eau.
 
 ## Module Mailing
 
