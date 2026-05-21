@@ -1,10 +1,30 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> **Dernière MàJ** : 2026-05-01 — Module Search Console (4ème onglet GeoGrid) : OAuth Google + sync API Search Analytics → `majordhome.gsc_keyword_metrics`. 3 edge functions (`gsc-oauth-init/callback/sync`) + RPC `gsc_upsert_metrics`. Détails : `docs/MODULE_SEARCH_CONSOLE.md`. Gotcha PostgREST `majordhome` documenté.
+> ⚠️ **Consolidation multi-tenant en cours (Sem 0 hardening DB, démarrée 2026-05-20)** — Une 2ème entreprise va rejoindre la même instance Supabase. Audit complet : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md` (13 CRITICAL codebase + 131 ERROR Supabase Advisor). État Sem 0 : voir mémoire `project_hardening_sem0_status.md`. **La roadmap fonctionnelle (Sprints 8-10) est en pause jusqu'à fin du hardening.**
+> **Dernière MàJ** : 2026-05-20 — Audit pré-onboarding 2ème entreprise + Sem 0 hardening DB (4/12 tâches faites : exec_sql INVOKER, REVOKE anon × 22 RPCs, RLS sur 13 tables, fix 6 policies USING(true), conversion 73 vues `majordhome_*` en `security_invoker`, audit corps 6 RPCs sensibles, search_path × 111 fonctions). Détails : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`.
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
-Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipeline commercial, outil terrain tablette, carte territoire. Pilote : **Mayer Énergie** (Gaillac, 81).
+Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipeline commercial, outil terrain tablette, carte territoire. Pilote : **Mayer Énergie** (Gaillac, 81). Préparation onboarding 2ème entreprise sur la même instance Supabase.
+
+## Multi-tenant & sécurité (état Sem 0 hardening)
+
+5 bombes structurelles identifiées par l'audit du 2026-05-20 :
+
+| # | Bombe | Fix | Statut |
+|---|---|---|---|
+| 1 | `public.exec_sql(text)` SECURITY DEFINER exécutable par `authenticated` → lecture totale DB depuis le navigateur | `ALTER FUNCTION ... SECURITY INVOKER` (P0.0.1) | ✅ Fait (2026-05-20) |
+| 2 | 73 vues `public.majordhome_*` SECURITY DEFINER bypassant RLS → filtre `.eq('org_id')` côté front était la SEULE défense | `ALTER VIEW ... SET (security_invoker=true)` (P0.0.2) | ✅ Fait (2026-05-20) |
+| 3 | 24 RPCs SECURITY DEFINER exposées à `anon` (delete_organization, update_user_role, …) | `REVOKE EXECUTE FROM anon` (P0.0.4) | ✅ Fait (2026-05-20) |
+| 4 | 13 tables `majordhome.*` sans RLS du tout + 6 policies `USING(true)` | RLS + policies `org_id IN (org_members)` (P0.0.5/.0.6) | ✅ Fait (2026-05-20) |
+| 5 | Storage `contracts` / `certificats` / `product-documents` : policy ALL pour tout `authenticated` sans filtre | DROP ALL + 4 policies par bucket avec filtre `(storage.foldername(name))[1]::uuid IN (org_members)` + migration paths `${orgId}/...` (P0.0.7) | 🔧 EN COURS |
+
+**Règles imposées par le multi-tenant** :
+- Toute mutation Supabase doit explicitement filtrer par `org_id` (défense en profondeur, même si RLS s'applique maintenant via `security_invoker`)
+- Tout nouveau RPC SECURITY DEFINER doit `REVOKE EXECUTE FROM anon` immédiatement après création (sauf webhooks publics légitimes)
+- Tout nouveau bucket Storage doit utiliser `${orgId}/...` en préfixe de path + policies `(storage.foldername(name))[1]::uuid IN (org_members)`
+- Toute nouvelle table `majordhome.*` doit avoir RLS activée + policies CRUD scopées org_id dès la création
+- Ne JAMAIS appeler `public.exec_sql` depuis le frontend, même si techniquement possible
 
 ## Stack
 - React 18 + Vite 5 + React Router 6
@@ -85,6 +105,8 @@ src/
 - **Séquences PostgreSQL** : Ne JAMAIS calculer manuellement un ID/numéro via `SELECT MAX(col) + 1`. Toujours laisser le DEFAULT de la séquence DB (`nextval()`) générer la valeur — atomique, évite race conditions et désynchronisation. Exemple : `majordhome.client_number` utilise `majordhome.client_number_seq`, toute insertion doit omettre `client_number` pour que le DEFAULT s'applique.
 - **Vérifier l'erreur sur les mutations Supabase** : Toujours destructurer `{ error }` sur `update()` / `insert()` / `delete()`, même sur des opérations qu'on pense sûres. Triggers DB, RLS ou contraintes peuvent causer des échecs silencieux. Pattern : `const { data, error } = await supabase.from(...).update(...); if (error) { ... }`. Vu en pratique avec un trigger fantôme `set_geogrid_scans_updated_at` qui faisait échouer silencieusement les UPDATE de `benchmark_id`.
 - **Schema `majordhome` non exposé via PostgREST** : `supabase-js` côté edge function ne peut PAS écrire dans `majordhome.*` via `.schema('majordhome').from(...)` — PostgREST renvoie "Invalid schema: majordhome". Pattern obligatoire : RPC SECURITY DEFINER dans `public` avec `SET search_path = majordhome, public`. Le schema `core` est en revanche exposé (asymétrie). Même pattern déjà utilisé pour les écritures N8N → Supabase.
+- **Vues `public.majordhome_*` → `security_invoker=true`** (P0.0.2, ✅ 2026-05-20) : avant le fix, les 73 vues étaient SECURITY DEFINER par défaut, ce qui bypassait RLS et faisait du filtre `.eq('org_id', orgId)` côté front la SEULE défense effective contre le cross-org. Aujourd'hui en `security_invoker=true`, RLS s'applique sur tous les accès via PostgREST. **Garder quand même le `.eq('org_id', orgId)` explicite (défense en profondeur)**. Si on crée une nouvelle vue `majordhome_*`, mettre `WITH (security_invoker=true)` dès la création.
+- **`public.exec_sql(text)` → SECURITY INVOKER** (P0.0.1, ✅ 2026-05-20) : avant le fix, cette fonction était SECURITY DEFINER exécutable par `authenticated` → permettait à n'importe quel user front authentifié de lire toute la DB via une requête SQL arbitraire. Maintenant en INVOKER, restreinte aux droits du caller. **NE PAS rajouter d'appels à cette fonction depuis le frontend** ou des edge functions exposées au public.
 
 ### Vues publiques principales
 - `majordhome_clients` → clients + has_active_contract calculé
@@ -487,6 +509,7 @@ GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m
 | 7 | Droits & Accès (permissions granulaires par rôle) | ✅ FAIT |
 | P | Prospection (Cédants + Commercial, Screener SIRENE, Pipeline, Drawer) | ✅ FAIT |
 | M | Mailing (Configurateur campagnes, mailing_logs, onglet Mailings fiche client) | ✅ FAIT |
-| 8 | Portail Client | ⬜ À FAIRE |
-| 9 | Intégration Pennylane (devis/factures) | ⬜ À FAIRE |
-| 10 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⬜ À FAIRE |
+| **Sem 0** | **Hardening DB pré-onboarding 2ème entreprise (cf. `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`)** | **🔧 EN COURS** |
+| 8 | Portail Client | ⏸ EN PAUSE (post-hardening) |
+| 9 | Intégration Pennylane (devis/factures) | ⏸ EN PAUSE (post-hardening) |
+| 10 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⏸ EN PAUSE (post-hardening) |

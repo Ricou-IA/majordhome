@@ -113,3 +113,23 @@ OU question ouverte : la doc CLAUDE.md grossit beaucoup avec ce module (~50 lign
 - (b) un résumé court inline + détails dans `docs/MODULE_SEARCH_CONSOLE.md`
 - (c) résumé court inline + détails déjà dans `docs/GSC_INTEGRATION_MASTER_PROMPT.md`
 ---
+
+## [2026-05-20 12:31] Audit pré-onboarding multi-tenant + Semaine 0 hardening DB
+**Statut** : RESOLU
+**Commit** : a53d2bf8f6f6229e99df5c6c251722225b087d78
+**Décision** : Intégré 2026-05-21 — les 6 propositions appliquées à CLAUDE.md :
+- #1 bannière "⚠️ Consolidation multi-tenant en cours" en tête + référence audit
+- #2 Dernière MàJ pointe sur l'audit du 2026-05-20
+- #3 nouvelle section "Multi-tenant & sécurité" avec les 5 bombes + statut + règles imposées
+- #4 ligne "Sem 0" 🔧 EN COURS dans tableau Plan Dev + Sprints 8-10 marqués ⏸ EN PAUSE
+- #5 gotcha vues `majordhome_*` en mode "historique fixé" (P0.0.2 ✅ 2026-05-20)
+- #6 gotcha `exec_sql` en mode "historique fixé" (P0.0.1 ✅ 2026-05-20)
+**Contexte** : Ajout de `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md` (936 lignes) — audit complet en vue de l'arrivée d'une 2ème entreprise sur la même instance Supabase. 91 findings codebase (13 CRITICAL) + 725 findings Supabase Advisor (131 ERROR). 5 bombes structurelles DB identifiées (exec_sql ouvert authenticated, 112 vues SECURITY DEFINER, 24 RPCs anon, storage contracts/certificats ALL, 19 tables sans RLS). Plan révisé : Semaine 0 hardening DB (~12 j-h) ajoutée avant les 4 semaines codebase. Total pré-onboarding : 5-6 semaines. La roadmap fonctionnelle est en pause durant la consolidation.
+**Proposition** : Plusieurs ajouts possibles à arbitrer :
+1. Ajouter en tête de CLAUDE.md une bannière "⚠️ Consolidation multi-tenant en cours — voir `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`. Roadmap (Sprint 8-10) en pause jusqu'à la fin du hardening."
+2. Mettre à jour la "Dernière MàJ" pour pointer vers l'audit.
+3. Ajouter une section "Multi-tenant & sécurité" qui rappelle les 5 bombes structurelles (exec_sql, vues SECURITY DEFINER, RPCs anon, storage ALL, tables sans RLS) avec leur fix one-liner — pour éviter qu'une session future les recrée ou les ignore.
+4. Mettre à jour le tableau "Plan de Développement" en bas : ajouter ligne "Sem 0 — Hardening DB pré-onboarding" en statut "🔧 EN COURS" avant les sprints 8-10.
+5. Documenter dans une note Gotcha DB que **les vues `public.majordhome_*` sont en SECURITY DEFINER par défaut** (RLS bypassée) — donc le filtre `.eq('org_id', orgId)` côté frontend est aujourd'hui la SEULE défense effective. À retirer une fois `security_invoker=true` appliqué (cf. P0.0.2 de l'audit).
+6. Documenter le grant dangereux `public.exec_sql` exécutable par `authenticated` jusqu'à fix P0.0.1 — toute session future qui rajouterait des appels à cette fonction depuis le frontend doit être bloquée.
+---
