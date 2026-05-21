@@ -3,6 +3,17 @@
  * ============================================================================
  * Source unique pour toutes les clés de cache TanStack React Query.
  * Élimine les imports croisés entre hooks et garantit la cohérence.
+ *
+ * P0.11 (DETTE TECHNIQUE) — propagation de `orgId` dans toutes les keys :
+ *   - Aujourd'hui : seulement `pricingKeys` (P0.0.6) et quelques `lists/stats`
+ *     prennent `orgId` en paramètre. La majorité des keys "par UUID enfant"
+ *     (detail, byClient, byLead) ne sont pas scopées par org.
+ *   - Risque résiduel : nul tant qu'un user n'a pas accès à 2 orgs
+ *     simultanément (queryClient.clear() au logout/switch couvre le reste).
+ *   - À refactor avant onboarding 2ème entreprise (~3-4h pour patch les
+ *     ~257 callsites + tests manuel). Plan : factory `all(orgId)` pour
+ *     toutes les familles + propagation `orgId` dans tous les hooks
+ *     (ajouter useAuth() où manquant) + tests manuels par module.
  * ============================================================================
  */
 

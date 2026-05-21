@@ -10,6 +10,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { storageService } from '@services/storage.service';
+import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 
 // ============================================================================
 // CONSTANTES
@@ -185,8 +186,12 @@ export const suppliersService = {
       if (kind) query = query.eq('product_kind', kind);
 
       if (search) {
-        const term = `%${search.trim()}%`;
-        query = query.or(`name.ilike.${term},reference.ilike.${term},code_ean.ilike.${term},code_famille.ilike.${term},gamme.ilike.${term}`);
+        // P0.26 : escape pour eviter injection PostgREST.
+        const safe = escapePostgrestSearchTerm(search);
+        if (safe) {
+          const term = `%${safe}%`;
+          query = query.or(`name.ilike.${term},reference.ilike.${term},code_ean.ilike.${term},code_famille.ilike.${term},gamme.ilike.${term}`);
+        }
       }
 
       const { data, count, error } = await query;
@@ -261,7 +266,10 @@ export const suppliersService = {
       if (!orgId) throw new Error('[suppliersService] orgId requis');
       if (!query || query.length < 2) return { data: [], error: null };
 
-      const searchTerm = `%${query.trim()}%`;
+      // P0.26 : escape pour eviter injection PostgREST.
+      const safeQuery = escapePostgrestSearchTerm(query);
+      if (!safeQuery || safeQuery.length < 2) return { data: [], error: null };
+      const searchTerm = `%${safeQuery}%`;
 
       const { data, error } = await supabase
         .from('majordhome_supplier_products')

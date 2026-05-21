@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { clientsService } from './clients.service';
 
 const DEFAULT_LIMIT = 25;
@@ -68,12 +69,14 @@ export const prospectsService = {
         query = query.lte('score', scoreMax);
       }
 
-      // Recherche texte (raison sociale, siren, commune, dirigeant)
+      // Recherche texte — P0.26 : escape pour eviter injection PostgREST.
       if (search && search.trim().length >= 2) {
-        const term = search.trim();
-        query = query.or(
-          `raison_sociale.ilike.%${term}%,siren.ilike.%${term}%,commune.ilike.%${term}%,dirigeant_nom.ilike.%${term}%`
-        );
+        const term = escapePostgrestSearchTerm(search);
+        if (term && term.length >= 2) {
+          query = query.or(
+            `raison_sociale.ilike.%${term}%,siren.ilike.%${term}%,commune.ilike.%${term}%,dirigeant_nom.ilike.%${term}%`
+          );
+        }
       }
 
       // Tri + pagination

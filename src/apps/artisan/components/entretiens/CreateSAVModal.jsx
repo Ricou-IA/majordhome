@@ -14,6 +14,7 @@ import { X, Search, Loader2, Wrench, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { supabase } from '@/lib/supabaseClient';
+import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 
 // ============================================================================
 // HOOK : RECHERCHE CLIENT
@@ -30,9 +31,15 @@ function useClientSearch(orgId, searchTerm) {
     }
 
     const timer = setTimeout(async () => {
+      // P0.26 : escape pour eviter injection PostgREST.
+      const safe = escapePostgrestSearchTerm(searchTerm);
+      if (!safe || safe.length < 2) {
+        setResults([]);
+        return;
+      }
       setIsSearching(true);
       try {
-        const term = `%${searchTerm.trim()}%`;
+        const term = `%${safe}%`;
         const { data } = await supabase
           .from('majordhome_clients')
           .select('id, display_name, first_name, last_name, postal_code, city, phone, project_id, has_active_contract')

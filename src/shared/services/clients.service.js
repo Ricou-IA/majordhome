@@ -14,6 +14,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
 import { cleanPhone, formatPhoneForSearch } from '@/lib/phoneUtils';
+import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { equipmentsService } from '@services/equipments.service';
 
 // ============================================================================
@@ -136,21 +137,23 @@ export const clientsService = {
       }
 
       // Recherche full-text (nom, email, téléphone, ville)
+      // P0.26 : escape pour eviter injection PostgREST via virgule/parentheses.
       if (search && search.trim().length >= 2) {
-        const term = search.trim();
-        // Si le terme ressemble à un numéro de téléphone, ajouter la version formatée avec espaces
-        const phoneSpaced = formatPhoneForSearch(term);
-        const conditions = [
-          `display_name.ilike.%${term}%`,
-          `email.ilike.%${term}%`,
-          `phone.ilike.%${term}%`,
-          `city.ilike.%${term}%`,
-          `postal_code.ilike.%${term}%`,
-        ];
-        if (phoneSpaced && phoneSpaced !== term) {
-          conditions.push(`phone.ilike.%${phoneSpaced}%`);
+        const term = escapePostgrestSearchTerm(search);
+        if (term && term.length >= 2) {
+          const phoneSpaced = formatPhoneForSearch(term);
+          const conditions = [
+            `display_name.ilike.%${term}%`,
+            `email.ilike.%${term}%`,
+            `phone.ilike.%${term}%`,
+            `city.ilike.%${term}%`,
+            `postal_code.ilike.%${term}%`,
+          ];
+          if (phoneSpaced && phoneSpaced !== term) {
+            conditions.push(`phone.ilike.%${phoneSpaced}%`);
+          }
+          query = query.or(conditions.join(','));
         }
-        query = query.or(conditions.join(','));
       }
 
       // Filtre catégorie client
@@ -952,6 +955,9 @@ export const clientsService = {
       if (!orgId || !query || query.length < 2) {
         return [];
       }
+      // P0.26 : escape pour eviter injection PostgREST.
+      const safeQuery = escapePostgrestSearchTerm(query);
+      if (!safeQuery || safeQuery.length < 2) return [];
 
       const { data, error } = await supabase
         .from('majordhome_clients')
@@ -960,13 +966,13 @@ export const clientsService = {
         .eq('is_archived', false)
         .or((() => {
           const conditions = [
-            `display_name.ilike.%${query}%`,
-            `email.ilike.%${query}%`,
-            `phone.ilike.%${query}%`,
-            `city.ilike.%${query}%`,
+            `display_name.ilike.%${safeQuery}%`,
+            `email.ilike.%${safeQuery}%`,
+            `phone.ilike.%${safeQuery}%`,
+            `city.ilike.%${safeQuery}%`,
           ];
-          const phoneSpaced = formatPhoneForSearch(query);
-          if (phoneSpaced && phoneSpaced !== query) {
+          const phoneSpaced = formatPhoneForSearch(safeQuery);
+          if (phoneSpaced && phoneSpaced !== safeQuery) {
             conditions.push(`phone.ilike.%${phoneSpaced}%`);
           }
           return conditions.join(',');

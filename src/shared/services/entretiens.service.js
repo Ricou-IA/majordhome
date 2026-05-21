@@ -19,6 +19,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
+import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 
 // ============================================================================
@@ -231,9 +232,13 @@ export const entretiensService = {
       }
 
       // Filtre recherche textuelle (nom client, commune, code postal)
+      // P0.26 : escape pour eviter injection PostgREST via virgule/parentheses.
       if (filters.search && filters.search.trim()) {
-        const term = `%${filters.search.trim()}%`;
-        query = query.or(`client_name.ilike.${term},client_city.ilike.${term},client_postal_code.ilike.${term}`);
+        const safe = escapePostgrestSearchTerm(filters.search);
+        if (safe) {
+          const term = `%${safe}%`;
+          query = query.or(`client_name.ilike.${term},client_city.ilike.${term},client_postal_code.ilike.${term}`);
+        }
       }
 
       // Pagination

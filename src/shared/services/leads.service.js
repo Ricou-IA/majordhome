@@ -24,6 +24,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
+import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { clientsService } from '@services/clients.service';
 import { technicalVisitService } from '@services/technicalVisit.service';
 
@@ -215,12 +216,15 @@ export const leadsService = {
         query = query.eq('is_long_term_project', false);
       }
 
-      // Recherche textuelle
+      // Recherche textuelle — P0.26 : escape pour eviter injection PostgREST.
       if (filters.search) {
-        const term = `%${filters.search}%`;
-        query = query.or(
-          `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`
-        );
+        const safe = escapePostgrestSearchTerm(filters.search);
+        if (safe) {
+          const term = `%${safe}%`;
+          query = query.or(
+            `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`
+          );
+        }
       }
 
       // Filtre par date de creation
@@ -784,7 +788,10 @@ export const leadsService = {
     }
 
     return withErrorHandling(async () => {
-      const term = `%${query}%`;
+      // P0.26 : escape pour eviter injection PostgREST.
+      const safe = escapePostgrestSearchTerm(query);
+      if (!safe) return [];
+      const term = `%${safe}%`;
       const { data, error } = await supabase
         .from('majordhome_leads')
         .select('id, first_name, last_name, email, phone, city, postal_code, address, client_id, status_label, source_name, status_color')
