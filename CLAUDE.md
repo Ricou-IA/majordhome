@@ -1,15 +1,15 @@
 # CLAUDE.md - Majord'home Module Artisan
 
-> ⚠️ **Consolidation multi-tenant en cours (Sem 0 hardening DB, démarrée 2026-05-20)** — Une 2ème entreprise va rejoindre la même instance Supabase. Audit complet : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md` (13 CRITICAL codebase + 131 ERROR Supabase Advisor). État Sem 0 : voir mémoire `project_hardening_sem0_status.md`. **La roadmap fonctionnelle (Sprints 8-10) est en pause jusqu'à fin du hardening.**
-> **Dernière MàJ** : 2026-05-20 — Audit pré-onboarding 2ème entreprise + Sem 0 hardening DB (4/12 tâches faites : exec_sql INVOKER, REVOKE anon × 22 RPCs, RLS sur 13 tables, fix 6 policies USING(true), conversion 73 vues `majordhome_*` en `security_invoker`, audit corps 6 RPCs sensibles, search_path × 111 fonctions). Détails : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`.
+> ⚠️ **Consolidation multi-tenant — Sem 0 hardening DB quasi-finie (~97%, 2026-05-21)** — Une 2ème entreprise va rejoindre la même instance Supabase. Audit complet : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md` (13 CRITICAL codebase + 131 ERROR Supabase Advisor). État Sem 0 détaillé : mémoire `project_hardening_sem0_status.md`. **Plus rien de bloquant côté Majord'home/core. La roadmap fonctionnelle (Sprints 8-10) peut reprendre.**
+> **Dernière MàJ** : 2026-05-21 — Sem 0 hardening DB complète (P0.0.1 exec_sql INVOKER, P0.0.2 73 vues security_invoker, P0.0.4 REVOKE anon × 22 RPCs, P0.0.5/.0.6 RLS + policies 13 tables, P0.0.7 storage paths `${orgId}/`, P0.0.9 audit corps 6 RPCs sensibles, P0.0.10 search_path × 111 fonctions, P0.2 MDH_CRON_SECRET crons, P0.3 pennylane-proxy hardened, P0.4 OAuth GSC state HMAC, P0.5 voice RPC service_role only, P0.6 voice quota daily, P0.7 requireOrganization, P0.8 V2 mailing N8n→edge, P0.10 voice_recorder permission, P0.11 cache keys orgId, P0.13-P0.20 branding multi-tenant, P0.21 headers HTTP, P0.22 no sourcemap, P0.23 xlsx→exceljs, P0.24 sandbox iframes, P0.25 helper `_shared/auth.ts`, P0.26 escapePostgrestSearchTerm, P0.27 ESLint config). Détails : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`.
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
 Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipeline commercial, outil terrain tablette, carte territoire. Pilote : **Mayer Énergie** (Gaillac, 81). Préparation onboarding 2ème entreprise sur la même instance Supabase.
 
-## Multi-tenant & sécurité (état Sem 0 hardening)
+## Multi-tenant & sécurité (Sem 0 hardening — 97% complet)
 
-5 bombes structurelles identifiées par l'audit du 2026-05-20 :
+8 bombes structurelles initiales + 3 ajoutées en cours d'hardening (P0.2, P0.4, P0.8 V2) :
 
 | # | Bombe | Fix | Statut |
 |---|---|---|---|
@@ -17,14 +17,26 @@ Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipelin
 | 2 | 73 vues `public.majordhome_*` SECURITY DEFINER bypassant RLS → filtre `.eq('org_id')` côté front était la SEULE défense | `ALTER VIEW ... SET (security_invoker=true)` (P0.0.2) | ✅ Fait (2026-05-20) |
 | 3 | 24 RPCs SECURITY DEFINER exposées à `anon` (delete_organization, update_user_role, …) | `REVOKE EXECUTE FROM anon` (P0.0.4) | ✅ Fait (2026-05-20) |
 | 4 | 13 tables `majordhome.*` sans RLS du tout + 6 policies `USING(true)` | RLS + policies `org_id IN (org_members)` (P0.0.5/.0.6) | ✅ Fait (2026-05-20) |
-| 5 | Storage `contracts` / `certificats` / `product-documents` : policy ALL pour tout `authenticated` sans filtre | DROP ALL + 4 policies par bucket avec filtre `(storage.foldername(name))[1]::uuid IN (org_members)` + migration paths `${orgId}/...` (P0.0.7) | 🔧 EN COURS |
+| 5 | Storage `contracts` / `certificats` / `product-documents` : policy ALL pour tout `authenticated` sans filtre | DROP ALL + 12 policies par bucket avec filtre `(storage.foldername(name))[1]::uuid IN (org_members)` + migration paths `${orgId}/...` (P0.0.7) | ✅ Fait DB (2026-05-21) — N8N upload contrat à migrer côté workflow |
+| 6 | Crons Pennylane `verify_jwt:false` publics → invocation anonyme possible (drain quota PL, pollution DB) | Auth header `MDH_CRON_SECRET` timing-safe via helper `requireSharedSecret` (P0.2) | ✅ Fait (2026-05-21) |
+| 7 | State OAuth GSC opaque (base64) → CSRF, replay, user-switch entre init et callback | State signé HMAC-SHA256 (`RESEND_WEBHOOK_SECRET`) avec binding `(orgId, userId, returnTo, nonce, exp)` + TTL 10 min + revalidation membership au callback (P0.4) | ✅ Fait (2026-05-21) |
+| 8 | Webhook N8n public `mayer-mailing` acceptait `segment_sql` brut → exfil cross-org possible si URL du webhook fuite | Migration N8n→edge function `mailing-send` qui n'accepte que `segment_id`/`client_id` + RPC `mail_fetch_recipients` membership-checked (P0.8 V2). Workflow N8n archivé. | ✅ Fait (2026-05-21) |
 
 **Règles imposées par le multi-tenant** :
-- Toute mutation Supabase doit explicitement filtrer par `org_id` (défense en profondeur, même si RLS s'applique maintenant via `security_invoker`)
+- Toute mutation Supabase doit explicitement filtrer par `org_id` (défense en profondeur, même si RLS s'applique via `security_invoker`)
 - Tout nouveau RPC SECURITY DEFINER doit `REVOKE EXECUTE FROM anon` immédiatement après création (sauf webhooks publics légitimes)
+- **RPC SECURITY DEFINER qui prend `org_id` dans son payload** (sans le dériver d'`auth.uid()`) : `REVOKE FROM PUBLIC, anon, authenticated`, accessible seulement à `service_role`. Sinon un attaquant authentifié peut forger un `org_id` arbitraire et écrire cross-org. Exemple : `record_voice_memo_extraction` (P0.5)
 - Tout nouveau bucket Storage doit utiliser `${orgId}/...` en préfixe de path + policies `(storage.foldername(name))[1]::uuid IN (org_members)`
 - Toute nouvelle table `majordhome.*` doit avoir RLS activée + policies CRUD scopées org_id dès la création
-- Ne JAMAIS appeler `public.exec_sql` depuis le frontend, même si techniquement possible
+- Toute nouvelle vue `public.majordhome_*` doit être créée avec `WITH (security_invoker=true)`
+- Ne JAMAIS appeler `public.exec_sql` depuis le frontend
+- **Ne JAMAIS construire de SQL dynamique côté frontend pour le mailing** (ou tout flux multi-tenant). Passer par une RPC SECURITY DEFINER qui vérifie `auth.uid() ∈ org_members` avant compile (cf. `mail_segment_compile_safe`, `mail_single_client_sql`, `mail_fetch_recipients`)
+- **Toute clause PostgREST `.or()` / `.ilike()` qui interpole un input utilisateur** DOIT passer par `escapePostgrestSearchTerm()` (`src/lib/postgrestUtils.js`) avant interpolation. Strip `,()*:%\` empêche un attaquant de forger un filtre additionnel (P0.26)
+- **Toute edge function `verify_jwt:false`** qui n'est PAS un webhook tiers légitime (Resend, Pennylane callback signé) doit exiger un secret partagé via `requireSharedSecret(req, MDH_CRON_SECRET)` du helper `_shared/auth.ts` (P0.2/P0.25)
+- **Toute edge function `verify_jwt:true`** doit valider la membership via `requireOrgMembership(req, opts)` du helper `_shared/auth.ts` (P0.25)
+- **Intégrations conditionnelles par org** : utiliser un flag dans `core.organizations.settings` (ex `{ pennylane: { enabled: true } }`) consommé via `orgSettingsFilter` de `requireOrgMembership`. Pattern à étendre pour Meta Ads, intégrations futures (P0.3)
+- **Cache keys React Query** : toutes les familles utilisent `all: (orgId) => [domain, orgId]` (convention pricingKeys-style). Détails dans l'en-tête de `cacheKeys.js` (P0.11)
+- **Toute valeur de branding** (nom, adresse, URL, certification, couleur, logo) DOIT passer par `core.organizations.settings` + helper `buildCompanyInfo(settings)` de `src/lib/orgBranding.js` plutôt que d'être hardcodée. Fallback Mayer accepté uniquement comme valeur par défaut dans le helper (P0.13-P0.20)
 
 ## Stack
 - React 18 + Vite 5 + React Router 6
@@ -40,9 +52,10 @@ Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipelin
 
 ## Commandes
 ```bash
-npm run dev      # Dev server (port 5173)
-npm run build    # Build production
-npm run lint     # ESLint
+npm run dev          # Dev server (port 5173)
+npm run build        # Build production
+npm run lint         # ESLint (max-warnings = count actuel, regression guard CI)
+npm run lint:errors  # ESLint errors uniquement (--quiet, utile en pre-commit hook)
 ```
 
 ## Architecture
@@ -59,7 +72,7 @@ src/
 ├── layouts/AppLayout.jsx       # Sidebar + header
 ├── hooks/pipeline/             # useDashboardData, useDashboardFilters
 ├── apps/artisan/
-│   ├── routes.jsx              # Routes lazy-loaded (15 routes)
+│   ├── routes.jsx              # Routes lazy-loaded (16 routes)
 │   ├── pages/                  # Dashboard, Clients, ClientDetail (+ client-detail/Tab*.jsx), Pipeline, Planning, Chantiers, Entretiens, Territoire, InterventionDetail, Settings, Profile, Mailing, GeoGrid
 │   └── components/
 │       ├── FormFields.jsx      # Composants formulaire partagés (FormField, TextInput, etc.)
@@ -107,6 +120,7 @@ src/
 - **Schema `majordhome` non exposé via PostgREST** : `supabase-js` côté edge function ne peut PAS écrire dans `majordhome.*` via `.schema('majordhome').from(...)` — PostgREST renvoie "Invalid schema: majordhome". Pattern obligatoire : RPC SECURITY DEFINER dans `public` avec `SET search_path = majordhome, public`. Le schema `core` est en revanche exposé (asymétrie). Même pattern déjà utilisé pour les écritures N8N → Supabase.
 - **Vues `public.majordhome_*` → `security_invoker=true`** (P0.0.2, ✅ 2026-05-20) : avant le fix, les 73 vues étaient SECURITY DEFINER par défaut, ce qui bypassait RLS et faisait du filtre `.eq('org_id', orgId)` côté front la SEULE défense effective contre le cross-org. Aujourd'hui en `security_invoker=true`, RLS s'applique sur tous les accès via PostgREST. **Garder quand même le `.eq('org_id', orgId)` explicite (défense en profondeur)**. Si on crée une nouvelle vue `majordhome_*`, mettre `WITH (security_invoker=true)` dès la création.
 - **`public.exec_sql(text)` → SECURITY INVOKER** (P0.0.1, ✅ 2026-05-20) : avant le fix, cette fonction était SECURITY DEFINER exécutable par `authenticated` → permettait à n'importe quel user front authentifié de lire toute la DB via une requête SQL arbitraire. Maintenant en INVOKER, restreinte aux droits du caller. **NE PAS rajouter d'appels à cette fonction depuis le frontend** ou des edge functions exposées au public.
+- **Gotcha `DROP SCHEMA` + Exposed schemas PostgREST** (incident 2026-05-21, 30 min downtime) : Ne JAMAIS `DROP SCHEMA xxx CASCADE` sans avoir d'abord vérifié que le schéma n'est PAS listé dans **Dashboard Supabase → API Settings → "Exposed schemas"**. Si oui : (1) retirer le schéma de la liste exposée, (2) attendre le re-deploy PostgREST (~30s), (3) puis seulement DROP. Sinon → 503 sur TOUTE l'API REST de l'instance (toutes les apps cohabitantes impactées). Symptôme : PGRST002 "Could not query the database for the schema cache" côté frontend, `ERROR: schema "xxx" does not exist` côté logs postgres. Fix d'urgence : `CREATE SCHEMA IF NOT EXISTS xxx; NOTIFY pgrst, 'reload schema';`. **Un schéma vide listé en exposed schemas EST une dépendance même sans objet dedans.**
 
 ### Vues publiques principales
 - `majordhome_clients` → clients + has_active_contract calculé
@@ -151,11 +165,22 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - Import : `import { clientKeys } from '@/shared/hooks/cacheKeys'`
   - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys, geogridKeys
   - Re-exports depuis chaque hook pour rétrocompatibilité
+  - **Convention P0.11 (2026-05-21)** : toutes les keys prennent `orgId` en 1ᵉʳ paramètre (`all: (orgId) => [domain, orgId]`, sous-keys idem) — défense en profondeur multi-tenant. Détails dans l'en-tête de `cacheKeys.js`.
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
 - **`useDebounce`** : Hook utilitaire de debounce (remplace les implémentations manuelles)
 - **`useModalManager`** : Gestion centralisée d'état de modales multiples
 - **`usePennylaneSyncClient`** : Sync client MDH→Pennylane (fire-and-forget, ne bloque pas UX). Le code 411 Pennylane est récupéré et stocké dans `clients.pennylane_account_number`. Erreurs loggées silencieusement (`console.warn`). Cron `pennylane-sync-cron` : ne calcule JAMAIS `client_number` manuellement, laisse la séquence DB le générer (cf. Gotchas DB).
 - Retournent : `{ data, isLoading, error, refetch, ...mutations }`
+
+### Edge functions (`supabase/functions/`)
+- **Helper partagé `_shared/auth.ts`** (P0.25, 2026-05-21) — pose la convention d'auth pour toutes les edges :
+  - `verify_jwt:true` → `requireOrgMembership(req, { orgId?, orgSettingsFilter?, requiredRole? })` — valide JWT user + membership user × org dans `core.organization_members`. Retourne `{ ok, userId, orgId, membershipRole, supabase }` ou `{ ok:false, response }` 401/403/500 prête à renvoyer.
+  - `verify_jwt:false` (crons N8n, jobs internes) → `requireSharedSecret(req, Deno.env.get("MDH_CRON_SECRET") || "", "MDH_CRON_SECRET")` — check Bearer secret timing-safe.
+  - Webhooks tiers (Resend Svix, Pennylane callbacks) → garder leur propre vérification de signature.
+  - Exports : `corsHeaders`, `jsonResponse`, `getAdminClient`, `timingSafeEqual`.
+  - Pattern d'import : `import { requireOrgMembership } from "../_shared/auth.ts";` — le `name` du fichier dans le `files` array du MCP `deploy_edge_function` doit être `../_shared/auth.ts` pour que le bundler résolve correctement.
+- **Edges déjà migrées vers le helper** (2026-05-21) : `gsc-oauth-init`, `pennylane-proxy`, `pennylane-sync-cron`, `pennylane-backfill-quotes`, `voice-extract-fieldreport`. À migrer plus tard : `gsc-oauth-callback`, `gsc-sync`, `mailing-send`, `contract-signed-notify`, `mailing-unsubscribe`, `resend-webhook`, `invite-client`.
+- **`MDH_*` namespace** pour les env vars partagées entre apps cohabitantes (isolation Majord'home vs Pack Vendeur / Baikal / Arpet) : `MDH_CRON_SECRET`, etc.
 
 ### Composants
 - Fichiers .jsx, PascalCase
@@ -175,6 +200,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - `formatDateFR` (→ "1 janvier 2026"), `formatDateShortFR` (→ "1 janv. 2026")
   - `formatDateTimeFR`, `formatPhoneNumber`, `formatEuro`
   - `computeEndTime`, `computeDuration`
+- **Branding multi-tenant** : `src/lib/orgBranding.js` — `buildCompanyInfo(settings)` construit l'objet `company` (nom, SIRET, adresse, RGE, etc.) depuis `core.organizations.settings`, avec fallback Mayer. Helpers `formatFullAddress(company)` + `buildLegalFooter(company)`. Consommé par les PDFs (`generateContractPdfBlob(data, company)`, idem Certificat/Devis/PvReception) et le wizard mailing.
 - **Constantes** : `src/lib/constants.js` — `DEFAULT_PAGE_SIZE`, `LARGE_PAGE_SIZE`, `KANBAN_PAGE_SIZE`
 
 ## Module Mailing
@@ -197,18 +223,23 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - **Cache keys** : `mailCampaignKeys`, `mailSegmentKeys`, `mailingKeys.byClient(clientId)`, `mailingKeys.byLead(leadId)`
 - **RPCs** :
   - `public.mail_segment_compile(filters jsonb, campaign_name text, org_id uuid) RETURNS text` — compose le SELECT SQL depuis le DSL jsonb. SECURITY DEFINER, format() + quote_literal pour la safety.
-  - `public.mail_segment_count(filters, campaign_name, org_id) RETURNS integer` — exécute COUNT(*) sur le SQL compilé
-  - `public.mail_segment_preview(filters, campaign_name, org_id, limit) RETURNS TABLE(...)` — retourne les N premiers destinataires
+  - `public.mail_segment_compile_safe(segment_id uuid, campaign_name text) RETURNS text` (P0.8, 2026-05-21) — recharge filters depuis `mail_segments` côté serveur + check `auth.uid() ∈ org_members` + délègue à `mail_segment_compile`. Utilisée par `mailing-send` edge function.
+  - `public.mail_single_client_sql(client_id uuid, campaign_name text) RETURNS text` (P0.8) — SQL pour 1 destinataire transactionnel, membership-checked.
+  - `public.mail_fetch_recipients(segment_id?, client_id?, campaign_name?)` (P0.8 V2) — wrapper appelé par `mailing-send`, compile + exécute en 1 aller-retour, retourne directement les rows destinataires.
+  - `public.mail_segment_count(filters, campaign_name, org_id) RETURNS integer` — COUNT(*) sur le SQL compilé
+  - `public.mail_segment_preview(filters, campaign_name, org_id, limit) RETURNS TABLE(...)` — N premiers destinataires
   - `public.mail_campaigns_due() RETURNS TABLE(...)` — campagnes `is_automated=true AND next_run_at <= NOW()`, consommée par le scheduler N8n
   - `public.mail_campaign_mark_run(campaign_id) RETURNS timestamptz` — update `last_run_at=NOW()` + calcule `next_run_at` selon cadence
 - **Constantes shared** :
   - `src/apps/artisan/components/mailing/segmentBuilder.constants.js` — audiences/housing/DPE/order_by + `buildEmptyFilters()` + `updateFilters()` (immutable path update)
   - `src/apps/artisan/components/mailing/resources.js` — 📌 caisse à outils URLs Mayer (CTA, services, blog, zones, contact). Source de vérité pour l'IA — à mettre à jour à chaque nouvelle ressource
-- **Env** : `VITE_N8N_WEBHOOK_MAILING` → webhook N8n `POST /webhook/mayer-mailing`
 - **Provider email** : Resend (API `https://api.resend.com/emails`) — bascule depuis Gmail le 2026-04-11
-- **Edge function webhook** : `supabase/functions/resend-webhook/` (verify_jwt: false, Svix HMAC SHA256 via Web Crypto API, RPC atomique)
+- **Edge function `mailing-send`** (P0.8 V2, 2026-05-21) : moteur d'envoi mailing pilote par le frontend / scheduler. Accepte `{ segment_id, campaign_id }` (broadcast) OU `{ client_id, campaign_id }` (transactionnel) — JAMAIS de SQL brut. RPC `mail_fetch_recipients(segment_id?, client_id?, campaign_name?)` membership-checked compile et exécute côté DB. Squelette HTML commun (`core.organizations.settings.email_skeleton_html`) appliqué automatiquement aux templates body-only.
+- **Edge function `contract-signed-notify`** (P0.14 transactionnel, 2026-05-21) : envoi transactionnel "contrat signé" multi-tenant. Charge contract + org settings + template `contrat_signature_confirm` depuis DB, télécharge PDF, envoie via Resend avec PDF en attachement, log dans `mailing_logs`. Remplace l'ancien workflow N8N "Mayer - Entretien Contrat".
+- **Edge function webhook Resend** : `supabase/functions/resend-webhook/` (verify_jwt: false, Svix HMAC SHA256 via Web Crypto API, RPC atomique)
 - **Edge function unsubscribe** : `supabase/functions/mailing-unsubscribe/` (verify_jwt: false, token HMAC SHA256 signé avec `RESEND_WEBHOOK_SECRET`, GET = page HTML confirmation + POST = one-click RFC 8058)
 - **Edge function avis-redirect** : `https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/avis-redirect` — redirige vers fiche Google Reviews Mayer + tracke le clic via `?log_id=` (utilisée dans SMS et accessible aux mails)
+- **Ancien webhook N8n `mayer-mailing` (id `1COgLUuiMtSq2sUq`)** : **ARCHIVÉ depuis P0.8 V2** (2026-05-21). Acceptait `segment_sql` brut — vulnérabilité cross-org si URL fuite. Ne plus appeler.
 
 ### Segment Builder (onglet Segments)
 Builder à facettes 4 blocs : **Population** (audience + base filters) / **Attributs** (géo, logement, équipement, source, Meta, tags, dates) / **Historique mailing** (exclure campagnes reçues, cooldown, engagement ouvert/cliqué) / **Preview** (count live + table 20 destinataires + tri/limite). Sauvegarde dans `mail_segments` avec jsonb filters. Voir DSL dans `docs/MAILING_SEGMENT_BUILDER.md` §3.
@@ -233,26 +264,22 @@ Setup complet : `docs/n8n/MAILING_SCHEDULER_SETUP.md`. `lead_bienvenue` est la 1
 
 **Vdef prévue** : remplacer l'étape 3 par appel API direct Anthropic au lieu du copier-coller.
 
-### Workflow N8n : "Mayer - Mailing" (id: 1COgLUuiMtSq2sUq)
-Moteur d'emailing générique piloté par webhook POST. Payload attendu :
-```json
-{
-  "subject": "Objet du mail",
-  "html_body": "<html>...{{SALUTATION}}...</html>",
-  "segment_sql": "SELECT id, first_name, last_name, display_name, email FROM ...",
-  "campaign_name": "Nom de la campagne",
-  "org_id": "uuid",
-  "recipient_type": "client|lead",
-  "batch_size": 400,
-  "test_email": "optionnel@test.fr"
-}
-```
-- Le placeholder `{{SALUTATION}}` est remplacé par "Bonjour Prénom Nom," automatiquement
-- En mode test (`test_email` rempli) : LIMIT 1 sur le SQL, envoi redirigé vers l'email de test
-- `recipient_type` : `client` (défaut) ou `lead` — détermine si l'INSERT va dans `client_id` ou `lead_id`
-- Noeud 6 `Resend Send` = HTTP Request POST `https://api.resend.com/emails` (credential `Header Auth` avec `Authorization: Bearer <RESEND_API_KEY>`), from = `Mayer Energie - Econ'Home <contact@mayer-energie.fr>`, reply_to identique
-- Noeud 7 fait un INSERT dans `majordhome.mailing_logs` après chaque envoi, incluant `provider_id` (ID Resend) et `error_message` (si échec Resend). Si Resend renvoie un `id` → `status='sent'`, sinon `status='failed'`
-- `onError: continueRegularOutput` sur le noeud 6 : la boucle ne casse pas en cas d'échec d'un destinataire, chaque échec est loggé avec son message
+### Edge function `mailing-send` (P0.8 V2 — remplace ancien workflow N8n)
+Moteur d'envoi mailing centralisé. Le frontend appelle `supabase.functions.invoke('mailing-send', { body: {...} })`. Le scheduler N8n auto-campagnes appelle l'edge avec `service_role` au lieu d'un webhook public.
+
+**Modes** :
+- **Broadcast** : `{ campaign_id, segment_id, test_email? }` — RPC `mail_fetch_recipients(p_segment_id, ...)` compile + exécute le SQL membership-checked
+- **Transactionnel** : `{ campaign_id, client_id }` (ou `lead_id`) — RPC `mail_fetch_recipients(p_client_id=...)` pour 1 destinataire
+
+**Sécurité** :
+- `verify_jwt:true` (frontend) OU `service_role` (scheduler N8n) — pas de webhook public
+- Le SQL n'est JAMAIS accepté du client — toujours compilé côté DB après check `auth.uid() ∈ org_members`
+- `mail_campaigns.is_transactional=true` → exclu de l'onglet Envoi broadcast (sécurité UX)
+
+**Templates** :
+- Squelette HTML commun dans `core.organizations.settings.email_skeleton_html` (+ `secondary_color`, `email_tagline`) appliqué automatiquement aux templates body-only.
+- Templates legacy `mail_a..g`, `lead_bienvenue`, etc. : détectés via heuristique `<!DOCTYPE>` et laissés intacts (migration progressive).
+- Placeholder `{{SALUTATION}}` remplacé par "Bonjour Prénom Nom," dans le squelette.
 
 ### Webhook Resend — tracking delivered / opened / clicked / bounced
 
@@ -350,7 +377,7 @@ Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
 
 **UI fiche client** : bandeau orange "Client désabonné" en haut de `TabMailings.jsx` si `email_unsubscribed_at` est set. Affiche la date + la raison (lien, bouton natif, spam, manuel). Le client reste dans la base, juste exclu des campagnes.
 
-### Templates campagnes (7)
+### Templates campagnes broadcast (7)
 | Template | Cible | Objet |
 |----------|-------|-------|
 | `mail_a` | Clients contrat actif | Information — Mayer Energie reprend le suivi |
@@ -360,6 +387,16 @@ Pipeline de désinscription conforme RFC 8058 avec plusieurs canaux.
 | `mail_e` | Leads Contacté | Relance Contacté — rappel à bon souvenir |
 | `mail_f` | Leads Devis envoyé | Relance Devis — suivi devis + aides + prix |
 | `mail_g` | Leads Perdu | Remerciement — ressources site web |
+
+### Templates transactionnels (`mail_campaigns.is_transactional=true`)
+Déclenchés 1-à-1 sur événement (pas envoyés en broadcast). Exclus de l'onglet Envoi.
+
+| Template | Trigger | Placeholders custom | Lieu de remplacement |
+|----------|---------|---------------------|---------------------|
+| `contrat_signature_confirm` | Signature contrat | `{{CLIENT_NAME}}`, `{{BRAND_NAME}}`, `{{ORG_EMAIL}}`, `{{ORG_PHONE}}`, `{{ORG_ADDRESS}}`, `{{ORG_POSTAL_CODE}}`, `{{ORG_CITY}}`, `{{ACCENT_COLOR}}` | Edge function `contract-signed-notify` (charge `core.organizations.settings`) |
+| `proposition_contrat` | Envoi devis depuis fiche client | `{{EQUIP_RECAP}}`, `{{TOTAL_AMOUNT}}`, `{{PDF_URL}}` | Frontend `ContractPdfSection.jsx:handleSendProposal` (replaceAll côté client) |
+
+**Convention** : éditables via onglet Mailing → Éditeur. La colonne `mail_campaigns.is_transactional BOOLEAN` distingue les transactionnels des broadcast. Pour ajouter une 3ᵉ campagne transactionnelle, considérer centraliser le `replaceAll` dans `mailCampaignsService.renderTemplate(orgId, key, vars)` plutôt qu'inline.
 
 ### Segments de ciblage (catalogue `mail_segments`, 8 presets seed)
 | Segment preset | Audience | Description |
@@ -442,6 +479,28 @@ planifie → [Remplir certificats équipements] → realise → facture (hors Ka
 - `markChildNeant(childId)` / `unmarkChildNeant(childId)` — NÉANT toggle
 - `completeParentEntretien(parentId, orgId, reportNotes)` — clôture + maintenance_visit
 
+## Module Tarification (Settings → /settings/pricing)
+
+CRUD per-org de la grille tarifaire (P0.0.6 pricing per-org, 2026-05-21). Accès `org_admin` only.
+
+- **Page** : `src/apps/artisan/pages/settings/PricingSettings.jsx` — 5 onglets : Zones / Types d'équipement / Tarifs (matrice zone × type) / Remises volume / Options
+- **Hook admin** : `usePricingAdmin()` dans `src/shared/hooks/usePricing.js` — expose `{zones, equipmentTypes, rates, discounts, extras}` (incluant inactifs) + 13 mutations CRUD scopées automatiquement sur `useAuth().organization.id`
+- **Hook prod** : `usePricingData()` (existant) — filtre `is_active=true` pour les formulaires contrat
+- **Service** : `pricing.service.js` — lectures via vues publiques `majordhome_pricing_*` (RLS via `security_invoker`), écritures via `.schema('majordhome')` (CRUD UI)
+- **Tables `majordhome.pricing_*`** : `pricing_zones`, `pricing_equipment_types`, `pricing_rates`, `pricing_discounts`, `pricing_extras` — toutes avec `org_id NOT NULL` + FK `core.organizations` + RLS `org_id IN (org_members)` + UNIQUE composites `(org_id, …)`
+- **`upsertRate`** utilise `onConflict: 'org_id,zone_id,equipment_type_id'` (composite UNIQUE)
+
+## Module Voice (PWA terrain)
+
+PWA dédiée pour les mémos vocaux structurés (RDV terrain / réunion / note libre) — Phase 1 MAKE. Routes `/voice/*` dans `src/apps/voice/`.
+
+- **Accès** : permission DB `voice_recorder.use` dans `majordhome.role_permissions` (P0.10, 2026-05-21). Configurable via Settings → Permissions par tout org_admin. Mayer seed : team_leader=true, commercial=false, technicien=false. `org_admin` bypass automatique.
+- **Pattern usage** : `const { can } = useCanAccess(); if (!can('voice_recorder', 'use')) <AccessDenied />` — guard dans `VoiceAccessGate.jsx`.
+- **Edge function `voice-extract-fieldreport`** (`verify_jwt:false`, P0.6 — 2026-05-21) : extraction structurée d'un mémo vocal CVC via Claude Sonnet 4.6 (fallback GPT-4o). Auth via `requireSharedSecret(MDH_CRON_SECRET)` du helper `_shared/auth.ts`. Body : `{ transcript, memo_type, duration_seconds, user_id?, org_id? }`.
+- **Quota daily user × org** (P0.6 follow-up, 2026-05-21) : table `majordhome.voice_quotas(user_id, org_id, date, count, last_at)` + RPC `public.increment_voice_quota(p_user_id, p_org_id, p_daily_limit DEFAULT 20)` SECURITY DEFINER service_role only. UPSERT atomique avec RAISE EXCEPTION P0001 `voice_quota_exceeded` si count > limit. Env var `VOICE_DAILY_LIMIT` override possible. Si `user_id`/`org_id` absents du body → warn + skip quota check (transition douce le temps d'updater le workflow N8n).
+- **RPC `public.record_voice_memo_extraction`** : insert dans `majordhome.voice_memos` + crée éventuellement leads/tâches. SECURITY DEFINER **service_role only** (P0.5, 2026-05-21) — `REVOKE FROM PUBLIC, anon, authenticated` car prend `org_id` dans le payload sans le dériver d'`auth.uid()`.
+- **Workflow N8n `mayer-voice-field-report`** : pipeline complet (transcription Whisper → voice-extract-fieldreport → record_voice_memo_extraction). Doit passer `Authorization: Bearer <MDH_CRON_SECRET>` sur le node Voice Extract + `user_id`/`org_id` dans le body pour activer le quota.
+
 ## Module GeoGrid Rank Tracker
 
 Suivi SEO local Google Maps via 2 modes de scan complémentaires :
@@ -509,7 +568,8 @@ GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m
 | 7 | Droits & Accès (permissions granulaires par rôle) | ✅ FAIT |
 | P | Prospection (Cédants + Commercial, Screener SIRENE, Pipeline, Drawer) | ✅ FAIT |
 | M | Mailing (Configurateur campagnes, mailing_logs, onglet Mailings fiche client) | ✅ FAIT |
-| **Sem 0** | **Hardening DB pré-onboarding 2ème entreprise (cf. `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`)** | **🔧 EN COURS** |
-| 8 | Portail Client | ⏸ EN PAUSE (post-hardening) |
-| 9 | Intégration Pennylane (devis/factures) | ⏸ EN PAUSE (post-hardening) |
-| 10 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⏸ EN PAUSE (post-hardening) |
+| **Sem 0** | **Hardening DB pré-onboarding 2ème entreprise (cf. `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`)** | **✅ ~97% (2026-05-21)** |
+| **Sem 3** | **Branding multi-tenant (P0.13-P0.20 — settings org, PDFs paramétrés, edges multi-tenant)** | **✅ FAIT (2026-05-21)** |
+| 8 | Portail Client | ⬜ À FAIRE |
+| 9 | Intégration Pennylane (devis/factures) | 🔧 EN COURS (proxy hardened P0.3, lignes libres + ledger_account livrés) |
+| 10 | N8N Avancé (Facebook Ads, Slack bidirectionnel) | ⬜ À FAIRE |
