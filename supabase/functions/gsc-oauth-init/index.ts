@@ -12,11 +12,14 @@
 //   Body: { orgId: string, returnTo: string }
 //   -> Response: { url: string }
 //
-// Securite :
+// Securite (P0.4) :
 //   - verify_jwt: true (JWT Supabase requis)
 //   - Valide que le user appartient a l'org demandee
 //   - Valide returnTo contre la whitelist FRONTEND_ORIGINS
-//   - Le state OAuth = base64({ orgId, returnTo }) pour reprise au callback
+//   - Le state OAuth est signe HMAC-SHA256 avec RESEND_WEBHOOK_SECRET et lie
+//     a (orgId, userId, returnTo, nonce, exp). Au callback : revalidation
+//     signature + expiration + membership. Empeche CSRF (state forge),
+//     replay (nonce + exp 10 min) et user-switch (binding userId).
 // ============================================================================
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -25,12 +28,74 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GSC_CLIENT_ID = Deno.env.get("GSC_CLIENT_ID") || "";
+const RESEND_WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET") || "";
 const FRONTEND_ORIGINS = (Deno.env.get("FRONTEND_ORIGINS") || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 
 const SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+const STATE_TTL_SECONDS = 600; // 10 min — fenetre OAuth raisonnable
+
+// ---------------------------------------------------------------------------
+// State signe (HMAC-SHA256) — P0.4
+// ---------------------------------------------------------------------------
+
+function base64Decode(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function base64UrlEncode(bytes: Uint8Array | string): string {
+  const buf =
+    typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
+  let bin = "";
+  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function getHmacKeyBytes(): Uint8Array {
+  // RESEND_WEBHOOK_SECRET est au format Svix `whsec_<base64>` — on decode
+  // la partie base64 pour obtenir la cle binaire (meme pattern que
+  // mailing-unsubscribe / resend-webhook).
+  const secretPart = RESEND_WEBHOOK_SECRET.startsWith("whsec_")
+    ? RESEND_WEBHOOK_SECRET.slice(6)
+    : RESEND_WEBHOOK_SECRET;
+  return base64Decode(secretPart);
+}
+
+async function hmacSha256(key: Uint8Array, message: string): Promise<Uint8Array> {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(message),
+  );
+  return new Uint8Array(sig);
+}
+
+interface SignedStatePayload {
+  orgId: string;
+  userId: string;
+  returnTo: string;
+  nonce: string;
+  exp: number;
+}
+
+async function signState(payload: SignedStatePayload): Promise<string> {
+  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
+  const sigBytes = await hmacSha256(getHmacKeyBytes(), payloadB64);
+  const sigB64 = base64UrlEncode(sigBytes);
+  return `${payloadB64}.${sigB64}`;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +123,12 @@ Deno.serve(async (req: Request) => {
   }
   if (!GSC_CLIENT_ID) {
     return jsonResponse({ error: "GSC_CLIENT_ID not configured" }, 500);
+  }
+  if (!RESEND_WEBHOOK_SECRET) {
+    return jsonResponse(
+      { error: "RESEND_WEBHOOK_SECRET not configured (required for state signing)" },
+      500,
+    );
   }
 
   const authHeader = req.headers.get("Authorization");
@@ -98,9 +169,11 @@ Deno.serve(async (req: Request) => {
 
     const callbackUri = `${SUPABASE_URL}/functions/v1/gsc-oauth-callback`;
 
-    // state = base64url({ orgId, returnTo })
-    const stateJson = JSON.stringify({ orgId, returnTo });
-    const state = btoa(stateJson);
+    // state signe HMAC-SHA256 (P0.4) — payload + signature pour anti-CSRF,
+    // anti-replay (nonce + exp) et anti user-switch (userId binde).
+    const nonce = crypto.randomUUID();
+    const exp = Math.floor(Date.now() / 1000) + STATE_TTL_SECONDS;
+    const state = await signState({ orgId, userId, returnTo, nonce, exp });
 
     const params = new URLSearchParams({
       client_id: GSC_CLIENT_ID,

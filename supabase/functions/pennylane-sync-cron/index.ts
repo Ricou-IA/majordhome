@@ -20,6 +20,7 @@ const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
 const PENNYLANE_BASE_URL =
   Deno.env.get("PENNYLANE_BASE_URL") ||
   "https://app.pennylane.com/api/external/v2";
+const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
 const LEAD_THRESHOLD_HT = 1000;
@@ -40,6 +41,29 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Comparaison timing-safe pour eviter les timing attacks sur le secret.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// P0.2 — Verifie le MDH_CRON_SECRET passe en header Authorization: Bearer <secret>.
+// verify_jwt:false (cron public) → ce check est la seule defense contre
+// les invocations non autorisees. Retourne une Response si KO, null si OK.
+function checkCronAuth(req: Request): Response | null {
+  if (!MDH_CRON_SECRET) {
+    return jsonResponse({ error: "MDH_CRON_SECRET not configured" }, 500);
+  }
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token || !timingSafeEqual(token, MDH_CRON_SECRET)) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +232,8 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const authError = checkCronAuth(req);
+  if (authError) return authError;
   if (!PENNYLANE_API_TOKEN) {
     return jsonResponse({ error: "No PL token" }, 500);
   }

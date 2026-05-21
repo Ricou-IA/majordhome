@@ -10,9 +10,13 @@
 // Interface :
 //   GET /functions/v1/gsc-oauth-callback?code=...&state=...
 //
-// Securite :
+// Securite (P0.4) :
 //   - verify_jwt: false (callback OAuth public, pas de JWT possible)
-//   - state = base64({ orgId, returnTo }) verifie contre la whitelist
+//   - state signe HMAC-SHA256 avec RESEND_WEBHOOK_SECRET : verifie signature
+//     (timing-safe) + expiration (10 min) + binding (orgId, userId, returnTo)
+//   - Revalidation membership userId/orgId au moment du callback (le user a
+//     pu etre revoque entre init et callback)
+//   - returnTo verifie contre la whitelist FRONTEND_ORIGINS
 //   - refresh_token jamais expose cote client
 //   - Echange code -> token cote serveur uniquement
 // ============================================================================
@@ -24,10 +28,112 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GSC_CLIENT_ID = Deno.env.get("GSC_CLIENT_ID") || "";
 const GSC_CLIENT_SECRET = Deno.env.get("GSC_CLIENT_SECRET") || "";
+const RESEND_WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET") || "";
 const FRONTEND_ORIGINS = (Deno.env.get("FRONTEND_ORIGINS") || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+// ---------------------------------------------------------------------------
+// State signe (HMAC-SHA256) — P0.4 — mirror de gsc-oauth-init/signState
+// ---------------------------------------------------------------------------
+
+function base64Decode(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function base64UrlDecode(s: string): Uint8Array {
+  const pad = s.length % 4 ? "=".repeat(4 - (s.length % 4)) : "";
+  const b64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  return base64Decode(b64);
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function hmacSha256(key: Uint8Array, message: string): Promise<Uint8Array> {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(message),
+  );
+  return new Uint8Array(sig);
+}
+
+function getHmacKeyBytes(): Uint8Array {
+  const secretPart = RESEND_WEBHOOK_SECRET.startsWith("whsec_")
+    ? RESEND_WEBHOOK_SECRET.slice(6)
+    : RESEND_WEBHOOK_SECRET;
+  return base64Decode(secretPart);
+}
+
+interface SignedStatePayload {
+  orgId: string;
+  userId: string;
+  returnTo: string;
+  nonce: string;
+  exp: number;
+}
+
+async function verifySignedState(
+  stateRaw: string,
+): Promise<{ ok: true; payload: SignedStatePayload } | { ok: false; error: string }> {
+  const parts = stateRaw.split(".");
+  if (parts.length !== 2) return { ok: false, error: "invalid_format" };
+  const [payloadB64, sigB64] = parts;
+  if (!payloadB64 || !sigB64) return { ok: false, error: "invalid_parts" };
+
+  let expectedSig: string;
+  try {
+    const expectedBytes = await hmacSha256(getHmacKeyBytes(), payloadB64);
+    expectedSig = base64UrlEncode(expectedBytes);
+  } catch {
+    return { ok: false, error: "hmac_compute_failed" };
+  }
+  if (!safeEqual(sigB64, expectedSig)) return { ok: false, error: "signature_mismatch" };
+
+  let payload: SignedStatePayload;
+  try {
+    const decoded = new TextDecoder().decode(base64UrlDecode(payloadB64));
+    payload = JSON.parse(decoded) as SignedStatePayload;
+  } catch {
+    return { ok: false, error: "payload_decode_failed" };
+  }
+
+  if (
+    typeof payload.orgId !== "string" ||
+    typeof payload.userId !== "string" ||
+    typeof payload.returnTo !== "string" ||
+    typeof payload.nonce !== "string" ||
+    typeof payload.exp !== "number"
+  ) {
+    return { ok: false, error: "payload_shape_invalid" };
+  }
+  if (payload.exp < Math.floor(Date.now() / 1000)) {
+    return { ok: false, error: "state_expired" };
+  }
+  return { ok: true, payload };
+}
 
 function htmlError(msg: string, status = 400): Response {
   const safe = msg.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!));
@@ -45,11 +151,6 @@ function isAllowedOrigin(origin: string): boolean {
   return FRONTEND_ORIGINS.includes(origin);
 }
 
-interface OAuthState {
-  orgId: string;
-  returnTo: string;
-}
-
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
@@ -65,19 +166,42 @@ Deno.serve(async (req: Request) => {
   if (!GSC_CLIENT_ID || !GSC_CLIENT_SECRET) {
     return htmlError("Credentials Google non configures cote serveur.", 500);
   }
+  if (!RESEND_WEBHOOK_SECRET) {
+    return htmlError(
+      "RESEND_WEBHOOK_SECRET non configure cote serveur (requis pour verification state).",
+      500,
+    );
+  }
 
-  // Decode state
-  let state: OAuthState;
-  try {
-    state = JSON.parse(atob(stateRaw)) as OAuthState;
-  } catch {
-    return htmlError("State OAuth invalide (decoding failed).");
+  // Verifie la signature HMAC du state (P0.4) — anti-CSRF / anti-replay / binding userId.
+  const stateVerif = await verifySignedState(stateRaw);
+  if (!stateVerif.ok) {
+    return htmlError(`State OAuth invalide : ${stateVerif.error}.`);
   }
-  if (!state.orgId || !state.returnTo) {
-    return htmlError("State OAuth incomplet.");
-  }
+  const state = stateVerif.payload;
   if (!isAllowedOrigin(state.returnTo)) {
     return htmlError(`Origin non autorisee : ${state.returnTo}`);
+  }
+
+  // Revalidation membership : entre l'init et le callback, le user a pu etre
+  // revoque de l'org. On verifie qu'il est toujours membre avant d'ecrire le
+  // refresh_token sur l'org.
+  const supaCheck = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: membership, error: memErr } = await supaCheck
+    .schema("core")
+    .from("organization_members")
+    .select("org_id")
+    .eq("org_id", state.orgId)
+    .eq("user_id", state.userId)
+    .maybeSingle();
+  if (memErr) {
+    return htmlError(`Verification membership echouee : ${memErr.message}`, 500);
+  }
+  if (!membership) {
+    return htmlError(
+      "Vous n'etes plus membre de cette organisation. Connexion GSC annulee.",
+      403,
+    );
   }
 
   // Le redirect_uri envoye doit etre identique a celui utilise dans l'init
