@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin, ExternalLink } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useGeoGridQuota } from '@hooks/useGeoGrid';
-import { fetchTarnCommunes, filterByPopulation, centroidOf } from './communesService';
+import { fetchDepartementCommunes, filterByPopulation, centroidOf } from './communesService';
 
 const DEFAULT_CONFIG = {
   businessName: 'Mayer Energie',
@@ -44,9 +44,11 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const orgName = organization?.name || '';
   const orgSettings = organization?.settings || {};
   const orgPlaceId = orgSettings.google_place_id || '';
-  // P0.20 — Multi-tenant : business name + default city depuis settings org
+  // P0.20 — Multi-tenant : business name + default city + département depuis settings org
   const orgBusinessName = orgSettings.brand_name || orgName || DEFAULT_CONFIG.businessName;
   const orgDefaultCity = orgSettings.geogrid_default_city || null;
+  const orgDepartmentCode = orgSettings.geogrid_department_code || null;
+  const orgDepartmentLabel = orgSettings.geogrid_department_label || '';
   const cityCodeInit = orgDefaultCity?.code || DEFAULT_CITY_CODE;
   const cityLatInit = orgDefaultCity?.lat ?? DEFAULT_CITY_LAT;
   const cityLngInit = orgDefaultCity?.lng ?? DEFAULT_CITY_LNG;
@@ -86,16 +88,21 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
 
   const { data: quota } = useGeoGridQuota(orgId);
 
-  // Charge la liste des communes du Tarn au mount (utilisée par les deux modes)
+  // Charge la liste des communes du département configuré pour l'org
   useEffect(() => {
     if (communes) return;
+    if (!orgDepartmentCode) {
+      // P0.20 — pas de département configuré pour l'org → liste vide, mode 'cities' indisponible
+      setCommunes([]);
+      return;
+    }
     setLoadingCommunes(true);
     setCommunesError(null);
-    fetchTarnCommunes()
+    fetchDepartementCommunes(orgDepartmentCode)
       .then((data) => setCommunes(data))
       .catch((err) => setCommunesError(err.message))
       .finally(() => setLoadingCommunes(false));
-  }, [communes]);
+  }, [communes, orgDepartmentCode]);
 
   const filteredCommunes = useMemo(
     () => (communes ? filterByPopulation(communes, minPopulation) : []),
@@ -188,17 +195,19 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
           }`}
         >
           <Grid3x3 className="w-3.5 h-3.5" />
-          Maillage Gaillac
+          Maillage local
         </button>
         <button
           type="button"
           onClick={() => setMode('cities')}
+          disabled={!orgDepartmentCode}
+          title={!orgDepartmentCode ? 'Configurer geogrid_department_code dans settings org' : ''}
           className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
             mode === 'cities' ? 'bg-white text-primary-700 shadow-sm' : 'text-secondary-600 hover:text-secondary-900'
-          }`}
+          } ${!orgDepartmentCode ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <MapPin className="w-3.5 h-3.5" />
-          Communes Tarn
+          {orgDepartmentLabel ? `Communes ${orgDepartmentLabel}` : 'Communes département'}
         </button>
       </div>
 
@@ -372,7 +381,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
           </div>
 
           <div className="text-xs text-secondary-600 bg-secondary-50 rounded px-2 py-1.5">
-            {loadingCommunes && <span>Chargement des communes du Tarn...</span>}
+            {loadingCommunes && <span>Chargement des communes{orgDepartmentLabel ? ` du ${orgDepartmentLabel}` : ''}...</span>}
             {communesError && <span className="text-red-600">Erreur : {communesError}</span>}
             {communes && !loadingCommunes && (
               <span>

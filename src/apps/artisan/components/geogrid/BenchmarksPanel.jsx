@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Play, Trash2, Clock, CheckCircle2, XCircle, BarChart3 } from 'lucide-react';
 import { formatDateTimeFR } from '@/lib/utils';
+import { useAuth } from '@contexts/AuthContext';
 import { useKeywordLists, useBenchmarks, useDeleteBenchmark, useGeoGridQuota } from '@hooks/useGeoGrid';
 import BenchmarkLauncher from './BenchmarkLauncher';
 import BenchmarkResultTable from './BenchmarkResultTable';
@@ -38,6 +39,9 @@ function StatusBadge({ status, completed, total }) {
 }
 
 export default function BenchmarksPanel({ orgId }) {
+  const { organization } = useAuth();
+  const orgDepartmentLabel = organization?.settings?.geogrid_department_label || '';
+
   const [selectedBenchmarkId, setSelectedBenchmarkId] = useState(null);
   const [launcherOpen, setLauncherOpen] = useState(false);
 
@@ -60,7 +64,7 @@ export default function BenchmarksPanel({ orgId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-secondary-600">
-          Un benchmark = un run d'une liste de keywords sur Gaillac et/ou Tarn. Lancement mensuel = thermomètre SEO.
+          Un benchmark = un run d'une liste de keywords sur une zone locale et/ou les communes{orgDepartmentLabel ? ` du ${orgDepartmentLabel}` : ' du département'}. Lancement mensuel = thermomètre SEO.
         </p>
         <button
           onClick={() => setLauncherOpen(true)}
@@ -113,7 +117,7 @@ export default function BenchmarksPanel({ orgId }) {
                   <td className="px-4 py-2 font-medium text-secondary-900">{b.list_name}</td>
                   <td className="px-3 py-2 text-secondary-600">
                     {b.scan_mode === 'grid' && '📍 Gaillac (grille)'}
-                    {b.scan_mode === 'cities' && '🗺️ Tarn (communes)'}
+                    {b.scan_mode === 'cities' && `🗺️ ${orgDepartmentLabel || 'Département'} (communes)`}
                     {b.scan_mode === 'both' && '📍🗺️ Les deux'}
                   </td>
                   <td className="px-3 py-2 text-secondary-600">{formatDateTimeFR(b.started_at)}</td>

@@ -1,5 +1,6 @@
 import { Trash2, Eye, Clock } from 'lucide-react';
 import { formatDateTimeFR } from '@/lib/utils';
+import { useAuth } from '@contexts/AuthContext';
 
 function getRankColor(rank) {
   if (rank === null || rank === undefined) return 'bg-secondary-100 text-secondary-600';
@@ -9,6 +10,9 @@ function getRankColor(rank) {
 }
 
 export default function ScanHistory({ scans, isLoading, selectedScanId, onSelect, onDelete }) {
+  const { organization } = useAuth();
+  const orgDepartmentLabel = organization?.settings?.geogrid_department_label || 'Département';
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg border p-4">
@@ -60,7 +64,7 @@ export default function ScanHistory({ scans, isLoading, selectedScanId, onSelect
                     </span>
                     {scan.scan_mode === 'cities' ? (
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 whitespace-nowrap">
-                        Tarn · {scan.total_points} villes
+                        {orgDepartmentLabel} · {scan.total_points} villes
                       </span>
                     ) : (
                       <span className="text-xs text-secondary-400 whitespace-nowrap">

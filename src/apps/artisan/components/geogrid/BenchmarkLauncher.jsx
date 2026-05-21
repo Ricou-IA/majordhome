@@ -6,7 +6,7 @@ import { useAuth } from '@contexts/AuthContext';
 import geogridService from '@services/geogrid.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { geogridKeys, FREE_TIER_LIMIT } from '@hooks/useGeoGrid';
-import { fetchTarnCommunes, filterByPopulation, centroidOf } from './communesService';
+import { fetchDepartementCommunes, filterByPopulation, centroidOf } from './communesService';
 
 const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
@@ -21,25 +21,25 @@ const GRID_SIZES = [
   { value: 7, label: '7x7 (49 pts)' },
 ];
 
-const BIG_CITIES_DEFAULT = [
-  { code: '81004', name: 'Albi', lat: 43.928, lng: 2.148 },
-  { code: '81065', name: 'Castres', lat: 43.605, lng: 2.241 },
-  { code: '81099', name: 'Gaillac', lat: 43.9016, lng: 1.8976 },
-];
+// Pas de BIG_CITIES_DEFAULT hardcoded — on attend que fetchDepartementCommunes
+// charge depuis l'API gouv. Si l'org n'a pas de département configuré, le
+// sélecteur reste vide (l'utilisateur doit configurer settings.geogrid_department_code).
 
 export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaunched }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
   const cancelRef = useRef(false);
 
-  // P0.20 — Multi-tenant : default city depuis settings org
+  // P0.20 — Multi-tenant : default city + département depuis settings org
   const orgDefaultCity = organization?.settings?.geogrid_default_city || null;
-  const defaultCityCode = orgDefaultCity?.code || '81099';
-  const orgBusinessName = organization?.settings?.brand_name || orgBusinessName;
+  const defaultCityCode = orgDefaultCity?.code || '';
+  const orgBusinessName = organization?.settings?.brand_name || organization?.name || '';
+  const orgDepartmentCode = organization?.settings?.geogrid_department_code || null;
+  const orgDepartmentLabel = organization?.settings?.geogrid_department_label || '';
 
   const [selectedListId, setSelectedListId] = useState(lists[0]?.id || '');
   const [scanMode, setScanMode] = useState('grid'); // grid | cities
-  const [gaillacCenter, setGaillacCenter] = useState(defaultCityCode); // code commune pour mode grid
+  const [centerCityCode, setCenterCityCode] = useState(defaultCityCode); // code commune pour mode grid
   const [gridSize, setGridSize] = useState(5);
   const [radiusKm, setRadiusKm] = useState(3);
   const [searchRadiusM, setSearchRadiusM] = useState(2000);
@@ -55,11 +55,15 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
 
   // Charge communes pour mode cities + sélecteur ville mode grid
   useEffect(() => {
-    fetchTarnCommunes().then(setCommunes).catch(() => setCommunes([]));
-  }, []);
+    if (!orgDepartmentCode) {
+      setCommunes([]);
+      return;
+    }
+    fetchDepartementCommunes(orgDepartmentCode).then(setCommunes).catch(() => setCommunes([]));
+  }, [orgDepartmentCode]);
 
   const bigCities = useMemo(
-    () => (communes ? filterByPopulation(communes, 10000) : BIG_CITIES_DEFAULT),
+    () => (communes ? filterByPopulation(communes, 10000) : []),
     [communes]
   );
 
@@ -68,7 +72,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
     [communes, minPopulation]
   );
 
-  const selectedCity = bigCities.find((c) => c.code === gaillacCenter) || BIG_CITIES_DEFAULT[2];
+  const selectedCity = bigCities.find((c) => c.code === centerCityCode) || bigCities[0] || null;
   const selectedList = lists.find((l) => l.id === selectedListId);
 
   // Calcul coût en req
@@ -108,7 +112,13 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
     // 1. Crée le benchmark en DB
     let benchmarkId;
     try {
-      const center = scanMode === 'cities' ? centroidOf(filteredCommunes) : { lat: selectedCity.lat, lng: selectedCity.lng };
+      if (!selectedCity && scanMode === 'grid') {
+        toast.error('Aucune ville disponible — configurez geogrid_department_code dans settings org');
+        return;
+      }
+      const center = scanMode === 'cities'
+        ? (centroidOf(filteredCommunes) || { lat: selectedCity?.lat ?? 0, lng: selectedCity?.lng ?? 0 })
+        : { lat: selectedCity.lat, lng: selectedCity.lng };
       const { data: benchmark, error: benchmarkError } = await geogridService.createBenchmark(orgId, {
         list_id: selectedListId,
         scan_mode: scanMode,
@@ -150,8 +160,8 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
 
         if (scanMode === 'grid') {
           params.mode = 'grid';
-          params.centerLat = selectedCity.lat;
-          params.centerLng = selectedCity.lng;
+          params.centerLat = selectedCity?.lat ?? 0;
+          params.centerLng = selectedCity?.lng ?? 0;
           params.radiusKm = radiusKm;
           params.gridSize = gridSize;
         } else {
@@ -243,7 +253,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
             <div className="grid grid-cols-2 gap-2">
               {[
                 { value: 'grid', label: '📍 Présence locale (Gaillac)', desc: 'Maillage fin sur 1 ville' },
-                { value: 'cities', label: '🗺️ Visibilité Tarn (communes)', desc: '1 point par ville' },
+                { value: 'cities', label: `🗺️ Visibilité ${orgDepartmentLabel || 'département'} (communes)`, desc: '1 point par ville' },
               ].map((m) => (
                 <button
                   key={m.value}
@@ -266,8 +276,8 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
               <div>
                 <label className="block text-xs font-medium text-secondary-600 mb-1">Ville</label>
                 <select
-                  value={gaillacCenter}
-                  onChange={(e) => setGaillacCenter(e.target.value)}
+                  value={centerCityCode}
+                  onChange={(e) => setCenterCityCode(e.target.value)}
                   disabled={running}
                   className="w-full px-3 py-1.5 text-sm border rounded-md"
                 >

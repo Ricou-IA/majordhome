@@ -22,6 +22,15 @@ export default function GeoGrid() {
   const initialTab = new URLSearchParams(location.search).get('gsc') ? 'gsc' : 'scan';
   const [activeTab, setActiveTab] = useState(initialTab);
 
+  // P0.20 — sous-titre paramétré par org (fallback générique)
+  const brandName = organization?.settings?.brand_name || organization?.name || '';
+  const territoryLabel = organization?.settings?.geogrid_territory_label || ''; // ex "le Tarn", "la Loire-Atlantique"
+  const subtitle = brandName && territoryLabel
+    ? `Mesurez la visibilité Google Maps de ${brandName} sur ${territoryLabel}`
+    : brandName
+      ? `Mesurez la visibilité Google Maps de ${brandName}`
+      : 'Mesurez votre visibilité Google Maps';
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -31,9 +40,7 @@ export default function GeoGrid() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-secondary-900">GeoGrid Rank Tracker</h1>
-          <p className="text-sm text-secondary-500">
-            Mesurez la visibilité Google Maps de Mayer sur le Tarn
-          </p>
+          <p className="text-sm text-secondary-500">{subtitle}</p>
         </div>
       </div>
 
