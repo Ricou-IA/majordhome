@@ -26,7 +26,7 @@ import { EQUIPMENT_TYPE_CATEGORIES } from '@services/pricing.service';
 
 export function Step2Equipment({ pricingData, calculator, clientAddress }) {
   const { equipmentTypes, zones, isLoading: loadingPricing, error: pricingError } = pricingData;
-  const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity, isDetectingZone, durationMinutes } = calculator;
+  const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity, isDetectingZone, durationMinutes, hqLabel } = calculator;
   const zoneSupplement = parseFloat(activeZone?.supplement || 0);
 
   // Grouper les types d'équipements par catégorie
@@ -84,7 +84,7 @@ export function Step2Equipment({ pricingData, calculator, clientAddress }) {
               <strong>{activeZone.label}</strong>
               <span className="text-blue-600 ml-1">
                 {durationMinutes != null
-                  ? `(~${durationMinutes} min depuis Gaillac${activeZone.supplement > 0 ? ` · +${parseFloat(activeZone.supplement).toFixed(0)}€ déplacement` : ''})`
+                  ? `(~${durationMinutes} min${hqLabel ? ` depuis ${hqLabel}` : ''}${activeZone.supplement > 0 ? ` · +${parseFloat(activeZone.supplement).toFixed(0)}€ déplacement` : ''})`
                   : `(CP ${clientAddress?.postalCode || ''}${activeZone.supplement > 0 ? ` · +${parseFloat(activeZone.supplement).toFixed(0)}€ déplacement` : ''})`
                 }
               </span>

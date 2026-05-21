@@ -71,4 +71,27 @@ export const CRM_POINT_TYPES = {
 /** Couleur des clients avec contrat actif (distinction visuelle dans la même catégorie) */
 export const CONTRACT_COLOR = '#8b5cf6'; // violet-500
 
+/**
+ * P0.19 — Retourne les coordonnées + label du siège de l'org pour les calculs
+ * de temps de trajet (zoneDetection, ChantierModal "X min · Y km depuis Z").
+ *
+ * Heuristique : 1ᵉʳ centre dans `settings.territoire_centers` (en pratique,
+ * le siège est listé en 1ᵉʳ pour Mayer = "gaillac"). Si pas de centres
+ * configurés, retourne null → l'UI doit cacher l'affichage "depuis X".
+ *
+ * @param {Object|null} settings - core.organizations.settings
+ * @returns {{ lat: number, lng: number, label: string } | null}
+ */
+export function getOrgHeadquarters(settings) {
+  const centers = settings?.territoire_centers;
+  if (!centers || typeof centers !== 'object') return null;
+  const first = Object.values(centers)[0];
+  if (!first || typeof first.lat !== 'number' || typeof first.lng !== 'number') return null;
+  return {
+    lat: first.lat,
+    lng: first.lng,
+    label: first.label || 'siège',
+  };
+}
+
 export default TERRITOIRE_CONFIG;

@@ -15,8 +15,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { detectZoneForAddress, detectZoneFromPostalCode } from '@services/pricing.service';
+import { useAuth } from '@contexts/AuthContext';
+import { getOrgHeadquarters } from '@/lib/territoire-config';
 
 export function useContractZone(client, contract, zones) {
+  const { organization } = useAuth();
+  const orgHq = useMemo(
+    () => getOrgHeadquarters(organization?.settings),
+    [organization?.settings],
+  );
   const [asyncZone, setAsyncZone] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(null);
@@ -48,7 +55,8 @@ export function useContractZone(client, contract, zones) {
           client.address || '',
           client.postal_code,
           client.city || '',
-          zones
+          zones,
+          orgHq
         );
         if (cancelled) return;
         setAsyncZone(result.zone);
@@ -63,7 +71,7 @@ export function useContractZone(client, contract, zones) {
     return () => {
       cancelled = true;
     };
-  }, [client?.address, client?.postal_code, client?.city, zones]);
+  }, [client?.address, client?.postal_code, client?.city, zones, orgHq]);
 
   // 3. Fallback sync département (si Mapbox pas encore résolu)
   const fallbackZone = useMemo(() => {
@@ -81,5 +89,5 @@ export function useContractZone(client, contract, zones) {
     (zones?.length ? zones.find((z) => z.is_default && z.is_active) : null) ||
     null;
 
-  return { activeZone, isDetecting, durationMinutes };
+  return { activeZone, isDetecting, durationMinutes, hqLabel: orgHq?.label || null };
 }

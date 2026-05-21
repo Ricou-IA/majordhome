@@ -8,13 +8,14 @@
  * ============================================================================
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuroCeil } from '@/lib/utils';
 import { getDrivingFromAddress } from '@/lib/zoneDetection';
+import { getOrgHeadquarters } from '@/lib/territoire-config';
 import {
   CHANTIER_TRANSITIONS,
   getChantierStatusConfig,
@@ -68,12 +69,17 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [loadingParent, setLoadingParent] = useState(true);
 
 
-  // Trajet depuis le siège (Gaillac) — calcul Mapbox idempotent (cache module)
+  // Trajet depuis le siège de l'org (P0.19 — paramétré via settings, fallback Mayer/Gaillac
+  // tant que territoire_centers n'est pas configuré). Calcul Mapbox idempotent (cache module).
+  const orgHq = useMemo(
+    () => getOrgHeadquarters(organization?.settings),
+    [organization?.settings],
+  );
   const [drivingInfo, setDrivingInfo] = useState(null);
   const [isLoadingDriving, setIsLoadingDriving] = useState(false);
 
   useEffect(() => {
-    if (!chantier?.postal_code && !chantier?.city) {
+    if ((!chantier?.postal_code && !chantier?.city) || !orgHq) {
       setDrivingInfo(null);
       return;
     }
@@ -82,7 +88,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     getDrivingFromAddress(
       chantier.address || '',
       chantier.postal_code || '',
-      chantier.city || ''
+      chantier.city || '',
+      orgHq
     )
       .then((result) => {
         if (cancelled) return;
@@ -97,7 +104,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     return () => {
       cancelled = true;
     };
-  }, [chantier?.id, chantier?.address, chantier?.postal_code, chantier?.city]);
+  }, [chantier?.id, chantier?.address, chantier?.postal_code, chantier?.city, orgHq]);
 
   // Charger l'intervention parent
   useEffect(() => {
@@ -327,7 +334,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                   {!isLoadingDriving && drivingInfo && (
                     <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                       <Car className="w-3 h-3" />
-                      {drivingInfo.durationMinutes} min · {drivingInfo.distanceKm} km depuis Gaillac
+                      {drivingInfo.durationMinutes} min · {drivingInfo.distanceKm} km{orgHq?.label ? ` depuis ${orgHq.label}` : ''}
                     </div>
                   )}
                 </div>

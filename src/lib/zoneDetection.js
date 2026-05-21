@@ -2,7 +2,12 @@
  * zoneDetection.js
  * Détection de zone tarifaire par temps de trajet Mapbox
  * Utilise l'API Directions pour calculer le temps de conduite
- * depuis l'adresse client jusqu'au siège de Gaillac.
+ * depuis l'adresse client jusqu'au siège de l'org.
+ *
+ * P0.19 (2026-05-21) — Multi-tenant : les coordonnées du siège viennent
+ * de `core.organizations.settings.territoire_centers[0]` via le helper
+ * `getOrgHeadquarters(settings)`. Si l'org n'a pas configuré ses centres,
+ * `hqCoords` est null → les calculs de trajet sont skip (UI doit gérer).
  *
  * 3 zones :
  *   - Zone 1 (< 30 min)
@@ -14,11 +19,8 @@ import { MAPBOX_CONFIG } from '@/lib/mapbox';
 import { geocodeAddress } from '@services/geocoding.service';
 import { detectZoneFromPostalCode } from '@services/pricing.service';
 
-// Coordonnées du siège (Gaillac)
-const HQ_LNG = MAPBOX_CONFIG.defaultCenter[0]; // 1.8898
-const HQ_LAT = MAPBOX_CONFIG.defaultCenter[1]; // 43.9119
-
 // Cache module-level pour éviter les appels Mapbox redondants
+// La clé inclut désormais les coords HQ pour éviter les collisions cross-org
 const _drivingCache = new Map();
 // Cache des centroïdes de communes (clé = "city|postcode")
 const _communeCentroidCache = new Map();
@@ -57,26 +59,32 @@ async function getCommuneCentroid(city, postalCode) {
 }
 
 /**
- * Calcule le temps de trajet en voiture entre des coordonnées et Gaillac
+ * Calcule le temps de trajet en voiture entre des coordonnées et le siège de l'org.
  * @param {number} lat - Latitude client
  * @param {number} lng - Longitude client
+ * @param {{ lat: number, lng: number } | null} hqCoords - Coordonnées du siège.
+ *   Si null (org sans territoire_centers configuré), retourne null.
  * @returns {Promise<{ durationMinutes: number, distanceKm: number } | null>}
  */
-export async function getDrivingDuration(lat, lng) {
+export async function getDrivingDuration(lat, lng, hqCoords) {
   const token = MAPBOX_CONFIG.accessToken;
   if (!token) {
     console.warn('[zoneDetection] Mapbox token non configuré');
     return null;
   }
+  if (!hqCoords || typeof hqCoords.lat !== 'number' || typeof hqCoords.lng !== 'number') {
+    // P0.19 — pas de siège configuré pour l'org → pas de calcul possible
+    return null;
+  }
 
-  // Clé de cache arrondie à ~100m
-  const cacheKey = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+  // Clé de cache arrondie à ~100m (inclut HQ pour éviter collision cross-org)
+  const cacheKey = `${hqCoords.lat.toFixed(3)}_${hqCoords.lng.toFixed(3)}__${lat.toFixed(3)}_${lng.toFixed(3)}`;
   if (_drivingCache.has(cacheKey)) {
     return _drivingCache.get(cacheKey);
   }
 
   try {
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${lng},${lat};${HQ_LNG},${HQ_LAT}?overview=false&access_token=${token}`;
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${lng},${lat};${hqCoords.lng},${hqCoords.lat}?overview=false&access_token=${token}`;
     const res = await fetch(url);
 
     if (!res.ok) {
@@ -129,7 +137,7 @@ export function detectZoneByDuration(durationMinutes, zones) {
 }
 
 /**
- * Calcule le temps/distance de trajet depuis une adresse vers le siège (Gaillac).
+ * Calcule le temps/distance de trajet depuis une adresse vers le siège de l'org.
  * Utilise la même logique de résolution de coords que detectZoneForAddress
  * (centroïde commune en priorité, fallback géocodage adresse exacte) mais
  * sans calcul de zone tarifaire — pour les écrans qui n'ont besoin que du
@@ -138,9 +146,10 @@ export function detectZoneByDuration(durationMinutes, zones) {
  * @param {string} address - Rue
  * @param {string} postalCode - Code postal
  * @param {string} city - Ville
+ * @param {{ lat: number, lng: number } | null} hqCoords - Coordonnées siège org
  * @returns {Promise<{ durationMinutes: number|null, distanceKm: number|null, coords: {lat,lng}|null }>}
  */
-export async function getDrivingFromAddress(address, postalCode, city) {
+export async function getDrivingFromAddress(address, postalCode, city, hqCoords) {
   const empty = { durationMinutes: null, distanceKm: null, coords: null };
   if (!postalCode && !city) return empty;
 
@@ -148,7 +157,7 @@ export async function getDrivingFromAddress(address, postalCode, city) {
   if (!coords) coords = await geocodeAddress(address, postalCode, city);
   if (!coords) return empty;
 
-  const driving = await getDrivingDuration(coords.lat, coords.lng);
+  const driving = await getDrivingDuration(coords.lat, coords.lng, hqCoords);
   if (!driving) return { ...empty, coords };
 
   return { ...driving, coords };
@@ -164,7 +173,7 @@ export async function getDrivingFromAddress(address, postalCode, city) {
  * @param {Array} zones - Zones depuis pricing_zones
  * @returns {Promise<{ zone: object|null, durationMinutes: number|null, coords: {lat,lng}|null }>}
  */
-export async function detectZoneForAddress(address, postalCode, city, zones) {
+export async function detectZoneForAddress(address, postalCode, city, zones, hqCoords) {
   const empty = { zone: null, durationMinutes: null, coords: null };
 
   if (!postalCode && !city) return empty;
@@ -182,7 +191,7 @@ export async function detectZoneForAddress(address, postalCode, city, zones) {
     }
 
     // 2. Temps de trajet Mapbox
-    const driving = await getDrivingDuration(coords.lat, coords.lng);
+    const driving = await getDrivingDuration(coords.lat, coords.lng, hqCoords);
     if (!driving) {
       const fallback = detectZoneFromPostalCode(postalCode, zones);
       return { zone: fallback, durationMinutes: null, coords };

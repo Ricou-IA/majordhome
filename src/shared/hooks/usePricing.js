@@ -21,6 +21,7 @@ import {
   calculateContractTotal,
 } from '@services/pricing.service';
 import { useAuth } from '@contexts/AuthContext';
+import { getOrgHeadquarters } from '@/lib/territoire-config';
 import { contractKeys, pricingKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
@@ -309,6 +310,12 @@ export function useContractPricing(contractId) {
  */
 export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
   const { zones, equipmentTypes, rates, discounts } = pricingData || {};
+  // P0.19 — siège org pour calcul temps de trajet (null si non configuré)
+  const { organization } = useAuth();
+  const orgHq = useMemo(
+    () => getOrgHeadquarters(organization?.settings),
+    [organization?.settings],
+  );
 
   // Normaliser l'entrée : string (legacy) ou objet { address, postalCode, city }
   const clientAddress = useMemo(() => {
@@ -342,7 +349,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
     const timer = setTimeout(async () => {
       setIsDetectingZone(true);
       try {
-        const result = await detectZoneForAddress(address, postalCode, city, zones);
+        const result = await detectZoneForAddress(address, postalCode, city, zones, orgHq);
         setAsyncZone(result.zone);
         setDurationMinutes(result.durationMinutes);
       } catch (err) {
@@ -353,7 +360,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [clientAddress.address, clientAddress.postalCode, clientAddress.city, zones]);
+  }, [clientAddress.address, clientAddress.postalCode, clientAddress.city, zones, orgHq]);
 
   // Zone effective : async (Mapbox) > sync (département) > manual override
   const detectedZone = asyncZone || syncZone;
@@ -499,6 +506,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
     hasItems: computedItems.length > 0,
     isDetectingZone,
     durationMinutes,
+    hqLabel: orgHq?.label || null,
 
     // Actions
     addItem,
