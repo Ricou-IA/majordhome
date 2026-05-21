@@ -35,6 +35,7 @@ export const RESOURCES = [
   { key: 'devis',      label: 'Devis' },
   { key: 'tasks',      label: 'Tâches' },
   { key: 'meta_ads',   label: 'Meta Ads' },
+  { key: 'voice_recorder', label: 'Compte-rendu vocal (PWA)' },
   { key: 'settings',   label: 'Paramètres' },
 ];
 

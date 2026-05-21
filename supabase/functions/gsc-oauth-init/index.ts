@@ -23,12 +23,11 @@
 // ============================================================================
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireOrgMembership } from "../_shared/auth.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GSC_CLIENT_ID = Deno.env.get("GSC_CLIENT_ID") || "";
 const RESEND_WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const FRONTEND_ORIGINS = (Deno.env.get("FRONTEND_ORIGINS") || "")
   .split(",")
   .map((s) => s.trim())
@@ -131,18 +130,7 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return jsonResponse({ error: "No auth header" }, 401);
-
   try {
-    const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: authErr } = await supa.auth.getUser(token);
-    if (authErr || !userData?.user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-    const userId = userData.user.id;
-
     const { orgId, returnTo } = await req.json();
     if (!orgId || !returnTo) {
       return jsonResponse({ error: "Missing orgId or returnTo" }, 400);
@@ -151,21 +139,10 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Origin not allowed" }, 400);
     }
 
-    // Verifie que le user est bien membre de l'org
-    const { data: membership, error: memErr } = await supa
-      .schema("core")
-      .from("organization_members")
-      .select("org_id")
-      .eq("org_id", orgId)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (memErr) {
-      return jsonResponse({ error: `DB error: ${memErr.message}` }, 500);
-    }
-    if (!membership) {
-      return jsonResponse({ error: "Not a member of this org" }, 403);
-    }
+    // Auth + membership user x org via helper partage (P0.25).
+    const auth = await requireOrgMembership(req, { orgId });
+    if (!auth.ok) return auth.response;
+    const { userId } = auth;
 
     const callbackUri = `${SUPABASE_URL}/functions/v1/gsc-oauth-callback`;
 
