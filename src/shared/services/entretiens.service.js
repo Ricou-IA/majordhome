@@ -594,15 +594,43 @@ export const entretiensService = {
   // ==========================================================================
 
   /**
-   * Déclenche la génération du PDF contrat via N8N
-   * Formate les données du contrat au format attendu par le webhook "Mayer - Entretien Contrat"
-   * (nom, prenom, email, details[], estimationTTC, zone, etc.)
-   * Le workflow N8N génère le HTML via l'API LP, convertit en PDF, l'envoie par email au client.
+   * Déclenche l'email de confirmation du contrat signé via l'edge function
+   * Supabase `contract-signed-notify` (remplace l'ancien workflow N8N
+   * "Mayer - Entretien Contrat", désactivé 2026-05-21).
    *
-   * @param {Object} contractData - Objet contrat depuis la vue majordhome_contracts
+   * L'edge function charge contract + org settings + template `contrat_signature_confirm`
+   * depuis la DB, télécharge le PDF, et envoie via Resend avec PDF en pièce jointe.
+   * Logue dans mailing_logs. Multi-tenant via core.organizations.settings.
+   *
+   * @param {Object} contractData - Objet contrat (au minimum { id })
    * @returns {{ success, error }}
    */
   async triggerContractPdf(contractData) {
+    if (!contractData?.id) throw new Error('[entretiensService] contractData requis');
+
+    try {
+      const { data, error } = await supabase.functions.invoke('contract-signed-notify', {
+        body: { contract_id: contractData.id },
+      });
+
+      if (error) {
+        console.error('[entretiensService] contract-signed-notify error:', error);
+        return { success: false, error };
+      }
+      if (data?.success === false) {
+        console.error('[entretiensService] contract-signed-notify failed:', data?.error);
+        return { success: false, error: new Error(data?.error || 'Edge function échec') };
+      }
+      return { success: true, error: null, providerId: data?.provider_id, sentTo: data?.sent_to };
+    } catch (err) {
+      console.error('[entretiensService] triggerContractPdf error:', err);
+      return { success: false, error: err };
+    }
+  },
+
+  // Ancien code N8N — remplacé par contract-signed-notify (commenté pour rollback)
+  // si la migration vers l'edge function pose problème.
+  async _legacyTriggerContractPdfN8n(contractData) {
     if (!contractData?.id) throw new Error('[entretiensService] contractData requis');
 
     const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_CONTRACT_PDF;
@@ -612,7 +640,6 @@ export const entretiensService = {
     }
 
     try {
-      // Charger les équipements liés au contrat
       const { data: links } = await supabase
         .from('majordhome_contract_equipments')
         .select('equipment_id')
@@ -626,13 +653,11 @@ export const entretiensService = {
           .select('equipment_type_id')
           .in('id', equipmentIds);
 
-        // Charger les types d'équipements pour les labels
         const { data: equipTypes } = await supabase
           .from('majordhome_pricing_equipment_types')
           .select('id, label, has_unit_pricing, included_units, unit_label')
           .eq('is_active', true);
 
-        // Charger les tarifs pour la zone du contrat
         const zoneId = contractData.zone_id;
         let rateMap = {};
         if (zoneId) {
@@ -648,7 +673,6 @@ export const entretiensService = {
         const typeMap = {};
         for (const et of equipTypes || []) typeMap[et.id] = et;
 
-        // Grouper par equipment_type_id + calculer prix
         const grouped = {};
         for (const eq of equipments || []) {
           const etId = eq.equipment_type_id;
@@ -660,7 +684,6 @@ export const entretiensService = {
         details = Object.values(grouped).map((g) => {
           const et = typeMap[g.typeId];
           const rate = rateMap[g.typeId];
-          // Chaque équipement = 1 unité complète au prix unitaire
           const basePrice = rate ? parseFloat(rate.price) || 0 : 0;
           const unitPrice = rate ? parseFloat(rate.unit_price) || 0 : 0;
           const pricePerUnit = basePrice > 0 ? basePrice : unitPrice;
@@ -673,18 +696,15 @@ export const entretiensService = {
         });
       }
 
-      // Extraire nom / prénom depuis client_name ("PRENOM NOM")
       const nameParts = (contractData.client_name || '').trim().split(/\s+/);
       const prenom = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : '';
       const nom = nameParts.length > 0 ? nameParts[nameParts.length - 1] : '';
 
-      // Remise label
       const discountPct = parseFloat(contractData.discount_percent) || 0;
       const discountLabel = discountPct > 0
         ? `Remise multi-équipements (-${discountPct}%)`
         : '';
 
-      // Payload au format webhook N8N "Mayer - Entretien Contrat"
       const payload = {
         nom,
         prenom,
