@@ -13,13 +13,12 @@ const DEFAULT_CONFIG = {
   searchRadiusM: 1000,
 };
 
-// Code INSEE de Gaillac — ville par défaut au mount (en attendant le chargement des communes)
-const DEFAULT_CITY_CODE = '81099';
-const DEFAULT_CITY_LAT = 43.9016;
-const DEFAULT_CITY_LNG = 1.8976;
+// P0.20 — Pas de DEFAULT_CITY hardcoded. La ville par défaut vient des settings org
+// (`geogrid_default_city`), ou à défaut de la 1ère grande commune chargée
+// depuis l'API gouv pour le département configuré.
 
 const POPULATION_THRESHOLDS = [
-  { value: 0, label: 'Toutes (314 communes)' },
+  { value: 0, label: 'Toutes' },
   { value: 500, label: '≥ 500 hab' },
   { value: 1000, label: '≥ 1000 hab' },
   { value: 2000, label: '≥ 2000 hab' },
@@ -49,9 +48,9 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const orgDefaultCity = orgSettings.geogrid_default_city || null;
   const orgDepartmentCode = orgSettings.geogrid_department_code || null;
   const orgDepartmentLabel = orgSettings.geogrid_department_label || '';
-  const cityCodeInit = orgDefaultCity?.code || DEFAULT_CITY_CODE;
-  const cityLatInit = orgDefaultCity?.lat ?? DEFAULT_CITY_LAT;
-  const cityLngInit = orgDefaultCity?.lng ?? DEFAULT_CITY_LNG;
+  // cityCodeInit vide si pas de défaut org — sera auto-rempli avec la 1ère
+  // grande commune du département après chargement (cf. useEffect plus bas).
+  const cityCodeInit = orgDefaultCity?.code || '';
 
   const [mode, setMode] = useState('grid'); // 'grid' | 'cities'
   const [config, setConfig] = useState({ ...DEFAULT_CONFIG, businessName: orgBusinessName });
@@ -115,23 +114,24 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
     [communes]
   );
 
-  // Ville sélectionnée (source de vérité). bigCities peut être vide pendant le chargement
-  // → fallback sur les coordonnées de Gaillac codées en dur.
+  // Ville sélectionnée (source de vérité). bigCities peut être vide pendant le chargement.
   const selectedCity = useMemo(
     () => bigCities.find((c) => c.code === selectedCityCode) || null,
     [bigCities, selectedCityCode]
   );
 
-  // Si la ville sélectionnée n'est plus dans la liste après chargement (edge case), fallback sur la 1ère
+  // Auto-sélection : si pas de ville défaut (cityCodeInit vide) ET communes chargées,
+  // prend la 1ère grande ville. Idem si la ville sélectionnée n'est plus dans la liste.
   useEffect(() => {
     if (bigCities.length && !bigCities.some((c) => c.code === selectedCityCode)) {
       setSelectedCityCode(bigCities[0].code);
     }
   }, [bigCities, selectedCityCode]);
 
-  // Coordonnées effectives utilisées pour le scan en mode grille (toujours dérivées de la ville sélectionnée)
-  const gridCenterLat = selectedCity?.lat ?? cityLatInit;
-  const gridCenterLng = selectedCity?.lng ?? cityLngInit;
+  // Coordonnées effectives utilisées pour le scan en mode grille (toujours dérivées
+  // de la ville sélectionnée). Null si aucune ville sélectionnable → bouton désactivé.
+  const gridCenterLat = selectedCity?.lat ?? null;
+  const gridCenterLng = selectedCity?.lng ?? null;
 
   const handleChange = (field, value) => {
     setConfig((prev) => ({ ...prev, [field]: value }));
@@ -179,7 +179,10 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
     : 'bg-green-500';
   const projectedColor = wouldExceed ? 'bg-red-300' : 'bg-green-300';
 
-  const isLaunchBlocked = (wouldExceed && !allowOverage) || (mode === 'cities' && totalPoints === 0);
+  const isLaunchBlocked =
+    (wouldExceed && !allowOverage)
+    || (mode === 'cities' && totalPoints === 0)
+    || (mode === 'grid' && (gridCenterLat == null || gridCenterLng == null));
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg border p-4 space-y-4">
@@ -287,6 +290,9 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
               disabled={loadingCommunes || !bigCities.length}
             >
               {loadingCommunes && <option>Chargement...</option>}
+              {!loadingCommunes && !bigCities.length && (
+                <option>{orgDepartmentCode ? 'Aucune commune ≥ 10 000 hab' : 'Aucun département configuré'}</option>
+              )}
               {bigCities.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.name} ({c.population.toLocaleString('fr-FR')} hab)
@@ -296,6 +302,11 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             {selectedCity && (
               <div className="text-[11px] text-secondary-500 mt-1">
                 Centre : {selectedCity.lat.toFixed(4)}, {selectedCity.lng.toFixed(4)}
+              </div>
+            )}
+            {!orgDepartmentCode && !loadingCommunes && (
+              <div className="text-[11px] text-amber-600 mt-1">
+                ⚠️ Configurez <code>geogrid_department_code</code> dans les settings org pour activer ce module.
               </div>
             )}
           </div>
