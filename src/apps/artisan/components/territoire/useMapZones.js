@@ -7,9 +7,9 @@
  * (le centre le plus rapide en temps de trajet prend le CP)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as turf from '@turf/turf';
-import { TERRITOIRE_CONFIG } from '@/lib/territoire-config';
+import { TERRITOIRE_CONFIG, getTerritoireCenters } from '@/lib/territoire-config';
 import { useAuth } from '@contexts/AuthContext';
 
 // P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
@@ -308,8 +308,12 @@ async function splitOverlapByPostalCodes(overlap, isoG, clippedIsoP, centers, to
  * Calcule les zones territoire Gaillac/Pechbonnieu
  * v2 : découpage par codes postaux au lieu de la bissectrice
  */
-async function calculateZones(token) {
-  const { centers, isochroneMinutes } = TERRITOIRE_CONFIG;
+async function calculateZones(token, centers) {
+  const { isochroneMinutes } = TERRITOIRE_CONFIG;
+  if (!centers || !centers.gaillac || !centers.pechbonnieu) {
+    // P0.19 — pas de centres pour l'org → pas de zones à calculer
+    return null;
+  }
 
   // 1. Récupérer les deux isochrones en parallèle
   let [isoG, isoP] = await Promise.all([
@@ -401,6 +405,13 @@ export function useMapZones(mapboxToken) {
   const orgId = organization?.id;
   const cacheKey = buildCacheKey(orgId);
   const cacheTsKey = buildCacheTsKey(orgId);
+  // P0.19 — centres territoriaux depuis settings org (fallback Mayer si non défini,
+  // mais le composant TerritoireMap gère le cas où orgCenters est vide ou ne
+  // matche pas la convention gaillac/pechbonnieu attendue par calculateZones).
+  const orgCenters = useMemo(
+    () => getTerritoireCenters(organization?.settings),
+    [organization?.settings],
+  );
 
   const [zones, setZones] = useState(null);
   const [isLoading, setLoading] = useState(true);
@@ -410,6 +421,14 @@ export function useMapZones(mapboxToken) {
     if (!mapboxToken) {
       setLoading(false);
       setError('Token Mapbox manquant');
+      return;
+    }
+
+    // Si l'org n'a pas les centres gaillac/pechbonnieu attendus, on ne calcule
+    // pas (zones = null, map affichera juste les points CRM sans overlay).
+    if (!orgCenters?.gaillac || !orgCenters?.pechbonnieu) {
+      setZones(null);
+      setLoading(false);
       return;
     }
 
@@ -427,12 +446,14 @@ export function useMapZones(mapboxToken) {
     }
 
     // Calculer les zones
-    calculateZones(mapboxToken)
+    calculateZones(mapboxToken, orgCenters)
       .then(data => {
         setZones(data);
         try {
-          localStorage.setItem(cacheKey, JSON.stringify(data));
-          localStorage.setItem(cacheTsKey, String(Date.now()));
+          if (data) {
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            localStorage.setItem(cacheTsKey, String(Date.now()));
+          }
         } catch (e) {
           console.warn('[useMapZones] Erreur cache localStorage:', e);
         }
@@ -442,7 +463,7 @@ export function useMapZones(mapboxToken) {
         setError(e.message);
       })
       .finally(() => setLoading(false));
-  }, [mapboxToken, cacheKey, cacheTsKey]);
+  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters]);
 
   const invalidate = useCallback(() => {
     localStorage.removeItem(cacheKey);
@@ -450,17 +471,22 @@ export function useMapZones(mapboxToken) {
     setLoading(true);
     setError(null);
 
-    if (mapboxToken) {
-      calculateZones(mapboxToken)
+    if (mapboxToken && orgCenters?.gaillac && orgCenters?.pechbonnieu) {
+      calculateZones(mapboxToken, orgCenters)
         .then(data => {
           setZones(data);
-          localStorage.setItem(cacheKey, JSON.stringify(data));
-          localStorage.setItem(cacheTsKey, String(Date.now()));
+          if (data) {
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            localStorage.setItem(cacheTsKey, String(Date.now()));
+          }
         })
         .catch(e => setError(e.message))
         .finally(() => setLoading(false));
+    } else {
+      setZones(null);
+      setLoading(false);
     }
-  }, [mapboxToken, cacheKey, cacheTsKey]);
+  }, [mapboxToken, cacheKey, cacheTsKey, orgCenters]);
 
   return { zones, isLoading, error, invalidate };
 }

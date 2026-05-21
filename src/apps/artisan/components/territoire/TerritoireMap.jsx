@@ -15,8 +15,9 @@ import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-import { MAPBOX_CONFIG } from '@/lib/mapbox';
-import { TERRITOIRE_CONFIG, CRM_POINT_TYPES, CONTRACT_COLOR } from '@/lib/territoire-config';
+import { MAPBOX_CONFIG, getMapDefaultCenter } from '@/lib/mapbox';
+import { CRM_POINT_TYPES, CONTRACT_COLOR, getTerritoireCenters } from '@/lib/territoire-config';
+import { useAuth } from '@contexts/AuthContext';
 import MapControls from './MapControls';
 import MapPopup from './MapPopup';
 import MapSearch from './MapSearch';
@@ -40,6 +41,13 @@ export default function TerritoireMap({
   initialZoom = 9,
 }) {
   const navigate = useNavigate();
+  const { organization } = useAuth();
+  const orgCenters = useMemo(
+    () => getTerritoireCenters(organization?.settings),
+    [organization?.settings],
+  );
+  const hasOrgCenters = Object.keys(orgCenters).length > 0;
+
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -115,7 +123,7 @@ export default function TerritoireMap({
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: MAPBOX_CONFIG.style,
-      center: initialCenter || MAPBOX_CONFIG.defaultCenter,
+      center: initialCenter || getMapDefaultCenter(organization?.settings),
       zoom: initialZoom,
       maxBounds: MAPBOX_CONFIG.maxBounds,
       attributionControl: false,
@@ -150,9 +158,8 @@ export default function TerritoireMap({
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    const { centers } = TERRITOIRE_CONFIG;
-
-    Object.entries(centers).forEach(([key, center]) => {
+    // P0.19 — centres territoriaux depuis settings org (fallback {} si non configuré)
+    Object.entries(orgCenters).forEach(([key, center]) => {
       // Créer l'élément HTML du marqueur
       const el = document.createElement('div');
       el.className = 'territoire-center-marker';
@@ -185,7 +192,7 @@ export default function TerritoireMap({
 
       markersRef.current.push(marker);
     });
-  }, [mapLoaded]);
+  }, [mapLoaded, orgCenters]);
 
   // ========================================================================
   // ZONES TERRITOIRE
@@ -203,9 +210,9 @@ export default function TerritoireMap({
       if (map.getSource(id)) map.removeSource(id);
     });
 
-    if (!zones || !showZones) return;
+    if (!zones || !showZones || !hasOrgCenters) return;
 
-    const { centers } = TERRITOIRE_CONFIG;
+    const centers = orgCenters;
 
     // Zone principale (outline pointillé — périmètre global d'intervention)
     if (zones.zone_principale) {
@@ -295,7 +302,7 @@ export default function TerritoireMap({
         });
       }
     });
-  }, [mapLoaded, zones, showZones, onZoneClick]);
+  }, [mapLoaded, zones, showZones, onZoneClick, orgCenters, hasOrgCenters]);
 
   // ========================================================================
   // POINTS CRM (CLUSTERS)

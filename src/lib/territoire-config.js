@@ -30,17 +30,25 @@ export const TERRITOIRE_CONFIG = {
 
 /**
  * P0.19 — Multi-tenant : retourne les centres territoriaux depuis les settings
- * de l'organisation. Fallback Mayer si non configuré.
+ * de l'organisation.
+ *
+ * Pas de fallback Mayer : si l'org n'a pas configuré ses centres, on retourne
+ * un objet vide. Le composant TerritoireMap n'affiche alors aucune zone
+ * (et aucun marker de centre). Évite la fuite cross-org où Cimaj voyait les
+ * zones Gaillac/Pechbonnieu de Mayer (bug 2026-05-21).
+ *
+ * Mayer a ses centres backfillés dans `core.organizations.settings.territoire_centers`
+ * depuis la migration P0.13.
  *
  * @param {Object|null} settings - core.organizations.settings
- * @returns {Object} Map des centres (même shape que TERRITOIRE_CONFIG.centers)
+ * @returns {Object} Map des centres ({} si non configurés)
  */
 export function getTerritoireCenters(settings) {
   const custom = settings?.territoire_centers;
   if (custom && typeof custom === 'object' && Object.keys(custom).length > 0) {
     return custom;
   }
-  return TERRITOIRE_CONFIG.centers;
+  return {};
 }
 
 /**
