@@ -311,7 +311,12 @@ export function CertificatWizard({
 
       // Upload + DB uniquement si on a un certificatId
       if (currentCertId) {
-        const uploadResult = await uploadPdf(client.id, currentCertId, blob);
+        const uploadResult = await uploadPdf({
+          orgId: organization?.id,
+          clientId: client.id,
+          certificatId: currentCertId,
+          pdfBlob: blob,
+        });
         if (uploadResult?.error) {
           throw new Error(uploadResult.error.message || 'Erreur upload PDF');
         }

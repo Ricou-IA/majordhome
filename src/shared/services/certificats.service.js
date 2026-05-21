@@ -181,16 +181,17 @@ export const certificatsService = {
 
   /**
    * Upload le PDF dans le bucket Storage.
-   * Chemin : {client_id}/{year}/{certificat_id}.pdf
+   * Chemin (multi-tenant P0.0.7) : {org_id}/{client_id}/{year}/{certificat_id}.pdf
+   * Le préfixe org_id est exigé par la storage RLS policy.
    */
-  async uploadPdf(clientId, certificatId, pdfBlob) {
-    if (!clientId || !certificatId || !pdfBlob) {
-      return { data: null, error: { message: 'clientId, certificatId et pdfBlob requis' } };
+  async uploadPdf(orgId, clientId, certificatId, pdfBlob) {
+    if (!orgId || !clientId || !certificatId || !pdfBlob) {
+      return { data: null, error: { message: 'orgId, clientId, certificatId et pdfBlob requis' } };
     }
 
     try {
       const year = new Date().getFullYear();
-      const storagePath = `${clientId}/${year}/${certificatId}.pdf`;
+      const storagePath = `${orgId}/${clientId}/${year}/${certificatId}.pdf`;
 
       const { data, error } = await supabase.storage
         .from('certificats')

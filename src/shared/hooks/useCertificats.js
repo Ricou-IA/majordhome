@@ -69,10 +69,10 @@ export function useCertificatMutations() {
     },
   });
 
-  // Upload PDF
+  // Upload PDF — orgId requis depuis P0.0.7 (storage RLS scopée org_id)
   const uploadPdfMutation = useMutation({
-    mutationFn: ({ clientId, certificatId, pdfBlob }) =>
-      certificatsService.uploadPdf(clientId, certificatId, pdfBlob),
+    mutationFn: ({ orgId, clientId, certificatId, pdfBlob }) =>
+      certificatsService.uploadPdf(orgId, clientId, certificatId, pdfBlob),
   });
 
   // Mettre à jour infos PDF
@@ -104,8 +104,8 @@ export function useCertificatMutations() {
     ),
 
     uploadPdf: useCallback(
-      async (clientId, certificatId, pdfBlob) => {
-        const result = await uploadPdfMutation.mutateAsync({ clientId, certificatId, pdfBlob });
+      async ({ orgId, clientId, certificatId, pdfBlob }) => {
+        const result = await uploadPdfMutation.mutateAsync({ orgId, clientId, certificatId, pdfBlob });
         return result;
       },
       [uploadPdfMutation]
