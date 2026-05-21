@@ -105,6 +105,25 @@ function RouteGuard({ resource, action = 'view', children }) {
 // =============================================================================
 // ROUTES CONFIGURATION
 // =============================================================================
+//
+// Sécurité (audit P1.10, 2026-05-21) :
+// - TOUTES les routes ci-dessous sont rendues à l'intérieur de <ProtectedRoute>
+//   + <AppLayout /> (cf. src/App.jsx:163-179). ProtectedRoute exige (a) un user
+//   authentifié, (b) une organization assignée via core.organization_members
+//   (garde réactivée en P0.7 — 2026-05-21).
+// - Pas de route artisan accessible sans auth + org.
+// - Le <RouteGuard resource="..."> ajoute une couche de permission fine
+//   (consume `majordhome.role_permissions` via useCanAccess). Posé sur
+//   pipeline / settings / chantiers / tasks / cedants / prospection_commerciale /
+//   mailing / meta_ads / geogrid. Les routes "core métier" (clients, planning,
+//   entretiens, contrats, profile, territoire, intervention/:id, certificat/:id,
+//   contrat/signer) sont accessibles à tout user authentifié de l'org, et la
+//   RLS DB scope ce qu'ils voient — pas un trou de sécurité.
+// - Dette résiduelle : on pourrait ajouter RouteGuard fin (par resource) sur
+//   les routes métier pour blocer en amont l'accès UI (UX). À faire si on
+//   définit des resources granulaires côté permissions DB.
+//
+// =============================================================================
 
 export const artisanRoutes = [
   {

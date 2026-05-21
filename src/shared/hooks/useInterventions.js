@@ -316,7 +316,11 @@ const AUTOSAVE_INTERVAL = 30_000; // 30 secondes
  * @returns {Object} { draft, saveDraft, clearDraft, hasDraft, lastSaved }
  */
 export function useInterventionDraft(interventionId) {
-  const storageKey = `${DRAFT_PREFIX}${interventionId}`;
+  // P1.9 — clé localStorage suffixée par userId (draft personnel, ne doit
+  // pas leaker à un autre user qui se connecterait sur le même device).
+  const { user } = useAuth();
+  const userId = user?.id || 'anon';
+  const storageKey = `${DRAFT_PREFIX}${userId}_${interventionId}`;
   const [lastSaved, setLastSaved] = useState(null);
   const draftRef = useRef(null);
   const intervalRef = useRef(null);

@@ -370,13 +370,32 @@ export async function geocodeLeadAddress(address, postalCode, city) {
 /**
  * Détecte la zone commerciale (gaillac/pechbonnieu) à partir de coordonnées
  * Utilise les polygones zones cachés dans localStorage par useMapZones
+ *
+ * P1.9 — clé localStorage suffixée par orgId. Si orgId n'est pas fourni,
+ * fallback : itère sur les clés `territoire-zones-v8:*` du localStorage
+ * et prend la première (cas mono-org Mayer aujourd'hui).
+ *
  * @param {number} lat
  * @param {number} lng
+ * @param {string} [orgId] - UUID de l'org pour lookup ciblé du cache
  * @returns {'gaillac' | 'pechbonnieu' | null}
  */
-export function detectLeadZone(lat, lng) {
+export function detectLeadZone(lat, lng, orgId) {
   try {
-    const cached = localStorage.getItem('mayer-territoire-zones-v8');
+    let cached = null;
+    if (orgId) {
+      cached = localStorage.getItem(`territoire-zones-v8:${orgId}`);
+    }
+    if (!cached) {
+      // Fallback : chercher la première clé territoire-zones-v8:* présente
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('territoire-zones-v8:')) {
+          cached = localStorage.getItem(k);
+          if (cached) break;
+        }
+      }
+    }
     if (!cached) {
       console.warn('[geocoding] Zones non disponibles en cache — zone non détectée');
       return null;

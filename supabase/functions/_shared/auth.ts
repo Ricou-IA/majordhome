@@ -33,17 +33,55 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, x-app-name, apikey, content-type",
-};
+// P1.5 — CORS restrictif : whitelist d'origines via FRONTEND_ORIGINS env var
+// (CSV). Fallback "*" si la var est vide (dev local). En prod, la var doit
+// contenir les origines Vercel + custom domains autorisés.
+const FRONTEND_ORIGINS = (Deno.env.get("FRONTEND_ORIGINS") || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-export function jsonResponse(body: unknown, status = 200): Response {
+function pickAllowedOrigin(req: Request): string {
+  if (FRONTEND_ORIGINS.length === 0) return "*"; // dev fallback
+  const origin = req.headers.get("Origin") || "";
+  return FRONTEND_ORIGINS.includes(origin) ? origin : FRONTEND_ORIGINS[0];
+}
+
+export function buildCorsHeaders(req?: Request): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": req ? pickAllowedOrigin(req) : "*",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, x-app-name, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
+
+// Kept for backward compat — équivalent à buildCorsHeaders() sans req (renvoie "*").
+export const corsHeaders = buildCorsHeaders();
+
+export function jsonResponse(body: unknown, status = 200, req?: Request): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...buildCorsHeaders(req), "Content-Type": "application/json" },
   });
+}
+
+// P1.4 — sanitizeError : strip stack traces + secrets en prod.
+// En dev (Deno.env.get("DENO_ENV") !== "production"), retourne le message complet.
+export function sanitizeError(err: unknown, fallback = "Internal error"): string {
+  const isProd = (Deno.env.get("DENO_ENV") || Deno.env.get("ENVIRONMENT") || "").toLowerCase() === "production";
+  if (err instanceof Error) {
+    if (isProd) {
+      // Strip stack + paths sensibles
+      const msg = err.message || fallback;
+      return msg
+        .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer ***")
+        .replace(/(eyJ[A-Za-z0-9._-]+)/g, "***jwt***")
+        .replace(/(\w+_SECRET=)[^\s,]+/gi, "$1***");
+    }
+    return `${err.message}${err.stack ? "\n" + err.stack : ""}`;
+  }
+  return isProd ? fallback : String(err);
 }
 
 export function getAdminClient(): SupabaseClient {

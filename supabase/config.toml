@@ -1,0 +1,69 @@
+# supabase/config.toml — Configuration versioning Supabase
+# ============================================================================
+# P1.6 (2026-05-21) — Versionne la config `verify_jwt` des edge functions
+# pour éviter les drifts entre prod (réglée via dashboard Supabase ou MCP
+# deploy_edge_function) et le repo. Si une edge est redéployée sans passer
+# `verify_jwt` au MCP, la valeur de cette config est appliquée.
+#
+# Référence : https://supabase.com/docs/guides/functions/secrets#config-toml
+# ============================================================================
+
+project_id = "odspcxgafcqxjzrarsqf"
+
+# ============================================================================
+# Edge functions — configuration verify_jwt
+# ============================================================================
+
+# Webhooks tiers (Svix HMAC / signature custom) : pas de JWT
+[functions.resend-webhook]
+verify_jwt = false
+
+[functions.mailing-unsubscribe]
+verify_jwt = false
+
+[functions.avis-redirect]
+verify_jwt = false
+
+# OAuth callbacks Google : pas de JWT (state HMAC validé en interne)
+[functions.gsc-oauth-callback]
+verify_jwt = false
+
+# Crons N8n / job one-shot — protégés par MDH_CRON_SECRET (P0.2)
+[functions.pennylane-sync-cron]
+verify_jwt = false
+
+[functions.pennylane-backfill-quotes]
+verify_jwt = false
+
+# Voice — protégée par MDH_CRON_SECRET (P0.6)
+[functions.voice-extract-fieldreport]
+verify_jwt = false
+
+# GeoGrid scan — protégée par MDH_CRON_SECRET (P0.2-like)
+[functions.geogrid-scan]
+verify_jwt = false
+
+# Edges appelées par le frontend authentifié (JWT user)
+[functions.pennylane-proxy]
+verify_jwt = true
+
+[functions.gsc-oauth-init]
+verify_jwt = true
+
+[functions.gsc-sync]
+verify_jwt = true
+
+[functions.mailing-send]
+verify_jwt = true
+
+[functions.contract-signed-notify]
+verify_jwt = true
+
+[functions.invite-client]
+verify_jwt = true
+
+[functions.transcribe-dictation]
+verify_jwt = true
+
+[functions.meeting-extract]
+verify_jwt = true

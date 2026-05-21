@@ -10,9 +10,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as turf from '@turf/turf';
 import { TERRITOIRE_CONFIG } from '@/lib/territoire-config';
+import { useAuth } from '@contexts/AuthContext';
 
-const CACHE_KEY = 'mayer-territoire-zones-v8';
-const CACHE_TS_KEY = 'mayer-territoire-zones-v8-at';
+// P1.9 — clés localStorage suffixées par orgId pour éviter fuite cross-org
+// au switch d'organisation (multi-tenant futur).
+const CACHE_KEY_BASE = 'territoire-zones-v8';
+const CACHE_TS_KEY_BASE = 'territoire-zones-v8-at';
+const buildCacheKey = (orgId) => `${CACHE_KEY_BASE}:${orgId || 'noorg'}`;
+const buildCacheTsKey = (orgId) => `${CACHE_TS_KEY_BASE}:${orgId || 'noorg'}`;
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 jours
 
 // ============================================================================
@@ -392,6 +397,11 @@ async function calculateZones(token) {
 // ============================================================================
 
 export function useMapZones(mapboxToken) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const cacheKey = buildCacheKey(orgId);
+  const cacheTsKey = buildCacheTsKey(orgId);
+
   const [zones, setZones] = useState(null);
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -405,8 +415,8 @@ export function useMapZones(mapboxToken) {
 
     // Vérifier le cache localStorage
     try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      const cachedAt = localStorage.getItem(CACHE_TS_KEY);
+      const cached = localStorage.getItem(cacheKey);
+      const cachedAt = localStorage.getItem(cacheTsKey);
       if (cached && cachedAt && Date.now() - Number(cachedAt) < CACHE_TTL) {
         setZones(JSON.parse(cached));
         setLoading(false);
@@ -421,8 +431,8 @@ export function useMapZones(mapboxToken) {
       .then(data => {
         setZones(data);
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-          localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+          localStorage.setItem(cacheKey, JSON.stringify(data));
+          localStorage.setItem(cacheTsKey, String(Date.now()));
         } catch (e) {
           console.warn('[useMapZones] Erreur cache localStorage:', e);
         }
@@ -432,11 +442,11 @@ export function useMapZones(mapboxToken) {
         setError(e.message);
       })
       .finally(() => setLoading(false));
-  }, [mapboxToken]);
+  }, [mapboxToken, cacheKey, cacheTsKey]);
 
   const invalidate = useCallback(() => {
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(CACHE_TS_KEY);
+    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(cacheTsKey);
     setLoading(true);
     setError(null);
 
@@ -444,13 +454,13 @@ export function useMapZones(mapboxToken) {
       calculateZones(mapboxToken)
         .then(data => {
           setZones(data);
-          localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-          localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+          localStorage.setItem(cacheKey, JSON.stringify(data));
+          localStorage.setItem(cacheTsKey, String(Date.now()));
         })
         .catch(e => setError(e.message))
         .finally(() => setLoading(false));
     }
-  }, [mapboxToken]);
+  }, [mapboxToken, cacheKey, cacheTsKey]);
 
   return { zones, isLoading, error, invalidate };
 }
