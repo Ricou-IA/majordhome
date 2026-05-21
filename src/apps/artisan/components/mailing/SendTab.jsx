@@ -4,18 +4,21 @@ import { Send, FlaskConical, Loader2, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useAuth } from '@contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import CampaignIdentityPanel from './CampaignIdentityPanel';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
 import { useMailSegments, useSegmentCount } from '@hooks/useMailSegments';
-import { mailSegmentsService } from '@services/mailSegments.service';
 
 /**
  * Onglet Envoi — sélection de campagne + segment + preview + envoi.
  * Campagnes et segments sont chargés depuis la DB (mail_campaigns + mail_segments).
+ *
+ * P0.8 V2 — L'envoi passe par l'edge function `mailing-send` (Supabase) au lieu
+ * du webhook N8n public. Le SQL est compilé + exécuté côté serveur via la RPC
+ * `mail_fetch_recipients` qui inclut un check membership multi-tenant.
  */
 export default function SendTab() {
   const { organization } = useAuth();
-  const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_MAILING;
   const orgId = organization?.id;
 
   const { campaigns: allCampaigns, isLoading: campaignsLoading } = useMailCampaigns(orgId);
@@ -85,47 +88,42 @@ export default function SendTab() {
     if (!iframeRef.current) return;
     const doc = iframeRef.current.contentDocument;
     if (!doc) return;
-    doc.open();
-    doc.write((htmlBody || '').replace(/\{\{SALUTATION\}\}/g, 'Bonjour Jean Dupont,'));
-    doc.close();
-  }, [htmlBody]);
-
-  const buildPayload = useCallback(async (isTest = false) => {
-    if (!segment) return null;
-    // P0.8 — Le SQL est compilé côté serveur via la RPC mail_segment_compile
-    // qui inclut un check membership (auth.uid() ∈ org_members). Un attaquant
-    // ne peut donc pas obtenir un SQL pour une autre organisation depuis le
-    // frontend. On envoie aussi `segment_id` pour la future bascule N8n
-    // (cf. P0.8 V2 — workflow doit n'accepter que segment_id et appeler la
-    // RPC `mail_segment_compile_safe` côté serveur).
-    const { data: compiledSql, error } = await mailSegmentsService.compileSql({
-      filters: segment.filters,
-      campaignName: campaignLabel,
-      orgId,
-    });
-    if (error) throw error;
-    const sql = compiledSql ? `${String(compiledSql).replace(/;?\s*$/, '')};` : '';
-    const recipientType = segment.audience === 'leads' ? 'lead' : 'client';
-    return {
-      subject,
-      html_body: htmlBody,
-      segment_sql: sql,
-      segment_id: segment.id,   // futur switch N8n
-      campaign_name: campaignLabel,
-      org_id: orgId,
-      recipient_type: recipientType,
-      tracking_column: 'emailing_reprise_sent_at',
-      tracking_type_column: 'emailing_reprise_type',
-      tracking_type_value: campaign?.tracking_type_value || '',
-      ...(isTest && testEmail ? { test_email: testEmail } : {}),
+    // Substitutions alignées avec l'edge mailing-send pour que la preview reflète
+    // le rendu final reçu par les destinataires (squelette + placeholders).
+    const s = (organization?.settings ?? {});
+    const contactEmail = s.from_email || s.reply_to || 'contact@mayer-energie.fr';
+    const replacements = {
+      '{{SALUTATION}}': 'Bonjour Jean Dupont,',
+      '{{CLIENT_NAME}}': 'Jean Dupont',
+      '{{BRAND_NAME}}': s.brand_name || "Majord'home",
+      '{{ORG_EMAIL}}': contactEmail,
+      '{{ORG_PHONE}}': s.phone || '',
+      '{{ORG_ADDRESS}}': s.address || '',
+      '{{ORG_POSTAL_CODE}}': s.postal_code || '',
+      '{{ORG_CITY}}': s.city || '',
+      '{{ORG_WEBSITE_URL}}': s.website_url || '',
+      '{{ACCENT_COLOR}}': s.accent_color || '#f97316',
+      '{{SECONDARY_COLOR}}': s.secondary_color || '#1E4D8C',
+      '{{EMAIL_TAGLINE}}': s.email_tagline || '',
+      '{{LOGO_URL}}': s.logo_url || '',
     };
-  }, [segment, subject, htmlBody, campaignLabel, orgId, campaign, testEmail]);
-
-  const sendToWebhook = useCallback(async (isTest = false) => {
-    if (!webhookUrl) {
-      toast.error('Variable VITE_N8N_WEBHOOK_MAILING non configurée');
-      return;
+    // Wrap dans le squelette commun si défini ET le template ne contient pas
+    // déjà un HTML complet (rétrocompat templates legacy).
+    const rawBody = htmlBody || '';
+    const isLegacyFullHtml = /<!doctype/i.test(rawBody) || /<html[\s>]/i.test(rawBody);
+    const skeleton = s.email_skeleton_html;
+    let rendered = (skeleton && !isLegacyFullHtml)
+      ? skeleton.split('{{EMAIL_BODY}}').join(rawBody)
+      : rawBody;
+    for (const [key, value] of Object.entries(replacements)) {
+      rendered = rendered.split(key).join(value);
     }
+    doc.open();
+    doc.write(rendered);
+    doc.close();
+  }, [htmlBody, organization]);
+
+  const sendCampaign = useCallback(async (isTest = false) => {
     if (isTest && !testEmail) {
       toast.error('Renseigne un email de test');
       return;
@@ -139,59 +137,45 @@ export default function SendTab() {
       return;
     }
 
+    const body = {
+      mode: 'bulk',
+      segment_id: segment.id,
+      subject,
+      html_body: htmlBody,
+      campaign_name: campaignLabel,
+      ...(isTest ? { test_email: testEmail } : {}),
+    };
+
     setSending(true);
     try {
-      const payload = await buildPayload(isTest);
-      if (!payload) throw new Error('Payload invalide');
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
-      let response;
-      try {
-        response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
+      // Pour les envois bulk, l'edge function peut prendre plusieurs minutes
+      // (boucle séquentielle sur 500+ destinataires). On affiche un succès
+      // immédiat sans attendre la fin — l'envoi continue côté serveur.
+      // Pour les tests (1 destinataire), on attend la vraie réponse.
+      if (!isTest) {
+        // Fire-and-forget : on n'attend pas la fin de la boucle d'envoi
+        supabase.functions.invoke('mailing-send', { body }).catch((err) => {
+          console.error('[mailing-send] background error:', err);
         });
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          toast.success(
-            isTest
-              ? `Test envoyé à ${testEmail}`
-              : `Campagne lancée ! L'envoi des ${recipientCount ?? ''} mails se poursuit en arrière-plan.`
-          );
-          setShowConfirm(false);
-          return;
-        }
-        throw err;
-      } finally {
-        clearTimeout(timeout);
+        toast.success(
+          `Campagne lancée ! L'envoi des ${recipientCount ?? ''} mails se poursuit en arrière-plan.`
+        );
+        setShowConfirm(false);
+        return;
       }
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      let result = {};
-      try {
-        const text = await response.text();
-        if (text) result = JSON.parse(text);
-      } catch {
-        // Réponse non-JSON, on ignore
-      }
-
-      toast.success(
-        isTest
-          ? `Test envoyé à ${testEmail}`
-          : `Campagne lancée ! ${result.message || ''}`
-      );
+      // Mode test : on attend
+      const { data, error } = await supabase.functions.invoke('mailing-send', { body });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Échec envoi test');
+      toast.success(`Test envoyé à ${testEmail}`);
       setShowConfirm(false);
     } catch (err) {
       toast.error(`Erreur : ${err.message}`);
     } finally {
       setSending(false);
     }
-  }, [webhookUrl, testEmail, buildPayload, recipientCount, subject, segment]);
+  }, [segment, subject, htmlBody, campaignLabel, testEmail, recipientCount]);
 
   if (campaignsLoading || segmentsLoading) {
     return (
@@ -296,7 +280,7 @@ export default function SendTab() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={() => sendToWebhook(true)} disabled={sending || !testEmail}>
+              <Button variant="secondary" onClick={() => sendCampaign(true)} disabled={sending || !testEmail}>
                 {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FlaskConical className="w-4 h-4 mr-2" />}
                 Envoyer test
               </Button>
@@ -327,7 +311,7 @@ export default function SendTab() {
         description={`Tu es sur le point d'envoyer la campagne "${campaignLabel}" au segment "${segment?.name || '?'}" (${recipientCount ?? '?'} destinataires). Cette action est irréversible.`}
         confirmLabel="Lancer l'envoi"
         variant="default"
-        onConfirm={() => sendToWebhook(false)}
+        onConfirm={() => sendCampaign(false)}
         loading={sending}
       />
     </>

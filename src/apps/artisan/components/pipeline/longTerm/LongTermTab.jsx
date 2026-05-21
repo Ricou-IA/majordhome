@@ -30,7 +30,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLongTermLeads, useLeadInteractionMutations } from '@hooks/useLeadInteractions';
 import { useLeadCommercials } from '@hooks/useLeads';
-import { formatEuro } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 import { computeFreshness, formatShortDate } from './longTermUtils';
 import { LongTermLeadDrawer } from './LongTermLeadDrawer';
 import { AddInteractionModal } from './AddInteractionModal';
@@ -317,7 +317,7 @@ export function LongTermTab() {
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <span className={`font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-                          {formatEuro(amount)}
+                          {formatEuroCeil(amount)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">

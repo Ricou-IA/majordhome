@@ -140,6 +140,11 @@ Deno.serve(async (req: Request) => {
     const fromName = settings.from_name || brandName;
     const replyTo = settings.reply_to || fromEmail;
     const accentColor = settings.accent_color || "#f97316";
+    const secondaryColor = settings.secondary_color || "#1E4D8C";
+    const emailTagline = settings.email_tagline || "";
+    const logoUrl = settings.logo_url || "";
+    const websiteUrl = settings.website_url || "";
+    const emailSkeleton = settings.email_skeleton_html || null;
 
     if (!fromEmail) {
       return json(
@@ -181,7 +186,14 @@ Deno.serve(async (req: Request) => {
     const pdfBuffer = await pdfBlob.arrayBuffer();
     const pdfBase64 = arrayBufferToBase64(pdfBuffer);
 
-    // 5) Remplacement placeholders
+    // 5) Wrap dans le squelette commun si défini, puis remplacement placeholders.
+    // Skip wrap si le template contient déjà un HTML complet (rétrocompat).
+    const rawBody = template.html_body || "";
+    const isLegacyFullHtml = /<!doctype/i.test(rawBody) || /<html[\s>]/i.test(rawBody);
+    const wrappedBody = (emailSkeleton && !isLegacyFullHtml)
+      ? emailSkeleton.replace("{{EMAIL_BODY}}", rawBody)
+      : rawBody;
+
     const replacements: Record<string, string> = {
       "{{CLIENT_NAME}}": contract.client_name || "cher client",
       "{{BRAND_NAME}}": brandName ?? "",
@@ -190,11 +202,15 @@ Deno.serve(async (req: Request) => {
       "{{ORG_ADDRESS}}": settings.address || "",
       "{{ORG_POSTAL_CODE}}": settings.postal_code || "",
       "{{ORG_CITY}}": settings.city || "",
+      "{{ORG_WEBSITE_URL}}": websiteUrl,
       "{{ACCENT_COLOR}}": accentColor,
+      "{{SECONDARY_COLOR}}": secondaryColor,
+      "{{EMAIL_TAGLINE}}": emailTagline,
+      "{{LOGO_URL}}": logoUrl,
     };
 
     const subject = applyPlaceholders(template.subject || "", replacements);
-    const htmlBody = applyPlaceholders(template.html_body || "", replacements);
+    const htmlBody = applyPlaceholders(wrappedBody, replacements);
 
     // 6) Envoi via Resend
     const resendPayload = {

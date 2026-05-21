@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@components/ui/card';
 import { Users, CalendarCheck, Trophy, Euro } from 'lucide-react';
-import { formatEuro } from '@lib/utils';
+import { formatEuroCeil } from '@lib/utils';
 
 const CARD_CONFIG = [
   {
@@ -30,7 +30,7 @@ const CARD_CONFIG = [
     getSub: (d) => {
       const parts = [];
       if (d.totalLeads > 0) parts.push(`${d.conversionVente.toFixed(1)}% conv.`);
-      if (d.ticketMoyen > 0) parts.push(`TM ${formatEuro(d.ticketMoyen)}`);
+      if (d.ticketMoyen > 0) parts.push(`TM ${formatEuroCeil(d.ticketMoyen)}`);
       return parts.length > 0 ? parts.join(' · ') : null;
     },
     subColor: 'text-emerald-600',
@@ -40,7 +40,7 @@ const CARD_CONFIG = [
     title: 'CA HT',
     icon: Euro,
     iconBg: 'bg-indigo-500',
-    getValue: (d) => formatEuro(d.revenue),
+    getValue: (d) => formatEuroCeil(d.revenue),
     getSub: () => null,
   },
 ];

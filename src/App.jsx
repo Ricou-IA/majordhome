@@ -19,6 +19,10 @@ import { artisanRoutes } from '@apps/artisan/routes';
 import { clientRoutes } from '@apps/client/routes';
 const ClientLayout = lazy(() => import('@apps/client/layouts/ClientLayout'));
 
+// Routes module Voice (PWA compte-rendu vocal)
+import { voiceRoutes } from '@apps/voice/routes';
+const VoiceLayout = lazy(() => import('@apps/voice/layouts/VoiceLayout'));
+
 // Pages utilitaires
 import NotFound from '@pages/NotFound';
 import Unauthorized from '@pages/Unauthorized';
@@ -113,6 +117,36 @@ export default function App() {
         }
       >
         {clientRoutes.map((route, index) => (
+          <Route
+            key={index}
+            index={route.index}
+            path={route.path}
+            element={route.element}
+          />
+        ))}
+      </Route>
+
+      {/* ===================================================================
+          PWA VOICE (auth requis, layout fullscreen, whitelist via VoiceAccessGate)
+          =================================================================== */}
+
+      <Route
+        path="/voice"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="min-h-screen flex items-center justify-center bg-secondary-900">
+                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                </div>
+              }
+            >
+              <VoiceLayout />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      >
+        {voiceRoutes.map((route, index) => (
           <Route
             key={index}
             index={route.index}

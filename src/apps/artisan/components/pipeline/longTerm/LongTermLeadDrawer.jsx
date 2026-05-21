@@ -28,7 +28,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatEuro } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   useLeadInteractions,
@@ -244,7 +244,7 @@ export function LongTermLeadDrawer({
               <h2 className="text-xl font-bold text-gray-900 truncate">{name}</h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
                 <span className={`font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-                  {formatEuro(amount)}
+                  {formatEuroCeil(amount)}
                 </span>
                 {lead.source_name && (
                   <span className="inline-flex items-center gap-1 text-xs">

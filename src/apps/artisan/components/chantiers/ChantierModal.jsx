@@ -13,17 +13,17 @@ import { useNavigate } from 'react-router-dom';
 import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatEuro } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 import { getDrivingFromAddress } from '@/lib/zoneDetection';
 import {
   CHANTIER_TRANSITIONS,
   getChantierStatusConfig,
+  getChantierAmount,
   chantiersService,
 } from '@services/chantiers.service';
 import { interventionsService } from '@services/interventions.service';
 import { useChantierMutations, useInterventionSlots } from '@hooks/useChantiers';
 import { useTeamMembers } from '@hooks/useAppointments';
-import { usePennylaneQuoteLines } from '@hooks/usePennylane';
 import { contractsService } from '@services/contracts.service';
 import { supabase } from '@/lib/supabaseClient';
 import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFields';
@@ -67,9 +67,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [parentIntervention, setParentIntervention] = useState(null);
   const [loadingParent, setLoadingParent] = useState(true);
 
-  // Devis Pennylane lié — pour récupérer le montant HT validé (cache partagé
-  // avec ChantierReceptionSection via React Query, donc 1 seul appel réseau)
-  const { quote: pennylaneQuote } = usePennylaneQuoteLines(chantier?.pennylane_quote_id);
 
   // Trajet depuis le siège (Gaillac) — calcul Mapbox idempotent (cache module)
   const [drivingInfo, setDrivingInfo] = useState(null);
@@ -141,9 +138,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       ? allTransitions
       : [];
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
-  // Priorité au montant HT du devis Pennylane validé (source de vérité quand devis lié) ;
-  // sinon fallback sur estimation pipeline (order_amount_ht / estimated_revenue)
-  const amount = Number(pennylaneQuote?.amount_ht) || Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
+  const amount = getChantierAmount(chantier);
 
   const handleEstimatedDateChange = async (val) => {
     setEstimatedDate(val);
@@ -307,7 +302,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               <span>{name}</span>
               {amount > 0 && (
                 <span className="ml-auto text-sm font-semibold text-emerald-700">
-                  {formatEuro(amount)}
+                  {formatEuroCeil(amount)}
                 </span>
               )}
             </div>

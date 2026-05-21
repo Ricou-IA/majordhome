@@ -392,7 +392,6 @@ async function getQuotesByClient(clientId, orgId) {
   }
 
   if (pageCount === MAX_PAGES && hasMore) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[pennylane.getQuotesByClient] reached MAX_PAGES=${MAX_PAGES}, some quotes may be missing for plCustomerId=${plCustomerId}`,
     );
@@ -617,7 +616,6 @@ async function getInvoicesByClient(clientId, orgId) {
   }
 
   if (pageCount === MAX_PAGES && hasMore) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[pennylane.getInvoicesByClient] reached MAX_PAGES=${MAX_PAGES}, some invoices may be missing for plCustomerId=${plCustomerId}`,
     );
@@ -660,6 +658,61 @@ async function getLedgerAccounts() {
 }
 
 // ============================================================================
+// LIAISON LEAD ↔ DEVIS PENNYLANE (multi-devis par chantier)
+// ============================================================================
+
+/**
+ * Liste les devis Pennylane liés à un lead (chantier), actifs uniquement.
+ * Triés par date de devis desc (le plus récent en haut).
+ */
+async function getLinkedQuotesByLead(leadId) {
+  const { data, error } = await supabase
+    .from('majordhome_lead_pennylane_quotes')
+    .select('id, lead_id, pennylane_quote_id, quote_amount_ht, quote_label, quote_date, quote_status, assigned_at')
+    .eq('lead_id', leadId)
+    .is('ejected_at', null)
+    .order('quote_date', { ascending: false, nullsFirst: false })
+    .order('assigned_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Lie un devis Pennylane à un lead via la RPC SECURITY DEFINER.
+ * @param {string} orgId
+ * @param {number|string} pennylaneQuoteId — id PL (bigint)
+ * @param {string} leadId
+ * @param {object} [quoteData] — métadonnées (label, amount_ht, date, status, customer_id)
+ * @returns {Promise<object>} action: 'inserted' | 'already_assigned' | 'moved'
+ */
+async function assignQuoteToLead(orgId, pennylaneQuoteId, leadId, quoteData = null) {
+  const { data, error } = await supabase.rpc('assign_pennylane_quote_to_lead', {
+    p_org_id: orgId,
+    p_quote_pl_id: Number(pennylaneQuoteId),
+    p_target_lead_id: leadId,
+    p_quote_data: quoteData,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Détache (soft-delete) un devis Pennylane d'un lead.
+ * @param {string} orgId
+ * @param {number|string} pennylaneQuoteId
+ * @param {string} [reason]
+ */
+async function ejectQuoteFromLead(orgId, pennylaneQuoteId, reason = null) {
+  const { data, error } = await supabase.rpc('eject_pennylane_quote', {
+    p_org_id: orgId,
+    p_quote_pl_id: Number(pennylaneQuoteId),
+    p_reason: reason,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// ============================================================================
 // EXPORT
 // ============================================================================
 
@@ -686,6 +739,11 @@ export const pennylaneService = {
 
   // Sync table
   getSyncRecord: (orgId, entityType, localId) => withErrorHandling(() => getSyncRecord(orgId, entityType, localId), 'pennylane.getSyncRecord'),
+
+  // Liaison lead ↔ devis (multi-devis par chantier)
+  getLinkedQuotesByLead: (leadId) => withErrorHandling(() => getLinkedQuotesByLead(leadId), 'pennylane.getLinkedQuotesByLead'),
+  assignQuoteToLead: (orgId, pennylaneQuoteId, leadId, quoteData) => withErrorHandling(() => assignQuoteToLead(orgId, pennylaneQuoteId, leadId, quoteData), 'pennylane.assignQuoteToLead'),
+  ejectQuoteFromLead: (orgId, pennylaneQuoteId, reason) => withErrorHandling(() => ejectQuoteFromLead(orgId, pennylaneQuoteId, reason), 'pennylane.ejectQuoteFromLead'),
 
   // Mappings (exportés pour usage externe)
   TVA_MAPPING,

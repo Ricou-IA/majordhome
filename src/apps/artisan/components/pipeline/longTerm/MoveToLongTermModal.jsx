@@ -11,7 +11,7 @@
 import { useState, useEffect } from 'react';
 import { Hourglass, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatEuro } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 
 export function MoveToLongTermModal({
   isOpen,
@@ -66,7 +66,7 @@ export function MoveToLongTermModal({
           <div className="flex items-center justify-between">
             <p className="font-medium text-gray-900">{name}</p>
             <span className={`text-sm font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-              {formatEuro(amount)}
+              {formatEuroCeil(amount)}
             </span>
           </div>
           {lead.city && (

@@ -1,49 +1,58 @@
 /**
  * ChantierReceptionSection.jsx — Majord'home Artisan
  * ============================================================================
- * Section "Réception marchandise" dans la fiche chantier.
+ * Section "Gestion des Appro" dans la fiche chantier (multi-devis).
  *
  * 2 états :
- *  - Pas de devis Pennylane lié → bouton "Lier un devis Pennylane"
- *  - Devis lié → header collapsible + bandeau devis + tableau lignes inline
- *               (saisie qty + bouton Valider directement sur la ligne,
- *                "+ détails" pour date/notes optionnels) + historique
+ *  - Aucun devis lié → bouton "Lier un devis Pennylane"
+ *  - ≥1 devis lié → header collapsible avec compteur détaillé par devis
+ *                 + 1 bloc par devis (bandeau + tableau lignes inline)
+ *                 + footer "+ Ajouter un devis"
+ *
+ * Source de vérité : vue majordhome_lead_pennylane_quotes (FK direct
+ * leads.pennylane_quote_id ignoré côté UI).
  *
  * Pilote chantier_status via la RPC chantier_recompute_order_status :
- *  - Toutes les lignes 100% reçues → 'commande_recue'
+ *  - Toutes les lignes de tous les devis 100% reçues → 'commande_recue'
  *  - Sinon → 'commande_a_faire' (uniquement si actuellement 'commande_recue')
  *
- * @version 2.0.0 — refonte UX (collapse global + inline edit)
+ * @version 3.0.0 — multi-devis par chantier
  * ============================================================================
  */
 
-import { Fragment, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Package,
   FileText,
-  ExternalLink,
   Loader2,
   Trash2,
   ChevronDown,
   ChevronRight,
   Link2,
   AlertCircle,
-  Check,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatEuro, formatDateShortFR, formatDateForInput } from '@/lib/utils';
-import { usePennylaneQuoteLines } from '@hooks/usePennylane';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatDateShortFR, formatDateForInput } from '@/lib/utils';
+import {
+  useMultiplePennylaneQuoteLines,
+  useLinkedPennylaneQuotes,
+  useLinkedPennylaneQuotesMutations,
+} from '@hooks/usePennylane';
 import { useChantierReceptions } from '@hooks/useChantierReceptions';
 import { LinkPennylaneQuoteModal } from './LinkPennylaneQuoteModal';
+import { QuoteBlock } from './QuoteBlock';
 
 export function ChantierReceptionSection({ chantier, onUpdated, disabled = false }) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-
-  // Collapse global du bloc (éphémère, reset à chaque ouverture du modal)
   const [globalExpanded, setGlobalExpanded] = useState(false);
 
-  // Inline edit state — qty drafts par ligne + détails (date/notes) sur 1 ligne max
+  // Inline edit state — qty drafts par ligne PL + détails (date/notes) sur 1 ligne max
   const [qtyDrafts, setQtyDrafts] = useState({}); // { [lineId]: '12' }
   const [expandedDetailsLineId, setExpandedDetailsLineId] = useState(null);
   const [detailsDraft, setDetailsDraft] = useState({
@@ -51,15 +60,24 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     notes: '',
   });
 
-  const pennylaneQuoteId = chantier?.pennylane_quote_id ?? null;
-
+  // Devis liés au chantier (source de vérité = pivot lead_pennylane_quotes)
   const {
-    quote,
-    lines,
+    linkedQuotes,
+    isLoading: isLoadingLinks,
+  } = useLinkedPennylaneQuotes(chantier?.id);
+
+  const { ejectQuote, isEjecting } = useLinkedPennylaneQuotesMutations(orgId, chantier?.id);
+
+  // Charge en parallèle les lignes de tous les devis liés
+  const linkedQuoteIds = useMemo(
+    () => (linkedQuotes || []).map((q) => q.pennylane_quote_id),
+    [linkedQuotes]
+  );
+  const {
+    resultsById: linesByQuote,
     isLoading: isLoadingLines,
-    error: linesError,
-    refetch: refetchLines,
-  } = usePennylaneQuoteLines(pennylaneQuoteId);
+    isError: linesError,
+  } = useMultiplePennylaneQuoteLines(linkedQuoteIds);
 
   const {
     receptions,
@@ -70,41 +88,84 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     isDeleting,
   } = useChantierReceptions(chantier?.id);
 
-  // Lignes enrichies avec qty reçue + reste
-  const enrichedLines = useMemo(() => {
-    return (lines || []).map((line) => {
-      const lineReceptions = (receptions || []).filter(
-        (r) => Number(r.pennylane_line_id) === Number(line.id)
-      );
-      const received = lineReceptions.reduce(
-        (sum, r) => sum + Number(r.quantity_received || 0),
-        0
-      );
-      const total = Number(line.quantity) || 0;
-      return {
-        ...line,
-        received,
-        remaining: Math.max(0, total - received),
-        is_complete: total > 0 && received >= total,
-      };
+  // Snapshot global des lignes attendues (toutes lignes de tous les devis)
+  // pour la RPC recompute. La RPC ne filtre PAS par quote_id, donc on passe l'union.
+  const expectedLinesPayload = useMemo(() => {
+    const out = [];
+    Object.values(linesByQuote).forEach((res) => {
+      (res.lines || []).forEach((l) => {
+        out.push({ line_id: l.id, qty_total: Number(l.quantity) || 0 });
+      });
     });
-  }, [lines, receptions]);
+    return out;
+  }, [linesByQuote]);
 
-  // Snapshot pour la RPC recompute (line_id, qty_total)
-  const expectedLinesPayload = useMemo(
-    () => (lines || []).map((l) => ({ line_id: l.id, qty_total: Number(l.quantity) || 0 })),
-    [lines]
-  );
+  // Pour chaque devis, lignes enrichies (qty reçue + reste)
+  // Filtre les réceptions par pennylane_quote_id ET pennylane_line_id (safety
+  // au cas où des line_ids se chevaucheraient entre devis — peu probable mais propre).
+  const enrichedByQuote = useMemo(() => {
+    const out = {};
+    (linkedQuotes || []).forEach((lq) => {
+      const qid = lq.pennylane_quote_id;
+      const lines = linesByQuote[qid]?.lines || [];
+      out[qid] = lines.map((line) => {
+        const lineReceptions = (receptions || []).filter(
+          (r) =>
+            Number(r.pennylane_quote_id) === Number(qid) &&
+            Number(r.pennylane_line_id) === Number(line.id)
+        );
+        const received = lineReceptions.reduce(
+          (sum, r) => sum + Number(r.quantity_received || 0),
+          0
+        );
+        const total = Number(line.quantity) || 0;
+        return {
+          ...line,
+          received,
+          remaining: Math.max(0, total - received),
+          is_complete: total > 0 && received >= total,
+        };
+      });
+    });
+    return out;
+  }, [linkedQuotes, linesByQuote, receptions]);
 
-  const linesCount = enrichedLines.length;
-  const completeCount = enrichedLines.filter((l) => l.is_complete).length;
+  // Compteur header par devis : "D-04107 · 5/8 · D-04106 · 7/11"
+  const headerSummary = useMemo(() => {
+    if (!linkedQuotes?.length) return '';
+    return linkedQuotes
+      .map((lq) => {
+        const lines = enrichedByQuote[lq.pennylane_quote_id] || [];
+        const total = lines.length;
+        const complete = lines.filter((l) => l.is_complete).length;
+        const meta = linesByQuote[lq.pennylane_quote_id];
+        const num = meta?.quote?.quote_number || `#${lq.pennylane_quote_id}`;
+        return `${num} · ${complete}/${total}`;
+      })
+      .join(' · ');
+  }, [linkedQuotes, enrichedByQuote, linesByQuote]);
+
   const totalReceptions = (receptions || []).length;
 
   // ============================================================================
   // ÉTAT NON LIÉ
   // ============================================================================
 
-  if (!pennylaneQuoteId) {
+  if (isLoadingLinks) {
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
+          <Package className="w-4 h-4" />
+          Gestion des Appro
+        </h3>
+        <div className="flex justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!linkedQuotes || linkedQuotes.length === 0) {
     return (
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
@@ -133,7 +194,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
             onClose={() => setLinkModalOpen(false)}
             chantierId={chantier.id}
             clientId={chantier.client_id}
-            currentQuoteId={null}
+            linkedQuoteIds={[]}
             onLinked={() => onUpdated?.()}
           />
         )}
@@ -142,10 +203,10 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
   }
 
   // ============================================================================
-  // ÉTAT LIÉ
+  // ÉTAT LIÉ (≥1 devis)
   // ============================================================================
 
-  const handleValidateLine = async (line) => {
+  const handleValidateLine = async (line, pennylaneQuoteId) => {
     const draftQty = qtyDrafts[line.id];
     const qty = draftQty != null && draftQty !== '' ? Number(draftQty) : line.remaining;
 
@@ -182,7 +243,6 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
       });
       await recomputeStatus(expectedLinesPayload);
 
-      // Reset state pour cette ligne
       setQtyDrafts((prev) => {
         const next = { ...prev };
         delete next[line.id];
@@ -196,7 +256,6 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
       onUpdated?.();
       toast.success('Réception enregistrée');
     } catch (e) {
-      // La RPC retourne un message déjà parlant (ex: "Quantite recue + déjà reçue dépasse...")
       toast.error(e?.message || 'Erreur enregistrement réception');
     }
   };
@@ -224,14 +283,23 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     }
   };
 
-  // Sous-titre du collapse (teaser pour décider de déplier, pas un indicateur de progression)
-  const subtitle = linesCount > 0
-    ? `${linesCount} ligne${linesCount > 1 ? 's' : ''} (${completeCount} complète${completeCount > 1 ? 's' : ''})`
-    : '';
+  const handleEjectQuote = async (pennylaneQuoteId, quoteNumber) => {
+    if (!window.confirm(
+      `Retirer le devis ${quoteNumber || `#${pennylaneQuoteId}`} de ce chantier ?`
+    )) return;
+    try {
+      await ejectQuote(pennylaneQuoteId, 'manual_ui');
+      await recomputeStatus(expectedLinesPayload);
+      onUpdated?.();
+      toast.success('Devis retiré du chantier');
+    } catch (e) {
+      toast.error(e?.message || 'Erreur retrait du devis');
+    }
+  };
 
   return (
     <div className="space-y-3">
-      {/* Header collapsible — toggle global du bloc */}
+      {/* Header collapsible */}
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
@@ -248,218 +316,68 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
           <span className="text-sm font-semibold text-secondary-500 uppercase tracking-wider group-hover:text-gray-700 transition-colors">
             Gestion des Appro
           </span>
-          {subtitle && (
+          {headerSummary && (
             <span className="text-xs font-normal normal-case tracking-normal text-gray-500 truncate">
-              · {subtitle}
+              · {headerSummary}
             </span>
           )}
         </button>
-        {quote?.pdf_url && (
-          <a
-            href={quote.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ExternalLink className="w-3 h-3" />
-            PDF devis
-          </a>
-        )}
       </div>
 
       {globalExpanded && (
         <>
-          {/* Bandeau devis lié */}
-          {quote && (
-            <div className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between text-sm gap-3">
-              <div className="min-w-0 flex-1">
-                <span className="font-medium text-gray-900">
-                  {quote.quote_number || `#${quote.id}`}
-                </span>
-                {quote.subject && (
-                  <span className="text-gray-500 ml-2">· {quote.subject}</span>
-                )}
-              </div>
-              {quote.amount_ht != null && (
-                <span className="font-semibold text-gray-900 shrink-0">
-                  {formatEuro(Number(quote.amount_ht))}
-                </span>
-              )}
+          {linesError && (
+            <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-sm text-amber-700">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span className="flex-1">Impossible de charger certaines lignes Pennylane.</span>
             </div>
           )}
 
-          {/* Lignes */}
-          {isLoadingLines ? (
-            <div className="flex justify-center py-6">
-              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-            </div>
-          ) : linesError ? (
-            <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-sm text-amber-700">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span className="flex-1">Impossible de charger les lignes du devis Pennylane.</span>
-              <button
-                type="button"
-                onClick={() => refetchLines()}
-                className="text-xs underline hover:text-amber-900"
-              >
-                Réessayer
-              </button>
-            </div>
-          ) : enrichedLines.length === 0 ? (
-            <div className="text-center py-4 text-sm text-gray-500 bg-gray-50 rounded-lg">
-              Aucune ligne dans ce devis.
-            </div>
-          ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Désignation</th>
-                    <th className="text-right px-2 py-2 font-medium w-16">Qty</th>
-                    <th className="text-right px-2 py-2 font-medium w-24">Reçu</th>
-                    <th className="px-2 py-2 w-56"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {enrichedLines.map((line) => {
-                    const detailsOpen = expandedDetailsLineId === line.id;
-                    const draftQty = qtyDrafts[line.id];
-                    const qtyValue =
-                      draftQty != null
-                        ? draftQty
-                        : line.remaining > 0
-                          ? String(line.remaining)
-                          : '';
-                    return (
-                      <Fragment key={line.id}>
-                        <tr className={line.is_complete ? 'bg-emerald-50/40' : ''}>
-                          <td className="px-3 py-2 text-gray-900 align-top">
-                            <div className="font-medium">{line.label || `Ligne #${line.id}`}</div>
-                            {line.unit_price_ht > 0 && (
-                              <div className="text-xs text-gray-500">
-                                {formatEuro(line.unit_price_ht)} / {line.unit || 'unité'}
-                                {line.vat_rate != null && ` · TVA ${line.vat_rate}%`}
-                              </div>
-                            )}
-                          </td>
-                          <td className="text-right px-2 py-2 text-gray-700 tabular-nums align-top">
-                            {line.quantity}
-                          </td>
-                          <td className="text-right px-2 py-2 tabular-nums align-top">
-                            <span
-                              className={
-                                line.is_complete
-                                  ? 'text-emerald-700 font-semibold'
-                                  : 'text-gray-700'
-                              }
-                            >
-                              {line.received}
-                              <span className="text-gray-400">/{line.quantity}</span>
-                            </span>
-                          </td>
-                          <td className="px-2 py-2 align-top">
-                            {line.is_complete ? (
-                              <div className="text-right">
-                                <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                                  <Check className="w-3.5 h-3.5" />
-                                  Complète
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-end gap-1">
-                                <div className="flex items-center gap-1.5">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    max={line.remaining}
-                                    value={qtyValue}
-                                    onChange={(e) =>
-                                      setQtyDrafts((prev) => ({
-                                        ...prev,
-                                        [line.id]: e.target.value,
-                                      }))
-                                    }
-                                    disabled={disabled || isCreating}
-                                    className="w-16 px-2 py-1 text-sm text-right border border-secondary-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent tabular-nums disabled:opacity-50"
-                                    aria-label={`Quantité reçue pour ${line.label}`}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleValidateLine(line)}
-                                    disabled={disabled || isCreating}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50"
-                                  >
-                                    Valider
-                                  </button>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleDetails(line.id)}
-                                  disabled={disabled}
-                                  className="text-xs text-gray-500 hover:text-gray-700 inline-flex items-center gap-0.5 disabled:opacity-50"
-                                >
-                                  {detailsOpen ? (
-                                    <ChevronDown className="w-3 h-3" />
-                                  ) : (
-                                    <ChevronRight className="w-3 h-3" />
-                                  )}
-                                  détails
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                        {detailsOpen && !line.is_complete && (
-                          <tr className="bg-gray-50/60">
-                            <td colSpan={4} className="px-3 py-3">
-                              <div className="flex flex-wrap items-end gap-3">
-                                <div>
-                                  <label className="block text-xs text-gray-500 mb-1">
-                                    Date de réception
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={detailsDraft.date}
-                                    max={formatDateForInput(new Date())}
-                                    onChange={(e) =>
-                                      setDetailsDraft((prev) => ({
-                                        ...prev,
-                                        date: e.target.value,
-                                      }))
-                                    }
-                                    className="px-2 py-1 text-sm border border-secondary-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <label className="block text-xs text-gray-500 mb-1">
-                                    Notes (numéro BL, commentaire...)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={detailsDraft.notes}
-                                    onChange={(e) =>
-                                      setDetailsDraft((prev) => ({
-                                        ...prev,
-                                        notes: e.target.value,
-                                      }))
-                                    }
-                                    placeholder="ex: BL ALT-1234"
-                                    className="w-full px-2 py-1 text-sm border border-secondary-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* 1 bloc par devis lié */}
+          {linkedQuotes.map((lq) => {
+            const qid = lq.pennylane_quote_id;
+            const meta = linesByQuote[qid];
+            const receptionsForQuote = (receptions || []).filter(
+              (r) => Number(r.pennylane_quote_id) === Number(qid)
+            );
+            const canEject = !disabled && receptionsForQuote.length === 0;
+
+            return (
+              <QuoteBlock
+                key={qid}
+                pennylaneQuoteId={qid}
+                linkedQuote={lq}
+                quote={meta?.quote}
+                lines={enrichedByQuote[qid] || []}
+                isLoading={meta?.isLoading}
+                canEject={canEject}
+                isEjecting={isEjecting}
+                onEjectQuote={handleEjectQuote}
+                onValidateLine={handleValidateLine}
+                onToggleDetails={handleToggleDetails}
+                qtyDrafts={qtyDrafts}
+                setQtyDrafts={setQtyDrafts}
+                expandedDetailsLineId={expandedDetailsLineId}
+                detailsDraft={detailsDraft}
+                setDetailsDraft={setDetailsDraft}
+                disabled={disabled}
+                isCreating={isCreating}
+              />
+            );
+          })}
+
+          {/* Footer : ajouter un devis */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setLinkModalOpen(true)}
+              disabled={disabled || isLoadingLines}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-dashed border-blue-300 text-blue-700 bg-blue-50/50 hover:bg-blue-50 transition-colors disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter un devis / option validé
+            </button>
+          </div>
 
           {/* Historique */}
           {totalReceptions > 0 && (
@@ -507,6 +425,17 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
             </details>
           )}
         </>
+      )}
+
+      {linkModalOpen && (
+        <LinkPennylaneQuoteModal
+          isOpen={linkModalOpen}
+          onClose={() => setLinkModalOpen(false)}
+          chantierId={chantier.id}
+          clientId={chantier.client_id}
+          linkedQuoteIds={linkedQuoteIds}
+          onLinked={() => onUpdated?.()}
+        />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
-import { formatEuro } from '@lib/utils';
+import { formatEuroCeil } from '@lib/utils';
 
 const COMMERCIAL_COLORS = [
   { bg: 'bg-indigo-50', text: 'text-indigo-700', accent: 'bg-indigo-500', ring: 'ring-indigo-200' },
@@ -64,7 +64,7 @@ export const CommercialKpis = ({ commercialMetrics }) => {
                 <MiniKpi label="Leads" value={cm.leads} />
                 <MiniKpi label="RDV" value={`${cm.appointments} (${convRdv}%)`} />
                 <MiniKpi label="Ventes" value={`${cm.sales} (${convVente}%)`} />
-                <MiniKpi label="CA HT" value={formatEuro(cm.revenue)} />
+                <MiniKpi label="CA HT" value={formatEuroCeil(cm.revenue)} />
               </div>
             </div>
           );

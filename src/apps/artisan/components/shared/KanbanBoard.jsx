@@ -23,7 +23,7 @@
 import { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Search, X } from 'lucide-react';
-import { formatEuro } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 
 // ============================================================================
 // COLUMN (INTERNAL)
@@ -74,7 +74,7 @@ function ColumnContent({
         </div>
         {amount !== null && (
           <p className={`text-xs mt-1 ${amount > 0 ? 'text-gray-500' : 'text-gray-300'}`}>
-            {formatEuro(amount)}
+            {formatEuroCeil(amount)}
           </p>
         )}
         {headerExtra && (

@@ -10,7 +10,7 @@
 
 import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle, Hourglass } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatEuro } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 
 /**
  * Calcule le nombre de jours depuis une date
@@ -195,7 +195,7 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
             <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-              {formatEuro(amount)}
+              {formatEuroCeil(amount)}
             </span>
           </div>
 
@@ -288,7 +288,7 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
           )}
         </div>
         <span className={`text-sm font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-          {formatEuro(amount)}
+          {formatEuroCeil(amount)}
         </span>
       </div>
 

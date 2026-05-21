@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useChantiers } from '@hooks/useChantiers';
 import { useLeadCommercials } from '@hooks/useLeads';
-import { CHANTIER_STATUSES } from '@services/chantiers.service';
+import { CHANTIER_STATUSES, getChantierAmount } from '@services/chantiers.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { ChantierCard } from './ChantierCard';
 import { ChantierModal } from './ChantierModal';
@@ -79,9 +79,10 @@ export function ChantierKanban() {
     return fields.some((f) => f && f.toLowerCase().includes(term));
   }, []);
 
-  const columnAmount = useCallback((items) =>
-    items.reduce((sum, c) => sum + (Number(c.order_amount_ht) || Number(c.estimated_revenue) || 0), 0),
-  []);
+  const columnAmount = useCallback(
+    (items) => items.reduce((sum, c) => sum + getChantierAmount(c), 0),
+    [],
+  );
 
   const renderCard = useCallback((chantier) => (
     <ChantierCard

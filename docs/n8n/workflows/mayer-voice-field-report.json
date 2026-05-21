@@ -1,0 +1,228 @@
+{
+  "name": "Mayer - Voice Field Report",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mayer-voice-field-report",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1f23b50-1e91-4a82-b101-7c0f9a9d1a01",
+      "name": "1. Webhook Voice",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1120, 240],
+      "webhookId": "mayer-voice-field-report"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Phase 1 voice agent — validate & normalize PWA payload\nconst input = $input.first().json;\nconst body = input.body || input;\nconst headers = input.headers || {};\n\nconst required = [\n  'voice_memo_id', 'org_id', 'recorded_by',\n  'audio_path', 'audio_signed_url', 'memo_type'\n];\nconst missing = required.filter((k) => !body[k]);\nif (missing.length > 0) {\n  throw new Error(`Missing required fields: ${missing.join(', ')}`);\n}\n\nconst authHeader = headers.authorization || headers.Authorization || '';\nconst userJwt = authHeader.replace(/^Bearer\\s+/i, '');\n\nreturn [{\n  json: {\n    voice_memo_id: body.voice_memo_id,\n    org_id: body.org_id,\n    recorded_by: body.recorded_by,\n    audio_path: body.audio_path,\n    audio_signed_url: body.audio_signed_url,\n    audio_duration_seconds: body.audio_duration_seconds || null,\n    audio_size_bytes: body.audio_size_bytes || null,\n    audio_mime_type: body.audio_mime_type || 'audio/webm',\n    memo_type: body.memo_type || 'rdv_terrain',\n    client_id_hint: body.client_id_hint || null,\n    user_jwt: userJwt,\n    submitted_at: body.submitted_at || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "b2f34c61-2e91-4a83-b201-7d0f9a9d1a02",
+      "name": "2. Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-896, 240]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.audio_signed_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "c3f45d72-3e91-4a84-b301-7e0f9a9d1a03",
+      "name": "3. Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-672, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "language",
+              "value": "fr"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4f56e83-4e91-4a85-b401-7f0f9a9d1a04",
+      "name": "4. Whisper Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-448, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://odspcxgafcqxjzrarsqf.supabase.co/functions/v1/voice-extract-fieldreport",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ transcript: $('4. Whisper Transcribe').item.json.text, memo_type: $('2. Validate Input').item.json.memo_type, duration_seconds: Math.round($('4. Whisper Transcribe').item.json.duration || 0) }) }}",
+        "options": {}
+      },
+      "id": "e5f67f94-5e91-4a86-b501-800f9a9d1a05",
+      "name": "5. Voice Extract (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-224, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://odspcxgafcqxjzrarsqf.supabase.co/rest/v1/rpc/record_voice_memo_extraction",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REPLACE_WITH_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_data: { voice_memo_id: $('2. Validate Input').item.json.voice_memo_id, org_id: $('2. Validate Input').item.json.org_id, recorded_by: $('2. Validate Input').item.json.recorded_by, audio_path: $('2. Validate Input').item.json.audio_path, audio_duration_seconds: Math.round($('4. Whisper Transcribe').item.json.duration || $('2. Validate Input').item.json.audio_duration_seconds || 0), audio_size_bytes: $('2. Validate Input').item.json.audio_size_bytes, audio_mime_type: $('2. Validate Input').item.json.audio_mime_type, transcript: $('4. Whisper Transcribe').item.json.text, extraction_json: $('5. Voice Extract (Claude)').item.json.extraction, memo_type: $('2. Validate Input').item.json.memo_type, processing_time_ms: $('5. Voice Extract (Claude)').item.json.processing_time_ms } }) }}",
+        "options": {}
+      },
+      "id": "f6f78fa5-6e91-4a87-b601-810f9a9d1a06",
+      "name": "6. Persist RPC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 240]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, voice_memo_id: $('2. Validate Input').item.json.voice_memo_id, client_id: $json.client_id || null, lead_id: $json.lead_id || null, status: $json.status || 'persisted', client_action: $json.client_action || null, memo_type: $('2. Validate Input').item.json.memo_type, transcript_preview: ($('4. Whisper Transcribe').item.json.text || '').slice(0, 200) }) }}",
+        "options": {}
+      },
+      "id": "07f890b6-7e91-4a88-b701-820f9a9d1a07",
+      "name": "7. Respond Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [224, 240]
+    }
+  ],
+  "connections": {
+    "1. Webhook Voice": {
+      "main": [
+        [
+          {
+            "node": "2. Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Validate Input": {
+      "main": [
+        [
+          {
+            "node": "3. Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Download Audio": {
+      "main": [
+        [
+          {
+            "node": "4. Whisper Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Whisper Transcribe": {
+      "main": [
+        [
+          {
+            "node": "5. Voice Extract (Claude)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Voice Extract (Claude)": {
+      "main": [
+        [
+          {
+            "node": "6. Persist RPC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Persist RPC": {
+      "main": [
+        [
+          {
+            "node": "7. Respond Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

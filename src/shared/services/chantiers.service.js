@@ -55,6 +55,20 @@ export function getChantierStatusConfig(status) {
   return CHANTIER_STATUSES.find(s => s.value === status) || CHANTIER_STATUSES[0];
 }
 
+/**
+ * Montant d'affichage d'un chantier (carte Kanban, total colonne, modal).
+ * Cascade : somme devis Pennylane liés (vue calculée) → montant figé Gagné → estimation initiale.
+ */
+export function getChantierAmount(chantier) {
+  if (!chantier) return 0;
+  return (
+    Number(chantier.linked_quotes_amount_ht) ||
+    Number(chantier.order_amount_ht) ||
+    Number(chantier.estimated_revenue) ||
+    0
+  );
+}
+
 function shouldAutoTransitionToCommandeRecue(equipmentStatus, materialsStatus) {
   const valid = ['recu', 'na'];
   return valid.includes(equipmentStatus) && valid.includes(materialsStatus);

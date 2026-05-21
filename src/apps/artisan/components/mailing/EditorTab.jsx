@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit, Copy, Archive, Loader2, Mail, Info, Zap, Filter } from 'lucide-react';
+import { Plus, Edit, Copy, Archive, Loader2, Mail, Info, Zap, Filter, Send } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
@@ -48,6 +48,12 @@ export default function EditorTab() {
   const segmentById = Object.fromEntries((segments || []).map((s) => [s.id, s]));
 
   const handleArchive = async (campaign) => {
+    if (campaign.is_transactional) {
+      window.alert(
+        `"${campaign.label}" est une campagne transactionnelle utilisée par le code (ex: envoi de proposition de contrat depuis la fiche client). L'archiver casserait l'envoi. Édite-la plutôt si tu veux modifier le contenu.`
+      );
+      return;
+    }
     if (!window.confirm(`Archiver "${campaign.label}" ? Elle disparaîtra du sélecteur d'envoi.`)) return;
     try {
       await archiveCampaign(campaign.id);
@@ -132,6 +138,15 @@ function CampaignCard({ campaign, segment, onEdit, onDuplicate, onArchive, disab
           <h3 className="font-semibold text-secondary-900 truncate">{campaign.label}</h3>
           <p className="text-xs text-secondary-500 font-mono">{campaign.key}</p>
         </div>
+        {campaign.is_transactional && (
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium flex-shrink-0"
+            title="Campagne déclenchée automatiquement depuis le code (1 destinataire à la fois) — non broadcast-able depuis l'onglet Envoi"
+          >
+            <Send className="w-3 h-3 mr-1" />
+            Transactionnel
+          </span>
+        )}
       </div>
 
       <p className="text-sm text-secondary-700 line-clamp-2">

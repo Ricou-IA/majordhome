@@ -30,6 +30,17 @@ export const mailCampaignsService = {
     return { data, error };
   },
 
+  async getByKey(orgId, key) {
+    const { data, error } = await supabase
+      .from('majordhome_mail_campaigns')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('key', key)
+      .eq('is_archived', false)
+      .maybeSingle();
+    return { data, error };
+  },
+
   async create(payload) {
     const { data, error } = await supabase
       .from('majordhome_mail_campaigns')

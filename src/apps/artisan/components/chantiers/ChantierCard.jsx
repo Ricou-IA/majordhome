@@ -9,8 +9,8 @@
  */
 
 import { MapPin, Calendar } from 'lucide-react';
-import { formatEuro } from '@/lib/utils';
-import { getChantierStatusConfig } from '@services/chantiers.service';
+import { formatEuroCeil } from '@/lib/utils';
+import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
 
 function formatShortDate(dateStr) {
   if (!dateStr) return null;
@@ -46,7 +46,7 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
   if (!chantier) return null;
 
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
-  const amount = Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
+  const amount = getChantierAmount(chantier);
   const statusConfig = getChantierStatusConfig(chantier.chantier_status);
   const shortDate = formatShortDate(chantier.won_date);
   const commercial = commercialsMap?.[chantier.assigned_user_id];
@@ -84,7 +84,7 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
         <div className="flex items-start justify-between gap-2">
           <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
           <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-            {formatEuro(amount)}
+            {formatEuroCeil(amount)}
           </span>
         </div>
 

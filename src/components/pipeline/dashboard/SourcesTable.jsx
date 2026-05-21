@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@components/ui/table';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatEuroCeil } from '@lib/utils';
 
 export const SourcesTable = ({ sourceMetrics }) => {
   const exportToCSV = () => {
@@ -80,7 +81,7 @@ export const SourcesTable = ({ sourceMetrics }) => {
               </div>
               <div className="flex justify-between text-sm pt-2 border-t">
                 <span className="text-muted-foreground">CA HT</span>
-                <span className="font-medium">{metric.revenue.toLocaleString('fr-FR')} €</span>
+                <span className="font-medium">{formatEuroCeil(metric.revenue)}</span>
               </div>
             </div>
           ))}
@@ -106,7 +107,7 @@ export const SourcesTable = ({ sourceMetrics }) => {
                   <TableCell className="text-right">{metric.appointments}</TableCell>
                   <TableCell className="text-right">{metric.sales}</TableCell>
                   <TableCell className="text-right whitespace-nowrap">
-                    {metric.revenue.toLocaleString('fr-FR')} €
+                    {formatEuroCeil(metric.revenue)}
                   </TableCell>
                 </TableRow>
               ))}

@@ -86,6 +86,13 @@ export function formatEuro(amount) {
   }).format(n);
 }
 
+// 1234.01 → "1 235 €" — arrondi au plafond, sans décimales.
+// Utilisé pour les KPI Kanban (cartes + totaux colonne) côté Pipeline et Chantiers.
+export function formatEuroCeil(amount) {
+  if (!amount && amount !== 0) return '-';
+  return formatEuro(Math.ceil(parseFloat(amount)));
+}
+
 // "09:00" + 60 → "10:00"
 export function computeEndTime(startTime, durationMinutes) {
   if (!startTime || !durationMinutes) return '';

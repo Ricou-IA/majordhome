@@ -1,13 +1,15 @@
 /**
  * LinkPennylaneQuoteModal.jsx — Majord'home Artisan
  * ============================================================================
- * Sélecteur de devis Pennylane pour lier un chantier (lead) à un devis.
+ * Sélecteur de devis Pennylane pour ajouter un devis à un chantier (lead).
  *
  * Affiche la liste des devis Pennylane du client (via usePennylaneQuotes),
- * triée par statut (accepted en haut) puis date desc. Click → UPDATE
- * leads.pennylane_quote_id via la RPC update_majordhome_lead.
+ * triée par statut (accepted en haut) puis date desc. Click → RPC
+ * assign_pennylane_quote_to_lead qui INSERT dans le pivot lead_pennylane_quotes.
  *
- * @version 1.0.0
+ * Multi-devis : les devis déjà liés au chantier sont grisés ("Déjà lié").
+ *
+ * @version 2.0.0 — multi-devis (RPC pivot au lieu de UPDATE FK direct)
  * ============================================================================
  */
 
@@ -15,8 +17,7 @@ import { useState, useMemo } from 'react';
 import { X, ExternalLink, FileText, Loader2, CheckCircle2, Link2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePennylaneQuotes } from '@hooks/usePennylane';
-import { leadsService } from '@services/leads.service';
+import { usePennylaneQuotes, useLinkedPennylaneQuotesMutations } from '@hooks/usePennylane';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 
 // ============================================================================
@@ -51,14 +52,20 @@ export function LinkPennylaneQuoteModal({
   onClose,
   chantierId,
   clientId,
-  currentQuoteId,
+  linkedQuoteIds = [],
   onLinked,
 }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
   const { quotes, isLoading } = usePennylaneQuotes(clientId, orgId);
+  const { assignQuote } = useLinkedPennylaneQuotesMutations(orgId, chantierId);
   const [linkingId, setLinkingId] = useState(null);
+
+  const linkedSet = useMemo(
+    () => new Set((linkedQuoteIds || []).map((id) => String(id))),
+    [linkedQuoteIds]
+  );
 
   const sortedQuotes = useMemo(() => {
     const list = quotes || [];
@@ -75,11 +82,14 @@ export function LinkPennylaneQuoteModal({
   const handleLink = async (quote) => {
     setLinkingId(quote.id);
     try {
-      const { error } = await leadsService.updateLead(chantierId, {
-        pennylane_quote_id: String(quote.id),
+      await assignQuote(quote.id, {
+        customer_id: quote.customer_id ?? null,
+        amount_ht: quote.amount_ht ?? null,
+        label: quote.subject || quote.quote_number || null,
+        date: quote.date || null,
+        status: quote.status || null,
       });
-      if (error) throw error;
-      toast.success(`Devis ${quote.quote_number || `#${quote.id}`} lié au chantier`);
+      toast.success(`Devis ${quote.quote_number || `#${quote.id}`} ajouté au chantier`);
       onLinked?.(quote);
       onClose();
     } catch (e) {
@@ -101,10 +111,10 @@ export function LinkPennylaneQuoteModal({
             <Link2 className="w-5 h-5 text-blue-600" />
             <div>
               <h2 className="text-base font-semibold text-gray-900">
-                Lier un devis Pennylane
+                Ajouter un devis Pennylane
               </h2>
               <p className="text-xs text-gray-500">
-                Sélectionnez le devis correspondant à ce chantier
+                Plusieurs devis peuvent composer un même chantier
               </p>
             </div>
           </div>
@@ -147,8 +157,7 @@ export function LinkPennylaneQuoteModal({
           ) : (
             <ul className="divide-y divide-gray-100">
               {sortedQuotes.map((quote) => {
-                const isCurrent =
-                  currentQuoteId != null && String(quote.id) === String(currentQuoteId);
+                const isLinked = linkedSet.has(String(quote.id));
                 const isLinking = linkingId === quote.id;
                 const cfg = getQuoteStatusConfig(quote.status);
                 return (
@@ -165,10 +174,10 @@ export function LinkPennylaneQuoteModal({
                           >
                             {cfg.label}
                           </span>
-                          {isCurrent && (
+                          {isLinked && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium inline-flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
-                              Lié actuellement
+                              Déjà lié
                             </span>
                           )}
                         </div>
@@ -201,7 +210,7 @@ export function LinkPennylaneQuoteModal({
                       <button
                         type="button"
                         onClick={() => handleLink(quote)}
-                        disabled={isCurrent || isLinking}
+                        disabled={isLinked || isLinking}
                         className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isLinking ? (
@@ -209,10 +218,10 @@ export function LinkPennylaneQuoteModal({
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             Liaison...
                           </>
-                        ) : isCurrent ? (
+                        ) : isLinked ? (
                           'Lié'
                         ) : (
-                          'Lier'
+                          'Ajouter'
                         )}
                       </button>
                     </div>
