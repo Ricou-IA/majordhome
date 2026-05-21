@@ -6,6 +6,7 @@ import { formatDateFR, formatEuro } from '@/lib/utils';
 import { toast } from 'sonner';
 import { storageService } from '@services/storage.service';
 import { contractsService } from '@services/contracts.service';
+import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { contractKeys } from '@hooks/cacheKeys';
 import { useContractEquipments } from '@hooks/useContracts';
 import { usePricingData } from '@hooks/usePricing';
@@ -193,7 +194,8 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const clientName = client?.display_name || [client?.last_name, client?.first_name].filter(Boolean).join(' ') || 'Client';
       const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').replace(/\s+/g, '_');
       const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-      const storagePath = `Contrat_Signe_-_${safeName}.${ext}`;
+      // P0.0.7 : préfixe org_id obligatoire (storage RLS filtre sur foldername[1])
+      const storagePath = `${orgId}/Contrat_Signe_-_${safeName}.${ext}`;
 
       const { path: uploadedPath, error: uploadError } = await storageService.uploadFile(
         'contracts',
@@ -220,7 +222,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     } finally {
       setIsUploading(false);
     }
-  }, [contract, client, isUploading, queryClient]);
+  }, [contract, client, orgId, isUploading, queryClient]);
 
   // Envoyer la proposition par email via N8N/Resend
   const handleSendProposal = useCallback(async () => {
@@ -232,9 +234,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const pdfData = buildPdfData();
       const blob = await generateContractPdfBlob(pdfData);
 
-      // 2. Upload vers Supabase Storage (nom simple = contract number only)
+      // 2. Upload vers Supabase Storage — préfixe org_id obligatoire (P0.0.7 storage RLS)
       const contractNum = contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`;
-      const storagePath = `Proposition_${contractNum}.pdf`;
+      const storagePath = `${orgId}/Proposition_${contractNum}.pdf`;
 
       const { path: uploadedPath, error: uploadError } = await storageService.uploadFile(
         'contracts',
@@ -258,14 +260,29 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         .join(', ') || 'Vos équipements';
       const totalStr = formatEuro(billableTotal);
 
-      // 5. Template HTML email
-      const htmlBody = buildProposalEmailHtml(pdfUrl, equipRecap, totalStr);
+      // 5. Charger le template depuis mail_campaigns (éditable via l'onglet Éditeur)
+      const { data: template, error: templateError } = await mailCampaignsService.getByKey(orgId, 'proposition_contrat');
+      if (templateError || !template) {
+        throw new Error("Template 'proposition_contrat' introuvable — vérifie l'onglet Mailing > Éditeur");
+      }
+
+      const requiredPlaceholders = ['{{EQUIP_RECAP}}', '{{TOTAL_AMOUNT}}', '{{PDF_URL}}'];
+      const missing = requiredPlaceholders.filter((p) => !template.html_body?.includes(p));
+      if (missing.length > 0) {
+        console.warn('[ContractPdfSection] Placeholders manquants dans le template:', missing);
+      }
+
+      const htmlBody = (template.html_body || '')
+        .replaceAll('{{EQUIP_RECAP}}', equipRecap)
+        .replaceAll('{{TOTAL_AMOUNT}}', totalStr)
+        .replaceAll('{{PDF_URL}}', pdfUrl);
+      const subject = template.subject || `Votre proposition de contrat d'entretien — Mayer Énergie`;
 
       // 6. Appel webhook N8N
       if (!N8N_WEBHOOK_URL) throw new Error('Variable VITE_N8N_WEBHOOK_MAILING non configurée');
 
       const payload = {
-        subject: `Votre proposition de contrat d'entretien — Mayer Énergie`,
+        subject,
         html_body: htmlBody,
         segment_sql: `SELECT id, first_name, last_name, display_name, email FROM majordhome.clients WHERE id = '${clientId}' AND email IS NOT NULL AND email_unsubscribed_at IS NULL LIMIT 1;`,
         campaign_name: 'Proposition Contrat',
@@ -487,71 +504,4 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       )}
     </div>
   );
-}
-
-// ============================================================================
-// TEMPLATE HTML EMAIL — PROPOSITION CONTRAT D'ENTRETIEN
-// ============================================================================
-
-function buildProposalEmailHtml(pdfUrl, equipRecap, totalStr) {
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f4f4;">
-<tr><td align="center" style="padding:20px 0;">
-<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
-<!-- HEADER : logo Mayer -->
-<tr><td style="background-color:#ffffff;padding:30px 40px 0 40px;text-align:center;">
-<img src="https://www.mayer-energie.fr/images/logo-email.png" alt="Mayer Energie" width="220" style="display:block;margin:0 auto;max-width:220px;height:auto;" />
-</td></tr>
-<!-- Bande bleue -->
-<tr><td style="background-color:#1E4D8C;padding:12px 40px;text-align:center;">
-<p style="color:#ffffff;margin:0;font-size:14px;">Votre confort, toute l'ann\u00e9e</p>
-</td></tr>
-<!-- Corps -->
-<tr><td style="padding:30px 40px;color:#333333;font-size:15px;line-height:1.7;text-align:justify;">
-<p style="margin:0 0 20px 0;">{{SALUTATION}}</p>
-<p style="margin:0 0 20px 0;font-size:17px;"><strong>Prenez soin de vos \u00e9quipements, on s'occupe du reste.</strong></p>
-<p style="margin:0 0 20px 0;">Nous vous avons pr\u00e9par\u00e9 une proposition de contrat d'entretien adapt\u00e9e \u00e0 votre installation. En quelques mots, voici ce que cela vous apporte\u00a0:</p>
-<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83d\udd27 Un entretien annuel par nos techniciens</strong></p>
-<p style="margin:0 0 20px 0;">Ludovic et Antoine, plus de 15 ans d'exp\u00e9rience chacun, se d\u00e9placent chez vous pour v\u00e9rifier, nettoyer et optimiser vos \u00e9quipements. Un rendez-vous simple, planifi\u00e9 avec vous.</p>
-<p style="margin:0 0 10px 0;font-size:16px;"><strong>\u2705 La tranquillit\u00e9 toute l'ann\u00e9e</strong></p>
-<p style="margin:0 0 20px 0;">Un \u00e9quipement bien entretenu, c'est moins de pannes, une meilleure performance \u00e9nerg\u00e9tique et une dur\u00e9e de vie prolong\u00e9e. C'est aussi la conformit\u00e9 r\u00e9glementaire de votre installation.</p>
-<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83c\udfe0 Un interlocuteur de proximit\u00e9 pour tous vos besoins</strong></p>
-<p style="margin:0 0 20px 0;">Bas\u00e9s \u00e0 Gaillac, nous intervenons rapidement sur votre secteur. Au-del\u00e0 de l'entretien, notre \u00e9quipe est \u00e0 votre \u00e9coute pour tous vos projets\u00a0: chauffage, climatisation, \u00e9lectricit\u00e9, \u00e9nergies renouvelables. Un seul num\u00e9ro, une \u00e9quipe qui vous conna\u00eet.</p>
-<p style="margin:0 0 10px 0;font-size:16px;"><strong>\ud83c\udf81 Des avantages r\u00e9serv\u00e9s \u00e0 nos clients</strong></p>
-<p style="margin:0 0 20px 0;">En rejoignant Mayer Energie, vous acc\u00e9dez \u00e0 des <strong>offres sp\u00e9ciales et tarifs pr\u00e9f\u00e9rentiels</strong> sur nos prestations et \u00e9quipements. Nos clients sont notre priorit\u00e9\u00a0: nous vous accompagnons dans la dur\u00e9e.</p>
-<!-- Récap équipement -->
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 20px 0;">
-<tr><td style="background-color:#f0f7ff;border:1px solid #d0e3f7;border-radius:6px;padding:16px 20px;">
-<p style="font-size:12px;color:#1E4D8C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px 0;">Votre \u00e9quipement</p>
-<p style="font-size:15px;color:#333333;font-weight:600;margin:0 0 10px 0;">${equipRecap}</p>
-<p style="border-top:1px solid #d0e3f7;padding-top:10px;margin:0;">
-<span style="font-size:13px;color:#666666;">Montant annuel TTC</span><br/>
-<span style="font-size:22px;font-weight:bold;color:#1E4D8C;">${totalStr}</span>
-</p>
-</td></tr>
-</table>
-<!-- CTA -->
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:10px 0 25px 0;">
-<a href="${pdfUrl}" target="_blank" style="display:inline-block;background-color:#f97316;color:#ffffff;font-size:16px;font-weight:bold;text-decoration:none;padding:12px 28px;border-radius:6px;">Consulter ma proposition</a>
-</td></tr></table>
-<p style="margin:0 0 20px 0;">Pour toute question ou pour souscrire, n'h\u00e9sitez pas \u00e0 nous appeler ou \u00e0 r\u00e9pondre directement \u00e0 cet email. Nous serons ravis d'\u00e9changer avec vous.</p>
-<p style="margin:25px 0 5px 0;">\u00c0 tr\u00e8s bient\u00f4t,</p>
-<p style="margin:0 0 5px 0;"><strong>L'\u00e9quipe Mayer Energie</strong></p>
-</td></tr>
-<!-- Footer -->
-<tr><td style="background-color:#f8f9fa;padding:20px 40px;text-align:center;font-size:13px;color:#666666;border-top:1px solid #e9ecef;">
-<p style="margin:0 0 5px 0;">\ud83d\udcde <a href="tel:+33563332314" style="color:#1E4D8C;text-decoration:none;">05 63 33 23 14</a></p>
-<p style="margin:0 0 5px 0;">\ud83d\udce7 <a href="mailto:contact@mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">contact@mayer-energie.fr</a></p>
-<p style="margin:0 0 5px 0;">\ud83c\udf10 <a href="https://www.mayer-energie.fr" style="color:#1E4D8C;text-decoration:none;">www.mayer-energie.fr</a></p>
-<p style="margin:10px 0 0 0;color:#999999;font-size:11px;">26 Route des Pyr\u00e9n\u00e9es \u2013 81600 Gaillac</p>
-<p style="margin:12px 0 0 0;color:#bbbbbb;font-size:10px;">Si vous ne souhaitez plus recevoir nos communications, <a href="mailto:contact@mayer-energie.fr?subject=D\u00e9sabonnement" style="color:#bbbbbb;text-decoration:underline;">cliquez ici pour vous d\u00e9sabonner</a>.</p>
-</td></tr>
-</table>
-</td></tr>
-</table>
-</body>
-</html>`;
 }
