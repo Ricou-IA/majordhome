@@ -8,7 +8,7 @@
 import { useAuth } from '@contexts/AuthContext';
 import { useClientContract, useContractEquipments } from '@hooks/useContracts';
 import {
-  FileText, Wrench, Calendar, Loader2,
+  FileText, Wrench, Calendar, Clock, Loader2,
 } from 'lucide-react';
 import { formatDateFR, formatEuro } from '@/lib/utils';
 import { CONTRACT_STATUS_CONFIG as STATUS_CONFIG, FREQUENCY_LABELS } from '../constants';

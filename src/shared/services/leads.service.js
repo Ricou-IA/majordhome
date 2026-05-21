@@ -487,7 +487,7 @@ export const leadsService = {
             clientCreated = conv.data?.client || null;
           }
         } catch (e) {
-          // eslint-disable-next-line no-console
+           
           console.warn('[leads] auto-convert on Gagn\u00e9 failed:', e?.message);
         }
       }

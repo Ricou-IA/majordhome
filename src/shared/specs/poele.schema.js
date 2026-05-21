@@ -495,7 +495,7 @@ export function parseSpecValue(key, rawValue) {
 
   if (field.type === 'number') {
     // "7,0 kW" → "7.0" → 7.0 ; "env. 100-140 m²" → on prend le premier nombre trouvé
-    const cleaned = raw.replace(',', '.').replace(/[^\d.\-]/g, ' ').trim();
+    const cleaned = raw.replace(',', '.').replace(/[^\d.-]/g, ' ').trim();
     const parts = cleaned.split(/\s+/).filter(Boolean);
     if (parts.length === 0) return null;
     const n = parseFloat(parts[0]);

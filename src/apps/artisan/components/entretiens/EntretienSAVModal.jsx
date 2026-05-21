@@ -126,18 +126,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
       });
   }, [item?.contract_id]);
 
-  if (!item) return null;
-
-  const type = item.intervention_type;
-  const typeConfig = TYPE_LABELS[type] || TYPE_LABELS.entretien;
-  const statusConfig = getStatusConfig(type, item.workflow_status);
-  const canEditSAV = can('sav', 'edit') || can('entretiens', 'edit');
-  const canCreateSAV = can('sav', 'create');
-
-  const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
-
   // --- Dirty check : savoir si quelque chose a changé ---
+  // (déclaré AVANT early return — règle React Hooks : ordre stable)
   const isDirty = useMemo(() => {
+    if (!item) return false;
     if (notes !== (item.report_notes || '')) return true;
     if (savDesc !== (item.sav_description || '')) return true;
     if (partsOrder !== (item.parts_order_status || null)) return true;
@@ -148,16 +140,27 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
   }, [notes, savDesc, partsOrder, devisAmount, devisStatus, includesEntretien, item]);
 
   // --- Objet "lead-like" pour le SchedulingPanel ---
+  // (déclaré AVANT early return)
   const schedulingLead = useMemo(() => ({
-    last_name: item.client_last_name || item.client_name || '',
-    first_name: item.client_first_name || '',
-    phone: item.client_phone || '',
-    email: item.client_email || '',
-    address: item.client_address || '',
-    city: item.client_city || '',
-    postal_code: item.client_postal_code || '',
+    last_name: item?.client_last_name || item?.client_name || '',
+    first_name: item?.client_first_name || '',
+    phone: item?.client_phone || '',
+    email: item?.client_email || '',
+    address: item?.client_address || '',
+    city: item?.client_city || '',
+    postal_code: item?.client_postal_code || '',
     assigned_user_id: null,
   }), [item]);
+
+  if (!item) return null;
+
+  const type = item.intervention_type;
+  const typeConfig = TYPE_LABELS[type] || TYPE_LABELS.entretien;
+  const statusConfig = getStatusConfig(type, item.workflow_status);
+  const canEditSAV = can('sav', 'edit') || can('entretiens', 'edit');
+  const canCreateSAV = can('sav', 'create');
+
+  const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
 
   // --- Handlers ---
   const handleTransition = async (newStatus) => {

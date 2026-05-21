@@ -26,6 +26,29 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
   const [loading, setLoading] = useState(false);
 
+  // Objet "lead-like" pour le SchedulingPanel — déclaré AVANT early return
+  // (règle React Hooks : ordre stable des hooks à chaque render).
+  const schedulingLead = useMemo(() => ({
+    last_name: item?.client_last_name || item?.client_name || '',
+    first_name: item?.client_first_name || '',
+    phone: item?.client_phone || '',
+    email: item?.client_email || '',
+    address: item?.client_address || '',
+    city: item?.client_city || '',
+    postal_code: item?.client_postal_code || '',
+    assigned_user_id: null,
+  }), [item]);
+
+  // Confirmation planning — déclaré AVANT early return.
+  const handleConfirmScheduling = useCallback(async (schedulingData) => {
+    setLoading(true);
+    try {
+      await onConfirm(schedulingData, includesEntretien);
+    } finally {
+      setLoading(false);
+    }
+  }, [onConfirm, includesEntretien]);
+
   if (!item) return null;
 
   const type = item.intervention_type;
@@ -35,18 +58,6 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const contractAmount = Number(item.contract_amount) || 0;
   const devisAmount = Number(item.devis_amount) || 0;
   const totalAmount = isSAV && includesEntretien ? devisAmount + contractAmount : devisAmount;
-
-  // Objet "lead-like" pour le SchedulingPanel
-  const schedulingLead = useMemo(() => ({
-    last_name: item.client_last_name || item.client_name || '',
-    first_name: item.client_first_name || '',
-    phone: item.client_phone || '',
-    email: item.client_email || '',
-    address: item.client_address || '',
-    city: item.client_city || '',
-    postal_code: item.client_postal_code || '',
-    assigned_user_id: null,
-  }), [item]);
 
   // Props contextuelles du SchedulingPanel
   const appointmentTypeLabel = isSAV
@@ -63,16 +74,6 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const handleToggleEntretien = () => {
     setIncludesEntretien(prev => !prev);
   };
-
-  // Confirmation planning
-  const handleConfirmScheduling = useCallback(async (schedulingData) => {
-    setLoading(true);
-    try {
-      await onConfirm(schedulingData, includesEntretien);
-    } finally {
-      setLoading(false);
-    }
-  }, [onConfirm, includesEntretien]);
 
   return (
     <>

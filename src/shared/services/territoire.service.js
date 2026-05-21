@@ -26,6 +26,7 @@ export const territoireService = {
       const PAGE_SIZE = 1000;
       let offset = 0;
 
+      // eslint-disable-next-line no-constant-condition -- pagination Supabase, break sur fin de page
       while (true) {
         const { data, error } = await supabase
           .from('majordhome_clients')
