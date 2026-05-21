@@ -28,6 +28,7 @@ import {
   BellOff,
 } from 'lucide-react';
 import { mailingKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 import { formatDateTimeFR } from '@/lib/utils';
 import supabase from '@lib/supabaseClient';
 
@@ -158,8 +159,11 @@ function Timeline({ steps }) {
 // =============================================================================
 
 export function TabMailings({ clientId }) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const { data: logs, isLoading, error } = useQuery({
-    queryKey: mailingKeys.byClient(clientId),
+    queryKey: mailingKeys.byClient(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('majordhome_mailing_logs')
@@ -170,7 +174,7 @@ export function TabMailings({ clientId }) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
     // Refetch toutes les 30s pour suivre les events webhook en quasi-temps réel
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,

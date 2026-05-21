@@ -27,7 +27,7 @@ export function useMailSegments(orgId, { includeArchived = false } = {}) {
     staleTime: 60_000,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: mailSegmentKeys.all });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: mailSegmentKeys.all(orgId) });
 
   const createMutation = useMutation({
     mutationFn: async (payload) => {
@@ -103,7 +103,7 @@ export function useMailSegments(orgId, { includeArchived = false } = {}) {
  */
 export function useSegmentCount({ filters, campaignName = null, orgId, enabled = true }) {
   return useQuery({
-    queryKey: mailSegmentKeys.count(filters, campaignName, orgId),
+    queryKey: mailSegmentKeys.count(orgId, filters, campaignName),
     queryFn: async () => {
       const { data, error } = await mailSegmentsService.count({ filters, campaignName, orgId });
       if (error) throw error;
@@ -119,7 +119,7 @@ export function useSegmentCount({ filters, campaignName = null, orgId, enabled =
  */
 export function useSegmentPreview({ filters, campaignName = null, orgId, limit = 20, enabled = true }) {
   return useQuery({
-    queryKey: [...mailSegmentKeys.preview(filters, campaignName, orgId), limit],
+    queryKey: [...mailSegmentKeys.preview(orgId, filters, campaignName), limit],
     queryFn: async () => {
       const { data, error } = await mailSegmentsService.preview({
         filters,

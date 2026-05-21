@@ -5,6 +5,7 @@
  * Utilise TanStack React Query pour le cache, la pagination et les mutations.
  *
  * @version 6.0.0 - Refonte : cacheKeys centralisées, usePaginatedList, useDebounce
+ * @version 6.1.0 - P0.11 : propagation orgId dans toutes les cache keys
  * ============================================================================
  */
 
@@ -14,6 +15,7 @@ import { clientsService } from '@services/clients.service';
 import { clientKeys, contractKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { clientKeys } from '@hooks/cacheKeys';
@@ -47,11 +49,6 @@ const DEFAULT_FILTERS = {
  * @param {Object} options
  * @param {string} options.orgId - ID de l'organisation (requis)
  * @param {number} [options.limit=25] - Éléments par page
- *
- * @returns {Object} État et méthodes
- *
- * @example
- * const { clients, isLoading, filters, setFilters, loadMore, hasMore } = useClients({ orgId });
  */
 export function useClients({ orgId, limit = DEFAULT_LIMIT } = {}) {
   const {
@@ -97,17 +94,10 @@ export function useClients({ orgId, limit = DEFAULT_LIMIT } = {}) {
 // HOOK - useClient (détail d'un client)
 // ============================================================================
 
-/**
- * Hook pour charger les détails d'un client
- *
- * @param {string} clientId - UUID du client (majordhome.clients.id)
- * @returns {Object} État et méthodes
- *
- * @example
- * const { client, isLoading, updateClient, refresh } = useClient(clientId);
- */
 export function useClient(clientId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: queryData,
@@ -115,9 +105,9 @@ export function useClient(clientId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: clientKeys.detail(clientId),
+    queryKey: clientKeys.detail(orgId, clientId),
     queryFn: () => clientsService.getClientById(clientId),
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
     staleTime: 30_000,
     select: (result) => result?.data || null,
   });
@@ -127,13 +117,11 @@ export function useClient(clientId) {
     mutationFn: (updates) => clientsService.updateClient(clientId, updates),
     onSuccess: (result) => {
       if (result?.data) {
-        // Mettre à jour le cache du détail
-        queryClient.setQueryData(clientKeys.detail(clientId), (old) => ({
+        queryClient.setQueryData(clientKeys.detail(orgId, clientId), (old) => ({
           ...old,
           data: { ...(old?.data || {}), ...result.data },
         }));
-        // Invalider la liste pour que les changements se reflètent
-        queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
       }
     },
   });
@@ -142,9 +130,9 @@ export function useClient(clientId) {
   const archiveMutation = useMutation({
     mutationFn: () => clientsService.archiveClient(clientId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: clientKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.stats(orgId) });
     },
   });
 
@@ -152,9 +140,9 @@ export function useClient(clientId) {
   const unarchiveMutation = useMutation({
     mutationFn: () => clientsService.unarchiveClient(clientId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: clientKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.stats(orgId) });
     },
   });
 
@@ -206,14 +194,10 @@ export function useClient(clientId) {
 // HOOK - useClientEquipments
 // ============================================================================
 
-/**
- * Hook pour gérer les équipements d'un client
- *
- * @param {string} clientId - UUID du client
- * @returns {Object} État et méthodes
- */
 export function useClientEquipments(clientId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: equipments,
@@ -221,38 +205,38 @@ export function useClientEquipments(clientId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: clientKeys.equipments(clientId),
+    queryKey: clientKeys.equipments(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await clientsService.getClientEquipments(clientId);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
     staleTime: 60_000,
   });
 
   const addMutation = useMutation({
     mutationFn: (equipmentData) => clientsService.addEquipment(clientId, equipmentData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.equipments(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
       // Invalider aussi le cache contrats (liaison contract_equipments)
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ equipmentId, updates }) => clientsService.updateEquipment(equipmentId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.equipments(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (equipmentId) => clientsService.deleteEquipment(equipmentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.equipments(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
     },
   });
 
@@ -274,22 +258,22 @@ export function useClientEquipments(clientId) {
 // HOOK - useEquipmentBrands (marques d'équipements)
 // ============================================================================
 
-/**
- * Hook pour les marques d'équipements (données quasi-statiques)
- * @returns {{ brands: Array, isLoading: boolean, error: Error|null }}
- */
 export function useEquipmentBrands() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const {
     data,
     isLoading,
     error,
   } = useQuery({
-    queryKey: clientKeys.brands(),
+    queryKey: clientKeys.brands(orgId),
     queryFn: async () => {
       const { data, error } = await clientsService.getBrands();
       if (error) throw error;
       return data;
     },
+    enabled: !!orgId,
     staleTime: 5 * 60 * 1000, // 5 min — données quasi-statiques
   });
 
@@ -300,24 +284,22 @@ export function useEquipmentBrands() {
 // HOOK - usePricingEquipmentTypes
 // ============================================================================
 
-/**
- * Hook pour les types d'équipements pricing (grille tarifaire)
- * Utilisé dans le formulaire d'ajout d'équipement pour le dropdown "Type"
- *
- * @returns {{ equipmentTypes: Array, isLoading: boolean, error: Error|null }}
- */
 export function usePricingEquipmentTypes() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const {
     data,
     isLoading,
     error,
   } = useQuery({
-    queryKey: clientKeys.pricingTypes(),
+    queryKey: clientKeys.pricingTypes(orgId),
     queryFn: async () => {
       const { data, error } = await clientsService.getPricingEquipmentTypes();
       if (error) throw error;
       return data;
     },
+    enabled: !!orgId,
     staleTime: 10 * 60 * 1000, // 10 min — données quasi-statiques
   });
 
@@ -328,14 +310,10 @@ export function usePricingEquipmentTypes() {
 // HOOK - useClientActivities (timeline)
 // ============================================================================
 
-/**
- * Hook pour la timeline d'un client
- *
- * @param {string} clientId - UUID du client
- * @returns {Object} État et méthodes
- */
 export function useClientActivities(clientId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: activities,
@@ -343,20 +321,20 @@ export function useClientActivities(clientId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: clientKeys.activities(clientId),
+    queryKey: clientKeys.activities(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await clientsService.getClientActivities(clientId);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
     staleTime: 15_000, // 15s - timeline change souvent
   });
 
   const addNoteMutation = useMutation({
     mutationFn: (noteData) => clientsService.addClientNote({ clientId, ...noteData }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.activities(clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.activities(orgId, clientId) });
     },
   });
 
@@ -374,12 +352,6 @@ export function useClientActivities(clientId) {
 // HOOK - useClientStats
 // ============================================================================
 
-/**
- * Hook pour les statistiques clients
- *
- * @param {string} orgId - ID de l'organisation
- * @returns {Object} État et méthodes
- */
 export function useClientStats(orgId) {
   const {
     data: stats,
@@ -409,14 +381,6 @@ export function useClientStats(orgId) {
 // HOOK - useClientSearch (autocomplete)
 // ============================================================================
 
-/**
- * Hook pour la recherche rapide de clients (autocomplete)
- *
- * @param {string} orgId - ID de l'organisation
- * @param {Object} [options]
- * @param {number} [options.debounceMs=300] - Délai debounce
- * @param {number} [options.minChars=2] - Caractères minimum
- */
 export function useClientSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, debounceMs);
@@ -450,15 +414,6 @@ export function useClientSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) 
 // HOOK - useDuplicateCheck (détection doublons)
 // ============================================================================
 
-/**
- * Hook pour la détection de doublons client par nom + code postal
- * Utilisé lors de la création d'un nouveau client (CreateContractModal)
- *
- * @param {string} orgId - ID de l'organisation
- * @param {string} lastName - Nom de famille à vérifier
- * @param {string} postalCode - Code postal (optionnel, affine la recherche)
- * @returns {{ duplicates: Array, isChecking: boolean }}
- */
 export function useDuplicateCheck(orgId, lastName, postalCode) {
   const debouncedLastName = useDebounce(lastName || '', 500);
   const debouncedPostalCode = useDebounce(postalCode || '', 500);
@@ -481,18 +436,11 @@ export function useDuplicateCheck(orgId, lastName, postalCode) {
 // HOOK - useLinkedClients (propriétaire / locataire)
 // ============================================================================
 
-/**
- * Hook pour récupérer et gérer les clients liés (propriétaire / locataire)
- *
- * @param {string} clientId - UUID du client
- * @param {string} orgId - UUID de l'organisation
- * @returns {{ owner, tenants, isLoading, linkClient, unlinkClient }}
- */
 export function useLinkedClients(clientId, orgId) {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: clientKeys.linked(clientId),
+    queryKey: clientKeys.linked(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await clientsService.getLinkedClients(clientId, orgId);
       if (error) throw error;
@@ -504,10 +452,10 @@ export function useLinkedClients(clientId, orgId) {
 
   const invalidateLinked = useCallback((ids) => {
     ids.forEach(id => {
-      if (id) queryClient.invalidateQueries({ queryKey: clientKeys.linked(id) });
+      if (id) queryClient.invalidateQueries({ queryKey: clientKeys.linked(orgId, id) });
     });
-    queryClient.invalidateQueries({ queryKey: clientKeys.details() });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: clientKeys.details(orgId) });
+  }, [queryClient, orgId]);
 
   const linkMutation = useMutation({
     mutationFn: ({ tenantId, ownerId }) => clientsService.linkClientAsOwner(tenantId, ownerId),

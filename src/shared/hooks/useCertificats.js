@@ -11,6 +11,7 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { certificatsService } from '@services/certificats.service';
 import { certificatKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { certificatKeys } from '@hooks/cacheKeys';
@@ -20,14 +21,16 @@ export { certificatKeys } from '@hooks/cacheKeys';
 // ============================================================================
 
 export function useCertificat(interventionId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data: certificat, isLoading, error, refetch } = useQuery({
-    queryKey: certificatKeys.byIntervention(interventionId),
+    queryKey: certificatKeys.byIntervention(orgId, interventionId),
     queryFn: async () => {
       const { data, error } = await certificatsService.getCertificatByIntervention(interventionId);
       if (error) throw error;
       return data; // peut être null
     },
-    enabled: !!interventionId,
+    enabled: !!orgId && !!interventionId,
     staleTime: 30_000,
   });
 
@@ -40,13 +43,15 @@ export function useCertificat(interventionId) {
 
 export function useCertificatMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidate = useCallback((interventionId) => {
     if (interventionId) {
-      queryClient.invalidateQueries({ queryKey: certificatKeys.byIntervention(interventionId) });
+      queryClient.invalidateQueries({ queryKey: certificatKeys.byIntervention(orgId, interventionId) });
     }
-    queryClient.invalidateQueries({ queryKey: certificatKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: certificatKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   // Sauvegarder brouillon
   const draftMutation = useMutation({

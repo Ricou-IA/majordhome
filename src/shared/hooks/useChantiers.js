@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@services/chantiers.service';
 import { interventionsService } from '@services/interventions.service';
 import { chantierKeys, interventionKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { chantierKeys } from '@hooks/cacheKeys';
@@ -46,10 +47,12 @@ export function useChantiers(orgId) {
 
 export function useChantierMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateChantiers = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: chantierKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   // Mutation : changer le statut chantier
   const statusMutation = useMutation({
@@ -86,7 +89,7 @@ export function useChantierMutations() {
     onSuccess: (_, variables) => {
       invalidateChantiers();
       queryClient.invalidateQueries({
-        queryKey: interventionKeys.byProject(variables.projectId),
+        queryKey: interventionKeys.byProject(orgId, variables.projectId),
       });
     },
   });
@@ -98,7 +101,7 @@ export function useChantierMutations() {
     onSuccess: (_, variables) => {
       invalidateChantiers();
       queryClient.invalidateQueries({
-        queryKey: interventionKeys.slots(variables.parentId),
+        queryKey: interventionKeys.slots(orgId, variables.parentId),
       });
     },
   });
@@ -109,7 +112,7 @@ export function useChantierMutations() {
       interventionsService.deleteInterventionSlot(slotId),
     onSuccess: () => {
       invalidateChantiers();
-      queryClient.invalidateQueries({ queryKey: interventionKeys.all });
+      queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
     },
   });
 
@@ -170,14 +173,16 @@ export function useChantierMutations() {
 // ============================================================================
 
 export function useInterventionSlots(parentId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: interventionKeys.slots(parentId),
+    queryKey: interventionKeys.slots(orgId, parentId),
     queryFn: async () => {
       const { data, error } = await interventionsService.getInterventionSlots(parentId);
       if (error) throw error;
       return data;
     },
-    enabled: !!parentId,
+    enabled: !!orgId && !!parentId,
     staleTime: 15_000,
   });
 

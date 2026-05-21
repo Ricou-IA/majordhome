@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadInteractionsService } from '@services/leadInteractions.service';
 import { leadsService } from '@services/leads.service';
 import { leadInteractionKeys, leadKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 export { leadInteractionKeys } from '@hooks/cacheKeys';
 
@@ -20,15 +21,17 @@ export { leadInteractionKeys } from '@hooks/cacheKeys';
 // ============================================================================
 
 export function useLeadInteractions(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: interactions,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: leadInteractionKeys.byLead(leadId),
+    queryKey: leadInteractionKeys.byLead(orgId, leadId),
     queryFn: () => leadInteractionsService.getByLeadId(leadId),
-    enabled: !!leadId,
+    enabled: !!orgId && !!leadId,
     staleTime: 15_000,
     select: (result) => result?.data || [],
   });
@@ -47,11 +50,13 @@ export function useLeadInteractions(leadId) {
 
 export function useLeadInteractionMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateForLead = (leadId) => {
-    queryClient.invalidateQueries({ queryKey: leadInteractionKeys.byLead(leadId) });
+    queryClient.invalidateQueries({ queryKey: leadInteractionKeys.byLead(orgId, leadId) });
     // last_interaction_at est calculé dans la vue leads → invalider les listes
-    queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
+    queryClient.invalidateQueries({ queryKey: leadKeys.lists(orgId) });
   };
 
   const createMutation = useMutation({
@@ -115,7 +120,7 @@ export function useLongTermLeads({ orgId, filters = {}, limit = 200 } = {}) {
   const totalCount = data?.count || 0;
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: leadKeys.all });
+    queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     return refetch();
   };
 
@@ -134,9 +139,11 @@ export function useLongTermLeads({ orgId, filters = {}, limit = 200 } = {}) {
 
 export function useLongTermMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: leadKeys.all });
+    queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
   };
 
   const moveMutation = useMutation({

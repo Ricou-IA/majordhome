@@ -16,12 +16,15 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantierReceptionsService } from '@services/chantierReceptions.service';
 import { chantierReceptionKeys, chantierKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { chantierReceptionKeys } from '@hooks/cacheKeys';
 
 export function useChantierReceptions(chantierId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: receptions,
@@ -29,20 +32,20 @@ export function useChantierReceptions(chantierId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: chantierReceptionKeys.byChantier(chantierId),
+    queryKey: chantierReceptionKeys.byChantier(orgId, chantierId),
     queryFn: async () => {
       const { data, error } = await chantierReceptionsService.getByChantier(chantierId);
       if (error) throw error;
       return data;
     },
-    enabled: !!chantierId,
+    enabled: !!orgId && !!chantierId,
     staleTime: 15_000,
   });
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: chantierReceptionKeys.byChantier(chantierId) });
-    queryClient.invalidateQueries({ queryKey: chantierKeys.all });
-  }, [queryClient, chantierId]);
+    queryClient.invalidateQueries({ queryKey: chantierReceptionKeys.byChantier(orgId, chantierId) });
+    queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+  }, [queryClient, chantierId, orgId]);
 
   const createMutation = useMutation({
     mutationFn: async (payload) => {

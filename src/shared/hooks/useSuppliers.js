@@ -9,6 +9,7 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { suppliersService } from '@services/suppliers.service';
 import { supplierKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { supplierKeys } from '@hooks/cacheKeys';
@@ -44,14 +45,16 @@ export function useSuppliers(orgId) {
  * Détail d'un fournisseur
  */
 export function useSupplierDetail(supplierId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useQuery({
-    queryKey: supplierKeys.detail(supplierId),
+    queryKey: supplierKeys.detail(orgId, supplierId),
     queryFn: async () => {
       const { data, error } = await suppliersService.getSupplierById(supplierId);
       if (error) throw error;
       return data;
     },
-    enabled: !!supplierId,
+    enabled: !!orgId && !!supplierId,
     staleTime: 60_000,
   });
 }
@@ -73,7 +76,7 @@ export function useSupplierMutations(orgId) {
     mutationFn: ({ supplierId, updates }) => suppliersService.updateSupplier(supplierId, updates),
     onSuccess: (_, { supplierId }) => {
       queryClient.invalidateQueries({ queryKey: supplierKeys.list(orgId) });
-      queryClient.invalidateQueries({ queryKey: supplierKeys.detail(supplierId) });
+      queryClient.invalidateQueries({ queryKey: supplierKeys.detail(orgId, supplierId) });
     },
   });
 
@@ -108,6 +111,8 @@ export function useSupplierMutations(orgId) {
  */
 export function useSupplierProducts(supplierId, { search = '', kind = null, page = 0, pageSize = 50 } = {}) {
   const offset = page * pageSize;
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data,
@@ -115,13 +120,13 @@ export function useSupplierProducts(supplierId, { search = '', kind = null, page
     error,
     refetch,
   } = useQuery({
-    queryKey: [...supplierKeys.products(supplierId), search, kind, page, pageSize],
+    queryKey: [...supplierKeys.products(orgId, supplierId), search, kind, page, pageSize],
     queryFn: async () => {
       const result = await suppliersService.getProducts(supplierId, { search, kind, limit: pageSize, offset });
       if (result.error) throw result.error;
       return { products: result.data, count: result.count };
     },
-    enabled: !!supplierId,
+    enabled: !!orgId && !!supplierId,
     staleTime: 30_000,
     keepPreviousData: true,
   });
@@ -139,14 +144,16 @@ export function useSupplierProducts(supplierId, { search = '', kind = null, page
  * Accessoires compatibles avec un produit donné
  */
 export function useAccessoriesForProduct(productId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [...supplierKeys.all, 'accessories-for', productId],
+    queryKey: [...supplierKeys.all(orgId), 'accessories-for', productId],
     queryFn: async () => {
       const { data, error } = await suppliersService.getAccessoriesForProduct(productId);
       if (error) throw error;
       return data;
     },
-    enabled: !!productId,
+    enabled: !!orgId && !!productId,
     staleTime: 30_000,
   });
   return { accessories: data || [], isLoading, error, refetch };
@@ -202,7 +209,7 @@ export function useProductMutations(orgId, supplierId) {
   const queryClient = useQueryClient();
 
   const invalidateAll = () => {
-    if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(supplierId) });
+    if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
     queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
   };
 
@@ -242,14 +249,16 @@ export function useProductMutations(orgId, supplierId) {
  * Détail d'un produit (pour la fiche produit enrichie)
  */
 export function useProductDetail(productId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: supplierKeys.productDetail(productId),
+    queryKey: supplierKeys.productDetail(orgId, productId),
     queryFn: async () => {
       const { data, error } = await suppliersService.getProductById(productId);
       if (error) throw error;
       return data;
     },
-    enabled: !!productId,
+    enabled: !!orgId && !!productId,
     staleTime: 30_000,
   });
 
@@ -260,14 +269,16 @@ export function useProductDetail(productId) {
  * Variantes d'un produit parent (G1 acier → G1 pierre ollaire, G1 pierre blanche)
  */
 export function useProductVariants(parentId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: supplierKeys.productVariants(parentId),
+    queryKey: supplierKeys.productVariants(orgId, parentId),
     queryFn: async () => {
       const { data, error } = await suppliersService.getProductVariants(parentId);
       if (error) throw error;
       return data;
     },
-    enabled: !!parentId,
+    enabled: !!orgId && !!parentId,
     staleTime: 30_000,
   });
 
@@ -281,8 +292,8 @@ export function useProductImageMutations(orgId, productId, supplierId) {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(productId) });
-    if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(supplierId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, productId) });
+    if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
     queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
   };
 
@@ -319,14 +330,16 @@ export function useProductImageMutations(orgId, productId, supplierId) {
 // =============================================================================
 
 export function useProductDocuments(productId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: supplierKeys.productDocuments(productId),
+    queryKey: supplierKeys.productDocuments(orgId, productId),
     queryFn: async () => {
       const { data, error } = await suppliersService.getProductDocuments(productId);
       if (error) throw error;
       return data;
     },
-    enabled: !!productId,
+    enabled: !!orgId && !!productId,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -334,14 +347,16 @@ export function useProductDocuments(productId) {
 }
 
 export function useProductDocumentsByProductIds(productIds) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error } = useQuery({
-    queryKey: supplierKeys.productDocumentsByIds(productIds),
+    queryKey: supplierKeys.productDocumentsByIds(orgId, productIds),
     queryFn: async () => {
       const { data, error } = await suppliersService.getDocumentsByProductIds(productIds);
       if (error) throw error;
       return data;
     },
-    enabled: !!productIds?.length,
+    enabled: !!orgId && !!productIds?.length,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -352,7 +367,7 @@ export function useProductDocumentMutations(orgId, productId) {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: supplierKeys.productDocuments(productId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productDocuments(orgId, productId) });
   };
 
   const uploadMutation = useMutation({

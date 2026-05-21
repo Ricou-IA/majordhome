@@ -13,6 +13,7 @@ import { appointmentsService } from '@services/appointments.service';
 import { chantierSlotsService } from '@services/chantierSlots.service';
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentKeys, leadKeys, chantierSlotKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { appointmentKeys } from '@hooks/cacheKeys';
@@ -69,7 +70,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   const appointmentIds = useMemo(() => (appointments || []).map(a => a.id), [appointments]);
 
   const { data: techLinks } = useQuery({
-    queryKey: ['appointment-technicians', appointmentIds],
+    queryKey: appointmentKeys.technicians(orgId, appointmentIds),
     queryFn: async () => {
       if (appointmentIds.length === 0) return [];
       const { data } = await supabase
@@ -143,7 +144,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   const createMutation = useMutation({
     mutationFn: (data) => appointmentsService.createAppointment({ coreOrgId: orgId, ...data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
     },
   });
 
@@ -152,8 +153,8 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: ({ appointmentId, updates }) =>
       appointmentsService.updateAppointment(appointmentId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: leadKeys.all });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
 
@@ -163,12 +164,12 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       appointmentsService.moveAppointment(appointmentId, moveData),
     // Optimistic update pour le drag & drop
     onMutate: async ({ appointmentId, scheduled_date, scheduled_start, scheduled_end }) => {
-      await queryClient.cancelQueries({ queryKey: appointmentKeys.lists() });
+      await queryClient.cancelQueries({ queryKey: appointmentKeys.lists(orgId) });
 
-      const previousData = queryClient.getQueriesData({ queryKey: appointmentKeys.lists() });
+      const previousData = queryClient.getQueriesData({ queryKey: appointmentKeys.lists(orgId) });
 
       // Mise à jour optimiste
-      queryClient.setQueriesData({ queryKey: appointmentKeys.lists() }, (old) => {
+      queryClient.setQueriesData({ queryKey: appointmentKeys.lists(orgId) }, (old) => {
         if (!old?.data) return old;
         return {
           ...old,
@@ -191,8 +192,8 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: leadKeys.all });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
 
@@ -201,7 +202,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: ({ appointmentId, reason }) =>
       appointmentsService.cancelAppointment(appointmentId, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
     },
   });
 
@@ -209,8 +210,8 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   const deleteMutation = useMutation({
     mutationFn: (appointmentId) => appointmentsService.deleteAppointment(appointmentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: leadKeys.all });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
 
@@ -293,15 +294,17 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
  * Hook pour un RDV spécifique
  */
 export function useAppointment(appointmentId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: appointment,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: appointmentKeys.detail(appointmentId),
+    queryKey: appointmentKeys.detail(orgId, appointmentId),
     queryFn: () => appointmentsService.getAppointmentById(appointmentId),
-    enabled: !!appointmentId,
+    enabled: !!orgId && !!appointmentId,
     staleTime: 30_000,
     select: (result) => result?.data || null,
   });

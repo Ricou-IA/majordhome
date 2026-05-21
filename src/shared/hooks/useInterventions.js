@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { interventionsService } from '@services/interventions.service';
 import { interventionKeys, clientKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { interventionKeys } from '@hooks/cacheKeys';
@@ -28,19 +29,21 @@ export { interventionKeys } from '@hooks/cacheKeys';
  * @returns {Object} { interventions, isLoading, error, refresh }
  */
 export function useProjectInterventions(projectId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: interventionKeys.byProject(projectId),
+    queryKey: interventionKeys.byProject(orgId, projectId),
     queryFn: async () => {
       const { data, error } = await interventionsService.getInterventionsByProject(projectId);
       if (error) throw error;
       return data;
     },
-    enabled: !!projectId,
+    enabled: !!orgId && !!projectId,
     staleTime: 30_000,
   });
 
@@ -63,16 +66,18 @@ export function useProjectInterventions(projectId) {
  */
 export function useCreateIntervention() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const mutation = useMutation({
     mutationFn: (params) => interventionsService.createIntervention(params),
     onSuccess: (result, variables) => {
       // Invalider la liste interventions du projet
       queryClient.invalidateQueries({
-        queryKey: interventionKeys.byProject(variables.projectId),
+        queryKey: interventionKeys.byProject(orgId, variables.projectId),
       });
       // Invalider le détail client (il charge aussi les interventions)
-      queryClient.invalidateQueries({ queryKey: clientKeys.all });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
     },
   });
 
@@ -104,15 +109,17 @@ export function useCreateIntervention() {
  * const { intervention, client, equipment, isLoading } = useIntervention(id);
  */
 export function useIntervention(interventionId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: interventionKeys.detail(interventionId),
+    queryKey: interventionKeys.detail(orgId, interventionId),
     queryFn: () => interventionsService.getInterventionById(interventionId),
-    enabled: !!interventionId,
+    enabled: !!orgId && !!interventionId,
     staleTime: 30_000, // 30s
     select: (result) => result?.data || null,
   });
@@ -138,18 +145,20 @@ export function useIntervention(interventionId) {
  * @returns {Object} { photoBeforeUrl, photoAfterUrl, photosExtraUrls, signatureUrl, isLoading }
  */
 export function useInterventionFileUrls(intervention) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: interventionKeys.fileUrls(intervention?.id),
+    queryKey: interventionKeys.fileUrls(orgId, intervention?.id),
     queryFn: async () => {
       const { data, error } = await interventionsService.getInterventionFileUrls(intervention);
       if (error) throw error;
       return data;
     },
-    enabled: !!intervention?.id,
+    enabled: !!orgId && !!intervention?.id,
     staleTime: 55 * 60 * 1000, // 55min (URLs signées valables 1h)
   });
 
@@ -175,11 +184,13 @@ export function useInterventionFileUrls(intervention) {
  */
 export function useInterventionMutations(interventionId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateIntervention = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: interventionKeys.detail(interventionId) });
-    queryClient.invalidateQueries({ queryKey: interventionKeys.fileUrls(interventionId) });
-  }, [queryClient, interventionId]);
+    queryClient.invalidateQueries({ queryKey: interventionKeys.detail(orgId, interventionId) });
+    queryClient.invalidateQueries({ queryKey: interventionKeys.fileUrls(orgId, interventionId) });
+  }, [queryClient, interventionId, orgId]);
 
   // Mutation : mettre à jour l'intervention
   const updateMutation = useMutation({

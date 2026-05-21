@@ -177,7 +177,7 @@ export default function ClientDetail() {
         toast.error('Erreur lors de la création du RDV');
         return false;
       }
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(organization?.id) });
       toast.success('RDV créé avec succès');
       setAppointmentModal({ open: false });
       return true;

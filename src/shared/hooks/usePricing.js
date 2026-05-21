@@ -238,15 +238,17 @@ export function usePricingAdmin() {
  */
 export function useContractPricing(contractId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const { data: items, isLoading, error, refetch } = useQuery({
-    queryKey: pricingKeys.contractItems(contractId),
+    queryKey: pricingKeys.contractItems(orgId, contractId),
     queryFn: async () => {
       const result = await pricingService.getContractPricingItems(contractId);
       if (result.error) throw result.error;
       return result.data;
     },
-    enabled: !!contractId,
+    enabled: !!orgId && !!contractId,
     staleTime: 30_000,
   });
 
@@ -263,8 +265,8 @@ export function useContractPricing(contractId) {
       return { items: itemsResult.data, contract: amountResult.data };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: pricingKeys.contractItems(contractId) });
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: pricingKeys.contractItems(orgId, contractId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     },
   });
 

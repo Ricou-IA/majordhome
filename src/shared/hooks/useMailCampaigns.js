@@ -26,7 +26,7 @@ export function useMailCampaigns(orgId, { includeArchived = false } = {}) {
     staleTime: 60_000,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: mailCampaignKeys.all });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: mailCampaignKeys.all(orgId) });
 
   const createMutation = useMutation({
     mutationFn: async (payload) => {

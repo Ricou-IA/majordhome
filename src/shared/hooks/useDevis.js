@@ -9,6 +9,7 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devisService } from '@services/devis.service';
 import { devisKeys, leadKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { devisKeys } from '@hooks/cacheKeys';
@@ -21,19 +22,21 @@ export { devisKeys } from '@hooks/cacheKeys';
  * Devis liés à un lead
  */
 export function useDevisByLead(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: quotes,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: devisKeys.byLead(leadId),
+    queryKey: devisKeys.byLead(orgId, leadId),
     queryFn: async () => {
       const { data, error } = await devisService.getQuotesByLead(leadId);
       if (error) throw error;
       return data;
     },
-    enabled: !!leadId,
+    enabled: !!orgId && !!leadId,
     staleTime: 30_000,
   });
 
@@ -44,19 +47,21 @@ export function useDevisByLead(leadId) {
  * Devis liés à un client
  */
 export function useDevisByClient(clientId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: quotes,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: devisKeys.byClient(clientId),
+    queryKey: devisKeys.byClient(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await devisService.getQuotesByClient(clientId);
       if (error) throw error;
       return data;
     },
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
     staleTime: 30_000,
   });
 
@@ -67,19 +72,21 @@ export function useDevisByClient(clientId) {
  * Détail d'un devis (header)
  */
 export function useDevisDetail(quoteId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: quote,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: devisKeys.detail(quoteId),
+    queryKey: devisKeys.detail(orgId, quoteId),
     queryFn: async () => {
       const { data, error } = await devisService.getQuoteById(quoteId);
       if (error) throw error;
       return data;
     },
-    enabled: !!quoteId,
+    enabled: !!orgId && !!quoteId,
     staleTime: 30_000,
   });
 
@@ -90,19 +97,21 @@ export function useDevisDetail(quoteId) {
  * Lignes d'un devis
  */
 export function useDevisLines(quoteId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: lines,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: devisKeys.lines(quoteId),
+    queryKey: devisKeys.lines(orgId, quoteId),
     queryFn: async () => {
       const { data, error } = await devisService.getQuoteLines(quoteId);
       if (error) throw error;
       return data;
     },
-    enabled: !!quoteId,
+    enabled: !!orgId && !!quoteId,
     staleTime: 30_000,
   });
 
@@ -118,12 +127,14 @@ export function useDevisLines(quoteId) {
  */
 export function useDevisMutations(leadId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: devisKeys.all });
+    queryClient.invalidateQueries({ queryKey: devisKeys.all(orgId) });
     if (leadId) {
-      queryClient.invalidateQueries({ queryKey: devisKeys.byLead(leadId) });
-      queryClient.invalidateQueries({ queryKey: leadKeys.detail(leadId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.byLead(orgId, leadId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.detail(orgId, leadId) });
     }
   };
 
@@ -137,7 +148,7 @@ export function useDevisMutations(leadId) {
   const updateMutation = useMutation({
     mutationFn: ({ quoteId, updates }) => devisService.updateQuote(quoteId, updates),
     onSuccess: (_, { quoteId }) => {
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(quoteId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
     },
   });
@@ -147,8 +158,8 @@ export function useDevisMutations(leadId) {
     mutationFn: ({ quoteId, lines, globalDiscountPercent }) =>
       devisService.upsertQuoteLines(quoteId, lines, globalDiscountPercent),
     onSuccess: (_, { quoteId }) => {
-      queryClient.invalidateQueries({ queryKey: devisKeys.lines(quoteId) });
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(quoteId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.lines(orgId, quoteId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
     },
   });
@@ -163,7 +174,7 @@ export function useDevisMutations(leadId) {
   const sendMutation = useMutation({
     mutationFn: (quoteId) => devisService.sendQuote(quoteId),
     onSuccess: (_, quoteId) => {
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(quoteId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
     },
   });
@@ -172,7 +183,7 @@ export function useDevisMutations(leadId) {
   const acceptMutation = useMutation({
     mutationFn: (quoteId) => devisService.acceptQuote(quoteId),
     onSuccess: (_, quoteId) => {
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(quoteId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
     },
   });
@@ -181,7 +192,7 @@ export function useDevisMutations(leadId) {
   const refuseMutation = useMutation({
     mutationFn: (quoteId) => devisService.refuseQuote(quoteId),
     onSuccess: (_, quoteId) => {
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(quoteId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
     },
   });

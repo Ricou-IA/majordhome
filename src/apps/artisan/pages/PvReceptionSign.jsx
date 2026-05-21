@@ -61,6 +61,7 @@ export default function PvReceptionSign() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, organization } = useAuth();
+  const orgId = organization?.id;
   const company = buildCompanyInfo(organization?.settings);
 
   // -- Données --
@@ -166,7 +167,7 @@ export default function PvReceptionSign() {
       if (dbError) throw dbError;
 
       // Invalider le cache
-      queryClient.invalidateQueries({ queryKey: chantierKeys.all });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
 
       toast.success('PV de réception signé et généré');
       navigate('/chantiers');

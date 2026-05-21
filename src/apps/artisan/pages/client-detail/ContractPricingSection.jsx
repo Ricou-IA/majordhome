@@ -27,7 +27,8 @@ import { formatEuro } from '@/lib/utils';
 
 export function ContractPricingSection({ contractId, contract, client }) {
   const queryClient = useQueryClient();
-  const { isOrgAdmin } = useAuth();
+  const { isOrgAdmin, organization } = useAuth();
+  const orgId = organization?.id;
   const { equipments, isLoading: loadingEquipments } = useContractEquipments(contractId);
   const { zones, rates, discounts, equipmentTypes, isLoading: loadingPricing } = usePricingData();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -126,7 +127,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
       );
       if (result.error) throw result.error;
       toast.success('Montant aligné sur le calcul');
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     } catch (err) {
       console.error('[ContractPricingSection] sync error:', err);
       toast.error('Erreur lors de la mise à jour du montant');
@@ -147,7 +148,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
           activeZone?.id,
           false
         );
-        queryClient.invalidateQueries({ queryKey: contractKeys.all });
+        queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       } catch (err) {
         console.warn('[ContractPricingSection] auto-sync silent fail:', err);
       }
@@ -174,7 +175,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
       );
       if (result.error) throw result.error;
       toast.success('Valeur forcée enregistrée');
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     } catch (err) {
       console.error('[ContractPricingSection] force error:', err);
       toast.error('Erreur lors de l\'enregistrement');

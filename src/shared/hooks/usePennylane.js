@@ -9,9 +9,10 @@
  */
 
 import { useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
 import { pennylaneKeys, devisKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
@@ -36,7 +37,7 @@ export function usePennylaneSync(quoteId, orgId) {
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: pennylaneKeys.sync('quote', quoteId),
+    queryKey: pennylaneKeys.sync(orgId, 'quote', quoteId),
     queryFn: async () => {
       const { data, error } = await pennylaneService.getSyncRecord(orgId, 'quote', quoteId);
       if (error) throw error;
@@ -54,9 +55,9 @@ export function usePennylaneSync(quoteId, orgId) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.sync('quote', quoteId) });
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.all });
-      queryClient.invalidateQueries({ queryKey: devisKeys.detail(quoteId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.sync(orgId, 'quote', quoteId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
     },
   });
 
@@ -85,18 +86,21 @@ export function usePennylaneSync(quoteId, orgId) {
  * Résultat mis en cache longue durée (les comptes changent rarement).
  */
 export function useLedgerAccounts() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: accounts,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: pennylaneKeys.ledgerAccounts(),
+    queryKey: pennylaneKeys.ledgerAccounts(orgId),
     queryFn: async () => {
       const { data, error } = await pennylaneService.getLedgerAccounts();
       if (error) throw error;
       return data;
     },
+    enabled: !!orgId,
     staleTime: 24 * 60 * 60_000, // 24h — les comptes comptables bougent rarement
   });
 
@@ -120,7 +124,7 @@ export function usePennylaneInvoices(clientId, orgId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: pennylaneKeys.invoicesByClient(clientId),
+    queryKey: pennylaneKeys.invoicesByClient(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await pennylaneService.getInvoicesByClient(clientId, orgId);
       if (error) throw error;
@@ -150,7 +154,7 @@ export function usePennylaneQuotes(clientId, orgId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: pennylaneKeys.quotesByClient(clientId),
+    queryKey: pennylaneKeys.quotesByClient(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await pennylaneService.getQuotesByClient(clientId, orgId);
       if (error) throw error;
@@ -174,19 +178,21 @@ export function usePennylaneQuotes(clientId, orgId) {
  * @param {number|string|null} pennylaneQuoteId
  */
 export function usePennylaneQuoteLines(pennylaneQuoteId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: pennylaneKeys.quoteLines(pennylaneQuoteId),
+    queryKey: pennylaneKeys.quoteLines(orgId, pennylaneQuoteId),
     queryFn: async () => {
       const { data, error } = await pennylaneService.getQuoteLines(pennylaneQuoteId);
       if (error) throw error;
       return data;
     },
-    enabled: !!pennylaneQuoteId,
+    enabled: !!orgId && !!pennylaneQuoteId,
     // Lignes d'un devis signé = quasi-immuables. Cache long pour éviter les
     // refetch inutiles quand on enchaîne les réceptions sur plusieurs chantiers.
     staleTime: 60 * 60_000,  // 1h : pas de refetch pendant ce délai
@@ -200,6 +206,151 @@ export function usePennylaneQuoteLines(pennylaneQuoteId) {
     isLoading,
     error,
     refetch,
+  };
+}
+
+// ============================================================================
+// LIGNES DE PLUSIEURS DEVIS PL (multi-devis par chantier)
+// ============================================================================
+
+/**
+ * Hook pour charger en parallèle les lignes de N devis Pennylane.
+ * Utilise useQueries → réutilise le cache de usePennylaneQuoteLines (même queryKey).
+ *
+ * @param {Array<number|string>} pennylaneQuoteIds
+ * @returns {{
+ *   resultsById: Record<id, { quote, lines, sections, isLoading, error }>,
+ *   isLoading: boolean,
+ *   isError: boolean,
+ *   allLines: Array — concat de toutes les lignes (utile pour recompute statut)
+ * }}
+ */
+export function useMultiplePennylaneQuoteLines(pennylaneQuoteIds) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const ids = Array.isArray(pennylaneQuoteIds) ? pennylaneQuoteIds.filter(Boolean) : [];
+
+  const queries = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: pennylaneKeys.quoteLines(orgId, id),
+      queryFn: async () => {
+        const { data, error } = await pennylaneService.getQuoteLines(id);
+        if (error) throw error;
+        return data;
+      },
+      enabled: !!orgId && !!id,
+      staleTime: 60 * 60_000,
+      gcTime: 60 * 60_000,
+    })),
+  });
+
+  const resultsById = {};
+  let isLoading = false;
+  let isError = false;
+  const allLines = [];
+
+  ids.forEach((id, idx) => {
+    const q = queries[idx];
+    const data = q?.data;
+    resultsById[id] = {
+      quote: data?.quote || null,
+      sections: data?.sections || [],
+      lines: data?.lines || [],
+      isLoading: q?.isLoading || false,
+      error: q?.error || null,
+    };
+    if (q?.isLoading) isLoading = true;
+    if (q?.isError) isError = true;
+    if (data?.lines?.length) {
+      allLines.push(...data.lines.map((l) => ({ ...l, _quote_pl_id: id })));
+    }
+  });
+
+  return { resultsById, isLoading, isError, allLines };
+}
+
+// ============================================================================
+// LIAISON LEAD ↔ DEVIS PL (multi-devis par chantier)
+// ============================================================================
+
+/**
+ * Liste des devis Pennylane liés à un lead (chantier), actifs uniquement.
+ * Source : vue majordhome_lead_pennylane_quotes (filtre ejected_at IS NULL côté service).
+ */
+export function useLinkedPennylaneQuotes(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const {
+    data: linkedQuotes,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getLinkedQuotesByLead(leadId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!leadId,
+    staleTime: 30_000,
+  });
+
+  return { linkedQuotes: linkedQuotes || [], isLoading, error, refetch };
+}
+
+/**
+ * Mutations attach/eject d'un devis Pennylane sur un lead.
+ * Invalide la liste des devis liés ET le statut chantier (la cascade côté UI).
+ */
+export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
+  const queryClient = useQueryClient();
+
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
+    queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+  }, [queryClient, leadId, orgId]);
+
+  const assignMutation = useMutation({
+    mutationFn: async ({ pennylaneQuoteId, quoteData }) => {
+      const { data, error } = await pennylaneService.assignQuoteToLead(
+        orgId,
+        pennylaneQuoteId,
+        leadId,
+        quoteData
+      );
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+
+  const ejectMutation = useMutation({
+    mutationFn: async ({ pennylaneQuoteId, reason }) => {
+      const { data, error } = await pennylaneService.ejectQuoteFromLead(
+        orgId,
+        pennylaneQuoteId,
+        reason
+      );
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+
+  return {
+    assignQuote: useCallback(
+      (pennylaneQuoteId, quoteData) =>
+        assignMutation.mutateAsync({ pennylaneQuoteId, quoteData }),
+      [assignMutation]
+    ),
+    ejectQuote: useCallback(
+      (pennylaneQuoteId, reason) =>
+        ejectMutation.mutateAsync({ pennylaneQuoteId, reason }),
+      [ejectMutation]
+    ),
+    isAssigning: assignMutation.isPending,
+    isEjecting: ejectMutation.isPending,
   };
 }
 
@@ -220,7 +371,7 @@ export function usePennylaneSyncClient(orgId) {
       return data;
     },
     onSuccess: (_, client) => {
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.syncByClient(client.id) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.syncByClient(orgId, client.id) });
     },
   });
 

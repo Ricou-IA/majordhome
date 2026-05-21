@@ -4,156 +4,174 @@
  * Source unique pour toutes les clés de cache TanStack React Query.
  * Élimine les imports croisés entre hooks et garantit la cohérence.
  *
- * P0.11 (DETTE TECHNIQUE) — propagation de `orgId` dans toutes les keys :
- *   - Aujourd'hui : seulement `pricingKeys` (P0.0.6) et quelques `lists/stats`
- *     prennent `orgId` en paramètre. La majorité des keys "par UUID enfant"
- *     (detail, byClient, byLead) ne sont pas scopées par org.
- *   - Risque résiduel : nul tant qu'un user n'a pas accès à 2 orgs
- *     simultanément (queryClient.clear() au logout/switch couvre le reste).
- *   - À refactor avant onboarding 2ème entreprise (~3-4h pour patch les
- *     ~257 callsites + tests manuel). Plan : factory `all(orgId)` pour
- *     toutes les familles + propagation `orgId` dans tous les hooks
- *     (ajouter useAuth() où manquant) + tests manuels par module.
+ * Convention (P0.11 — 2026-05-21) : toutes les familles utilisent
+ * `all: (orgId) => [<domain>, orgId]` en racine, et toutes les sous-keys
+ * prennent `orgId` en 1ᵉʳ paramètre. Pattern défini par `pricingKeys`
+ * (P0.0.6) et généralisé à toutes les familles.
+ *
+ *   Avantages :
+ *     - Le cache est scopé par org à TOUS les niveaux → un user qui
+ *       changerait d'org (multi-tenant futur) ne voit jamais le cache
+ *       d'une autre org via partial match.
+ *     - `invalidateQueries({ queryKey: clientKeys.all(orgId) })` invalide
+ *       tout le cache clients d'une org spécifique sans toucher aux autres.
+ *     - `invalidateQueries({ queryKey: ['clients'] })` reste possible
+ *       (préfixe match TanStack v5) si on veut tout invalider toutes orgs.
+ *
+ *   Bénéfice net aujourd'hui : nul tant qu'aucun user n'est dans 2 orgs
+ *   simultanément. `queryClient.clear()` au logout (P0.12) couvre déjà le
+ *   switch d'org. Mais c'est de la défense en profondeur indispensable
+ *   avant l'onboarding 2ᵉ entreprise.
+ *
+ * Usage côté hook (pattern standard) :
+ *
+ *   const { organization } = useAuth();
+ *   const orgId = organization?.id;
+ *   useQuery({
+ *     queryKey: clientKeys.detail(orgId, clientId),
+ *     queryFn: () => clientsService.getById(clientId),
+ *     enabled: !!orgId && !!clientId,  // évite fire avant que orgId soit résolu
+ *   });
  * ============================================================================
  */
 
 // --- Clients ---
 export const clientKeys = {
-  all: ['clients'],
-  lists: () => [...clientKeys.all, 'list'],
-  list: (orgId, filters) => [...clientKeys.lists(), orgId, filters],
-  details: () => [...clientKeys.all, 'detail'],
-  detail: (id) => [...clientKeys.details(), id],
-  stats: (orgId) => [...clientKeys.all, 'stats', orgId],
-  search: (orgId, query) => [...clientKeys.all, 'search', orgId, query],
-  activities: (clientId) => [...clientKeys.all, 'activities', clientId],
-  equipments: (clientId) => [...clientKeys.all, 'equipments', clientId],
-  brands: () => [...clientKeys.all, 'brands'],
-  pricingTypes: () => [...clientKeys.all, 'pricing-types'],
-  duplicates: (orgId, name, postal) => [...clientKeys.all, 'duplicates', orgId, name, postal],
-  linked: (clientId) => [...clientKeys.all, 'linked', clientId],
+  all: (orgId) => ['clients', orgId],
+  lists: (orgId) => [...clientKeys.all(orgId), 'list'],
+  list: (orgId, filters) => [...clientKeys.lists(orgId), filters],
+  details: (orgId) => [...clientKeys.all(orgId), 'detail'],
+  detail: (orgId, id) => [...clientKeys.details(orgId), id],
+  stats: (orgId) => [...clientKeys.all(orgId), 'stats'],
+  search: (orgId, query) => [...clientKeys.all(orgId), 'search', query],
+  activities: (orgId, clientId) => [...clientKeys.all(orgId), 'activities', clientId],
+  equipments: (orgId, clientId) => [...clientKeys.all(orgId), 'equipments', clientId],
+  brands: (orgId) => [...clientKeys.all(orgId), 'brands'],
+  pricingTypes: (orgId) => [...clientKeys.all(orgId), 'pricing-types'],
+  duplicates: (orgId, name, postal) => [...clientKeys.all(orgId), 'duplicates', name, postal],
+  linked: (orgId, clientId) => [...clientKeys.all(orgId), 'linked', clientId],
 };
 
 // --- Contracts ---
 export const contractKeys = {
-  all: ['contracts'],
-  lists: () => [...contractKeys.all, 'list'],
-  detail: (contractId) => [...contractKeys.all, 'detail', contractId],
-  byClient: (clientId) => [...contractKeys.all, 'byClient', clientId],
-  equipments: (contractId) => [...contractKeys.all, 'equipments', contractId],
-  stats: (orgId, year) => [...contractKeys.all, 'stats', orgId, year],
+  all: (orgId) => ['contracts', orgId],
+  lists: (orgId) => [...contractKeys.all(orgId), 'list'],
+  detail: (orgId, contractId) => [...contractKeys.all(orgId), 'detail', contractId],
+  byClient: (orgId, clientId) => [...contractKeys.all(orgId), 'byClient', clientId],
+  equipments: (orgId, contractId) => [...contractKeys.all(orgId), 'equipments', contractId],
+  stats: (orgId, year) => [...contractKeys.all(orgId), 'stats', year],
 };
 
 // --- Leads ---
 export const leadKeys = {
-  all: ['leads'],
-  lists: () => [...leadKeys.all, 'list'],
-  list: (orgId, filters) => [...leadKeys.lists(), orgId, filters],
-  detail: (id) => [...leadKeys.all, 'detail', id],
-  activities: (leadId) => [...leadKeys.all, 'activities', leadId],
-  sources: () => [...leadKeys.all, 'sources'],
-  statuses: () => [...leadKeys.all, 'statuses'],
-  commercials: (orgId) => [...leadKeys.all, 'commercials', orgId],
-  search: (orgId, query) => [...leadKeys.all, 'search', orgId, query],
-  longTerm: (orgId, filters) => [...leadKeys.all, 'longTerm', orgId, filters],
+  all: (orgId) => ['leads', orgId],
+  lists: (orgId) => [...leadKeys.all(orgId), 'list'],
+  list: (orgId, filters) => [...leadKeys.lists(orgId), filters],
+  detail: (orgId, id) => [...leadKeys.all(orgId), 'detail', id],
+  activities: (orgId, leadId) => [...leadKeys.all(orgId), 'activities', leadId],
+  sources: (orgId) => [...leadKeys.all(orgId), 'sources'],
+  statuses: (orgId) => [...leadKeys.all(orgId), 'statuses'],
+  commercials: (orgId) => [...leadKeys.all(orgId), 'commercials'],
+  search: (orgId, query) => [...leadKeys.all(orgId), 'search', query],
+  longTerm: (orgId, filters) => [...leadKeys.all(orgId), 'longTerm', filters],
 };
 
 // --- Lead Interactions (timeline MT-LT) ---
 export const leadInteractionKeys = {
-  all: ['lead-interactions'],
-  byLead: (leadId) => [...leadInteractionKeys.all, 'byLead', leadId],
+  all: (orgId) => ['lead-interactions', orgId],
+  byLead: (orgId, leadId) => [...leadInteractionKeys.all(orgId), 'byLead', leadId],
 };
 
 // --- Appointments ---
 export const appointmentKeys = {
-  all: ['appointments'],
-  lists: () => [...appointmentKeys.all, 'list'],
-  list: (orgId, dateRange, filters) => [...appointmentKeys.lists(), orgId, dateRange, filters],
-  detail: (id) => [...appointmentKeys.all, 'detail', id],
+  all: (orgId) => ['appointments', orgId],
+  lists: (orgId) => [...appointmentKeys.all(orgId), 'list'],
+  list: (orgId, dateRange, filters) => [...appointmentKeys.lists(orgId), dateRange, filters],
+  detail: (orgId, id) => [...appointmentKeys.all(orgId), 'detail', id],
   teamMembers: (orgId) => ['team-members', orgId],
-  technicians: (appointmentIds) => [...appointmentKeys.all, 'technicians', appointmentIds],
+  technicians: (orgId, appointmentIds) => [...appointmentKeys.all(orgId), 'technicians', appointmentIds],
 };
 
 // --- Interventions ---
 export const interventionKeys = {
-  all: ['interventions'],
-  detail: (id) => [...interventionKeys.all, 'detail', id],
-  fileUrls: (id) => [...interventionKeys.all, 'files', id],
-  byProject: (projectId) => [...interventionKeys.all, 'project', projectId],
-  slots: (parentId) => [...interventionKeys.all, 'slots', parentId],
+  all: (orgId) => ['interventions', orgId],
+  detail: (orgId, id) => [...interventionKeys.all(orgId), 'detail', id],
+  fileUrls: (orgId, id) => [...interventionKeys.all(orgId), 'files', id],
+  byProject: (orgId, projectId) => [...interventionKeys.all(orgId), 'project', projectId],
+  slots: (orgId, parentId) => [...interventionKeys.all(orgId), 'slots', parentId],
 };
 
 // --- Chantiers ---
 export const chantierKeys = {
-  all: ['chantiers'],
-  lists: () => [...chantierKeys.all, 'list'],
-  list: (orgId) => [...chantierKeys.lists(), orgId],
+  all: (orgId) => ['chantiers', orgId],
+  lists: (orgId) => [...chantierKeys.all(orgId), 'list'],
+  list: (orgId) => [...chantierKeys.lists(orgId)],
 };
 
 // --- Chantier Receptions (réceptions ligne par ligne) ---
 export const chantierReceptionKeys = {
-  all: ['chantier-receptions'],
-  byChantier: (chantierId) => [...chantierReceptionKeys.all, 'byChantier', chantierId],
+  all: (orgId) => ['chantier-receptions', orgId],
+  byChantier: (orgId, chantierId) => [...chantierReceptionKeys.all(orgId), 'byChantier', chantierId],
 };
 
 // --- Chantier Slots (Phase 0 transitoire — supprimé en Phase 1) ---
 export const chantierSlotKeys = {
-  all: ['chantier-slots'],
-  lists: () => [...chantierSlotKeys.all, 'list'],
-  list: (orgId, dateRange) => [...chantierSlotKeys.lists(), orgId, dateRange],
+  all: (orgId) => ['chantier-slots', orgId],
+  lists: (orgId) => [...chantierSlotKeys.all(orgId), 'list'],
+  list: (orgId, dateRange) => [...chantierSlotKeys.lists(orgId), dateRange],
 };
 
 // --- Prospects ---
 export const prospectKeys = {
-  all: ['prospects'],
-  lists: () => [...prospectKeys.all, 'list'],
-  list: (orgId, module, filters) => [...prospectKeys.lists(), orgId, module, filters],
-  details: () => [...prospectKeys.all, 'detail'],
-  detail: (id) => [...prospectKeys.details(), id],
-  interactions: (id) => [...prospectKeys.all, 'interactions', id],
-  stats: (orgId, module) => [...prospectKeys.all, 'stats', orgId, module],
-  sirens: (orgId, module) => [...prospectKeys.all, 'sirens', orgId, module],
+  all: (orgId) => ['prospects', orgId],
+  lists: (orgId) => [...prospectKeys.all(orgId), 'list'],
+  list: (orgId, module, filters) => [...prospectKeys.lists(orgId), module, filters],
+  details: (orgId) => [...prospectKeys.all(orgId), 'detail'],
+  detail: (orgId, id) => [...prospectKeys.details(orgId), id],
+  interactions: (orgId, id) => [...prospectKeys.all(orgId), 'interactions', id],
+  stats: (orgId, module) => [...prospectKeys.all(orgId), 'stats', module],
+  sirens: (orgId, module) => [...prospectKeys.all(orgId), 'sirens', module],
 };
 
-// --- Mailing ---
+// --- Mailing (logs) ---
 export const mailingKeys = {
-  all: ['mailing'],
-  byClient: (clientId) => [...mailingKeys.all, 'client', clientId],
-  byLead: (leadId) => [...mailingKeys.all, 'lead', leadId],
+  all: (orgId) => ['mailing', orgId],
+  byClient: (orgId, clientId) => [...mailingKeys.all(orgId), 'client', clientId],
+  byLead: (orgId, leadId) => [...mailingKeys.all(orgId), 'lead', leadId],
 };
 
 // --- Mail Campaigns (templates paramétrables) ---
 export const mailCampaignKeys = {
-  all: ['mail-campaigns'],
-  lists: () => [...mailCampaignKeys.all, 'list'],
-  list: (orgId) => [...mailCampaignKeys.lists(), orgId],
-  detail: (id) => [...mailCampaignKeys.all, 'detail', id],
+  all: (orgId) => ['mail-campaigns', orgId],
+  lists: (orgId) => [...mailCampaignKeys.all(orgId), 'list'],
+  list: (orgId) => [...mailCampaignKeys.lists(orgId)],
+  detail: (orgId, id) => [...mailCampaignKeys.all(orgId), 'detail', id],
 };
 
 // --- Mail Segments (catalogue de ciblages réutilisables) ---
 export const mailSegmentKeys = {
-  all: ['mail-segments'],
-  lists: () => [...mailSegmentKeys.all, 'list'],
-  list: (orgId) => [...mailSegmentKeys.lists(), orgId],
-  detail: (id) => [...mailSegmentKeys.all, 'detail', id],
-  count: (filters, campaignName, orgId) => [...mailSegmentKeys.all, 'count', orgId, campaignName, filters],
-  preview: (filters, campaignName, orgId) => [...mailSegmentKeys.all, 'preview', orgId, campaignName, filters],
+  all: (orgId) => ['mail-segments', orgId],
+  lists: (orgId) => [...mailSegmentKeys.all(orgId), 'list'],
+  list: (orgId) => [...mailSegmentKeys.lists(orgId)],
+  detail: (orgId, id) => [...mailSegmentKeys.all(orgId), 'detail', id],
+  count: (orgId, filters, campaignName) => [...mailSegmentKeys.all(orgId), 'count', campaignName, filters],
+  preview: (orgId, filters, campaignName) => [...mailSegmentKeys.all(orgId), 'preview', campaignName, filters],
 };
 
 // --- Mail Campaign Stats (KPIs agrégés par campagne) ---
 export const mailCampaignStatsKeys = {
-  all: ['mail-campaign-stats'],
-  list: (orgId) => [...mailCampaignStatsKeys.all, 'list', orgId],
+  all: (orgId) => ['mail-campaign-stats', orgId],
+  list: (orgId) => [...mailCampaignStatsKeys.all(orgId), 'list'],
 };
 
 // --- SMS ---
 export const smsKeys = {
-  all: ['sms'],
-  byClient: (clientId) => [...smsKeys.all, 'client', clientId],
-  byIntervention: (interventionId) => [...smsKeys.all, 'intervention', interventionId],
+  all: (orgId) => ['sms', orgId],
+  byClient: (orgId, clientId) => [...smsKeys.all(orgId), 'client', clientId],
+  byIntervention: (orgId, interventionId) => [...smsKeys.all(orgId), 'intervention', interventionId],
 };
 
-// --- Pricing per-org (P0.0.6 reste) : orgId en premier pour éviter fuite cross-org via cache RQ ---
+// --- Pricing per-org (P0.0.6 — pattern de référence pour P0.11) ---
 export const pricingKeys = {
   all: (orgId) => ['pricing', orgId],
   zones: (orgId) => [...pricingKeys.all(orgId), 'zones'],
@@ -163,118 +181,117 @@ export const pricingKeys = {
   discounts: (orgId) => [...pricingKeys.all(orgId), 'discounts'],
   extras: (orgId) => [...pricingKeys.all(orgId), 'extras'],
   allData: (orgId) => [...pricingKeys.all(orgId), 'allData'],
-  contractItems: (contractId) => ['pricing', 'contractItems', contractId],
+  contractItems: (orgId, contractId) => [...pricingKeys.all(orgId), 'contractItems', contractId],
 };
 
 // --- Permissions ---
 export const permissionKeys = {
-  all: ['permissions'],
-  org: (orgId) => [...permissionKeys.all, orgId],
-  members: (orgId) => [...permissionKeys.all, 'members', orgId],
+  all: (orgId) => ['permissions', orgId],
+  org: (orgId) => [...permissionKeys.all(orgId)],
+  members: (orgId) => [...permissionKeys.all(orgId), 'members'],
 };
 
 // --- Entretien SAV ---
 export const entretienSavKeys = {
-  all: ['entretien-sav'],
-  lists: () => [...entretienSavKeys.all, 'list'],
-  list: (orgId) => [...entretienSavKeys.lists(), orgId],
-  stats: (orgId) => [...entretienSavKeys.all, 'stats', orgId],
-  children: (parentId) => [...entretienSavKeys.all, 'children', parentId],
+  all: (orgId) => ['entretien-sav', orgId],
+  lists: (orgId) => [...entretienSavKeys.all(orgId), 'list'],
+  list: (orgId) => [...entretienSavKeys.lists(orgId)],
+  stats: (orgId) => [...entretienSavKeys.all(orgId), 'stats'],
+  children: (orgId, parentId) => [...entretienSavKeys.all(orgId), 'children', parentId],
 };
 
 // --- Technical Visit ---
 export const technicalVisitKeys = {
-  all: ['technical-visits'],
-  byLead: (leadId) => [...technicalVisitKeys.all, 'lead', leadId],
-  photos: (visitId) => [...technicalVisitKeys.all, 'photos', visitId],
+  all: (orgId) => ['technical-visits', orgId],
+  byLead: (orgId, leadId) => [...technicalVisitKeys.all(orgId), 'lead', leadId],
+  photos: (orgId, visitId) => [...technicalVisitKeys.all(orgId), 'photos', visitId],
 };
 
 // --- Certificats ---
 export const certificatKeys = {
-  all: ['certificats'],
-  byIntervention: (interventionId) => [...certificatKeys.all, 'intervention', interventionId],
+  all: (orgId) => ['certificats', orgId],
+  byIntervention: (orgId, interventionId) => [...certificatKeys.all(orgId), 'intervention', interventionId],
 };
 
 // --- Suppliers ---
 export const supplierKeys = {
-  all: ['suppliers'],
-  lists: () => [...supplierKeys.all, 'list'],
-  list: (orgId) => [...supplierKeys.lists(), orgId],
-  detail: (id) => [...supplierKeys.all, 'detail', id],
-  products: (supplierId) => [...supplierKeys.all, 'products', supplierId],
-  productDetail: (productId) => [...supplierKeys.all, 'product', productId],
-  productVariants: (parentId) => [...supplierKeys.all, 'variants', parentId],
-  allProducts: (orgId) => [...supplierKeys.all, 'all-products', orgId],
-  searchProducts: (orgId, query) => [...supplierKeys.all, 'search-products', orgId, query],
-  productDocuments: (productId) => [...supplierKeys.all, 'product-documents', productId],
-  productDocumentsByIds: (ids) => [...supplierKeys.all, 'product-documents-batch', ...(ids || [])],
+  all: (orgId) => ['suppliers', orgId],
+  lists: (orgId) => [...supplierKeys.all(orgId), 'list'],
+  list: (orgId) => [...supplierKeys.lists(orgId)],
+  detail: (orgId, id) => [...supplierKeys.all(orgId), 'detail', id],
+  products: (orgId, supplierId) => [...supplierKeys.all(orgId), 'products', supplierId],
+  productDetail: (orgId, productId) => [...supplierKeys.all(orgId), 'product', productId],
+  productVariants: (orgId, parentId) => [...supplierKeys.all(orgId), 'variants', parentId],
+  allProducts: (orgId) => [...supplierKeys.all(orgId), 'all-products'],
+  searchProducts: (orgId, query) => [...supplierKeys.all(orgId), 'search-products', query],
+  productDocuments: (orgId, productId) => [...supplierKeys.all(orgId), 'product-documents', productId],
+  productDocumentsByIds: (orgId, ids) => [...supplierKeys.all(orgId), 'product-documents-batch', ...(ids || [])],
 };
 
 // --- GeoGrid ---
 export const geogridKeys = {
-  all: ['geogrid'],
-  lists: () => [...geogridKeys.all, 'list'],
-  list: (orgId) => [...geogridKeys.lists(), orgId],
-  detail: (scanId) => [...geogridKeys.all, 'detail', scanId],
-  results: (scanId) => [...geogridKeys.all, 'results', scanId],
-  quota: (orgId) => [...geogridKeys.all, 'quota', orgId],
-  // Listes de keywords + benchmarks
-  keywordLists: (orgId) => [...geogridKeys.all, 'keyword-lists', orgId],
-  benchmarks: (orgId) => [...geogridKeys.all, 'benchmarks', orgId],
-  benchmarkScans: (benchmarkId) => [...geogridKeys.all, 'benchmark-scans', benchmarkId],
+  all: (orgId) => ['geogrid', orgId],
+  lists: (orgId) => [...geogridKeys.all(orgId), 'list'],
+  list: (orgId) => [...geogridKeys.lists(orgId)],
+  detail: (orgId, scanId) => [...geogridKeys.all(orgId), 'detail', scanId],
+  results: (orgId, scanId) => [...geogridKeys.all(orgId), 'results', scanId],
+  quota: (orgId) => [...geogridKeys.all(orgId), 'quota'],
+  keywordLists: (orgId) => [...geogridKeys.all(orgId), 'keyword-lists'],
+  benchmarks: (orgId) => [...geogridKeys.all(orgId), 'benchmarks'],
+  benchmarkScans: (orgId, benchmarkId) => [...geogridKeys.all(orgId), 'benchmark-scans', benchmarkId],
 };
 
 // --- GSC (Google Search Console) ---
 export const gscKeys = {
-  all: ['gsc'],
-  status: (orgId) => [...gscKeys.all, 'status', orgId],
-  metrics: (orgId, range, queries) => [...gscKeys.all, 'metrics', orgId, range, queries],
+  all: (orgId) => ['gsc', orgId],
+  status: (orgId) => [...gscKeys.all(orgId), 'status'],
+  metrics: (orgId, range, queries) => [...gscKeys.all(orgId), 'metrics', range, queries],
 };
 
 // --- Tasks ---
 export const taskKeys = {
-  all: ['tasks'],
-  lists: () => [...taskKeys.all, 'list'],
-  list: (orgId) => [...taskKeys.lists(), orgId],
-  archived: (orgId) => [...taskKeys.all, 'archived', orgId],
-  detail: (id) => [...taskKeys.all, 'detail', id],
-  notes: (taskId) => [...taskKeys.all, 'notes', taskId],
+  all: (orgId) => ['tasks', orgId],
+  lists: (orgId) => [...taskKeys.all(orgId), 'list'],
+  list: (orgId) => [...taskKeys.lists(orgId)],
+  archived: (orgId) => [...taskKeys.all(orgId), 'archived'],
+  detail: (orgId, id) => [...taskKeys.all(orgId), 'detail', id],
+  notes: (orgId, taskId) => [...taskKeys.all(orgId), 'notes', taskId],
 };
 
 // --- Google Calendar ---
 export const googleCalendarKeys = {
-  all: ['google-calendar'],
-  status: (orgId) => [...googleCalendarKeys.all, 'status', orgId],
+  all: (orgId) => ['google-calendar', orgId],
+  status: (orgId) => [...googleCalendarKeys.all(orgId), 'status'],
 };
 
 // --- Pennylane ---
 export const pennylaneKeys = {
-  all: ['pennylane'],
-  sync: (entityType, localId) => [...pennylaneKeys.all, 'sync', entityType, localId],
-  syncByClient: (clientId) => [...pennylaneKeys.all, 'sync', 'client', clientId],
-  ledgerAccounts: () => [...pennylaneKeys.all, 'ledger-accounts'],
-  invoicesByClient: (clientId) => [...pennylaneKeys.all, 'invoices', clientId],
-  quotesByClient: (clientId) => [...pennylaneKeys.all, 'quotes', clientId],
-  quoteLines: (pennylaneQuoteId) => [...pennylaneKeys.all, 'quote-lines', pennylaneQuoteId],
-  linkedQuotesByLead: (leadId) => [...pennylaneKeys.all, 'linked-quotes', leadId],
+  all: (orgId) => ['pennylane', orgId],
+  sync: (orgId, entityType, localId) => [...pennylaneKeys.all(orgId), 'sync', entityType, localId],
+  syncByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'sync', 'client', clientId],
+  ledgerAccounts: (orgId) => [...pennylaneKeys.all(orgId), 'ledger-accounts'],
+  invoicesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'invoices', clientId],
+  quotesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'quotes', clientId],
+  quoteLines: (orgId, pennylaneQuoteId) => [...pennylaneKeys.all(orgId), 'quote-lines', pennylaneQuoteId],
+  linkedQuotesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'linked-quotes', leadId],
 };
 
 // --- Meta Ads ---
 export const metaAdsKeys = {
-  all: ['meta-ads'],
-  stats: (orgId, range, level) => [...metaAdsKeys.all, 'stats', orgId, range, level],
-  attribution: (orgId, range, commercialId) => [...metaAdsKeys.all, 'attribution', orgId, range, commercialId || 'all'],
-  accounts: (orgId) => [...metaAdsKeys.all, 'accounts', orgId],
-  commercials: (orgId) => [...metaAdsKeys.all, 'commercials', orgId],
+  all: (orgId) => ['meta-ads', orgId],
+  stats: (orgId, range, level) => [...metaAdsKeys.all(orgId), 'stats', range, level],
+  attribution: (orgId, range, commercialId) => [...metaAdsKeys.all(orgId), 'attribution', range, commercialId || 'all'],
+  accounts: (orgId) => [...metaAdsKeys.all(orgId), 'accounts'],
+  commercials: (orgId) => [...metaAdsKeys.all(orgId), 'commercials'],
 };
 
 // --- Devis (Quotes) ---
 export const devisKeys = {
-  all: ['devis'],
-  lists: () => [...devisKeys.all, 'list'],
-  list: (orgId, filters) => [...devisKeys.lists(), orgId, filters],
-  detail: (id) => [...devisKeys.all, 'detail', id],
-  lines: (quoteId) => [...devisKeys.all, 'lines', quoteId],
-  byLead: (leadId) => [...devisKeys.all, 'byLead', leadId],
-  byClient: (clientId) => [...devisKeys.all, 'byClient', clientId],
+  all: (orgId) => ['devis', orgId],
+  lists: (orgId) => [...devisKeys.all(orgId), 'list'],
+  list: (orgId, filters) => [...devisKeys.lists(orgId), filters],
+  detail: (orgId, id) => [...devisKeys.all(orgId), 'detail', id],
+  lines: (orgId, quoteId) => [...devisKeys.all(orgId), 'lines', quoteId],
+  byLead: (orgId, leadId) => [...devisKeys.all(orgId), 'byLead', leadId],
+  byClient: (orgId, clientId) => [...devisKeys.all(orgId), 'byClient', clientId],
 };

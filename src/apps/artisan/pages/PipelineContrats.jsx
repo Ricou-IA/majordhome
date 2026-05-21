@@ -17,7 +17,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { contractKeys } from '@hooks/cacheKeys';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { supabase } from '@/lib/supabaseClient';
-import { formatEuro, formatDateShortFR } from '@/lib/utils';
+import { formatEuroCeil, formatDateShortFR } from '@/lib/utils';
 
 // ============================================================================
 // STAT CARD (léger, inline)
@@ -145,13 +145,13 @@ function useContractsPipeline(orgId) {
       setContracts(prev => prev.map(c =>
         c.id === contractId ? { ...c, workflow_status: newWorkflowStatus } : c
       ));
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       return { error: null };
     } catch (err) {
       console.error('[PipelineContrats] updateStatus error:', err);
       return { error: err };
     }
-  }, [queryClient]);
+  }, [queryClient, orgId]);
 
   return { contracts, loading, error: fetchError, refetch: fetchContracts, updateWorkflow };
 }
@@ -181,7 +181,7 @@ function ContractPipelineCard({ contract }) {
         </div>
         {amount > 0 && (
           <span className="text-sm font-bold text-emerald-600 tabular-nums flex-shrink-0">
-            {formatEuro(amount)}
+            {formatEuroCeil(amount)}
           </span>
         )}
       </div>

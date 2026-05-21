@@ -8,13 +8,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { smsKeys } from './cacheKeys';
 import supabase from '@lib/supabaseClient';
+import { useAuth } from '@contexts/AuthContext';
 
 /**
  * Récupère les SMS envoyés à un client
  */
 export function useSmsLogsByClient(clientId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useQuery({
-    queryKey: smsKeys.byClient(clientId),
+    queryKey: smsKeys.byClient(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('majordhome_sms_logs')
@@ -25,7 +28,7 @@ export function useSmsLogsByClient(clientId) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
   });
 }
 

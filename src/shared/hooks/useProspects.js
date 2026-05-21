@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { prospectsService } from '@services/prospects.service';
 import { prospectKeys, clientKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export pour les consumers existants
 export { prospectKeys } from '@hooks/cacheKeys';
@@ -82,6 +83,8 @@ export function useProspects({ orgId, module, limit = DEFAULT_LIMIT } = {}) {
 
 export function useProspect(prospectId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: prospect,
@@ -89,13 +92,13 @@ export function useProspect(prospectId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: prospectKeys.detail(prospectId),
+    queryKey: prospectKeys.detail(orgId, prospectId),
     queryFn: async () => {
       const { data, error } = await prospectsService.getProspectById(prospectId);
       if (error) throw error;
       return data;
     },
-    enabled: !!prospectId,
+    enabled: !!orgId && !!prospectId,
     staleTime: 30_000,
   });
 
@@ -103,8 +106,8 @@ export function useProspect(prospectId) {
     mutationFn: (updates) => prospectsService.updateProspect(prospectId, updates),
     onSuccess: (result) => {
       if (result?.data) {
-        queryClient.setQueryData(prospectKeys.detail(prospectId), result.data);
-        queryClient.invalidateQueries({ queryKey: prospectKeys.lists() });
+        queryClient.setQueryData(prospectKeys.detail(orgId, prospectId), result.data);
+        queryClient.invalidateQueries({ queryKey: prospectKeys.lists(orgId) });
       }
     },
   });
@@ -136,6 +139,8 @@ export function useProspect(prospectId) {
 
 export function useProspectInteractions(prospectId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: interactions,
@@ -143,13 +148,13 @@ export function useProspectInteractions(prospectId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: prospectKeys.interactions(prospectId),
+    queryKey: prospectKeys.interactions(orgId, prospectId),
     queryFn: async () => {
       const { data, error } = await prospectsService.getInteractions(prospectId);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!prospectId,
+    enabled: !!orgId && !!prospectId,
     staleTime: 15_000,
   });
 
@@ -157,7 +162,7 @@ export function useProspectInteractions(prospectId) {
     mutationFn: (interactionData) =>
       prospectsService.addInteraction(prospectId, interactionData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: prospectKeys.interactions(prospectId) });
+      queryClient.invalidateQueries({ queryKey: prospectKeys.interactions(orgId, prospectId) });
     },
   });
 
@@ -201,10 +206,12 @@ export function useProspectStats(orgId, module) {
 
 export function useProspectMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: prospectKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: prospectKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   const createMutation = useMutation({
     mutationFn: (data) => prospectsService.createProspect(data),
@@ -221,17 +228,17 @@ export function useProspectMutations() {
       prospectsService.updateStatus(prospectId, newStatus, userId, { contenu }),
     onSuccess: (_, { prospectId }) => {
       invalidateAll();
-      queryClient.invalidateQueries({ queryKey: prospectKeys.interactions(prospectId) });
+      queryClient.invalidateQueries({ queryKey: prospectKeys.interactions(orgId, prospectId) });
     },
   });
 
   const convertMutation = useMutation({
-    mutationFn: ({ prospectId, orgId, userId }) =>
-      prospectsService.convertToClient(prospectId, orgId, userId),
+    mutationFn: ({ prospectId, orgId: convertOrgId, userId }) =>
+      prospectsService.convertToClient(prospectId, convertOrgId, userId),
     onSuccess: () => {
       invalidateAll();
       // Invalider aussi la liste clients
-      queryClient.invalidateQueries({ queryKey: clientKeys.all });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
     },
   });
 

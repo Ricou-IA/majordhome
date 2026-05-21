@@ -10,12 +10,15 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@contexts/AuthContext';
 import { clientKeys } from '@hooks/cacheKeys';
 import { UserPlus, CheckCircle2, Loader2, Globe } from 'lucide-react';
 
 export function InviteClientButton({ client }) {
   const [inviting, setInviting] = useState(false);
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   // Déjà invité
   if (client.auth_user_id) {
@@ -52,7 +55,7 @@ export function InviteClientButton({ client }) {
       if (data?.error) throw new Error(data.error);
 
       toast.success(`Invitation envoyée à ${client.email}`);
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(client.id) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, client.id) });
     } catch (err) {
       console.error('[InviteClientButton] error:', err);
       const msg = err?.message || 'Erreur lors de l\'envoi de l\'invitation';

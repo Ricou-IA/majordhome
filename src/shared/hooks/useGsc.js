@@ -75,7 +75,7 @@ export function useGscSync() {
         }`,
       );
       queryClient.invalidateQueries({ queryKey: gscKeys.status(variables.orgId) });
-      queryClient.invalidateQueries({ queryKey: [...gscKeys.all, 'metrics', variables.orgId] });
+      queryClient.invalidateQueries({ queryKey: [...gscKeys.all(variables.orgId), 'metrics'] });
     },
     onError: (err) => {
       toast.error(`Sync GSC echouee : ${err?.message || err}`);

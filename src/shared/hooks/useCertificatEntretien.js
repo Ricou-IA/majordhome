@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
 import { entretienSavKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // ============================================================================
 // HOOK : LISTE ENFANTS
@@ -24,14 +25,16 @@ import { entretienSavKeys } from '@hooks/cacheKeys';
  * @param {string} parentId - ID de l'intervention parent
  */
 export function useCertificatChildren(parentId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: entretienSavKeys.children(parentId),
+    queryKey: entretienSavKeys.children(orgId, parentId),
     queryFn: async () => {
       const { data, error } = await savService.getChildInterventions(parentId);
       if (error) throw error;
       return data;
     },
-    enabled: !!parentId,
+    enabled: !!orgId && !!parentId,
     staleTime: 15_000,
   });
 
@@ -49,10 +52,12 @@ export function useCertificatChildren(parentId) {
 
 export function useCertificatEntretienMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateAll = (parentId) => {
-    queryClient.invalidateQueries({ queryKey: entretienSavKeys.children(parentId) });
-    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.children(orgId, parentId) });
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
   };
 
   // Créer les enfants (1 par équipement)
@@ -94,14 +99,14 @@ export function useCertificatEntretienMutations() {
 
   // Clôturer le parent
   const completeParentMutation = useMutation({
-    mutationFn: ({ parentId, orgId, reportNotes }) =>
-      savService.completeParentEntretien(parentId, orgId, reportNotes),
+    mutationFn: ({ parentId, orgId: completeOrgId, reportNotes }) =>
+      savService.completeParentEntretien(parentId, completeOrgId, reportNotes),
     onSuccess: (result) => {
       if (result.error) {
         toast.error('Erreur lors de la clôture');
       } else if (result.data?.allDone) {
         toast.success('Entretien clôturé — visite enregistrée');
-        queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+        queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
       }
     },
     onError: () => toast.error('Erreur lors de la clôture'),

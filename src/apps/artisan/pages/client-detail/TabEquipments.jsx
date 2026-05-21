@@ -50,10 +50,10 @@ export const TabEquipments = ({ clientId }) => {
   }, [allProductDocs]);
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: contractKeys.all });
-    queryClient.invalidateQueries({ queryKey: clientKeys.equipments(clientId) });
+    queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
     if (contract?.id) {
-      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(contract.id) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(orgId, contract.id) });
     }
   };
 

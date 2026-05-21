@@ -10,6 +10,7 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { technicalVisitService } from '@services/technicalVisit.service';
 import { technicalVisitKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { technicalVisitKeys } from '@hooks/cacheKeys';
@@ -23,10 +24,12 @@ export { technicalVisitKeys } from '@hooks/cacheKeys';
  * Retourne null si inexistante (pas d'erreur).
  */
 export function useTechnicalVisit(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: technicalVisitKeys.byLead(leadId),
+    queryKey: technicalVisitKeys.byLead(orgId, leadId),
     queryFn: () => technicalVisitService.getByLeadId(leadId),
-    enabled: !!leadId,
+    enabled: !!orgId && !!leadId,
     staleTime: 30_000,
     select: (result) => result?.data || null,
   });
@@ -47,14 +50,16 @@ export function useTechnicalVisit(leadId) {
  * Charge les photos d'une fiche technique avec URLs signées.
  */
 export function useTechnicalVisitPhotos(visitId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: technicalVisitKeys.photos(visitId),
+    queryKey: technicalVisitKeys.photos(orgId, visitId),
     queryFn: async () => {
       const { data: photos, error } = await technicalVisitService.getPhotosByVisitId(visitId);
       if (error) return [];
       return technicalVisitService.getPhotoSignedUrls(photos);
     },
-    enabled: !!visitId,
+    enabled: !!orgId && !!visitId,
     staleTime: 60_000, // URLs signées valables 1h, refresh toutes les minutes
   });
 
@@ -72,18 +77,20 @@ export function useTechnicalVisitPhotos(visitId) {
 
 export function useTechnicalVisitMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   const invalidateDetail = useCallback((leadId) => {
-    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.byLead(leadId) });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.byLead(orgId, leadId) });
+  }, [queryClient, orgId]);
 
   const invalidatePhotos = useCallback((visitId) => {
-    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.photos(visitId) });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: technicalVisitKeys.photos(orgId, visitId) });
+  }, [queryClient, orgId]);
 
   // CREATE
   const createMutation = useMutation({
@@ -120,13 +127,13 @@ export function useTechnicalVisitMutations() {
     if (result.error) throw result.error;
     // Mettre à jour le cache optimistiquement
     if (leadId) {
-      queryClient.setQueryData(technicalVisitKeys.byLead(leadId), (old) => {
+      queryClient.setQueryData(technicalVisitKeys.byLead(orgId, leadId), (old) => {
         if (!old?.data) return old;
         return { ...old, data: { ...old.data, [field]: value } };
       });
     }
     return result.data;
-  }, [autoSaveMutation, queryClient]);
+  }, [autoSaveMutation, queryClient, orgId]);
 
   // LOCK
   const lockMutation = useMutation({

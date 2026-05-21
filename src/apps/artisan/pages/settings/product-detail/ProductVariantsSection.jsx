@@ -26,8 +26,8 @@ export default function ProductVariantsSection({ parent, orgId }) {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: supplierKeys.productVariants(parent?.id) });
-    queryClient.invalidateQueries({ queryKey: supplierKeys.products(parent?.supplier_id) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productVariants(orgId, parent?.id) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, parent?.supplier_id) });
     queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
   };
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { tasksService } from '@services/tasks.service';
 import { taskKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 export { taskKeys };
 
@@ -47,10 +48,12 @@ export function useArchivedTasks(orgId, enabled = false) {
 
 export function useTaskMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateTasks = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: taskKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: taskKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   const createMutation = useMutation({
     mutationFn: (data) => tasksService.createTask(data),
@@ -92,21 +95,23 @@ export function useTaskMutations() {
 
 export function useTaskNotes(taskId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: taskKeys.notes(taskId),
+    queryKey: taskKeys.notes(orgId, taskId),
     queryFn: async () => {
       const { data, error } = await tasksService.getNotes(taskId);
       if (error) throw error;
       return data;
     },
-    enabled: !!taskId,
+    enabled: !!orgId && !!taskId,
     staleTime: 10_000,
   });
 
   const invalidateNotes = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: taskKeys.notes(taskId) });
-  }, [queryClient, taskId]);
+    queryClient.invalidateQueries({ queryKey: taskKeys.notes(orgId, taskId) });
+  }, [queryClient, taskId, orgId]);
 
   const addMutation = useMutation({
     mutationFn: (content) => tasksService.addNote(taskId, content),

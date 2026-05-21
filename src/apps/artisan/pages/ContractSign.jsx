@@ -118,6 +118,7 @@ async function sendContractEmail(contract, client, pdfPath) {
 // COMPOSANT
 export default function ContractSign() {
   const { organization } = useAuth();
+  const orgId = organization?.id;
   const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
 
   const { clientId } = useParams();
@@ -274,7 +275,7 @@ export default function ContractSign() {
       if (dbError) throw dbError;
 
       // Invalidation cache
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
 
       toast.success('Contrat signé et PDF généré avec succès');
 

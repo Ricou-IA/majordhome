@@ -121,8 +121,8 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
       if (result?.error) throw result.error;
       toast.success('Produit enregistré');
       setDirty(false);
-      queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(productId) });
-      queryClient.invalidateQueries({ queryKey: supplierKeys.products(supplierId) });
+      queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, productId) });
+      queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
       queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
     } catch (err) {
       toast.error(err?.message || 'Erreur lors de la sauvegarde');

@@ -198,7 +198,7 @@ export default function Entretiens() {
 
   // Contrats ayant déjà un entretien actif (pour désactiver le bouton Planifier)
   const { data: plannedContractIds } = useQuery({
-    queryKey: [...entretienSavKeys.all, 'planned-contracts', orgId],
+    queryKey: [...entretienSavKeys.all(orgId), 'planned-contracts'],
     queryFn: async () => {
       const { data } = await supabase
         .from('majordhome_entretien_sav')
@@ -268,7 +268,7 @@ export default function Entretiens() {
           toast.error(`Erreur : ${result.error.message || 'programmation échouée'}`);
         } else {
           toast.success('Entretien programmé');
-          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
         }
       } catch (err) {
         console.error('[Entretiens] handlePlanContract error:', err);
@@ -312,7 +312,7 @@ export default function Entretiens() {
           toast.success(
             `${created} entretien${created > 1 ? 's' : ''} programmé${created > 1 ? 's' : ''}`,
           );
-          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
         }
         if (errors > 0) {
           toast.error(`${errors} erreur${errors > 1 ? 's' : ''} de programmation`);

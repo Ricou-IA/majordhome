@@ -22,7 +22,6 @@ import { supabase } from '@/lib/supabaseClient';
 
 const ACCEPTED_FILE_TYPES = '.pdf,.jpg,.jpeg,.png';
 const MAX_FILE_SIZE_MB = 10;
-const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_MAILING;
 
 export function ContractPdfSection({ contract, clientId, client, orgId }) {
   const navigate = useNavigate();
@@ -219,7 +218,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
 
       if (dbError) throw dbError;
 
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       toast.success('Contrat signé téléversé avec succès');
     } catch (err) {
       console.error('[ContractPdfSection] upload signed error:', err);
@@ -283,54 +282,27 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         .replaceAll('{{PDF_URL}}', pdfUrl);
       const subject = template.subject || `Votre proposition de contrat d'entretien — Mayer Énergie`;
 
-      // 6. Appel webhook N8N
-      if (!N8N_WEBHOOK_URL) throw new Error('Variable VITE_N8N_WEBHOOK_MAILING non configurée');
-
-      // P0.8 — Compiler le SQL côté serveur via RPC `mail_single_client_sql`
-      // (check membership intégré) au lieu de construire en clair côté client.
-      // L'attaquant ne peut plus modifier le SQL avant compilation.
-      // Note résiduelle : le webhook N8n accepte encore `segment_sql` brut, donc
-      // un attaquant pourrait toujours forger un payload. Le fix complet
-      // nécessite de modifier le workflow N8n pour n'accepter que `client_id`
-      // et appeler la RPC côté serveur (P0.8 V2).
-      const { data: compiledSql, error: sqlError } = await supabase.rpc(
-        'mail_single_client_sql',
-        { p_client_id: clientId, p_campaign_name: 'Proposition Contrat' }
-      );
-      if (sqlError) throw sqlError;
-      const safeSql = compiledSql ? `${String(compiledSql).replace(/;?\s*$/, '')};` : '';
-
-      const payload = {
-        subject,
-        html_body: htmlBody,
-        segment_sql: safeSql,
-        client_id: clientId,   // futur switch N8n : exiger client_id au lieu de segment_sql
-        campaign_name: 'Proposition Contrat',
-        org_id: orgId,
-        recipient_type: 'client',
-        batch_size: 1,
-      };
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      try {
-        await fetch(N8N_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-      } catch (err) {
-        if (err.name !== 'AbortError') throw err;
-        // Timeout = normal, N8N continue en arrière-plan
-      } finally {
-        clearTimeout(timeout);
+      // 6. Envoi via edge function mailing-send (P0.8 V2)
+      // Le SQL n'est plus accepté du client : l'edge appelle la RPC
+      // `mail_fetch_recipients(client_id)` qui inclut check membership multi-tenant.
+      const { data: sendData, error: sendError } = await supabase.functions.invoke('mailing-send', {
+        body: {
+          mode: 'single',
+          client_id: clientId,
+          subject,
+          html_body: htmlBody,
+          campaign_name: 'Proposition Contrat',
+        },
+      });
+      if (sendError) throw sendError;
+      if (sendData?.success === false) {
+        throw new Error(sendData?.error || 'Envoi proposition échoué');
       }
 
       // 7. Marquer workflow_status = proposal_sent (le statut contractuel reste inchangé)
       if (!contract.workflow_status || contract.workflow_status === 'nouveau') {
         await contractsService.updateContract(contract.id, { workflow_status: 'proposal_sent' });
-        queryClient.invalidateQueries({ queryKey: contractKeys.all });
+        queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       }
 
       toast.success(`Proposition envoyée à ${client.email}`);

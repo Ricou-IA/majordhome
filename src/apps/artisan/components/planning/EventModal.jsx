@@ -484,7 +484,7 @@ export function EventModal({
 
     // Invalider le cache leads si un lead a été créé ou lié
     if (leadId) {
-      queryClient.invalidateQueries({ queryKey: leadKeys.all });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     }
   }, [formData, validate, onSave, selectedClient, selectedLead, isEdit, orgId, userId, queryClient]);
 

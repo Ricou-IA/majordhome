@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
 import { entretienSavKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { entretienSavKeys } from '@hooks/cacheKeys';
@@ -88,10 +89,12 @@ export function useEntretienSAVStats(orgId) {
  */
 export function useEntretienSAVMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   // --- Création entretien ---
   const createEntretienMutation = useMutation({

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { geogridKeys } from './cacheKeys';
 import geogridService from '@services/geogrid.service';
+import { useAuth } from '@contexts/AuthContext';
 
 export { geogridKeys };
 
@@ -48,14 +49,16 @@ export function useGeoGridQuota(orgId) {
 
 /** Résultats d'un scan spécifique. */
 export function useGeoGridResults(scanId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useQuery({
-    queryKey: geogridKeys.results(scanId),
+    queryKey: geogridKeys.results(orgId, scanId),
     queryFn: async () => {
       const { data, error } = await geogridService.getScanResults(scanId);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!scanId,
+    enabled: !!orgId && !!scanId,
   });
 }
 
@@ -86,12 +89,14 @@ export function useLaunchScan() {
 /** Mutation pour supprimer un scan. */
 export function useDeleteScan() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   return useMutation({
     mutationFn: (scanId) => geogridService.deleteScan(scanId),
     onSuccess: () => {
       toast.success('Scan supprimé');
-      queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+      queryClient.invalidateQueries({ queryKey: geogridKeys.all(orgId) });
     },
     onError: (error) => {
       toast.error(`Erreur suppression : ${error.message}`);
@@ -132,6 +137,8 @@ export function useCreateKeywordList() {
 
 export function useUpdateKeywordList() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useMutation({
     mutationFn: ({ listId, ...payload }) => geogridService.updateKeywordList(listId, payload),
     onSuccess: (result, variables) => {
@@ -143,7 +150,7 @@ export function useUpdateKeywordList() {
       if (variables.orgId) {
         queryClient.invalidateQueries({ queryKey: geogridKeys.keywordLists(variables.orgId) });
       } else {
-        queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+        queryClient.invalidateQueries({ queryKey: geogridKeys.all(orgId) });
       }
     },
   });
@@ -151,6 +158,8 @@ export function useUpdateKeywordList() {
 
 export function useDeleteKeywordList() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useMutation({
     mutationFn: (listId) => geogridService.deleteKeywordList(listId),
     onSuccess: (result) => {
@@ -159,7 +168,7 @@ export function useDeleteKeywordList() {
         return;
       }
       toast.success('Liste supprimée');
-      queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+      queryClient.invalidateQueries({ queryKey: geogridKeys.all(orgId) });
     },
   });
 }
@@ -181,19 +190,23 @@ export function useBenchmarks(orgId) {
 }
 
 export function useBenchmarkScans(benchmarkId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useQuery({
-    queryKey: geogridKeys.benchmarkScans(benchmarkId),
+    queryKey: geogridKeys.benchmarkScans(orgId, benchmarkId),
     queryFn: async () => {
       const { data, error } = await geogridService.getBenchmarkScans(benchmarkId);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!benchmarkId,
+    enabled: !!orgId && !!benchmarkId,
   });
 }
 
 export function useDeleteBenchmark() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   return useMutation({
     mutationFn: (benchmarkId) => geogridService.deleteBenchmark(benchmarkId),
     onSuccess: (result) => {
@@ -202,7 +215,7 @@ export function useDeleteBenchmark() {
         return;
       }
       toast.success('Benchmark supprimé');
-      queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+      queryClient.invalidateQueries({ queryKey: geogridKeys.all(orgId) });
     },
   });
 }

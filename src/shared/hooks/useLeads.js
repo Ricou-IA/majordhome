@@ -11,6 +11,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@services/leads.service';
 import { leadKeys, clientKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { leadKeys } from '@hooks/cacheKeys';
@@ -116,8 +117,8 @@ export function useLeads({ orgId, limit = 25 } = {}) {
   const refresh = useCallback(() => {
     setOffset(0);
     setAllLeads([]);
-    queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: leadKeys.lists(orgId) });
+  }, [queryClient, orgId]);
 
   const leads = allLeads.length > 0 ? allLeads : (data?.data || []);
   const hasMore = leads.length < totalCount;
@@ -146,15 +147,17 @@ export function useLeads({ orgId, limit = 25 } = {}) {
  * Hook pour un lead spécifique
  */
 export function useLead(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: lead,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: leadKeys.detail(leadId),
+    queryKey: leadKeys.detail(orgId, leadId),
     queryFn: () => leadsService.getLeadById(leadId),
-    enabled: !!leadId,
+    enabled: !!orgId && !!leadId,
     staleTime: 30_000,
     select: (result) => result?.data || null,
   });
@@ -175,15 +178,17 @@ export function useLead(leadId) {
  * Hook pour les activités d'un lead
  */
 export function useLeadActivities(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: activities,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: leadKeys.activities(leadId),
+    queryKey: leadKeys.activities(orgId, leadId),
     queryFn: () => leadsService.getLeadActivities(leadId),
-    enabled: !!leadId,
+    enabled: !!orgId && !!leadId,
     staleTime: 15_000,
     select: (result) => result?.data || [],
   });
@@ -201,13 +206,16 @@ export function useLeadActivities(leadId) {
 // ============================================================================
 
 export function useLeadSources() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: sources,
     isLoading,
     error,
   } = useQuery({
-    queryKey: leadKeys.sources(),
+    queryKey: leadKeys.sources(orgId),
     queryFn: () => leadsService.getSources(),
+    enabled: !!orgId,
     staleTime: 5 * 60_000, // 5 minutes
     select: (result) => result?.data || [],
   });
@@ -220,13 +228,16 @@ export function useLeadSources() {
 // ============================================================================
 
 export function useLeadStatuses() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
   const {
     data: statuses,
     isLoading,
     error,
   } = useQuery({
-    queryKey: leadKeys.statuses(),
+    queryKey: leadKeys.statuses(orgId),
     queryFn: () => leadsService.getStatuses(),
+    enabled: !!orgId,
     staleTime: 5 * 60_000,
     select: (result) => result?.data || [],
   });
@@ -263,10 +274,12 @@ export function useLeadCommercials(orgId) {
  */
 export function useLeadMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const invalidateLeads = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: leadKeys.all });
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+  }, [queryClient, orgId]);
 
   // Créer un lead
   const createMutation = useMutation({
@@ -307,7 +320,7 @@ export function useLeadMutations() {
     onSuccess: () => {
       invalidateLeads();
       // Invalider aussi le cache clients
-      queryClient.invalidateQueries({ queryKey: clientKeys.all });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
     },
   });
 
@@ -316,7 +329,7 @@ export function useLeadMutations() {
     mutationFn: ({ leadId, orgId, userId, description }) =>
       leadsService.addLeadNote(leadId, { orgId, userId, description }),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: leadKeys.activities(variables.leadId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.activities(orgId, variables.leadId) });
     },
   });
 

@@ -2,10 +2,9 @@
  * useContracts.js - Majord'home Artisan
  * ============================================================================
  * Hooks React pour la gestion des contrats d'entretien.
- * Utilise TanStack React Query pour le cache et les mutations.
  *
+ * v2.1.0 - P0.11 : propagation orgId dans toutes les cache keys
  * v2.0.0 - Refonte : table majordhome.contracts (remplace pending_contracts)
- * v1.0.0 - Sprint 5 (ancien système pending_contracts — supprimé)
  * ============================================================================
  */
 
@@ -16,6 +15,7 @@ import { savService } from '@services/sav.service';
 import { entretiensService } from '@services/entretiens.service';
 import { clientsService } from '@services/clients.service';
 import { contractKeys, clientKeys, interventionKeys, entretienSavKeys, appointmentKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
 export { contractKeys } from '@hooks/cacheKeys';
@@ -24,17 +24,10 @@ export { contractKeys } from '@hooks/cacheKeys';
 // HOOK - useClientContract (contrat d'un client, 1:1)
 // ============================================================================
 
-/**
- * Hook pour charger le contrat d'un client (1 client = max 1 contrat)
- *
- * @param {string} clientId - UUID du client
- * @returns {Object} État et méthodes
- *
- * @example
- * const { contract, isLoading, createContract, updateContract, deleteContract } = useClientContract(clientId);
- */
 export function useClientContract(clientId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: contract,
@@ -42,54 +35,50 @@ export function useClientContract(clientId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: contractKeys.byClient(clientId),
+    queryKey: contractKeys.byClient(orgId, clientId),
     queryFn: async () => {
       const { data, error } = await contractsService.getContractByClientId(clientId);
       if (error) throw error;
       return data; // null si pas de contrat
     },
-    enabled: !!clientId,
+    enabled: !!orgId && !!clientId,
     staleTime: 30_000,
   });
 
-  // Mutation création
   const createMutation = useMutation({
     mutationFn: (contractData) => contractsService.createContract({ ...contractData, clientId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
     },
   });
 
-  // Mutation mise à jour
   const updateMutation = useMutation({
     mutationFn: ({ contractId: cId, updates }) => contractsService.updateContract(cId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
     },
   });
 
-  // Mutation clôture
   const closeMutation = useMutation({
     mutationFn: ({ contractId: cId, reason }) => contractsService.closeContract(cId, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(clientId) });
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
     },
   });
 
-  // Mutation suppression
   const deleteMutation = useMutation({
     mutationFn: (contractId) => contractsService.deleteContract(contractId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
     },
   });
 
@@ -161,13 +150,10 @@ export function useClientContract(clientId) {
 // HOOK - useContractEquipments
 // ============================================================================
 
-/**
- * Hook pour les équipements liés à un contrat
- *
- * @param {string} contractId - UUID du contrat
- */
 export function useContractEquipments(contractId) {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const {
     data: equipments,
@@ -175,27 +161,27 @@ export function useContractEquipments(contractId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: contractKeys.equipments(contractId),
+    queryKey: contractKeys.equipments(orgId, contractId),
     queryFn: async () => {
       const { data, error } = await contractsService.getContractEquipments(contractId);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!contractId,
+    enabled: !!orgId && !!contractId,
     staleTime: 30_000,
   });
 
   const addMutation = useMutation({
     mutationFn: (equipmentId) => contractsService.addEquipmentToContract(contractId, equipmentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(contractId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(orgId, contractId) });
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (equipmentId) => contractsService.removeEquipmentFromContract(contractId, equipmentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(contractId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.equipments(orgId, contractId) });
     },
   });
 
@@ -215,14 +201,7 @@ export function useContractEquipments(contractId) {
 // HOOK - useContracts (liste paginée pour page Entretiens)
 // ============================================================================
 
-/**
- * Hook pour la liste paginée de contrats avec filtres (page Entretiens)
- *
- * @param {Object} options
- * @param {string} options.orgId - UUID de l'organisation
- */
 export function useContracts({ orgId, initialFilters } = {}) {
-  const queryClient = useQueryClient();
   const [filters, setFiltersState] = useState(() => ({
     search: '',
     status: 'active',
@@ -240,7 +219,7 @@ export function useContracts({ orgId, initialFilters } = {}) {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: [...contractKeys.lists(), orgId, filters, offset],
+    queryKey: [...contractKeys.lists(orgId), filters, offset],
     queryFn: async () => {
       const { data, count, error } = await entretiensService.getContracts({
         orgId,
@@ -266,11 +245,6 @@ export function useContracts({ orgId, initialFilters } = {}) {
     }
   }, [data, offset]);
 
-  // Reset offset quand les filtres changent
-  // NB : on ne vide PAS allContracts — l'effet d'accumulation ci-dessus
-  // le remplace dès que data arrive (offset===0 → remplacement complet).
-  // Vider allContracts causait un flash "Aucun contrat" quand les données
-  // étaient déjà en cache React Query (isLoading=false + contracts=[]).
   const setFilters = useCallback((newFilters) => {
     setFiltersState((prev) => ({ ...prev, ...newFilters }));
     setOffset(0);
@@ -315,19 +289,18 @@ export function useContracts({ orgId, initialFilters } = {}) {
 // HOOK - useContract (détail contrat pour modale Entretiens)
 // ============================================================================
 
-/**
- * Hook pour charger un contrat par ID (enrichi avec infos client)
- * @param {string} contractId - UUID du contrat
- */
 export function useContract(contractId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const { data: contract, isLoading, error } = useQuery({
-    queryKey: contractKeys.detail(contractId),
+    queryKey: contractKeys.detail(orgId, contractId),
     queryFn: async () => {
       const { data, error } = await entretiensService.getContractById(contractId);
       if (error) throw error;
       return data;
     },
-    enabled: !!contractId,
+    enabled: !!orgId && !!contractId,
     staleTime: 30_000,
   });
 
@@ -338,9 +311,6 @@ export function useContract(contractId) {
 // HOOK - useContractStats (dashboard Entretiens)
 // ============================================================================
 
-/**
- * Hook pour les statistiques du dashboard entretiens
- */
 export function useContractStats(orgId, year) {
   const { data: stats, isLoading, error } = useQuery({
     queryKey: contractKeys.stats(orgId, year),
@@ -360,12 +330,9 @@ export function useContractStats(orgId, year) {
 // HOOK - useContractSectors (vue secteurs Entretiens)
 // ============================================================================
 
-/**
- * Hook pour les contrats groupés par secteur géographique
- */
 export function useContractSectors(orgId) {
   const { data: sectors, isLoading, error } = useQuery({
-    queryKey: [...contractKeys.all, 'sectors', orgId],
+    queryKey: [...contractKeys.all(orgId), 'sectors'],
     queryFn: async () => {
       const { data, error } = await entretiensService.getContractsBySector(orgId);
       if (error) throw error;
@@ -382,18 +349,18 @@ export function useContractSectors(orgId) {
 // HOOK - useContractVisits (historique visites modale Entretiens)
 // ============================================================================
 
-/**
- * Hook pour les visites de maintenance d'un contrat
- */
 export function useContractVisits(contractId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const { data: visits, isLoading, error, refetch } = useQuery({
-    queryKey: [...contractKeys.all, 'visits', contractId],
+    queryKey: [...contractKeys.all(orgId), 'visits', contractId],
     queryFn: async () => {
       const { data, error } = await entretiensService.getVisitsForContract(contractId);
       if (error) throw error;
       return data;
     },
-    enabled: !!contractId,
+    enabled: !!orgId && !!contractId,
     staleTime: 30_000,
   });
 
@@ -404,38 +371,37 @@ export function useContractVisits(contractId) {
 // HOOK - useContractMutations (actions modale Entretiens)
 // ============================================================================
 
-/**
- * Hook pour les mutations contrat/visites (page Entretiens)
- */
 export function useContractMutations() {
   const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
 
   const updateMutation = useMutation({
     mutationFn: ({ contractId, updates }) => entretiensService.updateContract(contractId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      queryClient.invalidateQueries({ queryKey: clientKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
     },
   });
 
   const recordVisitMutation = useMutation({
     mutationFn: (params) => entretiensService.recordVisit(params),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [...contractKeys.all, 'visits', variables.contractId] });
-      queryClient.invalidateQueries({ queryKey: contractKeys.detail(variables.contractId) });
-      queryClient.invalidateQueries({ queryKey: contractKeys.stats(variables.orgId, variables.year) });
+      queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', variables.contractId] });
+      queryClient.invalidateQueries({ queryKey: contractKeys.detail(orgId, variables.contractId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.stats(orgId, variables.year) });
       // Cascade Kanban (entretien parent) + Planning (appointment)
-      queryClient.invalidateQueries({ queryKey: interventionKeys.all });
-      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
-      queryClient.invalidateQueries({ queryKey: clientKeys.all });
+      queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
     },
   });
 
   const updateVisitMutation = useMutation({
     mutationFn: ({ visitId, status, notes }) => entretiensService.updateVisitStatus(visitId, status, notes),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     },
   });
 
@@ -462,21 +428,6 @@ export function useContractMutations() {
 // HOOK - useCreateContractWithClient (création contrat + client optionnel)
 // ============================================================================
 
-/**
- * Hook composé pour créer un contrat avec client existant ou nouveau.
- * Utilisé par CreateContractModal.
- *
- * @returns {Object} État et méthodes
- *
- * @example
- * const { createContractWithClient, isCreating, error } = useCreateContractWithClient();
- * await createContractWithClient({
- *   orgId,
- *   existingClientId: 'xxx', // OU newClientData: { lastName, firstName, ... }
- *   contractData: { frequency, amount, startDate, ... },
- *   userId,
- * });
- */
 export function useCreateContractWithClient() {
   const queryClient = useQueryClient();
 
@@ -544,15 +495,11 @@ export function useCreateContractWithClient() {
       const contractId = contractResult.data?.id;
       if (contractId) {
         try {
-          // Récupérer le project_id du client (nécessaire pour l'entretien)
-          const clientData = contractResult.data?.client_project_id
-            || (existingClientId ? null : null); // project_id est sur le client, pas le contrat write
-          
           await savService.createEntretien({
             orgId,
             clientId,
             contractId,
-            projectId: null, // sera résolu par savService si nécessaire
+            projectId: null,
             scheduledDate: null,
             createdBy: userId,
           });
@@ -566,11 +513,12 @@ export function useCreateContractWithClient() {
         contract: contractResult.data,
       };
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       // Invalider tous les caches liés
-      queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      queryClient.invalidateQueries({ queryKey: clientKeys.all });
-      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all });
+      const orgId = variables?.orgId;
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
     },
   });
 

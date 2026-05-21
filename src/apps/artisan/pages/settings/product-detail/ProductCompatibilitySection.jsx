@@ -24,16 +24,16 @@ export default function ProductCompatibilitySection({ product, orgId }) {
   if (!product) return null;
 
   if (product.product_kind === 'accessory') {
-    return <AccessoryView product={product} />;
+    return <AccessoryView product={product} orgId={orgId} />;
   }
 
-  return <MainProductView product={product} />;
+  return <MainProductView product={product} orgId={orgId} />;
 }
 
 // ----------------------------------------------------------------------------
 // Vue ACCESSOIRE : liste des équipements compatibles (éditable)
 // ----------------------------------------------------------------------------
-function AccessoryView({ product }) {
+function AccessoryView({ product, orgId }) {
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -50,8 +50,8 @@ function AccessoryView({ product }) {
   const candidates = useMemo(() => allMain.filter((p) => !currentIds.includes(p.id)), [allMain, currentIds]);
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(product.id) });
-    queryClient.invalidateQueries({ queryKey: supplierKeys.products(product.supplier_id) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, product.id) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, product.supplier_id) });
   };
 
   const link = async (mainProduct) => {
@@ -104,7 +104,7 @@ function AccessoryView({ product }) {
 // ----------------------------------------------------------------------------
 // Vue ÉQUIPEMENT : liste des accessoires compatibles (éditable)
 // ----------------------------------------------------------------------------
-function MainProductView({ product }) {
+function MainProductView({ product, orgId }) {
   const { accessories, isLoading } = useAccessoriesForProduct(product.id);
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -125,9 +125,9 @@ function MainProductView({ product }) {
   );
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: [...supplierKeys.all, 'accessories-for', product.id] });
-    queryClient.invalidateQueries({ queryKey: supplierKeys.products(product.supplier_id) });
-    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(product.id) });
+    queryClient.invalidateQueries({ queryKey: [...supplierKeys.all(orgId), 'accessories-for', product.id] });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, product.supplier_id) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, product.id) });
   };
 
   // Lier : ajouter l'id de l'équipement courant au compatible_with_ids de l'accessoire

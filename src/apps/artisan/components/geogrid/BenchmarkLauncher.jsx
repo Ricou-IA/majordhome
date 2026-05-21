@@ -194,7 +194,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
       error_message: errorsList.length ? `${errorsList.length} keyword(s) en erreur` : null,
     });
 
-    queryClient.invalidateQueries({ queryKey: geogridKeys.all });
+    queryClient.invalidateQueries({ queryKey: geogridKeys.all(orgId) });
 
     if (finalStatus === 'completed') {
       toast.success(`Benchmark terminé — ${completedCount}/${totalKeywords} keywords scannés`);
