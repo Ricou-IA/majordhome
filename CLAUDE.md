@@ -53,11 +53,58 @@ Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipelin
 
 ## Commandes
 ```bash
-npm run dev          # Dev server (port 5173)
-npm run build        # Build production
-npm run lint         # ESLint (max-warnings = count actuel, regression guard CI)
-npm run lint:errors  # ESLint errors uniquement (--quiet, utile en pre-commit hook)
+npm run dev               # Dev server (port 5173)
+npm run build             # Build production
+npm run lint              # ESLint (max-warnings = count actuel, regression guard CI)
+npm run lint:errors       # ESLint errors uniquement (--quiet)
+npm run audit:dead-code   # Détecte les fichiers sources jamais importés
+npm run audit:quality     # lint:errors + audit:dead-code (à lancer avant PR)
 ```
+
+**Pre-commit hook actif** (`.githooks/pre-commit`) : lance `npm run lint:errors` avant chaque commit, bloque si une error apparaît. Setup automatique via `npm prepare` (`git config core.hooksPath .githooks`). Bypass d'urgence : `git commit --no-verify`.
+
+## Conventions qualité (2026-05-21)
+
+Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit qualité. **Ces règles s'appliquent à toute nouvelle feature ou refacto** :
+
+### Composants (.jsx)
+- **Pas de composant > 500 LOC** sans découpage en sous-composants (orchestrateur + sections)
+- **Pas de composant > 10 `useState`** sans envisager `useReducer` ou state machine. >15 useState = obligatoire à refacto
+- **Pas de logique business dans le JSX** : extraire dans des hooks ou des helpers `src/lib/`
+- **Tailwind only** : pas de CSS modules, pas de styled-components
+
+### Services (`src/shared/services/`)
+- **Pas de service > 700 LOC** sans décomposition en sous-modules (cf. `clients.service.js` → délègue à `equipments.service.js`)
+- Toujours retourner `{ data, error }` ou `{ data, count, error }` — jamais throw au caller
+- **Toujours destructurer `{ error }`** sur `update/insert/delete` Supabase (cf. Gotchas DB)
+- Utiliser `withErrorHandling()` du helper `serviceHelpers.js` pour wrapper les async
+
+### Hooks (`src/shared/hooks/`)
+- Toujours utiliser les cache keys centralisées de `cacheKeys.js` (jamais inline)
+- Toutes les keys prennent `orgId` en 1ᵉʳ paramètre (convention P0.11, voir en-tête `cacheKeys.js`)
+- `enabled: !!orgId && ...` obligatoire sur les `useQuery` qui dépendent d'orgId
+- Pas de console.* en prod : utiliser `import { logger } from '@lib/logger'` (no-op en prod, sauf `logger.error`)
+
+### Cache keys
+- Convention pricingKeys-style : `all: (orgId) => [domain, orgId]` + sous-keys avec orgId en 1ᵉʳ
+- Pas de key avec préfixe statique partagé (`['clients']` direct) — utiliser `clientKeys.all(orgId)`
+
+### Sécurité (charte multi-tenant — cf. section ci-dessus)
+- Toute mutation Supabase doit explicitement filtrer par `org_id`
+- Tout nouveau RPC SECURITY DEFINER : `REVOKE FROM anon` immédiat. Si payload contient `org_id` → `REVOKE FROM authenticated` aussi (service_role only)
+- Tout nouveau bucket Storage : path `${orgId}/...` + policies `(storage.foldername(name))[1]::uuid IN (org_members)`
+- Toute clause PostgREST `.or()` / `.ilike()` interpolant un input user : passer par `escapePostgrestSearchTerm()`
+- Toute edge function : utiliser `requireOrgMembership` ou `requireSharedSecret` du helper `_shared/auth.ts`
+
+### Code mort
+- **Lancer `npm run audit:dead-code` avant chaque PR feature majeur** — identifie les fichiers jamais importés
+- Si tu retires un import : vérifier que le fichier source n'a plus aucun caller, et le supprimer
+- Si tu crées un composant "partagé" : le consommer dans au moins 1 endroit dans le même commit (sinon il devient mort dès la naissance — vu sur ColumnHeader, useModalManager)
+
+### Dette technique
+- **1 nouveau warning ESLint → fix immédiat** (le `--max-warnings` du script `lint` est défini sur le count actuel pour empêcher la régression)
+- Si tu touches un fichier identifié comme dette (LeadModal, clients.service.js, etc.) : profiter pour le décomposer un peu plus dans le même commit
+- TODOs : OK temporairement avec une raison claire (ex `// TODO P0.X — à faire`), mais ne pas les laisser pourrir > 1 mois
 
 ## Architecture
 ```

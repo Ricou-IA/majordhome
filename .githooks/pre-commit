@@ -1,0 +1,21 @@
+#!/bin/sh
+# ============================================================================
+# Pre-commit hook — bloque les commits qui introduisent des erreurs ESLint
+# ============================================================================
+# Activé automatiquement via `core.hooksPath=.githooks` (set par le script
+# `prepare` de package.json à l'install).
+#
+# Pour désactiver temporairement (urgence) : `git commit --no-verify`.
+# ============================================================================
+
+set -e
+
+echo "[pre-commit] Running ESLint errors check..."
+npm run lint:errors --silent || {
+  echo ""
+  echo "❌ ESLint errors détectées — commit bloqué."
+  echo "   Fix les errors ou utilise --no-verify pour bypass (déconseillé)."
+  exit 1
+}
+
+echo "[pre-commit] ✅ ESLint errors clean."

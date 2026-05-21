@@ -8,7 +8,10 @@
         "build": "vite build",
         "preview": "vite preview",
         "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 384",
-        "lint:errors": "eslint . --ext js,jsx --report-unused-disable-directives --quiet"
+        "lint:errors": "eslint . --ext js,jsx --report-unused-disable-directives --quiet",
+        "audit:dead-code": "node scripts/audit-dead-code.mjs",
+        "audit:quality": "npm run lint:errors && npm run audit:dead-code",
+        "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
     },
     "dependencies": {
         "@fullcalendar/core": "^6.1.10",
