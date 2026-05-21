@@ -70,19 +70,22 @@ export default function ProtectedRoute({
   }
 
   // ===========================================================================
-  // ORGANIZATION CHECK - DÉSACTIVÉ TEMPORAIREMENT
+  // ORGANIZATION CHECK
   // ===========================================================================
+  // User authentifié sans org membership → redirect vers la page Join.
+  // Garde-fou multi-tenant : empêche un user orphelin de charger AppLayout
+  // et déclencher des requêtes (la RLS protège déjà côté DB, mais on évite
+  // une page blanche + des erreurs en chaîne dans le shell).
 
-  // TODO: Réactiver quand le système d'organisation sera fonctionnel
-  // if (requireOrganization && !organization) {
-  //   return (
-  //     <Navigate
-  //       to="/join-organization"
-  //       state={{ from: location.pathname }}
-  //       replace
-  //     />
-  //   );
-  // }
+  if (requireOrganization && !organization) {
+    return (
+      <Navigate
+        to="/join-organization"
+        state={{ from: location.pathname }}
+        replace
+      />
+    );
+  }
 
   // ===========================================================================
   // ROLE CHECK
