@@ -18,8 +18,15 @@ export default function SendTab() {
   const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_MAILING;
   const orgId = organization?.id;
 
-  const { campaigns, isLoading: campaignsLoading } = useMailCampaigns(orgId);
+  const { campaigns: allCampaigns, isLoading: campaignsLoading } = useMailCampaigns(orgId);
   const { segments, isLoading: segmentsLoading } = useMailSegments(orgId);
+
+  // Les campagnes transactionnelles (déclenchées 1-à-1 depuis le code, ex: proposition contrat)
+  // ne sont pas broadcast-ables — elles restent dans Éditeur et Stats mais sont exclues d'ici.
+  const campaigns = useMemo(
+    () => allCampaigns.filter((c) => !c.is_transactional),
+    [allCampaigns]
+  );
 
   const [selectedId, setSelectedId] = useState(null);
   const [selectedSegmentId, setSelectedSegmentId] = useState(null);
@@ -85,6 +92,12 @@ export default function SendTab() {
 
   const buildPayload = useCallback(async (isTest = false) => {
     if (!segment) return null;
+    // P0.8 — Le SQL est compilé côté serveur via la RPC mail_segment_compile
+    // qui inclut un check membership (auth.uid() ∈ org_members). Un attaquant
+    // ne peut donc pas obtenir un SQL pour une autre organisation depuis le
+    // frontend. On envoie aussi `segment_id` pour la future bascule N8n
+    // (cf. P0.8 V2 — workflow doit n'accepter que segment_id et appeler la
+    // RPC `mail_segment_compile_safe` côté serveur).
     const { data: compiledSql, error } = await mailSegmentsService.compileSql({
       filters: segment.filters,
       campaignName: campaignLabel,
@@ -97,6 +110,7 @@ export default function SendTab() {
       subject,
       html_body: htmlBody,
       segment_sql: sql,
+      segment_id: segment.id,   // futur switch N8n
       campaign_name: campaignLabel,
       org_id: orgId,
       recipient_type: recipientType,
@@ -299,6 +313,7 @@ export default function SendTab() {
           <iframe
             ref={iframeRef}
             title="Preview email"
+            sandbox="allow-same-origin"
             className="w-full border-0"
             style={{ minHeight: '700px' }}
           />

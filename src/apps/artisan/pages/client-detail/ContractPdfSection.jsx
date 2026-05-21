@@ -18,6 +18,7 @@ import {
 import { generateContractPdfBlob } from '@apps/artisan/components/contrat/ContractPDF';
 import { useAuth } from '@contexts/AuthContext';
 import { buildCompanyInfo } from '@/lib/orgBranding';
+import { supabase } from '@/lib/supabaseClient';
 
 const ACCEPTED_FILE_TYPES = '.pdf,.jpg,.jpeg,.png';
 const MAX_FILE_SIZE_MB = 10;
@@ -285,10 +286,25 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       // 6. Appel webhook N8N
       if (!N8N_WEBHOOK_URL) throw new Error('Variable VITE_N8N_WEBHOOK_MAILING non configurée');
 
+      // P0.8 — Compiler le SQL côté serveur via RPC `mail_single_client_sql`
+      // (check membership intégré) au lieu de construire en clair côté client.
+      // L'attaquant ne peut plus modifier le SQL avant compilation.
+      // Note résiduelle : le webhook N8n accepte encore `segment_sql` brut, donc
+      // un attaquant pourrait toujours forger un payload. Le fix complet
+      // nécessite de modifier le workflow N8n pour n'accepter que `client_id`
+      // et appeler la RPC côté serveur (P0.8 V2).
+      const { data: compiledSql, error: sqlError } = await supabase.rpc(
+        'mail_single_client_sql',
+        { p_client_id: clientId, p_campaign_name: 'Proposition Contrat' }
+      );
+      if (sqlError) throw sqlError;
+      const safeSql = compiledSql ? `${String(compiledSql).replace(/;?\s*$/, '')};` : '';
+
       const payload = {
         subject,
         html_body: htmlBody,
-        segment_sql: `SELECT id, first_name, last_name, display_name, email FROM majordhome.clients WHERE id = '${clientId}' AND email IS NOT NULL AND email_unsubscribed_at IS NULL LIMIT 1;`,
+        segment_sql: safeSql,
+        client_id: clientId,   // futur switch N8n : exiger client_id au lieu de segment_sql
         campaign_name: 'Proposition Contrat',
         org_id: orgId,
         recipient_type: 'client',
