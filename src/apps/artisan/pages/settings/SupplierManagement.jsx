@@ -14,7 +14,7 @@ import { suppliersService } from '@services/suppliers.service';
 import { TVA_RATES } from '@services/devis.service';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea, SectionTitle } from '../../components/FormFields';
 import { formatEuro } from '@/lib/utils';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import {
   ArrowLeft,
   Plus,
@@ -354,46 +354,107 @@ function normalizeCategory(raw) {
   return mapping[n] || null;
 }
 
-function parseExcelRows(worksheet) {
-  const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-  if (!jsonRows.length) return [];
+/** Convertit une valeur de cellule ExcelJS (string|number|Date|object) en string nettoyée */
+function cellToString(value) {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    if (value.text) return value.text.toString();           // hyperlink { hyperlink, text }
+    if (value.result != null) return value.result.toString(); // formula { formula, result }
+    if (value.richText) return value.richText.map((rt) => rt.text || '').join('');
+    return '';
+  }
+  return value.toString();
+}
 
-  // Map headers with normalized matching
-  const firstRow = jsonRows[0];
+/** Mapping commun rows[][] (array of arrays) → produits — utilisé par xlsx + csv */
+function rowsToMappedProducts(allRows) {
+  if (allRows.length < 1) return [];
+
+  const headers = allRows[0].map((v) => (v ?? '').toString());
   const headerMap = {};
-  const unmapped = [];
-  for (const key of Object.keys(firstRow)) {
-    const normalized = normalizeHeader(key);
+  for (let i = 0; i < headers.length; i++) {
+    const normalized = normalizeHeader(headers[i]);
     if (EXCEL_COLUMN_MAP[normalized]) {
-      headerMap[key] = EXCEL_COLUMN_MAP[normalized];
-    } else {
-      unmapped.push(key);
+      headerMap[i] = EXCEL_COLUMN_MAP[normalized];
     }
   }
-
-
   if (Object.keys(headerMap).length === 0) {
-    console.error('[Import Excel] Aucune colonne reconnue. Colonnes trouvées:', Object.keys(firstRow));
+    console.error('[Import Excel] Aucune colonne reconnue. Colonnes trouvées:', headers);
     return [];
   }
 
-  return jsonRows.map((row) => {
+  return allRows.slice(1).map((row) => {
     const mapped = {};
-    for (const [excelKey, appKey] of Object.entries(headerMap)) {
-      mapped[appKey] = row[excelKey]?.toString().trim() || '';
+    for (const [idx, appKey] of Object.entries(headerMap)) {
+      mapped[appKey] = (row[idx] ?? '').toString().trim();
     }
     if (mapped.category) mapped.category = normalizeCategory(mapped.category);
     return mapped;
   }).filter((r) => r.name);
 }
 
-function downloadTemplate() {
-  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_COLUMNS]);
-  // Largeurs colonnes
-  ws['!cols'] = TEMPLATE_COLUMNS.map(() => ({ wch: 20 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Produits');
-  XLSX.writeFile(wb, 'template_produits_fournisseur.xlsx');
+function parseWorksheetRows(worksheet) {
+  if (!worksheet) return [];
+  const allRows = [];
+  worksheet.eachRow({ includeEmpty: false }, (row) => {
+    // row.values est 1-indexé : index 0 toujours undefined
+    const values = (row.values || []).slice(1).map(cellToString);
+    allRows.push(values);
+  });
+  return rowsToMappedProducts(allRows);
+}
+
+/** Parser CSV minimal — gère le séparateur , ou ; + champs entre guillemets + escape "" */
+function parseCsvText(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+
+  // Détection séparateur : préfère ; si plus fréquent dans la 1ère ligne (export Excel FR)
+  const semi = (lines[0].match(/;/g) || []).length;
+  const comma = (lines[0].match(/,/g) || []).length;
+  const sep = semi > comma ? ';' : ',';
+
+  const parseLine = (line) => {
+    const out = [];
+    let cur = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuote = !inQuote;
+      } else if (ch === sep && !inQuote) {
+        out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+
+  return rowsToMappedProducts(lines.map(parseLine));
+}
+
+async function downloadTemplate() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Produits');
+  ws.addRow(TEMPLATE_COLUMNS);
+  ws.columns = TEMPLATE_COLUMNS.map(() => ({ width: 20 }));
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'template_produits_fournisseur.xlsx';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 // =============================================================================
@@ -470,10 +531,17 @@ function ProductCatalog({ supplier, orgId, onBack }) {
 
     setImporting(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = parseExcelRows(firstSheet);
+      const ext = file.name.toLowerCase().split('.').pop();
+      let rows;
+      if (ext === 'csv') {
+        const text = await file.text();
+        rows = parseCsvText(text);
+      } else {
+        const buffer = await file.arrayBuffer();
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(buffer);
+        rows = parseWorksheetRows(wb.worksheets[0]);
+      }
 
       if (rows.length === 0) {
         toast.error('Aucune ligne valide trouvée. Vérifiez que le fichier contient une colonne "Libellé Article". Utilisez le template pour le bon format.');
@@ -511,7 +579,7 @@ function ProductCatalog({ supplier, orgId, onBack }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls,.csv"
+            accept=".xlsx,.csv"
             onChange={handleImportExcel}
             className="hidden"
           />
