@@ -10,6 +10,7 @@ import {
   CreditCard,
   HelpCircle,
   Truck,
+  Calculator,
 } from 'lucide-react';
 
 // =============================================================================
@@ -60,6 +61,13 @@ export default function Settings() {
       icon: Truck,
       description: 'Gérer les fournisseurs et catalogues produits',
       href: '/settings/suppliers',
+      adminOnly: true,
+    },
+    {
+      title: 'Tarification',
+      icon: Calculator,
+      description: 'Zones, types d\'équipement, grille de prix, remises et options',
+      href: '/settings/pricing',
       adminOnly: true,
     },
     {

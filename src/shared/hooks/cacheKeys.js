@@ -142,17 +142,17 @@ export const smsKeys = {
   byIntervention: (interventionId) => [...smsKeys.all, 'intervention', interventionId],
 };
 
-// --- Pricing ---
+// --- Pricing per-org (P0.0.6 reste) : orgId en premier pour éviter fuite cross-org via cache RQ ---
 export const pricingKeys = {
-  all: ['pricing'],
-  zones: () => [...pricingKeys.all, 'zones'],
-  equipmentTypes: () => [...pricingKeys.all, 'equipmentTypes'],
-  rates: () => [...pricingKeys.all, 'rates'],
-  ratesByZone: (zoneId) => [...pricingKeys.all, 'rates', zoneId],
-  discounts: () => [...pricingKeys.all, 'discounts'],
-  extras: () => [...pricingKeys.all, 'extras'],
-  allData: () => [...pricingKeys.all, 'allData'],
-  contractItems: (contractId) => [...pricingKeys.all, 'contractItems', contractId],
+  all: (orgId) => ['pricing', orgId],
+  zones: (orgId) => [...pricingKeys.all(orgId), 'zones'],
+  equipmentTypes: (orgId) => [...pricingKeys.all(orgId), 'equipmentTypes'],
+  rates: (orgId) => [...pricingKeys.all(orgId), 'rates'],
+  ratesByZone: (orgId, zoneId) => [...pricingKeys.all(orgId), 'rates', zoneId],
+  discounts: (orgId) => [...pricingKeys.all(orgId), 'discounts'],
+  extras: (orgId) => [...pricingKeys.all(orgId), 'extras'],
+  allData: (orgId) => [...pricingKeys.all(orgId), 'allData'],
+  contractItems: (contractId) => ['pricing', 'contractItems', contractId],
 };
 
 // --- Permissions ---

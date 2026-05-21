@@ -3,7 +3,7 @@
  * ============================================================================
  * Service pour le moteur de tarification.
  *
- * Lectures via vues publiques :
+ * Lectures via vues publiques (scopées par RLS via security_invoker + org_id) :
  *   - majordhome_pricing_zones
  *   - majordhome_pricing_equipment_types
  *   - majordhome_pricing_rates           (enrichie : JOIN zones + equipment_types)
@@ -14,7 +14,9 @@
  * Écritures via vues publiques writable :
  *   - majordhome_contract_pricing_items_write (INSERT/DELETE)
  *   - majordhome_contracts_write (UPDATE amount)
+ *   - majordhome_pricing_zones / _equipment_types / _rates / _discounts / _extras (CRUD UI Tarification)
  *
+ * @version 1.3.0 - Pricing per-org (P0.0.6 reste) : ajout org_id partout + CRUD UI
  * @version 1.2.0 - Passage complet vues publiques (lecture + écriture, plus de .schema())
  * @version 1.1.0 - Passage aux vues publiques pour la lecture
  * @version 1.0.0 - Création moteur de tarification
@@ -128,14 +130,15 @@ export const pricingService = {
 
   /**
    * Charge toutes les zones de tarification
+   * @param {string} [orgId] - filtrer explicitement par org (défense en profondeur)
+   * @param {object} [opts] - { activeOnly: true } pour ne charger que les actifs
    */
-  async getZones() {
+  async getZones(orgId, { activeOnly = true } = {}) {
     try {
-      const { data, error } = await supabase
-        .from('majordhome_pricing_zones')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
+      let q = supabase.from('majordhome_pricing_zones').select('*').order('sort_order');
+      if (orgId) q = q.eq('org_id', orgId);
+      if (activeOnly) q = q.eq('is_active', true);
+      const { data, error } = await q;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -148,13 +151,12 @@ export const pricingService = {
   /**
    * Charge tous les types d'équipements
    */
-  async getEquipmentTypes() {
+  async getEquipmentTypes(orgId, { activeOnly = true } = {}) {
     try {
-      const { data, error } = await supabase
-        .from('majordhome_pricing_equipment_types')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
+      let q = supabase.from('majordhome_pricing_equipment_types').select('*').order('sort_order');
+      if (orgId) q = q.eq('org_id', orgId);
+      if (activeOnly) q = q.eq('is_active', true);
+      const { data, error } = await q;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -167,11 +169,11 @@ export const pricingService = {
   /**
    * Charge la grille tarifaire complète (vue enrichie avec zones + types)
    */
-  async getRates() {
+  async getRates(orgId) {
     try {
-      const { data, error } = await supabase
-        .from('majordhome_pricing_rates')
-        .select('*');
+      let q = supabase.from('majordhome_pricing_rates').select('*');
+      if (orgId) q = q.eq('org_id', orgId);
+      const { data, error } = await q;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -184,14 +186,13 @@ export const pricingService = {
   /**
    * Charge les tarifs pour une zone donnée
    */
-  async getRatesForZone(zoneId) {
+  async getRatesForZone(zoneId, orgId) {
     try {
       if (!zoneId) throw new Error('[pricingService] zoneId requis');
 
-      const { data, error } = await supabase
-        .from('majordhome_pricing_rates')
-        .select('*')
-        .eq('zone_id', zoneId);
+      let q = supabase.from('majordhome_pricing_rates').select('*').eq('zone_id', zoneId);
+      if (orgId) q = q.eq('org_id', orgId);
+      const { data, error } = await q;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -204,13 +205,12 @@ export const pricingService = {
   /**
    * Charge les remises volume
    */
-  async getDiscounts() {
+  async getDiscounts(orgId, { activeOnly = true } = {}) {
     try {
-      const { data, error } = await supabase
-        .from('majordhome_pricing_discounts')
-        .select('*')
-        .eq('is_active', true)
-        .order('min_equipments');
+      let q = supabase.from('majordhome_pricing_discounts').select('*').order('min_equipments');
+      if (orgId) q = q.eq('org_id', orgId);
+      if (activeOnly) q = q.eq('is_active', true);
+      const { data, error } = await q;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -223,13 +223,12 @@ export const pricingService = {
   /**
    * Charge les options supplémentaires
    */
-  async getExtras() {
+  async getExtras(orgId, { activeOnly = true } = {}) {
     try {
-      const { data, error } = await supabase
-        .from('majordhome_pricing_extras')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
+      let q = supabase.from('majordhome_pricing_extras').select('*').order('sort_order');
+      if (orgId) q = q.eq('org_id', orgId);
+      if (activeOnly) q = q.eq('is_active', true);
+      const { data, error } = await q;
 
       if (error) throw error;
       return { data: data || [], error: null };
@@ -241,16 +240,17 @@ export const pricingService = {
 
   /**
    * Charge toutes les données de référence pricing en une fois
+   * @param {string} [orgId] - filtrer explicitement par org (défense en profondeur)
    */
-  async getAllPricingData() {
+  async getAllPricingData(orgId) {
     try {
       const [zonesResult, typesResult, ratesResult, discountsResult, extrasResult] =
         await Promise.all([
-          this.getZones(),
-          this.getEquipmentTypes(),
-          this.getRates(),
-          this.getDiscounts(),
-          this.getExtras(),
+          this.getZones(orgId),
+          this.getEquipmentTypes(orgId),
+          this.getRates(orgId),
+          this.getDiscounts(orgId),
+          this.getExtras(orgId),
         ]);
 
       // Vérifier les erreurs
@@ -346,6 +346,232 @@ export const pricingService = {
     } catch (error) {
       console.error('[pricingService] saveContractPricingItems ERREUR:', error);
       return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
+  // CRUD ADMIN (Settings → Tarification) — RLS policies filtrent par org_members
+  // ==========================================================================
+
+  /** ZONES */
+  async createZone(orgId, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_zones')
+        .insert({ ...payload, org_id: orgId })
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] createZone:', error);
+      return { data: null, error };
+    }
+  },
+  async updateZone(id, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_zones')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] updateZone:', error);
+      return { data: null, error };
+    }
+  },
+  async deleteZone(id) {
+    try {
+      const { error } = await supabase
+        .schema('majordhome')
+        .from('pricing_zones')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[pricingService] deleteZone:', error);
+      return { error };
+    }
+  },
+
+  /** EQUIPMENT TYPES */
+  async createEquipmentType(orgId, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_equipment_types')
+        .insert({ ...payload, org_id: orgId })
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] createEquipmentType:', error);
+      return { data: null, error };
+    }
+  },
+  async updateEquipmentType(id, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_equipment_types')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] updateEquipmentType:', error);
+      return { data: null, error };
+    }
+  },
+  async deleteEquipmentType(id) {
+    try {
+      const { error } = await supabase
+        .schema('majordhome')
+        .from('pricing_equipment_types')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[pricingService] deleteEquipmentType:', error);
+      return { error };
+    }
+  },
+
+  /** RATES (upsert sur composite (org_id, zone_id, equipment_type_id)) */
+  async upsertRate(orgId, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_rates')
+        .upsert(
+          { ...payload, org_id: orgId },
+          { onConflict: 'org_id,zone_id,equipment_type_id' }
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] upsertRate:', error);
+      return { data: null, error };
+    }
+  },
+  async deleteRate(id) {
+    try {
+      const { error } = await supabase
+        .schema('majordhome')
+        .from('pricing_rates')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[pricingService] deleteRate:', error);
+      return { error };
+    }
+  },
+
+  /** EXTRAS */
+  async createExtra(orgId, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_extras')
+        .insert({ ...payload, org_id: orgId })
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] createExtra:', error);
+      return { data: null, error };
+    }
+  },
+  async updateExtra(id, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_extras')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] updateExtra:', error);
+      return { data: null, error };
+    }
+  },
+  async deleteExtra(id) {
+    try {
+      const { error } = await supabase
+        .schema('majordhome')
+        .from('pricing_extras')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[pricingService] deleteExtra:', error);
+      return { error };
+    }
+  },
+
+  /** DISCOUNTS */
+  async createDiscount(orgId, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_discounts')
+        .insert({ ...payload, org_id: orgId })
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] createDiscount:', error);
+      return { data: null, error };
+    }
+  },
+  async updateDiscount(id, payload) {
+    try {
+      const { data, error } = await supabase
+        .schema('majordhome')
+        .from('pricing_discounts')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] updateDiscount:', error);
+      return { data: null, error };
+    }
+  },
+  async deleteDiscount(id) {
+    try {
+      const { error } = await supabase
+        .schema('majordhome')
+        .from('pricing_discounts')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[pricingService] deleteDiscount:', error);
+      return { error };
     }
   },
 

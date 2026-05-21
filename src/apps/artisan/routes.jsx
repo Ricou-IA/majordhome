@@ -22,6 +22,7 @@ const GeoGrid = lazy(() => import('./pages/GeoGrid'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
 const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
 const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
+const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 
 // Certificat
 const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
@@ -224,6 +225,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <SupplierManagement />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/pricing',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <PricingSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

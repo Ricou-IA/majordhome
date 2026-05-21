@@ -20,6 +20,7 @@ import {
   calculateLineTotal,
   calculateContractTotal,
 } from '@services/pricing.service';
+import { useAuth } from '@contexts/AuthContext';
 import { contractKeys, pricingKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
@@ -30,19 +31,23 @@ export { pricingKeys } from '@hooks/cacheKeys';
 // ============================================================================
 
 /**
- * Charge toutes les données de référence pricing en une requête.
- * Utilisé par le formulaire de création contrat.
+ * Charge toutes les données de référence pricing en une requête, scopées sur
+ * l'organisation courante (RLS + filtre explicite défense en profondeur).
  *
  * @returns {Object} { zones, equipmentTypes, rates, discounts, extras, isLoading, error }
  */
 export function usePricingData() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
   const { data, isLoading, error } = useQuery({
-    queryKey: pricingKeys.allData(),
+    queryKey: pricingKeys.allData(orgId),
     queryFn: async () => {
-      const result = await pricingService.getAllPricingData();
+      const result = await pricingService.getAllPricingData(orgId);
       if (result.error) throw result.error;
       return result.data;
     },
+    enabled: !!orgId,
     staleTime: 5 * 60_000, // 5 min - données de référence stables
   });
 
@@ -54,6 +59,170 @@ export function usePricingData() {
     extras: data?.extras || [],
     isLoading,
     error,
+  };
+}
+
+// ============================================================================
+// HOOK - usePricingAdmin (CRUD UI Settings → Tarification)
+// ============================================================================
+
+/**
+ * Charge les 5 grilles tarifaires (zones, types, rates, discounts, extras) y
+ * compris les rows inactives — pour l'UI d'admin. Expose aussi toutes les
+ * mutations CRUD scopées sur l'org courante.
+ */
+export function usePricingAdmin() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const queryClient = useQueryClient();
+
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: pricingKeys.all(orgId) });
+  }, [queryClient, orgId]);
+
+  const zonesQuery = useQuery({
+    queryKey: pricingKeys.zones(orgId),
+    queryFn: async () => {
+      const r = await pricingService.getZones(orgId, { activeOnly: false });
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!orgId,
+  });
+
+  const equipmentTypesQuery = useQuery({
+    queryKey: pricingKeys.equipmentTypes(orgId),
+    queryFn: async () => {
+      const r = await pricingService.getEquipmentTypes(orgId, { activeOnly: false });
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!orgId,
+  });
+
+  const ratesQuery = useQuery({
+    queryKey: pricingKeys.rates(orgId),
+    queryFn: async () => {
+      const r = await pricingService.getRates(orgId);
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!orgId,
+  });
+
+  const discountsQuery = useQuery({
+    queryKey: pricingKeys.discounts(orgId),
+    queryFn: async () => {
+      const r = await pricingService.getDiscounts(orgId, { activeOnly: false });
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!orgId,
+  });
+
+  const extrasQuery = useQuery({
+    queryKey: pricingKeys.extras(orgId),
+    queryFn: async () => {
+      const r = await pricingService.getExtras(orgId, { activeOnly: false });
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!orgId,
+  });
+
+  // Helper qui transforme une réponse { data, error } du service en valeur résolvable
+  const unwrap = async (promise) => {
+    const r = await promise;
+    if (r.error) throw r.error;
+    return r.data ?? null;
+  };
+  const mutationOptions = { onSuccess: invalidateAll };
+
+  const createZone = useMutation({
+    mutationFn: (payload) => unwrap(pricingService.createZone(orgId, payload)),
+    ...mutationOptions,
+  });
+  const updateZone = useMutation({
+    mutationFn: ({ id, payload }) => unwrap(pricingService.updateZone(id, payload)),
+    ...mutationOptions,
+  });
+  const deleteZone = useMutation({
+    mutationFn: (id) => unwrap(pricingService.deleteZone(id)),
+    ...mutationOptions,
+  });
+
+  const createEquipmentType = useMutation({
+    mutationFn: (payload) => unwrap(pricingService.createEquipmentType(orgId, payload)),
+    ...mutationOptions,
+  });
+  const updateEquipmentType = useMutation({
+    mutationFn: ({ id, payload }) => unwrap(pricingService.updateEquipmentType(id, payload)),
+    ...mutationOptions,
+  });
+  const deleteEquipmentType = useMutation({
+    mutationFn: (id) => unwrap(pricingService.deleteEquipmentType(id)),
+    ...mutationOptions,
+  });
+
+  const upsertRate = useMutation({
+    mutationFn: (payload) => unwrap(pricingService.upsertRate(orgId, payload)),
+    ...mutationOptions,
+  });
+  const deleteRate = useMutation({
+    mutationFn: (id) => unwrap(pricingService.deleteRate(id)),
+    ...mutationOptions,
+  });
+
+  const createExtra = useMutation({
+    mutationFn: (payload) => unwrap(pricingService.createExtra(orgId, payload)),
+    ...mutationOptions,
+  });
+  const updateExtra = useMutation({
+    mutationFn: ({ id, payload }) => unwrap(pricingService.updateExtra(id, payload)),
+    ...mutationOptions,
+  });
+  const deleteExtra = useMutation({
+    mutationFn: (id) => unwrap(pricingService.deleteExtra(id)),
+    ...mutationOptions,
+  });
+
+  const createDiscount = useMutation({
+    mutationFn: (payload) => unwrap(pricingService.createDiscount(orgId, payload)),
+    ...mutationOptions,
+  });
+  const updateDiscount = useMutation({
+    mutationFn: ({ id, payload }) => unwrap(pricingService.updateDiscount(id, payload)),
+    ...mutationOptions,
+  });
+  const deleteDiscount = useMutation({
+    mutationFn: (id) => unwrap(pricingService.deleteDiscount(id)),
+    ...mutationOptions,
+  });
+
+  return {
+    orgId,
+    zones: zonesQuery.data || [],
+    equipmentTypes: equipmentTypesQuery.data || [],
+    rates: ratesQuery.data || [],
+    discounts: discountsQuery.data || [],
+    extras: extrasQuery.data || [],
+    isLoading:
+      zonesQuery.isLoading ||
+      equipmentTypesQuery.isLoading ||
+      ratesQuery.isLoading ||
+      discountsQuery.isLoading ||
+      extrasQuery.isLoading,
+    error:
+      zonesQuery.error ||
+      equipmentTypesQuery.error ||
+      ratesQuery.error ||
+      discountsQuery.error ||
+      extrasQuery.error,
+    createZone, updateZone, deleteZone,
+    createEquipmentType, updateEquipmentType, deleteEquipmentType,
+    upsertRate, deleteRate,
+    createExtra, updateExtra, deleteExtra,
+    createDiscount, updateDiscount, deleteDiscount,
   };
 }
 
