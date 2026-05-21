@@ -42,11 +42,18 @@ const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const { organization } = useAuth();
   const orgName = organization?.name || '';
-  const orgPlaceId = organization?.settings?.google_place_id || '';
+  const orgSettings = organization?.settings || {};
+  const orgPlaceId = orgSettings.google_place_id || '';
+  // P0.20 — Multi-tenant : business name + default city depuis settings org
+  const orgBusinessName = orgSettings.brand_name || orgName || DEFAULT_CONFIG.businessName;
+  const orgDefaultCity = orgSettings.geogrid_default_city || null;
+  const cityCodeInit = orgDefaultCity?.code || DEFAULT_CITY_CODE;
+  const cityLatInit = orgDefaultCity?.lat ?? DEFAULT_CITY_LAT;
+  const cityLngInit = orgDefaultCity?.lng ?? DEFAULT_CITY_LNG;
 
   const [mode, setMode] = useState('grid'); // 'grid' | 'cities'
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [selectedCityCode, setSelectedCityCode] = useState(DEFAULT_CITY_CODE);
+  const [config, setConfig] = useState({ ...DEFAULT_CONFIG, businessName: orgBusinessName });
+  const [selectedCityCode, setSelectedCityCode] = useState(cityCodeInit);
   const [allowOverage, setAllowOverage] = useState(false);
   const [minPopulation, setMinPopulation] = useState(1000);
   const [citiesSearchRadius, setCitiesSearchRadius] = useState(2000);
@@ -116,8 +123,8 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   }, [bigCities, selectedCityCode]);
 
   // Coordonnées effectives utilisées pour le scan en mode grille (toujours dérivées de la ville sélectionnée)
-  const gridCenterLat = selectedCity?.lat ?? DEFAULT_CITY_LAT;
-  const gridCenterLng = selectedCity?.lng ?? DEFAULT_CITY_LNG;
+  const gridCenterLat = selectedCity?.lat ?? cityLatInit;
+  const gridCenterLng = selectedCity?.lng ?? cityLngInit;
 
   const handleChange = (field, value) => {
     setConfig((prev) => ({ ...prev, [field]: value }));

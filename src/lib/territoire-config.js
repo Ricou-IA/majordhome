@@ -29,6 +29,21 @@ export const TERRITOIRE_CONFIG = {
 };
 
 /**
+ * P0.19 — Multi-tenant : retourne les centres territoriaux depuis les settings
+ * de l'organisation. Fallback Mayer si non configuré.
+ *
+ * @param {Object|null} settings - core.organizations.settings
+ * @returns {Object} Map des centres (même shape que TERRITOIRE_CONFIG.centers)
+ */
+export function getTerritoireCenters(settings) {
+  const custom = settings?.territoire_centers;
+  if (custom && typeof custom === 'object' && Object.keys(custom).length > 0) {
+    return custom;
+  }
+  return TERRITOIRE_CONFIG.centers;
+}
+
+/**
  * Types de points CRM avec styles visuels
  * Note : les contrats sont un sous-ensemble des clients (même type, couleur distincte)
  */

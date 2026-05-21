@@ -85,6 +85,36 @@ async function applyUnsubscribe(payload: TokenPayload, reason: string) {
   return { ok: !error, already: data?.already_unsubscribed === true };
 }
 
+// P0.16 — Multi-tenant : charger l'URL de landing depuis settings org du destinataire.
+// Fallback Mayer si payload absent ou org settings non configurées.
+const DEFAULT_LANDING_URL = "https://www.mayer-energie.fr/desabonnement";
+
+async function getUnsubscribeLandingUrl(payload: TokenPayload | null): Promise<string> {
+  if (!payload) return DEFAULT_LANDING_URL;
+  try {
+    const admin = getAdminClient();
+    const tableName = payload.rt === "c" ? "clients" : "leads";
+    const { data: recipient } = await admin
+      .schema("majordhome")
+      .from(tableName)
+      .select("org_id")
+      .eq("id", payload.rid)
+      .maybeSingle();
+    if (!recipient?.org_id) return DEFAULT_LANDING_URL;
+    const { data: org } = await admin
+      .schema("core")
+      .from("organizations")
+      .select("settings")
+      .eq("id", recipient.org_id)
+      .maybeSingle();
+    const settings = (org?.settings as Record<string, string | null> | null) || {};
+    return settings.unsubscribe_landing_url || DEFAULT_LANDING_URL;
+  } catch (err) {
+    console.warn("[mailing-unsubscribe] getUnsubscribeLandingUrl failed:", err);
+    return DEFAULT_LANDING_URL;
+  }
+}
+
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -114,11 +144,13 @@ Deno.serve(async (req: Request) => {
 
     // GET = redirect (lien dans l'email cliqué directement)
     if (req.method === "GET") {
+      const landingUrl = await getUnsubscribeLandingUrl(verif.payload || null);
       if (!verif.ok || !verif.payload) {
-        return Response.redirect("https://www.mayer-energie.fr/desabonnement", 302);
+        return Response.redirect(landingUrl, 302);
       }
       await applyUnsubscribe(verif.payload, "user_request");
-      return Response.redirect("https://www.mayer-energie.fr/desabonnement?unsub=ok", 302);
+      const sep = landingUrl.includes("?") ? "&" : "?";
+      return Response.redirect(`${landingUrl}${sep}unsub=ok`, 302);
     }
 
     // POST = JSON (appel depuis la page Next.js ou RFC 8058 one-click)
@@ -135,7 +167,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error("[mailing-unsubscribe] Unhandled:", err);
     if (req.method === "GET") {
-      return Response.redirect("https://www.mayer-energie.fr/desabonnement", 302);
+      return Response.redirect(DEFAULT_LANDING_URL, 302);
     }
     return jsonResponse({ error: "internal_error" }, 500);
   }

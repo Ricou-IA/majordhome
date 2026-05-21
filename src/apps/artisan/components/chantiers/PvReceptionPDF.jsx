@@ -25,7 +25,9 @@ import { LOGO_BASE64 } from '../contrat/logo-base64';
 // CONSTANTES
 // ============================================================================
 
-const COMPANY = {
+// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
+// Le caller doit passer `company` issu de buildCompanyInfo(organization.settings).
+const DEFAULT_COMPANY = {
   name: 'Mayer Énergie',
   legalName: 'MAYER ENERGIE',
   legalForm: 'SAS à associé unique',
@@ -36,7 +38,7 @@ const COMPANY = {
   email: 'contact@mayer-energie.fr',
 };
 
-const LEGAL_FOOTER = `${COMPANY.legalName} — ${COMPANY.legalForm}, capital ${COMPANY.capital} € — ${COMPANY.rcs} — ${COMPANY.address} — ${COMPANY.email}`;
+const DEFAULT_LEGAL_FOOTER = `${DEFAULT_COMPANY.legalName} — ${DEFAULT_COMPANY.legalForm}, capital ${DEFAULT_COMPANY.capital} € — ${DEFAULT_COMPANY.rcs} — ${DEFAULT_COMPANY.address} — ${DEFAULT_COMPANY.email}`;
 
 // ============================================================================
 // COULEURS
@@ -316,7 +318,22 @@ function Checkbox({ checked }) {
   );
 }
 
-function PvReceptionDocument({ data }) {
+function PvReceptionDocument({ data, company }) {
+  const COMPANY = company
+    ? {
+        name: company.name,
+        legalName: company.legalName,
+        legalForm: company.legalForm,
+        capital: company.capital,
+        rcs: company.rcs,
+        address: `${company.address} – ${company.postalCode} ${company.city}`,
+        phone: company.phone,
+        email: company.email,
+      }
+    : DEFAULT_COMPANY;
+  const LEGAL_FOOTER = company
+    ? `${COMPANY.legalName} — ${COMPANY.legalForm}, capital ${COMPANY.capital} € — ${COMPANY.rcs} — ${COMPANY.address} — ${COMPANY.email}`
+    : DEFAULT_LEGAL_FOOTER;
   const {
     pvNumber,
     pvDate,
@@ -514,7 +531,7 @@ function PvReceptionDocument({ data }) {
 // EXPORT : generatePvReceptionPdfBlob
 // ============================================================================
 
-export async function generatePvReceptionPdfBlob(data) {
-  const blob = await pdf(<PvReceptionDocument data={data} />).toBlob();
+export async function generatePvReceptionPdfBlob(data, company) {
+  const blob = await pdf(<PvReceptionDocument data={data} company={company} />).toBlob();
   return blob;
 }

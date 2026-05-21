@@ -16,6 +16,8 @@ import {
   calculateContractTotal,
 } from '@services/pricing.service';
 import { generateContractPdfBlob } from '@apps/artisan/components/contrat/ContractPDF';
+import { useAuth } from '@contexts/AuthContext';
+import { buildCompanyInfo } from '@/lib/orgBranding';
 
 const ACCEPTED_FILE_TYPES = '.pdf,.jpg,.jpeg,.png';
 const MAX_FILE_SIZE_MB = 10;
@@ -25,6 +27,8 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
+  const { organization } = useAuth();
+  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -163,7 +167,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     if (!contract || isGenerating) return;
     setIsGenerating(true);
     try {
-      const blob = await generateContractPdfBlob(buildPdfData());
+      const blob = await generateContractPdfBlob(buildPdfData(), company);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -232,7 +236,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     try {
       // 1. Générer le PDF
       const pdfData = buildPdfData();
-      const blob = await generateContractPdfBlob(pdfData);
+      const blob = await generateContractPdfBlob(pdfData, company);
 
       // 2. Upload vers Supabase Storage — préfixe org_id obligatoire (P0.0.7 storage RLS)
       const contractNum = contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`;

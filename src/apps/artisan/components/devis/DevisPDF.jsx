@@ -202,7 +202,9 @@ const s = StyleSheet.create({
 // COMPANY INFO (same as ContractPDF)
 // ============================================================================
 
-const COMPANY = {
+// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
+// Le caller doit passer `company` issu de buildCompanyInfo(organization.settings).
+const DEFAULT_COMPANY = {
   name: 'Mayer Énergie',
   address: '17 Rue Jean Moulin',
   postalCode: '81600',
@@ -216,7 +218,18 @@ const COMPANY = {
 // DOCUMENT
 // ============================================================================
 
-function DevisDocument({ data }) {
+function DevisDocument({ data, company }) {
+  const COMPANY = company
+    ? {
+        name: company.name,
+        address: company.address,
+        postalCode: company.postalCode,
+        city: company.city,
+        phone: company.phone,
+        siret: company.siret,
+        tvaIntra: company.tvaIntra,
+      }
+    : DEFAULT_COMPANY;
   const { quoteNumber, date, validityDate, subject, clientName, clientAddress, clientPostalCode, clientCity, clientPhone, clientEmail, lines = [], globalDiscountPercent = 0, totals, conditions } = data;
 
   const formatDate = (d) => {
@@ -369,8 +382,8 @@ function DevisDocument({ data }) {
 // EXPORT
 // ============================================================================
 
-export async function generateDevisPdfBlob(data) {
-  return pdf(<DevisDocument data={data} />).toBlob();
+export async function generateDevisPdfBlob(data, company) {
+  return pdf(<DevisDocument data={data} company={company} />).toBlob();
 }
 
 export default DevisDocument;

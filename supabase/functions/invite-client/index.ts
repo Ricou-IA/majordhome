@@ -25,8 +25,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 
-const PORTAL_URL = "https://majordhome.vercel.app";
-const FROM_EMAIL = "Mayer Energie <contact@mayer-energie.fr>";
+// P0.15 — Fallback Mayer si pas de settings org chargées. Le multi-tenant
+// charge core.organizations.settings au runtime (cf. plus bas).
+const DEFAULT_PORTAL_URL = "https://majordhome.vercel.app";
+const DEFAULT_FROM_EMAIL = "Mayer Energie <contact@mayer-energie.fr>";
+const DEFAULT_BRAND_NAME = "Mayer Energie";
+const DEFAULT_LOGO_URL = "https://www.mayer-energie.fr/images/logo-email.png";
+const DEFAULT_PHONE = "05 63 33 23 14";
+const DEFAULT_LOCATION = "Gaillac (81)";
+const DEFAULT_CONTACT_EMAIL = "contact@mayer-energie.fr";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,8 +63,16 @@ function buildInviteEmail(
   firstName: string,
   loginLink: string,
   email: string,
-  tempPassword: string
+  tempPassword: string,
+  branding: {
+    brandName: string;
+    logoUrl: string;
+    phone: string;
+    location: string;
+    contactEmail: string;
+  }
 ): string {
+  const { brandName, logoUrl, phone, location, contactEmail } = branding;
   return `<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -66,12 +81,12 @@ function buildInviteEmail(
 <tr><td align="center">
 <table width="580" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 <tr><td style="background:linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 100%);padding:28px 40px;text-align:center;">
-<img src="https://www.mayer-energie.fr/images/logo-email.png" alt="Mayer Energie" width="180" style="display:block;margin:0 auto 12px;max-width:180px;height:auto;" />
+<img src="${logoUrl}" alt="${brandName}" width="180" style="display:block;margin:0 auto 12px;max-width:180px;height:auto;" />
 <p style="margin:0;color:rgba(255,255,255,0.7);font-size:13px;">Espace Client</p>
 </td></tr>
 <tr><td style="padding:36px 40px 20px;">
 <p style="margin:0 0 20px;color:#1a1a1a;font-size:17px;line-height:1.5;">Bonjour <strong>${firstName}</strong>,</p>
-<p style="margin:0 0 20px;color:#4a4a4a;font-size:15px;line-height:1.6;">Votre espace client Mayer Energie est pr\u00eat ! Vous pouvez d\u00e9sormais consulter vos informations, suivre vos interventions et acc\u00e9der \u00e0 vos documents en ligne.</p>
+<p style="margin:0 0 20px;color:#4a4a4a;font-size:15px;line-height:1.6;">Votre espace client ${brandName} est pr\u00eat ! Vous pouvez d\u00e9sormais consulter vos informations, suivre vos interventions et acc\u00e9der \u00e0 vos documents en ligne.</p>
 <p style="margin:0 0 12px;color:#4a4a4a;font-size:15px;line-height:1.6;">Voici vos identifiants de connexion :</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
 <tr><td style="background-color:#f8f9fb;border:1px solid #e5e7eb;border-radius:8px;padding:20px 24px;">
@@ -99,8 +114,8 @@ function buildInviteEmail(
 </table>
 </td></tr>
 <tr><td style="background-color:#f8f9fb;padding:24px 40px;text-align:center;border-top:1px solid #eee;">
-<p style="margin:0 0 4px;color:#888;font-size:12px;">Mayer Energie</p>
-<p style="margin:0;color:#aaa;font-size:11px;">Gaillac (81) \u00b7 05 63 81 02 65 \u00b7 contact@mayer-energie.fr</p>
+<p style="margin:0 0 4px;color:#888;font-size:12px;">${brandName}</p>
+<p style="margin:0;color:#aaa;font-size:11px;">${location} \u00b7 ${phone} \u00b7 ${contactEmail}</p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -156,6 +171,29 @@ Deno.serve(async (req: Request) => {
     if (client.auth_user_id)
       return jsonResponse({ error: "Acces portail deja actif" }, 409);
 
+    // P0.15 — Charger settings org pour le branding (multi-tenant)
+    const { data: org } = await supabase
+      .schema("core")
+      .from("organizations")
+      .select("name, settings")
+      .eq("id", client.org_id)
+      .single();
+    const orgSettings = (org?.settings as Record<string, string | null> | null) || {};
+    const brandName = orgSettings.brand_name || org?.name || DEFAULT_BRAND_NAME;
+    const fromName = orgSettings.from_name || brandName;
+    const fromEmail = orgSettings.from_email
+      ? `${fromName} <${orgSettings.from_email}>`
+      : DEFAULT_FROM_EMAIL;
+    const portalUrl = orgSettings.portal_url || DEFAULT_PORTAL_URL;
+    const logoUrl = orgSettings.logo_url || DEFAULT_LOGO_URL;
+    const orgPhone = orgSettings.phone || DEFAULT_PHONE;
+    const orgCity = orgSettings.city;
+    const orgPostalCode = orgSettings.postal_code;
+    const location = orgCity && orgPostalCode
+      ? `${orgCity} (${orgPostalCode.toString().slice(0, 2)})`
+      : DEFAULT_LOCATION;
+    const contactEmail = orgSettings.from_email || DEFAULT_CONTACT_EMAIL;
+
     const displayName =
       [client.first_name, client.last_name].filter(Boolean).join(" ") ||
       "Client";
@@ -207,12 +245,13 @@ Deno.serve(async (req: Request) => {
     console.log("[invite-client] client linked");
 
     // 4. Email via Resend avec identifiants
-    const loginLink = PORTAL_URL + "/login?from=portal";
+    const loginLink = portalUrl + "/login?from=portal";
     const emailHtml = buildInviteEmail(
       firstName,
       loginLink,
       client.email,
-      tempPassword
+      tempPassword,
+      { brandName, logoUrl, phone: orgPhone, location, contactEmail }
     );
 
     try {
@@ -223,9 +262,9 @@ Deno.serve(async (req: Request) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: FROM_EMAIL,
+          from: fromEmail,
           to: client.email,
-          subject: "Votre espace client Mayer Energie est pret",
+          subject: `Votre espace client ${brandName} est pret`,
           html: emailHtml,
           reply_to: "contact@mayer-energie.fr",
         }),

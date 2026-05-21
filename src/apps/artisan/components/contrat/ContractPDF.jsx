@@ -26,7 +26,9 @@ import { LOGO_BASE64 } from './logo-base64';
 // CONSTANTES
 // ============================================================================
 
-const COMPANY = {
+// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
+// Le caller doit passer `company` issu de buildCompanyInfo(organization.settings).
+const DEFAULT_COMPANY = {
   name: 'Mayer Energie',
   legalName: 'MAYER ENERGIE',
   legalForm: 'SAS à associé unique',
@@ -39,7 +41,7 @@ const COMPANY = {
   assurance: 'Couvert par une assurance responsabilité civile professionnelle',
 };
 
-const LEGAL_FOOTER = `${COMPANY.legalName} — ${COMPANY.legalForm}, capital ${COMPANY.capital} € — ${COMPANY.rcs} — ${COMPANY.address} — ${COMPANY.email}`;
+const DEFAULT_LEGAL_FOOTER = `${DEFAULT_COMPANY.legalName} — ${DEFAULT_COMPANY.legalForm}, capital ${DEFAULT_COMPANY.capital} € — ${DEFAULT_COMPANY.rcs} — ${DEFAULT_COMPANY.address} — ${DEFAULT_COMPANY.email}`;
 
 // ============================================================================
 // COULEURS
@@ -319,7 +321,27 @@ const MONTHS_FR = [
 // DOCUMENT
 // ============================================================================
 
-function ContractDocument({ data }) {
+function ContractDocument({ data, company }) {
+  // Si `company` est fourni (depuis buildCompanyInfo), mapper vers le format local
+  // attendu (address joint + assurance au lieu de insurance) pour ne pas casser
+  // les références internes.
+  const COMPANY = company
+    ? {
+        name: company.name,
+        legalName: company.legalName,
+        legalForm: company.legalForm,
+        capital: company.capital,
+        rcs: company.rcs,
+        address: `${company.address} – ${company.postalCode} ${company.city}`,
+        phone: company.phone,
+        email: company.email,
+        domain: company.domain,
+        assurance: company.insurance,
+      }
+    : DEFAULT_COMPANY;
+  const LEGAL_FOOTER = company
+    ? `${COMPANY.legalName} — ${COMPANY.legalForm}, capital ${COMPANY.capital} € — ${COMPANY.rcs} — ${COMPANY.address} — ${COMPANY.email}`
+    : DEFAULT_LEGAL_FOOTER;
   const {
     contractNumber,
     startDate,
@@ -620,7 +642,7 @@ function ContractDocument({ data }) {
  * @param {Object} data - Données du contrat
  * @returns {Promise<Blob>}
  */
-export async function generateContractPdfBlob(data) {
-  const blob = await pdf(<ContractDocument data={data} />).toBlob();
+export async function generateContractPdfBlob(data, company) {
+  const blob = await pdf(<ContractDocument data={data} company={company} />).toBlob();
   return blob;
 }

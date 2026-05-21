@@ -18,6 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { buildCompanyInfo } from '@/lib/orgBranding';
 import { chantierKeys } from '@hooks/cacheKeys';
 import { chantiersService } from '@services/chantiers.service';
 import { storageService } from '@services/storage.service';
@@ -59,7 +60,8 @@ export default function PvReceptionSign() {
   const { leadId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
+  const company = buildCompanyInfo(organization?.settings);
 
   // -- Données --
   const { chantier, isLoading } = useChantier(leadId);
@@ -145,7 +147,7 @@ export default function PvReceptionSign() {
       };
 
       // Générer le PDF
-      const blob = await generatePvReceptionPdfBlob(pdfData);
+      const blob = await generatePvReceptionPdfBlob(pdfData, company);
 
       // Upload
       const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').replace(/\s+/g, '_');

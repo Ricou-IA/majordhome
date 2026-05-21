@@ -32,9 +32,14 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
   const queryClient = useQueryClient();
   const cancelRef = useRef(false);
 
+  // P0.20 — Multi-tenant : default city depuis settings org
+  const orgDefaultCity = organization?.settings?.geogrid_default_city || null;
+  const defaultCityCode = orgDefaultCity?.code || '81099';
+  const orgBusinessName = organization?.settings?.brand_name || orgBusinessName;
+
   const [selectedListId, setSelectedListId] = useState(lists[0]?.id || '');
   const [scanMode, setScanMode] = useState('grid'); // grid | cities
-  const [gaillacCenter, setGaillacCenter] = useState('81099'); // code commune pour mode grid
+  const [gaillacCenter, setGaillacCenter] = useState(defaultCityCode); // code commune pour mode grid
   const [gridSize, setGridSize] = useState(5);
   const [radiusKm, setRadiusKm] = useState(3);
   const [searchRadiusM, setSearchRadiusM] = useState(2000);
@@ -107,7 +112,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
       const { data: benchmark, error: benchmarkError } = await geogridService.createBenchmark(orgId, {
         list_id: selectedListId,
         scan_mode: scanMode,
-        business_name: organization?.name || 'Mayer Energie',
+        business_name: orgBusinessName,
         place_id: organization?.settings?.google_place_id || null,
         center_lat: center.lat,
         center_lng: center.lng,
@@ -138,7 +143,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
         const params = {
           orgId,
           keyword,
-          businessName: organization?.name || 'Mayer Energie',
+          businessName: orgBusinessName,
           placeId: organization?.settings?.google_place_id || '',
           searchRadiusM,
         };

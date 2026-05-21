@@ -286,10 +286,29 @@ export const RESOURCES = {
 };
 
 /**
+ * P0.17 — Retourne le catalogue de ressources pour une org donnée.
+ * Si `settings.mailing_resources` est défini (JSONB), il override le catalogue
+ * hardcodé. Sinon fallback Mayer (RESOURCES).
+ *
+ * @param {Object|null} settings - core.organizations.settings
+ * @returns {Object} Catalogue de ressources (même shape que RESOURCES)
+ */
+export function getResources(settings) {
+  const custom = settings?.mailing_resources;
+  if (custom && typeof custom === 'object' && Object.keys(custom).length > 0) {
+    return custom;
+  }
+  return RESOURCES;
+}
+
+/**
  * Formate la caisse à outils en section Markdown pour injection dans le prompt.
  * Seules les ressources avec url non nulle et category différente de 'workflow' sont incluses.
+ *
+ * @param {Object} [customResources] - Catalogue override (depuis getResources(settings))
  */
-export function formatResourcesForPrompt() {
+export function formatResourcesForPrompt(customResources) {
+  const resources = customResources || RESOURCES;
   const lines = [];
   lines.push('## Caisse à outils — URLs et ressources disponibles');
   lines.push('');
@@ -297,7 +316,7 @@ export function formatResourcesForPrompt() {
   lines.push('');
 
   const byCategory = {};
-  for (const [key, r] of Object.entries(RESOURCES)) {
+  for (const [key, r] of Object.entries(resources)) {
     if (!r.url || r.category === 'workflow') continue;
     if (!byCategory[r.category]) byCategory[r.category] = [];
     byCategory[r.category].push({ key, ...r });

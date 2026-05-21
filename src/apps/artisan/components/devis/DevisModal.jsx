@@ -134,6 +134,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       // Dynamic import to avoid loading react-pdf until needed
       const { generateDevisPdfBlob } = await import('./DevisPDF');
       const { devisService } = await import('@services/devis.service');
+      const { buildCompanyInfo } = await import('@/lib/orgBranding');
+      const company = buildCompanyInfo(organization?.settings);
 
       const pdfData = {
         quoteNumber: quote.quote_number,
@@ -152,7 +154,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         conditions: quote.conditions,
       };
 
-      const blob = await generateDevisPdfBlob(pdfData);
+      const blob = await generateDevisPdfBlob(pdfData, company);
       const result = await devisService.uploadQuotePdf(quoteId, blob, orgId);
       if (result?.error) throw result.error;
 

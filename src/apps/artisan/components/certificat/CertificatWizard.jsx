@@ -24,6 +24,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
 import { generatePdfBlob } from './CertificatPDF';
+import { buildCompanyInfo } from '@/lib/orgBranding';
 import {
   getSteps,
   getTypeDocument,
@@ -307,7 +308,7 @@ export function CertificatWizard({
       };
 
       // Générer le blob PDF
-      const blob = await generatePdfBlob(pdfData);
+      const blob = await generatePdfBlob(pdfData, buildCompanyInfo(organization?.settings));
 
       // Upload + DB uniquement si on a un certificatId
       if (currentCertId) {

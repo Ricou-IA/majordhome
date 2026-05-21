@@ -111,7 +111,15 @@ function Field({ label, value }) {
 // DOCUMENT PDF
 // ============================================================================
 
-function CertificatDocument({ data }) {
+// P0.13/P0.14 multi-tenant — Fallback Mayer si pas de company en prop.
+const DEFAULT_COMPANY_HEADER = 'MAYER ENERGIE';
+const DEFAULT_COMPANY_FOOTER = 'Mayer Energie - SASU SIRET 100 288 224 00015 - Gaillac (81600) - RGE QualiPAC, QualiBois';
+
+function CertificatDocument({ data, company }) {
+  const companyHeader = company ? (company.legalName || company.name || DEFAULT_COMPANY_HEADER) : DEFAULT_COMPANY_HEADER;
+  const companyFooter = company
+    ? `${company.name} - ${company.legalForm || 'SASU'} SIRET ${company.siret} - ${company.city} (${company.postalCode}) - RGE ${(company.rgeCertifications || []).join(', ')}`
+    : DEFAULT_COMPANY_FOOTER;
   const config = SECTIONS_PAR_EQUIPEMENT[data.equipement_type] || {};
   const controles = data.donnees_entretien?.controles_securite || {};
   const nettoyage = data.donnees_entretien?.nettoyage || {};
@@ -152,7 +160,7 @@ function CertificatDocument({ data }) {
             </View>
           </View>
           <View style={s.headerCenter}>
-            <Text style={s.title}>MAYER ENERGIE</Text>
+            <Text style={s.title}>{companyHeader}</Text>
             <Text style={s.subtitle}>CERTIFICAT D'ENTRETIEN{config.showRamonage ? ' & RAMONAGE' : ''}</Text>
           </View>
         </View>
@@ -314,7 +322,7 @@ function CertificatDocument({ data }) {
         {/* PIED DE PAGE */}
         <View style={s.footer}>
           <Text style={s.footerText}>
-            Mayer Energie - SASU SIRET 100 288 224 00015 - Gaillac (81600) - RGE QualiPAC, QualiBois
+            {companyFooter}
           </Text>
         </View>
       </Page>
@@ -326,8 +334,8 @@ function CertificatDocument({ data }) {
 // EXPORT
 // ============================================================================
 
-export async function generatePdfBlob(data) {
-  const blob = await pdf(<CertificatDocument data={data} />).toBlob();
+export async function generatePdfBlob(data, company) {
+  const blob = await pdf(<CertificatDocument data={data} company={company} />).toBlob();
   return blob;
 }
 

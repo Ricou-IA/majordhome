@@ -3,8 +3,9 @@ import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Check, Copy, Eye, Loader2, X, Sparkles, Zap, Filter } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
+import { buildCompanyInfo } from '@/lib/orgBranding';
 import { useMailSegments } from '@hooks/useMailSegments';
-import { formatResourcesForPrompt } from './resources';
+import { formatResourcesForPrompt, getResources } from './resources';
 
 // Palette de tons éditoriaux (volontairement courte et tranchée)
 const TONE_OPTIONS = [
@@ -44,7 +45,9 @@ export default function CampaignWizard({ initial, onClose, onSave, isSaving }) {
 
   const update = useCallback((patch) => setForm((f) => ({ ...f, ...patch })), []);
 
-  const promptText = useMemo(() => buildPrompt(form), [form]);
+  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
+  const resourcesCatalog = useMemo(() => getResources(organization?.settings), [organization]);
+  const promptText = useMemo(() => buildPrompt(form, company, resourcesCatalog), [form, company, resourcesCatalog]);
   const jsonText = useMemo(() => JSON.stringify(buildJsonPayload(form), null, 2), [form]);
 
   const copyToClipboard = async (text, label) => {
@@ -509,6 +512,7 @@ function StepGenerate({ form, update, promptText, jsonText, copyToClipboard }) {
             <iframe
               ref={iframeRef}
               title="Preview HTML"
+              sandbox="allow-same-origin"
               className="flex-1 w-full border-0"
             />
           </div>
@@ -625,11 +629,12 @@ function buildJsonPayload(form) {
   return { brief: form.brief };
 }
 
-function buildPrompt(form) {
+function buildPrompt(form, company, resourcesCatalog) {
   const campaignKey = form.key || slugifyKey(form.label);
+  const brandName = company?.name || 'Mayer Énergie';
   const lines = [];
-  lines.push(`Tu es un générateur d'emails HTML pour Mayer Énergie.`);
-  lines.push(`Génère un email HTML complet (de <!DOCTYPE html> à </html>) suivant le template "Mail I — Base réutilisable" de Mayer Énergie.`);
+  lines.push(`Tu es un générateur d'emails HTML pour ${brandName}.`);
+  lines.push(`Génère un email HTML complet (de <!DOCTYPE html> à </html>) suivant le template "Mail I — Base réutilisable" de ${brandName}.`);
   lines.push('');
   lines.push('## Carte d\'identité de la campagne');
   lines.push(`- Clé technique : ${campaignKey}`);
@@ -654,19 +659,25 @@ function buildPrompt(form) {
   lines.push(`5. **Preheader** : ${form.preheader ? `utilise exactement « ${form.preheader} »` : 'propose-en un (max 100 caractères) qui complète l\'objet sans le répéter'}.`);
   lines.push('6. **Intro** (après {{SALUTATION}}) : 1-2 phrases qui posent le sujet du mail.');
   lines.push('');
-  lines.push(formatResourcesForPrompt().replace(/\{CAMPAIGN_KEY\}/g, campaignKey));
+  lines.push(formatResourcesForPrompt(resourcesCatalog).replace(/\{CAMPAIGN_KEY\}/g, campaignKey));
   lines.push('');
   lines.push('## Types de blocs disponibles');
   lines.push('');
   lines.push('- **Offre du mois** : carte orange #fff7ed (bordure #fed7aa). Titre avec 🎁, description, CTA bouton orange #ea580c. À utiliser quand le brief parle d\'une offre commerciale, promo, remise, partenariat tarifaire.');
   lines.push('- **News / Nouveauté** : carte grise #f8f9fa (bordure #e9ecef). Titre avec 🆕, description, lien optionnel. À utiliser pour annonce (nouveau service, recrutement, partenariat, événement).');
   lines.push('- **Conseil** : liseré bleu 4px #1E4D8C à gauche. Titre avec 💡, intro contexte, 2-4 points à puces, conclusion. À utiliser pour conseil pratique, info réglementaire, astuce saisonnière.');
-  lines.push(`- **CTA contact** : carte bleue #eff6ff (bordure #bfdbfe). Titre "🏠 Un projet en cours ?", accroche, bouton bleu #1E4D8C "👉 Je contacte Mayer Énergie" → \`https://www.mayer-energie.fr/contact?utm_source=emailing&utm_campaign=${campaignKey}&utm_medium=email\` + téléphone 05 63 33 23 14 sous le bouton. À utiliser presque systématiquement en dernier bloc pour inviter au contact.`);
+  const contactUrl = company?.websiteUrl ? `${company.websiteUrl}/contact` : 'https://www.mayer-energie.fr/contact';
+  const orgPhone = company?.phone || '05 63 33 23 14';
+  const orgEmail = company?.email || 'contact@mayer-energie.fr';
+  const orgWebsite = company?.websiteUrl ? company.websiteUrl.replace(/^https?:\/\//, '') : 'www.mayer-energie.fr';
+  const orgFullAddress = company ? `${company.address} – ${company.postalCode} ${company.city}` : '26 Route des Pyrénées – 81600 Gaillac';
+  const orgRge = (company?.rgeCertifications || ['QualiPAC', 'QualiBois']).join(' · ');
+  lines.push(`- **CTA contact** : carte bleue #eff6ff (bordure #bfdbfe). Titre "🏠 Un projet en cours ?", accroche, bouton bleu #1E4D8C "👉 Je contacte ${brandName}" → \`${contactUrl}?utm_source=emailing&utm_campaign=${campaignKey}&utm_medium=email\` + téléphone ${orgPhone} sous le bouton. À utiliser presque systématiquement en dernier bloc pour inviter au contact.`);
   lines.push('');
   lines.push('## Contraintes techniques (obligatoires)');
   lines.push('- Inline CSS uniquement (compatibilité Gmail / Outlook)');
-  lines.push('- Header identique à Mail I : logo Mayer centré (220px) + bande bleue #1E4D8C avec "Votre confort, toute l\'année"');
-  lines.push('- Footer identique à Mail I : téléphone 05 63 33 23 14, email contact@mayer-energie.fr, site www.mayer-energie.fr, adresse 26 Route des Pyrénées – 81600 Gaillac, mention RGE QualiPAC · QualiBois · QualiPV, lien désabonnement');
+  lines.push(`- Header identique à Mail I : logo ${brandName} centré (220px) + bande bleue #1E4D8C avec "Votre confort, toute l'année"`);
+  lines.push(`- Footer identique à Mail I : téléphone ${orgPhone}, email ${orgEmail}, site ${orgWebsite}, adresse ${orgFullAddress}, mention RGE ${orgRge}, lien désabonnement`);
   lines.push('- Largeur max 600px, fond #f4f4f4, carte blanche border-radius 8px');
   lines.push('- Police : Arial, sans-serif');
   lines.push('- Ne touche pas au placeholder {{SALUTATION}} (remplacé côté N8N par "Bonjour Prénom Nom,")');

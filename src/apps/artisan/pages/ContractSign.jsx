@@ -31,6 +31,8 @@ import { formatEuro, formatDateFR } from '@/lib/utils';
 import { generateContractPdfBlob } from '../components/contrat/ContractPDF';
 import { CertificatSignaturePad } from '../components/certificat/CertificatSignaturePad';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@contexts/AuthContext';
+import { buildCompanyInfo } from '@/lib/orgBranding';
 
 // ============================================================================
 // MOIS FR
@@ -115,6 +117,9 @@ async function sendContractEmail(contract, client, pdfPath) {
 // ============================================================================
 // COMPOSANT
 export default function ContractSign() {
+  const { organization } = useAuth();
+  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
+
   const { clientId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -243,7 +248,7 @@ export default function ContractSign() {
       };
 
       // Générer le PDF
-      const blob = await generateContractPdfBlob(pdfData);
+      const blob = await generateContractPdfBlob(pdfData, company);
 
       // Nom du fichier : "Contrat Entretien - Nom_Prenom.pdf"
       const clientName = client?.display_name || [client?.last_name, client?.first_name].filter(Boolean).join(' ') || 'Client';
