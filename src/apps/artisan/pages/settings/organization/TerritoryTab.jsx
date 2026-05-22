@@ -11,7 +11,7 @@ const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md tex
 const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
 
-const PLACE_ID_FINDER_URL = 'https://developers.google.com/maps/documentation/places/web-service/place-id';
+const PLACE_ID_FINDER_URL = 'https://developers.google.com/maps/documentation/places/web-service/place-id?hl=fr#find-id';
 
 function slugify(label) {
   return (
