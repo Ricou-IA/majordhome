@@ -36,7 +36,8 @@ Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipelin
 - **Toute edge function `verify_jwt:true`** doit valider la membership via `requireOrgMembership(req, opts)` du helper `_shared/auth.ts` (P0.25)
 - **Intégrations conditionnelles par org** : utiliser un flag dans `core.organizations.settings` (ex `{ pennylane: { enabled: true } }`) consommé via `orgSettingsFilter` de `requireOrgMembership`. Pattern à étendre pour Meta Ads, intégrations futures (P0.3)
 - **Cache keys React Query** : toutes les familles utilisent `all: (orgId) => [domain, orgId]` (convention pricingKeys-style). Détails dans l'en-tête de `cacheKeys.js` (P0.11)
-- **Toute valeur de branding** (nom, adresse, URL, certification, couleur, logo) DOIT passer par `core.organizations.settings` + helper `buildCompanyInfo(settings)` de `src/lib/orgBranding.js` plutôt que d'être hardcodée. Fallback Mayer accepté uniquement comme valeur par défaut dans le helper (P0.13-P0.20)
+- **Toute valeur de branding** (nom, adresse, URL, certification, couleur, logo) DOIT passer par `core.organizations.settings` + helper `buildCompanyInfo(settings)` de `src/lib/orgBranding.js` plutôt que d'être hardcodée. **Fallback neutre** (`"Votre entreprise"`, champs vides, couleur slate `#64748b`, pas de logo) — une org sans settings affiche du neutre, **pas du Mayer** (P0.13-P0.20 + refacto 2026-05-22). `portal_url` est une constante app (`APP_PORTAL_URL='https://majordhome.vercel.app'`, singleton tant qu'il n'y a pas de sous-domaines par org), pas un setting. `domain` est dérivé de `from_email.split('@')[1]`. `formatFullAddress` / `buildLegalFooter` filtrent les champs vides (pas de séparateurs orphelins).
+- **Toute nouvelle valeur de configuration org** (branding, intégration tierce, paramètre métier) DOIT être éditable via `/settings/organization` (ou un autre tile `/settings/*` existant), jamais hardcodée dans le code. Si la valeur n'a pas encore son UI : ajouter le champ dans l'onglet pertinent de la page Settings AVANT de la consommer côté code. Sinon les futurs onboarding multi-tenant resteront bloqués (cf. Module Settings → Organization).
 - **Toute clé `localStorage`** doit être suffixée par `:${orgId}` (cache org-scoped) ou `:${userId}` (draft personnel) pour éviter fuite cross-org au switch d'organisation. Ex : `territoire-zones-v8:${orgId}` (`useMapZones`), `intervention-draft-${userId}_${id}` (`useInterventionDraft`) (P1.9)
 
 ## Stack
@@ -105,6 +106,7 @@ Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit quali
 - **1 nouveau warning ESLint → fix immédiat** (le `--max-warnings` du script `lint` est défini sur le count actuel pour empêcher la régression)
 - Si tu touches un fichier identifié comme dette (LeadModal, clients.service.js, etc.) : profiter pour le décomposer un peu plus dans le même commit
 - TODOs : OK temporairement avec une raison claire (ex `// TODO P0.X — à faire`), mais ne pas les laisser pourrir > 1 mois
+- **Migration `useAuth().organization.settings` → `useOrgSettings()`** (2026-05-22) : décision scale-ready prise — `useOrgSettings()` devient le canal canonique unique pour lire/écrire les settings d'org. Les callers existants qui lisent `useAuth().organization?.settings` (buildCompanyInfo dans les PDFs, getMapDefaultCenter, getOrgHeadquarters, GeoGrid `ScanConfigPanel`/`BenchmarkLauncher`, mailing wizard `CampaignWizard`, etc.) doivent être migrés progressivement. À faire au fil des touches sur ces fichiers (pas de big-bang refacto). Quand tu touches un caller, profite pour migrer.
 
 ## Architecture
 ```
@@ -130,6 +132,7 @@ src/
 │       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierInterventionSection
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
 │       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
+│       │   └── longTerm/       # LongTermTab, LongTermLeadDrawer, MoveToLongTermModal (suivi projets MT-LT, ⚠️ WIP)
 │       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
 │       ├── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
 │       └── geogrid/            # ScanTab, KeywordListsPanel, BenchmarksPanel, BenchmarkLauncher, BenchmarkResultTable, ScanConfigPanel, ScanHistory, GeoGridMap, communesService
@@ -213,12 +216,14 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - TanStack React Query v5
 - **Cache keys centralisées** : `src/shared/hooks/cacheKeys.js` — source unique pour toutes les query keys
   - Import : `import { clientKeys } from '@/shared/hooks/cacheKeys'`
-  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys, geogridKeys
+  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys, geogridKeys, orgSettingsKeys
   - Re-exports depuis chaque hook pour rétrocompatibilité
   - **Convention P0.11 (2026-05-21)** : toutes les keys prennent `orgId` en 1ᵉʳ paramètre (`all: (orgId) => [domain, orgId]`, sous-keys idem) — défense en profondeur multi-tenant. Détails dans l'en-tête de `cacheKeys.js`.
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
 - **`useDebounce`** : Hook utilitaire de debounce (remplace les implémentations manuelles)
 - **`usePennylaneSyncClient`** : Sync client MDH→Pennylane (fire-and-forget, ne bloque pas UX). Le code 411 Pennylane est récupéré et stocké dans `clients.pennylane_account_number`. Erreurs loggées silencieusement (`console.warn`). Cron `pennylane-sync-cron` : ne calcule JAMAIS `client_number` manuellement, laisse la séquence DB le générer (cf. Gotchas DB).
+- **`useOrgSettings()`** (2026-05-22) — **canal canonique** pour lire ET écrire `core.organizations.settings` côté frontend. Retourne `{ settings, isLoading, save, isSaving }`. Lecture via SELECT direct sur vue `core.organizations` (RLS scope user→org via `security_invoker`) ; écriture via RPC `org_update_settings` (SECURITY DEFINER, org_admin only, raise P0002 si org inexistante). `onSuccess` invalide `orgSettingsKeys.byOrg(orgId)` + appelle `refreshUserData()` du AuthContext pour resync `useAuth().organization.settings` (consommé par `buildCompanyInfo`, `getMapDefaultCenter`, etc.).
+  - **Règle (scale-ready)** : tout nouveau code lisant ou écrivant les settings d'org DOIT passer par `useOrgSettings()`. **Ne plus introduire de `useAuth().organization?.settings`** dans du nouveau code. Migration progressive des callers existants à planifier (cf. Dette technique).
 - Retournent : `{ data, isLoading, error, refetch, ...mutations }`
 
 ### Edge functions (`supabase/functions/`)
@@ -249,7 +254,9 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - `formatDateFR` (→ "1 janvier 2026"), `formatDateShortFR` (→ "1 janv. 2026")
   - `formatDateTimeFR`, `formatPhoneNumber`, `formatEuro`
   - `computeEndTime`, `computeDuration`
-- **Branding multi-tenant** : `src/lib/orgBranding.js` — `buildCompanyInfo(settings)` construit l'objet `company` (nom, SIRET, adresse, RGE, etc.) depuis `core.organizations.settings`, avec fallback Mayer. Helpers `formatFullAddress(company)` + `buildLegalFooter(company)`. Consommé par les PDFs (`generateContractPdfBlob(data, company)`, idem Certificat/Devis/PvReception) et le wizard mailing.
+- **Branding multi-tenant** : `src/lib/orgBranding.js` — `buildCompanyInfo(settings)` construit l'objet `company` (nom, SIRET, adresse, RGE, etc.) depuis `core.organizations.settings`, avec **fallback neutre** (`"Votre entreprise"`, champs vides, couleur slate, pas de logo — refacto 2026-05-22, plus de fallback Mayer). Helpers `formatFullAddress(company)` + `buildLegalFooter(company)` filtrent les champs vides. Consommé par les PDFs (`generateContractPdfBlob(data, company)`, idem Certificat/Devis/PvReception) et le wizard mailing.
+- **Siège org pour trajets** (P0.19, 2026-05-21) : `src/lib/territoire-config.js` — `getOrgHeadquarters(settings)` retourne `{ lat, lng, label }` du 1ᵉʳ centre de `settings.territoire_centers` ou `null`. Passé en `hqCoords` à `getDrivingDuration` / `getDrivingFromAddress` / `detectZoneForAddress` (`zoneDetection.js`). Si null → calcul de trajet skip, l'UI doit cacher l'affichage "depuis X".
+- **Départements couverts par l'org** (P0.13 follow-up) : `src/lib/territoire-config.js` — `getCoverageDepartments(settings)` retourne `string[]` (codes département) depuis `settings.geogrid_target_department` (singleton, itération 1). Fallback neutre = `[]` (UI doit prompter la config). Liste statique 95 + 2A/2B + DOM-TOM dans `src/lib/departments.js` (`FRENCH_DEPARTMENTS`, `getDepartmentByCode`, `getDepartmentLabel`).
 - **Constantes** : `src/lib/constants.js` — `DEFAULT_PAGE_SIZE`, `LARGE_PAGE_SIZE`, `KANBAN_PAGE_SIZE`
 - **Logger** : `src/lib/logger.js` (P1.7, 2026-05-21) — `logger.error/warn/info/log/debug/table/group/groupEnd`. En prod (`import.meta.env.PROD`), tout est no-op sauf `logger.error` (Sentry-like). Variant `logger.silent.error` pour muter aussi les erreurs. Migrer les nouveaux `console.*` vers `logger.*` au fil de l'eau.
 
@@ -540,6 +547,23 @@ CRUD per-org de la grille tarifaire (P0.0.6 pricing per-org, 2026-05-21). Accès
 - **Tables `majordhome.pricing_*`** : `pricing_zones`, `pricing_equipment_types`, `pricing_rates`, `pricing_discounts`, `pricing_extras` — toutes avec `org_id NOT NULL` + FK `core.organizations` + RLS `org_id IN (org_members)` + UNIQUE composites `(org_id, …)`
 - **`upsertRate`** utilise `onConflict: 'org_id,zone_id,equipment_type_id'` (composite UNIQUE)
 
+## Module Settings → Organization (/settings/organization)
+
+Configuration multi-tenant de l'identité de l'org (livraison Task 1-15, 2026-05-22). Accès `org_admin` only — RouteGuard `resource="settings"` + guard `isOrgAdmin` in-component (`<Navigate to="/settings" replace />` si non-admin).
+
+- **Page** : `src/apps/artisan/pages/settings/OrganizationSettings.jsx` — sidebar gauche + 3 onglets :
+  - **Identité** (`organization/IdentityTab.jsx`) : `brand_name`, `legal_name`, `legal_form`, `capital`, `siret` (auto-format groupes de 3+5), `rcs`, `tva_intra` (auto-format FR + uppercase), `insurance`, `rge_certifications` (chips via `RgeCertificationsInput`)
+  - **Coordonnées** (`organization/ContactTab.jsx`) : `address`, `postal_code`, `city`, `phone` (auto-format FR), `from_email`, `reply_to`, `website_url` (auto-prefix https au save). `domain` calculé auto depuis `from_email`, `portal_url` = constante app (singleton)
+  - **Territoire** (`organization/TerritoryTab.jsx`) : siège unique obligatoire (label + recherche adresse Mapbox + couleur + emoji) + référence Google Business (`google_place_id` + bouton "Trouver" vers Place ID Finder FR) + département principal (`geogrid_target_department` via `DepartmentSelect`, 95 dépts + DOM-TOM, bouton "Détecter depuis siège" via Mapbox reverse geocoding) + N antennes commerciales optionnelles (même `CenterEditor` que le siège, expandable inline)
+- **Composants partagés** : `pages/settings/organization/components/` — `RgeCertificationsInput.jsx`, `AddressSearch.jsx`, `DepartmentSelect.jsx`, `CenterEditor.jsx`
+- **Source de vérité** : `core.organizations.settings` (JSONB) — consommé par `buildCompanyInfo(settings)`, `getOrgHeadquarters(settings)`, `getMapDefaultCenter(settings)`, `getCoverageDepartments(settings)`, `getResources(settings)` (mailing)
+- **Hook** : `useOrgSettings()` — canal canonique read/write (cf. section Hooks)
+- **RPC** : `public.org_update_settings(p_org_id, p_patch jsonb)` SECURITY DEFINER, REVOKE anon, GRANT authenticated. Check `auth.uid() ∈ org_members WHERE role='org_admin'` côté DB. Raise `42501` si non-admin, `P0002` si org inexistante. Shallow merge JSONB (`||`).
+- **Save par onglet** (pas global) : chaque onglet a son `{ form, initial }` local + `isDirty` calculé via `JSON.stringify` diff. Bouton "Enregistrer" disabled si `!isDirty || !isValid || isSaving`.
+- **Migration legacy** : champ `geogrid_department_code` (singleton historique Mayer) → `geogrid_target_department` (convention unifiée). Backfill Mayer = `'81'` (2026-05-22).
+- **Fallbacks Mayer neutralisés** (refacto 2026-05-22) : `orgBranding.js` (NEUTRAL_DEFAULTS) + `mapbox.js` (`getMapDefaultCenter` dérive du siège, fallback centre France `[2.5, 46.5]`) + `communesService.js` (paramétré par `departmentCode`). Une org sans settings voit du neutre, pas du Mayer.
+- **Spec/plan source** : `docs/superpowers/specs/2026-05-22-multitenant-settings-organization-design.md` + `docs/superpowers/plans/2026-05-22-multitenant-settings-organization.md`
+
 ## Module Voice (PWA terrain)
 
 PWA dédiée pour les mémos vocaux structurés (RDV terrain / réunion / note libre) — Phase 1 MAKE. Routes `/voice/*` dans `src/apps/voice/`.
@@ -609,6 +633,28 @@ Au retour OAuth (`?gsc=connected`), `useEffect` déclenche auto `triggerSync({ m
 GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m/12m + filtre famille + toggle "Liste Mayer SEO 2026 uniquement" + 5 KPIs + tableau agrégé par requête avec étoile pour keywords curés).
 
 > Détails complets (edge functions, RLS, secrets GCP, etc.) : `docs/MODULE_SEARCH_CONSOLE.md`. Master prompt évolution : `docs/GSC_INTEGRATION_MASTER_PROMPT.md`.
+
+## Module Pennylane quote-driven (Sprint 9 — chantiers ↔ devis PL)
+
+> ⚠️ **WIP non finalisé** (commit `1df67db4`, 2026-05-21) — smoke test fonctionnel non couvert, "à reprendre 1 par 1 si bugs". Architecture susceptible de bouger avant stabilisation.
+
+Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devis Pennylane importés. Permet d'attacher/détacher manuellement un devis PL à un lead/chantier, de gérer plusieurs devis par chantier, et d'afficher le suivi devis directement sur la carte Kanban + la modale.
+
+### DB
+- **Table `majordhome.lead_pennylane_quotes`** (N:N leads ↔ devis Pennylane) — 127 lignes pour 90 leads en prod. Colonne `ejected_at` (timestamptz) pour soft-detach (un devis "éjecté" reste tracé sans bloquer un nouvel attachement).
+- Vue publique `public.majordhome_lead_pennylane_quotes`.
+
+### Composants frontend
+- `src/apps/artisan/components/chantiers/QuoteBlock.jsx` (257 LOC) — affiché sur **ChantierCard** (compact) + **ChantierModal** (détail). Liste les devis attachés, statut, montant, lien Pennylane.
+- `src/apps/artisan/components/chantiers/LinkPennylaneQuoteModal.jsx` — modale de liaison : recherche un devis PL existant et le rattache au lead courant.
+- `ChantierReceptionSection.jsx` (refacto +443 LOC) — intègre les devis liés dans le flow de réception chantier.
+
+### Service / Hook
+- `src/shared/services/pennylane.service.js` (+62 LOC) — méthodes `assign`/`eject`, support multi-devis par chantier.
+- `src/shared/hooks/usePennylane.js` — wrappers React Query autour du service.
+
+### Référence
+Spec d'arbitrage : `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md`. À reprendre + valider fonctionnellement avant de durcir cette doc.
 
 ## Plan de Développement
 | Sprint | Titre | Statut |

@@ -478,3 +478,76 @@ Avant le fix : tout user authentifié pouvait potentiellement faire `DELETE /quo
 
 Faute de visibilité complète sur l'état actuel du workflow N8n et de la nouvelle edge `mailing-send` (non touchée dans ce diff, présente en `??` dans git status), je ne propose pas de patch direct — arbitrage humain nécessaire.
 ---
+
+## [2026-05-21 21:26] Pennylane quote-driven — module chantiers ↔ devis Pennylane
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-05-22 — flag ⚠️ WIP conservé)
+**Commit** : 1df67db4079702821212d2d50357707e94a759ce
+**Contexte** : Le commit ajoute toute une couche "quote-driven" sur les chantiers : nouveau composant `QuoteBlock.jsx` (257 LOC, affiché sur ChantierCard et ChantierModal), `LinkPennylaneQuoteModal.jsx` (modale de liaison), réécriture lourde de `ChantierReceptionSection.jsx` (443 LOC modifiées), +14 LOC dans `chantiers.service.js` et +62 LOC dans `pennylane.service.js` (fonctions liaison lead↔devis : assign/eject/list multi-devis par chantier). Le doc `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md` décrit le plan d'arbitrage. Aujourd'hui le CLAUDE.md mentionne juste "Sprint 9 — Pennylane 🔧 EN COURS (proxy hardened P0.3, lignes libres + ledger_account livrés)" sans aucun détail sur cette architecture quote-driven. ⚠️ Le commit message indique explicitement que ce travail est non-finalisé ("À reprendre 1 par 1 si bugs", "smoke test fonctionnel non couvert").
+**Proposition** : NE PAS documenter dans CLAUDE.md tant que la feature n'est pas validée fonctionnellement. Une fois stable, ajouter une sous-section "Module Pennylane quote-driven" décrivant : (1) flow utilisateur (liaison/déliaison d'un devis PL à un chantier), (2) composants clés (`QuoteBlock`, `LinkPennylaneQuoteModal`), (3) méthodes service (`pennylane.service.js` : assign/eject, multi-devis par chantier), (4) modèle DB (table de liaison `lead_pennylane_quotes` ?), (5) côté frontend : où le bloc est affiché (carte Kanban + Modal + Réception). Arbitrage à faire avec Eric quand la feature sortira du WIP.
+---
+
+## [2026-05-21 21:26] Pipeline LongTerm — sous-arbo `pipeline/longTerm/`
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-05-22 — ligne ajoutée dans Architecture)
+**Commit** : 1df67db4079702821212d2d50357707e94a759ce
+**Contexte** : Création d'une sous-arborescence `src/apps/artisan/components/pipeline/longTerm/` contenant `LongTermLeadDrawer.jsx`, `LongTermTab.jsx`, `MoveToLongTermModal.jsx` (+ modif `LeadCard.jsx`). La fonctionnalité "Suivi MT-LT (devis long-terme)" est référencée dans MEMORY.md (`project_pipeline_mt_lt.md`, livraison 2026-04-25) mais l'arborescence n'apparaît pas dans la section "Architecture" du CLAUDE.md (la ligne pipeline mentionne uniquement `LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel`). Commit en bulk explicitement non-finalisé.
+**Proposition** : Une fois le module validé, ajouter à la section Architecture la ligne `│       ├── pipeline/longTerm/   # LongTermTab, LongTermLeadDrawer, MoveToLongTermModal (suivi projets MT-LT)` sous `pipeline/`. Vérifier également qu'il n'y a pas de duplication entre les composants `longTerm/` et le 4ème onglet Pipeline existant décrit dans MEMORY.md. Arbitrage humain pour confirmer l'arbo finale après stabilisation.
+---
+
+
+## [2026-05-22 02:49] Pattern lecture/écriture `core.organizations.settings` côté frontend
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-05-22 — règle "useOrgSettings = canal canonique unique", migration progressive des callers existants en dette technique)
+**Commit** : ff8b8ef27b28f050c1a88809514a0d57a93eba97
+**Contexte** : Le commit pose la couche fondation d'accès aux settings d'org : nouveau service `src/shared/services/orgSettings.service.js` (`getSettings` via SELECT direct sur `core.organizations`, `updateSettings` via RPC `org_update_settings`), nouveau hook `src/shared/hooks/useOrgSettings.js` (React Query : `{settings, isLoading, save, isSaving}`), nouvelle famille de cache keys `orgSettingsKeys`. Aucun consumer dans ce commit — c'est la fondation pour la future UI Settings multi-tenant (cf. `docs/superpowers/specs/2026-05-22-multitenant-settings-organization-design.md` §8). Le hook invalide aussi `['auth', 'organization']` pour resync `AuthContext.organization.settings`. Aujourd'hui plusieurs endroits du codebase lisent `useAuth().organization.settings` directement (ex GeoGrid Place ID, branding PDFs, territoire centers, Pennylane enabled flag).
+**Proposition** : Une fois la 1ère page consumer livrée, ajouter à CLAUDE.md (section "Hooks" ou nouvelle sous-section "Settings org") :
+- `useOrgSettings()` = canal canonique pour read/write des settings org côté frontend
+- Lecture : SELECT direct (RLS via `security_invoker`) ; écriture : RPC `org_update_settings` (SECURITY DEFINER, org_admin only, raise P0002 si org inexistante)
+- Invalide `['auth','organization']` après save → `useAuth().organization.settings` reste synchro
+- Ajouter `orgSettingsKeys` à la liste des familles cache keys
+
+Questions à arbitrer :
+1. Faut-il migrer les lectures existantes (`useAuth().organization.settings` éparpillé) vers `useOrgSettings()` pour homogénéité ? Ou garder AuthContext comme source de vérité pour la lecture (≠ écriture) et n'utiliser `useOrgSettings` que pour les pages d'édition ?
+2. Si on garde les 2 chemins, documenter la règle ("lecture passive = AuthContext, écriture + lecture editor = useOrgSettings") pour éviter de re-fetcher inutilement les settings sur chaque page.
+3. Le `staleTime: 60s` du hook : suffisant si l'AuthContext est invalidé en parallèle après save, à reconsidérer si on découple les deux flux.
+
+À documenter quand la 1ère page de Settings multi-tenant (cf. plan `2026-05-22-multitenant-settings-organization.md`) est livrée et qu'on sait quel pattern s'impose.
+---
+
+## [2026-05-22 02:55] Branding fallback : Mayer → Neutre (rule multi-tenant à corriger)
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-05-22 — règle multi-tenant + ligne Composants mises à jour)
+**Commit** : ab9dfe9fbe3ce5980f5f6175a122fb1cfa75456f
+**Contexte** : Refacto `MAYER_DEFAULTS` → `NEUTRAL_DEFAULTS` dans `src/lib/orgBranding.js`. Avant : une org sans settings voyait silencieusement Mayer Énergie partout (nom, SIRET, RCS, adresse Gaillac, couleur orange, RGE QualiPAC/QualiBois, logo, etc.). Après : `name="Votre entreprise"`, tous les autres champs vides, `accentColor="#64748b"` (slate neutre), `rgeCertifications=[]`, `logoUrl=""` (pas d'`<img>`). Trois changements de comportement notables : (1) `portalUrl` n'est plus lu de `settings` mais hardcodé en constante `APP_PORTAL_URL='https://majordhome.vercel.app'` (singleton tant qu'il n'y a pas de sous-domaines par org) ; (2) `domain` est dérivé de `from_email.split('@')[1]` au lieu d'un setting dédié ; (3) `formatFullAddress` et `buildLegalFooter` filtrent les champs vides au lieu de produire des séparateurs orphelins (" – ", " — — — "). Cf design `docs/superpowers/specs/2026-05-22-multitenant-settings-organization-design.md` §9.1.
+**Proposition** : Mettre à jour la règle existante dans CLAUDE.md section "Règles imposées par le multi-tenant" :
+
+> **Toute valeur de branding** (nom, adresse, URL, certification, couleur, logo) DOIT passer par `core.organizations.settings` + helper `buildCompanyInfo(settings)` de `src/lib/orgBranding.js` plutôt que d'être hardcodée. ~~Fallback Mayer accepté uniquement comme valeur par défaut dans le helper~~ → **Fallback neutre** (`"Votre entreprise"`, champs vides, couleur slate) — une org sans settings affiche du neutre, pas du Mayer (P0.13-P0.20 + refacto 2026-05-22). `portal_url` est une constante app (`APP_PORTAL_URL`), pas un setting. `domain` est dérivé de `from_email`.
+
+Et mettre à jour la ligne "Branding multi-tenant" de la section Composants pour remplacer "avec fallback Mayer" par "avec fallback neutre".
+
+Questions à arbitrer :
+1. La règle "Fallback Mayer accepté" était listée parmi les règles multi-tenant — son inversion mérite-t-elle d'être mise en évidence (badge ⚠️ ou ligne dédiée dans le changelog d'en-tête) ?
+2. Faut-il ajouter une note sur `APP_PORTAL_URL` constante app (singleton) dans la section "Aliases" ou "Constantes" du CLAUDE.md ?
+3. Le changement est-il considéré complet ou y a-t-il des callers PDF qui dépendent encore de fields Mayer hardcodés (à vérifier sur `generateContractPdfBlob` & co) avant de figer la doc ?
+---
+
+
+## [2026-05-22 03:25] Documenter la page /settings/organization (3 onglets) + neutralisation fallback Mayer
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-05-22 — nouvelle section "Module Settings → Organization" + règle "éditable via Settings, jamais hardcodée" ajoutée à la charte multi-tenant)
+**Commit** : 72de6063c05a95af084413b6d64bd4ca8bdccc3e
+**Contexte** : Livraison Task 1-15 de la spec `docs/superpowers/specs/2026-05-22-multitenant-settings-organization-design.md`. Une nouvelle page `/settings/organization` (org_admin only) avec 3 onglets (Identité, Coordonnées, Territoire) permet de configurer toutes les données de branding multi-tenant (`core.organizations.settings`). En parallèle, les fallbacks Mayer encore présents dans `orgBranding.js` et `mapbox.js` ont été neutralisés. Le champ legacy `geogrid_department_code` a été backfillé vers `geogrid_target_department` (Mayer = `81`).
+**Proposition** : Ajouter une section dédiée dans CLAUDE.md (parallèle à "Module Tarification") :
+
+```
+## Module Settings → Organization (/settings/organization)
+
+Configuration multi-tenant de l identité de l org (P0.13-P0.20 finalisé, 2026-05-22). Accès `org_admin` only.
+
+- **Page** : `src/apps/artisan/pages/settings/OrganizationSettings.jsx` — 3 onglets :
+  - **Identité** : nom, raison sociale, SIRET, RGE, logo, couleur secondaire
+  - **Coordonnées** : adresse siège, téléphone, email, site web, IBAN
+  - **Territoire** : centres territoire (siège + agences), département cible GeoGrid (singleton, code FR via `FRENCH_DEPARTMENTS`)
+- **Source de vérité** : `core.organizations.settings` (JSONB) — consommé par `buildCompanyInfo(settings)`, `getOrgHeadquarters(settings)`, `getCoverageDepartments(settings)`.
+- **Migration legacy** : champ `geogrid_department_code` (singleton historique Mayer) → `geogrid_target_department` (convention unifiée). Backfill Mayer = `81`.
+- **Fallbacks Mayer neutralisés** (2026-05-22) : `orgBranding.js` et `lib/mapbox.js` ne renvoient plus de valeurs Mayer hardcodées si `settings` est vide → UI doit prompter la config si org neuve.
+```
+
+Question ouverte : faut-il aussi mentionner ce nouveau point de configuration dans la section "Multi-tenant et sécurité" en tête (charte) sous forme de règle "Toute nouvelle valeur de branding doit être éditable via /settings/organization, jamais hardcodée" ?
+---
