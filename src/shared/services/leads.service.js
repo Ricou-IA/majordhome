@@ -363,6 +363,31 @@ export const leadsService = {
     }, 'leads.softDeleteLead');
   },
 
+  /**
+   * Hard delete d'un lead (org_admin only)
+   * --------------------------------------------------------------------------
+   * Appelle la RPC `public.lead_hard_delete` qui :
+   *  - vérifie auth.uid() ∈ org_admin de l'org du lead
+   *  - supprime les RDV liés (majordhome.appointments)
+   *  - DELETE le lead → CASCADE sur lead_activities, lead_interactions,
+   *    lead_pennylane_quotes, mailing_logs, technical_visits
+   *
+   * Retourne : { lead_id, org_id, deleted: true, counts: {...} }
+   * Throw "org_admin_required" si le user n'est pas admin.
+   */
+  async hardDeleteLead(leadId) {
+    if (!leadId) throw new Error('[leads] leadId requis');
+
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('lead_hard_delete', {
+        p_lead_id: leadId,
+      });
+
+      if (error) throw error;
+      return data;
+    }, 'leads.hardDeleteLead');
+  },
+
   // ==========================================================================
   // GESTION STATUTS
   // ==========================================================================

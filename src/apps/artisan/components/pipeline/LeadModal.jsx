@@ -12,10 +12,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save, Loader2, ArrowLeft } from 'lucide-react';
+import { X, Save, Loader2, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import {
@@ -83,9 +84,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const { equipmentTypes } = usePricingEquipmentTypes();
   const { query: clientSearchQuery, results: clientResults, searching: clientSearching, search: searchClient, clear: clearClientSearch } = useClientSearch(orgId);
   const {
-    createLead, updateLead, updateLeadStatus, convertLead, addNote,
-    isCreating, isUpdating, isChangingStatus, isConverting, isAddingNote,
+    createLead, updateLead, updateLeadStatus, convertLead, addNote, hardDeleteLead,
+    isCreating, isUpdating, isChangingStatus, isConverting, isAddingNote, isHardDeleting,
   } = useLeadMutations();
+  const isAdmin = effectiveRole === 'org_admin';
 
   // État formulaire
   const [form, setForm] = useState({
@@ -136,6 +138,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [showCreateDevis, setShowCreateDevis] = useState(false);
   const [openDevisId, setOpenDevisId] = useState(null);
   const [mailingCampaigns, setMailingCampaigns] = useState([]);
+  const [showHardDelete, setShowHardDelete] = useState(false);
+  const [hardDeleteCounts, setHardDeleteCounts] = useState(null);
 
   // Charger les mailings envoyés au lead
   useEffect(() => {
@@ -682,6 +686,59 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     toast.success('Note ajoutée');
   };
 
+  // ========== HARD DELETE (org_admin only) ==========
+
+  /**
+   * Ouvre le dialog en pré-fetchant les compteurs de dépendances
+   * (RDV, mailings, interactions) pour afficher ce qui sera supprimé.
+   */
+  const handleOpenHardDelete = async () => {
+    if (!leadId) return;
+    setShowHardDelete(true);
+    setHardDeleteCounts(null);
+    try {
+      const [apptRes, mailRes, interactRes] = await Promise.all([
+        supabase.from('majordhome_appointments').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
+        supabase.from('majordhome_mailing_logs').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
+        supabase.schema('majordhome').from('lead_interactions').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
+      ]);
+      setHardDeleteCounts({
+        appointments: apptRes.count ?? 0,
+        mailings: mailRes.count ?? 0,
+        interactions: interactRes.count ?? 0,
+      });
+    } catch (err) {
+      console.warn('[LeadModal] hard delete preflight count error:', err);
+      setHardDeleteCounts({ appointments: null, mailings: null, interactions: null });
+    }
+  };
+
+  const handleConfirmHardDelete = async () => {
+    if (!leadId) return;
+    try {
+      const result = await hardDeleteLead(leadId);
+      const nbApp = result?.counts?.appointments ?? 0;
+      toast.success(
+        nbApp > 0
+          ? `Lead supprimé (${nbApp} RDV nettoyé${nbApp > 1 ? 's' : ''})`
+          : 'Lead supprimé définitivement',
+      );
+      setShowHardDelete(false);
+      setHardDeleteCounts(null);
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      console.error('[LeadModal] hard delete error:', err);
+      const code = err?.message || '';
+      const msg = code.includes('org_admin_required')
+        ? 'Action réservée aux administrateurs'
+        : code.includes('lead_not_found')
+        ? 'Lead introuvable (déjà supprimé ?)'
+        : `Erreur : ${code || 'suppression échouée'}`;
+      toast.error(msg);
+    }
+  };
+
   // ========== COMPUTED ==========
 
   const groupedEquipmentTypes = useMemo(() => {
@@ -935,9 +992,24 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         {/* Footer sticky — masqué en mode planification RDV */}
         {!pendingRdvStatusId && (
           <div className="border-t bg-white px-6 py-4 flex items-center justify-between sticky bottom-0">
-            <Button variant="outline" onClick={onClose} className="min-h-[44px]">
-              Annuler
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={onClose} className="min-h-[44px]">
+                Annuler
+              </Button>
+              {isEditing && isAdmin && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleOpenHardDelete}
+                  disabled={isHardDeleting}
+                  className="min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                  title="God mode — supprimer définitivement (org_admin)"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </Button>
+              )}
+            </div>
             <Button
               onClick={handleSave}
               disabled={isSaving}
@@ -1014,6 +1086,50 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           onStatusChange={() => {}}
         />
       )}
+
+      {/* Hard delete — org_admin god mode */}
+      <ConfirmDialog
+        open={showHardDelete}
+        onOpenChange={(open) => {
+          setShowHardDelete(open);
+          if (!open) setHardDeleteCounts(null);
+        }}
+        title="Supprimer définitivement ce lead ?"
+        description="Cette action est irréversible. Le lead et toutes ses données associées seront purgés de la base."
+        confirmLabel={isHardDeleting ? 'Suppression…' : 'Supprimer définitivement'}
+        cancelLabel="Annuler"
+        variant="destructive"
+        loading={isHardDeleting}
+        onConfirm={handleConfirmHardDelete}
+      >
+        <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-gray-700">
+          <p className="font-medium text-red-700 mb-2">Données qui seront supprimées :</p>
+          {hardDeleteCounts === null ? (
+            <p className="text-gray-500 italic">Calcul en cours…</p>
+          ) : (
+            <ul className="space-y-1 list-disc list-inside text-xs">
+              <li>
+                <span className="font-medium">{hardDeleteCounts.appointments ?? '?'}</span>{' '}
+                RDV planning lié{(hardDeleteCounts.appointments || 0) > 1 ? 's' : ''}
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.interactions ?? '?'}</span>{' '}
+                interaction{(hardDeleteCounts.interactions || 0) > 1 ? 's' : ''} (timeline)
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.mailings ?? '?'}</span>{' '}
+                log{(hardDeleteCounts.mailings || 0) > 1 ? 's' : ''} mailing
+              </li>
+              <li className="text-gray-500">
+                + activités, devis Pennylane liés, visites techniques (cascade DB)
+              </li>
+            </ul>
+          )}
+          <p className="mt-3 text-xs text-gray-500 italic">
+            Les interventions ou devis fournisseur liés seront déliés (préservés mais sans lead).
+          </p>
+        </div>
+      </ConfirmDialog>
     </>
   );
 }

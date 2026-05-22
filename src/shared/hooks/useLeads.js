@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@services/leads.service';
-import { leadKeys, clientKeys } from '@hooks/cacheKeys';
+import { leadKeys, clientKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -299,6 +299,16 @@ export function useLeadMutations() {
     onSuccess: invalidateLeads,
   });
 
+  // Hard delete un lead (org_admin only) — supprime aussi RDV + cascade FK
+  const hardDeleteMutation = useMutation({
+    mutationFn: (leadId) => leadsService.hardDeleteLead(leadId),
+    onSuccess: () => {
+      invalidateLeads();
+      // Le RDV lié est supprimé côté DB → invalider le cache planning
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    },
+  });
+
   // Changer le statut
   const statusMutation = useMutation({
     mutationFn: ({ leadId, statusId, userId, extra }) =>
@@ -344,6 +354,7 @@ export function useLeadMutations() {
   const createLead = useCallback(async (data) => createMutation.mutateAsync(data), [createMutation]);
   const updateLead = useCallback(async (leadId, updates) => updateMutation.mutateAsync({ leadId, updates }), [updateMutation]);
   const deleteLead = useCallback(async (leadId) => deleteMutation.mutateAsync(leadId), [deleteMutation]);
+  const hardDeleteLead = useCallback(async (leadId) => hardDeleteMutation.mutateAsync(leadId), [hardDeleteMutation]);
   const updateLeadStatus = useCallback(async (leadId, statusId, userId, extra) => statusMutation.mutateAsync({ leadId, statusId, userId, extra }), [statusMutation]);
   const assignLead = useCallback(async (leadId, assignedUserId, currentUserId) => assignMutation.mutateAsync({ leadId, assignedUserId, currentUserId }), [assignMutation]);
   const convertLead = useCallback(async (leadId, orgId, userId) => convertMutation.mutateAsync({ leadId, orgId, userId }), [convertMutation]);
@@ -354,6 +365,7 @@ export function useLeadMutations() {
     createLead,
     updateLead,
     deleteLead,
+    hardDeleteLead,
     updateLeadStatus,
     assignLead,
     convertLead,
@@ -364,6 +376,7 @@ export function useLeadMutations() {
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isHardDeleting: hardDeleteMutation.isPending,
     isChangingStatus: statusMutation.isPending,
     isAssigning: assignMutation.isPending,
     isConverting: convertMutation.isPending,
