@@ -36,6 +36,10 @@ BEGIN
   WHERE id = p_org_id
   RETURNING settings INTO v_new_settings;
 
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Org % not found', p_org_id USING ERRCODE = 'P0002';
+  END IF;
+
   RETURN v_new_settings;
 END;
 $$;
