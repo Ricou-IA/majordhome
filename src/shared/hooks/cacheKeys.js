@@ -295,3 +295,9 @@ export const devisKeys = {
   byLead: (orgId, leadId) => [...devisKeys.all(orgId), 'byLead', leadId],
   byClient: (orgId, clientId) => [...devisKeys.all(orgId), 'byClient', clientId],
 };
+
+// Settings de l'organisation — convention P0.11 (orgId scoped)
+export const orgSettingsKeys = {
+  all: (orgId) => ['orgSettings', orgId],
+  byOrg: (orgId) => [...orgSettingsKeys.all(orgId)],
+};
