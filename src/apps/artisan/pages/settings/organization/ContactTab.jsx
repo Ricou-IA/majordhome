@@ -41,7 +41,9 @@ function validate(form) {
   if (!form.from_email?.trim()) errors.from_email = 'Obligatoire';
   if (form.from_email && !EMAIL_RE.test(form.from_email)) errors.from_email = 'Email invalide';
   if (form.reply_to && !EMAIL_RE.test(form.reply_to)) errors.reply_to = 'Email invalide';
-  if (form.website_url && !URL_RE.test(form.website_url)) errors.website_url = 'URL invalide (https://...)';
+  if (form.website_url && !URL_RE.test(autoPrefixHttps(form.website_url))) {
+    errors.website_url = 'URL invalide (ex: https://cimaj.fr ou cimaj.fr)';
+  }
   return errors;
 }
 

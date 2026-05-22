@@ -114,6 +114,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
     try {
       if (!selectedCity && scanMode === 'grid') {
         toast.error("Aucune ville disponible — configure ton département principal dans Paramètres → Organisation → Territoire");
+        setRunning(false);
         return;
       }
       const center = scanMode === 'cities'
@@ -282,7 +283,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
             <label className="block text-xs font-medium text-secondary-600 mb-1">Mode de scan</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: 'grid', label: '📍 Présence locale (Gaillac)', desc: 'Maillage fin sur 1 ville' },
+                { value: 'grid', label: `📍 Présence locale${selectedCity?.name ? ` (${selectedCity.name})` : ''}`, desc: 'Maillage fin sur 1 ville' },
                 { value: 'cities', label: `🗺️ Visibilité ${orgDepartmentLabel || 'département'} (communes)`, desc: '1 point par ville' },
               ].map((m) => (
                 <button

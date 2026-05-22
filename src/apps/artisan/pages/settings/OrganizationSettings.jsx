@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { Building2, Phone, MapPinned, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,10 +19,15 @@ export default function OrganizationSettings() {
   const [activeTab, setActiveTab] = useState('identity');
 
   // Garde org_admin (en complément du RouteGuard côté routes.jsx)
+  // useEffect pour le toast (side effect) + Navigate déclaratif pour le redirect.
+  useEffect(() => {
+    if (!isOrgAdmin) {
+      toast.error("Accès réservé à l'administrateur de l'organisation");
+    }
+  }, [isOrgAdmin]);
+
   if (!isOrgAdmin) {
-    toast.error("Accès réservé à l'administrateur de l'organisation");
-    navigate('/settings');
-    return null;
+    return <Navigate to="/settings" replace />;
   }
 
   const ActiveComponent = TABS.find((t) => t.key === activeTab)?.Component;
