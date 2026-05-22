@@ -9,9 +9,14 @@ import { orgSettingsKeys } from './cacheKeys';
  * - settings : objet (vide {} si rien configuré)
  * - save(patch) : merge le patch côté DB, retourne le nouveau settings
  * - isDirty est calculé localement par chaque consumer (form values vs initial)
+ *
+ * AuthContext utilise useState local (pas React Query) pour l'organization,
+ * on appelle donc refreshUserData() après save pour rafraîchir l'objet
+ * organization de AuthContext (consommé partout via useAuth().organization.settings,
+ * notamment par buildCompanyInfo dans les PDFs/emails).
  */
 export function useOrgSettings() {
-  const { organization } = useAuth();
+  const { organization, refreshUserData } = useAuth();
   const orgId = organization?.id;
   const qc = useQueryClient();
 
@@ -32,10 +37,12 @@ export function useOrgSettings() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: orgSettingsKeys.byOrg(orgId) });
-      // Le organization du AuthContext porte les settings — invalider aussi
-      qc.invalidateQueries({ queryKey: ['auth', 'organization'] });
+      // AuthContext gère organization en useState local — refresh manuel
+      // pour que useAuth().organization.settings reflète les nouvelles valeurs
+      // (consommé par buildCompanyInfo, getMapDefaultCenter, etc.)
+      await refreshUserData();
     },
   });
 
