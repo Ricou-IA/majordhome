@@ -94,4 +94,24 @@ export function getOrgHeadquarters(settings) {
   };
 }
 
+/**
+ * P0.13 follow-up — Multi-tenant : retourne la liste des départements
+ * couverts par l'org pour le module GeoGrid et la carte CRM.
+ *
+ * Convention actuelle (itération 1) : 1 seul département principal
+ * (settings.geogrid_target_department, singleton). Si non configuré,
+ * fallback **neutre** : array vide → l'UI affichera "Configure ton
+ * département principal".
+ *
+ * Itération future : transformer en multi-select via settings.coverage_departments.
+ *
+ * @param {Object|null} settings - core.organizations.settings
+ * @returns {string[]} liste de codes département (ex: ['81'])
+ */
+export function getCoverageDepartments(settings) {
+  const target = settings?.geogrid_target_department;
+  if (target && typeof target === 'string') return [target];
+  return [];
+}
+
 export default TERRITOIRE_CONFIG;
