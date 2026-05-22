@@ -6,7 +6,7 @@ import { useAuth } from '@contexts/AuthContext';
 import geogridService from '@services/geogrid.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { geogridKeys, FREE_TIER_LIMIT } from '@hooks/useGeoGrid';
-import { fetchDepartementCommunes, filterByPopulation, centroidOf } from './communesService';
+import { fetchCommunes, filterByPopulation, centroidOf } from './communesService';
 
 const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
@@ -21,9 +21,9 @@ const GRID_SIZES = [
   { value: 7, label: '7x7 (49 pts)' },
 ];
 
-// Pas de BIG_CITIES_DEFAULT hardcoded — on attend que fetchDepartementCommunes
-// charge depuis l'API gouv. Si l'org n'a pas de département configuré, le
-// sélecteur reste vide (l'utilisateur doit configurer settings.geogrid_department_code).
+// Pas de BIG_CITIES_DEFAULT hardcoded — on attend que fetchCommunes charge depuis
+// l'API gouv. Si l'org n'a pas de département configuré, on affiche un guard
+// "configure ton département principal" (le scan benchmark est inutile sans dept).
 
 export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaunched }) {
   const { organization } = useAuth();
@@ -34,7 +34,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
   const orgDefaultCity = organization?.settings?.geogrid_default_city || null;
   const defaultCityCode = orgDefaultCity?.code || '';
   const orgBusinessName = organization?.settings?.brand_name || organization?.name || '';
-  const orgDepartmentCode = organization?.settings?.geogrid_department_code || null;
+  const orgDepartmentCode = organization?.settings?.geogrid_target_department || null;
   const orgDepartmentLabel = organization?.settings?.geogrid_department_label || '';
 
   const [selectedListId, setSelectedListId] = useState(lists[0]?.id || '');
@@ -59,7 +59,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
       setCommunes([]);
       return;
     }
-    fetchDepartementCommunes(orgDepartmentCode).then(setCommunes).catch(() => setCommunes([]));
+    fetchCommunes(orgDepartmentCode).then(({ data }) => setCommunes(data));
   }, [orgDepartmentCode]);
 
   const bigCities = useMemo(
@@ -113,7 +113,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
     let benchmarkId;
     try {
       if (!selectedCity && scanMode === 'grid') {
-        toast.error('Aucune ville disponible — configurez geogrid_department_code dans settings org');
+        toast.error("Aucune ville disponible — configure ton département principal dans Paramètres → Organisation → Territoire");
         return;
       }
       const center = scanMode === 'cities'
@@ -217,6 +217,36 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
     setRunning(false);
     onLaunched(benchmarkId);
   };
+
+  // Guard : pas de département configuré → message dédié, pas de form
+  if (!orgDepartmentCode) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-secondary-900">Lancer un benchmark</h2>
+              <button onClick={handleClose} className="text-secondary-400 hover:text-secondary-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 border border-amber-200 bg-amber-50 rounded text-sm text-amber-800">
+              Configure ton <strong>département principal</strong> dans Paramètres → Organisation → Territoire
+              pour lancer un benchmark sur les communes.
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={handleClose}
+                className="px-3 py-1.5 text-sm font-medium text-secondary-700 hover:bg-secondary-100 rounded-md"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

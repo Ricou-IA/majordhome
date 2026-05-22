@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, AlertTriangle, Info, Grid3x3, MapPin, ExternalLink } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useGeoGridQuota } from '@hooks/useGeoGrid';
-import { fetchDepartementCommunes, filterByPopulation, centroidOf } from './communesService';
+import { fetchCommunes, filterByPopulation, centroidOf } from './communesService';
 
 const DEFAULT_CONFIG = {
   businessName: 'Mayer Energie',
@@ -46,7 +46,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   // P0.20 — Multi-tenant : business name + default city + département depuis settings org
   const orgBusinessName = orgSettings.brand_name || orgName || DEFAULT_CONFIG.businessName;
   const orgDefaultCity = orgSettings.geogrid_default_city || null;
-  const orgDepartmentCode = orgSettings.geogrid_department_code || null;
+  const orgDepartmentCode = orgSettings.geogrid_target_department || null;
   const orgDepartmentLabel = orgSettings.geogrid_department_label || '';
   // cityCodeInit vide si pas de défaut org — sera auto-rempli avec la 1ère
   // grande commune du département après chargement (cf. useEffect plus bas).
@@ -97,9 +97,11 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
     }
     setLoadingCommunes(true);
     setCommunesError(null);
-    fetchDepartementCommunes(orgDepartmentCode)
-      .then((data) => setCommunes(data))
-      .catch((err) => setCommunesError(err.message))
+    fetchCommunes(orgDepartmentCode)
+      .then(({ data, error }) => {
+        if (error) setCommunesError(error.message);
+        setCommunes(data);
+      })
       .finally(() => setLoadingCommunes(false));
   }, [communes, orgDepartmentCode]);
 
@@ -204,7 +206,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
           type="button"
           onClick={() => setMode('cities')}
           disabled={!orgDepartmentCode}
-          title={!orgDepartmentCode ? 'Configurer geogrid_department_code dans settings org' : ''}
+          title={!orgDepartmentCode ? 'Configure ton département principal dans Paramètres → Organisation → Territoire' : ''}
           className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
             mode === 'cities' ? 'bg-white text-primary-700 shadow-sm' : 'text-secondary-600 hover:text-secondary-900'
           } ${!orgDepartmentCode ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -306,7 +308,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
             )}
             {!orgDepartmentCode && !loadingCommunes && (
               <div className="text-[11px] text-amber-600 mt-1">
-                ⚠️ Configurez <code>geogrid_department_code</code> dans les settings org pour activer ce module.
+                ⚠️ Configure ton <strong>département principal</strong> dans Paramètres → Organisation → Territoire pour activer ce module.
               </div>
             )}
           </div>
