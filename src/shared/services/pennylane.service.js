@@ -373,6 +373,34 @@ function formatPennylaneCustomerName(customer) {
 }
 
 /**
+ * Pennylane V2 /quotes n'expand que customer.id, pas les fields name.
+ * Cette fonction fetch /customers/{id} en parallèle pour chaque ID unique,
+ * et retourne un Map (id → display name). Erreurs silencieuses (Promise.allSettled).
+ *
+ * @param {Array<number|string>} customerIds — peut contenir doublons + null/undefined
+ * @returns {Promise<Map<string, string>>} Map de string(id) → name
+ */
+async function fetchCustomerNamesByIds(customerIds) {
+  const uniqueIds = Array.from(
+    new Set((customerIds || []).filter(Boolean).map(id => String(id)))
+  );
+  if (uniqueIds.length === 0) return new Map();
+
+  const results = await Promise.allSettled(
+    uniqueIds.map(id => apiCall('GET', `/customers/${id}`))
+  );
+
+  const map = new Map();
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) {
+      const name = formatPennylaneCustomerName(r.value);
+      if (name) map.set(uniqueIds[i], name);
+    }
+  });
+  return map;
+}
+
+/**
  * Récupère les devis Pennylane d'un client via le proxy.
  * Lookup pennylane_sync pour trouver le pennylane_id du client,
  * puis GET /quotes?customer_id={pennylane_id}.
@@ -417,7 +445,11 @@ async function getQuotesByClient(clientId, orgId) {
   // 3. Filtrer par customer.id côté client
   const clientQuotes = allQuotes.filter(q => q.customer?.id === plCustomerId);
 
-  // 4. Formater pour l'affichage
+  // 4. Enrichir avec customer_name via /customers/{id} (1 seul appel : même customer)
+  const namesById = await fetchCustomerNamesByIds([plCustomerId]);
+  const customerName = namesById.get(String(plCustomerId)) || null;
+
+  // 5. Formater pour l'affichage
   return clientQuotes.map(q => ({
     id: q.id,
     quote_number: q.quote_number || q.label || null,
@@ -432,7 +464,7 @@ async function getQuotesByClient(clientId, orgId) {
     pdf_url: q.public_file_url || null,
     linked_invoices: q.linked_invoices || null,
     customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer),
+    customer_name: formatPennylaneCustomerName(q.customer) || customerName,
   }));
 }
 
@@ -940,7 +972,14 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
     return db - da;
   });
 
-  return filtered.slice(0, limit).map(q => ({
+  const sliced = filtered.slice(0, limit);
+
+  // Enrichir avec customer_name via /customers/{id} en batch parallèle.
+  // Pennylane V2 /quotes ne retourne que customer.id, pas le name.
+  const customerIds = sliced.map(q => q.customer?.id).filter(Boolean);
+  const namesById = await fetchCustomerNamesByIds(customerIds);
+
+  return sliced.map(q => ({
     id: q.id,
     quote_number: q.quote_number || q.label || null,
     label: q.label || null,
@@ -952,7 +991,9 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
     status: q.status || null,
     pdf_url: q.public_file_url || null,
     customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer),
+    customer_name: formatPennylaneCustomerName(q.customer)
+      || (q.customer?.id ? namesById.get(String(q.customer.id)) : null)
+      || null,
   }));
 }
 
