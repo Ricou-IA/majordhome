@@ -11,7 +11,7 @@
 import { useCallback } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
-import { pennylaneKeys, devisKeys } from '@hooks/cacheKeys';
+import { pennylaneKeys, devisKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -309,6 +309,9 @@ export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
     queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+    // La RPC peut basculer le lead en "Devis envoyé" + créer une lead_activity
+    // → invalider tout le sous-arbre leadKeys (liste Kanban + détail + activities)
+    queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
   }, [queryClient, leadId, orgId]);
 
   const assignMutation = useMutation({
