@@ -357,6 +357,22 @@ async function pushQuote(quote, lines, client, orgId) {
 // ============================================================================
 
 /**
+ * Construit un display name défensif depuis un objet customer Pennylane V2.
+ * Particulier : "first_name last_name". Entreprise : "name" (raison sociale).
+ * @param {object|null|undefined} customer
+ * @returns {string|null}
+ */
+function formatPennylaneCustomerName(customer) {
+  if (!customer) return null;
+  const fn = (customer.first_name || '').trim();
+  const ln = (customer.last_name || '').trim();
+  const full = [fn, ln].filter(Boolean).join(' ');
+  if (full) return full;
+  const name = (customer.name || '').trim();
+  return name || null;
+}
+
+/**
  * Récupère les devis Pennylane d'un client via le proxy.
  * Lookup pennylane_sync pour trouver le pennylane_id du client,
  * puis GET /quotes?customer_id={pennylane_id}.
@@ -415,6 +431,8 @@ async function getQuotesByClient(clientId, orgId) {
     status: q.status || null,
     pdf_url: q.public_file_url || null,
     linked_invoices: q.linked_invoices || null,
+    customer_id: q.customer?.id || null,
+    customer_name: formatPennylaneCustomerName(q.customer),
   }));
 }
 
@@ -934,6 +952,7 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
     status: q.status || null,
     pdf_url: q.public_file_url || null,
     customer_id: q.customer?.id || null,
+    customer_name: formatPennylaneCustomerName(q.customer),
   }));
 }
 

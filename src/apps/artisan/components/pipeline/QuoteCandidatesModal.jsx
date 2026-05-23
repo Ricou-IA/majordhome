@@ -22,6 +22,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   X, Loader2, AlertCircle, Search, Link2, Mail, Phone,
   CheckCircle2, ExternalLink, FileText, ChevronDown, ChevronUp,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -120,6 +121,12 @@ function QuoteRow({
             )}
             {signals.map(s => <SignalChip key={s} signal={s} />)}
           </div>
+          {quote.customer_name && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-gray-700 font-medium">
+              <User className="w-3 h-3 text-gray-400" />
+              <span className="truncate">{quote.customer_name}</span>
+            </div>
+          )}
           <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
             {quote.date && <span>{formatDateShortFR(quote.date)}</span>}
             {quote.subject && <span className="truncate max-w-md">{quote.subject}</span>}
