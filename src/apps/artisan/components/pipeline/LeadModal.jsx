@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save, Loader2, ArrowLeft, Trash2 } from 'lucide-react';
+import { X, Save, Loader2, ArrowLeft, Trash2, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -874,12 +874,28 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 }
               </h2>
               {!pendingRdvStatusId && isEditing && currentStatus && (
-                <Badge
-                  className="mt-1 text-xs text-white"
-                  style={{ backgroundColor: currentStatus.color }}
-                >
-                  {currentStatus.label}
-                </Badge>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <Badge
+                    className="text-xs text-white"
+                    style={{ backgroundColor: currentStatus.color }}
+                  >
+                    {currentStatus.label}
+                  </Badge>
+                  {/* TEMP backfill — point d'entrée QuoteCandidatesModal sur les leads
+                      déjà en "Devis envoyé" (pour rattacher leurs devis PL existants).
+                      À revert une fois le backfill manuel terminé. */}
+                  {pennylaneActive && currentStatus.label === 'Devis envoyé' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowQuoteCandidates(true)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors"
+                      title="Rattacher des devis Pennylane à ce lead (temporaire — backfill)"
+                    >
+                      <Link2 className="w-3 h-3" />
+                      Rattacher devis PL
+                    </button>
+                  )}
+                </div>
               )}
               {pendingRdvStatusId && (
                 <p className="text-sm text-gray-500 mt-0.5">
