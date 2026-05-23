@@ -54,3 +54,18 @@ export function useOrgSettings() {
     isSaving: mutation.isPending,
   };
 }
+
+/**
+ * Sélecteur : l'org courante a-t-elle l'intégration Pennylane activée ?
+ *
+ * Source : `core.organizations.settings.pennylane.enabled` (toggle posé via
+ * la spec bridge Pennylane PR 2 — UI future via /settings/integrations).
+ *
+ * Consommé par QuoteCandidatesModal (PR 4) et MarkWonQuoteModal (PR 5) pour
+ * brancher conditionnellement les nouvelles modales du bridge Pipeline ↔ PL.
+ * Si false (ou absent) : flow MDH actuel intégral, pas de bridge.
+ */
+export function usePennylaneEnabled() {
+  const { settings } = useOrgSettings();
+  return Boolean(settings?.pennylane?.enabled);
+}
