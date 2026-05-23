@@ -52,7 +52,9 @@ import { FicheTechniqueModal } from './FicheTechniqueModal';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
 import { QuoteCandidatesModal } from './QuoteCandidatesModal';
+import { MarkWonQuoteModal } from './MarkWonQuoteModal';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import CreateDevisModal from '../devis/CreateDevisModal';
 import DevisModal from '../devis/DevisModal';
 import { devisService } from '@services/devis.service';
@@ -136,7 +138,11 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [pendingQuoteStatusId, setPendingQuoteStatusId] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
+  const [showMarkWon, setShowMarkWon] = useState(false);
   const pennylaneActive = usePennylaneEnabled();
+  // Devis PL attachés (lecture, pour le branchement Gagné). Fetch léger via vue
+  // publique, staleTime 30s côté hook → pas de surcoût notable.
+  const { linkedQuotes } = useLinkedPennylaneQuotes(pennylaneActive && isEditing ? leadId : null);
   const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showFicheTechnique, setShowFicheTechnique] = useState(false);
   const [showCreateDevis, setShowCreateDevis] = useState(false);
@@ -429,6 +435,21 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       } else {
         setPendingQuoteStatusId(newStatusId);
       }
+      return;
+    }
+    if (targetStatus?.label === 'Gagné' && pennylaneActive) {
+      // PR 5 bridge : si Pennylane actif, choix du devis canonique via
+      // MarkWonQuoteModal (RPC PR 3 fait la bascule statut + activity +
+      // is_winning_quote flag transactionnellement).
+      // Si org sans Pennylane → flow MDH actuel (default ci-dessous).
+      const attachedCount = linkedQuotes?.length || 0;
+      if (attachedCount === 0) {
+        toast.error(
+          'Aucun devis Pennylane attaché à ce lead. Rattache d\'abord un devis via « Devis envoyé ».'
+        );
+        return;
+      }
+      setShowMarkWon(true);
       return;
     }
     try {
@@ -1094,6 +1115,26 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
             await syncClientFields();
           }}
           onAttached={() => {
+            onSaved?.();
+            onClose();
+          }}
+        />
+      )}
+
+      {/* PR 5 bridge — choix du devis canonique sur bascule Gagné */}
+      {pennylaneActive && isEditing && leadId && (
+        <MarkWonQuoteModal
+          isOpen={showMarkWon}
+          onClose={() => setShowMarkWon(false)}
+          leadId={leadId}
+          orgId={orgId}
+          userId={userId}
+          onBeforeMark={async () => {
+            const payload = buildPayload();
+            await updateLead(leadId, payload);
+            await syncClientFields();
+          }}
+          onMarked={() => {
             onSaved?.();
             onClose();
           }}
