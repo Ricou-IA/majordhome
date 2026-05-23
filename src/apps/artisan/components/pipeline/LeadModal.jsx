@@ -51,6 +51,8 @@ import { SchedulingPanel } from './SchedulingPanel';
 import { FicheTechniqueModal } from './FicheTechniqueModal';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
+import { QuoteCandidatesModal } from './QuoteCandidatesModal';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import CreateDevisModal from '../devis/CreateDevisModal';
 import DevisModal from '../devis/DevisModal';
 import { devisService } from '@services/devis.service';
@@ -133,6 +135,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [followupLoading, setFollowupLoading] = useState(false);
   const [pendingQuoteStatusId, setPendingQuoteStatusId] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
+  const pennylaneActive = usePennylaneEnabled();
   const [schedulingLoading, setSchedulingLoading] = useState(false);
   const [showFicheTechnique, setShowFicheTechnique] = useState(false);
   const [showCreateDevis, setShowCreateDevis] = useState(false);
@@ -417,7 +421,14 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       return;
     }
     if (targetStatus?.label === 'Devis envoyé') {
-      setPendingQuoteStatusId(newStatusId);
+      // PR 4 bridge : si Pennylane actif, multi-attach via QuoteCandidatesModal
+      // (RPC PR 2 fait la bascule statut + activity transactionnellement).
+      // Sinon flow MDH classique : QuoteModal (montant + date manuels).
+      if (pennylaneActive) {
+        setShowQuoteCandidates(true);
+      } else {
+        setPendingQuoteStatusId(newStatusId);
+      }
       return;
     }
     try {
@@ -1059,7 +1070,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         variant="followup"
       />
 
-      {/* Modale devis — transition vers Devis envoyé */}
+      {/* Modale devis — transition vers Devis envoyé (mode MDH classique) */}
       <QuoteModal
         isOpen={!!pendingQuoteStatusId}
         onClose={() => setPendingQuoteStatusId(null)}
@@ -1067,6 +1078,27 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         loading={quoteLoading}
         defaultAmount={form.order_amount_ht || form.estimated_revenue || ''}
       />
+
+      {/* PR 4 bridge — multi-attach Pennylane si org activée */}
+      {pennylaneActive && isEditing && leadId && (
+        <QuoteCandidatesModal
+          isOpen={showQuoteCandidates}
+          onClose={() => setShowQuoteCandidates(false)}
+          leadId={leadId}
+          orgId={orgId}
+          onBeforeAttach={async () => {
+            // Sauve les modifs en cours du form + sync client AVANT la RPC
+            // (cohérent avec handleConfirmQuote du flow MDH classique)
+            const payload = buildPayload();
+            await updateLead(leadId, payload);
+            await syncClientFields();
+          }}
+          onAttached={() => {
+            onSaved?.();
+            onClose();
+          }}
+        />
+      )}
 
       {/* Création devis fournisseur */}
       {showCreateDevis && (
