@@ -274,6 +274,10 @@ export const pennylaneKeys = {
   quotesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'quotes', clientId],
   quoteLines: (orgId, pennylaneQuoteId) => [...pennylaneKeys.all(orgId), 'quote-lines', pennylaneQuoteId],
   linkedQuotesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'linked-quotes', leadId],
+  // PR 4 bridge : candidats fuzzy + devis PL non rattachés (exploration + compteur)
+  candidatesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'candidates', leadId],
+  unlinkedQuotes: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'unlinked-quotes', sinceDays],
+  unlinkedQuotesCount: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'unlinked-quotes-count', sinceDays],
 };
 
 // --- Meta Ads ---

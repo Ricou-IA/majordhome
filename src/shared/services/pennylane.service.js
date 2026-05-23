@@ -21,6 +21,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
+import { cleanPhone } from '@/lib/phoneUtils';
 
 // ============================================================================
 // CONSTANTES & MAPPINGS
@@ -696,6 +697,293 @@ async function assignQuoteToLead(orgId, pennylaneQuoteId, leadId, quoteData = nu
   return data;
 }
 
+// ============================================================================
+// BRIDGE PIPELINE ↔ PENNYLANE (spec 2026-05-23 §8)
+// ============================================================================
+
+/**
+ * Normalise un téléphone pour comparaison stricte (digits uniquement).
+ * Sert au matching fuzzy téléphone — `cleanPhone()` conserve les espaces,
+ * ici on veut une clé de comparaison pure.
+ * @param {string|null|undefined} phone
+ * @returns {string|null} digits only, ou null si vide
+ */
+function phoneDigits(phone) {
+  const cleaned = cleanPhone(phone);
+  if (!cleaned) return null;
+  const digits = cleaned.replace(/\D/g, '');
+  return digits || null;
+}
+
+/**
+ * Récupère les devis PL candidats à un lead via empilement de 3 signaux fuzzy :
+ *   1. `pennylane_sync` (bridge fort) — client MDH lié + pennylane_id connu
+ *   2. `email` (exact, lowercase) — client MDH avec même email que le lead
+ *   3. `phone` (digits-only normalisés) — client MDH avec même phone que le lead
+ *
+ * Stratégie : on passe par les clients MDH (qu'on contrôle) plutôt que de
+ * scanner massivement Pennylane. Pour chaque client candidat, on fetch ses
+ * devis PL via `getQuotesByClient` (qui réutilise pennylane_sync).
+ *
+ * Exclusions :
+ * - Devis déjà rattachés activement à un AUTRE lead (`ejected_at IS NULL`)
+ * - PAS de match par nom (faux positifs, cf spec §3)
+ *
+ * Inclusions :
+ * - Devis déjà rattachés à CE lead → `alreadyAttached: true` (re-affichage)
+ *
+ * @param {string} leadId
+ * @param {string} orgId
+ * @returns {Promise<Array<{quote, signals: string[], alreadyAttached: boolean}>>}
+ */
+async function getCandidateQuotesForLead(leadId, orgId) {
+  if (!leadId || !orgId) return [];
+
+  // 1. Charger le lead (email, phone, client_id)
+  const { data: lead, error: leadErr } = await supabase
+    .schema('majordhome')
+    .from('leads')
+    .select('id, email, phone, client_id, first_name, last_name')
+    .eq('id', leadId)
+    .eq('org_id', orgId)
+    .single();
+  if (leadErr) throw leadErr;
+  if (!lead) return [];
+
+  const leadEmail = lead.email ? lead.email.trim().toLowerCase() : null;
+  const leadPhone = phoneDigits(lead.phone);
+
+  // 2. Trouver les client_ids candidats (signaux email + phone) côté MDH
+  //    Le client directement lié au lead est ajouté en signal 'pennylane_sync'.
+  const candidateClientIds = new Set();
+  if (lead.client_id) candidateClientIds.add(lead.client_id);
+
+  // Match email exact (insensible à la casse)
+  if (leadEmail) {
+    const { data: byEmail } = await supabase
+      .from('majordhome_clients')
+      .select('id')
+      .eq('org_id', orgId)
+      .ilike('email', leadEmail)
+      .limit(20);
+    (byEmail || []).forEach(c => candidateClientIds.add(c.id));
+  }
+
+  // Match phone normalisé (digits-only) — on récupère un set candidat large
+  // côté DB via ilike sur les premiers digits, puis filtrage strict côté JS.
+  if (leadPhone && leadPhone.length >= 6) {
+    const prefix = leadPhone.slice(0, 4); // discriminant suffisant pour préfiltrage
+    const { data: byPhone } = await supabase
+      .from('majordhome_clients')
+      .select('id, phone')
+      .eq('org_id', orgId)
+      .ilike('phone', `%${prefix}%`)
+      .limit(50);
+    (byPhone || []).forEach(c => {
+      if (phoneDigits(c.phone) === leadPhone) candidateClientIds.add(c.id);
+    });
+  }
+
+  if (candidateClientIds.size === 0) return [];
+
+  // 3. Pour chaque client candidat, fetch ses devis PL + récupérer email/phone
+  //    (pour annoter les signaux au cas où plusieurs matchent un même quote)
+  const { data: clientsMeta } = await supabase
+    .from('majordhome_clients')
+    .select('id, email, phone')
+    .eq('org_id', orgId)
+    .in('id', Array.from(candidateClientIds));
+  const clientMetaById = new Map((clientsMeta || []).map(c => [c.id, c]));
+
+  // 4. Liste des rattachements actifs existants (pour exclusion et flag)
+  const { data: existingLinks } = await supabase
+    .from('majordhome_lead_pennylane_quotes')
+    .select('pennylane_quote_id, lead_id')
+    .eq('org_id', orgId)
+    .is('ejected_at', null);
+  const attachedToOtherLead = new Map(); // pennylane_quote_id → lead_id (différent du courant)
+  const attachedToThisLead = new Set();
+  (existingLinks || []).forEach(link => {
+    if (link.lead_id === leadId) {
+      attachedToThisLead.add(link.pennylane_quote_id);
+    } else {
+      attachedToOtherLead.set(link.pennylane_quote_id, link.lead_id);
+    }
+  });
+
+  // 5. Fetch devis PL pour chaque client candidat (en parallèle), dédup par quote.id
+  const quotesByClientId = await Promise.all(
+    Array.from(candidateClientIds).map(async cid => {
+      try {
+        const quotes = await getQuotesByClient(cid, orgId);
+        return { cid, quotes };
+      } catch (err) {
+        console.warn(`[pennylane.getCandidateQuotesForLead] fetch quotes failed for client ${cid}:`, err);
+        return { cid, quotes: [] };
+      }
+    })
+  );
+
+  // 6. Construire le résultat enrichi de signaux
+  const resultByQuoteId = new Map(); // quote_id → { quote, signals: Set, alreadyAttached }
+  for (const { cid, quotes } of quotesByClientId) {
+    const meta = clientMetaById.get(cid);
+    const clientEmail = meta?.email ? meta.email.trim().toLowerCase() : null;
+    const clientPhone = phoneDigits(meta?.phone);
+
+    for (const q of quotes) {
+      // Exclure si déjà rattaché activement à un AUTRE lead
+      if (attachedToOtherLead.has(q.id)) continue;
+
+      let entry = resultByQuoteId.get(q.id);
+      if (!entry) {
+        entry = {
+          quote: q,
+          signals: new Set(),
+          alreadyAttached: attachedToThisLead.has(q.id),
+        };
+        resultByQuoteId.set(q.id, entry);
+      }
+
+      // Signal 1 : client directement lié au lead
+      if (cid === lead.client_id) entry.signals.add('pennylane_sync');
+      // Signal 2 : email match
+      if (leadEmail && clientEmail && clientEmail === leadEmail) entry.signals.add('email');
+      // Signal 3 : phone match
+      if (leadPhone && clientPhone && clientPhone === leadPhone) entry.signals.add('phone');
+    }
+  }
+
+  return Array.from(resultByQuoteId.values()).map(e => ({
+    quote: e.quote,
+    signals: Array.from(e.signals),
+    alreadyAttached: e.alreadyAttached,
+  }));
+}
+
+/**
+ * Devis PL des N derniers jours sans rattachement actif en MDH.
+ * Sert à la section "Explorer les devis non rattachés" de QuoteCandidatesModal
+ * et au calcul de `countUnlinkedQuotes` (voyant de discipline).
+ *
+ * Note : `since_days` filtre sur `quote.date` (date du devis Pennylane), pas
+ * sur `assigned_at` (qui n'existe que si déjà rattaché).
+ *
+ * @param {string} orgId
+ * @param {object} [opts]
+ * @param {number} [opts.sinceDays=60]
+ * @param {number} [opts.limit=100]
+ * @returns {Promise<Array>} devis PL formatés (même shape que getQuotesByClient)
+ */
+async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
+  if (!orgId) return [];
+
+  // 1. Set des pennylane_quote_id déjà rattachés activement
+  const { data: existingLinks } = await supabase
+    .from('majordhome_lead_pennylane_quotes')
+    .select('pennylane_quote_id')
+    .eq('org_id', orgId)
+    .is('ejected_at', null);
+  const attachedSet = new Set((existingLinks || []).map(l => l.pennylane_quote_id));
+
+  // 2. Fetch devis PL paginés (safety MAX_PAGES pour éviter timeout edge function)
+  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
+  const allQuotes = [];
+  let cursor = null;
+  let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
+
+  while (hasMore && pageCount < MAX_PAGES && allQuotes.length < limit) {
+    let path = '/quotes?limit=100';
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+    const result = await apiCall('GET', path);
+    const items = result?.items || [];
+    allQuotes.push(...items);
+    hasMore = result?.has_more && !!result?.next_cursor;
+    cursor = result?.next_cursor || null;
+    pageCount++;
+  }
+
+  // 3. Filtrer : pas déjà rattaché + dans la fenêtre temporelle
+  const filtered = allQuotes.filter(q => {
+    if (attachedSet.has(q.id)) return false;
+    if (q.date) {
+      const d = new Date(q.date).getTime();
+      if (!Number.isNaN(d) && d < cutoffMs) return false;
+    }
+    return true;
+  });
+
+  // 4. Tri date desc + limit + format
+  filtered.sort((a, b) => {
+    const da = a.date ? new Date(a.date).getTime() : 0;
+    const db = b.date ? new Date(b.date).getTime() : 0;
+    return db - da;
+  });
+
+  return filtered.slice(0, limit).map(q => ({
+    id: q.id,
+    quote_number: q.quote_number || q.label || null,
+    label: q.label || null,
+    subject: q.pdf_invoice_subject || null,
+    date: q.date || null,
+    deadline: q.deadline || null,
+    amount_ht: q.currency_amount_before_tax || null,
+    amount_ttc: q.amount || q.currency_amount || null,
+    status: q.status || null,
+    pdf_url: q.public_file_url || null,
+    customer_id: q.customer?.id || null,
+  }));
+}
+
+/**
+ * Compteur "devis PL non rattachés des N derniers jours".
+ * Voyant de discipline org_admin (Dashboard + Pipeline header).
+ * @param {string} orgId
+ * @param {object} [opts]
+ * @param {number} [opts.sinceDays=30]
+ * @returns {Promise<number>}
+ */
+async function countUnlinkedQuotes(orgId, { sinceDays = 30 } = {}) {
+  const list = await getUnlinkedQuotes(orgId, { sinceDays, limit: 500 });
+  return list.length;
+}
+
+/**
+ * Multi-attach + bascule statut en 1 transaction (RPC PR 2).
+ * @param {string} orgId
+ * @param {string} leadId
+ * @param {Array<{quote_pl_id: number, customer_id?: number, amount_ht?: number, label?: string, date?: string, status?: string}>} quotes
+ * @returns {Promise<object>} { attached, lead_status_changed, new_status_id, results: [...] }
+ */
+async function attachQuotesAndSendLead(orgId, leadId, quotes) {
+  const { data, error } = await supabase.rpc('lead_attach_quotes_and_send', {
+    p_org_id: orgId,
+    p_lead_id: leadId,
+    p_quotes: quotes,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Mark Won côté MDH (RPC PR 3).
+ * @param {string} orgId
+ * @param {string} leadId
+ * @param {number|string} winningQuotePlId
+ * @returns {Promise<object>} { lead_status_changed, winning_quote_pl_id, winning_quote_label }
+ */
+async function markLeadWonWithQuote(orgId, leadId, winningQuotePlId) {
+  const { data, error } = await supabase.rpc('lead_mark_won_with_quote', {
+    p_org_id: orgId,
+    p_lead_id: leadId,
+    p_winning_quote_pl_id: Number(winningQuotePlId),
+  });
+  if (error) throw error;
+  return data;
+}
+
 /**
  * Détache (soft-delete) un devis Pennylane d'un lead.
  * @param {string} orgId
@@ -744,6 +1032,13 @@ export const pennylaneService = {
   getLinkedQuotesByLead: (leadId) => withErrorHandling(() => getLinkedQuotesByLead(leadId), 'pennylane.getLinkedQuotesByLead'),
   assignQuoteToLead: (orgId, pennylaneQuoteId, leadId, quoteData) => withErrorHandling(() => assignQuoteToLead(orgId, pennylaneQuoteId, leadId, quoteData), 'pennylane.assignQuoteToLead'),
   ejectQuoteFromLead: (orgId, pennylaneQuoteId, reason) => withErrorHandling(() => ejectQuoteFromLead(orgId, pennylaneQuoteId, reason), 'pennylane.ejectQuoteFromLead'),
+
+  // Bridge Pipeline ↔ Pennylane (spec 2026-05-23 PR 4+)
+  getCandidateQuotesForLead: (leadId, orgId) => withErrorHandling(() => getCandidateQuotesForLead(leadId, orgId), 'pennylane.getCandidateQuotesForLead'),
+  getUnlinkedQuotes: (orgId, opts) => withErrorHandling(() => getUnlinkedQuotes(orgId, opts), 'pennylane.getUnlinkedQuotes'),
+  countUnlinkedQuotes: (orgId, opts) => withErrorHandling(() => countUnlinkedQuotes(orgId, opts), 'pennylane.countUnlinkedQuotes'),
+  attachQuotesAndSendLead: (orgId, leadId, quotes) => withErrorHandling(() => attachQuotesAndSendLead(orgId, leadId, quotes), 'pennylane.attachQuotesAndSendLead'),
+  markLeadWonWithQuote: (orgId, leadId, winningQuotePlId) => withErrorHandling(() => markLeadWonWithQuote(orgId, leadId, winningQuotePlId), 'pennylane.markLeadWonWithQuote'),
 
   // Mappings (exportés pour usage externe)
   TVA_MAPPING,

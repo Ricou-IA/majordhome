@@ -358,6 +358,162 @@ export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
 }
 
 // ============================================================================
+// BRIDGE PIPELINE ↔ PENNYLANE (spec 2026-05-23 PR 4+)
+// ============================================================================
+
+/**
+ * Devis PL candidats à un lead via fuzzy match (bridge fort + email + phone).
+ * Consommé par QuoteCandidatesModal (PR 4b) pour la section "Suggestions".
+ *
+ * @param {string} leadId
+ * @param {object} [opts]
+ * @param {boolean} [opts.enabled=true]
+ * @returns {{ candidates, isLoading, error, refetch }}
+ *   candidates : Array<{ quote, signals: string[], alreadyAttached: boolean }>
+ */
+export function useCandidateQuotesForLead(leadId, { enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const query = useQuery({
+    queryKey: pennylaneKeys.candidatesByLead(orgId, leadId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getCandidateQuotesForLead(leadId, orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!leadId && enabled,
+    staleTime: 60_000,
+  });
+
+  return {
+    candidates: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Devis PL des N derniers jours sans rattachement actif (liste exploratoire).
+ * Consommé par QuoteCandidatesModal (PR 4b) section "Explorer" + bonus
+ * voyant détail (PR 8).
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.sinceDays=60]
+ * @param {number} [opts.limit=100]
+ * @param {boolean} [opts.enabled=true]
+ */
+export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const query = useQuery({
+    queryKey: pennylaneKeys.unlinkedQuotes(orgId, sinceDays),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getUnlinkedQuotes(orgId, { sinceDays, limit });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 60_000,
+  });
+
+  return {
+    unlinkedQuotes: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Compteur "devis PL non rattachés des N derniers jours".
+ * Voyant de discipline (Dashboard + Pipeline header, org_admin only).
+ * StaleTime long (5 min) — pas besoin de fraîcheur temps réel.
+ */
+export function useUnlinkedQuoteCount({ sinceDays = 30, enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const query = useQuery({
+    queryKey: pennylaneKeys.unlinkedQuotesCount(orgId, sinceDays),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.countUnlinkedQuotes(orgId, { sinceDays });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 5 * 60_000,
+  });
+
+  return {
+    count: query.data ?? null,
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Mutation multi-attach + bascule lead → "Devis envoyé" (RPC PR 2).
+ * Invalide leadKeys (Kanban + détail + activities), linkedQuotes, candidates,
+ * unlinked (compteur de discipline).
+ */
+export function useAttachQuotesAndSend(orgId, leadId) {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (quotes) => {
+      const { data, error } = await pennylaneService.attachQuotesAndSendLead(orgId, leadId, quotes);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.candidatesByLead(orgId, leadId) });
+      queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes-count'] });
+      queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+    },
+  });
+
+  return {
+    attachQuotes: useCallback((quotes) => mutation.mutateAsync(quotes), [mutation]),
+    isAttaching: mutation.isPending,
+    error: mutation.error,
+  };
+}
+
+/**
+ * Mutation mark won côté MDH (RPC PR 3).
+ * Invalide leadKeys + linkedQuotes + chantiers (chantier_status='gagne').
+ */
+export function useMarkLeadWonWithQuote(orgId, leadId) {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (winningQuotePlId) => {
+      const { data, error } = await pennylaneService.markLeadWonWithQuote(orgId, leadId, winningQuotePlId);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
+      queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+    },
+  });
+
+  return {
+    markWon: useCallback((winningQuotePlId) => mutation.mutateAsync(winningQuotePlId), [mutation]),
+    isMarking: mutation.isPending,
+    error: mutation.error,
+  };
+}
+
+// ============================================================================
 // SYNC CLIENT (mutation ponctuelle)
 // ============================================================================
 
