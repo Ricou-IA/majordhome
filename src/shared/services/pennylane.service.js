@@ -373,6 +373,52 @@ function formatPennylaneCustomerName(customer) {
 }
 
 /**
+ * Fetch /customers/{id} en parallèle pour chaque ID unique. Retourne le
+ * customer COMPLET (pas juste le name) afin de pouvoir matcher email/phone
+ * dans le fuzzy matching de suggestions.
+ *
+ * @param {Array<number|string>} customerIds
+ * @returns {Promise<Map<string, object>>} Map de string(id) → customer
+ */
+async function fetchCustomersByIds(customerIds) {
+  const uniqueIds = Array.from(
+    new Set((customerIds || []).filter(Boolean).map(id => String(id)))
+  );
+  if (uniqueIds.length === 0) return new Map();
+
+  const results = await Promise.allSettled(
+    uniqueIds.map(id => apiCall('GET', `/customers/${id}`))
+  );
+
+  const map = new Map();
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) {
+      map.set(uniqueIds[i], r.value);
+    }
+  });
+  return map;
+}
+
+/**
+ * Extracteurs défensifs sur le payload customer V2 (multi-shape).
+ */
+function extractCustomerEmail(c) {
+  if (!c) return null;
+  if (typeof c.billing_email === 'string' && c.billing_email) return c.billing_email;
+  if (typeof c.email === 'string' && c.email) return c.email;
+  if (Array.isArray(c.emails) && c.emails[0]) {
+    const first = c.emails[0];
+    return typeof first === 'string' ? first : first.email || first.address || null;
+  }
+  return null;
+}
+
+function extractCustomerPhone(c) {
+  if (!c) return null;
+  return c.phone || c.billing_phone || c.mobile || null;
+}
+
+/**
  * Fetch /quotes/{id} en parallèle pour récupérer les quote_number (D-YYYY-XXXX)
  * qui ne sont PAS stockés en DB (`quote_label` peut contenir le subject à la
  * place du numéro, héritage des premiers attachements).
@@ -401,31 +447,20 @@ async function fetchQuoteNumbersByIds(quoteIds) {
 }
 
 /**
- * Pennylane V2 /quotes n'expand que customer.id, pas les fields name.
- * Cette fonction fetch /customers/{id} en parallèle pour chaque ID unique,
- * et retourne un Map (id → display name). Erreurs silencieuses (Promise.allSettled).
+ * Wrapper sur fetchCustomersByIds pour la rétro-compat des consumers qui
+ * n'ont besoin que du display name.
  *
- * @param {Array<number|string>} customerIds — peut contenir doublons + null/undefined
+ * @param {Array<number|string>} customerIds
  * @returns {Promise<Map<string, string>>} Map de string(id) → name
  */
 async function fetchCustomerNamesByIds(customerIds) {
-  const uniqueIds = Array.from(
-    new Set((customerIds || []).filter(Boolean).map(id => String(id)))
-  );
-  if (uniqueIds.length === 0) return new Map();
-
-  const results = await Promise.allSettled(
-    uniqueIds.map(id => apiCall('GET', `/customers/${id}`))
-  );
-
-  const map = new Map();
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value) {
-      const name = formatPennylaneCustomerName(r.value);
-      if (name) map.set(uniqueIds[i], name);
-    }
+  const customers = await fetchCustomersByIds(customerIds);
+  const names = new Map();
+  customers.forEach((c, id) => {
+    const name = formatPennylaneCustomerName(c);
+    if (name) names.set(id, name);
   });
-  return map;
+  return names;
 }
 
 /**
@@ -808,27 +843,35 @@ function phoneDigits(phone) {
 }
 
 /**
- * Récupère les devis PL candidats à un lead via empilement de 3 signaux fuzzy :
- *   1. `pennylane_sync` (bridge fort) — client MDH lié + pennylane_id connu
- *   2. `email` (exact, lowercase) — client MDH avec même email que le lead
- *   3. `phone` (digits-only normalisés) — client MDH avec même phone que le lead
+ * Récupère les devis PL candidats à un lead via matching direct lead ↔ customer
+ * Pennylane (sans dépendre du mapping pennylane_sync ou des clients MDH).
  *
- * Stratégie : on passe par les clients MDH (qu'on contrôle) plutôt que de
- * scanner massivement Pennylane. Pour chaque client candidat, on fetch ses
- * devis PL via `getQuotesByClient` (qui réutilise pennylane_sync).
+ * Algorithme :
+ *   1. Fetch les devis PL des N derniers jours (paginé /quotes)
+ *   2. Batch fetch les customers PL uniques (Promise.allSettled)
+ *   3. Pour chaque devis, comparer son customer PL avec le lead :
+ *      - Signal 'pennylane_sync' : customer PL mappé via pennylane_sync vers
+ *        le client MDH lié au lead (bridge fort résolu côté DB)
+ *      - Signal 'email' : customer.billing_email/emails match lead.email
+ *      - Signal 'phone' : customer.phone match lead.phone (digits-only)
+ *   4. Garder seulement les devis avec >=1 signal, exclure ceux rattachés à
+ *      un AUTRE lead actif
  *
- * Exclusions :
- * - Devis déjà rattachés activement à un AUTRE lead (`ejected_at IS NULL`)
- * - PAS de match par nom (faux positifs, cf spec §3)
+ * Pourquoi ce design (au lieu de partir des clients MDH) : trop de clients MDH
+ * n'ont pas leur mapping pennylane_sync peuplé. On ne peut pas se reposer dessus.
+ * On compare directement les customers PL avec les fields du lead.
  *
- * Inclusions :
- * - Devis déjà rattachés à CE lead → `alreadyAttached: true` (re-affichage)
+ * Coût : 1 page /quotes + N fetches /customers/{id} (cached 30s côté React Query).
+ * En pratique : 1-3 secondes pour la 1ère ouverture, instant ensuite.
  *
  * @param {string} leadId
  * @param {string} orgId
+ * @param {object} [opts]
+ * @param {number} [opts.sinceDays=90] — fenêtre de recherche (jours)
+ * @param {number} [opts.maxQuotes=200] — cap pour éviter timeout edge function
  * @returns {Promise<Array<{quote, signals: string[], alreadyAttached: boolean}>>}
  */
-async function getCandidateQuotesForLead(leadId, orgId) {
+async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuotes = 200 } = {}) {
   if (!leadId || !orgId) return [];
 
   // 1. Charger le lead (email, phone, client_id)
@@ -845,112 +888,121 @@ async function getCandidateQuotesForLead(leadId, orgId) {
   const leadEmail = lead.email ? lead.email.trim().toLowerCase() : null;
   const leadPhone = phoneDigits(lead.phone);
 
-  // 2. Trouver les client_ids candidats (signaux email + phone) côté MDH
-  //    Le client directement lié au lead est ajouté en signal 'pennylane_sync'.
-  const candidateClientIds = new Set();
-  if (lead.client_id) candidateClientIds.add(lead.client_id);
-
-  // Match email exact (insensible à la casse)
-  if (leadEmail) {
-    const { data: byEmail } = await supabase
-      .from('majordhome_clients')
-      .select('id')
+  // 2. Récupérer le pennylane_customer_id qui mapperait lead.client_id (signal fort)
+  let syncCustomerIdForLeadClient = null;
+  if (lead.client_id) {
+    const { data: syncRow } = await supabase
+      .from('majordhome_pennylane_sync')
+      .select('pennylane_id')
       .eq('org_id', orgId)
-      .ilike('email', leadEmail)
-      .limit(20);
-    (byEmail || []).forEach(c => candidateClientIds.add(c.id));
+      .eq('entity_type', 'client')
+      .eq('local_id', lead.client_id)
+      .maybeSingle();
+    syncCustomerIdForLeadClient = syncRow?.pennylane_id || null;
   }
 
-  // Match phone normalisé (digits-only) — on récupère un set candidat large
-  // côté DB via ilike sur les premiers digits, puis filtrage strict côté JS.
-  if (leadPhone && leadPhone.length >= 6) {
-    const prefix = leadPhone.slice(0, 4); // discriminant suffisant pour préfiltrage
-    const { data: byPhone } = await supabase
-      .from('majordhome_clients')
-      .select('id, phone')
-      .eq('org_id', orgId)
-      .ilike('phone', `%${prefix}%`)
-      .limit(50);
-    (byPhone || []).forEach(c => {
-      if (phoneDigits(c.phone) === leadPhone) candidateClientIds.add(c.id);
-    });
-  }
-
-  if (candidateClientIds.size === 0) return [];
-
-  // 3. Pour chaque client candidat, fetch ses devis PL + récupérer email/phone
-  //    (pour annoter les signaux au cas où plusieurs matchent un même quote)
-  const { data: clientsMeta } = await supabase
-    .from('majordhome_clients')
-    .select('id, email, phone')
-    .eq('org_id', orgId)
-    .in('id', Array.from(candidateClientIds));
-  const clientMetaById = new Map((clientsMeta || []).map(c => [c.id, c]));
-
-  // 4. Liste des rattachements actifs existants (pour exclusion et flag)
+  // 3. Liste des rattachements actifs (exclusion + flag)
   const { data: existingLinks } = await supabase
     .from('majordhome_lead_pennylane_quotes')
     .select('pennylane_quote_id, lead_id')
     .eq('org_id', orgId)
     .is('ejected_at', null);
-  const attachedToOtherLead = new Map(); // pennylane_quote_id → lead_id (différent du courant)
+  const attachedToOtherLead = new Set();
   const attachedToThisLead = new Set();
   (existingLinks || []).forEach(link => {
-    if (link.lead_id === leadId) {
-      attachedToThisLead.add(link.pennylane_quote_id);
-    } else {
-      attachedToOtherLead.set(link.pennylane_quote_id, link.lead_id);
-    }
+    if (link.lead_id === leadId) attachedToThisLead.add(link.pennylane_quote_id);
+    else attachedToOtherLead.add(link.pennylane_quote_id);
   });
 
-  // 5. Fetch devis PL pour chaque client candidat (en parallèle), dédup par quote.id
-  const quotesByClientId = await Promise.all(
-    Array.from(candidateClientIds).map(async cid => {
-      try {
-        const quotes = await getQuotesByClient(cid, orgId);
-        return { cid, quotes };
-      } catch (err) {
-        console.warn(`[pennylane.getCandidateQuotesForLead] fetch quotes failed for client ${cid}:`, err);
-        return { cid, quotes: [] };
-      }
-    })
-  );
+  // 4. Fetch devis PL paginés (fenêtre sinceDays)
+  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
+  const allQuotes = [];
+  let cursor = null;
+  let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
 
-  // 6. Construire le résultat enrichi de signaux
-  const resultByQuoteId = new Map(); // quote_id → { quote, signals: Set, alreadyAttached }
-  for (const { cid, quotes } of quotesByClientId) {
-    const meta = clientMetaById.get(cid);
-    const clientEmail = meta?.email ? meta.email.trim().toLowerCase() : null;
-    const clientPhone = phoneDigits(meta?.phone);
-
-    for (const q of quotes) {
-      // Exclure si déjà rattaché activement à un AUTRE lead
-      if (attachedToOtherLead.has(q.id)) continue;
-
-      let entry = resultByQuoteId.get(q.id);
-      if (!entry) {
-        entry = {
-          quote: q,
-          signals: new Set(),
-          alreadyAttached: attachedToThisLead.has(q.id),
-        };
-        resultByQuoteId.set(q.id, entry);
-      }
-
-      // Signal 1 : client directement lié au lead
-      if (cid === lead.client_id) entry.signals.add('pennylane_sync');
-      // Signal 2 : email match
-      if (leadEmail && clientEmail && clientEmail === leadEmail) entry.signals.add('email');
-      // Signal 3 : phone match
-      if (leadPhone && clientPhone && clientPhone === leadPhone) entry.signals.add('phone');
-    }
+  while (hasMore && pageCount < MAX_PAGES && allQuotes.length < maxQuotes) {
+    let path = '/quotes?limit=100';
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+    const result = await apiCall('GET', path);
+    const items = result?.items || [];
+    allQuotes.push(...items);
+    hasMore = result?.has_more && !!result?.next_cursor;
+    cursor = result?.next_cursor || null;
+    pageCount++;
   }
 
-  return Array.from(resultByQuoteId.values()).map(e => ({
-    quote: e.quote,
-    signals: Array.from(e.signals),
-    alreadyAttached: e.alreadyAttached,
-  }));
+  // Filtre fenêtre temporelle
+  const recentQuotes = allQuotes.filter(q => {
+    if (!q.date) return true;
+    const d = new Date(q.date).getTime();
+    return Number.isNaN(d) || d >= cutoffMs;
+  });
+
+  if (recentQuotes.length === 0) return [];
+
+  // 5. Batch fetch customers uniques
+  const customerIds = recentQuotes.map(q => q.customer?.id).filter(Boolean);
+  const customersById = await fetchCustomersByIds(customerIds);
+
+  // 6. Pour chaque devis, calculer les signaux par comparaison directe
+  const results = [];
+  for (const q of recentQuotes) {
+    if (!q.customer?.id) continue;
+    if (attachedToOtherLead.has(q.id)) continue; // déjà rattaché ailleurs
+
+    const customerKey = String(q.customer.id);
+    const customer = customersById.get(customerKey);
+
+    const signals = new Set();
+
+    // Signal 1 : bridge fort (mapping pennylane_sync → lead.client_id)
+    if (syncCustomerIdForLeadClient
+        && String(syncCustomerIdForLeadClient) === customerKey) {
+      signals.add('pennylane_sync');
+    }
+
+    // Signal 2 : email match (customer PL ↔ lead.email)
+    if (leadEmail && customer) {
+      const custEmail = extractCustomerEmail(customer);
+      if (custEmail && custEmail.trim().toLowerCase() === leadEmail) {
+        signals.add('email');
+      }
+    }
+
+    // Signal 3 : phone match (digits-only normalisés)
+    if (leadPhone && customer) {
+      const custPhone = phoneDigits(extractCustomerPhone(customer));
+      if (custPhone && custPhone === leadPhone) {
+        signals.add('phone');
+      }
+    }
+
+    if (signals.size === 0) continue; // pas de match, skip
+
+    // Formater le quote pour cohérence avec getQuotesByClient
+    results.push({
+      quote: {
+        id: q.id,
+        quote_number: q.quote_number || q.label || null,
+        label: q.label || null,
+        subject: q.pdf_invoice_subject || null,
+        date: q.date || null,
+        deadline: q.deadline || null,
+        amount_ht: q.currency_amount_before_tax || null,
+        amount_ttc: q.amount || q.currency_amount || null,
+        status: q.status || null,
+        pdf_url: q.public_file_url || null,
+        customer_id: q.customer?.id || null,
+        customer_name: formatPennylaneCustomerName(customer),
+      },
+      signals: Array.from(signals),
+      alreadyAttached: attachedToThisLead.has(q.id),
+    });
+  }
+
+  return results;
 }
 
 /**
