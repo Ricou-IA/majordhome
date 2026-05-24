@@ -179,6 +179,7 @@ export function QuoteCandidatesModal({
 }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showExploration, setShowExploration] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     candidates,
@@ -214,10 +215,29 @@ export function QuoteCandidatesModal({
     [candidates]
   );
 
-  const explorationQuotes = useMemo(
-    () => unlinkedQuotes.filter(q => !candidateIds.has(q.id)),
-    [unlinkedQuotes, candidateIds]
-  );
+  // Normalise pour comparaison insensible casse/accents
+  // (range ̀-ͯ = combining marks Unicode après NFD)
+  const normalizeForSearch = (s) =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const normalizedQuery = useMemo(() => normalizeForSearch(searchQuery), [searchQuery]);
+
+  const explorationQuotes = useMemo(() => {
+    const baseList = unlinkedQuotes.filter(q => !candidateIds.has(q.id));
+    if (!normalizedQuery) return baseList;
+    return baseList.filter(q => {
+      const haystack = normalizeForSearch(
+        [q.customer_name, q.quote_number, q.label, q.subject]
+          .filter(Boolean)
+          .join(' ')
+      );
+      return haystack.includes(normalizedQuery);
+    });
+  }, [unlinkedQuotes, candidateIds, normalizedQuery]);
 
   // Map id → quote pour reconstituer le payload au submit
   const quotesById = useMemo(() => {
@@ -249,6 +269,7 @@ export function QuoteCandidatesModal({
     if (isAttaching) return;
     setSelectedIds(new Set());
     setShowExploration(false);
+    setSearchQuery('');
     onClose();
   }, [isAttaching, onClose]);
 
@@ -390,6 +411,27 @@ export function QuoteCandidatesModal({
           {/* Section Exploration */}
           {showExploration && (
             <section className="mt-3">
+              {/* Champ de recherche full text (client + numéro + subject) */}
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher (nom client, numéro devis…)"
+                  className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                    aria-label="Effacer la recherche"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               {loadingUnlinked ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -397,7 +439,8 @@ export function QuoteCandidatesModal({
               ) : explorationQuotes.length > 0 ? (
                 <>
                   <p className="text-xs text-gray-500 mb-2">
-                    {explorationQuotes.length} devis sans rattachement actif
+                    {explorationQuotes.length} devis
+                    {normalizedQuery ? ` correspondant à « ${searchQuery} »` : ' sans rattachement actif'}
                   </p>
                   <ul className="divide-y divide-gray-100">
                     {explorationQuotes.map(quote => (
@@ -414,7 +457,9 @@ export function QuoteCandidatesModal({
                 </>
               ) : (
                 <div className="text-center py-6 text-sm text-gray-500">
-                  Aucun devis disponible dans la fenêtre de 60 jours.
+                  {normalizedQuery
+                    ? `Aucun devis ne correspond à « ${searchQuery} ».`
+                    : 'Aucun devis disponible dans la fenêtre de 60 jours.'}
                 </div>
               )}
             </section>
