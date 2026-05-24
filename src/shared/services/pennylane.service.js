@@ -719,7 +719,7 @@ async function getLedgerAccounts() {
 async function getLinkedQuotesByLead(leadId) {
   const { data, error } = await supabase
     .from('majordhome_lead_pennylane_quotes')
-    .select('id, lead_id, pennylane_quote_id, quote_amount_ht, quote_label, quote_date, quote_status, assigned_at')
+    .select('id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_amount_ht, quote_label, quote_date, quote_status, is_winning_quote, assigned_at')
     .eq('lead_id', leadId)
     .is('ejected_at', null)
     .order('quote_date', { ascending: false, nullsFirst: false })
