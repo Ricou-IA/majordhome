@@ -843,7 +843,12 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     ? getAllowedNextStatuses(currentStatus.label, statuses)
     : [];
 
-  const contactFieldsDisabled = !!linkedClient && !editClientMode;
+  // Contact disabled si :
+  //  - client lié et pas en mode édition (flow MDH actuel), OU
+  //  - bridge Pennylane actif avec >=1 devis attaché (les coordonnées du lead
+  //    sont synchronisées depuis Pennylane — cf spec §9)
+  const pennylaneSyncedContact = pennylaneActive && (linkedQuotes?.length || 0) > 0;
+  const contactFieldsDisabled = pennylaneSyncedContact || (!!linkedClient && !editClientMode);
 
   if (!isOpen) return null;
 
@@ -958,6 +963,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 form={form}
                 setField={setField}
                 contactFieldsDisabled={contactFieldsDisabled}
+                pennylaneSynced={pennylaneSyncedContact}
               />
 
               <SectionPipeline

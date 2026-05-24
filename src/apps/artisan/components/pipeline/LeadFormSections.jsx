@@ -15,7 +15,7 @@ import {
   Search, UserCircle, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
   ArrowRightLeft, Target, UserCheck, Loader2, Wrench,
-  FileText, ChevronRight, Plus,
+  FileText, ChevronRight, Plus, Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -180,9 +180,17 @@ export const SectionClientLinking = ({
 // CONTACT
 // ============================================================================
 
-export const SectionContact = ({ form, setField, contactFieldsDisabled }) => (
+export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false }) => (
   <>
     <SectionTitle>Contact</SectionTitle>
+    {pennylaneSynced && (
+      <div className="mb-2 flex items-start gap-1.5 text-xs text-gray-600 bg-blue-50/60 border border-blue-100 rounded px-2.5 py-1.5">
+        <Info className="w-3.5 h-3.5 mt-0.5 text-blue-600 shrink-0" />
+        <span>
+          Données synchronisées depuis Pennylane — à modifier dans Pennylane.
+        </span>
+      </div>
+    )}
 
     <div className="grid grid-cols-2 gap-3">
       <FormField label="Prénom">
