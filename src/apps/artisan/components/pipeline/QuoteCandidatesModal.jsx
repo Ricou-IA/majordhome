@@ -275,7 +275,8 @@ export function QuoteCandidatesModal({
           quote_pl_id: q.id,
           customer_id: q.customer_id ?? null,
           amount_ht: q.amount_ht ?? null,
-          label: q.subject || q.quote_number || q.label || null,
+          // Priorité quote_number (D-YYYY-XXXX) sur subject (titre long)
+          label: q.quote_number || q.label || q.subject || null,
           date: q.date || null,
           status: q.status || null,
         };

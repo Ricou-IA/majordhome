@@ -2,44 +2,20 @@
  * LinkedQuotesPanel.jsx — Majord'home Artisan (pipeline)
  * ============================================================================
  * Affichage lecture-seule des devis Pennylane attachés à un lead.
- * Spec : docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md
+ * Une ligne par devis : numéro (D-YYYY-XXXX) + badge Gagnant si applicable
+ * + montant HT + lien externe Pennylane.
  *
- * Une ligne par devis avec :
- *   - Numéro (D-2026-XXX) + statut (chip deutan-friendly)
- *   - Badge "Gagnant" si is_winning_quote=true
- *   - Date du devis
- *   - Montant HT
- *   - Lien externe Pennylane
- *
- * Pas d'action de modification depuis ce panel (read-only). Pour rattacher
- * un devis : QuoteCandidatesModal. Pour bouger le winning : MarkWonQuoteModal.
+ * Volontairement épuré (pas de chip statut ni de date) — la pertinence est
+ * de pointer vers le devis Pennylane qui détient la source de vérité.
  * ============================================================================
  */
 
 import { Link2, ExternalLink, Trophy } from 'lucide-react';
-import { formatEuro, formatDateShortFR } from '@/lib/utils';
-
-// Même palette que QuoteCandidatesModal / MarkWonQuoteModal (deutan-friendly)
-const QUOTE_STATUS_CONFIG = {
-  accepted: { label: 'Accepté', color: '#1d4ed8', bgColor: '#dbeafe' },
-  pending: { label: 'En attente', color: '#b45309', bgColor: '#fef3c7' },
-  draft: { label: 'Brouillon', color: '#6b7280', bgColor: '#f3f4f6' },
-  denied: { label: 'Refusé', color: '#4b5563', bgColor: '#e5e7eb' },
-  refused: { label: 'Refusé', color: '#4b5563', bgColor: '#e5e7eb' },
-  expired: { label: 'Expiré', color: '#4b5563', bgColor: '#e5e7eb' },
-};
-
-function getQuoteStatusConfig(status) {
-  return QUOTE_STATUS_CONFIG[status] || {
-    label: status || 'Inconnu',
-    color: '#6b7280',
-    bgColor: '#f3f4f6',
-  };
-}
+import { formatEuro } from '@/lib/utils';
 
 /**
  * @param {Object} props
- * @param {Array} props.quotes — liste de lead_pennylane_quotes (vue publique)
+ * @param {Array} props.quotes — lead_pennylane_quotes enrichis (quote_number_pl)
  * @param {boolean} [props.isLoading]
  */
 export function LinkedQuotesPanel({ quotes, isLoading }) {
@@ -54,31 +30,24 @@ export function LinkedQuotesPanel({ quotes, isLoading }) {
       </div>
       <ul className="space-y-1.5">
         {quotes.map((q) => {
-          const cfg = getQuoteStatusConfig(q.quote_status);
+          // Priorité : quote_number_pl (fetché depuis Pennylane) > quote_label
+          // > fallback pennylane_quote_id formaté
+          const displayNumber = q.quote_number_pl
+            || q.quote_label
+            || `#${q.pennylane_quote_id}`;
           return (
             <li
               key={q.id}
               className="flex items-center justify-between gap-3 px-2 py-1.5 bg-white rounded border border-blue-50"
             >
-              <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                <span className="font-medium text-gray-900 text-sm">
-                  {q.quote_label || `#${q.pennylane_quote_id}`}
-                </span>
-                <span
-                  className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                  style={{ color: cfg.color, backgroundColor: cfg.bgColor }}
-                >
-                  {cfg.label}
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-medium text-gray-900 text-sm truncate">
+                  {displayNumber}
                 </span>
                 {q.is_winning_quote && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium inline-flex items-center gap-0.5">
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium inline-flex items-center gap-0.5 shrink-0">
                     <Trophy className="w-3 h-3" />
                     Gagnant
-                  </span>
-                )}
-                {q.quote_date && (
-                  <span className="text-xs text-gray-500">
-                    {formatDateShortFR(q.quote_date)}
                   </span>
                 )}
               </div>

@@ -373,6 +373,34 @@ function formatPennylaneCustomerName(customer) {
 }
 
 /**
+ * Fetch /quotes/{id} en parallèle pour récupérer les quote_number (D-YYYY-XXXX)
+ * qui ne sont PAS stockés en DB (`quote_label` peut contenir le subject à la
+ * place du numéro, héritage des premiers attachements).
+ *
+ * @param {Array<number|string>} quoteIds
+ * @returns {Promise<Map<string, string>>} Map de string(id) → quote_number
+ */
+async function fetchQuoteNumbersByIds(quoteIds) {
+  const uniqueIds = Array.from(
+    new Set((quoteIds || []).filter(Boolean).map(id => String(id)))
+  );
+  if (uniqueIds.length === 0) return new Map();
+
+  const results = await Promise.allSettled(
+    uniqueIds.map(id => apiCall('GET', `/quotes/${id}`))
+  );
+
+  const map = new Map();
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) {
+      const num = r.value.quote_number || r.value.label || null;
+      if (num) map.set(uniqueIds[i], num);
+    }
+  });
+  return map;
+}
+
+/**
  * Pennylane V2 /quotes n'expand que customer.id, pas les fields name.
  * Cette fonction fetch /customers/{id} en parallèle pour chaque ID unique,
  * et retourne un Map (id → display name). Erreurs silencieuses (Promise.allSettled).
@@ -725,7 +753,21 @@ async function getLinkedQuotesByLead(leadId) {
     .order('quote_date', { ascending: false, nullsFirst: false })
     .order('assigned_at', { ascending: true });
   if (error) throw error;
-  return data || [];
+  const rows = data || [];
+
+  // Enrichir avec quote_number PL (D-YYYY-XXXX) — quote_label peut contenir
+  // le subject à la place du numéro selon l'origine du rattachement.
+  if (rows.length > 0) {
+    const ids = rows.map(r => r.pennylane_quote_id).filter(Boolean);
+    const numbersById = await fetchQuoteNumbersByIds(ids);
+    return rows.map(r => ({
+      ...r,
+      quote_number_pl: r.pennylane_quote_id
+        ? numbersById.get(String(r.pennylane_quote_id)) || null
+        : null,
+    }));
+  }
+  return rows;
 }
 
 /**
