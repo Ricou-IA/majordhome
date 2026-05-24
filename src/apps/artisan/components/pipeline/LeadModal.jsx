@@ -53,6 +53,7 @@ import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
 import { QuoteCandidatesModal } from './QuoteCandidatesModal';
 import { MarkWonQuoteModal } from './MarkWonQuoteModal';
+import { LinkedQuotesPanel } from './LinkedQuotesPanel';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import CreateDevisModal from '../devis/CreateDevisModal';
@@ -930,6 +931,11 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
             />
           ) : (
             <>
+              {/* PR 4/5 bridge — devis Pennylane attachés (read-only) */}
+              {pennylaneActive && linkedQuotes && linkedQuotes.length > 0 && (
+                <LinkedQuotesPanel quotes={linkedQuotes} />
+              )}
+
               <SectionClientLinking
                 linkedClient={linkedClient}
                 editClientMode={editClientMode}
