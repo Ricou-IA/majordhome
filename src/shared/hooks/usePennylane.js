@@ -11,8 +11,10 @@
 import { useCallback } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
-import { pennylaneKeys, devisKeys, leadKeys } from '@hooks/cacheKeys';
+import { leadsService } from '@services/leads.service';
+import { pennylaneKeys, devisKeys, leadKeys, clientKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
@@ -456,18 +458,135 @@ export function useUnlinkedQuoteCount({ sinceDays = 30, enabled = true } = {}) {
 }
 
 /**
+ * Post-attach : auto-create ou auto-link client MDH si le lead n'en a pas.
+ * Logique :
+ *   1. Lit le lead → skip si client_id déjà set
+ *   2. Récupère le 1er customer_id PL des devis attachés
+ *   3. Cherche dans pennylane_sync (entity_type='client', pennylane_id=customer_id)
+ *      → Si trouvé : UPDATE lead.client_id = mapping.local_id (link existing)
+ *   4. Sinon : convertLeadToClient (crée project + client + activity + lead.client_id)
+ *      (les coordonnées du LEAD sont utilisées, pas du customer PL — dans 99% des cas
+ *      c'est cohérent puisque le lead a été créé avec les mêmes infos)
+ *   5. Pose le mapping pennylane_sync + UPDATE lead_pennylane_quotes.pennylane_client_id
+ *
+ * Fire-and-forget : un échec n'invalide pas le succès de l'attach.
+ *
+ * @param {string} orgId
+ * @param {string} leadId
+ * @param {string} userId
+ * @param {Array} attachedResults — array des results de la RPC (avec quote_pl_id, etc.)
+ *   Sert à récupérer les customer_ids PL via re-fetch des lignes lead_pennylane_quotes.
+ */
+async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
+  // 1. Lire le lead
+  const { data: lead, error: leadErr } = await supabase
+    .schema('majordhome')
+    .from('leads')
+    .select('id, client_id')
+    .eq('id', leadId)
+    .eq('org_id', orgId)
+    .single();
+  if (leadErr) throw leadErr;
+  if (!lead) return { skipped: 'lead_not_found' };
+  if (lead.client_id) return { skipped: 'already_linked', client_id: lead.client_id };
+
+  // 2. Récupérer le 1er customer_id PL des devis attachés actifs
+  const { data: links, error: linksErr } = await supabase
+    .from('majordhome_lead_pennylane_quotes')
+    .select('pennylane_customer_id')
+    .eq('lead_id', leadId)
+    .is('ejected_at', null)
+    .not('pennylane_customer_id', 'is', null)
+    .limit(1);
+  if (linksErr) throw linksErr;
+  const customerId = links?.[0]?.pennylane_customer_id;
+  if (!customerId) return { skipped: 'no_customer_id' };
+
+  // 3. Cherche un mapping existant dans pennylane_sync
+  const { data: syncRow } = await supabase
+    .from('majordhome_pennylane_sync')
+    .select('local_id')
+    .eq('org_id', orgId)
+    .eq('entity_type', 'client')
+    .eq('pennylane_id', customerId)
+    .maybeSingle();
+
+  let clientId = syncRow?.local_id || null;
+  let createdClient = false;
+
+  if (clientId) {
+    // 3a. Mapping existe : link le lead au client existant
+    const { error: updateErr } = await supabase.rpc('update_majordhome_lead', {
+      p_lead_id: leadId,
+      p_updates: { client_id: clientId, updated_at: new Date().toISOString() },
+    });
+    if (updateErr) throw updateErr;
+  } else {
+    // 3b. Pas de mapping : convertLeadToClient (crée tout le chaînage MDH)
+    const conv = await leadsService.convertLeadToClient(leadId, orgId, userId);
+    if (conv?.error) throw conv.error;
+    clientId = conv?.data?.client?.id || null;
+    createdClient = !!clientId;
+    if (!clientId) return { skipped: 'convert_failed' };
+  }
+
+  // 4. Pose le mapping pennylane_sync (upsert idempotent)
+  await supabase
+    .schema('majordhome')
+    .from('pennylane_sync')
+    .upsert(
+      {
+        org_id: orgId,
+        entity_type: 'client',
+        local_id: clientId,
+        pennylane_id: customerId,
+        sync_status: 'synced',
+        last_synced_at: new Date().toISOString(),
+      },
+      { onConflict: 'org_id,entity_type,local_id' }
+    );
+
+  // 5. Update pennylane_client_id sur les liaisons de ce lead
+  await supabase
+    .schema('majordhome')
+    .from('lead_pennylane_quotes')
+    .update({ pennylane_client_id: clientId })
+    .eq('lead_id', leadId)
+    .is('ejected_at', null)
+    .is('pennylane_client_id', null);
+
+  return { client_id: clientId, created_client: createdClient };
+}
+
+/**
  * Mutation multi-attach + bascule lead → "Devis envoyé" (RPC PR 2).
+ * Post-success : auto-create / auto-link client MDH si lead.client_id IS NULL
+ * (cf ensureClientForLeadFromPennylane). Fire-and-forget : un échec du
+ * post-process n'invalide pas le succès de l'attach principal.
+ *
  * Invalide leadKeys (Kanban + détail + activities), linkedQuotes, candidates,
- * unlinked (compteur de discipline).
+ * unlinked (compteur de discipline) + clientKeys si client créé.
  */
 export function useAttachQuotesAndSend(orgId, leadId) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id;
 
   const mutation = useMutation({
     mutationFn: async (quotes) => {
       const { data, error } = await pennylaneService.attachQuotesAndSendLead(orgId, leadId, quotes);
       if (error) throw error;
-      return data;
+
+      // Post-attach : auto-create / link client (fire-and-forget conceptuel,
+      // mais on attend la résolution pour avoir l'UI à jour à la fermeture modale)
+      let postResult = null;
+      try {
+        postResult = await ensureClientForLeadFromPennylane(orgId, leadId, userId);
+      } catch (e) {
+
+        console.warn('[useAttachQuotesAndSend] ensureClient failed:', e?.message || e);
+      }
+      return { ...data, _post: postResult };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
@@ -476,6 +595,8 @@ export function useAttachQuotesAndSend(orgId, leadId) {
       queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes'] });
       queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes-count'] });
       queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+      // Client potentiellement créé → invalider listes clients
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
     },
   });
 
