@@ -82,6 +82,12 @@ export const leadInteractionKeys = {
   byLead: (orgId, leadId) => [...leadInteractionKeys.all(orgId), 'byLead', leadId],
 };
 
+// --- Kanban Cards (Phase 1 pipeline multi-devis) ---
+export const kanbanCardKeys = {
+  all: (orgId) => ['kanban-cards', orgId],
+  byColumn: (orgId, columnKey) => [...kanbanCardKeys.all(orgId), 'column', columnKey],
+};
+
 // --- Appointments ---
 export const appointmentKeys = {
   all: (orgId) => ['appointments', orgId],
