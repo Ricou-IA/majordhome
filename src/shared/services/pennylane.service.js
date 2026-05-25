@@ -894,11 +894,11 @@ function phoneDigits(phone) {
  * @param {string} leadId
  * @param {string} orgId
  * @param {object} [opts]
- * @param {number} [opts.sinceDays=90] — fenêtre de recherche (jours)
+ * @param {number} [opts.sinceDays=30] — fenêtre de recherche (jours)
  * @param {number} [opts.maxQuotes=200] — cap pour éviter timeout edge function
  * @returns {Promise<Array<{quote, signals: string[], alreadyAttached: boolean}>>}
  */
-async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuotes = 200 } = {}) {
+async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 30, maxQuotes = 200 } = {}) {
   if (!leadId || !orgId) return [];
 
   // 1. Charger le lead (email, phone, client_id) — via la vue publique
