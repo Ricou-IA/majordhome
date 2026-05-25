@@ -24,6 +24,36 @@ import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 
 // ============================================================================
+// CONCURRENCY LIMIT — helper interne sans dépendance
+// ============================================================================
+// Pennylane rate limit : 25 req / 5s. Lancer 30+ fetch /customers/{id} en
+// parallèle illimité sature le proxy → 429 retry interne → 500 remontés
+// côté front. Toujours wrapper les batches PL avec pLimit(5).
+// ============================================================================
+
+function pLimit(concurrency) {
+  let active = 0;
+  const queue = [];
+
+  const next = () => {
+    if (active >= concurrency || queue.length === 0) return;
+    active++;
+    const { fn, resolve, reject } = queue.shift();
+    Promise.resolve()
+      .then(fn)
+      .then(
+        (val) => { active--; resolve(val); next(); },
+        (err) => { active--; reject(err); next(); },
+      );
+  };
+
+  return (fn) => new Promise((resolve, reject) => {
+    queue.push({ fn, resolve, reject });
+    next();
+  });
+}
+
+// ============================================================================
 // CONSTANTES & MAPPINGS
 // ============================================================================
 
@@ -386,8 +416,10 @@ async function fetchCustomersByIds(customerIds) {
   );
   if (uniqueIds.length === 0) return new Map();
 
+  // Concurrency cap : Pennylane rate limit 25 req/5s. Au-delà → 429 → proxy 500.
+  const limit = pLimit(5);
   const results = await Promise.allSettled(
-    uniqueIds.map(id => apiCall('GET', `/customers/${id}`))
+    uniqueIds.map(id => limit(() => apiCall('GET', `/customers/${id}`)))
   );
 
   const map = new Map();
@@ -459,8 +491,9 @@ async function fetchQuoteNumbersByIds(quoteIds) {
   );
   if (uniqueIds.length === 0) return new Map();
 
+  const limit = pLimit(5);
   const results = await Promise.allSettled(
-    uniqueIds.map(id => apiCall('GET', `/quotes/${id}`))
+    uniqueIds.map(id => limit(() => apiCall('GET', `/quotes/${id}`)))
   );
 
   const map = new Map();
@@ -1016,9 +1049,13 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 30, maxQuo
 
   if (recentQuotes.length === 0) return [];
 
-  // 5. Batch fetch customers uniques
-  const customerIds = recentQuotes.map(q => q.customer?.id).filter(Boolean);
-  const customersById = await fetchCustomersByIds(customerIds);
+  // 5. Batch fetch customers uniquement si on a besoin de matcher email ou phone
+  // (l'embedded `q.customer` suffit pour bridge + name). Skip si lead sans
+  // email NI phone → 0 requête /customers, latence ~ instant.
+  const needsCustomerFetch = !!(leadNorm.email || leadNorm.phone);
+  const customersById = needsCustomerFetch
+    ? await fetchCustomersByIds(recentQuotes.map(q => q.customer?.id).filter(Boolean))
+    : new Map();
 
   // 6. Pour chaque devis, calculer les signaux via les matchers déclaratifs
   const results = [];
@@ -1129,11 +1166,9 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
 
   const sliced = filtered.slice(0, limit);
 
-  // Enrichir avec customer_name via /customers/{id} en batch parallèle.
-  // Pennylane V2 /quotes ne retourne que customer.id, pas le name.
-  const customerIds = sliced.map(q => q.customer?.id).filter(Boolean);
-  const namesById = await fetchCustomerNamesByIds(customerIds);
-
+  // Note perf : on n'enrichit PLUS via /customers/{id}. Pennylane V2 retourne
+  // déjà `q.customer.name` / `first_name` / `last_name` embedded dans /quotes,
+  // suffisant pour l'affichage. Le fetch batch saturait le proxy (cf pLimit).
   return sliced.map(q => ({
     id: q.id,
     quote_number: q.quote_number || q.label || null,
@@ -1146,23 +1181,62 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
     status: q.status || null,
     pdf_url: q.public_file_url || null,
     customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer)
-      || (q.customer?.id ? namesById.get(String(q.customer.id)) : null)
-      || null,
+    customer_name: formatPennylaneCustomerName(q.customer),
   }));
 }
 
 /**
  * Compteur "devis PL non rattachés des N derniers jours".
  * Voyant de discipline org_admin (Dashboard + Pipeline header).
+ *
+ * Variante minimale : pagine /quotes + filtre attached set, RIEN d'autre.
+ * Pas de fetch /customers/{id} (le compteur n'a pas besoin des noms).
+ * Plafond `softCap` pour éviter timeout edge function et capper l'usage proxy
+ * — au-delà on retourne `softCap` (le voyant doit juste signaler "beaucoup").
+ *
  * @param {string} orgId
  * @param {object} [opts]
  * @param {number} [opts.sinceDays=30]
+ * @param {number} [opts.softCap=500]
  * @returns {Promise<number>}
  */
-async function countUnlinkedQuotes(orgId, { sinceDays = 30 } = {}) {
-  const list = await getUnlinkedQuotes(orgId, { sinceDays, limit: 500 });
-  return list.length;
+async function countUnlinkedQuotes(orgId, { sinceDays = 30, softCap = 500 } = {}) {
+  if (!orgId) return 0;
+
+  const { data: existingLinks } = await supabase
+    .from('majordhome_lead_pennylane_quotes')
+    .select('pennylane_quote_id')
+    .eq('org_id', orgId)
+    .is('ejected_at', null);
+  const attachedSet = new Set((existingLinks || []).map(l => l.pennylane_quote_id));
+
+  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
+  let cursor = null;
+  let hasMore = true;
+  let pageCount = 0;
+  let count = 0;
+  const MAX_PAGES = 10;
+
+  while (hasMore && pageCount < MAX_PAGES && count < softCap) {
+    let path = '/quotes?limit=100';
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+    const result = await apiCall('GET', path);
+    const items = result?.items || [];
+    for (const q of items) {
+      if (attachedSet.has(q.id)) continue;
+      if (q.date) {
+        const d = new Date(q.date).getTime();
+        if (!Number.isNaN(d) && d < cutoffMs) continue;
+      }
+      count++;
+      if (count >= softCap) break;
+    }
+    hasMore = result?.has_more && !!result?.next_cursor;
+    cursor = result?.next_cursor || null;
+    pageCount++;
+  }
+
+  return count;
 }
 
 /**

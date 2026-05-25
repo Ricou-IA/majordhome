@@ -414,7 +414,9 @@ export function useCandidateQuotesForLead(leadId, { enabled = true } = {}) {
       return data;
     },
     enabled: !!orgId && !!leadId && enabled,
-    staleTime: 60_000,
+    // 2 min — devis PL créés en cours de session restent invalidables via
+    // invalidateQueries(candidatesByLead) après attach
+    staleTime: 2 * 60_000,
   });
 
   return {
@@ -447,7 +449,9 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
       return data;
     },
     enabled: !!orgId && enabled,
-    staleTime: 60_000,
+    // 5 min — les devis PL non rattachés bougent peu, invalidation manuelle
+    // via invalidateQueries(unlinkedQuotes) sur attach/eject
+    staleTime: 5 * 60_000,
   });
 
   return {
