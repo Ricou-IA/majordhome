@@ -12,7 +12,7 @@ import { useState, useMemo } from 'react';
 import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatEuroCeil } from '@/lib/utils';
-import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
+import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { QuoteSubCard } from './QuoteSubCard';
 
 /**
@@ -138,6 +138,9 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
   // Hooks AVANT tout return conditionnel (règles des hooks React)
   const hasDevis = (card?.devis_count || 0) > 0;
   const { linkedQuotes } = useLinkedPennylaneQuotes(hasDevis && expanded ? lead?.id : null);
+  // Prefetch au survol → ouverture instant si user clique dans la foulée
+  const prefetchLinkedQuotes = usePrefetchLinkedPennylaneQuotes();
+  const handleMouseEnter = hasDevis && !expanded ? () => prefetchLinkedQuotes(lead?.id) : undefined;
 
   // Filtrer les devis selon la colonne (pertinents uniquement)
   // useMemo doit rester avant tout return conditionnel (règles des hooks React)
@@ -178,6 +181,8 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
         role="button"
         tabIndex={0}
         onClick={() => onClick?.(lead)}
+        onMouseEnter={handleMouseEnter}
+        onFocus={handleMouseEnter}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(lead); }}
         className="w-full text-left bg-white rounded-lg border hover:shadow-md transition-shadow
                    focus:outline-none focus:ring-2 focus:ring-blue-500 flex cursor-pointer"

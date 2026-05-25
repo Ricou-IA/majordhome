@@ -302,6 +302,33 @@ export function useLinkedPennylaneQuotes(leadId) {
 }
 
 /**
+ * Retourne un prefetch (memoized) pour précharger les devis PL liés à un lead.
+ * À appeler sur onMouseEnter d'une carte Kanban pour rendre l'expand instant.
+ * No-op si leadId absent ou si la donnée est déjà fraîche en cache (staleTime géré).
+ */
+export function usePrefetchLinkedPennylaneQuotes() {
+  const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  return useCallback(
+    (leadId) => {
+      if (!orgId || !leadId) return;
+      queryClient.prefetchQuery({
+        queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId),
+        queryFn: async () => {
+          const { data, error } = await pennylaneService.getLinkedQuotesByLead(leadId);
+          if (error) throw error;
+          return data;
+        },
+        staleTime: 30_000,
+      });
+    },
+    [queryClient, orgId],
+  );
+}
+
+/**
  * Mutations attach/eject d'un devis Pennylane sur un lead.
  * Invalide la liste des devis liés ET le statut chantier (la cascade côté UI).
  */
