@@ -499,6 +499,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
+      // Bloquer le passage manuel à Perdu si le lead a un devis PL attaché
+      // (Pennylane canonical — marquer le devis refusé dans PL fera basculer la carte
+      // automatiquement via la vue majordhome_kanban_cards).
+      if (newStatusLabel === 'Perdu' && (draggedItem.card?.devis_count || 0) > 0) {
+        toast.error('Marquez le devis comme refusé dans Pennylane — la carte basculera automatiquement.');
+        return;
+      }
+
       // Si "Perdu", ouvrir la modale de motif
       if (newStatusLabel === 'Perdu') {
         setPendingLost({ leadId, newStatusId, oldStatusId });

@@ -839,8 +839,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const isFinal = currentStatus?.is_final === true;
   const isSaving = isCreating || isUpdating;
 
+  // Bloquer le passage manuel à "Perdu" si le lead a au moins un devis PL attaché
+  // (Pennylane canonical — quote_status pilote le placement Kanban via majordhome_kanban_cards).
+  // L'user doit marquer le devis refusé dans Pennylane, le sync propagera.
+  const hasLinkedPlQuotes = (linkedQuotes?.length || 0) > 0;
   const allowedNext = isEditing && currentStatus
     ? getAllowedNextStatuses(currentStatus.label, statuses)
+        .filter((s) => !(hasLinkedPlQuotes && s.label === 'Perdu'))
     : [];
 
   // Contact disabled si :
