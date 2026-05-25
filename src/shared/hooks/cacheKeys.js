@@ -283,6 +283,8 @@ export const pennylaneKeys = {
   candidatesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'candidates', leadId],
   unlinkedQuotes: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'unlinked-quotes', sinceDays],
   unlinkedQuotesCount: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'unlinked-quotes-count', sinceDays],
+  // Bug #5 ROGERO : recherche customer PL (cache D.5 + live)
+  customerSearch: (orgId, query) => [...pennylaneKeys.all(orgId), 'customer-search', query],
 };
 
 // --- Meta Ads ---

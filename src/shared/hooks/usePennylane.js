@@ -8,11 +8,12 @@
  * ============================================================================
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
 import { leadsService } from '@services/leads.service';
 import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
+import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { cleanPhone } from '@/lib/phoneUtils';
@@ -761,5 +762,88 @@ export function usePennylaneSyncClient(orgId) {
     ),
     isSyncing: syncMutation.isPending,
     syncError: syncMutation.error,
+  };
+}
+
+// ============================================================================
+// BUG #5 ROGERO — RECHERCHE CUSTOMER PENNYLANE + IMPORT MDH
+// ============================================================================
+
+/**
+ * Hook de recherche de customers Pennylane (cache D.5 + fallback live PL).
+ * API alignée avec `useClientSearch` pour intégration facile dans
+ * `SectionClientLinking` (LeadFormSections.jsx).
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.debounceMs=300]
+ * @param {number} [opts.minChars=2]
+ * @returns {{ query, results, searching, search, clear }}
+ *   results : Array<customer> avec champ `source: 'cache' | 'live'`
+ */
+export function usePennylaneClientSearch({ debounceMs = 300, minChars = 2 } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, debounceMs);
+
+  const { data: results, isLoading: searching } = useQuery({
+    queryKey: pennylaneKeys.customerSearch(orgId, debouncedQuery),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.searchPennylaneCustomers(debouncedQuery, orgId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!orgId && debouncedQuery.length >= minChars,
+    // Stale 30s : laisse le cache se peupler à l'usage, refetch raisonnable
+    staleTime: 30_000,
+  });
+
+  const search = useCallback((newQuery) => setQuery(newQuery), []);
+  const clear = useCallback(() => setQuery(''), []);
+
+  return {
+    query,
+    results: results || [],
+    searching,
+    search,
+    clear,
+  };
+}
+
+/**
+ * Mutation : importe un customer Pennylane comme nouveau client MDH +
+ * pose le mapping pennylane_sync. Idempotent (si déjà mappé → return
+ * client existant).
+ *
+ * Invalide les caches clients pour que la liste/recherche reflète
+ * l'import immédiatement.
+ */
+export function useImportPennylaneCustomer() {
+  const queryClient = useQueryClient();
+  const { organization, user } = useAuth();
+  const orgId = organization?.id;
+  const userId = user?.id;
+
+  const mutation = useMutation({
+    mutationFn: async (plCustomer) => {
+      if (!orgId || !userId) throw new Error('orgId et userId requis');
+      const { data, error } = await pennylaneService.importPennylaneCustomerToMdh(
+        orgId, plCustomer, userId,
+      );
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+    },
+  });
+
+  return {
+    importCustomer: useCallback(
+      (plCustomer) => mutation.mutateAsync(plCustomer),
+      [mutation]
+    ),
+    isImporting: mutation.isPending,
+    error: mutation.error,
   };
 }

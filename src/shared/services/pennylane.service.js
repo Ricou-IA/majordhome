@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
+import { clientsService } from '@services/clients.service';
 
 // ============================================================================
 // CONCURRENCY LIMIT — helper interne sans dépendance
@@ -1467,6 +1468,188 @@ async function ejectQuoteFromLead(orgId, pennylaneQuoteId, reason = null) {
 }
 
 // ============================================================================
+// BUG #5 ROGERO — RECHERCHE CUSTOMER PL (cache D.5 + fallback live)
+// ============================================================================
+
+/**
+ * Formate un payload PL V2 customer brut → shape uniforme attendue par
+ * useClientSearch (cohérent avec la shape de la table cache).
+ */
+function formatPennylaneCustomerForSearch(c, source) {
+  const { firstName, lastName, fullName } = extractCustomerName(c);
+  const { address, postalCode, city } = extractCustomerAddress(c);
+  return {
+    pennylane_id: c.id,
+    name: fullName,
+    first_name: firstName,
+    last_name: lastName,
+    customer_type: c.customer_type || null,
+    email: extractCustomerEmail(c),
+    phone: extractCustomerPhone(c),
+    address,
+    postal_code: postalCode,
+    city,
+    external_reference: c.reference || c.external_reference || null,
+    source, // 'cache' | 'live'
+  };
+}
+
+/**
+ * Bug #5 ROGERO — Recherche de customers Pennylane (cache + fallback live).
+ *
+ * Stratégie :
+ *   1. Cache D.5 : SELECT `majordhome_pennylane_customer_lookup` avec ILIKE
+ *      sur name/first_name/last_name (RLS scope org auto).
+ *   2. Si cache < `minLiveTrigger` résultats : fallback live PL via
+ *      `/customers?filters=[{name start_with query}]` (PL V2 supporte
+ *      start_with sur name côté customers — pas email/phone).
+ *      Chaque résultat live est aussi upserté dans le cache (write-through).
+ *   3. Union dédupliquée par pennylane_id (cache prioritaire), trim à `limit`.
+ *
+ * @param {string} query — texte recherche (min 2 chars)
+ * @param {string} orgId
+ * @param {object} [opts]
+ * @param {number} [opts.minLiveTrigger=3] — si cache < N résultats, fallback live
+ * @param {number} [opts.limit=10]
+ * @returns {Promise<Array>} résultats formatés (mix cache + live)
+ */
+async function searchPennylaneCustomers(query, orgId, { minLiveTrigger = 3, limit = 10 } = {}) {
+  if (!orgId) return [];
+  const q = (query || '').trim();
+  if (q.length < 2) return [];
+
+  // Escape ILIKE wildcards utilisateur pour éviter recherche détournée
+  const escaped = q.replace(/[%_\\]/g, m => `\\${m}`);
+
+  // 1. Cache lookup
+  let fromCache = [];
+  try {
+    const { data: cacheRows, error: cacheErr } = await supabase
+      .from('majordhome_pennylane_customer_lookup')
+      .select('pennylane_id, name, first_name, last_name, customer_type, email, phone, address, postal_code, city, external_reference, last_seen')
+      .eq('org_id', orgId)
+      .or(`name.ilike.%${escaped}%,first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%`)
+      .order('last_seen', { ascending: false })
+      .limit(limit);
+    if (cacheErr) {
+      logger.warn('[searchPennylaneCustomers] cache select failed', cacheErr?.message || cacheErr);
+    } else {
+      fromCache = (cacheRows || []).map(r => ({ ...r, source: 'cache' }));
+    }
+  } catch (err) {
+    logger.warn('[searchPennylaneCustomers] cache unexpected', err?.message || err);
+  }
+
+  // 2. Fallback live PL si cache insuffisant
+  let fromLive = [];
+  if (fromCache.length < minLiveTrigger) {
+    try {
+      const filterParam = encodeURIComponent(JSON.stringify([
+        { field: 'name', operator: 'start_with', value: q }
+      ]));
+      // PL V2 customer filter param utilise `filters` (pluriel) selon la doc
+      const result = await apiCall('GET', `/customers?limit=${limit}&filters=${filterParam}`);
+      const items = result?.items || [];
+      fromLive = items.map(c => formatPennylaneCustomerForSearch(c, 'live'));
+      // Write-through fire-and-forget pour les rendre disponibles instantanément la prochaine fois
+      items.forEach(c => cacheUpsertCustomer(orgId, c));
+    } catch (err) {
+      logger.warn('[searchPennylaneCustomers] live fetch failed', err?.message || err);
+    }
+  }
+
+  // 3. Union dédupliquée (cache prioritaire)
+  const seen = new Set(fromCache.map(r => String(r.pennylane_id)));
+  const merged = [...fromCache];
+  fromLive.forEach(r => {
+    if (!seen.has(String(r.pennylane_id))) merged.push(r);
+  });
+  return merged.slice(0, limit);
+}
+
+/**
+ * Bug #5 ROGERO — Importe un customer Pennylane dans majordhome.clients.
+ *
+ * Idempotent : si pennylane_sync mapping existe déjà pour ce pennylane_id,
+ * retourne le client MDH existant sans dupliquer. Sinon crée un nouveau
+ * client + pose le mapping.
+ *
+ * @param {string} orgId
+ * @param {object} plCustomer — payload formaté (output de searchPennylaneCustomers)
+ *   Doit avoir au moins : pennylane_id + (name OU first_name+last_name)
+ * @param {string} userId — pour createdBy
+ * @returns {Promise<{client: object, alreadyExisted: boolean}>}
+ */
+async function importPennylaneCustomerToMdh(orgId, plCustomer, userId) {
+  if (!orgId) throw new Error('orgId requis');
+  if (!plCustomer?.pennylane_id) throw new Error('plCustomer.pennylane_id requis');
+
+  // 1. Check mapping existant — idempotent
+  const { data: existingSync } = await supabase
+    .from('majordhome_pennylane_sync')
+    .select('local_id')
+    .eq('org_id', orgId)
+    .eq('entity_type', 'client')
+    .eq('pennylane_id', plCustomer.pennylane_id)
+    .maybeSingle();
+
+  if (existingSync?.local_id) {
+    const { data: client, error } = await supabase
+      .from('majordhome_clients_all')
+      .select('*')
+      .eq('id', existingSync.local_id)
+      .maybeSingle();
+    if (error) throw error;
+    return { client, alreadyExisted: true };
+  }
+
+  // 2. Créer le client MDH via clientsService (qui gère case + cleanPhone + display_name)
+  const isCompany = plCustomer.customer_type === 'company';
+  const { data: client, error: createErr } = await clientsService.createClient({
+    orgId,
+    firstName: plCustomer.first_name,
+    lastName: plCustomer.last_name || (isCompany ? plCustomer.name : null),
+    companyName: isCompany ? plCustomer.name : null,
+    email: plCustomer.email,
+    phone: plCustomer.phone,
+    address: plCustomer.address,
+    postalCode: plCustomer.postal_code,
+    city: plCustomer.city,
+    clientCategory: isCompany ? 'entreprise' : 'particulier',
+    leadSource: 'pennylane_import',
+    notes: plCustomer.external_reference
+      ? `Importé depuis Pennylane (ref: ${plCustomer.external_reference})`
+      : 'Importé depuis Pennylane',
+    createdBy: userId,
+  });
+  if (createErr) throw createErr;
+  if (!client?.id) throw new Error('Création client MDH échouée');
+
+  // 3. Pose le mapping pennylane_sync (upsert idempotent)
+  const { error: syncErr } = await supabase
+    .schema('majordhome')
+    .from('pennylane_sync')
+    .upsert(
+      {
+        org_id: orgId,
+        entity_type: 'client',
+        local_id: client.id,
+        pennylane_id: plCustomer.pennylane_id,
+        pennylane_number: plCustomer.external_reference || null,
+        sync_status: 'synced',
+        last_synced_at: new Date().toISOString(),
+      },
+      { onConflict: 'org_id,entity_type,local_id' }
+    );
+  if (syncErr) {
+    // Non bloquant : le client est créé, le mapping ratera = on retry plus tard
+    logger.warn('[importPennylaneCustomerToMdh] sync upsert failed', syncErr?.message || syncErr);
+  }
+
+  return { client, alreadyExisted: false };
+}
+
+// ============================================================================
 // EXPORT
 // ============================================================================
 
@@ -1500,6 +1683,10 @@ export const pennylaneService = {
 
   // Sync table
   getSyncRecord: (orgId, entityType, localId) => withErrorHandling(() => getSyncRecord(orgId, entityType, localId), 'pennylane.getSyncRecord'),
+
+  // Bug #5 ROGERO — search PL (cache + live) + import client
+  searchPennylaneCustomers: (query, orgId, opts) => withErrorHandling(() => searchPennylaneCustomers(query, orgId, opts), 'pennylane.searchPennylaneCustomers'),
+  importPennylaneCustomerToMdh: (orgId, plCustomer, userId) => withErrorHandling(() => importPennylaneCustomerToMdh(orgId, plCustomer, userId), 'pennylane.importPennylaneCustomerToMdh'),
 
   // Liaison lead ↔ devis (multi-devis par chantier)
   getLinkedQuotesByLead: (leadId) => withErrorHandling(() => getLinkedQuotesByLead(leadId), 'pennylane.getLinkedQuotesByLead'),

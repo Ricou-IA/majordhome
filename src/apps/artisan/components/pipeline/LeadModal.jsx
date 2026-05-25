@@ -55,7 +55,7 @@ import { QuoteCandidatesModal } from './QuoteCandidatesModal';
 import { MarkWonQuoteModal } from './MarkWonQuoteModal';
 import { LinkedQuotesPanel } from './LinkedQuotesPanel';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
-import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
+import { useLinkedPennylaneQuotes, usePennylaneClientSearch, useImportPennylaneCustomer } from '@hooks/usePennylane';
 import CreateDevisModal from '../devis/CreateDevisModal';
 import DevisModal from '../devis/DevisModal';
 import { devisService } from '@services/devis.service';
@@ -87,7 +87,20 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const { sources } = useLeadSources();
   const { commercials } = useLeadCommercials(orgId);
   const { equipmentTypes } = usePricingEquipmentTypes();
-  const { query: clientSearchQuery, results: clientResults, searching: clientSearching, search: searchClient, clear: clearClientSearch } = useClientSearch(orgId);
+  const pennylaneActive = usePennylaneEnabled();
+  const { query: clientSearchQuery, results: clientResults, searching: clientSearching, search: searchClientMdh, clear: clearClientMdhSearch } = useClientSearch(orgId);
+  // Bug #5 ROGERO : search customer Pennylane (cache D.5 + fallback live)
+  const { results: pennylaneResults, searching: pennylaneSearching, search: searchPennylane, clear: clearPennylaneSearch } = usePennylaneClientSearch();
+  const { importCustomer, isImporting: isImportingPennylane } = useImportPennylaneCustomer();
+  // Fan-out search MDH + Pennylane (search PL skip si org sans PL)
+  const searchClient = useCallback((value) => {
+    searchClientMdh(value);
+    if (pennylaneActive) searchPennylane(value);
+  }, [searchClientMdh, searchPennylane, pennylaneActive]);
+  const clearClientSearch = useCallback(() => {
+    clearClientMdhSearch();
+    clearPennylaneSearch();
+  }, [clearClientMdhSearch, clearPennylaneSearch]);
   const {
     createLead, updateLead, updateLeadStatus, convertLead, addNote, hardDeleteLead,
     isCreating, isUpdating, isChangingStatus, isConverting, isAddingNote, isHardDeleting,
@@ -140,7 +153,6 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
   const [showMarkWon, setShowMarkWon] = useState(false);
-  const pennylaneActive = usePennylaneEnabled();
   // Devis PL attachés (lecture, pour le branchement Gagné). Fetch léger via vue
   // publique, staleTime 30s côté hook → pas de surcoût notable.
   const { linkedQuotes } = useLinkedPennylaneQuotes(pennylaneActive && isEditing ? leadId : null);
@@ -302,6 +314,29 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     clearClientSearch();
     toast.info('Client délié — vous pouvez en rechercher un autre ou laisser vide');
   }, [clearClientSearch]);
+
+  // Bug #5 ROGERO — import un customer Pennylane comme nouveau client MDH +
+  // lie automatiquement au lead courant (via handleSelectClient).
+  const handleImportPennylane = useCallback(async (plCustomer) => {
+    try {
+      const result = await importCustomer(plCustomer);
+      const client = result?.client;
+      if (!client?.id) {
+        toast.error('Import depuis Pennylane échoué');
+        return;
+      }
+      // Lie le lead au client (existant ou nouvellement créé)
+      await handleSelectClient(client);
+      toast.success(
+        result.alreadyExisted
+          ? `Client existant lié (${client.display_name || 'sans nom'})`
+          : `Client importé depuis Pennylane (${client.display_name || 'sans nom'})`,
+      );
+    } catch (err) {
+      console.error('[LeadModal] import Pennylane error:', err);
+      toast.error(err?.message || 'Erreur lors de l\'import du client Pennylane');
+    }
+  }, [importCustomer, handleSelectClient]);
 
   const syncClientFields = useCallback(async () => {
     if (!linkedClient?.id || !editClientMode) return false;
@@ -963,6 +998,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 clientResults={clientResults}
                 handleSelectClient={handleSelectClient}
                 clearClientSearch={clearClientSearch}
+                pennylaneResults={pennylaneActive ? pennylaneResults : []}
+                pennylaneSearching={pennylaneActive ? pennylaneSearching : false}
+                handleImportPennylane={handleImportPennylane}
+                isImportingPennylane={isImportingPennylane}
               />
 
               <SectionContact

@@ -192,6 +192,7 @@ src/
 - `majordhome_mailing_events` → audit log complet des events webhook Resend (1 ligne par event reçu, dédupliqué par svix_id)
 - `majordhome_equipments`, `majordhome_interventions`, `majordhome_maintenance_visits`
 - `majordhome_geogrid_scans`, `majordhome_geogrid_results`, `majordhome_geogrid_keyword_lists`, `majordhome_geogrid_benchmarks`
+- `majordhome_pennylane_customer_lookup` → cache write-through des customers Pennylane (alimenté à chaque fetch `/customers/{id}` via `cacheUpsertCustomer` fire-and-forget — D.5, 2026-05-26)
 - `profiles`, `organizations`, `organization_members` (vues core)
 
 ### Org cible
@@ -664,6 +665,7 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
   - `ejected_reason` (text) — `'deleted_in_pennylane'` posé par le cron quand devis disparu PL (404)
   - `is_winning_quote` (boolean, default false) — "devis effectivement signé" pour les leads Gagnés. 1 winning max par lead actif, garanti par la RPC `lead_mark_won_with_quote` (pas de contrainte UNIQUE pour éviter UniqueViolation en transition)
 - Vue publique `public.majordhome_lead_pennylane_quotes`.
+- **Table `majordhome.pennylane_customer_lookup`** (D.5, 2026-05-26) — cache write-through des customers PL. PK composite `(org_id, pennylane_id)`, RLS scoped org_id. Alimentée fire-and-forget après chaque `fetchCustomerById`/`fetchCustomersByIds` via `cacheUpsertCustomer(orgId, customer)` dans `pennylane.service.js`. RPC d'upsert : `public.upsert_pennylane_customer_lookup(p_org_id, p_payload jsonb)` SECURITY DEFINER, COALESCE strict (jamais d'écrasement d'une valeur existante avec null/vide). Usage prévu : search "Client existant" sur création lead (bug #5 ROGERO) en complément de `majordhome_clients`. Pas de seed initial — le cache se peuple à l'usage.
 
 ### RPCs Pipeline ↔ PL (bridge PR 1-5, spec `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md`)
 - `public.lead_attach_quotes_and_send(p_org_id, p_lead_id, p_quotes jsonb)` — multi-attach + bascule statut "Devis envoyé" en 1 transaction. Calcule `most_recent_quote` via tie-break `pennylane_quote_id DESC` (cf Gotchas DB), propage `order_amount_ht` (ROUND).
@@ -706,6 +708,7 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
 ### Référence
 - Spec bridge complet : `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md` (8 PRs séquentielles, PR 1-5 livrées)
 - Spec multi-devis : `docs/superpowers/specs/2026-05-25-pipeline-multidevis-design.md`
+- Spec bug #7 quote_status sync : `docs/superpowers/specs/2026-05-25-bug7-quote-status-sync-design.md` (option B retenue : étendre allowlist `accepted_count` à `accepted,invoiced` + trigger invariant winning)
 - Spec d'arbitrage WIP : `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md`
 - Brief refonte modale matching : `docs/PROMPT_PENNYLANE_MATCHING_REFACTOR.md` (consommé partiellement par les commits perf + bridge prioritaire + pré-remplissage contact 2026-05-25 ; reste à traiter bug #5 ROGERO + cache `pennylane_customer_lookup`)
 

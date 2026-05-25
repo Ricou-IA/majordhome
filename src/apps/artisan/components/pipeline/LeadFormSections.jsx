@@ -49,6 +49,11 @@ export const SectionClientLinking = ({
   clientResults,
   handleSelectClient,
   clearClientSearch,
+  // Bug #5 ROGERO : recherche customer Pennylane (cache D.5 + live)
+  pennylaneResults = [],
+  pennylaneSearching = false,
+  handleImportPennylane,
+  isImportingPennylane = false,
 }) => (
   <div className="mb-2">
     {linkedClient ? (
@@ -92,7 +97,7 @@ export const SectionClientLinking = ({
         </div>
         {editClientMode && (
           <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-            Les modifications des champs contact seront répercutées sur la fiche client à l'enregistrement
+            Les modifications des champs contact seront répercutées sur la fiche client à l&apos;enregistrement
           </div>
         )}
       </>
@@ -139,15 +144,16 @@ export const SectionClientLinking = ({
                   className={`${inputClass} pl-9`}
                   placeholder="Rechercher un client existant..."
                 />
-                {clientSearching && (
+                {(clientSearching || pennylaneSearching) && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
                 )}
               </div>
-              {showClientDropdown && clientResults.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {showClientDropdown && (clientResults.length > 0 || pennylaneResults.length > 0) && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+                  {/* Résultats Majord'home */}
                   {clientResults.map((client) => (
                     <button
-                      key={client.id}
+                      key={`mdh-${client.id}`}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleSelectClient(client)}
@@ -161,11 +167,54 @@ export const SectionClientLinking = ({
                       </span>
                     </button>
                   ))}
+                  {/* Résultats Pennylane (bug #5 ROGERO) */}
+                  {pennylaneResults.length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 bg-indigo-50 text-xs font-semibold text-indigo-700 uppercase tracking-wide border-y border-indigo-100">
+                        Dans Pennylane (à importer)
+                      </div>
+                      {pennylaneResults.map((plCust) => (
+                        <div
+                          key={`pl-${plCust.pennylane_id}`}
+                          className="flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-indigo-50/50 transition-colors border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 block truncate">
+                              {plCust.name || `${plCust.first_name || ''} ${plCust.last_name || ''}`.trim() || `Customer ${plCust.pennylane_id}`}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {plCust.external_reference ? `${plCust.external_reference} — ` : ''}
+                              {plCust.city || ''}
+                              {plCust.phone ? ` — ${plCust.phone}` : ''}
+                              {plCust.email ? ` — ${plCust.email}` : ''}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleImportPennylane?.(plCust)}
+                            disabled={isImportingPennylane}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Importer ce client depuis Pennylane"
+                          >
+                            {isImportingPennylane ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                            Importer
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
-              {showClientDropdown && clientSearchQuery.length >= 2 && !clientSearching && clientResults.length === 0 && (
+              {showClientDropdown && clientSearchQuery.length >= 2
+                && !clientSearching && !pennylaneSearching
+                && clientResults.length === 0 && pennylaneResults.length === 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-3 text-sm text-gray-500 italic">
-                  Aucun client trouvé
+                  Aucun client trouvé (Majord'home + Pennylane)
                 </div>
               )}
             </div>
