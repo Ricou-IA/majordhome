@@ -363,7 +363,17 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     });
 
     // Trier : sort_order puis updated_at (ordre stable dans chaque colonne)
+    // Exception : colonne "RDV planifié" → tri par date de RDV ASC (plus ancien en haut)
+    // → permet de voir les RDV passés sans suite (devis ou positionnement perdu)
     items.sort((a, b) => {
+      if (a.column_key === 'rdv_planifie' && b.column_key === 'rdv_planifie') {
+        const dateA = a.lead.appointment_date;
+        const dateB = b.lead.appointment_date;
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;  // cartes sans date → en bas
+        if (!dateB) return -1;
+        return new Date(dateA) - new Date(dateB);
+      }
       const oa = a.lead.sort_order || 0;
       const ob = b.lead.sort_order || 0;
       if (oa !== ob) return oa - ob;
