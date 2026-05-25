@@ -419,6 +419,33 @@ function extractCustomerPhone(c) {
 }
 
 /**
+ * Extrait { firstName, lastName, fullName } depuis un customer PL multi-shape.
+ * Supporte les individuals (first_name/last_name) et fallback sur `name` global.
+ */
+function extractCustomerName(c) {
+  if (!c) return { firstName: null, lastName: null, fullName: null };
+  const firstName = c.first_name || c.firstName || null;
+  const lastName = c.last_name || c.lastName || null;
+  const fullName = c.name || c.label || (firstName && lastName ? `${firstName} ${lastName}` : null);
+  return { firstName, lastName, fullName };
+}
+
+/**
+ * Normalise un nom pour comparaison fuzzy : NFD + strip diacritics + lowercase + trim
+ * + collapse multiple spaces. Retourne null si vide.
+ */
+function normalizeName(s) {
+  if (!s || typeof s !== 'string') return null;
+  const cleaned = s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || null;
+}
+
+/**
  * Fetch /quotes/{id} en parallèle pour récupérer les quote_number (D-YYYY-XXXX)
  * qui ne sont PAS stockés en DB (`quote_label` peut contenir le subject à la
  * place du numéro, héritage des premiers attachements).
@@ -887,6 +914,8 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
 
   const leadEmail = lead.email ? lead.email.trim().toLowerCase() : null;
   const leadPhone = phoneDigits(lead.phone);
+  const leadFirstNorm = normalizeName(lead.first_name);
+  const leadLastNorm = normalizeName(lead.last_name);
 
   // 2. Récupérer le pennylane_customer_id qui mapperait lead.client_id (signal fort)
   let syncCustomerIdForLeadClient = null;
@@ -976,6 +1005,25 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
       const custPhone = phoneDigits(extractCustomerPhone(customer));
       if (custPhone && custPhone === leadPhone) {
         signals.add('phone');
+      }
+    }
+
+    // Signal 4 : name match (prénom + nom, case/accent insensible)
+    //   - Strict : custFirst === leadFirst AND custLast === leadLast
+    //   - Fallback : fullName contient (leadFirst ET leadLast)
+    if (leadFirstNorm && leadLastNorm && customer) {
+      const { firstName, lastName, fullName } = extractCustomerName(customer);
+      const custFirstNorm = normalizeName(firstName);
+      const custLastNorm = normalizeName(lastName);
+      const custFullNorm = normalizeName(fullName);
+
+      const strictMatch = custFirstNorm === leadFirstNorm && custLastNorm === leadLastNorm;
+      const fullNameMatch = custFullNorm
+        && custFullNorm.includes(leadFirstNorm)
+        && custFullNorm.includes(leadLastNorm);
+
+      if (strictMatch || fullNameMatch) {
+        signals.add('name');
       }
     }
 

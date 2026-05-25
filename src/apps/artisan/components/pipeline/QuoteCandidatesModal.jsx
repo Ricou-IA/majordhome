@@ -67,6 +67,7 @@ const SIGNAL_CONFIG = {
   pennylane_sync: { label: 'Bridge', icon: Link2, color: '#1d4ed8', bg: '#dbeafe' },
   email: { label: 'Email', icon: Mail, color: '#7c3aed', bg: '#ede9fe' },
   phone: { label: 'Tél.', icon: Phone, color: '#0891b2', bg: '#cffafe' },
+  name: { label: 'Nom', icon: User, color: '#0d9488', bg: '#ccfbf1' },
 };
 
 function SignalChip({ signal }) {
