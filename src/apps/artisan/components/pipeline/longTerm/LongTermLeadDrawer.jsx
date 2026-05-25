@@ -26,6 +26,7 @@ import {
   Plus,
   Loader2,
   CheckCircle2,
+  Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatEuroCeil } from '@/lib/utils';
@@ -36,8 +37,12 @@ import {
   useLongTermMutations,
 } from '@hooks/useLeadInteractions';
 import { useLeadStatuses, useLeadMutations } from '@hooks/useLeads';
+import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { leadsService } from '@services/leads.service';
 import { LOST_REASONS } from '../LeadStatusConfig';
+import { LinkedQuotesPanel } from '../LinkedQuotesPanel';
+import { QuoteCandidatesModal } from '../QuoteCandidatesModal';
 import { AddInteractionModal } from './AddInteractionModal';
 import { InteractionTimeline } from './InteractionTimeline';
 import { computeFreshness, formatShortDate } from './longTermUtils';
@@ -94,8 +99,9 @@ export function LongTermLeadDrawer({
   onClose,
   onLeadUpdated,
 }) {
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
   const userId = user?.id;
+  const orgId = organization?.id;
   const leadId = lead?.id;
 
   const { interactions, isLoading: loadingInteractions, refresh: refreshInteractions } = useLeadInteractions(leadId);
@@ -111,6 +117,11 @@ export function LongTermLeadDrawer({
   const [pendingLost, setPendingLost] = useState(false);
   const [lostReasonSelect, setLostReasonSelect] = useState('');
   const [lostReasonCustom, setLostReasonCustom] = useState('');
+
+  // Pennylane bridge — rattachement de devis pour régularisation
+  const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
+  const pennylaneActive = usePennylaneEnabled();
+  const { linkedQuotes } = useLinkedPennylaneQuotes(pennylaneActive && leadId ? leadId : null);
 
   // Reset des states internes au changement de lead
   useEffect(() => {
@@ -230,7 +241,7 @@ export function LongTermLeadDrawer({
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Hourglass className="h-4 w-4 text-purple-600 shrink-0" />
                 <span className="text-xs uppercase tracking-wide text-purple-700 font-semibold">Projet MT-LT</span>
                 <span
@@ -240,6 +251,17 @@ export function LongTermLeadDrawer({
                   <span className={`h-1.5 w-1.5 rounded-full ${freshness.dot}`} />
                   {freshness.label}
                 </span>
+                {pennylaneActive && (
+                  <button
+                    type="button"
+                    onClick={() => setShowQuoteCandidates(true)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors"
+                    title="Rattacher un devis Pennylane à ce projet MT-LT (régularisation base)"
+                  >
+                    <Link2 className="w-3 h-3" />
+                    Rattacher devis PL
+                  </button>
+                )}
               </div>
               <h2 className="text-xl font-bold text-gray-900 truncate">{name}</h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
@@ -295,6 +317,11 @@ export function LongTermLeadDrawer({
 
         {/* Body */}
         <div className="flex-1 px-6 py-5 space-y-6">
+          {/* Devis Pennylane attachés (si bridge activé et ≥1 devis) */}
+          {pennylaneActive && linkedQuotes && linkedQuotes.length > 0 && (
+            <LinkedQuotesPanel quotes={linkedQuotes} />
+          )}
+
           {/* Notes contextuelles */}
           <NotesEditor
             leadId={leadId}
@@ -371,6 +398,19 @@ export function LongTermLeadDrawer({
         onConfirm={handleAddInteraction}
         loading={isCreating}
       />
+
+      {/* Bridge Pennylane — rattachement devis (régularisation MT-LT) */}
+      {pennylaneActive && leadId && (
+        <QuoteCandidatesModal
+          isOpen={showQuoteCandidates}
+          onClose={() => setShowQuoteCandidates(false)}
+          leadId={leadId}
+          orgId={orgId}
+          onAttached={() => {
+            onLeadUpdated?.();
+          }}
+        />
+      )}
 
       {/* Modale motif Perdu */}
       {pendingLost && (
