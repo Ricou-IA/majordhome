@@ -22,6 +22,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // CONCURRENCY LIMIT — helper interne sans dépendance
@@ -903,31 +904,100 @@ function phoneDigits(phone) {
 }
 
 /**
+ * Récupère TOUS les devis PL d'un customer (sans fenêtre temporelle).
+ *
+ * Stratégie :
+ *   1. Tentative API V2 filter natif : `?filter=[{"field":"customer_id","operator":"eq","value":X}]`
+ *      → 1-few requêtes paginées, sans scan global
+ *   2. Fallback si le filter renvoie 400 (syntaxe rejetée, doc API évolue) :
+ *      pagine all + filter côté client par `q.customer.id` (scan exhaustif).
+ *
+ * Adresse bug #4 (SYLVIE ANE) : avant ce helper, getCandidateQuotesForLead
+ * limitait à une fenêtre 30j tronquant les devis anciens d'un client bridgé.
+ *
+ * @param {number|string} customerPlId
+ * @returns {Promise<Array>} devis PL bruts (pas formatés)
+ */
+async function fetchQuotesForCustomerId(customerPlId) {
+  if (!customerPlId) return [];
+
+  const filterParam = encodeURIComponent(
+    JSON.stringify([{ field: 'customer_id', operator: 'eq', value: Number(customerPlId) }])
+  );
+
+  try {
+    const collected = [];
+    let cursor = null;
+    let hasMore = true;
+    let pageCount = 0;
+    const MAX_PAGES = 5;
+    while (hasMore && pageCount < MAX_PAGES) {
+      let path = `/quotes?limit=100&filter=${filterParam}`;
+      if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+      const result = await apiCall('GET', path);
+      const items = result?.items || [];
+      collected.push(...items);
+      hasMore = result?.has_more && !!result?.next_cursor;
+      cursor = result?.next_cursor || null;
+      pageCount++;
+    }
+    return collected;
+  } catch (err) {
+    logger.warn(
+      '[pennylane.fetchQuotesForCustomerId] filter natif échoué, fallback scan paginé',
+      err?.message || err,
+    );
+    // Fallback exhaustif : pagine all puis filter côté client.
+    const collected = [];
+    let cursor = null;
+    let hasMore = true;
+    let pageCount = 0;
+    const MAX_PAGES = 10;
+    const targetId = Number(customerPlId);
+    while (hasMore && pageCount < MAX_PAGES) {
+      let path = '/quotes?limit=100';
+      if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+      const result = await apiCall('GET', path);
+      const items = result?.items || [];
+      collected.push(...items.filter(q => q.customer?.id === targetId));
+      hasMore = result?.has_more && !!result?.next_cursor;
+      cursor = result?.next_cursor || null;
+      pageCount++;
+    }
+    return collected;
+  }
+}
+
+/**
  * Récupère les devis PL candidats à un lead via matching direct lead ↔ customer
  * Pennylane (sans dépendre du mapping pennylane_sync ou des clients MDH).
  *
- * Algorithme :
- *   1. Fetch les devis PL des N derniers jours (paginé /quotes)
- *   2. Batch fetch les customers PL uniques (Promise.allSettled)
- *   3. Pour chaque devis, comparer son customer PL avec le lead :
- *      - Signal 'pennylane_sync' : customer PL mappé via pennylane_sync vers
- *        le client MDH lié au lead (bridge fort résolu côté DB)
- *      - Signal 'email' : customer.billing_email/emails match lead.email
- *      - Signal 'phone' : customer.phone match lead.phone (digits-only)
- *   4. Garder seulement les devis avec >=1 signal, exclure ceux rattachés à
- *      un AUTRE lead actif
+ * Stratégie de fetch (depuis bridge prioritaire — commit fix bug #4) :
+ *   - Si `bridgeCustomerId` résolu (lead.client_id → pennylane_sync) :
+ *     fetch direct via fetchQuotesForCustomerId(bridgeCustomerId) — TOUS les
+ *     devis du customer, SANS fenêtre temporelle (devis anciens compris).
+ *   - Sinon (ou en complément si lead a email/phone pour matcher d'autres
+ *     customers) : scan paginé /quotes par date desc avec fenêtre sinceDays.
+ *   - Dedup par q.id (un devis bridgé peut tomber dans le scan).
  *
- * Pourquoi ce design (au lieu de partir des clients MDH) : trop de clients MDH
- * n'ont pas leur mapping pennylane_sync peuplé. On ne peut pas se reposer dessus.
- * On compare directement les customers PL avec les fields du lead.
+ * Matchers déclaratifs :
+ *   - 'pennylane_sync' : customer PL mappé via pennylane_sync (bridge fort)
+ *   - 'email' : customer.billing_email/emails match lead.email
+ *   - 'phone' : customer.phone match lead.phone (digits-only)
+ *   - 'name' : (first+last) ou fullName match (NFD-stripped, case insensitive)
  *
- * Coût : 1 page /quotes + N fetches /customers/{id} (cached 30s côté React Query).
- * En pratique : 1-3 secondes pour la 1ère ouverture, instant ensuite.
+ * Garde seulement les devis avec >=1 signal, exclut ceux rattachés à un
+ * AUTRE lead actif.
+ *
+ * Coût (post-optim commit perf + bridge) :
+ *   - Lead bridgé sans email/phone : 1 requête /quotes filter → ~200ms
+ *   - Lead non-bridgé avec email : 1-3 pages /quotes + pLimit(5) fetch customers
+ *   - Lead bridgé + email : 1 requête filter + 1-3 pages scan
  *
  * @param {string} leadId
  * @param {string} orgId
  * @param {object} [opts]
- * @param {number} [opts.sinceDays=30] — fenêtre de recherche (jours)
+ * @param {number} [opts.sinceDays=30] — fenêtre du scan paginé (ignore pour bridge)
  * @param {number} [opts.maxQuotes=200] — cap pour éviter timeout edge function
  * @returns {Promise<Array<{quote, signals: string[], alreadyAttached: boolean}>>}
  */
@@ -1021,32 +1091,49 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 30, maxQuo
     else attachedToOtherLead.add(link.pennylane_quote_id);
   });
 
-  // 4. Fetch devis PL paginés (fenêtre sinceDays)
-  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
-  const allQuotes = [];
-  let cursor = null;
-  let hasMore = true;
-  let pageCount = 0;
-  const MAX_PAGES = 10;
+  // 4. Fetch devis PL — stratégie selon bridge :
+  //   - Bridge présent → 1 appel direct via filter customer_id (SANS fenêtre
+  //     temporelle, fix bug #4 SYLVIE ANE où les devis anciens étaient ignorés)
+  //   - Scan paginé par date desc ajouté SEULEMENT si pas de bridge ou si
+  //     le lead a email/phone (sinon les autres matchers n'ont rien à matcher)
+  //   - Dedup par q.id (un devis bridgé peut aussi tomber dans le scan)
+  const quotesById = new Map();
 
-  while (hasMore && pageCount < MAX_PAGES && allQuotes.length < maxQuotes) {
-    let path = '/quotes?limit=100';
-    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
-    const result = await apiCall('GET', path);
-    const items = result?.items || [];
-    allQuotes.push(...items);
-    hasMore = result?.has_more && !!result?.next_cursor;
-    cursor = result?.next_cursor || null;
-    pageCount++;
+  if (bridgeCustomerId) {
+    const bridgeQuotes = await fetchQuotesForCustomerId(bridgeCustomerId);
+    bridgeQuotes.forEach(q => quotesById.set(q.id, q));
   }
 
-  // Filtre fenêtre temporelle
-  const recentQuotes = allQuotes.filter(q => {
-    if (!q.date) return true;
-    const d = new Date(q.date).getTime();
-    return Number.isNaN(d) || d >= cutoffMs;
-  });
+  const needsRecentScan = !bridgeCustomerId || !!(leadNorm.email || leadNorm.phone);
+  if (needsRecentScan) {
+    const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
+    let cursor = null;
+    let hasMore = true;
+    let pageCount = 0;
+    const MAX_PAGES = 10;
 
+    while (hasMore && pageCount < MAX_PAGES && quotesById.size < maxQuotes) {
+      let path = '/quotes?limit=100';
+      if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+      const result = await apiCall('GET', path);
+      const items = result?.items || [];
+      for (const q of items) {
+        if (quotesById.has(q.id)) continue;
+        // Fenêtre temporelle pour le scan UNIQUEMENT (bridge skip ce filtre)
+        if (q.date) {
+          const d = new Date(q.date).getTime();
+          if (!Number.isNaN(d) && d < cutoffMs) continue;
+        }
+        quotesById.set(q.id, q);
+        if (quotesById.size >= maxQuotes) break;
+      }
+      hasMore = result?.has_more && !!result?.next_cursor;
+      cursor = result?.next_cursor || null;
+      pageCount++;
+    }
+  }
+
+  const recentQuotes = Array.from(quotesById.values());
   if (recentQuotes.length === 0) return [];
 
   // 5. Batch fetch customers uniquement si on a besoin de matcher email ou phone
