@@ -365,8 +365,13 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     // Trier : sort_order puis updated_at (ordre stable dans chaque colonne)
     // Exception : colonne "RDV planifié" → tri par date de RDV ASC (plus ancien en haut)
     // → permet de voir les RDV passés sans suite (devis ou positionnement perdu)
+    // IMPORTANT : on primary-sort par column_key pour garantir la transitivité
+    // du comparateur (sinon mélange inter-colonnes corrompt le sort intra-colonne).
     items.sort((a, b) => {
-      if (a.column_key === 'rdv_planifie' && b.column_key === 'rdv_planifie') {
+      if (a.column_key !== b.column_key) {
+        return a.column_key < b.column_key ? -1 : 1;
+      }
+      if (a.column_key === 'rdv_planifie') {
         const dateA = a.lead.appointment_date;
         const dateB = b.lead.appointment_date;
         if (!dateA && !dateB) return 0;
