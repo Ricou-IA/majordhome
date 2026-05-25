@@ -1022,15 +1022,33 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
 
   // 6. Pour chaque devis, calculer les signaux via les matchers déclaratifs
   const results = [];
+  const debug = import.meta.env?.DEV;
+  const debugLog = debug ? [] : null;
+
   for (const q of recentQuotes) {
     if (!q.customer?.id) continue;
     if (attachedToOtherLead.has(q.id)) continue; // déjà rattaché ailleurs
 
     const customerKey = String(q.customer.id);
-    const customer = customersById.get(customerKey);
+    // customer (fetched complet) en priorité, fallback sur q.customer embedded
+    // (si le GET /customers/{id} a échoué silencieusement on a quand même name+id)
+    const customer = customersById.get(customerKey) || q.customer;
     const ctx = { q, customer, customerKey };
 
     const signals = matchers.filter(m => m.check(ctx)).map(m => m.name);
+
+    if (debugLog && (signals.length > 0 || leadNorm.lastName)) {
+      const { firstName, lastName, fullName } = extractCustomerName(customer);
+      debugLog.push({
+        quote_id: q.id,
+        quote_number: q.quote_number,
+        cust_first: firstName,
+        cust_last: lastName,
+        cust_full: fullName,
+        signals,
+      });
+    }
+
     if (signals.length === 0) continue; // pas de match, skip
 
     results.push({
@@ -1038,6 +1056,10 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
       signals,
       alreadyAttached: attachedToThisLead.has(q.id),
     });
+  }
+
+  if (debugLog) {
+    console.log('[getCandidateQuotesForLead] leadNorm:', leadNorm, '— scanned', recentQuotes.length, 'quotes — debug:', debugLog);
   }
 
   return results;
