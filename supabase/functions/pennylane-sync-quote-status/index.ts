@@ -8,6 +8,7 @@
 // pennylane-proxy) car elle tourne sans JWT user — pennylane-proxy nécessite
 // verify_jwt:true + membership check qui n'a pas de sens ici.
 
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   requireSharedSecret,
   jsonResponse,
@@ -64,13 +65,18 @@ async function callPennylaneApi(
   const url = `${PENNYLANE_BASE_URL}${path}`;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        Accept: "application/json",
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          Accept: "application/json",
+        },
+      });
+    } catch (e) {
+      throw new Error(`Pennylane fetch failed: ${sanitizeError(e, "fetch error")}`);
+    }
 
     if (res.status === 429 && attempt < MAX_RETRIES) {
       const retryAfter = parseInt(res.headers.get("retry-after") || "2", 10);
@@ -117,7 +123,9 @@ Deno.serve(async (req) => {
 
   try {
     // 1. Charger les orgs Pennylane-activées
-    // settings->pennylane->>enabled = "true" (valeur JSON string)
+    // Org filter done client-side intentionally: PostgREST JSONB nested boolean filter
+    // (settings->pennylane->>enabled = 'true') can be unreliable across PostgREST versions.
+    // The organizations table is small (1-10 rows in pilot), so a full fetch is acceptable.
     const { data: orgs, error: orgsErr } = await supabase
       .schema("core")
       .from("organizations")
@@ -125,7 +133,6 @@ Deno.serve(async (req) => {
 
     if (orgsErr) throw orgsErr;
 
-    // Filtrer côté JS (PostgREST ne supporte pas facilement les filtres jsonb imbriqués)
     const plOrgs = (orgs ?? []).filter((org) => {
       const pl = (org.settings as Record<string, unknown>)?.pennylane as
         | { enabled?: boolean }
@@ -217,18 +224,15 @@ async function syncOrgQuotes(
       );
 
       if (httpStatus === 404) {
-        // Devis supprimé côté Pennylane → eject
-        const { error: ejectErr } = await supabase
-          .schema("majordhome")
-          .from("lead_pennylane_quotes")
-          .update({
-            ejected_at: new Date().toISOString(),
-            ejected_reason: "deleted_in_pennylane",
-          })
-          .eq("id", aq.id);
+        // Devis supprimé côté Pennylane → eject via RPC (pattern obligatoire :
+        // .schema('majordhome').from() ne fonctionne pas côté edge function)
+        const { error: ejectErr } = await supabase.rpc('pennylane_sync_eject_quote', {
+          p_quote_id: aq.id,
+          p_reason: 'deleted_in_pennylane',
+        });
 
         if (ejectErr) {
-          console.warn(`[pennylane-sync] eject error for quote ${aq.id}:`, ejectErr.message);
+          console.warn(`[pennylane-sync] eject failed for quote ${aq.id}:`, sanitizeError(ejectErr, 'eject failed'));
         } else {
           ejections++;
           console.log(
@@ -249,18 +253,17 @@ async function syncOrgQuotes(
       const plQuote = (rawData as { quote?: PennylaneQuote })?.quote ?? null;
       if (!plQuote) continue;
 
-      // Sync status si différent
+      // Sync status si différent via RPC (pattern obligatoire)
       if (plQuote.status && plQuote.status !== aq.quote_status) {
-        const { error: updateErr } = await supabase
-          .schema("majordhome")
-          .from("lead_pennylane_quotes")
-          .update({ quote_status: plQuote.status })
-          .eq("id", aq.id);
+        const { error: statusErr } = await supabase.rpc('pennylane_sync_update_quote_status', {
+          p_quote_id: aq.id,
+          p_new_status: plQuote.status,
+        });
 
-        if (updateErr) {
+        if (statusErr) {
           console.warn(
-            `[pennylane-sync] status update error for quote ${aq.id}:`,
-            updateErr.message,
+            `[pennylane-sync] status update failed for quote ${aq.id}:`,
+            sanitizeError(statusErr, 'status update failed'),
           );
         } else {
           quote_status_updates++;
@@ -272,7 +275,7 @@ async function syncOrgQuotes(
     } catch (e) {
       console.warn(
         `[pennylane-sync] error fetching quote ${aq.pennylane_quote_id}:`,
-        (e as Error)?.message,
+        sanitizeError(e, 'quote fetch error'),
       );
     }
   }
@@ -286,7 +289,7 @@ async function syncOrgQuotes(
     if (winnersErr) {
       console.warn(
         `[pennylane-sync] ensure_winning_quotes error for org ${orgId}:`,
-        winnersErr.message,
+        sanitizeError(winnersErr, 'ensure_winning_quotes error'),
       );
     } else {
       winning_quotes_set = (winnersSet as number) ?? 0;
@@ -294,7 +297,7 @@ async function syncOrgQuotes(
   } catch (e) {
     console.warn(
       `[pennylane-sync] ensure_winning_quotes exception for org ${orgId}:`,
-      (e as Error)?.message,
+      sanitizeError(e, 'ensure_winning_quotes exception'),
     );
   }
 
@@ -363,14 +366,14 @@ async function syncCustomerFields(
       if (syncErr) {
         console.warn(
           `[pennylane-sync] sync lookup error for customer ${customerId}:`,
-          syncErr.message,
+          sanitizeError(syncErr, 'sync lookup error'),
         );
         continue;
       }
       if (!syncRow?.local_id) continue;
 
-      // Extraire les valeurs PL non-nulles (COALESCE strict)
-      const updatePayload: Record<string, unknown> = {};
+      // Extraire les valeurs PL non-nulles (COALESCE strict côté RPC serveur)
+      const updatePayload: Record<string, string> = {};
 
       if (plCustomer.first_name?.trim()) {
         updatePayload.first_name = plCustomer.first_name.trim();
@@ -403,19 +406,18 @@ async function syncCustomerFields(
 
       if (Object.keys(updatePayload).length === 0) continue;
 
-      updatePayload.updated_at = new Date().toISOString();
-
-      const { error: updateErr } = await supabase
-        .schema("majordhome")
-        .from("clients")
-        .update(updatePayload)
-        .eq("id", syncRow.local_id)
-        .eq("org_id", orgId);
+      // Via RPC (pattern obligatoire : .schema('majordhome').from() ne fonctionne
+      // pas côté edge function). La RPC fait COALESCE strict server-side.
+      const { error: updateErr } = await supabase.rpc('pennylane_sync_update_client_fields', {
+        p_client_id: syncRow.local_id,
+        p_org_id: orgId,
+        p_fields: updatePayload,
+      });
 
       if (updateErr) {
         console.warn(
-          `[pennylane-sync] client update error (pl_customer ${customerId}):`,
-          updateErr.message,
+          `[pennylane-sync] client update failed (pl_customer ${customerId}):`,
+          sanitizeError(updateErr, 'client update failed'),
         );
       } else {
         updates++;
@@ -423,7 +425,7 @@ async function syncCustomerFields(
     } catch (e) {
       console.warn(
         `[pennylane-sync] customer ${customerId} sync exception:`,
-        (e as Error)?.message,
+        sanitizeError(e, 'customer sync exception'),
       );
     }
   }
