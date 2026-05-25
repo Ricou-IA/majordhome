@@ -24,7 +24,7 @@ import { MoveToLongTermModal } from './longTerm/MoveToLongTermModal';
 import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
 
 // ============================================================================
-// MAPPING status label (UI) → column_key (vue majordhome_kanban_cards)
+// MAPPING status label (UI) ↔ column_key (vue majordhome_kanban_cards)
 // ============================================================================
 
 const STATUS_LABEL_TO_COLUMN_KEY = {
@@ -35,6 +35,11 @@ const STATUS_LABEL_TO_COLUMN_KEY = {
   'Gagné': 'gagne',
   'Perdu': 'perdu',
 };
+
+// Inverse mapping: column_key → status label (for DnD droppable ID lookup)
+const COLUMN_KEY_TO_STATUS_LABEL = Object.fromEntries(
+  Object.entries(STATUS_LABEL_TO_COLUMN_KEY).map(([label, key]) => [key, label]),
+);
 
 // ============================================================================
 // HELPERS
@@ -300,46 +305,78 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     refetch();
   }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId]);
 
-  // Map composite `${leadId}:${columnKey}` → card — pour joindre la carte correcte
-  // dans renderCard (le lead peut avoir 1-2 cartes dans des colonnes différentes)
-  const cardsByLeadColumn = useMemo(() => {
+  // Map leadId → lead (pour jointure rapide dans kanbanItems)
+  const leadsById = useMemo(() => {
     const map = new Map();
-    cards.forEach((c) => {
-      map.set(`${c.lead_id}:${c.column_key}`, c);
-    });
+    allLeads.forEach((l) => map.set(l.id, l));
     return map;
-  }, [cards]);
-
-  // Map columnKey → SUM total_amount (pour columnAmount via cartes, défense en profondeur)
-  const amountByColumn = useMemo(() => {
-    const map = new Map();
-    cards.forEach((c) => {
-      map.set(c.column_key, (map.get(c.column_key) || 0) + Number(c.total_amount || 0));
-    });
-    return map;
-  }, [cards]);
-
-  // Pre-sort leads by sort_order then updated_at (KanbanBoard preserves order)
-  const sortedLeads = useMemo(() => {
-    return [...allLeads].sort((a, b) => {
-      const oa = a.sort_order || 0;
-      const ob = b.sort_order || 0;
-      if (oa !== ob) return oa - ob;
-      return new Date(b.updated_at) - new Date(a.updated_at);
-    });
   }, [allLeads]);
 
-  // Colonnes ordonnees par display_order, mappees au format KanbanBoard
+  // Colonnes ordonnees par display_order, chaque colonne a un column_key canonique
+  // (utilisé comme groupBy — différent de status_id qui est un UUID)
   const columns = useMemo(
     () => [...statuses]
       .sort((a, b) => a.display_order - b.display_order)
-      .map((s) => ({ id: s.id, label: s.label, color: s.color })),
+      .map((s) => ({
+        id: STATUS_LABEL_TO_COLUMN_KEY[s.label] ?? s.id, // column_key comme id de colonne
+        label: s.label,
+        color: s.color,
+        status_id: s.id, // conservé pour DnD (handleDragEnd cherche le status par id)
+      })),
     [statuses],
   );
 
-  // Search filter callback for KanbanBoard
-  const searchFilter = useCallback((lead, query) => {
+  // kanbanItems : 1 item par carte (pas par lead).
+  // Un lead avec mix pending+accepted génère 2 items dans 2 colonnes différentes.
+  // Fallback : si un lead n'a aucune carte dans la vue (mode classique sans PL),
+  // on crée un item synthétique depuis le lead lui-même avec column_key dérivé du statut.
+  const kanbanItems = useMemo(() => {
+    const leadsWithCard = new Set();
+
+    // Items issus des cartes de la vue majordhome_kanban_cards
+    const items = cards
+      .map((card) => {
+        const lead = leadsById.get(card.lead_id);
+        if (!lead) return null; // carte pour un lead hors du filtre courant
+        leadsWithCard.add(lead.id);
+        return {
+          id: card.card_key,          // clé React unique (card_key est unique par carte)
+          column_key: card.column_key, // utilisé par groupBy
+          lead,                        // objet lead complet pour LeadCard + DnD
+          card,                        // objet carte pour le chip multi-devis
+        };
+      })
+      .filter(Boolean);
+
+    // Leads sans aucune carte dans la vue (mode classique — pas de devis PL)
+    // → fallback synthétique basé sur leads.status_id
+    allLeads.forEach((lead) => {
+      if (leadsWithCard.has(lead.id)) return;
+      const colKey = STATUS_LABEL_TO_COLUMN_KEY[lead.statuses?.label];
+      if (!colKey) return;
+      items.push({
+        id: `classic:${lead.id}`,
+        column_key: colKey,
+        lead,
+        card: null,
+      });
+    });
+
+    // Trier : sort_order puis updated_at (ordre stable dans chaque colonne)
+    items.sort((a, b) => {
+      const oa = a.lead.sort_order || 0;
+      const ob = b.lead.sort_order || 0;
+      if (oa !== ob) return oa - ob;
+      return new Date(b.lead.updated_at) - new Date(a.lead.updated_at);
+    });
+
+    return items;
+  }, [cards, allLeads, leadsById]);
+
+  // Search filter callback for KanbanBoard (opère sur les items, chaque item a .lead)
+  const searchFilter = useCallback((item, query) => {
     const term = query.toLowerCase();
+    const lead = item.lead;
     const fields = [
       lead.first_name,
       lead.last_name,
@@ -351,22 +388,13 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     return fields.some((f) => f && f.toLowerCase().includes(term));
   }, []);
 
-  // Column amount: utilise les total_amount agrégés depuis les cartes (multi-devis)
-  // si disponibles, sinon fallback sur order_amount_ht / estimated_revenue du lead
+  // Column amount : somme des total_amount des cartes dans la colonne
   const columnAmount = useCallback((items) => {
-    if (items.length === 0) return 0;
-    // Trouver le column_key depuis le statut du premier item (tous ont le même statut dans la colonne)
-    const firstLead = items[0];
-    const colKey = STATUS_LABEL_TO_COLUMN_KEY[firstLead?.statuses?.label];
-    if (colKey && amountByColumn.has(colKey)) {
-      return amountByColumn.get(colKey);
-    }
-    // Fallback : somme des montants des leads
     return items.reduce(
-      (sum, l) => sum + (Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0),
+      (sum, item) => sum + (Number(item.card?.total_amount) || Number(item.lead?.order_amount_ht) || Number(item.lead?.estimated_revenue) || 0),
       0,
     );
-  }, [amountByColumn]);
+  }, []);
 
   // Etat pour le prompt "Perdu" depuis le kanban
   const [pendingLost, setPendingLost] = useState(null); // { leadId, newStatusId, oldStatusId }
@@ -404,27 +432,43 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     }
   }, [pendingLongTerm, moveToLongTerm, fetchLeads]);
 
-  // Drag & drop handler avec validation des transitions
+  // Drag & drop handler avec validation des transitions.
+  // Après le fix multi-cartes :
+  //   draggableId = item.id (card_key, ex: "uuid:column_key" ou "classic:lead_id")
+  //   droppableId = column_key (ex: "nouveau", "contacte", "gagne"…)
+  // On extrait le leadId depuis kanbanItems, et on mappe column_key → status via `columns`.
   const handleDragEnd = useCallback(
     async (result) => {
       const { draggableId, source, destination } = result;
       if (!destination) return;
       if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
-      const leadId = draggableId;
-      const newStatusId = destination.droppableId;
-      const oldStatusId = source.droppableId;
+      // draggableId = item.id (card_key), résoudre le lead correspondant
+      const draggedItem = kanbanItems.find((it) => it.id === draggableId);
+      if (!draggedItem) return;
+      const leadId = draggedItem.lead.id;
+
+      const oldColKey = source.droppableId;       // column_key source
+      const newColKey = destination.droppableId;  // column_key destination
+
+      // Retrouver les status_id (UUID) depuis les column_key via le tableau columns
+      const oldColDef = columns.find((c) => c.id === oldColKey);
+      const newColDef = columns.find((c) => c.id === newColKey);
+      const oldStatusId = oldColDef?.status_id;
+      const newStatusId = newColDef?.status_id;
+
+      // Labels pour validation des transitions
+      const oldStatusLabel = COLUMN_KEY_TO_STATUS_LABEL[oldColKey];
+      const newStatusLabel = COLUMN_KEY_TO_STATUS_LABEL[newColKey];
 
       // Reorganisation dans la meme colonne — reordonner + persister
-      if (oldStatusId === newStatusId) {
+      if (oldColKey === newColKey) {
         setAllLeads((prev) => {
           const colLeads = prev.filter((l) => l.status_id === oldStatusId);
           const others = prev.filter((l) => l.status_id !== oldStatusId);
           const [moved] = colLeads.splice(source.index, 1);
           colLeads.splice(destination.index, 0, moved);
-          // Mettre a jour sort_order localement
           const updated = colLeads.map((l, i) => ({ ...l, sort_order: i + 1 }));
-          // Persister en DB (fire-and-forget)
           leadsService.reorderLeads(updated.map((l) => l.id)).catch((err) =>
             console.error('[LeadKanban] reorder error:', err),
           );
@@ -434,17 +478,14 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
 
       // Valider la transition inter-colonnes
-      const oldStatus = statuses.find((s) => s.id === oldStatusId);
-      const newStatus = statuses.find((s) => s.id === newStatusId);
-      const allowed = ALLOWED_TRANSITIONS[oldStatus?.label] || [];
-
-      if (!allowed.includes(newStatus?.label)) {
-        toast.error(`Transition non autorisee : ${oldStatus?.label} → ${newStatus?.label}`);
+      const allowed = ALLOWED_TRANSITIONS[oldStatusLabel] || [];
+      if (!allowed.includes(newStatusLabel)) {
+        toast.error(`Transition non autorisee : ${oldStatusLabel} → ${newStatusLabel}`);
         return;
       }
 
       // Si "Perdu", ouvrir la modale de motif
-      if (newStatus?.label === 'Perdu') {
+      if (newStatusLabel === 'Perdu') {
         setPendingLost({ leadId, newStatusId, oldStatusId });
         setLostReasonSelect('');
         setLostReasonCustom('');
@@ -452,20 +493,20 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
 
       // Si "Contacte", ouvrir la modale d'appel
-      if (newStatus?.label === 'Contacté') {
+      if (newStatusLabel === 'Contacté') {
         setPendingContact({ leadId, newStatusId, oldStatusId });
         return;
       }
 
       // Si "RDV planifie", ouvrir la modale lead avec auto-scheduling
-      if (newStatus?.label === 'RDV planifié') {
+      if (newStatusLabel === 'RDV planifié') {
         const lead = allLeads.find((l) => l.id === leadId);
         if (lead) onLeadClick(lead, { autoSchedule: true });
         return;
       }
 
       // Si "Devis envoye", ouvrir la modale devis
-      if (newStatus?.label === 'Devis envoyé') {
+      if (newStatusLabel === 'Devis envoyé') {
         const lead = allLeads.find((l) => l.id === leadId);
         setPendingQuote({
           leadId,
@@ -492,7 +533,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         );
       }
     },
-    [updateLeadStatus, userId, fetchLeads, statuses, allLeads, onLeadClick],
+    [updateLeadStatus, userId, fetchLeads, columns, kanbanItems, allLeads, onLeadClick],
   );
 
   // Confirmer le passage en Perdu avec motif
@@ -610,25 +651,19 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
 
   return (
     <KanbanBoard
-      items={sortedLeads}
+      items={kanbanItems}
       columns={columns}
-      groupBy="status_id"
-      renderCard={(lead) => {
-        // Jointure lead → carte Kanban : on cherche la carte dont le column_key
-        // correspond au statut courant du lead (défense en profondeur multi-devis)
-        const colKey = STATUS_LABEL_TO_COLUMN_KEY[lead.statuses?.label];
-        const card = colKey ? cardsByLeadColumn.get(`${lead.id}:${colKey}`) : undefined;
-        return (
-          <LeadCard
-            lead={lead}
-            card={card}
-            onClick={onLeadClick}
-            compact
-            commercialsMap={commercialsMap}
-            onMoveToLongTerm={handleOpenLongTerm}
-          />
-        );
-      }}
+      groupBy="column_key"
+      renderCard={(item) => (
+        <LeadCard
+          lead={item.lead}
+          card={item.card}
+          onClick={onLeadClick}
+          compact
+          commercialsMap={commercialsMap}
+          onMoveToLongTerm={handleOpenLongTerm}
+        />
+      )}
       onDragEnd={handleDragEnd}
       searchPlaceholder="Rechercher un lead..."
       searchFilter={searchFilter}
