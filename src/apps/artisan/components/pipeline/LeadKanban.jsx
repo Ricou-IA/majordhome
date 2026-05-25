@@ -4,7 +4,7 @@
  * Vue kanban des leads par statut avec drag & drop.
  * Utilise le composant générique KanbanBoard.
  *
- * @version 2.0.0 - Refactored to use KanbanBoard
+ * @version 2.1.0 - Phase 1 pipeline multi-devis : consomme useKanbanCards
  * ============================================================================
  */
 
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@hooks/useLeads';
 import { useLongTermMutations } from '@hooks/useLeadInteractions';
+import { useKanbanCards } from '@hooks/useKanbanCards';
 import { leadsService } from '@services/leads.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LeadCard } from './LeadCard';
@@ -21,6 +22,19 @@ import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
 import { MoveToLongTermModal } from './longTerm/MoveToLongTermModal';
 import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
+
+// ============================================================================
+// MAPPING status label (UI) → column_key (vue majordhome_kanban_cards)
+// ============================================================================
+
+const STATUS_LABEL_TO_COLUMN_KEY = {
+  'Nouveau': 'nouveau',
+  'Contacté': 'contacte',
+  'RDV planifié': 'rdv_planifie',
+  'Devis envoyé': 'devis_envoye',
+  'Gagné': 'gagne',
+  'Perdu': 'perdu',
+};
 
 // ============================================================================
 // HELPERS
@@ -190,6 +204,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const { updateLeadStatus } = useLeadMutations();
   const { moveToLongTerm, isMoving: isMovingToLongTerm } = useLongTermMutations();
 
+  // Phase 1 — cartes Kanban multi-devis (1 lead peut produire 1-2 cartes)
+  const { cards, isLoading: cardsLoading } = useKanbanCards();
+
   // Map { userId -> { initials, name, colorIndex } } pour les badges
   const commercialsMap = useMemo(() => {
     const map = {};
@@ -283,6 +300,25 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     refetch();
   }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId]);
 
+  // Map composite `${leadId}:${columnKey}` → card — pour joindre la carte correcte
+  // dans renderCard (le lead peut avoir 1-2 cartes dans des colonnes différentes)
+  const cardsByLeadColumn = useMemo(() => {
+    const map = new Map();
+    cards.forEach((c) => {
+      map.set(`${c.lead_id}:${c.column_key}`, c);
+    });
+    return map;
+  }, [cards]);
+
+  // Map columnKey → SUM total_amount (pour columnAmount via cartes, défense en profondeur)
+  const amountByColumn = useMemo(() => {
+    const map = new Map();
+    cards.forEach((c) => {
+      map.set(c.column_key, (map.get(c.column_key) || 0) + Number(c.total_amount || 0));
+    });
+    return map;
+  }, [cards]);
+
   // Pre-sort leads by sort_order then updated_at (KanbanBoard preserves order)
   const sortedLeads = useMemo(() => {
     return [...allLeads].sort((a, b) => {
@@ -315,13 +351,22 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     return fields.some((f) => f && f.toLowerCase().includes(term));
   }, []);
 
-  // Column amount: sum of order_amount_ht or estimated_revenue
+  // Column amount: utilise les total_amount agrégés depuis les cartes (multi-devis)
+  // si disponibles, sinon fallback sur order_amount_ht / estimated_revenue du lead
   const columnAmount = useCallback((items) => {
+    if (items.length === 0) return 0;
+    // Trouver le column_key depuis le statut du premier item (tous ont le même statut dans la colonne)
+    const firstLead = items[0];
+    const colKey = STATUS_LABEL_TO_COLUMN_KEY[firstLead?.statuses?.label];
+    if (colKey && amountByColumn.has(colKey)) {
+      return amountByColumn.get(colKey);
+    }
+    // Fallback : somme des montants des leads
     return items.reduce(
       (sum, l) => sum + (Number(l.order_amount_ht) || Number(l.estimated_revenue) || 0),
       0,
     );
-  }, []);
+  }, [amountByColumn]);
 
   // Etat pour le prompt "Perdu" depuis le kanban
   const [pendingLost, setPendingLost] = useState(null); // { leadId, newStatusId, oldStatusId }
@@ -555,7 +600,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     }
   }, [pendingQuote, updateLeadStatus, userId, fetchLeads]);
 
-  if (isLoading) {
+  if (isLoading || cardsLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -568,15 +613,22 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       items={sortedLeads}
       columns={columns}
       groupBy="status_id"
-      renderCard={(lead) => (
-        <LeadCard
-          lead={lead}
-          onClick={onLeadClick}
-          compact
-          commercialsMap={commercialsMap}
-          onMoveToLongTerm={handleOpenLongTerm}
-        />
-      )}
+      renderCard={(lead) => {
+        // Jointure lead → carte Kanban : on cherche la carte dont le column_key
+        // correspond au statut courant du lead (défense en profondeur multi-devis)
+        const colKey = STATUS_LABEL_TO_COLUMN_KEY[lead.statuses?.label];
+        const card = colKey ? cardsByLeadColumn.get(`${lead.id}:${colKey}`) : undefined;
+        return (
+          <LeadCard
+            lead={lead}
+            card={card}
+            onClick={onLeadClick}
+            compact
+            commercialsMap={commercialsMap}
+            onMoveToLongTerm={handleOpenLongTerm}
+          />
+        );
+      }}
       onDragEnd={handleDragEnd}
       searchPlaceholder="Rechercher un lead..."
       searchFilter={searchFilter}
