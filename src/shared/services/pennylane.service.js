@@ -901,14 +901,14 @@ function phoneDigits(phone) {
 async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuotes = 200 } = {}) {
   if (!leadId || !orgId) return [];
 
-  // 1. Charger le lead (email, phone, client_id)
+  // 1. Charger le lead (email, phone, client_id) — via la vue publique
+  // (le schema 'majordhome' n'est PAS exposé via PostgREST, .schema() donne 406)
   const { data: lead, error: leadErr } = await supabase
-    .schema('majordhome')
-    .from('leads')
+    .from('majordhome_leads')
     .select('id, email, phone, client_id, first_name, last_name')
     .eq('id', leadId)
     .eq('org_id', orgId)
-    .single();
+    .maybeSingle();
   if (leadErr) throw leadErr;
   if (!lead) return [];
 
@@ -1022,9 +1022,6 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
 
   // 6. Pour chaque devis, calculer les signaux via les matchers déclaratifs
   const results = [];
-  const debug = import.meta.env?.DEV;
-  const debugLog = debug ? [] : null;
-
   for (const q of recentQuotes) {
     if (!q.customer?.id) continue;
     if (attachedToOtherLead.has(q.id)) continue; // déjà rattaché ailleurs
@@ -1036,19 +1033,6 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
     const ctx = { q, customer, customerKey };
 
     const signals = matchers.filter(m => m.check(ctx)).map(m => m.name);
-
-    if (debugLog && (signals.length > 0 || leadNorm.lastName)) {
-      const { firstName, lastName, fullName } = extractCustomerName(customer);
-      debugLog.push({
-        quote_id: q.id,
-        quote_number: q.quote_number,
-        cust_first: firstName,
-        cust_last: lastName,
-        cust_full: fullName,
-        signals,
-      });
-    }
-
     if (signals.length === 0) continue; // pas de match, skip
 
     results.push({
@@ -1056,10 +1040,6 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
       signals,
       alreadyAttached: attachedToThisLead.has(q.id),
     });
-  }
-
-  if (debugLog) {
-    console.log('[getCandidateQuotesForLead] leadNorm:', leadNorm, '— scanned', recentQuotes.length, 'quotes — debug:', debugLog);
   }
 
   return results;
