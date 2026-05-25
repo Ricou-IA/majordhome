@@ -499,11 +499,16 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Bloquer le passage manuel à Perdu si le lead a un devis PL attaché
-      // (Pennylane canonical — marquer le devis refusé dans PL fera basculer la carte
-      // automatiquement via la vue majordhome_kanban_cards).
-      if (newStatusLabel === 'Perdu' && (draggedItem.card?.devis_count || 0) > 0) {
+      // Bloquer le passage manuel à Perdu/Gagné si le lead a un devis PL attaché
+      // (Pennylane canonical — marquer le devis refusé/accepté dans PL fera basculer
+      // la carte automatiquement via la vue majordhome_kanban_cards).
+      const hasDevisPl = (draggedItem.card?.devis_count || 0) > 0;
+      if (hasDevisPl && newStatusLabel === 'Perdu') {
         toast.error('Marquez le devis comme refusé dans Pennylane — la carte basculera automatiquement.');
+        return;
+      }
+      if (hasDevisPl && newStatusLabel === 'Gagné') {
+        toast.error('Marquez le devis comme accepté dans Pennylane — la carte basculera automatiquement.');
         return;
       }
 
