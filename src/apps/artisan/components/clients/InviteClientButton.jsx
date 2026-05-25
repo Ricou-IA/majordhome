@@ -12,7 +12,7 @@ import { supabase } from '@lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { clientKeys } from '@hooks/cacheKeys';
-import { UserPlus, CheckCircle2, Loader2, Globe } from 'lucide-react';
+import { UserPlus, Loader2, Globe } from 'lucide-react';
 
 export function InviteClientButton({ client }) {
   const [inviting, setInviting] = useState(false);

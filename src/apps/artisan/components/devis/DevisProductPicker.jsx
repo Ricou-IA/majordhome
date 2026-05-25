@@ -12,7 +12,7 @@ import { useSuppliers } from '@hooks/useSuppliers';
 import { suppliersService } from '@services/suppliers.service';
 import { formatEuro } from '@/lib/utils';
 import {
-  Package, ChevronRight, ChevronLeft, Check, X,
+  Package, ChevronRight, ChevronLeft, X,
   Loader2, Search, Minus, Plus, ShoppingCart,
 } from 'lucide-react';
 

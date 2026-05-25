@@ -14,7 +14,7 @@
 import {
   Search, UserCircle, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
-  ArrowRightLeft, Target, UserCheck, Loader2, Wrench,
+  ArrowRightLeft, Target, Loader2, Wrench,
   FileText, ChevronRight, Plus, Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

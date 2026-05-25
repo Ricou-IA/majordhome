@@ -14,7 +14,7 @@ import DevisStatusBadge from './DevisStatusBadge';
 import DevisTvaSummary from './DevisTvaSummary';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import {
-  X, Send, CheckCircle, XCircle, Copy, Trash2, Pencil,
+  X, CheckCircle, XCircle, Copy, Trash2, Pencil,
   FileText, Download, Loader2, User, MapPin, Phone, Mail, BookmarkPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';

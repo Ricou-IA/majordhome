@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
 import { toast } from 'sonner';
