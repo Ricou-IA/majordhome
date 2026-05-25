@@ -48,21 +48,37 @@ L'user coche des devis et "Attache la sélection" → ils sont liés au lead via
    interroge uniquement `majordhome.clients` (table locale MDH) sans
    fallback PL. PL est devenu source de vérité parallèle non syncée vers
    MDH. Symptôme du même problème de fond que #4.
-6. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
+6. **Bug : attacher un devis PL ne sync pas les infos contact** — suite du
+   cas ROGERO : lead créé, devis D-2026-05185 attaché (1897€). La modale
+   indique "Données synchronisées depuis Pennylane — à modifier dans
+   Pennylane" mais TOUS les champs contact (prénom, téléphone, email,
+   adresse, CP, ville) restent vides. La RPC `attachQuotesAndSendLead`
+   attache le devis mais n'aspire pas les coordonnées du customer PL pour
+   alimenter le lead. Le hint UI est mensonger : il prétend que les
+   données viennent de PL alors qu'elles ne sont jamais récupérées.
+7. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
    + ajout matcher "nom" + fallback embedded customer)
 
 ## Vision : ressouder MDH ↔ Pennylane
 
-Tous les bugs #1-#5 dérivent du même socle fragile : MDH consomme Pennylane
+Tous les bugs #1-#6 dérivent du même socle fragile : MDH consomme Pennylane
 en best-effort, à la demande, sans cache ni sync structurée. Résultat :
 - Lectures massives à chaque ouverture de modale (latence, 500)
 - Connaissance partielle de la donnée PL côté UI (clients/devis manquants)
 - Pas de search côté serveur (filtre tout en mémoire après pagination)
+- Données dupliquées à saisir manuellement (contact lead non pré-rempli même
+  quand un devis PL avec customer complet est attaché)
+- Hints UI mensongers ("synchronisé depuis PL" alors que rien ne l'est)
 
 La refonte devrait probablement introduire une **couche de cache/mirror
 PL en DB** (alimentée par sync incrémental + on-demand refresh), pour que
 toutes les recherches/matchings interrogent **la DB MDH** au lieu de PL
 direct. PL devient la source d'écriture, MDH le miroir local de lecture.
+
+Et surtout : **l'attachement d'un devis PL doit déclencher une cascade de
+sync** (customer PL → lead.first_name/email/phone/adresse + optionnel
+création/liaison majordhome.client). Pas seulement créer la ligne
+`lead_pennylane_quotes` et basculer le statut.
 
 ## Fichiers en jeu
 
