@@ -8,9 +8,12 @@
  * ============================================================================
  */
 
-import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle, Hourglass } from 'lucide-react';
+import { useState } from 'react';
+import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatEuroCeil } from '@/lib/utils';
+import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
+import { QuoteSubCard } from './QuoteSubCard';
 
 /**
  * Calcule le nombre de jours depuis une date
@@ -127,7 +130,14 @@ function getCommercialColor(index) {
  * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche un bouton MT-LT
  *   sur les cartes "Devis envoyé" si fourni
  */
-export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMoveToLongTerm }) {
+export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMoveToLongTerm, card }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Devis Pennylane liés (expand inline dans le kanban)
+  // Hooks AVANT tout return conditionnel (règles des hooks React)
+  const hasDevis = (card?.devis_count || 0) > 0;
+  const { linkedQuotes } = useLinkedPennylaneQuotes(hasDevis && expanded ? lead?.id : null);
+
   if (!lead) return null;
 
   const name = `${lead.last_name || ''} ${lead.first_name || ''}`.trim() || 'Sans nom';
@@ -141,6 +151,16 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
 
   // Commercial assigné (initiales)
   const commercial = commercialsMap?.[lead.assigned_user_id];
+
+  // Filtrer les devis selon la colonne (pertinents uniquement)
+  const filteredQuotes = (linkedQuotes || []).filter(q => {
+    if (!card?.column_key) return true;
+    const status = q.quote_status;
+    if (card.column_key === 'devis_envoye') return ['pending', 'draft'].includes(status);
+    if (card.column_key === 'gagne') return status === 'accepted';
+    if (card.column_key === 'perdu') return ['refused', 'denied', 'expired', 'canceled'].includes(status);
+    return true;
+  });
 
   // Mode compact (kanban)
   if (compact) {
@@ -233,6 +253,24 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
                 {daysInStatus}j
               </span>
             )}
+            {hasDevis && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+                className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
+                style={{
+                  backgroundColor: card.column_key === 'gagne' ? '#16a34a'
+                    : card.column_key === 'perdu' ? '#94a3b8'
+                    : '#1d4ed8',
+                  color: 'white',
+                }}
+                title="Voir les devis Pennylane attachés"
+              >
+                <FileText className="w-3 h-3" />
+                {card.devis_count}
+                {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            )}
             {onMoveToLongTerm && lead.statuses?.label === 'Devis envoyé' && (
               <button
                 type="button"
@@ -249,6 +287,14 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
             <p className="text-xs text-gray-500 mt-1.5 truncate">
               → {lead.next_action}
             </p>
+          )}
+
+          {expanded && filteredQuotes.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1">
+              {filteredQuotes.map(q => (
+                <QuoteSubCard key={q.id} quote={q} />
+              ))}
+            </div>
           )}
         </div>
       </div>
