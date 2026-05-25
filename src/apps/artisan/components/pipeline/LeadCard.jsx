@@ -218,9 +218,21 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
         <div className="flex-1 min-w-0 p-2.5">
           <div className="flex items-start justify-between gap-2">
             <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
-            <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
-              {formatEuroCeil(amount)}
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onMoveToLongTerm && lead.statuses?.label === 'Devis envoyé' && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onMoveToLongTerm(lead); }}
+                  className="inline-flex items-center justify-center h-5 w-5 rounded-full text-purple-600 hover:bg-purple-100 transition-colors"
+                  title="Passer en Projet MT-LT (sortir du pipeline)"
+                >
+                  <Hourglass className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <span className={`text-xs font-semibold whitespace-nowrap ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+                {formatEuroCeil(amount)}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 mt-1.5">
@@ -273,16 +285,6 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
                 <FileText className="w-3 h-3" />
                 {card.devis_count}
                 {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-            )}
-            {onMoveToLongTerm && lead.statuses?.label === 'Devis envoyé' && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onMoveToLongTerm(lead); }}
-                className="ml-auto inline-flex items-center justify-center h-5 w-5 rounded-full text-purple-600 hover:bg-purple-100 transition-colors"
-                title="Passer en Projet MT-LT (sortir du pipeline)"
-              >
-                <Hourglass className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
