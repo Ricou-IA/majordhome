@@ -2,7 +2,7 @@
 
 > **Date** : 2026-05-25
 > **Auteur** : Diagnostic via MCP Supabase (Eric + Claude)
-> **Statut** : Validé pour implémentation, à exécuter en session dédiée
+> **Statut** : ✅ **APPLIQUÉ EN PROD 2026-05-25** (migrations `20260525_5/6/7`)
 > **Sprint** : 9 Pennylane quote-driven — fix de cohérence data + structurel
 > **Lié** : brief `docs/PROMPT_PENNYLANE_MATCHING_REFACTOR.md` bug #7
 
