@@ -72,6 +72,14 @@ L'user coche des devis et "Attache la sélection" → ils sont liés au lead via
    De plus, double source de vérité non synchronisée : `is_winning_quote`
    (booléen UI) vs `quote_status` (view). Le badge "Gagnant" reste affiché
    alors que la carte Kanban dit autre chose.
+   **Observation prod (2026-05-25)** : sur 6 cartes visibles dans la
+   colonne Gagné, 4 sont impactées (FEDERATION, FAISANT GISELE, VEOLIA
+   ENVIRONNE..., SALLOIGNON AGNES). Le bug n'est PAS isolé. Probable
+   majorité des leads marqués "Gagné" via flux historique (avant le
+   bridge PL canonical). Prévoir une migration data en plus du fix code :
+   `UPDATE majordhome.lead_pennylane_quotes SET quote_status = 'accepted'
+    WHERE is_winning_quote = true AND quote_status NOT IN (allowlist)`
+   (à ajuster selon ce qu'on trouve en DB).
 8. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
    + ajout matcher "nom" + fallback embedded customer)
 
