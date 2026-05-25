@@ -56,12 +56,28 @@ L'user coche des devis et "Attache la sélection" → ils sont liés au lead via
    attache le devis mais n'aspire pas les coordonnées du customer PL pour
    alimenter le lead. Le hint UI est mensonger : il prétend que les
    données viennent de PL alors qu'elles ne sont jamais récupérées.
-7. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
+7. **Bug : chip "devis attaché" absent sur la carte Kanban** — exemple
+   FEDERATION (Gagné, 1 devis attaché D-2026-0371 avec badge "🏆 Gagnant"
+   en modale) : la carte Kanban n'affiche AUCUN chip de devis (devis_count
+   manquant). Diagnostic : le `quote_status` stocké dans
+   `lead_pennylane_quotes` pour ce devis n'est probablement pas dans
+   l'allowlist de la vue `majordhome_kanban_cards` (qui ne reconnaît que
+   pending/draft/accepted/refused/denied/expired/canceled). Conséquences
+   en cascade :
+     - Aucune carte créée par les COUNT FILTER de la vue
+     - Le fallback "classic" est skippé car EXISTS dans lqs
+     - → Aucune carte du tout pour ce lead dans `majordhome_kanban_cards`
+     - → LeadKanban tombe sur le fallback synthétique (`card: null`)
+     - → Carte visible dans la colonne via `lead.status_id` MAIS sans chip
+   De plus, double source de vérité non synchronisée : `is_winning_quote`
+   (booléen UI) vs `quote_status` (view). Le badge "Gagnant" reste affiché
+   alors que la carte Kanban dit autre chose.
+8. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
    + ajout matcher "nom" + fallback embedded customer)
 
 ## Vision : ressouder MDH ↔ Pennylane
 
-Tous les bugs #1-#6 dérivent du même socle fragile : MDH consomme Pennylane
+Tous les bugs #1-#7 dérivent du même socle fragile : MDH consomme Pennylane
 en best-effort, à la demande, sans cache ni sync structurée. Résultat :
 - Lectures massives à chaque ouverture de modale (latence, 500)
 - Connaissance partielle de la donnée PL côté UI (clients/devis manquants)
