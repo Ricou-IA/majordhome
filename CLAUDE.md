@@ -161,8 +161,12 @@ src/
 ### Pattern d'accès frontend
 ```javascript
 // Tables avec vue publique → supabase.from('majordhome_clients')
-// Tables sans vue → supabase.schema('majordhome').from('leads')
+// Tables sans vue publique :
+//   - côté frontend : créer une vue publique majordhome_xxx (security_invoker=true).
+//     .schema('majordhome').from(...) renvoie HTTP 406 — le schema n'est pas exposé via PostgREST.
+//   - côté edge function : RPC SECURITY DEFINER dans public avec SET search_path = majordhome, public.
 // TOUJOURS filtrer par org_id explicitement : .eq('org_id', orgId)
+// Préférer .maybeSingle() à .single() quand 0 row est un cas légitime (sinon HTTP 406).
 ```
 
 ### Gotchas DB
@@ -172,6 +176,9 @@ src/
 - **Vues `public.majordhome_*` → `security_invoker=true`** (P0.0.2, ✅ 2026-05-20) : avant le fix, les 73 vues étaient SECURITY DEFINER par défaut, ce qui bypassait RLS et faisait du filtre `.eq('org_id', orgId)` côté front la SEULE défense effective contre le cross-org. Aujourd'hui en `security_invoker=true`, RLS s'applique sur tous les accès via PostgREST. **Garder quand même le `.eq('org_id', orgId)` explicite (défense en profondeur)**. Si on crée une nouvelle vue `majordhome_*`, mettre `WITH (security_invoker=true)` dès la création.
 - **`public.exec_sql(text)` → SECURITY INVOKER** (P0.0.1, ✅ 2026-05-20) : avant le fix, cette fonction était SECURITY DEFINER exécutable par `authenticated` → permettait à n'importe quel user front authentifié de lire toute la DB via une requête SQL arbitraire. Maintenant en INVOKER, restreinte aux droits du caller. **NE PAS rajouter d'appels à cette fonction depuis le frontend** ou des edge functions exposées au public.
 - **Gotcha `DROP SCHEMA` + Exposed schemas PostgREST** (incident 2026-05-21, 30 min downtime) : Ne JAMAIS `DROP SCHEMA xxx CASCADE` sans avoir d'abord vérifié que le schéma n'est PAS listé dans **Dashboard Supabase → API Settings → "Exposed schemas"**. Si oui : (1) retirer le schéma de la liste exposée, (2) attendre le re-deploy PostgREST (~30s), (3) puis seulement DROP. Sinon → 503 sur TOUTE l'API REST de l'instance (toutes les apps cohabitantes impactées). Symptôme : PGRST002 "Could not query the database for the schema cache" côté frontend, `ERROR: schema "xxx" does not exist` côté logs postgres. Fix d'urgence : `CREATE SCHEMA IF NOT EXISTS xxx; NOTIFY pgrst, 'reload schema';`. **Un schéma vide listé en exposed schemas EST une dépendance même sans objet dedans.**
+- **RPC `public.update_majordhome_lead(p_lead_id uuid, p_updates jsonb)`** : RPC SECURITY DEFINER générique pour patcher partiellement un lead côté frontend. Préférable à `supabase.schema('majordhome').from('leads').update(...)` qui renvoie 406 (schema non exposé). Pattern : `supabase.rpc('update_majordhome_lead', { p_lead_id, p_updates: { client_id, updated_at: new Date().toISOString() } })`. Utilisée dans ~15 endroits (leads.service, geocoding.service, hook ensureClientForLeadFromPennylane, etc.). Le filtre `org_id` est appliqué côté RPC (check membership).
+- **Gotcha `pennylane_sync` peu peuplé** : `majordhome.pennylane_sync` n'est alimentée que par les flux MDH→PL (création client via `usePennylaneSyncClient`) ou backfills explicites. Les clients créés directement dans Pennylane (avant intégration, ou hors MDH) n'ont JAMAIS leur mapping posé. **Pattern préféré pour matcher entité PL ↔ entité MDH** : partir des entités PL (paginé), fetcher leurs détails en batch (avec `pLimit` pour éviter le rate limit), comparer leurs fields avec le lead/client. Cf. `getCandidateQuotesForLead` dans `pennylane.service.js`. **Bridge prioritaire** : quand un mapping existe (`bridgeCustomerId` résolu), faire 1 appel direct `/quotes?filter=[{customer_id eq}]` SANS fenêtre temporelle pour ramener exhaustivement les devis du customer.
+- **Tie-break Pennylane** : pour départager 2 devis PL créés le même jour, trier sur `pennylane_quote_id DESC` (ID interne PL, strictement incrémental dans le temps de création) — PAS sur `amount_ht DESC` ni `assigned_at`. Pattern utilisé dans la RPC `lead_attach_quotes_and_send` pour calculer `most_recent_*` et propager `order_amount_ht` sur `leads`. À généraliser pour tout tri chronologique d'entités PL (factures, paiements).
 
 ### Vues publiques principales
 - `majordhome_clients` → clients + has_active_contract calculé
@@ -203,6 +210,16 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 ```
 
 - **RPC `public.org_seed_permissions(p_org_id)`** (P1.8, 2026-05-21) — copie les permissions Mayer comme template pour provisioning d'une nouvelle org. SECURITY DEFINER, `service_role` only, idempotent.
+
+### God mode org_admin (hard delete avec cascade)
+Pour les entités où un soft-delete + restauration ne suffisent pas (planning fantôme, doublons d'import) : bouton "Supprimer" rouge ghost dans le footer de la modale d'édition (visible si `effectiveRole === 'org_admin'`) appelant une RPC `public.<entity>_hard_delete(p_<entity>_id)` :
+- SECURITY DEFINER, REVOKE anon, `SET search_path = majordhome, public` explicite
+- Check `auth.uid() ∈ core.organization_members WHERE role='org_admin' AND org_id = (SELECT org_id FROM <entity> WHERE id = p_<entity>_id)` → `RAISE EXCEPTION 'org_admin_required'` sinon
+- Purge des dépendances "satellites" qui n'ont pas de FK CASCADE explicite (ex : RDV planning lié à un lead)
+- DELETE final → cascade DB sur les FK
+- Retourne JSON avec compteurs purgés pour feedback UX
+- Côté front : `ConfirmDialog` destructive avec preflight count via SELECT count head sur les tables satellites, toast success, invalidation cache croisée
+- Exemple livré : `lead_hard_delete` (2026-05-22)
 
 ## Conventions de Code
 
@@ -642,20 +659,55 @@ GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m
 Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devis Pennylane importés. Permet d'attacher/détacher manuellement un devis PL à un lead/chantier, de gérer plusieurs devis par chantier, et d'afficher le suivi devis directement sur la carte Kanban + la modale.
 
 ### DB
-- **Table `majordhome.lead_pennylane_quotes`** (N:N leads ↔ devis Pennylane) — 127 lignes pour 90 leads en prod. Colonne `ejected_at` (timestamptz) pour soft-detach (un devis "éjecté" reste tracé sans bloquer un nouvel attachement).
+- **Table `majordhome.lead_pennylane_quotes`** (N:N leads ↔ devis Pennylane) — 127 lignes pour 90 leads en prod. Colonnes :
+  - `ejected_at` (timestamptz) — soft-detach (un devis "éjecté" reste tracé sans bloquer un nouvel attachement)
+  - `ejected_reason` (text) — `'deleted_in_pennylane'` posé par le cron quand devis disparu PL (404)
+  - `is_winning_quote` (boolean, default false) — "devis effectivement signé" pour les leads Gagnés. 1 winning max par lead actif, garanti par la RPC `lead_mark_won_with_quote` (pas de contrainte UNIQUE pour éviter UniqueViolation en transition)
 - Vue publique `public.majordhome_lead_pennylane_quotes`.
+
+### RPCs Pipeline ↔ PL (bridge PR 1-5, spec `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md`)
+- `public.lead_attach_quotes_and_send(p_org_id, p_lead_id, p_quotes jsonb)` — multi-attach + bascule statut "Devis envoyé" en 1 transaction. Calcule `most_recent_quote` via tie-break `pennylane_quote_id DESC` (cf Gotchas DB), propage `order_amount_ht` (ROUND).
+- `public.lead_mark_won_with_quote(p_org_id, p_lead_id, p_winning_quote_pl_id)` — marque 1 devis attaché comme canonique (`is_winning_quote=true`, false sur les autres), bascule lead en Gagné + insère `lead_activity` `'status_changed'` source `'mark_won_with_quote'`. Idempotent.
+- `public.pennylane_sync_ensure_winning_quotes(p_org_id)` — helper du cron, pose `is_winning_quote=true` sur le plus récent accepted. SECURITY DEFINER, service_role only.
+- Toutes : SECURITY DEFINER, `search_path = majordhome, public, core` locked, REVOKE anon, check `auth.uid() ∈ core.organization_members` + check `settings.pennylane.enabled=true`.
+
+### Cron `pennylane-sync-quote-status` (edge function, 15 min)
+- `verify_jwt:false` + `MDH_CRON_SECRET` (cf charte edge functions). Appel Pennylane direct (pas via `pennylane-proxy` qui exige JWT user).
+- Sync `quote_status` PL → `lead_pennylane_quotes`, ejecte les devis disparus côté PL (404 → `ejected_reason='deleted_in_pennylane'`), appelle `pennylane_sync_ensure_winning_quotes`, sync identité PL → MDH en COALESCE strict (jamais écraser avec null/vide).
+- Pattern général : **Cron sans JWT user → appel API tierce direct. Filtrer orgs activées via `settings.<integration>.enabled` côté JS quand PostgREST ne suffit pas (jsonb imbriqué).**
 
 ### Composants frontend
 - `src/apps/artisan/components/chantiers/QuoteBlock.jsx` (257 LOC) — affiché sur **ChantierCard** (compact) + **ChantierModal** (détail). Liste les devis attachés, statut, montant, lien Pennylane.
-- `src/apps/artisan/components/chantiers/LinkPennylaneQuoteModal.jsx` — modale de liaison : recherche un devis PL existant et le rattache au lead courant.
-- `ChantierReceptionSection.jsx` (refacto +443 LOC) — intègre les devis liés dans le flow de réception chantier.
+- `src/apps/artisan/components/chantiers/LinkPennylaneQuoteModal.jsx` — modale single-attach manuel pour le chantier post-vente.
+- `src/apps/artisan/components/pipeline/QuoteCandidatesModal.jsx` — modale multi-attach au pivot lead "Devis envoyé". Sections Suggestions (`useCandidateQuotesForLead`) + Exploration 60j (`useUnlinkedQuotes`).
+- `ChantierReceptionSection.jsx` — intègre les devis liés dans le flow de réception chantier.
+- **Branchement conditionnel** : si `usePennylaneEnabled()` true (lecture `settings.pennylane.enabled`) ET target="Devis envoyé" → `QuoteCandidatesModal`. Sinon flow MDH classique (`QuoteModal`). Préserve le mode 100% MDH pour les orgs sans Pennylane.
 
 ### Service / Hook
-- `src/shared/services/pennylane.service.js` (+62 LOC) — méthodes `assign`/`eject`, support multi-devis par chantier.
-- `src/shared/hooks/usePennylane.js` — wrappers React Query autour du service.
+- `src/shared/services/pennylane.service.js` — méthodes `assign`/`eject`, multi-devis, `getCandidateQuotesForLead`, `getUnlinkedQuotes`, `fetchCustomerById`, extracteurs (`extractCustomerEmail/Phone/Name/Address`).
+- `src/shared/hooks/usePennylane.js` — wrappers React Query.
+- `src/shared/hooks/useOrgSettings.js::usePennylaneEnabled()` — sélecteur sec `Boolean(settings?.pennylane?.enabled)`.
+- **Gotcha rate limit** : Pennylane V2 = 25 req/5s. Tout batch `/customers/{id}` ou `/quotes/{id}` doit être wrappé par le helper interne `pLimit(5)` de `pennylane.service.js` (sinon → 429 retry → 500 proxy + latence >3s). PL V2 retourne déjà `q.customer.name/first_name/last_name` embedded dans `/quotes` → ne pas re-fetch `/customers/{id}` pour l'affichage.
+- **Filter natif PL V2** : `/quotes?filter=[{"field":"customer_id","operator":"eq","value":X}]` (JSON URL-encoded) évite le scan paginé global. Pattern via `fetchQuotesForCustomerId()` avec fallback try/catch sur scan + filter client-side si syntaxe rejetée (400). `pennylane-proxy` whitelist OK car split sur "?" → `cleanPath='/quotes'`.
+
+### Règles métier Pipeline ↔ PL
+- **Auto-matérialisation client au rattachement de devis** : quand un devis PL est rattaché à un lead sans `client_id`, le hook `useAttachQuotesAndSend` déclenche post-process `ensureClientForLeadFromPennylane` (`src/shared/hooks/usePennylane.js`) qui :
+  1. Fetch `/customers/{customer_id}` PL pour récupérer les coordonnées complètes
+  2. Patche le lead avec les champs vides remplis depuis le customer PL (jamais d'écrasement d'une saisie user — règle stricte via `buildContactPatchFromCustomer`)
+  3. Cherche un mapping existant dans `majordhome.pennylane_sync` (entity_type='client', pennylane_id=customer_id) → link au client existant si trouvé
+  4. Sinon `convertLeadToClient` (qui copie les fields du lead — patché à l'étape 2 — vers le client créé)
+  5. Upsert `pennylane_sync` + UPDATE `lead_pennylane_quotes.pennylane_client_id`
+  - Fire-and-forget : un échec ne casse pas l'attach principal.
+  - **Note backfill** : les leads attachés AVANT 2026-05-24 (pré-règle) et AVANT 2026-05-25 (pré-fix #6 pré-remplissage) n'ont pas bénéficié — re-trigger via détache/rattache manuel.
+- **Contact lead lecture seule si devis PL attaché** : `pennylaneSyncedContact = pennylaneActive && linkedQuotes.length > 0` → `contactFieldsDisabled` (override `editClientMode`). Bandeau bleu "Données synchronisées depuis Pennylane — à modifier dans Pennylane" si au moins 1 champ contact est rempli ; bandeau amber "Aucune coordonnée disponible" si tous vides (lead ancien pré-fix #6 — l'user doit détacher/rattacher pour resync).
+- **Sémantique `is_winning_quote` vs `order_amount_ht`** : 2 valeurs distinctes. `is_winning_quote=true` = "devis effectivement signé" (sélection commerciale via mark won). `leads.order_amount_ht` = "montant du dernier devis PL envoyé" (calculé à l'attach, arrondi entier pour Kanban). Peuvent pointer sur des devis différents si le commercial signe un devis antérieur à la dernière version envoyée.
+- **Seuil pipeline 1000€ HT** : devis PL <1000€ HT exclus du sélecteur de rattachement (constante `PIPELINE_MIN_AMOUNT_HT` dans `QuoteCandidatesModal.jsx`) — considérés SAV/entretien, hors pipeline commercial. Devis déjà attachés préservés même sous le seuil (vue informative).
 
 ### Référence
-Spec d'arbitrage : `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md`. À reprendre + valider fonctionnellement avant de durcir cette doc.
+- Spec bridge complet : `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md` (8 PRs séquentielles, PR 1-5 livrées)
+- Spec multi-devis : `docs/superpowers/specs/2026-05-25-pipeline-multidevis-design.md`
+- Spec d'arbitrage WIP : `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md`
+- Brief refonte modale matching : `docs/PROMPT_PENNYLANE_MATCHING_REFACTOR.md` (consommé partiellement par les commits perf + bridge prioritaire + pré-remplissage contact 2026-05-25 ; reste à traiter bug #5 ROGERO + cache `pennylane_customer_lookup`)
 
 ## Plan de Développement
 | Sprint | Titre | Statut |
