@@ -178,6 +178,7 @@ src/
 - `majordhome_contracts` → contracts JOIN clients (client_name, client_address, etc.)
 - `majordhome_appointments` → appointments + client_first_name, assigned_commercial_id
 - `majordhome_chantiers` → leads filtrés (chantier_status IS NOT NULL) + JOIN equipment_type + intervention parent
+- `majordhome_kanban_cards` → cartes Kanban matérialisées depuis `lead_pennylane_quotes.quote_status` (1 lead → 1-2 cartes selon mix pending/accepted/refused, fallback sur `leads.status_id` si aucun devis PL attaché). Pennylane canonical pour le placement.
 - `majordhome_prospects` → prospects JOIN profiles (created_by_name, assigned_to_name)
 - `majordhome_prospect_interactions` → interactions JOIN profiles (created_by_name)
 - `majordhome_mailing_logs` → historique des emails envoyés par campagne (client_id, lead_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
@@ -216,7 +217,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 - TanStack React Query v5
 - **Cache keys centralisées** : `src/shared/hooks/cacheKeys.js` — source unique pour toutes les query keys
   - Import : `import { clientKeys } from '@/shared/hooks/cacheKeys'`
-  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys, geogridKeys, orgSettingsKeys
+  - Familles : clientKeys, contractKeys, leadKeys, appointmentKeys, interventionKeys, chantierKeys, prospectKeys, pricingKeys, mailingKeys, pennylaneSyncKeys, geogridKeys, orgSettingsKeys, kanbanCardKeys
   - Re-exports depuis chaque hook pour rétrocompatibilité
   - **Convention P0.11 (2026-05-21)** : toutes les keys prennent `orgId` en 1ᵉʳ paramètre (`all: (orgId) => [domain, orgId]`, sous-keys idem) — défense en profondeur multi-tenant. Détails dans l'en-tête de `cacheKeys.js`.
 - **`usePaginatedList`** : Hook générique pour listes paginées (utilisé par useClients, useProspects)
@@ -235,7 +236,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
   - Pattern d'import : `import { requireOrgMembership } from "../_shared/auth.ts";` — le `name` du fichier dans le `files` array du MCP `deploy_edge_function` doit être `../_shared/auth.ts` pour que le bundler résolve correctement.
 - **Helpers P1** (2026-05-21) : `sanitizeError(err, fallback)` strip stack/Bearer/JWT/`*_SECRET=…` en prod (détecté via env `DENO_ENV=production` ou `ENVIRONMENT=production`) ; `buildCorsHeaders(req)` whitelist d'origines via env CSV `FRONTEND_ORIGINS` (fallback `*` si vide — dev local).
 - **`supabase/config.toml`** (P1.6, 2026-05-21) — versionne `verify_jwt` des 16 edges pour éviter drift prod/repo lors d'un redéploiement via MCP.
-- **Edges déjà migrées vers le helper** (2026-05-21) : `gsc-oauth-init`, `pennylane-proxy`, `pennylane-sync-cron`, `pennylane-backfill-quotes`, `voice-extract-fieldreport`. À migrer plus tard : `gsc-oauth-callback`, `gsc-sync`, `mailing-send`, `contract-signed-notify`, `mailing-unsubscribe`, `resend-webhook`, `invite-client`.
+- **Edges déjà migrées vers le helper** (2026-05-21) : `gsc-oauth-init`, `pennylane-proxy`, `pennylane-sync-cron`, `pennylane-backfill-quotes`, `pennylane-sync-quote-status`, `voice-extract-fieldreport`. À migrer plus tard : `gsc-oauth-callback`, `gsc-sync`, `mailing-send`, `contract-signed-notify`, `mailing-unsubscribe`, `resend-webhook`, `invite-client`.
 - **`MDH_*` namespace** pour les env vars partagées entre apps cohabitantes (isolation Majord'home vs Pack Vendeur / Baikal / Arpet) : `MDH_CRON_SECRET`, etc.
 
 ### Composants

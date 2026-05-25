@@ -551,3 +551,143 @@ Configuration multi-tenant de l identité de l org (P0.13-P0.20 finalisé, 2026-
 
 Question ouverte : faut-il aussi mentionner ce nouveau point de configuration dans la section "Multi-tenant et sécurité" en tête (charte) sous forme de règle "Toute nouvelle valeur de branding doit être éditable via /settings/organization, jamais hardcodée" ?
 ---
+
+## [2026-05-22 23:39] Pattern "god mode" org_admin — hard delete avec cascade
+**Statut** : PENDING
+**Commit** : 32d75cc5778525248d86817edac1779d847e024e
+**Contexte** : Nouveau pattern introduit : bouton "Supprimer" (Trash2 rouge ghost) dans le footer LeadModal, visible uniquement si `isEditing && effectiveRole === 'org_admin'`. Appelle la RPC `public.lead_hard_delete(p_lead_id)` (SECURITY DEFINER, REVOKE anon, search_path explicite) qui vérifie `auth.uid() ∈ core.organization_members WHERE role='org_admin'` avant de purger le lead + son RDV planning lié (`majordhome.appointments`) + cascade FK (lead_interactions, lead_activities, lead_pennylane_quotes, mailing_logs, technical_visits). Retourne `{ lead_id, org_id, deleted: true, counts: {...} }`. Preflight UX : `ConfirmDialog` destructive avec compteurs RDV/interactions/mailings pré-fetchés via 3 SELECT count head. Gestion erreurs ciblée (`org_admin_required`, `lead_not_found`). Motivation : éviter le bug récurrent de duplications planning en l'absence d'outil d'admin pour nettoyer.
+**Proposition** : Ce pattern (RPC `<entity>_hard_delete` SECURITY DEFINER org_admin-only + bouton ghost rouge dans footer modale + ConfirmDialog destructive avec preflight count) va-t-il être étendu à d'autres entités (clients, contracts, chantiers, prospects) ? Si oui, formaliser dans une nouvelle section "God mode admin" sous "Rôles & Permissions" du CLAUDE.md, du type :
+
+> **God mode org_admin** — pour les entités où un soft-delete + restauration ne suffisent pas (planning fantôme, doublons d'import), exposer un bouton "Supprimer" rouge ghost dans le footer de la modale d'édition (visible si `effectiveRole === 'org_admin'`) appelant une RPC `public.<entity>_hard_delete(p_<entity>_id)` :
+> - SECURITY DEFINER, REVOKE anon, search_path explicite (`SET search_path = majordhome, public`)
+> - Check `auth.uid() ∈ core.organization_members WHERE role='org_admin' AND org_id = (SELECT org_id FROM <entity> WHERE id = p_<entity>_id)` → RAISE EXCEPTION `org_admin_required` sinon
+> - Purge des dépendances "satellites" qui n'ont pas de FK CASCADE explicite (ex : RDV planning lié à un lead)
+> - DELETE final de l'entité → cascade DB sur les FK
+> - Retourne JSON avec compteurs purgés pour feedback UX
+> - Côté front : `ConfirmDialog` destructive avec preflight count via SELECT count head sur les tables satellites, toast success avec compteurs, invalidation cache croisée (ex : `leadKeys` + `appointmentKeys`).
+> Exemples livrés : `lead_hard_delete` (2026-05-22).
+
+Ou bien c'est une feature one-shot pour les leads et on ne formalise rien tant qu'on n'en a pas un 2ᵉ exemple ?
+---
+
+## [2026-05-23 08:45] Bridge Pipeline ↔ Pennylane — PR 1 (flag is_winning_quote)
+**Statut** : PENDING
+**Commit** : 8e4f3714a5cd7cece785a52c40ffa94dbdc8c0e5
+**Contexte** : 1ʳᵉ PR (sur 8) du bridge Pipeline ↔ Pennylane. Ajoute colonne `majordhome.lead_pennylane_quotes.is_winning_quote BOOLEAN NOT NULL DEFAULT false` + index partiel `idx_lead_pennylane_quotes_winning (lead_id) WHERE is_winning_quote=true AND ejected_at IS NULL` + backfill (18 leads Gagnés Mayer flaggés sur leur devis PL le plus récent par `assigned_at DESC`) + recréation vue publique `majordhome_lead_pennylane_quotes` pour exposer la colonne (security_invoker=true conservé). Spec complète (8 PRs, RPCs `lead_attach_quotes_and_send` / `lead_mark_won_with_quote`, modales `QuoteCandidatesModal` / `MarkWonQuoteModal`, cron `pennylane-sync-quote-status`, sync continue identité PL → MDH, voyant "devis PL non rattachés", branchement conditionnel via `settings.pennylane.enabled`) dans `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md`. Pas d'impact UI à cette PR.
+**Proposition** : Mettre à jour la section "Module Pennylane quote-driven" du CLAUDE.md (actuellement marquée WIP non finalisé) pour :
+- Ajouter `is_winning_quote BOOLEAN` à la description de `majordhome.lead_pennylane_quotes` (mentionner l'invariant "1 winning max par lead actif, garanti par la RPC `lead_mark_won_with_quote` à venir — pas de contrainte UNIQUE pour éviter UniqueViolation en transition")
+- Ajouter une note "Bridge Pipeline ↔ PL en cours d'implémentation — spec `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md` (8 PRs séquentielles, PR 1/8 livrée)"
+
+Ou bien attendre que plusieurs PRs aient atterri (PR 2-3 idéalement, qui livreront les RPCs et le branchement conditionnel `usePennylaneEnabled`) avant de rafraîchir la section CLAUDE.md, pour éviter de documenter un état intermédiaire instable ?
+---
+
+## [2026-05-23 09:22] Bridge Pipeline ↔ Pennylane PR 3 — RPC lead_mark_won_with_quote + hook usePennylaneEnabled
+**Statut** : PENDING
+**Commit** : b7f72b8129bffe2385df4c5a1bd96b0d3871b046
+**Contexte** : 3ème PR du bridge Pipeline ↔ Pennylane (spec `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md` §6 RPC 2 + §10). Deux ajouts :
+- **RPC `public.lead_mark_won_with_quote(p_org_id, p_lead_id, p_winning_quote_pl_id) RETURNS jsonb`** (SECURITY DEFINER, `search_path = majordhome, public, core` locked, REVOKE anon, GRANT authenticated). Marque un devis attaché comme canonique (`is_winning_quote=true`, false sur les autres devis non-éjectés du lead → unicité applicative), bascule le lead en "Gagné" (status_id display_order=5, `won_date=CURRENT_DATE`, `chantier_status='gagne'` cohérent avec `leads.service.js:451`) + insère 1 `lead_activity` `'status_changed'` source=`'mark_won_with_quote'` avec metadata `{winning_quote_pl_id, winning_quote_label}`. Idempotent : si lead déjà Gagné (display_order=5) → pas de bascule, pas d''activity, mais le flag winning peut bouger (cas d''usage : commercial change d''avis sur le devis canonique). Check membership P0.7 + check `core.organizations.settings.pennylane.enabled=true` (raise 42501 sinon). Le lock fiche technique terrain reste côté front (fire-and-forget dans `leads.service.js:454`), pas dans la RPC (futur cron PR 7 n''aura pas de session user).
+- **Hook `usePennylaneEnabled()`** ajouté dans `src/shared/hooks/useOrgSettings.js` : sélecteur sec `Boolean(settings?.pennylane?.enabled)`. Consommé par les futures modales `QuoteCandidatesModal` (PR 4) et `MarkWonQuoteModal` (PR 5) pour brancher conditionnellement le bridge. Si false → flow MDH actuel intégral, pas de bridge.
+
+**Proposition** : C''est la PR 3 d''une série (PR 1 = flag `is_winning_quote`, PR 2 = RPC `lead_attach_quotes_and_send`, PR 3 = RPC `lead_mark_won_with_quote` + hook, PR 4-5+ = modales front, PR 7 = cron auto-marquage). Plutôt que de doc PR par PR (bruit), proposer de **documenter le bridge en bloc une fois la série terminée** dans une nouvelle sous-section du Module Pennylane qui couvrirait : flag `is_winning_quote`, les 2 (puis 3+) RPCs avec leur contrat (check membership P0.7 + check flag `pennylane.enabled`), hook `usePennylaneEnabled()`, les modales front, le cron PR 7, et la convention "RPC qui n''a pas de session user (cron) ne doit jamais faire d''action user-bound (lock fiche technique)".
+
+À arbitrer :
+1. **Quand consolider la doc** : maintenant (chaque PR ajoute sa ligne dans CLAUDE.md) ou attendre la fin de la série (PR 5-7 landed + smoke test fonctionnel validé) ? Recommandation : attendre, vu que la section actuelle "Module Pennylane quote-driven" est déjà flaggée WIP `1df67db4` et que la spec bouge encore.
+2. **Quoi faire de la section "Module Pennylane quote-driven" actuelle** (qui pointe sur `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md` et flag WIP `1df67db4`) : la remplacer par la nouvelle sous-section bridge une fois la série terminée, ou les coexister (cette section décrit l''attach/eject manuel pré-bridge, la nouvelle décrirait le flow automatisé) ?
+3. **Hook `usePennylaneEnabled()`** : est-ce qu''on l''ajoute dès maintenant à la liste des hooks documentés dans la section "### Hooks" de CLAUDE.md, ou on attend la PR 4 qui le consomme effectivement ? Risque d''ajouter un hook documenté mais sans caller → ressemble à de l''over-doc dans un état intermédiaire.
+---
+
+## [2026-05-23 09:48] Drift `--max-warnings` ESLint (389 vs 384)
+**Statut** : PENDING
+**Commit** : b384ef125989a04c8a95dbcc21bdacc8f122c320
+**Contexte** : Le commit PR 4b mentionne explicitement que `npm run lint` global affiche 389 warnings vs `--max-warnings 384` (delta antérieur à la session, vérifié au commit 32d75cc). La convention CLAUDE.md ("Dette technique") dit pourtant : "1 nouveau warning ESLint → fix immédiat (le `--max-warnings` du script `lint` est défini sur le count actuel pour empêcher la régression)". Le garde-fou est donc désynchronisé du count réel, et `npm run lint` doit échouer actuellement sur main.
+**Proposition** : Décision tactique à prendre :
+- Option A : bumper `--max-warnings` à 389 (rapide, conservatif, mais enregistre 5 warnings de dette sans intention claire de résolution)
+- Option B : résoudre les 5 warnings résiduels (retour à la convention "count actuel = baseline propre")
+- Option C : garder la dette mais documenter dans CLAUDE.md le count cible (`389 au 2026-05-23, à réduire`) pour qu''un futur Claude ne pense pas que le seuil est arbitraire
+
+À arbitrer aussi : la convention "count actuel" suppose qu''on bouge le seuil à chaque fix de warning (vers le bas). Personne ne le fait. Faut-il abandonner cette posture et adopter un seuil plat (ex 400) + chasse aux warnings en sprint dédié ?
+---
+
+## [2026-05-23 09:48] Bridge Pipeline → Pennylane PR 4b — QuoteCandidatesModal + branchement LeadModal
+**Statut** : PENDING
+**Commit** : b384ef125989a04c8a95dbcc21bdacc8f122c320
+**Contexte** : PR 4b du bridge (couche UI consommant le data layer PR 4a). Nouveau composant `src/apps/artisan/components/pipeline/QuoteCandidatesModal.jsx` (465 LOC) — multi-attach de devis Pennylane au pivot lead "Devis envoyé" : section Suggestions (fuzzy via `useCandidateQuotesForLead`) + section Exploration (60j non rattachés via `useUnlinkedQuotes`) + multi-checkbox + RPC `useAttachQuotesAndSend` (bascule statut + activity transactionnels). Branchement dans `LeadModal.jsx` : si `usePennylaneEnabled()` true ET target="Devis envoyé" → ouvre `QuoteCandidatesModal`, sinon flow MDH classique (`QuoteModal`). Callback `onBeforeAttach` sauve le form + sync client avant la RPC (parité avec `handleConfirmQuote`).
+
+**Coexistence intentionnelle de 2 modales Pennylane** :
+- `LinkPennylaneQuoteModal` (chantier post-vente, single-attach manuel) — inchangée
+- `QuoteCandidatesModal` (pipeline "Devis envoyé", multi-attach + bascule statut transactionnelle) — nouvelle
+
+**Proposition** : Cohérent avec la stratégie "doc en bloc à la fin de la série" déjà proposée pour PR 1 et PR 3 (entrées du 2026-05-23 08:45 et 09:22). Ne pas documenter PR 4b en isolation. Quand la série sera consolidée, la sous-section "Bridge Pipeline → Pennylane" du Module Pennylane devra :
+- Décrire les 2 modales (chantier vs pipeline) et leur sémantique distincte (post-vente single vs pré-vente multi-variantes)
+- Mentionner que le branchement conditionnel passe par `usePennylaneEnabled()` lu dans `LeadModal.handleStatusChange` (pattern à étendre pour les autres pivots — Gagné via PR 5 `MarkWonQuoteModal`)
+- Préciser que `QuoteModal` legacy (montant + date manuels) reste comme fallback `pennylane.enabled=false`
+
+À arbitrer (en plus des questions déjà ouvertes dans PR 3) : faut-il à terme **supprimer la `QuoteModal` legacy** une fois toutes les orgs sur Pennylane, ou la garder comme parcours "off-Pennylane" durable pour les orgs sans intégration ? La spec dit "garder" mais ça crée 2 chemins de code à maintenir.
+---
+
+## [2026-05-24 22:35] Pennylane — auto-matérialisation client MDH au rattachement de devis (règle métier)
+**Statut** : PENDING
+**Commit** : 32a4bef5d0e16917b6d46eba6284fcf24f95c5d3
+**Contexte** : Ajout dans `useAttachQuotesAndSend` (`src/shared/hooks/usePennylane.js`) d'un post-process fire-and-forget `ensureClientForLeadFromPennylane` qui, après rattachement d'un devis PL à un lead sans `client_id` : (1) lit le `pennylane_customer_id` du 1er devis attaché actif, (2) cherche un mapping existant dans `majordhome.pennylane_sync` (entity_type='client', pennylane_id=customer_id), (3) si trouvé → UPDATE lead.client_id via RPC `update_majordhome_lead`, (4) sinon → `leadsService.convertLeadToClient` (création complète client MDH + project + activity), (5) upsert mapping `pennylane_sync` avec `onConflict: 'org_id,entity_type,local_id'`, (6) UPDATE `lead_pennylane_quotes.pennylane_client_id` sur les liaisons. Justification commit : "sur Pennylane la création d'un devis implique la création en base → côté MDH, le rattachement d'un devis PL doit aussi matérialiser le client MDH (pas attendre la bascule Gagné)".
+**Proposition** : Documenter cette règle métier dans la section "Module Pennylane quote-driven" du CLAUDE.md (actuellement marquée WIP). Ajout suggéré :
+
+> **Règle d'auto-matérialisation client (rattachement devis)** — quand un devis PL est rattaché à un lead sans `client_id`, le hook `useAttachQuotesAndSend` déclenche un post-process (`ensureClientForLeadFromPennylane`) qui crée OU re-link le client MDH automatiquement. Le link existant est retrouvé via la table `majordhome.pennylane_sync` (entity_type='client', pennylane_id = customer_id PL). Si pas de mapping → `convertLeadToClient` réutilise tout le chaînage standard (project + client + lead_activities). Fire-and-forget : un échec ne casse pas l'attach principal. Conséquence : le commercial n'a plus à attendre la bascule "Gagné" pour voir un client MDH apparaître sur un lead pré-vente. **Note backfill** : les leads attachés AVANT 2026-05-24 n'ont pas bénéficié de cette logique — re-trigger via re-attach manuel OU script SQL one-shot.
+
+À arbitrer : (1) faut-il étendre la même logique aux flux d'envoi de devis depuis MDH (proposition_contrat) ? (2) Faut-il un script SQL de backfill systématique pour les leads existants, ou laisser le re-attach manuel suffire ? (3) Cette règle introduit une dépendance forte au mapping `pennylane_sync` — vaut-il le coup d'ajouter `majordhome.pennylane_sync` à la section "Vues publiques principales" ou Gotchas DB pour signaler son rôle de table-pivot bidirectionnelle ?
+---
+
+## [2026-05-24 22:35] RPC `update_majordhome_lead(p_lead_id, p_updates jsonb)` — pattern d'update générique non documenté
+**Statut** : PENDING
+**Commit** : 32a4bef5d0e16917b6d46eba6284fcf24f95c5d3
+**Contexte** : Le post-process `ensureClientForLeadFromPennylane` appelle `supabase.rpc('update_majordhome_lead', { p_lead_id, p_updates: { client_id, updated_at } })` pour patcher un lead. Cette RPC générique (jsonb patch) existe déjà en DB mais n'apparaît nulle part dans CLAUDE.md ni dans les conventions Hooks/Services. Elle constitue pourtant un raccourci pratique vs `supabase.schema('majordhome').from('leads').update(...)`.
+**Proposition** : Soit (a) ajouter une ligne dans la section "Gotchas DB" ou "Conventions / Hooks" pour signaler l'existence de `update_majordhome_lead(p_lead_id uuid, p_updates jsonb)` comme RPC SECURITY DEFINER permettant un patch partiel d'un lead (utile depuis hooks/services frontend qui n'ont pas accès direct au schéma majordhome via PostgREST côté edge functions), soit (b) déprécier cet usage et imposer le pattern `supabase.schema('majordhome').from('leads').update(...).eq('id', ...).eq('org_id', ...)` côté frontend pour rester explicite sur le filtre org_id (défense en profondeur). À trancher car les 2 patterns coexistent maintenant dans le codebase.
+---
+
+
+
+## [2026-05-24 23:10] Règle UX Pennylane : Contact lead lecture seule si devis PL attaché
+**Statut** : PENDING
+**Commit** : 338eaa032821be7ba0ca7c2d9a1ec0f1f8a1bc7b
+**Contexte** : PR 6 du Sprint 9 Pennylane quote-driven. `LeadModal.jsx` calcule `pennylaneSyncedContact = pennylaneActive && (linkedQuotes?.length || 0) > 0` et étend `contactFieldsDisabled = pennylaneSyncedContact || (!!linkedClient && !editClientMode)` (priorité Pennylane sur editClientMode). `SectionContact` (LeadFormSections.jsx) reçoit une prop `pennylaneSynced` qui affiche un bandeau "Données synchronisées depuis Pennylane — à modifier dans Pennylane". Le sync continu coordonnées PL→MDH est annoncé pour PR 7 (edge function cron). Sprint 9 toujours marqué WIP dans le CLAUDE.md actuel.
+**Proposition** : Une fois les PR 7-N stabilisées et le module validé fonctionnellement, enrichir la section "Module Pennylane quote-driven" du CLAUDE.md avec une sous-section "Propriété des données" :
+- Quand `pennylane.enabled=true` (settings org) ET `>=1` devis PL attaché à un lead, les coordonnées du lead (`SectionContact` du LeadModal) deviennent canonical Pennylane → champs lecture seule côté MDH + bandeau d'info.
+- Priorité override : `pennylaneSyncedContact` prime sur le toggle `editClientMode` existant (cas client lié sans bridge PL).
+- Pas de deeplink vers Pennylane (cf spec §3 — pas de mapping URL à maintenir).
+- Cron de sync coordonnées PL→MDH : PR 7 (à compléter quand livré).
+
+Questions à arbitrer :
+1. Le pattern "canonical externe = lecture seule MDH + bandeau d'info" mérite-t-il d'être généralisé en convention transverse (ex: futures intégrations Meta Ads, autres CRM) ou rester spécifique à Pennylane ?
+2. Faut-il documenter dans la charte multi-tenant la règle "intégration tierce ayant pull périodique des données entité = freeze des champs côté MDH" ?
+---
+
+## [2026-05-24 23:22] Gotcha pennylane_sync peu peuplé → matching direct PL préférable
+**Statut** : PENDING
+**Commit** : 94aefb8a43a820814d2be407c449faeada01050b
+**Contexte** : Fix du bug "Suggestions pour ce client" qui ne remontait jamais rien dans `QuoteCandidatesModal`. L'algo initial partait des clients MDH liés au lead puis fetchait `/quotes` via `getQuotesByClient`, qui dépend de la table `pennylane_sync`. Or chez Mayer cette table n'est peuplée que pour les 5 backfills posés + les push MDH→PL — jamais pour les clients créés directement dans Pennylane. Résultat : 0 candidate dans 99% des cas. Le nouvel algo (`getCandidateQuotesForLead`) part directement des devis PL des N derniers jours et matche le `customer` PL avec le lead par email/phone, indépendamment de tout mapping `pennylane_sync`.
+**Proposition** : Documenter dans la section "Module Pennylane quote-driven" ou "Gotchas DB" :
+**Gotcha `pennylane_sync` peu peuplé** : La table `majordhome.pennylane_sync` n'est alimentée que par les flux MDH→PL (création client via `usePennylaneSyncClient`) ou backfills explicites. Les clients créés directement dans Pennylane (avant intégration ou hors MDH) n'ont JAMAIS leur mapping posé. Conséquence : tout algo qui part d'un client MDH et tente de retrouver ses devis PL via `pennylane_sync` retournera 0 ligne dans la majorité des cas. **Pattern préféré pour le matching lead ↔ devis PL** : partir des devis PL (paginé `/quotes`), fetcher leurs `customers` en batch, comparer `customer.billing_email/emails`+`phone` avec `lead.email`+`lead.phone` (digits-only). Cf. `getCandidateQuotesForLead` dans `pennylane.service.js`.
+Question : ce gotcha est-il à durcir comme convention de design pour TOUTE feature qui matche entité PL ↔ entité MDH (ex: factures, paiements, avoirs futurs), ou rester limité au cas suggestions devis ?
+---
+
+## [2026-05-24 23:30] Gotchas Pennylane : tie-break chronologique + sémantique winning/order_amount_ht
+**Statut** : PENDING
+**Commit** : c4518cae6bbc08671e54084d447a617dc835bbeb
+**Contexte** : Fix RPC `lead_attach_quotes_and_send` suite test Laure Gauthier (carte Kanban affichait 4800€ estimation commerciale au lieu de 5094€ devis le plus récent). 2 changements dans la migration `20260524_lead_attach_quotes_round_and_tiebreak.sql` : (1) `ROUND(order_amount_ht)` sur les 2 UPDATEs leads (affichage carte sans décimale) ; (2) tie-break "devis le plus récent" passe de `amount_ht DESC` à `pennylane_quote_id DESC` — l'ID interne PL est strictement incrémental dans le temps de création, donc plus fiable qu'un tri montant pour départager 2 devis créés le même jour. Backfill SQL one-shot sur les 57 leads Mayer existants. Mentionne aussi explicitement que `is_winning_quote` ("quel devis a été signé") et `order_amount_ht` ("dernier devis envoyé") sont 2 sémantiques **distinctes** : sur Berna Hélène, le winning est D-2026-04106 mais `order_amount_ht` reflète D-2026-04107 (créé après par `pennylane_quote_id`).
+**Proposition** : Ajouter dans la section "Module Pennylane quote-driven" du CLAUDE.md (ou Gotchas DB), une fois le bridge stabilisé :
+
+> **Gotcha tie-break Pennylane** : pour départager 2 devis PL créés le même jour, trier sur `pennylane_quote_id DESC` (ID interne PL, strictement incrémental dans le temps de création) — PAS sur `amount_ht DESC` ni `assigned_at`. Pattern utilisé dans `lead_attach_quotes_and_send` pour calculer `most_recent_*` et propager `order_amount_ht` sur `leads`.
+>
+> **Sémantique winning vs order_amount_ht** : `lead_pennylane_quotes.is_winning_quote=true` = "devis effectivement signé" (sélection commerciale via `lead_mark_won_with_quote`). `leads.order_amount_ht` = "montant du dernier devis PL envoyé" (calculé à l'attach, arrondi à l'entier pour affichage Kanban). Ces 2 valeurs peuvent pointer sur des devis différents si le commercial signe un devis antérieur à la dernière version envoyée.
+
+À arbitrer : (1) attendre la consolidation du bridge Pennylane (PR 7-N + smoke test) avant d'ajouter ces gotchas, cohérent avec les autres entrées PENDING qui proposent "doc en bloc" ; (2) le tie-break par `pennylane_quote_id` est-il à généraliser comme convention pour TOUT tri chronologique d'entités PL (factures, paiements, avoirs) ?
+---
+
+## [2026-05-25 10:55] PR 5 Phase 1 — cron pennylane-sync-quote-status + RPC ensure_winning_quotes
+**Statut** : PENDING
+**Commit** : bd7150b686f2d2bdc6929b0b779cdf22f26dd972
+**Contexte** : Nouvelle edge function `pennylane-sync-quote-status` (cron 15 min, `verify_jwt:false` + `MDH_CRON_SECRET`) qui sync `quote_status` Pennylane → `lead_pennylane_quotes`, ejecte les devis disparus côté PL (404 → `ejected_reason='deleted_in_pennylane'`), pose `is_winning_quote=true` sur le plus récent accepted via la RPC helper `public.pennylane_sync_ensure_winning_quotes(p_org_id)` (service_role only, REVOKE anon+authenticated), et sync les champs customer PL → `clients` MDH en COALESCE strict (jamais écraser avec null/vide). Appel Pennylane direct (pas via `pennylane-proxy` qui exige JWT user). Filtrage des orgs PL-activées via `settings.pennylane.enabled` côté JS (PostgREST limité sur filtres jsonb imbriqués). Cron à configurer séparément (N8n ou Supabase Cron). Spec : `docs/superpowers/specs/2026-05-25-pipeline-multidevis-design.md` §9.
+**Proposition** : Sprint 9 reste flaggé WIP "à reprendre 1 par 1 si bugs" dans CLAUDE.md, donc ne PAS durcir tout de suite. Options :
+  (a) Attendre la stabilisation Sprint 9 puis rédiger une sous-section "Module Pennylane quote-driven > Cron sync quote_status" documentant : edge, cadence 15 min, auth `MDH_CRON_SECRET`, RPC helper, colonnes `is_winning_quote` / `ejected_reason` sur `lead_pennylane_quotes`, COALESCE strict, choix appel direct vs proxy.
+  (b) Ajouter dès maintenant une ligne courte dans "Module Pennylane quote-driven" listant le cron + la RPC, pour que les futures sessions ne les redécouvrent pas. Quid des nouvelles colonnes `is_winning_quote` / `ejected_reason` non documentées ?
+  (c) Documenter aussi le pattern général : "Cron sans JWT user → appel API tierce direct (pas via proxy verify_jwt:true). Filtrer orgs activées via flag `settings.<integration>.enabled` côté JS quand PostgREST ne suffit pas." (généralisable Meta Ads, etc.)
+---
