@@ -1,4 +1,9 @@
-# Refonte du module "Rattachement devis Pennylane" — diagnostic + refacto
+# Refonte intégration MDH ↔ Pennylane — diagnostic + refacto
+
+> **Scope élargi (2026-05-25 update)** : initialement centré sur la modale
+> "Rattachement devis", étendu après identification de 3 bugs symptomatiques
+> du même socle d'intégration PL non complet (devis anciens, clients PL
+> introuvables, latence). Voir Vision section.
 
 > **Statut** : à exécuter dans une session dédiée. Plusieurs hotfixes ont été
 > empilés et il faut maintenant une vision d'ensemble + refonte ciblée.
@@ -37,8 +42,27 @@ L'user coche des devis et "Attache la sélection" → ils sont liés au lead via
    client a d'autres devis PL plus anciens qui devraient être rattachés. La
    fenêtre temporelle limite le bridge match — si on bridge sur un client_id
    connu, on devrait fetch TOUS ses devis sans contrainte de date.
-5. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
+5. **Bug : clients PL non importés introuvables côté UI** — exemple ROGERO
+   (CHRISTIANE ROGERO existe dans Pennylane avec devis) : recherche
+   "CLIENT EXISTANT" sur création de lead ne le trouve pas, parce qu'elle
+   interroge uniquement `majordhome.clients` (table locale MDH) sans
+   fallback PL. PL est devenu source de vérité parallèle non syncée vers
+   MDH. Symptôme du même problème de fond que #4.
+6. Précédemment : suggestions vides systématiquement (fixé par 406→majordhome_leads
    + ajout matcher "nom" + fallback embedded customer)
+
+## Vision : ressouder MDH ↔ Pennylane
+
+Tous les bugs #1-#5 dérivent du même socle fragile : MDH consomme Pennylane
+en best-effort, à la demande, sans cache ni sync structurée. Résultat :
+- Lectures massives à chaque ouverture de modale (latence, 500)
+- Connaissance partielle de la donnée PL côté UI (clients/devis manquants)
+- Pas de search côté serveur (filtre tout en mémoire après pagination)
+
+La refonte devrait probablement introduire une **couche de cache/mirror
+PL en DB** (alimentée par sync incrémental + on-demand refresh), pour que
+toutes les recherches/matchings interrogent **la DB MDH** au lieu de PL
+direct. PL devient la source d'écriture, MDH le miroir local de lecture.
 
 ## Fichiers en jeu
 
@@ -173,6 +197,10 @@ de date) pour récupérer TOUS ses devis. C'est aussi plus rapide.
   matcher 6 devis PL via Bridge + Tél + Nom
 - **Lead test B** : SYLVIE ANE — client lié CLI-03438. Doit faire remonter
   TOUS les devis PL de ce client (pas seulement les 30 derniers jours)
+- **Cas test C** : recherche "rogero" dans CLIENT EXISTANT à la création d'un
+  lead. CHRISTIANE ROGERO existe dans PL mais pas (encore) dans
+  `majordhome.clients` → doit être proposée quand même (fallback search PL
+  ou pré-sync), avec import à la sélection.
 - ~3300 clients en DB, ~666 contrats actifs/expirés
 - Pennylane API V2 : doc https://pennylane.readme.io/reference/
 
