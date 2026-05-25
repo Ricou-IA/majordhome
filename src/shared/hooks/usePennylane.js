@@ -572,7 +572,8 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
   }
 
   // 3. Fetch customer PL pour pré-remplissage (bug #6) — best-effort, peut être null
-  const { data: customer } = await pennylaneService.fetchCustomerById(customerId);
+  // orgId passé pour write-through cache D.5 (pennylane_customer_lookup)
+  const { data: customer } = await pennylaneService.fetchCustomerById(customerId, orgId);
   const leadPatch = buildContactPatchFromCustomer(lead, customer);
   const hasLeadPatch = Object.keys(leadPatch).length > 0;
 

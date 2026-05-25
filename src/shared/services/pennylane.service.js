@@ -404,14 +404,62 @@ function formatPennylaneCustomerName(customer) {
 }
 
 /**
+ * D.5 — write-through cache : upsert un customer PL dans
+ * `majordhome.pennylane_customer_lookup` via RPC. Fire-and-forget : la
+ * promesse retournée est .catch() en interne pour ne JAMAIS faire échouer
+ * le caller. Skip silencieusement si orgId absent ou customer null.
+ *
+ * Appelé après chaque fetch /customers/{id} ; le cache se peuple ainsi à
+ * l'usage. Brief : docs/PROMPT_PENNYLANE_MATCHING_REFACTOR.md — D.5.
+ *
+ * @param {string|null} orgId
+ * @param {object|null} customer — payload PL V2 multi-shape
+ * @returns {Promise<void>}
+ */
+async function cacheUpsertCustomer(orgId, customer) {
+  if (!orgId || !customer || !customer.id) return;
+  try {
+    const { firstName, lastName, fullName } = extractCustomerName(customer);
+    const { address, postalCode, city } = extractCustomerAddress(customer);
+    const payload = {
+      pennylane_id: Number(customer.id),
+      name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      customer_type: customer.customer_type || null,
+      email: extractCustomerEmail(customer),
+      phone: extractCustomerPhone(customer),
+      address,
+      postal_code: postalCode,
+      city,
+      external_reference: customer.reference || customer.external_reference || null,
+      raw_payload: customer,
+    };
+    const { error } = await supabase.rpc('upsert_pennylane_customer_lookup', {
+      p_org_id: orgId,
+      p_payload: payload,
+    });
+    if (error) {
+      logger.warn('[pennylane.cacheUpsertCustomer]', customer.id, error?.message || error);
+    }
+  } catch (err) {
+    logger.warn('[pennylane.cacheUpsertCustomer] unexpected', err?.message || err);
+  }
+}
+
+/**
  * Fetch /customers/{id} en parallèle pour chaque ID unique. Retourne le
  * customer COMPLET (pas juste le name) afin de pouvoir matcher email/phone
  * dans le fuzzy matching de suggestions.
  *
+ * Write-through cache (D.5) : si `orgId` fourni, chaque customer fetché est
+ * upserté en background dans `pennylane_customer_lookup` (fire-and-forget).
+ *
  * @param {Array<number|string>} customerIds
+ * @param {string|null} [orgId=null] — pour le write-through cache D.5
  * @returns {Promise<Map<string, object>>} Map de string(id) → customer
  */
-async function fetchCustomersByIds(customerIds) {
+async function fetchCustomersByIds(customerIds, orgId = null) {
   const uniqueIds = Array.from(
     new Set((customerIds || []).filter(Boolean).map(id => String(id)))
   );
@@ -427,6 +475,8 @@ async function fetchCustomersByIds(customerIds) {
   results.forEach((r, i) => {
     if (r.status === 'fulfilled' && r.value) {
       map.set(uniqueIds[i], r.value);
+      // Write-through fire-and-forget — on n'attend PAS la réponse
+      cacheUpsertCustomer(orgId, r.value);
     }
   });
   return map;
@@ -435,13 +485,19 @@ async function fetchCustomersByIds(customerIds) {
 /**
  * Fetch un seul customer Pennylane. Retourne null si échec (jamais throw).
  * Utilisé pour le pré-remplissage contact post-attach (cf bug #6).
+ *
+ * Write-through cache (D.5) : si `orgId` fourni, le customer fetché est
+ * upserté en background dans `pennylane_customer_lookup` (fire-and-forget).
+ *
  * @param {number|string} customerId
+ * @param {string|null} [orgId=null] — pour le write-through cache D.5
  * @returns {Promise<object|null>}
  */
-async function fetchCustomerById(customerId) {
+async function fetchCustomerById(customerId, orgId = null) {
   if (!customerId) return null;
   try {
     const c = await apiCall('GET', `/customers/${customerId}`);
+    if (c) cacheUpsertCustomer(orgId, c); // fire-and-forget
     return c || null;
   } catch (err) {
     logger.warn('[pennylane.fetchCustomerById]', customerId, err?.message || err);
@@ -1175,7 +1231,7 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 30, maxQuo
   // email NI phone → 0 requête /customers, latence ~ instant.
   const needsCustomerFetch = !!(leadNorm.email || leadNorm.phone);
   const customersById = needsCustomerFetch
-    ? await fetchCustomersByIds(recentQuotes.map(q => q.customer?.id).filter(Boolean))
+    ? await fetchCustomersByIds(recentQuotes.map(q => q.customer?.id).filter(Boolean), orgId)
     : new Map();
 
   // 6. Pour chaque devis, calculer les signaux via les matchers déclaratifs
@@ -1421,7 +1477,7 @@ export const pennylaneService = {
   // Clients
   syncClient: (client, orgId) => withErrorHandling(() => syncClient(client, orgId), 'pennylane.syncClient'),
   getOrCreateCustomer: (client, orgId) => withErrorHandling(() => getOrCreateCustomer(client, orgId), 'pennylane.getOrCreateCustomer'),
-  fetchCustomerById: (customerId) => withErrorHandling(() => fetchCustomerById(customerId), 'pennylane.fetchCustomerById'),
+  fetchCustomerById: (customerId, orgId = null) => withErrorHandling(() => fetchCustomerById(customerId, orgId), 'pennylane.fetchCustomerById'),
   fetchLedgerAccountNumber: (ledgerAccountId) => withErrorHandling(() => fetchLedgerAccountNumber(ledgerAccountId), 'pennylane.fetchLedgerAccountNumber'),
 
   // Extractors (utiles aux callers qui ont déjà un payload customer en main)
