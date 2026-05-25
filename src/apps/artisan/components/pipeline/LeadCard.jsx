@@ -261,7 +261,7 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-                className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
+                className="ml-auto inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
                 style={{
                   backgroundColor: card?.column_key === 'gagne' ? '#d97706'
                     : card?.column_key === 'perdu' ? '#94a3b8'
