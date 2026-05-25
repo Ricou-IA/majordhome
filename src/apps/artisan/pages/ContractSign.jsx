@@ -226,6 +226,15 @@ export default function ContractSign() {
 
     setIsSaving(true);
     try {
+      const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
+      const computedTotal = computedPricing?.total || 0;
+      const billableTotal = forcedAmount != null && !isNaN(forcedAmount)
+        ? forcedAmount
+        : (computedTotal || parseFloat(contract?.amount) || 0);
+      const extraDiscountAmount = forcedAmount != null && computedTotal > forcedAmount
+        ? Math.round((computedTotal - forcedAmount) * 100) / 100
+        : 0;
+
       const pdfData = {
         contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
         startDate: new Date().toISOString(),
@@ -240,7 +249,8 @@ export default function ContractSign() {
         subtotal: computedPricing?.subtotal || 0,
         discountPercent: computedPricing?.discountPercent || 0,
         discountAmount: computedPricing?.discountAmount || 0,
-        total: computedPricing?.total || parseFloat(contract.amount) || 0,
+        extraDiscountAmount,
+        total: billableTotal,
         zoneName: activeZone?.label || '-',
         notes: contract.notes || null,
         signatureBase64,

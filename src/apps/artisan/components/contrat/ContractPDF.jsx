@@ -356,6 +356,7 @@ function ContractDocument({ data, company }) {
     subtotal,
     discountPercent,
     discountAmount,
+    extraDiscountAmount = 0,
     total,
     zoneName,
     notes,
@@ -365,6 +366,8 @@ function ContractDocument({ data, company }) {
   } = data;
 
   const hasDiscount = discountPercent > 0 && discountAmount > 0;
+  const hasExtraDiscount = extraDiscountAmount > 0;
+  const showSubtotal = hasDiscount || hasExtraDiscount;
 
   return (
     <Document>
@@ -453,22 +456,32 @@ function ContractDocument({ data, company }) {
           </View>
         ))}
 
-        {/* Sous-total + remise */}
+        {/* Sous-total + remises */}
+        {showSubtotal && (
+          <View style={s.rowSubtotal}>
+            <Text style={[s.subtotalCell, { flex: 3 }]}>Sous-total</Text>
+            <Text style={[s.subtotalCell, { flex: 1, textAlign: 'right' }]}>{fmtEuro(subtotal)}</Text>
+          </View>
+        )}
         {hasDiscount && (
-          <>
-            <View style={s.rowSubtotal}>
-              <Text style={[s.subtotalCell, { flex: 3 }]}>Sous-total</Text>
-              <Text style={[s.subtotalCell, { flex: 1, textAlign: 'right' }]}>{fmtEuro(subtotal)}</Text>
-            </View>
-            <View style={s.rowDiscount}>
-              <Text style={[s.discountCell, { flex: 3 }]}>
-                Dégressivité -{discountPercent}%
-              </Text>
-              <Text style={[s.discountCell, { flex: 1, textAlign: 'right' }]}>
-                -{fmtEuro(discountAmount)}
-              </Text>
-            </View>
-          </>
+          <View style={s.rowDiscount}>
+            <Text style={[s.discountCell, { flex: 3 }]}>
+              Dégressivité -{discountPercent}%
+            </Text>
+            <Text style={[s.discountCell, { flex: 1, textAlign: 'right' }]}>
+              -{fmtEuro(discountAmount)}
+            </Text>
+          </View>
+        )}
+        {hasExtraDiscount && (
+          <View style={s.rowDiscount}>
+            <Text style={[s.discountCell, { flex: 3 }]}>
+              Remise commerciale
+            </Text>
+            <Text style={[s.discountCell, { flex: 1, textAlign: 'right' }]}>
+              -{fmtEuro(extraDiscountAmount)}
+            </Text>
+          </View>
         )}
 
         {/* Total */}

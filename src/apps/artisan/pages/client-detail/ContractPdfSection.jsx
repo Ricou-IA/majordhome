@@ -97,8 +97,11 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   }, [contract, computedPricing]);
 
   // Helper : construire les données PDF (réutilisé par impression + envoi)
-  // Si le montant est forcé (admin), on scale les lignes proportionnellement
-  // pour que la somme affichée match le montant forcé (sans mention "forcé" pour le client).
+  // Si le montant est forcé (admin, en général pour maintenir un prix historique),
+  // on garde les lignes équipement à leur prix réel + on affiche 2 lignes de remise :
+  //   1. Dégressivité X% (depuis la grille tarifaire)
+  //   2. Remise complémentaire (le solde entre total calculé et montant forcé)
+  // Transparence client + traçabilité du geste commercial.
   const buildPdfData = useCallback(() => {
     const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
     const computedTotal = computedPricing?.total || 0;
@@ -106,18 +109,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       ? forcedAmount
       : (computedTotal || parseFloat(contract?.amount) || 0);
 
-    const scale = forcedAmount != null && computedTotal > 0 ? forcedAmount / computedTotal : 1;
-    const equipmentLines = (computedPricing?.items || []).map((item) => ({
-      ...item,
-      lineTotal: Math.round((item.lineTotal || 0) * scale * 100) / 100,
-    }));
-
-    const subtotalScaled = forcedAmount != null
-      ? Math.round((computedPricing?.subtotal || 0) * scale * 100) / 100
-      : (computedPricing?.subtotal || 0);
-    const discountAmountScaled = forcedAmount != null
-      ? Math.round((computedPricing?.discountAmount || 0) * scale * 100) / 100
-      : (computedPricing?.discountAmount || 0);
+    const extraDiscountAmount = forcedAmount != null && computedTotal > forcedAmount
+      ? Math.round((computedTotal - forcedAmount) * 100) / 100
+      : 0;
 
     return {
       contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
@@ -129,10 +123,11 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       clientCity: client?.city || '',
       clientPhone: client?.phone || '-',
       clientEmail: client?.email || '-',
-      equipmentLines,
-      subtotal: subtotalScaled,
+      equipmentLines: computedPricing?.items || [],
+      subtotal: computedPricing?.subtotal || 0,
       discountPercent: computedPricing?.discountPercent || 0,
-      discountAmount: discountAmountScaled,
+      discountAmount: computedPricing?.discountAmount || 0,
+      extraDiscountAmount,
       total: billableTotal,
       zoneName: activeZone?.label || '-',
       notes: contract.notes || null,
