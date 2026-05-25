@@ -912,13 +912,16 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
   if (leadErr) throw leadErr;
   if (!lead) return [];
 
-  const leadEmail = lead.email ? lead.email.trim().toLowerCase() : null;
-  const leadPhone = phoneDigits(lead.phone);
-  const leadFirstNorm = normalizeName(lead.first_name);
-  const leadLastNorm = normalizeName(lead.last_name);
+  // Normalise une fois les champs du lead (réutilisés pour chaque devis)
+  const leadNorm = {
+    email: lead.email ? lead.email.trim().toLowerCase() : null,
+    phone: phoneDigits(lead.phone),
+    firstName: normalizeName(lead.first_name),
+    lastName: normalizeName(lead.last_name),
+  };
 
   // 2. Récupérer le pennylane_customer_id qui mapperait lead.client_id (signal fort)
-  let syncCustomerIdForLeadClient = null;
+  let bridgeCustomerId = null;
   if (lead.client_id) {
     const { data: syncRow } = await supabase
       .from('majordhome_pennylane_sync')
@@ -927,8 +930,50 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
       .eq('entity_type', 'client')
       .eq('local_id', lead.client_id)
       .maybeSingle();
-    syncCustomerIdForLeadClient = syncRow?.pennylane_id || null;
+    bridgeCustomerId = syncRow?.pennylane_id || null;
   }
+
+  // Matchers déclaratifs (ordre = priorité d'affichage des chips côté UI).
+  // Ajouter un signal = ajouter 1 entrée + 1 chip dans QuoteCandidatesModal.SIGNAL_CONFIG.
+  const matchers = [
+    {
+      name: 'pennylane_sync',
+      check: ({ customerKey }) =>
+        bridgeCustomerId && String(bridgeCustomerId) === customerKey,
+    },
+    {
+      name: 'email',
+      check: ({ customer }) => {
+        if (!leadNorm.email || !customer) return false;
+        const custEmail = extractCustomerEmail(customer);
+        return custEmail && custEmail.trim().toLowerCase() === leadNorm.email;
+      },
+    },
+    {
+      name: 'phone',
+      check: ({ customer }) => {
+        if (!leadNorm.phone || !customer) return false;
+        const custPhone = phoneDigits(extractCustomerPhone(customer));
+        return custPhone && custPhone === leadNorm.phone;
+      },
+    },
+    {
+      name: 'name',
+      check: ({ customer }) => {
+        if (!leadNorm.firstName || !leadNorm.lastName || !customer) return false;
+        const { firstName, lastName, fullName } = extractCustomerName(customer);
+        const custFirst = normalizeName(firstName);
+        const custLast = normalizeName(lastName);
+        const custFull = normalizeName(fullName);
+        // Strict : (first, last) exactement égaux, OU fallback : fullName contient les deux
+        const strictMatch = custFirst === leadNorm.firstName && custLast === leadNorm.lastName;
+        const fullNameMatch = custFull
+          && custFull.includes(leadNorm.firstName)
+          && custFull.includes(leadNorm.lastName);
+        return strictMatch || fullNameMatch;
+      },
+    },
+  ];
 
   // 3. Liste des rattachements actifs (exclusion + flag)
   const { data: existingLinks } = await supabase
@@ -975,7 +1020,7 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
   const customerIds = recentQuotes.map(q => q.customer?.id).filter(Boolean);
   const customersById = await fetchCustomersByIds(customerIds);
 
-  // 6. Pour chaque devis, calculer les signaux par comparaison directe
+  // 6. Pour chaque devis, calculer les signaux via les matchers déclaratifs
   const results = [];
   for (const q of recentQuotes) {
     if (!q.customer?.id) continue;
@@ -983,74 +1028,40 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 90, maxQuo
 
     const customerKey = String(q.customer.id);
     const customer = customersById.get(customerKey);
+    const ctx = { q, customer, customerKey };
 
-    const signals = new Set();
+    const signals = matchers.filter(m => m.check(ctx)).map(m => m.name);
+    if (signals.length === 0) continue; // pas de match, skip
 
-    // Signal 1 : bridge fort (mapping pennylane_sync → lead.client_id)
-    if (syncCustomerIdForLeadClient
-        && String(syncCustomerIdForLeadClient) === customerKey) {
-      signals.add('pennylane_sync');
-    }
-
-    // Signal 2 : email match (customer PL ↔ lead.email)
-    if (leadEmail && customer) {
-      const custEmail = extractCustomerEmail(customer);
-      if (custEmail && custEmail.trim().toLowerCase() === leadEmail) {
-        signals.add('email');
-      }
-    }
-
-    // Signal 3 : phone match (digits-only normalisés)
-    if (leadPhone && customer) {
-      const custPhone = phoneDigits(extractCustomerPhone(customer));
-      if (custPhone && custPhone === leadPhone) {
-        signals.add('phone');
-      }
-    }
-
-    // Signal 4 : name match (prénom + nom, case/accent insensible)
-    //   - Strict : custFirst === leadFirst AND custLast === leadLast
-    //   - Fallback : fullName contient (leadFirst ET leadLast)
-    if (leadFirstNorm && leadLastNorm && customer) {
-      const { firstName, lastName, fullName } = extractCustomerName(customer);
-      const custFirstNorm = normalizeName(firstName);
-      const custLastNorm = normalizeName(lastName);
-      const custFullNorm = normalizeName(fullName);
-
-      const strictMatch = custFirstNorm === leadFirstNorm && custLastNorm === leadLastNorm;
-      const fullNameMatch = custFullNorm
-        && custFullNorm.includes(leadFirstNorm)
-        && custFullNorm.includes(leadLastNorm);
-
-      if (strictMatch || fullNameMatch) {
-        signals.add('name');
-      }
-    }
-
-    if (signals.size === 0) continue; // pas de match, skip
-
-    // Formater le quote pour cohérence avec getQuotesByClient
     results.push({
-      quote: {
-        id: q.id,
-        quote_number: q.quote_number || q.label || null,
-        label: q.label || null,
-        subject: q.pdf_invoice_subject || null,
-        date: q.date || null,
-        deadline: q.deadline || null,
-        amount_ht: q.currency_amount_before_tax || null,
-        amount_ttc: q.amount || q.currency_amount || null,
-        status: q.status || null,
-        pdf_url: q.public_file_url || null,
-        customer_id: q.customer?.id || null,
-        customer_name: formatPennylaneCustomerName(customer),
-      },
-      signals: Array.from(signals),
+      quote: formatQuoteForCandidate(q, customer),
+      signals,
       alreadyAttached: attachedToThisLead.has(q.id),
     });
   }
 
   return results;
+}
+
+/**
+ * Formate un quote PL brut en payload uniforme pour QuoteCandidatesModal.
+ * Cohérent avec la shape retournée par getQuotesByClient.
+ */
+function formatQuoteForCandidate(q, customer) {
+  return {
+    id: q.id,
+    quote_number: q.quote_number || q.label || null,
+    label: q.label || null,
+    subject: q.pdf_invoice_subject || null,
+    date: q.date || null,
+    deadline: q.deadline || null,
+    amount_ht: q.currency_amount_before_tax || null,
+    amount_ttc: q.amount || q.currency_amount || null,
+    status: q.status || null,
+    pdf_url: q.public_file_url || null,
+    customer_id: q.customer?.id || null,
+    customer_name: formatPennylaneCustomerName(customer),
+  };
 }
 
 /**
