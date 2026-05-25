@@ -36,6 +36,12 @@ import { formatEuro, formatDateShortFR } from '@/lib/utils';
 // Statuts Pennylane (palette deutan-friendly — pas de rouge/vert)
 // ============================================================================
 
+// Seuil min pour qu'un devis Pennylane soit considéré "pipeline" (vs SAV/entretien).
+// Les devis < 1000€ HT sont quasi-toujours du SAV ou de l'entretien et n'ont pas
+// vocation à être rattachés à un lead du pipeline commercial.
+// Les devis déjà attachés sont préservés (informatif) même s'ils sont sous le seuil.
+const PIPELINE_MIN_AMOUNT_HT = 1000;
+
 const QUOTE_STATUS_CONFIG = {
   accepted: { label: 'Accepté', color: '#1d4ed8', bgColor: '#dbeafe' },
   pending: { label: 'En attente', color: '#b45309', bgColor: '#fef3c7' },
@@ -182,9 +188,17 @@ export function QuoteCandidatesModal({
   const [searchQuery, setSearchQuery] = useState('');
 
   const {
-    candidates,
+    candidates: rawCandidates,
     isLoading: loadingCandidates,
   } = useCandidateQuotesForLead(leadId, { enabled: isOpen });
+
+  // Filtre seuil pipeline (cf PIPELINE_MIN_AMOUNT_HT) — devis déjà attachés préservés.
+  const candidates = useMemo(
+    () => rawCandidates.filter(c =>
+      c.alreadyAttached || Number(c.quote?.amount_ht ?? 0) >= PIPELINE_MIN_AMOUNT_HT
+    ),
+    [rawCandidates],
+  );
 
   const {
     unlinkedQuotes,
@@ -227,7 +241,10 @@ export function QuoteCandidatesModal({
   const normalizedQuery = useMemo(() => normalizeForSearch(searchQuery), [searchQuery]);
 
   const explorationQuotes = useMemo(() => {
-    const baseList = unlinkedQuotes.filter(q => !candidateIds.has(q.id));
+    // Filtre seuil pipeline (exclut SAV/entretien <1000€)
+    const baseList = unlinkedQuotes
+      .filter(q => !candidateIds.has(q.id))
+      .filter(q => Number(q.amount_ht ?? 0) >= PIPELINE_MIN_AMOUNT_HT);
     if (!normalizedQuery) return baseList;
     return baseList.filter(q => {
       const haystack = normalizeForSearch(
