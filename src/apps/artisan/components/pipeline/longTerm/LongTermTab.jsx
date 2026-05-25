@@ -44,6 +44,36 @@ const FRESHNESS_FILTERS = [
   { value: 'never', label: '⚪ Jamais relancés' },
 ];
 
+// Palette badges initiales commerciaux (cohérent avec LeadCard)
+const COMMERCIAL_COLORS = [
+  'bg-indigo-100 text-indigo-700 ring-indigo-300',
+  'bg-teal-100 text-teal-700 ring-teal-300',
+  'bg-rose-100 text-rose-700 ring-rose-300',
+  'bg-amber-100 text-amber-700 ring-amber-300',
+];
+
+function getInitials(fullName) {
+  if (!fullName) return '?';
+  return fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+}
+
+function CommercialBadge({ commercial }) {
+  if (!commercial) return <span className="text-gray-300">—</span>;
+  return (
+    <span
+      className={`inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded-full font-bold ring-1 ${COMMERCIAL_COLORS[commercial.colorIndex % COMMERCIAL_COLORS.length]}`}
+      title={commercial.full_name}
+    >
+      {commercial.initials}
+    </span>
+  );
+}
+
 function FilterDropdown({ value, onChange, options, icon: Icon, placeholder }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -101,6 +131,19 @@ export function LongTermTab() {
     if (effectiveRole !== 'commercial' || !userId) return null;
     return commercials.find((c) => c.profile_id === userId)?.id || null;
   }, [effectiveRole, userId, commercials]);
+
+  // Map commercial id → { initials, colorIndex, full_name } pour le badge dans la table
+  const commercialById = useMemo(() => {
+    const map = new Map();
+    commercials.forEach((c, idx) => {
+      map.set(c.id, {
+        ...c,
+        initials: getInitials(c.full_name),
+        colorIndex: idx,
+      });
+    });
+    return map;
+  }, [commercials]);
 
   const [search, setSearch] = useState('');
   const [freshnessFilter, setFreshnessFilter] = useState('all');
@@ -286,6 +329,7 @@ export function LongTermTab() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left font-medium text-gray-600 px-4 py-3">Client</th>
+                  <th className="text-center font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Commercial</th>
                   <th className="text-right font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Montant</th>
                   <th className="text-left font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Passé en MT-LT</th>
                   <th className="text-left font-medium text-gray-600 px-4 py-3 whitespace-nowrap">Dernière interaction</th>
@@ -314,6 +358,9 @@ export function LongTermTab() {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <CommercialBadge commercial={commercialById.get(l.assigned_user_id)} />
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <span className={`font-semibold ${amount > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
