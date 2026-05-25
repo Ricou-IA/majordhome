@@ -35,6 +35,9 @@ verify_jwt = false
 [functions.pennylane-backfill-quotes]
 verify_jwt = false
 
+[functions.pennylane-sync-quote-status]
+verify_jwt = false
+
 # Voice — protégée par MDH_CRON_SECRET (P0.6)
 [functions.voice-extract-fieldreport]
 verify_jwt = false
