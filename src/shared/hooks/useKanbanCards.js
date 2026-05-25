@@ -12,6 +12,9 @@ import { useAuth } from '@contexts/AuthContext';
 import { kanbanService } from '@services/kanban.service';
 import { kanbanCardKeys } from './cacheKeys';
 
+// Re-export for backward compatibility (convention projet)
+export { kanbanCardKeys } from './cacheKeys';
+
 /**
  * @returns {{ cards, isLoading, error, refetch }}
  */
