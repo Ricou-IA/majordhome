@@ -12,7 +12,7 @@ import { useCallback } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
 import { leadsService } from '@services/leads.service';
-import { pennylaneKeys, devisKeys, leadKeys, clientKeys } from '@hooks/cacheKeys';
+import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -314,6 +314,8 @@ export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
     // La RPC peut basculer le lead en "Devis envoyé" + créer une lead_activity
     // → invalider tout le sous-arbre leadKeys (liste Kanban + détail + activities)
     queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+    // Vue kanban_cards recalculée — placement et compteurs colonnes
+    queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
   }, [queryClient, leadId, orgId]);
 
   const assignMutation = useMutation({
@@ -597,6 +599,8 @@ export function useAttachQuotesAndSend(orgId, leadId) {
       queryClient.invalidateQueries({ queryKey: ['chantiers'] });
       // Client potentiellement créé → invalider listes clients
       queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+      // Vue kanban_cards recalculée (lead a basculé en Devis envoyé, ou MAJ count)
+      queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
     },
   });
 
@@ -624,6 +628,8 @@ export function useMarkLeadWonWithQuote(orgId, leadId) {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
       queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+      // Vue kanban_cards recalculée (winning quote modifié → carte Gagné refresh)
+      queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
     },
   });
 
