@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Phone, Calendar, Clock, User, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatEuroCeil } from '@/lib/utils';
@@ -129,6 +129,7 @@ function getCommercialColor(index) {
  * @param {Object} props.commercialsMap - Map { id: { initials, name, colorIndex } }
  * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche un bouton MT-LT
  *   sur les cartes "Devis envoyé" si fourni
+ * @param {Object} [props.card] - Carte Kanban courante (column_key, devis_count) passée par LeadKanban (Phase 1 pipeline multi-devis)
  */
 export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMoveToLongTerm, card }) {
   const [expanded, setExpanded] = useState(false);
@@ -137,6 +138,19 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
   // Hooks AVANT tout return conditionnel (règles des hooks React)
   const hasDevis = (card?.devis_count || 0) > 0;
   const { linkedQuotes } = useLinkedPennylaneQuotes(hasDevis && expanded ? lead?.id : null);
+
+  // Filtrer les devis selon la colonne (pertinents uniquement)
+  // useMemo doit rester avant tout return conditionnel (règles des hooks React)
+  const filteredQuotes = useMemo(() => {
+    return (linkedQuotes || []).filter(q => {
+      if (!card?.column_key) return true;
+      const status = q.quote_status;
+      if (card.column_key === 'devis_envoye') return ['pending', 'draft'].includes(status);
+      if (card.column_key === 'gagne') return status === 'accepted';
+      if (card.column_key === 'perdu') return ['refused', 'denied', 'expired', 'canceled'].includes(status);
+      return true;
+    });
+  }, [linkedQuotes, card?.column_key]);
 
   if (!lead) return null;
 
@@ -151,16 +165,6 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
 
   // Commercial assigné (initiales)
   const commercial = commercialsMap?.[lead.assigned_user_id];
-
-  // Filtrer les devis selon la colonne (pertinents uniquement)
-  const filteredQuotes = (linkedQuotes || []).filter(q => {
-    if (!card?.column_key) return true;
-    const status = q.quote_status;
-    if (card.column_key === 'devis_envoye') return ['pending', 'draft'].includes(status);
-    if (card.column_key === 'gagne') return status === 'accepted';
-    if (card.column_key === 'perdu') return ['refused', 'denied', 'expired', 'canceled'].includes(status);
-    return true;
-  });
 
   // Mode compact (kanban)
   if (compact) {
@@ -259,8 +263,8 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
                 onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
                 className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
                 style={{
-                  backgroundColor: card.column_key === 'gagne' ? '#16a34a'
-                    : card.column_key === 'perdu' ? '#94a3b8'
+                  backgroundColor: card?.column_key === 'gagne' ? '#d97706'
+                    : card?.column_key === 'perdu' ? '#94a3b8'
                     : '#1d4ed8',
                   color: 'white',
                 }}

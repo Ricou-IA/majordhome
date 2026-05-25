@@ -43,7 +43,7 @@ export function QuoteSubCard({ quote }) {
           {cfg.label}
         </span>
         <span className="font-medium text-gray-700 truncate">
-          {quote.quote_label || `#${quote.pennylane_quote_id}`}
+          {quote.quote_number_pl || quote.quote_label || `#${quote.pennylane_quote_id}`}
         </span>
         {quote.quote_date && (
           <span className="text-gray-400 shrink-0">{formatDateShortFR(quote.quote_date)}</span>
