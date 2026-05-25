@@ -433,6 +433,23 @@ async function fetchCustomersByIds(customerIds) {
 }
 
 /**
+ * Fetch un seul customer Pennylane. Retourne null si échec (jamais throw).
+ * Utilisé pour le pré-remplissage contact post-attach (cf bug #6).
+ * @param {number|string} customerId
+ * @returns {Promise<object|null>}
+ */
+async function fetchCustomerById(customerId) {
+  if (!customerId) return null;
+  try {
+    const c = await apiCall('GET', `/customers/${customerId}`);
+    return c || null;
+  } catch (err) {
+    logger.warn('[pennylane.fetchCustomerById]', customerId, err?.message || err);
+    return null;
+  }
+}
+
+/**
  * Extracteurs défensifs sur le payload customer V2 (multi-shape).
  */
 function extractCustomerEmail(c) {
@@ -461,6 +478,23 @@ function extractCustomerName(c) {
   const lastName = c.last_name || c.lastName || null;
   const fullName = c.name || c.label || (firstName && lastName ? `${firstName} ${lastName}` : null);
   return { firstName, lastName, fullName };
+}
+
+/**
+ * Extrait l'adresse postale depuis un customer PL.
+ * Pennylane V2 expose `billing_address` (objet) avec address/postal_code/city.
+ * Fallback sur les fields top-level `address` au cas où certaines réponses
+ * legacy les exposent (rare en V2 mais safe).
+ * @returns {{ address: string|null, postalCode: string|null, city: string|null }}
+ */
+function extractCustomerAddress(c) {
+  if (!c) return { address: null, postalCode: null, city: null };
+  const ba = c.billing_address || c.address || {};
+  return {
+    address: ba.address || ba.line1 || c.address_line1 || null,
+    postalCode: ba.postal_code || c.postal_code || null,
+    city: ba.city || c.city || null,
+  };
 }
 
 /**
@@ -1387,7 +1421,14 @@ export const pennylaneService = {
   // Clients
   syncClient: (client, orgId) => withErrorHandling(() => syncClient(client, orgId), 'pennylane.syncClient'),
   getOrCreateCustomer: (client, orgId) => withErrorHandling(() => getOrCreateCustomer(client, orgId), 'pennylane.getOrCreateCustomer'),
+  fetchCustomerById: (customerId) => withErrorHandling(() => fetchCustomerById(customerId), 'pennylane.fetchCustomerById'),
   fetchLedgerAccountNumber: (ledgerAccountId) => withErrorHandling(() => fetchLedgerAccountNumber(ledgerAccountId), 'pennylane.fetchLedgerAccountNumber'),
+
+  // Extractors (utiles aux callers qui ont déjà un payload customer en main)
+  extractCustomerEmail,
+  extractCustomerPhone,
+  extractCustomerName,
+  extractCustomerAddress,
 
   // Devis
   pushQuote: (quote, lines, client, orgId) => withErrorHandling(() => pushQuote(quote, lines, client, orgId), 'pennylane.pushQuote'),

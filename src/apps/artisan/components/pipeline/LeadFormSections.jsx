@@ -180,14 +180,32 @@ export const SectionClientLinking = ({
 // CONTACT
 // ============================================================================
 
-export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false }) => (
+export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylaneSynced = false }) => {
+  // Hint conditionnel — évite de mentir si on prétend "synchronisé" alors qu'on
+  // n'a rien aspiré du customer PL (cf bug #6, fix commit pré-remplissage contact).
+  // Si tous les champs contact sont vides, c'est probablement un lead ancien
+  // attaché AVANT le fix : on affiche un message d'alerte au lieu du hint.
+  const hasAnyContactValue = !!(
+    form.first_name || form.last_name ||
+    form.email || form.phone ||
+    form.address || form.postal_code || form.city
+  );
+  return (
   <>
     <SectionTitle>Contact</SectionTitle>
-    {pennylaneSynced && (
+    {pennylaneSynced && hasAnyContactValue && (
       <div className="mb-2 flex items-start gap-1.5 text-xs text-gray-600 bg-blue-50/60 border border-blue-100 rounded px-2.5 py-1.5">
         <Info className="w-3.5 h-3.5 mt-0.5 text-blue-600 shrink-0" />
         <span>
           Données synchronisées depuis Pennylane — à modifier dans Pennylane.
+        </span>
+      </div>
+    )}
+    {pennylaneSynced && !hasAnyContactValue && (
+      <div className="mb-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+        <Info className="w-3.5 h-3.5 mt-0.5 text-amber-600 shrink-0" />
+        <span>
+          Aucune coordonnée disponible. Vérifie que le client est bien rempli dans Pennylane, puis détache/rattache le devis pour resynchroniser.
         </span>
       </div>
     )}
@@ -323,7 +341,8 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
       </FormField>
     </div>
   </>
-);
+  );
+};
 
 // ============================================================================
 // PIPELINE

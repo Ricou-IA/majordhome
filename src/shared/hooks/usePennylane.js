@@ -15,6 +15,7 @@ import { leadsService } from '@services/leads.service';
 import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { cleanPhone } from '@/lib/phoneUtils';
 
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
@@ -491,37 +492,68 @@ export function useUnlinkedQuoteCount({ sinceDays = 30, enabled = true } = {}) {
 }
 
 /**
- * Post-attach : auto-create ou auto-link client MDH si le lead n'en a pas.
- * Logique :
- *   1. Lit le lead → skip si client_id déjà set
- *   2. Récupère le 1er customer_id PL des devis attachés
- *   3. Cherche dans pennylane_sync (entity_type='client', pennylane_id=customer_id)
- *      → Si trouvé : UPDATE lead.client_id = mapping.local_id (link existing)
- *   4. Sinon : convertLeadToClient (crée project + client + activity + lead.client_id)
- *      (les coordonnées du LEAD sont utilisées, pas du customer PL — dans 99% des cas
- *      c'est cohérent puisque le lead a été créé avec les mêmes infos)
- *   5. Pose le mapping pennylane_sync + UPDATE lead_pennylane_quotes.pennylane_client_id
+ * Construit un patch lead = champs contact PL à reporter sur le lead.
+ * Règle stricte : on N'ÉCRASE JAMAIS une valeur existante du lead (l'user
+ * peut avoir corrigé manuellement). On ne remplit que les champs vides.
  *
- * Fire-and-forget : un échec n'invalide pas le succès de l'attach.
+ * @param {object} lead — lead courant (avec ses champs contact actuels)
+ * @param {object} customer — payload customer Pennylane V2
+ * @returns {object} patch jsonb pour update_majordhome_lead
+ */
+function buildContactPatchFromCustomer(lead, customer) {
+  if (!customer || !lead) return {};
+  const patch = {};
+  const isEmpty = v => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+
+  const { firstName, lastName } = pennylaneService.extractCustomerName(customer);
+  const email = pennylaneService.extractCustomerEmail(customer);
+  const phone = pennylaneService.extractCustomerPhone(customer);
+  const { address, postalCode, city } = pennylaneService.extractCustomerAddress(customer);
+
+  if (firstName && isEmpty(lead.first_name)) patch.first_name = firstName;
+  if (lastName && isEmpty(lead.last_name)) patch.last_name = lastName;
+  if (email && isEmpty(lead.email)) patch.email = email;
+  if (phone && isEmpty(lead.phone)) patch.phone = cleanPhone(phone);
+  if (address && isEmpty(lead.address)) patch.address = address;
+  if (postalCode && isEmpty(lead.postal_code)) patch.postal_code = postalCode;
+  if (city && isEmpty(lead.city)) patch.city = city;
+
+  return patch;
+}
+
+/**
+ * Post-attach : pré-remplit le contact du lead depuis le customer PL +
+ * auto-create/auto-link client MDH si nécessaire.
+ *
+ * Logique :
+ *   1. Lit le lead avec tous les fields contact
+ *   2. Récupère le 1er customer_id PL des devis attachés
+ *   3. Fetch /customers/{id} pour récupérer les coordonnées complètes
+ *   4. Calcule un patch lead (champs vides seulement) → UPDATE
+ *   5. Si lead pas encore lié à un client MDH :
+ *      a. Cherche un mapping pennylane_sync → link au client existant si trouvé
+ *      b. Sinon convertLeadToClient (qui copie les fields du lead — patché à
+ *         l'étape 4 — vers le client créé)
+ *   6. Pose mapping pennylane_sync + UPDATE lead_pennylane_quotes.pennylane_client_id
+ *
+ * Fire-and-forget côté caller : un échec n'invalide pas le succès de l'attach.
  *
  * @param {string} orgId
  * @param {string} leadId
  * @param {string} userId
- * @param {Array} attachedResults — array des results de la RPC (avec quote_pl_id, etc.)
- *   Sert à récupérer les customer_ids PL via re-fetch des lignes lead_pennylane_quotes.
+ * @returns {Promise<{ client_id?, created_client?, contact_synced?, skipped? }>}
  */
 async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
-  // 1. Lire le lead
+  // 1. Lire le lead avec tous les fields contact (élargi vs version précédente)
   const { data: lead, error: leadErr } = await supabase
     .schema('majordhome')
     .from('leads')
-    .select('id, client_id')
+    .select('id, client_id, first_name, last_name, email, phone, address, address_complement, postal_code, city')
     .eq('id', leadId)
     .eq('org_id', orgId)
     .single();
   if (leadErr) throw leadErr;
   if (!lead) return { skipped: 'lead_not_found' };
-  if (lead.client_id) return { skipped: 'already_linked', client_id: lead.client_id };
 
   // 2. Récupérer le 1er customer_id PL des devis attachés actifs
   const { data: links, error: linksErr } = await supabase
@@ -533,9 +565,29 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
     .limit(1);
   if (linksErr) throw linksErr;
   const customerId = links?.[0]?.pennylane_customer_id;
-  if (!customerId) return { skipped: 'no_customer_id' };
+  if (!customerId) {
+    return lead.client_id
+      ? { skipped: 'no_customer_id', client_id: lead.client_id }
+      : { skipped: 'no_customer_id' };
+  }
 
-  // 3. Cherche un mapping existant dans pennylane_sync
+  // 3. Fetch customer PL pour pré-remplissage (bug #6) — best-effort, peut être null
+  const { data: customer } = await pennylaneService.fetchCustomerById(customerId);
+  const leadPatch = buildContactPatchFromCustomer(lead, customer);
+  const hasLeadPatch = Object.keys(leadPatch).length > 0;
+
+  // 4. Si lead a déjà un client_id → patch lead seul, pas de convert
+  if (lead.client_id) {
+    if (hasLeadPatch) {
+      await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: leadId,
+        p_updates: { ...leadPatch, updated_at: new Date().toISOString() },
+      });
+    }
+    return { skipped: 'already_linked', client_id: lead.client_id, contact_synced: hasLeadPatch };
+  }
+
+  // 5. Cherche un mapping existant dans pennylane_sync
   const { data: syncRow } = await supabase
     .from('majordhome_pennylane_sync')
     .select('local_id')
@@ -548,14 +600,23 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
   let createdClient = false;
 
   if (clientId) {
-    // 3a. Mapping existe : link le lead au client existant
+    // 5a. Mapping existe : link lead → client existant (+ patch lead s'il y a)
+    const updates = { client_id: clientId, updated_at: new Date().toISOString(), ...leadPatch };
     const { error: updateErr } = await supabase.rpc('update_majordhome_lead', {
       p_lead_id: leadId,
-      p_updates: { client_id: clientId, updated_at: new Date().toISOString() },
+      p_updates: updates,
     });
     if (updateErr) throw updateErr;
   } else {
-    // 3b. Pas de mapping : convertLeadToClient (crée tout le chaînage MDH)
+    // 5b. Pas de mapping : appliquer patch lead AVANT convert (convertLeadToClient
+    // copie les fields du lead vers le client créé — leads.service.js:730-746)
+    if (hasLeadPatch) {
+      const { error: patchErr } = await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: leadId,
+        p_updates: { ...leadPatch, updated_at: new Date().toISOString() },
+      });
+      if (patchErr) throw patchErr;
+    }
     const conv = await leadsService.convertLeadToClient(leadId, orgId, userId);
     if (conv?.error) throw conv.error;
     clientId = conv?.data?.client?.id || null;
@@ -563,7 +624,7 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
     if (!clientId) return { skipped: 'convert_failed' };
   }
 
-  // 4. Pose le mapping pennylane_sync (upsert idempotent)
+  // 6. Pose le mapping pennylane_sync (upsert idempotent)
   await supabase
     .schema('majordhome')
     .from('pennylane_sync')
@@ -579,7 +640,7 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
       { onConflict: 'org_id,entity_type,local_id' }
     );
 
-  // 5. Update pennylane_client_id sur les liaisons de ce lead
+  // 7. Update pennylane_client_id sur les liaisons de ce lead
   await supabase
     .schema('majordhome')
     .from('lead_pennylane_quotes')
@@ -588,7 +649,7 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
     .is('ejected_at', null)
     .is('pennylane_client_id', null);
 
-  return { client_id: clientId, created_client: createdClient };
+  return { client_id: clientId, created_client: createdClient, contact_synced: hasLeadPatch };
 }
 
 /**
