@@ -233,16 +233,27 @@ export function MarkWonQuoteModal({
                               ? formatEuro(Number(q.quote_amount_ht))
                               : '—'}
                           </div>
-                          <a
-                            href={`https://app.pennylane.com/quotes/${q.pennylane_quote_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 mt-1"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            Pennylane
-                          </a>
+                          {q.pdf_url ? (
+                            <a
+                              href={q.pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 mt-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              PDF
+                            </a>
+                          ) : (
+                            <span
+                              className="text-xs text-gray-300 inline-flex items-center gap-1 mt-1 cursor-not-allowed"
+                              title="PDF non encore synchronisé"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              PDF
+                            </span>
+                          )}
                         </div>
                       </label>
                     </li>

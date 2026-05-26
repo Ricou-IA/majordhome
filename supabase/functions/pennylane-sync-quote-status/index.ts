@@ -28,6 +28,7 @@ interface PennylaneQuote {
   date?: string;
   status?: string;
   currency_amount_before_tax?: number;
+  public_file_url?: string;
   customer?: { id?: number };
 }
 
@@ -203,7 +204,7 @@ async function syncOrgQuotes(
   const { data: attachedQuotes, error: aqErr } = await supabase
     .from("majordhome_lead_pennylane_quotes")
     .select(
-      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, is_winning_quote",
+      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, is_winning_quote, pdf_url",
     )
     .eq("org_id", orgId)
     .is("ejected_at", null);
@@ -253,23 +254,38 @@ async function syncOrgQuotes(
       const plQuote = (rawData as { quote?: PennylaneQuote })?.quote ?? null;
       if (!plQuote) continue;
 
-      // Sync status si différent via RPC (pattern obligatoire)
-      if (plQuote.status && plQuote.status !== aq.quote_status) {
-        const { error: statusErr } = await supabase.rpc('pennylane_sync_update_quote_status', {
+      // Sync fields (status + pdf_url) via RPC unifiée — COALESCE strict côté DB.
+      // Appel systématique si l'un des 2 fields diverge (incluant pdf_url=NULL
+      // côté DB pour les 152 lignes pré-pdf_url).
+      const plStatus = plQuote.status ?? null;
+      const plPdfUrl = plQuote.public_file_url ?? null;
+      const statusDiffers = plStatus && plStatus !== aq.quote_status;
+      const pdfDiffers = plPdfUrl && plPdfUrl !== aq.pdf_url;
+
+      if (statusDiffers || pdfDiffers) {
+        const { error: updErr } = await supabase.rpc('pennylane_sync_update_quote_fields', {
           p_quote_id: aq.id,
-          p_new_status: plQuote.status,
+          p_new_status: plStatus,
+          p_pdf_url: plPdfUrl,
         });
 
-        if (statusErr) {
+        if (updErr) {
           console.warn(
-            `[pennylane-sync] status update failed for quote ${aq.id}:`,
-            sanitizeError(statusErr, 'status update failed'),
+            `[pennylane-sync] fields update failed for quote ${aq.id}:`,
+            sanitizeError(updErr, 'fields update failed'),
           );
         } else {
           quote_status_updates++;
-          console.log(
-            `[pennylane-sync] quote ${aq.pennylane_quote_id}: ${aq.quote_status} → ${plQuote.status}`,
-          );
+          if (statusDiffers) {
+            console.log(
+              `[pennylane-sync] quote ${aq.pennylane_quote_id}: ${aq.quote_status} → ${plStatus}`,
+            );
+          }
+          if (pdfDiffers && !aq.pdf_url) {
+            console.log(
+              `[pennylane-sync] quote ${aq.pennylane_quote_id}: pdf_url backfilled`,
+            );
+          }
         }
       }
     } catch (e) {

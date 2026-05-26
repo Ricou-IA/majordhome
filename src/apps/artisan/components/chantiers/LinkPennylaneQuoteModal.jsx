@@ -88,6 +88,7 @@ export function LinkPennylaneQuoteModal({
         label: quote.subject || quote.quote_number || null,
         date: quote.date || null,
         status: quote.status || null,
+        pdf_url: quote.pdf_url || null,
       });
       toast.success(`Devis ${quote.quote_number || `#${quote.id}`} ajouté au chantier`);
       onLinked?.(quote);

@@ -57,15 +57,24 @@ export function LinkedQuotesPanel({ quotes, isLoading }) {
                     ? formatEuro(Number(q.quote_amount_ht))
                     : '—'}
                 </span>
-                <a
-                  href={`https://app.pennylane.com/quotes/${q.pennylane_quote_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 text-xs"
-                  title="Ouvrir dans Pennylane"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                {q.pdf_url ? (
+                  <a
+                    href={q.pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 text-xs"
+                    title="Ouvrir le PDF Pennylane"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : (
+                  <span
+                    className="text-gray-300 inline-flex items-center gap-1 text-xs cursor-not-allowed"
+                    title="PDF non encore synchronisé (prochain cycle sous 15 min)"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </span>
+                )}
               </div>
             </li>
           );

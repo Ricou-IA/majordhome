@@ -318,6 +318,7 @@ export function QuoteCandidatesModal({
           label: q.quote_number || q.label || q.subject || null,
           date: q.date || null,
           status: q.status || null,
+          pdf_url: q.pdf_url || null,
         };
       })
       .filter(Boolean);
