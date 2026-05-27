@@ -820,3 +820,44 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 
 - **sanitizeError** : pour les PostgrestError et autres objets non-Error throw par supabase-js, JSON.stringify côté dev (pas `String(err)` qui sort "[object Object]" et masque la vraie cause). En prod, fallback générique pour ne pas leaker. Pattern à respecter dans tout helper d'erreur.
 ---
+
+## [2026-05-27 14:00] Bridge canonique lead↔customer PL : inversion règle COALESCE → OVERWRITE + auto-attach
+**Statut** : PENDING
+**Commit** : 8b084243a7c7994340e1f6f2bdc2dabbca352a6e
+**Contexte** : Décision produit majeure du 2026-05-27. Une fois un devis PL attaché à un lead, PL devient canonique pour l'identité du lead. Deux changements coordonnés contredisent la doc actuelle :
+1. `buildContactPatchFromCustomer` (frontend) passe de COALESCE strict (jamais écraser une saisie user) à OVERWRITE (patche systématiquement si PL a une valeur). Sécurité via NULLIF côté RPC : PL vide → préserve MDH.
+2. Cron `pennylane-sync-quote-status` étape 4 : nouvelle sync identité PL → leads (en plus des clients), via nouvelle RPC `pennylane_sync_overwrite_lead_fields(lead_id, org_id, fields jsonb)` SECURITY DEFINER service_role only.
+3. Cron étape 5 (nouvelle) : auto-attach des nouveaux devis PL ≥1000€ HT pour chaque customer bridgé (≥1 devis déjà attaché). Via nouvelle RPC `pennylane_sync_auto_attach_quote(...)` SECURITY DEFINER service_role only. Idempotent (no-op si quote_pl_id déjà en base, y compris ejected = respect du soft-detach manuel). Bump statut lead → "Devis envoyé" si stage<4 (forward-only).
+Plusieurs passages de CLAUDE.md sont maintenant obsolètes :
+- Section "Règles métier Pipeline ↔ PL" → "Patche le lead avec les champs vides remplis depuis le customer PL (jamais d'écrasement d'une saisie user — règle stricte via `buildContactPatchFromCustomer`)" : FAUX désormais
+- Section "Cron pennylane-sync-quote-status" → "sync identité PL → MDH en COALESCE strict (jamais écraser avec null/vide)" : à reformuler en "OVERWRITE-when-PL-has-value"
+- Section "Cron pennylane-sync-quote-status" : nouvelle étape 5 auto-attach pas mentionnée
+
+**Proposition** : Mettre à jour la section "Module Pennylane quote-driven" du CLAUDE.md (3 sous-sections) avec :
+
+1. Dans "Règles métier Pipeline ↔ PL", remplacer la règle d'auto-matérialisation par :
+```
+- **Auto-matérialisation client + bridge canonique au rattachement de devis** : quand un devis PL est rattaché à un lead, le hook `useAttachQuotesAndSend` déclenche post-process `ensureClientForLeadFromPennylane` qui :
+  1. Fetch `/customers/{customer_id}` PL pour récupérer les coordonnées complètes
+  2. Patche le lead avec les champs PL en mode **OVERWRITE** (décision 2026-05-27 : post-attach, PL est canonique pour l'identité du lead — `buildContactPatchFromCustomer` ne préserve plus les saisies user). Sécurité : PL vide → préserve MDH (NULLIF côté RPC). Le bandeau bleu UI "Données synchronisées depuis Pennylane — à modifier dans Pennylane" prévient l'user.
+  3. Cherche un mapping existant dans `majordhome.pennylane_sync` (entity_type='client', pennylane_id=customer_id) → link au client existant si trouvé
+  4. Sinon `convertLeadToClient`
+  5. Upsert `pennylane_sync` + UPDATE `lead_pennylane_quotes.pennylane_client_id`
+  - Fire-and-forget : un échec ne casse pas l'attach principal.
+```
+
+2. Dans "Cron pennylane-sync-quote-status", remplacer la description par :
+```
+- Sync `quote_status` + `pdf_url` PL → `lead_pennylane_quotes`, ejecte les devis disparus côté PL (404 → `ejected_reason='deleted_in_pennylane'`), appelle `pennylane_sync_ensure_winning_quotes`.
+- **Étape 4 — Sync identité PL → MDH (OVERWRITE-when-PL-has-value)** : pour chaque customer bridgé (≥1 devis attaché actif), fetch `/customers/{id}` puis update clients ET leads via deux RPCs service_role only :
+  - `pennylane_sync_update_client_fields(client_id, org_id, fields jsonb)` (existante)
+  - `pennylane_sync_overwrite_lead_fields(lead_id, org_id, fields jsonb)` (nouvelle 2026-05-27) — mirror de la version client. Sémantique COALESCE+NULLIF : PL non-vide → écrase MDH (PL canonical post-attach) ; PL vide → préserve MDH.
+- **Étape 5 — Auto-attach nouveaux devis PL pour bridges existants** (nouvelle 2026-05-27) : pour chaque customer bridgé, fetch `/quotes?filter=customer_id eq X` (filter natif V2). Diff avec `lead_pennylane_quotes` → pour chaque nouveau devis ≥1000€ HT (seuil `PIPELINE_MIN_AMOUNT_HT`, exclut SAV/entretien), appel RPC `pennylane_sync_auto_attach_quote(org_id, lead_id, quote_pl_id, customer_id, amount_ht, label, date, status, pdf_url)` SECURITY DEFINER service_role only. Idempotence stricte : no-op si quote_pl_id déjà en base (incluant ejected = respect du soft-detach manuel). Auto-bump statut lead vers "Devis envoyé" si stage actuel < 4 (forward-only : ne rétrograde pas Gagné/Perdu). Lookup label-based du status_id pour robustesse multi-tenant.
+```
+
+3. Ajouter en fin de section "DB" les 2 nouvelles RPCs dans la liste des RPCs Pipeline ↔ PL.
+
+4. Mettre à jour la note WIP en tête de section avec la date 2026-05-27 et la mention du bridge canonique.
+
+Question ouverte : valider la sémantique OVERWRITE (impact potentiel : si l'user a corrigé manuellement le nom/email d'un lead post-attach, le cron va re-écraser depuis PL au prochain run de 15 min). C'est la décision documentée, mais à confirmer comme intentionnelle avant intégration définitive au CLAUDE.md.
+---

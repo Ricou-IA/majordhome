@@ -663,20 +663,9 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
       </FormField>
     )}
 
-    {/* Devis envoyé : date d'envoi */}
-    {currentStatus.display_order >= 4 && (
-      <FormField label="Date d'envoi du devis" className="mt-3">
-        <div className="relative">
-          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="date"
-            value={form.quote_sent_date}
-            onChange={(e) => setField('quote_sent_date', e.target.value)}
-            className={`${inputClass} pl-9`}
-          />
-        </div>
-      </FormField>
-    )}
+    {/* Date d'envoi devis : retiree de l'UI (2026-05-27).
+        PL est canonical ; chaque date est lisible dans LinkedQuotesPanel.
+        Colonne leads.quote_sent_date preservee en DB pour historique. */}
 
     {/* Devis envoyé : suivi relances */}
     {currentStatus.display_order >= 4 && !isWon && (
@@ -731,20 +720,10 @@ export const SectionSuivi = ({ form, setField, currentStatus, isWon, lead, onLog
       </div>
     )}
 
-    {/* Gagné : date de signature */}
-    {isWon && (
-      <FormField label="Date de signature" className="mt-3">
-        <div className="relative">
-          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="date"
-            value={form.won_date}
-            onChange={(e) => setField('won_date', e.target.value)}
-            className={`${inputClass} pl-9`}
-          />
-        </div>
-      </FormField>
-    )}
+    {/* Date de signature : retiree de l'UI (2026-05-27).
+        PL ne fournit pas de timestamp de signature fiable ; le moment
+        signature = quand le devis PL passe en "accepted" (visible dans
+        LinkedQuotesPanel). Colonne leads.won_date preservee en DB. */}
   </>
 );
 
