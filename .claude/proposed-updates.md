@@ -741,3 +741,82 @@ Le second point (`.maybeSingle()` vs `.single()`) est aussi un gotcha PostgREST 
   - Spec d'arbitrage : `docs/PROMPT_SPRINT_PENNYLANE_QUOTE_DRIVEN.md`
   - **Brief refonte matching (latence + bug devis anciens type SYLVIE ANE)** : `docs/PROMPT_PENNYLANE_MATCHING_REFACTOR.md` (à exécuter en session dédiée)
 ---
+
+## [2026-05-26 00:00] Invariant DB winning ⟹ accepted|invoiced + allowlist Kanban étendue
+**Statut** : PENDING
+**Commit** : e06ce28953d5aa19d3de1bb6c92f9c6af7ecb17d
+**Contexte** : Bug #7 fix appliqué en prod 2026-05-25 (migrations `20260525_5/6/7`). Deux changements structurels au-delà de la simple data fix : (1) trigger BEFORE INSERT/UPDATE `trg_lead_pennylane_quotes_invariant_winning` sur `majordhome.lead_pennylane_quotes` qui force `quote_status='accepted'` si `is_winning_quote=true` est posé sur un statut incompatible (expired/refused/pending/null) ; (2) vue `public.majordhome_kanban_cards` étend désormais `accepted_count` au filtre `quote_status IN ('accepted','invoiced')` (auparavant 'accepted' seul) — sémantique métier `invoiced` = stade post-accepted (devis facturé), doit apparaître en colonne Gagné. La spec est déjà référencée dans CLAUDE.md mais ni l'invariant DB ni la nouvelle allowlist Kanban ne sont documentés au niveau "comportement runtime".
+**Proposition** : Compléter 2 endroits dans CLAUDE.md sous `## Module Pennylane quote-driven` :
+
+1. Dans la sous-section `### DB`, sur la ligne décrivant `is_winning_quote`, ajouter :
+> **Invariant DB (trigger `trg_lead_pennylane_quotes_invariant_winning`, 2026-05-25) : `is_winning_quote=true ⟹ quote_status ∈ {accepted,invoiced}` — toute tentative de poser winning sur expired/refused/pending/null force `quote_status='accepted'`. Préserve le geste commercial face aux désynchros cron/RPC.**
+
+2. Dans la sous-section `### Vues publiques principales`, sur la ligne `majordhome_kanban_cards`, préciser :
+> **Allowlist Gagné = `quote_status IN ('accepted','invoiced')` (bug #7 fix 2026-05-25) — tout autre statut PL inconnu reste invisible côté Kanban et doit être étendu au cas par cas dans la vue.**
+
+OU plus condensé : un seul gotcha dans `### Gotchas DB` :
+> **Invariant winning_quote (trigger DB, 2026-05-25)** : sur `majordhome.lead_pennylane_quotes`, poser `is_winning_quote=true` sur un statut hors {accepted,invoiced} force `quote_status='accepted'` automatiquement. Vue Kanban `majordhome_kanban_cards` filtre `accepted_count` sur ces 2 mêmes statuts. Toute nouvelle valeur PL future (`scheduled`, etc.) restera invisible Kanban jusqu'à extension explicite.
+
+À arbitrer : 2 sections séparées (DB + vues) ou 1 gotcha consolidé ?
+---
+
+## [2026-05-26 00:28] Escape ILIKE local vs `escapePostgrestSearchTerm()` — déviation convention P0.26
+**Statut** : PENDING
+**Commit** : 1dc78e1621d1d7d19c70dfbdfb03987c36219239
+**Contexte** : `searchPennylaneCustomers` (`pennylane.service.js`) interpole un input utilisateur dans `.or('name.ilike.%${escaped}%,first_name.ilike...')`. L'escape utilise un `q.replace(/[%_\]/g, m => '\' + m)` local — il échappe `%`, `_`, `\` (anti-wildcard) mais ne strip PAS `,()*:` que strippe `escapePostgrestSearchTerm()` (`src/lib/postgrestUtils.js`). Or la convention P0.26 du CLAUDE.md dit : "Toute clause PostgREST `.or()` / `.ilike()` qui interpole un input utilisateur DOIT passer par `escapePostgrestSearchTerm()`". Un input contenant une virgule pourrait ajouter une clause au `.or()` (`ROGERO,id.eq.<uuid>` → 4 conditions au lieu de 3). Risque limité ici car la requête est scoped org via RLS, mais c'est un drift de convention.
+**Proposition** : (1) Refacto `searchPennylaneCustomers` pour utiliser `escapePostgrestSearchTerm()` au lieu du regex local. OU (2) Documenter explicitement que les ILIKE PL search ont leur propre escape (anti-wildcard) parce que `escapePostgrestSearchTerm` strip `%` ce qui empêche la recherche partielle. Si (2), envisager d'ajouter une variante `escapePostgrestSearchTermPreservingWildcards()` au helper centralisé. Trancher avant qu'un autre dev ne re-copie ce pattern.
+---
+
+## [2026-05-26 11:26] Convention liens devis Pennylane - toujours public_file_url
+**Statut** : PENDING
+**Commit** : 4b90cf7f6cbdf77f70a30734e7b18f09376863a3
+**Contexte** : Bug #8 - 3 composants Kanban (QuoteSubCard, LinkedQuotesPanel, MarkWonQuoteModal) pointaient vers `app.pennylane.com/quotes/{id}` - format invente qui 404 en multi-cabinet. Migration vers le pattern Sprint 9 (TabDevisPL / QuoteBlock / etc) : ouvrir le PDF direct via `q.public_file_url` Pennylane, stocke en DB dans `lead_pennylane_quotes.pdf_url` (option B retenue vs fetch a la volee pour zero latence au clic).
+**Proposition** : Ajouter une regle dans la section "Module Pennylane quote-driven -> Regles metier Pipeline <-> PL" :
+
+- **Liens vers les devis Pennylane (UI)** : TOUJOURS utiliser `q.public_file_url` (PDF direct, persiste dans `lead_pennylane_quotes.pdf_url`). Ne JAMAIS construire d'URL `app.pennylane.com/quotes/{id}` a la main - format invente qui 404 en multi-cabinet (bug #8, 2026-05-26). Si `pdf_url` est NULL (devis tout neuf, pas encore passe dans le cron), afficher le lien grise + tooltip "PDF non synchronise (prochain cycle <15 min)" plutot qu'un lien casse.
+---
+
+## [2026-05-26 11:26] Nouvelle RPC pennylane_sync_update_quote_fields (remplace _update_quote_status cote cron)
+**Statut** : PENDING
+**Commit** : 4b90cf7f6cbdf77f70a30734e7b18f09376863a3
+**Contexte** : Nouvelle RPC interne service_role `public.pennylane_sync_update_quote_fields(p_quote_id, p_new_status, p_pdf_url)` - update batch status + pdf_url en COALESCE strict (jamais vider une valeur existante). Le cron `pennylane-sync-quote-status` v5 l'appelle desormais a chaque sync au lieu de `pennylane_sync_update_quote_status` (qui reste disponible pour retrocompat). Appel systematique si l'un des 2 fields diverge (incluant `pdf_url=NULL` cote DB pour les 152 lignes pre-pdf_url) -> backfill auto en 1 cycle (<15 min).
+**Proposition** : Ajouter dans la section "Module Pennylane quote-driven -> Cron pennylane-sync-quote-status (edge function, 15 min)" :
+
+- **RPC d'ecriture** : appelle `public.pennylane_sync_update_quote_fields(quote_id, new_status, pdf_url)` (service_role only, COALESCE strict). Remplace l'ancienne `pennylane_sync_update_quote_status` cote cron a partir du 2026-05-26 (bug #8). L'ancienne RPC reste disponible mais n'est plus appelee par le cron.
+---
+
+## [2026-05-27 08:30] Cron pennylane-sync-quote-status jamais planifié — bug silencieux
+**Statut** : PENDING
+**Commit** : (cron créé via apply_migration 2026-05-27, fichier supabase/migrations/<date>_pennylane_sync_quote_status_cron.sql à versionner)
+**Contexte** : L'edge function existait depuis 2026-05-25 (commits 1df67db..4b90cf7) et était documentée dans CLAUDE.md comme tournant toutes les 15 min — mais l'entrée `cron.job` n'a jamais été créée. Conséquences pendant ~2 jours : pdf_url jamais backfillé sur les 155 devis attachés, quote_status jamais sync PL→MDH, customer fields jamais sync, devis supprimés PL jamais éjectés. Découvert via tooltip "PDF non synchronisé" qui ne se résolvait jamais. Fix : pg_cron schedule `*/15 * * * *` + secret stocké dans `vault.secrets` (entrée `mdh_cron_secret`) lu par le job.
+**Proposition** : Documenter une convention dans la section "Conventions de Code → Edge functions" :
+
+- **Edge functions cron** : toute edge function décrite comme un cron dans la doc DOIT avoir une entrée `cron.job` correspondante créée via migration versionnée. Vérifier avec `SELECT jobname FROM cron.job` que le cron est réellement planifié et actif. Le secret partagé (MDH_CRON_SECRET ou équivalent) doit être stocké dans `vault.secrets` pour être lu par le job pg_cron (cf pattern `pv-scrape-auto-poll`).
+---
+
+## [2026-05-27 08:35] GRANT SELECT à service_role manquant sur 14 tables majordhome.* post-Sem0
+**Statut** : PENDING
+**Commit** : (migration apply_migration 2026-05-27 `grant_service_role_select_majordhome_tables`)
+**Contexte** : Depuis le hardening Sem 0 (P0.0.2 — vues publiques en `security_invoker=true`), les edge functions qui lisent via `public.majordhome_*` ont besoin du GRANT SELECT explicite à service_role sur la table sous-jacente — RLS ne suffit plus. Le cron pennylane-sync-quote-status plantait silencieusement sur `42501 permission denied for table lead_pennylane_quotes` (erreur cachée par `sanitizeError` qui sortait "[object Object]"). 14 tables ajoutées post-Sem0 n'avaient pas le GRANT : chantier_line_receptions, client_creation_audit, dedup_*, geogrid_benchmarks/keyword_lists, lead_interactions, lead_pennylane_quotes, mail_segments, meta_ads_daily_stats, pellets_orders, pennylane_customer_lookup, voice_memos, voice_quotas. Fix : GRANT SELECT (pas INSERT/UPDATE/DELETE — les écritures passent par RPCs SECURITY DEFINER).
+**Proposition** : Ajouter une règle dans la charte multi-tenant (CLAUDE.md section "Multi-tenant & sécurité → Règles imposées par le multi-tenant") :
+
+- **Toute nouvelle table `majordhome.*`** lisible via une vue publique `majordhome_*` doit avoir `GRANT SELECT ON majordhome.<table> TO service_role` dans sa migration de création. Sans ce GRANT, les edge functions qui lisent la vue plantent en 42501 silencieusement (les vues sont `security_invoker=true` → le caller a besoin des droits sur la table sous-jacente, RLS ne suffit pas). INSERT/UPDATE/DELETE non accordés — les écritures passent par RPCs SECURITY DEFINER. À auditer périodiquement via `has_table_privilege('service_role', ..., 'SELECT')`.
+---
+
+## [2026-05-27 08:50] PL V2 single GET retourne au ROOT (pas wrappé)
+**Statut** : PENDING
+**Commit** : (deploy edge function pennylane-sync-quote-status v6, 2026-05-27)
+**Contexte** : L'edge function assumait que GET `/quotes/{id}` PL retournait `{ quote: {...} }` et faisait `(rawData as { quote })?.quote` — toujours undefined → 155 quotes skip silencieux sans backfill pdf_url. En réalité PL V2 retourne le quote DIRECTEMENT au root (confirmé par le frontend `apiCall` via pennylane-proxy + line 779 de pennylane.service.js qui accède `quote.id` directement). Fix : helper `unwrapPennylaneResource<T>(rawData, expectedKey)` défensif qui essaie d'abord la clé wrap puis fallback root via `'id' in obj`. Idem pour `/customers/{id}`.
+**Proposition** : Ajouter dans "Module Pennylane quote-driven → Gotchas PL V2" (nouvelle sous-section ou existante) :
+
+- **Shape réponse PL V2 single GET** : `/quotes/{id}` et `/customers/{id}` retournent la ressource DIRECTEMENT au root (pas dans `{ quote: ... }` ou `{ customer: ... }`). Toute edge function ou code qui consomme ces endpoints doit accepter le format root. Helper défensif : `unwrapPennylaneResource<T>(rawData, expectedKey)` qui essaie d'abord la clé wrap puis fallback root.
+---
+
+## [2026-05-27 08:55] sanitizeError stringifie maintenant les objets non-Error
+**Statut** : PENDING
+**Commit** : (edit local supabase/functions/_shared/auth.ts 2026-05-27 — non encore commité)
+**Contexte** : Avant fix, `sanitizeError({ code: 42501, message: 'permission denied for table X' })` retournait `String(err)` = `'[object Object]'` au lieu du vrai message. Bug détecté sur le cron pennylane-sync-quote-status qui plantait avec un PostgrestError mais sortait "[object Object]" dans les logs — diagnostic complètement bloqué. Fix : pour les objets non-Error (typeof === 'object' && err !== null), JSON.stringify(err) (ou fallback en prod si Sentry-like).
+**Proposition** : Acter le changement de `sanitizeError` dans la charte edge functions (CLAUDE.md section "Edge functions") :
+
+- **sanitizeError** : pour les PostgrestError et autres objets non-Error throw par supabase-js, JSON.stringify côté dev (pas `String(err)` qui sort "[object Object]" et masque la vraie cause). En prod, fallback générique pour ne pas leaker. Pattern à respecter dans tout helper d'erreur.
+---

@@ -81,6 +81,17 @@ export function sanitizeError(err: unknown, fallback = "Internal error"): string
     }
     return `${err.message}${err.stack ? "\n" + err.stack : ""}`;
   }
+  // Bug-fix 2026-05-27 : pour les objets non-Error (ex: PostgrestError dont
+  // String(...) renvoie "[object Object]" et masque la vraie cause), on
+  // JSON.stringify. Vu en pratique avec le cron pennylane-sync-quote-status
+  // qui plantait sur "permission denied" mais sortait juste "[object Object]".
+  if (err && typeof err === "object") {
+    try {
+      return isProd ? fallback : JSON.stringify(err);
+    } catch {
+      return fallback;
+    }
+  }
   return isProd ? fallback : String(err);
 }
 

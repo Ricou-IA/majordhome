@@ -50,6 +50,32 @@ interface PennylaneCustomer {
 }
 
 // ---------------------------------------------------------------------------
+// Unwrap defensif des reponses PL V2.
+// Les single GET (/quotes/{id}, /customers/{id}) retournent au ROOT, pas
+// dans { quote: ... } ni { customer: ... }. On garde un fallback au cas
+// ou PL change le shape un jour (deja vu chez d'autres APIs REST).
+// ---------------------------------------------------------------------------
+
+function unwrapPennylaneResource<T>(
+  rawData: unknown,
+  expectedKey: string,
+): T | null {
+  if (!rawData || typeof rawData !== "object") return null;
+  const obj = rawData as Record<string, unknown>;
+  // Cas wrap : { quote: {...} } / { customer: {...} }
+  if (
+    expectedKey in obj &&
+    obj[expectedKey] &&
+    typeof obj[expectedKey] === "object"
+  ) {
+    return obj[expectedKey] as T;
+  }
+  // Cas root : { id, ... }
+  if ("id" in obj) return obj as T;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Appel direct Pennylane (sans passer par pennylane-proxy)
 // ---------------------------------------------------------------------------
 
@@ -250,8 +276,13 @@ async function syncOrgQuotes(
         continue;
       }
 
-      // L'API Pennylane retourne { quote: {...} }
-      const plQuote = (rawData as { quote?: PennylaneQuote })?.quote ?? null;
+      // Pennylane V2 retourne les ressources single GET (/quotes/{id},
+      // /customers/{id}) directement au ROOT, pas dans { quote: ... } ni
+      // { customer: ... }. Le frontend (apiCall via pennylane-proxy) confirme.
+      // Bug detecte 2026-05-27 : l'unwrap (rawData as { quote })?.quote
+      // renvoyait toujours null -> 155 quotes skip silencieux sans backfill pdf_url.
+      // On garde un fallback defensif au cas ou PL change le shape un jour.
+      const plQuote = unwrapPennylaneResource<PennylaneQuote>(rawData, "quote");
       if (!plQuote) continue;
 
       // Sync fields (status + pdf_url) via RPC unifiée — COALESCE strict côté DB.
@@ -365,9 +396,8 @@ async function syncCustomerFields(
         continue;
       }
 
-      // L'API Pennylane retourne { customer: {...} }
-      const plCustomer = (rawData as { customer?: PennylaneCustomer })
-        ?.customer ?? null;
+      // PL V2 retourne au ROOT (cf commentaire au-dessus du sync quotes).
+      const plCustomer = unwrapPennylaneResource<PennylaneCustomer>(rawData, "customer");
       if (!plCustomer) continue;
 
       // Trouver le client MDH via pennylane_sync
