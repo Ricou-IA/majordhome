@@ -163,7 +163,16 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
   const sourceRaw = lead.sources?.name || null;
   const sourceLabel = sourceRaw ? (SOURCE_SHORT_LABELS[sourceRaw] || sourceRaw) : null;
   const sourceColor = lead.sources?.color || '#6B7280';
-  const amount = lead.order_amount_ht || lead.estimated_revenue || 0;
+  // Montant affiche :
+  // - Colonne Gagne -> somme des devis valides (card.total_amount = accepted_sum
+  //   de la vue majordhome_kanban_cards, decision produit 2026-05-27 : tous
+  //   les devis acceptes = autant d'interventions a prevoir)
+  // - Autres colonnes -> montant du dernier devis (order_amount_ht pose par
+  //   lead_attach_quotes_and_send) car on ne peut pas prevoir lequel sera
+  //   signe (cas Amalric avec 6 devis pending)
+  const amount = card?.column_key === 'gagne'
+    ? (Number(card?.total_amount) || lead.order_amount_ht || lead.estimated_revenue || 0)
+    : (lead.order_amount_ht || lead.estimated_revenue || 0);
   const daysInStatus = daysSince(lead.updated_at);
 
   // Commercial assigné (initiales)

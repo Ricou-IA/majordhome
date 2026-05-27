@@ -13,15 +13,12 @@
 import { Link2, ExternalLink, Trophy } from 'lucide-react';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 
-// Palette deutan-friendly (pas de rouge/vert) — mirror QuoteCandidatesModal.
+// Chips minimalistes : on n'affiche QUE "Refusé" (denied/refused PL).
+// Expired et autres statuts intermediaires ne sont pas suivis cote metier
+// (decision produit 2026-05-27). Le badge Gagnant signale les accepted.
 const QUOTE_STATUS_CHIP = {
-  accepted: { label: 'Accepté', color: '#1d4ed8', bg: '#dbeafe' },
-  pending: null, // statut par défaut, pas de chip
-  draft: { label: 'Brouillon', color: '#6b7280', bg: '#f3f4f6' },
   denied: { label: 'Refusé', color: '#4b5563', bg: '#e5e7eb' },
   refused: { label: 'Refusé', color: '#4b5563', bg: '#e5e7eb' },
-  expired: { label: 'Expiré', color: '#4b5563', bg: '#e5e7eb' },
-  invoiced: { label: 'Facturé', color: '#1d4ed8', bg: '#dbeafe' },
 };
 
 /**
