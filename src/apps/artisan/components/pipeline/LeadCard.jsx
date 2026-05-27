@@ -143,14 +143,18 @@ export function LeadCard({ lead, onClick, compact = false, commercialsMap, onMov
   const handleMouseEnter = hasDevis && !expanded ? () => prefetchLinkedQuotes(lead?.id) : undefined;
 
   // Filtrer les devis selon la colonne (pertinents uniquement)
+  // Aligne sur la vue majordhome_kanban_cards (migration 2026-05-27) :
+  // - devis_envoye groupe pending+draft+expired (expired non suivi metier)
+  // - gagne groupe accepted+invoiced
+  // - perdu groupe refused+denied+canceled (expired exclu)
   // useMemo doit rester avant tout return conditionnel (règles des hooks React)
   const filteredQuotes = useMemo(() => {
     return (linkedQuotes || []).filter(q => {
       if (!card?.column_key) return true;
       const status = q.quote_status;
-      if (card.column_key === 'devis_envoye') return ['pending', 'draft'].includes(status);
-      if (card.column_key === 'gagne') return status === 'accepted';
-      if (card.column_key === 'perdu') return ['refused', 'denied', 'expired', 'canceled'].includes(status);
+      if (card.column_key === 'devis_envoye') return ['pending', 'draft', 'expired'].includes(status);
+      if (card.column_key === 'gagne') return ['accepted', 'invoiced'].includes(status);
+      if (card.column_key === 'perdu') return ['refused', 'denied', 'canceled'].includes(status);
       return true;
     });
   }, [linkedQuotes, card?.column_key]);
