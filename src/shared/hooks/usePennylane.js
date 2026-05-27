@@ -494,30 +494,33 @@ export function useUnlinkedQuoteCount({ sinceDays = 30, enabled = true } = {}) {
 
 /**
  * Construit un patch lead = champs contact PL à reporter sur le lead.
- * Règle stricte : on N'ÉCRASE JAMAIS une valeur existante du lead (l'user
- * peut avoir corrigé manuellement). On ne remplit que les champs vides.
+ * Sémantique OVERWRITE (décision produit 2026-05-27) : une fois qu'un
+ * devis PL est attaché, Pennylane est canonique pour l'identité — on
+ * écrase MDH avec PL même si MDH avait une valeur. Le bandeau UI
+ * "Données synchronisées depuis Pennylane — à modifier dans Pennylane"
+ * prévient l'user. Si PL fournit une valeur vide, on ne touche pas
+ * MDH (sécurité : NULLIF côté RPC `update_majordhome_lead`).
  *
- * @param {object} lead — lead courant (avec ses champs contact actuels)
+ * @param {object} lead — lead courant (lu pour signature, non utilisé pour merge)
  * @param {object} customer — payload customer Pennylane V2
  * @returns {object} patch jsonb pour update_majordhome_lead
  */
 function buildContactPatchFromCustomer(lead, customer) {
   if (!customer || !lead) return {};
   const patch = {};
-  const isEmpty = v => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 
   const { firstName, lastName } = pennylaneService.extractCustomerName(customer);
   const email = pennylaneService.extractCustomerEmail(customer);
   const phone = pennylaneService.extractCustomerPhone(customer);
   const { address, postalCode, city } = pennylaneService.extractCustomerAddress(customer);
 
-  if (firstName && isEmpty(lead.first_name)) patch.first_name = firstName;
-  if (lastName && isEmpty(lead.last_name)) patch.last_name = lastName;
-  if (email && isEmpty(lead.email)) patch.email = email;
-  if (phone && isEmpty(lead.phone)) patch.phone = cleanPhone(phone);
-  if (address && isEmpty(lead.address)) patch.address = address;
-  if (postalCode && isEmpty(lead.postal_code)) patch.postal_code = postalCode;
-  if (city && isEmpty(lead.city)) patch.city = city;
+  if (firstName) patch.first_name = firstName;
+  if (lastName) patch.last_name = lastName;
+  if (email) patch.email = email;
+  if (phone) patch.phone = cleanPhone(phone);
+  if (address) patch.address = address;
+  if (postalCode) patch.postal_code = postalCode;
+  if (city) patch.city = city;
 
   return patch;
 }

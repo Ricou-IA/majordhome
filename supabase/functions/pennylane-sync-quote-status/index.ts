@@ -1,12 +1,13 @@
 // supabase/functions/pennylane-sync-quote-status/index.ts
-// Cron 15 min : sync quote_status Pennylane → DB + sync customer fields → clients MDH
+// Cron 15 min : sync devis attachés (status + pdf_url) + sync identité PL→MDH
+// (clients + leads) + auto-attach nouveaux devis PL pour bridges existants.
+//
 // Spec : docs/superpowers/specs/2026-05-25-pipeline-multidevis-design.md §9
+// Bridge canonique (2026-05-27) : une fois un devis attaché à un lead, PL
+// devient canonical pour l'identité du lead + tous les nouveaux devis PL
+// de ce customer sont auto-attachés au même lead.
 //
-// Auth : verify_jwt:false — protégée par MDH_CRON_SECRET (pattern P0.2)
-//
-// NOTE : cette edge function appelle l'API Pennylane **directement** (pas via
-// pennylane-proxy) car elle tourne sans JWT user — pennylane-proxy nécessite
-// verify_jwt:true + membership check qui n'a pas de sens ici.
+// Auth : verify_jwt:false — protégée par MDH_CRON_SECRET (pattern P0.2).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
@@ -49,20 +50,24 @@ interface PennylaneCustomer {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Unwrap defensif des reponses PL V2.
-// Les single GET (/quotes/{id}, /customers/{id}) retournent au ROOT, pas
-// dans { quote: ... } ni { customer: ... }. On garde un fallback au cas
-// ou PL change le shape un jour (deja vu chez d'autres APIs REST).
-// ---------------------------------------------------------------------------
+interface AttachedQuote {
+  id: string;
+  lead_id: string;
+  pennylane_quote_id: number;
+  pennylane_customer_id: number | null;
+  quote_status: string | null;
+  is_winning_quote: boolean;
+  pdf_url: string | null;
+  assigned_at: string;
+}
 
+// Bug-fix 2026-05-27 : PL V2 single GET retourne au ROOT, pas dans { quote: ... }.
 function unwrapPennylaneResource<T>(
   rawData: unknown,
   expectedKey: string,
 ): T | null {
   if (!rawData || typeof rawData !== "object") return null;
   const obj = rawData as Record<string, unknown>;
-  // Cas wrap : { quote: {...} } / { customer: {...} }
   if (
     expectedKey in obj &&
     obj[expectedKey] &&
@@ -70,10 +75,14 @@ function unwrapPennylaneResource<T>(
   ) {
     return obj[expectedKey] as T;
   }
-  // Cas root : { id, ... }
   if ("id" in obj) return obj as T;
   return null;
 }
+
+// Seuil pipeline : devis < 1000€ HT = SAV/entretien hors pipeline commercial.
+// Pas d'auto-attach pour ces devis (alignement constante frontend
+// PIPELINE_MIN_AMOUNT_HT dans QuoteCandidatesModal).
+const PIPELINE_MIN_AMOUNT_HT = 1000;
 
 // ---------------------------------------------------------------------------
 // Appel direct Pennylane (sans passer par pennylane-proxy)
@@ -119,6 +128,35 @@ async function callPennylaneApi(
   return { status: 429, data: { error: "Rate limit after retries" } };
 }
 
+// Helpers extraction non-vide depuis customer PL (mirror frontend service)
+function extractUpdatePayload(c: PennylaneCustomer): Record<string, string> {
+  const p: Record<string, string> = {};
+
+  if (c.first_name?.trim()) p.first_name = c.first_name.trim();
+  if (c.last_name?.trim()) p.last_name = c.last_name.trim();
+
+  const email =
+    c.billing_email?.trim() ||
+    c.emails?.find((e) => e.is_default)?.value?.trim() ||
+    c.emails?.[0]?.value?.trim();
+  if (email) p.email = email;
+
+  const phone = (c.billing_phone || c.phone)?.trim();
+  if (phone) p.phone = phone;
+
+  if (c.billing_address?.street?.trim()) {
+    p.address = c.billing_address.street.trim();
+  }
+  if (c.billing_address?.postal_code?.trim()) {
+    p.postal_code = c.billing_address.postal_code.trim();
+  }
+  if (c.billing_address?.city?.trim()) {
+    p.city = c.billing_address.city.trim();
+  }
+
+  return p;
+}
+
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
@@ -128,8 +166,6 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: buildCorsHeaders(req) });
   }
 
-  // Auth : Bearer secret partagé (pattern P0.2 — requireSharedSecret retourne
-  // Response|null, pas {ok, response})
   const authError = requireSharedSecret(
     req,
     Deno.env.get("MDH_CRON_SECRET") || "",
@@ -149,10 +185,6 @@ Deno.serve(async (req) => {
   const supabase = getAdminClient();
 
   try {
-    // 1. Charger les orgs Pennylane-activées
-    // Org filter done client-side intentionally: PostgREST JSONB nested boolean filter
-    // (settings->pennylane->>enabled = 'true') can be unreliable across PostgREST versions.
-    // The organizations table is small (1-10 rows in pilot), so a full fetch is acceptable.
     const { data: orgs, error: orgsErr } = await supabase
       .schema("core")
       .from("organizations")
@@ -179,6 +211,8 @@ Deno.serve(async (req) => {
       processed_orgs: 0,
       quote_status_updates: 0,
       customer_field_updates: 0,
+      lead_field_updates: 0,
+      auto_attached_quotes: 0,
       ejections: 0,
       winning_quotes_set: 0,
       errors: [] as string[],
@@ -190,6 +224,8 @@ Deno.serve(async (req) => {
         summary.processed_orgs++;
         summary.quote_status_updates += result.quote_status_updates;
         summary.customer_field_updates += result.customer_field_updates;
+        summary.lead_field_updates += result.lead_field_updates;
+        summary.auto_attached_quotes += result.auto_attached_quotes;
         summary.ejections += result.ejections;
         summary.winning_quotes_set += result.winning_quotes_set;
       } catch (orgErr) {
@@ -215,119 +251,39 @@ async function syncOrgQuotes(
   supabase: ReturnType<typeof getAdminClient>,
   orgId: string,
   apiToken: string,
-): Promise<{
-  quote_status_updates: number;
-  customer_field_updates: number;
-  ejections: number;
-  winning_quotes_set: number;
-}> {
+) {
   let quote_status_updates = 0;
-  let customer_field_updates = 0;
-  let ejections = 0;
+  const ejections_ref = { v: 0 };
   let winning_quotes_set = 0;
 
-  // 1. Récupérer tous les devis actifs (non éjectés) de cette org
-  const { data: attachedQuotes, error: aqErr } = await supabase
+  // 1. Recuperer tous les devis actifs (non ejectes) de cette org
+  const { data: attachedRows, error: aqErr } = await supabase
     .from("majordhome_lead_pennylane_quotes")
     .select(
-      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, is_winning_quote, pdf_url",
+      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, is_winning_quote, pdf_url, assigned_at",
     )
     .eq("org_id", orgId)
     .is("ejected_at", null);
 
   if (aqErr) throw aqErr;
-  if (!attachedQuotes || attachedQuotes.length === 0) {
-    return { quote_status_updates, customer_field_updates, ejections, winning_quotes_set };
+  const attachedQuotes: AttachedQuote[] = (attachedRows ?? []) as AttachedQuote[];
+  if (attachedQuotes.length === 0) {
+    return {
+      quote_status_updates: 0,
+      customer_field_updates: 0,
+      lead_field_updates: 0,
+      auto_attached_quotes: 0,
+      ejections: 0,
+      winning_quotes_set: 0,
+    };
   }
 
-  // 2. Sync quote_status pour chaque devis
-  for (const aq of attachedQuotes) {
-    if (!aq.pennylane_quote_id) continue;
+  // 2. Sync quote_status + pdf_url pour chaque devis attache
+  quote_status_updates = await syncAttachedQuoteFields(
+    supabase, orgId, apiToken, attachedQuotes, ejections_ref,
+  );
 
-    try {
-      const { status: httpStatus, data: rawData } = await callPennylaneApi(
-        `/quotes/${aq.pennylane_quote_id}`,
-        apiToken,
-      );
-
-      if (httpStatus === 404) {
-        // Devis supprimé côté Pennylane → eject via RPC (pattern obligatoire :
-        // .schema('majordhome').from() ne fonctionne pas côté edge function)
-        const { error: ejectErr } = await supabase.rpc('pennylane_sync_eject_quote', {
-          p_quote_id: aq.id,
-          p_reason: 'deleted_in_pennylane',
-        });
-
-        if (ejectErr) {
-          console.warn(`[pennylane-sync] eject failed for quote ${aq.id}:`, sanitizeError(ejectErr, 'eject failed'));
-        } else {
-          ejections++;
-          console.log(
-            `[pennylane-sync] ejected quote ${aq.pennylane_quote_id} (deleted in PL)`,
-          );
-        }
-        continue;
-      }
-
-      if (httpStatus < 200 || httpStatus >= 300) {
-        console.warn(
-          `[pennylane-sync] quote ${aq.pennylane_quote_id} returned HTTP ${httpStatus}`,
-        );
-        continue;
-      }
-
-      // Pennylane V2 retourne les ressources single GET (/quotes/{id},
-      // /customers/{id}) directement au ROOT, pas dans { quote: ... } ni
-      // { customer: ... }. Le frontend (apiCall via pennylane-proxy) confirme.
-      // Bug detecte 2026-05-27 : l'unwrap (rawData as { quote })?.quote
-      // renvoyait toujours null -> 155 quotes skip silencieux sans backfill pdf_url.
-      // On garde un fallback defensif au cas ou PL change le shape un jour.
-      const plQuote = unwrapPennylaneResource<PennylaneQuote>(rawData, "quote");
-      if (!plQuote) continue;
-
-      // Sync fields (status + pdf_url) via RPC unifiée — COALESCE strict côté DB.
-      // Appel systématique si l'un des 2 fields diverge (incluant pdf_url=NULL
-      // côté DB pour les 152 lignes pré-pdf_url).
-      const plStatus = plQuote.status ?? null;
-      const plPdfUrl = plQuote.public_file_url ?? null;
-      const statusDiffers = plStatus && plStatus !== aq.quote_status;
-      const pdfDiffers = plPdfUrl && plPdfUrl !== aq.pdf_url;
-
-      if (statusDiffers || pdfDiffers) {
-        const { error: updErr } = await supabase.rpc('pennylane_sync_update_quote_fields', {
-          p_quote_id: aq.id,
-          p_new_status: plStatus,
-          p_pdf_url: plPdfUrl,
-        });
-
-        if (updErr) {
-          console.warn(
-            `[pennylane-sync] fields update failed for quote ${aq.id}:`,
-            sanitizeError(updErr, 'fields update failed'),
-          );
-        } else {
-          quote_status_updates++;
-          if (statusDiffers) {
-            console.log(
-              `[pennylane-sync] quote ${aq.pennylane_quote_id}: ${aq.quote_status} → ${plStatus}`,
-            );
-          }
-          if (pdfDiffers && !aq.pdf_url) {
-            console.log(
-              `[pennylane-sync] quote ${aq.pennylane_quote_id}: pdf_url backfilled`,
-            );
-          }
-        }
-      }
-    } catch (e) {
-      console.warn(
-        `[pennylane-sync] error fetching quote ${aq.pennylane_quote_id}:`,
-        sanitizeError(e, 'quote fetch error'),
-      );
-    }
-  }
-
-  // 3. Pose is_winning_quote sur le plus récent accepted (si aucun déjà posé)
+  // 3. Pose is_winning_quote sur le plus recent accepted
   try {
     const { data: winnersSet, error: winnersErr } = await supabase.rpc(
       "pennylane_sync_ensure_winning_quotes",
@@ -348,42 +304,133 @@ async function syncOrgQuotes(
     );
   }
 
-  // 4. Sync customer fields PL → clients MDH (COALESCE strict)
-  customer_field_updates = await syncCustomerFields(
-    supabase,
-    orgId,
-    apiToken,
-    attachedQuotes,
+  // 4. Sync identite PL -> MDH (clients + leads, mode OVERWRITE)
+  const { customer_field_updates, lead_field_updates } =
+    await syncIdentityFromPennylane(supabase, orgId, apiToken, attachedQuotes);
+
+  // 5. Auto-attach nouveaux devis PL pour bridges existants (bridge canonique)
+  const auto_attached_quotes = await autoAttachNewQuotes(
+    supabase, orgId, apiToken, attachedQuotes,
   );
 
-  return { quote_status_updates, customer_field_updates, ejections, winning_quotes_set };
+  return {
+    quote_status_updates,
+    customer_field_updates,
+    lead_field_updates,
+    auto_attached_quotes,
+    ejections: ejections_ref.v,
+    winning_quotes_set,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// syncCustomerFields — sync champs contact PL → clients MDH
-// COALESCE strict : ne jamais écraser avec null/vide
+// syncAttachedQuoteFields — etape 2 : sync status + pdf_url des devis attaches
 // ---------------------------------------------------------------------------
 
-async function syncCustomerFields(
+async function syncAttachedQuoteFields(
   supabase: ReturnType<typeof getAdminClient>,
   orgId: string,
   apiToken: string,
-  attachedQuotes: Array<{ pennylane_customer_id: number | null }>,
+  attachedQuotes: AttachedQuote[],
+  ejections_ref: { v: number },
 ): Promise<number> {
   let updates = 0;
 
-  // Dédup sur pennylane_customer_id
-  const uniqueCustomerIds = Array.from(
-    new Set(
-      attachedQuotes
-        .map((q) => q.pennylane_customer_id)
-        .filter((id): id is number => id !== null),
-    ),
-  );
+  for (const aq of attachedQuotes) {
+    if (!aq.pennylane_quote_id) continue;
 
-  for (const customerId of uniqueCustomerIds) {
     try {
-      // Fetch customer PL
+      const { status: httpStatus, data: rawData } = await callPennylaneApi(
+        `/quotes/${aq.pennylane_quote_id}`,
+        apiToken,
+      );
+
+      if (httpStatus === 404) {
+        const { error: ejectErr } = await supabase.rpc('pennylane_sync_eject_quote', {
+          p_quote_id: aq.id,
+          p_reason: 'deleted_in_pennylane',
+        });
+
+        if (ejectErr) {
+          console.warn(`[pennylane-sync] eject failed for quote ${aq.id}:`, sanitizeError(ejectErr, 'eject failed'));
+        } else {
+          ejections_ref.v++;
+        }
+        continue;
+      }
+
+      if (httpStatus < 200 || httpStatus >= 300) {
+        console.warn(
+          `[pennylane-sync] quote ${aq.pennylane_quote_id} returned HTTP ${httpStatus}`,
+        );
+        continue;
+      }
+
+      const plQuote = unwrapPennylaneResource<PennylaneQuote>(rawData, "quote");
+      if (!plQuote) continue;
+
+      const plStatus = plQuote.status ?? null;
+      const plPdfUrl = plQuote.public_file_url ?? null;
+      const statusDiffers = plStatus && plStatus !== aq.quote_status;
+      const pdfDiffers = plPdfUrl && plPdfUrl !== aq.pdf_url;
+
+      if (statusDiffers || pdfDiffers) {
+        const { error: updErr } = await supabase.rpc('pennylane_sync_update_quote_fields', {
+          p_quote_id: aq.id,
+          p_new_status: plStatus,
+          p_pdf_url: plPdfUrl,
+        });
+
+        if (updErr) {
+          console.warn(
+            `[pennylane-sync] fields update failed for quote ${aq.id}:`,
+            sanitizeError(updErr, 'fields update failed'),
+          );
+        } else {
+          updates++;
+        }
+      }
+    } catch (e) {
+      console.warn(
+        `[pennylane-sync] error fetching quote ${aq.pennylane_quote_id}:`,
+        sanitizeError(e, 'quote fetch error'),
+      );
+    }
+  }
+
+  return updates;
+}
+
+// ---------------------------------------------------------------------------
+// syncIdentityFromPennylane — etape 4 : sync identite PL -> MDH
+// Pour chaque customer unique : fetch /customers/{id} et update :
+//   - client(s) MDH lies via pennylane_sync (OVERWRITE-when-PL-has-value)
+//   - lead(s) bridges via lead_pennylane_quotes (OVERWRITE direct, PL canonical)
+// ---------------------------------------------------------------------------
+
+async function syncIdentityFromPennylane(
+  supabase: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  apiToken: string,
+  attachedQuotes: AttachedQuote[],
+): Promise<{ customer_field_updates: number; lead_field_updates: number }> {
+  let customer_field_updates = 0;
+  let lead_field_updates = 0;
+
+  // Bridge map : customer_id -> Set<lead_id>
+  const bridgeMap = new Map<number, Set<string>>();
+  for (const aq of attachedQuotes) {
+    if (!aq.pennylane_customer_id) continue;
+    let set = bridgeMap.get(aq.pennylane_customer_id);
+    if (!set) {
+      set = new Set();
+      bridgeMap.set(aq.pennylane_customer_id, set);
+    }
+    set.add(aq.lead_id);
+  }
+
+  for (const [customerId, leadIds] of bridgeMap) {
+    try {
       const { status: httpStatus, data: rawData } = await callPennylaneApi(
         `/customers/${customerId}`,
         apiToken,
@@ -396,11 +443,13 @@ async function syncCustomerFields(
         continue;
       }
 
-      // PL V2 retourne au ROOT (cf commentaire au-dessus du sync quotes).
       const plCustomer = unwrapPennylaneResource<PennylaneCustomer>(rawData, "customer");
       if (!plCustomer) continue;
 
-      // Trouver le client MDH via pennylane_sync
+      const updatePayload = extractUpdatePayload(plCustomer);
+      if (Object.keys(updatePayload).length === 0) continue;
+
+      // 4a. Sync client MDH (si mapping pennylane_sync existe)
       const { data: syncRow, error: syncErr } = await supabase
         .from("majordhome_pennylane_sync")
         .select("local_id")
@@ -414,67 +463,178 @@ async function syncCustomerFields(
           `[pennylane-sync] sync lookup error for customer ${customerId}:`,
           sanitizeError(syncErr, 'sync lookup error'),
         );
-        continue;
-      }
-      if (!syncRow?.local_id) continue;
+      } else if (syncRow?.local_id) {
+        const { error: clientUpdErr } = await supabase.rpc('pennylane_sync_update_client_fields', {
+          p_client_id: syncRow.local_id,
+          p_org_id: orgId,
+          p_fields: updatePayload,
+        });
 
-      // Extraire les valeurs PL non-nulles (COALESCE strict côté RPC serveur)
-      const updatePayload: Record<string, string> = {};
-
-      if (plCustomer.first_name?.trim()) {
-        updatePayload.first_name = plCustomer.first_name.trim();
-      }
-      if (plCustomer.last_name?.trim()) {
-        updatePayload.last_name = plCustomer.last_name.trim();
-      }
-
-      // Email : priorité billing_email, sinon emails[is_default], sinon premier
-      const email =
-        plCustomer.billing_email?.trim() ||
-        plCustomer.emails?.find((e) => e.is_default)?.value?.trim() ||
-        plCustomer.emails?.[0]?.value?.trim();
-      if (email) updatePayload.email = email;
-
-      // Téléphone
-      const phone = (plCustomer.billing_phone || plCustomer.phone)?.trim();
-      if (phone) updatePayload.phone = phone;
-
-      // Adresse
-      if (plCustomer.billing_address?.street?.trim()) {
-        updatePayload.address = plCustomer.billing_address.street.trim();
-      }
-      if (plCustomer.billing_address?.postal_code?.trim()) {
-        updatePayload.postal_code = plCustomer.billing_address.postal_code.trim();
-      }
-      if (plCustomer.billing_address?.city?.trim()) {
-        updatePayload.city = plCustomer.billing_address.city.trim();
+        if (clientUpdErr) {
+          console.warn(
+            `[pennylane-sync] client update failed (pl_customer ${customerId}):`,
+            sanitizeError(clientUpdErr, 'client update failed'),
+          );
+        } else {
+          customer_field_updates++;
+        }
       }
 
-      if (Object.keys(updatePayload).length === 0) continue;
+      // 4b. Sync lead(s) bridges a ce customer (PL canonical post-attach)
+      for (const leadId of leadIds) {
+        const { error: leadUpdErr } = await supabase.rpc('pennylane_sync_overwrite_lead_fields', {
+          p_lead_id: leadId,
+          p_org_id: orgId,
+          p_fields: updatePayload,
+        });
 
-      // Via RPC (pattern obligatoire : .schema('majordhome').from() ne fonctionne
-      // pas côté edge function). La RPC fait COALESCE strict server-side.
-      const { error: updateErr } = await supabase.rpc('pennylane_sync_update_client_fields', {
-        p_client_id: syncRow.local_id,
-        p_org_id: orgId,
-        p_fields: updatePayload,
-      });
-
-      if (updateErr) {
-        console.warn(
-          `[pennylane-sync] client update failed (pl_customer ${customerId}):`,
-          sanitizeError(updateErr, 'client update failed'),
-        );
-      } else {
-        updates++;
+        if (leadUpdErr) {
+          console.warn(
+            `[pennylane-sync] lead update failed (lead ${leadId}):`,
+            sanitizeError(leadUpdErr, 'lead update failed'),
+          );
+        } else {
+          lead_field_updates++;
+        }
       }
     } catch (e) {
       console.warn(
-        `[pennylane-sync] customer ${customerId} sync exception:`,
-        sanitizeError(e, 'customer sync exception'),
+        `[pennylane-sync] identity sync exception for customer ${customerId}:`,
+        sanitizeError(e, 'identity sync exception'),
       );
     }
   }
 
-  return updates;
+  return { customer_field_updates, lead_field_updates };
+}
+
+// ---------------------------------------------------------------------------
+// autoAttachNewQuotes — etape 5 : auto-attach nouveaux devis PL pour bridges
+// existants. Pour chaque customer ayant deja un bridge (>=1 devis attache),
+// fetch tous ses devis PL et attache ceux qui ne sont pas en base.
+//
+// Respecte le seuil pipeline 1000€ HT (SAV/entretien exclus).
+// Respecte les ejections manuelles (RPC pennylane_sync_auto_attach_quote
+// no-op si quote_pl_id existe en base, meme ejected).
+//
+// Bridge lead_id : on prend la rangee la plus recemment assignee pour chaque
+// customer (assigned_at DESC).
+// ---------------------------------------------------------------------------
+
+interface PennylaneQuoteListItem {
+  id: number;
+  quote_number?: string;
+  label?: string;
+  date?: string;
+  status?: string;
+  currency_amount_before_tax?: number;
+  public_file_url?: string;
+  customer?: { id?: number };
+}
+
+interface PennylaneQuotesListResponse {
+  items?: PennylaneQuoteListItem[];
+  has_more?: boolean;
+  next_cursor?: string;
+}
+
+async function autoAttachNewQuotes(
+  supabase: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  apiToken: string,
+  attachedQuotes: AttachedQuote[],
+): Promise<number> {
+  let attached = 0;
+
+  // Set des quote_pl_id deja attaches (pour diff rapide)
+  const attachedPlIds = new Set<number>(
+    attachedQuotes.map((aq) => aq.pennylane_quote_id),
+  );
+
+  // Bridge map : customer_id -> lead_id le plus recemment assigne
+  const bridgeMap = new Map<number, { lead_id: string; assigned_at: string }>();
+  for (const aq of attachedQuotes) {
+    if (!aq.pennylane_customer_id) continue;
+    const existing = bridgeMap.get(aq.pennylane_customer_id);
+    if (!existing || aq.assigned_at > existing.assigned_at) {
+      bridgeMap.set(aq.pennylane_customer_id, {
+        lead_id: aq.lead_id,
+        assigned_at: aq.assigned_at,
+      });
+    }
+  }
+
+  for (const [customerId, bridge] of bridgeMap) {
+    try {
+      // Fetch tous les devis PL pour ce customer via filter natif V2
+      const filter = encodeURIComponent(
+        JSON.stringify([{ field: "customer_id", operator: "eq", value: customerId }]),
+      );
+      const { status: httpStatus, data: rawData } = await callPennylaneApi(
+        `/quotes?filter=${filter}&limit=100`,
+        apiToken,
+      );
+
+      if (httpStatus !== 200) {
+        console.warn(
+          `[pennylane-sync] customer ${customerId} quotes list HTTP ${httpStatus}`,
+        );
+        continue;
+      }
+
+      const list = (rawData as PennylaneQuotesListResponse) ?? {};
+      const items = list.items ?? [];
+
+      for (const q of items) {
+        if (!q.id) continue;
+        if (attachedPlIds.has(q.id)) continue; // deja attache
+
+        const amountHt = Number(q.currency_amount_before_tax ?? 0);
+        if (amountHt < PIPELINE_MIN_AMOUNT_HT) continue; // SAV/entretien hors pipeline
+
+        const label = q.quote_number || q.label || `Q-${q.id}`;
+        const quoteDate = q.date || new Date().toISOString().slice(0, 10);
+        const status = q.status || null;
+        const pdfUrl = q.public_file_url || null;
+
+        const { data: result, error: attachErr } = await supabase.rpc(
+          'pennylane_sync_auto_attach_quote',
+          {
+            p_org_id: orgId,
+            p_lead_id: bridge.lead_id,
+            p_quote_pl_id: q.id,
+            p_customer_id: customerId,
+            p_amount_ht: amountHt,
+            p_label: label,
+            p_quote_date: quoteDate,
+            p_status: status,
+            p_pdf_url: pdfUrl,
+          },
+        );
+
+        if (attachErr) {
+          console.warn(
+            `[pennylane-sync] auto-attach failed for quote ${q.id}:`,
+            sanitizeError(attachErr, 'auto-attach failed'),
+          );
+          continue;
+        }
+
+        const wasAttached = (result as { attached?: boolean } | null)?.attached === true;
+        if (wasAttached) {
+          attached++;
+          console.log(
+            `[pennylane-sync] auto-attached quote ${q.id} (${label}, ${amountHt}€) to lead ${bridge.lead_id}`,
+          );
+        }
+      }
+    } catch (e) {
+      console.warn(
+        `[pennylane-sync] auto-attach exception for customer ${customerId}:`,
+        sanitizeError(e, 'auto-attach exception'),
+      );
+    }
+  }
+
+  return attached;
 }
