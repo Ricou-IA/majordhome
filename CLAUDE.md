@@ -2,6 +2,7 @@
 
 > ⚠️ **Consolidation multi-tenant — Sem 0 hardening DB quasi-finie (~97%, 2026-05-21)** — Une 2ème entreprise va rejoindre la même instance Supabase. Audit complet : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md` (13 CRITICAL codebase + 131 ERROR Supabase Advisor). État Sem 0 détaillé : mémoire `project_hardening_sem0_status.md`. **Plus rien de bloquant côté Majord'home/core. La roadmap fonctionnelle (Sprints 8-10) peut reprendre.**
 > **Dernière MàJ** : 2026-05-21 — Sem 0 hardening DB complète (P0.0.1 exec_sql INVOKER, P0.0.2 73 vues security_invoker, P0.0.4 REVOKE anon × 22 RPCs, P0.0.5/.0.6 RLS + policies 13 tables, P0.0.7 storage paths `${orgId}/`, P0.0.9 audit corps 6 RPCs sensibles, P0.0.10 search_path × 111 fonctions, P0.2 MDH_CRON_SECRET crons, P0.3 pennylane-proxy hardened, P0.4 OAuth GSC state HMAC, P0.5 voice RPC service_role only, P0.6 voice quota daily, P0.7 requireOrganization, P0.8 V2 mailing N8n→edge, P0.10 voice_recorder permission, P0.11 cache keys orgId, P0.13-P0.20 branding multi-tenant, P0.21 headers HTTP, P0.22 no sourcemap, P0.23 xlsx→exceljs, P0.24 sandbox iframes, P0.25 helper `_shared/auth.ts`, P0.26 escapePostgrestSearchTerm, P0.27 ESLint config). Détails : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`.
+> **MàJ 2026-06-01** : sync doc post-bridge Pennylane — bridge canonique (OVERWRITE post-attache + auto-attach cron), stabilisation pipeline (montant Gagné = accepted_sum, chip Refusé seul, expired=pending) + conventions GRANT service_role, cron.job pg_cron, gotcha PL V2 single GET root, signature contrat figée (nouvelle section Module Contrats).
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -29,9 +30,10 @@ Plateforme SaaS métier pour artisans du bâtiment (CVC). CRM, planning, pipelin
 - Tout nouveau bucket Storage doit utiliser `${orgId}/...` en préfixe de path + policies `(storage.foldername(name))[1]::uuid IN (org_members)`
 - Toute nouvelle table `majordhome.*` doit avoir RLS activée + policies CRUD scopées org_id dès la création
 - Toute nouvelle vue `public.majordhome_*` doit être créée avec `WITH (security_invoker=true)`
+- **Toute nouvelle table `majordhome.*` lisible via une vue publique `majordhome_*`** doit inclure `GRANT SELECT ON majordhome.<table> TO service_role` dans sa migration. Les vues étant `security_invoker=true`, RLS ne suffit pas : sans ce GRANT, les edge functions qui lisent la vue plantent en `42501 permission denied` **silencieux**. INSERT/UPDATE/DELETE non accordés (écritures via RPCs SECURITY DEFINER). Auditer via `has_table_privilege('service_role', …, 'SELECT')` (régression post-Sem0 : 14 tables corrigées le 2026-05-27)
 - Ne JAMAIS appeler `public.exec_sql` depuis le frontend
 - **Ne JAMAIS construire de SQL dynamique côté frontend pour le mailing** (ou tout flux multi-tenant). Passer par une RPC SECURITY DEFINER qui vérifie `auth.uid() ∈ org_members` avant compile (cf. `mail_segment_compile_safe`, `mail_single_client_sql`, `mail_fetch_recipients`)
-- **Toute clause PostgREST `.or()` / `.ilike()` qui interpole un input utilisateur** DOIT passer par `escapePostgrestSearchTerm()` (`src/lib/postgrestUtils.js`) avant interpolation. Strip `,()*:%\` empêche un attaquant de forger un filtre additionnel (P0.26)
+- **Toute clause PostgREST `.or()` / `.ilike()` qui interpole un input utilisateur** DOIT passer par `escapePostgrestSearchTerm()` (`src/lib/postgrestUtils.js`) avant interpolation. Strip `,()*:%\` empêche un attaquant de forger un filtre additionnel (P0.26). **Exception documentée (2026-05-26)** : les recherches ILIKE Pennylane (`searchPennylaneCustomers` dans `pennylane.service.js`) conservent un escape anti-wildcard LOCAL (échappe les wildcards `%` et `_`) car `escapePostgrestSearchTerm()` strip `%` et casserait la recherche partielle. Si ce besoin se répète → créer une variante `escapePostgrestSearchTermPreservingWildcards()` au helper plutôt que re-copier le regex local
 - **Toute edge function `verify_jwt:false`** qui n'est PAS un webhook tiers légitime (Resend, Pennylane callback signé) doit exiger un secret partagé via `requireSharedSecret(req, MDH_CRON_SECRET)` du helper `_shared/auth.ts` (P0.2/P0.25)
 - **Toute edge function `verify_jwt:true`** doit valider la membership via `requireOrgMembership(req, opts)` du helper `_shared/auth.ts` (P0.25)
 - **Intégrations conditionnelles par org** : utiliser un flag dans `core.organizations.settings` (ex `{ pennylane: { enabled: true } }`) consommé via `orgSettingsFilter` de `requireOrgMembership`. Pattern à étendre pour Meta Ads, intégrations futures (P0.3)
@@ -185,7 +187,7 @@ src/
 - `majordhome_contracts` → contracts JOIN clients (client_name, client_address, etc.)
 - `majordhome_appointments` → appointments + client_first_name, assigned_commercial_id
 - `majordhome_chantiers` → leads filtrés (chantier_status IS NOT NULL) + JOIN equipment_type + intervention parent
-- `majordhome_kanban_cards` → cartes Kanban matérialisées depuis `lead_pennylane_quotes.quote_status` (1 lead → 1-2 cartes selon mix pending/accepted/refused, fallback sur `leads.status_id` si aucun devis PL attaché). Pennylane canonical pour le placement.
+- `majordhome_kanban_cards` → cartes Kanban matérialisées depuis `lead_pennylane_quotes.quote_status` (1 lead → 1-2 cartes selon le mix de statuts, fallback sur `leads.status_id` si aucun devis PL attaché). Pennylane canonical pour le placement. **Allowlists statut (2026-05-27)** : Gagné = `accepted`|`invoiced` (bug #7) ; Devis envoyé = `pending`|`draft`|`expired` ; Perdu = `refused`|`denied`|`canceled` UNIQUEMENT (et seulement si pending=0 ET accepted=0). `expired` est traité comme pending (devis expiré = relançable, ne pousse PAS le lead en Perdu — décision produit 2026-05-27). Tout autre statut PL futur (`scheduled`…) reste invisible jusqu'à extension explicite de la vue.
 - `majordhome_prospects` → prospects JOIN profiles (created_by_name, assigned_to_name)
 - `majordhome_prospect_interactions` → interactions JOIN profiles (created_by_name)
 - `majordhome_mailing_logs` → historique des emails envoyés par campagne (client_id, lead_id, campaign_name, subject, email_to, sent_at, status, provider_id, error_message, delivered_at, opened_at, clicked_at, bounced_at, complained_at, last_event_at, open_count, click_count)
@@ -252,10 +254,11 @@ Pour les entités où un soft-delete + restauration ne suffisent pas (planning f
   - Webhooks tiers (Resend Svix, Pennylane callbacks) → garder leur propre vérification de signature.
   - Exports : `corsHeaders`, `buildCorsHeaders(req)`, `jsonResponse(body, status, req?)`, `getAdminClient`, `timingSafeEqual`, `sanitizeError(err, fallback)`.
   - Pattern d'import : `import { requireOrgMembership } from "../_shared/auth.ts";` — le `name` du fichier dans le `files` array du MCP `deploy_edge_function` doit être `../_shared/auth.ts` pour que le bundler résolve correctement.
-- **Helpers P1** (2026-05-21) : `sanitizeError(err, fallback)` strip stack/Bearer/JWT/`*_SECRET=…` en prod (détecté via env `DENO_ENV=production` ou `ENVIRONMENT=production`) ; `buildCorsHeaders(req)` whitelist d'origines via env CSV `FRONTEND_ORIGINS` (fallback `*` si vide — dev local).
+- **Helpers P1** (2026-05-21) : `sanitizeError(err, fallback)` strip stack/Bearer/JWT/`*_SECRET=…` en prod (détecté via env `DENO_ENV=production` ou `ENVIRONMENT=production`) ; `buildCorsHeaders(req)` whitelist d'origines via env CSV `FRONTEND_ORIGINS` (fallback `*` si vide — dev local). **`sanitizeError` (fix 2026-05-27)** : pour les objets non-Error (ex. `PostgrestError`, dont `String(err)` renvoie `"[object Object]"` et masque la vraie cause), fait `JSON.stringify(err)` en dev (fallback générique en prod pour ne pas leaker). À respecter dans tout helper d'erreur.
 - **`supabase/config.toml`** (P1.6, 2026-05-21) — versionne `verify_jwt` des 16 edges pour éviter drift prod/repo lors d'un redéploiement via MCP.
 - **Edges déjà migrées vers le helper** (2026-05-21) : `gsc-oauth-init`, `pennylane-proxy`, `pennylane-sync-cron`, `pennylane-backfill-quotes`, `pennylane-sync-quote-status`, `voice-extract-fieldreport`. À migrer plus tard : `gsc-oauth-callback`, `gsc-sync`, `mailing-send`, `contract-signed-notify`, `mailing-unsubscribe`, `resend-webhook`, `invite-client`.
 - **`MDH_*` namespace** pour les env vars partagées entre apps cohabitantes (isolation Majord'home vs Pack Vendeur / Baikal / Arpet) : `MDH_CRON_SECRET`, etc.
+- **Edge function décrite comme un cron** : elle DOIT avoir une entrée `cron.job` réellement créée via migration versionnée (pg_cron) — sinon elle ne tourne jamais. Bug silencieux vécu : le cron `pennylane-sync-quote-status`, documenté "toutes les 15 min", est resté ~2 jours sans planification (entrée `cron.job` absente). Vérifier avec `SELECT jobname, schedule FROM cron.job`. Le secret partagé (`MDH_CRON_SECRET`) est lu depuis `vault.secrets` par le job pg_cron (cf. `pv-scrape-auto-poll`).
 
 ### Composants
 - Fichiers .jsx, PascalCase
@@ -555,6 +558,16 @@ planifie → [Remplir certificats équipements] → realise → facture (hors Ka
 - `markChildNeant(childId)` / `unmarkChildNeant(childId)` — NÉANT toggle
 - `completeParentEntretien(parentId, orgId, reportNotes)` — clôture + maintenance_visit
 
+## Module Contrats (configuration, PDF, signature)
+
+Conventions contrat centralisées (config tarifaire / PDF / signature / zone). Code éparpillé : `ContractPdfSection.jsx` (envoi devis), `ContractSign.jsx` (écran de signature), `useContractZone` (resolver zone partagé), `generateContractPdfBlob` (PDF).
+
+### Sources de vérité figées à la signature (2026-06-01)
+- À la signature, **`contract.amount` et `contract.zone_id` sont les sources de vérité — figées à la configuration du contrat**. L'écran de signature (`ContractSign.jsx`) et le PDF ne recalculent JAMAIS le total ni la zone.
+- `useContractZone` (resolver partagé) n'est qu'un **fallback** si `contract.zone_id` est NULL (contrat jamais configuré). Ne pas le laisser écarter une zone enregistrée (même la zone par défaut « Hors Zone ») au profit d'une re-détection par code postal.
+- Tout écart entre la somme des lignes (grille tarifaire courante × zone stockée) et `contract.amount` s'affiche en **« Remise commerciale »** pour traçabilité — la somme des lignes retombe toujours sur le total signé.
+- **Règle générale** : tout artefact contractuel signé/envoyé au client (devis, contrat, certificat) lit les valeurs **ENREGISTRÉES**, jamais recalculées depuis la grille tarifaire courante. Sinon divergence config↔signature (bug CTR-00457 : contrat « Hors Zone » à 250 € enregistrés affiché/signé 220 €).
+
 ## Module Tarification (Settings → /settings/pricing)
 
 CRUD per-org de la grille tarifaire (P0.0.6 pricing per-org, 2026-05-21). Accès `org_admin` only.
@@ -655,7 +668,7 @@ GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m
 
 ## Module Pennylane quote-driven (Sprint 9 — chantiers ↔ devis PL)
 
-> ⚠️ **WIP non finalisé** (commit `1df67db4`, 2026-05-21) — smoke test fonctionnel non couvert, "à reprendre 1 par 1 si bugs". Architecture susceptible de bouger avant stabilisation.
+> ⚠️ **WIP — stabilisation en cours** (init `1df67db4` 2026-05-21 ; bridge canonique lead↔customer livré `8b08424` 2026-05-27). Pipeline ↔ Pennylane opérationnel : attache multi-devis, cron sync 15 min, **bridge canonique (PL fait foi pour l'identité du lead post-attache)**, auto-attach des nouveaux devis. À reprendre 1 par 1 si bugs.
 
 Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devis Pennylane importés. Permet d'attacher/détacher manuellement un devis PL à un lead/chantier, de gérer plusieurs devis par chantier, et d'afficher le suivi devis directement sur la carte Kanban + la modale.
 
@@ -663,7 +676,8 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
 - **Table `majordhome.lead_pennylane_quotes`** (N:N leads ↔ devis Pennylane) — 127 lignes pour 90 leads en prod. Colonnes :
   - `ejected_at` (timestamptz) — soft-detach (un devis "éjecté" reste tracé sans bloquer un nouvel attachement)
   - `ejected_reason` (text) — `'deleted_in_pennylane'` posé par le cron quand devis disparu PL (404)
-  - `is_winning_quote` (boolean, default false) — "devis effectivement signé" pour les leads Gagnés. 1 winning max par lead actif, garanti par la RPC `lead_mark_won_with_quote` (pas de contrainte UNIQUE pour éviter UniqueViolation en transition)
+  - `is_winning_quote` (boolean, default false) — "devis effectivement signé" pour les leads Gagnés. 1 winning max par lead actif, garanti par la RPC `lead_mark_won_with_quote` (pas de contrainte UNIQUE pour éviter UniqueViolation en transition). **Invariant DB (trigger `trg_lead_pennylane_quotes_invariant_winning`, 2026-05-25)** : `is_winning_quote=true ⟹ quote_status ∈ {accepted, invoiced}` — poser winning sur un statut incompatible (expired/refused/pending/null) force `quote_status='accepted'` automatiquement. Préserve le geste commercial face aux désynchros cron/RPC.
+  - `pdf_url` (text, nullable) — URL publique stable du PDF Pennylane (`q.public_file_url`). Posée à l'attach par `lead_attach_quotes_and_send` / `assign_pennylane_quote_to_lead` + sync systématique par le cron `pennylane-sync-quote-status` (bug #8, 2026-05-26).
 - Vue publique `public.majordhome_lead_pennylane_quotes`.
 - **Table `majordhome.pennylane_customer_lookup`** (D.5, 2026-05-26) — cache write-through des customers PL. PK composite `(org_id, pennylane_id)`, RLS scoped org_id. Alimentée fire-and-forget après chaque `fetchCustomerById`/`fetchCustomersByIds` via `cacheUpsertCustomer(orgId, customer)` dans `pennylane.service.js`. RPC d'upsert : `public.upsert_pennylane_customer_lookup(p_org_id, p_payload jsonb)` SECURITY DEFINER, COALESCE strict (jamais d'écrasement d'une valeur existante avec null/vide). Usage prévu : search "Client existant" sur création lead (bug #5 ROGERO) en complément de `majordhome_clients`. Pas de seed initial — le cache se peuple à l'usage.
 
@@ -671,11 +685,16 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
 - `public.lead_attach_quotes_and_send(p_org_id, p_lead_id, p_quotes jsonb)` — multi-attach + bascule statut "Devis envoyé" en 1 transaction. Calcule `most_recent_quote` via tie-break `pennylane_quote_id DESC` (cf Gotchas DB), propage `order_amount_ht` (ROUND).
 - `public.lead_mark_won_with_quote(p_org_id, p_lead_id, p_winning_quote_pl_id)` — marque 1 devis attaché comme canonique (`is_winning_quote=true`, false sur les autres), bascule lead en Gagné + insère `lead_activity` `'status_changed'` source `'mark_won_with_quote'`. Idempotent.
 - `public.pennylane_sync_ensure_winning_quotes(p_org_id)` — helper du cron, pose `is_winning_quote=true` sur le plus récent accepted. SECURITY DEFINER, service_role only.
-- Toutes : SECURITY DEFINER, `search_path = majordhome, public, core` locked, REVOKE anon, check `auth.uid() ∈ core.organization_members` + check `settings.pennylane.enabled=true`.
+- `public.pennylane_sync_update_quote_fields(p_quote_id, p_new_status, p_pdf_url)` (2026-05-26) — update batch `quote_status` + `pdf_url` en COALESCE strict (ne vide jamais une valeur existante). Appelée par le cron à chaque sync, remplace `pennylane_sync_update_quote_status` côté cron (l'ancienne reste dispo pour rétrocompat). service_role only.
+- `public.pennylane_sync_overwrite_lead_fields(p_lead_id, p_org_id, p_fields jsonb)` (2026-05-27) — mirror lead de `pennylane_sync_update_client_fields`. Sémantique COALESCE+NULLIF : PL non-vide → écrase MDH (PL canonical post-attache) ; PL vide → préserve MDH. service_role only.
+- `public.pennylane_sync_auto_attach_quote(p_org_id, p_lead_id, p_quote_pl_id, …)` (2026-05-27) — attache un nouveau devis PL ≥1000€ HT à un lead déjà bridgé. Idempotent (no-op si quote_pl_id déjà en base, y compris ejected = respect du soft-detach). Bump lead → "Devis envoyé" si stage < 4 (forward-only). service_role only.
+- Toutes : SECURITY DEFINER, `search_path = majordhome, public, core` locked, REVOKE anon, check `auth.uid() ∈ core.organization_members` + check `settings.pennylane.enabled=true` (sauf les `*_sync_*` service_role only).
 
 ### Cron `pennylane-sync-quote-status` (edge function, 15 min)
-- `verify_jwt:false` + `MDH_CRON_SECRET` (cf charte edge functions). Appel Pennylane direct (pas via `pennylane-proxy` qui exige JWT user).
-- Sync `quote_status` PL → `lead_pennylane_quotes`, ejecte les devis disparus côté PL (404 → `ejected_reason='deleted_in_pennylane'`), appelle `pennylane_sync_ensure_winning_quotes`, sync identité PL → MDH en COALESCE strict (jamais écraser avec null/vide).
+- `verify_jwt:false` + `MDH_CRON_SECRET` (cf charte edge functions). Appel Pennylane direct (pas via `pennylane-proxy` qui exige JWT user). **Planifié via `cron.job` pg_cron** (la planification a manqué ~2 j à la création — cf. charte edge functions).
+- **Étapes 1-3** : sync `quote_status` + `pdf_url` PL → `lead_pennylane_quotes` via RPC `pennylane_sync_update_quote_fields` (COALESCE strict, backfill auto du `pdf_url` manquant en 1 cycle) ; ejecte les devis disparus côté PL (404 → `ejected_reason='deleted_in_pennylane'`) ; appelle `pennylane_sync_ensure_winning_quotes`.
+- **Étape 4 — Sync identité PL → MDH (OVERWRITE-when-PL-has-value, 2026-05-27)** : pour chaque customer bridgé (≥1 devis attaché actif), fetch `/customers/{id}` puis update clients ET leads via `pennylane_sync_update_client_fields` + `pennylane_sync_overwrite_lead_fields`. PL non-vide écrase MDH (PL canonical post-attache) ; PL vide → préserve MDH (NULLIF). Sûr car les champs contact MDH sont verrouillés en lecture seule dès qu'un devis est attaché (cf. règle "Contact lead lecture seule").
+- **Étape 5 — Auto-attach nouveaux devis (2026-05-27)** : pour chaque customer bridgé, `/quotes?filter=customer_id eq X` (filter natif V2), diff avec `lead_pennylane_quotes` → chaque nouveau devis ≥1000€ HT (`PIPELINE_MIN_AMOUNT_HT`) attaché via `pennylane_sync_auto_attach_quote`. Idempotent (no-op si déjà en base/ejected). Auto-bump lead → "Devis envoyé" si stage < 4 (forward-only, ne rétrograde pas Gagné/Perdu).
 - Pattern général : **Cron sans JWT user → appel API tierce direct. Filtrer orgs activées via `settings.<integration>.enabled` côté JS quand PostgREST ne suffit pas (jsonb imbriqué).**
 
 ### Composants frontend
@@ -691,19 +710,25 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
 - `src/shared/hooks/useOrgSettings.js::usePennylaneEnabled()` — sélecteur sec `Boolean(settings?.pennylane?.enabled)`.
 - **Gotcha rate limit** : Pennylane V2 = 25 req/5s. Tout batch `/customers/{id}` ou `/quotes/{id}` doit être wrappé par le helper interne `pLimit(5)` de `pennylane.service.js` (sinon → 429 retry → 500 proxy + latence >3s). PL V2 retourne déjà `q.customer.name/first_name/last_name` embedded dans `/quotes` → ne pas re-fetch `/customers/{id}` pour l'affichage.
 - **Filter natif PL V2** : `/quotes?filter=[{"field":"customer_id","operator":"eq","value":X}]` (JSON URL-encoded) évite le scan paginé global. Pattern via `fetchQuotesForCustomerId()` avec fallback try/catch sur scan + filter client-side si syntaxe rejetée (400). `pennylane-proxy` whitelist OK car split sur "?" → `cleanPath='/quotes'`.
+- **Shape réponse PL V2 single GET** : `/quotes/{id}` et `/customers/{id}` retournent la ressource **directement au root** (PAS wrappée dans `{ quote: … }` / `{ customer: … }`). Assumer le wrap a fait skip 155 devis silencieusement (2026-05-27). Helper défensif `unwrapPennylaneResource<T>(rawData, expectedKey)` : essaie la clé wrap puis fallback root via `'id' in obj`.
 
 ### Règles métier Pipeline ↔ PL
-- **Auto-matérialisation client au rattachement de devis** : quand un devis PL est rattaché à un lead sans `client_id`, le hook `useAttachQuotesAndSend` déclenche post-process `ensureClientForLeadFromPennylane` (`src/shared/hooks/usePennylane.js`) qui :
+- **Auto-matérialisation client + bridge canonique au rattachement de devis** : quand un devis PL est rattaché à un lead, le hook `useAttachQuotesAndSend` déclenche post-process `ensureClientForLeadFromPennylane` (`src/shared/hooks/usePennylane.js`) qui :
   1. Fetch `/customers/{customer_id}` PL pour récupérer les coordonnées complètes
-  2. Patche le lead avec les champs vides remplis depuis le customer PL (jamais d'écrasement d'une saisie user — règle stricte via `buildContactPatchFromCustomer`)
+  2. Patche le lead avec les champs PL en mode **OVERWRITE** (décision 2026-05-27 : post-attache, PL est canonique pour l'identité du lead — `buildContactPatchFromCustomer` ne préserve PLUS les saisies user). Sécurité : PL vide → préserve MDH (NULLIF côté RPC). Aucun conflit possible car les champs contact MDH sont verrouillés en lecture seule dès qu'un devis est attaché (cf. règle "Contact lead lecture seule"). Bandeau bleu UI "Données synchronisées depuis Pennylane — à modifier dans Pennylane".
   3. Cherche un mapping existant dans `majordhome.pennylane_sync` (entity_type='client', pennylane_id=customer_id) → link au client existant si trouvé
-  4. Sinon `convertLeadToClient` (qui copie les fields du lead — patché à l'étape 2 — vers le client créé)
+  4. Sinon `convertLeadToClient`
   5. Upsert `pennylane_sync` + UPDATE `lead_pennylane_quotes.pennylane_client_id`
   - Fire-and-forget : un échec ne casse pas l'attach principal.
-  - **Note backfill** : les leads attachés AVANT 2026-05-24 (pré-règle) et AVANT 2026-05-25 (pré-fix #6 pré-remplissage) n'ont pas bénéficié — re-trigger via détache/rattache manuel.
+  - **Note backfill** : les leads attachés avant les règles (pré-2026-05-24/25) n'ont pas bénéficié — re-trigger via détache/rattache manuel.
 - **Contact lead lecture seule si devis PL attaché** : `pennylaneSyncedContact = pennylaneActive && linkedQuotes.length > 0` → `contactFieldsDisabled` (override `editClientMode`). Bandeau bleu "Données synchronisées depuis Pennylane — à modifier dans Pennylane" si au moins 1 champ contact est rempli ; bandeau amber "Aucune coordonnée disponible" si tous vides (lead ancien pré-fix #6 — l'user doit détacher/rattacher pour resync).
-- **Sémantique `is_winning_quote` vs `order_amount_ht`** : 2 valeurs distinctes. `is_winning_quote=true` = "devis effectivement signé" (sélection commerciale via mark won). `leads.order_amount_ht` = "montant du dernier devis PL envoyé" (calculé à l'attach, arrondi entier pour Kanban). Peuvent pointer sur des devis différents si le commercial signe un devis antérieur à la dernière version envoyée.
+- **Sémantique 3-fold des montants pipeline** : trois valeurs distinctes. (1) `card.total_amount` = `accepted_sum` de la vue `majordhome_kanban_cards` (SUM des devis `quote_status IN ('accepted','invoiced')`) = "montant total des devis valides du lead" → affiché en colonne **Gagné uniquement** (ex. 2 devis accepted 6481+5470 → 11951€). (2) `leads.order_amount_ht` = "montant du dernier devis PL envoyé" (calculé à l'attache, arrondi entier) → affiché dans les **autres colonnes** Kanban (en amont, on ne sait pas lequel sera signé). (3) `is_winning_quote=true` = "devis effectivement signé" (sélection commerciale via `lead_mark_won_with_quote`). Les trois peuvent diverger.
 - **Seuil pipeline 1000€ HT** : devis PL <1000€ HT exclus du sélecteur de rattachement (constante `PIPELINE_MIN_AMOUNT_HT` dans `QuoteCandidatesModal.jsx`) — considérés SAV/entretien, hors pipeline commercial. Devis déjà attachés préservés même sous le seuil (vue informative).
+- **Liens vers les devis Pennylane (UI)** : TOUJOURS utiliser `q.public_file_url` (PDF direct, persisté dans `lead_pennylane_quotes.pdf_url`). Ne JAMAIS construire d'URL `app.pennylane.com/quotes/{id}` à la main — format inventé qui 404 en multi-cabinet (bug #8, 2026-05-26). Si `pdf_url` est NULL (devis tout neuf pas encore passé dans le cron) → lien grisé + tooltip "PDF non synchronisé (prochain cycle <15 min)" plutôt qu'un lien cassé.
+- **Stabilisation UI pipeline post-bridge (2026-05-27)** :
+  - **Dates lead canoniques côté PL** : `quote_sent_date` et `won_date` ne sont plus éditables depuis la modale lead. La date d'envoi de chaque devis est lisible dans `LinkedQuotesPanel` (`quote_date` PL) ; la date de signature n'est pas exposée par PL V2, le passage en Gagné est tracé via `leads.status_changed_at`. **Colonnes DB `leads.quote_sent_date`/`won_date` préservées** (nullables) pour les consommateurs legacy (rapports, chantiers) mais ne plus les éditer côté UI lead.
+  - **`LinkedQuotesPanel` chip statut** : un seul chip affiché — "Refusé" (`quote_status IN ('denied','refused')`). Les autres statuts (pending/accepted/draft/expired/invoiced) ne sont pas chip-isés : le placement Kanban + le badge Gagnant transmettent déjà l'info. Palette deutan-friendly (mirror `QuoteCandidatesModal`).
+  - **`expired` = pending sémantique** : un devis Pennylane expiré reste en "Devis envoyé" (relançable), ne pousse pas le lead en Perdu. Aligné sur la vue `majordhome_kanban_cards` (expired dans `pending_count`/`pending_sum`) et `LeadCard.filteredQuotes` (expired dans `devis_envoye`, pas `perdu`).
 
 ### Référence
 - Spec bridge complet : `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md` (8 PRs séquentielles, PR 1-5 livrées)

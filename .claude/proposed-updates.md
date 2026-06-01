@@ -743,7 +743,7 @@ Le second point (`.maybeSingle()` vs `.single()`) est aussi un gotcha PostgREST 
 ---
 
 ## [2026-05-26 00:00] Invariant DB winning ⟹ accepted|invoiced + allowlist Kanban étendue
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-06-01)
 **Commit** : e06ce28953d5aa19d3de1bb6c92f9c6af7ecb17d
 **Contexte** : Bug #7 fix appliqué en prod 2026-05-25 (migrations `20260525_5/6/7`). Deux changements structurels au-delà de la simple data fix : (1) trigger BEFORE INSERT/UPDATE `trg_lead_pennylane_quotes_invariant_winning` sur `majordhome.lead_pennylane_quotes` qui force `quote_status='accepted'` si `is_winning_quote=true` est posé sur un statut incompatible (expired/refused/pending/null) ; (2) vue `public.majordhome_kanban_cards` étend désormais `accepted_count` au filtre `quote_status IN ('accepted','invoiced')` (auparavant 'accepted' seul) — sémantique métier `invoiced` = stade post-accepted (devis facturé), doit apparaître en colonne Gagné. La spec est déjà référencée dans CLAUDE.md mais ni l'invariant DB ni la nouvelle allowlist Kanban ne sont documentés au niveau "comportement runtime".
 **Proposition** : Compléter 2 endroits dans CLAUDE.md sous `## Module Pennylane quote-driven` :
@@ -761,14 +761,14 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-26 00:28] Escape ILIKE local vs `escapePostgrestSearchTerm()` — déviation convention P0.26
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — option « documenter l'exception » retenue, pas de refacto code)
 **Commit** : 1dc78e1621d1d7d19c70dfbdfb03987c36219239
 **Contexte** : `searchPennylaneCustomers` (`pennylane.service.js`) interpole un input utilisateur dans `.or('name.ilike.%${escaped}%,first_name.ilike...')`. L'escape utilise un `q.replace(/[%_\]/g, m => '\' + m)` local — il échappe `%`, `_`, `\` (anti-wildcard) mais ne strip PAS `,()*:` que strippe `escapePostgrestSearchTerm()` (`src/lib/postgrestUtils.js`). Or la convention P0.26 du CLAUDE.md dit : "Toute clause PostgREST `.or()` / `.ilike()` qui interpole un input utilisateur DOIT passer par `escapePostgrestSearchTerm()`". Un input contenant une virgule pourrait ajouter une clause au `.or()` (`ROGERO,id.eq.<uuid>` → 4 conditions au lieu de 3). Risque limité ici car la requête est scoped org via RLS, mais c'est un drift de convention.
 **Proposition** : (1) Refacto `searchPennylaneCustomers` pour utiliser `escapePostgrestSearchTerm()` au lieu du regex local. OU (2) Documenter explicitement que les ILIKE PL search ont leur propre escape (anti-wildcard) parce que `escapePostgrestSearchTerm` strip `%` ce qui empêche la recherche partielle. Si (2), envisager d'ajouter une variante `escapePostgrestSearchTermPreservingWildcards()` au helper centralisé. Trancher avant qu'un autre dev ne re-copie ce pattern.
 ---
 
 ## [2026-05-26 11:26] Convention liens devis Pennylane - toujours public_file_url
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-06-01)
 **Commit** : 4b90cf7f6cbdf77f70a30734e7b18f09376863a3
 **Contexte** : Bug #8 - 3 composants Kanban (QuoteSubCard, LinkedQuotesPanel, MarkWonQuoteModal) pointaient vers `app.pennylane.com/quotes/{id}` - format invente qui 404 en multi-cabinet. Migration vers le pattern Sprint 9 (TabDevisPL / QuoteBlock / etc) : ouvrir le PDF direct via `q.public_file_url` Pennylane, stocke en DB dans `lead_pennylane_quotes.pdf_url` (option B retenue vs fetch a la volee pour zero latence au clic).
 **Proposition** : Ajouter une regle dans la section "Module Pennylane quote-driven -> Regles metier Pipeline <-> PL" :
@@ -777,7 +777,7 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-26 11:26] Nouvelle RPC pennylane_sync_update_quote_fields (remplace _update_quote_status cote cron)
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-06-01 — fusionné dans la description du cron)
 **Commit** : 4b90cf7f6cbdf77f70a30734e7b18f09376863a3
 **Contexte** : Nouvelle RPC interne service_role `public.pennylane_sync_update_quote_fields(p_quote_id, p_new_status, p_pdf_url)` - update batch status + pdf_url en COALESCE strict (jamais vider une valeur existante). Le cron `pennylane-sync-quote-status` v5 l'appelle desormais a chaque sync au lieu de `pennylane_sync_update_quote_status` (qui reste disponible pour retrocompat). Appel systematique si l'un des 2 fields diverge (incluant `pdf_url=NULL` cote DB pour les 152 lignes pre-pdf_url) -> backfill auto en 1 cycle (<15 min).
 **Proposition** : Ajouter dans la section "Module Pennylane quote-driven -> Cron pennylane-sync-quote-status (edge function, 15 min)" :
@@ -786,7 +786,7 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-27 08:30] Cron pennylane-sync-quote-status jamais planifié — bug silencieux
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-06-01)
 **Commit** : (cron créé via apply_migration 2026-05-27, fichier supabase/migrations/<date>_pennylane_sync_quote_status_cron.sql à versionner)
 **Contexte** : L'edge function existait depuis 2026-05-25 (commits 1df67db..4b90cf7) et était documentée dans CLAUDE.md comme tournant toutes les 15 min — mais l'entrée `cron.job` n'a jamais été créée. Conséquences pendant ~2 jours : pdf_url jamais backfillé sur les 155 devis attachés, quote_status jamais sync PL→MDH, customer fields jamais sync, devis supprimés PL jamais éjectés. Découvert via tooltip "PDF non synchronisé" qui ne se résolvait jamais. Fix : pg_cron schedule `*/15 * * * *` + secret stocké dans `vault.secrets` (entrée `mdh_cron_secret`) lu par le job.
 **Proposition** : Documenter une convention dans la section "Conventions de Code → Edge functions" :
@@ -795,7 +795,7 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-27 08:35] GRANT SELECT à service_role manquant sur 14 tables majordhome.* post-Sem0
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-06-01)
 **Commit** : (migration apply_migration 2026-05-27 `grant_service_role_select_majordhome_tables`)
 **Contexte** : Depuis le hardening Sem 0 (P0.0.2 — vues publiques en `security_invoker=true`), les edge functions qui lisent via `public.majordhome_*` ont besoin du GRANT SELECT explicite à service_role sur la table sous-jacente — RLS ne suffit plus. Le cron pennylane-sync-quote-status plantait silencieusement sur `42501 permission denied for table lead_pennylane_quotes` (erreur cachée par `sanitizeError` qui sortait "[object Object]"). 14 tables ajoutées post-Sem0 n'avaient pas le GRANT : chantier_line_receptions, client_creation_audit, dedup_*, geogrid_benchmarks/keyword_lists, lead_interactions, lead_pennylane_quotes, mail_segments, meta_ads_daily_stats, pellets_orders, pennylane_customer_lookup, voice_memos, voice_quotas. Fix : GRANT SELECT (pas INSERT/UPDATE/DELETE — les écritures passent par RPCs SECURITY DEFINER).
 **Proposition** : Ajouter une règle dans la charte multi-tenant (CLAUDE.md section "Multi-tenant & sécurité → Règles imposées par le multi-tenant") :
@@ -804,7 +804,7 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-27 08:50] PL V2 single GET retourne au ROOT (pas wrappé)
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md, session 2026-06-01)
 **Commit** : (deploy edge function pennylane-sync-quote-status v6, 2026-05-27)
 **Contexte** : L'edge function assumait que GET `/quotes/{id}` PL retournait `{ quote: {...} }` et faisait `(rawData as { quote })?.quote` — toujours undefined → 155 quotes skip silencieux sans backfill pdf_url. En réalité PL V2 retourne le quote DIRECTEMENT au root (confirmé par le frontend `apiCall` via pennylane-proxy + line 779 de pennylane.service.js qui accède `quote.id` directement). Fix : helper `unwrapPennylaneResource<T>(rawData, expectedKey)` défensif qui essaie d'abord la clé wrap puis fallback root via `'id' in obj`. Idem pour `/customers/{id}`.
 **Proposition** : Ajouter dans "Module Pennylane quote-driven → Gotchas PL V2" (nouvelle sous-section ou existante) :
@@ -813,7 +813,7 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-27 08:55] sanitizeError stringifie maintenant les objets non-Error
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — fix vérifié commité dans b03fde0)
 **Commit** : (edit local supabase/functions/_shared/auth.ts 2026-05-27 — non encore commité)
 **Contexte** : Avant fix, `sanitizeError({ code: 42501, message: 'permission denied for table X' })` retournait `String(err)` = `'[object Object]'` au lieu du vrai message. Bug détecté sur le cron pennylane-sync-quote-status qui plantait avec un PostgrestError mais sortait "[object Object]" dans les logs — diagnostic complètement bloqué. Fix : pour les objets non-Error (typeof === 'object' && err !== null), JSON.stringify(err) (ou fallback en prod si Sentry-like).
 **Proposition** : Acter le changement de `sanitizeError` dans la charte edge functions (CLAUDE.md section "Edge functions") :
@@ -822,7 +822,7 @@ OU plus condensé : un seul gotcha dans `### Gotchas DB` :
 ---
 
 ## [2026-05-27 14:00] Bridge canonique lead↔customer PL : inversion règle COALESCE → OVERWRITE + auto-attach
-**Statut** : PENDING
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — OVERWRITE confirmé par Eric : champs MDH verrouillés en lecture seule si devis attaché, donc pas de saisie concurrente à protéger)
 **Commit** : 8b084243a7c7994340e1f6f2bdc2dabbca352a6e
 **Contexte** : Décision produit majeure du 2026-05-27. Une fois un devis PL attaché à un lead, PL devient canonique pour l'identité du lead. Deux changements coordonnés contredisent la doc actuelle :
 1. `buildContactPatchFromCustomer` (frontend) passe de COALESCE strict (jamais écraser une saisie user) à OVERWRITE (patche systématiquement si PL a une valeur). Sécurité via NULLIF côté RPC : PL vide → préserve MDH.
@@ -860,4 +860,69 @@ Plusieurs passages de CLAUDE.md sont maintenant obsolètes :
 4. Mettre à jour la note WIP en tête de section avec la date 2026-05-27 et la mention du bridge canonique.
 
 Question ouverte : valider la sémantique OVERWRITE (impact potentiel : si l'user a corrigé manuellement le nom/email d'un lead post-attach, le cron va re-écraser depuis PL au prochain run de 15 min). C'est la décision documentée, mais à confirmer comme intentionnelle avant intégration définitive au CLAUDE.md.
+---
+
+## [2026-05-27 18:42] UI épuration : champs dates lead modal retirés, PL canonical
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — fusionné bloc « Stabilisation UI pipeline post-bridge »)
+**Commit** : e5b6c051dd6e864749b1e7dfde7629c6634e0257
+**Contexte** : Suite à la livraison du bridge canonique (8b08424), épuration UI de `LeadFormSections.jsx` et `LinkedQuotesPanel.jsx` :
+- Champs `quote_sent_date` (Date d'envoi du devis) et `won_date` (Date de signature) retirés de la modale lead. Colonnes DB préservées pour les consommateurs legacy (rapports, chantiers).
+- `LinkedQuotesPanel` affiche désormais la date PL (`quote_date`) sous le numéro de chaque devis + chip statut (Refusé/Expiré/Brouillon/Facturé) à gauche du montant, sauf si winning (le badge Gagnant prime). Palette deutan-friendly cohérente avec `QuoteCandidatesModal`.
+- Justification : PL canonical post-attach — date d'envoi de chaque devis lisible dans `LinkedQuotesPanel` (depuis `quote_date`) ; date de signature non exposée de manière fiable par PL V2 (pas de timestamp `accepted_at`), le passage en Gagné est tracé via `leads.status_changed_at`.
+
+**Proposition** : Ajouter dans la section "Module Pennylane quote-driven → Règles métier Pipeline ↔ PL" du CLAUDE.md :
+
+```
+- **Dates lead canoniques côté PL (UI épurée 2026-05-27)** : les champs `quote_sent_date` et `won_date` ne sont plus éditables depuis la modale lead. La date d'envoi de chaque devis est lisible dans `LinkedQuotesPanel` (depuis `quote_date` PL). La date de signature n'est pas exposée par PL V2 ; le passage en Gagné est tracé via `leads.status_changed_at` (trigger `WHEN OLD.status_id IS DISTINCT FROM NEW.status_id`). **Colonnes `leads.quote_sent_date` et `leads.won_date` préservées en DB** pour les consommateurs legacy (rapports, chantiers) mais ne plus les éditer côté UI lead.
+- **`LinkedQuotesPanel` palette statuts deutan-friendly** : chip statut affiché à gauche du montant pour les devis non-pending et non-winning. Mirror de la palette `QUOTE_STATUS_CHIP` dans `QuoteCandidatesModal.jsx`.
+```
+
+Question ouverte : faut-il aussi retirer les colonnes `leads.quote_sent_date` et `leads.won_date` du payload `buildPayload()` côté frontend, ou les laisser nullables et juste cacher l'input ? (Décision actuelle = laisser nullables, mais à valider si conserve une vraie utilité aval.)
+---
+
+## [2026-05-27 18:47] Pipeline : montant Gagne (accepted_sum) + chip uniquement Refuse
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — fusionné bloc « Stabilisation UI pipeline post-bridge » + sémantique 3-fold montants)
+**Commit** : 709e6659858975c8f55842d2606f200bae737705
+**Contexte** : Ajustement UI post-feedback en 2 points. (1) `LeadCard.amount` : colonne Gagne utilise `card.total_amount` (= `accepted_sum` de la vue `majordhome_kanban_cards` = SUM des devis `quote_status IN ('accepted','invoiced')`), les autres colonnes gardent `lead.order_amount_ht` (dernier devis posé par `lead_attach_quotes_and_send`). Cas concret : BERNA HELENE avec 2 devis accepted 6481+5470 affiche 11951€ au lieu de 6481€ en Gagne. (2) `LinkedQuotesPanel` : retrait des chips Accepté/Brouillon/Expiré/Facturé. Seul le chip "Refusé" (denied/refused PL) est conservé. Décision produit : expired n'est pas suivi côté métier ; pour pending/accepted le placement Kanban + badge Gagnant transmettent déjà l'info. Cette nouvelle décision walk-back partiellement l'entrée PENDING précédente du 2026-05-27 sur les chips multi-statuts.
+
+**Proposition** : 
+1. Étendre le bullet "Sémantique `is_winning_quote` vs `order_amount_ht`" de la section "Module Pennylane quote-driven → Règles métier Pipeline ↔ PL" pour intégrer la 3ᵉ valeur :
+
+```
+- **Sémantique 3-fold montants pipeline** : `card.total_amount` (= `accepted_sum` de la vue `majordhome_kanban_cards`, SUM des devis `quote_status IN ('accepted','invoiced')`) = "montant total des devis valides du lead, autant d'interventions à prévoir" → affiché en colonne **Gagne** uniquement. `leads.order_amount_ht` = "montant du dernier devis PL envoyé" (calculé à l'attach, arrondi entier) → affiché dans les autres colonnes Kanban (en stage antérieur, on ne peut pas prévoir lequel sera signé). `is_winning_quote=true` = "devis effectivement signé" (sélection commerciale via `lead_mark_won_with_quote`). Les trois peuvent diverger : ex. Amalric avec 6 devis pending de montants varies (affiche le dernier) → bascule en Gagné avec 1 winning sélectionné (affiche somme des accepted).
+```
+
+2. Mettre à jour le bullet `LinkedQuotesPanel` (ajouté dans l'entrée PENDING du 2026-05-27) pour refléter la simplification :
+
+```
+- **`LinkedQuotesPanel` chip statut** : un seul chip affiché — "Refusé" (PL `quote_status IN (denied, refused)`). Les autres statuts (pending/accepted/draft/expired/invoiced) ne sont pas chip-isés : le placement Kanban et le badge Gagnant transmettent déjà l'info, et `expired` n'est pas suivi côté métier.
+```
+
+Question ouverte : faut-il fusionner les 2 entrées PENDING du 2026-05-27 (cette nouvelle + celle de e5b6c05 sur l'épuration panel devis PL) en 1 seul bloc à intégrer dans CLAUDE.md ? Elles documentent ensemble la stabilisation UI du pipeline post-bridge PL.
+---
+
+## [2026-05-27 19:00] Sémantique `expired` Pennylane : pending (relancable), pas Perdu
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — fusionné bloc « Stabilisation UI » + allowlists vue Kanban)
+**Commit** : 7ae28524246ba06639d881e1963293c4dd22ca6d
+**Contexte** : Décision produit 2026-05-27 — "expired n'est pas une notion suivie". Un devis PL `expired` est informatif (le client n'a pas tranché dans les temps) mais ne classe PAS le lead en Perdu — le commercial peut relancer. Bug détecté sur PORCQ HUGO (2 devis expired) qui basculait en Perdu au lieu de rester en Devis envoyé. Migration `20260527_kanban_cards_expired_as_pending` repositionne `expired` : (1) côté vue `majordhome_kanban_cards`, expired bascule de `refused_count`/`refused_sum` vers `pending_count`/`pending_sum`. (2) `refused_count` = refused + denied + canceled (sans expired). (3) Carte Perdu apparaît uniquement si refused+denied+canceled > 0 ET pending (incluant expired) = 0 ET accepted = 0. (4) Côté `LeadCard.filteredQuotes`, filtre aligné : `devis_envoye` = pending+draft+expired, `gagne` = accepted+invoiced, `perdu` = refused+denied+canceled. Contradiction avec la doc actuelle de `majordhome_kanban_cards` qui décrit "1 lead → 1-2 cartes selon mix pending/accepted/refused" — ne mentionne pas expired explicitement, mais l'entrée PENDING 2026-05-26 #7 documente `accepted_count` étendu à invoiced sans toucher refused.
+
+**Proposition** : Compléter 2 endroits dans CLAUDE.md sous `## Module Pennylane quote-driven` :
+
+1. Dans `### Vues publiques principales`, sur la ligne `majordhome_kanban_cards`, préciser :
+> **Allowlists Kanban (2026-05-27)** : Gagné = `quote_status IN ('accepted','invoiced')` (bug #7) ; Devis envoyé = `pending|draft|expired` (expired non suivi côté métier — décision produit : un devis expiré reste en Devis envoyé pour relance, ne pousse PAS le lead en Perdu) ; Perdu = `refused|denied|canceled` UNIQUEMENT (et seulement si pending=0 ET accepted=0). Tout autre statut PL futur (`scheduled`, etc.) reste invisible Kanban jusqu'à extension explicite.
+
+2. Dans `### Règles métier Pipeline ↔ PL`, ajouter (cohérent avec la simplification chip 709e665) :
+> **`expired` = pending sémantique** : un devis Pennylane expiré reste en "Devis envoyé" pour relance, ne pousse pas le lead en Perdu. Aligné sur la vue `majordhome_kanban_cards` (expired bascule dans `pending_count`/`pending_sum`) et sur `LeadCard.filteredQuotes` (expired dans `devis_envoye`, pas dans `perdu`). Décision produit 2026-05-27.
+
+Question ouverte : faut-il fusionner cette entrée avec les 2 PENDING du 2026-05-27 (e5b6c05 épuration panel devis + 709e665 montant Gagne + chip Refuse) en 1 seul bloc "stabilisation UI pipeline post-bridge PL" à intégrer dans CLAUDE.md ? Les 3 décrivent la même phase de durcissement sémantique du pipeline.
+---
+
+## [2026-06-01 15:11] Signature contrat — sources de vérité figées (amount + zone_id)
+**Statut** : RESOLU (intégré CLAUDE.md 2026-06-01 — nouvelle section « Module Contrats »)
+**Commit** : c84b6be3e66da514df696a90420c0e1fde6039f7
+**Contexte** : `ContractSign.jsx` recalculait la zone tarifaire via un resolver inline qui écartait la zone enregistrée si c'était la zone par défaut (« Hors Zone ») et retombait sur la détection par code postal — divergeait du resolver partagé `useContractZone` utilisé à la configuration. Conséquence : un contrat « Hors Zone » à 250 € enregistrés/proposés s'affichait/signait à 220 € (cas CTR-00457). Fix : l'écran de signature lit désormais `contract.amount` et `contract.zone_id` comme sources de vérité figées ; `useContractZone` n'est qu'un fallback si `zone_id` est null. Tout écart entre somme des lignes (grille tarifaire) et montant convenu (remise admin, tarif historique) s'affiche en « Remise commerciale ».
+**Proposition** : Ajouter une convention dans CLAUDE.md (section « Conventions qualité » ou nouvelle section « Module Contrats ») :
+> **Signature contrat — sources de vérité figées** : à la signature, `contract.amount` et `contract.zone_id` sont les sources de vérité — figées à la configuration du contrat. L'écran de signature et le PDF ne recalculent JAMAIS le total ni la zone. La détection partagée `useContractZone` n'est qu'un fallback si `zone_id` est null (contrat jamais configuré). Tout écart entre somme des lignes (grille tarifaire courante × zone stockée) et `contract.amount` s'affiche en « Remise commerciale » pour traçabilité — la somme des lignes retombe toujours sur le total signé. Règle générale : tout artefact contractuel signé/envoyé au client (devis, contrat, certificat) doit lire les valeurs ENREGISTRÉES, pas les recalculer depuis la grille tarifaire courante.
+
+Question ouverte : faut-il créer une section dédiée « Module Contrats » dans CLAUDE.md (actuellement éparpillé entre « Module Certificats d'entretien », `ContractPdfSection.jsx`, `ContractSign.jsx`) pour centraliser les conventions PDF / signature / zone / pricing ? Ou rester ponctuel dans « Conventions qualité » ?
 ---
