@@ -11,27 +11,17 @@ export default defineConfig({
       registerType: 'autoUpdate',
       strategies: 'generateSW',
       includeAssets: ['voice/icons/*'],
-      manifest: {
-        id: '/voice/',
-        scope: '/voice/',
-        start_url: '/voice/',
-        name: 'Mayer — Compte-rendu vocal',
-        short_name: 'Mayer Voice',
-        description: 'Enregistrement vocal post-RDV pour Mayer Énergie',
-        theme_color: '#1e3a5f',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
-        lang: 'fr-FR',
-        icons: [
-          { src: '/voice/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: '/voice/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-          { src: '/voice/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
-        ],
-      },
+      // Le manifeste est volontairement servi en statique (public/voice/manifest.webmanifest)
+      // et lié au <head> uniquement depuis VoiceLayout (routes /voice). Sinon le plugin
+      // injecterait le <link rel="manifest"> dans l'index.html unique de la SPA, donc sur
+      // TOUTES les pages — un utilisateur installant l'app depuis le dashboard récupérait
+      // alors un raccourci dont le start_url est /voice et restait bloqué sur le gate voice.
+      manifest: false,
       workbox: {
-        navigateFallback: '/voice/',
-        navigateFallbackDenylist: [/^\/(?!voice)/],
+        // Fallback SPA réservé aux navigations /voice (offline PWA terrain). Les autres
+        // routes ne passent pas par le fallback. index.html est bien précaché par generateSW.
+        navigateFallback: '/index.html',
+        navigateFallbackAllowlist: [/^\/voice/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/[^/]+\.supabase\.co\/.*/i,
