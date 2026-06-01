@@ -19,13 +19,13 @@ import { Button } from '@/components/ui/button';
 
 import { useClientContract, useContractEquipments } from '@hooks/useContracts';
 import { usePricingData } from '@hooks/usePricing';
+import { useContractZone } from '@hooks/useContractZone';
 import { contractKeys } from '@hooks/cacheKeys';
 import { contractsService } from '@services/contracts.service';
 import { storageService } from '@services/storage.service';
 import {
   calculateLineTotal,
   calculateContractTotal,
-  detectZoneFromPostalCode,
 } from '@services/pricing.service';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import { generateContractPdfBlob } from '../components/contrat/ContractPDF';
@@ -144,18 +144,19 @@ export default function ContractSign() {
     }
   }, [client, signataireNom]);
 
-  // -- Zone tarifaire --
+  // -- Zone tarifaire — LECTURE de la zone enregistrée sur le contrat (source de vérité,
+  //    figée à la configuration via l'auto-sync de ContractPricingSection). L'écran de
+  //    signature ne re-détecte PAS la zone : il signe ce qui a été convenu et enregistré.
+  //    Détection de secours (hook partagé) uniquement si le contrat n'a jamais reçu de
+  //    zone (zone_id null) — sinon un contrat "Hors Zone" était sous-évalué (bug CTR-00457). --
+  const { activeZone: detectedZone } = useContractZone(client, contract, zones);
   const activeZone = useMemo(() => {
     if (contract?.zone_id && zones?.length) {
       const stored = zones.find((z) => z.id === contract.zone_id);
-      if (stored && !stored.is_default) return stored;
+      if (stored) return stored;
     }
-    if (client?.postal_code && zones?.length) {
-      const detected = detectZoneFromPostalCode(client.postal_code, zones);
-      if (detected) return detected;
-    }
-    return null;
-  }, [client?.postal_code, contract?.zone_id, zones]);
+    return detectedZone;
+  }, [contract?.zone_id, zones, detectedZone]);
 
   // -- Index tarifs --
   const rateIndex = useMemo(() => {
@@ -211,6 +212,23 @@ export default function ContractSign() {
     return { items, ...totals };
   }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
 
+  // -- Montant à signer = montant ENREGISTRÉ sur le contrat (ce qui a été proposé/convenu).
+  //    On ne signe jamais un total recalculé en live qui divergerait. Secours : total
+  //    calculé si le contrat n'a pas de montant enregistré (cas non configuré). --
+  const billableTotal = useMemo(() => {
+    const stored = contract?.amount != null ? parseFloat(contract.amount) : NaN;
+    if (!isNaN(stored) && stored > 0) return stored;
+    return computedPricing?.total || 0;
+  }, [contract?.amount, computedPricing?.total]);
+
+  // -- Écart éventuel entre la somme des lignes (grille tarifaire) et le montant convenu
+  //    (remise admin, tarif historique…) → affiché en "remise commerciale" pour que la
+  //    somme des lignes retombe sur le total signé (transparence + traçabilité). --
+  const extraDiscountAmount = useMemo(() => {
+    const computed = computedPricing?.total || 0;
+    return computed > billableTotal ? Math.round((computed - billableTotal) * 100) / 100 : 0;
+  }, [computedPricing?.total, billableTotal]);
+
   // -- Signature callback --
   const handleSign = useCallback((dataUrl) => {
     setSignatureBase64(dataUrl);
@@ -226,15 +244,6 @@ export default function ContractSign() {
 
     setIsSaving(true);
     try {
-      const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
-      const computedTotal = computedPricing?.total || 0;
-      const billableTotal = forcedAmount != null && !isNaN(forcedAmount)
-        ? forcedAmount
-        : (computedTotal || parseFloat(contract?.amount) || 0);
-      const extraDiscountAmount = forcedAmount != null && computedTotal > forcedAmount
-        ? Math.round((computedTotal - forcedAmount) * 100) / 100
-        : 0;
-
       const pdfData = {
         contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
         startDate: new Date().toISOString(),
@@ -300,7 +309,7 @@ export default function ContractSign() {
     } finally {
       setIsSaving(false);
     }
-  }, [contract, signatureBase64, signataireNom, isSaving, client, computedPricing, activeZone, queryClient]);
+  }, [contract, signatureBase64, signataireNom, isSaving, client, computedPricing, billableTotal, extraDiscountAmount, activeZone, queryClient]);
 
   // -- Loading --
   const isLoading = loadingClient || loadingContract || loadingEquipments || loadingPricing;
@@ -428,23 +437,30 @@ export default function ContractSign() {
                 ))}
               </div>
 
-              {/* Totaux */}
+              {/* Totaux — le total signé = montant ENREGISTRÉ sur le contrat (billableTotal),
+                  pas un recalcul. Sous-total/remises mirrorisent le PDF généré. */}
               <div className="mt-3 space-y-1">
+                {(computedPricing.discountPercent > 0 || extraDiscountAmount > 0) && (
+                  <div className="flex justify-between text-sm px-4">
+                    <span className="text-gray-500">Sous-total</span>
+                    <span className="tabular-nums">{formatEuro(computedPricing.subtotal)}</span>
+                  </div>
+                )}
                 {computedPricing.discountPercent > 0 && (
-                  <>
-                    <div className="flex justify-between text-sm px-4">
-                      <span className="text-gray-500">Sous-total</span>
-                      <span className="tabular-nums">{formatEuro(computedPricing.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm px-4 text-green-700">
-                      <span>Remise -{computedPricing.discountPercent}%</span>
-                      <span className="tabular-nums">-{formatEuro(computedPricing.discountAmount)}</span>
-                    </div>
-                  </>
+                  <div className="flex justify-between text-sm px-4 text-green-700">
+                    <span>Dégressivité -{computedPricing.discountPercent}%</span>
+                    <span className="tabular-nums">-{formatEuro(computedPricing.discountAmount)}</span>
+                  </div>
+                )}
+                {extraDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm px-4 text-green-700">
+                    <span>Remise commerciale</span>
+                    <span className="tabular-nums">-{formatEuro(extraDiscountAmount)}</span>
+                  </div>
                 )}
                 <div className="flex justify-between px-4 py-2 bg-orange-50 rounded-lg text-base font-bold text-[#EA580C]">
                   <span>Total annuel TTC</span>
-                  <span className="tabular-nums">{formatEuro(computedPricing.total)}</span>
+                  <span className="tabular-nums">{formatEuro(billableTotal)}</span>
                 </div>
               </div>
             </div>
