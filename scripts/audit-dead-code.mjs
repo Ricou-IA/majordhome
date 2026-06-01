@@ -87,7 +87,8 @@ function isReferenced(targetFile, allFiles) {
 // Whitelist : fichiers récemment créés non encore propagés.
 // À retirer une fois les imports en place.
 const ALLOW_ORPHAN = new Set([
-  'src/lib/logger.js', // P1.7 — wrapper créé, migration au fil de l'eau
+  'src/lib/logger.js',          // P1.7 — wrapper créé, migration au fil de l'eau
+  'src/lib/permissionsRegistry.js', // Phase 1 — inerte (seed only) ; consommé par can() en Phase 3
 ]);
 
 const allFiles = walk(SRC);

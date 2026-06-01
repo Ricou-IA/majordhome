@@ -53,8 +53,10 @@ export const REGISTRY = {
     create: { sql: 'INSERT', default: d([1, 1, 1]) },
     edit:   { sql: 'UPDATE', default: d([1, 0, 1]) },
   } },
-  // NOTE: `sav` partage la table `interventions` avec `entretiens` (réconciliation
-  // entretiens/sav à traiter dans une phase ultérieure ; ici on garde les défauts existants).
+  // NOTE: asymétrie connue avec permissions.js (RESOURCES) : `sav` est ici mais pas
+  // dans RESOURCES ; `cedants`/`prospection_commerciale` sont dans RESOURCES mais absents
+  // ici (=> fail-closed). Le registre reflète la réalité DB actuelle. Réconciliation
+  // (incl. fusion sav/entretiens + unification permissions.js) traitée en Phase 3 au câblage de can().
   sav: { label: 'SAV', tables: {}, actions: {
     view:   { sql: 'SELECT', default: d([1, 1, 1]) },
     create: { sql: 'INSERT', default: d([1, 0, 0]) },
@@ -103,7 +105,7 @@ export function appDefault(role, resource, action) {
 
 /**
  * Résolution canonique : override per-org si présent, sinon défaut app, sinon false.
- * @param {Object} orgOverrideMap - map "role:resource:action" -> boolean (lignes role_permissions)
+ * @param {Object|null} orgOverrideMap - map "role:resource:action" -> boolean (lignes role_permissions) (null => aucun override, on retombe sur appDefault)
  */
 export function resolvePermission(orgOverrideMap, role, resource, action) {
   if (role === 'org_admin') return true;

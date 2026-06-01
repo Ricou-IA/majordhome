@@ -1,7 +1,7 @@
 // scripts/verify-permissions-registry.mjs
 // Vérifie la structure du registre + des cas de résolution clés.
 // Lancement : node scripts/verify-permissions-registry.mjs
-import { REGISTRY, EDITABLE_ROLES, resolvePermission, appDefault, tableScope }
+import { REGISTRY, EDITABLE_ROLES, resolvePermission, appDefault, tableScope, iterAppDefaults }
   from '../src/lib/permissionsRegistry.js';
 
 let failures = 0;
@@ -33,6 +33,26 @@ assert(resolvePermission({ 'technicien:clients:create': true }, 'technicien', 'c
 assert(tableScope('equipments')?.scope === 'project', 'equipments scope = project');
 assert(tableScope('clients')?.resource === 'clients', 'clients -> clients');
 assert(tableScope('inconnue') === null, 'table inconnue -> null');
+
+// 5. iterAppDefaults : shape + valeurs de seed
+const defaults = [...iterAppDefaults()];
+assert(defaults.length > 0, 'iterAppDefaults émet des tuples');
+assert(defaults.every(x => typeof x.allowed === 'boolean'), 'seed: allowed booléen');
+assert(defaults.find(x => x.role==='team_leader' && x.resource==='clients' && x.action==='view')?.allowed === true, 'seed: TL clients.view = true');
+assert(defaults.find(x => x.role==='technicien' && x.resource==='clients' && x.action==='delete')?.allowed === false, 'seed: tech clients.delete = false');
+
+// 6. Override false prime sur défaut true
+assert(resolvePermission({ 'team_leader:clients:view': false }, 'team_leader', 'clients', 'view') === false,
+  'override false prime sur défaut true');
+
+// 7. Aucune table enregistrée dans 2 resources
+const tableIndex = {};
+for (const [res, def] of Object.entries(REGISTRY)) {
+  for (const tbl of Object.keys(def.tables || {})) {
+    assert(!tableIndex[tbl], `table '${tbl}' dans 2 resources (${tableIndex[tbl]} & ${res})`);
+    tableIndex[tbl] = res;
+  }
+}
 
 if (failures) { console.error(`\n${failures} échec(s)`); process.exit(1); }
 console.log('✅ Registre OK');
