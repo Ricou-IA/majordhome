@@ -9,10 +9,10 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLeadStatuses, useLeadCommercials, useLeadMutations } from '@hooks/useLeads';
+import { useLeadStatuses, useLeadCommercials, useLeadSources, useLeadMutations } from '@hooks/useLeads';
 import { useLongTermMutations } from '@hooks/useLeadInteractions';
 import { useKanbanCards } from '@hooks/useKanbanCards';
 import { leadsService } from '@services/leads.service';
@@ -190,6 +190,78 @@ function CommercialFilterDropdown({ value, onChange, commercials }) {
 }
 
 // ============================================================================
+// FILTRE SOURCE
+// ============================================================================
+
+function SourceFilterDropdown({ value, onChange, sources }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = sources.find((s) => s.id === value);
+  const hasValue = !!value;
+
+  const options = [
+    { value: '', label: 'Toutes les sources', color: null },
+    ...sources.map((s) => ({ value: s.id, label: s.name, color: s.color })),
+  ];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`
+          inline-flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors min-h-[40px]
+          ${hasValue
+            ? 'bg-blue-50 border-blue-200 text-blue-700'
+            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+          }
+        `}
+      >
+        {selected?.color ? (
+          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selected.color }} />
+        ) : (
+          <Tag className="w-4 h-4" />
+        )}
+        <span className="text-sm font-medium truncate max-w-[140px]">
+          {selected?.name || 'Source'}
+        </span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
+            {options.map((option) => (
+              <button
+                key={option.value ?? 'all'}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors
+                  ${option.value === value
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                  }
+                `}
+              >
+                <span className="flex items-center gap-2 truncate">
+                  {option.color && (
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: option.color }} />
+                  )}
+                  {option.label}
+                </span>
+                {option.value === value && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
@@ -206,6 +278,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
 
   const { statuses } = useLeadStatuses();
   const { commercials } = useLeadCommercials(orgId);
+  const { sources } = useLeadSources();
   const { updateLeadStatus } = useLeadMutations();
   const { moveToLongTerm, isMoving: isMovingToLongTerm } = useLongTermMutations();
 
@@ -235,6 +308,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedCommercialId, setSelectedCommercialId] = useState('');
+  const [selectedSourceId, setSelectedSourceId] = useState('');
 
   const canFilterCommercial = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
 
@@ -254,6 +328,10 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       if (canFilterCommercial && selectedCommercialId) {
         dateFilters.assignedUserId = selectedCommercialId;
       }
+      // Filtre source (tous rôles)
+      if (selectedSourceId) {
+        dateFilters.sourceId = selectedSourceId;
+      }
       // Exclure les leads MT-LT (Suivi long terme) du Kanban
       dateFilters.excludeLongTerm = true;
       const { data, error } = await leadsService.getLeads({
@@ -270,7 +348,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId]);
+  }, [orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId, selectedSourceId]);
 
   useEffect(() => {
     fetchLeads();
@@ -289,6 +367,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         if (canFilterCommercial && selectedCommercialId) {
           dateFilters.assignedUserId = selectedCommercialId;
         }
+        if (selectedSourceId) {
+          dateFilters.sourceId = selectedSourceId;
+        }
         dateFilters.excludeLongTerm = true;
         const { data, error } = await leadsService.getLeads({
           orgId,
@@ -303,7 +384,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       }
     };
     refetch();
-  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId]);
+  }, [refreshTrigger, orgId, selectedMonth, effectiveRole, myCommercialId, canFilterCommercial, selectedCommercialId, selectedSourceId]);
 
   // Map leadId → lead (pour jointure rapide dans kanbanItems)
   const leadsById = useMemo(() => {
@@ -687,7 +768,6 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
           lead={item.lead}
           card={item.card}
           onClick={onLeadClick}
-          compact
           commercialsMap={commercialsMap}
           onMoveToLongTerm={handleOpenLongTerm}
         />
@@ -711,6 +791,11 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
               commercials={commercials}
             />
           )}
+          <SourceFilterDropdown
+            value={selectedSourceId}
+            onChange={setSelectedSourceId}
+            sources={sources}
+          />
           <MonthFilterDropdown value={selectedMonth} onChange={setSelectedMonth} />
           <button
             onClick={fetchLeads}

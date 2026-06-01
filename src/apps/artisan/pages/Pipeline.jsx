@@ -12,7 +12,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, List, Columns3, Hourglass, Loader2 } from 'lucide-react';
+import { BarChart3, Columns3, Hourglass, Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -24,7 +24,6 @@ import { CommercialKpis } from '@components/pipeline/dashboard/CommercialKpis';
 import { SourcesTable } from '@components/pipeline/dashboard/SourcesTable';
 import { ConversionFunnel } from '@components/pipeline/dashboard/ConversionFunnel';
 import { MonthlyTrendsChart } from '@components/pipeline/dashboard/MonthlyTrendsChart';
-import { LeadsList } from '@apps/artisan/components/pipeline/LeadsList';
 import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
 import { LeadKanban } from '@apps/artisan/components/pipeline/LeadKanban';
 import { LongTermTab } from '@apps/artisan/components/pipeline/longTerm/LongTermTab';
@@ -134,10 +133,6 @@ export default function Pipeline() {
             <BarChart3 className="h-4 w-4" />
             Dashboard
           </TabsTrigger>
-          <TabsTrigger value="leads" className="gap-2 data-[state=active]:bg-white">
-            <List className="h-4 w-4" />
-            Leads
-          </TabsTrigger>
           <TabsTrigger value="kanban" className="gap-2 data-[state=active]:bg-white">
             <Columns3 className="h-4 w-4" />
             Kanban
@@ -179,11 +174,6 @@ export default function Pipeline() {
           )}
         </TabsContent>
 
-        {/* ==================== TAB LEADS ==================== */}
-        <TabsContent value="leads" className="mt-6">
-          <LeadsList onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} />
-        </TabsContent>
-
         {/* ==================== TAB KANBAN ==================== */}
         <TabsContent value="kanban" className="mt-6">
           <LeadKanban onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} refreshTrigger={refreshKey} />
@@ -195,7 +185,7 @@ export default function Pipeline() {
         </TabsContent>
       </Tabs>
 
-      {/* Modale Lead (partagée entre les 3 onglets) */}
+      {/* Modale Lead (ouverte depuis le Kanban) */}
       <LeadModal
         leadId={selectedLeadId}
         isOpen={modalOpen}
