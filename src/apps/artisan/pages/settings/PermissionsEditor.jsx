@@ -13,13 +13,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { usePermissions } from '@hooks/usePermissions';
 import { permissionsService } from '@services/permissions.service';
-import {
-  RESOURCES,
-  ACTIONS,
-  EDITABLE_ROLES,
-  ROLE_LABELS,
-  hasPermission,
-} from '@lib/permissions';
+import { ACTIONS, EDITABLE_ROLES, ROLE_LABELS, hasPermission } from '@lib/permissions';
+import { REGISTRY } from '@lib/permissionsRegistry';
 import {
   Shield,
   ArrowLeft,
@@ -43,6 +38,11 @@ export default function PermissionsEditor() {
   const orgId = organization?.id;
 
   const { permissionMap, permissionRows, isLoading, error } = usePermissions(orgId);
+
+  const ACTION_LABEL = Object.fromEntries(ACTIONS.map((a) => [a.key, a.label]));
+  const overrideSet = new Set(
+    (permissionRows || []).map((r) => `${r.role}:${r.resource}:${r.action}`)
+  );
 
   // ===========================================================================
   // HANDLERS
@@ -91,30 +91,6 @@ export default function PermissionsEditor() {
     },
     [orgId, queryClient]
   );
-
-  // ===========================================================================
-  // HELPERS
-  // ===========================================================================
-
-  /**
-   * Détermine les actions pertinentes pour une resource.
-   * Toutes les resources n'ont pas toutes les actions.
-   */
-  const getActionsForResource = (resourceKey) => {
-    switch (resourceKey) {
-      case 'dashboard':
-      case 'territoire':
-        return ACTIONS.filter((a) => a.key === 'view');
-      case 'settings':
-        return ACTIONS.filter((a) => ['view', 'edit'].includes(a.key));
-      case 'planning':
-        return ACTIONS.filter((a) => ['view', 'create'].includes(a.key));
-      case 'entretiens':
-        return ACTIONS.filter((a) => ['view', 'create', 'edit'].includes(a.key));
-      default:
-        return ACTIONS;
-    }
-  };
 
   // ===========================================================================
   // RENDER
@@ -178,62 +154,39 @@ export default function PermissionsEditor() {
               </tr>
             </thead>
             <tbody>
-              {RESOURCES.map((resource) => {
-                const actions = getActionsForResource(resource.key);
-
-                return actions.map((action, actionIdx) => (
+              {Object.entries(REGISTRY).map(([resourceKey, def]) => {
+                const actionKeys = Object.keys(def.actions);
+                return actionKeys.map((actionKey, actionIdx) => (
                   <tr
-                    key={`${resource.key}-${action.key}`}
-                    className={`border-b border-secondary-100 ${
-                      actionIdx === 0 ? 'border-t-2 border-t-secondary-200' : ''
-                    }`}
+                    key={`${resourceKey}-${actionKey}`}
+                    className={`border-b border-secondary-100 ${actionIdx === 0 ? 'border-t-2 border-t-secondary-200' : ''}`}
                   >
-                    {/* Resource + Action label */}
                     <td className="py-2.5 px-4">
                       <div className="flex items-center gap-2">
                         {actionIdx === 0 && (
-                          <span className="text-sm font-semibold text-secondary-900">
-                            {resource.label}
-                          </span>
+                          <span className="text-sm font-semibold text-secondary-900">{def.label}</span>
                         )}
                         {actionIdx > 0 && <span className="w-[1px]" />}
                         <span className="text-sm text-secondary-500 ml-4">
-                          {action.label}
+                          {ACTION_LABEL[actionKey] || actionKey}
                         </span>
                       </div>
                     </td>
-
-                    {/* Toggle per role */}
                     {EDITABLE_ROLES.map((role) => {
-                      const allowed = hasPermission(
-                        permissionMap,
-                        role,
-                        resource.key,
-                        action.key
-                      );
-
+                      const allowed = hasPermission(permissionMap, role, resourceKey, actionKey);
+                      const isOverride = overrideSet.has(`${role}:${resourceKey}:${actionKey}`);
                       return (
                         <td key={role} className="py-2.5 px-3 text-center">
                           <button
-                            onClick={() =>
-                              handleToggle(role, resource.key, action.key, allowed)
-                            }
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+                            onClick={() => handleToggle(role, resourceKey, actionKey, allowed)}
+                            className={`relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
                               allowed
                                 ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'
                                 : 'bg-secondary-100 text-secondary-400 hover:bg-secondary-200'
-                            }`}
-                            title={
-                              allowed
-                                ? `${ROLE_LABELS[role]} : autorisé`
-                                : `${ROLE_LABELS[role]} : refusé`
-                            }
+                            } ${isOverride ? 'ring-2 ring-amber-400' : ''}`}
+                            title={`${ROLE_LABELS[role]} : ${allowed ? 'autorisé' : 'refusé'}${isOverride ? ' (surcharge org)' : ' (défaut app)'}`}
                           >
-                            {allowed ? (
-                              <Check className="w-4 h-4" />
-                            ) : (
-                              <X className="w-4 h-4" />
-                            )}
+                            {allowed ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
                           </button>
                         </td>
                       );
@@ -270,6 +223,9 @@ export default function PermissionsEditor() {
               </li>
               <li>
                 <strong>Assigner</strong> — Assigner un commercial à un lead
+              </li>
+              <li>
+                <strong>Anneau ambre</strong> — réglage spécifique à cette organisation (surcharge). Sans anneau = défaut commun à toutes les organisations.
               </li>
             </ul>
             <p className="mt-2 text-blue-600 italic">
