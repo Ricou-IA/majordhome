@@ -64,6 +64,28 @@ export function formatDateTimeFR(dateString) {
   }
 }
 
+// Date → relatif fr : "à l'instant", "dans 6 minutes", "il y a 2 heures", "demain",
+// "il y a 3 jours". Au-delà d'une semaine → date courte ("9 juin 2026").
+// Renvoie null si la date est absente/invalide (le caller décide du fallback).
+export function formatRelativeFR(dateString) {
+  if (!dateString) return null;
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return null;
+    const diffMs = d.getTime() - Date.now();
+    const absMs = Math.abs(diffMs);
+    const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+    if (absMs < MIN) return "à l'instant";
+    const rtf = new Intl.RelativeTimeFormat('fr', { numeric: 'auto' });
+    if (absMs < HOUR) return rtf.format(Math.round(diffMs / MIN), 'minute');
+    if (absMs < DAY) return rtf.format(Math.round(diffMs / HOUR), 'hour');
+    if (absMs < 7 * DAY) return rtf.format(Math.round(diffMs / DAY), 'day');
+    return formatDateShortFR(dateString);
+  } catch {
+    return null;
+  }
+}
+
 // "0612345678" → "06 12 34 56 78"
 export function formatPhoneNumber(value) {
   if (!value) return '';
