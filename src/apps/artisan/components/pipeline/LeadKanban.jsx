@@ -407,6 +407,18 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     [statuses],
   );
 
+  // Map status_id (UUID) → column_key. Le fallback classique dérive sa colonne de
+  // status_id (que les updates optimistes modifient) plutôt que de statuses.label
+  // (qui n'est pas rafraîchi localement) → la carte bouge immédiatement au drag.
+  const statusIdToColumnKey = useMemo(() => {
+    const m = new Map();
+    statuses.forEach((s) => {
+      const ck = STATUS_LABEL_TO_COLUMN_KEY[s.label];
+      if (ck) m.set(s.id, ck);
+    });
+    return m;
+  }, [statuses]);
+
   // kanbanItems : 1 item par carte (pas par lead).
   // Un lead avec mix pending+accepted génère 2 items dans 2 colonnes différentes.
   // Fallback : si un lead n'a aucune carte dans la vue (mode classique sans PL),
@@ -433,7 +445,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     // → fallback synthétique basé sur leads.status_id
     allLeads.forEach((lead) => {
       if (leadsWithCard.has(lead.id)) return;
-      const colKey = STATUS_LABEL_TO_COLUMN_KEY[lead.statuses?.label];
+      const colKey = statusIdToColumnKey.get(lead.status_id);
       if (!colKey) return;
       items.push({
         id: `classic:${lead.id}`,
@@ -467,7 +479,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
     });
 
     return items;
-  }, [cards, allLeads, leadsById]);
+  }, [cards, allLeads, leadsById, statusIdToColumnKey]);
 
   // Search filter callback for KanbanBoard (opère sur les items, chaque item a .lead)
   const searchFilter = useCallback((item, query) => {
