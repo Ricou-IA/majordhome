@@ -11,6 +11,8 @@
  * ============================================================================
  */
 
+import { resolvePermission } from './permissionsRegistry.js';
+
 // =============================================================================
 // CONSTANTES
 // =============================================================================
@@ -136,11 +138,9 @@ export function buildPermissionMap(rows) {
  * @returns {boolean}
  */
 export function hasPermission(permissionMap, role, resource, action) {
-  // Sécurité : org_admin = accès total (même si DB corrompu)
-  if (role === 'org_admin') return true;
-
-  const key = `${role}:${resource}:${action}`;
-  return permissionMap[key] === true;
+  // Délègue au registre : org_admin bypass, sinon override per-org (permissionMap)
+  // s'il existe, sinon défaut app-level. permissionMap = map des overrides per-org.
+  return resolvePermission(permissionMap, role, resource, action);
 }
 
 /**
@@ -152,19 +152,9 @@ export function hasPermission(permissionMap, role, resource, action) {
  * @returns {Object} - Ex: { view: true, create: false, edit: false, ... }
  */
 export function getResourcePermissions(permissionMap, role, resource) {
-  if (role === 'org_admin') {
-    // Admin : tout autorisé
-    const result = {};
-    for (const a of ACTIONS) {
-      result[a.key] = true;
-    }
-    return result;
-  }
-
   const result = {};
   for (const a of ACTIONS) {
-    const key = `${role}:${resource}:${a.key}`;
-    result[a.key] = permissionMap[key] === true;
+    result[a.key] = resolvePermission(permissionMap, role, resource, a.key);
   }
   return result;
 }

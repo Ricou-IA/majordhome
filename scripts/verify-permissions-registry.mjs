@@ -3,6 +3,7 @@
 // Lancement : node scripts/verify-permissions-registry.mjs
 import { REGISTRY, EDITABLE_ROLES, resolvePermission, appDefault, tableScope, iterAppDefaults }
   from '../src/lib/permissionsRegistry.js';
+import { hasPermission } from '../src/lib/permissions.js';
 
 let failures = 0;
 const assert = (cond, msg) => { if (!cond) { console.error('❌', msg); failures++; } };
@@ -53,6 +54,12 @@ for (const [res, def] of Object.entries(REGISTRY)) {
     tableIndex[tbl] = res;
   }
 }
+
+// 8. hasPermission (permissions.js) délègue bien à resolvePermission
+assert(hasPermission({}, 'technicien', 'clients', 'create') === false, 'hasPermission tech clients.create = false');
+assert(hasPermission({}, 'technicien', 'clients', 'edit') === true, 'hasPermission tech clients.edit = true');
+assert(hasPermission({ 'technicien:clients:create': true }, 'technicien', 'clients', 'create') === true, 'hasPermission respecte override');
+assert(hasPermission({}, 'org_admin', 'settings', 'edit') === true, 'hasPermission admin bypass');
 
 if (failures) { console.error(`\n${failures} échec(s)`); process.exit(1); }
 console.log('✅ Registre OK');
