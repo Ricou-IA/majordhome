@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp } from 'lucide-react';
+import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp, CalendarClock } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { QuoteSubCard } from './QuoteSubCard';
@@ -181,7 +181,13 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
   const commercial = commercialsMap?.[lead.assigned_user_id];
 
   const ctx = getContextualDate(lead);
-  const shortDate = formatShortDate(ctx.date);
+  // Colonne "RDV planifié" : la puce est pilotée par le RDV réel (vue dérivée).
+  // RDV actif -> date du 1er RDV ; sinon -> marqueur ambre "à replanifier".
+  const requiresRdv = card?.column_key === 'rdv_planifie';
+  const hasActiveRdv = Boolean(card?.has_active_rdv);
+  const showAmber = requiresRdv && !hasActiveRdv;
+  const effectiveDate = (requiresRdv && hasActiveRdv && card?.next_rdv_date) ? card.next_rdv_date : ctx.date;
+  const shortDate = formatShortDate(effectiveDate);
   const CtxIcon = ctx.icon;
   const isPerdu = lead.statuses?.label === 'Perdu';
 
@@ -200,9 +206,11 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
       <div
         className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
         style={{ backgroundColor: `${statusColor}10`, borderColor: `${statusColor}30` }}
-        title={ctx.tooltip}
+        title={showAmber ? 'À replanifier' : ctx.tooltip}
       >
-        {isPerdu ? (
+        {showAmber ? (
+          <CalendarClock className="h-4 w-4 text-amber-500" />
+        ) : isPerdu ? (
           <>
             <XCircle className="h-4 w-4 mb-0.5" style={{ color: statusColor }} />
             {ctx.text && (

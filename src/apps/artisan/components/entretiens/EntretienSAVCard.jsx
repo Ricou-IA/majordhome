@@ -72,8 +72,10 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
     ? devis + (item.includes_entretien ? contrat : 0)
     : contrat;
 
-  // Date pertinente : scheduled_date ou created_at
-  const dateStr = item.scheduled_date || item.created_at;
+  // Date pertinente : RDV actif (vue dérivée) > scheduled_date > created_at
+  const dateStr = (item.has_active_rdv && item.next_rdv_date)
+    ? item.next_rdv_date
+    : (item.scheduled_date || item.created_at);
   const dateObj = dateStr ? new Date(dateStr) : null;
   const dayNum = dateObj ? dateObj.getDate() : '';
   const monthShort = dateObj

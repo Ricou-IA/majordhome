@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { MapPin, Calendar } from 'lucide-react';
+import { MapPin, Calendar, CalendarClock } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
 
@@ -48,7 +48,13 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
   const amount = getChantierAmount(chantier);
   const statusConfig = getChantierStatusConfig(chantier.chantier_status);
-  const shortDate = formatShortDate(chantier.won_date);
+  // Puce gauche : RDV installation si présent (vue dérivée), sinon date de signature.
+  // Colonne "Planification" sans RDV -> marqueur ambre "à replanifier".
+  const hasActiveRdv = Boolean(chantier.has_active_rdv);
+  const showAmber = chantier.chantier_status === 'planification' && !hasActiveRdv;
+  const chipDate = (hasActiveRdv && chantier.next_rdv_date)
+    ? formatShortDate(chantier.next_rdv_date)
+    : formatShortDate(chantier.won_date);
   const commercial = commercialsMap?.[chantier.assigned_user_id];
 
   return (
@@ -62,15 +68,17 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
       <div
         className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
         style={{ backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` }}
-        title="Date signature"
+        title={showAmber ? 'À replanifier' : (hasActiveRdv ? 'Date RDV installation' : 'Date signature')}
       >
-        {shortDate ? (
+        {showAmber ? (
+          <CalendarClock className="h-4 w-4 text-amber-500" />
+        ) : chipDate ? (
           <>
             <span className="text-sm font-bold leading-none" style={{ color: statusConfig.color }}>
-              {shortDate.day}
+              {chipDate.day}
             </span>
             <span className="text-[10px] uppercase leading-tight" style={{ color: statusConfig.color }}>
-              {shortDate.month}
+              {chipDate.month}
             </span>
           </>
         ) : (
