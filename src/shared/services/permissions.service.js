@@ -49,17 +49,12 @@ export const permissionsService = {
    */
   async updatePermission(orgId, role, resource, action, allowed) {
     return withErrorHandling(async () => {
-      const { data, error } = await supabase
-        .schema('majordhome')
-        .from('role_permissions')
-        .upsert(
-          { org_id: orgId, role, resource, action, allowed, updated_at: new Date().toISOString() },
-          { onConflict: 'org_id,role,resource,action' }
-        )
-        .select()
-        .single();
+      // majordhome non exposé via PostgREST → écriture par RPC SECURITY DEFINER (org_admin only)
+      const { error } = await supabase.rpc('org_upsert_role_permission', {
+        p_org_id: orgId, p_role: role, p_resource: resource, p_action: action, p_allowed: allowed,
+      });
       if (error) throw error;
-      return data;
+      return { org_id: orgId, role, resource, action, allowed };
     }, 'permissions.updatePermission');
   },
 
@@ -71,17 +66,14 @@ export const permissionsService = {
    */
   async bulkUpdatePermissions(orgId, updates) {
     return withErrorHandling(async () => {
-      const rows = updates.map((u) => ({
-        org_id: orgId, role: u.role, resource: u.resource,
-        action: u.action, allowed: u.allowed, updated_at: new Date().toISOString(),
-      }));
-      const { data, error } = await supabase
-        .schema('majordhome')
-        .from('role_permissions')
-        .upsert(rows, { onConflict: 'org_id,role,resource,action' })
-        .select();
-      if (error) throw error;
-      return data;
+      // majordhome non exposé via PostgREST → RPC SECURITY DEFINER par ligne (org_admin only)
+      for (const u of updates) {
+        const { error } = await supabase.rpc('org_upsert_role_permission', {
+          p_org_id: orgId, p_role: u.role, p_resource: u.resource, p_action: u.action, p_allowed: u.allowed,
+        });
+        if (error) throw error;
+      }
+      return updates;
     }, 'permissions.bulkUpdatePermissions');
   },
 
