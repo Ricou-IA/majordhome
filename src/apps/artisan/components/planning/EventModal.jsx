@@ -16,10 +16,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Loader2, Trash2, Ban, CalendarDays, ClipboardCheck } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
-import { getAppointmentTypeConfig, COMMERCIAL_TYPES } from '@services/appointments.service';
+import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, leadKeys } from '@hooks/useLeads';
 import { leadsService } from '@services/leads.service';
+import { resolveCardForAppointment } from '@services/appointmentActivation.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -64,6 +65,7 @@ const DEFAULT_SOURCE_BOUCHE_A_OREILLE = '3d945733-475a-46ee-891b-50acf9e2151d';
  * @param {Function} props.onDelete - () => Promise
  * @param {Function} props.onCancel - (reason) => Promise
  * @param {boolean} props.isSaving
+ * @param {Object|null} [props.attachContext] - Rattachement direct depuis un kanban : { leadId?, interventionId?, lockedType? }. Le type est figé et la carte pré-liée.
  */
 export function EventModal({
   isOpen,
@@ -80,6 +82,7 @@ export function EventModal({
   onDelete,
   onCancel,
   isSaving = false,
+  attachContext = null,
 }) {
   // État du formulaire
   const [formData, setFormData] = useState({});
@@ -217,7 +220,7 @@ export function EventModal({
       const duration = 60;
       setFormData({
         subject: '',
-        appointment_type: 'rdv_technical',
+        appointment_type: attachContext?.lockedType || 'other',
         priority: 'normal',
         status: 'scheduled',
         client_name: prefillClient?.last_name || '',
@@ -253,7 +256,7 @@ export function EventModal({
     clearClientSearch();
     clearLeadSearch();
     setShowClientDropdown(false);
-  }, [isOpen, mode, appointment, defaultDate, defaultTime, prefillClient, isEdit, clearClientSearch, clearLeadSearch]);
+  }, [isOpen, mode, appointment, defaultDate, defaultTime, prefillClient, isEdit, clearClientSearch, clearLeadSearch, attachContext]);
 
   // --------------------------------------------------------------------------
   // Mettre à jour un champ (avec auto-calcul heures)
@@ -412,16 +415,23 @@ export function EventModal({
   }, []);
 
   // --------------------------------------------------------------------------
-  // Enregistrer (avec auto-création lead pour prospects walk-in)
+  // Enregistrer — activation déduppée de la carte selon le type.
+  // Plus d'auto-lead silencieux : le seul prospect créé est le walk-in inconnu.
   // --------------------------------------------------------------------------
   const handleSave = useCallback(async () => {
     if (!validate()) return;
 
-    let leadId = selectedLead?.id || null;
+    let leadId = selectedLead?.id || attachContext?.leadId || null;
+    let interventionId = isEdit
+      ? (appointment?.intervention_id || null)
+      : (attachContext?.interventionId || null);
 
-    // Auto-création lead pour les RDV commerciaux sans lead existant
-    if (!isEdit && COMMERCIAL_TYPES.includes(formData.appointment_type) && !selectedLead) {
-      try {
+    if (!isEdit) {
+      // Walk-in inconnu (Planning, ni client ni lead, type commercial) -> vrai prospect
+      const isWalkInProspect = !selectedClient && !selectedLead && !attachContext
+        && COMMERCIAL_TYPES.includes(formData.appointment_type);
+
+      if (isWalkInProspect) {
         const result = await leadsService.createLead({
           orgId,
           userId,
@@ -434,24 +444,36 @@ export function EventModal({
           city: formData.client_city || null,
           source_id: DEFAULT_SOURCE_BOUCHE_A_OREILLE,
           status_id: RDV_PLANIFIE_STATUS_ID,
-          client_id: selectedClient?.id || null,
-          notes: `Lead auto-créé depuis le Planning — RDV du ${formData.scheduled_date}`,
+          notes: `Prospect créé depuis le Planning — RDV du ${formData.scheduled_date}`,
         });
-
         if (result.error) {
-          console.error('[EventModal] Auto-create lead error:', result.error);
-          toast.error('Erreur lors de la création automatique du lead');
+          console.error('[EventModal] create prospect error:', result.error);
+          toast.error('Erreur lors de la création du prospect');
           return;
         }
-
         leadId = result.data?.id || null;
-        if (leadId) {
-          toast.success('Lead créé automatiquement dans le pipeline');
+        if (leadId) toast.success('Prospect créé dans le pipeline');
+      } else {
+        // Activation déduppée : rattache / matérialise la carte du client selon le type
+        const resolved = await resolveCardForAppointment({
+          orgId,
+          userId,
+          type: formData.appointment_type,
+          clientId: selectedClient?.id || null,
+          leadId: selectedLead?.id || attachContext?.leadId || null,
+          interventionId: attachContext?.interventionId || null,
+        });
+        if (resolved.error === 'client_sans_projet') {
+          toast.error("Ce client n'a pas de fiche projet — impossible de créer l'entretien.");
+          return;
         }
-      } catch (err) {
-        console.error('[EventModal] Auto-create lead error:', err);
-        toast.error('Erreur lors de la création automatique du lead');
-        return;
+        if (resolved.error) {
+          console.error('[EventModal] activation error:', resolved.error);
+          toast.error("Erreur lors de l'activation de la carte");
+          return;
+        }
+        leadId = resolved.lead_id || null;
+        interventionId = resolved.intervention_id || null;
       }
     }
 
@@ -470,6 +492,7 @@ export function EventModal({
       postal_code: formData.client_postal_code || null,
       client_id: selectedClient?.id || null,
       lead_id: leadId,
+      intervention_id: interventionId,
       scheduled_date: formData.scheduled_date,
       scheduled_start: formData.scheduled_start,
       scheduled_end: formData.scheduled_end || null,
@@ -482,17 +505,31 @@ export function EventModal({
 
     await onSave(data);
 
-    // Invalider le cache leads si un lead a été créé ou lié
     if (leadId) {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     }
-  }, [formData, validate, onSave, selectedClient, selectedLead, isEdit, orgId, userId, queryClient]);
+  }, [formData, validate, onSave, selectedClient, selectedLead, isEdit, appointment, orgId, userId, queryClient, attachContext]);
 
   // Type config pour le badge coloré
   const typeConfig = useMemo(
     () => getAppointmentTypeConfig(formData.appointment_type),
     [formData.appointment_type]
   );
+
+  // Types proposés selon le point d'entrée (Bloc A)
+  // - kanban (attachContext.lockedType) -> type figé
+  // - fiche / planning -> Visite Technique / Entretien / SAV / Autre (PAS Installation,
+  //   PAS RDV Commercial legacy). On garde toujours le type courant pour l'affichage en édition.
+  const typeLocked = Boolean(attachContext?.lockedType);
+  const availableTypes = useMemo(() => {
+    if (attachContext?.lockedType) {
+      return APPOINTMENT_TYPES.filter(t => t.value === attachContext.lockedType);
+    }
+    const allowed = ['rdv_technical', 'maintenance', 'service', 'other'];
+    return APPOINTMENT_TYPES.filter(
+      t => allowed.includes(t.value) || t.value === formData.appointment_type
+    );
+  }, [attachContext, formData.appointment_type]);
 
   // Si fermée, on ne rend rien
   if (!isOpen) return null;
@@ -577,6 +614,8 @@ export function EventModal({
                 isEdit={isEdit}
                 isCancelled={isCancelled}
                 selectedLead={selectedLead}
+                availableTypes={availableTypes}
+                typeLocked={typeLocked}
               />
 
               <SectionDateTime

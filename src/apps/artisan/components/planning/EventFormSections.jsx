@@ -12,7 +12,7 @@
 
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
-  Search, ExternalLink, Link2, X, Loader2, Ban,
+  Search, ExternalLink, Link2, X, Loader2,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import {
@@ -43,7 +43,8 @@ export const SectionType = ({
   errors,
   isEdit,
   isCancelled,
-  selectedLead,
+  availableTypes = APPOINTMENT_TYPES,
+  typeLocked = false,
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -54,8 +55,8 @@ export const SectionType = ({
       <SelectInput
         value={formData.appointment_type}
         onChange={(v) => updateField('appointment_type', v)}
-        options={APPOINTMENT_TYPES}
-        disabled={isEdit || isCancelled}
+        options={availableTypes}
+        disabled={isEdit || isCancelled || typeLocked}
       />
     </FormField>
     <div className="mt-4">
@@ -68,13 +69,6 @@ export const SectionType = ({
         />
       </FormField>
     </div>
-    {/* Info auto-lead pour les types commerciaux */}
-    {!isEdit && COMMERCIAL_TYPES.includes(formData.appointment_type) && !selectedLead && (
-      <p className="text-xs text-violet-600 mt-4 flex items-center gap-1">
-        <Link2 className="w-3 h-3" />
-        Un lead sera créé automatiquement dans le pipeline au statut "RDV planifié"
-      </p>
-    )}
     {isEdit && (
       <div className="mt-4">
         <FormField label="Statut">
@@ -428,7 +422,7 @@ export const SectionClient = ({
  * - TECHNICIAN_TYPES → team_members avec role technician
  * - other → tous les team_members actifs
  */
-export const SectionAssignee = ({ formData, updateField, allTeamMembers, isCancelled }) => {
+export const SectionAssignee = ({ formData, updateField, allTeamMembers }) => {
   const type = formData.appointment_type;
   const isCommercialType = COMMERCIAL_TYPES.includes(type);
   const isTechnicianType = TECHNICIAN_TYPES.includes(type);

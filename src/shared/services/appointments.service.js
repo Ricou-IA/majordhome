@@ -80,6 +80,107 @@ export function getAppointmentTypeConfig(type) {
 // ============================================================================
 
 // ============================================================================
+// CYCLE DE VIE CARTE <-> RDV (Bloc A)
+// ============================================================================
+
+const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
+
+// display_order par status_id (pipeline) — garde forward-only
+const STATUS_DISPLAY_ORDER = {
+  'ea926b9a-521c-4012-a60b-85b6f7e5c09c': 1, // Nouveau
+  '4b1b967d-1c70-4510-8095-60a27e20e244': 2, // Contacté
+  'e23d04b8-da2e-4477-8e1c-b92868b682ae': 3, // RDV planifié
+  '47937391-5ffa-4804-9b5d-72f3fec6f4fe': 4, // Devis envoyé
+  'c717780c-0ba7-4bf1-9e1e-5f014c1e9e2f': 5, // Gagné
+  'e0419cea-d0fe-4be5-aba4-56197b2fd4fb': 6, // Perdu
+};
+
+// ordre des états chantier — garde forward-only installation
+const CHANTIER_ORDER = { gagne: 1, commande_a_faire: 2, commande_recue: 3, planification: 4, realise: 5 };
+
+const VT_TYPES = ['rdv_technical', 'rdv_agency'];
+
+/**
+ * Prise de RDV : avance la carte liée en colonne « planifiée » (forward-only).
+ * Ne descend jamais une carte plus avancée, ne touche pas une carte clôturée.
+ */
+async function syncCardStateOnCreate(appt) {
+  if (!appt) return;
+
+  // Entretien / SAV -> planifie
+  if (appt.intervention_id) {
+    const { error } = await supabase
+      .from('majordhome_interventions')
+      .update({ workflow_status: 'planifie', updated_at: new Date().toISOString() })
+      .eq('id', appt.intervention_id)
+      .not('workflow_status', 'in', '(realise,facture)');
+    if (error) console.error('[appointments] syncCreate entretien error:', error);
+    return;
+  }
+  if (!appt.lead_id) return;
+
+  // Visite Technique -> pipeline « RDV planifié » si en amont
+  if (VT_TYPES.includes(appt.appointment_type)) {
+    const { data: lead } = await supabase
+      .from('majordhome_leads').select('status_id').eq('id', appt.lead_id).maybeSingle();
+    const order = STATUS_DISPLAY_ORDER[lead?.status_id] ?? 99;
+    if (order < 3) {
+      const { error } = await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: appt.lead_id,
+        p_updates: { status_id: RDV_PLANIFIE_STATUS_ID, updated_at: new Date().toISOString() },
+      });
+      if (error) console.error('[appointments] syncCreate VT lead error:', error);
+    }
+    return;
+  }
+
+  // Installation -> chantier « planification » si en amont
+  if (appt.appointment_type === 'installation') {
+    const { data: lead } = await supabase
+      .from('majordhome_leads').select('chantier_status').eq('id', appt.lead_id).maybeSingle();
+    const order = CHANTIER_ORDER[lead?.chantier_status] ?? 0;
+    if (lead?.chantier_status && order < CHANTIER_ORDER.planification) {
+      const { error } = await supabase.rpc('update_majordhome_lead', {
+        p_lead_id: appt.lead_id,
+        p_updates: { chantier_status: 'planification', updated_at: new Date().toISOString() },
+      });
+      if (error) console.error('[appointments] syncCreate install lead error:', error);
+    }
+  }
+}
+
+/**
+ * Recalcule l'état d'une carte entretien selon la présence d'un RDV actif :
+ * >=1 RDV actif -> planifie, 0 -> a_planifier. Ne touche pas les états terminaux.
+ */
+async function recomputeEntretienWorkflow(interventionId) {
+  if (!interventionId) return;
+  const { count } = await supabase
+    .from('majordhome_appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('intervention_id', interventionId)
+    .not('status', 'in', '(cancelled,no_show)');
+  const nextStatus = count && count > 0 ? 'planifie' : 'a_planifier';
+  const { error } = await supabase
+    .from('majordhome_interventions')
+    .update({ workflow_status: nextStatus, updated_at: new Date().toISOString() })
+    .eq('id', interventionId)
+    .not('workflow_status', 'in', '(realise,facture)');
+  if (error) console.error('[appointments] recomputeEntretien error:', error);
+}
+
+/**
+ * Suppression / annulation de RDV : recalcule l'état de la carte entretien liée
+ * (retour en « À planifier » si c'était le dernier RDV actif). Pipeline/chantier :
+ * no-op (le marqueur « à replanifier » est dérivé de has_active_rdv=false dans les vues).
+ * À appeler APRÈS la suppression / le changement de statut.
+ */
+async function syncCardStateOnDelete(appt) {
+  if (!appt?.intervention_id) return;
+  await recomputeEntretienWorkflow(appt.intervention_id);
+}
+
+// ============================================================================
 // SERVICE
 // ============================================================================
 
@@ -215,6 +316,9 @@ export const appointmentsService = {
           .insert(techRows);
       }
 
+      // Cycle de vie carte <-> RDV : avance la carte liée en « planifié » (forward-only)
+      await syncCardStateOnCreate(appointment);
+
       // Fire-and-forget Google Calendar sync
       googleCalendarService.syncAppointment('create', appointment, {
         technicianIds,
@@ -253,6 +357,11 @@ export const appointmentsService = {
         leadsService
           .updateLead(appointment.lead_id, { appointment_date: updates.scheduled_date })
           .catch((err) => console.error('[appointments] sync lead.appointment_date error:', err));
+      }
+
+      // Reflux carte entretien si le statut du RDV a changé (annulation / réactivation)
+      if ('status' in updates && appointment?.intervention_id) {
+        await recomputeEntretienWorkflow(appointment.intervention_id);
       }
 
       // Mettre à jour les techniciens si fournis
@@ -366,6 +475,9 @@ export const appointmentsService = {
         console.error('[appointments] deleteAppointment error:', error);
         return { error };
       }
+
+      // Cycle de vie : reflux de la carte entretien en « À planifier » si dernier RDV
+      await syncCardStateOnDelete(appointment);
 
       // Fire-and-forget Google Calendar sync (delete event)
       // Pass sync records since CASCADE already deleted them from DB

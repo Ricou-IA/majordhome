@@ -185,6 +185,78 @@ async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visit
 }
 
 // ============================================================================
+// HELPER EXPORTÉ — Matérialisation carte entretien (sans appointment)
+// ============================================================================
+
+/**
+ * Matérialise (ou réutilise) la carte Kanban entretien/SAV d'un client, SANS créer
+ * d'appointment (le RDV est créé à part par le flux d'activation de prise de RDV).
+ *
+ * Idempotent : réutilise la carte parent non terminale existante du client + type.
+ * Bloc A — consommé par `resolveCardForAppointment` (appointmentActivation.service).
+ *
+ * @param {Object} p
+ * @param {string} p.clientId
+ * @param {string|null} [p.contractId] - lié au contrat actif si présent (sinon carte dégradée)
+ * @param {string|null} [p.visitDate] - pré-remplit interventions.scheduled_date (compat legacy ; la date d'affichage est dérivée du RDV)
+ * @param {string|null} [p.userId]
+ * @param {'entretien'|'sav'} [p.interventionType]
+ * @returns {Promise<{ interventionId: string|null, error: any }>}
+ */
+export async function ensureEntretienCard({
+  clientId,
+  contractId = null,
+  visitDate = null,
+  userId = null,
+  interventionType = 'entretien',
+}) {
+  if (!clientId) return { interventionId: null, error: 'client_requis' };
+
+  // project_id obligatoire pour une intervention (INNER JOIN core.projects dans la vue)
+  const { data: client } = await supabase
+    .from('majordhome_clients')
+    .select('project_id')
+    .eq('id', clientId)
+    .maybeSingle();
+  if (!client?.project_id) return { interventionId: null, error: 'client_sans_projet' };
+
+  // Anti-doublon : carte parent non terminale déjà existante pour ce client + type
+  const { data: existing } = await supabase
+    .from('majordhome_interventions')
+    .select('id')
+    .eq('client_id', clientId)
+    .eq('intervention_type', interventionType)
+    .is('parent_id', null)
+    .not('workflow_status', 'in', '(realise,facture)')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return { interventionId: existing.id, error: null };
+
+  const { data: created, error } = await supabase
+    .from('majordhome_interventions')
+    .insert({
+      project_id: client.project_id,
+      client_id: clientId,
+      contract_id: contractId,
+      intervention_type: interventionType,
+      workflow_status: 'planifie',
+      scheduled_date: visitDate,
+      status: 'scheduled',
+      created_by: userId,
+      tags: contractId ? ['Contrat'] : [],
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[entretiensService] ensureEntretienCard insert error:', error);
+    return { interventionId: null, error };
+  }
+  return { interventionId: created.id, error: null };
+}
+
+// ============================================================================
 // SERVICE
 // ============================================================================
 
