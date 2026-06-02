@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import ResendDomainSection from './components/ResendDomainSection';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -93,6 +94,7 @@ export default function ContactTab() {
   }
 
   return (
+    <>
     <div className="card space-y-8">
       {/* Section Siège social */}
       <section>
@@ -161,7 +163,7 @@ export default function ContactTab() {
               className={INPUT_CLASS}
             />
             {errors.from_email && <p className={ERROR_CLASS}>{errors.from_email}</p>}
-            <p className={HINT_CLASS}>Cet email doit être validé sur Resend pour l'envoi de campagnes.</p>
+            <p className={HINT_CLASS}>Son domaine doit être vérifié sur Resend (voir « Domaine d'envoi » ci-dessous).</p>
           </div>
         </div>
         <div className="mt-4">
@@ -214,5 +216,7 @@ export default function ContactTab() {
         </button>
       </div>
     </div>
+    <ResendDomainSection />
+    </>
   );
 }

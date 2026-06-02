@@ -42,6 +42,10 @@ verify_jwt = false
 [functions.voice-extract-fieldreport]
 verify_jwt = false
 
+# Scheduler campagnes mailing auto — protégée par MDH_CRON_SECRET (pg_cron 10 min)
+[functions.mailing-scheduler]
+verify_jwt = false
+
 # GeoGrid scan — protégée par MDH_CRON_SECRET (P0.2-like)
 [functions.geogrid-scan]
 verify_jwt = false
@@ -56,10 +60,16 @@ verify_jwt = true
 [functions.gsc-sync]
 verify_jwt = true
 
+# mailing-send : verify_jwt:false (2026-06-02) — auth interne (MDH_CRON_SECRET
+# pour le scheduler cron OU JWT user pour le frontend). La clé service_role du
+# projet est sb_secret (non-JWT) → inappelable via gateway verify_jwt:true.
 [functions.mailing-send]
-verify_jwt = true
+verify_jwt = false
 
 [functions.contract-signed-notify]
+verify_jwt = true
+
+[functions.resend-domain-onboard]
 verify_jwt = true
 
 [functions.invite-client]
