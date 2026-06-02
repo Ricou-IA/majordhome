@@ -115,7 +115,7 @@ Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit quali
 src/
 ├── main.jsx                    # Point d'entrée
 ├── App.jsx                     # Routes
-├── lib/                        # supabaseClient, mapbox, territoire-config, serviceHelpers, phoneUtils, constants
+├── lib/                        # supabaseClient, mapbox, territoire-config, serviceHelpers, phoneUtils, constants, deviceViewport
 ├── contexts/AuthContext.jsx     # Auth + org + rôles
 ├── pages/                      # Pages publiques (Login, Reset)
 ├── components/
@@ -133,7 +133,7 @@ src/
 │       # Note : ClientDetail a 6 onglets : Info/Contrat/Équipements/Interventions/Timeline/Mailings
 │       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierInterventionSection
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
-│       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, LeadList, SchedulingPanel
+│       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, SchedulingPanel
 │       │   └── longTerm/       # LongTermTab, LongTermLeadDrawer, MoveToLongTermModal (suivi projets MT-LT, ⚠️ WIP)
 │       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
 │       ├── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
@@ -213,6 +213,7 @@ const { isOrgAdmin, isTeamLeaderOrAbove, canAccessPipeline } = useAuth();
 ```
 
 - **RPC `public.org_seed_permissions(p_org_id)`** (P1.8, 2026-05-21) — copie les permissions Mayer comme template pour provisioning d'une nouvelle org. SECURITY DEFINER, `service_role` only, idempotent.
+- **RPC `public.org_upsert_role_permission(p_org_id, p_role, p_resource, p_action, p_allowed)`** — upsert d'une ligne `majordhome.role_permissions` depuis le frontend (éditeur Droits d'accès). SECURITY DEFINER, REVOKE anon, org_admin only. À utiliser pour toute écriture : `.schema('majordhome').from('role_permissions').upsert(...)` renvoie 406 PGRST106 (schema non exposé via PostgREST).
 
 ### God mode org_admin (hard delete avec cascade)
 Pour les entités où un soft-delete + restauration ne suffisent pas (planning fantôme, doublons d'import) : bouton "Supprimer" rouge ghost dans le footer de la modale d'édition (visible si `effectiveRole === 'org_admin'`) appelant une RPC `public.<entity>_hard_delete(p_<entity>_id)` :
@@ -683,8 +684,8 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
 
 ### RPCs Pipeline ↔ PL (bridge PR 1-5, spec `docs/superpowers/specs/2026-05-23-pipeline-pennylane-bridge-design.md`)
 - `public.lead_attach_quotes_and_send(p_org_id, p_lead_id, p_quotes jsonb)` — multi-attach + bascule statut "Devis envoyé" en 1 transaction. Calcule `most_recent_quote` via tie-break `pennylane_quote_id DESC` (cf Gotchas DB), propage `order_amount_ht` (ROUND).
-- `public.lead_mark_won_with_quote(p_org_id, p_lead_id, p_winning_quote_pl_id)` — marque 1 devis attaché comme canonique (`is_winning_quote=true`, false sur les autres), bascule lead en Gagné + insère `lead_activity` `'status_changed'` source `'mark_won_with_quote'`. Idempotent.
-- `public.pennylane_sync_ensure_winning_quotes(p_org_id)` — helper du cron, pose `is_winning_quote=true` sur le plus récent accepted. SECURITY DEFINER, service_role only.
+- `public.lead_mark_won_with_quote(p_org_id, p_lead_id, p_winning_quote_pl_id)` — **définition canonique UNIQUE de « gagner un lead »** : pose `is_winning_quote=true` (false sur les autres), bascule `status_id` en Gagné, pose `won_date` + **`chantier_status='gagne'` (= crée le chantier)** + insère `lead_activity` `'status_changed'` source `'mark_won_with_quote'`. Idempotent (garde `display_order<>5`). **Appelée par le chemin manuel ET par le cron** — ne JAMAIS dupliquer la logique de gain (statut / won_date / chantier) ailleurs, toujours passer par cette RPC. Fix régression chantier (2026-06-02) : avant, le gain auto via le cron ne posait que `is_winning_quote` → ni statut Gagné, ni chantier. `won_date` = jour du run (PL V2 n'expose pas la date de signature réelle).
+- `public.pennylane_sync_ensure_winning_quotes(p_org_id)` — helper du cron : pour chaque lead avec ≥1 devis `accepted` sans devis gagnant, appelle `lead_mark_won_with_quote` sur le plus récent `accepted` (effet « gagné » complet → crée le chantier). Déclencheur sur `accepted` uniquement (évite de créer des chantiers rétroactifs sur de vieux `invoiced`). Chaque lead wrappé en `EXCEPTION` (un échec ne casse pas le batch). SECURITY DEFINER, service_role only.
 - `public.pennylane_sync_update_quote_fields(p_quote_id, p_new_status, p_pdf_url)` (2026-05-26) — update batch `quote_status` + `pdf_url` en COALESCE strict (ne vide jamais une valeur existante). Appelée par le cron à chaque sync, remplace `pennylane_sync_update_quote_status` côté cron (l'ancienne reste dispo pour rétrocompat). service_role only.
 - `public.pennylane_sync_overwrite_lead_fields(p_lead_id, p_org_id, p_fields jsonb)` (2026-05-27) — mirror lead de `pennylane_sync_update_client_fields`. Sémantique COALESCE+NULLIF : PL non-vide → écrase MDH (PL canonical post-attache) ; PL vide → préserve MDH. service_role only.
 - `public.pennylane_sync_auto_attach_quote(p_org_id, p_lead_id, p_quote_pl_id, …)` (2026-05-27) — attache un nouveau devis PL ≥1000€ HT à un lead déjà bridgé. Idempotent (no-op si quote_pl_id déjà en base, y compris ejected = respect du soft-detach). Bump lead → "Devis envoyé" si stage < 4 (forward-only). service_role only.

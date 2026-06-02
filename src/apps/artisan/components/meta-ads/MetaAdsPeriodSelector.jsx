@@ -4,12 +4,14 @@ const PRESETS = [
   { key: '7d', label: '7 jours', days: 7 },
   { key: '30d', label: '30 jours', days: 30 },
   { key: '90d', label: '90 jours', days: 90 },
+  { key: 'all', label: 'Tout', days: null },
 ];
 
 export function computeRange(presetKey, customStart, customEnd) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const end = new Date(today);
+  const fmt = (d) => d.toISOString().slice(0, 10);
 
   if (presetKey === 'custom') {
     return {
@@ -18,11 +20,15 @@ export function computeRange(presetKey, customStart, customEnd) {
     };
   }
 
+  if (presetKey === 'all') {
+    // "Tout" : couvre tout l'historique Meta de l'org (les données démarrent en mars 2026).
+    return { startDate: '2026-01-01', endDate: fmt(end) };
+  }
+
   const preset = PRESETS.find((p) => p.key === presetKey) || PRESETS[1];
   const start = new Date(today);
   start.setDate(start.getDate() - (preset.days - 1));
 
-  const fmt = (d) => d.toISOString().slice(0, 10);
   return { startDate: fmt(start), endDate: fmt(end) };
 }
 
