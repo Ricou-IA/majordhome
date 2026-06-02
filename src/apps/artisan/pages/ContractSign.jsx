@@ -273,7 +273,7 @@ export default function ContractSign() {
       // Nom du fichier : "Contrat Entretien - Nom_Prenom.pdf"
       const clientName = client?.display_name || [client?.last_name, client?.first_name].filter(Boolean).join(' ') || 'Client';
       const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').replace(/\s+/g, '_');
-      const storagePath = `Contrat_Entretien_-_${safeName}.pdf`;
+      const storagePath = `${orgId}/Contrat_Entretien_-_${safeName}.pdf`;
       const { path: uploadedPath, error: uploadError } = await storageService.uploadFile(
         'contracts',
         storagePath,
