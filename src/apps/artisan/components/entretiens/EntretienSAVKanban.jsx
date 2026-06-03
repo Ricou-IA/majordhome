@@ -67,7 +67,10 @@ export function EntretienSAVKanban() {
     if (effectiveRole === 'commercial' && user?.id) {
       result = result.filter(i => i.created_by === user.id || i.technician_id === user.id);
     }
-    return result;
+    // Tri par date du RDV, ascendant (du plus ancien au plus futur) — même date que
+    // celle affichée sur la carte : next_rdv_date > scheduled_date > created_at.
+    const cardDate = (i) => i.next_rdv_date || i.scheduled_date || i.created_at || '9999-12-31';
+    return [...result].sort((a, b) => String(cardDate(a)).localeCompare(String(cardDate(b))));
   }, [items, effectiveRole, user?.id]);
 
   // =========================================================================
