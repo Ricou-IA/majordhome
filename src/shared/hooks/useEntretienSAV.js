@@ -12,11 +12,12 @@
  * ============================================================================
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
-import { entretienSavKeys } from '@hooks/cacheKeys';
+import { callCampaignsService } from '@services/callCampaigns.service';
+import { entretienSavKeys, callAttemptKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -32,7 +33,7 @@ export { entretienSavKeys } from '@hooks/cacheKeys';
  * @returns {{ items: Array, isLoading: boolean, error: Error, refresh: Function }}
  */
 export function useEntretienSAV(orgId) {
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data: baseItems, isLoading, error, refetch } = useQuery({
     queryKey: entretienSavKeys.list(orgId),
     queryFn: async () => {
       const { data, error } = await savService.getEntretiensSAV({ orgId });
@@ -43,8 +44,32 @@ export function useEntretienSAV(orgId) {
     staleTime: 15_000,
   });
 
+  const { data: callStats = [] } = useQuery({
+    queryKey: callAttemptKeys.stats(orgId),
+    queryFn: () => callCampaignsService.getStats(orgId),
+    enabled: !!orgId,
+    staleTime: 15_000,
+    select: (r) => r?.data ?? [],
+  });
+
+  const statsByIntervention = useMemo(() => {
+    const m = new Map();
+    (callStats || []).forEach((s) => { if (s.intervention_id) m.set(s.intervention_id, s); });
+    return m;
+  }, [callStats]);
+
+  const itemsWithCalls = useMemo(
+    () => (baseItems || []).map((it) => {
+      const s = statsByIntervention.get(it.id);
+      return s
+        ? { ...it, call_count: s.call_count, last_call_at: s.last_call_at, last_call_result: s.last_call_result }
+        : it;
+    }),
+    [baseItems, statsByIntervention],
+  );
+
   return {
-    items: data || [],
+    items: itemsWithCalls,
     isLoading,
     error,
     refresh: refetch,

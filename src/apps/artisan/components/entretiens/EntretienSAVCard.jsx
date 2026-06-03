@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Calendar, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive } from 'lucide-react';
+import { MapPin, Calendar, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
@@ -192,6 +192,17 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             )}
             {type === 'sav' && item.parts_order_status && (
               <PartsOrderBadge status={item.parts_order_status} />
+            )}
+            {item.call_count > 0 && (
+              <span className="text-xs flex items-center gap-0.5 text-amber-600"
+                    title={`${item.call_count} appel${item.call_count > 1 ? 's' : ''}${item.last_call_result === 'voicemail' ? ' · répondeur' : ''}`}>
+                <Phone className="h-3 w-3" />{item.call_count}
+              </span>
+            )}
+            {item.last_call_result === 'callback' && (
+              <span className="text-xs flex items-center gap-0.5 text-amber-700" title="À rappeler">
+                <PhoneForwarded className="h-3 w-3" />
+              </span>
             )}
           </div>
 
