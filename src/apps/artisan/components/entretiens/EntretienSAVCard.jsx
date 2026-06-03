@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { entretienSavKeys } from '@hooks/cacheKeys';
 
 // ============================================================================
 // CONSTANTES VISUELLES
@@ -61,6 +63,7 @@ function PartsOrderBadge({ status }) {
 export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [smsLoading, setSmsLoading] = useState(false);
   const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
+  const queryClient = useQueryClient();
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
 
@@ -86,6 +89,12 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   // planifiable dans l'outil secteur (il sort de plannedContractIds).
   const handleRanger = async (e) => {
     e.stopPropagation();
+    // Rafraîchit le kanban ET l'outil de programmation (plannedContractIds est une
+    // query sous entretienSavKeys.all → invalidation = dégrisement instant du secteur).
+    const refreshAll = () => {
+      onRefresh?.();
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+    };
     const snapshot = {
       orgId,
       clientId: item.client_id,
@@ -98,7 +107,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
       toast.error('Impossible de ranger la carte');
       return;
     }
-    onRefresh?.();
+    refreshAll();
     toast('Carte rangée', {
       description: name,
       action: {
@@ -106,7 +115,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
         onClick: async () => {
           const { error: rErr } = await savService.createEntretien(snapshot);
           if (rErr) toast.error('Annulation impossible');
-          onRefresh?.();
+          refreshAll();
         },
       },
     });
@@ -125,7 +134,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
           type="button"
           onClick={handleRanger}
           title="Ranger la carte (la retirer de « À planifier »)"
-          className="absolute bottom-1 left-1 z-10 p-1 rounded-md text-white/75 hover:text-white hover:bg-white/25 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+          className="absolute bottom-1 left-1 z-10 p-1 rounded-md text-white/70 hover:text-white hover:bg-white/25 transition-all"
         >
           <Archive className="w-3.5 h-3.5" />
         </button>
