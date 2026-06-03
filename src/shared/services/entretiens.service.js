@@ -76,9 +76,11 @@ async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visit
   const parentClosed = existingParent?.workflow_status === 'realise'
     || existingParent?.workflow_status === 'facture';
 
+  let parentId = existingParent?.id || null;
+
   if (!existingParent) {
     // CREATE entretien parent en planifie
-    const { error: insertErr } = await supabase
+    const { data: createdParent, error: insertErr } = await supabase
       .from('majordhome_interventions')
       .insert({
         project_id: client.project_id,
@@ -91,10 +93,14 @@ async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visit
         report_notes: notes || null,
         created_by: userId || null,
         tags: ['Contrat'],
-      });
+      })
+      .select('id')
+      .single();
 
     if (insertErr) {
       console.error('[entretiensService] CREATE entretien parent error:', insertErr);
+    } else {
+      parentId = createdParent.id;
     }
   } else if (!parentClosed && existingParent.scheduled_date !== visitDate) {
     // UPDATE date du parent (cas : client décale son RDV)
@@ -133,15 +139,15 @@ async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visit
     .maybeSingle();
 
   if (existingAppt?.id) {
-    if (existingAppt.scheduled_date !== visitDate) {
-      const { error: updateApptErr } = await supabase
-        .from('majordhome_appointments')
-        .update({ scheduled_date: visitDate, updated_at: new Date().toISOString() })
-        .eq('id', existingAppt.id);
+    const apptUpdates = { intervention_id: parentId, updated_at: new Date().toISOString() };
+    if (existingAppt.scheduled_date !== visitDate) apptUpdates.scheduled_date = visitDate;
+    const { error: updateApptErr } = await supabase
+      .from('majordhome_appointments')
+      .update(apptUpdates)
+      .eq('id', existingAppt.id);
 
-      if (updateApptErr) {
-        console.error('[entretiensService] UPDATE appointment error:', updateApptErr);
-      }
+    if (updateApptErr) {
+      console.error('[entretiensService] UPDATE appointment error:', updateApptErr);
     }
     return;
   }
@@ -168,6 +174,7 @@ async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visit
       status: 'scheduled',
       subject: `Entretien annuel — ${clientName}`,
       client_id: contract.client_id,
+      intervention_id: parentId,
       client_name: clientName,
       client_first_name: client.first_name || null,
       client_phone: client.phone || null,

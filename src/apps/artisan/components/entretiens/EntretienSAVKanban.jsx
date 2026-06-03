@@ -210,6 +210,7 @@ export function EntretienSAVKanban() {
         city: item.client_city || null,
         postal_code: item.client_postal_code || null,
         client_id: item.client_id || null,
+        intervention_id: item.id,
         status: 'scheduled',
         priority: 'normal',
         internal_notes: schedulingData.notes || null,
