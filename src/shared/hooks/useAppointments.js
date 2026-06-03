@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
 import { chantierSlotsService } from '@services/chantierSlots.service';
 import { supabase } from '@/lib/supabaseClient';
+import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { appointmentKeys, leadKeys, chantierSlotKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -344,6 +345,59 @@ export function useTeamMembers(orgId) {
     error,
     refresh: refetch,
   };
+}
+
+// ============================================================================
+// HOOK - useTeamDayAvailability (dispo d'un jour par membre)
+// ============================================================================
+
+/**
+ * RDV d'un jour (avec technician_ids) pour alimenter les colonnes par membre
+ * du DayResourceGrid / SchedulingAssistant.
+ */
+export function useTeamDayAvailability(orgId, date) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: appointmentKeys.dayAvailability(orgId, date),
+    queryFn: async () => {
+      const { data, error } = await appointmentsService.getTeamDayAvailability({ coreOrgId: orgId, date });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!date,
+    staleTime: 15_000,
+  });
+  return { dayAppointments: data || [], isLoading, error, refresh: refetch };
+}
+
+// ============================================================================
+// HOOK - useChantierAppointments (jours d'installation d'un chantier)
+// ============================================================================
+
+/**
+ * Appointments d'installation d'un chantier (lead_id), triés par date puis début.
+ * Exclut annulés/no_show.
+ */
+export function useChantierAppointments(orgId, leadId) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: appointmentKeys.chantier(orgId, leadId),
+    queryFn: async () => {
+      const mhOrg = await getMajordhomeOrgId(orgId);
+      const { data, error } = await supabase
+        .from('majordhome_appointments')
+        .select('*')
+        .eq('org_id', mhOrg)
+        .eq('lead_id', leadId)
+        .eq('appointment_type', 'installation')
+        .not('status', 'in', '(cancelled,no_show)')
+        .order('scheduled_date', { ascending: true })
+        .order('scheduled_start', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!orgId && !!leadId,
+    staleTime: 15_000,
+  });
+  return { appointments: data || [], isLoading, error, refresh: refetch };
 }
 
 // ============================================================================

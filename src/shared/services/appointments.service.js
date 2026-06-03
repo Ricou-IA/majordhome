@@ -552,6 +552,104 @@ export const appointmentsService = {
     }
   },
 
+  /**
+   * RDV d'un jour donné (avec technician_ids via la vue étendue) pour alimenter
+   * les colonnes du DayResourceGrid. Filtre org_id, exclut annulés/no_show.
+   */
+  async getTeamDayAvailability({ coreOrgId, date }) {
+    try {
+      const orgId = await getMajordhomeOrgId(coreOrgId);
+      const { data, error } = await supabase
+        .from('majordhome_appointments')
+        .select('id, subject, appointment_type, scheduled_date, scheduled_start, scheduled_end, duration_minutes, status, technician_ids, technician_names, client_name, client_first_name')
+        .eq('org_id', orgId)
+        .eq('scheduled_date', date)
+        .not('status', 'in', '(cancelled,no_show)')
+        .order('scheduled_start', { ascending: true });
+      if (error) { console.error('[appointments] getTeamDayAvailability error:', error); return { data: null, error }; }
+      return { data: data || [], error: null };
+    } catch (err) {
+      console.error('[appointments] getTeamDayAvailability error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Crée N appointments (1 par créneau) en réutilisant createAppointment
+   * (donc même syncCardStateOnCreate + sync Google par appointment).
+   * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes? }]
+   * shared = { coreOrgId, appointment_type, lead_id?, intervention_id?, client_id?,
+   *            client_name?, client_first_name?, client_phone?, client_email?,
+   *            address?, city?, postal_code?, assigned_commercial_id?, subjectPrefix? }
+   * Retourne { data: [appointments...], error } — error = 1ère erreur rencontrée (best-effort, ne rollback pas les précédents).
+   */
+  async createAppointmentBatch(slots, shared) {
+    const created = [];
+    for (const slot of slots) {
+      const { data, error } = await this.createAppointment({
+        coreOrgId: shared.coreOrgId,
+        technicianIds: slot.technicianIds || [],
+        appointment_type: shared.appointment_type,
+        subject: slot.subject || shared.subjectPrefix || null,
+        scheduled_date: slot.date,
+        scheduled_start: slot.startTime,
+        scheduled_end: slot.endTime || null,
+        duration_minutes: slot.duration || 60,
+        lead_id: shared.lead_id || null,
+        intervention_id: shared.intervention_id || null,
+        client_id: shared.client_id || null,
+        client_name: shared.client_name || null,
+        client_first_name: shared.client_first_name || null,
+        client_phone: shared.client_phone || null,
+        client_email: shared.client_email || null,
+        address: shared.address || null,
+        city: shared.city || null,
+        postal_code: shared.postal_code || null,
+        assigned_commercial_id: shared.assigned_commercial_id || null,
+        status: 'scheduled',
+        priority: 'normal',
+        internal_notes: slot.notes || null,
+      });
+      if (error) return { data: created, error };
+      created.push(data);
+    }
+    return { data: created, error: null };
+  },
+
+  /**
+   * Retire UN technicien d'un RDV (annulation ressource, pas de trace conservée).
+   * Le RDV reste actif → pas de reflux de carte (has_active_rdv inchangé).
+   * Re-sync Google pour refléter le retrait.
+   */
+  async removeAppointmentTechnician(appointmentId, technicianId) {
+    if (!appointmentId || !technicianId) throw new Error('[appointments] appointmentId & technicianId requis');
+    try {
+      const { error } = await supabase
+        .from('majordhome_appointment_technicians')
+        .delete()
+        .eq('appointment_id', appointmentId)
+        .eq('technician_id', technicianId);
+      if (error) { console.error('[appointments] removeAppointmentTechnician error:', error); return { error }; }
+
+      // Re-sync Google avec la liste de techs restante (fire-and-forget).
+      const { data: appointment } = await supabase
+        .from('majordhome_appointments').select('*').eq('id', appointmentId).maybeSingle();
+      const { data: remaining } = await supabase
+        .from('majordhome_appointment_technicians').select('technician_id').eq('appointment_id', appointmentId);
+      if (appointment) {
+        googleCalendarService.syncAppointment('update', appointment, {
+          technicianIds: remaining?.map(t => t.technician_id) || [],
+          assignedCommercialId: appointment.assigned_commercial_id,
+          orgId: appointment.org_id,
+        }).catch(() => {});
+      }
+      return { error: null };
+    } catch (err) {
+      console.error('[appointments] removeAppointmentTechnician error:', err);
+      return { error: err };
+    }
+  },
+
   // ==========================================================================
   // HELPERS - Conversion FullCalendar
   // ==========================================================================

@@ -95,6 +95,8 @@ export const appointmentKeys = {
   detail: (orgId, id) => [...appointmentKeys.all(orgId), 'detail', id],
   teamMembers: (orgId) => ['team-members', orgId],
   technicians: (orgId, appointmentIds) => [...appointmentKeys.all(orgId), 'technicians', appointmentIds],
+  dayAvailability: (orgId, date) => [...appointmentKeys.all(orgId), 'day-availability', date],
+  chantier: (orgId, leadId) => [...appointmentKeys.all(orgId), 'chantier', leadId],
 };
 
 // --- Interventions ---
