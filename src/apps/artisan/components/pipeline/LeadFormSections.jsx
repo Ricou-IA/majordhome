@@ -481,7 +481,7 @@ export const SectionPipeline = ({
       </div>
     )}
 
-    {/* SchedulingPanel rendu en overlay dans LeadModal */}
+    {/* Assistant de planification rendu en overlay dans LeadModal */}
 
     <FormField label="Équipement concerné" className="mt-3">
       <div className="relative">

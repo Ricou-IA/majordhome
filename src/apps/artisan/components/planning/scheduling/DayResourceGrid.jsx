@@ -18,7 +18,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { formatDateForInput } from '@/lib/utils';
-import { findTechnicianConflicts, memberWorkingHoursForDate, timeToMinutes } from '@/lib/scheduleConflicts';
+import { findMemberConflicts, memberWorkingHoursForDate, timeToMinutes } from '@/lib/scheduleConflicts';
 
 // ============================================================================
 // CONSTANTES
@@ -121,6 +121,9 @@ export function DayResourceGrid({
 
   // --- Blocs occupés par membre (avec index de début + nb de créneaux) ---
   // Map<memberId, Array<{ startIdx, slotCount, color, subject }>>
+  // Un RDV occupe la colonne d'un membre s'il l'implique comme technicien
+  // (technician_ids) OU comme commercial assigné (assigned_commercial_id) —
+  // prédicat unifié pour supporter les colonnes tech ET commercial.
   const blocksByMember = useMemo(() => {
     const map = new Map();
     members.forEach((m) => map.set(m.id, []));
@@ -132,9 +135,11 @@ export function DayResourceGrid({
       const duration = apt.duration_minutes || 60;
       const slotCount = Math.max(1, Math.ceil(duration / SLOT_MINUTES));
       const cfg = getAppointmentTypeConfig(apt.appointment_type);
-      (apt.technician_ids || []).forEach((tid) => {
-        if (!map.has(tid)) return;
-        map.get(tid).push({
+      members.forEach((m) => {
+        const involved =
+          (apt.technician_ids || []).includes(m.id) || apt.assigned_commercial_id === m.id;
+        if (!involved) return;
+        map.get(m.id).push({
           startIdx,
           slotCount,
           color: cfg.color,
@@ -160,7 +165,7 @@ export function DayResourceGrid({
       const endTime = slot.endTime || slotIndexToTime(startIdx + slotCount);
       (slot.technicianIds || []).forEach((tid) => {
         if (!map.has(tid)) return;
-        const conflict = findTechnicianConflicts(
+        const conflict = findMemberConflicts(
           { date: slot.date, startTime: slot.startTime, endTime },
           tid,
           dayAppointments,

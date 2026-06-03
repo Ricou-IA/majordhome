@@ -47,7 +47,7 @@ import {
   SectionNotes,
 } from './LeadFormSections';
 import SectionDevis from '../devis/SectionDevis';
-import { SchedulingPanel } from './SchedulingPanel';
+import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { FicheTechniqueModal } from './FicheTechniqueModal';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
@@ -252,7 +252,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     }
   }, [isOpen, isEditing, defaultCommercialId]);
 
-  // Auto-schedule : ouvrir directement le SchedulingPanel après chargement du lead
+  // Auto-schedule : ouvrir directement l'assistant de planification après chargement du lead
   useEffect(() => {
     if (!autoSchedule || !isOpen || !isEditing || !lead || !statuses.length) return;
     const rdvStatus = statuses.find((s) => s.label === 'RDV planifié');
@@ -530,22 +530,24 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     }
   };
 
-  const handleConfirmScheduling = async (schedulingData) => {
+  // VT pipeline (Bloc B stage 2) : l'assistant remonte slots[] (mode commercial,
+  // 1 créneau). On crée le(s) RDV via createAppointmentBatch (assigned_commercial_id
+  // = owner de la carte, technicianIds vide), puis on bascule le lead en
+  // « RDV planifié » avec le PREMIER appointment créé.
+  const handleConfirmScheduling = async (slots) => {
     if (!pendingRdvStatusId) return;
+    if (!slots || slots.length === 0) return;
     setSchedulingLoading(true);
     try {
       const payload = buildPayload();
       await updateLead(leadId, payload);
       await syncClientFields();
-      const appointmentPayload = {
+      const { data: created, error: aptError } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
-        technicianIds: schedulingData.technicianIds,
-        appointment_type: schedulingData.appointmentType,
-        subject: schedulingData.subject,
-        scheduled_date: schedulingData.date,
-        scheduled_start: schedulingData.startTime,
-        scheduled_end: schedulingData.endTime || null,
-        duration_minutes: schedulingData.duration,
+        appointment_type: 'rdv_technical',
+        lead_id: leadId,
+        client_id: linkedClient?.id || null,
+        assigned_commercial_id: form.assigned_user_id || null,
         client_name: form.last_name || 'Sans nom',
         client_first_name: form.first_name || null,
         client_phone: form.phone || '',
@@ -553,14 +555,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         address: form.address || null,
         city: form.city || null,
         postal_code: form.postal_code || null,
-        lead_id: leadId,
-        client_id: linkedClient?.id || null,
-        assigned_commercial_id: form.assigned_user_id || null,
-        status: 'scheduled',
-        priority: 'normal',
-        internal_notes: schedulingData.notes || null,
-      };
-      const { data: appointment, error: aptError } = await appointmentsService.createAppointment(appointmentPayload);
+        subjectPrefix: 'Visite technique',
+      });
       if (aptError) {
         console.error('[LeadModal] Erreur création RDV:', aptError);
         toast.error('Erreur lors de la création du RDV');
@@ -568,8 +564,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         return;
       }
       await updateLeadStatus(leadId, pendingRdvStatusId, userId, {
-        appointmentDate: schedulingData.date,
-        appointmentId: appointment?.id || null,
+        appointmentDate: slots[0].date,
+        appointmentId: created?.[0]?.id || null,
       });
       setPendingRdvStatusId(null);
       toast.success('RDV planifié avec succès');
@@ -966,11 +962,18 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
           ) : pendingRdvStatusId ? (
-            /* ── Mode planification RDV : overlay plein body ── */
-            <SchedulingPanel
+            /* ── Mode planification RDV (VT) : overlay plein body ──
+               Assistant en mode commercial — affiche la dispo du SEUL commercial
+               assigné à la carte (figé), 1 créneau, sortie assigned_commercial_id. */
+            <SchedulingAssistant
+              assigneeType="commercial"
+              fixedAssigneeId={lead?.assigned_user_id || form?.assigned_user_id || null}
+              multi={false}
+              commercials={commercials}
+              appointmentTypeLabel="Visite technique"
+              appointmentTypeValue="rdv_technical"
               lead={lead || form}
               orgId={orgId}
-              commercials={commercials}
               onConfirm={handleConfirmScheduling}
               onCancel={() => { setPendingRdvStatusId(null); if (autoSchedule) onClose(); }}
               isLoading={schedulingLoading}

@@ -25,7 +25,7 @@ import { CalendarCheck, Loader2, X, FileText, User } from 'lucide-react';
 import { DayResourceGrid } from './DayResourceGrid';
 import { SlotDraftList } from './SlotDraftList';
 import { useTeamDayAvailability } from '@hooks/useAppointments';
-import { findTechnicianConflicts } from '@/lib/scheduleConflicts';
+import { findMemberConflicts } from '@/lib/scheduleConflicts';
 import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================
@@ -57,6 +57,7 @@ function newId() {
  * @param {Array} [props.commercials] - [{ id, full_name, role? }] (colonnes en mode commercial — filtrées role commercial/admin)
  * @param {Array} [props.members] - [{ id, display_name, calendar_color, default_availability, role }] (colonnes en mode technician — filtrées role technician)
  * @param {'commercial'|'technician'} [props.assigneeType]
+ * @param {string|null} [props.fixedAssigneeId] - (mode commercial) id du commercial figé (= owner de la carte) : la grille n'affiche QUE sa colonne. null → tous les commerciaux.
  * @param {string} [props.appointmentTypeLabel] - libellé affiché du type de RDV
  * @param {number} [props.defaultDuration]
  * @param {string} [props.defaultSubjectPrefix]
@@ -71,6 +72,7 @@ export function SchedulingAssistant({
   commercials = [],
   members = [],
   assigneeType = 'commercial',
+  fixedAssigneeId = null,
   appointmentTypeLabel = 'Visite technique',
   // NB: le type de RDV (appointment_type) est appliqué par le CALLER via le
   // contexte partagé de createAppointmentBatch — pas par l'assistant. Les callers
@@ -84,16 +86,22 @@ export function SchedulingAssistant({
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
+  // Mode commercial : assignation portée par la carte (assigned_commercial_id),
+  // pas choisie ici. La colonne affichée = le commercial figé (fixedAssigneeId).
+  const commercialMode = assigneeType === 'commercial';
+
   // Colonnes affichées = membres assignables selon le type, FILTRÉS par rôle.
   // Mirror de la convention SectionAssignee (EventFormSections.jsx) :
   //   - 'technician' → role === 'technician'
   //   - 'commercial' → role === 'commercial' || role === 'admin'
   //   - inconnu / membre sans rôle → conservé (fallback).
+  // En mode commercial avec fixedAssigneeId → on ne garde QUE ce commercial
+  // (la dispo affichée est celle du commercial assigné à la carte).
   // Source unique : la liste filtrée est passée à DayResourceGrid (colonnes) ET
-  // à SlotDraftList (sélecteur de tech par créneau) — pas de filtre dans les leaves.
+  // à SlotDraftList (sélecteur par créneau, masqué en mode commercial).
   const columnMembers = useMemo(() => {
-    if (assigneeType === 'commercial') {
-      return (commercials || [])
+    if (commercialMode) {
+      const mapped = (commercials || [])
         .filter((c) => !c.role || c.role === 'commercial' || c.role === 'admin')
         .map((c) => ({
           id: c.id,
@@ -102,20 +110,29 @@ export function SchedulingAssistant({
           default_availability: c.default_availability || null,
           role: c.role,
         }));
+      if (fixedAssigneeId) {
+        return mapped.filter((c) => c.id === fixedAssigneeId);
+      }
+      return mapped;
     }
     if (assigneeType === 'technician') {
       return (members || []).filter((m) => !m.role || m.role === 'technician');
     }
     return members || [];
-  }, [assigneeType, commercials, members]);
+  }, [commercialMode, assigneeType, commercials, members, fixedAssigneeId]);
 
-  // Tech(s) par défaut posés sur un nouveau créneau (commercial assigné au lead).
+  // Membre(s) posé(s) par défaut sur un nouveau créneau.
+  // Mode commercial : le commercial figé (fixedAssigneeId) ou, à défaut,
+  // l'owner du lead — son id pilote le rendu de la colonne + les conflits.
+  // Il est retiré de l'output final (technicianIds: []) dans handleSubmit.
   const defaultTechIds = useMemo(() => {
-    if (assigneeType === 'commercial' && lead?.assigned_user_id) {
-      return columnMembers.some((m) => m.id === lead.assigned_user_id) ? [lead.assigned_user_id] : [];
+    if (commercialMode) {
+      const target = fixedAssigneeId || lead?.assigned_user_id || null;
+      if (target && columnMembers.some((m) => m.id === target)) return [target];
+      return [];
     }
     return [];
-  }, [assigneeType, lead?.assigned_user_id, columnMembers]);
+  }, [commercialMode, fixedAssigneeId, lead?.assigned_user_id, columnMembers]);
 
   const [selectedDate, setSelectedDate] = useState(defaultStartDate);
   const [draftSlots, setDraftSlots] = useState([]);
@@ -169,7 +186,7 @@ export function SchedulingAssistant({
     draftSlots.forEach((slot) => {
       let count = 0;
       (slot.technicianIds || []).forEach((tid) => {
-        count += findTechnicianConflicts(
+        count += findMemberConflicts(
           { date: slot.date, startTime: slot.startTime, endTime: slot.endTime },
           tid,
           dayAppointments,
@@ -187,8 +204,10 @@ export function SchedulingAssistant({
 
   // --- Confirmation : remonte les slots[] au format du contrat ---
   // slots = [{ date, startTime, endTime, duration, technicianIds, subject, notes }]
-  // `technicianIds` porte les membres sélectionnés (techniciens). En mode commercial,
-  // les colonnes sont des commerciaux ; le caller (pipeline) mappe vers assigned_commercial_id.
+  // Mode technician : `technicianIds` porte les techniciens sélectionnés.
+  // Mode commercial : l'assignation est celle de la carte (assigned_commercial_id,
+  // posé par le caller) → on sort technicianIds: [] (l'id commercial servait
+  // uniquement, en interne, au rendu de colonne + aux conflits).
   const handleSubmit = useCallback(() => {
     if (draftSlots.length === 0) return;
     const slots = draftSlots.map((s) => ({
@@ -196,14 +215,26 @@ export function SchedulingAssistant({
       startTime: s.startTime,
       endTime: s.endTime || null,
       duration: s.duration || defaultDuration,
-      technicianIds: s.technicianIds || [],
+      technicianIds: commercialMode ? [] : (s.technicianIds || []),
       subject: subject.trim() || subjectPrefix,
       notes: notes.trim() || null,
     }));
     onConfirm?.(slots);
-  }, [draftSlots, defaultDuration, subject, subjectPrefix, notes, onConfirm]);
+  }, [draftSlots, defaultDuration, commercialMode, subject, subjectPrefix, notes, onConfirm]);
 
-  const assigneeLabel = assigneeType === 'commercial' ? 'Commercial(aux)' : 'Technicien(s)';
+  const assigneeLabel = commercialMode ? 'Commercial(aux)' : 'Technicien(s)';
+
+  // Affichage du membre dans l'en-tête : en mode commercial figé, le nom du
+  // commercial assigné à la carte (parité avec l'ancien SchedulingPanel) ;
+  // sinon le libellé générique.
+  const assigneeDisplay = useMemo(() => {
+    if (commercialMode && fixedAssigneeId) {
+      const assigned = columnMembers.find((m) => m.id === fixedAssigneeId);
+      if (assigned) return assigned.display_name;
+      return 'Aucun commercial assigné';
+    }
+    return assigneeLabel;
+  }, [commercialMode, fixedAssigneeId, columnMembers, assigneeLabel]);
 
   return (
     <div className="space-y-4">
@@ -228,7 +259,7 @@ export function SchedulingAssistant({
         <span className="font-medium">{appointmentTypeLabel}</span>
         <span className="text-gray-300">•</span>
         <User className="w-3.5 h-3.5 text-indigo-500" />
-        <span className="text-gray-500">{assigneeLabel}</span>
+        <span className="text-gray-500">{assigneeDisplay}</span>
       </div>
 
       {/* Grille jour × colonnes par membre */}
@@ -241,7 +272,8 @@ export function SchedulingAssistant({
         onPlaceSlot={handlePlaceSlot}
       />
 
-      {/* Liste des créneaux empilés */}
+      {/* Liste des créneaux empilés (sélecteur par créneau masqué en mode commercial :
+          l'assignation est celle de la carte, pas choisie ici). */}
       <SlotDraftList
         slots={draftSlots}
         members={columnMembers}
@@ -249,6 +281,7 @@ export function SchedulingAssistant({
         onRemoveSlot={handleRemoveSlot}
         onToggleTech={handleToggleTech}
         assigneeLabel={assigneeLabel}
+        showTechSelect={!commercialMode}
       />
 
       {/* Objet */}

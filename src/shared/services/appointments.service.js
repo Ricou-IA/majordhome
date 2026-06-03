@@ -564,7 +564,7 @@ export const appointmentsService = {
       const orgId = await getMajordhomeOrgId(coreOrgId);
       const { data, error } = await supabase
         .from('majordhome_appointments')
-        .select('id, subject, appointment_type, scheduled_date, scheduled_start, scheduled_end, duration_minutes, status, client_name, client_first_name')
+        .select('id, subject, appointment_type, scheduled_date, scheduled_start, scheduled_end, duration_minutes, status, client_name, client_first_name, assigned_commercial_id')
         .eq('org_id', orgId)
         .eq('scheduled_date', date)
         .not('status', 'in', '(cancelled,no_show)')
