@@ -23,6 +23,9 @@ import { leadsService } from '@services/leads.service';
 const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
 const STATUS_GAGNE = 'c717780c-0ba7-4bf1-9e1e-5f014c1e9e2f';
 const STATUS_PERDU = 'e0419cea-d0fe-4be5-aba4-56197b2fd4fb';
+// Source « Client Existant » : marque les leads matérialisés depuis une fiche client
+// (activation VT), pour les distinguer des vrais prospects entrants.
+const SOURCE_CLIENT_EXISTANT = '1c4d75fb-4cc0-4d2f-b49f-b8b000d10c83';
 
 /**
  * @param {Object} p
@@ -105,6 +108,7 @@ export async function resolveCardForAppointment({
       address: client?.address || null,
       postal_code: client?.postal_code || null,
       city: client?.city || null,
+      source_id: SOURCE_CLIENT_EXISTANT,
       status_id: RDV_PLANIFIE_STATUS_ID,
       notes: 'Carte client activée via prise de RDV',
     });
