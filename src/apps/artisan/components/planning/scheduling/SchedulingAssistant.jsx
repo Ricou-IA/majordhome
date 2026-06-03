@@ -32,10 +32,11 @@ import { formatDateForInput } from '@/lib/utils';
 // HELPERS
 // ============================================================================
 
-/** Date du prochain jour ouvré (saute le dimanche) au format YYYY-MM-DD. */
+/** Date du prochain jour ouvré (saute samedi/dimanche, semaine Lun-Ven) au format YYYY-MM-DD. */
 function defaultStartDate() {
   const d = new Date();
-  if (d.getDay() === 0) d.setDate(d.getDate() + 1); // dimanche → lundi
+  if (d.getDay() === 6) d.setDate(d.getDate() + 2); // samedi → lundi
+  else if (d.getDay() === 0) d.setDate(d.getDate() + 1); // dimanche → lundi
   return formatDateForInput(d);
 }
 
@@ -53,8 +54,8 @@ function newId() {
  * @param {Object} props
  * @param {Object} props.lead - lead/client courant (pré-remplit objet + assigned_user_id)
  * @param {string} props.orgId - core org_id
- * @param {Array} [props.commercials] - [{ id, full_name }] (colonnes en mode commercial)
- * @param {Array} [props.members] - [{ id, display_name, calendar_color, default_availability }] (colonnes en mode technician)
+ * @param {Array} [props.commercials] - [{ id, full_name, role? }] (colonnes en mode commercial — filtrées role commercial/admin)
+ * @param {Array} [props.members] - [{ id, display_name, calendar_color, default_availability, role }] (colonnes en mode technician — filtrées role technician)
  * @param {'commercial'|'technician'} [props.assigneeType]
  * @param {string} [props.appointmentTypeLabel] - libellé affiché du type de RDV
  * @param {number} [props.defaultDuration]
@@ -83,16 +84,27 @@ export function SchedulingAssistant({
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
-  // Colonnes affichées = membres assignables selon le type.
-  // Normalisées en { id, display_name, calendar_color, default_availability }.
+  // Colonnes affichées = membres assignables selon le type, FILTRÉS par rôle.
+  // Mirror de la convention SectionAssignee (EventFormSections.jsx) :
+  //   - 'technician' → role === 'technician'
+  //   - 'commercial' → role === 'commercial' || role === 'admin'
+  //   - inconnu / membre sans rôle → conservé (fallback).
+  // Source unique : la liste filtrée est passée à DayResourceGrid (colonnes) ET
+  // à SlotDraftList (sélecteur de tech par créneau) — pas de filtre dans les leaves.
   const columnMembers = useMemo(() => {
     if (assigneeType === 'commercial') {
-      return (commercials || []).map((c) => ({
-        id: c.id,
-        display_name: c.full_name || c.display_name || 'Commercial',
-        calendar_color: c.calendar_color || '#6366F1',
-        default_availability: c.default_availability || null,
-      }));
+      return (commercials || [])
+        .filter((c) => !c.role || c.role === 'commercial' || c.role === 'admin')
+        .map((c) => ({
+          id: c.id,
+          display_name: c.full_name || c.display_name || 'Commercial',
+          calendar_color: c.calendar_color || '#6366F1',
+          default_availability: c.default_availability || null,
+          role: c.role,
+        }));
+    }
+    if (assigneeType === 'technician') {
+      return (members || []).filter((m) => !m.role || m.role === 'technician');
     }
     return members || [];
   }, [assigneeType, commercials, members]);

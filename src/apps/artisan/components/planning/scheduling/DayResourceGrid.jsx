@@ -3,7 +3,7 @@
  * ============================================================================
  * Vue JOUR avec une colonne PAR MEMBRE (technicien ou commercial).
  * Évolution CSS-grid de MiniWeekCalendar (PAS de FullCalendar) :
- *  - bande semaine en tête (Lun-Sam) pour choisir le jour
+ *  - bande semaine en tête (Lun-Ven) pour choisir le jour
  *  - 1 colonne par membre ; blocs occupés filtrés par technician_ids
  *  - hors-horaire grisé via default_availability (memberWorkingHoursForDate)
  *  - blocs "draft" (créneaux en cours) rendus distinctement (bleu plein)
@@ -31,8 +31,8 @@ const SLOT_MINUTES = 30;
 const TOTAL_SLOTS = (END_HOUR - START_HOUR) * (60 / SLOT_MINUTES); // 24 créneaux
 const SLOT_HEIGHT = 20; // px par créneau de 30 min
 
-const WEEK_DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-const WEEK_DAYS_COUNT = 6;
+const WEEK_DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
+const WEEK_DAYS_COUNT = 5;
 
 // ============================================================================
 // HELPERS
@@ -97,7 +97,7 @@ export function DayResourceGrid({
   // État du drag : { memberId, startIndex, currentIndex }
   const [dragState, setDragState] = useState(null);
 
-  // --- Bande semaine (Lun-Sam) ---
+  // --- Bande semaine (Lun-Ven) ---
   const monday = useMemo(() => getMonday(date ? new Date(date + 'T00:00:00') : new Date()), [date]);
   const weekDays = useMemo(() => {
     const result = [];
@@ -191,16 +191,23 @@ export function DayResourceGrid({
     return blocks.some((b) => slotIndex >= b.startIdx && slotIndex < b.startIdx + b.slotCount);
   }, [blocksByMember]);
 
-  // --- Navigation jour ---
+  // --- Navigation jour (saute les week-ends : semaine Lun-Ven) ---
   const shiftDay = useCallback((delta) => {
     const d = new Date(date + 'T00:00:00');
     d.setDate(d.getDate() + delta);
+    // Si on tombe sur un week-end, continuer dans le sens du déplacement
+    // jusqu'au prochain jour ouvré (vendredi en arrière, lundi en avant).
+    while (d.getDay() === 0 || d.getDay() === 6) {
+      d.setDate(d.getDate() + (delta >= 0 ? 1 : -1));
+    }
     onDateChange(formatDate(d));
   }, [date, onDateChange]);
 
   const goToToday = useCallback(() => {
-    let d = new Date();
-    if (d.getDay() === 0) d = new Date(d.getTime() + 86400000); // dimanche → lundi
+    const d = new Date();
+    const dow = d.getDay();
+    if (dow === 6) d.setDate(d.getDate() + 2); // samedi → lundi
+    else if (dow === 0) d.setDate(d.getDate() + 1); // dimanche → lundi
     onDateChange(formatDate(d));
   }, [onDateChange]);
 
