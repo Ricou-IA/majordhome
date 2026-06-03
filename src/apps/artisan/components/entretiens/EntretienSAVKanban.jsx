@@ -191,20 +191,19 @@ export function EntretienSAVKanban() {
     }
   }, [pendingTransition, updateFields, updateWorkflowStatus, refresh]);
 
-  const handleConfirmSchedule = useCallback(async (schedulingData, includesEntretien) => {
+  const handleConfirmSchedule = useCallback(async (slots, includesEntretien) => {
     if (!pendingTransition) return;
+    if (!slots || slots.length === 0) return;
     const item = pendingTransition.item;
 
     try {
-      const { error: appointmentError } = await appointmentsService.createAppointment({
+      // Multi-créneau (Bloc B) : 1 appointment par créneau, même cycle de vie Bloc A
+      // (chaque createAppointment passe par syncCardStateOnCreate via intervention_id).
+      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
-        technicianIds: schedulingData.technicianIds || [],
-        appointment_type: schedulingData.appointmentType,
-        subject: schedulingData.subject,
-        scheduled_date: schedulingData.date,
-        scheduled_start: schedulingData.startTime,
-        scheduled_end: schedulingData.endTime,
-        duration_minutes: schedulingData.duration,
+        appointment_type: item.intervention_type === 'sav' ? 'service' : 'maintenance',
+        intervention_id: item.id,
+        client_id: item.client_id || null,
         client_name: item.client_last_name || item.client_name || 'Sans nom',
         client_first_name: item.client_first_name || null,
         client_phone: item.client_phone || '',
@@ -212,11 +211,9 @@ export function EntretienSAVKanban() {
         address: item.client_address || null,
         city: item.client_city || null,
         postal_code: item.client_postal_code || null,
-        client_id: item.client_id || null,
-        intervention_id: item.id,
-        status: 'scheduled',
-        priority: 'normal',
-        internal_notes: schedulingData.notes || null,
+        subjectPrefix: item.intervention_type === 'sav'
+          ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
+          : 'Entretien',
       });
 
       if (appointmentError) {
@@ -224,7 +221,7 @@ export function EntretienSAVKanban() {
         return;
       }
 
-      const fields = { scheduled_date: schedulingData.date };
+      const fields = { scheduled_date: slots[0].date };
       if (item.intervention_type === 'sav' && includesEntretien !== (item.includes_entretien || false)) {
         fields.includes_entretien = includesEntretien;
       }

@@ -1,0 +1,312 @@
+/**
+ * SchedulingAssistant.jsx - Majord'home Artisan
+ * ============================================================================
+ * Assistant de planification multi-créneaux conscient de la dispo PAR PERSONNE.
+ * Remplace SchedulingPanel : "jour d'abord" + colonnes par membre + empilage
+ * de plusieurs créneaux (fix du bug mono-créneau).
+ *
+ * Modèle : 1 créneau = 1 appointment + N techs. Multi-créneau = N appointments.
+ * L'assistant NE CRÉE RIEN — il retourne `slots[]` via onConfirm ; le caller
+ * appelle appointmentsService.createAppointmentBatch.
+ *
+ * `appointment_type` n'est PAS par-slot : il vient du contexte (appointmentTypeValue).
+ *
+ * Composé de :
+ *  - DayResourceGrid (jour × colonnes par membre, drag pour poser)
+ *  - SlotDraftList (liste des créneaux empilés + édition des techs par créneau)
+ *  - TechnicianSelect (réutilisé dans SlotDraftList)
+ *
+ * @version 1.0.0 - Bloc B stage 2 (assistant créneaux)
+ * ============================================================================
+ */
+
+import { useState, useMemo, useCallback } from 'react';
+import { CalendarCheck, Loader2, X, FileText, User } from 'lucide-react';
+import { DayResourceGrid } from './DayResourceGrid';
+import { SlotDraftList } from './SlotDraftList';
+import { useTeamDayAvailability } from '@hooks/useAppointments';
+import { findTechnicianConflicts } from '@/lib/scheduleConflicts';
+import { formatDateForInput } from '@/lib/utils';
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Date du prochain jour ouvré (saute le dimanche) au format YYYY-MM-DD. */
+function defaultStartDate() {
+  const d = new Date();
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1); // dimanche → lundi
+  return formatDateForInput(d);
+}
+
+/** UUID compatible (fallback si crypto.randomUUID indispo). */
+function newId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `slot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// ============================================================================
+// COMPOSANT
+// ============================================================================
+
+/**
+ * @param {Object} props
+ * @param {Object} props.lead - lead/client courant (pré-remplit objet + assigned_user_id)
+ * @param {string} props.orgId - core org_id
+ * @param {Array} [props.commercials] - [{ id, full_name }] (colonnes en mode commercial)
+ * @param {Array} [props.members] - [{ id, display_name, calendar_color, default_availability }] (colonnes en mode technician)
+ * @param {'commercial'|'technician'} [props.assigneeType]
+ * @param {string} [props.appointmentTypeLabel] - libellé affiché du type de RDV
+ * @param {number} [props.defaultDuration]
+ * @param {string} [props.defaultSubjectPrefix]
+ * @param {boolean} [props.multi] - false = 1 créneau (parité) ; true = multi-créneau
+ * @param {Function} props.onConfirm - (slots[]) => void
+ * @param {Function} props.onCancel
+ * @param {boolean} [props.isLoading]
+ */
+export function SchedulingAssistant({
+  lead,
+  orgId,
+  commercials = [],
+  members = [],
+  assigneeType = 'commercial',
+  appointmentTypeLabel = 'Visite technique',
+  // NB: le type de RDV (appointment_type) est appliqué par le CALLER via le
+  // contexte partagé de createAppointmentBatch — pas par l'assistant. Les callers
+  // peuvent passer `appointmentTypeValue` sans effet ici (forward-compat).
+  defaultDuration = 30,
+  defaultSubjectPrefix,
+  multi = false,
+  onConfirm,
+  onCancel,
+  isLoading = false,
+}) {
+  const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
+
+  // Colonnes affichées = membres assignables selon le type.
+  // Normalisées en { id, display_name, calendar_color, default_availability }.
+  const columnMembers = useMemo(() => {
+    if (assigneeType === 'commercial') {
+      return (commercials || []).map((c) => ({
+        id: c.id,
+        display_name: c.full_name || c.display_name || 'Commercial',
+        calendar_color: c.calendar_color || '#6366F1',
+        default_availability: c.default_availability || null,
+      }));
+    }
+    return members || [];
+  }, [assigneeType, commercials, members]);
+
+  // Tech(s) par défaut posés sur un nouveau créneau (commercial assigné au lead).
+  const defaultTechIds = useMemo(() => {
+    if (assigneeType === 'commercial' && lead?.assigned_user_id) {
+      return columnMembers.some((m) => m.id === lead.assigned_user_id) ? [lead.assigned_user_id] : [];
+    }
+    return [];
+  }, [assigneeType, lead?.assigned_user_id, columnMembers]);
+
+  const [selectedDate, setSelectedDate] = useState(defaultStartDate);
+  const [draftSlots, setDraftSlots] = useState([]);
+  const [subject, setSubject] = useState(() => {
+    const name = `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim();
+    return name ? `${subjectPrefix} - ${name}` : subjectPrefix;
+  });
+  const [notes, setNotes] = useState('');
+
+  // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
+  const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
+
+  // --- Poser un créneau depuis la grille ---
+  const handlePlaceSlot = useCallback(({ memberId, date, startTime, endTime, duration }) => {
+    const slot = {
+      id: newId(),
+      date,
+      startTime,
+      endTime,
+      duration: duration || defaultDuration,
+      technicianIds: memberId
+        ? Array.from(new Set([memberId, ...defaultTechIds]))
+        : [...defaultTechIds],
+    };
+    setDraftSlots((prev) => (multi ? [...prev, slot] : [slot]));
+  }, [multi, defaultDuration, defaultTechIds]);
+
+  // --- Ajouter / retirer un tech sur un créneau ---
+  const handleToggleTech = useCallback((slotId, techId) => {
+    setDraftSlots((prev) =>
+      prev.map((s) => {
+        if (s.id !== slotId) return s;
+        const has = (s.technicianIds || []).includes(techId);
+        return {
+          ...s,
+          technicianIds: has
+            ? s.technicianIds.filter((id) => id !== techId)
+            : [...(s.technicianIds || []), techId],
+        };
+      }),
+    );
+  }, []);
+
+  const handleRemoveSlot = useCallback((slotId) => {
+    setDraftSlots((prev) => prev.filter((s) => s.id !== slotId));
+  }, []);
+
+  // --- Conflits par créneau (somme des conflits sur tous ses techs) ---
+  const conflictsBySlot = useMemo(() => {
+    const map = {};
+    draftSlots.forEach((slot) => {
+      let count = 0;
+      (slot.technicianIds || []).forEach((tid) => {
+        count += findTechnicianConflicts(
+          { date: slot.date, startTime: slot.startTime, endTime: slot.endTime },
+          tid,
+          dayAppointments,
+        ).length;
+      });
+      map[slot.id] = count;
+    });
+    return map;
+  }, [draftSlots, dayAppointments]);
+
+  const totalConflicts = useMemo(
+    () => Object.values(conflictsBySlot).reduce((a, b) => a + b, 0),
+    [conflictsBySlot],
+  );
+
+  // --- Confirmation : remonte les slots[] au format du contrat ---
+  // slots = [{ date, startTime, endTime, duration, technicianIds, subject, notes }]
+  // `technicianIds` porte les membres sélectionnés (techniciens). En mode commercial,
+  // les colonnes sont des commerciaux ; le caller (pipeline) mappe vers assigned_commercial_id.
+  const handleSubmit = useCallback(() => {
+    if (draftSlots.length === 0) return;
+    const slots = draftSlots.map((s) => ({
+      date: s.date,
+      startTime: s.startTime,
+      endTime: s.endTime || null,
+      duration: s.duration || defaultDuration,
+      technicianIds: s.technicianIds || [],
+      subject: subject.trim() || subjectPrefix,
+      notes: notes.trim() || null,
+    }));
+    onConfirm?.(slots);
+  }, [draftSlots, defaultDuration, subject, subjectPrefix, notes, onConfirm]);
+
+  const assigneeLabel = assigneeType === 'commercial' ? 'Commercial(aux)' : 'Technicien(s)';
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <CalendarCheck className="w-5 h-5 text-blue-600" />
+          Planifier le RDV
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <X className="w-4 h-4 text-gray-500" />
+        </button>
+      </div>
+
+      {/* Type de RDV */}
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <CalendarCheck className="w-3.5 h-3.5 text-blue-500" />
+        <span className="font-medium">{appointmentTypeLabel}</span>
+        <span className="text-gray-300">•</span>
+        <User className="w-3.5 h-3.5 text-indigo-500" />
+        <span className="text-gray-500">{assigneeLabel}</span>
+      </div>
+
+      {/* Grille jour × colonnes par membre */}
+      <DayResourceGrid
+        date={selectedDate}
+        onDateChange={setSelectedDate}
+        members={columnMembers}
+        dayAppointments={dayAppointments}
+        draftSlots={draftSlots}
+        onPlaceSlot={handlePlaceSlot}
+      />
+
+      {/* Liste des créneaux empilés */}
+      <SlotDraftList
+        slots={draftSlots}
+        members={columnMembers}
+        conflictsBySlot={conflictsBySlot}
+        onRemoveSlot={handleRemoveSlot}
+        onToggleTech={handleToggleTech}
+        assigneeLabel={assigneeLabel}
+      />
+
+      {/* Objet */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+          <FileText className="w-3.5 h-3.5" />
+          Objet
+        </label>
+        <input
+          type="text"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Objet du RDV"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
+      {/* Notes internes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes internes (optionnel)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes pour l'équipe..."
+          rows={2}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+        />
+      </div>
+
+      {/* Compteur de conflits global */}
+      {totalConflicts > 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {totalConflicts} conflit(s) de disponibilité détecté(s) — la planification reste possible.
+        </p>
+      )}
+
+      {/* Boutons */}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isLoading || draftSlots.length === 0}
+          className="flex-1 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
+                     hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                     flex items-center justify-center gap-2 min-h-[44px]"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Planification...
+            </>
+          ) : (
+            <>
+              <CalendarCheck className="w-4 h-4" />
+              Planifier {draftSlots.length || ''} créneau{draftSlots.length > 1 ? 'x' : ''}
+            </>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isLoading}
+          className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg
+                     hover:bg-gray-50 transition-colors disabled:opacity-50 min-h-[44px]"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default SchedulingAssistant;

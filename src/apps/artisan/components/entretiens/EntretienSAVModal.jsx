@@ -13,7 +13,7 @@
  * - Notes
  * - Bouton "Enregistrer" unique pour sauvegarder tous les champs modifiés
  * - Footer : boutons transition back/forward
- * - Transition "Planifié" → ouvre le SchedulingPanel (mini-calendrier)
+ * - Transition "Planifié" → ouvre le SchedulingAssistant (jour + colonnes par tech)
  *
  * @version 4.0.0 - Sprint 8 Entretien & SAV
  * ============================================================================
@@ -41,7 +41,7 @@ import { clientsService } from '@services/clients.service';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
-import { SchedulingPanel } from '@apps/artisan/components/pipeline/SchedulingPanel';
+import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { CertificatsSection } from './CertificatsSection';
@@ -72,7 +72,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     isSavingFields,
   } = useEntretienSAVMutations();
 
-  // Techniciens pour le SchedulingPanel (mode SAV-Entretien)
+  // Techniciens pour le SchedulingAssistant (mode SAV-Entretien)
   const { members: teamMembers } = useTeamMembers(orgId);
 
   // État local — tous les champs éditables
@@ -140,7 +140,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     return false;
   }, [notes, savDesc, partsOrder, devisAmount, devisStatus, includesEntretien, item]);
 
-  // --- Objet "lead-like" pour le SchedulingPanel ---
+  // --- Objet "lead-like" pour le SchedulingAssistant ---
   // (déclaré AVANT early return)
   const schedulingLead = useMemo(() => ({
     last_name: item?.client_last_name || item?.client_name || '',
@@ -181,20 +181,19 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     }
   };
 
-  // Confirmation de la planification → crée le RDV + transition planifié
-  const handleConfirmScheduling = async (schedulingData) => {
+  // Confirmation de la planification → crée le(s) RDV + transition planifié
+  // L'assistant (Bloc B) remonte `slots[]` (multi-créneau possible).
+  const handleConfirmScheduling = async (slots) => {
+    if (!slots || slots.length === 0) return;
     setSchedulingLoading(true);
     try {
-      // Le SchedulingPanel envoie maintenant le bon type et les techniciens
-      const { error: appointmentError } = await appointmentsService.createAppointment({
+      // 1 appointment par créneau via createAppointmentBatch (même cycle de vie Bloc A :
+      // chaque createAppointment passe par syncCardStateOnCreate via intervention_id).
+      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
-        technicianIds: schedulingData.technicianIds || [],
-        appointment_type: schedulingData.appointmentType,
-        subject: schedulingData.subject,
-        scheduled_date: schedulingData.date,
-        scheduled_start: schedulingData.startTime,
-        scheduled_end: schedulingData.endTime,
-        duration_minutes: schedulingData.duration,
+        appointment_type: type === 'sav' ? 'service' : 'maintenance',
+        intervention_id: item.id,
+        client_id: item.client_id || null,
         client_name: item.client_last_name || item.client_name || 'Sans nom',
         client_first_name: item.client_first_name || null,
         client_phone: item.client_phone || '',
@@ -202,11 +201,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
         address: item.client_address || null,
         city: item.client_city || null,
         postal_code: item.client_postal_code || null,
-        client_id: item.client_id || null,
-        intervention_id: item.id,
-        status: 'scheduled',
-        priority: 'normal',
-        internal_notes: schedulingData.notes || null,
+        subjectPrefix: type === 'sav' ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
       });
 
       if (appointmentError) {
@@ -214,11 +209,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
         return;
       }
 
-      // Mettre à jour l'intervention : workflow_status + scheduled_date
+      // Mettre à jour l'intervention : workflow_status + scheduled_date (1er créneau)
       await updateWorkflowStatus(item.id, 'planifie');
-
-      // Enregistrer la date planifiée sur l'intervention
-      await updateFields(item.id, { scheduled_date: schedulingData.date });
+      await updateFields(item.id, { scheduled_date: slots[0].date });
 
       // Confirmer le client draft si c'est un contact web
       if (item.client_id && item.tags?.includes('Web')) {
@@ -379,7 +372,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[calc(100vh-4rem)] flex flex-col">
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-2xl' : 'max-w-lg'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -411,10 +404,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
           {/* ============================================================ */}
-          {/* VUE PLANIFICATION (SchedulingPanel) */}
+          {/* VUE PLANIFICATION (SchedulingAssistant — Bloc B) */}
           {/* ============================================================ */}
           {showScheduling ? (
-            <SchedulingPanel
+            <SchedulingAssistant
               lead={schedulingLead}
               orgId={orgId}
               commercials={[]}
@@ -435,6 +428,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                   ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
                   : 'Entretien'
               }
+              multi
             />
           ) : (
             <>

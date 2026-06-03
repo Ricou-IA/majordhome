@@ -2,11 +2,12 @@
  * SchedulingTransitionModal.jsx - Majord'home Artisan
  * ============================================================================
  * Modale plein écran déclenchée au drag vers "Planifié" ou via bouton transition.
- * Wrapper autour de SchedulingPanel (contextuel v3.0) avec :
+ * Wrapper autour de SchedulingAssistant (Bloc B) avec :
  * - Toggle "Réaliser l'entretien" (SAV uniquement)
  * - Affichage montant total si entretien inclus
+ * - Multi-créneau (slots[]) remonté via onConfirm(slots, includesEntretien)
  *
- * @version 1.0.0 - Sprint 8 Entretien & SAV
+ * @version 2.0.0 - Bloc B (assistant créneaux multi-technicien)
  * ============================================================================
  */
 
@@ -14,7 +15,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { X, ClipboardCheck, Check } from 'lucide-react';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { formatEuro } from '@/lib/utils';
-import { SchedulingPanel } from '@apps/artisan/components/pipeline/SchedulingPanel';
+import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 
 // ============================================================================
 // COMPOSANT
@@ -26,7 +27,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
   const [loading, setLoading] = useState(false);
 
-  // Objet "lead-like" pour le SchedulingPanel — déclaré AVANT early return
+  // Objet "lead-like" pour le SchedulingAssistant — déclaré AVANT early return
   // (règle React Hooks : ordre stable des hooks à chaque render).
   const schedulingLead = useMemo(() => ({
     last_name: item?.client_last_name || item?.client_name || '',
@@ -40,10 +41,12 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   }), [item]);
 
   // Confirmation planning — déclaré AVANT early return.
-  const handleConfirmScheduling = useCallback(async (schedulingData) => {
+  // L'assistant remonte `slots[]` (multi-créneau) ; on relaie au parent
+  // avec le flag includesEntretien (le parent appelle createAppointmentBatch).
+  const handleConfirmScheduling = useCallback(async (slots) => {
     setLoading(true);
     try {
-      await onConfirm(schedulingData, includesEntretien);
+      await onConfirm(slots, includesEntretien);
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const devisAmount = Number(item.devis_amount) || 0;
   const totalAmount = isSAV && includesEntretien ? devisAmount + contractAmount : devisAmount;
 
-  // Props contextuelles du SchedulingPanel
+  // Props contextuelles du SchedulingAssistant
   const appointmentTypeLabel = isSAV
     ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
     : 'Entretien';
@@ -81,7 +84,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
       <div className="fixed inset-0 bg-black/50 z-[60]" onClick={onCancel} />
 
       {/* Modal */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-lg max-h-[calc(100vh-4rem)] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-2xl max-h-[calc(100vh-4rem)] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
           <h2 className="text-base font-semibold text-gray-900">
@@ -126,8 +129,8 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
             </div>
           )}
 
-          {/* SchedulingPanel */}
-          <SchedulingPanel
+          {/* Assistant créneaux (Bloc B) — multi-créneau + colonnes par technicien */}
+          <SchedulingAssistant
             lead={schedulingLead}
             orgId={orgId}
             commercials={[]}
@@ -140,6 +143,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
             members={teamMembers || []}
             defaultDuration={defaultDuration}
             defaultSubjectPrefix={defaultSubjectPrefix}
+            multi
           />
         </div>
       </div>
