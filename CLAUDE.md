@@ -3,6 +3,7 @@
 > ⚠️ **Consolidation multi-tenant — Sem 0 hardening DB quasi-finie (~97%, 2026-05-21)** — Une 2ème entreprise va rejoindre la même instance Supabase. Audit complet : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md` (13 CRITICAL codebase + 131 ERROR Supabase Advisor). État Sem 0 détaillé : mémoire `project_hardening_sem0_status.md`. **Plus rien de bloquant côté Majord'home/core. La roadmap fonctionnelle (Sprints 8-10) peut reprendre.**
 > **Dernière MàJ** : 2026-05-21 — Sem 0 hardening DB complète (P0.0.1 exec_sql INVOKER, P0.0.2 73 vues security_invoker, P0.0.4 REVOKE anon × 22 RPCs, P0.0.5/.0.6 RLS + policies 13 tables, P0.0.7 storage paths `${orgId}/`, P0.0.9 audit corps 6 RPCs sensibles, P0.0.10 search_path × 111 fonctions, P0.2 MDH_CRON_SECRET crons, P0.3 pennylane-proxy hardened, P0.4 OAuth GSC state HMAC, P0.5 voice RPC service_role only, P0.6 voice quota daily, P0.7 requireOrganization, P0.8 V2 mailing N8n→edge, P0.10 voice_recorder permission, P0.11 cache keys orgId, P0.13-P0.20 branding multi-tenant, P0.21 headers HTTP, P0.22 no sourcemap, P0.23 xlsx→exceljs, P0.24 sandbox iframes, P0.25 helper `_shared/auth.ts`, P0.26 escapePostgrestSearchTerm, P0.27 ESLint config). Détails : `docs/AUDIT_PRE_ONBOARDING_2026-05-20.md`.
 > **MàJ 2026-06-01** : sync doc post-bridge Pennylane — bridge canonique (OVERWRITE post-attache + auto-attach cron), stabilisation pipeline (montant Gagné = accepted_sum, chip Refusé seul, expired=pending) + conventions GRANT service_role, cron.job pg_cron, gotcha PL V2 single GET root, signature contrat figée (nouvelle section Module Contrats).
+> **MàJ 2026-06-03** : Bloc A — refonte prise de RDV ↔ Kanban (nouvelle section **Module Planning**). Un RDV planifie une carte unique selon son type, plus d'auto-lead silencieux, activation déduppée, lien `appointments.intervention_id`, dérivation `next_rdv_date`/`has_active_rdv` dans les vues kanban, cycle de vie carte↔RDV. Reste : flux installation chantier + Bloc B (assistant créneaux).
 > **Détails DB/composants/sprints** : `docs/DATABASE.md`, `docs/COMPONENTS.md`, `docs/SPRINT_LOG.md`
 
 ## Projet
@@ -520,6 +521,43 @@ Utilise la RPC `public.mail_segment_count(filters, campaign_name, org_id)` qui c
 - "Unique click" : déduplication des clics via `mailing_events` (GROUP BY user_agent/ip) pour filtrer Safe Links Outlook
 - Bouton "Désabonner manuellement" sur fiche client (UI-driven) — actuel : il faut passer par un UPDATE SQL ou attendre un event automatique
 - Bouton "Réabonner" (undo) sur fiche client désabonnée — pour les cas où un client se désinscrit par erreur et veut revenir
+
+## Module Planning / Prise de RDV ↔ Kanban (Bloc A — livré 2026-06-03)
+
+Refonte du service de prise de RDV. **Principe unique** : un RDV (`appointments`) planifie **une seule carte** (work item) déterminée par son **type** ; l'état de la carte est piloté par ses RDV. **Plus d'auto-lead silencieux** (cause historique des leads fantômes dans le pipeline).
+
+### Types → destination unique
+| Type (`appointment_type`) | Kanban | Work item |
+|---|---|---|
+| `rdv_technical` (Visite Technique = closing) + `rdv_agency` (legacy, alias) | Pipeline | `leads` (`status_id`) |
+| `installation` | Chantier | `leads` (`chantier_status`) |
+| `maintenance` (Entretien) | Entretien | `interventions` (`entretien`) |
+| `service` (SAV) | Entretien | `interventions` (`sav`) |
+| `other` (Autre) | — (planning seul) | aucun — **défaut non piégeux** |
+
+### Modèle de données
+- Lien `appointments.intervention_id` (miroir de `lead_id`, FK `ON DELETE SET NULL`). Un RDV pointe vers `lead_id` **ou** `intervention_id` **ou** rien (Autre). Multi-RDV : N appointments par carte (la date carte = 1ᵉʳ RDV).
+- **Dérivation, source unique = `appointments`** : les vues `majordhome_entretien_sav`, `majordhome_chantiers`, `majordhome_kanban_cards` exposent `next_rdv_date` (MIN des RDV actifs liés) + `has_active_rdv`, via `LEFT JOIN LATERAL` filtré par type d'appt (`status NOT IN ('cancelled','no_show')`). Toutes en `security_invoker=true` (préservé). **Pas de champ dénormalisé** : puce date + marqueur ambre dérivent de ces 2 colonnes. Le filtre par type évite qu'un vieux RDV VT pollue la date d'un chantier (pipeline = `rdv_technical`/`rdv_agency`, chantier = `installation`, entretien = via `intervention_id`).
+
+### Activation (prendre un RDV)
+- `appointmentActivation.service.js::resolveCardForAppointment({type, clientId, leadId?, interventionId?})` : rattache (depuis un kanban) **ou** active la carte du client (dédup par client+type, jamais de doublon, jamais de formulaire prospect). Entretien/SAV → matérialise l'intervention via `entretiens.service.js::ensureEntretienCard`. VT → réutilise un lead **actif** (≠ Gagné/Perdu) sinon en crée un lié au client. `other` → rien.
+- **Prospect** (vrai formulaire) réservé au **walk-in inconnu** (Planning, ni client ni lead lié), dans `EventModal::handleSave`.
+- `EventModal` accepte `attachContext={ leadId?, interventionId?, lockedType? }` (rattachement direct + type figé depuis un kanban). Défaut fiche/planning = `other` ; Installation non proposée depuis la fiche.
+
+### Cycle de vie carte ↔ RDV (unique writer = `appointments.service.js`)
+- `syncCardStateOnCreate` (prise) : avance la carte en « planifié » **forward-only** (entretien `workflow_status→planifie` ; lead VT `status_id→RDV planifié` si display_order<3 ; chantier `chantier_status→planification` si en amont). Ne descend jamais, ne touche pas un état terminal.
+- `recomputeEntretienWorkflow` (suppression/annulation de RDV) : entretien → recalcule `planifie`/`a_planifier` selon présence d'un RDV actif. Pipeline/chantier : no-op (marqueur « à replanifier » dérivé de `has_active_rdv=false`).
+- **Les 3 chemins de planification entretien doivent poser `intervention_id`** : `EntretienSAVModal.handleConfirmScheduling`, `EntretienSAVKanban.handleConfirmSchedule`, `entretiens.service.ensureKanbanAndAppointmentForVisit`. Le pipeline pose déjà `lead_id` (`LeadModal`).
+
+### Cartes & kanban
+- Puce de gauche = **date du RDV** (`next_rdv_date` > `scheduled_date` > `created_at`). Pipeline : icône ambre `CalendarClock` si colonne `rdv_planifie` sans RDV actif. **Chantier : ambre désactivé** (pas encore de flux de planif installation depuis le kanban → faux positif sinon ; réactiver quand le flux existera).
+- `EntretienSAVKanban` : tri par date du RDV **ascendant** (du plus ancien au plus futur), même clé que l'affichage. Le `KanbanBoard` générique préserve l'ordre des items.
+- Bouton **« Ranger »** (icône `Archive`, bas-gauche, cartes `a_planifier` uniquement) : `savService.deleteEntretienCard` + toast undo (recrée via `createEntretien`). Invalide `entretienSavKeys.all(orgId)` → dégrise instantanément le contrat dans l'outil Programmation (`plannedContractIds` est une query sous ce préfixe). Certificats masqués en `a_planifier` (utiles seulement une fois planifié).
+
+### Gotcha & reste à faire
+- **⚠️ Backfill entretien** : un RDV `maintenance` sans `intervention_id` ne veut PAS dire entretien non fait — il peut déjà être `realise`/`facture`. Un backfill ne gardant que `workflow_status NOT IN (realise,facture)` crée des doublons « planifié » pour des entretiens déjà faits. **Scope correct = RDV À VENIR uniquement** (régression vécue & corrigée le 2026-06-03 : 24 doublons supprimés).
+- **Reste** : flux de planification **installation** depuis le kanban Chantier (réactivera l'ambre chantier) ; **Bloc B** = assistant créneaux (dispo par technicien, multi-créneaux multi-intervenants, fix « créneau pris = impossible d'en ajouter »).
+- Spec : `docs/superpowers/specs/2026-06-03-rdv-kanban-unifie-bloc-a-design.md` · Plan : `docs/superpowers/plans/2026-06-03-rdv-kanban-unifie-bloc-a.md` · mémoire `project_refonte_rdv_kanban_bloc_a.md`.
 
 ## Module Certificats d'entretien (multi-équipements)
 
