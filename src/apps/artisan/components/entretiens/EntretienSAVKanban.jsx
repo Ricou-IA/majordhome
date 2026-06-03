@@ -273,13 +273,12 @@ export function EntretienSAVKanban() {
       searchPlaceholder="Rechercher..."
       searchFilter={searchFilter}
       emptyMessage="Aucun élément"
-      headerExtra={(column, items) =>
-        column.id === 'a_planifier'
-          ? <LancerAppelButton items={items} orgId={orgId} />
-          : null
-      }
       headerRight={
         <>
+          <LancerAppelButton
+            items={roleFilteredItems.filter((i) => i.workflow_status === 'a_planifier')}
+            orgId={orgId}
+          />
           {canCreateSAV && (
             <button
               onClick={() => { setCreateSAVPrefill(null); setCreateSAVOpen(true); }}

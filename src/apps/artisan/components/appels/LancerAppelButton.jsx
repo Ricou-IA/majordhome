@@ -17,8 +17,7 @@ export function LancerAppelButton({ items, orgId }) {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
         disabled={disabled}
-        className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium
-                   rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
         title={disabled ? 'Aucune carte avec téléphone' : `Appeler ${callable.length} contact(s)`}
       >
         <PhoneCall className="h-4 w-4" />
