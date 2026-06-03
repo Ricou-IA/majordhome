@@ -316,13 +316,7 @@ export const orgSettingsKeys = {
 };
 
 // --- Appels sortants (campagnes) ---
-export const callSessionKeys = {
-  all: (orgId) => ['call-sessions', orgId],
-  detail: (orgId, id) => [...callSessionKeys.all(orgId), 'detail', id],
-};
-
 export const callAttemptKeys = {
   all: (orgId) => ['call-attempts', orgId],
   stats: (orgId) => [...callAttemptKeys.all(orgId), 'stats'],
-  byIntervention: (orgId, interventionId) => [...callAttemptKeys.all(orgId), 'intervention', interventionId],
 };

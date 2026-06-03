@@ -55,6 +55,8 @@ export function useCallSession({ orgId }) {
       setStatus('running');
     });
 
+    provider.on('transfer_accepted', () => setCounters((k) => ({ ...k, transfers: k.transfers + 1 })));
+
     provider.on('session_done', () => { setStatus('done'); setCurrent(null); });
   }, [orgId, findContact]);
 
@@ -81,17 +83,15 @@ export function useCallSession({ orgId }) {
 
   const acceptTransfer = useCallback(() => {
     if (current) providerRef.current?.resolveTransfer(current.id, true);
-    setCounters((k) => ({ ...k, transfers: k.transfers + 1 }));
   }, [current]);
 
   const closeCurrent = useCallback(async ({ result, note = null } = {}) => {
     const c = current;
-    if (c) {
-      await callCampaignsService.recordAttempt({
-        orgId, sessionId: sessionRef.current, interventionId: c.id, result: result || 'callback', phone: c.phone, note,
-      });
-      queryClient.invalidateQueries({ queryKey: callAttemptKeys.stats(orgId) });
-    }
+    if (!c) return;
+    await callCampaignsService.recordAttempt({
+      orgId, sessionId: sessionRef.current, interventionId: c.id, result: result || 'callback', phone: c.phone, note,
+    });
+    queryClient.invalidateQueries({ queryKey: callAttemptKeys.stats(orgId) });
     setCurrent(null);
     setStatus('running');
     providerRef.current?.advance();
