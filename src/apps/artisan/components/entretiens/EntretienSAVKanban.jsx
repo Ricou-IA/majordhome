@@ -17,6 +17,7 @@ import { useEntretienSAV, useEntretienSAVMutations } from '@hooks/useEntretienSA
 import { KANBAN_COLUMNS, getTransitions } from '@services/sav.service';
 import { appointmentsService } from '@services/appointments.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
+import { LancerAppelButton } from '../appels/LancerAppelButton';
 import { EntretienSAVCard } from './EntretienSAVCard';
 import { EntretienSAVModal } from './EntretienSAVModal';
 import { CreateSAVModal } from './CreateSAVModal';
@@ -272,6 +273,11 @@ export function EntretienSAVKanban() {
       searchPlaceholder="Rechercher..."
       searchFilter={searchFilter}
       emptyMessage="Aucun élément"
+      headerExtra={(column, items) =>
+        column.id === 'a_planifier'
+          ? <LancerAppelButton items={items} orgId={orgId} />
+          : null
+      }
       headerRight={
         <>
           {canCreateSAV && (
