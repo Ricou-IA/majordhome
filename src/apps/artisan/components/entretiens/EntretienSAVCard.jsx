@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Calendar, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check } from 'lucide-react';
+import { MapPin, Calendar, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
@@ -82,14 +82,54 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
     ? dateObj.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '')
     : '';
 
+  // "Ranger" la carte (À planifier) : suppression + undo toast. Le contrat redevient
+  // planifiable dans l'outil secteur (il sort de plannedContractIds).
+  const handleRanger = async (e) => {
+    e.stopPropagation();
+    const snapshot = {
+      orgId,
+      clientId: item.client_id,
+      contractId: item.contract_id || null,
+      projectId: item.project_id || item.client_project_id,
+      scheduledDate: item.scheduled_date || null,
+    };
+    const { error } = await savService.deleteEntretienCard(item.id);
+    if (error) {
+      toast.error('Impossible de ranger la carte');
+      return;
+    }
+    onRefresh?.();
+    toast('Carte rangée', {
+      description: name,
+      action: {
+        label: 'Annuler',
+        onClick: async () => {
+          const { error: rErr } = await savService.createEntretien(snapshot);
+          if (rErr) toast.error('Annulation impossible');
+          onRefresh?.();
+        },
+      },
+    });
+  };
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={() => onClick?.(item)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(item); }}
-      className="w-full text-left bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="relative w-full text-left bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
+      {item.workflow_status === 'a_planifier' && (
+        <button
+          type="button"
+          onClick={handleRanger}
+          title="Ranger la carte (la retirer de « À planifier »)"
+          className="absolute top-1 right-1 z-10 p-1 rounded-md text-gray-300 hover:text-gray-700 hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+        >
+          <Archive className="w-3.5 h-3.5" />
+        </button>
+      )}
       <div className="flex">
         {/* Bandeau gauche coloré avec date */}
         <div

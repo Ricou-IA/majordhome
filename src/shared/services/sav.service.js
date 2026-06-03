@@ -315,6 +315,36 @@ export const savService = {
   },
 
   /**
+   * "Ranger" une carte entretien : supprime l'intervention (et ses enfants).
+   * Les RDV liés sont déliés automatiquement (FK appointments.intervention_id ON DELETE SET NULL).
+   * Usage : déclutter la colonne "À planifier" (le contrat redevient planifiable dans le secteur).
+   */
+  async deleteEntretienCard(interventionId) {
+    if (!interventionId) throw new Error('[sav] interventionId requis');
+    try {
+      // Enfants éventuels (certificats par équipement) d'abord
+      await supabase
+        .from('majordhome_interventions')
+        .delete()
+        .eq('parent_id', interventionId);
+
+      const { error } = await supabase
+        .from('majordhome_interventions')
+        .delete()
+        .eq('id', interventionId);
+
+      if (error) {
+        console.error('[sav] deleteEntretienCard error:', error);
+        return { error };
+      }
+      return { error: null };
+    } catch (err) {
+      console.error('[sav] deleteEntretienCard error:', err);
+      return { error: err };
+    }
+  },
+
+  /**
    * Créer un SAV (demande de réparation)
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    */
