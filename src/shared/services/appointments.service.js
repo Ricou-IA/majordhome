@@ -553,21 +553,41 @@ export const appointmentsService = {
   },
 
   /**
-   * RDV d'un jour donné (avec technician_ids via la vue étendue) pour alimenter
-   * les colonnes du DayResourceGrid. Filtre org_id, exclut annulés/no_show.
+   * RDV d'un jour donné (enrichis de technician_ids) pour alimenter les colonnes
+   * du DayResourceGrid. Filtre org_id, exclut annulés/no_show.
+   * NB : la vue majordhome_appointments est un miroir simple (auto-updatable) qui
+   * n'agrège PAS les techs — on fait une 2ᵉ requête sur la jointure et on merge
+   * (même pattern que useAppointments / getAppointmentById).
    */
   async getTeamDayAvailability({ coreOrgId, date }) {
     try {
       const orgId = await getMajordhomeOrgId(coreOrgId);
       const { data, error } = await supabase
         .from('majordhome_appointments')
-        .select('id, subject, appointment_type, scheduled_date, scheduled_start, scheduled_end, duration_minutes, status, technician_ids, technician_names, client_name, client_first_name')
+        .select('id, subject, appointment_type, scheduled_date, scheduled_start, scheduled_end, duration_minutes, status, client_name, client_first_name')
         .eq('org_id', orgId)
         .eq('scheduled_date', date)
         .not('status', 'in', '(cancelled,no_show)')
         .order('scheduled_start', { ascending: true });
       if (error) { console.error('[appointments] getTeamDayAvailability error:', error); return { data: null, error }; }
-      return { data: data || [], error: null };
+
+      const rows = data || [];
+      if (rows.length === 0) return { data: [], error: null };
+
+      // Techniciens par RDV via la table de jointure, puis merge en technician_ids[].
+      const ids = rows.map(r => r.id);
+      const { data: techLinks } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('appointment_id, technician_id')
+        .in('appointment_id', ids);
+      const byAppt = new Map();
+      (techLinks || []).forEach(t => {
+        const arr = byAppt.get(t.appointment_id) || [];
+        arr.push(t.technician_id);
+        byAppt.set(t.appointment_id, arr);
+      });
+      const enriched = rows.map(r => ({ ...r, technician_ids: byAppt.get(r.id) || [] }));
+      return { data: enriched, error: null };
     } catch (err) {
       console.error('[appointments] getTeamDayAvailability error:', err);
       return { data: null, error: err };
