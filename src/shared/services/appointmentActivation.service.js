@@ -86,11 +86,25 @@ export async function resolveCardForAppointment({
       .maybeSingle();
     if (activeLead?.id) return { lead_id: activeLead.id };
 
-    // Sinon matérialiser UNE carte liée au client (pas de formulaire prospect)
+    // Sinon matérialiser UNE carte liée au client (pas de formulaire prospect).
+    // Recopier nom + contact du client pour que la carte soit identifiable et
+    // recherchable dans le pipeline (sinon lead sans nom = carte fantôme invisible).
+    const { data: client } = await supabase
+      .from('majordhome_clients')
+      .select('first_name, last_name, phone, email, address, postal_code, city')
+      .eq('id', clientId)
+      .maybeSingle();
     const { data, error } = await leadsService.createLead({
       orgId,
       userId,
       client_id: clientId,
+      first_name: client?.first_name || null,
+      last_name: client?.last_name || null,
+      phone: client?.phone || null,
+      email: client?.email || null,
+      address: client?.address || null,
+      postal_code: client?.postal_code || null,
+      city: client?.city || null,
       status_id: RDV_PLANIFIE_STATUS_ID,
       notes: 'Carte client activée via prise de RDV',
     });
