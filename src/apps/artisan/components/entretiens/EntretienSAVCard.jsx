@@ -125,7 +125,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
           type="button"
           onClick={handleRanger}
           title="Ranger la carte (la retirer de « À planifier »)"
-          className="absolute top-1 right-1 z-10 p-1 rounded-md text-gray-300 hover:text-gray-700 hover:bg-gray-100 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+          className="absolute bottom-1 left-1 z-10 p-1 rounded-md text-white/75 hover:text-white hover:bg-white/25 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
         >
           <Archive className="w-3.5 h-3.5" />
         </button>
