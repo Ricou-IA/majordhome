@@ -294,6 +294,75 @@ export function useContractPricing(contractId) {
 }
 
 // ============================================================================
+// HOOK - useContractLineOverrides (prix forcés par ligne d'équipement)
+// ============================================================================
+
+/**
+ * Charge les prix forcés par ligne d'un contrat (map equipment_id → prix) +
+ * mutations set/clear. Convention : 1 entrée `contract_pricing_items` avec
+ * `equipment_id` NON NULL par équipement forcé (cf. pricingService).
+ *
+ * @param {string} contractId
+ * @returns {Object} { overrides, isLoading, setOverride, clearOverride, isSaving }
+ */
+export function useContractLineOverrides(contractId) {
+  const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const { data: overrides, isLoading } = useQuery({
+    queryKey: pricingKeys.contractOverrides(orgId, contractId),
+    queryFn: async () => {
+      const result = await pricingService.getContractLineOverrides(contractId);
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    enabled: !!orgId && !!contractId,
+    staleTime: 30_000,
+  });
+
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: pricingKeys.contractOverrides(orgId, contractId) });
+    queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+  }, [queryClient, orgId, contractId]);
+
+  const setMutation = useMutation({
+    mutationFn: async ({ line, forcedPrice }) => {
+      const result = await pricingService.setContractLineOverride(contractId, line, forcedPrice);
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    onSuccess: invalidate,
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: async (equipmentId) => {
+      const result = await pricingService.clearContractLineOverride(contractId, equipmentId);
+      if (result.error) throw result.error;
+      return true;
+    },
+    onSuccess: invalidate,
+  });
+
+  const setOverride = useCallback(
+    (line, forcedPrice) => setMutation.mutateAsync({ line, forcedPrice }),
+    [setMutation]
+  );
+  const clearOverride = useCallback(
+    (equipmentId) => clearMutation.mutateAsync(equipmentId),
+    [clearMutation]
+  );
+
+  return {
+    overrides: overrides || {},
+    isLoading,
+    setOverride,
+    clearOverride,
+    isSaving: setMutation.isPending || clearMutation.isPending,
+  };
+}
+
+// ============================================================================
 // HOOK - usePricingCalculator (state machine formulaire)
 // ============================================================================
 

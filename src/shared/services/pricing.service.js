@@ -119,6 +119,73 @@ export function calculateContractTotal(items, discounts = []) {
   return { subtotal, discountPercent, discountAmount, total };
 }
 
+const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
+
+/**
+ * Construit la présentation tarifaire (lignes équipement + remises) cohérente avec
+ * le montant RÉELLEMENT facturé, qu'il soit calculé depuis la grille ou forcé par
+ * un admin. Garantit toujours que la somme des lignes (± remises) retombe sur le total.
+ *
+ * Trois cas :
+ *  - billable ≈ computedTotal (calcul grille standard) :
+ *      lignes au prix grille + dégressivité éventuelle, pas de remise commerciale.
+ *  - billable < computedTotal (forçage à la BAISSE) :
+ *      lignes au prix grille + ligne "Remise commerciale" = computedTotal − billable.
+ *  - billable > computedTotal (forçage à la HAUSSE) :
+ *      les prix d'articles sont MAJORÉS au prorata de leur prix grille pour que la
+ *      somme des lignes = montant facturé. Pas de remise négative ni de dégressivité
+ *      affichée (absorbées dans les prix de ligne). Un équipement unique forcé à 350 €
+ *      voit simplement sa ligne passer à 350 €.
+ *
+ * @param {{items:Array, subtotal:number, discountPercent:number, discountAmount:number, total:number}|null} computedPricing
+ * @param {number} billableTotal - montant facturé (forcé ou calculé)
+ * @returns {{equipmentLines:Array, subtotal:number, discountPercent:number, discountAmount:number, extraDiscountAmount:number, total:number}}
+ */
+export function buildContractPresentation(computedPricing, billableTotal) {
+  const items = computedPricing?.items || [];
+  const computedTotal = computedPricing?.total || 0;
+  const billable = round2(billableTotal);
+
+  // Index des lignes réellement chiffrées (lineTotal > 0) — les lignes "Sur devis"
+  // (lineTotal = 0) restent inchangées et ne reçoivent jamais de prix redistribué.
+  const pricedIndexes = items
+    .map((it, i) => ((parseFloat(it.lineTotal) || 0) > 0 ? i : -1))
+    .filter((i) => i >= 0);
+
+  // --- Forçage à la hausse : majorer les lignes pour que leur somme = montant facturé ---
+  if (pricedIndexes.length > 0 && billable > computedTotal + 0.01) {
+    const baseSum = pricedIndexes.reduce((s, i) => s + parseFloat(items[i].lineTotal), 0);
+    const remainderIdx = pricedIndexes[pricedIndexes.length - 1]; // absorbe l'arrondi
+    let allocated = 0;
+    const equipmentLines = items.map((it, i) => {
+      if (!pricedIndexes.includes(i)) return it; // ligne "Sur devis" : inchangée
+      if (i === remainderIdx) return { ...it, lineTotal: round2(billable - allocated) };
+      const price = round2(billable * (parseFloat(it.lineTotal) / baseSum));
+      allocated += price;
+      return { ...it, lineTotal: price };
+    });
+    return {
+      equipmentLines,
+      subtotal: billable,
+      discountPercent: 0,
+      discountAmount: 0,
+      extraDiscountAmount: 0,
+      total: billable,
+    };
+  }
+
+  // --- Calcul standard / forçage à la baisse : remise commerciale absorbe l'écart ---
+  const extraDiscountAmount = billable < computedTotal - 0.01 ? round2(computedTotal - billable) : 0;
+  return {
+    equipmentLines: items,
+    subtotal: computedPricing?.subtotal || 0,
+    discountPercent: computedPricing?.discountPercent || 0,
+    discountAmount: computedPricing?.discountAmount || 0,
+    extraDiscountAmount,
+    total: billable,
+  };
+}
+
 // ============================================================================
 // SERVICE PRINCIPAL
 // ============================================================================
@@ -346,6 +413,112 @@ export const pricingService = {
     } catch (error) {
       console.error('[pricingService] saveContractPricingItems ERREUR:', error);
       return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
+  // PRIX FORCÉS PAR LIGNE (override par équipement, sans migration)
+  // --------------------------------------------------------------------------
+  // Convention : une ligne `contract_pricing_items` avec `equipment_id` NON NULL
+  // = prix manuel volontaire de cet équipement dans ce contrat. Le snapshot de
+  // création (equipment_id NULL) reste inerte et n'est jamais lu ici. Le prix
+  // forcé substitue uniquement le prix de base de la ligne ; la dégressivité et
+  // le reste du mécanisme de calcul restent appliqués en aval (cf. computedPricing).
+  // ==========================================================================
+
+  /**
+   * Charge les prix forcés par ligne d'un contrat.
+   * @returns {Promise<{data: Object<string, number>, error}>} map equipment_id → prix forcé
+   */
+  async getContractLineOverrides(contractId) {
+    try {
+      if (!contractId) throw new Error('[pricingService] contractId requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_contract_pricing_items')
+        .select('equipment_id, line_total')
+        .eq('contract_id', contractId)
+        .not('equipment_id', 'is', null);
+
+      if (error) throw error;
+
+      const map = {};
+      for (const row of data || []) {
+        if (row.equipment_id != null) map[row.equipment_id] = parseFloat(row.line_total) || 0;
+      }
+      return { data: map, error: null };
+    } catch (error) {
+      console.error('[pricingService] getContractLineOverrides ERREUR:', error);
+      return { data: {}, error };
+    }
+  },
+
+  /**
+   * Pose (ou met à jour) le prix forcé d'une ligne d'équipement.
+   * Delete ciblé + insert (l'equipment_id est unique par contrat → 1 ligne max).
+   * @param {string} contractId
+   * @param {{equipmentId:string, equipmentTypeId:string, zoneId:string, basePrice?:number, unitPrice?:number, quantity?:number}} line
+   * @param {number} forcedPrice
+   */
+  async setContractLineOverride(contractId, line, forcedPrice) {
+    try {
+      if (!contractId || !line?.equipmentId) {
+        throw new Error('[pricingService] contractId et equipmentId requis');
+      }
+      if (!line.equipmentTypeId || !line.zoneId) {
+        throw new Error('[pricingService] equipmentTypeId et zoneId requis (colonnes NOT NULL)');
+      }
+      const price = Math.round((parseFloat(forcedPrice) || 0) * 100) / 100;
+
+      // Purge ciblée de l'override existant pour cet équipement (idempotent)
+      const { error: delError } = await supabase
+        .from('majordhome_contract_pricing_items_write')
+        .delete()
+        .eq('contract_id', contractId)
+        .eq('equipment_id', line.equipmentId);
+      if (delError) throw delError;
+
+      const { data, error: insError } = await supabase
+        .from('majordhome_contract_pricing_items_write')
+        .insert({
+          contract_id: contractId,
+          equipment_id: line.equipmentId,
+          equipment_type_id: line.equipmentTypeId,
+          zone_id: line.zoneId,
+          quantity: line.quantity || 1,
+          base_price: line.basePrice ?? price,
+          unit_price: line.unitPrice || 0,
+          line_total: price,
+        })
+        .select()
+        .single();
+      if (insError) throw insError;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] setContractLineOverride ERREUR:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Supprime le prix forcé d'une ligne (retour au prix grille).
+   */
+  async clearContractLineOverride(contractId, equipmentId) {
+    try {
+      if (!contractId || !equipmentId) {
+        throw new Error('[pricingService] contractId et equipmentId requis');
+      }
+      const { error } = await supabase
+        .from('majordhome_contract_pricing_items_write')
+        .delete()
+        .eq('contract_id', contractId)
+        .eq('equipment_id', equipmentId);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('[pricingService] clearContractLineOverride ERREUR:', error);
+      return { error };
     }
   },
 

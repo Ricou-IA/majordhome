@@ -9,11 +9,12 @@ import { contractsService } from '@services/contracts.service';
 import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { contractKeys } from '@hooks/cacheKeys';
 import { useContractEquipments } from '@hooks/useContracts';
-import { usePricingData } from '@hooks/usePricing';
+import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
 import { useContractZone } from '@hooks/useContractZone';
 import {
   calculateLineTotal,
   calculateContractTotal,
+  buildContractPresentation,
 } from '@services/pricing.service';
 import { generateContractPdfBlob } from '@apps/artisan/components/contrat/ContractPDF';
 import { useAuth } from '@contexts/AuthContext';
@@ -38,6 +39,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
   // Données pour la génération PDF sans signature
   const { equipments } = useContractEquipments(contract?.id);
   const { zones, rates, discounts, equipmentTypes } = usePricingData();
+  const { overrides } = useContractLineOverrides(contract?.id);
 
   // Zone tarifaire : stockée → Mapbox (temps trajet) → fallback CP dept → défaut
   const { activeZone } = useContractZone(client, contract, zones);
@@ -68,7 +70,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       const rate = etId ? rateIndex[`${activeZone.id}_${etId}`] || null : null;
       const equipType = etId ? equipTypeMap[etId] || null : null;
       const unitCount = eq.unit_count || 1;
-      const lineTotal = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
+      // Prix forcé par ligne (override) → substitue le prix grille ; dégressivité appliquée en aval.
+      const ov = overrides?.[eq.id];
+      const lineTotal = ov != null ? ov : calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
       const refParts = [
         eq.brand,
         eq.model,
@@ -87,7 +91,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     });
     const totals = calculateContractTotal(items, discounts);
     return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides]);
 
   // Montant facturable : priorité au montant forcé (admin), sinon calculé, sinon DB
   const billableTotal = useMemo(() => {
@@ -96,22 +100,19 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     return computedPricing?.total || parseFloat(contract?.amount) || 0;
   }, [contract, computedPricing]);
 
-  // Helper : construire les données PDF (réutilisé par impression + envoi)
-  // Si le montant est forcé (admin, en général pour maintenir un prix historique),
-  // on garde les lignes équipement à leur prix réel + on affiche 2 lignes de remise :
-  //   1. Dégressivité X% (depuis la grille tarifaire)
-  //   2. Remise complémentaire (le solde entre total calculé et montant forcé)
-  // Transparence client + traçabilité du geste commercial.
+  // Helper : construire les données PDF (réutilisé par impression + envoi).
+  // La présentation tarifaire (lignes + remises) est dérivée du montant facturé via
+  // buildContractPresentation : forçage à la baisse → ligne "Remise commerciale" ;
+  // forçage à la hausse → prix d'articles majorés au prorata (la somme des lignes
+  // retombe toujours sur le total). Transparence client + traçabilité du geste commercial.
   const buildPdfData = useCallback(() => {
     const forcedAmount = contract?.amount_forced ? parseFloat(contract.amount) : null;
     const computedTotal = computedPricing?.total || 0;
-    const billableTotal = forcedAmount != null && !isNaN(forcedAmount)
+    const billable = forcedAmount != null && !isNaN(forcedAmount)
       ? forcedAmount
       : (computedTotal || parseFloat(contract?.amount) || 0);
 
-    const extraDiscountAmount = forcedAmount != null && computedTotal > forcedAmount
-      ? Math.round((computedTotal - forcedAmount) * 100) / 100
-      : 0;
+    const presentation = buildContractPresentation(computedPricing, billable);
 
     return {
       contractNumber: contract.contract_number || `CTR-${contract.id?.slice(0, 8)?.toUpperCase()}`,
@@ -123,12 +124,12 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       clientCity: client?.city || '',
       clientPhone: client?.phone || '-',
       clientEmail: client?.email || '-',
-      equipmentLines: computedPricing?.items || [],
-      subtotal: computedPricing?.subtotal || 0,
-      discountPercent: computedPricing?.discountPercent || 0,
-      discountAmount: computedPricing?.discountAmount || 0,
-      extraDiscountAmount,
-      total: billableTotal,
+      equipmentLines: presentation.equipmentLines,
+      subtotal: presentation.subtotal,
+      discountPercent: presentation.discountPercent,
+      discountAmount: presentation.discountAmount,
+      extraDiscountAmount: presentation.extraDiscountAmount,
+      total: presentation.total,
       zoneName: activeZone?.label || '-',
       notes: contract.notes || null,
       signatureBase64: null,

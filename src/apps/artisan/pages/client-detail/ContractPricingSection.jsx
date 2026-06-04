@@ -9,13 +9,13 @@
  * ============================================================================
  */
 
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { Loader2, Calculator, Tag, AlertTriangle, Lock, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { useContractEquipments } from '@hooks/useContracts';
-import { usePricingData } from '@hooks/usePricing';
+import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
 import { useContractZone } from '@hooks/useContractZone';
 import { contractKeys } from '@hooks/cacheKeys';
 import {
@@ -31,9 +31,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
   const orgId = organization?.id;
   const { equipments, isLoading: loadingEquipments } = useContractEquipments(contractId);
   const { zones, rates, discounts, equipmentTypes, isLoading: loadingPricing } = usePricingData();
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [forcedInput, setForcedInput] = useState('');
-  const [isSavingForced, setIsSavingForced] = useState(false);
+  const { overrides, setOverride, clearOverride, isSaving: isSavingOverrides } = useContractLineOverrides(contractId);
 
   // Zone tarifaire : stockée → Mapbox (temps trajet) → fallback CP dept → défaut
   const { activeZone, isDetecting: isDetectingZone, durationMinutes } = useContractZone(
@@ -82,63 +80,47 @@ export function ContractPricingSection({ contractId, contract, client }) {
       const rate = rateIndex[`${activeZone.id}_${etId}`] || null;
       const equipType = equipTypeMap[etId] || null;
       const unitCount = eq.unit_count || 1;
-      const lineTotal = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
+      const gridPrice = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
+      // Prix forcé par ligne (override) → substitue le prix grille ; la dégressivité
+      // s'applique ensuite normalement sur le sous-total (cf. calculateContractTotal).
+      const ov = overrides?.[eq.id];
+      const isForced = ov != null;
+      const lineTotal = isForced ? ov : gridPrice;
       const refParts = [eq.brand, eq.model].filter(Boolean);
       const unitLabel = unitCount > 1 && equipType?.unit_label ? ` (${unitCount} ${equipType.unit_label}s)` : '';
 
       items.push({
+        equipmentId: eq.id,
         equipmentTypeId: etId,
+        zoneId: activeZone.id,
+        basePrice: rate ? parseFloat(rate.price) : 0,
+        unitPrice: rate?.unit_price != null ? parseFloat(rate.unit_price) : 0,
+        quantity: 1,
         label: (equipType?.label || 'Équipement') + unitLabel,
         reference: refParts.length > 0 ? refParts.join(' ') : null,
-        quantity: 1,
+        gridPrice,
+        isForced,
         lineTotal,
       });
     }
 
     const totals = calculateContractTotal(items, discounts);
     return { items, unmapped, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides]);
 
   // Vérifier si le montant du contrat correspond au calcul
   const currentAmount = contract?.amount ? parseFloat(contract.amount) : 0;
   const calculatedTotal = computedPricing?.total || 0;
   const amountMismatch = computedPricing && computedPricing.items.length > 0 && Math.abs(currentAmount - calculatedTotal) > 0.01;
   const isForced = !!contract?.amount_forced;
+  const hasOverrides = !!overrides && Object.keys(overrides).length > 0;
 
-  // Pré-remplir l'input "Forcer valeur" avec le montant stocké quand le contrat est en mode forcé
+  // Auto-sync silencieux : aligne `amount` sur le calcul (prix forcés par ligne + dégressivité inclus).
+  // Un contrat legacy en mode global-forcé (`amount_forced=true`) est préservé tant qu'aucun prix de
+  // ligne n'a été posé ; dès qu'un override existe, on bascule sur le calcul (amount_forced → false).
   useEffect(() => {
-    if (isForced && currentAmount > 0) {
-      setForcedInput(String(currentAmount));
-    } else {
-      setForcedInput('');
-    }
-  }, [currentAmount, isForced]);
-
-  // Synchroniser le montant du contrat sur la valeur calculée (amount_forced = false)
-  const handleSync = useCallback(async () => {
-    if (!computedPricing || isSyncing) return;
-    setIsSyncing(true);
-    try {
-      const result = await pricingService.updateContractAmount(
-        contractId,
-        computedPricing,
-        activeZone?.id,
-        false
-      );
-      if (result.error) throw result.error;
-      toast.success('Montant aligné sur le calcul');
-      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
-    } catch (err) {
-      console.error('[ContractPricingSection] sync error:', err);
-      toast.error('Erreur lors de la mise à jour du montant');
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [computedPricing, contractId, activeZone, isSyncing, queryClient]);
-
-  // Auto-sync silencieux à l'ouverture : si mismatch ET pas forcé → aligner sur calcul
-  useEffect(() => {
-    if (!computedPricing || isForced || !amountMismatch || isSyncing) return;
+    if (!computedPricing || !amountMismatch) return;
+    if (isForced && !hasOverrides) return; // legacy global force préservé
     // Fire-and-forget : pas de toast, juste l'alignement silencieux
     (async () => {
       try {
@@ -154,35 +136,57 @@ export function ContractPricingSection({ contractId, contract, client }) {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amountMismatch, isForced, contractId, activeZone?.id, computedPricing?.total]);
+  }, [amountMismatch, isForced, hasOverrides, contractId, activeZone?.id, computedPricing?.total]);
 
-  // Forcer un montant saisi manuellement (org_admin uniquement) — amount_forced = true
-  const handleSaveForced = useCallback(async () => {
-    const value = parseFloat(forcedInput);
-    if (!computedPricing || isSavingForced || isNaN(value) || value < 0) return;
-    setIsSavingForced(true);
-    try {
-      const forcedPricing = {
-        total: value,
-        subtotal: computedPricing.subtotal,
-        discountPercent: computedPricing.discountPercent,
-      };
-      const result = await pricingService.updateContractAmount(
-        contractId,
-        forcedPricing,
-        activeZone?.id,
-        true
-      );
-      if (result.error) throw result.error;
-      toast.success('Valeur forcée enregistrée');
-      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
-    } catch (err) {
-      console.error('[ContractPricingSection] force error:', err);
-      toast.error('Erreur lors de l\'enregistrement');
-    } finally {
-      setIsSavingForced(false);
+  // Forçage du prix d'une ligne d'équipement (admin) — override par equipment_id.
+  // Le total se réaligne ensuite via l'auto-sync (amount = somme des lignes − dégressivité).
+  const handleLinePriceCommit = useCallback(async (item, rawValue) => {
+    const parsed = parseFloat(String(rawValue).replace(',', '.'));
+    if (isNaN(parsed) || parsed < 0) return;
+    const value = Math.round(parsed * 100) / 100;
+    // Valeur = prix grille → on retire l'override (retour grille)
+    if (Math.abs(value - item.gridPrice) < 0.01) {
+      if (item.isForced) {
+        try {
+          await clearOverride(item.equipmentId);
+          toast.success('Ligne réalignée sur le prix grille');
+        } catch (err) {
+          console.error('[ContractPricingSection] clear line override:', err);
+          toast.error('Erreur lors de la réinitialisation');
+        }
+      }
+      return;
     }
-  }, [forcedInput, computedPricing, contractId, activeZone, isSavingForced, queryClient]);
+    // Inchangé vs override courant → no-op
+    if (item.isForced && Math.abs(value - item.lineTotal) < 0.01) return;
+    try {
+      await setOverride(
+        {
+          equipmentId: item.equipmentId,
+          equipmentTypeId: item.equipmentTypeId,
+          zoneId: item.zoneId,
+          basePrice: item.basePrice,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+        },
+        value
+      );
+      toast.success('Prix de la ligne forcé');
+    } catch (err) {
+      console.error('[ContractPricingSection] set line override:', err);
+      toast.error('Erreur lors du forçage du prix');
+    }
+  }, [setOverride, clearOverride]);
+
+  const handleClearLine = useCallback(async (item) => {
+    try {
+      await clearOverride(item.equipmentId);
+      toast.success('Ligne réalignée sur le prix grille');
+    } catch (err) {
+      console.error('[ContractPricingSection] clear line override:', err);
+      toast.error('Erreur lors de la réinitialisation');
+    }
+  }, [clearOverride]);
 
   const isLoading = loadingEquipments || loadingPricing;
 
@@ -266,17 +270,58 @@ export function ContractPricingSection({ contractId, contract, client }) {
       </div>
 
       <div className="bg-secondary-50 rounded-lg p-4 space-y-1.5">
-        {computedPricing.items.map((item, idx) => (
-          <div key={idx} className="flex items-center justify-between text-sm">
-            <span className="text-secondary-700">
+        {computedPricing.items.map((item) => (
+          <div key={item.equipmentId} className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-secondary-700 min-w-0 truncate">
               {item.label}
               {item.reference && (
                 <span className="text-secondary-400 ml-1">— {item.reference}</span>
               )}
             </span>
-            <span className="font-medium text-secondary-900 tabular-nums">
-              {formatEuro(item.lineTotal)}
-            </span>
+            {isOrgAdmin ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {item.isForced && (
+                  <span
+                    className="inline-flex items-center gap-0.5 text-[10px] text-amber-600"
+                    title={`Prix grille : ${formatEuro(item.gridPrice)}`}
+                  >
+                    <Lock className="w-3 h-3" /> forcé
+                  </span>
+                )}
+                <input
+                  key={`${item.equipmentId}-${item.lineTotal}`}
+                  type="number"
+                  step="1"
+                  min="0"
+                  defaultValue={item.lineTotal}
+                  onBlur={(e) => handleLinePriceCommit(item, e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  disabled={isSavingOverrides}
+                  className={`w-20 px-1.5 py-0.5 border rounded text-right tabular-nums text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50 ${
+                    item.isForced
+                      ? 'border-amber-300 text-amber-700 font-medium bg-amber-50'
+                      : 'border-secondary-200 text-secondary-900 bg-white'
+                  }`}
+                />
+                <span className="text-secondary-400 text-xs">€</span>
+                {item.isForced ? (
+                  <button
+                    onClick={() => handleClearLine(item)}
+                    disabled={isSavingOverrides}
+                    title="Revenir au prix grille"
+                    className="p-0.5 text-secondary-400 hover:text-secondary-700 disabled:opacity-50"
+                  >
+                    <Unlock className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <span className="w-[18px]" aria-hidden />
+                )}
+              </div>
+            ) : (
+              <span className="font-medium text-secondary-900 tabular-nums">
+                {formatEuro(item.lineTotal)}
+              </span>
+            )}
           </div>
         ))}
 
@@ -306,59 +351,21 @@ export function ContractPricingSection({ contractId, contract, client }) {
             </div>
           )}
           <div className="flex justify-between text-sm font-semibold">
-            <span className="text-secondary-900">Total annuel (calculé)</span>
+            <span className="text-secondary-900">Total annuel</span>
             <span className="text-primary-700 tabular-nums">{formatEuro(computedPricing.total)}</span>
           </div>
 
-          {isForced && (
-            <div className="flex justify-between text-sm font-semibold pt-1">
-              <span className="text-amber-700 flex items-center gap-1">
-                <Lock className="w-3.5 h-3.5" />
-                Montant facturé (forcé)
+          {isForced && !hasOverrides && amountMismatch && (
+            <div className="flex items-center justify-between gap-2 text-xs pt-1.5 mt-1 border-t border-dashed border-amber-200 text-amber-700">
+              <span className="inline-flex items-center gap-1 min-w-0">
+                <Lock className="w-3 h-3 shrink-0" />
+                <span className="truncate">Montant facturé hérité — modifie une ligne pour repasser au calcul</span>
               </span>
-              <span className="text-amber-700 tabular-nums">{formatEuro(currentAmount)}</span>
+              <span className="tabular-nums font-semibold whitespace-nowrap">{formatEuro(currentAmount)}</span>
             </div>
           )}
         </div>
       </div>
-
-      {isOrgAdmin && (
-        <div className="mt-3 flex items-center justify-end gap-2 text-xs">
-          <label className="text-secondary-600 flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-secondary-400" />
-            Forcer la valeur
-          </label>
-          <input
-            type="number"
-            step="1"
-            min="0"
-            value={forcedInput}
-            onChange={(e) => setForcedInput(e.target.value)}
-            placeholder={String(computedPricing.total)}
-            className="w-24 px-2 py-1 border border-secondary-300 rounded-md text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <span className="text-secondary-500">€</span>
-          <button
-            onClick={handleSaveForced}
-            disabled={isSavingForced || !forcedInput}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50"
-          >
-            {isSavingForced ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-            Enregistrer
-          </button>
-          {isForced && (
-            <button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-md transition-colors disabled:opacity-50"
-              title="Supprimer le forçage et aligner sur le calcul"
-            >
-              {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
-              Aligner sur calcul
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

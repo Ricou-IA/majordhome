@@ -18,7 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 
 import { useClientContract, useContractEquipments } from '@hooks/useContracts';
-import { usePricingData } from '@hooks/usePricing';
+import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
 import { useContractZone } from '@hooks/useContractZone';
 import { contractKeys } from '@hooks/cacheKeys';
 import { contractsService } from '@services/contracts.service';
@@ -26,6 +26,7 @@ import { storageService } from '@services/storage.service';
 import {
   calculateLineTotal,
   calculateContractTotal,
+  buildContractPresentation,
 } from '@services/pricing.service';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import { generateContractPdfBlob } from '../components/contrat/ContractPDF';
@@ -130,6 +131,7 @@ export default function ContractSign() {
   const { contract, isLoading: loadingContract } = useClientContract(clientId);
   const { equipments, isLoading: loadingEquipments } = useContractEquipments(contract?.id);
   const { zones, rates, discounts, equipmentTypes, isLoading: loadingPricing } = usePricingData();
+  const { overrides } = useContractLineOverrides(contract?.id);
 
   // -- State --
   const [signatureBase64, setSignatureBase64] = useState(null);
@@ -189,7 +191,9 @@ export default function ContractSign() {
       const rate = etId ? rateIndex[`${activeZone.id}_${etId}`] || null : null;
       const equipType = etId ? equipTypeMap[etId] || null : null;
       const unitCount = eq.unit_count || 1;
-      const lineTotal = calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
+      // Prix forcé par ligne (override) → substitue le prix grille ; dégressivité appliquée en aval.
+      const ov = overrides?.[eq.id];
+      const lineTotal = ov != null ? ov : calculateLineTotal(rate, equipType, unitCount, zoneSupplement);
       // Référence : "Marque · Modèle · Année · Pose · N splits"
       const refParts = [
         eq.brand,
@@ -210,7 +214,7 @@ export default function ContractSign() {
 
     const totals = calculateContractTotal(items, discounts);
     return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides]);
 
   // -- Montant à signer = montant ENREGISTRÉ sur le contrat (ce qui a été proposé/convenu).
   //    On ne signe jamais un total recalculé en live qui divergerait. Secours : total
@@ -221,13 +225,14 @@ export default function ContractSign() {
     return computedPricing?.total || 0;
   }, [contract?.amount, computedPricing?.total]);
 
-  // -- Écart éventuel entre la somme des lignes (grille tarifaire) et le montant convenu
-  //    (remise admin, tarif historique…) → affiché en "remise commerciale" pour que la
-  //    somme des lignes retombe sur le total signé (transparence + traçabilité). --
-  const extraDiscountAmount = useMemo(() => {
-    const computed = computedPricing?.total || 0;
-    return computed > billableTotal ? Math.round((computed - billableTotal) * 100) / 100 : 0;
-  }, [computedPricing?.total, billableTotal]);
+  // -- Présentation tarifaire alignée sur le montant signé (billableTotal) :
+  //    forçage à la baisse → ligne "Remise commerciale" qui absorbe l'écart ;
+  //    forçage à la hausse → prix d'articles majorés au prorata (pas de remise négative).
+  //    Dans tous les cas la somme des lignes (± remises) retombe sur le total signé. --
+  const presentation = useMemo(
+    () => buildContractPresentation(computedPricing, billableTotal),
+    [computedPricing, billableTotal]
+  );
 
   // -- Signature callback --
   const handleSign = useCallback((dataUrl) => {
@@ -254,12 +259,12 @@ export default function ContractSign() {
         clientCity: client?.city || '',
         clientPhone: client?.phone || '-',
         clientEmail: client?.email || '-',
-        equipmentLines: computedPricing?.items || [],
-        subtotal: computedPricing?.subtotal || 0,
-        discountPercent: computedPricing?.discountPercent || 0,
-        discountAmount: computedPricing?.discountAmount || 0,
-        extraDiscountAmount,
-        total: billableTotal,
+        equipmentLines: presentation.equipmentLines,
+        subtotal: presentation.subtotal,
+        discountPercent: presentation.discountPercent,
+        discountAmount: presentation.discountAmount,
+        extraDiscountAmount: presentation.extraDiscountAmount,
+        total: presentation.total,
         zoneName: activeZone?.label || '-',
         notes: contract.notes || null,
         signatureBase64,
@@ -309,7 +314,7 @@ export default function ContractSign() {
     } finally {
       setIsSaving(false);
     }
-  }, [contract, signatureBase64, signataireNom, isSaving, client, computedPricing, billableTotal, extraDiscountAmount, activeZone, queryClient]);
+  }, [contract, signatureBase64, signataireNom, isSaving, client, presentation, activeZone, queryClient]);
 
   // -- Loading --
   const isLoading = loadingClient || loadingContract || loadingEquipments || loadingPricing;
@@ -415,8 +420,8 @@ export default function ContractSign() {
             </div>
           </div>
 
-          {/* Équipements — lignes individuelles avec références */}
-          {computedPricing && computedPricing.items.length > 0 && (
+          {/* Équipements — lignes individuelles avec références (alignées sur le montant signé) */}
+          {presentation.equipmentLines.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-2">Équipements sous contrat</h3>
               <div className="border rounded-lg overflow-hidden">
@@ -424,7 +429,7 @@ export default function ContractSign() {
                   <div className="col-span-9">Équipement</div>
                   <div className="col-span-3 text-right">Prix</div>
                 </div>
-                {computedPricing.items.map((item, idx) => (
+                {presentation.equipmentLines.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 px-4 py-2.5 text-sm border-t border-gray-100">
                     <div className="col-span-9">
                       <div className="text-gray-800">{item.label}</div>
@@ -432,7 +437,9 @@ export default function ContractSign() {
                         <div className="text-xs text-gray-400 mt-0.5">{item.reference}</div>
                       )}
                     </div>
-                    <div className="col-span-3 text-right font-medium">{formatEuro(item.lineTotal)}</div>
+                    <div className="col-span-3 text-right font-medium">
+                      {item.lineTotal > 0 ? formatEuro(item.lineTotal) : 'Sur devis'}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -440,27 +447,27 @@ export default function ContractSign() {
               {/* Totaux — le total signé = montant ENREGISTRÉ sur le contrat (billableTotal),
                   pas un recalcul. Sous-total/remises mirrorisent le PDF généré. */}
               <div className="mt-3 space-y-1">
-                {(computedPricing.discountPercent > 0 || extraDiscountAmount > 0) && (
+                {(presentation.discountPercent > 0 || presentation.extraDiscountAmount > 0) && (
                   <div className="flex justify-between text-sm px-4">
                     <span className="text-gray-500">Sous-total</span>
-                    <span className="tabular-nums">{formatEuro(computedPricing.subtotal)}</span>
+                    <span className="tabular-nums">{formatEuro(presentation.subtotal)}</span>
                   </div>
                 )}
-                {computedPricing.discountPercent > 0 && (
+                {presentation.discountPercent > 0 && (
                   <div className="flex justify-between text-sm px-4 text-green-700">
-                    <span>Dégressivité -{computedPricing.discountPercent}%</span>
-                    <span className="tabular-nums">-{formatEuro(computedPricing.discountAmount)}</span>
+                    <span>Dégressivité -{presentation.discountPercent}%</span>
+                    <span className="tabular-nums">-{formatEuro(presentation.discountAmount)}</span>
                   </div>
                 )}
-                {extraDiscountAmount > 0 && (
+                {presentation.extraDiscountAmount > 0 && (
                   <div className="flex justify-between text-sm px-4 text-green-700">
                     <span>Remise commerciale</span>
-                    <span className="tabular-nums">-{formatEuro(extraDiscountAmount)}</span>
+                    <span className="tabular-nums">-{formatEuro(presentation.extraDiscountAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between px-4 py-2 bg-orange-50 rounded-lg text-base font-bold text-[#EA580C]">
                   <span>Total annuel TTC</span>
-                  <span className="tabular-nums">{formatEuro(billableTotal)}</span>
+                  <span className="tabular-nums">{formatEuro(presentation.total)}</span>
                 </div>
               </div>
             </div>

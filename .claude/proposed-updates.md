@@ -857,6 +857,18 @@ Plusieurs passages de CLAUDE.md sont maintenant obsolètes :
 
 3. Ajouter en fin de section "DB" les 2 nouvelles RPCs dans la liste des RPCs Pipeline ↔ PL.
 
+---
+
+## [2026-06-03 11:35] Nouvelle méthode `savService.deleteEntretienCard` (Ranger)
+**Statut** : PENDING
+**Commit** : 0420b77cf933516ba4ce3efd35519106bba873ed
+**Contexte** : Ajout d'un bouton "Ranger" (icône Archive, hover top-right) sur les cartes Kanban entretien en statut `a_planifier`. Côté service : nouvelle méthode `savService.deleteEntretienCard(interventionId)` qui supprime les enfants (certificats) puis le parent. Les RDV liés sont déliés automatiquement via FK `appointments.intervention_id ON DELETE SET NULL`. Toast undo recrée via `createEntretien` à partir d'un snapshot `{ orgId, clientId, contractId, projectId, scheduledDate }`. Effet métier : le contrat sort de `plannedContractIds` et redevient planifiable dans l'outil secteur.
+**Proposition** : Ajouter à la liste "Service methods (`sav.service.js`)" du Module Certificats d'entretien :
+- `deleteEntretienCard(interventionId)` — hard delete intervention (et enfants certificats). Délie les RDV via FK ON DELETE SET NULL. Usage : "Ranger" une carte « À planifier » pour libérer le contrat dans l'outil secteur.
+
+Question ouverte : faut-il documenter le pattern "toast undo avec snapshot + recreate" comme convention UX réutilisable, ou rester silencieux tant qu'il n'y a qu'un seul caller ?
+---
+
 4. Mettre à jour la note WIP en tête de section avec la date 2026-05-27 et la mention du bridge canonique.
 
 Question ouverte : valider la sémantique OVERWRITE (impact potentiel : si l'user a corrigé manuellement le nom/email d'un lead post-attach, le cron va re-écraser depuis PL au prochain run de 15 min). C'est la décision documentée, mais à confirmer comme intentionnelle avant intégration définitive au CLAUDE.md.
@@ -878,6 +890,31 @@ Question ouverte : valider la sémantique OVERWRITE (impact potentiel : si l'use
 ```
 
 Question ouverte : faut-il aussi retirer les colonnes `leads.quote_sent_date` et `leads.won_date` du payload `buildPayload()` côté frontend, ou les laisser nullables et juste cacher l'input ? (Décision actuelle = laisser nullables, mais à valider si conserve une vraie utilité aval.)
+---
+
+## [2026-06-03 13:31] Module Appels — abstraction CallProvider + plages horaires légales
+**Statut** : PENDING
+**Commit** : c270f443abf3b226eecda39c3729412d0aac83fa
+**Contexte** : Suite des commits `feat(appels):` (cerveau DB le 6a7ceee, frontend abstraction maintenant). Le module Appels (moteur de campagne d'appels V1 entretien, plan dans `e702edb`) introduit une abstraction `CallProvider` (classe de base avec EventEmitter simple `on/off/_emit`) + `MockCallProvider` (sous-classe rejouant un scénario déterministe sans téléphonie). V1 = mock, V2 = provider réel (Vapi/Telnyx + PBX). Events émis (1 payload `{contactId, ...}`) : `dialing` / `no_answer` / `voicemail` / `human_answered` / `transfer_accepted` / `transfer_missed` / `session_done`. Helper `isWithinCallWindow(params, now)` avec garde-fou plages horaires légales (défaut 9h-20h, pas le dimanche `getDay()===0`), constante `DEFAULT_CALL_WINDOW = { window_start: 9, window_end: 20 }`.
+
+**Proposition** : Le module Appels est en construction incrémentale (DB ✅, frontend provider ✅, UI/hook à venir). Deux options :
+
+(a) **Attendre que le module soit complet** pour documenter d'un bloc dans CLAUDE.md (nouvelle section "Module Appels" similaire aux autres modules).
+
+(b) **Ajouter dès maintenant un stub minimal** dans CLAUDE.md (section Architecture ou nouvelle section) :
+
+```
+## Module Appels (campagne d'appels — WIP)
+
+> 🔧 **WIP** — moteur de campagne d'appels V1 entretien. DB livrée (`call_sessions`/`call_attempts` + vues + RPCs), frontend abstraction livrée. UI/hook à venir.
+
+- **Abstraction provider** : `src/apps/artisan/components/appels/callProvider.js` — classe `CallProvider` (EventEmitter `on/off/_emit` + API `start/pause/resume/stop/resolveTransfer`). V1 = `MockCallProvider` (scénarios déterministes pour dev/test sans téléphonie). V2 prévue = provider réel (Vapi/Telnyx + PBX).
+- **Events émis** (payload `{contactId, ...}`) : `dialing` | `no_answer` | `voicemail` | `human_answered` | `transfer_accepted` | `transfer_missed` | `session_done`. Le hook orchestrateur appelle `resolveTransfer(contactId, accepted)` après le geste de l'humain, puis `advance()` pour enchaîner.
+- **Plages horaires légales** : `src/apps/artisan/components/appels/callWindow.js` — `isWithinCallWindow(params, now)` + `DEFAULT_CALL_WINDOW = { window_start: 9, window_end: 20 }`. Garde-fou : pas le dimanche, fenêtre 9h-20h par défaut. Override possible via `params.window_start` / `params.window_end`.
+- **Spec/plan** : `docs/superpowers/plans/...` (commit e702edb).
+```
+
+À trancher selon le rythme du module : si plusieurs commits encore à venir, (a) évite le bruit ; si on veut tracker la convention provider + events dès maintenant (utile pour les contributeurs futurs), (b) est plus prudent.
 ---
 
 ## [2026-05-27 18:47] Pipeline : montant Gagne (accepted_sum) + chip uniquement Refuse
@@ -925,4 +962,301 @@ Question ouverte : faut-il fusionner cette entrée avec les 2 PENDING du 2026-05
 > **Signature contrat — sources de vérité figées** : à la signature, `contract.amount` et `contract.zone_id` sont les sources de vérité — figées à la configuration du contrat. L'écran de signature et le PDF ne recalculent JAMAIS le total ni la zone. La détection partagée `useContractZone` n'est qu'un fallback si `zone_id` est null (contrat jamais configuré). Tout écart entre somme des lignes (grille tarifaire courante × zone stockée) et `contract.amount` s'affiche en « Remise commerciale » pour traçabilité — la somme des lignes retombe toujours sur le total signé. Règle générale : tout artefact contractuel signé/envoyé au client (devis, contrat, certificat) doit lire les valeurs ENREGISTRÉES, pas les recalculer depuis la grille tarifaire courante.
 
 Question ouverte : faut-il créer une section dédiée « Module Contrats » dans CLAUDE.md (actuellement éparpillé entre « Module Certificats d'entretien », `ContractPdfSection.jsx`, `ContractSign.jsx`) pour centraliser les conventions PDF / signature / zone / pricing ? Ou rester ponctuel dans « Conventions qualité » ?
+---
+
+
+## [2026-06-02 01:22] Adaptation viewport tablette (deviceViewport.js)
+**Statut** : PENDING
+**Commit** : cc9ac2ba4cf7069ac6bbc66989c238a12ce47e71
+**Contexte** : Nouveau `src/lib/deviceViewport.js` + appel `initDeviceViewport()` dans `main.jsx` avant le render. Pour les tablettes durcies type Oukitel RT3 Pro (écran 8", largeur logique ~400-850 px), le `<meta viewport>` est réécrit pour forcer la largeur de rendu à `TABLET_VIEWPORT_WIDTH = 1024` (constante exportée). Le navigateur dézoome alors automatiquement → l'app bascule en vue bureau (sidebar fixe + colonnes) au lieu de rester mono-colonne au-dessous du breakpoint `lg`. PC (pointeur fin) et grands écrans tactiles (longEdge ≥1024) sont exclus = inchangés. La détection s'appuie sur `screen.width/height` stables (pas `innerWidth` qui change après dézoom). Hook DOM `html[data-device-class="tablet|desktop"]` exposé pour cibles CSS futures. Le point d'extension unique pour ajouter un cas téléphone est `getDeviceClass()`.
+**Proposition** : Ajouter une sous-section dans "Conventions de Code → Composants" (ou créer une mini-section "Viewport & responsive") :
+**Viewport adaptatif** : `src/lib/deviceViewport.js` réécrit `<meta viewport>` au boot pour forcer la largeur de rendu à `TABLET_VIEWPORT_WIDTH=1024` sur les tablettes durcies (écran <1024px logique + pointeur tactile). Effet : dézoom natif du navigateur → bascule en vue bureau (sidebar + colonnes). PC et grands écrans tactiles inchangés. Init synchrone dans `main.jsx` avant le render React (évite flash de re-layout). Hook DOM `html[data-device-class]` pour cibles CSS conditionnelles. Point d'extension unique pour ajouter un cas "phone" : `getDeviceClass()` (aucun téléphone dans le parc actuellement).
+---
+
+## [2026-06-02 01:22] Spec design — modèle de droits app-level canonical
+**Statut** : PENDING
+**Commit** : cc9ac2ba4cf7069ac6bbc66989c238a12ce47e71
+**Contexte** : Nouveau spec `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md` capture la conception complète du job "droits app-level" différé par Eric (cf. mémoire `project_droits_app_level.md`). Pas d'implémentation dans ce commit — uniquement le design validé (4 décisions actées §13 : interventions=double owner entretiens+chantiers, contracts sous clients, delete=org_admin only, défauts app-level éditables par super-admin only). Séquençage en 6 PRs (registre → DB socle → front merge → RLS écritures → test cohérence CI → cleanup). La Couche 1 (lecture équipements/interventions via assignment) est déjà en prod.
+**Proposition** : Mettre à jour la section "Rôles & Permissions" du CLAUDE.md pour mentionner que le modèle évolue vers un registre canonical (app-level + surcharges per-org) et lier le spec ? Ou attendre la PR 1 (extension `lib/permissions.js`) pour documenter au moment où le code change ? Aujourd'hui la section décrit `role_permissions` per-org seedé de Mayer, qui sera retiré à l'étape 6. Risque si on ne dit rien : un futur Claude rajoutera des permissions au seed Mayer sans savoir que ça va sauter.
+---
+
+## [2026-06-02 01:39] Registre de permissions app-level (src/lib/permissionsRegistry.js)
+**Statut** : PENDING
+**Commit** : 74a9e00513c1414864c4cc6f3ac157de16cf64a2
+**Contexte** : Nouveau fichier pur `src/lib/permissionsRegistry.js` (136 LOC, aucun import) — source unique des défauts app-level pour le modèle de droits (Phase 1 de la spec `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md` validée la veille, cf. PENDING précédent 01:22). Couvre 13 ressources (`dashboard` / `clients` / `pipeline` / `chantiers` / `planning` / `entretiens` / `sav` / `devis` / `tasks` / `territoire` / `meta_ads` / `voice_recorder` / `settings`) × 3 rôles éditables (`team_leader`, `commercial`, `technicien`) ; `org_admin` n'apparaît jamais (bypass total côté helpers). Exporte 4 helpers : `appDefault(role, resource, action)` (fail-closed false), `resolvePermission(orgOverrideMap, role, resource, action)` (override per-org sinon défaut app sinon false), `tableScope(table)` (résout `table → { resource, scope }` parmi 5 scopes : `org` / `project` / `client` / `parent:<table>` / `reference`), `iterAppDefaults()` (générateur pour seed DB `app_role_permissions`). Convention ordre tuple `[team_leader, commercial, technicien]`. 2 notes laissées dans le code : `sav` partage la table `interventions` avec `entretiens` (réconciliation à traiter dans une phase ultérieure), `cedants` / `prospection_commerciale` absents du registre = fail-closed pour les non-admin. **Inerte dans ce commit : aucun consommateur ajouté** (front `can()` après merge + seed DB en Phase 3+ selon la spec).
+
+**Proposition** : 3 options à arbitrer pour CLAUDE.md (la spec + l'entrée PENDING précédente du 2026-06-02 01:22 couvrent déjà le pourquoi haut-niveau) :
+
+A) **Mention courte dans `## Rôles & Permissions`** (recommandé) — 2-3 lignes factuelles type :
+> **Registre app-level** (`src/lib/permissionsRegistry.js`, 2026-06-02) — source unique des défauts de permissions par (role, resource, action) pour 13 ressources × 3 rôles éditables (`org_admin` = bypass total, jamais listé). Pur (aucun import), consommé en Phase 3+ par le front (`can()` après merge override per-org) ET le seed DB `app_role_permissions`. Helpers : `appDefault`, `resolvePermission(orgOverrideMap, role, resource, action)`, `tableScope(table)` (scopes : `org` / `project` / `client` / `parent:<table>` / `reference`), `iterAppDefaults()`. Spec : `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`.
+
+B) **Attendre la PR 1** (extension `lib/permissions.js` + 1er consommateur) et documenter à ce moment-là — risque : un futur Claude voit le fichier orphelin et ne sait pas s'il faut l'utiliser ou si c'est du code mort à supprimer.
+
+C) **Une note minimale "WIP — ne pas consommer encore"** dans `## Rôles & Permissions` pour éviter qu'une session future câble prématurément des consommateurs avant que la spec ne soit déroulée dans l'ordre des PRs.
+
+Question additionnelle : le bullet existant `RPC public.org_seed_permissions(p_org_id)` (P1.8, copie Mayer comme template) deviendra obsolète à l'étape 6 de la spec. Faut-il déjà l'annoter `(à retirer à la Phase 6 — remplacé par le registre app-level)` ou attendre que la migration soit faite ?
+---
+
+## [2026-06-02 01:55] Socle DB droits app-level appliqué (table + fonctions) — Phase 2 spec terminée
+**Statut** : PENDING
+**Commit** : 4285f8253e69aa3048de1e3b87ac29bb11f5f461
+**Contexte** : Suite directe des 2 PENDING précédents (01:22 spec, 01:39 registre `permissionsRegistry.js`). Ce commit ajoute uniquement `scripts/gen-app-role-permissions-sql.mjs` (12 LOC) — générateur one-shot qui émet le SQL d'INSERT pour `majordhome.app_role_permissions` depuis le registre via `iterAppDefaults()`. **Mais le commit message documente que le socle DB est désormais appliqué en prod via migrations MCP** : table `majordhome.app_role_permissions(role, resource, action, allowed)` + seed 111 lignes (générées depuis le registre) + fonctions `public.user_effective_role(p_user_id, p_org_id)` et `public.role_can(p_role, p_resource, p_action, p_org_id)`. Vérifié par impersonation. **Inerte : aucune policy RLS ni helper `can()` ne consomme `role_can` à ce stade** — fin de la Phase 2 (DB socle) de la spec, avant la Phase 3 (front merge override+default) et Phase 4 (RLS écritures).
+
+**Proposition** : 3 axes à arbitrer pour CLAUDE.md (à coordonner avec les 2 PENDING précédents — peut-être fusionner les 3 décisions en une seule édition cohérente de la section `## Rôles & Permissions`) :
+
+1. **Documenter la nouvelle commande** dans la section `## Commandes` :
+> `node scripts/gen-app-role-permissions-sql.mjs` — émet sur stdout le SQL de seed `app_role_permissions` depuis `src/lib/permissionsRegistry.js`. Lancé manuellement quand le registre app-level change, output appliqué via migration MCP (`apply_migration`). Le registre est la source unique, jamais le SQL.
+
+2. **Documenter le socle DB** dans `## Rôles & Permissions` (ou dans une nouvelle sous-section "Droits app-level — état de déploiement") :
+> **Socle DB (Phase 2 spec, 2026-06-02)** — Table `majordhome.app_role_permissions(role, resource, action, allowed)` seedée à 111 lignes depuis le registre. Fonctions SQL `public.user_effective_role(uid, org)` (résout le rôle effectif user×org) et `public.role_can(role, resource, action, org)` (résout permission via override per-org sinon défaut app, fail-closed). **Inerte** — aucune policy RLS ni `can()` côté front ne les consomme encore. Branchement progressif prévu en Phase 3+ (cf. spec `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`).
+
+3. **Garde-fou contre régression** : pendant que le socle est inerte, le risque est qu'un futur Claude (a) modifie `app_role_permissions` à la main au lieu de régénérer depuis le registre, ou (b) ajoute des consommateurs prématurés à `role_can` avant la Phase 3. Faut-il ajouter une note explicite type "⚠️ Ne JAMAIS éditer `app_role_permissions` à la main — toujours passer par `gen-app-role-permissions-sql.mjs` + migration MCP. Ne pas brancher de policy RLS sur `role_can` avant la Phase 4 de la spec" ?
+
+**Question de regroupement** : étant donné qu'on a 3 PENDING liés (spec / registre / socle DB) avec des propositions partiellement redondantes, est-ce qu'on les traite en bloc une fois la Phase 3 atterrie (= une seule édition cohérente de la section `## Rôles & Permissions`), ou est-ce qu'on intègre dès maintenant pour éviter qu'une session future ne sache pas que le socle existe ?
+---
+
+## [2026-06-02 02:21] Phase 3 RLS enforcement partiel — equipments+interventions gouvernes par role_can(clients)
+**Statut** : PENDING
+**Commit** : ed671ecb86a6b7324626428ebb97a17d0df3b68a
+**Contexte** : Suite directe des 3 PENDING precedents (01:22 spec, 01:39 registre, 01:55 socle DB). Ce commit ajoute uniquement le record markdown `docs/superpowers/plans/2026-06-02-permissions-phase3-rls-enforcement.md` (35 LOC). **Le commit message documente une migration prod deja appliquee via MCP** (pas de fichier SQL repo) : helper `majordhome.project_org_id(uuid)` (SECDEF + search_path lock + REVOKE anon) qui resout l'org d'un projet en bypassant la RLS `core.projects` ; puis sur `equipments` + `interventions`, les anciennes policies `FOR ALL` core.projects-based (`equipments_owner_or_org`, `interventions_tech_owner_org`) sont **droppees** et remplacees par des policies d'ecriture pilotees par `role_can(project_org_id(project_id), 'clients', ...)` — INSERT/UPDATE = tous roles (`edit`), DELETE = admin only (`delete`). SELECT inchange (Couche 1 org-wide). Modele : equipments/interventions = "satellites" de la fiche client, donc gouvernes par la resource `clients` (decision spec §13). **Inerte cote prod (additif)** car les anciennes policies FOR ALL etaient deja cassees pour les non-admins (RLS sur `core.projects` bloquait le lookup). Verification par impersonation OK (Ludovic technicien UPDATE equip/interv autorise ; DELETE bloque ; cross-org bloque ; admin DELETE passe RLS). **Reste a faire (avec Eric present)** : remplacer les policies fonctionnelles sur clients/contracts (resource `clients`) et leads (resource `pipeline`). Note : sur ces tables, `role_can` est un SURSET de l'ancien (create ajoute commercial ; edit ajoute commercial+technicien ; delete=admin inchange) — dropper l'ancien ne retire aucun acces (verifie diff false→true vide pour Mayer). Technique sure recommandee : ADD role_can (OR avec ancien) → verifier → DROP ancien.
+
+**Proposition** : 3 axes a arbitrer pour CLAUDE.md (toujours en coordination avec les 3 PENDING precedents — la Phase 3 etant partielle, l'edition cohérente "une seule fois" de `## Roles & Permissions` peut etre prematuree) :
+
+1. **Documenter le nouveau helper SQL** dans Gotchas DB ou Conventions DB :
+> `majordhome.project_org_id(uuid)` — helper SQL (SECDEF + search_path lock + REVOKE anon) qui resout `project_id → org_id` en bypassant la RLS `core.projects`. Necessaire pour les policies RLS sur tables liees a un projet (equipments, interventions) qui doivent connaitre l'org sans declencher la RLS de `core.projects`. Pattern a reprendre pour toute nouvelle table satellite d'un projet.
+
+2. **Documenter le pattern "satellites de la fiche client gouvernes par role_can(clients)"** dans `## Roles & Permissions` (ou dans la sous-section "Droits app-level" si elle est creee suite aux PENDING precedents) :
+> **Phase 3 RLS enforcement (partiel, 2026-06-02)** — Les ecritures sur `equipments` + `interventions` sont desormais gouvernees par `role_can(project_org_id(project_id), 'clients', edit|delete)` : INSERT/UPDATE = tous roles, DELETE = org_admin only. Modele : equipments/interventions = satellites de la fiche client, gouvernes par la resource parente `clients` plutot que par une resource dediee. SELECT inchange (Couche 1 org-wide). Anciennes policies `FOR ALL` core.projects-based droppees. **Reste a faire** : meme pattern pour `clients` + `contracts` (resource `clients`) et `leads` (resource `pipeline`) — differe car remplacement de policies fonctionnelles sur prod partagee (risque de casser la session Eric en direct).
+
+3. **Garde-fou contre regression** : pendant que la Phase 3 est partielle (equipments/interventions seulement), un futur Claude pourrait (a) recreer une policy `FOR ALL core.projects`-based sur ces tables, (b) ajouter une nouvelle table satellite sans le pattern `role_can(project_org_id(...), 'clients', ...)`, ou (c) tenter de remplacer les policies clients/leads/contracts en solo sur prod partagee. Faut-il ajouter une note explicite type "Pour toute nouvelle table satellite d'un projet, gouverner les ecritures via `role_can(project_org_id(project_id), '<resource_parente>', <action>)`. Pour le remplacement de policies fonctionnelles existantes sur prod partagee, utiliser le pattern ADD role_can (OR avec ancien) → verifier → DROP ancien, et le faire avec Eric present" ?
+
+**Question de regroupement (suite)** : la decision sur les 3 PENDING precedents (spec / registre / socle DB) reste valable — cette entree ajoute une 4eme brique a un meme bloc cohesif. Argument pour integrer maintenant : la Phase 3 partielle change deja le comportement prod (ecritures equipments/interventions). Argument pour attendre la Phase 3 complete : les 3 tables manquantes (clients/leads/contracts) sont plus visibles cote produit, l'edition CLAUDE.md gagne en valeur quand tout est aligne.
+---
+
+## [2026-06-02 13:17] Pattern "leads gagnés Pennylane-aware" + RPC backfill Meta + section Module Meta Ads
+**Statut** : PENDING
+**Commit** : c86def40f70d256f20f0ffc32c30f38ae96815d8
+**Contexte** : Fix du dashboard Meta Ads (suivi ROI). 3 changements structurants au-delà du fix de bug isolé :
+1. **Vue `public.majordhome_meta_ads_leads_attribution` (recréée)** — Retrait du filtre `meta_campaign_id IS NOT NULL` qui jetait tous les leads live (N8N polling ne demandait pas le campaign_id). Surtout, `leads_won` devient **Pennylane-aware** : `count(*) FILTER (WHERE s.is_won = true OR pq.pl_won)` avec `pq.pl_won = bool_or(q.is_winning_quote OR q.quote_status IN ('accepted','invoiced'))` sur les devis PL non-éjectés. Et `leads_lost` ajoute le guard `AND NOT COALESCE(pq.pl_won, false)`. Motivation : un lead gagné via devis PL accepté reste souvent `status_id='Devis envoyé'` côté `leads` (le cron pose `is_winning_quote` mais le statut, jusqu'à ce commit, n'était pas mis à jour automatiquement — fix complémentaire dans `pennylane_sync_ensure_winning_quotes`). Le Kanban (`majordhome_kanban_cards`) lit déjà PL canonique, mais les dashboards d'agrégation lisaient `status_id` → sous-comptage des Gagnés.
+2. **RPC `public.meta_ads_backfill_lead_attribution(p_external_id, p_campaign_id, p_adset_id, p_ad_id, p_campaign_name, p_adset_name, p_ad_name)`** — service_role only, SECURITY DEFINER, `search_path = majordhome, public`. Merge-only : `jsonb_strip_nulls` + `external_data || patch` (ne vide jamais une clé existante). Une réponse Meta sans champ campagne est un no-op. Utilisée par un workflow N8N de re-fetch Meta par lead pour rétro-peupler les campaign_id/adset_id/ad_id manquants dans `external_data`. Les colonnes générées `meta_campaign_id/adset_id/ad_id` se recalculent automatiquement.
+3. **Preset "Tout"** dans `MetaAdsPeriodSelector.jsx` — bornes `2026-01-01 → today` (les données Meta démarrent en mars 2026).
+
+**Proposition** : 3 axes à arbitrer, sachant qu'il n'existe **aucune section "Module Meta Ads" dans CLAUDE.md** aujourd'hui (le sujet est tracé dans la mémoire `project_meta_ads_initiative.md` qui contient les gotchas Meta API — double-comptage leads, System User Token, CBO/ABO, budget +25%) :
+
+A) **Créer une section "Module Meta Ads" dans CLAUDE.md** (entre Pennylane et Plan de Dev) qui documente :
+   - La vue `majordhome_meta_ads_leads_attribution` (org_id/campaign_id/adset_id/commercial_id/date_start + funnel total/contacted/planified/quoted/won/lost) — **lue par le dashboard Meta Ads** ; règle Pennylane-aware sur `leads_won/leads_lost`
+   - La RPC `meta_ads_backfill_lead_attribution` (merge-only, service_role only, alimentée par workflow N8N de re-fetch)
+   - Colonnes générées `leads.meta_campaign_id/adset_id/ad_id` dérivées de `external_data->>` (et donc dépendent du polling N8N pour être peuplées)
+   - Pattern "leads live N8N ne contiennent pas les fields campagne par défaut" → les colonnes générées sont NULL tant que pas backfillé
+
+B) **Règle générale à formaliser** (à mettre dans "Multi-tenant & sécurité" ou nouvelle section "Conventions agrégation pipeline") :
+> **Toute vue/RPC d'agrégation qui compte les « leads gagnés » doit être Pennylane-aware** : un lead peut être gagné via statut (`statuses.is_won=true`) OU via devis PL non-éjecté `is_winning_quote=true` ou `quote_status IN ('accepted','invoiced')`. Le statut `leads.status_id` reste éventuellement consistent (réparé par `pennylane_sync_ensure_winning_quotes` qui appelle `lead_mark_won_with_quote`), mais une vue qui filtre sur statut seul sous-comptera les Gagnés au moment où le cron tourne. À étendre à tout futur dashboard pipeline / KPI commercial qui agrège des Gagnés.
+
+C) **Garder le silence** — le fix est un bug fix isolé, la mémoire `project_meta_ads_initiative.md` est suffisante pour le Meta Ads-specifique, et la règle Pennylane-aware vit déjà dans CLAUDE.md à travers la doc `majordhome_kanban_cards` (allowlists statut) et `lead_mark_won_with_quote` (définition canonique du gain). Risque : la prochaine session qui crée un nouveau dashboard ne pensera pas à appliquer le filtre Pennylane-aware.
+
+Question subsidiaire : si on retient (A), faut-il aussi documenter la sémantique du preset "Tout" (bornes `2026-01-01 → today`, à shifter quand l'historique grandit) ?
+---
+
+## [2026-06-02 13:21] Scheduler campagnes auto : migration N8n → edge function (fix régression 0 envoi 21/05-02/06)
+**Statut** : PENDING
+**Commit** : 420289f12c576f05c1e40bf52a2015ac679601ed
+**Contexte** : Régression silencieuse — depuis P0.8 V2 (21/05) le webhook N8n `mayer-mailing` a été archivé mais le workflow scheduler N8n "Mayer - Scheduler Campagnes Auto" continuait d'appeler `mail_campaigns_due` + `mail_campaign_mark_run` (donc `last_run_at` avançait, masquant la panne) sans plus jamais déclencher d'envoi réel. ~12 jours sans bienvenue ni relances Devis/Contacté. Fix : nouvelle edge `mailing-scheduler` (verify_jwt:false, protégée par `MDH_CRON_SECRET`) planifiée par `pg_cron` toutes les 10 min (migration `20260602_mailing_scheduler_cron.sql`, secret lu depuis `vault.decrypted_secrets`). Pour chaque campagne due (cross-org via `mail_campaigns_due()`) : POST `mailing-send` mode bulk → `mark_run` UNIQUEMENT si HTTP 2xx (self-healing — un échec gateway laisse la campagne due). Body `{ dry_run: true }` supporté pour pré-vérification. App-level cross-org : 1 cron pour toutes les orgs, chaque campagne porte son `org_id`.
+**Proposition** : Refonte de la section "### Scheduler Campagnes Auto (workflow N8n générique)" du Module Mailing :
+1. **Remplacer** la liste actuelle (6 étapes N8n + référence `docs/n8n/MAILING_SCHEDULER_SETUP.md`) par une description de l'edge `mailing-scheduler` (cron 10 min pg_cron, MDH_CRON_SECRET, mark_run conditionnel sur HTTP 2xx, body dry_run).
+2. **Mettre à jour** la sous-section "### Campagne automatique — Workflow générique" qui mentionne "scheduler N8n Mayer - Scheduler Campagnes Auto" → pointer sur l'edge `mailing-scheduler`.
+3. **Marquer comme obsolète** `docs/n8n/MAILING_SCHEDULER_SETUP.md` (déprécier ou supprimer ?) — le workflow N8n scheduler reste à archiver côté N8n.
+4. **Ajouter dans "Edges déjà migrées"** (section Edge functions) : `mailing-scheduler` et préciser pattern self-healing (mark_run conditionnel).
+5. **Règle à formaliser** ? "Une edge cron qui orchestre un appel à une autre edge doit conditionner son `mark_done`/`commit` à la réussite HTTP de l'edge appelée, sinon une panne gateway peut consommer la fenêtre sans effet — vu sur scheduler N8n pré-fix qui appelait `mark_run` même quand l'envoi avait échoué." Pattern à étendre aux futurs crons app-level.
+---
+
+## [2026-06-02 13:21] Connecteur domaine Resend (onboarding multi-tenant `settings.resend`)
+**Statut** : PENDING
+**Commit** : 420289f12c576f05c1e40bf52a2015ac679601ed
+**Contexte** : Nouvelle edge `resend-domain-onboard` (verify_jwt:true, `requireOrgMembership(requiredRole: 'org_admin')`) + composant `ResendDomainSection.jsx` dans Settings → Organization → onglet Coordonnées. Architecture explicite app-level vs org-level : le moteur Resend (clé API) est app-level (1 compte partagé entre orgs cohabitantes), le domaine d'envoi est org-level (dérivé strictement de `settings.from_email`, pas un input libre — un admin ne peut pas enregistrer un domaine arbitraire dans le compte Resend partagé). Edge stateless = proxy mince vers l'API Domains Resend (région `eu-west-1` pour RGPD), actions `setup` / `status` / `verify`. Le frontend persiste le résultat dans `core.organizations.settings.resend` via `useOrgSettings().save()` (cache d'affichage uniquement). UI : statut (not_started / pending / verified / failed / temporary_failure), tableau DNS avec copier, bouton Configurer / Vérifier / Rafraîchir.
+**Proposition** : 3 endroits à enrichir dans CLAUDE.md :
+1. **Section "Module Mailing → Edge function `mailing-send`"** ou nouvelle sous-section "### Onboarding domaine Resend (multi-tenant)" : documenter que pour qu'une org envoie depuis `@<son-domaine>`, l'admin doit passer par Settings → Organization → Coordonnées → bloc "Domaine d'envoi (Resend)" qui appelle l'edge `resend-domain-onboard`. Préciser la dérivation stricte du domaine depuis `from_email` (pas d'input libre). Région EU. Statut persisté dans `settings.resend`.
+2. **Section "Module Settings → Organization"** : enrichir l'onglet "Coordonnées" — ajouter mention du `ResendDomainSection` (visible une fois `from_email` saisi+enregistré) et de l'edge sous-jacente.
+3. **Règle architecturale à formaliser ?** dans "Multi-tenant & sécurité" : "Pour toute intégration tierce app-level (1 compte partagé), un ressource org-level (domaine, identifiant…) doit être strictement dérivée d'un setting déjà validé par l'UI (ex: `from_email` → domaine Resend), jamais d'un input libre côté edge — sinon un admin d'org A pourrait enregistrer une ressource au nom d'org B dans le compte partagé." Pattern à reprendre pour de futurs onboardings tiers (Stripe ? Calendly ? Twilio ?).
+---
+
+## [2026-06-02 13:21] `mailing-send` passe en `verify_jwt:false` + gotcha clé service_role `sb_secret` (non-JWT)
+**Statut** : PENDING
+**Commit** : 420289f12c576f05c1e40bf52a2015ac679601ed
+**Contexte** : Le projet Supabase utilise un format de clé service_role `sb_secret` (non-JWT, format récent). Conséquence non-documentée : une edge `verify_jwt:true` ne peut PAS être appelée avec cette clé service_role via le gateway Supabase (le gateway rejette la clé qui n'a pas la forme JWT attendue). Bloque le pattern "edge orchestratrice cron → edge applicative en service_role" qui était l'intention initiale de P0.8 V2. Fix dans ce commit : `mailing-send` repasse en `verify_jwt:false` et fait son auth en interne (`requireSharedSecret(MDH_CRON_SECRET)` pour le scheduler cron OU JWT user pour le frontend). Le scheduler `mailing-scheduler` appelle `mailing-send` avec `Authorization: Bearer ${MDH_CRON_SECRET}` (pas la service_role JWT). Note explicite dans le message de commit : **le code prod de `mailing-send` (v11 — badge cron + log via vue publique `majordhome_mailing_logs`) n'est PAS resynchronisé dans le repo** — drift volontaire/temporaire ou à corriger ?
+**Proposition** : 3 ajouts à arbitrer :
+1. **Nouveau gotcha edge functions** dans la charte (section "Edge functions") : "Si la clé service_role du projet est en format `sb_secret` (non-JWT — format récent Supabase), elle ne peut PAS être utilisée pour appeler une edge `verify_jwt:true` via le gateway. Conséquence : tout appel inter-edges (orchestrateur cron → edge applicative) doit utiliser soit `verify_jwt:false` + auth interne via `MDH_CRON_SECRET`, soit un détour via PostgREST RPC service_role. Vérifier le format de la clé avant de planifier une archi `verify_jwt:true` cross-edge."
+2. **Mise à jour `mailing-send`** dans la liste "Edges déjà migrées vers le helper" et la doc "Edge function `mailing-send`" : passer la mention "`verify_jwt:true` (frontend) OU `service_role` (scheduler N8n)" → "`verify_jwt:false` — auth interne via `requireSharedSecret(MDH_CRON_SECRET)` (badge cron) OU validation JWT user en début de handler (frontend)". Le `config.toml` versionné est cohérent.
+3. **Drift repo/prod** : documenter quelque part (note transitoire dans Module Mailing ? mémoire dette technique ?) que la v11 de `mailing-send` déployée prod (badge cron + INSERT via vue publique) n'est PAS dans le repo — toute prochaine modification de `mailing-send` doit d'abord resynchroniser le source depuis prod via MCP `get_edge_function`, sinon écrasement silencieux. Sinon à acter et resynchroniser dans le repo au prochain touch.
+---
+
+## [2026-06-02 15:11] Nouveau helper `formatRelativeFR()` dans `src/lib/utils.js`
+**Statut** : PENDING
+**Commit** : a29d6f63aabb988f3b08838926c696e251289294
+**Contexte** : Ajout d'un helper `formatRelativeFR(dateString)` dans `src/lib/utils.js`. Convertit une date en formulation relative française via `Intl.RelativeTimeFormat` (« à l'instant », « dans 6 minutes », « il y a 2 heures », « demain », « il y a 3 jours »). Au-delà d'une semaine → délègue à `formatDateShortFR`. Renvoie `null` si date absente/invalide (caller décide du fallback). Consommé par `EditorTab.jsx` pour les lignes « Prochain envoi » / « Dernier envoi » des campagnes automatiques.
+**Proposition** : Ajouter 1 ligne dans la section **Conventions de Code → Composants → Utilitaires partagés (`src/lib/utils.js`)** de CLAUDE.md, à la suite des autres formatters de date :
+  - `formatRelativeFR` (→ « il y a 2 heures », « dans 3 jours », fallback `formatDateShortFR` au-delà d'une semaine ; renvoie `null` si invalide)
+---
+
+## [2026-06-03 01:08] Bloc A — Activation déduppée RDV ↔ carte (planning)
+**Statut** : PENDING
+**Commit** : fd7b671966903fe57ab657c5a1b11aba5d9028f3
+**Contexte** : Refonte de la prise de RDV pour ne plus créer de lead silencieux. Nouveau service `appointmentActivation.service.js` (`resolveCardForAppointment`) : routage par type vers la bonne carte (entretien/SAV → intervention via `ensureEntretienCard` idempotent ; Visite Technique → lead actif dédup par client, jamais de doublon ; installation → passthrough Kanban Chantier ; other → calendaire pur). Le seul prospect créé reste le walk-in inconnu (planning sans client ni lead, type commercial). EventModal ajoute la prop `attachContext` (rattachement direct depuis un kanban avec `lockedType`). Cycle de vie carte ajouté dans `appointments.service.js` : `syncCardStateOnCreate` avance forward-only (entretien → planifie, VT lead → RDV planifié si display_order<3, installation → planification chantier si en amont) ; `syncCardStateOnDelete`/`recomputeEntretienWorkflow` reflue l’entretien en a_planifier quand le dernier RDV actif disparaît. Types filtrés par point d’entrée (planning/fiche : Visite Technique / Entretien / SAV / Autre — pas d’Installation legacy).
+**Proposition** : Ajouter une nouvelle section `## Module Planning — Activation RDV ↔ carte (Bloc A)` dans CLAUDE.md (entre Module Settings et Module Voice par exemple) qui documente :
+- Le service `appointmentActivation.service.js` comme point d’entrée unique de l’activation, et la règle « jamais de lead fantôme : 1 carte active par (client, type) sinon réutilisation »
+- Le helper `ensureEntretienCard` (`entretiens.service.js`) — matérialise l’intervention SANS appointment, idempotent sur (client, type, parent_id IS NULL, workflow_status non terminal)
+- Le cycle de vie forward-only dans `appointments.service.js` (syncCreate avance, syncDelete reflue uniquement l’entretien ; pipeline/chantier non rétrogradés)
+- La prop `attachContext = { leadId?, interventionId?, lockedType? }` sur EventModal pour les entrées kanban (type figé, carte pré-liée)
+- Les types autorisés selon l’entrée : kanban → lockedType ; planning/fiche → rdv_technical + maintenance + service + other (Installation jamais proposée hors Kanban Chantier)
+- Le seul vrai prospect créé depuis le Planning = walk-in inconnu (ni client ni lead, type commercial) → source `bouche-à-oreille`, status `RDV planifié`
+
+Question à trancher : faut-il aussi extraire les magic UUIDs (`RDV_PLANIFIE_STATUS_ID`, `STATUS_GAGNE`, `STATUS_PERDU`, `STATUS_DISPLAY_ORDER`, `CHANTIER_ORDER`) dans un module partagé `src/lib/leadStatus.js` ? Ils sont maintenant dupliqués entre `appointmentActivation.service.js`, `appointments.service.js` et `EventModal.jsx` — risque de drift si on renomme/réordonne le pipeline.
+---
+
+## [2026-06-03 01:14] Bloc A (suite) — Puce date des cartes Kanban pilotée par le RDV dérivé
+**Statut** : PENDING
+**Commit** : 19b0f2a0da29c87be9a1b0f75cca5169d8b5a7c4
+**Contexte** : Convention UI partagée sur les 3 cartes Kanban (LeadCard, ChantierCard, EntretienSAVCard) : la puce date à gauche est désormais pilotée par les colonnes dérivées `has_active_rdv` / `next_rdv_date` exposées par les 3 vues publiques (`majordhome_kanban_cards`, `majordhome_chantiers`, `majordhome_entretien_sav`) — remontées au front via `select('*')`. Règle commune : si RDV actif → date du RDV ; sinon → fallback date métier (won_date / scheduled_date / created_at / contextuelle). Sur les colonnes qui REQUIÈRENT un RDV (`rdv_planifie` pour les leads, `planification` pour les chantiers), absence de RDV actif → marqueur ambre `CalendarClock` + tooltip « À replanifier » (au lieu d'une date vide ou trompeuse). Suite directe du commit fd7b671 (cycle de vie carte forward-only).
+**Proposition** : 2 ajouts à arbitrer (idéalement à fusionner avec la section Bloc A déjà proposée le 2026-06-03 01:08) :
+1. **Côté DB / Vues publiques** : ajouter une mention dans la section "### Vues publiques principales" — `majordhome_kanban_cards`, `majordhome_chantiers`, `majordhome_entretien_sav` exposent maintenant `has_active_rdv BOOLEAN` + `next_rdv_date DATE` (date du 1ᵉʳ RDV actif rattaché à la carte). Source de vérité pour l'affichage de la puce date des cartes Kanban, à préférer à `won_date`/`scheduled_date` dès que disponible.
+2. **Convention UI Kanban** dans "Conventions de Code → Composants" ou nouvelle sous-section "### Puce date Kanban (convention partagée)" : décrire la règle commune `RDV actif > date métier` + marqueur ambre `CalendarClock` "À replanifier" sur les colonnes RDV-required (`rdv_planifie` pour leads, `planification` pour chantiers). Si une nouvelle carte Kanban est ajoutée, elle DOIT suivre la même convention pour cohérence visuelle. Les colonnes RDV-required sont définies par le `column_key` (`card?.column_key === 'rdv_planifie'` pour leads, `chantier.chantier_status === 'planification'` pour chantiers).
+---
+
+## [2026-06-03 13:11] Module Appels sortants (cerveau, V1 entretien) — plan d'implémentation
+**Statut** : PENDING
+**Commit** : e702edbc07bb40868b8f20478f9a15e033d5c6b6
+**Contexte** : Nouveau plan `docs/superpowers/plans/2026-06-03-campagne-appels-sortants-moteur.md` (~1040 lignes, V1 entretien only) pour un moteur d'appels sortants séquentiel : bouton "Lancer l'appel" sur colonne `a_planifier` du kanban entretien → file via `CallProvider` abstrait (V1 = `MockCallProvider`, V2 = téléphonie réelle Vapi/Telnyx) → filtre non-aboutis → screen-pop quand humain décroche → 3 gestes (RDV / refus / à rappeler). Architecture prévue : tables `majordhome.call_sessions` + `majordhome.call_attempts`, vues publiques (dont `majordhome_call_attempt_stats` dérivée), RPCs `call_session_start` / `call_attempt_record` / `call_get_card_context`, service `callCampaigns.service.js`, hook `useCallSession`, dossier `src/apps/artisan/components/appels/`, cache keys `callSessionKeys` / `callAttemptKeys`, tag 📞 sur les cartes entretien. Réutilise les flux existants `appointmentsService.createAppointment` (RDV) et `entretiensService.recordVisit({status:'cancelled'})` (refus). Garde-fou plage horaire 9h-20h hors dimanche. **Aucun code livré dans ce commit — uniquement le plan.**
+**Proposition** : Ajouter une mini-section "Module Appels sortants (à implémenter)" dans CLAUDE.md sur le modèle du marqueur "Bloc B" déjà présent dans le Module Planning, OU attendre que la Phase 1 (DB) soit livrée avant d'introduire la section. Texte proposé si on documente dès maintenant :
+
+> ### Module Appels sortants (à implémenter)
+> Moteur de campagne d'appels sortants depuis le kanban entretien colonne `a_planifier` : file séquentielle 1-à-1 via `CallProvider` abstrait (V1 `MockCallProvider`, V2 téléphonie réelle), screen-pop quand humain décroche, 3 gestes (RDV / refus / à rappeler) qui réutilisent `appointmentsService.createAppointment` et `entretiensService.recordVisit({status:'cancelled'})`. Tables `call_sessions` + `call_attempts` + vue dérivée `majordhome_call_attempt_stats` (count + last_call_at + last_call_result) → tag 📞 sur cartes entretien. Plan : `docs/superpowers/plans/2026-06-03-campagne-appels-sortants-moteur.md`. V1 entretien uniquement (pipeline + audio réel = extensions).
+---
+
+## [2026-06-03 13:28] Module Appels sortants — Phase 1 livrée (DB socle, niveau 0.5)
+**Statut** : PENDING
+**Commit** : 6a7ceeedd2631cebe46e837d77a7461d2b5253d4
+**Contexte** : Suite directe de la PENDING précédente (13:11 plan d'implémentation). Migration `supabase/migrations/20260603_call_campaign_brain.sql` matérialise Phase 1 du plan : (1) tables `majordhome.call_sessions(id, org_id, kanban, params jsonb, status, started_by, started_at, ended_at)` + `majordhome.call_attempts(id, org_id, session_id, intervention_id, lead_id, phone_dialed, result, note, attempt_at, created_by, created_at)` — RLS scoped `org_id IN (org_members)` + GRANT SELECT à `service_role` (convention multi-tenant respectée). Contrainte CHECK XOR : exactement 1 de `intervention_id`/`lead_id` non-null. Allowlist `result` figée à 7 valeurs (`no_answer, voicemail, transferred_answered, transfer_missed, rdv_booked, refused, callback`). (2) Vues publiques `majordhome_call_sessions`, `majordhome_call_attempts`, `majordhome_call_attempt_stats` (vue dérivée avec `call_count` + `last_call_at` + `last_call_result` via array_agg ordered) — toutes en `security_invoker=true`. (3) RPCs `call_session_start(org_id, kanban, params)`, `call_attempt_record(org_id, session_id, intervention_id, lead_id, result, phone, note)`, `call_get_card_context(intervention_id)` — toutes SECURITY DEFINER + `search_path = majordhome, public, core` lock + REVOKE PUBLIC,anon + GRANT authenticated + check `auth.uid() ∈ core.organization_members`. Aucun caller frontend dans ce commit (DB-only). Indexes sur `org_id`, `intervention_id`, `lead_id`, `session_id` côté `call_attempts`.
+**Proposition** : 3 axes à arbitrer (peut être fusionné avec la PENDING 13:11 lors de l'intégration finale) :
+
+1. **Mettre à jour la mini-section "Module Appels sortants (à implémenter)"** proposée dans la PENDING 13:11 pour marquer "Phase 1 DB livrée (cerveau, niveau 0.5)" — texte type :
+> ### Module Appels sortants (Phase 1 DB livrée — cerveau, niveau 0.5)
+> Moteur de campagne d'appels sortants depuis le kanban entretien colonne `a_planifier` : file séquentielle 1-à-1 via `CallProvider` abstrait (V1 `MockCallProvider`, V2 téléphonie réelle), screen-pop quand humain décroche, 3 gestes (RDV / refus / à rappeler) qui réutilisent `appointmentsService.createAppointment` et `entretiensService.recordVisit({status:'cancelled'})`. **DB livrée (2026-06-03)** : tables `majordhome.call_sessions` + `majordhome.call_attempts` (CHECK XOR intervention_id/lead_id, allowlist 7 résultats), vues `majordhome_call_sessions/_attempts/_attempt_stats` (stats = count + last_at + last_result par carte), RPCs `call_session_start` / `call_attempt_record` / `call_get_card_context`. Reste à implémenter : service `callCampaigns.service.js`, hook `useCallSession`, composants `src/apps/artisan/components/appels/`, cache keys, tag 📞 sur cartes entretien. Plan : `docs/superpowers/plans/2026-06-03-campagne-appels-sortants-moteur.md`.
+
+2. **Ajouter dans `### Vues publiques principales`** (Module DB Supabase) :
+> `majordhome_call_sessions`, `majordhome_call_attempts`, `majordhome_call_attempt_stats` → moteur d'appels sortants (Phase 1, 2026-06-03). `_attempt_stats` dérive `call_count` + `last_call_at` + `last_call_result` par carte (intervention_id ou lead_id), à JOIN sur les vues kanban pour afficher le tag 📞.
+
+3. **Aucune nouvelle convention de sécurité à formaliser** — la migration applique strictement la charte multi-tenant existante (RLS org_id, vues security_invoker, GRANT service_role SELECT, RPCs SECDEF + search_path + REVOKE anon + check membership). À noter au moment de l'intégration finale pour rassurer un futur Claude que rien d'exceptionnel n'a été introduit.
+
+Question subsidiaire : faut-il documenter explicitement le pattern "vue de stats dérivée via `(ARRAY_AGG(col ORDER BY ts DESC))[1]`" comme convention réutilisable (alternative à un LATERAL JOIN ou DISTINCT ON) ? Vu une seule fois pour l'instant.
+---
+
+
+## [2026-06-03 13:35] Module Appels sortants — Phase 2 livrée (cacheKeys + service + hook useCallSession)
+**Statut** : PENDING
+**Commit** : 53b0dc84127bc4bade09e8b9988ca5185d603fdf
+**Contexte** : Suite directe des PENDING 13:11 (plan) et 13:28 (Phase 1 DB). Ce commit ajoute la couche frontend de pilotage : (1) `src/shared/hooks/cacheKeys.js` — familles `callSessionKeys` (`all(orgId)`, `detail(orgId, id)`) et `callAttemptKeys` (`all(orgId)`, `stats(orgId)`, `byIntervention(orgId, interventionId)`) — conformes convention P0.11 (orgId 1ᵉʳ param). (2) `src/shared/services/callCampaigns.service.js` (45 LOC) — wrappers `startSession({orgId, kanban='entretien', params})` / `recordAttempt({orgId, sessionId, interventionId?, leadId?, result, phone?, note?})` / `getCardContext(interventionId)` (RPCs DB Phase 1) + `getStats(orgId)` (lecture vue publique `majordhome_call_attempt_stats`). Pattern `withErrorHandling` + retour `{data, error}` respecté. (3) `src/shared/hooks/useCallSession.js` (106 LOC) — state machine `idle|running|paused|popped|done` + compteurs `{dialed, no_answer, voicemail, transfers}` + API `{start, pause, resume, stop, acceptTransfer, closeCurrent}`. Câble un `MockCallProvider` (commit précédent `c270f44`) via events `dialing|no_answer|voicemail|human_answered|transfer_missed|session_done` → log via `callCampaignsService.recordAttempt` + invalide `callAttemptKeys.stats(orgId)` à la clôture. Garde-fou plage horaire via `isWithinCallWindow(params)` du helper `callWindow.js`. Aucun composant UI / route / câblage Kanban dans ce commit — le hook est prêt à être consommé par le futur écran "Lancer l'appel". **Mémo gotcha** : `findContact` lookup synchrone sur `contactsRef.current` (mis à jour à `start()`) — pas de re-render à chaque appel ; le `MockCallProvider` émet les events avec `contactId` seulement, c'est au hook de re-résoudre l'objet contact complet.
+**Proposition** : 2 axes (fusionnables avec les PENDING 13:11 + 13:28 lors de l'intégration finale) :
+
+1. **Mettre à jour la mini-section "Module Appels sortants"** (proposée en 13:11/13:28) pour marquer Phase 2 livrée — texte type :
+> ### Module Appels sortants (Phase 1 DB + Phase 2 frontend — cerveau livré, UI à câbler)
+> Moteur de campagne d'appels sortants depuis le kanban entretien colonne `a_planifier` : file séquentielle 1-à-1 via `CallProvider` abstrait (V1 `MockCallProvider`, V2 téléphonie réelle), screen-pop quand humain décroche, 3 gestes (RDV / refus / à rappeler). Réutilise `appointmentsService.createAppointment` (RDV) et `entretiensService.recordVisit({status:'cancelled'})` (refus). Garde-fou plage horaire via `isWithinCallWindow` (`callWindow.js`).
+> **DB (2026-06-03)** : tables `majordhome.call_sessions` + `call_attempts` (CHECK XOR intervention_id/lead_id, allowlist 7 résultats), vues `majordhome_call_sessions/_attempts/_attempt_stats`, RPCs `call_session_start` / `call_attempt_record` / `call_get_card_context`.
+> **Frontend (2026-06-03)** : service `callCampaigns.service.js` (wrappers RPC + lecture stats), hook `useCallSession({orgId})` (state machine `idle|running|paused|popped|done` + compteurs + API `start/pause/resume/stop/acceptTransfer/closeCurrent`), cache keys `callSessionKeys` / `callAttemptKeys` (convention P0.11).
+> **Reste à câbler** : composants `src/apps/artisan/components/appels/` (écran session + screen-pop), bouton "Lancer l'appel" sur kanban entretien colonne `a_planifier`, tag 📞 sur cartes entretien (JOIN `majordhome_call_attempt_stats` dans `majordhome_entretien_sav`).
+> Plan complet : `docs/superpowers/plans/2026-06-03-campagne-appels-sortants-moteur.md`.
+
+2. **Convention à confirmer** : `useCallSession` est livré dans `src/shared/hooks/` (donc transverse), alors que les composants `CallProvider` / `MockCallProvider` / `callWindow.js` vivent dans `src/apps/artisan/components/appels/` (app-specific). C'est cohérent avec le pattern existant (hooks shared, UI app-scoped) mais à acter explicitement si on veut éventuellement remonter `CallProvider` dans `src/shared/` quand un 2ᵉ app voudra l'utiliser. Pas urgent — la limite shared/app est lisible aujourd'hui.
+---
+
+## [2026-06-03 13:39] Module Appels sortants — Phase 3 livrée (UI : PhoningPanel + PhoningScreenPop)
+**Statut** : PENDING
+**Commit** : cbc362293ac67448b063772eff47a8dfcecdd4fe
+**Contexte** : Suite directe des PENDING 13:11 (plan), 13:28 (Phase 1 DB) et 13:35 (Phase 2 frontend). Ce commit livre la couche UI du moteur d'appels : (1) `src/apps/artisan/components/appels/PhoningPanel.jsx` (98 LOC) — modale plein écran qui consomme `useCallSession({orgId})`, affiche 4 compteurs temps réel (Appelés / Non décrochés / Répondeurs / Transferts), bouton Démarrer/Pause/Reprendre selon `status`, et mount conditionnel de `PhoningScreenPop` quand `status==='popped'`. Toast `"Hors plage d'appel autorisée (9h-20h, hors dimanche)"` si `session.start()` renvoie `error==='hors_plage_horaire'` — révèle les bornes par défaut du garde-fou `callWindow.js`. (2) `src/apps/artisan/components/appels/PhoningScreenPop.jsx` (172 LOC) — screen-pop affiché à l'humain au moment du transfert : appelle `onAccept()` au mount (marque la prise du transfert), charge le contexte carte via `callCampaignsService.getCardContext(contact.id)`, expose 3 boutons mutuellement exclusifs : (a) **Caler le RDV** → `appointmentsService.createAppointment({appointment_type:'maintenance', intervention_id: contact.id, client_id: ctx.client_id, scheduled_date, scheduled_start, status:'scheduled', priority:'normal'})` puis `onClosed({result:'rdv_booked'})` ; (b) **Refusé client** → `entretiensService.recordVisit({contractId: ctx.contract_id, year: ctx.visit_year, visitDate: null, status:'cancelled', notes, userId})` puis `onClosed({result:'refused', note})` (= passe l'entretien à `cancelled` directement, pas de carte fantôme dans le kanban) ; (c) **À rappeler** → `onClosed({result:'callback'})`, pas d'effet métier (le rappel est piloté côté `useCallSession` via la file). Aucun branchement Kanban / route / bouton "Lancer l'appel" dans ce commit — `PhoningPanel` attend un parent qui lui passe `contacts` et `onClose`.
+**Proposition** : 2 axes (fusionnables avec les PENDING 13:11 / 13:28 / 13:35 lors de l'intégration finale) :
+
+1. **Mettre à jour la mini-section "Module Appels sortants"** (proposée en 13:11/13:28/13:35) pour marquer Phase 3 livrée — texte type :
+> ### Module Appels sortants (Phases 1-3 livrées — DB + frontend + UI, câblage Kanban à faire)
+> Moteur de campagne d'appels sortants depuis le kanban entretien colonne `a_planifier` : file séquentielle 1-à-1 via `CallProvider` abstrait (V1 `MockCallProvider`, V2 téléphonie réelle), screen-pop quand humain décroche, 3 gestes (RDV / refus / à rappeler). Réutilise `appointmentsService.createAppointment({appointment_type:'maintenance'})` (RDV) et `entretiensService.recordVisit({status:'cancelled'})` (refus = passe directement l'entretien en cancelled, pas de carte fantôme). Garde-fou plage horaire via `isWithinCallWindow` (`callWindow.js`) — défaut 9h-20h hors dimanche.
+> **DB (2026-06-03)** : tables `majordhome.call_sessions` + `call_attempts` (CHECK XOR intervention_id/lead_id, allowlist 7 résultats), vues `majordhome_call_sessions/_attempts/_attempt_stats`, RPCs `call_session_start` / `call_attempt_record` / `call_get_card_context`.
+> **Frontend (2026-06-03)** : service `callCampaigns.service.js`, hook `useCallSession({orgId})` (state machine `idle|running|paused|popped|done` + compteurs + API `start/pause/resume/stop/acceptTransfer/closeCurrent`), cache keys `callSessionKeys` / `callAttemptKeys`.
+> **UI (2026-06-03)** : `PhoningPanel.jsx` (98 LOC, modale orchestrateur — compteurs temps réel + boutons Démarrer/Pause/Reprendre + mount conditionnel screen-pop) ; `PhoningScreenPop.jsx` (172 LOC, screen-pop transfert — 3 boutons RDV/refus/à rappeler, charge contexte carte via `getCardContext`).
+> **Reste à câbler** : bouton "Lancer l'appel" sur kanban entretien colonne `a_planifier` (mount `PhoningPanel`), tag 📞 sur cartes entretien (JOIN `majordhome_call_attempt_stats` dans `majordhome_entretien_sav`).
+> Plan complet : `docs/superpowers/plans/2026-06-03-campagne-appels-sortants-moteur.md`.
+
+2. **Gotcha à éventuellement documenter** : `PhoningScreenPop` appelle `onAccept()` dans `useEffect` au mount avec déps `[contact.id]` + `eslint-disable-next-line react-hooks/exhaustive-deps` sur `onAccept`. Convention assumée : `onAccept` est un callback stable (issu de `useCallback` côté `useCallSession`), donc pas besoin de le mettre en dépendance. Si un futur dev oublie le `useCallback` et passe une fonction inline, le screen-pop appellera `onAccept` à chaque render → double comptage transferts. À surveiller mais probablement trop spécifique pour CLAUDE.md.
+---
+
+
+## [2026-06-03 13:42] Bloc B stage 2 — SchedulingAssistant livré (flows entretien/SAV)
+**Statut** : PENDING
+**Commit** : 0fe3a29d1a9068adbdc1d60b1d4d46e552a3303d
+**Contexte** : Création d'un nouveau sous-dossier `src/apps/artisan/components/planning/scheduling/` avec 3 composants : `SchedulingAssistant.jsx` (312 LOC, orchestrateur multi-créneau), `DayResourceGrid.jsx` (422 LOC, vue jour × colonnes par membre, drag pour poser un créneau, conflits ambre non bloquants, off-hours grisés via `memberWorkingHoursForDate`), `SlotDraftList.jsx` (138 LOC, liste empilée des créneaux en construction avec édition tech par ligne). `SchedulingAssistant` remplace `SchedulingPanel` dans les 3 callers entretien : `EntretienSAVModal.jsx`, `EntretienSAVKanban.jsx`, `SchedulingTransitionModal.jsx`. Côté service : les 3 callers basculent de `appointmentsService.createAppointment(...)` à `appointmentsService.createAppointmentBatch(slots, ctx)` (méthode supposée déjà existante, non touchée par ce diff) qui crée 1 appointment par créneau avec le même contexte partagé. `appointment_type` n'est plus par-slot mais imposé par le caller via le contexte. La modale entretien/SAV élargit son `max-w-lg` → `max-w-2xl` quand `showScheduling` pour accueillir les colonnes par tech. Pipeline et chantier installation pas encore migrés vers `SchedulingAssistant`.
+**Proposition** : Mettre à jour la section **Module Planning** du CLAUDE.md :
+1. Section "Reste à faire" : le Bloc B est partiellement livré (entretien/SAV) — préciser que pipeline (LeadModal) et chantier installation utilisent encore `SchedulingPanel`.
+2. Ajouter une nouvelle sous-section **Assistant créneaux (Bloc B)** documentant : nouveau dossier `planning/scheduling/`, contrat `slots[]` remonté par `onConfirm` (multi-créneau via `multi=true`), pattern "1 créneau = 1 appointment, multi-créneau = N appointments via `createAppointmentBatch`", `appointment_type` imposé par le caller (pas par-slot), conflits ambre non bloquants.
+3. Mettre à jour l'architecture (ligne `planning/`) pour mentionner le sous-dossier `scheduling/`.
+OU question : faut-il déjà documenter cette livraison partielle, ou attendre que les 3 flows (entretien, pipeline, installation) soient tous migrés vers `SchedulingAssistant` avant de toucher le CLAUDE.md ?
+---
+
+## [2026-06-03 14:01] Module Appels sortants — revue finale RPCs (gotcha COALESCE org via client/contrat)
+**Statut** : PENDING
+**Commit** : 3820fc8b764135f52bd0b98de271d814b738eefe
+**Contexte** : Suite directe des PENDING 13:11 / 13:28 / 13:35 / 13:39 (Phases 1-3 du Module Appels sortants). Migration `20260603_call_campaign_brain_review_fixes.sql` (84 LOC) issue de la revue finale du moteur — 2 fixes ciblés sur les RPCs livrées en Phase 1. (1) Fix #2 `call_get_card_context(intervention_id)` : passe en `LEFT JOIN clients` (une intervention sans client ne doit PAS lever `not_authorized`) et dérive `v_org` via `COALESCE(c.org_id, ct.org_id)` (org accessible via client OU contrat). `contract_id` côté résultat utilise `COALESCE(i.contract_id, ct_active.id)` (rattache un contrat actif si l'intervention n'a pas de contract_id direct). (2) Fix #7 `call_attempt_record(...)` : ajoute une vérification que `p_intervention_id` ET `p_lead_id` appartiennent bien à `p_org_id` (défense en profondeur multi-tenant) — pour l'intervention via le même `COALESCE(c.org_id, ct.org_id)` pattern, pour le lead via `l.org_id = p_org_id` direct. Raises distincts `not_authorized` / `intervention_not_in_org` / `lead_not_in_org` / `not_a_member` (debug-friendly). REVOKE PUBLIC,anon + GRANT authenticated réappliqués (CREATE OR REPLACE écrase les grants). Spec : `docs/superpowers/specs/2026-06-03-campagne-appels-sortants-moteur-design.md`.
+**Proposition** : 2 axes à arbitrer (potentiellement fusionnables avec les 4 PENDING précédents du module lors de l'intégration finale) :
+
+1. **Mettre à jour la mini-section "Module Appels sortants"** (proposée en 13:11/13:28/13:35/13:39) pour mentionner la revue finale dans le bloc DB :
+> **DB (2026-06-03)** : tables `majordhome.call_sessions` + `call_attempts` (CHECK XOR intervention_id/lead_id, allowlist 7 résultats), vues `majordhome_call_sessions/_attempts/_attempt_stats`, RPCs `call_session_start` / `call_attempt_record` (vérifie ownership intervention/lead × org en défense en profondeur) / `call_get_card_context` (org dérivée via `COALESCE(client.org_id, contract.org_id)` car une intervention peut être rattachée à un contrat sans client). Revue finale : migration `20260603_call_campaign_brain_review_fixes.sql`.
+
+2. **Gotcha transversal à formaliser dans Gotchas DB** (utile pour toute future RPC qui touche `interventions`) :
+> **Intervention org = client OU contrat** : `majordhome.interventions` peut être rattachée à un client (`client_id`) OU à un contrat (`contract_id`) sans client direct. Toute RPC SECURITY DEFINER qui dérive `org_id` depuis une intervention doit utiliser `COALESCE(c.org_id, ct.org_id)` via `LEFT JOIN clients c ON c.id = i.client_id LEFT JOIN contracts ct ON ct.id = i.contract_id` — sinon faux positif `not_authorized` sur les interventions orphelines de client mais liées à un contrat (ou vice-versa). Pattern utilisé dans `call_get_card_context` et `call_attempt_record` (revue finale 2026-06-03).
+   OU question : ce gotcha mérite-t-il un bullet dédié dans Gotchas DB, ou est-ce suffisamment niche pour rester dans la doc du module Appels sortants uniquement ?
+---
+
+## [2026-06-03 14:02] Gotcha vue majordhome_appointments = miroir simple auto-updatable
+**Statut** : PENDING
+**Commit** : b63f5c15545cdc5f612012e33669b7c36ec1c860
+**Contexte** : Hotfix Bloc B — la version étendue de la vue `majordhome_appointments` (LATERAL + window function pour pré-agréger `technician_ids` / `technician_names`) a cassé les INSERT/UPDATE/DELETE PostgREST (`is_insertable_into=NO`). Migration `bloc_b_revert_appointments_view_to_updatable_mirror` revert en miroir simple. Côté service, `appointmentsService.getTeamDayAvailability` agrège désormais les techs via une 2ᵉ requête sur `majordhome_appointment_technicians` + merge JS — même pattern que `useAppointments` / `getAppointmentById`.
+**Proposition** : Ajouter un gotcha dans la section "Gotchas DB" du CLAUDE.md :
+
+- **Vue `majordhome_appointments` = miroir simple auto-updatable** : ne JAMAIS l'étendre en LATERAL+window (ex. pré-agréger `technician_ids`/`technician_names`) — la vue perd `is_insertable_into=YES` et les INSERT/UPDATE/DELETE via PostgREST cassent. Pour exposer la relation N:N techniciens, faire une 2ᵉ requête côté service sur `majordhome_appointment_technicians` puis merger en mémoire (pattern utilisé par `appointmentsService.getTeamDayAvailability`, `useAppointments`, `getAppointmentById`). Régression vécue lors du Bloc B (hotfix 2026-06-03).
+   OU question : cette règle vaut-elle pour toute vue `majordhome_*` qu'on voudrait garder écrivable (miroir simple = updatable, agrégat/LATERAL = read-only) ? Si oui, formuler le gotcha en générique plutôt qu'appointments-spécifique.
+---
+
+## [2026-06-04 21:54] Bloc B stage 4 — convergence chantier → appointments installation
+**Statut** : PENDING
+**Commit** : 2d189a2289d728289dd6a0d55fdbb72f08d23e78
+**Contexte** : Suite du Bloc B (stages 1-3 déjà PENDING). Les jours d'installation d'un chantier ne sont plus des `interventions enfants` (`parent_id` + `intervention_slots`) mais des `appointments` natifs de type `installation` avec `lead_id=chantier.id` (cf. table de mapping types→work item du CLAUDE.md). 4 changements de comportement : (1) `ChantierModal.jsx` retire la création d'« intervention parent » + branche `useChantierAppointments` + ouvre `SchedulingAssistant` (multi-jours, techniciens) → `appointmentsService.createAppointmentBatch(slots, { appointment_type:'installation', lead_id: chantier.id, ... })`. (2) `ChantierInterventionSection.jsx` passe d'un éditeur de slots inline à une liste read-only des appointments (date / heure / techs / `J X/N` via `chantier_day_index`/`chantier_total_days`) + bouton « Planifier l'installation » + suppression d'un jour via `appointmentsService.deleteAppointment`. (3) `ChantierCard.jsx` réactive l'icône ambre `CalendarClock` « à replanifier » quand `chantier_status='planification' && !has_active_rdv` (le CLAUDE.md disait explicitement « ambre désactivé tant qu'il n'existe pas de flux de planif installation depuis le kanban Chantier » — c'est désormais le cas). (4) `useAppointments.js` retire le merge `chantierSlots` (les installs remontent nativement comme appointments) → suppression de la 2ᵉ requête `chantierSlotsService.getChantierSlots`. Décision produit explicite (commit message) : pas de migration des 5 slots historiques — ils mourront avec la vue `intervention_slots` au stage 5. Services orphelins après ce commit : `chantierSlots.service.js`, `chantierSlotKeys` (cacheKeys), `interventionsService.getChantierInterventionByLeadId`, `useInterventionSlots`, `useChantierMutations.createChantierIntervention/createSlot/deleteSlot` → à nettoyer au stage 5.
+**Proposition** : Mettre à jour la section **Module Planning / Prise de RDV ↔ Kanban** du CLAUDE.md sur 3 points (potentiellement fusionnable avec les PENDING du Bloc B stages 2-3) :
+
+1. **Sous-section « Cartes & kanban »** — remplacer la phrase :
+   > « **Chantier : ambre désactivé** (pas encore de flux de planif installation depuis le kanban → faux positif sinon ; réactiver quand le flux existera). »
+   par :
+   > « Chantier : icône ambre `CalendarClock` si `chantier_status='planification'` sans RDV `installation` actif (`!has_active_rdv`) — réactivé au stage 4 du Bloc B avec le flux de planif depuis `ChantierModal`. »
+
+2. **Sous-section « Gotcha & reste à faire »** — retirer le 1ᵉʳ point « flux de planification installation depuis le kanban Chantier » (livré), et clarifier le mapping `installation` :
+   > Stage 4 (livré 2026-06-04) : les jours d'installation sont des `appointments` `installation` natifs avec `lead_id=chantier.id`, plus de slots `intervention_slots` ni d'« intervention parent ». `ChantierModal` ouvre `SchedulingAssistant` (multi-jours, techniciens) → `createAppointmentBatch` ; `useAppointments` ne merge plus les chantier-slots ; `ChantierCard` réactive l'ambre « à replanifier ».
+   > **Reste stage 5** : suppression des services orphelins (`chantierSlots.service.js`, `chantierSlotKeys`, `useInterventionSlots`, `getChantierInterventionByLeadId`, mutations `createChantierIntervention/createSlot/deleteSlot` dans `useChantierMutations`) + drop de la vue `intervention_slots`. Les 5 slots historiques ne seront pas migrés (décision Eric : repartir propre).
+
+3. **Bandeau d'en-tête** — ajouter dans la MàJ datée :
+   > **MàJ 2026-06-04** : Bloc B stage 4 — convergence chantier → appointments `installation`. Plus de `intervention_slots` (les jours d'install sont des appointments natifs, `lead_id=chantier`). `ChantierModal` planifie via `SchedulingAssistant` + `createAppointmentBatch`. Ambre « à replanifier » réactivé sur les chantiers en `planification` sans RDV actif. Reste stage 5 = nettoyage des services orphelins.
+
+OU question : faut-il déjà documenter le stage 4 ou attendre le stage 5 (nettoyage des services orphelins) pour faire une seule mise à jour cohérente de la section Module Planning ?
+---
+
+## [2026-06-05 00:41] Prix forcé par ligne sur contrat d'entretien (override par équipement, sans migration)
+**Statut** : RESOLU (intégré dans CLAUDE.md le 2026-06-05 — section « Module Contrats » → sous-section « Forçage de prix par ligne »)
+**Commit** : (working tree, non commité)
+**Contexte** : Refonte du forçage de prix sur les contrats d'entretien. Avant : un seul montant global forçable par contrat (`contracts.amount_forced` + `contracts.amount`), avec redistribution calculée à l'affichage (helper `buildContractPresentation`) pour que la somme des lignes retombe sur le total — incohérent en cas de forçage à la hausse (lignes grille < total, écart fantôme). Nouveau modèle : forçage **par ligne d'équipement**, l'admin saisit un prix manuel par équipement dans `ContractPricingSection`. Le prix forcé substitue le prix grille de la ligne ; la dégressivité et le reste du mécanisme (`sous-total → dégressivité → total`) restent appliqués en aval. L'ancien input "Forcer la valeur" global est retiré de l'UI. Les 33 contrats legacy `amount_forced=true` sont préservés jusqu'à ce qu'on touche une ligne (bascule auto vers le calcul, `amount_forced → false`).
+
+**Stockage (clé, non-évident — pas de migration)** : le prix forcé par ligne est rangé dans la table existante `majordhome.contract_pricing_items` via la convention **« une ligne avec `equipment_id` NON NULL = prix forcé volontaire de cet équipement »**. Les lignes `equipment_id` NULL (88 en prod) sont des snapshots de création, ignorés → aucune régression. Service : `getContractLineOverrides` (SELECT equipment_id, line_total WHERE contract_id=X AND equipment_id IS NOT NULL → map) / `setContractLineOverride` (delete ciblé + insert) / `clearContractLineOverride`. Hook `useContractLineOverrides`. Cache key `pricingKeys.contractOverrides`.
+
+**Le forçage est lié au CLIENT/CONTRAT, ce n'est PAS un cas général** : le prix forcé est scopé par `contract_id` (1 contrat = 1 client, relation 1:1) **+** `equipment_id`. Forcer la chaudière d'un client n'affecte QUE son contrat — jamais la grille tarifaire (`pricing_rates`, par zone × type, partagée par toute l'org), jamais un autre client. La grille reste le cas général/par défaut ; le forçage par ligne est une exception contractuelle ponctuelle.
+
+**Proposition** : Ajouter au CLAUDE.md (section "Module Contrats" ou "Module Tarification") :
+
+### Forçage de prix par ligne (contrats d'entretien)
+- Le prix d'un équipement dans un contrat peut être **forcé manuellement par ligne** (admin, dans `ContractPricingSection`). Sans migration : stocké dans `majordhome.contract_pricing_items` via la convention **`equipment_id` NON NULL = prix forcé** (lignes `equipment_id` NULL = snapshots de création, ignorés). Service `getContractLineOverrides`/`setContractLineOverride`/`clearContractLineOverride` ; hook `useContractLineOverrides` ; cache key `pricingKeys.contractOverrides`.
+- **Scope = contrat (donc client), jamais global** : le forçage porte sur `(contract_id, equipment_id)`. Il ne touche JAMAIS la grille tarifaire `pricing_rates` (cas général par zone × type, partagée par l'org) ni les autres clients. La grille = défaut ; le forçage = exception contractuelle ponctuelle.
+- Le prix forcé **substitue le prix grille de la ligne**, puis la dégressivité s'applique normalement sur le sous-total (`calculateContractTotal`). `contracts.amount` se réaligne via l'auto-sync de `ContractPricingSection`.
+- Consommé par les 3 calculs `computedPricing` (ContractPricingSection, ContractSign, ContractPdfSection) → écran de signature + PDF cohérents (la somme des lignes retombe sur le total).
+- L'ancien forçage global (`contracts.amount_forced` + input "Forcer la valeur") est retiré de l'UI. Les contrats legacy `amount_forced=true` sont préservés jusqu'à édition d'une ligne (bascule auto → `amount_forced=false`). Le helper `buildContractPresentation` reste le filet de rétro-compat pour ces contrats non encore basculés.
 ---

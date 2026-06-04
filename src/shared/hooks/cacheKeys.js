@@ -189,6 +189,7 @@ export const pricingKeys = {
   extras: (orgId) => [...pricingKeys.all(orgId), 'extras'],
   allData: (orgId) => [...pricingKeys.all(orgId), 'allData'],
   contractItems: (orgId, contractId) => [...pricingKeys.all(orgId), 'contractItems', contractId],
+  contractOverrides: (orgId, contractId) => [...pricingKeys.all(orgId), 'contractOverrides', contractId],
 };
 
 // --- Permissions ---

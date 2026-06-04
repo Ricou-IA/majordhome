@@ -134,9 +134,9 @@ src/
 │       # Note : ClientDetail a 6 onglets : Info/Contrat/Équipements/Interventions/Timeline/Mailings
 │       ├── chantiers/          # ChantierKanban, ChantierCard, ChantierModal, ChantierInterventionSection
 │       ├── entretiens/         # CreateContractModal+Steps, ContractModal, ContractsList, EntretiensDashboard
-│       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban, SchedulingPanel
+│       ├── pipeline/           # LeadModal+FormSections+StatusConfig, LeadKanban
 │       │   └── longTerm/       # LongTermTab, LongTermLeadDrawer, MoveToLongTermModal (suivi projets MT-LT, ⚠️ WIP)
-│       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, MiniWeekCalendar
+│       ├── planning/           # EventModal+FormSections+Confirmations, TechnicianSelect, scheduling/SchedulingAssistant
 │       ├── territoire/         # TerritoireMap, MapControls, MapPopup, MapSearch, useMapZones, useTerritoireData
 │       └── geogrid/            # ScanTab, KeywordListsPanel, BenchmarksPanel, BenchmarkLauncher, BenchmarkResultTable, ScanConfigPanel, ScanHistory, GeoGridMap, communesService
 ├── apps/prospection/
@@ -557,7 +557,8 @@ Refonte du service de prise de RDV. **Principe unique** : un RDV (`appointments`
 ### Gotcha & reste à faire
 - **⚠️ Backfill entretien** : un RDV `maintenance` sans `intervention_id` ne veut PAS dire entretien non fait — il peut déjà être `realise`/`facture`. Un backfill ne gardant que `workflow_status NOT IN (realise,facture)` crée des doublons « planifié » pour des entretiens déjà faits. **Scope correct = RDV À VENIR uniquement** (régression vécue & corrigée le 2026-06-03 : 24 doublons supprimés).
 - **Reste** : flux de planification **installation** depuis le kanban Chantier (réactivera l'ambre chantier) ; **Bloc B** = assistant créneaux (dispo par technicien, multi-créneaux multi-intervenants, fix « créneau pris = impossible d'en ajouter »).
-- Spec : `docs/superpowers/specs/2026-06-03-rdv-kanban-unifie-bloc-a-design.md` · Plan : `docs/superpowers/plans/2026-06-03-rdv-kanban-unifie-bloc-a.md` · mémoire `project_refonte_rdv_kanban_bloc_a.md`.
+- Spec Bloc A : `docs/superpowers/specs/2026-06-03-rdv-kanban-unifie-bloc-a-design.md` · Plan : `docs/superpowers/plans/2026-06-03-rdv-kanban-unifie-bloc-a.md` · mémoire `project_refonte_rdv_kanban_bloc_a.md`.
+- Spec Bloc B (assistant créneaux multi-tech, à implémenter) : `docs/superpowers/specs/2026-06-03-rdv-kanban-assistant-creneaux-bloc-b-design.md` · Plan : `docs/superpowers/plans/2026-06-03-rdv-kanban-assistant-creneaux-bloc-b.md`.
 
 ## Module Certificats d'entretien (multi-équipements)
 
@@ -604,8 +605,14 @@ Conventions contrat centralisées (config tarifaire / PDF / signature / zone). C
 ### Sources de vérité figées à la signature (2026-06-01)
 - À la signature, **`contract.amount` et `contract.zone_id` sont les sources de vérité — figées à la configuration du contrat**. L'écran de signature (`ContractSign.jsx`) et le PDF ne recalculent JAMAIS le total ni la zone.
 - `useContractZone` (resolver partagé) n'est qu'un **fallback** si `contract.zone_id` est NULL (contrat jamais configuré). Ne pas le laisser écarter une zone enregistrée (même la zone par défaut « Hors Zone ») au profit d'une re-détection par code postal.
-- Tout écart entre la somme des lignes (grille tarifaire courante × zone stockée) et `contract.amount` s'affiche en **« Remise commerciale »** pour traçabilité — la somme des lignes retombe toujours sur le total signé.
+- Tout écart entre la somme des lignes (grille tarifaire courante × zone stockée) et `contract.amount` s'affiche en **« Remise commerciale »** pour traçabilité — la somme des lignes retombe toujours sur le total signé. (Cas du forçage global *legacy* ; le mécanisme courant est le **forçage par ligne** ci-dessous.)
 - **Règle générale** : tout artefact contractuel signé/envoyé au client (devis, contrat, certificat) lit les valeurs **ENREGISTRÉES**, jamais recalculées depuis la grille tarifaire courante. Sinon divergence config↔signature (bug CTR-00457 : contrat « Hors Zone » à 250 € enregistrés affiché/signé 220 €).
+
+### Forçage de prix par ligne (override par équipement, 2026-06-05)
+- Le prix d'un équipement dans un contrat peut être **forcé manuellement par ligne** (admin, dans `ContractPricingSection`). Le prix forcé **substitue le prix grille de la ligne** ; la dégressivité et le reste du mécanisme (`sous-total → dégressivité → total` via `calculateContractTotal`) restent appliqués en aval. `contracts.amount` se réaligne via l'auto-sync de `ContractPricingSection`.
+- **Scope = contrat (donc client), JAMAIS global** : le forçage porte sur `(contract_id, equipment_id)` (1 contrat = 1 client). Il ne touche **jamais** la grille tarifaire `pricing_rates` (cas général par zone × type, partagée par l'org) ni les autres clients. La grille reste le défaut ; le forçage est une exception contractuelle ponctuelle.
+- **Stockage sans migration** : rangé dans la table existante `majordhome.contract_pricing_items` via la convention **« ligne avec `equipment_id` NON NULL = prix forcé volontaire »** (les lignes `equipment_id` NULL = snapshots de création, ignorés → aucune régression). Service `getContractLineOverrides` / `setContractLineOverride` (delete ciblé + insert) / `clearContractLineOverride` (`pricing.service.js`) ; hook `useContractLineOverrides` (`usePricing.js`) ; cache key `pricingKeys.contractOverrides`. Consommé par les 3 calculs `computedPricing` (`ContractPricingSection`, `ContractSign`, `ContractPdfSection`) → écran de signature + PDF cohérents.
+- **Legacy** : l'ancien forçage global (`contracts.amount_forced` + input « Forcer la valeur ») est retiré de l'UI. Les contrats `amount_forced=true` (33 en prod) sont préservés tant qu'aucune ligne n'est éditée ; à la 1ʳᵉ édition de ligne ils basculent sur le calcul (`amount_forced → false`). `buildContractPresentation` (écart en « Remise commerciale » / redistribution à la hausse) reste le **filet de rétro-compat** pour ces contrats non encore basculés.
 
 ## Module Tarification (Settings → /settings/pricing)
 
