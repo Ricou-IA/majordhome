@@ -45,6 +45,7 @@ export const SectionType = ({
   isCancelled,
   availableTypes = APPOINTMENT_TYPES,
   typeLocked = false,
+  hideSubject = false,
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -59,16 +60,19 @@ export const SectionType = ({
         disabled={isEdit || isCancelled || typeLocked}
       />
     </FormField>
-    <div className="mt-4">
-      <FormField label="Objet">
-        <TextInput
-          value={formData.subject}
-          onChange={(v) => updateField('subject', v)}
-          placeholder="Ex: Installation PAC, Entretien annuel..."
-          disabled={isCancelled}
-        />
-      </FormField>
-    </div>
+    {/* Objet : masqué quand l'assistant créneaux le collecte (création VT/entretien/SAV/install) */}
+    {!hideSubject && (
+      <div className="mt-4">
+        <FormField label="Objet">
+          <TextInput
+            value={formData.subject}
+            onChange={(v) => updateField('subject', v)}
+            placeholder="Ex: Installation PAC, Entretien annuel..."
+            disabled={isCancelled}
+          />
+        </FormField>
+      </div>
+    )}
     {isEdit && (
       <div className="mt-4">
         <FormField label="Statut">
@@ -336,6 +340,9 @@ export const SectionClient = ({
       <p className="text-xs text-gray-400 mb-2 text-center">— ou saisie manuelle —</p>
     )}
 
+    {/* Saisie manuelle / compact : masquée dès qu'un client ou lead est lié
+        (le banner ci-dessus tient lieu de « client implicite ») */}
+    {!selectedClient && !selectedLead && (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Nom" required error={errors.client_name}>
@@ -402,6 +409,7 @@ export const SectionClient = ({
         </FormField>
       </div>
     </div>
+    )}
   </div>
 );
 

@@ -203,11 +203,13 @@ export function SchedulingAssistant({
   );
 
   // --- Confirmation : remonte les slots[] au format du contrat ---
-  // slots = [{ date, startTime, endTime, duration, technicianIds, subject, notes }]
+  // slots = [{ date, startTime, endTime, duration, technicianIds, assignedCommercialId, subject, notes }]
   // Mode technician : `technicianIds` porte les techniciens sélectionnés.
-  // Mode commercial : l'assignation est celle de la carte (assigned_commercial_id,
-  // posé par le caller) → on sort technicianIds: [] (l'id commercial servait
-  // uniquement, en interne, au rendu de colonne + aux conflits).
+  // Mode commercial : l'assignation N'EST PAS dans technicianIds (sort []). Deux cas :
+  //   - figé (fixedAssigneeId, ex. VT pipeline) : le caller pose assigned_commercial_id
+  //     lui-même → il ignore assignedCommercialId (rétrocompat).
+  //   - sélectionnable (fixedAssigneeId=null, ex. VT depuis EventModal) : la colonne
+  //     choisie est portée par `assignedCommercialId` → le caller la recopie sur le RDV.
   const handleSubmit = useCallback(() => {
     if (draftSlots.length === 0) return;
     const slots = draftSlots.map((s) => ({
@@ -216,6 +218,7 @@ export function SchedulingAssistant({
       endTime: s.endTime || null,
       duration: s.duration || defaultDuration,
       technicianIds: commercialMode ? [] : (s.technicianIds || []),
+      assignedCommercialId: commercialMode ? (s.technicianIds?.[0] || null) : null,
       subject: subject.trim() || subjectPrefix,
       notes: notes.trim() || null,
     }));
