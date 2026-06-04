@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Phone, CalendarPlus, XCircle, PhoneForwarded } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { callCampaignsService } from '@services/callCampaigns.service';
 import { appointmentsService } from '@services/appointments.service';
 import { entretiensService } from '@services/entretiens.service';
+import { useTeamMembers } from '@hooks/useAppointments';
+import { SchedulingAssistant } from '../planning/scheduling/SchedulingAssistant';
 
 /**
  * Screen-pop affiché quand un transfert d'appel est accepté.
@@ -16,8 +18,7 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
   const { user } = useAuth();
   const [ctx, setCtx] = useState(null);
   const [mode, setMode] = useState(null); // null | 'rdv' | 'refus'
-  const [rdvDate, setRdvDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [rdvTime, setRdvTime] = useState('');
+  const [slots, setSlots] = useState([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -30,29 +31,45 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
     return () => { alive = false; };
   }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Techniciens disponibles pour l'assistant créneaux
+  const { members } = useTeamMembers(orgId);
+  const technicians = useMemo(
+    () => (members || []).filter((m) => m.role === 'technician'),
+    [members],
+  );
+
+  // Lead minimal pour l'assistant (pré-remplit le contact)
+  const schedulingLead = useMemo(
+    () => ({
+      last_name: contact.name || '',
+      first_name: '',
+      phone: contact.phone || '',
+      email: '',
+      address: '',
+      city: '',
+      postal_code: '',
+      assigned_user_id: null,
+    }),
+    [contact.name, contact.phone],
+  );
+
   const bookRdv = async () => {
+    if (slots.length === 0) { toast.error('Choisissez un créneau'); return; }
     setBusy(true);
-    const { error } = await appointmentsService.createAppointment({
+    const { error } = await appointmentsService.createAppointmentBatch(slots, {
       coreOrgId: orgId,
-      technicianIds: [],
       appointment_type: 'maintenance',
+      intervention_id: contact.id,        // carte entretien connue → carte passe en "Planifié" (Bloc A)
+      lead_id: null,
       client_id: ctx?.client_id ?? null,
-      intervention_id: contact.id,
-      scheduled_date: rdvDate,
-      scheduled_start: rdvTime || null,
-      subject: `Entretien annuel — ${contact.name}`,
-      client_name: contact.name,
-      client_phone: contact.phone || '',
-      status: 'scheduled',
-      priority: 'normal',
+      client_name: contact.name || null,
+      client_phone: contact.phone || null,
+      subjectPrefix: contact.name ? `Entretien — ${contact.name}` : 'Entretien',
     });
     setBusy(false);
-    if (error) {
-      toast.error('Erreur création RDV');
-      return;
-    }
+    if (error) { toast.error('Erreur création RDV'); return; }
     toast.success('RDV planifié');
-    onClosed({ result: 'rdv_booked' });
+    onClosed({ result: 'rdv_booked' });   // hook journalise rdv_booked + avance la file
   };
 
   const refuse = async () => {
@@ -81,8 +98,10 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
 
   const callback = () => onClosed({ result: 'callback' });
 
+  const goBack = () => { setMode(null); setSlots([]); };
+
   return (
-    <div className="rounded-xl border bg-white shadow-lg p-5">
+    <div className="rounded-xl border bg-white shadow-lg p-5 overflow-y-auto max-h-[85vh]">
       <div className="flex items-center gap-2 text-emerald-700 mb-1">
         <PhoneForwarded className="h-5 w-5" />
         <span className="font-semibold">Appel transféré</span>
@@ -96,58 +115,69 @@ export function PhoningScreenPop({ contact, orgId, onAccept, onClosed }) {
         <p className="text-xs text-gray-400 mt-0.5">Contrat {ctx.contract_number}</p>
       )}
 
-      <div className="grid grid-cols-3 gap-2 mt-4">
-        <button
-          onClick={() => setMode('rdv')}
-          className="flex flex-col items-center gap-1 p-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-        >
-          <CalendarPlus className="h-5 w-5" />
-          <span className="text-xs font-medium">Caler le RDV</span>
-        </button>
-        <button
-          onClick={() => setMode('refus')}
-          className="flex flex-col items-center gap-1 p-3 rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-        >
-          <XCircle className="h-5 w-5" />
-          <span className="text-xs font-medium">Refusé client</span>
-        </button>
-        <button
-          onClick={callback}
-          className="flex flex-col items-center gap-1 p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-        >
-          <PhoneForwarded className="h-5 w-5" />
-          <span className="text-xs font-medium">À rappeler</span>
-        </button>
-      </div>
+      {/* Grille 3 actions — visible uniquement quand aucune action n'est choisie */}
+      {mode === null && (
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          <button
+            onClick={() => setMode('rdv')}
+            className="flex flex-col items-center gap-1 p-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          >
+            <CalendarPlus className="h-5 w-5" />
+            <span className="text-xs font-medium">Caler le RDV</span>
+          </button>
+          <button
+            onClick={() => setMode('refus')}
+            className="flex flex-col items-center gap-1 p-3 rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+          >
+            <XCircle className="h-5 w-5" />
+            <span className="text-xs font-medium">Refusé client</span>
+          </button>
+          <button
+            onClick={callback}
+            className="flex flex-col items-center gap-1 p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+          >
+            <PhoneForwarded className="h-5 w-5" />
+            <span className="text-xs font-medium">À rappeler</span>
+          </button>
+        </div>
+      )}
 
+      {/* Lien retour commun aux deux sous-panneaux */}
+      {mode !== null && (
+        <button
+          onClick={goBack}
+          className="mt-3 text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+        >
+          ← Retour
+        </button>
+      )}
+
+      {/* Panneau RDV — assistant créneaux unifié */}
       {mode === 'rdv' && (
-        <div className="mt-4 space-y-2 border-t pt-3">
-          <label className="block text-sm font-medium text-gray-700">Date du RDV</label>
-          <input
-            type="date"
-            value={rdvDate}
-            onChange={(e) => setRdvDate(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg text-sm"
-          />
-          <label className="block text-sm font-medium text-gray-700">
-            Heure <span className="font-normal text-gray-400">(facultatif)</span>
-          </label>
-          <input
-            type="time"
-            value={rdvTime}
-            onChange={(e) => setRdvTime(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg text-sm"
+        <div className="mt-3 border-t pt-3">
+          <SchedulingAssistant
+            embedded
+            orgId={orgId}
+            lead={schedulingLead}
+            members={technicians}
+            assigneeType="technician"
+            fixedAssigneeId={null}
+            appointmentTypeLabel="Entretien"
+            defaultDuration={60}
+            multi={false}
+            onSlotsChange={setSlots}
           />
           <button
-            disabled={busy}
+            disabled={busy || slots.length === 0}
             onClick={bookRdv}
-            className="w-full py-2 rounded-lg bg-emerald-600 text-white font-medium disabled:opacity-50"
+            className="mt-3 w-full py-2 rounded-lg bg-emerald-600 text-white font-medium disabled:opacity-50"
           >
             {busy ? 'Enregistrement…' : 'Confirmer le RDV'}
           </button>
         </div>
       )}
 
+      {/* Panneau Refus — inchangé */}
       {mode === 'refus' && (
         <div className="mt-4 space-y-2 border-t pt-3">
           <label className="block text-sm font-medium text-gray-700">Motif du refus</label>
