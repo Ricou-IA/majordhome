@@ -247,7 +247,9 @@ export function SchedulingAssistant({
     onConfirm?.(slots);
   }, [draftSlots, defaultDuration, commercialMode, subject, subjectPrefix, notes, onConfirm]);
 
-  const assigneeLabel = commercialMode ? 'Commercial(aux)' : 'Technicien(s)';
+  const assigneeLabel = commercialMode
+    ? 'Commercial(aux)'
+    : assigneeType === 'technician' ? 'Technicien(s)' : 'Personne(s)';
 
   // Affichage du membre dans l'en-tête : en mode commercial figé, le nom du
   // commercial assigné à la carte (parité avec l'ancien SchedulingPanel) ;

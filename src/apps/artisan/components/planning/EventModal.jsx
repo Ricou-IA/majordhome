@@ -130,15 +130,16 @@ export function EventModal({
   const isCancelled = appointment?.status === 'cancelled';
 
   // --------------------------------------------------------------------------
-  // Assistant créneaux (Bloc B) — pilotage par type
-  // - création + type ≠ « Autre » → l'assistant pose le(s) créneau(x) (date +
-  //   colonnes par personne) ; l'édition et « Autre » gardent le picker classique.
+  // Assistant créneaux (Bloc B) — pilotage par type (CRÉATION ; l'édition garde le picker classique)
   // - VT (commercial) → colonnes commerciaux SÉLECTIONNABLES (pas d'owner figé
-  //   ici, contrairement au pipeline) → le commercial choisi alimente
-  //   assigned_commercial_id. Entretien/SAV/Installation → colonnes techniciens.
+  //   ici, contrairement au pipeline) → le commercial choisi alimente assigned_commercial_id.
+  // - Entretien/SAV/Installation → colonnes techniciens.
+  // - « Autre » → colonnes = tous les membres (soi en 1ʳᵉ colonne), client optionnel.
   // --------------------------------------------------------------------------
   const isCommercialType = COMMERCIAL_TYPES.includes(formData.appointment_type);
-  const usesAssistant = !isEdit && formData.appointment_type !== 'other';
+  // Tous les types en CRÉATION utilisent l'assistant (grille jour × colonnes par personne),
+  // y compris « Autre » (colonnes = tous les membres). Seule l'édition garde le picker classique.
+  const usesAssistant = !isEdit;
   // Ouverture depuis une fiche client (prefillClient) → client implicite :
   // on masque entièrement le bloc Client (inutile de rappeler la fiche, on y est déjà).
   const fromFiche = !!prefillClient;
@@ -151,6 +152,17 @@ export function EventModal({
     () => (allTeamMembers || []).find((m) => m.user_id === userId)?.id || null,
     [allTeamMembers, userId],
   );
+  // Mode colonnes de l'assistant selon le type : VT→commerciaux, entretien/SAV/install→techniciens, « Autre »→tous.
+  const assistantAssigneeType = isCommercialType
+    ? 'commercial'
+    : (formData.appointment_type === 'other' ? 'all' : 'technician');
+  // « Autre » : place l'utilisateur connecté en 1ʳᵉ colonne (défaut naturel, réaffectable en cliquant une autre colonne).
+  const assistantMembers = useMemo(() => {
+    if (formData.appointment_type !== 'other' || !currentMemberId) return allTeamMembers;
+    const mine = (allTeamMembers || []).filter((m) => m.id === currentMemberId);
+    const others = (allTeamMembers || []).filter((m) => m.id !== currentMemberId);
+    return [...mine, ...others];
+  }, [allTeamMembers, formData.appointment_type, currentMemberId]);
   // Objet « lead-like » consommé par l'assistant (pré-remplit nom/objet). Pas
   // d'owner figé depuis EventModal → assigned_user_id null (colonnes sélectionnables).
   const schedulingLead = useMemo(() => ({
@@ -303,19 +315,6 @@ export function EventModal({
     clearLeadSearch();
     setShowClientDropdown(false);
   }, [isOpen, mode, appointment, defaultDate, defaultTime, prefillClient, isEdit, clearClientSearch, clearLeadSearch, attachContext]);
-
-  // « Autre » (création) : pré-affecte l'utilisateur connecté par défaut, sans écraser
-  // un choix déjà fait (le sélecteur permet de réaffecter à quelqu'un d'autre). S'exécute
-  // quand les team_members sont chargés (currentMemberId) ou au passage en type « Autre ».
-  useEffect(() => {
-    if (!isOpen || isEdit) return;
-    if (formData.appointment_type !== 'other' || !currentMemberId) return;
-    setFormData((prev) => (
-      (prev.technicianIds && prev.technicianIds.length > 0)
-        ? prev
-        : { ...prev, technicianIds: [currentMemberId] }
-    ));
-  }, [isOpen, isEdit, formData.appointment_type, currentMemberId]);
 
   // --------------------------------------------------------------------------
   // Mettre à jour un champ (avec auto-calcul heures)
@@ -620,8 +619,9 @@ export function EventModal({
       toast.error('Choisissez au moins un créneau');
       return;
     }
-    // Walk-in / Planning : le nom du client est requis (depuis une fiche il est implicite).
-    if (!fromFiche && !formData.client_name?.trim()) {
+    // Nom client requis pour les RDV liés à un client (VT/entretien/SAV/install) hors fiche.
+    // « Autre » : client optionnel (RDV perso / interne).
+    if (formData.appointment_type !== 'other' && !fromFiche && !formData.client_name?.trim()) {
       setErrors((prev) => ({ ...prev, client_name: 'Nom requis' }));
       toast.error('Nom du client requis');
       return;
@@ -639,7 +639,9 @@ export function EventModal({
       // (RDV rapide = type + créneau). Notes éditables après coup via l'édition du RDV.
       const typeLabel = getAppointmentTypeConfig(formData.appointment_type).label;
       const clientLabel = [formData.client_name, formData.client_first_name].filter(Boolean).join(' ').trim();
-      const autoSubject = `${typeLabel}${clientLabel ? ` — ${clientLabel}` : ''}`;
+      const autoSubject = clientLabel
+        ? `${typeLabel} — ${clientLabel}`
+        : (formData.appointment_type === 'other' ? 'Rendez-vous' : typeLabel);
       const slots = assistantSlots.map((s) => ({ ...s, subject: autoSubject, notes: null }));
 
       const { error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
@@ -845,10 +847,10 @@ export function EventModal({
                   onSlotsChange={setAssistantSlots}
                   lead={schedulingLead}
                   orgId={orgId}
-                  assigneeType={isCommercialType ? 'commercial' : 'technician'}
+                  assigneeType={assistantAssigneeType}
                   fixedAssigneeId={null}
                   commercials={commercialMembers}
-                  members={allTeamMembers}
+                  members={assistantMembers}
                   appointmentTypeLabel={typeConfig.label}
                   appointmentTypeValue={formData.appointment_type}
                   defaultDuration={Number(formData.duration_minutes) || 60}
