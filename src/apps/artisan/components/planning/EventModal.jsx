@@ -617,12 +617,12 @@ export function EventModal({
       // (colonne) est porté par slot.assignedCommercialId. Entretien/SAV/install : null.
       const assignedCommercialId = isCommercialType ? (assistantSlots[0]?.assignedCommercialId || null) : null;
 
-      // Injecte objet/notes (saisis dans la modale) sur chaque créneau.
-      const slots = assistantSlots.map((s) => ({
-        ...s,
-        subject: formData.subject || null,
-        notes: formData.internal_notes || null,
-      }));
+      // Objet AUTO (type + client) — pas de champ Objet/Notes dans le flux assistant
+      // (RDV rapide = type + créneau). Notes éditables après coup via l'édition du RDV.
+      const typeLabel = getAppointmentTypeConfig(formData.appointment_type).label;
+      const clientLabel = [formData.client_name, formData.client_first_name].filter(Boolean).join(' ').trim();
+      const autoSubject = `${typeLabel}${clientLabel ? ` — ${clientLabel}` : ''}`;
+      const slots = assistantSlots.map((s) => ({ ...s, subject: autoSubject, notes: null }));
 
       const { error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
@@ -638,8 +638,8 @@ export function EventModal({
         city: formData.client_city || null,
         postal_code: formData.client_postal_code || null,
         assigned_commercial_id: assignedCommercialId,
-        description: formData.description || null,
-        subjectPrefix: formData.subject || null,
+        description: null,
+        subjectPrefix: autoSubject,
       });
       if (batchErr) {
         console.error('[EventModal] batch create error:', batchErr);
@@ -777,6 +777,7 @@ export function EventModal({
                 selectedLead={selectedLead}
                 availableTypes={availableTypes}
                 typeLocked={typeLocked}
+                hideSubject={usesAssistant}
               />
 
               {/* Date/heure classique : édition + « Autre » (sinon l'assistant intégré pose le créneau) */}
@@ -847,12 +848,15 @@ export function EventModal({
                 />
               )}
 
-              {/* Notes (l'objet est dans SectionType) — visibles pour tous les types */}
-              <SectionNotes
-                formData={formData}
-                updateField={updateField}
-                isCancelled={isCancelled}
-              />
+              {/* Notes : édition + « Autre » uniquement. Dans le flux assistant, le RDV va
+                  droit au but (type + créneau) ; objet auto, notes éditables après coup. */}
+              {!usesAssistant && (
+                <SectionNotes
+                  formData={formData}
+                  updateField={updateField}
+                  isCancelled={isCancelled}
+                />
+              )}
 
               {/* CTA Certificat d'entretien */}
               {isEdit && entretienId && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (

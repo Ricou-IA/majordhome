@@ -45,6 +45,7 @@ export const SectionType = ({
   isCancelled,
   availableTypes = APPOINTMENT_TYPES,
   typeLocked = false,
+  hideSubject = false,
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -59,16 +60,20 @@ export const SectionType = ({
         disabled={isEdit || isCancelled || typeLocked}
       />
     </FormField>
-    <div className="mt-4">
-      <FormField label="Objet">
-        <TextInput
-          value={formData.subject}
-          onChange={(v) => updateField('subject', v)}
-          placeholder="Ex: Installation PAC, Entretien annuel..."
-          disabled={isCancelled}
-        />
-      </FormField>
-    </div>
+    {/* Objet masqué dans le flux assistant (création VT/entretien/SAV/install) :
+        généré automatiquement (type + client) pour aller droit au but. */}
+    {!hideSubject && (
+      <div className="mt-4">
+        <FormField label="Objet">
+          <TextInput
+            value={formData.subject}
+            onChange={(v) => updateField('subject', v)}
+            placeholder="Ex: Installation PAC, Entretien annuel..."
+            disabled={isCancelled}
+          />
+        </FormField>
+      </div>
+    )}
     {isEdit && (
       <div className="mt-4">
         <FormField label="Statut">
