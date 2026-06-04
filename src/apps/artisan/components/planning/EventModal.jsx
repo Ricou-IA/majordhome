@@ -146,6 +146,11 @@ export function EventModal({
     () => (allTeamMembers || []).filter((m) => ['commercial', 'admin'].includes(m.role)),
     [allTeamMembers],
   );
+  // team_member de l'utilisateur connecté → pré-affectation « Autre » à soi par défaut.
+  const currentMemberId = useMemo(
+    () => (allTeamMembers || []).find((m) => m.user_id === userId)?.id || null,
+    [allTeamMembers, userId],
+  );
   // Objet « lead-like » consommé par l'assistant (pré-remplit nom/objet). Pas
   // d'owner figé depuis EventModal → assigned_user_id null (colonnes sélectionnables).
   const schedulingLead = useMemo(() => ({
@@ -298,6 +303,19 @@ export function EventModal({
     clearLeadSearch();
     setShowClientDropdown(false);
   }, [isOpen, mode, appointment, defaultDate, defaultTime, prefillClient, isEdit, clearClientSearch, clearLeadSearch, attachContext]);
+
+  // « Autre » (création) : pré-affecte l'utilisateur connecté par défaut, sans écraser
+  // un choix déjà fait (le sélecteur permet de réaffecter à quelqu'un d'autre). S'exécute
+  // quand les team_members sont chargés (currentMemberId) ou au passage en type « Autre ».
+  useEffect(() => {
+    if (!isOpen || isEdit) return;
+    if (formData.appointment_type !== 'other' || !currentMemberId) return;
+    setFormData((prev) => (
+      (prev.technicianIds && prev.technicianIds.length > 0)
+        ? prev
+        : { ...prev, technicianIds: [currentMemberId] }
+    ));
+  }, [isOpen, isEdit, formData.appointment_type, currentMemberId]);
 
   // --------------------------------------------------------------------------
   // Mettre à jour un champ (avec auto-calcul heures)
@@ -703,8 +721,8 @@ export function EventModal({
       {/* Overlay transparent — laisse passer les clics sur le calendrier */}
       <div className="fixed inset-0 z-40 pointer-events-none" />
 
-      {/* Panel modale — plus large quand l'assistant créneaux est intégré (grille jour × colonnes) */}
-      <div className={`fixed inset-y-4 right-4 w-full ${usesAssistant ? 'max-w-2xl' : 'max-w-lg'} bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden`}>
+      {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant) */}
+      <div className="fixed inset-y-4 right-4 w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
         {/* ---- Header ---- */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 min-w-0">
