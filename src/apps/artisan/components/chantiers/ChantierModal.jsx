@@ -22,15 +22,18 @@ import {
   getChantierAmount,
   chantiersService,
 } from '@services/chantiers.service';
-import { interventionsService } from '@services/interventions.service';
-import { useChantierMutations, useInterventionSlots } from '@hooks/useChantiers';
-import { useTeamMembers } from '@hooks/useAppointments';
+import { useChantierMutations } from '@hooks/useChantiers';
+import { useTeamMembers, useChantierAppointments } from '@hooks/useAppointments';
+import { appointmentsService } from '@services/appointments.service';
+import { appointmentKeys } from '@hooks/cacheKeys';
+import { useQueryClient } from '@tanstack/react-query';
 import { contractsService } from '@services/contracts.service';
 import { supabase } from '@/lib/supabaseClient';
 import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFields';
 import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
+import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
   const { organization, user } = useAuth();
@@ -41,15 +44,14 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     updateChantierStatus,
     updateEstimatedDate,
     updateChantierNotes,
-    createChantierIntervention,
-    createSlot,
-    deleteSlot,
     isUpdatingStatus,
-    isCreatingIntervention,
-    isCreatingSlot,
   } = useChantierMutations();
 
   const { members } = useTeamMembers(orgId);
+  const queryClient = useQueryClient();
+  // Jours d'installation = appointments `installation` liés au chantier (lead_id = chantier.id)
+  const { appointments: installAppointments, refresh: refreshInstallAppointments } =
+    useChantierAppointments(orgId, chantier?.id);
 
   // État local
   const [estimatedDate, setEstimatedDate] = useState(chantier?.estimated_date || '');
@@ -64,9 +66,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [clientForContract, setClientForContract] = useState(null);
   const [loadingContract, setLoadingContract] = useState(false);
 
-  // Intervention parent
-  const [parentIntervention, setParentIntervention] = useState(null);
-  const [loadingParent, setLoadingParent] = useState(true);
+  // Planification installation (assistant créneaux)
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [isSchedulingInstall, setIsSchedulingInstall] = useState(false);
 
 
   // Trajet depuis le siège de l'org (P0.19 — paramétré via settings, fallback Mayer/Gaillac
@@ -105,28 +107,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       cancelled = true;
     };
   }, [chantier?.id, chantier?.address, chantier?.postal_code, chantier?.city, orgHq]);
-
-  // Charger l'intervention parent
-  useEffect(() => {
-    if (!chantier?.id) {
-      setLoadingParent(false);
-      return;
-    }
-    const load = async () => {
-      try {
-        const { data } = await interventionsService.getChantierInterventionByLeadId(chantier.id);
-        setParentIntervention(data);
-      } catch (err) {
-        console.error('[ChantierModal] load parent error:', err);
-      } finally {
-        setLoadingParent(false);
-      }
-    };
-    load();
-  }, [chantier?.id]);
-
-  // Slots de l'intervention parent
-  const { slots, refresh: refreshSlots } = useInterventionSlots(parentIntervention?.id);
 
   if (!chantier) return null;
 
@@ -200,21 +180,56 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     }
   };
 
-  const handleCreateParent = async () => {
-    const result = await createChantierIntervention({
-      leadId: chantier.id,
-      projectId: chantier.project_id,
-      equipmentId: chantier.equipment_id || null,
-      createdBy: user?.id,
-    });
-    if (result?.data) {
-      setParentIntervention(result.data);
-      // Auto-transition vers planification
-      if (['commande_a_faire', 'commande_recue'].includes(chantier.chantier_status)) {
-        await updateChantierStatus(chantier.id, 'planification');
-        toast.success('Passage en Planification');
+  // Objet « lead-like » pour l'assistant (pré-remplit le nom dans l'objet du RDV).
+  const schedulingLead = {
+    last_name: chantier.last_name || '',
+    first_name: chantier.first_name || '',
+    assigned_user_id: null,
+  };
+
+  // Planifier des jours d'installation : l'assistant remonte slots[] → N appointments
+  // `installation` (lead_id = chantier). createAppointment → syncCardStateOnCreate avance
+  // le chantier en « planification » (forward-only, Bloc A) ; onUpdated rafraîchit le kanban.
+  const handleConfirmInstallation = async (slots) => {
+    if (!slots || slots.length === 0) return;
+    setIsSchedulingInstall(true);
+    try {
+      const { error } = await appointmentsService.createAppointmentBatch(slots, {
+        coreOrgId: orgId,
+        appointment_type: 'installation',
+        lead_id: chantier.id,
+        client_id: chantier.client_id || null,
+        client_name: chantier.last_name || 'Sans nom',
+        client_first_name: chantier.first_name || null,
+        address: chantier.address || null,
+        city: chantier.city || null,
+        postal_code: chantier.postal_code || null,
+        subjectPrefix: 'Installation',
+      });
+      if (error) {
+        console.error('[ChantierModal] createAppointmentBatch error:', error);
+        toast.error('Erreur lors de la planification');
+        return;
       }
+      setShowScheduler(false);
+      refreshInstallAppointments();
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      onUpdated?.();
+      toast.success(slots.length > 1 ? `${slots.length} jours planifiés` : 'Installation planifiée');
+    } catch (err) {
+      console.error('[ChantierModal] handleConfirmInstallation error:', err);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setIsSchedulingInstall(false);
     }
+  };
+
+  // Supprimer un jour d'installation (throw en cas d'erreur → la section catch + toast).
+  const handleDeleteInstallAppointment = async (appointmentId) => {
+    const { error } = await appointmentsService.deleteAppointment(appointmentId);
+    if (error) throw error;
+    refreshInstallAppointments();
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
     onUpdated?.();
   };
 
@@ -248,27 +263,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     } finally {
       setLoadingContract(false);
     }
-  };
-
-  const handleAddSlot = async (slotData) => {
-    await createSlot({
-      parentId: parentIntervention.id,
-      projectId: chantier.project_id,
-      slotDate: slotData.slotDate,
-      slotStartTime: slotData.slotStartTime || null,
-      slotEndTime: slotData.slotEndTime || null,
-      technicianIds: slotData.technicianIds || [],
-      slotNotes: slotData.slotNotes || null,
-      createdBy: user?.id,
-    });
-    refreshSlots();
-    onUpdated?.();
-  };
-
-  const handleDeleteSlot = async (slotId) => {
-    await deleteSlot(slotId);
-    refreshSlots();
-    onUpdated?.();
   };
 
   return (
@@ -371,21 +365,28 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             </>
           )}
 
-          {/* Section intervention */}
-          {loadingParent ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          {/* Section installation (Bloc B stage 4 : jours = appointments `installation`) */}
+          {showScheduler ? (
+            <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3">
+              <SchedulingAssistant
+                lead={schedulingLead}
+                orgId={orgId}
+                assigneeType="technician"
+                members={members}
+                appointmentTypeLabel="Installation"
+                appointmentTypeValue="installation"
+                defaultDuration={480}
+                multi
+                onConfirm={handleConfirmInstallation}
+                onCancel={() => setShowScheduler(false)}
+                isLoading={isSchedulingInstall}
+              />
             </div>
           ) : (
             <ChantierInterventionSection
-              parentIntervention={parentIntervention}
-              slots={slots}
-              members={members}
-              onCreateParent={handleCreateParent}
-              onAddSlot={handleAddSlot}
-              onDeleteSlot={handleDeleteSlot}
-              isCreatingParent={isCreatingIntervention}
-              isCreatingSlot={isCreatingSlot}
+              appointments={installAppointments}
+              onSchedule={() => setShowScheduler(true)}
+              onDeleteAppointment={handleDeleteInstallAppointment}
               disabled={chantier.chantier_status === 'gagne'}
             />
           )}

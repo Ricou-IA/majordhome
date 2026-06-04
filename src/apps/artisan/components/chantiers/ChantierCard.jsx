@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { MapPin, Calendar } from 'lucide-react';
+import { MapPin, Calendar, CalendarClock } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
 
@@ -49,12 +49,13 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
   const amount = getChantierAmount(chantier);
   const statusConfig = getChantierStatusConfig(chantier.chantier_status);
   // Puce gauche : RDV installation si présent (vue dérivée), sinon date de signature.
-  // Pas de marqueur ambre tant qu'il n'existe pas de flux de planification installation
-  // depuis le kanban Chantier (sinon faux positif sur toutes les cartes en planification).
+  // Marqueur ambre « à replanifier » réactivé en Bloc B stage 4 (flux de planif installation
+  // depuis ChantierModal) : chantier en planification sans RDV d'installation actif.
   const hasActiveRdv = Boolean(chantier.has_active_rdv);
   const chipDate = (hasActiveRdv && chantier.next_rdv_date)
     ? formatShortDate(chantier.next_rdv_date)
     : formatShortDate(chantier.won_date);
+  const needsReplan = chantier.chantier_status === 'planification' && !hasActiveRdv;
   const commercial = commercialsMap?.[chantier.assigned_user_id];
 
   return (
@@ -67,10 +68,14 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
       {/* Bande date à gauche */}
       <div
         className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
-        style={{ backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` }}
-        title={hasActiveRdv ? 'Date RDV installation' : 'Date signature'}
+        style={needsReplan
+          ? { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' }
+          : { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` }}
+        title={needsReplan ? 'Installation à replanifier' : (hasActiveRdv ? 'Date RDV installation' : 'Date signature')}
       >
-        {chipDate ? (
+        {needsReplan ? (
+          <CalendarClock className="h-4 w-4 text-amber-500" />
+        ) : chipDate ? (
           <>
             <span className="text-sm font-bold leading-none" style={{ color: statusConfig.color }}>
               {chipDate.day}

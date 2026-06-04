@@ -10,10 +10,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
-import { chantierSlotsService } from '@services/chantierSlots.service';
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
-import { appointmentKeys, leadKeys, chantierSlotKeys } from '@hooks/cacheKeys';
+import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -84,24 +83,10 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     staleTime: 15_000,
   });
 
-  // Query parallèle : slots chantier (Phase 0 transitoire — supprimé en Phase 1
-  // quand les slots seront migrés vers appointments)
-  const { data: chantierSlots } = useQuery({
-    queryKey: chantierSlotKeys.list(orgId, { startDate, endDate }),
-    queryFn: () =>
-      chantierSlotsService.getChantierSlots({
-        coreOrgId: orgId,
-        startDate,
-        endDate,
-      }),
-    enabled: !!orgId && !!startDate && !!endDate,
-    staleTime: 15_000,
-    select: (result) => result?.data || [],
-  });
-
-  // Convertir en events FullCalendar — appointments + slots chantier mergés
+  // Convertir en events FullCalendar. Les jours d'installation sont désormais des
+  // appointments `installation` natifs (Bloc B stage 4) → plus de merge chantier-slots.
   const events = useMemo(() => {
-    if (!appointments && !chantierSlots) return [];
+    if (!appointments) return [];
 
     // Enrichir chaque appointment avec ses technician_ids
     const techMap = new Map();
@@ -125,21 +110,8 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       );
     }
 
-    const appointmentEvents = enrichedAppointments.map(a => appointmentsService.toCalendarEvent(a));
-
-    // Slots chantier — masqués si filtre type actif (chantier_jour n'a pas d'équivalent dans APPOINTMENT_TYPES)
-    let visibleSlots = chantierSlots || [];
-    if (filters.appointmentType) {
-      visibleSlots = [];
-    }
-    if (filters.memberIds.length > 0) {
-      const memberSet = new Set(filters.memberIds);
-      visibleSlots = visibleSlots.filter(s => (s.technician_ids || []).some(id => memberSet.has(id)));
-    }
-    const slotEvents = visibleSlots.map(s => chantierSlotsService.toCalendarEvent(s));
-
-    return [...appointmentEvents, ...slotEvents];
-  }, [appointments, chantierSlots, filters.memberIds, filters.appointmentType, techLinks]);
+    return enrichedAppointments.map(a => appointmentsService.toCalendarEvent(a));
+  }, [appointments, filters.memberIds, techLinks]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
