@@ -29,14 +29,14 @@ export const LOST_REASONS = [
  * Transitions autorisées par statut
  * Nouveau → Contacté, RDV planifié, Perdu
  * Contacté → RDV planifié, Perdu
- * RDV planifié → Devis envoyé, Perdu
+ * RDV planifié → Contacté (régression, ex. RDV annulé), Devis envoyé, Perdu
  * Devis envoyé → Gagné, Perdu
  * Gagné / Perdu → terminaux (pas de transition)
  */
 export const ALLOWED_TRANSITIONS = {
   'Nouveau': ['Contacté', 'RDV planifié', 'Devis envoyé', 'Perdu'],
   'Contacté': ['RDV planifié', 'Devis envoyé', 'Perdu'],
-  'RDV planifié': ['Devis envoyé', 'Perdu'],
+  'RDV planifié': ['Contacté', 'Devis envoyé', 'Perdu'],
   'Devis envoyé': ['Gagné', 'Perdu'],
   'Gagné': [],
   'Perdu': [],

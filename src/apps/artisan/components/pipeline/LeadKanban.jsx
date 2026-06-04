@@ -613,10 +613,15 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Si "Contacte", ouvrir la modale d'appel
+      // Si "Contacte", ouvrir la modale d'appel — sauf régression (ex. RDV planifié →
+      // Contacté après annulation de RDV) qui se fait en retour direct (pas de modale).
       if (newStatusLabel === 'Contacté') {
-        setPendingContact({ leadId, newStatusId, oldStatusId });
-        return;
+        const isRegression = newColDef && oldColDef && newColDef.display_order < oldColDef.display_order;
+        if (!isRegression) {
+          setPendingContact({ leadId, newStatusId, oldStatusId });
+          return;
+        }
+        // régression → on tombe dans l'optimistic update + updateLeadStatus ci-dessous
       }
 
       // Si "RDV planifie", ouvrir la modale lead avec auto-scheduling

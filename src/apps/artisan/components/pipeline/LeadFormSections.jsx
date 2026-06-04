@@ -14,7 +14,7 @@
 import {
   Search, UserCircle, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
-  ArrowRightLeft, Target, Loader2, Wrench,
+  ArrowRightLeft, Target, Loader2, Wrench, Undo2,
   FileText, ChevronRight, Plus, Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -753,8 +753,19 @@ export const SectionActions = ({
       <>
         <SectionTitle>Action suivante</SectionTitle>
         <div className="flex flex-wrap gap-2">
-          {allowedNext.map((status) => {
+          {[...allowedNext]
+            // Ordre d'affichage : avancées d'abord, puis régression, puis Perdu (exit).
+            .sort((a, b) => {
+              const rank = (s) =>
+                s.label === 'Perdu' ? 2 : (currentStatus && s.display_order < currentStatus.display_order ? 1 : 0);
+              return rank(a) - rank(b) || a.display_order - b.display_order;
+            })
+            .map((status) => {
             const isPerdu = status.label === 'Perdu';
+            // Régression = retour à un statut antérieur (ex. RDV planifié → Contacté
+            // après annulation de RDV) → style neutre + icône retour, pour le distinguer
+            // visuellement des avancées (boutons pleins colorés).
+            const isRegression = !isPerdu && currentStatus && status.display_order < currentStatus.display_order;
             return (
               <button
                 key={status.id}
@@ -764,12 +775,16 @@ export const SectionActions = ({
                 className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]
                   ${isPerdu
                     ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                    : isRegression
+                    ? 'bg-slate-50 text-slate-700 border border-slate-300 hover:bg-slate-100'
                     : 'text-white hover:opacity-90'
                   }`}
-                style={isPerdu ? {} : { backgroundColor: status.color }}
+                style={(isPerdu || isRegression) ? {} : { backgroundColor: status.color }}
               >
                 {isChangingStatus ? (
                   <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
+                ) : isRegression ? (
+                  <Undo2 className="h-4 w-4 inline mr-1" />
                 ) : (
                   <ArrowRightLeft className="h-4 w-4 inline mr-1" />
                 )}

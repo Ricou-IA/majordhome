@@ -455,8 +455,15 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       return;
     }
     if (targetStatus?.label === 'Contacté') {
-      setPendingContactStatusId(newStatusId);
-      return;
+      // Forward (Nouveau → Contacté) : modale d'appel pour qualifier le contact.
+      // Régression (ex. RDV planifié → Contacté après annulation de RDV) : retour
+      // direct sans modale d'appel (un résultat d'appel n'aurait pas de sens ici).
+      const isRegression = currentStatus && targetStatus.display_order < currentStatus.display_order;
+      if (!isRegression) {
+        setPendingContactStatusId(newStatusId);
+        return;
+      }
+      // régression → on tombe dans le flux de changement direct ci-dessous
     }
     if (targetStatus?.label === 'RDV planifié') {
       setPendingRdvStatusId(newStatusId);
