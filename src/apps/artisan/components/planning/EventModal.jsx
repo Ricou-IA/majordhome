@@ -90,8 +90,8 @@ export function EventModal({
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
   const [confirmAction, setConfirmAction] = useState(null); // 'cancel' | 'delete' | null
-  // Sous-vue assistant créneaux (création VT/entretien/SAV/install) + état d'envoi du lot
-  const [schedulerOpen, setSchedulerOpen] = useState(false);
+  // Créneaux posés via l'assistant INTÉGRÉ (création VT/entretien/SAV/install) + état d'envoi du lot
+  const [assistantSlots, setAssistantSlots] = useState([]);
   const [batchSaving, setBatchSaving] = useState(false);
 
   // État recherche / liaison client & lead
@@ -139,6 +139,9 @@ export function EventModal({
   // --------------------------------------------------------------------------
   const isCommercialType = COMMERCIAL_TYPES.includes(formData.appointment_type);
   const usesAssistant = !isEdit && formData.appointment_type !== 'other';
+  // Ouverture depuis une fiche client (prefillClient) → client implicite :
+  // on masque entièrement le bloc Client (inutile de rappeler la fiche, on y est déjà).
+  const fromFiche = !!prefillClient;
   const commercialMembers = useMemo(
     () => (allTeamMembers || []).filter((m) => ['commercial', 'admin'].includes(m.role)),
     [allTeamMembers],
@@ -198,7 +201,7 @@ export function EventModal({
 
     setErrors({});
     setConfirmAction(null);
-    setSchedulerOpen(false);
+    setAssistantSlots([]);
     setBatchSaving(false);
 
     if (isEdit && appointment) {
@@ -455,7 +458,7 @@ export function EventModal({
   // --------------------------------------------------------------------------
   // Activation déduppée de la carte — SOURCE UNIQUE partagée par le chemin
   // classique (édition / « Autre » → handleSave) et le chemin assistant
-  // (VT/entretien/SAV/install → handleAssistantConfirm). Plus d'auto-lead
+  // (VT/entretien/SAV/install → handleCreateFromAssistant). Plus d'auto-lead
   // silencieux : le seul prospect créé est le walk-in inconnu (Planning, ni
   // client ni lead, type commercial). Renvoie { leadId, interventionId, error }.
   // --------------------------------------------------------------------------
@@ -537,7 +540,7 @@ export function EventModal({
   // --------------------------------------------------------------------------
   // Enregistrer (chemin CLASSIQUE) : édition (1 RDV) + création « Autre ».
   // Les types VT/entretien/SAV/install en création passent par l'assistant
-  // (handleAssistantConfirm) via le bouton « Choisir un créneau ».
+  // intégré (handleCreateFromAssistant), bouton « Créer le RDV ».
   // --------------------------------------------------------------------------
   const handleSave = useCallback(async () => {
     if (!validate()) return;
@@ -588,21 +591,38 @@ export function EventModal({
   }, [validate, selectedLead, attachContext, isEdit, appointment, resolveActivation, reportActivationError, formData, onSave, selectedClient, orgId, queryClient]);
 
   // --------------------------------------------------------------------------
-  // Confirmer depuis l'assistant créneaux (chemin CRÉATION VT/entretien/SAV/install).
-  // L'assistant remonte slots[] ; on résout la carte UNE fois, puis on crée N
-  // RDV via createAppointmentBatch (réutilise createAppointment → syncCardStateOnCreate
-  // + sync Google par RDV, donc cycle de vie Bloc A préservé).
+  // Créer depuis l'assistant INTÉGRÉ (chemin CRÉATION VT/entretien/SAV/install).
+  // `assistantSlots` est alimenté en continu par l'assistant inline ; on résout
+  // la carte UNE fois, puis on crée N RDV via createAppointmentBatch (réutilise
+  // createAppointment → syncCardStateOnCreate + sync Google par RDV, cycle Bloc A préservé).
+  // Objet/notes/description viennent de la modale (SectionType/SectionNotes), pas de l'assistant.
   // --------------------------------------------------------------------------
-  const handleAssistantConfirm = useCallback(async (slots) => {
-    if (!slots || slots.length === 0) return;
+  const handleCreateFromAssistant = useCallback(async () => {
+    if (assistantSlots.length === 0) {
+      toast.error('Choisissez au moins un créneau');
+      return;
+    }
+    // Walk-in / Planning : le nom du client est requis (depuis une fiche il est implicite).
+    if (!fromFiche && !formData.client_name?.trim()) {
+      setErrors((prev) => ({ ...prev, client_name: 'Nom requis' }));
+      toast.error('Nom du client requis');
+      return;
+    }
     setBatchSaving(true);
     try {
-      const act = await resolveActivation({ rdvDate: slots[0]?.date });
+      const act = await resolveActivation({ rdvDate: assistantSlots[0]?.date });
       if (reportActivationError(act.error)) { setBatchSaving(false); return; }
 
       // VT depuis EventModal = commercial sélectionnable → le commercial choisi
       // (colonne) est porté par slot.assignedCommercialId. Entretien/SAV/install : null.
-      const assignedCommercialId = isCommercialType ? (slots[0]?.assignedCommercialId || null) : null;
+      const assignedCommercialId = isCommercialType ? (assistantSlots[0]?.assignedCommercialId || null) : null;
+
+      // Injecte objet/notes (saisis dans la modale) sur chaque créneau.
+      const slots = assistantSlots.map((s) => ({
+        ...s,
+        subject: formData.subject || null,
+        notes: formData.internal_notes || null,
+      }));
 
       const { error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
@@ -618,6 +638,7 @@ export function EventModal({
         city: formData.client_city || null,
         postal_code: formData.client_postal_code || null,
         assigned_commercial_id: assignedCommercialId,
+        description: formData.description || null,
         subjectPrefix: formData.subject || null,
       });
       if (batchErr) {
@@ -644,21 +665,11 @@ export function EventModal({
       toast.success(slots.length > 1 ? `${slots.length} RDV créés` : 'RDV créé avec succès');
       onClose();
     } catch (err) {
-      console.error('[EventModal] handleAssistantConfirm error:', err);
+      console.error('[EventModal] handleCreateFromAssistant error:', err);
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [resolveActivation, reportActivationError, isCommercialType, orgId, formData, selectedClient, queryClient, onClose]);
-
-  // Ouvre l'assistant créneaux (valide d'abord type + nom client si requis).
-  const handleOpenScheduler = useCallback(() => {
-    const e = {};
-    if (!formData.appointment_type) e.appointment_type = 'Type requis';
-    if (formData.appointment_type !== 'other' && !formData.client_name?.trim()) e.client_name = 'Nom requis';
-    setErrors(e);
-    if (Object.keys(e).length > 0) return;
-    setSchedulerOpen(true);
-  }, [formData.appointment_type, formData.client_name]);
+  }, [assistantSlots, fromFiche, resolveActivation, reportActivationError, isCommercialType, orgId, formData, selectedClient, queryClient, onClose]);
 
   // Type config pour le badge coloré
   const typeConfig = useMemo(
@@ -692,8 +703,8 @@ export function EventModal({
       {/* Overlay transparent — laisse passer les clics sur le calendrier */}
       <div className="fixed inset-0 z-40 pointer-events-none" />
 
-      {/* Panel modale */}
-      <div className="fixed inset-y-4 right-4 w-full max-w-lg bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+      {/* Panel modale — plus large quand l'assistant créneaux est intégré (grille jour × colonnes) */}
+      <div className={`fixed inset-y-4 right-4 w-full ${usesAssistant ? 'max-w-2xl' : 'max-w-lg'} bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden`}>
         {/* ---- Header ---- */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 min-w-0">
@@ -741,28 +752,8 @@ export function EventModal({
             />
           )}
 
-          {/* Sous-vue assistant créneaux (création VT/entretien/SAV/install) */}
-          {!confirmAction && schedulerOpen && (
-            <SchedulingAssistant
-              lead={schedulingLead}
-              orgId={orgId}
-              assigneeType={isCommercialType ? 'commercial' : 'technician'}
-              fixedAssigneeId={null}
-              commercials={commercialMembers}
-              members={allTeamMembers}
-              appointmentTypeLabel={typeConfig.label}
-              appointmentTypeValue={formData.appointment_type}
-              defaultDuration={Number(formData.duration_minutes) || 60}
-              defaultSubjectPrefix={formData.subject || typeConfig.label}
-              multi={formData.appointment_type === 'installation'}
-              onConfirm={handleAssistantConfirm}
-              onCancel={() => setSchedulerOpen(false)}
-              isLoading={batchSaving}
-            />
-          )}
-
           {/* Formulaire principal */}
-          {!confirmAction && !schedulerOpen && (
+          {!confirmAction && (
             <div className="space-y-6">
               {/* Badge annulé */}
               {isCancelled && (
@@ -786,10 +777,9 @@ export function EventModal({
                 selectedLead={selectedLead}
                 availableTypes={availableTypes}
                 typeLocked={typeLocked}
-                hideSubject={usesAssistant}
               />
 
-              {/* Date/heure classique : édition + « Autre » (sinon l'assistant pose le créneau) */}
+              {/* Date/heure classique : édition + « Autre » (sinon l'assistant intégré pose le créneau) */}
               {!usesAssistant && (
                 <SectionDateTime
                   formData={formData}
@@ -799,29 +789,53 @@ export function EventModal({
                 />
               )}
 
-              {/* Client lié quel que soit le type (« Autre » inclus → lié au client, sans carte kanban) */}
-              <SectionClient
-                formData={formData}
-                updateField={updateField}
-                errors={errors}
-                isCancelled={isCancelled}
-                selectedClient={selectedClient}
-                selectedLead={selectedLead}
-                navigate={navigate}
-                handleUnlinkClient={handleUnlinkClient}
-                handleUnlinkLead={handleUnlinkLead}
-                clientSearchQuery={clientSearchQuery}
-                searchClient={searchClient}
-                searchLead={searchLead}
-                showClientDropdown={showClientDropdown}
-                setShowClientDropdown={setShowClientDropdown}
-                clientSearching={clientSearching}
-                leadSearching={leadSearching}
-                clientSearchResults={clientSearchResults}
-                leadSearchResults={leadSearchResults}
-                handleSelectClient={handleSelectClient}
-                handleSelectLead={handleSelectLead}
-              />
+              {/* Client : masqué si on vient d'une fiche (implicite). Sinon recherche/lien
+                  (« Autre » inclus → lié au client, sans carte kanban). */}
+              {!fromFiche && (
+                <SectionClient
+                  formData={formData}
+                  updateField={updateField}
+                  errors={errors}
+                  isCancelled={isCancelled}
+                  selectedClient={selectedClient}
+                  selectedLead={selectedLead}
+                  navigate={navigate}
+                  handleUnlinkClient={handleUnlinkClient}
+                  handleUnlinkLead={handleUnlinkLead}
+                  clientSearchQuery={clientSearchQuery}
+                  searchClient={searchClient}
+                  searchLead={searchLead}
+                  showClientDropdown={showClientDropdown}
+                  setShowClientDropdown={setShowClientDropdown}
+                  clientSearching={clientSearching}
+                  leadSearching={leadSearching}
+                  clientSearchResults={clientSearchResults}
+                  leadSearchResults={leadSearchResults}
+                  handleSelectClient={handleSelectClient}
+                  handleSelectLead={handleSelectLead}
+                />
+              )}
+
+              {/* Assistant créneaux INTÉGRÉ : création VT/entretien/SAV/install.
+                  Colonnes filtrées par type (VT→commerciaux/direction, entretien/SAV→techs).
+                  key=type → remise à zéro propre des créneaux quand on change de type. */}
+              {usesAssistant && (
+                <SchedulingAssistant
+                  key={formData.appointment_type}
+                  embedded
+                  onSlotsChange={setAssistantSlots}
+                  lead={schedulingLead}
+                  orgId={orgId}
+                  assigneeType={isCommercialType ? 'commercial' : 'technician'}
+                  fixedAssigneeId={null}
+                  commercials={commercialMembers}
+                  members={allTeamMembers}
+                  appointmentTypeLabel={typeConfig.label}
+                  appointmentTypeValue={formData.appointment_type}
+                  defaultDuration={Number(formData.duration_minutes) || 60}
+                  multi={formData.appointment_type === 'installation'}
+                />
+              )}
 
               {/* Assigné classique : édition + « Autre » (sinon l'assistant gère les colonnes) */}
               {!usesAssistant && (
@@ -833,14 +847,12 @@ export function EventModal({
                 />
               )}
 
-              {/* Notes classiques : édition + « Autre » (sinon l'assistant collecte objet + notes) */}
-              {!usesAssistant && (
-                <SectionNotes
-                  formData={formData}
-                  updateField={updateField}
-                  isCancelled={isCancelled}
-                />
-              )}
+              {/* Notes (l'objet est dans SectionType) — visibles pour tous les types */}
+              <SectionNotes
+                formData={formData}
+                updateField={updateField}
+                isCancelled={isCancelled}
+              />
 
               {/* CTA Certificat d'entretien */}
               {isEdit && entretienId && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
@@ -870,7 +882,7 @@ export function EventModal({
         </div>
 
         {/* ---- Footer ---- */}
-        {!confirmAction && !schedulerOpen && (
+        {!confirmAction && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
             {/* Actions danger (mode edit seulement) */}
             <div className="flex items-center gap-2">
@@ -907,11 +919,21 @@ export function EventModal({
               {!isCancelled && (
                 usesAssistant ? (
                   <button
-                    onClick={handleOpenScheduler}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    onClick={handleCreateFromAssistant}
+                    disabled={batchSaving || assistantSlots.length === 0}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <CalendarDays className="w-4 h-4" />
-                    Choisir un créneau
+                    {batchSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Création...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Créer le RDV
+                      </>
+                    )}
                   </button>
                 ) : (
                   <button

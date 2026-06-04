@@ -20,7 +20,7 @@
  * ============================================================================
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { CalendarCheck, Loader2, X, FileText, User } from 'lucide-react';
 import { DayResourceGrid } from './DayResourceGrid';
 import { SlotDraftList } from './SlotDraftList';
@@ -62,9 +62,12 @@ function newId() {
  * @param {number} [props.defaultDuration]
  * @param {string} [props.defaultSubjectPrefix]
  * @param {boolean} [props.multi] - false = 1 créneau (parité) ; true = multi-créneau
- * @param {Function} props.onConfirm - (slots[]) => void
+ * @param {Function} props.onConfirm - (slots[]) => void  (mode autonome, avec bouton)
  * @param {Function} props.onCancel
  * @param {boolean} [props.isLoading]
+ * @param {boolean} [props.embedded] - mode intégré : pas de header/objet/notes/boutons ;
+ *   remonte les créneaux en continu via onSlotsChange (le host gère objet/notes/confirmation).
+ * @param {Function} [props.onSlotsChange] - (slots[]) => void  (mode embedded, doit être stable)
  */
 export function SchedulingAssistant({
   lead,
@@ -83,6 +86,8 @@ export function SchedulingAssistant({
   onConfirm,
   onCancel,
   isLoading = false,
+  embedded = false,
+  onSlotsChange,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -202,6 +207,23 @@ export function SchedulingAssistant({
     [conflictsBySlot],
   );
 
+  // --- Mode intégré (embedded) : remonte en continu les créneaux au host (EventModal),
+  // sans bouton de confirmation interne. Objet/notes/subject sont gérés par le host. ---
+  const emittedSlots = useMemo(
+    () => draftSlots.map((s) => ({
+      date: s.date,
+      startTime: s.startTime,
+      endTime: s.endTime || null,
+      duration: s.duration || defaultDuration,
+      technicianIds: commercialMode ? [] : (s.technicianIds || []),
+      assignedCommercialId: commercialMode ? (s.technicianIds?.[0] || null) : null,
+    })),
+    [draftSlots, defaultDuration, commercialMode],
+  );
+  useEffect(() => {
+    if (embedded) onSlotsChange?.(emittedSlots);
+  }, [embedded, emittedSlots, onSlotsChange]);
+
   // --- Confirmation : remonte les slots[] au format du contrat ---
   // slots = [{ date, startTime, endTime, duration, technicianIds, assignedCommercialId, subject, notes }]
   // Mode technician : `technicianIds` porte les techniciens sélectionnés.
@@ -241,29 +263,33 @@ export function SchedulingAssistant({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-          <CalendarCheck className="w-5 h-5 text-blue-600" />
-          Planifier le RDV
-        </h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-500" />
-        </button>
-      </div>
+      {!embedded && (
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarCheck className="w-5 h-5 text-blue-600" />
+              Planifier le RDV
+            </h3>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
 
-      {/* Type de RDV */}
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <CalendarCheck className="w-3.5 h-3.5 text-blue-500" />
-        <span className="font-medium">{appointmentTypeLabel}</span>
-        <span className="text-gray-300">•</span>
-        <User className="w-3.5 h-3.5 text-indigo-500" />
-        <span className="text-gray-500">{assigneeDisplay}</span>
-      </div>
+          {/* Type de RDV */}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <CalendarCheck className="w-3.5 h-3.5 text-blue-500" />
+            <span className="font-medium">{appointmentTypeLabel}</span>
+            <span className="text-gray-300">•</span>
+            <User className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="text-gray-500">{assigneeDisplay}</span>
+          </div>
+        </>
+      )}
 
       {/* Grille jour × colonnes par membre */}
       <DayResourceGrid
@@ -287,32 +313,36 @@ export function SchedulingAssistant({
         showTechSelect={!commercialMode}
       />
 
-      {/* Objet */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-          <FileText className="w-3.5 h-3.5" />
-          Objet
-        </label>
-        <input
-          type="text"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="Objet du RDV"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-      </div>
+      {!embedded && (
+        <>
+          {/* Objet */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+              <FileText className="w-3.5 h-3.5" />
+              Objet
+            </label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Objet du RDV"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
 
-      {/* Notes internes */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes internes (optionnel)</label>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes pour l'équipe..."
-          rows={2}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-        />
-      </div>
+          {/* Notes internes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes internes (optionnel)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notes pour l'équipe..."
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            />
+          </div>
+        </>
+      )}
 
       {/* Compteur de conflits global */}
       {totalConflicts > 0 && (
@@ -321,38 +351,40 @@ export function SchedulingAssistant({
         </p>
       )}
 
-      {/* Boutons */}
-      <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isLoading || draftSlots.length === 0}
-          className="flex-1 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
-                     hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                     flex items-center justify-center gap-2 min-h-[44px]"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Planification...
-            </>
-          ) : (
-            <>
-              <CalendarCheck className="w-4 h-4" />
-              Planifier {draftSlots.length || ''} créneau{draftSlots.length > 1 ? 'x' : ''}
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isLoading}
-          className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg
-                     hover:bg-gray-50 transition-colors disabled:opacity-50 min-h-[44px]"
-        >
-          Annuler
-        </button>
-      </div>
+      {/* Boutons (mode autonome uniquement — en embedded, le host confirme) */}
+      {!embedded && (
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isLoading || draftSlots.length === 0}
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
+                       hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                       flex items-center justify-center gap-2 min-h-[44px]"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Planification...
+              </>
+            ) : (
+              <>
+                <CalendarCheck className="w-4 h-4" />
+                Planifier {draftSlots.length || ''} créneau{draftSlots.length > 1 ? 'x' : ''}
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isLoading}
+            className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg
+                       hover:bg-gray-50 transition-colors disabled:opacity-50 min-h-[44px]"
+          >
+            Annuler
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -600,7 +600,7 @@ export const appointmentsService = {
    * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes? }]
    * shared = { coreOrgId, appointment_type, lead_id?, intervention_id?, client_id?,
    *            client_name?, client_first_name?, client_phone?, client_email?,
-   *            address?, city?, postal_code?, assigned_commercial_id?, subjectPrefix? }
+   *            address?, city?, postal_code?, assigned_commercial_id?, description?, subjectPrefix? }
    * Retourne { data: [appointments...], error } — error = 1ère erreur rencontrée (best-effort, ne rollback pas les précédents).
    */
   async createAppointmentBatch(slots, shared) {
@@ -626,6 +626,7 @@ export const appointmentsService = {
         city: shared.city || null,
         postal_code: shared.postal_code || null,
         assigned_commercial_id: shared.assigned_commercial_id || null,
+        description: shared.description || null,
         status: 'scheduled',
         priority: 'normal',
         internal_notes: slot.notes || null,
