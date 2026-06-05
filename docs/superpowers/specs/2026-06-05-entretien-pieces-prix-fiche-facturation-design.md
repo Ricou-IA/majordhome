@@ -164,6 +164,18 @@ Aucune modif de service de lecture nécessaire (`select('*')`).
 
 ---
 
+## Itération UI (2026-06-05, post-validation Phase 1)
+
+Trois ajustements demandés après validation visuelle :
+
+1. **Carte — hauteur égale** : le montant pièces n'est plus sur une ligne dédiée (qui rendait les cartes inégales) mais **inline** sur la ligne du montant, en ambre, juste après le montant contrat (`190 € +100€`). `EntretienSAVCard.jsx`.
+2. **Fiche — détail des pièces** : la ligne unique « Pièces de rechange : XX € » est remplacée par un composant dédié **`EntretienPartsSection.jsx`** qui liste **une ligne par pièce** (désignation ×qté … prix) sous un en-tête avec le total. Source : nouveau champ dérivé `parts_detail` (jsonb agrégé sur les certificats parent+enfants, lignes vides filtrées, chaque pièce porte `intervention_id` + `idx` original pour le ciblage). Vue v2 (migration `entretien_parts_detail_and_offert`).
+3. **« Offert » par pièce (team_leader+)** : chaque ligne expose un bouton **Offrir / Annuler** visible seulement si `isTeamLeaderOrAbove`. Effet : pièce exclue du total (barrée + tag « Offert »). Persisté dans `pieces_remplacees[idx].offert` via RPC `public.certificat_set_piece_offert(p_intervention_id, p_piece_index, p_offert)` (SECURITY DEFINER, `search_path` locké, REVOKE anon, check membership + rôle `org_admin`/`team_leader` dérivé du certificat). Toggle **optimiste** + invalidation `entretienSavKeys.all(orgId)` → carte + total resync. `parts_total_ttc` (vue) **exclut** désormais l'offert (`CASE WHEN offert THEN 0 …`), donc le « +X€ » carte et la future facture Pennylane n'incluent jamais le gratuit.
+
+**Fichiers** : `EntretienSAVCard.jsx` (inline), `EntretienPartsSection.jsx` (nouveau), `EntretienSAVModal.jsx` (wiring), migrations `entretien_parts_detail_and_offert` (vue) + `certificat_set_piece_offert` (RPC).
+
+---
+
 ## Phase 2 — Facturation Pennylane (design préliminaire, NON implémenté)
 
 > Décision : shipper la Phase 1 d'abord, valider en prod, puis attaquer la Phase 2.
