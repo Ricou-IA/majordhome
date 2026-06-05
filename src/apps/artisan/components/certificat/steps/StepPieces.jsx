@@ -78,7 +78,7 @@ export function StepPieces({ formData, onChange }) {
                 onChange={(val) => updatePiece(index, 'quantite', val ? parseInt(val) : 1)}
               />
             </FormField>
-            <FormField label="Prix HT (€)">
+            <FormField label="Prix TTC (€)">
               <TextInput
                 type="number"
                 step="0.01"
