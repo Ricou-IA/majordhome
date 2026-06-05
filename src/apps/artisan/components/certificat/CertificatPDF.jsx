@@ -277,17 +277,15 @@ function CertificatDocument({ data, company }) {
           <>
             <Text style={s.sectionTitle}>PIECES REMPLACEES</Text>
             <View style={s.tableHeader}>
-              <Text style={[s.tableHeaderCell, { flex: 3 }]}>Designation</Text>
-              <Text style={[s.tableHeaderCell, { flex: 2 }]}>Reference</Text>
+              <Text style={[s.tableHeaderCell, { flex: 4 }]}>Designation</Text>
+              <Text style={[s.tableHeaderCell, { flex: 3 }]}>Reference</Text>
               <Text style={[s.tableHeaderCell, { flex: 1, textAlign: 'center' }]}>Qte</Text>
-              <Text style={[s.tableHeaderCell, { flex: 1, textAlign: 'right' }]}>Prix HT</Text>
             </View>
             {pieces.map((p, i) => (
               <View key={i} style={s.tableRow}>
-                <Text style={[s.tableCell, { flex: 3 }]}>{p.designation}</Text>
-                <Text style={[s.tableCell, { flex: 2 }]}>{p.reference || '-'}</Text>
+                <Text style={[s.tableCell, { flex: 4 }]}>{p.designation}</Text>
+                <Text style={[s.tableCell, { flex: 3 }]}>{p.reference || '-'}</Text>
                 <Text style={[s.tableCell, { flex: 1, textAlign: 'center' }]}>{p.quantite}</Text>
-                <Text style={[s.tableCell, { flex: 1, textAlign: 'right' }]}>{p.prix_ht ? `${p.prix_ht} EUR` : '-'}</Text>
               </View>
             ))}
           </>
