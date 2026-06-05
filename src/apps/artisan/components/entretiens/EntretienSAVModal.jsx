@@ -480,6 +480,17 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                   </div>
                 )}
 
+                {/* Total TTC des pièces saisies dans les certificats (préparation facturation) */}
+                {item.parts_total_ttc > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Wrench className="w-4 h-4 text-gray-400" />
+                    <span>Pièces de rechange</span>
+                    <span className="ml-auto text-sm font-semibold text-emerald-700">
+                      {formatEuro(item.parts_total_ttc)}
+                    </span>
+                  </div>
+                )}
+
                 {/* Équipements du contrat */}
                 {contractEquipments.length > 0 && (
                   <div className="flex items-start gap-2 text-sm text-gray-500">
