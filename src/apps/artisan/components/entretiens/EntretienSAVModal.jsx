@@ -38,6 +38,7 @@ import {
 } from '@services/sav.service';
 import { appointmentsService } from '@services/appointments.service';
 import { clientsService } from '@services/clients.service';
+import { EntretienPartsSection } from './EntretienPartsSection';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
@@ -480,16 +481,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                   </div>
                 )}
 
-                {/* Total TTC des pièces saisies dans les certificats (préparation facturation) */}
-                {item.parts_total_ttc > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Wrench className="w-4 h-4 text-gray-400" />
-                    <span>Pièces de rechange</span>
-                    <span className="ml-auto text-sm font-semibold text-emerald-700">
-                      {formatEuro(item.parts_total_ttc)}
-                    </span>
-                  </div>
-                )}
+                {/* Pièces de rechange : détail + toggle « Offert » (team_leader+) */}
+                <EntretienPartsSection item={item} orgId={item.org_id} />
 
                 {/* Équipements du contrat */}
                 {contractEquipments.length > 0 && (
