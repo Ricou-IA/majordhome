@@ -162,6 +162,15 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             )}
           </div>
 
+          {/* Montant pièces (TTC) — à facturer en plus du contrat */}
+          {Number(item.parts_total_ttc) > 0 && (
+            <div className="flex justify-end">
+              <span className="text-[10px] font-medium text-amber-700">
+                + {formatEuro(Number(item.parts_total_ttc))} pièces
+              </span>
+            </div>
+          )}
+
           {/* Ligne 2 : Code postal + ville */}
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
