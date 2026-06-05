@@ -31,7 +31,7 @@ Ce prix sert deux besoins qui se mélangent mal :
 
 **Phase 1 (ce sprint)** :
 - Retirer le prix des pièces du certificat PDF (liste conservée).
-- Calculer le total HT des pièces d'un entretien à la source (vue), une seule fois.
+- Calculer le total TTC des pièces d'un entretien à la source (vue), une seule fois.
 - Afficher ce total sur la modale et sur la carte Kanban.
 
 **Phase 2 (différée, conçue ici pour cohérence)** :
@@ -43,7 +43,9 @@ Ce prix sert deux besoins qui se mélangent mal :
 - Coût de main-d'œuvre.
 
 ## Hypothèses validées
-- `prix_ht` = **prix unitaire HT**. Montant d'une ligne = `prix_ht × quantité`. Total pièces = Σ des lignes, **en HT**.
+- **Prix saisis en TTC** (décision Eric : la table sera remplie en TTC). Le montant des contrats est **déjà TTC** en base (`contracts.amount`) → les deux lignes de la fiche (contrat + pièces) sont sur la même base, cohérentes.
+- La valeur saisie est un **prix unitaire TTC**. Montant d'une ligne = `prix × quantité`. Total pièces = Σ des lignes, **en TTC**.
+- **Clé JSONB inchangée** : la clé reste `prix_ht` (nom historique) mais contient désormais du TTC. On **ne migre pas** les données existantes ni la clé. On relabellise seulement la saisie (étape 7) et on nomme le champ dérivé `parts_total_ttc`. Le découplage propre HT/TTC est repoussé en Phase 2, où Pennylane impose le HT (dérivé du TTC via `tva_taux`).
 - Le total s'affiche **dès qu'au moins une pièce avec prix est saisie** (en pratique : pendant/après l'étape 7).
 - La future facture Pennylane ne porte **que les pièces** (pas le contrat).
 
@@ -51,7 +53,7 @@ Ce prix sert deux besoins qui se mélangent mal :
 
 ## Phase 1 — Décisions de design
 
-### 1. Source unique du total : champ dérivé `parts_total_ht` dans la vue `majordhome_entretien_sav`
+### 1. Source unique du total : champ dérivé `parts_total_ttc` dans la vue `majordhome_entretien_sav`
 
 **Pourquoi la vue plutôt que le frontend** : la carte Kanban est une liste ; agréger par carte côté front = N+1 requêtes. En posant le calcul dans la vue (déjà `security_invoker=true`, déjà des `LEFT JOIN LATERAL` pour `next_rdv_date`), le total est disponible **partout sans requête supplémentaire** et se **met à jour tout seul** quand un certificat change. Pas de dénormalisation à resynchroniser, donc pas de dérive possible.
 
@@ -59,14 +61,14 @@ Ce prix sert deux besoins qui se mélangent mal :
 - sur le **parent lui-même** (`certificats.intervention_id = i.id`) — flux mono-équipement / legacy,
 - sur ses **enfants** (`certificats.intervention_id IN (enfants où parent_id = i.id)`) — flux multi-équipements (lazy-create).
 
-L'agrégat **somme les deux** pour ne rien rater. Les `prix_ht` à `null` comptent pour 0.
+L'agrégat **somme les deux** pour ne rien rater. Les `prix_ht` à `null` comptent pour 0. (La clé JSONB est `prix_ht` par historique mais contient du TTC — cf. Hypothèses ; le champ dérivé est donc nommé `parts_total_ttc`.)
 
 **SQL ajouté à la `SELECT` de la vue** (scalar subquery, à insérer à côté de `contract_amount`) :
 
 ```sql
 COALESCE((
   SELECT SUM(
-    COALESCE((elem->>'prix_ht')::numeric, 0)
+    COALESCE((elem->>'prix_ht')::numeric, 0)          -- clé historique, valeur TTC
     * COALESCE(NULLIF(elem->>'quantite', '')::numeric, 1)
   )
   FROM majordhome.certificats cert
@@ -75,7 +77,7 @@ COALESCE((
      OR cert.intervention_id IN (
           SELECT ch.id FROM majordhome.interventions ch WHERE ch.parent_id = i.id
         )
-), 0) AS parts_total_ht
+), 0) AS parts_total_ttc
 ```
 
 **Contraintes à respecter (charte multi-tenant)** :
@@ -83,9 +85,9 @@ COALESCE((
 - `GRANT SELECT ON majordhome.certificats TO service_role;` (idempotent) — la vue lit désormais cette table ; sous `security_invoker`, RLS suffit pour le frontend, mais une lecture service_role planterait en `42501` silencieux sans ce GRANT (`majordhome.interventions` est déjà accordé puisque la vue le lit déjà).
 - Pas de filtre `org_id` à ajouter dans la subquery : la portée org est déjà garantie par la jointure `i → core.projects p` de la vue + RLS sur `certificats`.
 
-**Migration** : versionnée via `apply_migration` (DDL), nom type `20260605_entretien_parts_total_ht.sql`.
+**Migration** : versionnée via `apply_migration` (DDL), nom type `20260605_entretien_parts_total_ttc.sql`.
 
-**Impact frontend de lecture** : `savService.getEntretiensSAV` fait `.select('*')` → `item.parts_total_ht` devient disponible **sans changement de service**.
+**Impact frontend de lecture** : `savService.getEntretiensSAV` fait `.select('*')` → `item.parts_total_ttc` devient disponible **sans changement de service**.
 
 ### 2. PDF certificat — retrait du prix
 
@@ -94,19 +96,20 @@ Fichier : `src/apps/artisan/components/certificat/CertificatPDF.jsx` (section «
 - **Supprimer** l'en-tête de colonne `Prix HT` (ligne ~283) et la cellule `{p.prix_ht ? ...}` (ligne ~290).
 - **Redistribuer** les `flex` restants pour occuper la largeur : `Designation` 3→4, `Reference` 2→3, `Qte` inchangé (1, centré).
 - Conserver Désignation / Référence / Quantité → la traçabilité reste sur le document client, sans tarif.
-- **Aucun changement** à la saisie étape 7 (`StepPieces.jsx`) ni au stockage (`certificats.service.js` continue de persister `pieces_remplacees` avec `prix_ht`). Le prix reste capturé, simplement il ne s'imprime plus.
+- **Stockage inchangé** : `certificats.service.js` continue de persister `pieces_remplacees` avec la clé `prix_ht`. Le prix reste capturé, simplement il ne s'imprime plus.
+- **Une seule modif à la saisie étape 7** (`StepPieces.jsx`) : relabelliser le champ `Prix HT (€)` → **`Prix TTC (€)`** (la clé stockée reste `prix_ht`). Aucune autre modif du formulaire.
 
 ### 3. Fiche (modale entretien) — ligne « Pièces de rechange : XX € »
 
 Fichier : `src/apps/artisan/components/entretiens/EntretienSAVModal.jsx`, juste **après le bloc contrat** (après la ligne ~481, avant le bloc « Équipements du contrat »).
 
 ```jsx
-{item.parts_total_ht > 0 && (
+{item.parts_total_ttc > 0 && (
   <div className="flex items-center gap-2 text-sm text-gray-500">
     <Wrench className="w-4 h-4 text-gray-400" />
     <span>Pièces de rechange</span>
     <span className="ml-auto text-sm font-semibold text-emerald-700">
-      {formatEuro(item.parts_total_ht)}
+      {formatEuro(item.parts_total_ttc)}
     </span>
   </div>
 )}
@@ -114,34 +117,35 @@ Fichier : `src/apps/artisan/components/entretiens/EntretienSAVModal.jsx`, juste 
 
 - Même gabarit visuel que la ligne contrat (icône + libellé + montant aligné à droite, vert émeraude).
 - `formatEuro` déjà importé dans le fichier. Icône : réutiliser une icône Lucide déjà présente (`Wrench` / `Package`).
-- Montant **HT** ; libellé explicite (« Pièces de rechange »). Pas de mention HT/TTC inline pour rester lisible — c'est un indicateur de préparation facturation, pas un document comptable.
+- Montant **TTC**, même base que le contrat juste au-dessus → pas de mention HT/TTC inline nécessaire, les deux lignes sont homogènes.
 
 ### 4. Carte Kanban — montant pièces secondaire
 
 Fichier : `src/apps/artisan/components/entretiens/EntretienSAVCard.jsx` (montant principal calculé ~lignes 71-76, rendu ~lignes 158-162).
 
 - Le montant principal reste inchangé (contrat, ou devis+contrat pour SAV).
-- Ajouter, sous/à côté du montant principal, un **petit montant secondaire** affiché seulement si `item.parts_total_ht > 0` :
+- Ajouter, sous/à côté du montant principal, un **petit montant secondaire** affiché seulement si `item.parts_total_ttc > 0` :
 
 ```jsx
-{Number(item.parts_total_ht) > 0 && (
+{Number(item.parts_total_ttc) > 0 && (
   <span className="text-[10px] font-medium text-amber-700">
-    + {formatEuro(item.parts_total_ht)} pièces
+    + {formatEuro(item.parts_total_ttc)} pièces
   </span>
 )}
 ```
 
-- Couleur distincte du montant contrat (ambre) pour signaler « à facturer en plus ».
+- Couleur distincte du montant contrat (ambre) pour signaler « à facturer en plus ». (À confirmer : ambre vs vert discret comme le contrat.)
 - Visible dès qu'il y a des pièces valorisées (= certificat en cours/établi), ce qui répond à « ajouter le montant des pièces sur la carte quand le certificat est établi ».
 
 ### Fichiers touchés (Phase 1)
 
 | Fichier | Changement |
 |---|---|
-| Migration SQL `majordhome.*` | Ajout `parts_total_ht` à la vue `majordhome_entretien_sav` + `GRANT SELECT certificats TO service_role` + `security_invoker` préservé |
+| Migration SQL `majordhome.*` | Ajout `parts_total_ttc` à la vue `majordhome_entretien_sav` + `GRANT SELECT certificats TO service_role` + `security_invoker` préservé |
 | `CertificatPDF.jsx` | Retrait colonne Prix HT (header + cellule), redistribution flex |
-| `EntretienSAVModal.jsx` | Nouvelle ligne « Pièces de rechange : XX € » sous le contrat |
-| `EntretienSAVCard.jsx` | Montant pièces secondaire ambre si `parts_total_ht > 0` |
+| `StepPieces.jsx` | Relabel champ `Prix HT (€)` → `Prix TTC (€)` (clé stockée inchangée) |
+| `EntretienSAVModal.jsx` | Nouvelle ligne « Pièces de rechange : XX € » (TTC) sous le contrat |
+| `EntretienSAVCard.jsx` | Montant pièces secondaire ambre si `parts_total_ttc > 0` |
 
 Aucune modif de service de lecture nécessaire (`select('*')`).
 
@@ -149,7 +153,7 @@ Aucune modif de service de lecture nécessaire (`select('*')`).
 
 - **Pièces sans prix** (`prix_ht: null`) → comptent 0, n'apparaissent pas comme montant. Liste toujours imprimée dans le PDF (traçabilité).
 - **Double saisie parent + enfant d'une même pièce avec prix** → risque théorique de double comptage. En pratique le flux écrit soit sur le parent (mono/legacy), soit sur les enfants (lazy-create) ; les données observées n'ont de prix que d'un côté. Risque accepté et documenté ; aucune contrainte ajoutée.
-- **Aucune pièce** → `parts_total_ht = 0`, aucune ligne ni badge affichés (rendu identique à l'existant).
+- **Aucune pièce** → `parts_total_ttc = 0`, aucune ligne ni badge affichés (rendu identique à l'existant).
 - **Quantité vide/absente** → traitée comme 1 (`NULLIF(...,'')` + `COALESCE(...,1)`).
 
 ### Validation
@@ -166,7 +170,9 @@ Aucune modif de service de lecture nécessaire (`select('*')`).
 
 **État de l'intégration** : le proxy Pennylane sait créer **clients** (`POST /customers`) et **devis** (`POST/PUT /quotes`), mais **bloque la création de factures** (`/customer_invoices` en `GET` uniquement). Il n'existe aujourd'hui aucun flux de création de facture in-app.
 
-**Approche cible** : bouton « Facturer les pièces sur Pennylane » sur la carte/modale (entretien avec `parts_total_ht > 0`, certificat établi) → crée un **brouillon de facture** (facture en brouillon, validée/envoyée ensuite depuis Pennylane), lignes = pièces (désignation, qté, prix unitaire HT, TVA `tva_taux` du certificat).
+**Approche cible** : bouton « Facturer les pièces sur Pennylane » sur la carte/modale (entretien avec `parts_total_ttc > 0`, certificat établi) → crée un **brouillon de facture** (facture en brouillon, validée/envoyée ensuite depuis Pennylane), lignes = pièces (désignation, qté, prix, TVA).
+
+**Conséquence du choix TTC** : les prix sont saisis en **TTC**, or Pennylane raisonne en **HT + TVA**. Au moment de construire la facture, dériver le HT du TTC via le `tva_taux` du certificat : `prix_ht = prix_ttc / (1 + tva_taux/100)` (mapping `TVA_MAPPING`). C'est le moment naturel pour introduire un découplage HT/TTC propre des lignes (clé JSONB encore nommée `prix_ht` mais contenant du TTC en Phase 1).
 
 **Travaux nécessaires (≈2 jours)** :
 1. **Proxy** : ajouter `POST` à `/customer_invoices` dans l'allowlist (`supabase/functions/pennylane-proxy/index.ts`).
@@ -177,7 +183,7 @@ Aucune modif de service de lecture nécessaire (`select('*')`).
 **Questions à trancher au démarrage Phase 2** :
 - Facture **brouillon** (recommandé : l'humain valide dans Pennylane) vs finalisée directement.
 - Comportement si le client n'a pas encore de customer Pennylane (créer à la volée vs bloquer).
-- Granularité : 1 facture par entretien (somme des pièces tous équipements) — cohérent avec le `parts_total_ht`.
+- Granularité : 1 facture par entretien (somme des pièces tous équipements) — cohérent avec le `parts_total_ttc`.
 
 ---
 
