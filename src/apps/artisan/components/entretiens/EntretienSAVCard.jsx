@@ -155,21 +155,21 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             <span className="font-medium text-sm text-gray-900 truncate">
               {name}
             </span>
-            {amount > 0 && (
-              <span className="text-xs font-semibold text-emerald-700 flex-shrink-0">
-                {formatEuro(amount)}
+            {(amount > 0 || Number(item.parts_total_ttc) > 0) && (
+              <span className="flex items-baseline gap-1 flex-shrink-0">
+                {amount > 0 && (
+                  <span className="text-xs font-semibold text-emerald-700">
+                    {formatEuro(amount)}
+                  </span>
+                )}
+                {Number(item.parts_total_ttc) > 0 && (
+                  <span className="text-[10px] font-medium text-amber-700" title="Pièces de rechange (à facturer en plus)">
+                    +{formatEuro(Number(item.parts_total_ttc))}
+                  </span>
+                )}
               </span>
             )}
           </div>
-
-          {/* Montant pièces (TTC) — à facturer en plus du contrat */}
-          {Number(item.parts_total_ttc) > 0 && (
-            <div className="flex justify-end">
-              <span className="text-[10px] font-medium text-amber-700">
-                + {formatEuro(Number(item.parts_total_ttc))} pièces
-              </span>
-            </div>
-          )}
 
           {/* Ligne 2 : Code postal + ville */}
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
