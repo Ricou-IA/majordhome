@@ -13,6 +13,7 @@ import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } f
 import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
 import Step1Localisation from '../components/Step1Localisation';
+import Step2Consommation from '../components/Step2Consommation';
 
 const STEPS = [
   { n: 1, label: 'Localisation' },
@@ -190,7 +191,15 @@ function SimulateurInner({ config }) {
         />
       )}
       {state.step === 2 && (
-        <div className="card text-sm text-secondary-500">Étape 2 — en construction (Task G3)</div>
+        <Step2Consommation
+          conso={state.conso}
+          ev={state.ev}
+          config={config}
+          onConso={(patch) => dispatch({ type: 'SET_CONSO', patch })}
+          onEv={(patch) => dispatch({ type: 'SET_EV', patch })}
+          onBack={() => goToStep(1)}
+          onNext={() => goToStep(3)}
+        />
       )}
       {state.step === 3 && (
         <div className="card text-sm text-secondary-500">Étape 3 — en construction (Task G4)</div>
