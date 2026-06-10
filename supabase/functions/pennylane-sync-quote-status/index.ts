@@ -38,13 +38,14 @@ interface PennylaneCustomer {
   name?: string;
   first_name?: string;
   last_name?: string;
-  emails?: Array<{ label?: string; value?: string; is_default?: boolean }>;
+  emails?: Array<string | { label?: string; value?: string; is_default?: boolean }>;
   billing_email?: string;
   phone?: string;
   billing_phone?: string;
   billing_iban?: string;
   billing_address?: {
     street?: string;
+    address?: string;
     postal_code?: string;
     city?: string;
   };
@@ -128,6 +129,25 @@ async function callPennylaneApi(
   return { status: 429, data: { error: "Rate limit after retries" } };
 }
 
+// PL V2 : `emails` peut etre un array de strings (["x@y.fr"]) OU d'objets
+// ({ value, is_default }). On gere les deux formes (mirror frontend
+// extractCustomerEmail). Bug 2026-06-10 : la forme string-array etait ignoree
+// (lecture .value sur une string -> undefined), l'email n'etait jamais synced.
+function extractEmail(c: PennylaneCustomer): string | undefined {
+  if (c.billing_email?.trim()) return c.billing_email.trim();
+  if (Array.isArray(c.emails)) {
+    const def = c.emails.find(
+      (e) => e && typeof e === "object" && e.is_default && e.value?.trim(),
+    );
+    if (def && typeof def === "object" && def.value) return def.value.trim();
+    for (const e of c.emails) {
+      if (typeof e === "string" && e.trim()) return e.trim();
+      if (e && typeof e === "object" && e.value?.trim()) return e.value.trim();
+    }
+  }
+  return undefined;
+}
+
 // Helpers extraction non-vide depuis customer PL (mirror frontend service)
 function extractUpdatePayload(c: PennylaneCustomer): Record<string, string> {
   const p: Record<string, string> = {};
@@ -135,18 +155,15 @@ function extractUpdatePayload(c: PennylaneCustomer): Record<string, string> {
   if (c.first_name?.trim()) p.first_name = c.first_name.trim();
   if (c.last_name?.trim()) p.last_name = c.last_name.trim();
 
-  const email =
-    c.billing_email?.trim() ||
-    c.emails?.find((e) => e.is_default)?.value?.trim() ||
-    c.emails?.[0]?.value?.trim();
+  const email = extractEmail(c);
   if (email) p.email = email;
 
   const phone = (c.billing_phone || c.phone)?.trim();
   if (phone) p.phone = phone;
 
-  if (c.billing_address?.street?.trim()) {
-    p.address = c.billing_address.street.trim();
-  }
+  // PL V2 : billing_address.address (et non .street). Fallback .street par securite.
+  const addr = c.billing_address?.address?.trim() || c.billing_address?.street?.trim();
+  if (addr) p.address = addr;
   if (c.billing_address?.postal_code?.trim()) {
     p.postal_code = c.billing_address.postal_code.trim();
   }

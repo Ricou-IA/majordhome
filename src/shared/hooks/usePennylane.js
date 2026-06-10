@@ -549,13 +549,16 @@ function buildContactPatchFromCustomer(lead, customer) {
  */
 async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
   // 1. Lire le lead avec tous les fields contact (élargi vs version précédente)
+  // Lecture via la vue publique : le schema `majordhome` n'est PAS exposé via
+  // PostgREST -> `.schema('majordhome').from(...)` renvoie 406. La lecture
+  // plantait ici, faisant echouer en SILENCE tout le contact-sync post-attach
+  // (email/adresse jamais repris depuis Pennylane). cf bug rapproche 2026-06-10.
   const { data: lead, error: leadErr } = await supabase
-    .schema('majordhome')
-    .from('leads')
+    .from('majordhome_leads')
     .select('id, client_id, first_name, last_name, email, phone, address, address_complement, postal_code, city')
     .eq('id', leadId)
     .eq('org_id', orgId)
-    .single();
+    .maybeSingle();
   if (leadErr) throw leadErr;
   if (!lead) return { skipped: 'lead_not_found' };
 
@@ -631,8 +634,7 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
 
   // 6. Pose le mapping pennylane_sync (upsert idempotent)
   await supabase
-    .schema('majordhome')
-    .from('pennylane_sync')
+    .from('majordhome_pennylane_sync')
     .upsert(
       {
         org_id: orgId,
@@ -645,14 +647,14 @@ async function ensureClientForLeadFromPennylane(orgId, leadId, userId) {
       { onConflict: 'org_id,entity_type,local_id' }
     );
 
-  // 7. Update pennylane_client_id sur les liaisons de ce lead
-  await supabase
-    .schema('majordhome')
-    .from('lead_pennylane_quotes')
-    .update({ pennylane_client_id: clientId })
-    .eq('lead_id', leadId)
-    .is('ejected_at', null)
-    .is('pennylane_client_id', null);
+  // 7. Update pennylane_client_id sur les liaisons de ce lead.
+  // Via RPC : la vue `majordhome_lead_pennylane_quotes` n'est pas updatable
+  // (et `.schema('majordhome')` renvoie 406 — schema non exposé).
+  await supabase.rpc('lead_pennylane_quotes_link_client', {
+    p_lead_id: leadId,
+    p_org_id: orgId,
+    p_client_id: clientId,
+  });
 
   return { client_id: clientId, created_client: createdClient, contact_synced: hasLeadPatch };
 }
