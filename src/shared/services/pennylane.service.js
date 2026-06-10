@@ -615,6 +615,71 @@ async function fetchCustomerNamesByIds(customerIds) {
   return names;
 }
 
+// Plafond de fetch live /customers/{id} par appel de resolveCustomerNames.
+// Borne l'usage proxy quand le cache est froid (au-delà → nom vide, ligne
+// cachée par l'UI). Le write-through peuple le cache pour les appels suivants.
+const CUSTOMER_NAME_LIVE_CAP = 40;
+
+/**
+ * Résout le nom d'affichage de N customers PL — cache-first, borné.
+ *
+ * Pourquoi : l'endpoint LISTE `/quotes` de Pennylane V2 n'embarque QUE
+ * `customer.id` (confirmé empiriquement, cf commit ef7c175), PAS le nom.
+ * Faire un fetch /customers/{id} sur les ~100 devis explorés saturait le proxy
+ * (cf ad57337, qui avait alors retiré l'enrichissement → régression de
+ * l'affichage du nom dans QuoteCandidatesModal).
+ *
+ * Stratégie :
+ *   1. Cache D.5 `pennylane_customer_lookup` : 1 SELECT batch (RLS org), 0 appel PL.
+ *   2. Fallback live /customers/{id} sur les manquants UNIQUEMENT, borné à
+ *      CUSTOMER_NAME_LIVE_CAP + pLimit(5) (via fetchCustomersByIds), avec
+ *      write-through qui peuple le cache pour les prochains appels (self-healing).
+ *
+ * Jamais throw : un échec renvoie une Map partielle.
+ *
+ * @param {string} orgId
+ * @param {Array<number|string>} customerIds
+ * @returns {Promise<Map<string, string>>} Map string(id) → display name
+ */
+async function resolveCustomerNames(orgId, customerIds) {
+  const names = new Map();
+  const ids = Array.from(
+    new Set((customerIds || []).filter(Boolean).map((id) => String(id)))
+  );
+  if (!orgId || ids.length === 0) return names;
+
+  // 1. Cache write-through (pennylane_customer_lookup) — 1 requête, 0 appel PL
+  try {
+    const { data, error } = await supabase
+      .from('majordhome_pennylane_customer_lookup')
+      .select('pennylane_id, name, first_name, last_name')
+      .eq('org_id', orgId)
+      .in('pennylane_id', ids.map(Number));
+    if (error) {
+      logger.warn('[pennylane.resolveCustomerNames] cache select', error?.message || error);
+    } else {
+      for (const row of data || []) {
+        const nm = formatPennylaneCustomerName(row);
+        if (nm) names.set(String(row.pennylane_id), nm);
+      }
+    }
+  } catch (err) {
+    logger.warn('[pennylane.resolveCustomerNames] cache unexpected', err?.message || err);
+  }
+
+  // 2. Fallback live borné sur les manquants (write-through peuple le cache)
+  const missing = ids.filter((id) => !names.has(id));
+  if (missing.length > 0) {
+    const customers = await fetchCustomersByIds(missing.slice(0, CUSTOMER_NAME_LIVE_CAP), orgId);
+    customers.forEach((c, id) => {
+      const nm = formatPennylaneCustomerName(c);
+      if (nm) names.set(String(id), nm);
+    });
+  }
+
+  return names;
+}
+
 /**
  * Récupère les devis Pennylane d'un client via le proxy.
  * Lookup pennylane_sync pour trouver le pennylane_id du client,
@@ -1257,6 +1322,21 @@ async function getCandidateQuotesForLead(leadId, orgId, { sinceDays = 30, maxQuo
     });
   }
 
+  // Enrichir customer_name manquant : pour un lead sans email NI phone on ne
+  // fetch pas les customers en amont (perf ad57337) et q.customer embedded n'a
+  // que l'id → nom vide. Résolution cache-first bornée sur les seuls manquants.
+  const missingNameIds = results
+    .filter(r => !r.quote.customer_name && r.quote.customer_id)
+    .map(r => r.quote.customer_id);
+  if (missingNameIds.length > 0) {
+    const namesById = await resolveCustomerNames(orgId, missingNameIds);
+    for (const r of results) {
+      if (!r.quote.customer_name && r.quote.customer_id) {
+        r.quote.customer_name = namesById.get(String(r.quote.customer_id)) || null;
+      }
+    }
+  }
+
   return results;
 }
 
@@ -1344,9 +1424,15 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
 
   const sliced = filtered.slice(0, limit);
 
-  // Note perf : on n'enrichit PLUS via /customers/{id}. Pennylane V2 retourne
-  // déjà `q.customer.name` / `first_name` / `last_name` embedded dans /quotes,
-  // suffisant pour l'affichage. Le fetch batch saturait le proxy (cf pLimit).
+  // Enrichissement nom client : l'endpoint LISTE /quotes n'embarque que
+  // customer.id (PL V2, cf ef7c175), PAS le nom. resolveCustomerNames résout
+  // cache-first (pennylane_customer_lookup) + fallback live borné — restaure
+  // l'affichage du nom dans QuoteCandidatesModal régressé par ad57337.
+  const namesById = await resolveCustomerNames(
+    orgId,
+    sliced.map(q => q.customer?.id),
+  );
+
   return sliced.map(q => ({
     id: q.id,
     quote_number: q.quote_number || q.label || null,
@@ -1359,7 +1445,9 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
     status: q.status || null,
     pdf_url: q.public_file_url || null,
     customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer),
+    customer_name: formatPennylaneCustomerName(q.customer)
+      || (q.customer?.id ? namesById.get(String(q.customer.id)) : null)
+      || null,
   }));
 }
 
