@@ -1,8 +1,8 @@
 // src/apps/solaire/components/Step3Resultats.jsx
 // Étape 3 : pipeline de calcul complet (optimiseur → scénarios → financement
 // → tableau annuel). Le surplus n'est JAMAIS valorisé en € (spec §1).
-import { useMemo } from 'react';
-import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save } from 'lucide-react';
 import { formatEuro } from '@lib/utils';
 import {
   computeMonthly, yearlyEconomy, monthlyPayment, buildYearlyTable,
@@ -13,11 +13,13 @@ import ScenarioCards from './ScenarioCards';
 import MonthlyChart from './MonthlyChart';
 import FinancingModule from './FinancingModule';
 import TableauAnnuel from './TableauAnnuel';
+import SaveSimulationModal from './SaveSimulationModal';
 
 export default function Step3Resultats({
-  state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onBack, footer,
+  state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onBack, onSave, isSaving,
 }) {
   const { conso, ev, roof, pvgis, selectedKwc, financing } = state;
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   // --- Conso effective (+ VE linéarisé, spec §8.6 : AVANT l'optimiseur) ---
   const evMonthly = ev.enabled
@@ -230,8 +232,43 @@ export default function Step3Resultats({
         >
           <ArrowLeft className="w-4 h-4" /> Retour
         </button>
-        {footer}
+        <button
+          onClick={() => setShowSaveModal(true)}
+          className="btn-primary flex-1 py-3 flex items-center justify-center gap-2"
+        >
+          <Save className="w-4 h-4" /> Enregistrer la simulation
+        </button>
       </div>
+
+      <SaveSimulationModal
+        open={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        isSaving={isSaving}
+        onSave={async ({ clientName, comment }) => {
+          await onSave({
+            clientName,
+            comment,
+            results: {
+              recommendedKwc: results.recommendedKwc,
+              selectedKwc: activeKwc,
+              tauxAutoconso: Math.round(active.totals.tauxAutoconso * 1000) / 1000,
+              tauxAutoproduction: Math.round(active.totals.tauxAutoproduction * 1000) / 1000,
+              economyYear1: Math.round(economyYear1Active),
+              mensualite: mensualite !== null ? Math.round(mensualite * 100) / 100 : null,
+              capital,
+              indicators: table
+                ? {
+                    avgMonthlyEffortDuringLoan: Math.round(table.indicators.avgMonthlyEffortDuringLoan * 100) / 100,
+                    neutralityYear: table.indicators.neutralityYear,
+                    cumulAtLoanEnd: Math.round(table.indicators.cumulAtLoanEnd),
+                    totalGainAtHorizon: Math.round(table.indicators.totalGainAtHorizon),
+                  }
+                : null,
+            },
+          });
+          setShowSaveModal(false);
+        }}
+      />
     </div>
   );
 }

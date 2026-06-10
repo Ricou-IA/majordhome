@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { History, RotateCcw, Loader2, Check } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { usePvSimulation } from '@hooks/usePvSimulations';
+import { usePvSimulation, usePvSimulationMutations } from '@hooks/usePvSimulations';
 import { buildPvConfig } from '../lib/pvConfig';
 import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } from '../lib/wizardState';
 import { fetchPvgis1kwc } from '../lib/pvgis';
@@ -41,6 +41,7 @@ function SimulateurInner({ config }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const simId = searchParams.get('sim');
   const { data: savedSim } = usePvSimulation(simId);
+  const { createSimulation } = usePvSimulationMutations();
 
   const [state, dispatch] = useReducer(wizardReducer, config, initialWizardState);
   const restoredRef = useRef(false);
@@ -120,6 +121,33 @@ function SimulateurInner({ config }) {
     setPvgisError(null);
     if (simId) setSearchParams({}, { replace: true });
     dispatch({ type: 'RESET', config });
+  };
+
+  const handleSave = async ({ clientName, comment, results }) => {
+    try {
+      await createSimulation.mutateAsync({
+        clientName,
+        comment,
+        clientAddress: state.location.address || null,
+        lat: state.location.lat,
+        lon: state.location.lon,
+        inputs: {
+          location: state.location,
+          roof: state.roof,
+          conso: state.conso,
+          ev: state.ev,
+          financing: state.financing,
+          selectedKwc: results.selectedKwc,
+        },
+        pvgisMonthly: state.pvgis,
+        results,
+      });
+      clearDraft(userId);
+      toast.success(`Simulation « ${clientName} » enregistrée`);
+    } catch (err) {
+      toast.error(`Échec de l'enregistrement : ${err.message}`);
+      throw err;
+    }
   };
 
   const goToStep = (n) => dispatch({ type: 'SET_STEP', step: n });
@@ -216,6 +244,8 @@ function SimulateurInner({ config }) {
           }}
           onFinancing={(patch) => dispatch({ type: 'SET_FINANCING', patch })}
           onBack={() => goToStep(2)}
+          onSave={handleSave}
+          isSaving={createSimulation.isPending}
         />
       )}
     </div>
