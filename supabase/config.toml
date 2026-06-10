@@ -54,6 +54,10 @@ verify_jwt = false
 [functions.pennylane-proxy]
 verify_jwt = true
 
+# Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
+[functions.pvgis-proxy]
+verify_jwt = true
+
 [functions.gsc-oauth-init]
 verify_jwt = true
 
