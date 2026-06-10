@@ -71,7 +71,7 @@ import { devisService } from '@services/devis.service';
  * @param {Function} props.onClose - Fermer
  * @param {Function} props.onSaved - Callback après save/create
  */
-export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false }) {
+export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false, autoQuote = false }) {
   const isEditing = !!leadId;
   const { organization, user, effectiveRole } = useAuth();
   const { can, canEdit, isOwner } = useCanAccess();
@@ -260,6 +260,15 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       setPendingRdvStatusId(rdvStatus.id);
     }
   }, [autoSchedule, isOpen, isEditing, lead, statuses]);
+
+  // Auto-quote : ouvrir directement la modale d'attache de devis Pennylane
+  // (drag kanban → « Devis envoyé » sur une org PL). Le rattachement d'un devis
+  // est obligatoire pour basculer en « Devis envoyé » (invariant garanti côté
+  // DB par le trigger enforce_devis_envoye_requires_quote).
+  useEffect(() => {
+    if (!autoQuote || !isOpen || !isEditing || !lead || !pennylaneActive) return;
+    setShowQuoteCandidates(true);
+  }, [autoQuote, isOpen, isEditing, lead, pennylaneActive]);
 
   // ========== HANDLERS ==========
 
@@ -641,6 +650,12 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
 
   // Envoyer le devis (marquer brouillons comme envoyés + transition lead → Devis envoyé)
   const handleSendDevis = async () => {
+    // Org Pennylane : « Devis envoyé » exige le rattachement d'un devis PL
+    // (invariant DB). On route vers la modale d'attache plutôt que le flux MDH.
+    if (pennylaneActive) {
+      setShowQuoteCandidates(true);
+      return;
+    }
     try {
       // 1. Marquer tous les devis brouillon comme envoyés
       const { data: quotes } = await devisService.getQuotesByLead(leadId);

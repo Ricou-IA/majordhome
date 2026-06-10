@@ -62,6 +62,7 @@ export default function Pipeline() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [autoSchedule, setAutoSchedule] = useState(false);
+  const [autoQuote, setAutoQuote] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Onglet actif (supporte ?tab=kanban depuis le dashboard)
@@ -81,6 +82,7 @@ export default function Pipeline() {
   const handleLeadClick = (lead, options) => {
     setSelectedLeadId(lead.id);
     setAutoSchedule(!!options?.autoSchedule);
+    setAutoQuote(!!options?.autoQuote);
     setModalOpen(true);
   };
 
@@ -93,6 +95,7 @@ export default function Pipeline() {
     setModalOpen(false);
     setSelectedLeadId(null);
     setAutoSchedule(false);
+    setAutoQuote(false);
   };
 
   const handleModalSaved = () => {
@@ -192,6 +195,7 @@ export default function Pipeline() {
         onClose={handleModalClose}
         onSaved={handleModalSaved}
         autoSchedule={autoSchedule}
+        autoQuote={autoQuote}
       />
     </div>
   );

@@ -20,6 +20,7 @@ import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LeadCard } from './LeadCard';
 import { CallModal } from './CallModal';
 import { QuoteModal } from './QuoteModal';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { MoveToLongTermModal } from './longTerm/MoveToLongTermModal';
 import { ALLOWED_TRANSITIONS, LOST_REASONS } from './LeadStatusConfig';
 
@@ -515,6 +516,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
 
   // Etat pour le prompt "Devis envoye" depuis le kanban
   const [pendingQuote, setPendingQuote] = useState(null); // { leadId, newStatusId, oldStatusId, defaultAmount }
+  const pennylaneActive = usePennylaneEnabled();
   const [quoteLoading, setQuoteLoading] = useState(false);
 
   // Etat pour le bascule en Projet MT-LT
@@ -631,9 +633,17 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Si "Devis envoye", ouvrir la modale devis
+      // Si "Devis envoye" : le rattachement d'un devis est OBLIGATOIRE.
+      // Org Pennylane → ouvrir la fiche lead avec auto-ouverture de la modale
+      // d'attache (QuoteCandidatesModal) ; pas de bascule de statut sans devis
+      // rattaché (invariant garanti aussi côté DB par le trigger
+      // enforce_devis_envoye_requires_quote). Org sans PL → QuoteModal MDH.
       if (newStatusLabel === 'Devis envoyé') {
         const lead = allLeads.find((l) => l.id === leadId);
+        if (pennylaneActive) {
+          if (lead) onLeadClick(lead, { autoQuote: true });
+          return;
+        }
         setPendingQuote({
           leadId,
           newStatusId,
@@ -659,7 +669,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         );
       }
     },
-    [updateLeadStatus, userId, fetchLeads, columns, kanbanItems, allLeads, onLeadClick],
+    [updateLeadStatus, userId, fetchLeads, columns, kanbanItems, allLeads, onLeadClick, pennylaneActive],
   );
 
   // Confirmer le passage en Perdu avec motif

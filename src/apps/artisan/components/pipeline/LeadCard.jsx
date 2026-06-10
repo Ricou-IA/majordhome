@@ -10,9 +10,10 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp, CalendarClock } from 'lucide-react';
+import { Phone, Calendar, Clock, PhoneCall, FileText, Trophy, XCircle, Hourglass, ChevronDown, ChevronUp, CalendarClock, AlertTriangle } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hooks/usePennylane';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { QuoteSubCard } from './QuoteSubCard';
 
 /**
@@ -136,6 +137,12 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
   // Devis Pennylane liés (expand inline dans le kanban)
   // Hooks AVANT tout return conditionnel (règles des hooks React)
   const hasDevis = (card?.devis_count || 0) > 0;
+  // Flag « à rapprocher » : org Pennylane, carte « Devis envoyé » sans aucun
+  // devis PL rattaché (placement par fallback status_id). Ces leads ne devraient
+  // plus exister (invariant DB depuis 2026-06-10) ; le flag aide à traiter à la
+  // main les violateurs historiques.
+  const pennylaneActive = usePennylaneEnabled();
+  const needsQuoteLink = pennylaneActive && card?.column_key === 'devis_envoye' && !hasDevis;
   const { linkedQuotes } = useLinkedPennylaneQuotes(hasDevis && expanded ? lead?.id : null);
   // Prefetch au survol → ouverture instant si user clique dans la foulée
   const prefetchLinkedQuotes = usePrefetchLinkedPennylaneQuotes();
@@ -311,6 +318,15 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
           )}
         </div>
 
+        {needsQuoteLink && (
+          <p
+            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-amber-700"
+            title="Devis envoyé sans devis Pennylane rattaché — à rapprocher manuellement"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            Devis à rapprocher
+          </p>
+        )}
         {lead.next_action && (
           <p className="text-xs text-gray-500 mt-1.5 truncate">
             → {lead.next_action}
