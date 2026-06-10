@@ -12,6 +12,7 @@ import { buildPvConfig } from '../lib/pvConfig';
 import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } from '../lib/wizardState';
 import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
+import Step1Localisation from '../components/Step1Localisation';
 
 const STEPS = [
   { n: 1, label: 'Localisation' },
@@ -179,7 +180,14 @@ function SimulateurInner({ config }) {
 
       {/* Étape courante */}
       {state.step === 1 && (
-        <div className="card text-sm text-secondary-500">Étape 1 — en construction (Task G2)</div>
+        <Step1Localisation
+          location={state.location}
+          roof={state.roof}
+          config={config}
+          onLocation={(patch) => dispatch({ type: 'SET_LOCATION', patch })}
+          onRoof={(patch) => dispatch({ type: 'SET_ROOF', patch })}
+          onNext={() => goToStep(2)}
+        />
       )}
       {state.step === 2 && (
         <div className="card text-sm text-secondary-500">Étape 2 — en construction (Task G3)</div>
