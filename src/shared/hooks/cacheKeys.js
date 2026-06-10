@@ -321,3 +321,11 @@ export const callAttemptKeys = {
   all: (orgId) => ['call-attempts', orgId],
   stats: (orgId) => [...callAttemptKeys.all(orgId), 'stats'],
 };
+
+// --- PV / Solaire (simulations photovoltaïques) ---
+export const pvKeys = {
+  all: (orgId) => ['pv', orgId],
+  simulations: (orgId) => [...pvKeys.all(orgId), 'simulations'],
+  list: (orgId, filters) => [...pvKeys.simulations(orgId), filters],
+  detail: (orgId, id) => [...pvKeys.simulations(orgId), 'detail', id],
+};
