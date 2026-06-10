@@ -1,5 +1,7 @@
 # App Solaire — Calculateur de rentabilité PV — Plan d'implémentation
 
+> **✅ EXÉCUTÉ le 2026-06-11** — Stages A→H livrés (commits `32e7ef3` → `8969542`, migrations `pv_simulations_create` / `pv_simulations_public_view` / `pv_calculator_permission_seed`, edge `pvgis-proxy` v1 déployée). 15/15 tests moteur, lint + build + audit:quality OK. Reste : validation manuelle Eric (mobile/GPS, simulation complète) puis push.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Livrer l'app interne `/solaire` : simulation de rentabilité photovoltaïque en 3 étapes (localisation → consommation → résultats), moteur de calcul conservateur (surplus = 0 €), optimiseur de puissance, module VE, financement, historique, page admin `/settings/solaire`.
