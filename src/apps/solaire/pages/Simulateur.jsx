@@ -14,6 +14,7 @@ import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
 import Step1Localisation from '../components/Step1Localisation';
 import Step2Consommation from '../components/Step2Consommation';
+import Step3Resultats from '../components/Step3Resultats';
 
 const STEPS = [
   { n: 1, label: 'Localisation' },
@@ -202,7 +203,20 @@ function SimulateurInner({ config }) {
         />
       )}
       {state.step === 3 && (
-        <div className="card text-sm text-secondary-500">Étape 3 — en construction (Task G4)</div>
+        <Step3Resultats
+          state={state}
+          config={config}
+          pvgisLoading={pvgisLoading}
+          pvgisError={pvgisError}
+          onRetryPvgis={fetchPvgis}
+          onSelectKwc={(kwc) => {
+            dispatch({ type: 'SELECT_KWC', kwc });
+            // Changer de scénario invalide le coût saisi à la main (repart de la grille)
+            dispatch({ type: 'SET_FINANCING', patch: { manualCost: null } });
+          }}
+          onFinancing={(patch) => dispatch({ type: 'SET_FINANCING', patch })}
+          onBack={() => goToStep(2)}
+        />
       )}
     </div>
   );
