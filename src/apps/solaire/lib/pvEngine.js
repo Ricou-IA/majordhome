@@ -99,3 +99,60 @@ export function monthlyPayment({ capital, annualRate, years }) {
   const r = annualRate / 12;
   return (capital * r) / (1 - Math.pow(1 + r, -12 * years));
 }
+
+/** Tableau annuel type amortissement + 3 indicateurs de tête (spec §8.7). */
+export function buildYearlyTable({
+  autoconsoAnnual, priceKwh, inflationRate, degradationRate,
+  horizonYears, capital, annualRate, loanYears,
+}) {
+  const annuity = monthlyPayment({ capital, annualRate, years: loanYears }) * 12;
+  const rows = [];
+  let cumul = 0;
+  for (let n = 1; n <= horizonYears; n++) {
+    const economy = yearlyEconomy({ autoconsoAnnual, priceKwh, inflationRate, degradationRate, yearN: n });
+    const yearAnnuity = n <= loanYears ? annuity : 0;
+    const effortNet = yearAnnuity - economy;       // négatif = le client gagne
+    cumul += economy - yearAnnuity;
+    rows.push({ year: n, economy, annuity: yearAnnuity, effortNet, cumul });
+  }
+  const neutralityRow = rows.find((r) => r.effortNet <= 0);
+  const loanRows = rows.slice(0, loanYears);
+  return {
+    rows,
+    indicators: {
+      avgMonthlyEffortDuringLoan: loanYears > 0
+        ? loanRows.reduce((a, r) => a + r.effortNet, 0) / (12 * loanYears)
+        : 0,
+      neutralityYear: neutralityRow ? neutralityRow.year : null,
+      cumulAtLoanEnd: loanYears > 0 && rows[loanYears - 1] ? rows[loanYears - 1].cumul : 0,
+      totalGainAtHorizon: rows.length ? rows[rows.length - 1].cumul : 0,
+    },
+  };
+}
+
+/**
+ * Optimiseur (spec §9) : plus grande puissance (pas stepKwc, de stepKwc à maxKwc)
+ * dont le taux d'autoconso annuel ≥ threshold. Aucun appel PVGIS (linéarité).
+ * Cas limites : rien ne passe → plus petite puissance ; tout passe → maxKwc.
+ */
+export function optimize({ eM1kwc, consoMonthly, coeff, threshold, maxKwc, stepKwc }) {
+  const EPS = 1e-9;
+  let recommendedKwc = stepKwc;
+  for (let p = stepKwc; p <= maxKwc + EPS; p += stepKwc) {
+    const kwc = Math.round(p * 100) / 100; // évite la dérive float de l'accumulation
+    const { totals } = computeMonthly({ eM1kwc, powerKwc: kwc, consoMonthly, coeff });
+    if (totals.tauxAutoconso >= threshold - EPS) recommendedKwc = kwc;
+  }
+  return { recommendedKwc };
+}
+
+/** Scénarios Recommandé / −1 palier (sobre) / +1 palier (confort), clampés [stepKwc, maxKwc]. */
+export function buildScenarios({ recommendedKwc, stepKwc, maxKwc }) {
+  const candidates = [
+    { key: 'sobre', label: 'Sobre', kwc: recommendedKwc - stepKwc },
+    { key: 'recommande', label: 'Recommandé', kwc: recommendedKwc },
+    { key: 'confort', label: 'Confort', kwc: recommendedKwc + stepKwc },
+  ];
+  return candidates.filter((c) => c.kwc >= stepKwc - 1e-9 && c.kwc <= maxKwc + 1e-9)
+    .map((c) => ({ ...c, kwc: Math.round(c.kwc * 100) / 100 }));
+}

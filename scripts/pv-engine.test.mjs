@@ -8,6 +8,7 @@ import {
   percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount,
   spreadAnnualToMonthly, evMonthlyConsumption, simultaneityCoeff, costFromGrid,
   computeMonthly, yearlyEconomy, monthlyPayment,
+  buildYearlyTable, optimize, buildScenarios,
 } from '../src/apps/solaire/lib/pvEngine.js';
 import { buildPvConfig, PV_DEFAULTS } from '../src/apps/solaire/lib/pvConfig.js';
 
@@ -92,4 +93,57 @@ test('monthlyPayment — annuités constantes', () => {
   assert.ok(Math.abs(monthlyPayment({ capital: 12000, annualRate: 0.06, years: 10 }) - 133.22) < 0.05);
   assert.equal(monthlyPayment({ capital: 12000, annualRate: 0, years: 10 }), 100); // taux 0
   assert.equal(monthlyPayment({ capital: 0, annualRate: 0.06, years: 10 }), 0);
+});
+
+test('buildYearlyTable — invariants + indicateurs', () => {
+  const t = buildYearlyTable({
+    autoconsoAnnual: 3000, priceKwh: 0.20, inflationRate: 0.03, degradationRate: 0.005,
+    horizonYears: 25, capital: 12000, annualRate: 0.06, loanYears: 10,
+  });
+  assert.equal(t.rows.length, 25);
+  const annuity = monthlyPayment({ capital: 12000, annualRate: 0.06, years: 10 }) * 12;
+  // Année 1 : économie 600, effort net = annuité − économie
+  assert.ok(Math.abs(t.rows[0].economy - 600) < 0.01);
+  assert.ok(Math.abs(t.rows[0].effortNet - (annuity - 600)) < 0.01);
+  // Après la fin du crédit : annuité 0, effort net négatif (= gain)
+  assert.equal(t.rows[10].annuity, 0);
+  assert.ok(t.rows[10].effortNet < 0);
+  // Cumul cohérent : cumul[N] − cumul[N−1] = économie[N] − annuité[N]
+  for (let i = 1; i < 25; i++) {
+    const delta = t.rows[i].cumul - t.rows[i - 1].cumul;
+    assert.ok(Math.abs(delta - (t.rows[i].economy - t.rows[i].annuity)) < 0.01);
+  }
+  // Indicateurs
+  assert.equal(t.indicators.neutralityYear, 11); // économie an 10 ≈ 748 € < annuité 1599 € → bascule an 11
+  assert.ok(Math.abs(t.indicators.totalGainAtHorizon - t.rows[24].cumul) < 0.001);
+  assert.ok(Math.abs(t.indicators.cumulAtLoanEnd - t.rows[9].cumul) < 0.001);
+  const expectedAvg = t.rows.slice(0, 10).reduce((a, r) => a + r.effortNet, 0) / 120;
+  assert.ok(Math.abs(t.indicators.avgMonthlyEffortDuringLoan - expectedAvg) < 0.001);
+});
+
+test('optimize — plus grande puissance avec taux ≥ seuil', () => {
+  const eM1kwc = Array(12).fill(100);
+  const consoMonthly = Array(12).fill(250);
+  // P ≤ 2,5 : prod ≤ conso → taux = coeff = 0,85 ≥ seuil ; P = 3 : taux 0,708 < seuil
+  const r = optimize({ eM1kwc, consoMonthly, coeff: 0.85, threshold: 0.85, maxKwc: 6.5, stepKwc: 0.5 });
+  assert.equal(r.recommendedKwc, 2.5);
+});
+
+test('optimize — cas limites', () => {
+  const eM1kwc = Array(12).fill(100);
+  // Conso énorme : même le max toiture reste ≥ seuil → recommander le max
+  let r = optimize({ eM1kwc, consoMonthly: Array(12).fill(10000), coeff: 0.85, threshold: 0.85, maxKwc: 4, stepKwc: 0.5 });
+  assert.equal(r.recommendedKwc, 4);
+  // Conso minuscule : aucun palier ne passe → recommander le plus petit (0,5)
+  r = optimize({ eM1kwc, consoMonthly: Array(12).fill(10), coeff: 0.85, threshold: 0.85, maxKwc: 4, stepKwc: 0.5 });
+  assert.equal(r.recommendedKwc, 0.5);
+});
+
+test('buildScenarios — recommandé / sobre / confort, clampés', () => {
+  const s = buildScenarios({ recommendedKwc: 2.5, stepKwc: 0.5, maxKwc: 6.5 });
+  assert.deepEqual(s.map((x) => x.kwc), [2, 2.5, 3]);
+  assert.deepEqual(s.map((x) => x.key), ['sobre', 'recommande', 'confort']);
+  // Recommandé au max toiture → pas de confort (2 scénarios)
+  const s2 = buildScenarios({ recommendedKwc: 6.5, stepKwc: 0.5, maxKwc: 6.5 });
+  assert.deepEqual(s2.map((x) => x.kwc), [6, 6.5]);
 });
