@@ -30,6 +30,7 @@ import {
   Mail,
   FileText,
   Megaphone,
+  Sun,
 } from 'lucide-react';
 
 // =============================================================================
@@ -51,6 +52,7 @@ const navigation = [
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
   { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
   { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
+  { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator' },
 ];
 
 // =============================================================================

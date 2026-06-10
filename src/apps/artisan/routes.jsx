@@ -51,6 +51,10 @@ const Mailing = lazy(() => import('./pages/Mailing'));
 // Meta Ads
 const MetaAds = lazy(() => import('./pages/MetaAds'));
 
+// Solaire (calculateur PV)
+const SolaireSimulateur = lazy(() => import('@apps/solaire/pages/Simulateur'));
+const SolaireHistorique = lazy(() => import('@apps/solaire/pages/Historique'));
+
 // =============================================================================
 // LOADING COMPONENT
 // =============================================================================
@@ -372,6 +376,26 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="meta_ads">
           <MetaAds />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'solaire',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="pv_calculator">
+          <SolaireSimulateur />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'solaire/historique',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="pv_calculator">
+          <SolaireHistorique />
         </RouteGuard>
       </SuspenseWrapper>
     ),
