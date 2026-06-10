@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount,
   spreadAnnualToMonthly, evMonthlyConsumption, simultaneityCoeff, costFromGrid,
+  computeMonthly, yearlyEconomy, monthlyPayment,
 } from '../src/apps/solaire/lib/pvEngine.js';
 import { buildPvConfig, PV_DEFAULTS } from '../src/apps/solaire/lib/pvConfig.js';
 
@@ -66,4 +67,29 @@ test('buildPvConfig — merge profond settings.pv sur les défauts', () => {
   assert.equal(cfg.ev.charger_price, 1500);           // override imbriqué
   assert.equal(cfg.ev.home_charge_share, 0.95);       // défaut imbriqué conservé
   assert.deepEqual(buildPvConfig(undefined).cost_grid, []);
+});
+
+test('computeMonthly — autoconso, surplus, taux', () => {
+  const eM1kwc = Array(12).fill(100);              // 1200 kWh/kWc/an (flat synthétique)
+  const consoMonthly = Array(12).fill(250);        // 3000 kWh/an
+  const r = computeMonthly({ eM1kwc, powerKwc: 2, consoMonthly, coeff: 0.7 });
+  assert.equal(r.prod[0], 200);
+  assert.equal(r.autoconso[0], 140);               // min(200,250) × 0,7
+  assert.equal(r.surplus[0], 60);
+  assert.equal(r.totals.prod, 2400);
+  assert.equal(r.totals.autoconso, 1680);
+  assert.ok(Math.abs(r.totals.tauxAutoconso - 0.7) < 1e-9);
+  assert.ok(Math.abs(r.totals.tauxAutoproduction - 0.56) < 1e-9);  // 1680 / 3000
+});
+
+test('yearlyEconomy — inflation + dégradation', () => {
+  const base = { autoconsoAnnual: 3000, priceKwh: 0.20, inflationRate: 0.03, degradationRate: 0.005 };
+  assert.ok(Math.abs(yearlyEconomy({ ...base, yearN: 1 }) - 600) < 0.01);
+  assert.ok(Math.abs(yearlyEconomy({ ...base, yearN: 2 }) - 614.91) < 0.01); // 3000×0,995×0,206
+});
+
+test('monthlyPayment — annuités constantes', () => {
+  assert.ok(Math.abs(monthlyPayment({ capital: 12000, annualRate: 0.06, years: 10 }) - 133.22) < 0.05);
+  assert.equal(monthlyPayment({ capital: 12000, annualRate: 0, years: 10 }), 100); // taux 0
+  assert.equal(monthlyPayment({ capital: 0, annualRate: 0.06, years: 10 }), 0);
 });
