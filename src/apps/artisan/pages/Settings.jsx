@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Truck,
   Calculator,
+  Sun,
 } from 'lucide-react';
 
 // =============================================================================
@@ -68,6 +69,13 @@ export default function Settings() {
       icon: Calculator,
       description: 'Zones, types d\'équipement, grille de prix, remises et options',
       href: '/settings/pricing',
+      adminOnly: true,
+    },
+    {
+      title: 'Solaire',
+      icon: Sun,
+      description: 'Paramètres du calculateur photovoltaïque et grille de coûts',
+      href: '/settings/solaire',
       adminOnly: true,
     },
     {

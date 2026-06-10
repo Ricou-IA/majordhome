@@ -24,6 +24,7 @@ const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'
 const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
 const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'));
+const SolaireSettings = lazy(() => import('./pages/settings/SolaireSettings'));
 
 // Certificat
 const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
@@ -265,6 +266,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <PricingSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/solaire',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <SolaireSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),
