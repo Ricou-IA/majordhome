@@ -53,7 +53,10 @@ export default function Step3Resultats({
   const results = useMemo(() => {
     if (!pvgis?.e_m) return null;
     const stepKwc = config.panel_power_wc / 1000;
-    const maxKwc = maxPowerKwc(Number(roof.surfaceM2) || 0, config.panel_area_m2, config.panel_power_wc);
+    const roofMaxKwc = maxPowerKwc(Number(roof.surfaceM2) || 0, config.panel_area_m2, config.panel_power_wc);
+    // Plafond d'offre résidentielle : au-delà (9 kWc par défaut), régime
+    // réglementaire différent + hors grille de coûts — jamais recommandé.
+    const maxKwc = Math.min(roofMaxKwc, config.max_power_kwc ?? 9);
     if (maxKwc < stepKwc) return null;
     // Critère = recouvrement théorique AVANT coefficient (cf. doc optimize) —
     // le coefficient plafonnerait le taux sous le seuil et forcerait le minimum.
@@ -87,7 +90,7 @@ export default function Step3Resultats({
         avgMonthlyEffort,
       };
     });
-    return { recommendedKwc, scenarios };
+    return { recommendedKwc, scenarios, roofMaxKwc, cappedByOffer: roofMaxKwc > maxKwc };
   }, [pvgis, consoMonthly, coeff, priceKwh, roof.surfaceM2, config, financingOk, rate, years, deposit, chargerPrice]);
 
   // --- Scénario actif + détails (chart, financement, tableau) ---
@@ -202,6 +205,13 @@ export default function Step3Resultats({
 
       {/* Scénarios */}
       <ScenarioCards scenarios={results.scenarios} activeKwc={activeKwc} onSelect={onSelectKwc} />
+      {results.cappedByOffer && (
+        <p className="text-xs text-secondary-500 flex items-center gap-1.5 -mt-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          Dimensionnement plafonné à {config.max_power_kwc} kWc (offre résidentielle — régime réglementaire
+          différent au-delà). La toiture permettrait {results.roofMaxKwc} kWc.
+        </p>
+      )}
 
       {/* Graphique mensuel */}
       <MonthlyChart monthly={active} consoMonthly={consoMonthly} />

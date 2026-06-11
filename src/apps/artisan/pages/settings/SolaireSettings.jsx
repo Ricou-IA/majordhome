@@ -102,6 +102,9 @@ function CalculTab({ form, patch }) {
           <PctField label="Seuil de recouvrement (optimiseur)" value={form.autoconso_threshold} step={1}
             hint="Part de la production qui doit rester sous la conso mensuelle (avant coefficient de simultanéité) — l'optimiseur retient la plus grande puissance qui respecte ce seuil"
             onChange={(v) => patch({ autoconso_threshold: v })} />
+          <NumberField label="Puissance max recommandée" value={form.max_power_kwc} step={0.5} suffix="kWc"
+            hint="Plafond de l'optimiseur et des scénarios (offre résidentielle ≤ 9 kWc — régime réglementaire différent au-delà)"
+            onChange={(v) => patch({ max_power_kwc: v })} />
         </div>
       </div>
       <div>
@@ -254,7 +257,7 @@ function validatePvForm(form) {
   const flatNums = [
     form.default_price_kwh, form.inflation_rate, form.degradation_rate, form.horizon_years,
     form.system_loss, form.panel_power_wc, form.panel_area_m2, form.default_tilt_percent,
-    form.autoconso_threshold, form.default_loan_rate, form.default_loan_years, form.vat_rate,
+    form.autoconso_threshold, form.max_power_kwc, form.default_loan_rate, form.default_loan_years, form.vat_rate,
     form.simultaneity?.presence_journee, form.simultaneity?.presence_partielle,
     form.simultaneity?.absent_journee, form.simultaneity?.bonus_ecs,
     form.simultaneity?.bonus_ve, form.simultaneity?.cap,

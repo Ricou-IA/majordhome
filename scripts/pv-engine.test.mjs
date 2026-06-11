@@ -68,6 +68,9 @@ test('buildPvConfig — merge profond settings.pv sur les défauts', () => {
   assert.equal(cfg.ev.charger_price, 1500);           // override imbriqué
   assert.equal(cfg.ev.home_charge_share, 0.95);       // défaut imbriqué conservé
   assert.deepEqual(buildPvConfig(undefined).cost_grid, []);
+  // Plafond d'offre résidentielle (régression 2026-06-11 : 20 kWc recommandés
+  // pour un gros consommateur — l'optimiseur doit être borné à min(toiture, 9 kWc))
+  assert.equal(buildPvConfig(undefined).max_power_kwc, 9);
 });
 
 test('computeMonthly — autoconso, surplus, taux', () => {

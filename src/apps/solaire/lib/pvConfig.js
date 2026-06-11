@@ -12,6 +12,7 @@ export const PV_DEFAULTS = {
   panel_area_m2: 2.26,
   default_tilt_percent: 18,
   autoconso_threshold: 0.85,
+  max_power_kwc: 9,             // plafond offre résidentielle (régime réglementaire ≤ 9 kWc)
   simultaneity: {
     presence_journee: 0.70,
     presence_partielle: 0.55,
