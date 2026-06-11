@@ -182,3 +182,27 @@ test('buildEtudeModel — pipeline complet cohérent (source unique UI + PDF)', 
   assert.ok(model.mensualite > 0);
   assert.equal(model.table.rows.length, config.horizon_years);
 });
+
+test('buildEtudeModel — transparence : recouvrement + décomposition coefficient', async () => {
+  const { buildEtudeModel } = await import('../src/apps/solaire/lib/etudeModel.js');
+  const config = buildPvConfig(undefined);
+  const model = buildEtudeModel({
+    roof: { tiltPercent: 18, orientation: 'S', surfaceM2: 45 },
+    conso: { monthly: Array(12).fill(1000), priceKwh: 0.25, preset: 'presence_partielle', ecsBonus: true },
+    ev: { enabled: true, kmPerYear: 20000, kwhPer100km: 20, pilotedCharge: true, addCharger: false },
+    financing: { rate: 0.045, years: 12, deposit: 0, manualCost: null },
+    selectedKwc: null,
+    pvgis: { e_m: [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40], e_y: 1152 },
+    config,
+  });
+  // 0,55 + 0,10 (ECS) + 0,10 (VE pilotée) = 0,75, non plafonné
+  assert.ok(Math.abs(model.coeff - 0.75) < 1e-9);
+  assert.equal(model.coeffParts.presetValue, 0.55);
+  assert.equal(model.coeffParts.ecsApplied, true);
+  assert.equal(model.coeffParts.evApplied, true);
+  assert.equal(model.coeffParts.capped, false);
+  // Cohérence : tauxAutoconso = recouvrement × coefficient
+  const t = model.active.totals;
+  assert.ok(Math.abs(t.tauxAutoconso - model.overlapRatio * model.coeff) < 1e-9);
+  assert.ok(model.overlapRatio > 0.9 && model.overlapRatio <= 1); // conso 12k + VE 3,8k >> prod 9 kWc
+});

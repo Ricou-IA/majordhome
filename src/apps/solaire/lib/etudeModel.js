@@ -37,6 +37,21 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     config.simultaneity,
   );
 
+  // Décomposition du coefficient (transparence du résultat, UI + PDF)
+  const coeffParts = {
+    preset: conso.preset,
+    presetValue: config.simultaneity[conso.preset] ?? config.simultaneity.presence_partielle,
+    ecsApplied: Boolean(conso.ecsBonus),
+    evApplied: Boolean(ev.enabled && ev.pilotedCharge),
+    bonusEcs: config.simultaneity.bonus_ecs,
+    bonusVe: config.simultaneity.bonus_ve,
+    cap: config.simultaneity.cap,
+  };
+  coeffParts.rawSum = coeffParts.presetValue
+    + (coeffParts.ecsApplied ? coeffParts.bonusEcs : 0)
+    + (coeffParts.evApplied ? coeffParts.bonusVe : 0);
+  coeffParts.capped = coeffParts.rawSum > coeffParts.cap + 1e-9;
+
   const priceKwh = Number(conso.priceKwh) || 0;
   const rate = typeof financing.rate === 'number' ? financing.rate : NaN;
   const years = Number(financing.years);
@@ -88,6 +103,12 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   const activeKwc = scenarios.some((s) => s.kwc === selectedKwc) ? selectedKwc : recommendedKwc;
   const active = computeMonthly({ eM1kwc: pvgis.e_m, powerKwc: activeKwc, consoMonthly, coeff });
 
+  // Recouvrement mensuel théorique (avant coefficient) : autoconso = Σ min × coeff
+  // → Σ min = autoconso / coeff. Affiché pour expliquer tauxAutoconso = recouvrement × coeff.
+  const overlapRatio = active.totals.prod > 0 && coeff > 0
+    ? active.totals.autoconso / coeff / active.totals.prod
+    : 0;
+
   const gridCost = costFromGrid(config.cost_grid, activeKwc);
   const baseCost = financing.manualCost ?? (gridCost !== null ? Math.round(gridCost) : null);
   const totalCost = baseCost !== null ? baseCost + chargerPrice : null;
@@ -114,6 +135,8 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     evAnnual: Math.round(evMonthly * 12),
     consoMonthly,
     coeff,
+    coeffParts,
+    overlapRatio,
     priceKwh,
     rate,
     years,

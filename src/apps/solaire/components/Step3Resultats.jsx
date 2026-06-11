@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save, FileDown 
 import { formatEuro } from '@lib/utils';
 import { buildEtudeModel } from '../lib/etudeModel';
 import ScenarioCards from './ScenarioCards';
+import TransparencyPanel from './TransparencyPanel';
 import MonthlyChart from './MonthlyChart';
 import FinancingModule from './FinancingModule';
 import TableauAnnuel from './TableauAnnuel';
@@ -115,6 +116,9 @@ export default function Step3Resultats({
           — le surplus est compté comme perdu (0 €), approche volontairement conservatrice.
         </p>
       </div>
+
+      {/* Transparence du calcul */}
+      <TransparencyPanel model={model} config={config} conso={conso} ev={ev} roof={roof} />
 
       {/* Scénarios */}
       <ScenarioCards scenarios={model.scenarios} activeKwc={model.activeKwc} onSelect={onSelectKwc} />

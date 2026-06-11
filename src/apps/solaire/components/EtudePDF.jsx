@@ -52,6 +52,8 @@ const s = StyleSheet.create({
   heroStatLabel: { fontSize: 6.5, color: C.grisTxt },
   heroStatValue: { fontSize: 10, fontFamily: 'Helvetica-Bold', marginTop: 1 },
   altLine: { fontSize: 7, color: C.grisTxt, marginTop: 4 },
+  calcLine: { fontSize: 6.8, color: C.grisTxt, marginBottom: 1.5, lineHeight: 1.35 },
+  calcStrong: { fontFamily: 'Helvetica-Bold', color: C.noir },
   // Légende chart
   legendRow: { flexDirection: 'row', gap: 10, marginTop: 5, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
@@ -184,6 +186,12 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
   const others = model.scenarios.filter((sc) => sc.kwc !== model.activeKwc);
   const ind = model.table?.indicators ?? null;
   const effortLabel = (v) => (v <= 0 ? `Gain ${eur(Math.abs(v))}` : `Effort ${eur(v)}`);
+  const parts = model.coeffParts;
+  const coeffFormula = [
+    `${PRESET_LABELS[parts.preset] || parts.preset} (${pct(parts.presetValue)})`,
+    parts.ecsApplied ? `pilotage ECS (+${pct(parts.bonusEcs)})` : null,
+    parts.evApplied ? `recharge VE pilotée (+${pct(parts.bonusVe)})` : null,
+  ].filter(Boolean).join(' + ');
 
   return (
     <Document title={`Étude photovoltaïque — ${meta.clientName}`} author={company.name}>
@@ -251,6 +259,27 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
             Également étudié : {others.map((sc) => `${sc.label} ${sc.kwc} kWc (économie an 1 ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)})`).join(' · ')}
           </Text>
         )}
+
+        <Text style={s.sectionTitle}>Transparence du calcul</Text>
+        <Text style={s.calcLine}>
+          1. <Text style={s.calcStrong}>Production an 1 : {kwh(totals.prod)}</Text> — données solaires PVGIS pour ce
+          lieu (pente {roof.tiltPercent} % ≈ {tiltDeg}°, orientation {String(roof.orientation)}, pertes {config.system_loss} %) × {model.activeKwc} kWc.
+        </Text>
+        <Text style={s.calcLine}>
+          2. <Text style={s.calcStrong}>Recouvrement mensuel : {pct(model.overlapRatio)}</Text> — part de la production
+          qui reste sous la consommation, mois par mois.
+        </Text>
+        <Text style={s.calcLine}>
+          3. <Text style={s.calcStrong}>Coefficient de simultanéité : {pct(model.coeff)}</Text> = {coeffFormula}
+          {parts.capped ? `, plafonné à ${pct(parts.cap)}` : ''} — part du recouvrement réellement consommée au fil de la
+          journée (la production de 11h-16h doit coïncider avec les usages).
+        </Text>
+        <Text style={s.calcLine}>
+          4. <Text style={s.calcStrong}>Autoconsommation : {pct(totals.tauxAutoconso)}</Text> = {pct(model.overlapRatio)} × {pct(model.coeff)} → {kwh(totals.autoconso)} autoconsommés ({pct(totals.tauxAutoproduction)} de la facture couverte).
+        </Text>
+        <Text style={s.calcLine}>
+          5. <Text style={s.calcStrong}>Économie an 1 : {eur(model.economyYear1)}</Text> = {kwh(totals.autoconso)} × {model.priceKwh.toLocaleString('fr-FR')} €/kWh — le surplus ({kwh(totals.surplus)}) est valorisé 0 €.
+        </Text>
 
         <Text style={s.sectionTitle}>Production vs consommation (kWh/mois)</Text>
         <MonthlyBarsChart model={model} />
