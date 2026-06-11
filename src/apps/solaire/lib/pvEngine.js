@@ -131,17 +131,33 @@ export function buildYearlyTable({
 }
 
 /**
- * Optimiseur (spec §9) : plus grande puissance (pas stepKwc, de stepKwc à maxKwc)
- * dont le taux d'autoconso annuel ≥ threshold. Aucun appel PVGIS (linéarité).
- * Cas limites : rien ne passe → plus petite puissance ; tout passe → maxKwc.
+ * Optimiseur (spec §9, critère corrigé 2026-06-11) : plus grande puissance
+ * (pas stepKwc, de stepKwc à maxKwc) dont le RECOUVREMENT THÉORIQUE annuel
+ * Σ min(prod, conso) / Σ prod ≥ threshold — calculé AVANT le coefficient de
+ * simultanéité. Le coefficient est volontairement exclu du critère :
+ * taux_autoconso = coeff × recouvrement est plafonné par coeff (0,45-0,85),
+ * donc un seuil à 0,85 serait inatteignable et l'optimiseur retomberait
+ * toujours sur le minimum (bug vu en validation : 22 110 kWh/an → 0,5 kWc).
+ * Le coefficient scale toutes les puissances uniformément, il ne déplace pas
+ * le point de surdimensionnement. Seuil 0,85 = « au plus 15 % de la production
+ * déborde structurellement de la consommation mensuelle ».
+ * Aucun appel PVGIS (linéarité). Cas limites : rien ne passe → plus petite
+ * puissance ; tout passe → maxKwc.
  */
-export function optimize({ eM1kwc, consoMonthly, coeff, threshold, maxKwc, stepKwc }) {
+export function optimize({ eM1kwc, consoMonthly, threshold, maxKwc, stepKwc }) {
   const EPS = 1e-9;
   let recommendedKwc = stepKwc;
   for (let p = stepKwc; p <= maxKwc + EPS; p += stepKwc) {
     const kwc = Math.round(p * 100) / 100; // évite la dérive float de l'accumulation
-    const { totals } = computeMonthly({ eM1kwc, powerKwc: kwc, consoMonthly, coeff });
-    if (totals.tauxAutoconso >= threshold - EPS) recommendedKwc = kwc;
+    let prodSum = 0;
+    let overlapSum = 0;
+    for (let m = 0; m < 12; m++) {
+      const prod = eM1kwc[m] * kwc;
+      prodSum += prod;
+      overlapSum += Math.min(prod, consoMonthly[m]);
+    }
+    const overlapRatio = prodSum > 0 ? overlapSum / prodSum : 0;
+    if (overlapRatio >= threshold - EPS) recommendedKwc = kwc;
   }
   return { recommendedKwc };
 }

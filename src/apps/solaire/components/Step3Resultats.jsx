@@ -55,8 +55,10 @@ export default function Step3Resultats({
     const stepKwc = config.panel_power_wc / 1000;
     const maxKwc = maxPowerKwc(Number(roof.surfaceM2) || 0, config.panel_area_m2, config.panel_power_wc);
     if (maxKwc < stepKwc) return null;
+    // Critère = recouvrement théorique AVANT coefficient (cf. doc optimize) —
+    // le coefficient plafonnerait le taux sous le seuil et forcerait le minimum.
     const { recommendedKwc } = optimize({
-      eM1kwc: pvgis.e_m, consoMonthly, coeff,
+      eM1kwc: pvgis.e_m, consoMonthly,
       threshold: config.autoconso_threshold, maxKwc, stepKwc,
     });
     const scenarios = buildScenarios({ recommendedKwc, stepKwc, maxKwc }).map((s) => {

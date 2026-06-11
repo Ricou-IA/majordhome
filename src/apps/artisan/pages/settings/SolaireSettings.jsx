@@ -99,8 +99,8 @@ function CalculTab({ form, patch }) {
             onChange={(v) => patch({ panel_area_m2: v })} />
           <NumberField label="Pente toiture par défaut" value={form.default_tilt_percent} step={1} suffix="%"
             onChange={(v) => patch({ default_tilt_percent: v })} />
-          <PctField label="Seuil d'autoconsommation (optimiseur)" value={form.autoconso_threshold} step={1}
-            hint="Plus grande puissance dont le taux d'autoconso reste ≥ ce seuil"
+          <PctField label="Seuil de recouvrement (optimiseur)" value={form.autoconso_threshold} step={1}
+            hint="Part de la production qui doit rester sous la conso mensuelle (avant coefficient de simultanéité) — l'optimiseur retient la plus grande puissance qui respecte ce seuil"
             onChange={(v) => patch({ autoconso_threshold: v })} />
         </div>
       </div>

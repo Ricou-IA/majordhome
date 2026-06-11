@@ -242,7 +242,8 @@ Profil résidentiel standard (constante du moteur, % du total annuel) :
 ## 9. Dimensionnement optimal (pivot central)
 
 L'outil **suggère la puissance**, le commercial peut la modifier.
-- Tester les puissances par pas de 1 panneau (0,5 kWc), de 1 panneau jusqu'à la puissance max toiture, et retenir **la plus grande puissance dont le taux d'autoconsommation annuel ≥ seuil admin (défaut 85 %)**. Aucun nouvel appel PVGIS (linéarité).
+- Tester les puissances par pas de 1 panneau (0,5 kWc), de 1 panneau jusqu'à la puissance max toiture, et retenir **la plus grande puissance dont le recouvrement théorique annuel `Σ min(prod, conso) / Σ prod` ≥ seuil admin (défaut 85 %)**. Aucun nouvel appel PVGIS (linéarité).
+- **⚠️ Correctif 2026-06-11** : le critère se calcule **AVANT** le coefficient de simultanéité (contrairement au `taux_autoconso` du §8.3, qui reste la métrique affichée). Le taux post-coefficient est plafonné par le coefficient (0,45–0,85) → un seuil à 85 % serait inatteignable et l'optimiseur recommanderait toujours le minimum (bug constaté en validation : 22 110 kWh/an → 0,5 kWc). Le coefficient scale toutes les puissances uniformément et ne déplace pas le point de surdimensionnement ; le seuil signifie « au plus 15 % de la production déborde structurellement de la consommation mensuelle ».
 - Cas limites : si même 1 panneau < seuil → recommander 1 panneau ; si max toiture ≥ seuil → recommander max toiture ; scénarios ±1 clampés à [1 panneau, max toiture] (si recommandé = max, n'afficher que 2 scénarios).
 - Affichage : **3 scénarios côte à côte** — « Recommandé », « −1 palier » (sobre), « +1 palier » (confort) — chacun : kWc, nb panneaux, taux d'autoconso, % surplus perdu, économie an 1, effort net mensuel moyen. Le « +1 palier » doit visuellement montrer le surplus perdu qui grimpe : argument anti-survente face aux concurrents.
 

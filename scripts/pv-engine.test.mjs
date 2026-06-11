@@ -121,21 +121,21 @@ test('buildYearlyTable — invariants + indicateurs', () => {
   assert.ok(Math.abs(t.indicators.avgMonthlyEffortDuringLoan - expectedAvg) < 0.001);
 });
 
-test('optimize — plus grande puissance avec taux ≥ seuil', () => {
+test('optimize — plus grande puissance avec recouvrement ≥ seuil', () => {
   const eM1kwc = Array(12).fill(100);
   const consoMonthly = Array(12).fill(250);
-  // P ≤ 2,5 : prod ≤ conso → taux = coeff = 0,85 ≥ seuil ; P = 3 : taux 0,708 < seuil
-  const r = optimize({ eM1kwc, consoMonthly, coeff: 0.85, threshold: 0.85, maxKwc: 6.5, stepKwc: 0.5 });
+  // P ≤ 2,5 : prod ≤ conso → recouvrement = 1 ≥ 0,85 ; P = 3 : 3000/3600 = 0,833 < 0,85
+  const r = optimize({ eM1kwc, consoMonthly, threshold: 0.85, maxKwc: 6.5, stepKwc: 0.5 });
   assert.equal(r.recommendedKwc, 2.5);
 });
 
 test('optimize — cas limites', () => {
   const eM1kwc = Array(12).fill(100);
-  // Conso énorme : même le max toiture reste ≥ seuil → recommander le max
-  let r = optimize({ eM1kwc, consoMonthly: Array(12).fill(10000), coeff: 0.85, threshold: 0.85, maxKwc: 4, stepKwc: 0.5 });
+  // Conso énorme : même le max toiture garde un recouvrement = 1 → recommander le max
+  let r = optimize({ eM1kwc, consoMonthly: Array(12).fill(10000), threshold: 0.85, maxKwc: 4, stepKwc: 0.5 });
   assert.equal(r.recommendedKwc, 4);
   // Conso minuscule : aucun palier ne passe → recommander le plus petit (0,5)
-  r = optimize({ eM1kwc, consoMonthly: Array(12).fill(10), coeff: 0.85, threshold: 0.85, maxKwc: 4, stepKwc: 0.5 });
+  r = optimize({ eM1kwc, consoMonthly: Array(12).fill(10), threshold: 0.85, maxKwc: 4, stepKwc: 0.5 });
   assert.equal(r.recommendedKwc, 0.5);
 });
 
@@ -146,4 +146,14 @@ test('buildScenarios — recommandé / sobre / confort, clampés', () => {
   // Recommandé au max toiture → pas de confort (2 scénarios)
   const s2 = buildScenarios({ recommendedKwc: 6.5, stepKwc: 0.5, maxKwc: 6.5 });
   assert.deepEqual(s2.map((x) => x.kwc), [6, 6.5]);
+});
+
+test('optimize — régression 2026-06-11 : gros consommateur → max toiture (critère pré-coefficient)', () => {
+  // Bug vu en validation : 22 110 kWh/an, profil présence partielle (coeff 0,55)
+  // → l'ancien critère (taux post-coeff ≤ 0,55 < seuil 0,85) recommandait 0,5 kWc.
+  // Critère correct = recouvrement théorique Σ min(prod, conso) / Σ prod ≥ seuil.
+  const eM1kwc = [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40];
+  const consoMonthly = Array(12).fill(1842.5); // 22 110 kWh/an
+  const r = optimize({ eM1kwc, consoMonthly, threshold: 0.85, maxKwc: 8, stepKwc: 0.5 });
+  assert.equal(r.recommendedKwc, 8); // prod max mois (150×8=1200) < conso (1842) → recouvrement = 1
 });
