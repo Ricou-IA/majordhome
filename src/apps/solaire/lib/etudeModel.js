@@ -130,6 +130,16 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
       })
     : null;
 
+  // --- Sensibilité & point mort (transparence, demande Eric 2026-06-11) ---
+  // +1 point de taux d'autoconsommation = production × 1 % × prix (économie an 1)
+  const sensitivityPerAutoconsoPoint = active.totals.prod * 0.01 * priceKwh;
+  // Taux d'autoconso (sur production) où l'économie an 1 couvre l'annuité de crédit
+  const breakEvenAutoconsoRate = table && active.totals.prod > 0 && priceKwh > 0
+    ? table.rows[0].annuity / (active.totals.prod * priceKwh)
+    : null;
+  // Plafond comportemental : recouvrement × coefficient max (pilotage parfait)
+  const maxAchievableAutoconso = overlapRatio * coeffParts.cap;
+
   return {
     evMonthly,
     evAnnual: Math.round(evMonthly * 12),
@@ -159,5 +169,8 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     mensualite,
     economyYear1,
     table,
+    sensitivityPerAutoconsoPoint,
+    breakEvenAutoconsoRate,
+    maxAchievableAutoconso,
   };
 }

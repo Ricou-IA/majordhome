@@ -206,3 +206,25 @@ test('buildEtudeModel — transparence : recouvrement + décomposition coefficie
   assert.ok(Math.abs(t.tauxAutoconso - model.overlapRatio * model.coeff) < 1e-9);
   assert.ok(model.overlapRatio > 0.9 && model.overlapRatio <= 1); // conso 12k + VE 3,8k >> prod 9 kWc
 });
+
+test('buildEtudeModel — point mort & sensibilité', async () => {
+  const { buildEtudeModel } = await import('../src/apps/solaire/lib/etudeModel.js');
+  const config = buildPvConfig({ pv: { cost_grid: [{ kwc: 9, prix_ttc: 20000 }] } });
+  const model = buildEtudeModel({
+    roof: { tiltPercent: 18, orientation: 'S', surfaceM2: 45 },
+    conso: { monthly: Array(12).fill(1000), priceKwh: 0.25, preset: 'presence_partielle', ecsBonus: false },
+    ev: { enabled: false },
+    financing: { rate: 0.045, years: 12, deposit: 0, manualCost: null },
+    selectedKwc: null,
+    pvgis: { e_m: [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40], e_y: 1152 },
+    config,
+  });
+  const prod = model.active.totals.prod;
+  // Sensibilité : +1 pt d'autoconso = production × 1 % × prix
+  assert.ok(Math.abs(model.sensitivityPerAutoconsoPoint - prod * 0.01 * 0.25) < 1e-9);
+  // Point mort : annuité an 1 / (production × prix)
+  const annuity = monthlyPayment({ capital: 20000, annualRate: 0.045, years: 12 }) * 12;
+  assert.ok(Math.abs(model.breakEvenAutoconsoRate - annuity / (prod * 0.25)) < 1e-9);
+  // Plafond comportemental = recouvrement × cap
+  assert.ok(Math.abs(model.maxAchievableAutoconso - model.overlapRatio * 0.85) < 1e-9);
+});

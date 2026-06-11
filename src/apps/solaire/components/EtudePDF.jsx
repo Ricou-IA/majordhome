@@ -84,8 +84,13 @@ const s = StyleSheet.create({
   footerText: { fontSize: 5.8, color: C.grisTxt, textAlign: 'center' },
 });
 
-const eur = (n) => `${Math.round(n).toLocaleString('fr-FR')} €`;
-const kwh = (n) => `${Math.round(n).toLocaleString('fr-FR')} kWh`;
+// ⚠️ Helvetica (police PDF de base) ne couvre pas tous les glyphes Unicode :
+// l'espace fine insécable (U+202F) des milliers fr-FR, ≈, ▲/▼ et le signe
+// moins U+2212 sortent en artefacts. Formatters PDF-safe obligatoires.
+const fmtInt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/\s/g, ' '); // \s couvre U+202F/U+00A0
+const numStr = (x) => String(x).replace('.', ',');
+const eur = (n) => `${fmtInt(n)} €`;
+const kwh = (n) => `${fmtInt(n)} kWh`;
 const pct = (x) => `${Math.round(x * 100)} %`;
 
 function Field({ label, value }) {
@@ -209,30 +214,30 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
         <Text style={s.sectionTitle}>Hypothèses de l'étude</Text>
         <View style={s.row2}>
           <View style={s.col}>
-            <Field label="Pente toiture" value={`${roof.tiltPercent} % (≈ ${tiltDeg}°)`} />
-            <Field label="Orientation" value={String(roof.orientation)} />
-            <Field label="Surface disponible" value={`${roof.surfaceM2} m²`} />
-            <Field label="Panneau de référence" value={`${config.panel_power_wc} Wc / ${config.panel_area_m2} m²`} />
-            <Field label="Pertes système" value={`${config.system_loss} % (PVGIS)`} />
+            <Field label="Pente toiture" value={`${numStr(roof.tiltPercent)} % (soit ${numStr(tiltDeg)}°)`} />
+            <Field label="Orientation" value={typeof roof.orientation === 'number' ? `${roof.orientation}° (Sud = 0)` : String(roof.orientation)} />
+            <Field label="Surface disponible" value={`${numStr(roof.surfaceM2)} m²`} />
+            <Field label="Panneau de référence" value={`${config.panel_power_wc} Wc / ${numStr(config.panel_area_m2)} m²`} />
+            <Field label="Pertes système" value={`${numStr(config.system_loss)} % (PVGIS)`} />
           </View>
           <View style={s.col}>
             <Field label="Consommation saisie" value={`${kwh(consoSaisie)}/an`} />
             {model.evAnnual > 0 && (
-              <Field label="Véhicule électrique" value={`+ ${kwh(model.evAnnual)}/an (${ev.kmPerYear} km, ${ev.kwhPer100km} kWh/100 km)`} />
+              <Field label="Véhicule électrique" value={`+ ${kwh(model.evAnnual)}/an (${fmtInt(ev.kmPerYear)} km, ${numStr(ev.kwhPer100km)} kWh/100 km)`} />
             )}
-            <Field label="Prix du kWh" value={`${model.priceKwh.toLocaleString('fr-FR')} € TTC`} />
+            <Field label="Prix du kWh" value={`${numStr(model.priceKwh)} € TTC`} />
             <Field label="Profil de présence" value={`${PRESET_LABELS[conso.preset] || conso.preset}${conso.ecsBonus ? ' + pilotage ECS' : ''}${ev.enabled && ev.pilotedCharge ? ' + recharge VE pilotée' : ''}`} />
-            <Field label="Projection" value={`${config.horizon_years} ans · inflation élec +${Math.round(config.inflation_rate * 100)} %/an · dégradation −${config.degradation_rate * 100} %/an`} />
+            <Field label="Projection" value={`${config.horizon_years} ans · inflation élec +${numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an · dégradation -${numStr(config.degradation_rate * 100)} %/an`} />
           </View>
         </View>
 
         <Text style={s.sectionTitle}>Installation proposée</Text>
         <View style={s.heroBox}>
-          <Text style={s.heroKwc}>{model.activeKwc} kWc — {model.activePanels} panneaux</Text>
+          <Text style={s.heroKwc}>{numStr(model.activeKwc)} kWc — {model.activePanels} panneaux</Text>
           <Text style={s.heroSub}>
             {model.activeKwc === model.recommendedKwc
               ? 'Dimensionnement optimal suggéré par l’étude'
-              : `Dimensionnement choisi (recommandation de l’étude : ${model.recommendedKwc} kWc)`}
+              : `Dimensionnement choisi (recommandation de l’étude : ${numStr(model.recommendedKwc)} kWc)`}
             {model.cappedByOffer ? ` — plafonné à ${config.max_power_kwc} kWc (offre résidentielle)` : ''}
           </Text>
           <View style={s.heroStats}>
@@ -256,14 +261,14 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
         </View>
         {others.length > 0 && (
           <Text style={s.altLine}>
-            Également étudié : {others.map((sc) => `${sc.label} ${sc.kwc} kWc (économie an 1 ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)})`).join(' · ')}
+            Également étudié : {others.map((sc) => `${sc.label} ${numStr(sc.kwc)} kWc (économie an 1 ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)})`).join(' · ')}
           </Text>
         )}
 
         <Text style={s.sectionTitle}>Transparence du calcul</Text>
         <Text style={s.calcLine}>
           1. <Text style={s.calcStrong}>Production an 1 : {kwh(totals.prod)}</Text> — données solaires PVGIS pour ce
-          lieu (pente {roof.tiltPercent} % ≈ {tiltDeg}°, orientation {String(roof.orientation)}, pertes {config.system_loss} %) × {model.activeKwc} kWc.
+          lieu (pente {numStr(roof.tiltPercent)} % soit {numStr(tiltDeg)}°, orientation {typeof roof.orientation === 'number' ? `${roof.orientation}°` : String(roof.orientation)}, pertes {numStr(config.system_loss)} %) × {numStr(model.activeKwc)} kWc.
         </Text>
         <Text style={s.calcLine}>
           2. <Text style={s.calcStrong}>Recouvrement mensuel : {pct(model.overlapRatio)}</Text> — part de la production
@@ -275,10 +280,22 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
           journée (la production de 11h-16h doit coïncider avec les usages).
         </Text>
         <Text style={s.calcLine}>
-          4. <Text style={s.calcStrong}>Autoconsommation : {pct(totals.tauxAutoconso)}</Text> = {pct(model.overlapRatio)} × {pct(model.coeff)} → {kwh(totals.autoconso)} autoconsommés ({pct(totals.tauxAutoproduction)} de la facture couverte).
+          4. <Text style={s.calcStrong}>Autoconsommation : {pct(totals.tauxAutoconso)}</Text> = {pct(model.overlapRatio)} × {pct(model.coeff)}, soit {kwh(totals.autoconso)} autoconsommés ({pct(totals.tauxAutoproduction)} de la facture couverte).
         </Text>
         <Text style={s.calcLine}>
-          5. <Text style={s.calcStrong}>Économie an 1 : {eur(model.economyYear1)}</Text> = {kwh(totals.autoconso)} × {model.priceKwh.toLocaleString('fr-FR')} €/kWh — le surplus ({kwh(totals.surplus)}) est valorisé 0 €.
+          5. <Text style={s.calcStrong}>Économie an 1 : {eur(model.economyYear1)}</Text> = {kwh(totals.autoconso)} × {numStr(model.priceKwh)} €/kWh — le surplus ({kwh(totals.surplus)}) est valorisé 0 €.
+        </Text>
+        {model.breakEvenAutoconsoRate !== null && (
+          <Text style={s.calcLine}>
+            6. <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</Text> suffisent
+            pour que les économies couvrent l'annuité de crédit (an 1) — cette étude est à {pct(totals.tauxAutoconso)}
+            {totals.tauxAutoconso >= model.breakEvenAutoconsoRate ? ' (au-dessus : gain dès la première année)' : ''}.
+          </Text>
+        )}
+        <Text style={s.calcLine}>
+          {model.breakEvenAutoconsoRate !== null ? '7' : '6'}. <Text style={s.calcStrong}>Sensibilité : +1 point
+          d'autoconsommation = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> d'économies (an 1). Potentiel maximum
+          via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation (coefficient plafonné à {pct(parts.cap)}).
         </Text>
 
         <Text style={s.sectionTitle}>Production vs consommation (kWh/mois)</Text>
@@ -378,7 +395,7 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
                   <Text style={[s.tCell, s.cNum]}>{eur(r.economy)}</Text>
                   <Text style={[s.tCell, s.cNum]}>{r.annuity > 0 ? eur(r.annuity) : '0 €'}</Text>
                   <Text style={[s.tCell, s.cEffort, r.effortNet <= 0 ? { color: C.bleuM, fontFamily: 'Helvetica-Bold' } : {}]}>
-                    {r.effortNet <= 0 ? `▼ gain ${eur(Math.abs(r.effortNet))}` : `▲ effort ${eur(r.effortNet)}`}
+                    {r.effortNet <= 0 ? `Gain ${eur(Math.abs(r.effortNet))}` : `Effort ${eur(r.effortNet)}`}
                   </Text>
                   <Text style={[s.tCell, s.cNum, r.cumul >= 0 ? { color: C.bleuM, fontFamily: 'Helvetica-Bold' } : {}]}>
                     {eur(r.cumul)}
@@ -398,8 +415,8 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
           <Text style={s.noteText}>
             Le surplus de production non autoconsommé est valorisé 0 € dans toute cette étude (revente non prise en
             compte — arrêté du 1er juin 2026). Les économies proviennent uniquement de l'électricité autoconsommée.
-            Hypothèses : inflation du prix de l'électricité +{Math.round(config.inflation_rate * 100)} %/an, dégradation
-            des panneaux −{config.degradation_rate * 100} %/an, horizon {config.horizon_years} ans.
+            Hypothèses : inflation du prix de l'électricité +{numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an, dégradation
+            des panneaux -{numStr(config.degradation_rate * 100)} %/an, horizon {config.horizon_years} ans.
           </Text>
           {annexLabels?.length > 0 && (
             <Text style={[s.noteText, { marginTop: 3 }]}>
