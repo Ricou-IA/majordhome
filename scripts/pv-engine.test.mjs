@@ -228,3 +228,28 @@ test('buildEtudeModel — point mort & sensibilité', async () => {
   // Plafond comportemental = recouvrement × cap
   assert.ok(Math.abs(model.maxAchievableAutoconso - model.overlapRatio * 0.85) < 1e-9);
 });
+
+test('buildEtudeModel — lecture investisseur (ROCE / ROE / full credit)', async () => {
+  const { buildEtudeModel } = await import('../src/apps/solaire/lib/etudeModel.js');
+  const config = buildPvConfig({ pv: { cost_grid: [{ kwc: 9, prix_ttc: 20000 }] } });
+  const base = {
+    roof: { tiltPercent: 18, orientation: 'S', surfaceM2: 45 },
+    conso: { monthly: Array(12).fill(1000), priceKwh: 0.25, preset: 'presence_partielle', ecsBonus: false },
+    ev: { enabled: false },
+    selectedKwc: null,
+    pvgis: { e_m: [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40], e_y: 1152 },
+    config,
+  };
+  // Sans apport : ROCE défini, ROE indéfini, full credit
+  const m0 = buildEtudeModel({ ...base, financing: { rate: 0.045, years: 12, deposit: 0, manualCost: null } });
+  assert.ok(Math.abs(m0.assetYieldYear1 - m0.economyYear1 / 20000) < 1e-9);
+  assert.ok(m0.assetYieldAvg > m0.assetYieldYear1); // inflation > dégradation → moyenne supérieure à l'an 1
+  assert.equal(m0.equityYieldYear1, null);
+  assert.equal(m0.fullCredit, true);
+  assert.ok(Math.abs(m0.netGainYear1 + m0.table.rows[0].effortNet) < 1e-9);
+  // Avec apport 5 000 € : ROE = (économie − annuité) / apport
+  const m5 = buildEtudeModel({ ...base, financing: { rate: 0.045, years: 12, deposit: 5000, manualCost: null } });
+  const annuity5 = monthlyPayment({ capital: 15000, annualRate: 0.045, years: 12 }) * 12;
+  assert.ok(Math.abs(m5.equityYieldYear1 - (m5.economyYear1 - annuity5) / 5000) < 1e-9);
+  assert.equal(m5.fullCredit, false);
+});

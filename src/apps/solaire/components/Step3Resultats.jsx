@@ -143,6 +143,8 @@ export default function Step3Resultats({
         capital={model.capital}
         mensualite={model.mensualite}
         economyYear1={model.economyYear1}
+        model={model}
+        horizonYears={config.horizon_years}
       />
 
       {/* Tableau annuel + cumul */}

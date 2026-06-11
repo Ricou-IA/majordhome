@@ -64,26 +64,10 @@ export default function TransparencyPanel({ model, config, conso, ev, roof }) {
             {' '}= {kwh(t.autoconso)} × {model.priceKwh.toLocaleString('fr-FR')} €/kWh.
             Le surplus ({kwh(t.surplus)}) est volontairement valorisé 0 €.
           </li>
-          {model.breakEvenAutoconsoRate !== null && (
-            <li>
-              <span className="font-semibold text-secondary-900">Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</span>
-              {' '}suffisent pour que les économies couvrent l'annuité de crédit (an 1) — cette simulation est à {pct(t.tauxAutoconso)}
-              {t.tauxAutoconso >= model.breakEvenAutoconsoRate
-                ? ' (au-dessus : gain dès la première année)'
-                : model.maxAchievableAutoconso >= model.breakEvenAutoconsoRate
-                  ? ' (atteignable en améliorant le pilotage des usages)'
-                  : ' (atteint plus tard, porté par l\'inflation du prix de l\'électricité)'}.
-            </li>
-          )}
-          <li>
-            <span className="font-semibold text-secondary-900">
-              Sensibilité : +1 point d'autoconsommation = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an
-            </span>
-            {' '}d'économies (an 1). Potentiel maximum via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation
-            (coefficient plafonné à {pct(parts.cap)}).
-          </li>
         </ol>
       )}
+      {/* Point mort, sensibilité, ROCE/ROE : volet FINANCEMENT (FinancingModule),
+          pas performance de l'actif — séparation Eric 2026-06-11. */}
     </div>
   );
 }

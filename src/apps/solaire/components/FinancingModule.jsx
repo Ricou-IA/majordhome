@@ -1,12 +1,18 @@
 // src/apps/solaire/components/FinancingModule.jsx
 // Module financement : taux/durée saisis par le commercial, apport, coût
 // (pré-rempli depuis la grille admin, toujours éditable). Mensualité live.
-import { Landmark } from 'lucide-react';
+// + « Lecture investisseur » : ROCE/ROE, point mort, sensibilité — rattachés
+// au financement, PAS à la performance de l'actif (séparation Eric 2026-06-11).
+import { Landmark, LineChart } from 'lucide-react';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { formatEuro } from '@lib/utils';
 
+const pct1 = (x) => `${Math.round(x * 1000) / 10} %`;
+const pct = (x) => `${Math.round(x * 100)} %`;
+
 export default function FinancingModule({
   financing, onFinancing, gridCost, chargerPrice, totalCost, capital, mensualite, economyYear1,
+  model, horizonYears,
 }) {
   const costValue = financing.manualCost ?? (gridCost !== null ? Math.round(gridCost) : '');
   const economyMonthly = economyYear1 / 12;
@@ -107,6 +113,54 @@ export default function FinancingModule({
           </>
         )}
       </div>
+
+      {/* Lecture investisseur (ROCE / ROE / point mort / levier) */}
+      {model && model.totalCost !== null && model.assetYieldYear1 !== null && (
+        <div className="rounded-xl border border-secondary-200 p-4 space-y-2">
+          <p className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
+            <LineChart className="w-4 h-4 text-[#1565C0]" /> Lecture investisseur
+          </p>
+          <ul className="space-y-1.5 text-sm text-secondary-700">
+            <li>
+              <span className="font-semibold text-secondary-900">Rendement de l'actif (ROCE) : {pct1(model.assetYieldYear1)} an 1</span>
+              {' '}— économie {formatEuro(Math.round(model.economyYear1))} ÷ coût {formatEuro(model.totalCost)}.
+              Performance de l'installation, indépendante du financement
+              {model.assetYieldAvg !== null && ` (moyenne sur ${horizonYears} ans : ${pct1(model.assetYieldAvg)})`}.
+            </li>
+            {model.equityYieldYear1 !== null ? (
+              <li>
+                <span className="font-semibold text-secondary-900">Rendement des fonds propres (ROE) : {pct1(model.equityYieldYear1)} an 1</span>
+                {' '}— gain net (économie − annuité) ÷ apport {formatEuro(model.deposit)}. L'effet de levier du crédit.
+              </li>
+            ) : model.fullCredit && model.netGainYear1 !== null ? (
+              <li>
+                <span className="font-semibold text-secondary-900">Fonds propres : 0 € immobilisé</span>
+                {' '}— financement 100 % à crédit, effet de levier maximal :{' '}
+                {model.netGainYear1 >= 0
+                  ? `gain net de ${formatEuro(Math.round(model.netGainYear1))}/an dès l'an 1 sans mobiliser d'épargne.`
+                  : `effort net de ${formatEuro(Math.round(Math.abs(model.netGainYear1)))}/an pendant le crédit, sans mobiliser d'épargne.`}
+              </li>
+            ) : null}
+            {model.breakEvenAutoconsoRate !== null && (
+              <li>
+                <span className="font-semibold text-secondary-900">Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</span>
+                {' '}pour que les économies couvrent l'annuité (an 1) — cette simulation est à {pct(model.active.totals.tauxAutoconso)}
+                {model.active.totals.tauxAutoconso >= model.breakEvenAutoconsoRate
+                  ? ' (au-dessus : gain dès la première année)'
+                  : model.maxAchievableAutoconso >= model.breakEvenAutoconsoRate
+                    ? ' (atteignable en améliorant le pilotage des usages)'
+                    : ' (atteint plus tard, porté par l\'inflation du prix de l\'électricité)'}.
+              </li>
+            )}
+            <li>
+              <span className="font-semibold text-secondary-900">
+                Levier : +1 point d'autoconsommation = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an
+              </span>
+              {' '}d'économies. Potentiel maximum via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation.
+            </li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -130,7 +130,8 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
       })
     : null;
 
-  // --- Sensibilité & point mort (transparence, demande Eric 2026-06-11) ---
+  // --- Lecture investisseur (rattachée au FINANCEMENT, pas à la performance
+  // de l'actif — séparation demandée par Eric 2026-06-11) ---
   // +1 point de taux d'autoconsommation = production × 1 % × prix (économie an 1)
   const sensitivityPerAutoconsoPoint = active.totals.prod * 0.01 * priceKwh;
   // Taux d'autoconso (sur production) où l'économie an 1 couvre l'annuité de crédit
@@ -139,6 +140,23 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     : null;
   // Plafond comportemental : recouvrement × coefficient max (pilotage parfait)
   const maxAchievableAutoconso = overlapRatio * coeffParts.cap;
+  // Type ROCE — rendement de l'actif : économie ÷ coût total, indépendant du financement
+  const assetYieldYear1 = totalCost ? economyYear1 / totalCost : null;
+  let horizonEconomies = 0;
+  for (let n = 1; n <= config.horizon_years; n++) {
+    horizonEconomies += yearlyEconomy({
+      autoconsoAnnual: active.totals.autoconso, priceKwh,
+      inflationRate: config.inflation_rate, degradationRate: config.degradation_rate, yearN: n,
+    });
+  }
+  const assetYieldAvg = totalCost ? horizonEconomies / config.horizon_years / totalCost : null;
+  // Type ROE — rendement des fonds propres : gain net après crédit ÷ apport.
+  // Apport 0 = effet de levier maximal (aucun capital immobilisé), ROE non défini.
+  const netGainYear1 = table ? -table.rows[0].effortNet : null;
+  const equityYieldYear1 = table && deposit > 0
+    ? (economyYear1 - table.rows[0].annuity) / deposit
+    : null;
+  const fullCredit = financingOk && deposit === 0;
 
   return {
     evMonthly,
@@ -172,5 +190,10 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     sensitivityPerAutoconsoPoint,
     breakEvenAutoconsoRate,
     maxAchievableAutoconso,
+    assetYieldYear1,
+    assetYieldAvg,
+    netGainYear1,
+    equityYieldYear1,
+    fullCredit,
   };
 }

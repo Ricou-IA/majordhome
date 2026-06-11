@@ -92,6 +92,7 @@ const numStr = (x) => String(x).replace('.', ',');
 const eur = (n) => `${fmtInt(n)} €`;
 const kwh = (n) => `${fmtInt(n)} kWh`;
 const pct = (x) => `${Math.round(x * 100)} %`;
+const pct1Pdf = (x) => `${numStr(Math.round(x * 1000) / 10)} %`; // 1 décimale, virgule FR
 
 function Field({ label, value }) {
   return (
@@ -285,18 +286,6 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
         <Text style={s.calcLine}>
           5. <Text style={s.calcStrong}>Économie an 1 : {eur(model.economyYear1)}</Text> = {kwh(totals.autoconso)} × {numStr(model.priceKwh)} €/kWh — le surplus ({kwh(totals.surplus)}) est valorisé 0 €.
         </Text>
-        {model.breakEvenAutoconsoRate !== null && (
-          <Text style={s.calcLine}>
-            6. <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</Text> suffisent
-            pour que les économies couvrent l'annuité de crédit (an 1) — cette étude est à {pct(totals.tauxAutoconso)}
-            {totals.tauxAutoconso >= model.breakEvenAutoconsoRate ? ' (au-dessus : gain dès la première année)' : ''}.
-          </Text>
-        )}
-        <Text style={s.calcLine}>
-          {model.breakEvenAutoconsoRate !== null ? '7' : '6'}. <Text style={s.calcStrong}>Sensibilité : +1 point
-          d'autoconsommation = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> d'économies (an 1). Potentiel maximum
-          via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation (coefficient plafonné à {pct(parts.cap)}).
-        </Text>
 
         <Text style={s.sectionTitle}>Production vs consommation (kWh/mois)</Text>
         <MonthlyBarsChart model={model} />
@@ -341,6 +330,38 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
             <Field label="Économie moyenne an 1" value={`${eur(model.economyYear1 / 12)}/mois`} />
           </View>
         </View>
+
+        {model.totalCost !== null && model.assetYieldYear1 !== null && (
+          <>
+            <Text style={s.sectionTitle}>Lecture investisseur</Text>
+            <Text style={s.calcLine}>
+              • <Text style={s.calcStrong}>Rendement de l'actif (ROCE) : {pct1Pdf(model.assetYieldYear1)} an 1</Text> — économie {eur(model.economyYear1)} ÷ coût {eur(model.totalCost)}. Performance de l'installation, indépendante du
+              financement{model.assetYieldAvg !== null ? ` (moyenne sur ${config.horizon_years} ans : ${pct1Pdf(model.assetYieldAvg)})` : ''}.
+            </Text>
+            {model.equityYieldYear1 !== null ? (
+              <Text style={s.calcLine}>
+                • <Text style={s.calcStrong}>Rendement des fonds propres (ROE) : {pct1Pdf(model.equityYieldYear1)} an 1</Text> — gain net (économie - annuité) ÷ apport {eur(model.deposit)}. L'effet de levier du crédit.
+              </Text>
+            ) : model.fullCredit && model.netGainYear1 !== null ? (
+              <Text style={s.calcLine}>
+                • <Text style={s.calcStrong}>Fonds propres : 0 € immobilisé</Text> — financement 100 % à crédit, effet de
+                levier maximal : {model.netGainYear1 >= 0
+                  ? `gain net de ${eur(model.netGainYear1)}/an dès l'an 1 sans mobiliser d'épargne.`
+                  : `effort net de ${eur(Math.abs(model.netGainYear1))}/an pendant le crédit, sans mobiliser d'épargne.`}
+              </Text>
+            ) : null}
+            {model.breakEvenAutoconsoRate !== null && (
+              <Text style={s.calcLine}>
+                • <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</Text> pour
+                que les économies couvrent l'annuité (an 1) — cette étude est à {pct(totals.tauxAutoconso)}
+                {totals.tauxAutoconso >= model.breakEvenAutoconsoRate ? ' (au-dessus : gain dès la première année)' : ''}.
+              </Text>
+            )}
+            <Text style={s.calcLine}>
+              • <Text style={s.calcStrong}>Levier : +1 point d'autoconsommation = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> d'économies. Potentiel maximum via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation.
+            </Text>
+          </>
+        )}
 
         {ind && (
           <View style={s.indicRow}>
