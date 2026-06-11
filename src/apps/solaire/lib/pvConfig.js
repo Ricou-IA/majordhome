@@ -22,6 +22,7 @@ export const PV_DEFAULTS = {
     cap: 0.85,
   },
   cost_grid: [],                // [{ kwc, prix_ttc }] — 1 à 9 kWc, rempli par l'admin
+  tech_docs: [],                // bibliothèque technique : [{ id, label, kind: 'panneau'|'borne'|'onduleur'|'autre', path, attach }]
   default_loan_rate: 0.045,
   default_loan_years: 12,
   vat_rate: 0.055,              // informatif (grille en TTC)

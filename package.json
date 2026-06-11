@@ -43,6 +43,7 @@
         "exceljs": "^4.4.0",
         "lucide-react": "^0.462.0",
         "mapbox-gl": "^3.19.1",
+        "pdf-lib": "^1.17.1",
         "react": "^18.3.1",
         "react-day-picker": "^8.10.1",
         "react-dom": "^18.3.1",

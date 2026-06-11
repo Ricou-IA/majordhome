@@ -160,3 +160,25 @@ test('optimize — régression 2026-06-11 : gros consommateur → max toiture (c
   const r = optimize({ eM1kwc, consoMonthly, threshold: 0.85, maxKwc: 8, stepKwc: 0.5 });
   assert.equal(r.recommendedKwc, 8); // prod max mois (150×8=1200) < conso (1842) → recouvrement = 1
 });
+
+test('buildEtudeModel — pipeline complet cohérent (source unique UI + PDF)', async () => {
+  const { buildEtudeModel } = await import('../src/apps/solaire/lib/etudeModel.js');
+  const config = buildPvConfig({ pv: { cost_grid: [{ kwc: 1, prix_ttc: 4000 }, { kwc: 9, prix_ttc: 20000 }] } });
+  const model = buildEtudeModel({
+    roof: { tiltPercent: 18, orientation: 'S', surfaceM2: 45 },
+    conso: { monthly: Array(12).fill(1000), priceKwh: 0.25, preset: 'presence_partielle', ecsBonus: false },
+    ev: { enabled: false },
+    financing: { rate: 0.045, years: 12, deposit: 0, manualCost: null },
+    selectedKwc: null,
+    pvgis: { e_m: [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40], e_y: 1152 },
+    config,
+  });
+  assert.ok(model);
+  assert.equal(model.maxKwc, 9);                 // toiture 45 m² → 9,5 kWc, plafonné à 9
+  assert.equal(model.cappedByOffer, true);
+  assert.equal(model.recommendedKwc, 9);         // 12 000 kWh/an flat → recouvrement 0,90 ≥ 0,85
+  assert.equal(model.activeKwc, model.recommendedKwc);
+  assert.equal(model.capital, 20000);            // ligne exacte de la grille à 9 kWc
+  assert.ok(model.mensualite > 0);
+  assert.equal(model.table.rows.length, config.horizon_years);
+});

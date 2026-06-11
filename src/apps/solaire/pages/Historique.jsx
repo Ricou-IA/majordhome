@@ -4,24 +4,77 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Sun, MapPin, RotateCw, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sun, MapPin, RotateCw, Trash2, Loader2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
+import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { usePvSimulations, usePvSimulationMutations } from '@hooks/usePvSimulations';
 import { useDebounce } from '@hooks/useDebounce';
+import { pvService } from '@services/pv.service';
 import { SearchBar } from '@apps/artisan/components/shared/SearchBar';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { formatDateShortFR, formatEuro } from '@lib/utils';
+import { formatDateShortFR, formatDateFR, formatEuro } from '@lib/utils';
+import { buildCompanyInfo } from '@lib/orgBranding';
+import { buildPvConfig } from '../lib/pvConfig';
+import { buildEtudeModel } from '../lib/etudeModel';
+import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
+import { generateEtudePdfBlob } from '../components/EtudePDF';
 
 const PAGE_SIZE = 25;
 
 export default function Historique() {
   const navigate = useNavigate();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { settings } = useOrgSettings();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [toDelete, setToDelete] = useState(null);
+  const [pdfBusyId, setPdfBusyId] = useState(null);
   const debouncedSearch = useDebounce(search, 300);
 
   const { data, isLoading } = usePvSimulations({ search: debouncedSearch, page });
   const { deleteSimulation } = usePvSimulationMutations();
+
+  // Régénère l'étude PDF depuis la simulation persistée (pvgis_monthly inclus
+  // → AUCUN nouvel appel PVGIS, chiffres identiques des mois plus tard).
+  const handlePdf = async (simRow) => {
+    setPdfBusyId(simRow.id);
+    try {
+      const { data: sim, error } = await pvService.getById(orgId, simRow.id);
+      if (error || !sim) throw error || new Error('Simulation introuvable');
+      const config = buildPvConfig(settings);
+      const model = buildEtudeModel({
+        roof: sim.inputs.roof,
+        conso: sim.inputs.conso,
+        ev: sim.inputs.ev,
+        financing: sim.inputs.financing,
+        selectedKwc: sim.inputs.selectedKwc ?? null,
+        pvgis: sim.pvgis_monthly,
+        config,
+      });
+      if (!model) throw new Error('Données incomplètes');
+      const inputs = { roof: sim.inputs.roof, conso: sim.inputs.conso, ev: sim.inputs.ev };
+      const annexes = selectAnnexDocs(config, inputs);
+      const studyBlob = await generateEtudePdfBlob({
+        model, config,
+        company: buildCompanyInfo(settings),
+        inputs,
+        meta: {
+          clientName: sim.client_name || 'Client',
+          clientAddress: sim.client_address || '',
+          dateLabel: formatDateFR(sim.created_at),
+        },
+        annexLabels: annexes.map((d) => d.label),
+      });
+      const finalBlob = await attachAnnexes(studyBlob, annexes);
+      downloadBlob(finalBlob, buildEtudeFilename(sim.client_name));
+      toast.success('Étude PDF générée');
+    } catch (err) {
+      toast.error(`Échec de la génération : ${err.message}`);
+    } finally {
+      setPdfBusyId(null);
+    }
+  };
 
   const rows = data?.rows ?? [];
   const count = data?.count ?? 0;
@@ -103,6 +156,14 @@ export default function Historique() {
                     className="btn-primary flex items-center gap-1.5 text-sm"
                   >
                     <RotateCw className="w-3.5 h-3.5" /> Recharger
+                  </button>
+                  <button
+                    onClick={() => handlePdf(sim)}
+                    disabled={pdfBusyId !== null}
+                    className="p-2 rounded-lg text-secondary-400 hover:text-secondary-700 hover:bg-secondary-100 disabled:opacity-50"
+                    title="Télécharger l'étude PDF"
+                  >
+                    {pdfBusyId === sim.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => setToDelete(sim)}

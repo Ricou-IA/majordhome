@@ -8,10 +8,15 @@ import { History, RotateCcw, Loader2, Check } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { usePvSimulation, usePvSimulationMutations } from '@hooks/usePvSimulations';
+import { buildCompanyInfo } from '@lib/orgBranding';
+import { formatDateFR } from '@lib/utils';
 import { buildPvConfig } from '../lib/pvConfig';
 import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } from '../lib/wizardState';
 import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
+import { buildEtudeModel } from '../lib/etudeModel';
+import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
+import { generateEtudePdfBlob } from '../components/EtudePDF';
 import Step1Localisation from '../components/Step1Localisation';
 import Step2Consommation from '../components/Step2Consommation';
 import Step3Resultats from '../components/Step3Resultats';
@@ -31,10 +36,10 @@ export default function Simulateur() {
       </div>
     );
   }
-  return <SimulateurInner config={buildPvConfig(settings)} />;
+  return <SimulateurInner config={buildPvConfig(settings)} settings={settings} />;
 }
 
-function SimulateurInner({ config }) {
+function SimulateurInner({ config, settings }) {
   const { user } = useAuth();
   const userId = user?.id;
   const navigate = useNavigate();
@@ -47,6 +52,7 @@ function SimulateurInner({ config }) {
   const restoredRef = useRef(false);
   const [pvgisLoading, setPvgisLoading] = useState(false);
   const [pvgisError, setPvgisError] = useState(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // --- Brouillon : restauration au mount (sauf rechargement ?sim=) ---
   useEffect(() => {
@@ -150,6 +156,38 @@ function SimulateurInner({ config }) {
     }
   };
 
+  const handleGeneratePdf = async ({ clientName }) => {
+    setIsGeneratingPdf(true);
+    try {
+      const model = buildEtudeModel({
+        roof: state.roof, conso: state.conso, ev: state.ev,
+        financing: state.financing, selectedKwc: state.selectedKwc,
+        pvgis: state.pvgis, config,
+      });
+      if (!model) throw new Error('Données incomplètes');
+      const inputs = { roof: state.roof, conso: state.conso, ev: state.ev };
+      const annexes = selectAnnexDocs(config, inputs);
+      const company = buildCompanyInfo(settings);
+      const studyBlob = await generateEtudePdfBlob({
+        model, config, company, inputs,
+        meta: {
+          clientName,
+          clientAddress: state.location.address || '',
+          dateLabel: formatDateFR(new Date()),
+        },
+        annexLabels: annexes.map((d) => d.label),
+      });
+      const finalBlob = await attachAnnexes(studyBlob, annexes);
+      downloadBlob(finalBlob, buildEtudeFilename(clientName));
+      toast.success('Étude PDF générée');
+    } catch (err) {
+      toast.error(`Échec de la génération : ${err.message}`);
+      throw err;
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const goToStep = (n) => dispatch({ type: 'SET_STEP', step: n });
 
   return (
@@ -246,6 +284,9 @@ function SimulateurInner({ config }) {
           onBack={() => goToStep(2)}
           onSave={handleSave}
           isSaving={createSimulation.isPending}
+          onGeneratePdf={handleGeneratePdf}
+          isGeneratingPdf={isGeneratingPdf}
+          defaultClientName={savedSim?.client_name ?? ''}
         />
       )}
     </div>
