@@ -267,7 +267,7 @@ Wizard 3 étapes (§3) + Historique + Admin. Mobile-first : utilisable à une ma
 ## 11. Hors périmètre (v1)
 - Revente du surplus (volontairement ignorée, cf. §1).
 - Batteries de stockage (v2 : augmenterait le coefficient de simultanéité).
-- Export PDF client (v2).
+- ~~Export PDF client (v2)~~ → **livré le 2026-06-11** (cf. §13).
 - Comparatif coût carburant évité VE vs thermique (v2).
 - Données horaires PVGIS (modèle mensuel + coefficient suffisent en v1).
 - Ombrages, multi-pans de toiture.
@@ -286,3 +286,23 @@ Wizard 3 étapes (§3) + Historique + Admin. Mobile-first : utilisable à une ma
 8. Simulation rechargeable à l'identique depuis l'historique (via `pvgis_monthly` persisté, sans nouvel appel).
 9. Bloc VE : activer/désactiver recalcule instantanément conso, dimensionnement, capital (borne) et tableau annuel.
 10. Charte multi-tenant respectée : RLS dès la création, vue `security_invoker=true`, GRANT service_role, `org_id` explicite partout, cache keys org-scopées, `escapePostgrestSearchTerm` sur la recherche.
+
+---
+
+## 13. Étude PDF personnalisée & bibliothèque technique (ajout 2026-06-11, validé Eric)
+
+### Étude PDF (2 pages A4, transmissible au client)
+- **Génération** : `@react-pdf/renderer` (pattern PDFs existants), brandé via `buildCompanyInfo(settings)` (multi-tenant, fallback neutre). Graphique mensuel **redessiné en primitives** (barre production empilée autoconsommée + surplus avec liseré jaune, barre conso) — pas de capture d'écran.
+- **Page 1** : en-tête org (logo, coordonnées, RGE) · titre + client/adresse/date · hypothèses complètes · scénario retenu en vedette (+ autres scénarios en 1 ligne — l'étude vend UNE solution) · graphique + 4 totaux annuels.
+- **Page 2** : financement · 3 indicateurs · tableau annuel complet (badges NEUTRALITÉ / FIN DU CRÉDIT) · encadré « approche conservatrice, surplus 0 € » · liste des annexes · footer mentions légales + « étude indicative non contractuelle ».
+- **Source unique de calcul** : `src/apps/solaire/lib/etudeModel.js::buildEtudeModel` — le MÊME pipeline alimente l'étape 3 (UI) et le PDF (étape 3 live + historique). Testé via node --test.
+- **Accès** : bouton « Étude PDF » à l'étape 3 (modale nom client, pré-remplie si simulation rechargée) + bouton par ligne d'historique (régénération à l'identique via `pvgis_monthly` persisté). Fichier `etude-pv-<client>-<date>.pdf`.
+
+### Bibliothèque technique (fiches annexées)
+- **Dépôt** : Settings → Solaire → onglet « Bibliothèque technique » (org_admin). Upload PDF vers bucket existant **`product-documents`** (policies org-scoped P0.0.7), path `${orgId}/solaire/<uuid>.pdf`.
+- **Métadonnées** : `settings.pv.tech_docs: [{ id, label, kind: 'panneau'|'borne'|'onduleur'|'autre', path, attach }]` — sauvées avec le reste du pv (en bloc).
+- **Règles de jonction** : `attach=true` requis ; les fiches `kind='borne'` ne sont jointes **que si** l'option borne est cochée dans la simulation. Liste des annexes mentionnée en page 2.
+- **Fusion** : `pdf-lib` (dépendance ajoutée 2026-06-11) — copie des pages des fiches à la suite de l'étude. Une annexe illisible/introuvable est **ignorée avec warn**, jamais bloquante (l'étude part seule au pire).
+
+### UI graphique (ajout même date)
+- Légende du graphique mensuel = 4 vignettes cliquables (couleur + libellé + **total annuel kWh**) ; un clic masque/affiche la série (état porté par opacité + barré, jamais couleur seule).
