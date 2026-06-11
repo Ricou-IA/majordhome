@@ -3,22 +3,35 @@
 // Source de vérité : core.organizations.settings.pv via useOrgSettings().
 // ⚠️ La RPC org_update_settings merge au niveau 1 : on sauve TOUJOURS
 // l'objet pv complet (jamais un sous-objet partiel).
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { buildPvConfig } from '@apps/solaire/lib/pvConfig';
-import { Calculator, Grid3x3, Users, ChevronLeft, Plus, X, Loader2 } from 'lucide-react';
+import { TECH_DOCS_BUCKET } from '@apps/solaire/lib/etudeExport';
+import { storageService } from '@services/storage.service';
+import {
+  Calculator, Grid3x3, Users, ChevronLeft, Plus, X, Loader2,
+  FileText, Upload, ExternalLink, Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { FormField, SectionTitle, inputClass } from '../../components/FormFields';
+import { FormField, SectionTitle, inputClass, selectClass } from '../../components/FormFields';
 
 const TABS = [
   { key: 'calcul', label: 'Paramètres calcul', icon: Calculator },
   { key: 'grille', label: 'Grille de coûts', icon: Grid3x3 },
   { key: 'simultaneite', label: 'Simultanéité & VE', icon: Users },
+  { key: 'bibliotheque', label: 'Bibliothèque technique', icon: FileText },
 ];
 
 const KWC_OPTIONS = Array.from({ length: 17 }, (_, i) => 1 + i * 0.5); // 1 → 9 kWc, pas 0,5
+
+const DOC_KINDS = [
+  { value: 'panneau', label: 'Panneau' },
+  { value: 'borne', label: 'Borne de recharge' },
+  { value: 'onduleur', label: 'Onduleur' },
+  { value: 'autre', label: 'Autre' },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers champs numériques
@@ -249,6 +262,137 @@ function SimultaneiteTab({ form, patch }) {
   );
 }
 
+function BibliothequeTab({ form, patch, orgId }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const docs = Array.isArray(form.tech_docs) ? form.tech_docs : [];
+
+  const updateDoc = (id, p) => patch({ tech_docs: docs.map((d) => (d.id === id ? { ...d, ...p } : d)) });
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Seuls les fichiers PDF sont acceptés');
+      return;
+    }
+    setUploading(true);
+    const path = `${orgId}/solaire/${crypto.randomUUID()}.pdf`;
+    const { path: storedPath, error } = await storageService.uploadFile(
+      TECH_DOCS_BUCKET, path, file, { contentType: 'application/pdf' },
+    );
+    setUploading(false);
+    if (error || !storedPath) {
+      toast.error(`Échec de l'upload : ${error?.message ?? 'erreur inconnue'}`);
+      return;
+    }
+    patch({
+      tech_docs: [
+        ...docs,
+        {
+          id: crypto.randomUUID(),
+          label: file.name.replace(/\.pdf$/i, ''),
+          kind: 'autre',
+          path: storedPath,
+          attach: true,
+        },
+      ],
+    });
+    toast.success('Fiche ajoutée — ne pas oublier d\'Enregistrer');
+  };
+
+  const handleOpen = async (doc) => {
+    const { url, error } = await storageService.getSignedUrl(TECH_DOCS_BUCKET, doc.path);
+    if (error || !url) {
+      toast.error('Fichier introuvable dans le Storage');
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  };
+
+  const handleDelete = async (doc) => {
+    await storageService.deleteFile(TECH_DOCS_BUCKET, doc.path);
+    patch({ tech_docs: docs.filter((d) => d.id !== doc.id) });
+    toast.success('Fiche supprimée — ne pas oublier d\'Enregistrer');
+  };
+
+  return (
+    <div className="card space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <SectionTitle>Bibliothèque technique</SectionTitle>
+          <p className="text-sm text-secondary-600 mt-1">
+            Fiches techniques (PDF) jointes en annexe des études : panneaux, borne, onduleur…
+            Les fiches « Borne de recharge » ne sont jointes que si l'option borne est cochée dans la simulation.
+          </p>
+        </div>
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="btn-primary flex items-center gap-1.5 flex-shrink-0 disabled:opacity-60"
+        >
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          Déposer un PDF
+        </button>
+        <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={handleUpload} />
+      </div>
+
+      {docs.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-secondary-300 bg-secondary-50 p-6 text-center text-sm text-secondary-600">
+          Aucune fiche déposée — les études seront générées sans annexes.
+        </div>
+      ) : (
+        <div className="divide-y divide-secondary-100">
+          {docs.map((doc) => (
+            <div key={doc.id} className="flex items-center gap-3 py-2 flex-wrap">
+              <FileText className="w-4 h-4 text-secondary-400 flex-shrink-0" />
+              <input
+                className={`${inputClass} flex-1 min-w-[140px]`}
+                value={doc.label ?? ''}
+                placeholder="Libellé (ex : Panneau 500 Wc DualSun)"
+                onChange={(e) => updateDoc(doc.id, { label: e.target.value })}
+              />
+              <select
+                className={`${selectClass} w-44`}
+                value={doc.kind ?? 'autre'}
+                onChange={(e) => updateDoc(doc.id, { kind: e.target.value })}
+              >
+                {DOC_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-1.5 text-xs text-secondary-600 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  className="rounded border-secondary-300"
+                  checked={doc.attach !== false}
+                  onChange={(e) => updateDoc(doc.id, { attach: e.target.checked })}
+                />
+                Joint aux études
+              </label>
+              <button
+                onClick={() => handleOpen(doc)}
+                className="p-1.5 rounded-md text-secondary-400 hover:text-secondary-700 hover:bg-secondary-100"
+                title="Ouvrir le PDF"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDelete(doc)}
+                className="p-1.5 rounded-md text-secondary-400 hover:text-secondary-700 hover:bg-secondary-100"
+                title="Supprimer la fiche"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -272,7 +416,7 @@ function validatePvForm(form) {
 }
 
 export default function SolaireSettings() {
-  const { isOrgAdmin } = useAuth();
+  const { isOrgAdmin, organization } = useAuth();
   const navigate = useNavigate();
   const { settings, isLoading, save, isSaving } = useOrgSettings();
   const [activeTab, setActiveTab] = useState('calcul');
@@ -360,6 +504,7 @@ export default function SolaireSettings() {
             {activeTab === 'calcul' && <CalculTab form={form} patch={patch} />}
             {activeTab === 'grille' && <GrilleTab form={form} patch={patch} />}
             {activeTab === 'simultaneite' && <SimultaneiteTab form={form} patch={patch} />}
+            {activeTab === 'bibliotheque' && <BibliothequeTab form={form} patch={patch} orgId={organization?.id} />}
           </div>
         </div>
       )}
