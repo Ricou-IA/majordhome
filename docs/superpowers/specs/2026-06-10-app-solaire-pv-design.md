@@ -129,12 +129,15 @@ Lus/écrits exclusivement via `useOrgSettings()` (canal canonique). Shape :
     "autoconso_threshold": 0.85,      // seuil optimiseur (recouvrement pré-coefficient)
     "max_power_kwc": 9,               // plafond offre résidentielle (régime réglementaire ≤ 9 kWc)
     "simultaneity": {
-      "presence_journee": 0.70,
-      "presence_partielle": 0.55,     // défaut
-      "absent_journee": 0.45,
-      "bonus_ecs": 0.10,              // pilotage ECS/domotique (argument Mayer CVC/ENR)
-      "bonus_ve": 0.10,               // recharge VE pilotée en journée
-      "cap": 0.85                     // plafond global
+      // ⚠️ Recalibrage prudent 2026-06-11 (Eric) : les valeurs initiales
+      // (0,70/0,55/0,45, bonus +0,10, cap 0,85) promettaient 75 % d'autoconso
+      // en stack — jamais constaté. Hypothèses déclaratives à calibrer à l'usage.
+      "presence_journee": 0.60,
+      "presence_partielle": 0.50,     // défaut (≈ base constatée sans pilotage)
+      "absent_journee": 0.40,
+      "bonus_ecs": 0.05,              // pilotage ECS/domotique (argument Mayer CVC/ENR)
+      "bonus_ve": 0.05,               // recharge VE pilotée en journée
+      "cap": 0.75                     // plafond global (= l'« Objectif » affiché)
     },
     "cost_grid": [],                  // [{ "kwc": 3, "prix_ttc": 8990 }, ...] — 1 à 9 kWc, rempli au fil de l'eau
     "default_loan_rate": 0.045,
@@ -190,7 +193,7 @@ PVGIS ne renvoie pas d'en-têtes CORS → proxy obligatoire.
 
 ### 8.2 Coefficient de simultanéité
 Le `min(prod, conso)` mensuel donne le recouvrement *théorique* mais ignore le décalage intra-journalier (production 11h–16h vs conso matin/soir). Le coefficient = **part du recouvrement mensuel réellement simultanée à l'échelle de la journée**. Ce n'est PAS le taux d'autoconsommation final (celui-ci est un résultat : autoconsommé ÷ produit).
-`coeff = preset_présence + bonus_ecs (si coché) + bonus_ve (si VE actif ET recharge pilotée cochée)`, **plafonné à `cap` (0,85)**.
+`coeff = preset_présence + bonus_ecs (si coché) + bonus_ve (si VE actif ET recharge pilotée cochée)`, **plafonné à `cap` (0,75 depuis le recalibrage prudent du 2026-06-11)**.
 
 ### 8.3 Autoconsommation mensuelle
 ```
@@ -244,7 +247,7 @@ Profil résidentiel standard (constante du moteur, % du total annuel) :
 
 L'outil **suggère la puissance**, le commercial peut la modifier.
 - Tester les puissances par pas de 1 panneau (0,5 kWc), de 1 panneau jusqu'à la puissance max toiture, et retenir **la plus grande puissance dont le recouvrement théorique annuel `Σ min(prod, conso) / Σ prod` ≥ seuil admin (défaut 85 %)**. Aucun nouvel appel PVGIS (linéarité).
-- **⚠️ Correctif 2026-06-11** : le critère se calcule **AVANT** le coefficient de simultanéité (contrairement au `taux_autoconso` du §8.3, qui reste la métrique affichée). Le taux post-coefficient est plafonné par le coefficient (0,45–0,85) → un seuil à 85 % serait inatteignable et l'optimiseur recommanderait toujours le minimum (bug constaté en validation : 22 110 kWh/an → 0,5 kWc). Le coefficient scale toutes les puissances uniformément et ne déplace pas le point de surdimensionnement ; le seuil signifie « au plus 15 % de la production déborde structurellement de la consommation mensuelle ».
+- **⚠️ Correctif 2026-06-11** : le critère se calcule **AVANT** le coefficient de simultanéité (contrairement au `taux_autoconso` du §8.3, qui reste la métrique affichée). Le taux post-coefficient est plafonné par le coefficient (0,40–0,75 depuis le recalibrage prudent) → un seuil à 85 % serait inatteignable et l'optimiseur recommanderait toujours le minimum (bug constaté en validation : 22 110 kWh/an → 0,5 kWc). Le coefficient scale toutes les puissances uniformément et ne déplace pas le point de surdimensionnement ; le seuil signifie « au plus 15 % de la production déborde structurellement de la consommation mensuelle ».
 - Cas limites : si même 1 panneau < seuil → recommander 1 panneau ; si max ≥ seuil → recommander le max ; scénarios ±1 clampés à [1 panneau, max] (si recommandé = max, n'afficher que 2 scénarios).
 - **⚠️ Plafond d'offre (correctif 2026-06-11)** : la puissance testée est bornée par `min(max toiture, max_power_kwc admin — défaut 9 kWc)`. Au-delà de 9 kWc le régime réglementaire change (offre résidentielle, grille de coûts 1–9 kWc). Bug constaté en validation : un gros consommateur (25 910 kWh/an) se voyait recommander 20 kWc / 40 panneaux. Si la toiture permettrait plus que le plafond, l'UI l'indique sous les scénarios.
 - Affichage : **3 scénarios côte à côte** — « Recommandé », « −1 palier » (sobre), « +1 palier » (confort) — chacun : kWc, nb panneaux, taux d'autoconso, % surplus perdu, économie an 1, effort net mensuel moyen. Le « +1 palier » doit visuellement montrer le surplus perdu qui grimpe : argument anti-survente face aux concurrents.

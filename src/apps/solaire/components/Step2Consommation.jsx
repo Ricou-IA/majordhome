@@ -145,7 +145,7 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
             checked={conso.ecsBonus}
             onChange={(e) => onConso({ ecsBonus: e.target.checked })}
           />
-          Pilotage ECS / domotique (+10 % de simultanéité)
+          Pilotage ECS / domotique (+{Math.round(config.simultaneity.bonus_ecs * 100)} % de simultanéité)
         </label>
       </div>
 
@@ -210,7 +210,7 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
                 checked={ev.pilotedCharge}
                 onChange={(e) => onEv({ pilotedCharge: e.target.checked })}
               />
-              Recharge pilotée en journée (+10 % de simultanéité)
+              Recharge pilotée en journée (+{Math.round(config.simultaneity.bonus_ve * 100)} % de simultanéité)
             </label>
 
             <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">

@@ -15,10 +15,10 @@ export const PRESET_LABELS = {
   absent_journee: 'Absent en journée',
 };
 
-/** Repère national affiché à côté du point mort (fourchette honnête plutôt
- * qu'un chiffre précis : l'ADEME constate ~20-40 % d'autoconsommation
- * résidentielle sans pilotage). Texte partagé UI + PDF. */
-export const NATIONAL_AUTOCONSO_BENCHMARK = 'repère : 20 à 40 % constatés en France sans pilotage (ADEME)';
+/** Note de prudence affichée à côté du point mort (UI + PDF). Le taux
+ * d'autoconsommation est une HYPOTHÈSE déclarative (presets simultanéité),
+ * pas une mesure — il sera calibré avec les relevés réels à l'usage. */
+export const NATIONAL_AUTOCONSO_BENCHMARK = 'hypothèse prudente, à confirmer par les relevés réels la première année';
 
 /**
  * Construit le modèle complet d'une étude depuis les saisies + PVGIS + config.

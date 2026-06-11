@@ -43,12 +43,15 @@ test('evMonthlyConsumption', () => {
   assert.ok(Math.abs(m - 316.667) < 0.01);
 });
 
-test('simultaneityCoeff — presets, bonus, plafond', () => {
+test('simultaneityCoeff — presets, bonus, plafond (défauts prudents 2026-06-11)', () => {
   const profiles = PV_DEFAULTS.simultaneity;
-  assert.equal(simultaneityCoeff({ preset: 'absent_journee', ecsBonus: false, evBonus: false }, profiles), 0.45);
-  assert.equal(simultaneityCoeff({ preset: 'presence_partielle', ecsBonus: true, evBonus: false }, profiles), 0.65);
-  // 0,70 + 0,10 + 0,10 = 0,90 → plafonné 0,85
-  assert.equal(simultaneityCoeff({ preset: 'presence_journee', ecsBonus: true, evBonus: true }, profiles), 0.85);
+  assert.ok(Math.abs(simultaneityCoeff({ preset: 'absent_journee', ecsBonus: false, evBonus: false }, profiles) - 0.40) < 1e-9);
+  assert.ok(Math.abs(simultaneityCoeff({ preset: 'presence_partielle', ecsBonus: true, evBonus: false }, profiles) - 0.55) < 1e-9);
+  // 0,60 + 0,05 + 0,05 = 0,70 — sous le plafond 0,75
+  assert.ok(Math.abs(simultaneityCoeff({ preset: 'presence_journee', ecsBonus: true, evBonus: true }, profiles) - 0.70) < 1e-9);
+  // Plafond : profil custom qui dépasse → clampé
+  const custom = { presence_journee: 0.70, presence_partielle: 0.50, absent_journee: 0.40, bonus_ecs: 0.10, bonus_ve: 0.10, cap: 0.75 };
+  assert.ok(Math.abs(simultaneityCoeff({ preset: 'presence_journee', ecsBonus: true, evBonus: true }, custom) - 0.75) < 1e-9);
 });
 
 test('costFromGrid — exact, interpolation, hors bornes, vide', () => {
@@ -195,9 +198,9 @@ test('buildEtudeModel — transparence : recouvrement + décomposition coefficie
     pvgis: { e_m: [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40], e_y: 1152 },
     config,
   });
-  // 0,55 + 0,10 (ECS) + 0,10 (VE pilotée) = 0,75, non plafonné
-  assert.ok(Math.abs(model.coeff - 0.75) < 1e-9);
-  assert.equal(model.coeffParts.presetValue, 0.55);
+  // 0,50 + 0,05 (ECS) + 0,05 (VE pilotée) = 0,60, non plafonné (défauts prudents)
+  assert.ok(Math.abs(model.coeff - 0.60) < 1e-9);
+  assert.equal(model.coeffParts.presetValue, 0.50);
   assert.equal(model.coeffParts.ecsApplied, true);
   assert.equal(model.coeffParts.evApplied, true);
   assert.equal(model.coeffParts.capped, false);
@@ -226,7 +229,7 @@ test('buildEtudeModel — point mort & sensibilité', async () => {
   const annuity = monthlyPayment({ capital: 20000, annualRate: 0.045, years: 12 }) * 12;
   assert.ok(Math.abs(model.breakEvenAutoconsoRate - annuity / (prod * 0.25)) < 1e-9);
   // Plafond comportemental = recouvrement × cap
-  assert.ok(Math.abs(model.maxAchievableAutoconso - model.overlapRatio * 0.85) < 1e-9);
+  assert.ok(Math.abs(model.maxAchievableAutoconso - model.overlapRatio * 0.75) < 1e-9);
 });
 
 test('buildEtudeModel — lecture investisseur (ROCE / ROE / full credit)', async () => {
