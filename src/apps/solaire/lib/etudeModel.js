@@ -15,6 +15,11 @@ export const PRESET_LABELS = {
   absent_journee: 'Absent en journée',
 };
 
+/** Repère national affiché à côté du point mort (fourchette honnête plutôt
+ * qu'un chiffre précis : l'ADEME constate ~20-40 % d'autoconsommation
+ * résidentielle sans pilotage). Texte partagé UI + PDF. */
+export const NATIONAL_AUTOCONSO_BENCHMARK = 'repère : 20 à 40 % constatés en France sans pilotage (ADEME)';
+
 /**
  * Construit le modèle complet d'une étude depuis les saisies + PVGIS + config.
  * Retourne null si les données sont incomplètes (pas de PVGIS, toiture < 1 panneau).
@@ -157,6 +162,10 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     ? (economyYear1 - table.rows[0].annuity) / deposit
     : null;
   const fullCredit = financingOk && deposit === 0;
+  // Objectif pilotage : delta entre l'autoconso actuelle et le plafond
+  // atteignable, exprimé en points ET en €/an (vulgarisation Eric 2026-06-11)
+  const pilotageDeltaPoints = Math.max(0, Math.round((maxAchievableAutoconso - active.totals.tauxAutoconso) * 100));
+  const pilotageDeltaEuros = pilotageDeltaPoints * sensitivityPerAutoconsoPoint;
 
   return {
     evMonthly,
@@ -195,5 +204,7 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     netGainYear1,
     equityYieldYear1,
     fullCredit,
+    pilotageDeltaPoints,
+    pilotageDeltaEuros,
   };
 }

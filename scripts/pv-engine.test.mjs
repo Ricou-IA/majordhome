@@ -253,3 +253,21 @@ test('buildEtudeModel — lecture investisseur (ROCE / ROE / full credit)', asyn
   assert.ok(Math.abs(m5.equityYieldYear1 - (m5.economyYear1 - annuity5) / 5000) < 1e-9);
   assert.equal(m5.fullCredit, false);
 });
+
+test('buildEtudeModel — objectif pilotage en delta points / euros', async () => {
+  const { buildEtudeModel } = await import('../src/apps/solaire/lib/etudeModel.js');
+  const config = buildPvConfig({ pv: { cost_grid: [{ kwc: 9, prix_ttc: 20000 }] } });
+  const model = buildEtudeModel({
+    roof: { tiltPercent: 18, orientation: 'S', surfaceM2: 45 },
+    conso: { monthly: Array(12).fill(1000), priceKwh: 0.25, preset: 'presence_partielle', ecsBonus: false },
+    ev: { enabled: false },
+    financing: { rate: 0.045, years: 12, deposit: 0, manualCost: null },
+    selectedKwc: null,
+    pvgis: { e_m: [45.8, 60, 92, 110, 128, 138, 150, 142, 112, 82, 52, 40], e_y: 1152 },
+    config,
+  });
+  const expectedPoints = Math.round((model.maxAchievableAutoconso - model.active.totals.tauxAutoconso) * 100);
+  assert.equal(model.pilotageDeltaPoints, Math.max(0, expectedPoints));
+  assert.ok(Math.abs(model.pilotageDeltaEuros - model.pilotageDeltaPoints * model.sensitivityPerAutoconsoPoint) < 1e-9);
+  assert.ok(model.pilotageDeltaPoints > 0); // coeff 0,55 → marge réelle jusqu'au plafond 0,85
+});

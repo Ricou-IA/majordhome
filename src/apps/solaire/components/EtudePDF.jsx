@@ -9,7 +9,7 @@
 import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer';
 import { formatFullAddress, buildLegalFooter } from '@lib/orgBranding';
 import { percentToDegrees } from '../lib/pvEngine';
-import { PRESET_LABELS } from '../lib/etudeModel';
+import { PRESET_LABELS, NATIONAL_AUTOCONSO_BENCHMARK } from '../lib/etudeModel';
 
 const C = {
   jaune: '#F5C542',
@@ -333,32 +333,28 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
 
         {model.totalCost !== null && model.assetYieldYear1 !== null && (
           <>
-            <Text style={s.sectionTitle}>Lecture investisseur</Text>
+            <Text style={s.sectionTitle}>Rentabilité</Text>
             <Text style={s.calcLine}>
-              • <Text style={s.calcStrong}>Rendement de l'actif (ROCE) : {pct1Pdf(model.assetYieldYear1)} an 1</Text> — économie {eur(model.economyYear1)} ÷ coût {eur(model.totalCost)}. Performance de l'installation, indépendante du
-              financement{model.assetYieldAvg !== null ? ` (moyenne sur ${config.horizon_years} ans : ${pct1Pdf(model.assetYieldAvg)})` : ''}.
+              • <Text style={s.calcStrong}>Rentabilité : {pct1Pdf(model.assetYieldYear1)} par an</Text> — l'installation
+              rapporte {eur(model.economyYear1)}/an pour {eur(model.totalCost)} investis
+              {model.assetYieldAvg !== null ? `. En moyenne ${pct1Pdf(model.assetYieldAvg)}/an sur ${config.horizon_years} ans (le prix de l'électricité augmente, pas les mensualités)` : ''}.
             </Text>
-            {model.equityYieldYear1 !== null ? (
-              <Text style={s.calcLine}>
-                • <Text style={s.calcStrong}>Rendement des fonds propres (ROE) : {pct1Pdf(model.equityYieldYear1)} an 1</Text> — gain net (économie - annuité) ÷ apport {eur(model.deposit)}. L'effet de levier du crédit.
-              </Text>
-            ) : model.fullCredit && model.netGainYear1 !== null ? (
-              <Text style={s.calcLine}>
-                • <Text style={s.calcStrong}>Fonds propres : 0 € immobilisé</Text> — financement 100 % à crédit, effet de
-                levier maximal : {model.netGainYear1 >= 0
-                  ? `gain net de ${eur(model.netGainYear1)}/an dès l'an 1 sans mobiliser d'épargne.`
-                  : `effort net de ${eur(Math.abs(model.netGainYear1))}/an pendant le crédit, sans mobiliser d'épargne.`}
-              </Text>
-            ) : null}
             {model.breakEvenAutoconsoRate !== null && (
               <Text style={s.calcLine}>
-                • <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</Text> pour
-                que les économies couvrent l'annuité (an 1) — cette étude est à {pct(totals.tauxAutoconso)}
-                {totals.tauxAutoconso >= model.breakEvenAutoconsoRate ? ' (au-dessus : gain dès la première année)' : ''}.
+                • <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</Text> — au-dessus,
+                l'installation rapporte plus qu'elle ne coûte. Cette étude : {pct(totals.tauxAutoconso)}
+                {totals.tauxAutoconso >= model.breakEvenAutoconsoRate ? ', gain dès la première année' : ''} ({NATIONAL_AUTOCONSO_BENCHMARK}).
               </Text>
             )}
             <Text style={s.calcLine}>
-              • <Text style={s.calcStrong}>Levier : +1 point d'autoconsommation = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> d'économies. Potentiel maximum via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation.
+              • <Text style={s.calcStrong}>Chaque point d'autoconsommation gagné = +{eur(model.sensitivityPerAutoconsoPoint)}/an.</Text>
+            </Text>
+            <Text style={s.calcLine}>
+              • <Text style={s.calcStrong}>Objectif : {pct(model.maxAchievableAutoconso)} d'autoconsommation</Text> avec un bon
+              pilotage (ECS, recharges en journée)
+              {model.pilotageDeltaPoints > 0
+                ? <Text> — soit jusqu'à <Text style={s.calcStrong}>+{model.pilotageDeltaPoints} points = +{eur(model.pilotageDeltaEuros)}/an</Text> par rapport à aujourd'hui.</Text>
+                : ' — déjà atteint.'}
             </Text>
           </>
         )}

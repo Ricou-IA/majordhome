@@ -1,11 +1,14 @@
 // src/apps/solaire/components/FinancingModule.jsx
 // Module financement : taux/durée saisis par le commercial, apport, coût
 // (pré-rempli depuis la grille admin, toujours éditable). Mensualité live.
-// + « Lecture investisseur » : ROCE/ROE, point mort, sensibilité — rattachés
-// au financement, PAS à la performance de l'actif (séparation Eric 2026-06-11).
+// + bloc « Rentabilité » : point mort, levier, objectif pilotage — rattachés
+// au financement, PAS à la performance de l'actif. Vocabulaire VULGARISÉ
+// (cible : particuliers en RDV, pas investisseurs — demande Eric 2026-06-11,
+// le jargon ROCE/ROE/fonds propres fait peur).
 import { Landmark, LineChart } from 'lucide-react';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { formatEuro } from '@lib/utils';
+import { NATIONAL_AUTOCONSO_BENCHMARK } from '../lib/etudeModel';
 
 const pct1 = (x) => `${Math.round(x * 1000) / 10} %`;
 const pct = (x) => `${Math.round(x * 100)} %`;
@@ -114,49 +117,41 @@ export default function FinancingModule({
         )}
       </div>
 
-      {/* Lecture investisseur (ROCE / ROE / point mort / levier) */}
+      {/* Rentabilité — vocabulaire pragmatique (pas de jargon investisseur) */}
       {model && model.totalCost !== null && model.assetYieldYear1 !== null && (
         <div className="rounded-xl border border-secondary-200 p-4 space-y-2">
           <p className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
-            <LineChart className="w-4 h-4 text-[#1565C0]" /> Lecture investisseur
+            <LineChart className="w-4 h-4 text-[#1565C0]" /> Rentabilité
           </p>
           <ul className="space-y-1.5 text-sm text-secondary-700">
             <li>
-              <span className="font-semibold text-secondary-900">Rendement de l'actif (ROCE) : {pct1(model.assetYieldYear1)} an 1</span>
-              {' '}— économie {formatEuro(Math.round(model.economyYear1))} ÷ coût {formatEuro(model.totalCost)}.
-              Performance de l'installation, indépendante du financement
-              {model.assetYieldAvg !== null && ` (moyenne sur ${horizonYears} ans : ${pct1(model.assetYieldAvg)})`}.
+              <span className="font-semibold text-secondary-900">Rentabilité : {pct1(model.assetYieldYear1)} par an</span>
+              {' '}— l'installation rapporte {formatEuro(Math.round(model.economyYear1))}/an pour {formatEuro(model.totalCost)} investis
+              {model.assetYieldAvg !== null && `. En moyenne ${pct1(model.assetYieldAvg)}/an sur ${horizonYears} ans (le prix de l'électricité augmente, pas vos mensualités)`}.
             </li>
-            {model.equityYieldYear1 !== null ? (
-              <li>
-                <span className="font-semibold text-secondary-900">Rendement des fonds propres (ROE) : {pct1(model.equityYieldYear1)} an 1</span>
-                {' '}— gain net (économie − annuité) ÷ apport {formatEuro(model.deposit)}. L'effet de levier du crédit.
-              </li>
-            ) : model.fullCredit && model.netGainYear1 !== null ? (
-              <li>
-                <span className="font-semibold text-secondary-900">Fonds propres : 0 € immobilisé</span>
-                {' '}— financement 100 % à crédit, effet de levier maximal :{' '}
-                {model.netGainYear1 >= 0
-                  ? `gain net de ${formatEuro(Math.round(model.netGainYear1))}/an dès l'an 1 sans mobiliser d'épargne.`
-                  : `effort net de ${formatEuro(Math.round(Math.abs(model.netGainYear1)))}/an pendant le crédit, sans mobiliser d'épargne.`}
-              </li>
-            ) : null}
             {model.breakEvenAutoconsoRate !== null && (
               <li>
                 <span className="font-semibold text-secondary-900">Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</span>
-                {' '}pour que les économies couvrent l'annuité (an 1) — cette simulation est à {pct(model.active.totals.tauxAutoconso)}
+                {' '}— au-dessus, l'installation rapporte plus qu'elle ne coûte. Cette simulation : {pct(model.active.totals.tauxAutoconso)}
                 {model.active.totals.tauxAutoconso >= model.breakEvenAutoconsoRate
-                  ? ' (au-dessus : gain dès la première année)'
+                  ? ', gain dès la première année'
                   : model.maxAchievableAutoconso >= model.breakEvenAutoconsoRate
-                    ? ' (atteignable en améliorant le pilotage des usages)'
-                    : ' (atteint plus tard, porté par l\'inflation du prix de l\'électricité)'}.
+                    ? ', atteignable avec un meilleur pilotage'
+                    : ', atteint plus tard avec la hausse du prix de l\'électricité'}
+                {' '}({NATIONAL_AUTOCONSO_BENCHMARK}).
               </li>
             )}
             <li>
               <span className="font-semibold text-secondary-900">
-                Levier : +1 point d'autoconsommation = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an
+                Chaque point d'autoconsommation gagné = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an.
               </span>
-              {' '}d'économies. Potentiel maximum via pilotage : {pct(model.maxAchievableAutoconso)} d'autoconsommation.
+            </li>
+            <li>
+              <span className="font-semibold text-secondary-900">Objectif : {pct(model.maxAchievableAutoconso)} d'autoconsommation</span>
+              {' '}avec un bon pilotage (ECS, recharges en journée)
+              {model.pilotageDeltaPoints > 0
+                ? <> — soit jusqu'à <span className="font-semibold text-secondary-900">+{model.pilotageDeltaPoints} points = +{formatEuro(Math.round(model.pilotageDeltaEuros))}/an</span> par rapport à aujourd'hui.</>
+                : ' — vous y êtes déjà.'}
             </li>
           </ul>
         </div>
