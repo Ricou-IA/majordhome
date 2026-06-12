@@ -15,7 +15,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, CalendarDays } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { formatDateForInput } from '@/lib/utils';
 import { findMemberConflicts, memberWorkingHoursForDate, timeToMinutes } from '@/lib/scheduleConflicts';
@@ -69,6 +69,14 @@ function slotIndexToTime(index) {
 function formatDayLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   const label = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Libellé mois + année : "Juin 2026". */
+function formatMonthLabel(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -254,10 +262,24 @@ export function DayResourceGrid({
 
   const gridTemplateColumns = `40px repeat(${Math.max(members.length, 1)}, minmax(96px, 1fr))`;
 
+  // Sélecteur de date : navigation directe vers une période lointaine.
+  // Week-end choisi → snap au lundi suivant (grille Lun-Ven).
+  const handlePickDate = useCallback((value) => {
+    if (!value) return;
+    const d = new Date(value + 'T00:00:00');
+    if (d.getDay() === 6) d.setDate(d.getDate() + 2);
+    else if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    onDateChange(formatDate(d));
+  }, [onDateChange]);
+
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
       {/* Bande semaine + navigation jour */}
       <div className="flex items-center justify-between px-2 py-2 bg-gray-50 border-b gap-1">
+        {/* Mois affiché en évidence (repère de période) */}
+        <span className="text-sm font-bold text-gray-900 shrink-0 pl-1 whitespace-nowrap">
+          {formatMonthLabel(date)}
+        </span>
         <button
           type="button"
           onClick={() => shiftDay(-1)}
@@ -295,6 +317,20 @@ export function DayResourceGrid({
           >
             Auj.
           </button>
+          {/* Sélecteur de date — saut direct vers une période lointaine */}
+          <label
+            className="relative p-1 rounded hover:bg-gray-200 transition-colors cursor-pointer shrink-0"
+            title="Aller à une date"
+          >
+            <CalendarDays className="w-4 h-4 text-gray-600" />
+            <input
+              type="date"
+              value={date || ''}
+              onChange={(e) => handlePickDate(e.target.value)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              tabIndex={-1}
+            />
+          </label>
           <button
             type="button"
             onClick={() => shiftDay(1)}
