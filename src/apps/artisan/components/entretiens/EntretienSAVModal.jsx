@@ -24,14 +24,17 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
   User, MapPin, Phone, ClipboardCheck, Wrench, Mail, FileText,
-  ExternalLink, Calendar, Check, UserPlus,
+  ExternalLink, Calendar, Check, UserPlus, Archive,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
+import { entretienSavKeys } from '@hooks/cacheKeys';
 import {
+  savService,
   getStatusConfig,
   getTransitions,
   KANBAN_COLUMNS,
@@ -62,6 +65,7 @@ const TYPE_LABELS = {
 
 export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpenClient, onOpenCertificats }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { organization } = useAuth();
   const { can } = useCanAccess();
   const orgId = organization?.id;
@@ -340,6 +344,39 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
       onClose();
       navigate(`/clients/${item.client_id}`);
     }
+  };
+
+  // "Ranger" la carte (À planifier) depuis la fiche : suppression + undo toast.
+  // Miroir du bouton Archive de EntretienSAVCard — le contrat redevient
+  // planifiable dans l'outil secteur (il sort de plannedContractIds).
+  const handleRanger = async () => {
+    const snapshot = {
+      orgId,
+      clientId: item.client_id,
+      contractId: item.contract_id || null,
+      projectId: item.project_id || item.client_project_id,
+      scheduledDate: item.scheduled_date || null,
+    };
+    const { error } = await savService.deleteEntretienCard(item.id);
+    if (error) {
+      toast.error('Impossible de ranger la carte');
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+    onUpdated?.();
+    onClose?.();
+    toast('Carte rangée', {
+      description: name,
+      action: {
+        label: 'Annuler',
+        onClick: async () => {
+          const { error: rErr } = await savService.createEntretien(snapshot);
+          if (rErr) toast.error('Annulation impossible');
+          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+          onUpdated?.();
+        },
+      },
+    });
   };
 
   // --- Transitions ---
@@ -676,6 +713,20 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
                     </button>
                   );
                 })}
+
+                {/* Ranger (À planifier uniquement) : retire la carte du kanban, undo via toast */}
+                {item.workflow_status === 'a_planifier' && (
+                  <button
+                    type="button"
+                    onClick={handleRanger}
+                    disabled={isUpdatingStatus}
+                    title="Ranger la carte (la retirer de « À planifier »)"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-500 bg-white transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    Ranger
+                  </button>
+                )}
 
                 <div className="flex-1" />
 
