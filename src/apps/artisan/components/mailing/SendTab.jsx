@@ -82,6 +82,8 @@ export default function SendTab() {
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [sending, setSending] = useState(false);
+  // Progression de l'envoi bulk par vagues (v12) : { wave, sent, failed, remaining }
+  const [bulkProgress, setBulkProgress] = useState(null);
   const iframeRef = useRef(null);
 
   useEffect(() => {
@@ -148,32 +150,63 @@ export default function SendTab() {
 
     setSending(true);
     try {
-      // Pour les envois bulk, l'edge function peut prendre plusieurs minutes
-      // (boucle séquentielle sur 500+ destinataires). On affiche un succès
-      // immédiat sans attendre la fin — l'envoi continue côté serveur.
-      // Pour les tests (1 destinataire), on attend la vraie réponse.
-      if (!isTest) {
-        // Fire-and-forget : on n'attend pas la fin de la boucle d'envoi
-        supabase.functions.invoke('mailing-send', { body }).catch((err) => {
-          console.error('[mailing-send] background error:', err);
-        });
-        toast.success(
-          `Campagne lancée ! L'envoi des ${recipientCount ?? ''} mails se poursuit en arrière-plan.`
-        );
+      // Mode test : 1 destinataire, un seul appel.
+      if (isTest) {
+        const { data, error } = await supabase.functions.invoke('mailing-send', { body });
+        if (error) throw error;
+        if (data?.success === false) throw new Error(data?.error || 'Échec envoi test');
+        toast.success(`Test envoyé à ${testEmail}`);
         setShowConfirm(false);
         return;
       }
 
-      // Mode test : on attend
-      const { data, error } = await supabase.functions.invoke('mailing-send', { body });
-      if (error) throw error;
-      if (data?.success === false) throw new Error(data?.error || 'Échec envoi test');
-      toast.success(`Test envoyé à ${testEmail}`);
+      // Envoi bulk par vagues (mailing-send v12) : l'edge plafonne chaque
+      // invocation à ~300 envois (wall-clock 150 s + rate limit Resend 5/s)
+      // et répond { remaining, complete }. On enchaîne les vagues jusqu'à
+      // épuisement — l'exclusion `NOT IN mailing_logs WHERE campaign_name = X`
+      // côté DB garantit la reprise sans doublon (y compris après une
+      // interruption : recliquer reprend où c'était arrêté).
       setShowConfirm(false);
+      setBulkProgress({ wave: 0, sent: 0, failed: 0, remaining: recipientCount ?? null });
+      const MAX_WAVES = 40; // garde-fou (40 × 300 = 12 000 mails)
+      let totalSent = 0;
+      let totalFailed = 0;
+      let wave = 0;
+      for (;;) {
+        wave += 1;
+        const { data, error } = await supabase.functions.invoke('mailing-send', { body });
+        if (error) throw error;
+        if (data?.success === false) throw new Error(data?.error || 'Échec envoi');
+        totalSent += data?.sent ?? 0;
+        totalFailed += data?.failed ?? 0;
+        const remaining = data?.remaining ?? 0;
+        setBulkProgress({ wave, sent: totalSent, failed: totalFailed, remaining });
+        // Rétrocompat : une edge sans batching ne renvoie pas `complete` → one-shot.
+        if (data?.complete ?? true) break;
+        // Garde anti-boucle : si une vague ne traite plus rien, on sort.
+        if ((data?.processed ?? 0) === 0) break;
+        if (wave >= MAX_WAVES) {
+          toast.warning(
+            `Envoi interrompu après ${MAX_WAVES} vagues — reclique sur « Lancer la campagne » pour continuer (reprise sans doublon).`
+          );
+          break;
+        }
+      }
+      toast.success(
+        `Campagne envoyée : ${totalSent} mail${totalSent > 1 ? 's' : ''} en ${wave} vague${wave > 1 ? 's' : ''}` +
+        (totalFailed ? ` — ${totalFailed} échec${totalFailed > 1 ? 's' : ''} (voir Stats)` : '')
+      );
     } catch (err) {
-      toast.error(`Erreur : ${err.message}`);
+      if (isTest) {
+        toast.error(`Erreur : ${err.message}`);
+      } else {
+        toast.error(
+          `Erreur pendant l'envoi : ${err.message} — reclique sur « Lancer la campagne » pour reprendre là où c'était arrêté (aucun doublon).`
+        );
+      }
     } finally {
       setSending(false);
+      setBulkProgress(null);
     }
   }, [segment, subject, htmlBody, campaignLabel, testEmail, recipientCount]);
 
@@ -290,6 +323,24 @@ export default function SendTab() {
                 Lancer la campagne
               </Button>
             </div>
+
+            {sending && bulkProgress && (
+              <div className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-800">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                  <span>
+                    {bulkProgress.wave === 0
+                      ? 'Préparation de l’envoi…'
+                      : `Vague ${bulkProgress.wave} — ${bulkProgress.sent} envoyé${bulkProgress.sent > 1 ? 's' : ''}` +
+                        (bulkProgress.failed > 0 ? `, ${bulkProgress.failed} échec${bulkProgress.failed > 1 ? 's' : ''}` : '') +
+                        (bulkProgress.remaining > 0 ? ` — reste ~${bulkProgress.remaining}` : '')}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-primary-600">
+                  Garde cet onglet ouvert jusqu'à la fin. En cas d'interruption, relancer reprend sans doublon.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

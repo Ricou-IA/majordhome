@@ -1,43 +1,21 @@
 // ============================================================================
-// mailing-send — Edge Function d'envoi de campagnes mailing
+// mailing-send v12 — batching + throttle Resend + retry 429
 // ============================================================================
-//
-// Remplace le webhook N8n public "Mayer - Mailing" (P0.8 V2).
-//
-// Interface :
-//   POST /functions/v1/mailing-send
-//   Authorization: Bearer <supabase_jwt | service_role>
-//   Body:
-//     {
-//       mode: "bulk" | "single",
-//       segment_id?: uuid,   // requis si mode="bulk"
-//       client_id?: uuid,    // requis si mode="single"
-//       subject: string,
-//       html_body: string,
-//       campaign_name: string,
-//       test_email?: string,             // mode test → 1 destinataire factice
-//     }
-//
-// Sécurité :
-//   - verify_jwt: true (rejet anonymes)
-//   - Le SQL n'est JAMAIS accepté du client. Compilé + exécuté côté DB via
-//     RPC SECURITY DEFINER `mail_fetch_recipients` (check membership intégré).
-//
-// Multi-tenant :
-//   - org_id est dérivée du segment ou du client (côté RPC).
-//   - from/reply_to/branding chargés depuis core.organizations.settings.
-//
-// Pipeline (équivalent fidèle du workflow N8n "Mayer - Mailing", id 1COgLUuiMtSq2sUq) :
-//   1. Validation payload
-//   2. Fetch destinataires via RPC unifiée (compile + exec en interne)
-//   3. Mode test → 1 destinataire factice, override email
-//   4. Pour chaque destinataire :
-//      a. Salutation "Bonjour {first} {last},"
-//      b. Lien pellets avec UTM + token éventuel
-//      c. Token unsubscribe HMAC SHA256 (compatible mailing-unsubscribe)
-//      d. POST Resend
-//      e. INSERT mailing_logs
-//   5. Retour JSON {total, sent, failed, test_mode}
+// Auth interne via authenticate() : MDH_CRON_SECRET (badge cron) OU
+// SUPABASE_SERVICE_ROLE_KEY → service_role cross-org ; sinon JWT user valide.
+// FIX 2026-06-02 : insertMailingLog écrit via la vue publique
+// `majordhome_mailing_logs` (et non .schema('majordhome').from('mailing_logs')
+// que PostgREST rejette — le schema majordhome n'est pas exposé → les logs
+// étaient perdus silencieusement, cf. gotcha DB).
+// FIX 2026-06-12 (v12) — campagne 2617 destinataires coupée à 706 :
+//   1. Wall-clock edge ~150s tuait la boucle d'envoi → cap MAX_PER_RUN (300)
+//      par invocation. La réponse expose { remaining, complete } : tant que
+//      remaining > 0, ré-appeler l'edge avec le même payload — l'exclusion
+//      `NOT IN mailing_logs WHERE campaign_name = X` (mail_segment_compile)
+//      fait reprendre là où on s'est arrêté, sans doublon.
+//   2. Resend rate limit 5 req/s (56 failed « Too many requests ») →
+//      throttle MIN_SEND_INTERVAL_MS entre débuts d'envois (~4 req/s)
+//      + retry x2 avec backoff sur 429 / erreur réseau.
 // ============================================================================
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -48,9 +26,22 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const RESEND_WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET") || "";
+const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const UNSUB_URL = `${SUPABASE_URL}/functions/v1/mailing-unsubscribe`;
 const UNSUB_EXPIRATION_SECONDS = 90 * 24 * 3600;
+
+// v12 — Budget par invocation : 300 envois × 250 ms ≈ 75 s d'envoi + logs DB,
+// confortablement sous le wall-clock de 150 s. Override env MAILING_MAX_PER_RUN
+// ou payload.batch_limit (borné à 400).
+const MAX_PER_RUN = Math.max(
+  1,
+  Math.min(400, parseInt(Deno.env.get("MAILING_MAX_PER_RUN") || "300", 10) || 300),
+);
+const MIN_SEND_INTERVAL_MS = 250; // Resend = 5 req/s → on vise ~4 req/s
+const RATE_LIMIT_BACKOFF_MS = 1200;
+
+const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,9 +57,12 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// HMAC helpers — alignés avec supabase/functions/mailing-unsubscribe/index.ts
-// ---------------------------------------------------------------------------
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 function base64Decode(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -85,11 +79,7 @@ function base64UrlEncode(bytes: Uint8Array): string {
 
 async function hmacSha256(key: Uint8Array, message: string): Promise<Uint8Array> {
   const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    key,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
+    "raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
   );
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(message));
   return new Uint8Array(sig);
@@ -115,30 +105,22 @@ async function buildUnsubscribeUrl(
   return `${UNSUB_URL}?token=${encodeURIComponent(token)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Auth — verify JWT user ou service_role
-// ---------------------------------------------------------------------------
-
 type AuthContext = { userId: string | null; isServiceRole: boolean };
 
 async function authenticate(authHeader: string): Promise<AuthContext | null> {
   const token = authHeader.replace(/^Bearer\s+/i, "");
   if (!token) return null;
+  if (MDH_CRON_SECRET && timingSafeEqual(token, MDH_CRON_SECRET)) {
+    return { userId: null, isServiceRole: true };
+  }
   if (token === SUPABASE_SERVICE_ROLE_KEY) {
     return { userId: null, isServiceRole: true };
   }
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const {
-    data: { user },
-    error,
-  } = await admin.auth.getUser(token);
+  const { data: { user }, error } = await admin.auth.getUser(token);
   if (error || !user) return null;
   return { userId: user.id, isServiceRole: false };
 }
-
-// ---------------------------------------------------------------------------
-// Fetch destinataires via RPC (compile + exec + check membership server-side)
-// ---------------------------------------------------------------------------
 
 type Recipient = {
   recipient_id: string;
@@ -165,9 +147,6 @@ async function fetchRecipients(params: {
   authHeader: string;
   isServiceRole: boolean;
 }): Promise<FetchResult> {
-  // Si JWT user → init avec ANON_KEY + Authorization header pour que la RPC
-  // SECURITY DEFINER puisse lire auth.uid() et faire son check membership.
-  // Si service_role → la RPC bypass le check (auth.uid()=NULL).
   const client = params.isServiceRole
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     : createClient(SUPABASE_URL, SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY, {
@@ -191,12 +170,7 @@ async function fetchRecipients(params: {
   }
   const rows = (data ?? []) as Recipient[];
   if (rows.length === 0) {
-    // Aucun destinataire — on retourne quand même org/type (depuis le segment/client)
-    return {
-      recipients: [],
-      orgId: "",
-      recipientType: "client",
-    };
+    return { recipients: [], orgId: "", recipientType: "client" };
   }
   return {
     recipients: rows,
@@ -205,10 +179,6 @@ async function fetchRecipients(params: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Resolve org_id si la liste est vide (besoin pour logs/branding)
-// ---------------------------------------------------------------------------
-
 async function resolveOrgIfEmpty(
   segmentId?: string,
   clientId?: string,
@@ -216,11 +186,8 @@ async function resolveOrgIfEmpty(
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   if (segmentId) {
     const { data } = await admin
-      .schema("majordhome")
-      .from("mail_segments")
-      .select("org_id, audience")
-      .eq("id", segmentId)
-      .maybeSingle();
+      .schema("majordhome").from("mail_segments")
+      .select("org_id, audience").eq("id", segmentId).maybeSingle();
     if (!data?.org_id) return null;
     return {
       orgId: data.org_id as string,
@@ -229,20 +196,13 @@ async function resolveOrgIfEmpty(
   }
   if (clientId) {
     const { data } = await admin
-      .schema("majordhome")
-      .from("clients")
-      .select("org_id")
-      .eq("id", clientId)
-      .maybeSingle();
+      .schema("majordhome").from("clients")
+      .select("org_id").eq("id", clientId).maybeSingle();
     if (!data?.org_id) return null;
     return { orgId: data.org_id as string, recipientType: "client" };
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Load branding org
-// ---------------------------------------------------------------------------
 
 type OrgBranding = {
   fromName: string;
@@ -266,11 +226,8 @@ type OrgBranding = {
 async function loadOrgBranding(orgId: string): Promise<OrgBranding> {
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: org } = await admin
-    .schema("core")
-    .from("organizations")
-    .select("settings")
-    .eq("id", orgId)
-    .maybeSingle();
+    .schema("core").from("organizations")
+    .select("settings").eq("id", orgId).maybeSingle();
   const s = ((org?.settings as Record<string, unknown> | null) ?? {}) as Record<string, string>;
   const contactEmail = s.from_email || s.reply_to || "contact@mayer-energie.fr";
   return {
@@ -293,16 +250,12 @@ async function loadOrgBranding(orgId: string): Promise<OrgBranding> {
   };
 }
 
-// Wrap le corps du template dans le squelette commun de l'org si applicable.
-// Heuristique : on wrap si le squelette est défini ET le body ne contient pas
-// déjà un <!DOCTYPE (= template legacy avec HTML complet, on laisse tel quel).
 function wrapInSkeleton(body: string, branding: OrgBranding): string {
   if (!branding.emailSkeleton) return body;
   if (/<!doctype/i.test(body) || /<html[\s>]/i.test(body)) return body;
   return branding.emailSkeleton.replace("{{EMAIL_BODY}}", body);
 }
 
-// Substitution placeholders {{KEY}} dans un texte arbitraire (subject ou body)
 function applyPlaceholders(text: string, replacements: Record<string, string>): string {
   let out = text;
   for (const [key, value] of Object.entries(replacements)) {
@@ -310,10 +263,6 @@ function applyPlaceholders(text: string, replacements: Record<string, string>): 
   }
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// Resend send
-// ---------------------------------------------------------------------------
 
 type SendResult = { providerId: string | null; errorMessage: string | null };
 
@@ -336,32 +285,44 @@ async function sendViaResend(params: {
     },
   };
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.id) {
-      const msg = data?.message || data?.error?.message || data?.name || `Resend HTTP ${res.status}`;
-      return { providerId: null, errorMessage: String(msg).substring(0, 500) };
+  // v12 : jusqu'à 3 tentatives — backoff sur 429 (rate limit Resend) et
+  // sur erreur réseau transitoire. Les erreurs définitives (4xx autres)
+  // sortent immédiatement.
+  let lastError = "unknown";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        lastError = String(data?.message || "Resend rate limit (429)");
+        if (attempt < 2) {
+          await sleep(RATE_LIMIT_BACKOFF_MS * (attempt + 1));
+          continue;
+        }
+        break;
+      }
+      if (!res.ok || !data?.id) {
+        const msg = data?.message || data?.error?.message || data?.name || `Resend HTTP ${res.status}`;
+        return { providerId: null, errorMessage: String(msg).substring(0, 500) };
+      }
+      return { providerId: data.id, errorMessage: null };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      if (attempt < 2) {
+        await sleep(RATE_LIMIT_BACKOFF_MS);
+        continue;
+      }
     }
-    return { providerId: data.id, errorMessage: null };
-  } catch (err) {
-    return {
-      providerId: null,
-      errorMessage: (err instanceof Error ? err.message : String(err)).substring(0, 500),
-    };
   }
+  return { providerId: null, errorMessage: lastError.substring(0, 500) };
 }
-
-// ---------------------------------------------------------------------------
-// Insert mailing_logs (skip si recipientId NULL → mode test)
-// ---------------------------------------------------------------------------
 
 async function insertMailingLog(params: {
   recipientType: "client" | "lead";
@@ -389,18 +350,12 @@ async function insertMailingLog(params: {
   } else {
     row.client_id = params.recipientId;
   }
-  const { error } = await admin
-    .schema("majordhome")
-    .from("mailing_logs")
-    .insert(row);
+  // Via la vue publique (le schema majordhome n'est pas exposé via PostgREST).
+  const { error } = await admin.from("majordhome_mailing_logs").insert(row);
   if (error) {
     console.error("[mailing-send] mailing_logs insert failed:", error);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Personalisation HTML
-// ---------------------------------------------------------------------------
 
 function buildSalutation(r: { first_name: string | null; last_name: string | null }): string {
   const fullName = [r.first_name, r.last_name].filter(Boolean).join(" ").trim();
@@ -414,9 +369,7 @@ function buildPelletsLink(
 ): string {
   const baseUrl = branding.pelletsOfferUrl || `${branding.websiteUrl}/offre-pellets`;
   const campaignSlug = String(campaignName || "custom")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_|_$/g, "");
+    .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
   const utm = `utm_source=emailing&utm_campaign=${encodeURIComponent(campaignSlug)}&utm_medium=email`;
   const token = (r.pellets_total_token || "").trim();
   return token ? `${baseUrl}?token=${encodeURIComponent(token)}&${utm}` : `${baseUrl}?${utm}`;
@@ -455,9 +408,7 @@ function personalizeHtml(params: {
   brandingReplacements: Record<string, string>;
 }): string {
   let html = params.htmlBody;
-  // Placeholders branding/contact (alignés avec contract-signed-notify)
   html = applyPlaceholders(html, params.brandingReplacements);
-  // Placeholders dynamiques par destinataire
   html = html.replace(/\{\{SALUTATION\}\}/g, params.salutation);
   html = html.replace(/\{\{lien_pellets\}\}/g, params.lienPellets);
   const escapedEmail = params.contactEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -465,10 +416,6 @@ function personalizeHtml(params: {
   html = html.replace(mailtoRegex, params.unsubscribeUrl);
   return html;
 }
-
-// ---------------------------------------------------------------------------
-// Main handler
-// ---------------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -516,20 +463,13 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Fetch destinataires via RPC (compile + exec + check membership serverside)
     const fetched = await fetchRecipients({
-      mode,
-      segmentId,
-      clientId,
-      campaignName,
-      authHeader,
+      mode, segmentId, clientId, campaignName, authHeader,
       isServiceRole: auth.isServiceRole,
     });
 
     let { recipients, orgId, recipientType } = fetched;
 
-    // Cas test : on garde l'org/type du segment ou client, peu importe que la
-    // liste réelle soit vide.
     if (testEmail) {
       const resolved = orgId
         ? { orgId, recipientType }
@@ -541,7 +481,7 @@ Deno.serve(async (req: Request) => {
       recipientType = resolved.recipientType;
       recipients = [
         {
-          recipient_id: "", // sentinel non-uuid → mailing_logs skip
+          recipient_id: "",
           first_name: "Test",
           last_name: "Destinataire",
           display_name: "Test Destinataire",
@@ -555,84 +495,84 @@ Deno.serve(async (req: Request) => {
 
     if (recipients.length === 0) {
       return jsonResponse({
-        success: true,
-        test_mode: false,
-        total: 0,
-        sent: 0,
-        failed: 0,
+        success: true, test_mode: false, total: 0, sent: 0, failed: 0,
+        total_eligible: 0, processed: 0, remaining: 0, complete: true,
         note: "Aucun destinataire éligible — segment vide après filtres.",
       });
     }
 
-    // Load branding org
     const branding = await loadOrgBranding(orgId);
 
-    // Boucle d'envoi séquentiel
+    // v12 — cap par invocation pour rester sous le wall-clock edge (~150 s).
+    // Les destinataires non traités restent éligibles : l'exclusion campagne
+    // courante (mailing_logs) garantit la reprise sans doublon au run suivant.
+    const totalEligible = recipients.length;
+    const batchLimitRaw = Number(payload.batch_limit);
+    const perRun = Number.isFinite(batchLimitRaw) && batchLimitRaw >= 1
+      ? Math.min(Math.floor(batchLimitRaw), 400)
+      : MAX_PER_RUN;
+    const batch = recipients.slice(0, perRun);
+
     let sentCount = 0;
     let failedCount = 0;
-    for (const r of recipients) {
+    let lastSendStart = 0;
+    for (const r of batch) {
       const toEmail = testEmail || r.email;
       if (!toEmail) {
         failedCount++;
         continue;
       }
 
+      // v12 — throttle : plancher entre débuts d'envois (~4 req/s < 5 req/s Resend)
+      const waitMs = lastSendStart + MIN_SEND_INTERVAL_MS - Date.now();
+      if (waitMs > 0) await sleep(waitMs);
+      lastSendStart = Date.now();
+
       const recipientIdForLog = testEmail ? null : r.recipient_id;
       const salutation = buildSalutation(r);
       const lienPellets = buildPelletsLink(r, campaignName, branding);
       const unsubscribeUrl = await buildUnsubscribeUrl(
-        recipientType,
-        recipientIdForLog,
+        recipientType, recipientIdForLog,
         `mailto:${branding.contactEmail}?subject=Désabonnement`,
       );
       const listUnsubscribeHeader =
         `<${unsubscribeUrl}>, <mailto:${branding.contactEmail}?subject=Désabonnement>`;
 
-      // Placeholders branding + nom destinataire (aligné avec contract-signed-notify)
       const brandingReplacements = buildRecipientReplacements(r, branding);
       const personalizedSubject = applyPlaceholders(subject, brandingReplacements);
 
-      // Wrap le corps dans le squelette commun (logo + bande couleur + footer) si défini en settings org.
-      // Templates legacy (avec <html>/<!DOCTYPE>) sont laissés tels quels.
       const wrappedHtml = wrapInSkeleton(htmlBody, branding);
 
       const html = personalizeHtml({
-        htmlBody: wrappedHtml,
-        salutation,
-        lienPellets,
-        unsubscribeUrl,
+        htmlBody: wrappedHtml, salutation, lienPellets, unsubscribeUrl,
         contactEmail: branding.contactEmail,
         brandingReplacements,
       });
 
       const sendResult = await sendViaResend({
-        branding,
-        to: toEmail,
-        subject: personalizedSubject,
-        html,
-        listUnsubscribeHeader,
+        branding, to: toEmail, subject: personalizedSubject, html, listUnsubscribeHeader,
       });
 
       if (sendResult.providerId) sentCount++;
       else failedCount++;
 
       await insertMailingLog({
-        recipientType,
-        recipientId: recipientIdForLog,
-        orgId,
-        campaignName,
-        subject: personalizedSubject,
-        emailTo: toEmail,
-        result: sendResult,
+        recipientType, recipientId: recipientIdForLog, orgId, campaignName,
+        subject: personalizedSubject, emailTo: toEmail, result: sendResult,
       });
     }
 
+    const processed = batch.length;
+    const remaining = totalEligible - processed;
+    console.log(
+      `[mailing-send] campaign="${campaignName}" eligible=${totalEligible} processed=${processed} sent=${sentCount} failed=${failedCount} remaining=${remaining}`,
+    );
+
     return jsonResponse({
-      success: true,
-      test_mode: !!testEmail,
-      total: recipients.length,
-      sent: sentCount,
-      failed: failedCount,
+      success: true, test_mode: !!testEmail,
+      total: processed, sent: sentCount, failed: failedCount,
+      total_eligible: totalEligible, processed, remaining,
+      complete: remaining === 0,
     });
   } catch (err) {
     console.error("[mailing-send] error:", err);
