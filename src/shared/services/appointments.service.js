@@ -36,6 +36,13 @@ export const APPOINTMENT_TYPES = [
   { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-500' },
 ];
 
+// Types dont la tâche liée se facture (pose / SAV / entretien). Les VT et « Autre »
+// ne sont jamais recolorés en « facturé » sur le planning.
+export const INVOICEABLE_APPOINTMENT_TYPES = ['maintenance', 'service', 'installation'];
+// Violet foncé « facturé » — volontairement plus sombre que le violet Installation
+// (#8B5CF6) pour rester lisible quand une pose passe en facturé.
+export const INVOICED_EVENT_COLOR = '#6D28D9';
+
 /**
  * Règles d'assignation par type de RDV
  * - commercial: Responsable + Commercial (multi-select 1-2)
@@ -715,13 +722,22 @@ export const appointmentsService = {
       ? `${appointment.scheduled_date}T${appointment.scheduled_end}`
       : null;
 
+    // Tâche liée facturée (entretien / SAV / pose) → violet foncé : lecture
+    // « tout est facturé » d'un coup d'œil sur le planning. Les Visites
+    // Techniques et « Autre » ne sont jamais recolorées (rien à facturer).
+    // Source : majordhome_appointments.target_invoiced (invoiced_at ou
+    // workflow 'facture' de l'intervention ; devis gagnant 'invoiced' pour la pose).
+    const isInvoiced = appointment.target_invoiced === true
+      && INVOICEABLE_APPOINTMENT_TYPES.includes(appointment.appointment_type);
+    const eventColor = isInvoiced ? INVOICED_EVENT_COLOR : typeConfig.color;
+
     return {
       id: appointment.id,
       title: appointment.subject || `${typeConfig.label} - ${[appointment.client_name, appointment.client_first_name].filter(Boolean).join(' ')}`,
       start: startStr,
       end: endStr,
-      backgroundColor: typeConfig.color,
-      borderColor: typeConfig.color,
+      backgroundColor: eventColor,
+      borderColor: eventColor,
       textColor: '#FFFFFF',
       extendedProps: {
         ...appointment,

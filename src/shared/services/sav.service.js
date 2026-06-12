@@ -539,6 +539,7 @@ export const savService = {
       if (fields.devis_status !== undefined) updates.devis_status = fields.devis_status || null;
       if (fields.parts_order_status !== undefined) updates.parts_order_status = fields.parts_order_status || null;
       if (fields.includes_entretien !== undefined) updates.includes_entretien = !!fields.includes_entretien;
+      if (fields.invoiced_at !== undefined) updates.invoiced_at = fields.invoiced_at;
 
       if (Object.keys(updates).length === 0) {
         return { data: null, error: null };

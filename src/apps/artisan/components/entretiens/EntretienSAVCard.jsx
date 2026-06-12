@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Calendar, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
@@ -230,9 +230,34 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             </span>
           )}
 
-          {/* Boutons d'action (Facturer + SMS avis) — tout item réalisé, entretien ou SAV */}
+          {/* Boutons d'action (Facturé + Encaissé + SMS avis) — tout item réalisé, entretien ou SAV */}
           {item.workflow_status === 'realise' && (
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {/* Facturé : suivi de facturation (toggle) — la carte reste en Réalisé.
+                  Alimente aussi le violet « facturé » des RDV liés sur le planning. */}
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const next = item.invoiced_at ? null : new Date().toISOString();
+                  const { error } = await savService.updateFields(item.id, { invoiced_at: next });
+                  if (error) {
+                    toast.error('Erreur mise à jour facturation');
+                    return;
+                  }
+                  toast.success(next ? 'Marqué facturé' : 'Marquage facturé retiré');
+                  onRefresh?.();
+                }}
+                title={item.invoiced_at ? 'Facturé — cliquer pour annuler' : 'Marquer comme facturé (la carte reste affichée)'}
+                className={`inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border transition-colors ${
+                  item.invoiced_at
+                    ? 'border-violet-300 text-violet-700 bg-violet-50'
+                    : 'border-gray-300 text-gray-600 bg-white hover:bg-violet-50 hover:border-violet-400 hover:text-violet-700'
+                }`}
+              >
+                <Receipt className="w-3 h-3" />
+                {item.invoiced_at ? 'Facturé' : 'Facturé ?'}
+              </button>
+              {/* Encaissé : paiement reçu → workflow 'facture', la carte sort du kanban */}
               <button
                 onClick={async (e) => {
                   e.stopPropagation();
@@ -240,7 +265,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                   onRefresh?.();
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
-                title="Marquer comme facturé"
+                title="Marquer comme encaissé (clôture la carte)"
               >
                 <Euro className="w-3 h-3" />
               </button>
