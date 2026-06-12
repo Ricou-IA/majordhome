@@ -91,8 +91,10 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
 
   // --- Certificats multi-équipements ---
   const isEntretien = item?.intervention_type === 'entretien';
-  // Certificats : seulement une fois le RDV planifié (déclencheur de la suite), pas en "À planifier"
-  const showCertificatsSection = isEntretien && item?.contract_id && item?.workflow_status !== 'a_planifier';
+  // Certificats : seulement une fois le RDV planifié (déclencheur de la suite),
+  // pas en "Demande de contrat" ni "À planifier"
+  const showCertificatsSection = isEntretien && item?.contract_id
+    && !['demande_contrat', 'a_planifier'].includes(item?.workflow_status);
 
   // Charger la date du dernier entretien réalisé via maintenance_visits (source de vérité)
   useEffect(() => {

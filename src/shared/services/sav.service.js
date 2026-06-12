@@ -22,6 +22,7 @@ import { entretiensService } from './entretiens.service';
 // ============================================================================
 
 export const ENTRETIEN_STATUSES = [
+  { value: 'demande_contrat', label: 'Demande de contrat', color: '#06B6D4', display_order: 0 },
   { value: 'a_planifier', label: 'À planifier', color: '#3B82F6', display_order: 1 },
   { value: 'planifie',    label: 'Planifié',    color: '#8B5CF6', display_order: 2 },
   { value: 'realise',     label: 'Réalisé',     color: '#10B981', display_order: 3 },
@@ -45,12 +46,17 @@ export const KANBAN_COLUMNS = [
   { value: 'demande',           label: 'Demande SAV',       color: '#EF4444', types: ['sav'] },
   { value: 'devis_envoye',      label: 'Devis envoyé',      color: '#3B82F6', types: ['sav'] },
   { value: 'pieces_commandees', label: 'Pièces commandées', color: '#F59E0B', types: ['sav'] },
+  { value: 'demande_contrat',   label: 'Demande de contrat', color: '#06B6D4', types: ['entretien'] },
   { value: 'a_planifier',       label: 'À planifier',       color: '#3B82F6', types: ['entretien', 'sav'] },
   { value: 'planifie',          label: 'Planifié',          color: '#8B5CF6', types: ['entretien', 'sav'] },
   { value: 'realise',           label: 'Réalisé',           color: '#10B981', types: ['entretien', 'sav'] },
 ];
 
 export const ENTRETIEN_TRANSITIONS = {
+  // demande_contrat : carte en attente de contrat signé — non planifiable.
+  // Bascule auto vers a_planifier quand le contrat passe active (trigger DB
+  // trg_contract_activation_promote_cards), ou manuelle (drag / bouton modale).
+  demande_contrat: ['a_planifier'],
   a_planifier: ['planifie'],
   planifie:    ['realise', 'a_planifier'],
   realise:     ['facture'],
@@ -264,7 +270,7 @@ export const savService = {
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    * Anti-doublon : refuse si un entretien actif (non réalisé) existe déjà pour ce contrat
    */
-  async createEntretien({ orgId, clientId, contractId, projectId, scheduledDate, createdBy }) {
+  async createEntretien({ orgId, clientId, contractId, projectId, scheduledDate, createdBy, workflowStatus = 'a_planifier' }) {
     if (!orgId || !clientId || !projectId) {
       throw new Error('[sav] orgId, clientId et projectId requis');
     }
@@ -293,7 +299,7 @@ export const savService = {
           client_id: clientId,
           contract_id: contractId || null,
           intervention_type: 'entretien',
-          workflow_status: 'a_planifier',
+          workflow_status: workflowStatus,
           scheduled_date: scheduledDate || null,
           status: 'scheduled',
           created_by: createdBy || null,

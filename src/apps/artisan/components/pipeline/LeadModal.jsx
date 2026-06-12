@@ -28,11 +28,15 @@ import {
   useLeadMutations,
 } from '@hooks/useLeads';
 import { usePricingEquipmentTypes, useClientSearch } from '@hooks/useClients';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@services/appointments.service';
 import { leadsService } from '@services/leads.service';
 import { clientsService } from '@services/clients.service';
 import { contractsService } from '@services/contracts.service';
+import { savService } from '@services/sav.service';
+import { entretienSavKeys } from '@hooks/cacheKeys';
+import { logger } from '@lib/logger';
 import { formatDateForInput } from '@/lib/utils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
@@ -76,6 +80,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const { organization, user, effectiveRole } = useAuth();
   const { can, canEdit, isOwner } = useCanAccess();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const orgId = organization?.id;
   const userId = user?.id;
   const [isRequalifying, setIsRequalifying] = useState(false);
@@ -837,12 +842,14 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     return groups;
   }, [equipmentTypes]);
 
-  // Requalifier lead → Entretien : crée client + contrat pending, puis soft-delete du lead
+  // Requalifier lead → Entretien : crée client + contrat pending + carte Kanban
+  // Entretien « À planifier », puis soft-delete du lead
   const handleRequalifyEntretien = useCallback(async () => {
     if (isRequalifying || !orgId || !lead) return;
     setIsRequalifying(true);
     try {
       let clientId = lead.client_id;
+      let projectId = null;
 
       if (!clientId) {
         const { data: newClient, error: clientError } = await clientsService.createClient({
@@ -859,10 +866,24 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         });
         if (clientError) throw clientError;
         clientId = newClient?.id;
+        projectId = newClient?.project_id || null;
         if (!clientId) throw new Error('Client non créé');
+
+        // Lier le lead au client (traçabilité + pas de doublon client si retry après échec)
+        const { error: linkError } = await leadsService.updateLead(lead.id, { client_id: clientId });
+        if (linkError) logger.warn('[LeadModal] requalify: lien lead→client non posé:', linkError);
+      } else {
+        const { data: clientRow } = await supabase
+          .from('majordhome_clients')
+          .select('project_id')
+          .eq('id', clientId)
+          .maybeSingle();
+        projectId = clientRow?.project_id || null;
       }
 
-      const { error: contractError } = await contractsService.createContract({
+      if (!projectId) throw new Error('Projet client introuvable — requalification impossible');
+
+      const { data: newContract, error: contractError } = await contractsService.createContract({
         orgId,
         clientId,
         status: 'pending',
@@ -874,9 +895,24 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       });
       if (contractError) throw contractError;
 
+      // Carte Kanban Entretien « Demande de contrat » — la demande reste visible côté
+      // Entretien sans être planifiable (pas de contrat actif). Elle bascule en
+      // « À planifier » à l'activation du contrat (trigger DB) ou manuellement.
+      const { error: entretienError } = await savService.createEntretien({
+        orgId,
+        clientId,
+        contractId: newContract?.id || null,
+        projectId,
+        scheduledDate: null,
+        createdBy: userId,
+        workflowStatus: 'demande_contrat',
+      });
+      if (entretienError) throw entretienError;
+
       await leadsService.softDeleteLead(lead.id);
 
-      toast.success('Lead requalifié → contrat créé');
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      toast.success('Lead requalifié → demande de contrat créée (Kanban Entretien)');
       onClose();
       navigate(`/clients/${clientId}?tab=contract`);
     } catch (err) {
@@ -885,7 +921,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     } finally {
       setIsRequalifying(false);
     }
-  }, [orgId, lead, form, isRequalifying, navigate, onClose]);
+  }, [orgId, lead, form, isRequalifying, navigate, onClose, userId, queryClient]);
 
   const currentStatus = statuses.find((s) => s.id === form.status_id);
   const isWon = currentStatus?.is_won === true;
