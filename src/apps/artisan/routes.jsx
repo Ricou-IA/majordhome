@@ -45,6 +45,9 @@ const CommercialPipeline = lazy(() => import('@apps/prospection/commercial/Comme
 // Pipeline Contrats
 const PipelineContrats = lazy(() => import('./pages/PipelineContrats'));
 
+// Webshop (commandes site web + tarifs produits)
+const Webshop = lazy(() => import('./pages/Webshop'));
+
 // Mailing
 const Mailing = lazy(() => import('./pages/Mailing'));
 
@@ -336,6 +339,17 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="tasks">
           <Tasks />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    // Webshop : même périmètre d'accès que le pipeline (équipe commerciale)
+    path: 'webshop',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="pipeline">
+          <Webshop />
         </RouteGuard>
       </SuspenseWrapper>
     ),

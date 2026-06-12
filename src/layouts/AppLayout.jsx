@@ -31,6 +31,7 @@ import {
   FileText,
   Megaphone,
   Sun,
+  ShoppingCart,
 } from 'lucide-react';
 
 // =============================================================================
@@ -43,6 +44,7 @@ const navigation = [
   { name: 'Clients',    href: '/clients',    icon: Users,           resource: 'clients' },
   { name: 'Territoire', href: '/territoire', icon: MapPin,          resource: 'territoire' },
   { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
+  { name: 'Webshop',    href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
   { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens' },
   { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
