@@ -12,7 +12,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@services/clients.service';
-import { clientKeys, contractKeys } from '@hooks/cacheKeys';
+import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
@@ -146,6 +146,18 @@ export function useClient(clientId) {
     },
   });
 
+  // Mutation hard delete (org_admin only) — god mode, nettoyage de base.
+  // Supprime contrats/interventions/certificats + détache leads/RDV → invalidation croisée large.
+  const hardDeleteMutation = useMutation({
+    mutationFn: () => clientsService.hardDeleteClient(clientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    },
+  });
+
   const updateClient = useCallback(
     async (updates) => {
       try {
@@ -176,6 +188,11 @@ export function useClient(clientId) {
     }
   }, [unarchiveMutation]);
 
+  const hardDeleteClient = useCallback(
+    async () => hardDeleteMutation.mutateAsync(),
+    [hardDeleteMutation]
+  );
+
   return {
     client: queryData,
     isLoading,
@@ -186,6 +203,8 @@ export function useClient(clientId) {
     isArchiving: archiveMutation.isPending,
     unarchiveClient,
     isUnarchiving: unarchiveMutation.isPending,
+    hardDeleteClient,
+    isHardDeleting: hardDeleteMutation.isPending,
     refresh: refetch,
   };
 }

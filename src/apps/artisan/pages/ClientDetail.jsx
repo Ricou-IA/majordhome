@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, FileText, Wrench, History, Mail, MessageSquare,
   Save, Loader2, AlertCircle, Lock, Unlock, Clock,
-  Archive, ArchiveRestore, Receipt, CalendarPlus,
+  Archive, ArchiveRestore, Receipt, CalendarPlus, Trash2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +23,8 @@ import { useTeamMembers, appointmentKeys } from '@hooks/useAppointments';
 import { useCanAccess } from '@hooks/usePermissions';
 import { appointmentsService } from '@services/appointments.service';
 import { formatDateFR } from '@/lib/utils';
+import { supabase } from '@/lib/supabaseClient';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EventModal } from '../components/planning/EventModal';
 
 // Sous-composants extraits
@@ -52,9 +54,10 @@ const TABS = [
 
 export default function ClientDetail() {
   const { id } = useParams();
-  const { organization, user } = useAuth();
+  const { organization, user, effectiveRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdmin = effectiveRole === 'org_admin';
 
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'info');
   const [isLocked, setIsLocked] = useState(true);
@@ -64,6 +67,8 @@ export default function ClientDetail() {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [appointmentModal, setAppointmentModal] = useState({ open: false });
   const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
+  const [showHardDelete, setShowHardDelete] = useState(false);
+  const [hardDeleteCounts, setHardDeleteCounts] = useState(null);
 
   const { can } = useCanAccess();
   const canCreateAppointment = can('planning', 'create');
@@ -72,6 +77,7 @@ export default function ClientDetail() {
   const {
     client, isLoading, error, updateClient, isUpdating,
     archiveClient, isArchiving, unarchiveClient, isUnarchiving, refresh,
+    hardDeleteClient, isHardDeleting,
   } = useClient(id);
 
   const { members } = useTeamMembers(organization?.id);
@@ -199,6 +205,54 @@ export default function ClientDetail() {
     }
   };
 
+  // ===== HARD DELETE (org_admin only) — god mode, nettoyage de base =====
+
+  // Pré-compte ce qui sera détruit pour l'afficher dans la confirmation.
+  const handleOpenHardDelete = async () => {
+    setShowHardDelete(true);
+    setHardDeleteCounts(null);
+    try {
+      const [contractsRes, intervRes, certifRes, apptRes, mailRes, smsRes] = await Promise.all([
+        supabase.from('majordhome_contracts').select('id', { count: 'exact', head: true }).eq('client_id', id),
+        supabase.from('majordhome_interventions').select('id', { count: 'exact', head: true }).eq('client_id', id),
+        supabase.from('majordhome_certificats').select('id', { count: 'exact', head: true }).eq('client_id', id),
+        supabase.from('majordhome_appointments').select('id', { count: 'exact', head: true }).eq('client_id', id),
+        supabase.from('majordhome_mailing_logs').select('id', { count: 'exact', head: true }).eq('client_id', id),
+        supabase.from('majordhome_sms_logs').select('id', { count: 'exact', head: true }).eq('client_id', id),
+      ]);
+      setHardDeleteCounts({
+        contracts: contractsRes.count ?? 0,
+        interventions: intervRes.count ?? 0,
+        certificats: certifRes.count ?? 0,
+        appointments: apptRes.count ?? 0,
+        mailings: mailRes.count ?? 0,
+        sms: smsRes.count ?? 0,
+      });
+    } catch (err) {
+      console.warn('[ClientDetail] hard delete preflight count error:', err);
+      setHardDeleteCounts({ contracts: null, interventions: null, certificats: null, appointments: null, mailings: null, sms: null });
+    }
+  };
+
+  const handleConfirmHardDelete = async () => {
+    try {
+      await hardDeleteClient();
+      toast.success('Client supprimé définitivement');
+      setShowHardDelete(false);
+      setHardDeleteCounts(null);
+      navigate('/clients');
+    } catch (err) {
+      console.error('[ClientDetail] hard delete error:', err);
+      const code = err?.message || '';
+      const msg = code.includes('org_admin_required') || code.includes('not_member_of_org')
+        ? 'Action réservée aux administrateurs'
+        : code.includes('client_not_found')
+        ? 'Client introuvable'
+        : 'Erreur lors de la suppression';
+      toast.error(msg);
+    }
+  };
+
   // État de chargement
   if (isLoading) {
     return (
@@ -317,6 +371,18 @@ export default function ClientDetail() {
               title="Archiver ce client"
             >
               <Archive className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* God mode — hard delete réservé aux org_admin (nettoyage de base), masqué en édition */}
+          {isAdmin && isLocked && (
+            <button
+              onClick={handleOpenHardDelete}
+              disabled={isHardDeleting}
+              className="p-2 rounded-lg text-secondary-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+              title="God mode — supprimer définitivement ce client (org_admin)"
+            >
+              <Trash2 className="w-5 h-5" />
             </button>
           )}
 
@@ -453,6 +519,61 @@ export default function ClientDetail() {
           </div>
         </div>
       )}
+
+      {/* Hard delete — org_admin god mode (nettoyage de base, irréversible) */}
+      <ConfirmDialog
+        open={showHardDelete}
+        onOpenChange={(open) => {
+          setShowHardDelete(open);
+          if (!open) setHardDeleteCounts(null);
+        }}
+        title="Supprimer définitivement ce client ?"
+        description="Cette action est irréversible. Le client et ses données rattachées seront purgés de la base."
+        confirmLabel={isHardDeleting ? 'Suppression…' : 'Supprimer définitivement'}
+        cancelLabel="Annuler"
+        variant="destructive"
+        loading={isHardDeleting}
+        onConfirm={handleConfirmHardDelete}
+      >
+        <div className="mt-4 rounded-lg border border-red-100 bg-red-50/60 p-3 text-sm text-gray-700">
+          <p className="font-medium text-red-700 mb-2">
+            Données de <strong>{displayName}</strong> qui seront supprimées :
+          </p>
+          {hardDeleteCounts === null ? (
+            <p className="text-gray-500 italic">Calcul en cours…</p>
+          ) : (
+            <ul className="space-y-1 list-disc list-inside text-xs">
+              <li>
+                <span className="font-medium">{hardDeleteCounts.contracts ?? '?'}</span>{' '}
+                contrat{(hardDeleteCounts.contracts || 0) > 1 ? 's' : ''}
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.interventions ?? '?'}</span>{' '}
+                intervention{(hardDeleteCounts.interventions || 0) > 1 ? 's' : ''} (entretiens / SAV)
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.certificats ?? '?'}</span>{' '}
+                certificat{(hardDeleteCounts.certificats || 0) > 1 ? 's' : ''}
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.appointments ?? '?'}</span>{' '}
+                RDV planning
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.mailings ?? '?'}</span>{' '}
+                log{(hardDeleteCounts.mailings || 0) > 1 ? 's' : ''} mailing
+              </li>
+              <li>
+                <span className="font-medium">{hardDeleteCounts.sms ?? '?'}</span>{' '}
+                SMS
+              </li>
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-gray-500">
+            Les fiches liées (locataire / propriétaire, filleuls) et les leads pipeline rattachés seront détachés, pas supprimés.
+          </p>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

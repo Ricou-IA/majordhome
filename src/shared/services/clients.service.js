@@ -630,6 +630,30 @@ export const clientsService = {
     }, 'clients.unarchiveClient');
   },
 
+  /**
+   * Hard delete d'un client (org_admin only) — god mode, nettoyage de base
+   * --------------------------------------------------------------------------
+   * Appelle la RPC `public.client_hard_delete` qui :
+   *  - vérifie auth.uid() ∈ org_admin de l'org du client
+   *  - purge les satellites NO ACTION (interventions, certificats, sms, service_requests)
+   *  - détache les leads pointant vers le client (client_id → NULL) et les filleuls
+   *  - DELETE le client → CASCADE sur contracts, client_activities, mailing_logs, dedup_candidates
+   * Retourne : { client_id, org_id, deleted: true, counts: {...} }
+   * Throw "org_admin_required" si le user n'est pas admin.
+   */
+  async hardDeleteClient(clientId) {
+    if (!clientId) throw new Error('[clientsService] clientId requis');
+
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('client_hard_delete', {
+        p_client_id: clientId,
+      });
+
+      if (error) throw error;
+      return data;
+    }, 'clients.hardDeleteClient');
+  },
+
   // ==========================================================================
   // ÉQUIPEMENTS (délégués à equipmentsService — rétrocompatibilité)
   // ==========================================================================
