@@ -340,6 +340,19 @@ export const appointmentsService = {
     if (!appointmentId) throw new Error('[appointments] appointmentId requis');
 
     try {
+      // Re-planification avec changement de cible (type / liens carte) : lire l'état
+      // actuel AVANT l'update pour pouvoir refluer l'ancienne carte après coup.
+      // Drag & drop / éditions simples (date, heure, notes) : previous reste null, no-op.
+      let previous = null;
+      if ('appointment_type' in updates || 'intervention_id' in updates || 'lead_id' in updates) {
+        const { data: prev } = await supabase
+          .from('majordhome_appointments')
+          .select('appointment_type, intervention_id, lead_id')
+          .eq('id', appointmentId)
+          .maybeSingle();
+        previous = prev || null;
+      }
+
       const { data: appointment, error } = await supabase
         .from('majordhome_appointments')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -362,6 +375,21 @@ export const appointmentsService = {
       // Reflux carte entretien si le statut du RDV a changé (annulation / réactivation)
       if ('status' in updates && appointment?.intervention_id) {
         await recomputeEntretienWorkflow(appointment.intervention_id);
+      }
+
+      // Changement de cible (re-typage) : reflux de l'ancienne carte entretien si le
+      // RDV ne pointe plus dessus, puis avancée forward-only de la nouvelle cible.
+      if (previous) {
+        const targetChanged =
+          previous.appointment_type !== appointment?.appointment_type ||
+          previous.intervention_id !== appointment?.intervention_id ||
+          previous.lead_id !== appointment?.lead_id;
+        if (targetChanged) {
+          if (previous.intervention_id && previous.intervention_id !== appointment?.intervention_id) {
+            await recomputeEntretienWorkflow(previous.intervention_id);
+          }
+          await syncCardStateOnCreate(appointment);
+        }
       }
 
       // Mettre à jour les techniciens si fournis

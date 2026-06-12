@@ -68,6 +68,8 @@ function newId() {
  * @param {boolean} [props.embedded] - mode intégré : pas de header/objet/notes/boutons ;
  *   remonte les créneaux en continu via onSlotsChange (le host gère objet/notes/confirmation).
  * @param {Function} [props.onSlotsChange] - (slots[]) => void  (mode embedded, doit être stable)
+ * @param {string|null} [props.initialDate] - YYYY-MM-DD : jour affiché à l'ouverture
+ *   (re-planification → date actuelle du RDV). null → prochain jour ouvré.
  */
 export function SchedulingAssistant({
   lead,
@@ -88,6 +90,7 @@ export function SchedulingAssistant({
   isLoading = false,
   embedded = false,
   onSlotsChange,
+  initialDate = null,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -139,7 +142,7 @@ export function SchedulingAssistant({
     return [];
   }, [commercialMode, fixedAssigneeId, lead?.assigned_user_id, columnMembers]);
 
-  const [selectedDate, setSelectedDate] = useState(defaultStartDate);
+  const [selectedDate, setSelectedDate] = useState(() => initialDate || defaultStartDate());
   const [draftSlots, setDraftSlots] = useState([]);
   const [subject, setSubject] = useState(() => {
     const name = `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim();

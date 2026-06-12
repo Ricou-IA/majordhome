@@ -13,11 +13,12 @@
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2,
+  Phone, MapPin, CalendarClock,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
+import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
 import {
   APPOINTMENT_TYPES,
-  APPOINTMENT_STATUSES,
   COMMERCIAL_TYPES,
   TECHNICIAN_TYPES,
 } from '@services/appointments.service';
@@ -46,6 +47,7 @@ export const SectionType = ({
   availableTypes = APPOINTMENT_TYPES,
   typeLocked = false,
   hideSubject = false,
+  allowTypeChange = false,
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -57,7 +59,7 @@ export const SectionType = ({
         value={formData.appointment_type}
         onChange={(v) => updateField('appointment_type', v)}
         options={availableTypes}
-        disabled={isEdit || isCancelled || typeLocked}
+        disabled={(isEdit && !allowTypeChange) || isCancelled || typeLocked}
       />
     </FormField>
     {/* Objet masqué dans le flux assistant (création VT/entretien/SAV/install) :
@@ -74,18 +76,6 @@ export const SectionType = ({
         </FormField>
       </div>
     )}
-    {isEdit && (
-      <div className="mt-4">
-        <FormField label="Statut">
-          <SelectInput
-            value={formData.status}
-            onChange={(v) => updateField('status', v)}
-            options={APPOINTMENT_STATUSES.filter(s => s.value !== 'cancelled')}
-            disabled={isCancelled}
-          />
-        </FormField>
-      </div>
-    )}
   </div>
 );
 
@@ -93,7 +83,43 @@ export const SectionType = ({
 // SECTION DATE & HEURE
 // ============================================================================
 
-export const SectionDateTime = ({ formData, updateField, errors, isCancelled }) => (
+export const SectionDateTime = ({ formData, updateField, errors, isCancelled, readOnly = false, onRequestReschedule }) => {
+  // Lecture seule (édition) : la planification se modifie via l'assistant
+  // (« Modifier le RDV ») ou par glisser-déposer sur le calendrier.
+  if (readOnly) {
+    const timeRange = [formData.scheduled_start, formData.scheduled_end].filter(Boolean).join(' – ');
+    const durationLabel = DURATION_OPTIONS.find((o) => o.value === Number(formData.duration_minutes))?.label
+      || (formData.duration_minutes ? `${formData.duration_minutes} min` : '');
+    return (
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-gray-500" />
+          Date & Heure
+        </h3>
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="text-sm text-gray-900 min-w-0">
+            <span className="font-medium">
+              {formData.scheduled_date ? formatDateFR(formData.scheduled_date) : '—'}
+            </span>
+            {timeRange && <span className="text-gray-600"> · {timeRange}</span>}
+            {durationLabel && <span className="text-gray-500"> ({durationLabel})</span>}
+          </div>
+          {!isCancelled && onRequestReschedule && (
+            <button
+              type="button"
+              onClick={onRequestReschedule}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors shrink-0"
+            >
+              <CalendarClock className="w-4 h-4" />
+              Modifier le RDV
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
       <Clock className="w-4 h-4 text-gray-500" />
@@ -136,7 +162,8 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled }) 
       </FormField>
     </div>
   </div>
-);
+  );
+};
 
 // ============================================================================
 // SECTION CLIENT
@@ -152,6 +179,7 @@ export const SectionClient = ({
   navigate,
   handleUnlinkClient,
   handleUnlinkLead,
+  showContactDetails = false,
   // Search
   clientSearchQuery,
   searchClient,
@@ -171,6 +199,37 @@ export const SectionClient = ({
       Client
     </h3>
 
+    {/* Coordonnées du RDV (édition) : lecture directe pour le technicien —
+        nom, téléphone cliquable, adresse. Source = champs dénormalisés du RDV. */}
+    {showContactDetails && (formData.client_name || formData.client_first_name
+      || formData.client_phone || formData.client_address) && (
+      <div className="mb-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-1.5">
+        <div className="text-sm font-semibold text-gray-900">
+          {[formData.client_name, formData.client_first_name].filter(Boolean).join(' ') || 'Sans nom'}
+        </div>
+        {formData.client_phone && (
+          <a
+            href={`tel:${formData.client_phone}`}
+            className="flex items-center gap-1.5 text-sm text-blue-700 hover:underline w-fit"
+          >
+            <Phone className="w-3.5 h-3.5 shrink-0" />
+            {formatPhoneNumber(formData.client_phone)}
+          </a>
+        )}
+        {(formData.client_address || formData.client_city) && (
+          <div className="flex items-start gap-1.5 text-sm text-gray-600">
+            <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>
+              {[
+                formData.client_address,
+                [formData.client_postal_code, formData.client_city].filter(Boolean).join(' '),
+              ].filter(Boolean).join(', ')}
+            </span>
+          </div>
+        )}
+      </div>
+    )}
+
     {/* Bannière client lié */}
     {selectedClient && (
       <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-3">
@@ -186,7 +245,7 @@ export const SectionClient = ({
         </div>
         <button
           type="button"
-          onClick={() => navigate(`/artisan/clients/${selectedClient.id}`)}
+          onClick={() => navigate(`/clients/${selectedClient.id}`)}
           className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors shrink-0"
           title="Voir la fiche client"
         >
@@ -220,7 +279,7 @@ export const SectionClient = ({
         </div>
         <button
           type="button"
-          onClick={() => navigate('/artisan/pipeline')}
+          onClick={() => navigate('/pipeline')}
           className="flex items-center gap-1 text-xs px-2 py-1 bg-violet-100 text-violet-700 hover:bg-violet-200 rounded-md transition-colors shrink-0"
           title="Voir dans le pipeline"
         >

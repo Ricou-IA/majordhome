@@ -93,6 +93,9 @@ export function EventModal({
   // Créneaux posés via l'assistant INTÉGRÉ (création VT/entretien/SAV/install) + état d'envoi du lot
   const [assistantSlots, setAssistantSlots] = useState([]);
   const [batchSaving, setBatchSaving] = useState(false);
+  // Re-planification (édition) : ré-ouvre l'assistant créneaux pour déplacer le RDV
+  // (date/heure/personne), changement de type inclus. Date/heure figées sinon.
+  const [rescheduleMode, setRescheduleMode] = useState(false);
 
   // État recherche / liaison client & lead
   const [selectedClient, setSelectedClient] = useState(null);
@@ -138,8 +141,9 @@ export function EventModal({
   // --------------------------------------------------------------------------
   const isCommercialType = COMMERCIAL_TYPES.includes(formData.appointment_type);
   // Tous les types en CRÉATION utilisent l'assistant (grille jour × colonnes par personne),
-  // y compris « Autre » (colonnes = tous les membres). Seule l'édition garde le picker classique.
-  const usesAssistant = !isEdit;
+  // y compris « Autre » (colonnes = tous les membres). En édition, l'assistant revient
+  // via « Modifier le RDV » (rescheduleMode) ; sinon la planification est en lecture seule.
+  const usesAssistant = !isEdit || rescheduleMode;
   // Ouverture depuis une fiche client (prefillClient) → client implicite :
   // on masque entièrement le bloc Client (inutile de rappeler la fiche, on y est déjà).
   const fromFiche = !!prefillClient;
@@ -220,6 +224,7 @@ export function EventModal({
     setConfirmAction(null);
     setAssistantSlots([]);
     setBatchSaving(false);
+    setRescheduleMode(false);
 
     if (isEdit && appointment) {
       // Mode édition : pré-remplir avec les données existantes
@@ -691,6 +696,79 @@ export function EventModal({
     }
   }, [assistantSlots, fromFiche, resolveActivation, reportActivationError, isCommercialType, orgId, formData, selectedClient, queryClient, onClose]);
 
+  // --------------------------------------------------------------------------
+  // Re-planifier (édition) : 1 créneau choisi dans l'assistant → update du RDV
+  // existant. Si le type change, la carte cible est re-résolue (resolveActivation)
+  // et appointments.service refait le sync carte (reflux ancienne / avancée nouvelle).
+  // Le drag & drop calendrier reste l'autre chemin (date/heure uniquement).
+  // --------------------------------------------------------------------------
+  const handleRescheduleSave = useCallback(async () => {
+    const slot = assistantSlots[0];
+    if (!slot) {
+      toast.error('Choisissez un créneau');
+      return;
+    }
+    setBatchSaving(true);
+    try {
+      const typeChanged = formData.appointment_type !== appointment?.appointment_type;
+      let leadId = appointment?.lead_id || null;
+      let interventionId = appointment?.intervention_id || null;
+
+      if (typeChanged) {
+        const act = await resolveActivation({ rdvDate: slot.date });
+        if (reportActivationError(act.error)) {
+          setBatchSaving(false);
+          return;
+        }
+        leadId = act.leadId;
+        interventionId = act.interventionId;
+      }
+
+      // Objet recalculé si le type change (cohérence type — client), conservé sinon
+      const typeLabel = getAppointmentTypeConfig(formData.appointment_type).label;
+      const clientLabel = [formData.client_name, formData.client_first_name].filter(Boolean).join(' ').trim();
+      const subject = typeChanged
+        ? (clientLabel ? `${typeLabel} — ${clientLabel}` : typeLabel)
+        : (formData.subject || null);
+
+      const ok = await onSave({
+        appointment_type: formData.appointment_type,
+        subject,
+        scheduled_date: slot.date,
+        scheduled_start: slot.startTime,
+        scheduled_end: slot.endTime || null,
+        duration_minutes: slot.duration || Number(formData.duration_minutes) || 60,
+        status: 'scheduled', // un RDV re-planifié redevient actif (ex: no_show)
+        lead_id: leadId,
+        intervention_id: interventionId,
+        technicianIds: slot.technicianIds || [],
+        assigned_commercial_id: isCommercialType
+          ? (slot.assignedCommercialId || null)
+          : (formData.assigned_commercial_id || null),
+      });
+
+      if (ok !== false) {
+        // Cartes liées (ancienne et nouvelle cible) : rafraîchir les kanbans
+        if (leadId || appointment?.lead_id) {
+          queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+          queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+        }
+        if (interventionId || appointment?.intervention_id) {
+          queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+          queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+        }
+      }
+    } catch (err) {
+      console.error('[EventModal] handleRescheduleSave error:', err);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setBatchSaving(false);
+    }
+  }, [
+    assistantSlots, formData, appointment, resolveActivation, reportActivationError,
+    isCommercialType, onSave, orgId, queryClient,
+  ]);
+
   // Type config pour le badge coloré
   const typeConfig = useMemo(
     () => getAppointmentTypeConfig(formData.appointment_type),
@@ -798,15 +876,22 @@ export function EventModal({
                 availableTypes={availableTypes}
                 typeLocked={typeLocked}
                 hideSubject={usesAssistant}
+                allowTypeChange={rescheduleMode}
               />
 
-              {/* Date/heure classique : édition + « Autre » (sinon l'assistant intégré pose le créneau) */}
+              {/* Date/heure (édition) : lecture seule + bouton « Modifier le RDV » →
+                  assistant créneaux. Le déplacement reste possible par drag & drop calendrier. */}
               {!usesAssistant && (
                 <SectionDateTime
                   formData={formData}
                   updateField={updateField}
                   errors={errors}
                   isCancelled={isCancelled}
+                  readOnly={isEdit}
+                  onRequestReschedule={() => {
+                    setAssistantSlots([]);
+                    setRescheduleMode(true);
+                  }}
                 />
               )}
 
@@ -818,6 +903,7 @@ export function EventModal({
                   updateField={updateField}
                   errors={errors}
                   isCancelled={isCancelled}
+                  showContactDetails={isEdit}
                   selectedClient={selectedClient}
                   selectedLead={selectedLead}
                   navigate={navigate}
@@ -854,7 +940,8 @@ export function EventModal({
                   appointmentTypeLabel={typeConfig.label}
                   appointmentTypeValue={formData.appointment_type}
                   defaultDuration={Number(formData.duration_minutes) || 60}
-                  multi={formData.appointment_type === 'installation'}
+                  initialDate={rescheduleMode ? (formData.scheduled_date || null) : null}
+                  multi={!rescheduleMode && formData.appointment_type === 'installation'}
                 />
               )}
 
@@ -879,7 +966,7 @@ export function EventModal({
               )}
 
               {/* CTA Certificat d'entretien */}
-              {isEdit && entretienId && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
+              {isEdit && !rescheduleMode && entretienId && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
                 <div className={`${entretienStatus === 'realise' ? 'bg-green-50 border-green-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-4`}>
                   <CertificatLink
                     interventionId={entretienId}
@@ -908,9 +995,9 @@ export function EventModal({
         {/* ---- Footer ---- */}
         {!confirmAction && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {/* Actions danger (mode edit seulement) */}
+            {/* Actions danger (mode edit seulement, hors re-planification) */}
             <div className="flex items-center gap-2">
-              {isEdit && !isCancelled && (
+              {isEdit && !isCancelled && !rescheduleMode && (
                 <>
                   <button
                     onClick={() => setConfirmAction('cancel')}
@@ -934,28 +1021,40 @@ export function EventModal({
 
             {/* Actions principales */}
             <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                Fermer
-              </button>
+              {rescheduleMode ? (
+                <button
+                  onClick={() => {
+                    setAssistantSlots([]);
+                    setRescheduleMode(false);
+                  }}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Retour
+                </button>
+              ) : (
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Fermer
+                </button>
+              )}
               {!isCancelled && (
                 usesAssistant ? (
                   <button
-                    onClick={handleCreateFromAssistant}
+                    onClick={rescheduleMode ? handleRescheduleSave : handleCreateFromAssistant}
                     disabled={batchSaving || assistantSlots.length === 0}
                     className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {batchSaving ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Création...
+                        {rescheduleMode ? 'Enregistrement...' : 'Création...'}
                       </>
                     ) : (
                       <>
                         <Save className="w-4 h-4" />
-                        Créer le RDV
+                        {rescheduleMode ? 'Enregistrer le créneau' : 'Créer le RDV'}
                       </>
                     )}
                   </button>
