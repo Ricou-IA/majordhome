@@ -47,13 +47,28 @@ export default function SendTab() {
   );
   const campaignLabel = campaign?.label || 'custom';
 
-  // Le segment par défaut vient de la campagne si renseigné, sinon premier segment disponible
+  // Segment par défaut : appliqué UNIQUEMENT au changement de campagne (auto_segment_id
+  // si renseigné, sinon premier segment). On ne le re-force PAS à chaque render — sinon
+  // toute sélection manuelle de l'utilisateur est immédiatement annulée (sélecteur figé).
+  const initializedCampaignRef = useRef(null);
   useEffect(() => {
     if (!campaign || segments.length === 0) return;
-    const preferredId = campaign.auto_segment_id;
-    if (preferredId && segments.some((s) => s.id === preferredId)) {
-      setSelectedSegmentId(preferredId);
-    } else if (!selectedSegmentId || !segments.some((s) => s.id === selectedSegmentId)) {
+
+    if (initializedCampaignRef.current !== campaign.id) {
+      // Nouvelle campagne → (ré)applique son segment par défaut.
+      initializedCampaignRef.current = campaign.id;
+      const preferredId = campaign.auto_segment_id;
+      if (preferredId && segments.some((s) => s.id === preferredId)) {
+        setSelectedSegmentId(preferredId);
+      } else {
+        setSelectedSegmentId(segments[0].id);
+      }
+      return;
+    }
+
+    // Même campagne : on ne corrige que si la sélection est vide/invalide (ex. liste de
+    // segments qui vient de charger). Le choix manuel de l'utilisateur est respecté.
+    if (!selectedSegmentId || !segments.some((s) => s.id === selectedSegmentId)) {
       setSelectedSegmentId(segments[0].id);
     }
   }, [campaign, segments, selectedSegmentId]);
