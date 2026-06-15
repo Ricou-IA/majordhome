@@ -6,6 +6,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useMailSegments, useSegmentCount, useSegmentPreview } from '@hooks/useMailSegments';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
 import { useLeadStatuses, useLeadSources, useLeadCommercials } from '@hooks/useLeads';
+import { usePricingEquipmentTypes } from '@hooks/useClients';
 import { useDebounce } from '@hooks/useDebounce';
 import {
   AUDIENCES,
@@ -20,6 +21,7 @@ import {
   arrayToCsv,
   updateFilters,
 } from './segmentBuilder.constants';
+import { EQUIPMENT_CATEGORY_LABELS } from '../pipeline/LeadStatusConfig';
 
 /**
  * SegmentBuilderDrawer — builder à facettes (4 blocs) pour composer un segment
@@ -55,6 +57,18 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
   const { sources: leadSources } = useLeadSources();
   const { commercials: leadCommercials } = useLeadCommercials(orgId);
   const { campaigns } = useMailCampaigns(orgId);
+  const { equipmentTypes } = usePricingEquipmentTypes();
+
+  // Types d'équipement groupés par catégorie (même source/grouping que la fiche lead)
+  const groupedEquipmentTypes = useMemo(() => {
+    const groups = {};
+    for (const type of equipmentTypes) {
+      const cat = type.category || 'autre';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(type);
+    }
+    return groups;
+  }, [equipmentTypes]);
 
   // ------------------------------------------------------------------
   // Compteur + preview (debounced)
@@ -173,6 +187,7 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
               audience={audience}
               leadSources={leadSources}
               leadCommercials={leadCommercials}
+              groupedEquipmentTypes={groupedEquipmentTypes}
             />
           </Section>
 
@@ -294,6 +309,50 @@ function CheckboxList({ label, options, values, onChange }) {
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function EquipmentTypePicker({ groupedTypes, values, onChange, audience }) {
+  const entries = Object.entries(groupedTypes || {});
+  if (entries.length === 0) return null;
+  const toggle = (id) => {
+    const next = new Set(values || []);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onChange(Array.from(next));
+  };
+  return (
+    <div>
+      <label className="block text-sm font-medium text-secondary-700 mb-1">Équipement concerné</label>
+      <p className="text-xs text-secondary-500 mb-2">
+        {audience === 'clients'
+          ? 'Clients ayant cet équipement installé (via leurs contrats).'
+          : 'Leads dont la demande porte sur cet équipement.'}
+      </p>
+      <div className="space-y-2">
+        {entries.map(([category, types]) => (
+          <div key={category}>
+            <p className="text-xs font-medium text-secondary-500 mb-1">
+              {EQUIPMENT_CATEGORY_LABELS[category] || category}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {types.map((t) => {
+                const checked = (values || []).includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggle(t.id)}
+                    className={`px-2.5 py-1 rounded-full border text-xs transition-colors ${checked ? 'bg-primary-100 border-primary-400 text-primary-700' : 'bg-white border-gray-300 text-secondary-700 hover:bg-gray-50'}`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -446,7 +505,7 @@ function LeadsBaseFields({ filters, set, leadStatuses }) {
 // ----------------------------------------------------------------------------
 // BLOC 2 — Attributes
 // ----------------------------------------------------------------------------
-function AttributesFields({ filters, set, audience, leadSources, leadCommercials }) {
+function AttributesFields({ filters, set, audience, leadSources, leadCommercials, groupedEquipmentTypes }) {
   const a = filters.attributes || {};
   return (
     <div className="space-y-3">
@@ -464,6 +523,12 @@ function AttributesFields({ filters, set, audience, leadSources, leadCommercials
           placeholder="81000, 81100"
         />
       </div>
+      <EquipmentTypePicker
+        groupedTypes={groupedEquipmentTypes}
+        values={a.equipment_type_ids}
+        onChange={(v) => set(['attributes', 'equipment_type_ids'], v)}
+        audience={audience}
+      />
       {audience === 'leads' && (
         <TextInputRow
           label="Zones (séparées par virgule)"
