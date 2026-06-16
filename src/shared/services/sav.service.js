@@ -854,6 +854,59 @@ export const savService = {
       error: null,
     };
   },
+
+  /**
+   * Envoie un SMS de rappel d'entretien à un client sous contrat.
+   * Campagne 'rappel_entretien' (distincte de l'avis 'avis_j1'). Mono-destinataire.
+   * Déclenché depuis l'onglet Programmation (SectorGroupView).
+   * N8N envoie le SMS ET log dans sms_logs (campaign_name='rappel_entretien').
+   */
+  async sendEntretienReminder({ contractId, clientId, clientFirstName, clientName, clientPhone, orgId }) {
+    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_SMS_RAPPEL;
+    if (!webhookUrl) {
+      console.error('[sav] VITE_N8N_WEBHOOK_SMS_RAPPEL non configuré');
+      return { data: null, error: new Error('Webhook SMS rappel non configuré') };
+    }
+
+    if (!isMobileFR(clientPhone)) {
+      const reason = clientPhone
+        ? 'Aucun numéro mobile (06/07) disponible pour ce client'
+        : 'Le client n\'a pas de numéro de téléphone';
+      return { data: null, error: new Error(reason) };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contract_id: contractId,
+          client_id: clientId,
+          client_first_name: clientFirstName,
+          client_name: clientName,
+          client_phone: clientPhone,
+          org_id: orgId,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        throw new Error(`Webhook error: ${response.status}`);
+      }
+      await response.json();
+      return { data: { success: true }, error: null };
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') {
+        // Timeout = N8N traite en background, considéré comme succès
+        return { data: { success: true }, error: null };
+      }
+      console.error('[sav] sendEntretienReminder error:', err);
+      return { data: null, error: err };
+    }
+  },
 };
 
 export default savService;
