@@ -189,8 +189,12 @@ export function EquipmentFormModal({
     if (!form.equipmentTypeId) return;
 
     // Trouver le type sélectionné pour récupérer le equipment_category (ENUM)
+    // Fallback 'autre' : equipments.category est NOT NULL. Certains types
+    // (Panneau photovoltaïque, Prestations…) n'ont pas de equipment_category mappé
+    // → ne JAMAIS envoyer null (violation NOT NULL). Le type précis reste porté
+    // par equipment_type_id. Même convention que _pricingCodeToEquipmentCategory.
     const selectedType = equipmentTypes.find(t => t.id === form.equipmentTypeId);
-    const category = selectedType?.equipment_category || null;
+    const category = selectedType?.equipment_category || 'autre';
 
     await onSubmit({
       equipmentTypeId: form.equipmentTypeId,
