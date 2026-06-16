@@ -15,6 +15,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
+import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService } from './entretiens.service';
 
 // ============================================================================
@@ -780,13 +781,6 @@ export const savService = {
       console.error('[sav] VITE_N8N_WEBHOOK_SMS_AVIS non configuré');
       return { data: null, error: new Error('Webhook SMS non configuré') };
     }
-
-    // Détection mobile FR : 06/07 au format national ou international
-    const isMobileFR = (phone) => {
-      if (!phone) return false;
-      const cleaned = String(phone).replace(/[\s.-]/g, '');
-      return /^0[67]\d{8}$/.test(cleaned) || /^(?:\+33|0033|33)[67]\d{8}$/.test(cleaned);
-    };
 
     // Normaliser pour dédupliquer (ex: "06 12..." et "0612...")
     const normalize = (phone) => String(phone || '').replace(/[\s.-]/g, '');

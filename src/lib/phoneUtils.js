@@ -39,3 +39,15 @@ export function formatPhoneForSearch(term) {
   const spaced = (hasPlus ? '+' : '') + pairs.join(' ');
   return spaced;
 }
+
+/**
+ * Teste si un numéro est un mobile français (06/07), au format national
+ * (0612345678) ou international (+33/0033/33). Tolère espaces, points, tirets.
+ * @param {string} phone - Numéro brut
+ * @returns {boolean}
+ */
+export function isMobileFR(phone) {
+  if (!phone) return false;
+  const cleaned = String(phone).replace(/[\s.-]/g, '');
+  return /^0[67]\d{8}$/.test(cleaned) || /^(?:\+33|0033|33)[67]\d{8}$/.test(cleaned);
+}
