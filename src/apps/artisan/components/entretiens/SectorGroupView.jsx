@@ -19,11 +19,14 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCircle2,
+  Check,
   Clock,
   Calendar,
   Loader2,
   Map,
+  MessageSquare,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { VisitBadge } from './VisitBadge';
 import { SearchBar } from '../shared/SearchBar';
 
@@ -128,6 +131,138 @@ function SectorHeader({ sector, isExpanded, onToggle, canPlan, onPlanSector, isP
   );
 }
 
+function ContractRow({
+  contract,
+  onContractClick,
+  canPlan,
+  onPlanContract,
+  isPlanningDisabled,
+  isAlreadyPlanned,
+  remindedClientIds,
+  onSendReminder,
+  canSendReminder,
+}) {
+  // Statut visite : basé sur current_year_visit_status (visite année en cours)
+  const visitStatus =
+    contract.current_year_visit_status === 'completed' ? 'completed' : 'pending';
+
+  // Traité pour l'année = entretien en cours OU visite effectuée
+  const isDone = isAlreadyPlanned || visitStatus === 'completed';
+
+  // Mois de référence
+  const monthLabel = contract.maintenance_month
+    ? MONTHS.find((m) => m.value === contract.maintenance_month)?.label
+    : null;
+
+  // Bulle SMS : visible uniquement quand le contrat est « à planifier »
+  // (même condition que le bouton « Planifier » — jamais sur une ligne grisée).
+  const canShowReminder =
+    canSendReminder && !isAlreadyPlanned && visitStatus !== 'completed';
+  const [smsLoading, setSmsLoading] = useState(false);
+  const [smsSent, setSmsSent] = useState(
+    remindedClientIds?.has(contract.client_id) ?? false,
+  );
+
+  const handleReminderClick = async (e) => {
+    e.stopPropagation();
+    if (smsLoading || smsSent) return;
+    setSmsLoading(true);
+    const { error } = await onSendReminder(contract);
+    setSmsLoading(false);
+    if (error) {
+      toast.error(error.message || 'Échec de l\'envoi du SMS');
+    } else {
+      setSmsSent(true);
+      toast.success('Rappel envoyé par SMS');
+    }
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-3 px-4 py-2.5 pl-11 transition-colors group ${
+        isDone ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-100'
+      }`}
+    >
+      {/* Nom (cliquable) */}
+      <span
+        onClick={() => onContractClick?.(contract)}
+        className="font-medium text-gray-900 truncate flex-1 min-w-0 cursor-pointer hover:text-blue-600 transition-colors"
+      >
+        {contract.client_name || 'Sans nom'}
+      </span>
+
+      {/* Mois de référence */}
+      {monthLabel && (
+        <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">
+          {monthLabel}
+        </span>
+      )}
+
+      {/* Tarif */}
+      {contract.amount ? (
+        <span className="text-xs font-medium text-blue-700 flex-shrink-0">
+          {new Intl.NumberFormat('fr-FR', {
+            style: 'currency',
+            currency: 'EUR',
+            maximumFractionDigits: 0,
+          }).format(contract.amount)}
+        </span>
+      ) : null}
+
+      {/* Badge visite */}
+      <VisitBadge status={visitStatus} />
+
+      {/* Bulle SMS rappel — uniquement « à planifier » */}
+      {canShowReminder && (
+        <button
+          onClick={handleReminderClick}
+          disabled={smsLoading || smsSent}
+          title={
+            smsSent
+              ? 'Rappel déjà envoyé cette année'
+              : 'Envoyer un rappel d\'entretien par SMS'
+          }
+          className={`inline-flex items-center justify-center p-1.5 rounded border transition-colors flex-shrink-0 ${
+            smsSent
+              ? 'border-green-300 text-green-600 bg-green-50'
+              : 'border-gray-300 text-gray-600 bg-white hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700'
+          } disabled:opacity-60`}
+        >
+          {smsLoading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : smsSent ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <MessageSquare className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+
+      {/* CTA Planifier / badge Planifié / rien (si visite déjà effectuée) */}
+      {canPlan &&
+        (isAlreadyPlanned ? (
+          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded flex-shrink-0">
+            <CheckCircle2 className="h-3 w-3" />
+            Planifié
+          </span>
+        ) : visitStatus === 'completed' ? null : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlanContract?.(contract);
+            }}
+            disabled={isPlanningDisabled}
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-all disabled:opacity-50 flex-shrink-0"
+            title="Programmer un entretien"
+          >
+            <Calendar className="h-3 w-3" />
+            Planifier
+          </button>
+        ))}
+    </div>
+  );
+}
+
 function SectorContracts({
   contracts,
   onContractClick,
@@ -135,90 +270,27 @@ function SectorContracts({
   onPlanContract,
   isPlanningDisabled,
   plannedContractIds,
+  remindedClientIds,
+  onSendReminder,
+  canSendReminder,
 }) {
   return (
     <div className="bg-gray-50 border-t border-gray-100">
       <div className="divide-y divide-gray-100">
-        {contracts.map((contract) => {
-          const isAlreadyPlanned = plannedContractIds?.has(contract.id) ?? false;
-
-          // Statut visite : basé sur current_year_visit_status (visite année en cours)
-          const visitStatus =
-            contract.current_year_visit_status === 'completed'
-              ? 'completed'
-              : 'pending';
-
-          // Traité pour l'année = entretien en cours OU visite effectuée
-          const isDone = isAlreadyPlanned || visitStatus === 'completed';
-
-          // Mois de référence
-          const monthLabel = contract.maintenance_month
-            ? MONTHS.find((m) => m.value === contract.maintenance_month)?.label
-            : null;
-
-          return (
-            <div
-              key={contract.id}
-              className={`flex items-center gap-3 px-4 py-2.5 pl-11 transition-colors group ${
-                isDone
-                  ? 'opacity-50 bg-gray-50'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
-              {/* Nom (cliquable) */}
-              <span
-                onClick={() => onContractClick?.(contract)}
-                className="font-medium text-gray-900 truncate flex-1 min-w-0 cursor-pointer hover:text-blue-600 transition-colors"
-              >
-                {contract.client_name || 'Sans nom'}
-              </span>
-
-              {/* Mois de référence */}
-              {monthLabel && (
-                <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">
-                  {monthLabel}
-                </span>
-              )}
-
-              {/* Tarif */}
-              {contract.amount ? (
-                <span className="text-xs font-medium text-blue-700 flex-shrink-0">
-                  {new Intl.NumberFormat('fr-FR', {
-                    style: 'currency',
-                    currency: 'EUR',
-                    maximumFractionDigits: 0,
-                  }).format(contract.amount)}
-                </span>
-              ) : null}
-
-              {/* Badge visite */}
-              <VisitBadge status={visitStatus} />
-
-              {/* CTA Planifier / badge Planifié / rien (si visite déjà effectuée) */}
-              {canPlan && (
-                isAlreadyPlanned ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded flex-shrink-0">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Planifié
-                  </span>
-                ) : visitStatus === 'completed' ? null : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlanContract?.(contract);
-                    }}
-                    disabled={isPlanningDisabled}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-all disabled:opacity-50 flex-shrink-0"
-                    title="Programmer un entretien"
-                  >
-                    <Calendar className="h-3 w-3" />
-                    Planifier
-                  </button>
-                )
-              )}
-            </div>
-          );
-        })}
+        {contracts.map((contract) => (
+          <ContractRow
+            key={contract.id}
+            contract={contract}
+            onContractClick={onContractClick}
+            canPlan={canPlan}
+            onPlanContract={onPlanContract}
+            isPlanningDisabled={isPlanningDisabled}
+            isAlreadyPlanned={plannedContractIds?.has(contract.id) ?? false}
+            remindedClientIds={remindedClientIds}
+            onSendReminder={onSendReminder}
+            canSendReminder={canSendReminder}
+          />
+        ))}
       </div>
     </div>
   );
@@ -237,6 +309,9 @@ export function SectorGroupView({
   isPlanningDisabled = false,
   canPlan = false,
   plannedContractIds,
+  remindedClientIds,
+  onSendReminder,
+  canSendReminder = false,
 }) {
   const [expandedSectors, setExpandedSectors] = useState(new Set());
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -455,6 +530,9 @@ export function SectorGroupView({
                     onPlanContract={onPlanContract}
                     isPlanningDisabled={isPlanningDisabled}
                     plannedContractIds={plannedContractIds}
+                    remindedClientIds={remindedClientIds}
+                    onSendReminder={onSendReminder}
+                    canSendReminder={canSendReminder}
                   />
                 )}
               </div>
