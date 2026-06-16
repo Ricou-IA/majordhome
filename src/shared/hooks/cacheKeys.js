@@ -176,6 +176,7 @@ export const smsKeys = {
   all: (orgId) => ['sms', orgId],
   byClient: (orgId, clientId) => [...smsKeys.all(orgId), 'client', clientId],
   byIntervention: (orgId, interventionId) => [...smsKeys.all(orgId), 'intervention', interventionId],
+  remindedClients: (orgId, year) => [...smsKeys.all(orgId), 'reminded-clients', year],
 };
 
 // --- Pricing per-org (P0.0.6 — pattern de référence pour P0.11) ---

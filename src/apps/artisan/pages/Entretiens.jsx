@@ -41,6 +41,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useContracts, useContractStats, useContractSectors } from '@hooks/useContracts';
 import { useEntretienSAVStats, entretienSavKeys } from '@hooks/useEntretienSAV';
+import { smsKeys } from '@hooks/cacheKeys';
 import { savService } from '@services/sav.service';
 import { supabase } from '@/lib/supabaseClient';
 import { EntretienSAVKanban } from '@apps/artisan/components/entretiens/EntretienSAVKanban';
@@ -212,6 +213,24 @@ export default function Entretiens() {
     staleTime: 30_000,
   });
 
+  // Clients ayant déjà reçu le SMS de rappel cette année (campagne 'rappel_entretien').
+  // Dérivé de sms_logs (option A — pas de colonne dédiée). Réinit. au 01/01.
+  const { data: remindedClientIds } = useQuery({
+    queryKey: smsKeys.remindedClients(orgId, currentYear),
+    queryFn: async () => {
+      const yearStart = new Date(currentYear, 0, 1).toISOString();
+      const { data } = await supabase
+        .from('majordhome_sms_logs')
+        .select('client_id')
+        .eq('org_id', orgId)
+        .eq('campaign_name', 'rappel_entretien')
+        .gte('sent_at', yearStart);
+      return new Set((data || []).map((r) => r.client_id).filter(Boolean));
+    },
+    enabled: !!orgId,
+    staleTime: 30_000,
+  });
+
   // ---------- Planning state ----------
   const [isPlanning, setIsPlanning] = useState(false);
 
@@ -328,6 +347,28 @@ export default function Entretiens() {
       }
     },
     [orgId, user?.id, queryClient],
+  );
+
+  // Envoyer un SMS de rappel d'entretien (depuis l'onglet Programmation).
+  // Renvoie { data, error } pour que la ligne gère son état visuel.
+  const handleSendReminder = useCallback(
+    async (contract) => {
+      const res = await savService.sendEntretienReminder({
+        contractId: contract.id,
+        clientId: contract.client_id,
+        clientFirstName: contract.client_first_name,
+        clientName: contract.client_name,
+        clientPhone: contract.client_phone,
+        orgId,
+      });
+      if (!res.error) {
+        queryClient.invalidateQueries({
+          queryKey: smsKeys.remindedClients(orgId, currentYear),
+        });
+      }
+      return res;
+    },
+    [orgId, currentYear, queryClient],
   );
 
   // ---------- Loader initial ----------
@@ -482,6 +523,9 @@ export default function Entretiens() {
             isPlanningDisabled={isPlanning}
             canPlan={canCreateContract}
             plannedContractIds={plannedContractIds}
+            remindedClientIds={remindedClientIds}
+            onSendReminder={handleSendReminder}
+            canSendReminder={canCreateContract}
           />
         </TabsContent>
 
