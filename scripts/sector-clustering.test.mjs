@@ -3,7 +3,7 @@
 // Run : node --test scripts/sector-clustering.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { haversineKm, clusterSectorsByProximity } from '../src/lib/sectorClustering.js';
+import { haversineKm, clusterSectorsByProximity, normalizeCity } from '../src/lib/sectorClustering.js';
 
 const contract = (city, lat, lng, status = 'pending') => ({
   id: `${city}-${lat}-${lng}-${Math.round((lat + lng) * 1e6)}`,
@@ -81,4 +81,25 @@ test('déterminisme : l\'ordre d\'entrée ne change pas le regroupement', () => 
   const b = clusterSectorsByProximity(shuffled, { radiusKm: 15 });
   const norm = (gs) => gs.map((g) => g.codePostals.slice().sort().join(',')).sort();
   assert.deepEqual(norm(a), norm(b));
+});
+
+test('normalizeCity — accents + abréviations St/Ste', () => {
+  assert.equal(normalizeCity('Le Séquestre'), 'le sequestre');
+  assert.equal(normalizeCity('ST SULPICE LA POINTE'), 'saint sulpice la pointe');
+  assert.equal(normalizeCity('Saint-Sulpice-la-Pointe'), 'saint sulpice la pointe');
+});
+
+test('nommage par taille de ville quand la population est fournie', () => {
+  const sectors = [
+    { codePostal: '81000', commune: 'Albi', contracts: [contract('Albi', 43.927, 2.159)] },
+    { codePostal: '81990', commune: 'Le Séquestre', contracts: [
+        contract('Le Séquestre', 43.908, 2.156),
+        contract('Le Séquestre', 43.908, 2.156),
+        contract('Le Séquestre', 43.909, 2.157) ] },
+  ];
+  // Le Séquestre a plus de contrats (3 vs 1) mais Albi est bien plus peuplée → "Albi"
+  const pop = new Map([['albi', 51290], ['le sequestre', 2025]]);
+  const groups = clusterSectorsByProximity(sectors, { radiusKm: 15, cityPopulation: pop });
+  const g = groups.find((x) => x.codePostals.includes('81000'));
+  assert.equal(g.name, 'Albi');
 });

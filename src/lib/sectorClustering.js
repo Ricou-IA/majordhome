@@ -18,6 +18,17 @@ export function haversineKm(a, b) {
   return 2 * EARTH_KM * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+export function normalizeCity(s) {
+  return (s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\bst\b/g, 'saint')
+    .replace(/\bste\b/g, 'sainte');
+}
+
 function hasCoords(c) {
   return (
     c &&
@@ -68,7 +79,7 @@ function radiusOk(sectors, radiusKm) {
   return sectors.every((s) => haversineKm(c, s._centroid) <= radiusKm);
 }
 
-function dominantCommune(sectors) {
+function dominantCommune(sectors, cityPopulation) {
   const counts = new Map();
   for (const s of sectors) {
     for (const c of s.contracts || []) {
@@ -77,15 +88,30 @@ function dominantCommune(sectors) {
       counts.set(city, (counts.get(city) || 0) + 1);
     }
   }
+  if (counts.size === 0) return sectors[0].codePostal;
+  // ordre alpha stable pour les tie-breaks
+  const cities = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+
+  // 1) Nommer par la plus grande ville (population) si disponible
+  if (cityPopulation && cityPopulation.size) {
+    let best = null, bestPop = -1;
+    for (const city of cities) {
+      const pop = cityPopulation.get(normalizeCity(city));
+      if (pop != null && pop > bestPop) { bestPop = pop; best = city; }
+    }
+    if (best) return best;
+  }
+
+  // 2) Fallback : la ville au plus de contrats (puis alpha)
   let best = null, bestN = -1;
-  // tri alpha pour un tie-break déterministe
-  for (const [city, n] of [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    if (n > bestN) { best = city; bestN = n; }
+  for (const city of cities) {
+    const n = counts.get(city);
+    if (n > bestN) { bestN = n; best = city; }
   }
   return best || sectors[0].codePostal;
 }
 
-export function clusterSectorsByProximity(sectors, { radiusKm = 15 } = {}) {
+export function clusterSectorsByProximity(sectors, { radiusKm = 15, cityPopulation = null } = {}) {
   // tri d'entrée → déterminisme
   const input = [...(sectors || [])].sort((a, b) =>
     String(a.codePostal).localeCompare(String(b.codePostal)),
@@ -125,7 +151,7 @@ export function clusterSectorsByProximity(sectors, { radiusKm = 15 } = {}) {
       .sort((a, b) => String(a).localeCompare(String(b)));
     return {
       id: codePostals.join('-'),
-      name: dominantCommune(cl.sectors),
+      name: dominantCommune(cl.sectors, cityPopulation),
       codePostals,
       centroid: cl.centroid,
       visitsPending: pendingCount(cl.sectors),

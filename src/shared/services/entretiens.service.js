@@ -22,6 +22,7 @@ import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 import { clusterSectorsByProximity } from '@/lib/sectorClustering';
+import { fetchCityPopulations } from '@/lib/communePopulation';
 
 // ============================================================================
 // RÉEXPORT DES CONSTANTES (pour backward-compat des imports)
@@ -512,7 +513,7 @@ export const entretiensService = {
       // Grouper par code postal client
       const sectors = {};
       for (const contract of contracts) {
-        const cp = contract.client_postal_code || 'Inconnu';
+        const cp = (contract.client_postal_code || '').trim() || 'Inconnu';
         const city = contract.client_city || '';
         const co = coordsMap.get(contract.client_id);
         contract.client_latitude = co?.latitude ?? null;
@@ -548,7 +549,13 @@ export const entretiensService = {
       // Regroupement en grands secteurs géographiques (partition par CP, rayon 15 km).
       // On annote chaque secteur CP avec son grand secteur ; la forme de retour
       // (tableau de secteurs CP) reste inchangée pour le hook/la page.
-      const groups = clusterSectorsByProximity(sortedSectors, { radiusKm: 15 });
+      // Nommage des grands secteurs par la ville la plus peuplée (cache org-scoped ;
+      // dégradation gracieuse → nommage par nb de contrats si l'API échoue).
+      const cityPopulation = await fetchCityPopulations(
+        sortedSectors.map((s) => s.codePostal),
+        orgId,
+      );
+      const groups = clusterSectorsByProximity(sortedSectors, { radiusKm: 15, cityPopulation });
       const cpToGroup = new Map();
       groups.forEach((g, idx) => {
         for (const cp of g.codePostals) cpToGroup.set(cp, { id: g.id, name: g.name, order: idx });
