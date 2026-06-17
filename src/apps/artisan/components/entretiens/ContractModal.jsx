@@ -309,17 +309,18 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {visits.map((visit) => (
-                          <tr key={visit.id} className="border-t border-gray-100">
-                            <td className="px-3 py-2 text-gray-900">{visit.visit_year}</td>
-                            <td className="px-3 py-2 text-gray-600">
-                              {formatDateFR(visit.visit_date)}
-                            </td>
-                            <td className="px-3 py-2">
-                              <VisitBadge status={visit.status} />
-                            </td>
-                          </tr>
-                        ))}
+                        {visits.map((visit) => {
+                          const done = visit.status === 'completed';
+                          return (
+                            <tr key={visit.id} className="border-t border-gray-100">
+                              <td className="px-3 py-2 text-gray-900">{visit.visit_year}</td>
+                              <td className="px-3 py-2 text-gray-600">{done ? formatDateFR(visit.visit_date) : '—'}</td>
+                              <td className="px-3 py-2">
+                                <VisitBadge status={done ? 'completed' : 'non_realise'} />
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
