@@ -144,7 +144,7 @@ function GrandSecteurHeader({ group, isExpanded, onToggle, canPlan, onPlanGroup,
         </div>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <MapPin className={`h-4 w-4 flex-shrink-0 ${isNonLocalise ? 'text-gray-400' : 'text-indigo-500'}`} />
-          <span className="font-semibold text-gray-900 truncate">{group.name}</span>
+          <span className="font-semibold text-gray-900 truncate uppercase">{group.name}</span>
           <span className="text-xs text-gray-400 flex-shrink-0">
             {group.sectors.length} CP
           </span>
