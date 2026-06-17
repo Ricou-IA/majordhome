@@ -31,6 +31,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
 import { Button } from '@components/ui/button';
 import { formatDateFR, formatEuro } from '@/lib/utils';
+import { logger } from '@lib/logger';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { deriveVisitBadgeStatus } from '@/lib/entretienVisitStatus';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
@@ -117,7 +118,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
       });
       setSchedulingOpen(true);
     } catch (err) {
-      console.error('[ContractModal] handlePlanifier error:', err);
+      logger.error('[ContractModal] handlePlanifier error:', err);
       toast.error('Erreur lors de la planification');
     } finally {
       setPlanning(false);
@@ -136,7 +137,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     toast.success('RDV planifié avec succès');
     setSchedulingOpen(false);
     setSchedulingItem(null);
-    queryClient.invalidateQueries({ queryKey: [...entretienSavKeys.all(orgId), 'by-contract', contractId] });
     queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
     queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
     queryClient.invalidateQueries({ queryKey: contractKeys.detail(orgId, contractId) });
