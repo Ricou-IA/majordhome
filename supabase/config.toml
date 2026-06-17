@@ -50,6 +50,10 @@ verify_jwt = false
 [functions.geogrid-scan]
 verify_jwt = false
 
+# Géocodage serveur (balayage 30 min) — protégée par MDH_CRON_SECRET
+[functions.geocode-sweep]
+verify_jwt = false
+
 # Edges appelées par le frontend authentifié (JWT user)
 [functions.pennylane-proxy]
 verify_jwt = true
