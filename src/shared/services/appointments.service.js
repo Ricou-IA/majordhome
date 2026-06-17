@@ -296,11 +296,28 @@ export const appointmentsService = {
     try {
       const orgId = await getMajordhomeOrgId(coreOrgId);
 
+      // Photo du grand secteur, figée à la création (même découpage que la
+      // Programmation). Non bloquant : un échec laisse la valeur fournie (souvent null).
+      let grandSecteur = appointmentData.grand_secteur ?? null;
+      if (!grandSecteur && (appointmentData.client_id || appointmentData.postal_code)) {
+        try {
+          const { entretiensService } = await import('@services/entretiens.service');
+          const { byClient, byCp } = await entretiensService.getGrandSecteurMaps(orgId);
+          grandSecteur =
+            (appointmentData.client_id && byClient.get(appointmentData.client_id)) ||
+            (appointmentData.postal_code && byCp.get(String(appointmentData.postal_code).trim())) ||
+            null;
+        } catch (e) {
+          console.warn('[appointments] grand_secteur snapshot skipped:', e?.message);
+        }
+      }
+
       const { data: appointment, error } = await supabase
         .from('majordhome_appointments')
         .insert({
           org_id: orgId,
           ...appointmentData,
+          grand_secteur: grandSecteur,
         })
         .select()
         .single();

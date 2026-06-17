@@ -269,6 +269,11 @@ export async function ensureEntretienCard({
 // SERVICE
 // ============================================================================
 
+// Cache module-level des maps grand secteur (photo RDV). La partition est stable ;
+// 30 min suffisent largement (et c'est de toute façon une « photo » figée à la création).
+let _gsMapCache = { orgId: null, ts: 0, byClient: null, byCp: null };
+const GS_MAP_TTL_MS = 30 * 60 * 1000;
+
 export const entretiensService = {
   // ==========================================================================
   // CONTRATS — LECTURE (vue enrichie majordhome_contracts)
@@ -574,6 +579,36 @@ export const entretiensService = {
       console.error('[entretiensService] getContractsBySector exception:', error);
       return { data: [], error };
     }
+  },
+
+  /**
+   * Maps CP→grand secteur et clientId→grand secteur, dérivées du MÊME clustering
+   * que la Programmation (getContractsBySector). Mémoïsées 30 min. Sert à figer
+   * (« photo ») le grand secteur sur un RDV à sa création — sans recalcul live.
+   */
+  async getGrandSecteurMaps(orgId) {
+    if (!orgId) return { byClient: new Map(), byCp: new Map() };
+    if (
+      _gsMapCache.orgId === orgId &&
+      _gsMapCache.byClient &&
+      Date.now() - _gsMapCache.ts < GS_MAP_TTL_MS
+    ) {
+      return { byClient: _gsMapCache.byClient, byCp: _gsMapCache.byCp };
+    }
+    const { data: sectors } = await this.getContractsBySector(orgId);
+    const byClient = new Map();
+    const byCp = new Map();
+    for (const s of sectors || []) {
+      const name = s.grandSecteurName;
+      if (!name || name === 'Non localisé') continue;
+      const cp = String(s.codePostal || '').trim();
+      if (cp) byCp.set(cp, name);
+      for (const c of s.contracts || []) {
+        if (c.client_id) byClient.set(c.client_id, name);
+      }
+    }
+    _gsMapCache = { orgId, ts: Date.now(), byClient, byCp };
+    return { byClient, byCp };
   },
 
   // ==========================================================================

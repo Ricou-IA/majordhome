@@ -304,9 +304,12 @@ function CalendarFilters({ filters, setFilters, teamList }) {
  * Rendu custom d'un événement dans le calendrier
  */
 function renderEventContent(eventInfo) {
-  const { appointment_type, client_name, client_first_name, status, lead_id } = eventInfo.event.extendedProps;
+  const { typeConfig, client_name, client_first_name, status, lead_id, grand_secteur } = eventInfo.event.extendedProps;
   const isCancelled = status === 'cancelled';
   const fullName = [client_name, client_first_name].filter(Boolean).join(' ');
+  // Ligne 1 = type (plus le nom), ligne 2 = nom · grand secteur → le nom n'apparaît
+  // qu'une seule fois (fini le doublon) et le grand secteur est visible d'un coup d'œil.
+  const typeLabel = typeConfig?.label || eventInfo.event.title;
 
   return (
     <div className={`px-1 py-0.5 overflow-hidden ${isCancelled ? 'opacity-50 line-through' : ''}`}>
@@ -319,11 +322,12 @@ function renderEventContent(eventInfo) {
         {eventInfo.timeText && (
           <span className="mr-1">{eventInfo.timeText}</span>
         )}
-        {eventInfo.event.title}
+        {typeLabel}
       </div>
-      {fullName && eventInfo.view.type !== 'dayGridMonth' && (
+      {(fullName || grand_secteur) && eventInfo.view.type !== 'dayGridMonth' && (
         <div className="text-xs truncate opacity-80">
           {fullName}
+          {grand_secteur && <span className="opacity-90"> · {grand_secteur}</span>}
         </div>
       )}
     </div>
