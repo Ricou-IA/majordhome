@@ -11,8 +11,9 @@
  * ============================================================================
  */
 
+import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import {
-  Search, UserCircle, PenLine, Unlink, Link2, X,
+  Search, PenLine, Unlink, Link2, X,
   Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
   ArrowRightLeft, Target, Loader2, Wrench, Undo2,
   FileText, ChevronRight, Plus, Info,
@@ -69,18 +70,11 @@ export const SectionClientLinking = ({
             <Unlink className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-          <UserCircle className="h-5 w-5 text-blue-500 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <span className="text-sm font-medium text-blue-800 truncate block">
-              {linkedClient.display_name}
-            </span>
-            {(linkedClient.city || linkedClient.client_number) && (
-              <span className="text-xs text-blue-600">
-                {linkedClient.client_number}{linkedClient.city ? ` — ${linkedClient.city}` : ''}
-              </span>
-            )}
-          </div>
+        <LinkedClientCard
+          name={linkedClient.display_name}
+          clientNumber={linkedClient.client_number}
+          city={linkedClient.city}
+        >
           <button
             type="button"
             onClick={() => setEditClientMode(!editClientMode)}
@@ -94,7 +88,7 @@ export const SectionClientLinking = ({
             <PenLine className="h-3 w-3" />
             {editClientMode ? 'Modification' : 'Modifier'}
           </button>
-        </div>
+        </LinkedClientCard>
         {editClientMode && (
           <div className="mt-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
             Les modifications des champs contact seront répercutées sur la fiche client à l&apos;enregistrement
