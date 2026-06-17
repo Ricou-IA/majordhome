@@ -6,9 +6,12 @@
 // les échecs de géocodage, et les ré-adressages (geocoded_at remis à NULL par le
 // trigger). Source de vérité : geocoded_at IS NULL + adresse exploitable.
 //
+// Géocodage via l'endpoint unitaire éprouvé /search/ de api-adresse.data.gouv.fr
+// (gratuit), en petits paquets concurrents pour rester poli.
+//
 // Pattern : pg_cron (30 min) → cette edge (verify_jwt:false, MDH_CRON_SECRET) →
 //   1. geocode_fetch_pending_clients(limit)
-//   2. géocodage via l'API CSV gouv (api-adresse.data.gouv.fr, gratuit)
+//   2. géocodage unitaire
 //   3. geocode_apply_client_coordinates(rows)
 //
 // App-level cross-org : géocodage org-agnostique (adresse → coords).
@@ -24,9 +27,10 @@ import {
 } from "../_shared/auth.ts";
 
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
-const GOUV_CSV = "https://api-adresse.data.gouv.fr/search/csv/";
+const GOUV_SEARCH = "https://api-adresse.data.gouv.fr/search/";
 const BATCH_LIMIT = 100;
 const SCORE_MIN = 0.3;
+const CHUNK = 5;
 
 interface PendingClient {
   id: string;
@@ -40,66 +44,45 @@ interface ApplyRow {
   lng: number | null;
 }
 
-function parseCSVLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') inQ = !inQ;
-    else if (ch === "," && !inQ) { out.push(cur.trim()); cur = ""; }
-    else cur += ch;
-  }
-  out.push(cur.trim());
-  return out;
-}
+// Géocode une adresse via l'endpoint unitaire gouv. Retourne lat/lng null si échec
+// ou score < seuil.
+async function geocodeOne(c: PendingClient): Promise<ApplyRow> {
+  const q = [c.address, c.postal_code, c.city].filter(Boolean).join(" ").trim();
+  if (q.length < 5) return { id: c.id, lat: null, lng: null };
 
-// Géocode un lot via l'API CSV gouv. Retourne 1 ApplyRow par client (lat/lng null si échec).
-async function geocodeBatch(clients: PendingClient[]): Promise<ApplyRow[]> {
-  const lines = ["id,adresse,postcode,city"];
-  for (const c of clients) {
-    const addr = (c.address || "").replace(/,/g, " ").replace(/"/g, "");
-    const cp = c.postal_code || "";
-    const city = (c.city || "").replace(/,/g, " ").replace(/"/g, "");
-    lines.push(`${c.id},"${addr}",${cp},"${city}"`);
-  }
-
-  const form = new FormData();
-  form.append("data", new Blob([lines.join("\n")], { type: "text/csv" }), "addresses.csv");
-  form.append("columns", "adresse");
-  form.append("postcode", "postcode");
-  form.append("city_column", "city");
-  form.append("result_columns", "result_score,latitude,longitude");
+  const params = new URLSearchParams({ q, limit: "1" });
+  if (c.postal_code) params.set("postcode", c.postal_code);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-
-  // défaut : échec pour tous (lat/lng null) ; on remplit les succès ensuite
-  const byId = new Map<string, ApplyRow>();
-  for (const c of clients) byId.set(c.id, { id: c.id, lat: null, lng: null });
-
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(GOUV_CSV, { method: "POST", body: form, signal: controller.signal });
+    const res = await fetch(`${GOUV_SEARCH}?${params}`, { signal: controller.signal });
     clearTimeout(timeout);
-    if (!res.ok) return [...byId.values()];
+    if (!res.ok) return { id: c.id, lat: null, lng: null };
 
-    const text = await res.text();
-    const rows = text.split("\n").slice(1);
-    for (const line of rows) {
-      if (!line.trim()) continue;
-      const parts = parseCSVLine(line);
-      const id = parts[0];
-      const score = parseFloat(parts[parts.length - 3]) || 0;
-      const lat = parseFloat(parts[parts.length - 2]);
-      const lng = parseFloat(parts[parts.length - 1]);
-      if (byId.has(id) && score >= SCORE_MIN && !isNaN(lat) && !isNaN(lng)) {
-        byId.set(id, { id, lat, lng });
-      }
-    }
+    const data = await res.json();
+    const f = data?.features?.[0];
+    const score = f?.properties?.score ?? 0;
+    if (!f || score < SCORE_MIN) return { id: c.id, lat: null, lng: null };
+
+    const [lng, lat] = f.geometry.coordinates;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { id: c.id, lat: null, lng: null };
+    return { id: c.id, lat, lng };
   } catch {
     clearTimeout(timeout);
+    return { id: c.id, lat: null, lng: null };
   }
-  return [...byId.values()];
+}
+
+// Géocode le lot en petits paquets concurrents.
+async function geocodeBatch(clients: PendingClient[]): Promise<ApplyRow[]> {
+  const out: ApplyRow[] = [];
+  for (let i = 0; i < clients.length; i += CHUNK) {
+    const chunk = clients.slice(i, i + CHUNK);
+    out.push(...(await Promise.all(chunk.map(geocodeOne))));
+    if (i + CHUNK < clients.length) await new Promise((r) => setTimeout(r, 100));
+  }
+  return out;
 }
 
 Deno.serve(async (req: Request) => {
