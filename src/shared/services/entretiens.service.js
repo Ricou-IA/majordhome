@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
+import { clusterSectorsByProximity } from '@/lib/sectorClustering';
 
 // ============================================================================
 // RÉEXPORT DES CONSTANTES (pour backward-compat des imports)
@@ -473,7 +474,6 @@ export const entretiensService = {
    */
   async getContractsBySector(orgId, { status = 'active' } = {}) {
     try {
-
       let query = supabase
         .from('majordhome_contracts')
         .select('*')
@@ -484,7 +484,6 @@ export const entretiensService = {
       if (status) {
         query = query.eq('status', status);
       } else {
-        // Sans filtre statut explicite, exclure les archivés
         query = query.neq('status', 'archived');
       }
 
@@ -495,11 +494,29 @@ export const entretiensService = {
         return { data: [], error };
       }
 
+      const contracts = data || [];
+
+      // Rattacher les coordonnées client (la vue majordhome_contracts ne les expose
+      // pas). Les ids sont déjà scopés à l'org via la requête contrats ci-dessus ;
+      // la lecture clients est en plus scopée par RLS (security_invoker).
+      const clientIds = [...new Set(contracts.map((c) => c.client_id).filter(Boolean))];
+      const coordsMap = new Map();
+      if (clientIds.length) {
+        const { data: coordRows } = await supabase
+          .from('majordhome_clients')
+          .select('id, latitude, longitude')
+          .in('id', clientIds);
+        for (const r of coordRows || []) coordsMap.set(r.id, r);
+      }
+
       // Grouper par code postal client
       const sectors = {};
-      for (const contract of (data || [])) {
+      for (const contract of contracts) {
         const cp = contract.client_postal_code || 'Inconnu';
         const city = contract.client_city || '';
+        const co = coordsMap.get(contract.client_id);
+        contract.client_latitude = co?.latitude ?? null;
+        contract.client_longitude = co?.longitude ?? null;
 
         if (!sectors[cp]) {
           sectors[cp] = {
@@ -525,8 +542,25 @@ export const entretiensService = {
 
       // Trier par visites à faire (décroissant)
       const sortedSectors = Object.values(sectors).sort(
-        (a, b) => b.visitsPending - a.visitsPending || a.codePostal.localeCompare(b.codePostal)
+        (a, b) => b.visitsPending - a.visitsPending || a.codePostal.localeCompare(b.codePostal),
       );
+
+      // Regroupement en grands secteurs géographiques (partition par CP, rayon 15 km).
+      // On annote chaque secteur CP avec son grand secteur ; la forme de retour
+      // (tableau de secteurs CP) reste inchangée pour le hook/la page.
+      const groups = clusterSectorsByProximity(sortedSectors, { radiusKm: 15 });
+      const cpToGroup = new Map();
+      groups.forEach((g, idx) => {
+        for (const cp of g.codePostals) cpToGroup.set(cp, { id: g.id, name: g.name, order: idx });
+      });
+      for (const sector of sortedSectors) {
+        const g = cpToGroup.get(sector.codePostal) || {
+          id: 'non-localise', name: 'Non localisé', order: groups.length,
+        };
+        sector.grandSecteurId = g.id;
+        sector.grandSecteurName = g.name;
+        sector.grandSecteurOrder = g.order;
+      }
 
       return { data: sortedSectors, error: null };
     } catch (error) {
