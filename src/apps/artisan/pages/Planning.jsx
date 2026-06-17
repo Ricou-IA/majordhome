@@ -327,7 +327,7 @@ function renderEventContent(eventInfo) {
       {(fullName || grand_secteur) && eventInfo.view.type !== 'dayGridMonth' && (
         <div className="text-xs truncate opacity-80">
           {fullName}
-          {grand_secteur && <span className="opacity-90"> · {grand_secteur}</span>}
+          {grand_secteur && <span className="opacity-90"> · Secteur {grand_secteur}</span>}
         </div>
       )}
     </div>
