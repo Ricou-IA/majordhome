@@ -22,7 +22,7 @@ Cette dualité génère plusieurs frictions UI + un bug de cohérence de statut.
 | Label refus année courante | **« Non réalisé » (gris)** — cohérent avec la ligne d'historique juste en dessous. Pas de vert « Réalisé » pour un refus. |
 | Sémantique « sortir du process » | Une visite `cancelled` de l'année courante est reconnue comme **tâche close** (lue depuis le record `cancelled`) : le badge quitte « À faire » et le CTA « Planifier » disparaît pour l'année. Le record `cancelled` **est** la trace informatique. |
 | Portée du fix de statut | **Modal-only**. La vue `majordhome_contracts` n'est **pas** modifiée pour le filtre Programmation. ⚠️ Conséquence assumée : l'onglet Programmation pourra encore lister ce contrat comme « à planifier » l'année du refus. |
-| `client_number` carte Client lié | **Colonne ajoutée à la vue** `majordhome_contracts` (récupérée gratuitement par `useContract`, pas de requête supplémentaire). |
+| `client_number` carte Client lié | **Déjà exposé** par la vue `majordhome_contracts` (`cl.client_number`) et `getContractById` fait `.select('*')` → disponible dans `useContract` sans migration (vérifié via `pg_get_viewdef` le 2026-06-17). |
 
 ## 3. Changements détaillés
 
@@ -113,10 +113,8 @@ useEntretienByContract(orgId, contractId)
 ```
 **Emplacement** : `src/shared/hooks/useContracts.js` (co-localisé avec `useContract`/`useContractVisits` déjà consommés par le modal), clé sous `entretienSavKeys` pour rester cohérent avec l'invalidation planning.
 
-### H. Migration DB
-`public.majordhome_contracts` : ajouter la colonne `c.client_number` (issue du JOIN `clients` déjà présent), en **fin de liste de colonnes** (compatible `CREATE OR REPLACE VIEW`), en **préservant `WITH (security_invoker=true)`** et les GRANT existants.
-- Aucune nouvelle table → pas de RLS/GRANT supplémentaire à poser.
-- Défense en profondeur : la vue reste filtrée `org_id` côté frontend (inchangé).
+### H. Migration DB — SANS OBJET
+Vérification `pg_get_viewdef('public.majordhome_contracts')` (2026-06-17) : la vue expose **déjà** `cl.client_number` (alias clients = `cl`). `contractsService.getContractById` fait `.select('*')` → `contract.client_number` est déjà présent dans `useContract`. **Aucune migration ni modification de service.** La carte « Client lié » consomme directement `contract.client_number`.
 
 ## 4. Flux de données (planification depuis le modal)
 
@@ -160,4 +158,4 @@ ContractModal « Planifier »
 | `src/shared/services/entretiens.service.js` | ajout `scheduleEntretien(...)` |
 | `src/shared/hooks/useContracts.js` | ajout `useEntretienByContract` |
 | `src/apps/artisan/components/entretiens/VisitBadge.jsx` | ajout état `non_realise` (optionnel) |
-| migration SQL `majordhome_contracts` | ajout colonne `client_number` |
+| ~~migration SQL `majordhome_contracts`~~ | sans objet — `client_number` déjà exposé par la vue |
