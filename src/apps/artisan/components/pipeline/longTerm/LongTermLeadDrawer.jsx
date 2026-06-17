@@ -375,7 +375,16 @@ export function LongTermLeadDrawer({
           <div className="flex flex-wrap gap-2 justify-between">
             <button
               type="button"
-              onClick={() => setPendingLost(true)}
+              onClick={() => {
+                // Parité fiche/board : sur org Pennylane avec devis attaché(s), la perte
+                // est pilotée par Pennylane (marquer les devis refusés → la carte bascule
+                // en Perdu quand 100% sont refusés). Perte directe (sans devis) autorisée.
+                if (pennylaneActive && (linkedQuotes?.length || 0) > 0) {
+                  toast.error('Marquez le(s) devis comme refusé(s) dans Pennylane — la carte basculera automatiquement.');
+                  return;
+                }
+                setPendingLost(true);
+              }}
               disabled={isBusy}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-50"
             >

@@ -594,11 +594,13 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Bloquer le passage manuel à Perdu si le lead a un devis PL attaché
-      // (Pennylane canonical — marquer le devis refusé dans PL fera basculer
-      // la carte automatiquement via la vue majordhome_kanban_cards).
+      // « Perdu » : sur une org Pennylane, si le lead a des devis attachés, le statut est
+      // piloté par Pennylane — marquer les devis refusés dans Pennylane fait basculer la
+      // carte en Perdu seulement quand 100% des devis sont refusés (via la vue
+      // majordhome_kanban_cards). Perte directe (lead SANS devis : RDV non pertinent,
+      // ghost…) reste autorisée. Org sans Pennylane → autonomie MDH conservée.
       const hasDevisPl = (draggedItem.card?.devis_count || 0) > 0;
-      if (hasDevisPl && newStatusLabel === 'Perdu') {
+      if (pennylaneActive && hasDevisPl && newStatusLabel === 'Perdu') {
         toast.error('Marquez le devis comme refusé dans Pennylane — la carte basculera automatiquement.');
         return;
       }
