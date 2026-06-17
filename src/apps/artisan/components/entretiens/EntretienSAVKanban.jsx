@@ -14,8 +14,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useEntretienSAV, useEntretienSAVMutations } from '@hooks/useEntretienSAV';
-import { KANBAN_COLUMNS, getTransitions } from '@services/sav.service';
-import { appointmentsService } from '@services/appointments.service';
+import { KANBAN_COLUMNS, getTransitions, savService } from '@services/sav.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LancerAppelButton } from '../appels/LancerAppelButton';
 import { EntretienSAVCard } from './EntretienSAVCard';
@@ -196,51 +195,24 @@ export function EntretienSAVKanban() {
     if (!pendingTransition) return;
     if (!slots || slots.length === 0) return;
     const item = pendingTransition.item;
-
     try {
-      // Multi-créneau (Bloc B) : 1 appointment par créneau, même cycle de vie Bloc A
-      // (chaque createAppointment passe par syncCardStateOnCreate via intervention_id).
-      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
+      const { error } = await savService.scheduleEntretien({
+        card: item,
+        slots,
+        includesEntretien,
         coreOrgId: orgId,
-        appointment_type: item.intervention_type === 'sav' ? 'service' : 'maintenance',
-        intervention_id: item.id,
-        client_id: item.client_id || null,
-        client_name: item.client_last_name || item.client_name || 'Sans nom',
-        client_first_name: item.client_first_name || null,
-        client_phone: item.client_phone || '',
-        client_email: item.client_email || null,
-        address: item.client_address || null,
-        city: item.client_city || null,
-        postal_code: item.client_postal_code || null,
-        subjectPrefix: item.intervention_type === 'sav'
-          ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
-          : 'Entretien',
       });
-
-      if (appointmentError) {
-        toast.error('Erreur création du RDV');
+      if (error) {
+        toast.error('Erreur lors de la planification');
         return;
       }
-
-      const fields = { scheduled_date: slots[0].date };
-      if (item.intervention_type === 'sav' && includesEntretien !== (item.includes_entretien || false)) {
-        fields.includes_entretien = includesEntretien;
-      }
-      await updateFields(item.id, fields);
-      await updateWorkflowStatus(item.id, 'planifie');
-
-      if (item.client_id && item.tags?.includes('Web')) {
-        const { clientsService } = await import('@services/clients.service');
-        await clientsService.confirmWebDraft(item.client_id);
-      }
-
       toast.success('RDV planifié avec succès');
       setPendingTransition(null);
       refresh();
     } catch {
       toast.error('Erreur lors de la planification');
     }
-  }, [pendingTransition, orgId, updateFields, updateWorkflowStatus, refresh]);
+  }, [pendingTransition, orgId, refresh]);
 
   // =========================================================================
   // RENDER

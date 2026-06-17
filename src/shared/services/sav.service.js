@@ -421,6 +421,52 @@ export const savService = {
   },
 
   /**
+   * Planifie une carte entretien/SAV : crée le(s) RDV (1 par créneau), pose la date
+   * + workflow_status='planifie', confirme un éventuel brouillon Web.
+   * Source unique appelée par le kanban ET le modal ContractModal.
+   * @returns {{ error: any }}
+   */
+  async scheduleEntretien({ card, slots, includesEntretien = false, coreOrgId }) {
+    try {
+      if (!card?.id || !slots?.length) return { error: { message: 'invalid_args' } };
+      const isSav = card.intervention_type === 'sav';
+
+      const { appointmentsService } = await import('@services/appointments.service');
+      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
+        coreOrgId,
+        appointment_type: isSav ? 'service' : 'maintenance',
+        intervention_id: card.id,
+        client_id: card.client_id || null,
+        client_name: card.client_last_name || card.client_name || 'Sans nom',
+        client_first_name: card.client_first_name || null,
+        client_phone: card.client_phone || '',
+        client_email: card.client_email || null,
+        address: card.client_address || null,
+        city: card.client_city || null,
+        postal_code: card.client_postal_code || null,
+        subjectPrefix: isSav ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
+      });
+      if (appointmentError) return { error: appointmentError };
+
+      const fields = { scheduled_date: slots[0].date };
+      if (isSav && includesEntretien !== (card.includes_entretien || false)) {
+        fields.includes_entretien = includesEntretien;
+      }
+      await savService.updateFields(card.id, fields);
+      await savService.updateWorkflowStatus(card.id, 'planifie');
+
+      if (card.client_id && card.tags?.includes('Web')) {
+        const { clientsService } = await import('@services/clients.service');
+        await clientsService.confirmWebDraft(card.client_id);
+      }
+      return { error: null };
+    } catch (error) {
+      console.error('[sav] scheduleEntretien error:', error);
+      return { error };
+    }
+  },
+
+  /**
    * Mettre à jour le statut commande pièces
    */
   async updatePartsOrderStatus(interventionId, status) {
@@ -541,6 +587,7 @@ export const savService = {
       if (fields.parts_order_status !== undefined) updates.parts_order_status = fields.parts_order_status || null;
       if (fields.includes_entretien !== undefined) updates.includes_entretien = !!fields.includes_entretien;
       if (fields.invoiced_at !== undefined) updates.invoiced_at = fields.invoiced_at;
+      if (fields.scheduled_date !== undefined) updates.scheduled_date = fields.scheduled_date || null;
 
       if (Object.keys(updates).length === 0) {
         return { data: null, error: null };
