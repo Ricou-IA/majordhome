@@ -2,33 +2,28 @@
  * ContractModal.jsx - Slide-over détail contrat d'entretien
  * ============================================================================
  * Overlay droit avec :
- * 1. Infos client (nom, adresse, tél, email)
- * 2. Infos contrat (type, tarif, début, statut)
- * 3. Visite en cours (statut + bouton "Marquer effectué")
+ * 1. Client lié (carte + lien CRM)
+ * 2. Infos contrat (tarif, tps estimé, mois entretien)
+ * 3. Visite en cours (statut dérivé + bouton Planifier)
  * 4. Historique visites (table année/date/statut)
- * 5. Lien CRM si matched_project_id
  *
  * Pattern identique à ClientModal.jsx / LeadModal.jsx (slide-over droit).
  *
- * @version 1.0.0 - Sprint 5
+ * @version 2.0.0 - Refonte structure + Planifier
  * ============================================================================
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  X, User, MapPin, Phone, Mail, Wrench, Euro, Calendar, Clock,
-  CheckCircle2, FileText, History, ExternalLink, Loader2, AlertCircle,
-  Download, Globe,
+  X, User, Calendar,
+  FileText, History, ExternalLink, Loader2, AlertCircle,
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { useContract, useContractVisits, useContractMutations } from '@hooks/useContracts';
-import { entretiensService } from '@services/entretiens.service';
-import { CONTRACT_STATUSES } from '@services/contracts.service';
-import { useAuth } from '@contexts/AuthContext';
+import { useContract, useContractVisits } from '@hooks/useContracts';
+import { MAINTENANCE_MONTHS } from '@services/contracts.service';
 import { VisitBadge } from './VisitBadge';
-import { Button } from '@components/ui/button';
 import { formatDateFR, formatEuro } from '@/lib/utils';
+import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -73,23 +68,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const navigate = useNavigate();
   const { contract, isLoading: loadingContract } = useContract(contractId);
   const { visits, isLoading: loadingVisits } = useContractVisits(contractId);
-  const { recordVisit, isRecordingVisit } = useContractMutations();
-  const { user, organization } = useAuth();
-
-  const [visitDate, setVisitDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [visitNotes, setVisitNotes] = useState('');
-  const [showRecordForm, setShowRecordForm] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-
-  // Reset state quand le contrat change
-  useEffect(() => {
-    if (contractId) {
-      setShowRecordForm(false);
-      setVisitNotes('');
-      setVisitDate(new Date().toISOString().split('T')[0]);
-    }
-  }, [contractId]);
-
   // Gestion ESC pour fermer
   useEffect(() => {
     const handleEsc = (e) => {
@@ -109,73 +87,10 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     };
   }, [isOpen]);
 
-  const handleRecordVisit = useCallback(async () => {
-    if (!contract || !organization) return;
-
-    const currentYear = new Date().getFullYear();
-    try {
-      await recordVisit({
-        contractId: contract.id,
-        orgId: organization.id,
-        year: currentYear,
-        visitDate,
-        technicianName: user?.user_metadata?.full_name || null,
-        technicianId: user?.id || null,
-        notes: visitNotes || null,
-        userId: user?.id || null,
-      });
-      setShowRecordForm(false);
-      setVisitNotes('');
-    } catch (err) {
-      console.error('[ContractModal] recordVisit error:', err);
-    }
-  }, [contract, organization, visitDate, visitNotes, user, recordVisit]);
-
-  const handleGeneratePdf = useCallback(async () => {
-    if (!contract || generatingPdf) return;
-    setGeneratingPdf(true);
-    try {
-      if (contract.contract_pdf_path) {
-        // PDF exists — download it
-        const { url, error } = await entretiensService.getContractPdfUrl(contract.contract_pdf_path);
-        if (url) {
-          window.open(url, '_blank');
-        } else {
-          console.error('[ContractModal] getContractPdfUrl error:', error);
-          toast.error('Impossible de récupérer le PDF');
-        }
-      } else {
-        // Generate PDF via N8N
-        const { success, error } = await entretiensService.triggerContractPdf(contract);
-        if (success) {
-          toast.success('Génération du contrat PDF lancée — le PDF sera disponible dans quelques instants');
-        } else {
-          console.error('[ContractModal] triggerContractPdf error:', error);
-          toast.error('Erreur lors de la génération du PDF');
-        }
-      }
-    } catch (err) {
-      console.error('[ContractModal] PDF error:', err);
-      toast.error('Erreur lors de la génération du PDF');
-    } finally {
-      setGeneratingPdf(false);
-    }
-  }, [contract, generatingPdf]);
-
   if (!isOpen) return null;
 
   const isLoading = loadingContract || (!contract && !!contractId);
   const currentYear = new Date().getFullYear();
-
-  // Statut visite basé sur current_year_visit_status (visite année en cours)
-  const isVisitDone = contract?.current_year_visit_status === 'completed';
-  const visitStatus = isVisitDone ? 'completed' : 'pending';
-
-  // Label statut
-  const statusLabel = contract
-    ? (CONTRACT_STATUSES.find(s => s.value === contract.status)?.label || contract.status || '-')
-    : '-';
-  const isActive = contract?.status === 'active';
 
   return (
     <>
@@ -234,6 +149,27 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                 />
               </Section>
 
+              {/* Carte Client lié */}
+              {contract.client_id && (
+                <div className="py-4 border-b border-gray-100">
+                  <LinkedClientCard
+                    name={contract.client_name}
+                    clientNumber={contract.client_number}
+                    city={contract.client_city}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); navigate(`/clients/${contract.client_id}`); }}
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors shrink-0"
+                      title="Voir la fiche client"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Voir la fiche
+                    </button>
+                  </LinkedClientCard>
+                </div>
+              )}
+
               {/* Section Contrat */}
               <Section title="Contrat" icon={FileText}>
                 <InfoRow label="Tarif" value={formatEuro(contract.amount)} />
@@ -243,147 +179,15 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                     ? `${Math.round(Number(contract.estimated_time) * 60)} min`
                     : '—'}
                 />
-                <InfoRow label="Début" value={formatDateFR(contract.start_date)} />
-                <InfoRow label="Fin" value={formatDateFR(contract.end_date)} />
-                {contract.renewal_date && (
-                  <InfoRow label="Renouvellement" value={formatDateFR(contract.renewal_date)} />
-                )}
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-gray-500">Statut</span>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
-                      isActive
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}
-                  >
-                    {statusLabel}
-                  </span>
-                </div>
-                {contract.notes && (
-                  <div className="mt-2">
-                    <span className="text-sm text-gray-500 block mb-1">Notes</span>
-                    <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-2.5">
-                      {contract.notes}
-                    </p>
-                  </div>
-                )}
-                {contract.source === 'web' && (
-                  <div className="flex items-center justify-between gap-4 mt-2">
-                    <span className="text-sm text-gray-500">Source</span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
-                      <Globe className="w-3 h-3" />
-                      Site internet
-                    </span>
-                  </div>
-                )}
-                <div className="mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleGeneratePdf}
-                    disabled={generatingPdf}
-                  >
-                    {generatingPdf ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        {contract.contract_pdf_path ? 'Ouverture...' : 'Génération...'}
-                      </>
-                    ) : (
-                      <>
-                        {contract.contract_pdf_path ? (
-                          <><Download className="h-4 w-4 mr-1.5" />Télécharger le contrat PDF</>
-                        ) : (
-                          <><FileText className="h-4 w-4 mr-1.5" />Générer le contrat PDF</>
-                        )}
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <InfoRow
+                  label="Mois d'entretien"
+                  value={MAINTENANCE_MONTHS.find((m) => m.value === contract.maintenance_month)?.label || '—'}
+                />
               </Section>
 
-              {/* Section Visite en cours */}
+              {/* Section Visite en cours — badge dérivé + bouton Planifier (Task 7) */}
               <Section title={`Visite ${currentYear}`} icon={Calendar}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Statut</span>
-                  <VisitBadge status={visitStatus} size="md" />
-                </div>
-                {contract.next_maintenance_date && (
-                  <InfoRow label="Prochaine visite" value={formatDateFR(contract.next_maintenance_date)} />
-                )}
-
-                {/* Bouton marquer comme effectué */}
-                {!isVisitDone && isActive && (
-                  <div className="mt-3">
-                    {showRecordForm ? (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Date de la visite
-                          </label>
-                          <input
-                            type="date"
-                            value={visitDate}
-                            onChange={(e) => setVisitDate(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                              focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Notes (optionnel)
-                          </label>
-                          <textarea
-                            value={visitNotes}
-                            onChange={(e) => setVisitNotes(e.target.value)}
-                            placeholder="Observations, commentaires..."
-                            rows={2}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                              focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleRecordVisit}
-                            disabled={isRecordingVisit}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                            size="sm"
-                          >
-                            {isRecordingVisit ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                Enregistrement...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Confirmer
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowRecordForm(false)}
-                          >
-                            Annuler
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full border-green-300 text-green-700 hover:bg-green-50"
-                        onClick={() => setShowRecordForm(true)}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                        Marquer comme effectué
-                      </Button>
-                    )}
-                  </div>
-                )}
+                <span className="text-sm text-gray-400 italic">—</span>
               </Section>
 
               {/* Historique visites */}
@@ -422,23 +226,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                 )}
               </Section>
 
-              {/* Lien CRM */}
-              {contract.client_id && (
-                <Section title="Fiche CRM" icon={ExternalLink}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      onClose();
-                      navigate(`/clients/${contract.client_id}`);
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1.5" />
-                    Voir la fiche client CRM
-                  </Button>
-                </Section>
-              )}
             </>
           )}
         </div>
