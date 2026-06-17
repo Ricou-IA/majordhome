@@ -302,7 +302,9 @@ export const appointmentsService = {
       if (!grandSecteur && (appointmentData.client_id || appointmentData.postal_code)) {
         try {
           const { entretiensService } = await import('@services/entretiens.service');
-          const { byClient, byCp } = await entretiensService.getGrandSecteurMaps(orgId);
+          // getContractsBySector filtre majordhome_contracts.org_id = org CORE (3c68…),
+          // PAS l'org majordhome (orgId, 7825…) utilisée pour l'insert appointment.
+          const { byClient, byCp } = await entretiensService.getGrandSecteurMaps(coreOrgId);
           grandSecteur =
             (appointmentData.client_id && byClient.get(appointmentData.client_id)) ||
             (appointmentData.postal_code && byCp.get(String(appointmentData.postal_code).trim())) ||
