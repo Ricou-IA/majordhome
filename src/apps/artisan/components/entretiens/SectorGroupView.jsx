@@ -23,7 +23,7 @@ import {
   Clock,
   Calendar,
   Loader2,
-  Map,
+  Map as MapIcon,
   MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -501,7 +501,7 @@ export function SectorGroupView({
   if (!sectors || sectors.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <Map className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+        <MapIcon className="h-10 w-10 text-gray-300 mx-auto mb-3" />
         <p className="text-gray-700 font-medium">Aucun secteur trouvé</p>
         <p className="text-sm text-gray-500 mt-1">
           Les contrats seront groupés par code postal ici.
