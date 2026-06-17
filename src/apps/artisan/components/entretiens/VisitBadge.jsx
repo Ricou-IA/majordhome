@@ -3,7 +3,7 @@
  * Petit badge réutilisable avec icône + label coloré.
  */
 
-import { Check, Clock, Minus, X } from 'lucide-react';
+import { Check, Clock, Minus, X, CalendarClock } from 'lucide-react';
 
 const VISIT_CONFIG = {
   completed: {
@@ -25,6 +25,26 @@ const VISIT_CONFIG = {
     label: 'Annulé',
     className: 'bg-red-100 text-red-800',
     Icon: X,
+  },
+  realise: {
+    label: 'Réalisé',
+    className: 'bg-green-100 text-green-800',
+    Icon: Check,
+  },
+  planifie: {
+    label: 'Planifié',
+    className: 'bg-blue-100 text-blue-800',
+    Icon: CalendarClock,
+  },
+  a_planifier: {
+    label: 'À planifier',
+    className: 'bg-amber-100 text-amber-800',
+    Icon: Clock,
+  },
+  non_realise: {
+    label: 'Non réalisé',
+    className: 'bg-gray-100 text-gray-600',
+    Icon: Minus,
   },
 };
 

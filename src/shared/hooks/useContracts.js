@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabaseClient';
 import { contractsService } from '@services/contracts.service';
 import { savService } from '@services/sav.service';
 import { entretiensService } from '@services/entretiens.service';
@@ -365,6 +366,31 @@ export function useContractVisits(contractId) {
   });
 
   return { visits: visits || [], isLoading, error, refresh: refetch };
+}
+
+// ============================================================================
+// HOOK - useEntretienByContract (carte entretien active d'un contrat)
+// ============================================================================
+
+export function useEntretienByContract(orgId, contractId) {
+  const { data: card, isLoading } = useQuery({
+    queryKey: [...entretienSavKeys.all(orgId), 'by-contract', contractId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('majordhome_entretien_sav')
+        .select('id, workflow_status, next_rdv_date, scheduled_date')
+        .eq('org_id', orgId)
+        .eq('contract_id', contractId)
+        .eq('intervention_type', 'entretien')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data || null;
+    },
+    enabled: !!orgId && !!contractId,
+    staleTime: 30_000,
+  });
+  return { card, isLoading };
 }
 
 // ============================================================================

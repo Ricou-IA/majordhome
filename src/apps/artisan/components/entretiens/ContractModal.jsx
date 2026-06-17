@@ -13,17 +13,27 @@
  * ============================================================================
  */
 
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X, User, Calendar,
   FileText, History, ExternalLink, Loader2, AlertCircle,
+  CalendarPlus,
 } from 'lucide-react';
-import { useContract, useContractVisits } from '@hooks/useContracts';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useContract, useContractVisits, useEntretienByContract } from '@hooks/useContracts';
+import { entretienSavKeys, appointmentKeys, contractKeys } from '@hooks/cacheKeys';
 import { MAINTENANCE_MONTHS } from '@services/contracts.service';
+import { ensureEntretienCard } from '@services/entretiens.service';
+import { savService } from '@services/sav.service';
+import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
+import { Button } from '@components/ui/button';
 import { formatDateFR, formatEuro } from '@/lib/utils';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
+import { deriveVisitBadgeStatus } from '@/lib/entretienVisitStatus';
+import { SchedulingTransitionModal } from './SchedulingTransitionModal';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -68,6 +78,71 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const navigate = useNavigate();
   const { contract, isLoading: loadingContract } = useContract(contractId);
   const { visits, isLoading: loadingVisits } = useContractVisits(contractId);
+  const { user, organization } = useAuth();
+  const queryClient = useQueryClient();
+  const { card: activeCard } = useEntretienByContract(organization?.id, contractId);
+
+  const [schedulingOpen, setSchedulingOpen] = useState(false);
+  const [schedulingItem, setSchedulingItem] = useState(null);
+  const [planning, setPlanning] = useState(false);
+
+  const handlePlanifier = useCallback(async () => {
+    if (!contract || planning) return;
+    setPlanning(true);
+    try {
+      const { interventionId, error } = await ensureEntretienCard({
+        clientId: contract.client_id,
+        contractId: contract.id,
+        userId: user?.id,
+      });
+      if (error || !interventionId) {
+        toast.error(error === 'client_sans_projet'
+          ? 'Projet client introuvable — impossible de planifier'
+          : 'Erreur lors de la préparation de la planification');
+        return;
+      }
+      setSchedulingItem({
+        id: interventionId,
+        intervention_type: 'entretien',
+        client_id: contract.client_id,
+        client_name: contract.client_name,
+        client_last_name: contract.client_name,
+        client_first_name: null,
+        client_phone: contract.client_phone || '',
+        client_email: contract.client_email || null,
+        client_address: contract.client_address || null,
+        client_city: contract.client_city || null,
+        client_postal_code: contract.client_postal_code || null,
+        includes_entretien: false,
+      });
+      setSchedulingOpen(true);
+    } catch (err) {
+      console.error('[ContractModal] handlePlanifier error:', err);
+      toast.error('Erreur lors de la planification');
+    } finally {
+      setPlanning(false);
+    }
+  }, [contract, planning, user]);
+
+  const handleConfirmScheduling = useCallback(async (slots) => {
+    const orgId = organization?.id;
+    const { error } = await savService.scheduleEntretien({
+      card: schedulingItem,
+      slots,
+      includesEntretien: false,
+      coreOrgId: orgId,
+    });
+    if (error) { toast.error('Erreur création du RDV'); return; }
+    toast.success('RDV planifié avec succès');
+    setSchedulingOpen(false);
+    setSchedulingItem(null);
+    queryClient.invalidateQueries({ queryKey: [...entretienSavKeys.all(orgId), 'by-contract', contractId] });
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: contractKeys.detail(orgId, contractId) });
+    queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', contractId] });
+  }, [organization, schedulingItem, contractId, queryClient]);
+
   // Gestion ESC pour fermer
   useEffect(() => {
     const handleEsc = (e) => {
@@ -91,6 +166,8 @@ export function ContractModal({ contractId, isOpen, onClose }) {
 
   const isLoading = loadingContract || (!contract && !!contractId);
   const currentYear = new Date().getFullYear();
+  const badgeStatus = contract ? deriveVisitBadgeStatus({ visits, activeCard, currentYear }) : null;
+  const nextVisitDate = activeCard?.next_rdv_date || contract?.next_maintenance_date;
 
   return (
     <>
@@ -185,9 +262,32 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                 />
               </Section>
 
-              {/* Section Visite en cours — badge dérivé + bouton Planifier (Task 7) */}
+              {/* Section Visite en cours */}
               <Section title={`Visite ${currentYear}`} icon={Calendar}>
-                <span className="text-sm text-gray-400 italic">—</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Statut</span>
+                  <VisitBadge status={badgeStatus} size="md" />
+                </div>
+                {nextVisitDate && (
+                  <InfoRow label="Prochaine visite" value={formatDateFR(nextVisitDate)} />
+                )}
+                {badgeStatus === 'a_planifier' && (
+                  <div className="mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-primary-300 text-primary-700 hover:bg-primary-50"
+                      onClick={handlePlanifier}
+                      disabled={planning}
+                    >
+                      {planning ? (
+                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Préparation…</>
+                      ) : (
+                        <><CalendarPlus className="h-4 w-4 mr-1.5" />Planifier</>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </Section>
 
               {/* Historique visites */}
@@ -230,6 +330,14 @@ export function ContractModal({ contractId, isOpen, onClose }) {
           )}
         </div>
       </div>
+      {schedulingOpen && schedulingItem && (
+        <SchedulingTransitionModal
+          item={schedulingItem}
+          orgId={organization?.id}
+          onConfirm={handleConfirmScheduling}
+          onCancel={() => { setSchedulingOpen(false); setSchedulingItem(null); }}
+        />
+      )}
     </>
   );
 }
