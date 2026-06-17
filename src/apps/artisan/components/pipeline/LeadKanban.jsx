@@ -594,16 +594,24 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         return;
       }
 
-      // Bloquer le passage manuel à Perdu/Gagné si le lead a un devis PL attaché
-      // (Pennylane canonical — marquer le devis refusé/accepté dans PL fera basculer
+      // Bloquer le passage manuel à Perdu si le lead a un devis PL attaché
+      // (Pennylane canonical — marquer le devis refusé dans PL fera basculer
       // la carte automatiquement via la vue majordhome_kanban_cards).
       const hasDevisPl = (draggedItem.card?.devis_count || 0) > 0;
       if (hasDevisPl && newStatusLabel === 'Perdu') {
         toast.error('Marquez le devis comme refusé dans Pennylane — la carte basculera automatiquement.');
         return;
       }
-      if (hasDevisPl && newStatusLabel === 'Gagné') {
-        toast.error('Marquez le devis comme accepté dans Pennylane — la carte basculera automatiquement.');
+      // « Gagné » : sur une org Pennylane, le gain est piloté par Pennylane (marquer le
+      // devis accepté → bascule auto via majordhome_kanban_cards). Le passage manuel par
+      // drag est désactivé, qu'il y ait ou non un devis attaché. Org sans Pennylane →
+      // autonomie MDH conservée (updateLeadStatus direct plus bas).
+      if (pennylaneActive && newStatusLabel === 'Gagné') {
+        toast.error(
+          hasDevisPl
+            ? 'Marquez le devis comme accepté dans Pennylane — la carte basculera automatiquement.'
+            : 'Le passage en « Gagné » se gère depuis Pennylane. Rattachez d’abord un devis (colonne « Devis envoyé »).',
+        );
         return;
       }
 

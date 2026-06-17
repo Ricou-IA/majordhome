@@ -43,6 +43,7 @@ import { leadsService } from '@services/leads.service';
 import { LOST_REASONS } from '../LeadStatusConfig';
 import { LinkedQuotesPanel } from '../LinkedQuotesPanel';
 import { QuoteCandidatesModal } from '../QuoteCandidatesModal';
+import { MarkWonQuoteModal } from '../MarkWonQuoteModal';
 import { AddInteractionModal } from './AddInteractionModal';
 import { InteractionTimeline } from './InteractionTimeline';
 import { computeFreshness, formatShortDate } from './longTermUtils';
@@ -120,6 +121,7 @@ export function LongTermLeadDrawer({
 
   // Pennylane bridge — rattachement de devis pour régularisation
   const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
+  const [showMarkWon, setShowMarkWon] = useState(false);
   const pennylaneActive = usePennylaneEnabled();
   const { linkedQuotes } = useLinkedPennylaneQuotes(pennylaneActive && leadId ? leadId : null);
 
@@ -130,6 +132,7 @@ export function LongTermLeadDrawer({
       setPendingLost(false);
       setLostReasonSelect('');
       setLostReasonCustom('');
+      setShowMarkWon(false);
     }
   }, [isOpen, leadId]);
 
@@ -183,6 +186,19 @@ export function LongTermLeadDrawer({
   };
 
   const handleWon = async () => {
+    // Org Pennylane : le gain est piloté par Pennylane, exactement comme « Devis envoyé »
+    // (le Long Terme n'est qu'un autre affichage de Devis envoyé, jamais plus permissif).
+    // Pas de bascule « à la main » : on sélectionne le devis signé via MarkWonQuoteModal
+    // (→ lead_mark_won_with_quote). Sans devis attaché, rattachement obligatoire d'abord.
+    if (pennylaneActive) {
+      if ((linkedQuotes?.length || 0) === 0) {
+        toast.error('Aucun devis Pennylane attaché. Rattachez d’abord un devis avant de marquer « Gagné ».');
+        return;
+      }
+      setShowMarkWon(true);
+      return;
+    }
+    // Org sans Pennylane : autonomie MDH — bascule manuelle conservée.
     if (!wonStatusId) {
       toast.error('Statut "Gagné" introuvable');
       return;
@@ -408,6 +424,26 @@ export function LongTermLeadDrawer({
           orgId={orgId}
           onAttached={() => {
             onLeadUpdated?.();
+          }}
+        />
+      )}
+
+      {/* Bridge Pennylane — bascule « Gagné » par choix du devis signé (parité fiche lead).
+          onBeforeMark : on sort d'abord le lead du parking MT-LT, puis la RPC
+          lead_mark_won_with_quote fait la bascule statut + chantier + is_winning_quote. */}
+      {pennylaneActive && leadId && (
+        <MarkWonQuoteModal
+          isOpen={showMarkWon}
+          onClose={() => setShowMarkWon(false)}
+          leadId={leadId}
+          orgId={orgId}
+          userId={userId}
+          onBeforeMark={async () => {
+            await reactivateFromLongTerm({ leadId });
+          }}
+          onMarked={() => {
+            onLeadUpdated?.();
+            onClose();
           }}
         />
       )}
