@@ -131,6 +131,60 @@ function SectorHeader({ sector, isExpanded, onToggle, canPlan, onPlanSector, isP
   );
 }
 
+function GrandSecteurHeader({ group, isExpanded, onToggle, canPlan, onPlanGroup, isPlanningDisabled, plannableCount }) {
+  const completionPct =
+    group.totalContracts > 0 ? Math.round((group.visitsDone / group.totalContracts) * 100) : 0;
+  const isNonLocalise = group.id === 'non-localise';
+
+  return (
+    <div className="flex items-center gap-1 bg-gray-50">
+      <button onClick={onToggle} className="flex-1 flex items-center gap-3 px-4 py-3 text-left min-w-0">
+        <div className="flex-shrink-0 text-gray-400">
+          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </div>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <MapPin className={`h-4 w-4 flex-shrink-0 ${isNonLocalise ? 'text-gray-400' : 'text-indigo-500'}`} />
+          <span className="font-semibold text-gray-900 truncate">{group.name}</span>
+          <span className="text-xs text-gray-400 flex-shrink-0">
+            {group.sectors.length} CP
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
+            </div>
+            <span className="text-xs text-gray-500 w-8 text-right">{completionPct}%</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="inline-flex items-center gap-1 text-green-600">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {group.visitsDone}
+            </span>
+            <span className="text-gray-300">|</span>
+            <span className="inline-flex items-center gap-1 text-amber-600">
+              <Clock className="h-3.5 w-3.5" />
+              {group.visitsPending}
+            </span>
+          </div>
+        </div>
+      </button>
+
+      {canPlan && plannableCount > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPlanGroup?.(group); }}
+          disabled={isPlanningDisabled}
+          className="mr-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50 flex-shrink-0"
+          title={`Programmer ${plannableCount} entretien${plannableCount > 1 ? 's' : ''} sur ce grand secteur`}
+        >
+          <Calendar className="h-3.5 w-3.5" />
+          Planifier le grand secteur ({plannableCount})
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ContractRow({
   contract,
   onContractClick,
@@ -190,6 +244,13 @@ function ContractRow({
       >
         {contract.client_name || 'Sans nom'}
       </span>
+
+      {/* Commune réelle du client (résout l'ambiguïté CP multi-communes) */}
+      {contract.client_city && (
+        <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">
+          {contract.client_city}
+        </span>
+      )}
 
       {/* Mois de référence */}
       {monthLabel && (
@@ -316,6 +377,7 @@ export function SectorGroupView({
   const [expandedSectors, setExpandedSectors] = useState(new Set());
   const [selectedMonth, setSelectedMonth] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
 
   // Filtrer par mois de référence + recherche full-text
   const filteredSectors = useMemo(() => {
@@ -364,6 +426,46 @@ export function SectorGroupView({
       .filter((s) => s.contracts.length > 0);
   }, [sectors, selectedMonth, searchQuery]);
 
+  // Regrouper les secteurs CP filtrés sous leur grand secteur
+  const grandSecteurs = useMemo(() => {
+    const map = new Map();
+    for (const s of filteredSectors) {
+      const key = s.grandSecteurId || 'non-localise';
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          name: s.grandSecteurName || 'Non localisé',
+          order: s.grandSecteurOrder ?? 9999,
+          sectors: [],
+          totalContracts: 0,
+          visitsDone: 0,
+          visitsPending: 0,
+        });
+      }
+      const g = map.get(key);
+      g.sectors.push(s);
+      g.totalContracts += s.totalContracts;
+      g.visitsDone += s.visitsDone;
+      g.visitsPending += s.visitsPending;
+    }
+    return [...map.values()].sort(
+      (a, b) =>
+        (a.id === 'non-localise' ? 1 : 0) - (b.id === 'non-localise' ? 1 : 0) ||
+        a.order - b.order ||
+        b.visitsPending - a.visitsPending ||
+        a.name.localeCompare(b.name),
+    );
+  }, [filteredSectors]);
+
+  const toggleGroup = (id) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const toggleSector = (codePostal) => {
     setExpandedSectors((prev) => {
       const next = new Set(prev);
@@ -378,10 +480,12 @@ export function SectorGroupView({
 
   const expandAll = () => {
     setExpandedSectors(new Set(filteredSectors.map((s) => s.codePostal)));
+    setCollapsedGroups(new Set());
   };
 
   const collapseAll = () => {
     setExpandedSectors(new Set());
+    setCollapsedGroups(new Set(grandSecteurs.map((g) => g.id)));
   };
 
   if (isLoading) {
@@ -500,40 +604,78 @@ export function SectorGroupView({
         </div>
       )}
 
-      {/* Liste des secteurs */}
-      {filteredSectors.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-          {filteredSectors.map((sector) => {
-            const isExpanded = effectiveExpanded.has(sector.codePostal);
-            // Nombre de contrats planifiables : pas dans le workflow ET visite année en cours non effectuée
-            const plannableCount = sector.contracts.filter(
-              (c) =>
-                !plannedContractIds?.has(c.id) &&
-                c.current_year_visit_status !== 'completed',
-            ).length;
+      {/* Liste des grands secteurs → CP → contrats */}
+      {grandSecteurs.length > 0 && (
+        <div className="space-y-3">
+          {grandSecteurs.map((group) => {
+            const isGroupExpanded = searchQuery.trim() ? true : !collapsedGroups.has(group.id);
+            const groupPlannable = group.sectors.reduce(
+              (n, s) =>
+                n +
+                s.contracts.filter(
+                  (c) => !plannedContractIds?.has(c.id) && c.current_year_visit_status !== 'completed',
+                ).length,
+              0,
+            );
             return (
-              <div key={sector.codePostal}>
-                <SectorHeader
-                  sector={sector}
-                  isExpanded={isExpanded}
-                  onToggle={() => toggleSector(sector.codePostal)}
+              <div key={group.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <GrandSecteurHeader
+                  group={group}
+                  isExpanded={isGroupExpanded}
+                  onToggle={() => toggleGroup(group.id)}
                   canPlan={canPlan}
-                  onPlanSector={onPlanSector}
+                  onPlanGroup={(g) =>
+                    onPlanSector?.({
+                      codePostal: g.name,
+                      contracts: g.sectors.flatMap((s) =>
+                        s.contracts.filter(
+                          (c) =>
+                            !plannedContractIds?.has(c.id) &&
+                            c.current_year_visit_status !== 'completed',
+                        ),
+                      ),
+                    })
+                  }
                   isPlanningDisabled={isPlanningDisabled}
-                  plannableCount={plannableCount}
+                  plannableCount={groupPlannable}
                 />
-                {isExpanded && (
-                  <SectorContracts
-                    contracts={sector.contracts}
-                    onContractClick={onContractClick}
-                    canPlan={canPlan}
-                    onPlanContract={onPlanContract}
-                    isPlanningDisabled={isPlanningDisabled}
-                    plannedContractIds={plannedContractIds}
-                    remindedClientIds={remindedClientIds}
-                    onSendReminder={onSendReminder}
-                    canSendReminder={canSendReminder}
-                  />
+                {isGroupExpanded && (
+                  <div className="divide-y divide-gray-100 border-t border-gray-100">
+                    {group.sectors.map((sector) => {
+                      const isExpanded = effectiveExpanded.has(sector.codePostal);
+                      const plannableCount = sector.contracts.filter(
+                        (c) =>
+                          !plannedContractIds?.has(c.id) &&
+                          c.current_year_visit_status !== 'completed',
+                      ).length;
+                      return (
+                        <div key={sector.codePostal}>
+                          <SectorHeader
+                            sector={sector}
+                            isExpanded={isExpanded}
+                            onToggle={() => toggleSector(sector.codePostal)}
+                            canPlan={canPlan}
+                            onPlanSector={onPlanSector}
+                            isPlanningDisabled={isPlanningDisabled}
+                            plannableCount={plannableCount}
+                          />
+                          {isExpanded && (
+                            <SectorContracts
+                              contracts={sector.contracts}
+                              onContractClick={onContractClick}
+                              canPlan={canPlan}
+                              onPlanContract={onPlanContract}
+                              isPlanningDisabled={isPlanningDisabled}
+                              plannedContractIds={plannedContractIds}
+                              remindedClientIds={remindedClientIds}
+                              onSendReminder={onSendReminder}
+                              canSendReminder={canSendReminder}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             );
