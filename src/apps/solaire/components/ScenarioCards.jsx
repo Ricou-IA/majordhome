@@ -1,5 +1,6 @@
 // src/apps/solaire/components/ScenarioCards.jsx
-// Bandeau 3 scénarios (Sobre / Recommandé / Confort) — spec §9.
+// Bandeau de scénarios : paliers commerciaux (3 / 6 / 9 kWc) + carte « Optimisé »
+// (dimensionnement calculé, pré-sélectionnée) — spec révisée 2026-06-18.
 // Deutan : sélection = ring + badge texte, jamais la couleur seule.
 import { Star, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { formatEuro } from '@lib/utils';
@@ -21,10 +22,10 @@ export function EffortBadge({ monthlyValue, className = '' }) {
 
 export default function ScenarioCards({ scenarios, activeKwc, onSelect }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {scenarios.map((s) => {
         const isActive = s.kwc === activeKwc;
-        const isRecommended = s.key === 'recommande';
+        const isOptimum = s.isOptimum;
         return (
           <button
             key={s.key}
@@ -36,8 +37,8 @@ export default function ScenarioCards({ scenarios, activeKwc, onSelect }) {
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-secondary-600 flex items-center gap-1">
-                {isRecommended && <Star className="w-3.5 h-3.5 text-[#F5C542] fill-[#F5C542]" />}
+              <span className={`text-sm font-medium flex items-center gap-1 ${isOptimum ? 'text-secondary-800' : 'text-secondary-400'}`}>
+                {isOptimum && <Star className="w-3.5 h-3.5 text-[#F5C542] fill-[#F5C542]" />}
                 {s.label}
               </span>
               {isActive && (

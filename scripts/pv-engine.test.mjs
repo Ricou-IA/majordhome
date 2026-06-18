@@ -8,7 +8,7 @@ import {
   percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount,
   spreadAnnualToMonthly, evMonthlyConsumption, simultaneityCoeff, costFromGrid,
   computeMonthly, yearlyEconomy, monthlyPayment,
-  buildYearlyTable, optimize, buildScenarios,
+  buildYearlyTable, optimize, buildScenarios, defaultScenarioKwc,
 } from '../src/apps/solaire/lib/pvEngine.js';
 import { buildPvConfig, PV_DEFAULTS } from '../src/apps/solaire/lib/pvConfig.js';
 
@@ -145,13 +145,49 @@ test('optimize — cas limites', () => {
   assert.equal(r.recommendedKwc, 0.5);
 });
 
-test('buildScenarios — recommandé / sobre / confort, clampés', () => {
-  const s = buildScenarios({ recommendedKwc: 2.5, stepKwc: 0.5, maxKwc: 6.5 });
-  assert.deepEqual(s.map((x) => x.kwc), [2, 2.5, 3]);
-  assert.deepEqual(s.map((x) => x.key), ['sobre', 'recommande', 'confort']);
-  // Recommandé au max toiture → pas de confort (2 scénarios)
-  const s2 = buildScenarios({ recommendedKwc: 6.5, stepKwc: 0.5, maxKwc: 6.5 });
-  assert.deepEqual(s2.map((x) => x.kwc), [6, 6.5]);
+test('buildScenarios — paliers 3/6/9 + Optimisé inséré, trié croissant', () => {
+  // Optimum hors palier (4,5) : 4 cartes triées, l'Optimisé s'insère à sa place
+  const s = buildScenarios({ recommendedKwc: 4.5, maxKwc: 9 });
+  assert.deepEqual(s.map((x) => x.kwc), [3, 4.5, 6, 9]);
+  assert.deepEqual(s.map((x) => x.isOptimum), [false, true, false, false]);
+  assert.deepEqual(s.map((x) => x.isMultiple), [true, false, true, true]);
+  assert.equal(s.find((x) => x.kwc === 4.5).label, 'Optimisé');
+  assert.equal(s.find((x) => x.kwc === 3).label, 'Standard');
+});
+
+test('defaultScenarioKwc — palier le plus proche de l\'optimum, égalité → le plus grand', () => {
+  const s = buildScenarios({ recommendedKwc: 4.5, maxKwc: 9 }); // paliers 3/6/9
+  // 4,5 équidistant de 3 et 6 → on ne sous-dimensionne pas → 6
+  assert.equal(defaultScenarioKwc({ scenarios: s, recommendedKwc: 4.5 }), 6);
+  // 4,1 plus proche de 3 → 3
+  assert.equal(defaultScenarioKwc({ scenarios: buildScenarios({ recommendedKwc: 4.1, maxKwc: 9 }), recommendedKwc: 4.1 }), 3);
+  // Optimum pile sur un palier (fusion) → ce palier
+  assert.equal(defaultScenarioKwc({ scenarios: buildScenarios({ recommendedKwc: 9, maxKwc: 9 }), recommendedKwc: 9 }), 9);
+  // Petite toiture, aucun palier → l'optimum lui-même
+  const tiny = buildScenarios({ recommendedKwc: 2, maxKwc: 2.5 });
+  assert.equal(defaultScenarioKwc({ scenarios: tiny, recommendedKwc: 2 }), 2);
+});
+
+test('buildScenarios — Optimisé pile sur un palier → fusion (pas de doublon)', () => {
+  // Gros consommateur : optimum = plafond 9 kWc = palier → 3 cartes, le 9 porte l'Optimisé
+  const s = buildScenarios({ recommendedKwc: 9, maxKwc: 9 });
+  assert.deepEqual(s.map((x) => x.kwc), [3, 6, 9]);
+  assert.equal(s.find((x) => x.kwc === 9).isOptimum, true);
+  assert.equal(s.find((x) => x.kwc === 9).label, 'Optimisé');
+  assert.equal(s.filter((x) => x.isOptimum).length, 1);
+});
+
+test('buildScenarios — paliers bornés par maxKwc (toiture/plafond)', () => {
+  // Toiture limite à 7 → seuls 3 et 6 rentrent (+ Optimisé 4,5)
+  const s = buildScenarios({ recommendedKwc: 4.5, maxKwc: 7 });
+  assert.deepEqual(s.map((x) => x.kwc), [3, 4.5, 6]);
+});
+
+test('buildScenarios — petite toiture (< incrément) → Optimisé seul', () => {
+  const s = buildScenarios({ recommendedKwc: 2, maxKwc: 2.5 });
+  assert.deepEqual(s.map((x) => x.kwc), [2]);
+  assert.equal(s[0].isOptimum, true);
+  assert.equal(s[0].label, 'Optimisé');
 });
 
 test('optimize — régression 2026-06-11 : gros consommateur → max toiture (critère pré-coefficient)', () => {

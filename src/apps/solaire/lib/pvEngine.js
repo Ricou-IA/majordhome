@@ -162,13 +162,61 @@ export function optimize({ eM1kwc, consoMonthly, threshold, maxKwc, stepKwc }) {
   return { recommendedKwc };
 }
 
-/** Scénarios Recommandé / −1 palier (sobre) / +1 palier (confort), clampés [stepKwc, maxKwc]. */
-export function buildScenarios({ recommendedKwc, stepKwc, maxKwc }) {
-  const candidates = [
-    { key: 'sobre', label: 'Sobre', kwc: recommendedKwc - stepKwc },
-    { key: 'recommande', label: 'Recommandé', kwc: recommendedKwc },
-    { key: 'confort', label: 'Confort', kwc: recommendedKwc + stepKwc },
-  ];
-  return candidates.filter((c) => c.kwc >= stepKwc - 1e-9 && c.kwc <= maxKwc + 1e-9)
-    .map((c) => ({ ...c, kwc: Math.round(c.kwc * 100) / 100 }));
+/** Incrément des paliers commerciaux (kWc) : on installe par multiples de 3 (3, 6, 9). */
+export const OFFER_INCREMENT_KWC = 3;
+
+/**
+ * Scénarios proposés (spec révisée 2026-06-18) : les paliers commerciaux réels
+ * (multiples de `increment` : 3, 6, 9 kWc) bornés par maxKwc = min(toiture,
+ * plafond offre), PLUS la puissance « Optimisé » calculée par optimize()
+ * (`recommendedKwc`, le pas-panneau le mieux dimensionné).
+ * - `isOptimum:true` flague l'Optimisé (étoile UI, repère de juste
+ *   dimensionnement). `isMultiple:true` flague les paliers commerciaux.
+ * - Fusion : si l'Optimisé tombe pile sur un palier (ex. gros consommateur →
+ *   optimum = plafond 9 kWc), le palier porte `isOptimum` (pas de carte doublon).
+ * - Petite toiture (maxKwc < increment) : aucun palier ne rentre → seule la
+ *   carte Optimisé est retournée.
+ * Tri croissant par kWc. La sélection par défaut est calculée par
+ * `defaultScenarioKwc` (palier le plus proche de l'optimum, décision A).
+ */
+export function buildScenarios({ recommendedKwc, maxKwc, increment = OFFER_INCREMENT_KWC }) {
+  const EPS = 1e-9;
+  const round2 = (x) => Math.round(x * 100) / 100;
+  const opt = round2(recommendedKwc);
+
+  const byKwc = new Map();
+  for (let p = increment; p <= maxKwc + EPS; p += increment) {
+    const kwc = round2(p);
+    byKwc.set(kwc, { key: `palier_${kwc}`, label: 'Standard', kwc, isOptimum: false, isMultiple: true });
+  }
+
+  const existing = byKwc.get(opt);
+  if (existing) {
+    existing.isOptimum = true;
+    existing.label = 'Optimisé';
+  } else {
+    byKwc.set(opt, { key: 'optimise', label: 'Optimisé', kwc: opt, isOptimum: true, isMultiple: false });
+  }
+
+  return [...byKwc.values()].sort((a, b) => a.kwc - b.kwc);
+}
+
+/**
+ * Palier commercial pré-sélectionné par défaut (décision A, 2026-06-18) : le
+ * palier (`isMultiple`) le plus proche de l'optimum ; à égalité de distance, le
+ * plus grand (ne pas sous-dimensionner). Aucun palier disponible (petite
+ * toiture) → l'optimum lui-même. Le commercial peut ensuite cliquer une autre
+ * carte ; l'Optimisé reste le repère affiché (étoile).
+ */
+export function defaultScenarioKwc({ scenarios, recommendedKwc }) {
+  const EPS = 1e-9;
+  const paliers = scenarios.filter((s) => s.isMultiple);
+  if (paliers.length === 0) return Math.round(recommendedKwc * 100) / 100;
+  return paliers.reduce((best, s) => {
+    const d = Math.abs(s.kwc - recommendedKwc);
+    const bestD = Math.abs(best.kwc - recommendedKwc);
+    if (d < bestD - EPS) return s;
+    if (Math.abs(d - bestD) < EPS && s.kwc > best.kwc) return s; // égalité → le plus grand
+    return best;
+  }).kwc;
 }

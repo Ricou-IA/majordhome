@@ -5,7 +5,7 @@
 // PUR : aucun import React/Supabase (testé via node --test).
 import {
   computeMonthly, yearlyEconomy, monthlyPayment, buildYearlyTable,
-  optimize, buildScenarios, costFromGrid, maxPowerKwc, panelsCount,
+  optimize, buildScenarios, defaultScenarioKwc, costFromGrid, maxPowerKwc, panelsCount,
   simultaneityCoeff, evMonthlyConsumption,
 } from './pvEngine.js';
 
@@ -77,7 +77,7 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     threshold: config.autoconso_threshold, maxKwc, stepKwc,
   });
 
-  const scenarios = buildScenarios({ recommendedKwc, stepKwc, maxKwc }).map((s) => {
+  const scenarios = buildScenarios({ recommendedKwc, maxKwc }).map((s) => {
     const m = computeMonthly({ eM1kwc: pvgis.e_m, powerKwc: s.kwc, consoMonthly, coeff });
     const economyYear1 = yearlyEconomy({
       autoconsoAnnual: m.totals.autoconso, priceKwh,
@@ -105,7 +105,10 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   });
 
   // --- Scénario actif + détails (chart, financement, tableau) ---
-  const activeKwc = scenarios.some((s) => s.kwc === selectedKwc) ? selectedKwc : recommendedKwc;
+  // Défaut = palier commercial le plus proche de l'optimum (décision A) ; un
+  // choix explicite (selectedKwc) présent dans les scénarios prime.
+  const defaultKwc = defaultScenarioKwc({ scenarios, recommendedKwc });
+  const activeKwc = scenarios.some((s) => s.kwc === selectedKwc) ? selectedKwc : defaultKwc;
   const active = computeMonthly({ eM1kwc: pvgis.e_m, powerKwc: activeKwc, consoMonthly, coeff });
 
   // Recouvrement mensuel théorique (avant coefficient) : autoconso = Σ min × coeff

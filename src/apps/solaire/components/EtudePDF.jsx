@@ -237,8 +237,8 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
           <Text style={s.heroKwc}>{numStr(model.activeKwc)} kWc — {model.activePanels} panneaux</Text>
           <Text style={s.heroSub}>
             {model.activeKwc === model.recommendedKwc
-              ? 'Dimensionnement optimal suggéré par l’étude'
-              : `Dimensionnement choisi (recommandation de l’étude : ${numStr(model.recommendedKwc)} kWc)`}
+              ? 'Dimensionnement optimisé suggéré par l’étude'
+              : `Palier choisi (dimensionnement optimisé suggéré : ${numStr(model.recommendedKwc)} kWc)`}
             {model.cappedByOffer ? ` — plafonné à ${config.max_power_kwc} kWc (offre résidentielle)` : ''}
           </Text>
           <View style={s.heroStats}>
@@ -262,7 +262,7 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
         </View>
         {others.length > 0 && (
           <Text style={s.altLine}>
-            Également étudié : {others.map((sc) => `${sc.label} ${numStr(sc.kwc)} kWc (économie an 1 ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)})`).join(' · ')}
+            Également étudié : {others.map((sc) => `${numStr(sc.kwc)} kWc${sc.isOptimum ? ' (optimisé)' : ''} — économie an 1 ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)}`).join(' · ')}
           </Text>
         )}
 
