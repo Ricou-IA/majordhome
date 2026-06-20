@@ -62,6 +62,18 @@ function getDateRange(dateInfo) {
   };
 }
 
+/**
+ * Numéro de semaine ISO 8601 (lundi = 1er jour ; semaine 1 = celle du 1er jeudi de l'année).
+ * Ex : 2026-06-22 → 26.
+ */
+function getISOWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7; // dimanche (0) → 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // jeudi de la semaine courante
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
@@ -74,6 +86,7 @@ function CalendarToolbar({
   currentView,
   onViewChange,
   title,
+  weekNumber,
   onAddEvent,
   onRefresh,
   isLoading
@@ -112,6 +125,14 @@ function CalendarToolbar({
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
+        {weekNumber != null && (
+          <span
+            className="px-2 py-1 text-sm font-semibold bg-blue-50 text-blue-700 rounded-md shrink-0"
+            title={`Semaine ${weekNumber}`}
+          >
+            S{weekNumber}
+          </span>
+        )}
         <h2 className="text-lg font-semibold text-gray-900 min-w-[200px]">
           {title}
         </h2>
@@ -348,6 +369,7 @@ export default function Planning() {
   // État local
   const [currentView, setCurrentView] = useState('timeGridWeek');
   const [calendarTitle, setCalendarTitle] = useState('');
+  const [calendarWeek, setCalendarWeek] = useState(null);
   const [dateRange, setDateRange] = useState(() => getDateRange(null));
   const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
   const [selectedChantier, setSelectedChantier] = useState(null);
@@ -413,6 +435,13 @@ export default function Planning() {
     setCalendarTitle(dateInfo.view.title);
     setCurrentView(dateInfo.view.type);
     setDateRange(getDateRange(dateInfo));
+    // Numéro de semaine ISO — pertinent uniquement sur les vues à 1 semaine
+    const viewType = dateInfo.view.type;
+    setCalendarWeek(
+      viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+        ? getISOWeekNumber(dateInfo.start)
+        : null
+    );
   }, []);
 
   // Changer de vue
@@ -630,6 +659,7 @@ export default function Planning() {
           currentView={currentView}
           onViewChange={handleViewChange}
           title={calendarTitle}
+          weekNumber={calendarWeek}
           onAddEvent={canCreateAppointment ? () => setModalState({ open: true, mode: 'create', appointment: null, defaultDate: new Date().toISOString().split('T')[0], defaultTime: '09:00' }) : null}
           onRefresh={refresh}
           isLoading={isLoading}
@@ -661,6 +691,7 @@ export default function Planning() {
             contentHeight={650}
             // Dates et heures
             firstDay={1}
+            weekends={false}
             slotMinTime="07:00:00"
             slotMaxTime="20:00:00"
             slotDuration="00:30:00"
