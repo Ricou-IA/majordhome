@@ -19,6 +19,10 @@ import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
 
+// Buckets de type — source unique dans le module pur (re-export pour les callers
+// existants : EventModal, EventFormSections).
+export { COMMERCIAL_TYPES, TECHNICIAN_TYPES } from '@/lib/planningEvents';
+
 
 // ============================================================================
 // CONSTANTES
@@ -35,23 +39,6 @@ export const APPOINTMENT_TYPES = [
   { value: 'service', label: 'SAV', color: '#EF4444', bgClass: 'bg-red-500' },
   { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-500' },
 ];
-
-// Types dont la tâche liée se facture (pose / SAV / entretien). Les VT et « Autre »
-// ne sont jamais recolorés en « facturé » sur le planning.
-export const INVOICEABLE_APPOINTMENT_TYPES = ['maintenance', 'service', 'installation'];
-// Violet foncé « facturé » — volontairement plus sombre que le violet Installation
-// (#8B5CF6) pour rester lisible quand une pose passe en facturé.
-export const INVOICED_EVENT_COLOR = '#6D28D9';
-
-/**
- * Règles d'assignation par type de RDV
- * - commercial: Responsable + Commercial (multi-select 1-2)
- * - technician: Techniciens (multi-select 1-2)
- * - all: Tous les membres (multi-select illimité)
- */
-export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical'];
-export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
-// 'other' → all members
 
 /**
  * Statuts de RDV
@@ -730,9 +717,13 @@ export const appointmentsService = {
   // ==========================================================================
 
   /**
-   * Convertit un appointment DB → event FullCalendar
+   * Convertit un appointment DB → event FullCalendar.
+   * @param {Object} appointment
+   * @param {Object} [opts]
+   * @param {string} [opts.color] couleur résolue par personne (cf. resolveAppointmentColor
+   *   dans planningEvents). Si absente → fallback couleur du type (rétro-compat).
    */
-  toCalendarEvent(appointment) {
+  toCalendarEvent(appointment, { color } = {}) {
     const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
 
     // Construire les datetimes ISO
@@ -741,14 +732,8 @@ export const appointmentsService = {
       ? `${appointment.scheduled_date}T${appointment.scheduled_end}`
       : null;
 
-    // Tâche liée facturée (entretien / SAV / pose) → violet foncé : lecture
-    // « tout est facturé » d'un coup d'œil sur le planning. Les Visites
-    // Techniques et « Autre » ne sont jamais recolorées (rien à facturer).
-    // Source : majordhome_appointments.target_invoiced (invoiced_at ou
-    // workflow 'facture' de l'intervention ; devis gagnant 'invoiced' pour la pose).
-    const isInvoiced = appointment.target_invoiced === true
-      && INVOICEABLE_APPOINTMENT_TYPES.includes(appointment.appointment_type);
-    const eventColor = isInvoiced ? INVOICED_EVENT_COLOR : typeConfig.color;
+    // Couleur par personne (calculée par le hook), fallback type si non fournie.
+    const eventColor = color || typeConfig.color;
 
     return {
       id: appointment.id,
