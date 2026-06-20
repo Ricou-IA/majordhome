@@ -9,7 +9,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -21,18 +21,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
-  Users,
   Loader2,
   AlertCircle,
   RefreshCw,
   X,
-  CheckCircle2,
   ChevronDown,
+  Wrench,
+  Briefcase,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
-import { useLeadCommercials } from '@hooks/useLeads';
 import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
@@ -181,91 +180,87 @@ function CalendarToolbar({
 }
 
 /**
- * Filtres équipe (multi-sélection) + type
+ * Bouton toggle de bucket (Intervention / Commercial)
+ */
+function KindToggle({ active, onClick, icon: Icon, label }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+        active
+          ? 'bg-blue-50 border-blue-200 text-blue-700'
+          : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50'
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Filtres : toggles bucket (Intervention/Commercial) + chips équipe (par personne) + type
  */
 function CalendarFilters({ filters, setFilters, teamList }) {
-  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
-  const selectedCount = filters.memberIds?.length || 0;
+  const kinds = filters.kinds || { intervention: true, commercial: true };
+  const selectedKeys = filters.memberProfileKeys || [];
   const selectedType = APPOINTMENT_TYPES.find(t => t.value === filters.appointmentType);
-  const hasFilters = selectedCount > 0 || filters.appointmentType;
+  const hasFilters =
+    selectedKeys.length > 0 || filters.appointmentType || !kinds.intervention || !kinds.commercial;
 
-  const toggleMember = (memberId) => {
+  const toggleKind = (kind) =>
+    setFilters(f => ({ ...f, kinds: { ...f.kinds, [kind]: !f.kinds[kind] } }));
+
+  const toggleMember = (profileKey) =>
     setFilters(f => {
-      const current = f.memberIds || [];
-      const next = current.includes(memberId)
-        ? current.filter(id => id !== memberId)
-        : [...current, memberId];
-      return { ...f, memberIds: next };
+      const cur = f.memberProfileKeys || [];
+      const next = cur.includes(profileKey) ? cur.filter(k => k !== profileKey) : [...cur, profileKey];
+      return { ...f, memberProfileKeys: next };
     });
-  };
 
-  // Label bouton : noms sélectionnés ou "Équipe"
-  const buttonLabel = useMemo(() => {
-    if (selectedCount === 0) return 'Équipe';
-    const names = teamList
-      .filter(m => (filters.memberIds || []).includes(m.id))
-      .map(m => m.display_name.split(' ')[0]);
-    return names.join(', ');
-  }, [selectedCount, teamList, filters.memberIds]);
+  const resetAll = () =>
+    setFilters(f => ({
+      ...f,
+      kinds: { intervention: true, commercial: true },
+      memberProfileKeys: [],
+      appointmentType: null,
+    }));
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Filtre équipe (multi-sélection) */}
-      <div className="relative">
-        <button
-          onClick={() => setShowTeamDropdown(!showTeamDropdown)}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
-            selectedCount > 0
-              ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          {buttonLabel}
-          <ChevronDown className={`w-3 h-3 transition-transform ${showTeamDropdown ? 'rotate-180' : ''}`} />
-        </button>
-        {showTeamDropdown && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setShowTeamDropdown(false)} />
-            <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 max-h-64 overflow-y-auto">
-              <button
-                onClick={() => { setFilters(f => ({ ...f, memberIds: [] })); setShowTeamDropdown(false); }}
-                className={`w-full flex items-center px-3 py-2 text-sm text-left ${selectedCount === 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
-              >
-                Tous
-              </button>
-              {teamList.map(member => {
-                const isSelected = (filters.memberIds || []).includes(member.id);
-                return (
-                  <button
-                    key={member.id}
-                    onClick={() => toggleMember(member.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left ${
-                      isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span
-                      className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
-                        isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-                      }`}
-                    >
-                      {isSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
-                    </span>
-                    <span
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: member.color || '#6B7280' }}
-                    />
-                    <span className="truncate">{member.display_name}</span>
-                    <span className="text-[10px] text-gray-400 ml-auto shrink-0">{member.roleLabel}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
+      {/* Toggles bucket */}
+      <div className="flex items-center gap-1.5">
+        <KindToggle active={kinds.intervention} onClick={() => toggleKind('intervention')} icon={Wrench} label="Intervention" />
+        <KindToggle active={kinds.commercial} onClick={() => toggleKind('commercial')} icon={Briefcase} label="Commercial" />
       </div>
+
+      <span className="w-px h-6 bg-gray-200" />
+
+      {/* Chips équipe (1 par personne) */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {teamList.map(h => {
+          const isSel = selectedKeys.includes(h.profileKey);
+          return (
+            <button
+              key={h.profileKey}
+              onClick={() => toggleMember(h.profileKey)}
+              title={h.displayName}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-sm transition-colors ${
+                isSel
+                  ? 'border-gray-400 bg-gray-100 text-gray-900'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: h.color }} />
+              {h.displayName.split(' ')[0]}
+            </button>
+          );
+        })}
+      </div>
+
+      <span className="w-px h-6 bg-gray-200" />
 
       {/* Filtre type */}
       <div className="relative">
@@ -311,7 +306,7 @@ function CalendarFilters({ filters, setFilters, teamList }) {
       {/* Reset filtres */}
       {hasFilters && (
         <button
-          onClick={() => setFilters({ memberIds: [], appointmentType: null, status: null })}
+          onClick={resetAll}
           className="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
           Effacer
@@ -382,6 +377,7 @@ export default function Planning() {
     error,
     filters,
     setFilters,
+    teamList,
     createAppointment,
     updateAppointment,
     moveAppointment,
@@ -397,34 +393,7 @@ export default function Planning() {
     endDate: dateRange.endDate,
   });
 
-  const { members, isLoading: isLoadingMembers } = useTeamMembers(orgId);
-  const { commercials } = useLeadCommercials(orgId);
-
-  // Liste unifiée : techniciens + commerciaux (pour filtres + EventModal)
-  const teamList = useMemo(() => {
-    const list = [];
-    // Techniciens (depuis team_members)
-    (members || []).forEach(m => {
-      list.push({
-        id: m.id,
-        display_name: m.display_name || m.first_name || 'Tech',
-        color: m.color || '#6B7280',
-        roleLabel: 'Tech',
-      });
-    });
-    // Commerciaux (depuis majordhome_commercials)
-    const memberIdSet = new Set(list.map(m => m.id));
-    (commercials || []).forEach(c => {
-      if (memberIdSet.has(c.id)) return; // éviter les doublons
-      list.push({
-        id: c.id,
-        display_name: c.full_name || 'Commercial',
-        color: '#3B82F6',
-        roleLabel: 'Com.',
-      });
-    });
-    return list;
-  }, [members, commercials]);
+  const { members } = useTeamMembers(orgId);
 
   // ==========================================================================
   // HANDLERS FULLCALENDAR

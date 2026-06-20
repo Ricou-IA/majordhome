@@ -14,6 +14,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
+import { useLeadCommercials } from '@hooks/useLeads';
+import {
+  buildPersonColorMaps, buildTeamList, resolveAppointmentColor,
+  matchesKindFilter, matchesMemberFilter,
+} from '@/lib/planningEvents';
 
 // Re-export for backward compatibility
 export { appointmentKeys } from '@hooks/cacheKeys';
@@ -40,7 +45,8 @@ export { appointmentKeys } from '@hooks/cacheKeys';
 export function useAppointments({ orgId, startDate, endDate } = {}) {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({
-    memberIds: [],          // IDs sélectionnés (techniciens + commerciaux)
+    kinds: { intervention: true, commercial: true }, // 2 toggles (les 2 ON = vue globale)
+    memberProfileKeys: [],                            // chips équipe (humains, dédup par profile_key)
     appointmentType: null,
     status: null,
   });
@@ -83,6 +89,21 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     staleTime: 15_000,
   });
 
+  // Membres + commerciaux (caches partagés avec Planning) → maps couleur + teamList unifié.
+  const { members } = useTeamMembers(orgId);
+  const { commercials } = useLeadCommercials(orgId);
+  const colorMaps = useMemo(() => buildPersonColorMaps({ members, commercials }), [members, commercials]);
+  const teamList = useMemo(() => buildTeamList({ members, commercials }), [members, commercials]);
+
+  // Record ids des humains sélectionnés (union team_member + commercial).
+  const selectedRecordIds = useMemo(() => {
+    if (!filters.memberProfileKeys.length) return null;
+    const keySet = new Set(filters.memberProfileKeys);
+    const ids = new Set();
+    teamList.forEach((h) => { if (keySet.has(h.profileKey)) h.recordIds.forEach((id) => ids.add(id)); });
+    return ids;
+  }, [filters.memberProfileKeys, teamList]);
+
   // Convertir en events FullCalendar. Les jours d'installation sont désormais des
   // appointments `installation` natifs (Bloc B stage 4) → plus de merge chantier-slots.
   const events = useMemo(() => {
@@ -91,27 +112,21 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     // Enrichir chaque appointment avec ses technician_ids
     const techMap = new Map();
     if (techLinks) {
-      techLinks.forEach(t => {
+      techLinks.forEach((t) => {
         if (!techMap.has(t.appointment_id)) techMap.set(t.appointment_id, []);
         techMap.get(t.appointment_id).push(t.technician_id);
       });
     }
 
-    let enrichedAppointments = (appointments || []).map(a => ({
+    const enriched = (appointments || []).map((a) => ({
       ...a,
       technician_ids: techMap.get(a.id) || [],
     }));
 
-    // Filtre multi-membres : techniciens (via techLinks) + commerciaux (via assigned_commercial_id)
-    if (filters.memberIds.length > 0 && techLinks) {
-      const memberSet = new Set(filters.memberIds);
-      enrichedAppointments = enrichedAppointments.filter(
-        a => a.technician_ids.some(id => memberSet.has(id)) || memberSet.has(a.assigned_commercial_id)
-      );
-    }
-
-    return enrichedAppointments.map(a => appointmentsService.toCalendarEvent(a));
-  }, [appointments, filters.memberIds, techLinks]);
+    return enriched
+      .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
+      .map((a) => appointmentsService.toCalendarEvent(a, { color: resolveAppointmentColor(a, colorMaps) }));
+  }, [appointments, techLinks, filters.kinds, selectedRecordIds, colorMaps]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
@@ -239,6 +254,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     // Filtres
     filters,
     setFilters,
+    teamList,
 
     // Mutations
     createAppointment,
