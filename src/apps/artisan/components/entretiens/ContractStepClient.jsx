@@ -24,6 +24,7 @@ import { FormField, TextInput, SelectInput } from '../FormFields';
 const CLIENT_CATEGORIES = [
   { value: 'particulier', label: 'Particulier' },
   { value: 'entreprise', label: 'Entreprise' },
+  { value: 'public', label: 'Public' },
 ];
 
 // ============================================================================

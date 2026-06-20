@@ -19,6 +19,7 @@ import {
   User,
   Users,
   Building2,
+  Landmark,
   MapPin,
   Phone,
   Mail,
@@ -111,11 +112,12 @@ export function ClientCard({
   const hasContract = has_active_contract === true;
   const isArchived = is_archived === true;
   const isEntreprise = client_category === 'entreprise';
+  const isPublic = client_category === 'public';
 
   // Icône selon catégorie
-  const CategoryIcon = isArchived ? Archive : isEntreprise ? Building2 : Users;
-  const iconBg = isArchived ? 'bg-amber-100' : isEntreprise ? 'bg-purple-100' : 'bg-amber-100';
-  const iconColor = isArchived ? 'text-amber-600' : isEntreprise ? 'text-purple-600' : 'text-amber-600';
+  const CategoryIcon = isArchived ? Archive : isPublic ? Landmark : isEntreprise ? Building2 : Users;
+  const iconBg = isArchived ? 'bg-amber-100' : isPublic ? 'bg-teal-100' : isEntreprise ? 'bg-purple-100' : 'bg-amber-100';
+  const iconColor = isArchived ? 'text-amber-600' : isPublic ? 'text-teal-600' : isEntreprise ? 'text-purple-600' : 'text-amber-600';
 
   // Nom affiché (compatible ancien et nouveau format)
   const displayName = display_name || name || `${last_name || ''} ${first_name || ''}`.trim() || 'Client sans nom';

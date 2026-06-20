@@ -27,6 +27,7 @@ import { equipmentsService } from '@services/equipments.service';
 export const CLIENT_CATEGORIES = [
   { value: 'particulier', label: 'Particulier', color: 'bg-blue-100 text-blue-700' },
   { value: 'entreprise', label: 'Entreprise', color: 'bg-purple-100 text-purple-700' },
+  { value: 'public', label: 'Public', color: 'bg-teal-100 text-teal-700' },
 ];
 
 /**

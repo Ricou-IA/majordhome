@@ -1,0 +1,63 @@
+﻿nom_affiche;telephone;email;adresse;code_postal;ville;categorie;remarque
+Mairie de Mézens;05 63 40 10 66;mairie.mezenf@wanadoo.fr;Grand'rue;81800;Mézens;public;email a verifier (mezenf -> mezens ?)
+Mairie de Saint-Juéry;05 63 76 07 00;mairie@ville-saint-juery.fr;Place de la mairie;81160;Saint-Juéry;public;
+Mairie d'Aiguefonde;05 63 61 22 59;mairie.aiguefonde@wanadoo.fr;20 Avenue de la mairie;81200;Aiguefonde;public;
+Mairie de Carmaux (service technique);05 63 80 11 06;servicetechnique@carmaux.fr;124 Avenue Roucan;81400;Carmaux;public;2 contacts Carmaux (technique + accueil)
+Mairie de Saint-Sulpice-la-Pointe;05 63 41 93 34;intervention.technique@ville-saint-sulpice-81.fr;Rue Capit Beaumont;81370;Saint-Sulpice-la-Pointe;public;
+Mairie de Lacaune;05 63 37 00 18;mairie@lacaune.com;1 Rue de la mairie;81230;Lacaune;public;
+Mairie de Labruguière;05 63 73 30 32;accueil-technique@labruguiere.fr;Place Hôtel de ville;81290;Labruguière;public;
+Mairie de Cordes-sur-Ciel;05 63 56 04 59;mairie@cordesurciel.fr;Les Tuileries;81170;Cordes-sur-Ciel;public;meme email que l'autre Cordes (fusionner ?)
+Mairie de Castres (service technique);05 63 71 57 11;N.hallett@ville-castres.fr;3 Allée Maréchal Juin;81100;Castres;public;2 contacts Castres (technique + accueil)
+Mairie de Réalmont;05 63 79 25 80;mairie-réalmont@wanadoo.fr;3 Rue Hôtel de ville;81120;Réalmont;public;accent dans l'email a verifier
+Mairie de Gaillac;05 63 81 20 36;secretariats@ville-gaillac.fr;70 Place d'Hautpoul;81600;Gaillac;public;
+Mairie de Murat-sur-Vèbre;05 63 37 24 86;mairie.murat81@orange.fr;Peyroux Murat;81320;Murat-sur-Vèbre;public;
+Mairie d'Aussillon;05 63 98 99 41;m.arnaud@ville-aussillon.fr;19 Rue École;81200;Aussillon;public;2e contact Aussillon (meme email)
+Mairie de Puygouzon;05 63 43 27 43;mairie@puygouzon.fr;La Cayrie;81990;Puygouzon;public;
+Mairie de Castres (accueil);05 63 71 58 58;mairie@ville-castres.fr;1 Rue de l'Hôtel de ville;81100;Castres;public;2 contacts Castres (technique + accueil)
+Mairie de Rabastens;05 63 33 64 05;mairie.rabastens@wanadoo.fr;3 Quai Escoucières;81800;Rabastens;public;
+Mairie de Carmaux (accueil);05 63 80 22 50;contact@carmaux.fr;7 Place Libération;81400;Carmaux;public;2 contacts Carmaux (technique + accueil)
+Mairie de Blaye-les-Mines;05 63 76 54 27;contact@mairie-blaye.fr;145 Bis Avenue d'Albi;81400;Blaye-les-Mines;public;
+Mairie de Vielmur-sur-Agout;05 63 74 30 11;vielmur.mairie@wanadoo.fr;Place Esplanade;81570;Vielmur-sur-Agout;public;
+Mairie de Cadalen;05 63 81 53 97;cadalen.mairie@orange.fr;Le Bourg;81600;Cadalen;public;
+Mairie du Séquestre;05 63 54 40 13;mairie@lesequestre.fr;Place Jules Ferry;81990;Le Séquestre;public;
+Mairie de Lescure-d'Albigeois;05 63 60 76 73;accueil@mairie-lescure.fr;Avenue Hermet;81380;Lescure-d'Albigeois;public;
+Mairie de Saïx;05 63 74 71 76;rst@ville-saix.fr;2 Place Jean Jaurès;81710;Saïx;public;
+Mairie de Lisle-sur-Tarn;05 63 33 35 18;mairie@ville-lisle-sur-tarn.fr;21 Place Paul Saissac;81310;Lisle-sur-Tarn;public;
+Mairie de Marssac-sur-Tarn;05 63 55 40 47;technique@marssac-sur-tarn.fr;Rue Toni Marie;81150;Marssac-sur-Tarn;public;
+Mairie de Couffouleux;05 63 33 73 10;mairie.couffouleux@free.fr;Avenue Jean Bérenguier;81800;Couffouleux;public;ville PDF "Coufouleux" -> Couffouleux
+Mairie de Lavaur;05 63 83 12 20;mairie@ville-lavaur.fr;Place Général Sudre;81500;Lavaur;public;
+Mairie d'Aussillon (2);05 63 97 71 80;m.arnaud@ville-aussillon.fr;Place Mairie;81200;Aussillon;public;2e contact Aussillon (meme email)
+Mairie de Soual;05 63 75 52 49;contact@mairie-soual.fr;Place Mairie;81580;Soual;public;
+Mairie de Brassac;05 63 74 57 44;mairie.brassac.agout@wanadoo.fr;Place Hôtel de ville;81260;Brassac;public;
+Mairie de Valence-d'Albigeois;05 63 53 41 00;mairievalence81@wanadoo.fr;7 Place du Coq;81340;Valence-d'Albigeois;public;
+Mairie d'Arthès;05 63 55 10 11;mairie@mairie-arthes.fr;Place Jean Jaurès;81160;Arthès;public;
+Mairie de Briatexte;06 15 06 60 33;mairiebriatexte@wanadoo.fr;2 Place Monument;81390;Briatexte;public;tel portable (06)
+Mairie de Sorèze;05 63 74 40 30;mairie@-de-sorèze.wanadoo.fr;Allée Ravelin;81540;Sorèze;public;EMAIL MALFORME - a corriger
+Mairie de Cordes-sur-Ciel (2);05 63 56 00 40;mairie@cordesurciel.fr;34 Grand'Rue Raimond VII;81170;Cordes-sur-Ciel;public;meme email que l'autre Cordes (fusionner ?)
+Mairie de Castelnau-de-Lévis;05 63 46 15 98;mairiecastelnaudelevis@orange.fr;Rue Sicard Alaman;81150;Castelnau-de-Lévis;public;
+Mairie de Rayssac;05 63 55 72 57;mairie.rayssac@wanadoo.fr;Bourg;81330;Rayssac;public;
+Mairie de Brens;05 63 57 05 04;mairie-de-brens@wanadoo.fr;5 Place de la mairie;81600;Brens;public;
+Mairie d'Alban;05 63 55 82 09;mairie.alban@wanadoo.fr;18 Avenue d'Albi;81250;Alban;public;
+Mairie de Vénès;05 63 75 91 14;mairie.venes@orange.fr;1 Place Mairie;81440;Vénès;public;
+Mairie de Pampelonne;05 63 76 32 09;mairie.pampelonne@wanadoo.fr;1 Avenue Thuriès;81190;Pampelonne;public;
+Mairie de Lescout;05 63 75 53 25;mairie.lescout@wanadoo.fr;Le Bourg;81110;Lescout;public;
+Mairie de Saint-Jean-de-Rives;05 63 41 66 00;stjeanderives.mairie@wanadoo.fr;7 Rue Castelas;81500;Saint-Jean-de-Rives;public;
+Mairie de Terssac;05 63 54 39 30;service-technique@terssac.fr;2 Rue Mairie;81150;Terssac;public;
+Mairie de Barre;05 63 37 40 81;mairiebarre@orange.fr;Avenue Camarès;81320;Barre;public;
+Mairie d'Arfons;05 63 74 11 37;mairie.arfons@orange.fr;5 Rue Mairie;81110;Arfons;public;
+Mairie de Cambon;05 63 78 81 65;elus@mairiedecambon.fr;16 Place Mairie;81990;Cambon;public;
+Mairie de Fréjeville;05 63 74 33 58;mairiefrejeville@wanadoo.fr;1 Rue Mairie;81570;Fréjeville;public;
+Mairie de Combefa;05 63 76 12 58;mairiedecombefa@wanadoo.fr;4 Rue Mairie;81640;Combefa;public;ville a verifier (Combefa ?)
+Mairie de Burlats;05 63 35 07 83;mairie-burlats@wanadoo.fr;1 Place du 8 mai 1945;81100;Burlats;public;
+Mairie d'Albine;05 63 98 32 34;mairie-albine@wanadoo.fr;13 Avenue Ribaute;81240;Albine;public;
+Mairie de Sémalens;09 62 29 55 41;mairie-de-semalens@orange.fr;14 Rue Théron;81570;Sémalens;public;
+Mairie de Vabre;05 63 74 40 60;mairie.vabre@wanadoo.fr;3 Place Mairie;81330;Vabre;public;
+Mairie de Montans;05 63 41 42 30;mairie.montans@orange.fr;Avenue Élie Rossignol;81600;Montans;public;
+Mairie de Monestiés;05 63 80 14 00;mairie-monesties@orange.fr;Place Mairie;81640;Monestiés;public;
+Mairie de Parisot;09 77 65 16 34;parisot81@wanadoo.fr;2 Place Lavoir;81310;Parisot;public;tel fixe (09)
+Mairie de Lacaune (DOUBLON);05 63 37 00 18;mairie@lacaune.com;1 Rue de la mairie;81230;Lacaune;public;DOUBLON EXACT de Lacaune ligne 6 - a supprimer
+Mairie de Pont-de-l'Arn;05 63 61 90 40;mairie.pontdelarn@wanadoo.fr;2 Avenue Philippe Cormouls;81660;Pont-de-l'Arn;public;
+Mairie de Payrin-Augmontel;05 63 61 04 00;payrin-augmontel@wanadoo.fr;Avenue de la mairie;81660;Payrin-Augmontel;public;
+Mairie de Roquevidal;05 63 58 70 90;mairie-roquevidal@orange.fr;2 Chemin des Brugues;81470;Roquevidal;public;
+Mairie de Loubers;05 63 56 35 57;mairie-de-loubers@orange.fr;Le Bourg;81170;Loubers;public;
+Mairie de Lagrave;05 63 81 44 45;mairie-lagrave@wanadoo.fr;16 Place de l'Église;81150;Lagrave;public;
