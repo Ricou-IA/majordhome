@@ -683,6 +683,8 @@ export default function Planning() {
             eventResize={handleEventResize}
             // Style
             eventDisplay="block"
+            // RDV concurrents (2 techniciens) côte à côte sans se recouvrir
+            slotEventOverlap={false}
             dayHeaderFormat={{ weekday: 'short', day: 'numeric', month: 'short' }}
             allDaySlot={false}
             expandRows={true}
