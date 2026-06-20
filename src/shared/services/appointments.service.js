@@ -722,8 +722,10 @@ export const appointmentsService = {
    * @param {Object} [opts]
    * @param {string} [opts.color] couleur résolue par personne (cf. resolveAppointmentColor
    *   dans planningEvents). Si absente → fallback couleur du type (rétro-compat).
+   * @param {string} [opts.idSuffix] rend l'event unique quand un RDV est découpé en
+   *   plusieurs blocs (1 par technicien). L'id réel du RDV reste dans extendedProps.id.
    */
-  toCalendarEvent(appointment, { color } = {}) {
+  toCalendarEvent(appointment, { color, idSuffix } = {}) {
     const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
 
     // Construire les datetimes ISO
@@ -736,7 +738,7 @@ export const appointmentsService = {
     const eventColor = color || typeConfig.color;
 
     return {
-      id: appointment.id,
+      id: idSuffix ? `${appointment.id}__${idSuffix}` : appointment.id,
       title: appointment.subject || `${typeConfig.label} - ${[appointment.client_name, appointment.client_first_name].filter(Boolean).join(' ')}`,
       start: startStr,
       end: endStr,

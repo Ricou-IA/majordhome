@@ -16,7 +16,7 @@ import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { useLeadCommercials } from '@hooks/useLeads';
 import {
-  buildPersonColorMaps, buildTeamList, resolveAppointmentColor,
+  buildPersonColorMaps, buildTeamList, expandAppointmentBlocks,
   matchesKindFilter, matchesMemberFilter,
 } from '@/lib/planningEvents';
 
@@ -125,7 +125,11 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
 
     return enriched
       .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
-      .map((a) => appointmentsService.toCalendarEvent(a, { color: resolveAppointmentColor(a, colorMaps) }));
+      .flatMap((a) =>
+        expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
+          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix })
+        )
+      );
   }, [appointments, techLinks, filters.kinds, selectedRecordIds, colorMaps]);
 
   // Mutation : créer un RDV

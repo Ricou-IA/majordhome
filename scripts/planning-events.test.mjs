@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   appointmentKind, buildPersonColorMaps, resolveAppointmentColor,
-  buildTeamList, matchesKindFilter, matchesMemberFilter,
+  buildTeamList, matchesKindFilter, matchesMemberFilter, expandAppointmentBlocks,
   INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR,
 } from '../src/lib/planningEvents.js';
 
@@ -73,4 +73,42 @@ test('matchesMemberFilter: match via commercial OU technicien, vide = tout', () 
   assert.equal(matchesMemberFilter({ technician_ids: ['tm-ludo'], assigned_commercial_id: null }, sel), false);
   assert.equal(matchesMemberFilter({ technician_ids: ['tm-ludo'] }, null), true);
   assert.equal(matchesMemberFilter({ technician_ids: ['tm-ludo'] }, new Set()), true);
+});
+
+test('expandAppointmentBlocks: intervention multi-tech -> 1 bloc par technicien', () => {
+  const appt = { appointment_type: 'installation', technician_ids: ['tm-ludo', 'tm-phil'], target_invoiced: false };
+  const blocks = expandAppointmentBlocks(appt, maps, null);
+  assert.equal(blocks.length, 2);
+  assert.deepEqual(blocks.map((b) => b.color), ['#EF4444', '#3B82F6']);
+  assert.deepEqual(blocks.map((b) => b.idSuffix), ['tm-ludo', 'tm-phil']);
+});
+
+test('expandAppointmentBlocks: filtre actif -> seuls les techniciens visibles', () => {
+  const appt = { appointment_type: 'installation', technician_ids: ['tm-ludo', 'tm-phil'], target_invoiced: false };
+  const blocks = expandAppointmentBlocks(appt, maps, new Set(['tm-ludo']));
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].color, '#EF4444');
+  assert.equal(blocks[0].idSuffix, 'tm-ludo');
+});
+
+test('expandAppointmentBlocks: mono-tech -> 1 bloc unique (idSuffix null)', () => {
+  const appt = { appointment_type: 'maintenance', technician_ids: ['tm-ludo'], target_invoiced: false };
+  const blocks = expandAppointmentBlocks(appt, maps, null);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].color, '#EF4444');
+  assert.equal(blocks[0].idSuffix, null);
+});
+
+test('expandAppointmentBlocks: facturé multi-tech -> 1 bloc violet', () => {
+  const appt = { appointment_type: 'installation', technician_ids: ['tm-ludo', 'tm-phil'], target_invoiced: true };
+  const blocks = expandAppointmentBlocks(appt, maps, null);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].color, INVOICED_EVENT_COLOR);
+});
+
+test('expandAppointmentBlocks: RDV commercial ne se découpe pas', () => {
+  const appt = { appointment_type: 'rdv_technical', technician_ids: ['tm-ludo', 'tm-phil'], assigned_commercial_id: 'co-phil', target_invoiced: false };
+  const blocks = expandAppointmentBlocks(appt, maps, null);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].idSuffix, null);
 });

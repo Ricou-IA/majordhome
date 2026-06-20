@@ -473,7 +473,7 @@ export default function Planning() {
   // Drag & drop d'un événement
   const handleEventDrop = useCallback(async (dropInfo) => {
     const { event } = dropInfo;
-    const appointmentId = event.id;
+    const appointmentId = event.extendedProps.id || event.id;
 
     try {
       const start = event.start;
@@ -502,7 +502,7 @@ export default function Planning() {
   // Resize d'un événement
   const handleEventResize = useCallback(async (resizeInfo) => {
     const { event } = resizeInfo;
-    const appointmentId = event.id;
+    const appointmentId = event.extendedProps.id || event.id;
 
     try {
       const start = event.start;
