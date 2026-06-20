@@ -569,6 +569,27 @@ export const appointmentsService = {
   },
 
   /**
+   * Définir la couleur planning d'un membre (calendar_color).
+   * Écriture via RPC SECURITY DEFINER org_admin (schéma majordhome non exposé).
+   */
+  async setTeamMemberColor(teamMemberId, color) {
+    try {
+      const { error } = await supabase.rpc('team_member_set_calendar_color', {
+        p_team_member_id: teamMemberId,
+        p_color: color,
+      });
+      if (error) {
+        console.error('[appointments] setTeamMemberColor error:', error);
+        return { error };
+      }
+      return { error: null };
+    } catch (err) {
+      console.error('[appointments] setTeamMemberColor error:', err);
+      return { error: err };
+    }
+  },
+
+  /**
    * Récupérer les techniciens assignés à un RDV
    */
   async getAppointmentTechnicians(appointmentId) {

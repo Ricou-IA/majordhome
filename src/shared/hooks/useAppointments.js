@@ -340,6 +340,26 @@ export function useTeamMembers(orgId) {
 }
 
 // ============================================================================
+// HOOK - useSetTeamMemberColor (édition couleur planning)
+// ============================================================================
+
+/**
+ * Mutation : définir la couleur planning (calendar_color) d'un membre.
+ * Invalide le cache teamMembers → la liste équipe ET le planning se recolorent.
+ */
+export function useSetTeamMemberColor(orgId) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ teamMemberId, color }) =>
+      appointmentsService.setTeamMemberColor(teamMemberId, color),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.teamMembers(orgId) });
+    },
+  });
+  return { setColor: mutation.mutateAsync, isSaving: mutation.isPending };
+}
+
+// ============================================================================
 // HOOK - useTeamDayAvailability (dispo d'un jour par membre)
 // ============================================================================
 

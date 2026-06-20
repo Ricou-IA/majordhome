@@ -11,10 +11,11 @@
  * ============================================================================
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
+import { useTeamMembers, useSetTeamMemberColor } from '@hooks/useAppointments';
 import {
   EFFECTIVE_ROLES,
   ROLE_LABELS,
@@ -31,6 +32,7 @@ import {
   X,
   Eye,
   EyeOff,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -64,6 +66,52 @@ const ROLE_OPTIONS = EFFECTIVE_ROLES.map((role) => ({
   value: role,
   label: ROLE_LABELS[role],
 }));
+
+// Palette planning : couleurs distinctes et lisibles. Le violet #6D28D9 est
+// volontairement EXCLU (réservé aux RDV facturés sur le calendrier).
+const PLANNING_COLORS = [
+  '#EF4444', '#F97316', '#F59E0B', '#10B981', '#0D9488',
+  '#06B6D4', '#3B82F6', '#6366F1', '#DB2777', '#64748B',
+];
+
+// =============================================================================
+// COMPOSANT — MemberColorPicker
+// =============================================================================
+
+function MemberColorPicker({ color, onPick, disabled }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+        className="flex items-center gap-2 px-2 py-1 rounded-lg border border-secondary-300 hover:bg-secondary-50 transition-colors disabled:opacity-50"
+        title="Changer la couleur planning"
+      >
+        <span className="w-4 h-4 rounded-full border border-black/10" style={{ backgroundColor: color || '#94A3B8' }} />
+        <ChevronDown className={`w-3 h-3 text-secondary-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-secondary-200 rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1.5">
+            {PLANNING_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onPick(c); setOpen(false); }}
+                className={`w-6 h-6 rounded-full border-2 transition ${color === c ? 'border-secondary-900' : 'border-transparent hover:border-secondary-300'}`}
+                style={{ backgroundColor: c }}
+                title={c}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // =============================================================================
 // COMPOSANT — InviteModal
@@ -213,7 +261,7 @@ function InviteModal({ open, onClose, onInvite, isInviting }) {
 // COMPOSANT — MemberRow
 // =============================================================================
 
-function MemberRow({ member, isCurrentUser, isUpdating, isUpdatingRole, onRoleChangeRequest }) {
+function MemberRow({ member, teamMember, canEditColor, isCurrentUser, isUpdating, isUpdatingRole, onRoleChangeRequest, onColorChange, isColorSaving }) {
   const effectiveRole = computeEffectiveRole(member.profile, { role: member.role });
 
   return (
@@ -274,6 +322,25 @@ function MemberRow({ member, isCurrentUser, isUpdating, isUpdatingRole, onRoleCh
           </div>
         )}
       </td>
+
+      {/* Couleur planning */}
+      <td className="py-4 px-4">
+        {!teamMember ? (
+          <span className="text-xs text-secondary-400">—</span>
+        ) : canEditColor ? (
+          <MemberColorPicker
+            color={teamMember.calendar_color}
+            onPick={(c) => onColorChange(teamMember.id, c)}
+            disabled={isColorSaving}
+          />
+        ) : (
+          <span
+            className="inline-block w-4 h-4 rounded-full border border-black/10"
+            style={{ backgroundColor: teamMember.calendar_color || '#94A3B8' }}
+            title={teamMember.calendar_color || ''}
+          />
+        )}
+      </td>
     </tr>
   );
 }
@@ -284,7 +351,7 @@ function MemberRow({ member, isCurrentUser, isUpdating, isUpdatingRole, onRoleCh
 
 export default function TeamManagement() {
   const navigate = useNavigate();
-  const { organization, user } = useAuth();
+  const { organization, user, isOrgAdmin } = useAuth();
   const orgId = organization?.id;
 
   const {
@@ -292,6 +359,16 @@ export default function TeamManagement() {
     updateRole, isUpdatingRole,
     inviteMember, isInviting,
   } = useOrgMembers(orgId);
+
+  // Couleurs planning : team_members reliés aux membres par user_id.
+  const { members: teamMembers } = useTeamMembers(orgId);
+  const { setColor } = useSetTeamMemberColor(orgId);
+  const tmByUser = useMemo(() => {
+    const map = new Map();
+    (teamMembers || []).forEach((t) => { if (t.user_id) map.set(t.user_id, t); });
+    return map;
+  }, [teamMembers]);
+  const [savingColorId, setSavingColorId] = useState(null);
 
   const [updatingUserId, setUpdatingUserId] = useState(null);
 
@@ -362,6 +439,25 @@ export default function TeamManagement() {
     return result;
   };
 
+  /**
+   * Change la couleur planning d'un membre (team_member.calendar_color).
+   */
+  const handleColorChange = async (teamMemberId, color) => {
+    setSavingColorId(teamMemberId);
+    try {
+      const result = await setColor({ teamMemberId, color });
+      if (result?.error) {
+        toast.error('Erreur lors du changement de couleur');
+      } else {
+        toast.success('Couleur mise à jour');
+      }
+    } catch {
+      toast.error('Erreur inattendue');
+    } finally {
+      setSavingColorId(null);
+    }
+  };
+
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -428,19 +524,29 @@ export default function TeamManagement() {
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Changer le rôle
                 </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
+                  Couleur planning
+                </th>
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
-                <MemberRow
-                  key={member.user_id}
-                  member={member}
-                  isCurrentUser={member.user_id === user?.id}
-                  isUpdating={updatingUserId === member.user_id}
-                  isUpdatingRole={isUpdatingRole}
-                  onRoleChangeRequest={handleRoleChangeRequest}
-                />
-              ))}
+              {members.map((member) => {
+                const tm = tmByUser.get(member.user_id);
+                return (
+                  <MemberRow
+                    key={member.user_id}
+                    member={member}
+                    teamMember={tm}
+                    canEditColor={isOrgAdmin}
+                    isCurrentUser={member.user_id === user?.id}
+                    isUpdating={updatingUserId === member.user_id}
+                    isUpdatingRole={isUpdatingRole}
+                    onRoleChangeRequest={handleRoleChangeRequest}
+                    onColorChange={handleColorChange}
+                    isColorSaving={!!tm && savingColorId === tm.id}
+                  />
+                );
+              })}
             </tbody>
           </table>
 
