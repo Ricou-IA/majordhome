@@ -38,6 +38,7 @@ import {
   WEBSHOP_ORDER_TYPES,
   getStatusMeta,
 } from '@services/webshop.service';
+import InscriptionsTab from '@/apps/artisan/components/webshop/InscriptionsTab';
 
 // ============================================================================
 // HELPERS
@@ -558,9 +559,19 @@ export default function Webshop() {
         >
           Produits &amp; tarifs
         </button>
+        <button
+          onClick={() => setTab('inscriptions')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            tab === 'inscriptions'
+              ? 'border-primary-600 text-primary-700'
+              : 'border-transparent text-secondary-500 hover:text-secondary-700'
+          }`}
+        >
+          Inscriptions
+        </button>
       </div>
 
-      {tab === 'orders' ? <OrdersTab /> : <ProductsTab />}
+      {tab === 'orders' ? <OrdersTab /> : tab === 'products' ? <ProductsTab /> : <InscriptionsTab />}
     </div>
   );
 }
