@@ -48,6 +48,7 @@ export const SectionType = ({
   typeLocked = false,
   hideSubject = false,
   allowTypeChange = false,
+  retypeHint = null,
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -62,6 +63,9 @@ export const SectionType = ({
         disabled={(isEdit && !allowTypeChange) || isCancelled || typeLocked}
       />
     </FormField>
+    {retypeHint && (
+      <p className="mt-1.5 text-xs text-gray-400">{retypeHint}</p>
+    )}
     {/* Objet masqué dans le flux assistant (création VT/entretien/SAV/install) :
         généré automatiquement (type + client) pour aller droit au but. */}
     {!hideSubject && (

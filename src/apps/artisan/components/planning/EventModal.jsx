@@ -24,6 +24,7 @@ import { resolveCardForAppointment } from '@services/appointmentActivation.servi
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
@@ -119,6 +120,7 @@ export function EventModal({
   } = useLeadSearch(orgId);
 
   const queryClient = useQueryClient();
+  const { isOrgAdmin } = useAuth();
 
   // Tous les team_members actifs (techniciens + commerciaux + admin)
   // `members` prop = team_members from Planning.jsx, mais ne contient que les techniciens
@@ -572,16 +574,38 @@ export function EventModal({
       ? (appointment?.intervention_id || null)
       : (attachContext?.interventionId || null);
 
+    // Correction de type inline par un org_admin sur un RDV existant (god-mode) :
+    // un RDV mal catégorisé (ex. « Autre » au lieu d'« Entretien ») ne déclenche pas
+    // le workflow lié. On re-résout la carte cible comme à la re-planification —
+    // mais SANS re-choix de créneau (date/heure conservées).
+    const typeChangedInEdit = isEdit && formData.appointment_type !== appointment?.appointment_type;
+
+    let subject = formData.subject?.trim() || null;
+
     if (!isEdit) {
       const act = await resolveActivation({ rdvDate: formData.scheduled_date });
       if (reportActivationError(act.error)) return;
       leadId = act.leadId;
       interventionId = act.interventionId;
+    } else if (typeChangedInEdit) {
+      const act = await resolveActivation({ rdvDate: formData.scheduled_date });
+      if (reportActivationError(act.error)) return;
+      leadId = act.leadId;
+      interventionId = act.interventionId;
+
+      // Rafraîchir l'objet auto (type — client) si l'utilisateur n'a pas saisi
+      // d'objet custom (un objet écrit à la main reste intact).
+      const oldLabel = getAppointmentTypeConfig(appointment?.appointment_type).label;
+      const newLabel = getAppointmentTypeConfig(formData.appointment_type).label;
+      const clientLabel = [formData.client_name, formData.client_first_name].filter(Boolean).join(' ').trim();
+      const looksAuto = !subject || subject === oldLabel
+        || subject.startsWith(`${oldLabel} —`) || subject.startsWith(`${oldLabel}—`);
+      if (looksAuto) subject = clientLabel ? `${newLabel} — ${clientLabel}` : newLabel;
     }
 
     // Construire les données à envoyer
     const data = {
-      subject: formData.subject || null,
+      subject,
       appointment_type: formData.appointment_type,
       priority: formData.priority,
       status: formData.status,
@@ -609,6 +633,15 @@ export function EventModal({
 
     if (leadId) {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+    }
+    // Re-typage : la carte cible a changé (ancienne refluée, nouvelle avancée par le
+    // service appointments) → rafraîchir kanbans / interventions / entretiens.
+    if (typeChangedInEdit) {
+      queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+      if (interventionId || appointment?.intervention_id) {
+        queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+        queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      }
     }
   }, [validate, selectedLead, attachContext, isEdit, appointment, resolveActivation, reportActivationError, formData, onSave, selectedClient, orgId, queryClient]);
 
@@ -780,6 +813,10 @@ export function EventModal({
   // - fiche / planning -> Visite Technique / Entretien / SAV / Autre (PAS Installation,
   //   PAS RDV Commercial legacy). On garde toujours le type courant pour l'affichage en édition.
   const typeLocked = Boolean(attachContext?.lockedType);
+  // Déverrouillage inline du type en édition, réservé à l'org_admin (god-mode) :
+  // corriger un RDV mal catégorisé sans repasser par la re-planification. Le picker
+  // classique reste verrouillé pour les autres rôles (chemin « Modifier le RDV »).
+  const canRetypeInline = isEdit && isOrgAdmin && !isCancelled && !typeLocked;
   const availableTypes = useMemo(() => {
     if (attachContext?.lockedType) {
       return APPOINTMENT_TYPES.filter(t => t.value === attachContext.lockedType);
@@ -876,7 +913,10 @@ export function EventModal({
                 availableTypes={availableTypes}
                 typeLocked={typeLocked}
                 hideSubject={usesAssistant}
-                allowTypeChange={rescheduleMode}
+                allowTypeChange={rescheduleMode || canRetypeInline}
+                retypeHint={canRetypeInline && !rescheduleMode
+                  ? 'Admin : corriger le type recrée la carte liée (entretien, visite…) et conserve la date.'
+                  : null}
               />
 
               {/* Date/heure (édition) : lecture seule + bouton « Modifier le RDV » →
