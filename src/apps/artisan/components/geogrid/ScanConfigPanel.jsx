@@ -38,6 +38,14 @@ const SEARCH_PROFILES = [
 // Pricing Google Places API Text Search Pro — tranche 5000-100000 req/mois
 const PRICE_PER_REQ_OVER_FREE_EUR = 27.75 / 1000;
 
+// Normalise un nom d'établissement pour comparaison tolérante (casse + accents + espaces),
+// même logique que le matching de l'edge function geogrid-scan. Sans ça, "Mayer Énergie"
+// (brand_name, accentué) ne matche pas "Mayer Energie" (organization.name) → le Place ID
+// auto ne se remplit jamais et le scan retombe sur le matching par nom (fragile).
+function normalizeBusinessName(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
 export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const { organization } = useAuth();
   const orgName = organization?.name || '';
@@ -62,12 +70,13 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
   const [loadingCommunes, setLoadingCommunes] = useState(false);
   const [communesError, setCommunesError] = useState(null);
 
-  // Détecte si le businessName saisi correspond à l'org (insensible casse/espaces)
+  // Détecte si le businessName saisi correspond à l'org (insensible casse/accents/espaces).
+  // Compare au nom légal (organization.name) ET au brand_name, car le nom par défaut du
+  // champ vient de brand_name : sans ce double test, le Place ID auto ne se remplirait pas.
   const isOrgBusiness = useMemo(() => {
-    const a = config.businessName?.toLowerCase().trim();
-    const b = orgName.toLowerCase().trim();
-    return a && b && a === b;
-  }, [config.businessName, orgName]);
+    const a = normalizeBusinessName(config.businessName);
+    return !!a && (a === normalizeBusinessName(orgName) || a === normalizeBusinessName(orgBusinessName));
+  }, [config.businessName, orgName, orgBusinessName]);
 
   // Synchronise le placeId avec le businessName :
   // - Match org → remplit le placeId stocké
