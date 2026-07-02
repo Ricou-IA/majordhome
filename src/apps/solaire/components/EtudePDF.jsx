@@ -262,7 +262,7 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
         </View>
         {others.length > 0 && (
           <Text style={s.altLine}>
-            Également étudié : {others.map((sc) => `${numStr(sc.kwc)} kWc${sc.isOptimum ? ' (optimisé)' : ''} — économie an 1 ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)}`).join(' · ')}
+            Également étudié : {others.map((sc) => `${numStr(sc.kwc)} kWc${sc.isOptimum ? ' (optimisé)' : ''} — économie an 1 : ${eur(sc.economyYear1)}, surplus perdu ${pct(sc.surplusPct)}`).join(' · ')}
           </Text>
         )}
 
