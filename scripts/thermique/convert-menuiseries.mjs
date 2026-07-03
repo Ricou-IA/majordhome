@@ -18,6 +18,7 @@ const coffresVolets = parseCoffresVolets(readSource('CoffreVolets.txt'));
 
 if (vitrages.length < 3) throw new Error(`${vitrages.length} vitrages seulement — parser à vérifier`);
 if (menuiseriesTypes.length < 2) throw new Error(`${menuiseriesTypes.length} profils menuiserie seulement — parser à vérifier`);
+if (intercalairesWarmEdge.length < 3) throw new Error(`${intercalairesWarmEdge.length} intercalaires warm-edge seulement — parser à vérifier`);
 
 // Garde-fous physiques (bornes de la tâche) : ug/uf dans [0.5, 6.5], deltaR dans [0, 1].
 for (const { nom, ug } of vitrages) {
@@ -28,6 +29,10 @@ for (const { nom, uf } of menuiseriesTypes) {
 }
 for (const { nom, deltaR } of volets) {
   if (deltaR < 0 || deltaR > 1) throw new Error(`Volet "${nom}" : deltaR=${deltaR} hors [0, 1]`);
+}
+// Ψ linéique d'intercalaire typique : 0.03-0.1 W/(m.K) ; bornes larges [0, 0.2].
+for (const { nom, psi } of intercalairesWarmEdge) {
+  if (psi < 0 || psi > 0.2) throw new Error(`Intercalaire "${nom}" : psi=${psi} hors [0, 0.2]`);
 }
 // CoffreVolets.txt exprime aussi un coefficient U (Uc) : mêmes bornes que ug/uf.
 for (const { nom, uc } of coffresVolets) {

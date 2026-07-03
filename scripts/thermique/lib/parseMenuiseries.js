@@ -13,7 +13,8 @@
 //   [nom, valeur, ""]
 import { unquote, parseFrNumber } from './sourceFiles.js';
 
-/** Déballe chaque ligne non vide "a\tb\t..." -> ['a','b',...] (guillemets retirés, split tab). */
+/** Déballe chaque ligne non vide "a\tb\t..." -> ['a','b',...] (guillemets retirés, split tab).
+ * NB : unquote() trim() la ligne, donc le champ vide final (tabulation traînante) disparaît. */
 export function parseTabQuoted(text) {
   const rows = [];
   for (const raw of text.split(/\r?\n/)) {
