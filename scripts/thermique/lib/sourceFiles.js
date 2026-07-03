@@ -24,9 +24,15 @@ export function unquote(line) {
 // exports FR du logiciel Thermique (ex. separateur de milliers des DJU : "2 165").
 const NUMERIC_WHITESPACE_RE = /[\s\u00A0\u202F]/g;
 
-/** "0,036" | "1 000" | "2 165" (avec espaces normales/insecables) -> number ; vide/non-numerique -> null. */
+// Forme numerique FR attendue : signe optionnel, chiffres (avec espaces de milliers,
+// insecables comprises), decimales via virgule ou point. Rejette le reste ("0x10", "1e3"...)
+// que Number() coercerait silencieusement.
+const FR_NUMBER_RE = /^[+-]?\d[\d\s\u00A0\u202F]*([.,]\d+)?$/;
+
+/** "0,036" | "1 000" | "2 165" | "-5,2" -> number ; vide/non-numerique ("0x10") -> null. */
 export function parseFrNumber(raw) {
   if (raw == null) return null;
+  if (!FR_NUMBER_RE.test(String(raw).trim())) return null;
   const cleaned = String(raw).replace(NUMERIC_WHITESPACE_RE, '').replace(',', '.');
   if (cleaned === '') return null;
   const n = Number(cleaned);

@@ -15,6 +15,9 @@ test('parseFrNumber gère virgule, espaces (dont insécables) et vide', () => {
   assert.equal(parseFrNumber('1 000'), 1000);
   assert.equal(parseFrNumber(''), null);
   assert.equal(parseFrNumber('abc'), null);
+  assert.equal(parseFrNumber('-0.09'), -0.09); // lat/lng communes
+  assert.equal(parseFrNumber('-5,2'), -5.2);
+  assert.equal(parseFrNumber('0x10'), null); // pas de coercition hexadécimale
 });
 
 test('stripDiacritics pour comparaisons de noms', () => {
