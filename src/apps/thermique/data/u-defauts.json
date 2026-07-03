@@ -1,0 +1,111 @@
+{
+  "_meta": {
+    "convertedAt": "2026-07-03",
+    "source": "Open3CL/engine (MIT) — src/tv.js, tables umur/upb/uph (tvs.umur, tvs.upb, tvs.uph)",
+    "sourceRef": "bb583ee75bb9faf5f3c5ba0984115c21b7a167d5",
+    "license": "MIT",
+    "note": "Tables Open3CL multi-dimensionnelles (période de construction × zone climatique H1/H2/H3 × effet Joule 0/1) ; colonne retenue = zone_climatique 'H1' (zone de référence la plus tempérée) et effet_joule '0' (cas non-Joule, cas général). Pour uph (plafond/toiture), colonne type_toiture='combles' retenue (vs 'terrasse'), cas résidentiel le plus courant. Les enum_periode_construction_id '1|2' sont fusionnées par Open3CL en un seul libellé 'avant 1974 ou inconnu' (même valeur pour avant 1948 et 1948-1974) : reporté ici comme période unique 'avant 1974'. La dernière période Open3CL '>=2013' (reportée ici 'après 2012') couvre les enum_periode_construction '2013-2021' et 'après 2021' (même valeur dans la table). AUCUNE valeur fenêtre : la table Open3CL `uw` (tv.js) est indexée par type de baie/menuiserie/vitrage, PAS par période de construction — il n'existe pas de Uw par défaut par période dans Open3CL. Dériver un tel mapping aurait nécessité d'inventer des valeurs hors source : non fait (voir rapport de tâche)."
+  },
+  "mur": [
+    {
+      "periode": "avant 1974",
+      "u": 2.5
+    },
+    {
+      "periode": "1975-1977",
+      "u": 1
+    },
+    {
+      "periode": "1978-1982",
+      "u": 1
+    },
+    {
+      "periode": "1983-1988",
+      "u": 0.8
+    },
+    {
+      "periode": "1989-2000",
+      "u": 0.5
+    },
+    {
+      "periode": "2001-2005",
+      "u": 0.4
+    },
+    {
+      "periode": "2006-2012",
+      "u": 0.36
+    },
+    {
+      "periode": "après 2012",
+      "u": 0.23
+    }
+  ],
+  "plancherBas": [
+    {
+      "periode": "avant 1974",
+      "u": 2
+    },
+    {
+      "periode": "1975-1977",
+      "u": 0.9
+    },
+    {
+      "periode": "1978-1982",
+      "u": 0.9
+    },
+    {
+      "periode": "1983-1988",
+      "u": 0.8
+    },
+    {
+      "periode": "1989-2000",
+      "u": 0.5
+    },
+    {
+      "periode": "2001-2005",
+      "u": 0.3
+    },
+    {
+      "periode": "2006-2012",
+      "u": 0.27
+    },
+    {
+      "periode": "après 2012",
+      "u": 0.23
+    }
+  ],
+  "plafond": [
+    {
+      "periode": "avant 1974",
+      "u": 2.5
+    },
+    {
+      "periode": "1975-1977",
+      "u": 0.5
+    },
+    {
+      "periode": "1978-1982",
+      "u": 0.5
+    },
+    {
+      "periode": "1983-1988",
+      "u": 0.3
+    },
+    {
+      "periode": "1989-2000",
+      "u": 0.25
+    },
+    {
+      "periode": "2001-2005",
+      "u": 0.23
+    },
+    {
+      "periode": "2006-2012",
+      "u": 0.2
+    },
+    {
+      "periode": "après 2012",
+      "u": 0.14
+    }
+  ]
+}
