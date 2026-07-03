@@ -1,0 +1,179 @@
+{
+  "_meta": {
+    "convertedAt": "2026-07-03",
+    "source": "C:\\Thermique (Vitrages, Menuiseries, Volets, WarmEdge, CoffreVolets)",
+    "license": "proprietary-internal",
+    "note": "fenetresTypes omis : les sources ne donnent que des composants (Ug/Uf/deltaR), jamais un Uw de fenêtre complète — aucune valeur n'est calculée/inventée. intercalairesWarmEdge (psi, W/(m.K)) et coffresVolets (Uc, W/(m².K)) sont des grandeurs annexes hors du triplet ug/uf/deltaR, ajoutées car les fichiers sources existent et sont exploitables."
+  },
+  "vitrages": [
+    {
+      "nom": "Simple vitrage courant",
+      "format": "4",
+      "ug": 5.7
+    },
+    {
+      "nom": "Saint-Gobain - double vitrage - Planitherm argon",
+      "format": "4/12/4",
+      "ug": 1.4
+    },
+    {
+      "nom": "Saint-Gobain - double vitrage - Eko + argon",
+      "format": "4/12/4",
+      "ug": 1.6
+    },
+    {
+      "nom": "Saint-Gobain - double vitrage - Planilux + Planitherm Ultra N + Argon 90%",
+      "format": "4/16/4",
+      "ug": 1.1
+    },
+    {
+      "nom": "Double vitrage courant, vide d'air 12 mm",
+      "format": "4/12/4",
+      "ug": 2.9
+    },
+    {
+      "nom": "Saint-Gobain - double vitrage - Planiclear + Eclaz +  Argon 90%",
+      "format": "4/16/4",
+      "ug": 1.1
+    },
+    {
+      "nom": "Saint-Gobain - double vitrage - Planitherm",
+      "format": "4/12/4",
+      "ug": 1.8
+    },
+    {
+      "nom": "Double vitrage courant, vide d'air 16 mm",
+      "format": "4/16/4",
+      "ug": 2.7
+    },
+    {
+      "nom": "Porte palière isolante",
+      "format": "",
+      "ug": 1.6
+    }
+  ],
+  "menuiseriesTypes": [
+    {
+      "nom": "Menuiserie métallique à  rupture de pont thermique de mauvais niveau",
+      "uf": 5
+    },
+    {
+      "nom": "Menuiserie métallique à  rupture de pont thermique de niveau moyen",
+      "uf": 4
+    },
+    {
+      "nom": "Menuiserie bois feuillus très lourd",
+      "uf": 3.5
+    },
+    {
+      "nom": "Menuiserie métallique à  rupture de pont thermique de bon niveau",
+      "uf": 3
+    },
+    {
+      "nom": "Menuiserie bois feuillus mi-lourd",
+      "uf": 2.6
+    },
+    {
+      "nom": "Menuiserie PVC de mauvais niveau",
+      "uf": 2.5
+    },
+    {
+      "nom": "Menuiserie PVC de niveau moyen",
+      "uf": 1.8
+    },
+    {
+      "nom": "Menuiserie PVC de très bon niveau",
+      "uf": 1.5
+    },
+    {
+      "nom": "Menuiserie VELUX fenètre de toit double vitrage",
+      "uf": 1.5
+    }
+  ],
+  "volets": [
+    {
+      "nom": "Volet roulant PVC (e > 12 mm)",
+      "deltaR": 0.25
+    },
+    {
+      "nom": "Persienne coulissante ou volet battant (e < 22 mm)",
+      "deltaR": 0.19
+    },
+    {
+      "nom": "Volet roulant PVC (e < 12 mm)",
+      "deltaR": 0.19
+    },
+    {
+      "nom": "Fermeture sans ajours en position fermée",
+      "deltaR": 0.15
+    },
+    {
+      "nom": "Volet roulant alu",
+      "deltaR": 0.14
+    },
+    {
+      "nom": "Fermeture sans ajour en position déployée",
+      "deltaR": 0.14
+    },
+    {
+      "nom": "Vénitien extérieur tout métal, volets battants",
+      "deltaR": 0.08
+    },
+    {
+      "nom": "Jalousie accordéon, fermeture à lames orientables",
+      "deltaR": 0.08
+    },
+    {
+      "nom": "Persienne avec ajours fixes",
+      "deltaR": 0.08
+    }
+  ],
+  "intercalairesWarmEdge": [
+    {
+      "nom": "Double Vitrage - Métal avec séparation thermique",
+      "psi": 0.051
+    },
+    {
+      "nom": "Triple Vitrage - Métal avec séparation thermique",
+      "psi": 0.045
+    },
+    {
+      "nom": "Double Vitrage - Bois et métal - Aluminium",
+      "psi": 0.044
+    },
+    {
+      "nom": "Double Vitrage - Bois - Aluminium",
+      "psi": 0.041
+    },
+    {
+      "nom": "Double Vitrage - Matière synthétique - Warm edge",
+      "psi": 0.041
+    },
+    {
+      "nom": "Triple Vitrage - Bois et métal - Aluminium  25",
+      "psi": 0.04
+    },
+    {
+      "nom": "Triple Vitrage - Bois - Aluminium",
+      "psi": 0.039
+    },
+    {
+      "nom": "Triple Vitrage - Matière synthétique - Warm edge",
+      "psi": 0.038
+    }
+  ],
+  "coffresVolets": [
+    {
+      "nom": "Coffre PVC, non isolé",
+      "uc": 1.4
+    },
+    {
+      "nom": "Coffre PVC, isolé, de qualité moyenne",
+      "uc": 1
+    },
+    {
+      "nom": "Coffre PVC, isolé, de très bonne qualité",
+      "uc": 0.58
+    }
+  ]
+}
