@@ -5,7 +5,7 @@
     "convertedAt": "2026-07-03",
     "note": "La source donne UNE température de base par département (référence chef-lieu), sans tranches d'altitude : chaque département est donc transcrit en une tranche unique ouverte (altMax null). Le logiciel historique applique ensuite une correction d'altitude (« Température corrigée hiver », cf. Aide générale-1.pdf p. 10, exemple Amanzé 350 m : base -10 → corrigée -11) dont la règle n'est pas documentée dans les fichiers accessibles (probablement codée dans Thermique.exe). La source regroupe la Corse sous le numéro 20 (Ajaccio/S-2A - Bastia/N-2B, T Hiver -2) : la valeur est dupliquée sur les clés 2A et 2B."
   },
-  "_ancres": { "75": -5, "67": -15, "06": -5, "81": -5 },
+  "_ancres": { "75": -5, "67": -15, "06": -5, "81": -5, "09": -5, "25": -12, "42": -10, "59": -9, "88": -15 },
   "thetaNonChauffage": 16,
   "thetaBase": {
     "01": [ { "altMax": null, "thetaE": -10 } ],

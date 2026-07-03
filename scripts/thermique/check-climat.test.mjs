@@ -24,14 +24,15 @@ test('structure : ≥95 départements métropole, tranches d’altitude croissan
   }
 });
 
-test('valeurs de contrôle lues dans la source', () => {
+test('cohérence lookup ↔ ancres (9 départements contre-lus dans la source)', () => {
   const at = (dept, alt) => {
     const tr = climat.thetaBase[dept].find((t) => t.altMax === null || alt <= t.altMax);
     return tr.thetaE;
   };
-  assert.equal(at('75', 50), climat._ancres['75']);   // Paris
-  assert.equal(at('67', 150), climat._ancres['67']);  // Strasbourg
-  assert.equal(at('06', 10), climat._ancres['06']);   // Nice littoral
-  assert.equal(at('81', 140), climat._ancres['81']);  // Tarn (org pilote)
+  for (const [dept, expected] of Object.entries(climat._ancres)) {
+    assert.equal(at(dept, 100), expected, `${dept}: lookup ≠ ancre`);
+  }
   assert.ok(at('67', 150) < at('06', 10), 'Strasbourg plus froid que Nice');
+  // Invariant Corse : la source groupe 2A et 2B sous le numéro 20 (cf. _meta.note)
+  assert.equal(climat.thetaBase['2A'][0].thetaE, climat.thetaBase['2B'][0].thetaE, 'Corse : 2A et 2B doivent porter la même valeur');
 });
