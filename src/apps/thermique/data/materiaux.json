@@ -1,0 +1,2873 @@
+{
+  "_meta": {
+    "convertedAt": "2026-07-03",
+    "source": "C:\\Thermique\\Composants (bibliothèque du logiciel historique, usage interne)",
+    "license": "proprietary-internal"
+  },
+  "materiaux": [
+    {
+      "nom": "Air",
+      "famille": "Autres matériaux",
+      "lambda": 0.025,
+      "masseVolumique": 1.23,
+      "capacite": 1008,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Argile ou limon",
+      "famille": "Autres matériaux",
+      "lambda": 1.5,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Argon",
+      "famille": "Autres matériaux",
+      "lambda": 0.017,
+      "masseVolumique": 1.7,
+      "capacite": 519,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Bauge",
+      "famille": "Autres matériaux",
+      "lambda": 1.1,
+      "masseVolumique": 1885,
+      "capacite": 836,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton de terre stabilisé",
+      "famille": "Autres matériaux",
+      "lambda": 1.1,
+      "masseVolumique": 1885,
+      "capacite": 850,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs de terre comprimée",
+      "famille": "Autres matériaux",
+      "lambda": 1.1,
+      "masseVolumique": 1885,
+      "capacite": 836,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Caoutchouc",
+      "famille": "Autres matériaux",
+      "lambda": 0.17,
+      "masseVolumique": 1200,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Dioxyde de carbone",
+      "famille": "Autres matériaux",
+      "lambda": 0.014,
+      "masseVolumique": 1.95,
+      "capacite": 820,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "eau à 10°C",
+      "famille": "Autres matériaux",
+      "lambda": 0.6,
+      "masseVolumique": 1000,
+      "capacite": 4190,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "eau à 40°C",
+      "famille": "Autres matériaux",
+      "lambda": 0.63,
+      "masseVolumique": 990,
+      "capacite": 4190,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "eau à 80°C",
+      "famille": "Autres matériaux",
+      "lambda": 0.67,
+      "masseVolumique": 970,
+      "capacite": 4190,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Fibres ciment  1400 à 1800 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.65,
+      "masseVolumique": 1600,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Fibres ciment  1800 à 2200 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.95,
+      "masseVolumique": 2000,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Fibres ciment  cellulose 1000 à 1400 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.35,
+      "masseVolumique": 1200,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Fibres ciment  cellulose 1400 à 1800 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.46,
+      "masseVolumique": 1600,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Glace à -0°C",
+      "famille": "Autres matériaux",
+      "lambda": 2.2,
+      "masseVolumique": 900,
+      "capacite": 2000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Glace à -10°C",
+      "famille": "Autres matériaux",
+      "lambda": 2.3,
+      "masseVolumique": 920,
+      "capacite": 2000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Hexaflorure de soufre",
+      "famille": "Autres matériaux",
+      "lambda": 0.013,
+      "masseVolumique": 6.36,
+      "capacite": 614,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Krypton",
+      "famille": "Autres matériaux",
+      "lambda": 0.009,
+      "masseVolumique": 3.56,
+      "capacite": 245,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Linoléom",
+      "famille": "Autres matériaux",
+      "lambda": 0.17,
+      "masseVolumique": 1200,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Matière organique",
+      "famille": "Autres matériaux",
+      "lambda": 0.25,
+      "masseVolumique": 1300,
+      "capacite": 1900,
+      "source": "Mussy et Soulter"
+    },
+    {
+      "nom": "Minéraux (moyenne)",
+      "famille": "Autres matériaux",
+      "lambda": 2.9,
+      "masseVolumique": 2650,
+      "capacite": 800,
+      "source": "Mussy et Soulter"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 1250 à 1450 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.8,
+      "masseVolumique": 1350,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 1450 à 1600 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.8,
+      "masseVolumique": 1525,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 1600 à 1800 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 1,
+      "masseVolumique": 1700,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 1800 à 2000 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 1.3,
+      "masseVolumique": 1900,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 2000 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 1.8,
+      "masseVolumique": 2000,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 500 à 750 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.3,
+      "masseVolumique": 625,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Mortiers d'enduits et de joints 750 à 1000 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.4,
+      "masseVolumique": 875,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Neige compactée ( plus de 200 mm)",
+      "famille": "Autres matériaux",
+      "lambda": 0.6,
+      "masseVolumique": 500,
+      "capacite": 2000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Neige fraîchement tombée (supérieure à 30 mm)",
+      "famille": "Autres matériaux",
+      "lambda": 0.05,
+      "masseVolumique": 100,
+      "capacite": 2000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Neige légèrement comprimée (de 70 à 100 mm)",
+      "famille": "Autres matériaux",
+      "lambda": 0.23,
+      "masseVolumique": 300,
+      "capacite": 2000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Neige souple (de 30 à 70 mm)",
+      "famille": "Autres matériaux",
+      "lambda": 0.12,
+      "masseVolumique": 200,
+      "capacite": 2000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pâte de verre",
+      "famille": "Autres matériaux",
+      "lambda": 1.2,
+      "masseVolumique": 2000,
+      "capacite": 750,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pisé",
+      "famille": "Autres matériaux",
+      "lambda": 1.1,
+      "masseVolumique": 1885,
+      "capacite": 836,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de liège",
+      "famille": "Autres matériaux",
+      "lambda": 0.065,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaques à bases de vermiculite 200 à 300 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.1,
+      "masseVolumique": 250,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaques à bases de vermiculite 300 à 400 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.14,
+      "masseVolumique": 350,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaques à bases de vermiculite 400 à 500 kg au m3",
+      "famille": "Autres matériaux",
+      "lambda": 0.19,
+      "masseVolumique": 450,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plastique",
+      "famille": "Autres matériaux",
+      "lambda": 0.25,
+      "masseVolumique": 1700,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Quartz",
+      "famille": "Autres matériaux",
+      "lambda": 1.4,
+      "masseVolumique": 2200,
+      "capacite": 750,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Roche homogène",
+      "famille": "Autres matériaux",
+      "lambda": 3.5,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 4/5"
+    },
+    {
+      "nom": "Sable et graviers",
+      "famille": "Autres matériaux",
+      "lambda": 2,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Sous couche feutre",
+      "famille": "Autres matériaux",
+      "lambda": 0.05,
+      "masseVolumique": 120,
+      "capacite": 1300,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Sous couche laine",
+      "famille": "Autres matériaux",
+      "lambda": 0.06,
+      "masseVolumique": 200,
+      "capacite": 1300,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Sous couche liège",
+      "famille": "Autres matériaux",
+      "lambda": 0.05,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Sous couche, caoutchouc-mousse ou plastique cellulaire",
+      "famille": "Autres matériaux",
+      "lambda": 0.1,
+      "masseVolumique": 270,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Tapis, revêtement textile",
+      "famille": "Autres matériaux",
+      "lambda": 0.06,
+      "masseVolumique": 200,
+      "capacite": 1300,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Verre sodo-calciaire (y compris le verre flotté)",
+      "famille": "Autres matériaux",
+      "lambda": 1,
+      "masseVolumique": 2500,
+      "capacite": 750,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Xénon",
+      "famille": "Autres matériaux",
+      "lambda": 0.0054,
+      "masseVolumique": 5.68,
+      "capacite": 160,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton caverneux 1600 - 1800",
+      "famille": "Bétons",
+      "lambda": 1.15,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton caverneux 1800 - 2000",
+      "famille": "Bétons",
+      "lambda": 1.35,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton caverneux comportant moins de 10% de sable de rivière",
+      "famille": "Bétons",
+      "lambda": 0.7,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton de copeaux de bois",
+      "famille": "Bétons",
+      "lambda": 0.16,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton de pouzzolane avec éléments fins ou sable 1400 - 1600",
+      "famille": "Bétons",
+      "lambda": 0.52,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton de pouzzolane sans éléments fins",
+      "famille": "Bétons",
+      "lambda": 0.35,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton plein 2000 - 2300",
+      "famille": "Bétons",
+      "lambda": 1.65,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton plein 2300 - 2600",
+      "famille": "Bétons",
+      "lambda": 2,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton plein armé avec de 1% à 2% d'acier 2300 - 2400",
+      "famille": "Bétons",
+      "lambda": 2.3,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton plein armé avec plus de  2% d'acier ",
+      "famille": "Bétons",
+      "lambda": 2.5,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton plein avec laitier granulé",
+      "famille": "Bétons",
+      "lambda": 0.8,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Béton plein avec sable de rivière ou de carrière",
+      "famille": "Bétons",
+      "lambda": 1.4,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 15 x 20 x 50 - 6 alv. 2 rang. - Ep. 15 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.833,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 17.5 x 20 x 50 - 6 alv. 2 rang. - Ep. 17.5 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.952,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 20 x 20 x 50 - 6 alv. 2 rang. - Ep. 20 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.869,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 20 x 20 x 50 - 8 alv. 3 rang. - Ep. 20 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.689,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 22.5 x 20 x 50 - 6 alv. 2 rang. - Ep. 22,5 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.938,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 25 x 20 x 50 - 8 alv.3 rang. - Ep. 25 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.781,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs creux béton 27.5 x 20 x 50 - 8 alv. 3 rang. - Ep. 27.5 cm",
+      "famille": "Blocs creux en béton",
+      "lambda": 0.809,
+      "masseVolumique": 2025,
+      "capacite": 1080,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Blocs béton cellulaire YTONG ep 20, h 25 cm",
+      "famille": "Blocs de béton cellulaire",
+      "lambda": 0.125,
+      "masseVolumique": 350,
+      "capacite": 1000,
+      "source": "Documentation de l'industriel"
+    },
+    {
+      "nom": "Blocs béton cellulaire YTONG ep 25, h 25 cm",
+      "famille": "Blocs de béton cellulaire",
+      "lambda": 0.09,
+      "masseVolumique": 350,
+      "capacite": 1000,
+      "source": "Documentation de l'industriel"
+    },
+    {
+      "nom": "Blocs béton cellulaire YTONG ep 30, h 25 cm",
+      "famille": "Blocs de béton cellulaire",
+      "lambda": 0.09,
+      "masseVolumique": 350,
+      "capacite": 1000,
+      "source": "Documentation de l'industriel"
+    },
+    {
+      "nom": "Blocs béton cellulaire YTONG ep 36.5, h 25 cm",
+      "famille": "Blocs de béton cellulaire",
+      "lambda": 0.09,
+      "masseVolumique": 350,
+      "capacite": 1000,
+      "source": "Documentation de l'industriel"
+    },
+    {
+      "nom": "Blocs béton cellulaire YTONG ep 50, h 15 cm",
+      "famille": "Blocs de béton cellulaire",
+      "lambda": 0.09,
+      "masseVolumique": 350,
+      "capacite": 1000,
+      "source": "Documentation de l'industriel"
+    },
+    {
+      "nom": "Bois feuillus légers",
+      "famille": "Bois",
+      "lambda": 0.15,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois feuillus lourds",
+      "famille": "Bois",
+      "lambda": 0.23,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois feuillus mi-lourds",
+      "famille": "Bois",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois feuillus très légers, balsa",
+      "famille": "Bois",
+      "lambda": 0.057,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois feuillus très lourds",
+      "famille": "Bois",
+      "lambda": 0.29,
+      "masseVolumique": 870,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois résineux légers",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois résineux lourds",
+      "famille": "Bois",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois résineux mi-lourds",
+      "famille": "Bois",
+      "lambda": 0.15,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Bois résineux très lourds",
+      "famille": "Bois",
+      "lambda": 0.23,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U - fascicule 2/5"
+    },
+    {
+      "nom": "Cèdre ",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Cellulose 35 kg par m3 en vrac pose manuelle",
+      "famille": "Bois",
+      "lambda": 0.039,
+      "masseVolumique": 35,
+      "capacite": 1944,
+      "source": "Thermofloc, homatherm, benotherm, hormis mu: wufi-1D"
+    },
+    {
+      "nom": "Cellulose 35 kg par m3 pose machine",
+      "famille": "Bois",
+      "lambda": 0.039,
+      "masseVolumique": 55,
+      "capacite": 1944,
+      "source": "Thermofloc, homatherm, benotherm, hormis mu: wufi-1D"
+    },
+    {
+      "nom": "Cellulose en panneaux",
+      "famille": "Bois",
+      "lambda": 0.04,
+      "masseVolumique": 70,
+      "capacite": 2500,
+      "source": "WUFI-1D"
+    },
+    {
+      "nom": "Chataignier",
+      "famille": "Bois",
+      "lambda": 0.15,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Chène - (rouvre et ou pédonculé)",
+      "famille": "Bois",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Copeaux en vrac",
+      "famille": "Bois",
+      "lambda": 0.05,
+      "masseVolumique": 65,
+      "capacite": 2100,
+      "source": "WUFI-1D"
+    },
+    {
+      "nom": "Douglas",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Epicéa",
+      "famille": "Bois",
+      "lambda": 0.11,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Fibragglo 250 à 350 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.1,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibragglo 350 à 450 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.12,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibragglo 450 à 550 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.15,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibre de bois 140 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.042,
+      "masseVolumique": 140,
+      "capacite": 2100,
+      "source": "Pavatex, hormis mu : WUFI"
+    },
+    {
+      "nom": "Fibre de bois 200 à 350 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.1,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibre de bois 350 à 550 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.14,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibre de bois 40 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.038,
+      "masseVolumique": 40,
+      "capacite": 2100,
+      "source": "Homatherm"
+    },
+    {
+      "nom": "Fibre de bois 55 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.038,
+      "masseVolumique": 55,
+      "capacite": 2100,
+      "source": "Homatherm"
+    },
+    {
+      "nom": "Fibre de bois 550 à 750 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibre de bois 750 à 1 000 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.2,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibre de bois moins de 200 kg par m3 en panneaux",
+      "famille": "Bois",
+      "lambda": 0.07,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Fibre de bois rigide dense ISOREL",
+      "famille": "Bois",
+      "lambda": 0.05,
+      "masseVolumique": 230,
+      "capacite": 2100,
+      "source": "ISOREL"
+    },
+    {
+      "nom": "Frêne",
+      "famille": "Bois",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Hêtre",
+      "famille": "Bois",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Liège comprimé",
+      "famille": "Bois",
+      "lambda": 0.1,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Liège en granulés",
+      "famille": "Bois",
+      "lambda": 0.045,
+      "masseVolumique": 100,
+      "capacite": 1600,
+      "source": "Liège Vrac"
+    },
+    {
+      "nom": "Liège expansé aggloméré au brai ou aux résines synthétiques",
+      "famille": "Bois",
+      "lambda": 0.049,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Liège expansé aggloméré au brai ou aux résines synthétiques ",
+      "famille": "Bois",
+      "lambda": 0.055,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Liège expansé en panneaux",
+      "famille": "Bois",
+      "lambda": 0.04,
+      "masseVolumique": 120,
+      "capacite": 1600,
+      "source": "IsoLiège"
+    },
+    {
+      "nom": "Liège expansé pur",
+      "famille": "Bois",
+      "lambda": 0.049,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Mélèze",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": 600,
+      "capacite": 1583,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Panneaux contreplaqués 300 à 400 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.11,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux contreplaqués 400 à 500 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux contreplaqués 500 à 600 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.15,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux contreplaqués 600 à 700 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.17,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux contreplaqués 700 à 850 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.21,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux contreplaqués 850 à 1 000 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.24,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux contreplaqués moins de 300 kg par m3",
+      "famille": "Bois",
+      "lambda": 0.09,
+      "masseVolumique": null,
+      "capacite": 1600,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Panneaux OSB",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": 1700,
+      "source": "Règles Th-U"
+    },
+    {
+      "nom": "Peuplier blanc",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Pin maritime",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Pin noir d'Autriche et Lancio",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Pin sylvestre",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Roseaux en panneaux",
+      "famille": "Bois",
+      "lambda": 0.056,
+      "masseVolumique": 225,
+      "capacite": 2100,
+      "source": "Akterre - isolation écologique"
+    },
+    {
+      "nom": "Sapin blanc",
+      "famille": "Bois",
+      "lambda": 0.11,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Sipo",
+      "famille": "Bois",
+      "lambda": 0.16,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Teck",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Western Hemlock",
+      "famille": "Bois",
+      "lambda": 0.13,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Western Red Cedar",
+      "famille": "Bois",
+      "lambda": 0.11,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Selon NF EN 13556"
+    },
+    {
+      "nom": "Briques 1 rang. d'alv., ép. 3.5 à 5 cm",
+      "famille": "Briques à perforations horizontales",
+      "lambda": 0.44,
+      "masseVolumique": 900,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Briques 2 rang. d'alv., ép. 5 à 10 cm",
+      "famille": "Briques à perforations horizontales",
+      "lambda": 0.36,
+      "masseVolumique": 900,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Briques 3 rang. d'alv., ép. 15 cm",
+      "famille": "Briques à perforations horizontales",
+      "lambda": 0.43,
+      "masseVolumique": 867,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Briques 4 rang. d'alv., ép. 20 cm",
+      "famille": "Briques à perforations horizontales",
+      "lambda": 0.4,
+      "masseVolumique": 875,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Briques 5 rang. d'alv., ép. de 20 à 27 cm",
+      "famille": "Briques à perforations horizontales",
+      "lambda": 0.4,
+      "masseVolumique": 860,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Briques GF R 15  L 50 x H 29.9 x ep 15 joints collés",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.1875,
+      "masseVolumique": 766,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GF R 20  L 50 x H 29.9 x ep 20 joints collés",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.198,
+      "masseVolumique": 600,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  50 x 29.9 x 20 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  50 x 29.9 x 20 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.154,
+      "masseVolumique": 675,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  50 x 29.9 x 20 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.154,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 ",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.152,
+      "masseVolumique": 675,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 ",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.152,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": 675,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.154,
+      "masseVolumique": 675,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.154,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th + 50 x 29.9 x 20 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": 675,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  50 x 29.9 x 25 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.16,
+      "masseVolumique": 662,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  50 x 29.9 x 25 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.16,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  50 x 29.9 x 25 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": 662,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  50 x 29.9 x 25 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.16,
+      "masseVolumique": 662,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.16,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": 662,
+      "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques L 27.5  x H 21.9 x ep 37.5",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.125,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Encyclopédie IMERYS 2012"
+    },
+    {
+      "nom": "Briques 10.5 x 21.5 - Epai. 10.5 cm",
+      "famille": "Briques pleines",
+      "lambda": 1.17,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-K77"
+    },
+    {
+      "nom": "Briques 10.5 x 21.5 - Epai. 21.5 cm",
+      "famille": "Briques pleines",
+      "lambda": 1.08,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-K77"
+    },
+    {
+      "nom": "Briques 10.5 x 21.5 - Epai. 33 cm",
+      "famille": "Briques pleines",
+      "lambda": 1.1,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-K77"
+    },
+    {
+      "nom": "Briques 10.5 x 21.5 - Epai. 44.5 cm",
+      "famille": "Briques pleines",
+      "lambda": 1.11,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-K77"
+    },
+    {
+      "nom": "Briques 10.5 x 21.5 - Epai. 5 cm",
+      "famille": "Briques pleines",
+      "lambda": 0.83,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-K77"
+    },
+    {
+      "nom": "Blocs polystyrène - Ep. 20 cm",
+      "famille": "Entrevous isolants thermiques",
+      "lambda": 0.07,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Fiche thechnique Isoltop"
+    },
+    {
+      "nom": "AGEPAN DWD - EN 13986 et EN 622-5 type MDF-RWH",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.09,
+      "masseVolumique": 570,
+      "capacite": null,
+      "source": "AGEPAN"
+    },
+    {
+      "nom": "Béton de chanvre Blocs",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.09,
+      "masseVolumique": 350,
+      "capacite": 1000,
+      "source": "ChanvreBloc"
+    },
+    {
+      "nom": "Botte de paille",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.052,
+      "masseVolumique": 100,
+      "capacite": 2000,
+      "source": "Paille Bio"
+    },
+    {
+      "nom": "Botte de paille posé sur champ ep = 0.34 m",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.048,
+      "masseVolumique": 110,
+      "capacite": 1332,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Bottes de paille posées à plat",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.08,
+      "masseVolumique": 125,
+      "capacite": 1500,
+      "source": "RFCP"
+    },
+    {
+      "nom": "Bottes de paille posées sur chant",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.052,
+      "masseVolumique": 125,
+      "capacite": 1500,
+      "source": "RFCP"
+    },
+    {
+      "nom": "Chanvre et chaux",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.1,
+      "masseVolumique": 200,
+      "capacite": 1500,
+      "source": "Internet"
+    },
+    {
+      "nom": "Chévenotte et bore",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.055,
+      "masseVolumique": 110,
+      "capacite": 1750,
+      "source": "Quint'essence"
+    },
+    {
+      "nom": "Coton en panneaux manufacturés",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.088,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Fibre de lin Rouleaux",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.038,
+      "masseVolumique": 30,
+      "capacite": 2000,
+      "source": "BiofibLin"
+    },
+    {
+      "nom": "Laine de bois Isonat Flex 140",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.038,
+      "masseVolumique": 50,
+      "capacite": 1220,
+      "source": "ISONAT"
+    },
+    {
+      "nom": "Laine de bois Isonat Multisol",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.042,
+      "masseVolumique": 140,
+      "capacite": 1220,
+      "source": "ISONAT"
+    },
+    {
+      "nom": "Laine de bois Panneaux rigides",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 110,
+      "capacite": 2100,
+      "source": "Steico Flex"
+    },
+    {
+      "nom": "Laine de bois Panneaux souples",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.038,
+      "masseVolumique": 50,
+      "capacite": 2100,
+      "source": "Soprema Universel"
+    },
+    {
+      "nom": "Laine de bois PAVATEX",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.044,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "PAVATEX"
+    },
+    {
+      "nom": "Laine de bois SAINBIOSE",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.036,
+      "masseVolumique": 50,
+      "capacite": 2016,
+      "source": "SAINBIOSE"
+    },
+    {
+      "nom": "Laine de chanvre en panneau",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.042,
+      "masseVolumique": 40,
+      "capacite": 2300,
+      "source": "Hempflex"
+    },
+    {
+      "nom": "Laine de chanvre en rouleau",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 30,
+      "capacite": 2300,
+      "source": "BiofibChanvre"
+    },
+    {
+      "nom": "Laine de lin en vrac",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.088,
+      "masseVolumique": 22,
+      "capacite": 1500,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Laine de mouton en vrac",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 10,
+      "capacite": 1800,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Laine de mouton Panneaux",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.038,
+      "masseVolumique": 30,
+      "capacite": 1700,
+      "source": "Actis Laine"
+    },
+    {
+      "nom": "Laine de mouton Rouleaux",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.035,
+      "masseVolumique": 25,
+      "capacite": 1700,
+      "source": "LaineMouton Bio"
+    },
+    {
+      "nom": "Métisse",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 20,
+      "capacite": 1300,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Ouate de cellulose Panneaux",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 65,
+      "capacite": 2000,
+      "source": "Celuloz PAN"
+    },
+    {
+      "nom": "Ouate de cellulose Vrac",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.039,
+      "masseVolumique": 50,
+      "capacite": 2000,
+      "source": "Celuloz VRAC"
+    },
+    {
+      "nom": "Ouate insufflée 60 kg par m3",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.038,
+      "masseVolumique": 60,
+      "capacite": 1860,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Ouate panneaux 85 kg par m3",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 85,
+      "capacite": 1860,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Panneau ide fibre de bois SAINTBIOSE Wall 140",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.042,
+      "masseVolumique": 140,
+      "capacite": null,
+      "source": "WF-EN13171-T4-CS(10/Y)100-TR20-WS1,0-AF100-MU3"
+    },
+    {
+      "nom": "Panneau ide fibre de bois SAINTBIOSE Wall 180",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.044,
+      "masseVolumique": 140,
+      "capacite": null,
+      "source": "WF-EN13171-T4-CS(10/Y)100-TR20-WS1,0-AF100-MU3"
+    },
+    {
+      "nom": "Panneau isolant SAINTBIOSE Top 180",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.042,
+      "masseVolumique": 180,
+      "capacite": null,
+      "source": "WF-EN13171-T4-CS(10/Y)100-TR7,5-WS1,0-AF100-MU3"
+    },
+    {
+      "nom": "Perlite en vrac",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.047,
+      "masseVolumique": 130,
+      "capacite": 800,
+      "source": "Efisol"
+    },
+    {
+      "nom": "Plume de canard en vrac",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.04,
+      "masseVolumique": 25,
+      "capacite": 1600,
+      "source": "Sans référence certaine"
+    },
+    {
+      "nom": "Vermiculite en vrac",
+      "famille": "Matériaux isolants divers",
+      "lambda": 0.068,
+      "masseVolumique": 90,
+      "capacite": 800,
+      "source": "Efisol Micatech"
+    },
+    {
+      "nom": "Cladipan 32",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.032,
+      "masseVolumique": 12,
+      "capacite": 838.8,
+      "source": "ISOVER - Documentation"
+    },
+    {
+      "nom": "Foamglas T3+",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.036,
+      "masseVolumique": 100,
+      "capacite": 1000,
+      "source": "Doc Foamglas terrasses bois - www.foamglas.com"
+    },
+    {
+      "nom": "Isofaçade 32P",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.032,
+      "masseVolumique": 12,
+      "capacite": 838.8,
+      "source": "ISOVER - Avis technique : 08/018/544"
+    },
+    {
+      "nom": "Isolant mince à bulles - Ep. 05 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.083,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince à bulles - Ep. 10 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.1,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince à bulles - Ep. 20 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.1,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince à bulles - Ep. 40 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.083,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince multicouches - Ep. 05 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.05,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince multicouches - Ep. 10 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.05,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince multicouches - Ep. 20 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.05,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolant mince multicouches - Ep. 40 mm",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.05,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Isolation en matières naturelles, (eau, sable et chaux)",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.043,
+      "masseVolumique": 115,
+      "capacite": 800,
+      "source": "Documentation de l'industriel"
+    },
+    {
+      "nom": "IsoTec 12 Pro",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.0137,
+      "masseVolumique": 20,
+      "capacite": 500,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de roche RA1",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.047,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de roche RA2",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de roche RA3",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.038,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de roche RB3",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.039,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de roche RB4",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre IBR",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.04,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "ISOVER - ACERMI n° 85/C/18/002 et 85/C/18/004/2"
+    },
+    {
+      "nom": "Laine de verre MONOSPACE 36",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.036,
+      "masseVolumique": 12,
+      "capacite": 838.8,
+      "source": "ISOVER - ACERMI n° 96/C/18/420"
+    },
+    {
+      "nom": "Laine de verre VA1",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.047,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VA2",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.042,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VA3",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.039,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VA4",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.037,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VA5",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.034,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VB1",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.051,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VB2",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.045,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VB3",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VB4",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.038,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VB5",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VC1",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.056,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VC2",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.049,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VC3",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.044,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VC4",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.04,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VC5",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.036,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VD1",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.054,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VD2",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.048,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VD3",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.043,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VE1",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.037,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine de verre VE2",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.039,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laine minérale soufflée - ISOLENE 4",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.046,
+      "masseVolumique": null,
+      "capacite": 1030,
+      "source": "ISOVER - ACERMI n° 05-D-18-404"
+    },
+    {
+      "nom": "Liège comprimé",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.1,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Liège expansé aggloméré au brai ou aux résines synthétiques ",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.049,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Liège expansé pur",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.049,
+      "masseVolumique": null,
+      "capacite": 1560,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Ouate de cellulose en soufflage en combles perdus",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.039,
+      "masseVolumique": 30,
+      "capacite": 1900,
+      "source": "IGLOO - ACERMI N°17/D/153/1211"
+    },
+    {
+      "nom": "Ouate de cellulose, insufflation en murs",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": 55,
+      "capacite": 1900,
+      "source": "IGLOO - ACERMI N°117/D/153/1211"
+    },
+    {
+      "nom": "Ouate de cellulose, projection humide",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": 40,
+      "capacite": 1900,
+      "source": "IGLOO - ACERMI N°117/D/153/1211"
+    },
+    {
+      "nom": "Panneaux HYBRIS d'ACTIS",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.033,
+      "masseVolumique": 7.75,
+      "capacite": 2300,
+      "source": "ACTIS - Brochure - ACERMI n°15-189-1047"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence AC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.03,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence AD",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.03,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence BC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.03,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence BD",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.03,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence CC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence CD",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence DC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence DD",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence EC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence ED",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.04,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence FC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.04,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence FD",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.045,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence GC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.04,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaque de polyuréthanne - Référence HC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.045,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Extrudé - Expansé avec des HCFC (142b ou R22)",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.035,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Extrudé - Sans gaz occlus autre que l'air",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.042,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence AM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.058,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence BC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.047,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence BM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.047,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence CC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.043,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence CM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.043,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence DC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence DM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence EC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.039,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence EM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.039,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence FC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.037,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence FM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.037,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence GC",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.036,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé - Référence GM",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.036,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé, extrudé,  expansé aux CFC.  Avec peau",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.031,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polystyrène expansé, extrudé,  expansé aux CFC. Sans peau",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.033,
+      "masseVolumique": null,
+      "capacite": 1450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polyuréthanne, exp. aux  HCFC (141b)",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.033,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polyuréthanne, exp. aux HCFC (141b) ",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.041,
+      "masseVolumique": null,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Système Optima et laine de verre GR 32",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.032,
+      "masseVolumique": 12,
+      "capacite": 838.8,
+      "source": "ISOVER - Catalogue 2010 - Avis technique : 9/08-876"
+    },
+    {
+      "nom": "Thane Sol",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.023,
+      "masseVolumique": 28,
+      "capacite": 1450,
+      "source": "Certificat ACERMI n°10/007/678"
+    },
+    {
+      "nom": "ThermaSoft natura",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.038,
+      "masseVolumique": 40,
+      "capacite": 1800,
+      "source": "ACERMI 21/007/1556 - Euroclasse F"
+    },
+    {
+      "nom": "TMS INSFR001-c",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.022,
+      "masseVolumique": 32.5,
+      "capacite": 1000,
+      "source": "Déclaration de performances n°INSFR001-c"
+    },
+    {
+      "nom": "XM ultra 22 calé-chevillé",
+      "famille": "Matériaux isolants manufacturés",
+      "lambda": 0.022,
+      "masseVolumique": 40,
+      "capacite": null,
+      "source": "Weber - ETAG 004 - ACERMI n° 11-128-685"
+    },
+    {
+      "nom": "Asphalte pur",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.7,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Asphalte sablé",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 1.15,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Bitume pur",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.17,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Bitume, cartons feutres et chapes souples imprégnées",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.23,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Butyle (iso butène), plein coulé à chaud",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.24,
+      "masseVolumique": 1200,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Butyle (iso butène), plein coulé à chaud",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.24,
+      "masseVolumique": 1200,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Caoutchouc dur (ébonite), plein",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.17,
+      "masseVolumique": 1200,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Caoutchouc dur (ébonite), plein",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.17,
+      "masseVolumique": 1200,
+      "capacite": 1400,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Caoutchouc mousse",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.06,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Caoutchouc mousse",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.06,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Néoprène (polycloroprène)",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.23,
+      "masseVolumique": 1240,
+      "capacite": 2140,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Néoprène (polycloroprène)",
+      "famille": "Matières synthétiques compactes",
+      "lambda": 0.23,
+      "masseVolumique": 1240,
+      "capacite": 2140,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Film polyamide contre collé sur voile non tissé",
+      "famille": "Membrane hygro-régulante",
+      "lambda": 10,
+      "masseVolumique": null,
+      "capacite": 1,
+      "source": "Document SAINT-GOBAIN"
+    },
+    {
+      "nom": "Acier",
+      "famille": "Métaux",
+      "lambda": 50,
+      "masseVolumique": 7800,
+      "capacite": 450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Acier inoxydable",
+      "famille": "Métaux",
+      "lambda": 17,
+      "masseVolumique": 7900,
+      "capacite": 460,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Alliages d'aluminium",
+      "famille": "Métaux",
+      "lambda": 160,
+      "masseVolumique": 2800,
+      "capacite": 880,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Aluminium",
+      "famille": "Métaux",
+      "lambda": 230,
+      "masseVolumique": 2700,
+      "capacite": 880,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Bronze",
+      "famille": "Métaux",
+      "lambda": 65,
+      "masseVolumique": 8700,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Cuivre",
+      "famille": "Métaux",
+      "lambda": 380,
+      "masseVolumique": 8900,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Fer pur",
+      "famille": "Métaux",
+      "lambda": 72,
+      "masseVolumique": 7870,
+      "capacite": 450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Fer, Fonte",
+      "famille": "Métaux",
+      "lambda": 50,
+      "masseVolumique": 7500,
+      "capacite": 450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Laiton",
+      "famille": "Métaux",
+      "lambda": 120,
+      "masseVolumique": 8400,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plomb",
+      "famille": "Métaux",
+      "lambda": 35,
+      "masseVolumique": 11300,
+      "capacite": 130,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Zinc",
+      "famille": "Métaux",
+      "lambda": 110,
+      "masseVolumique": 7200,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Acier",
+      "famille": "Pare-vapeur",
+      "lambda": 50,
+      "masseVolumique": 7800,
+      "capacite": 450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Acier inoxydable",
+      "famille": "Pare-vapeur",
+      "lambda": 17,
+      "masseVolumique": 7900,
+      "capacite": 460,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Aluminium",
+      "famille": "Pare-vapeur",
+      "lambda": 230,
+      "masseVolumique": 2700,
+      "capacite": 880,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Aluminium",
+      "famille": "Pare-vapeur",
+      "lambda": 230,
+      "masseVolumique": 2700,
+      "capacite": 880,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Bardage acier",
+      "famille": "Pare-vapeur",
+      "lambda": 50,
+      "masseVolumique": 7800,
+      "capacite": 450,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Cuivre",
+      "famille": "Pare-vapeur",
+      "lambda": 380,
+      "masseVolumique": 8900,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Cuivre",
+      "famille": "Pare-vapeur",
+      "lambda": 380,
+      "masseVolumique": 8900,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Membrane 2 couches Igloo Ivap 25",
+      "famille": "Pare-vapeur",
+      "lambda": 0.42,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Igloo France Cellulose"
+    },
+    {
+      "nom": "Membrane 3 couches Igloo Ivap hygro",
+      "famille": "Pare-vapeur",
+      "lambda": 0.42,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Igloo France Cellulose"
+    },
+    {
+      "nom": "Papier Kraft",
+      "famille": "Pare-vapeur",
+      "lambda": 0.42,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Bilan thermique"
+    },
+    {
+      "nom": "Papier Kraft et asphalte",
+      "famille": "Pare-vapeur",
+      "lambda": 9.999,
+      "masseVolumique": null,
+      "capacite": 1500,
+      "source": "Bilan thermique"
+    },
+    {
+      "nom": "Plomb",
+      "famille": "Pare-vapeur",
+      "lambda": 35,
+      "masseVolumique": 11300,
+      "capacite": 130,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plomb",
+      "famille": "Pare-vapeur",
+      "lambda": 35,
+      "masseVolumique": 11300,
+      "capacite": 130,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Polyéthylène 0.25 mm",
+      "famille": "Pare-vapeur",
+      "lambda": 0.34,
+      "masseVolumique": null,
+      "capacite": 1,
+      "source": "FTD FLACHDACH TECHNOLOGIE"
+    },
+    {
+      "nom": "Revêtement technique intérieur",
+      "famille": "Pare-vapeur",
+      "lambda": 0.42,
+      "masseVolumique": null,
+      "capacite": null,
+      "source": "Aéroblue"
+    },
+    {
+      "nom": "Zinc",
+      "famille": "Pare-vapeur",
+      "lambda": 110,
+      "masseVolumique": 7200,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Zinc",
+      "famille": "Pare-vapeur",
+      "lambda": 110,
+      "masseVolumique": 7200,
+      "capacite": 380,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Ardoises",
+      "famille": "Pierres",
+      "lambda": 2.2,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Basaltes",
+      "famille": "Pierres",
+      "lambda": 1.6,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Gneiss, porphyres",
+      "famille": "Pierres",
+      "lambda": 3.5,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Granites",
+      "famille": "Pierres",
+      "lambda": 2.8,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Grés (silice)",
+      "famille": "Pierres",
+      "lambda": 2.3,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Grés calcarifères",
+      "famille": "Pierres",
+      "lambda": 1.9,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Grés quartzeux",
+      "famille": "Pierres",
+      "lambda": 2.6,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Marbres",
+      "famille": "Pierres",
+      "lambda": 3.5,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Meulières 1300 à 1900 kg au m3",
+      "famille": "Pierres",
+      "lambda": 0.9,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Meulières 1900 à 2500 kg au m3",
+      "famille": "Pierres",
+      "lambda": 1.8,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres dures",
+      "famille": "Pierres",
+      "lambda": 1.7,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres extra dures",
+      "famille": "Pierres",
+      "lambda": 2.3,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres fermes et demi fermes",
+      "famille": "Pierres",
+      "lambda": 1.4,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres froides",
+      "famille": "Pierres",
+      "lambda": 2.3,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres naturelles poreuses. (laves)",
+      "famille": "Pierres",
+      "lambda": 0.55,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres tendres n°2 et n°3",
+      "famille": "Pierres",
+      "lambda": 1.1,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Pierres très tendres ",
+      "famille": "Pierres",
+      "lambda": 0.85,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Ponces naturelles",
+      "famille": "Pierres",
+      "lambda": 0.12,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Schistes",
+      "famille": "Pierres",
+      "lambda": 2.2,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Silex",
+      "famille": "Pierres",
+      "lambda": 2.6,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Trachytes. andésites",
+      "famille": "Pierres",
+      "lambda": 1.1,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Terre cuite 20 cm",
+      "famille": "Plancher prefa terre cuite",
+      "lambda": 0.16,
+      "masseVolumique": 250,
+      "capacite": 1000,
+      "source": "Exemple"
+    },
+    {
+      "nom": "Enduit intérieur à base de plâtre et de sable",
+      "famille": "Plâtres",
+      "lambda": 0.8,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "FERMACELL - Gypse 80% et fibre de papier 20%",
+      "famille": "Plâtres",
+      "lambda": 0.32,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "FERMACELL"
+    },
+    {
+      "nom": "Plaques de plâtre à parement de carton",
+      "famille": "Plâtres",
+      "lambda": 0.25,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaques de plâtre à parement de carton spéciales feu",
+      "famille": "Plâtres",
+      "lambda": 0.25,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plaques de plâtre armées de fibres minérales",
+      "famille": "Plâtres",
+      "lambda": 0.25,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre courant d'enduit intérieur 1000 à 1300 kg au m3",
+      "famille": "Plâtres",
+      "lambda": 0.57,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre courant d'enduit intérieur moins de 1000 kg au m3",
+      "famille": "Plâtres",
+      "lambda": 0.4,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre d'enduit avec perlite tout venant ou vermiculite grade 2 (1 volume)",
+      "famille": "Plâtres",
+      "lambda": 0.3,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre d'enduit avec perlite tout venant ou vermiculite grade 2 (2 volumes)",
+      "famille": "Plâtres",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre gaché serré ou très serré 1200 1500 kg au m3",
+      "famille": "Plâtres",
+      "lambda": 0.56,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre gaché serré ou très serré 600 900 kg au m3",
+      "famille": "Plâtres",
+      "lambda": 0.3,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre gaché serré ou très serré 900 1200 kg au m3",
+      "famille": "Plâtres",
+      "lambda": 0.43,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    },
+    {
+      "nom": "Plâtre gaché serré ou très serré moins de 600 kg au m3",
+      "famille": "Plâtres",
+      "lambda": 0.18,
+      "masseVolumique": null,
+      "capacite": 1000,
+      "source": "Règles Th-U 2.5"
+    }
+  ]
+}
