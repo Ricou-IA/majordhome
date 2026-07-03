@@ -2,7 +2,8 @@
   "_meta": {
     "convertedAt": "2026-07-03",
     "source": "C:\\Thermique\\Composants (bibliothèque du logiciel historique, usage interne)",
-    "license": "proprietary-internal"
+    "license": "proprietary-internal",
+    "note": "nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source"
   },
   "materiaux": [
     {

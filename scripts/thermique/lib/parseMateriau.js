@@ -9,7 +9,8 @@ import { unquote, parseFrNumber } from './sourceFiles.js';
 export function parseMateriau(contenu, nom, famille) {
   const l = contenu.split(/\r?\n/).map(unquote);
   const lambda = parseFrNumber(l[2]);
-  if (lambda == null || lambda <= 0 || lambda > 500) return null; // garde-fou physique
+  // Garde-fou physique : λ > 500 est au-delà de tout matériau réel (l'argent ~429 W/(m·K)).
+  if (lambda == null || lambda <= 0 || lambda > 500) return null;
   return {
     nom, famille,
     lambda,
