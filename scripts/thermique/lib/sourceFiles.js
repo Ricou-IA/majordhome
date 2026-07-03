@@ -45,5 +45,5 @@ export function writeDataJson(fileName, meta, data) {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const payload = { _meta: { convertedAt: new Date().toISOString().slice(0, 10), ...meta }, ...data };
   fs.writeFileSync(path.join(OUT_DIR, fileName), JSON.stringify(payload, null, 2) + '\n', 'utf8');
-  console.log(`Converted: ${fileName}`);
+  console.log(`✓ ${fileName}`);
 }
