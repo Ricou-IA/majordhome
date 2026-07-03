@@ -1,0 +1,105 @@
+{
+  "_meta": {
+    "convertedAt": "2026-07-03",
+    "source": "C:\\Thermique\\Coefficients-b.txt",
+    "license": "regulatory-table"
+  },
+  "categories": [
+    {
+      "categorie": "Pièce",
+      "valeurs": [
+        {
+          "b": 0.4,
+          "description": "Avec seulement 1 mur extérieur"
+        },
+        {
+          "b": 0.5,
+          "description": "Avec seulement 2 murs extérieurs sans portes extérieures"
+        },
+        {
+          "b": 0.6,
+          "description": "Avec au moins 2 murs extérieurs et des portes extérieures"
+        },
+        {
+          "b": 0.8,
+          "description": "Avec au moins 3 murs extérieurs (par ex. escalier extérieur)"
+        }
+      ]
+    },
+    {
+      "categorie": "Sous-sol",
+      "valeurs": [
+        {
+          "b": 0.5,
+          "description": "Sans fenêtre ni porte extérieure"
+        },
+        {
+          "b": 0.8,
+          "description": "Avec fenêtres ou portes extérieures"
+        }
+      ]
+    },
+    {
+      "categorie": "Espace sous toiture",
+      "valeurs": [
+        {
+          "b": 1,
+          "description": "Espace sous toiture fortement ventilé sans feutre ni panneau en sous face"
+        },
+        {
+          "b": 0.9,
+          "description": "Autres toitures non isolée"
+        },
+        {
+          "b": 0.7,
+          "description": "Toiture isolée"
+        }
+      ]
+    },
+    {
+      "categorie": "Circulation intérieure",
+      "valeurs": [
+        {
+          "b": 0,
+          "description": "Sans mur extérieur taux de renouvellement d'air < 0.5 volume/heure"
+        }
+      ]
+    },
+    {
+      "categorie": "Circulation ouverte sur l'extérieure",
+      "valeurs": [
+        {
+          "b": 1,
+          "description": "Aire des ouvertures / volume de l'espace > 0.005 m2 / m3"
+        }
+      ]
+    },
+    {
+      "categorie": "Vide sanitaire",
+      "valeurs": [
+        {
+          "b": 0.5,
+          "description": "Vide sanitaire très faiblement ventilé"
+        }
+      ]
+    },
+    {
+      "categorie": "Paroi donnant directement sur l'extérieur",
+      "valeurs": [
+        {
+          "b": 1,
+          "description": null
+        }
+      ]
+    },
+    {
+      "categorie": "Paroi donnant sur un local chauffée à la même température",
+      "valeurs": [
+        {
+          "b": 0,
+          "description": null
+        }
+      ]
+    }
+  ]
+}
