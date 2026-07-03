@@ -1,10 +1,12 @@
 // Conversion Composants/<famille>/.../<nom>.txt -> src/apps/thermique/data/materiaux.json
 import fs from 'node:fs';
 import path from 'node:path';
-import { SRC_ROOT, writeDataJson } from './lib/sourceFiles.js';
+import { SRC_ROOT_2024, writeDataJson } from './lib/sourceFiles.js';
 import { parseMateriau } from './lib/parseMateriau.js';
 
-const root = path.join(SRC_ROOT, 'Composants');
+// Règle "per-file newest" (cf. sourceFiles.js) : Composants/ est plus riche dans l'install 2024
+// (365 fichiers vs 359 dans C:/Thermique).
+const root = path.join(SRC_ROOT_2024, 'Composants');
 const materiaux = [];
 const rejets = [];
 
@@ -43,7 +45,7 @@ if (doublons.length) console.warn(`⚠ ${doublons.length} doublons (famille, nom
 
 writeDataJson('materiaux.json',
   {
-    source: 'C:\\Thermique\\Composants (bibliothèque du logiciel historique, usage interne)',
+    source: 'C:\\Thermique2\\Composants (bibliothèque du logiciel historique, install 2024, usage interne)',
     license: 'proprietary-internal',
     note: "nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source",
   },

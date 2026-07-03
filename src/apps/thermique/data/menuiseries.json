@@ -1,7 +1,7 @@
 {
   "_meta": {
     "convertedAt": "2026-07-03",
-    "source": "C:\\Thermique (Vitrages, Menuiseries, Volets, WarmEdge, CoffreVolets)",
+    "source": "C:\\Thermique2 (Vitrages, Menuiseries, Volets 2024 ; WarmEdge, CoffreVolets identiques dans les deux installs)",
     "license": "proprietary-internal",
     "note": "fenetresTypes omis : les sources ne donnent que des composants (Ug/Uf/deltaR), jamais un Uw de fenêtre complète — aucune valeur n'est calculée/inventée. intercalairesWarmEdge (psi, W/(m.K)) et coffresVolets (Uc, W/(m².K)) sont des grandeurs annexes hors du triplet ug/uf/deltaR, ajoutées car les fichiers sources existent et sont exploitables."
   },
@@ -12,24 +12,19 @@
       "ug": 5.7
     },
     {
+      "nom": "Double vitrage courant, vide d'air 16 mm",
+      "format": "4/16/4",
+      "ug": 2.7
+    },
+    {
       "nom": "Saint-Gobain - double vitrage - Planitherm argon",
       "format": "4/12/4",
       "ug": 1.4
     },
     {
-      "nom": "Saint-Gobain - double vitrage - Eko + argon",
-      "format": "4/12/4",
-      "ug": 1.6
-    },
-    {
       "nom": "Saint-Gobain - double vitrage - Planilux + Planitherm Ultra N + Argon 90%",
       "format": "4/16/4",
       "ug": 1.1
-    },
-    {
-      "nom": "Double vitrage courant, vide d'air 12 mm",
-      "format": "4/12/4",
-      "ug": 2.9
     },
     {
       "nom": "Saint-Gobain - double vitrage - Planiclear + Eclaz +  Argon 90%",
@@ -42,9 +37,34 @@
       "ug": 1.8
     },
     {
-      "nom": "Double vitrage courant, vide d'air 16 mm",
+      "nom": "Saint-Gobain - double vitrage - Eko + argon",
+      "format": "4/12/4",
+      "ug": 1.6
+    },
+    {
+      "nom": "Double vitrage courant, vide d'air 12 mm",
+      "format": "4/12/4",
+      "ug": 2.9
+    },
+    {
+      "nom": "Vitrage OPTIMA + Gaz",
+      "format": "6/12/6",
+      "ug": 1.1
+    },
+    {
+      "nom": "Glassolutions",
+      "format": "4/20/4",
+      "ug": 1.1
+    },
+    {
+      "nom": "Glassolutions",
       "format": "4/16/4",
-      "ug": 2.7
+      "ug": 1.1
+    },
+    {
+      "nom": "Verrière ETREZ",
+      "format": "4/20/4",
+      "ug": 1.1
     },
     {
       "nom": "Porte palière isolante",
@@ -82,11 +102,15 @@
       "uf": 1.8
     },
     {
-      "nom": "Menuiserie PVC de très bon niveau",
+      "nom": "Menuiserie bois alu de très bon niveau",
       "uf": 1.5
     },
     {
       "nom": "Menuiserie VELUX fenètre de toit double vitrage",
+      "uf": 1.5
+    },
+    {
+      "nom": "Menuiserie PVC de très bon niveau",
       "uf": 1.5
     }
   ],
@@ -96,11 +120,11 @@
       "deltaR": 0.25
     },
     {
-      "nom": "Persienne coulissante ou volet battant (e < 22 mm)",
+      "nom": "Volet roulant PVC (e < 12 mm)",
       "deltaR": 0.19
     },
     {
-      "nom": "Volet roulant PVC (e < 12 mm)",
+      "nom": "Persienne coulissante ou volet battant (e < 22 mm)",
       "deltaR": 0.19
     },
     {
@@ -116,11 +140,11 @@
       "deltaR": 0.14
     },
     {
-      "nom": "Vénitien extérieur tout métal, volets battants",
+      "nom": "Jalousie accordéon, fermeture à lames orientables",
       "deltaR": 0.08
     },
     {
-      "nom": "Jalousie accordéon, fermeture à lames orientables",
+      "nom": "Vénitien extérieur tout métal, volets battants",
       "deltaR": 0.08
     },
     {

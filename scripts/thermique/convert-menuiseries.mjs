@@ -5,16 +5,19 @@
 // profils de menuiserie, deltaR des volets) et jamais un Uw de fenêtre complète prêt à choisir.
 // Calculer un Uw à partir de Ug/Uf nécessiterait les fractions de surface vitrage/cadre (non
 // présentes dans ces fichiers) : on ne fabrique donc AUCUNE valeur Uw. fenetresTypes est omis.
-import { readSource, writeDataJson } from './lib/sourceFiles.js';
+import { SRC_ROOT_2024, readSource, writeDataJson } from './lib/sourceFiles.js';
 import {
   parseVitrages, parseMenuiseriesProfils, parseVolets, parseWarmEdge, parseCoffresVolets,
 } from './lib/parseMenuiseries.js';
 
-const vitrages = parseVitrages(readSource('Vitrages.txt'));
-const menuiseriesTypes = parseMenuiseriesProfils(readSource('Menuiseries.txt'));
-const volets = parseVolets(readSource('Volets.txt'));
-const intercalairesWarmEdge = parseWarmEdge(readSource('WarmEdge.txt'));
-const coffresVolets = parseCoffresVolets(readSource('CoffreVolets.txt'));
+// Règle "per-file newest" (cf. sourceFiles.js) : Vitrages/Menuiseries/Volets sont plus récents
+// dans l'install 2024 ; WarmEdge/CoffreVolets sont identiques octet à octet dans les deux
+// installs, on lit donc les 5 fichiers depuis la même racine 2024.
+const vitrages = parseVitrages(readSource('Vitrages.txt', SRC_ROOT_2024));
+const menuiseriesTypes = parseMenuiseriesProfils(readSource('Menuiseries.txt', SRC_ROOT_2024));
+const volets = parseVolets(readSource('Volets.txt', SRC_ROOT_2024));
+const intercalairesWarmEdge = parseWarmEdge(readSource('WarmEdge.txt', SRC_ROOT_2024));
+const coffresVolets = parseCoffresVolets(readSource('CoffreVolets.txt', SRC_ROOT_2024));
 
 if (vitrages.length < 3) throw new Error(`${vitrages.length} vitrages seulement — parser à vérifier`);
 if (menuiseriesTypes.length < 2) throw new Error(`${menuiseriesTypes.length} profils menuiserie seulement — parser à vérifier`);
@@ -41,7 +44,7 @@ for (const { nom, uc } of coffresVolets) {
 
 writeDataJson('menuiseries.json',
   {
-    source: 'C:\\Thermique (Vitrages, Menuiseries, Volets, WarmEdge, CoffreVolets)',
+    source: 'C:\\Thermique2 (Vitrages, Menuiseries, Volets 2024 ; WarmEdge, CoffreVolets identiques dans les deux installs)',
     license: 'proprietary-internal',
     note: "fenetresTypes omis : les sources ne donnent que des composants (Ug/Uf/deltaR), jamais un Uw de fenêtre complète — aucune valeur n'est calculée/inventée. intercalairesWarmEdge (psi, W/(m.K)) et coffresVolets (Uc, W/(m².K)) sont des grandeurs annexes hors du triplet ug/uf/deltaR, ajoutées car les fichiers sources existent et sont exploitables.",
   },

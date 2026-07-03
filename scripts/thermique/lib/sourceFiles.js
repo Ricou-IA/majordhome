@@ -2,16 +2,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Deux installs du logiciel historique coexistent ; RÈGLE : chaque converter lit la version
+// LA PLUS RÉCENTE de chaque fichier (décision validée par le propriétaire, "per-file newest") :
+//  - C:/Thermique2 (install 2024) : Composants/ (365 fichiers vs 359), Vitrages/Menuiseries/
+//    Volets (2024) et Bibliothèque Parois.txt (2024, 208 Ko) y sont plus récents ;
+//  - C:/Thermique : climat, communes, coefficients-b sont identiques octet à octet entre les
+//    deux installs (comme WarmEdge/CoffreVolets) ; les tarifs énergie 2025 y sont plus récents
+//    et y seront pris (tâche ultérieure).
 export const SRC_ROOT = process.env.THERMIQUE_SRC || 'C:/Thermique';
+export const SRC_ROOT_2024 = process.env.THERMIQUE_SRC_2024 || 'C:/Thermique2';
 export const OUT_DIR = path.join('src', 'apps', 'thermique', 'data');
 
-/** Lit un fichier source ANSI vers string UTF-8 (latin1 couvre les accents FR de Windows-1252). */
-export function readSource(relPath) {
-  return fs.readFileSync(path.join(SRC_ROOT, relPath), 'latin1');
+/** Lit un fichier source ANSI vers string UTF-8 (latin1 couvre les accents FR de Windows-1252).
+ * @param {string} [root] racine de l'install à lire (SRC_ROOT par défaut, ou SRC_ROOT_2024). */
+export function readSource(relPath, root = SRC_ROOT) {
+  return fs.readFileSync(path.join(root, relPath), 'latin1');
 }
 
-export function readSourceLines(relPath) {
-  return readSource(relPath).split(/\r?\n/);
+export function readSourceLines(relPath, root = SRC_ROOT) {
+  return readSource(relPath, root).split(/\r?\n/);
 }
 
 export function unquote(line) {

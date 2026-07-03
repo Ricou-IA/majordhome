@@ -1,7 +1,7 @@
 {
   "_meta": {
     "convertedAt": "2026-07-03",
-    "source": "C:\\Thermique\\Composants (bibliothèque du logiciel historique, usage interne)",
+    "source": "C:\\Thermique2\\Composants (bibliothèque du logiciel historique, install 2024, usage interne)",
     "license": "proprietary-internal",
     "note": "nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source"
   },
@@ -1151,6 +1151,22 @@
       "source": "Documentation POROTHERM"
     },
     {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 ",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.152,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 ",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.152,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
       "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux minces",
       "famille": "Briques à perforations verticales",
       "lambda": 0.157,
@@ -1167,11 +1183,27 @@
       "source": "Documentation POROTHERM"
     },
     {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
       "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux secs",
       "famille": "Briques à perforations verticales",
       "lambda": 0.154,
       "masseVolumique": 675,
       "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 20Th +  L 50 x H 29.9 x ep 20 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.154,
+      "masseVolumique": null,
+      "capacite": 660,
       "source": "Documentation POROTHERM"
     },
     {
@@ -1239,11 +1271,27 @@
       "source": "Documentation POROTHERM"
     },
     {
+      "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux minces",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.16,
+      "masseVolumique": null,
+      "capacite": 660,
+      "source": "Documentation POROTHERM"
+    },
+    {
       "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux secs",
       "famille": "Briques à perforations verticales",
       "lambda": 0.157,
       "masseVolumique": 662,
       "capacite": 1000,
+      "source": "Documentation POROTHERM"
+    },
+    {
+      "nom": "Briques GFR 25Th +  L 50 x H 29.9 x ep 25 joints verticaux secs",
+      "famille": "Briques à perforations verticales",
+      "lambda": 0.157,
+      "masseVolumique": null,
+      "capacite": 660,
       "source": "Documentation POROTHERM"
     },
     {

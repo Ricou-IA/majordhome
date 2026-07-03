@@ -1,34 +1,76 @@
 {
   "_meta": {
     "convertedAt": "2026-07-03",
-    "source": "C:\\Thermique\\Bibliothèque Parois.txt (U extraits, compositions non reprises)",
+    "source": "C:\\Thermique2\\Bibliothèque Parois.txt (install 2024 ; U extraits, compositions non reprises)",
     "license": "proprietary-internal",
-    "note": "Extraction minimale {nom, code, famille, u} par paroi. Compositions complètes NON reprises (seront reconstruites côté UI depuis materiaux.json). Le fichier source ne contient que 5 parois réelles au total (77 Ko presque entièrement occupés par un blob de sérialisation Excel/VB sans rapport) : ce n'est pas une limite du parseur."
+    "note": "Extraction minimale {nom, code, famille, u} par paroi. Compositions complètes NON reprises (seront reconstruites côté UI depuis materiaux.json). La source 2024 ne contient que 12 parois réelles au total (208 Ko presque entièrement occupés par un blob de sérialisation Excel/VB sans rapport) : ce n'est pas une limite du parseur. Certains noms sont génériques ('Mur Ext.', 'Mur Ent.'...) : entrées utilisateur réelles de la bibliothèque, conservées telles quelles ('Mur Ent.' = mur enterré non isolé, U jour = 6.71 dans la source)."
   },
   "parois": [
     {
-      "nom": "ME. Briques G35 Th - GR32 16 cm - Placo",
+      "nom": "ME. Briques GFR 25Th - GR32 14 cm - Placo",
+      "code": "A1",
+      "famille": "Mur Ext.",
+      "u": 0.16
+    },
+    {
+      "nom": "ME. Agglo béton 17.5 - GR32 14 cm - Placo",
+      "code": "A1",
+      "famille": "Mur Ext.",
+      "u": 0.19
+    },
+    {
+      "nom": "Mur Ext.",
       "code": "A1",
       "famille": "Mur Ext.",
       "u": 0.15
     },
     {
-      "nom": "FE. PVC 1.25 x 1.35 - DV - VR<12",
-      "code": "A7",
-      "famille": "Fen. Porte et Porte-fen.",
-      "u": 1.25
+      "nom": "Mur Ext.",
+      "code": "A1",
+      "famille": "Mur Ext.",
+      "u": 0.19
     },
     {
-      "nom": "PF. PVC 2.00 x 2.15 - DV - VR<12",
+      "nom": "Mur Ent.",
+      "code": "A1",
+      "famille": "Mur Ent.",
+      "u": 6.71
+    },
+    {
+      "nom": "ME. Briques GFR 25Th - GR32 16 cm - Placo",
+      "code": "A1",
+      "famille": "Mur Ext.",
+      "u": 0.15
+    },
+    {
+      "nom": "Mur Int.",
+      "code": "A1",
+      "famille": "Mur Int.",
+      "u": 3.85
+    },
+    {
+      "nom": "FE. 1.00 x 1.50 et coffre VR",
       "code": "A7",
       "famille": "Fen. Porte et Porte-fen.",
-      "u": 1.22
+      "u": 1.3
+    },
+    {
+      "nom": "PF. 1.00 x 2.15",
+      "code": "A7",
+      "famille": "Fen. Porte et Porte-fen.",
+      "u": 1.29
+    },
+    {
+      "nom": "Plan. TP, isol. continue.",
+      "code": "A4",
+      "famille": "Plan. TP, isol. continue.",
+      "u": 0.18
     },
     {
       "nom": "Plan. sur VS.",
       "code": "A4",
       "famille": "Plan. sur VS.",
-      "u": 0.22
+      "u": 0.23
     },
     {
       "nom": "Plaf. sous Comble.",
