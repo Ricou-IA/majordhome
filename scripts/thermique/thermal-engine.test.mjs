@@ -122,6 +122,12 @@ test('debitsParPiece : erreurs propres', () => {
   assert.throws(() => debitsParPiece({ systeme: { mode: 'debits' }, debitTotal: 75,
     pieces: [{ id: 'sdb', volume: 12, humide: true }] }), /thermique/); // aucune pièce sèche
   assert.throws(() => debitsParPiece({ systeme: { mode: 'autre' }, debitTotal: 75, pieces }), /thermique/);
+  assert.throws(() => debitsParPiece({ systeme: undefined, debitTotal: 75, pieces }), /thermique/);
+  assert.throws(() => debitsParPiece({ systeme: { mode: 'debits' }, debitTotal: 75, pieces: undefined }), /thermique/);
+  // mode taux : defaut manquant → échec fort ; humide manquant → échec fort dès qu'une pièce humide est présente
+  assert.throws(() => debitsParPiece({ systeme: { mode: 'taux', tauxParPiece: {} }, debitTotal: null, pieces }), /thermique/);
+  assert.throws(() => debitsParPiece({ systeme: { mode: 'taux', tauxParPiece: { defaut: 0.5 } }, debitTotal: null,
+    pieces: [{ id: 'sdb', volume: 12, humide: true }] }), /thermique/); // tauxParPiece.humide absent
 });
 
 test('ventilationPiece : ΦV = 0.34 × V̇ × ΔT × (1 − rendement DF)', () => {

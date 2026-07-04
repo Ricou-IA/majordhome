@@ -84,13 +84,22 @@ export function transmissionPiece({ thetaInt, thetaExt, parois }) {
  * mode 'debits' (VMC) : l'air neuf entre par les pièces sèches → débit total × facteurDebit réparti
  *   au prorata du volume des pièces sèches ; les pièces humides (extraction — l'air de transfert
  *   arrive déjà à θint) sont à 0. Approche EN 12831 simplifiée assumée (spec §4).
- * mode 'taux' (ventilation naturelle) : taux/h × volume, taux humide ≠ défaut.
+ * mode 'taux' (ventilation naturelle) : taux/h × volume. Clés consommées : tauxParPiece.defaut
+ *   (pièces sèches) et tauxParPiece.humide (pièces humides) — les clés par type de pièce
+ *   (cuisine/sdb/wc) de ventilation.json restent documentaires.
  * NB : le rendement du récupérateur (double flux) s'applique dans ventilationPiece, pas ici.
  */
 export function debitsParPiece({ systeme, debitTotal, pieces }) {
+  if (systeme === null || typeof systeme !== 'object') throw new Error('thermique: systeme requis');
+  if (!Array.isArray(pieces)) throw new Error('thermique: pieces requis');
   const d = {};
   if (systeme.mode === 'taux') {
-    for (const p of pieces) d[p.id] = (p.humide ? systeme.tauxParPiece.humide ?? 1.0 : systeme.tauxParPiece.defaut) * p.volume;
+    if (!Number.isFinite(systeme.tauxParPiece?.defaut)) throw new Error('thermique: tauxParPiece.defaut requis en mode taux');
+    for (const p of pieces) {
+      const taux = p.humide ? systeme.tauxParPiece.humide : systeme.tauxParPiece.defaut;
+      if (!Number.isFinite(taux)) throw new Error(`thermique: tauxParPiece.${p.humide ? 'humide' : 'defaut'} invalide (${taux})`);
+      d[p.id] = taux * p.volume;
+    }
     return d;
   }
   if (systeme.mode === 'debits') {
@@ -105,7 +114,11 @@ export function debitsParPiece({ systeme, debitTotal, pieces }) {
   throw new Error(`thermique: mode ventilation inconnu « ${systeme.mode} »`);
 }
 
-/** ΦV (W) = 0,34 Wh/(m³·K) × V̇ (m³/h) × ΔT (K) × (1 − rendement récupérateur). rendement ∈ [0,1). */
+/**
+ * ΦV (W) = 0,34 Wh/(m³·K) × V̇ (m³/h) × ΔT (K) × (1 − rendement récupérateur). rendement ∈ [0,1).
+ * ΔT négatif (été, θext > θint) → ΦV négatif, non clampé (le bilan hiver ne produit pas ce cas ;
+ * comportement assumé).
+ */
 export function ventilationPiece({ debit, thetaInt, thetaExt, rendement = 0 }) {
   if (!Number.isFinite(debit) || debit < 0) throw new Error(`thermique: débit invalide (${debit})`);
   if (!Number.isFinite(rendement) || rendement < 0 || rendement >= 1) throw new Error(`thermique: rendement hors [0,1) (${rendement})`);
