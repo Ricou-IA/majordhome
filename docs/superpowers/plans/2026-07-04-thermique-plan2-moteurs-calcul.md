@@ -676,19 +676,17 @@ export function pointBivalence({ pac, tDepart, charge, thetaBase, thetaNC }) { /
 
 ---
 
-### Task 9: Correction d'altitude de θe — calibration contre le logiciel historique
+### Task 9: Correction d'altitude de θe — documentation du report (décision Eric 2026-07-04)
 
-La règle est codée en dur dans `Thermique.exe` (constat plan 1 : Amanzé, alt. 350 m, dép. 71 : θe −10 → corrigée −11). **Aucune valeur inventée** : la règle sera déduite de points de mesure relevés dans le logiciel, ou à défaut la correction reste débranchée.
+La règle est codée en dur dans `Thermique.exe` (constat plan 1 : Amanzé, alt. 350 m, dép. 71 : θe −10 → corrigée −11) et n'existe dans aucune API publique (l'altitude elle-même est déjà disponible : communes.json + géocodage Mapbox de l'app). **Décision Eric : la calibration se fera lors de la phase de test A/B avec le logiciel historique (après plan 5), pas dans ce plan.**
 
 **Files:**
-- Modify: `src/apps/thermique/lib/refDataResolvers.js` (+ test)
-- Create: `docs/thermique-calibration-altitude.md` (protocole + relevés)
+- Create: `docs/thermique-calibration-altitude.md` (protocole prêt pour la phase A/B)
+- Modify: `src/apps/thermique/lib/refDataResolvers.js` (JSDoc uniquement)
 
-- [ ] **Step 1: Constituer le jeu de points.** Demander au contrôleur (qui relaiera à Eric si besoin) **8-12 relevés** depuis `C:\Thermique\Thermique.exe` ou `C:\Thermique2` : pour des communes d'altitudes étagées (~0, 200, 400, 600, 800, 1000 m…) dans 2-3 départements différents, noter (commune, département, altitude affichée, θe base, θe corrigée). Le point Amanzé (350 m, −10 → −11) fait déjà partie du jeu. Consigner le tableau dans `docs/thermique-calibration-altitude.md`. **Ce step est BLOQUANT-UTILISATEUR : reporter NEEDS_CONTEXT au contrôleur avec le protocole précis, ne pas deviner.**
-- [ ] **Step 2:** Déduire la règle (attendue de la forme : −1 K par tranche de N m au-delà d'un seuil, N à déterminer — vérifier l'hypothèse sur TOUS les points, l'écart max toléré est 0 K : la règle historique est exacte ou n'est pas retenue).
-- [ ] **Step 3:** Test : chaque relevé devient une assertion `thetaBasePour(climat, dept, altitude).thetaE === corrigée_relevée`.
-- [ ] **Step 4:** Implémenter dans `thetaBasePour` (le champ `correctionAltitude` passe de `'non-appliquée'` à `'calibrée-legacy'`), documenter la règle + provenance dans le JSDoc et le doc de calibration.
-- [ ] **Step 5:** Si les relevés sont indisponibles (logiciel cassé, Eric indisponible) : laisser `'non-appliquée'`, documenter dans le doc de calibration, et **le signaler comme risque connu** dans le rapport final — la v1 affichera θe départemental brut avec l'altitude en information. Commit `"feat(thermique): correction d'altitude θe calibrée sur le logiciel historique"` (ou `docs:` si non calibrée).
+- [ ] **Step 1:** Écrire `docs/thermique-calibration-altitude.md` : le protocole de relevés pour la phase A/B (8-12 points : communes d'altitudes étagées ~0/200/400/600/800/1000 m dans 2-3 départements ; noter commune, dept, altitude, θe base, θe corrigée ; le point Amanzé 350 m −10→−11 est déjà acquis), la forme attendue de la règle (−1 K par tranche de N m, à vérifier sur tous les points, écart toléré 0 K), et où la brancher (`thetaBasePour`, champ `correctionAltitude`).
+- [ ] **Step 2:** Vérifier que `thetaBasePour` documente clairement dans son JSDoc que la correction est volontairement non appliquée en v1 (champ `'non-appliquée'`, θe départementale brute, altitude affichée à titre informatif) avec renvoi au doc de calibration.
+- [ ] **Step 3:** Commit `"docs(thermique): protocole de calibration altitude (report en phase A/B, décision 2026-07-04)"`.
 
 ---
 
@@ -754,12 +752,12 @@ export function consoAnnuelle({ gv, dju, heuresChauffage, pac, tDepart, prixKwh,
 - Create: `docs/thermique-validation.md`
 - Create: `scripts/thermique/validation-croisee.test.mjs` (cas encodés une fois validés)
 
-- [ ] **Step 1:** Tenter de parser `C:\Thermique\Dossiers\232477 - Fichier exemple - Déperditions.dep` (+ `.Pc1`) : inspecter le format (dump texte quoté du plan 1 — chercher les lignes de résultats : puissances par pièce/totaux). Si les résultats du logiciel y sont lisibles → les extraire comme référence. Sinon :
-- [ ] **Step 2:** **NEEDS_CONTEXT au contrôleur** avec la liste précise de ce qu'il faut relever dans le logiciel (Eric ouvre le fichier exemple : puissance totale, puissance par pièce, θe retenue, détail transmission/ventilation si affiché).
-- [ ] **Step 3:** Ressaisir le cas exemple comme entrée `calculeBatiment` (les U/surfaces/pièces sont dans le `.dep`/`.Pc1` ou relevés), PLUS 2 cas simples construits (pièce unique tout paramétré ; maison 4 pièces type) calculés dans les deux outils.
-- [ ] **Step 4:** Comparer pièce par pièce et au total ; consigner dans `docs/thermique-validation.md` : tableau écarts, hypothèses divergentes identifiées (relance, PT forfaitaires, arrondis, correction altitude), verdict ±5 %.
-- [ ] **Step 5:** Encoder les cas validés en tests de non-régression (`validation-croisee.test.mjs`) avec les valeurs de référence du logiciel en dur + tolérance 5 %. Si l'écart dépasse 5 % : STOP, analyse de la divergence avec le contrôleur AVANT tout ajustement du moteur (on n'ajuste pas des constantes pour « faire passer » sans comprendre).
-- [ ] **Step 6:** Commit `"test(thermique): validation croisée contre le logiciel historique (±5 %)"`.
+**Décision Eric 2026-07-04 : la comparaison directe avec le logiciel (relevés à l'écran) se fera en phase de test A/B après le plan 5.** Ce plan garde uniquement la partie autonome :
+
+- [ ] **Step 1:** Tenter de parser `C:\Thermique\Dossiers\232477 - Fichier exemple - Déperditions.dep` (+ `.Pc1`) : inspecter le format (dump texte quoté du plan 1 — chercher les lignes de résultats : puissances par pièce/totaux). Si les résultats du logiciel y sont lisibles → les extraire comme référence et ressaisir le cas comme entrée `calculeBatiment` ; comparer pièce par pièce (tolérance ±5 %). Si illisibles → le documenter et passer au Step 2 (pas de sollicitation utilisateur dans ce plan).
+- [ ] **Step 2:** Construire 2 cas de non-régression calculés à la main de bout en bout (pièce unique tout paramétré ; maison 4 pièces type) : chaque terme posé en commentaire, encodés dans `scripts/thermique/validation-croisee.test.mjs`.
+- [ ] **Step 3:** Rédiger `docs/thermique-validation.md` : ce qui est validé aujourd'hui (cas manuels, éventuellement le `.dep` si parsable), ce qui reste pour la phase A/B (comparaison écran, calibration altitude, calibration facteurAjustement conso), protocole A/B prêt à dérouler.
+- [ ] **Step 4:** Commit `"test(thermique): cas de non-régression + protocole de validation A/B"`. Si un écart > 5 % apparaît sur le `.dep` parsé : STOP, analyse avec le contrôleur AVANT tout ajustement (on n'ajuste pas des constantes pour « faire passer » sans comprendre).
 
 ---
 
