@@ -43,11 +43,14 @@ test('thetaBasePour : valeurs plan 1, sans correction d’altitude (report phase
   assert.throws(() => thetaBasePour(climat, '99', 10), /thermique/);
 });
 
-test('coefficientBPour : lit les catégories réelles', () => {
-  // valeurs vérifiées plan 1 : Sous-sol[0] = 0.5 ; Espace sous toiture[2] = 0.7 (toiture isolée)
-  assert.equal(coefficientBPour(coefB, 'Sous-sol', 0), 0.5);
-  assert.equal(coefficientBPour(coefB, 'Espace sous toiture', 2), 0.7);
-  assert.throws(() => coefficientBPour(coefB, 'Grenier', 0), /thermique/);
+test('coefficientBPour : sélection par libellé (contrat stable, pas d’index)', () => {
+  // valeurs vérifiées plan 1 (coefficients-b.json)
+  assert.equal(coefficientBPour(coefB, 'Sous-sol', 'Sans fenêtre ni porte extérieure'), 0.5);
+  assert.equal(coefficientBPour(coefB, 'Espace sous toiture', 'Toiture isolée'), 0.7);
+  // catégorie à valeur unique sans libellé : description = null la sélectionne
+  assert.equal(coefficientBPour(coefB, 'Paroi donnant sur un local chauffée à la même température', null), 0);
+  assert.throws(() => coefficientBPour(coefB, 'Grenier', 'Sans fenêtre ni porte extérieure'), /thermique/);
+  assert.throws(() => coefficientBPour(coefB, 'Sous-sol', 'Libellé inconnu'), /thermique/);
 });
 
 test('chercheCommunes : par nom (insensible accents/casse) + dept', () => {
@@ -60,4 +63,9 @@ test('chercheCommunes : par nom (insensible accents/casse) + dept', () => {
   assert.equal(chercheCommunes(communes, 'gaillac', '81').length, 1);
   assert.equal(chercheCommunes(communes, 'g').length, 0); // < 2 caractères
   assert.equal(chercheCommunes(communes, 'GAILLAC-TOULZA')[0].insee, '310000'); // casse + tiret
+  // robustesse : saisie non-chaîne → [] (pas de crash)
+  assert.deepEqual(chercheCommunes(communes, null), []);
+  assert.deepEqual(chercheCommunes(communes, undefined), []);
+  // dept numérique (formulaires/JSON) coercé en chaîne
+  assert.equal(chercheCommunes(communes, 'gaillac', 81).length, 1);
 });

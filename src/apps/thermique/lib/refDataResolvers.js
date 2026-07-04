@@ -1,5 +1,7 @@
 // src/apps/thermique/lib/refDataResolvers.js
 // Résolution des données de référence (data/*.json passées en paramètres — module PUR, aucun import).
+// NOTE : la forme de retour { thetaE, correctionAltitude } de thetaBasePour est temporaire —
+// elle repassera scalaire (ou convention 'extras') quand la correction d'altitude sera calibrée.
 
 // Bornes exactes des périodes de u-defauts.json (labels vérifiés plan 1 / Open3CL).
 const PERIODES = [
@@ -37,31 +39,53 @@ export function uDefautPour(uDefauts, type, annee) {
 }
 
 /** θe de base pour un département. Correction d'altitude : volontairement non appliquée en v1
- * (règle du logiciel historique non documentée — calibration prévue en phase de test A/B,
- * cf. docs/thermique-calibration-altitude.md). L'altitude est acceptée en paramètre pour
- * figer la signature ; elle sert aujourd'hui au choix de tranche (une seule tranche ouverte par dépt). */
+ * (règle du logiciel historique non documentée — calibration prévue en phase de test A/B ;
+ * décision et données : _meta.note de climat.json ; protocole détaillé :
+ * docs/thermique-calibration-altitude.md, créé en Task 9 de ce plan). L'altitude est acceptée en
+ * paramètre pour figer la signature ; elle sert aujourd'hui au choix de tranche (une seule tranche
+ * ouverte par dépt). */
 export function thetaBasePour(climat, dept, altitude) {
-  if (/^97|^98/.test(dept)) throw new Error(`thermique: départements DOM non couverts par la table climat (${dept})`);
+  if (/^(97|98)/.test(dept)) throw new Error(`thermique: départements DOM non couverts par la table climat (${dept})`);
   const tranches = climat.thetaBase[dept];
   if (!tranches) throw new Error(`thermique: département inconnu « ${dept} »`);
   const tr = tranches.find((t) => t.altMax === null || altitude <= t.altMax);
   return { thetaE: tr.thetaE, correctionAltitude: 'non-appliquée' };
 }
 
-/** Coefficient b : catégorie de coefficients-b.json + index de la valeur choisie dans l'UI. */
-export function coefficientBPour(coefficientsB, categorie, indexValeur) {
+/** Coefficient b : catégorie de coefficients-b.json + libellé (description) de la valeur choisie.
+ * Sélection par libellé et non par index : l'index d'un tableau JSON n'est pas un contrat stable,
+ * le libellé l'est. Les catégories à valeur unique sans libellé (description: null dans le JSON)
+ * se sélectionnent avec description = null. */
+export function coefficientBPour(coefficientsB, categorie, description) {
   const cat = coefficientsB.categories.find((c) => c.categorie === categorie);
   if (!cat) throw new Error(`thermique: catégorie b inconnue « ${categorie} »`);
-  const v = cat.valeurs[indexValeur];
-  if (!v) throw new Error(`thermique: valeur b index ${indexValeur} absente (${categorie})`);
+  const v = cat.valeurs.find((val) => val.description === description);
+  if (!v) throw new Error(`thermique: valeur b « ${description} » absente (${categorie})`);
   return v.b;
 }
 
 const norm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-/** Recherche de communes par préfixe de nom (insensible accents/casse), filtre dept optionnel. */
+// Cache de normalisation des noms de communes (clé : le tableau lui-même — WeakMap, pas de fuite).
+const NOMS_NORMALISES = new WeakMap();
+
+function nomsNormalises(communes) {
+  let cached = NOMS_NORMALISES.get(communes);
+  if (!cached) {
+    cached = communes.map((c) => ({ ref: c, nomNorm: norm(c.nom) }));
+    NOMS_NORMALISES.set(communes, cached);
+  }
+  return cached;
+}
+
+/** Recherche de communes par préfixe de nom (insensible accents/casse), filtre dept optionnel
+ * (chaîne ou nombre). Saisie non-chaîne ou vide → []. */
 export function chercheCommunes(communes, saisie, dept = null) {
+  if (typeof saisie !== 'string' || !saisie.trim()) return [];
   const q = norm(saisie.trim());
   if (q.length < 2) return [];
-  return communes.filter((c) => norm(c.nom).startsWith(q) && (!dept || c.dept === dept));
+  const d = dept == null ? null : String(dept);
+  return nomsNormalises(communes)
+    .filter((e) => e.nomNorm.startsWith(q) && (!d || e.ref.dept === d))
+    .map((e) => e.ref);
 }
