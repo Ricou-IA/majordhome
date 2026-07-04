@@ -7,6 +7,7 @@ import { parseMateriau } from './lib/parseMateriau.js';
 // Règle "per-file newest" (cf. sourceFiles.js) : Composants/ est plus riche dans l'install 2024
 // (365 fichiers vs 359 dans C:/Thermique).
 const root = path.join(SRC_ROOT_2024, 'Composants');
+console.log(`source : ${root}`);
 const materiaux = [];
 const rejets = [];
 
@@ -47,6 +48,6 @@ writeDataJson('materiaux.json',
   {
     source: 'C:\\Thermique2\\Composants (bibliothèque du logiciel historique, install 2024, usage interne)',
     license: 'proprietary-internal',
-    note: "nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source",
+    note: "unités : lambda W/(m·K), masseVolumique kg/m³, capacite J/(kg·K). nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source",
   },
   { materiaux });

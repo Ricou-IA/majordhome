@@ -77,7 +77,8 @@
       "prixUnite": 133,
       "unite": "map",
       "pci": 2760,
-      "pciUnite": "kWh/Tonne",
+      "pciUnite": "kWh/tonne",
+      "note": "prixUnite en €/map (250 kg) ; pci en kWh/tonne — ne pas diviser directement ; prixKwh fait foi",
       "sourceRaw": "Bois déchiqueté — Tarif en €TTC/Map au 01 janvier 2020 : 133 €TTC/Map, 0.0481 €TTC/kWh, 2760 kWh/Tonne, 250 kg/map"
     }
   ]

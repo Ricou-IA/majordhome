@@ -13,6 +13,7 @@ import {
 // Règle "per-file newest" (cf. sourceFiles.js) : Vitrages/Menuiseries/Volets sont plus récents
 // dans l'install 2024 ; WarmEdge/CoffreVolets sont identiques octet à octet dans les deux
 // installs, on lit donc les 5 fichiers depuis la même racine 2024.
+console.log(`source : ${SRC_ROOT_2024}/{Vitrages,Menuiseries,Volets,WarmEdge,CoffreVolets}.txt`);
 const vitrages = parseVitrages(readSource('Vitrages.txt', SRC_ROOT_2024));
 const menuiseriesTypes = parseMenuiseriesProfils(readSource('Menuiseries.txt', SRC_ROOT_2024));
 const volets = parseVolets(readSource('Volets.txt', SRC_ROOT_2024));

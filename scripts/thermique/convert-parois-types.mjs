@@ -13,6 +13,7 @@
 import { SRC_ROOT_2024, readSource, writeDataJson } from './lib/sourceFiles.js';
 import { parseParois } from './lib/parseParois.js';
 
+console.log(`source : ${SRC_ROOT_2024}/Bibliothèque Parois.txt`);
 const { parois, rejects } = parseParois(readSource('Bibliothèque Parois.txt', SRC_ROOT_2024));
 
 if (parois.length < 3) {

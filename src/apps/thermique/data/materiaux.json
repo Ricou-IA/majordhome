@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "convertedAt": "2026-07-03",
+    "convertedAt": "2026-07-04",
     "source": "C:\\Thermique2\\Composants (bibliothèque du logiciel historique, install 2024, usage interne)",
     "license": "proprietary-internal",
-    "note": "nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source"
+    "note": "unités : lambda W/(m·K), masseVolumique kg/m³, capacite J/(kg·K). nom n'est pas une clé unique (doublons hérités du logiciel source, matériaux présents sous plusieurs familles) ; les champs masseVolumique/capacite à null correspondent à des plages (\"1 200 à 1 800\") ou champs vides de la source"
   },
   "materiaux": [
     {
