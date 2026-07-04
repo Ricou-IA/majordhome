@@ -32,4 +32,7 @@ test('calculeUParoi : erreurs propres', () => {
   assert.throws(() => calculeUParoi([{ e: 0.2 }], 'mur'), /thermique/);          // ni lambda ni r
   assert.throws(() => calculeUParoi([{ e: 0.2, lambda: 0 }], 'mur'), /thermique/);
   assert.throws(() => calculeUParoi([{ e: 0.2, lambda: 1 }], 'toit'), /thermique/); // type inconnu
+  // r ET e/lambda dans la même couche : ambigu → échec fort (erreur de saisie)
+  assert.throws(() => calculeUParoi([{ r: 0.18, e: 0.1, lambda: 0.04 }], 'mur'), /ambiguë/);
+  assert.throws(() => calculeUParoi([{ e: 0.1, lambda: 0.04, r: -1 }], 'mur'), /ambiguë/);
 });
