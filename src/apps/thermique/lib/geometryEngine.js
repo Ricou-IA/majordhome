@@ -188,3 +188,206 @@ export function decomposeIntervalle(de, a, recouvrements) {
   }
   return resultat;
 }
+
+/**
+ * Décompose un polygone rectilinéaire simple en rectangles axis-alignés d'intérieurs disjoints
+ * dont l'union est exactement le polygone (Σ aires = surfaceCm2). Balayage vertical sur les
+ * abscisses distinctes des sommets : dans chaque bande [xi, xi+1], la couverture verticale du
+ * polygone est constante (toutes les arêtes verticales tombent sur des bords de bande). Un rayon
+ * vertical lancé à l'intérieur de la bande croise exactement les arêtes HORIZONTALES qui
+ * enjambent toute la bande ; triées par y croissant, elles délimitent par parité les intervalles
+ * couverts ([y0,y1], [y2,y3], …). Sert aussi à la superposition des niveaux (Task 5).
+ * @param {{x: number, y: number}[]} poly polygone rectilinéaire VALIDE (sinon throw thermique —
+ *   erreur de programmation : les appelants valident en amont via validePolygone)
+ * @returns {{x1: number, y1: number, x2: number, y2: number}[]} rectangles (x1<x2, y1<y2),
+ *   ordonnés par bande puis par y
+ */
+export function rectanglesDe(poly) {
+  const problemes = validePolygone(poly);
+  if (problemes.length > 0) {
+    throw new Error(`thermique: rectanglesDe : polygone invalide (${problemes.join(' ; ')})`);
+  }
+  const xs = [...new Set(poly.map((p) => p.x))].sort((u, v) => u - v);
+  const aretesH = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    if (a.y === b.y) aretesH.push({ x1: Math.min(a.x, b.x), x2: Math.max(a.x, b.x), y: a.y });
+  }
+  const rects = [];
+  for (let i = 0; i + 1 < xs.length; i++) {
+    const gauche = xs[i], droite = xs[i + 1];
+    const ys = aretesH.filter((e) => e.x1 <= gauche && e.x2 >= droite)
+      .map((e) => e.y).sort((u, v) => u - v);
+    for (let j = 0; j + 1 < ys.length; j += 2) {
+      rects.push({ x1: gauche, y1: ys[j], x2: droite, y2: ys[j + 1] });
+    }
+  }
+  return rects;
+}
+
+/**
+ * Aire d'intersection (cm²) de deux polygones rectilinéaires simples : chacun est décomposé en
+ * rectangles disjoints (rectanglesDe), puis somme des aires d'intersection rectangle × rectangle
+ * (exacte : les rectangles issus d'un même polygone ont des intérieurs disjoints). 0 = disjoints
+ * ou simple contact par un bord/coin (aire nulle). Polygones VALIDES requis (sinon throw).
+ * @returns {number} aire commune en cm² (entier)
+ */
+export function aireIntersectionRectilineaire(polyA, polyB) {
+  const rectsA = rectanglesDe(polyA);
+  const rectsB = rectanglesDe(polyB);
+  let aire = 0;
+  for (const ra of rectsA) {
+    for (const rb of rectsB) {
+      const largeur = Math.min(ra.x2, rb.x2) - Math.max(ra.x1, rb.x1);
+      const hauteur = Math.min(ra.y2, rb.y2) - Math.max(ra.y1, rb.y1);
+      if (largeur > 0 && hauteur > 0) aire += largeur * hauteur;
+    }
+  }
+  return aire;
+}
+
+/**
+ * Adjacences des murs d'un niveau. Pour chaque pièce : décompose chaque segment de son polygone
+ * (normalisé CCW) en sous-segments classés { segmentIndex, de, a, longueur, adjacent } via
+ * decomposeIntervalle contre les segments colinéaires des AUTRES pièces du niveau (même axe,
+ * même ordonnée constante, quel que soit leur sens de parcours). `adjacent` = id de la pièce
+ * voisine, ou null = donne sur l'extérieur. `de`/`a` = coordonnée le long de l'axe du segment
+ * (x pour 'h', y pour 'v'), bornes croissantes — indépendantes du sens de parcours CCW.
+ *
+ * Problèmes de DESSIN (jamais de throw, décision structurante n°5 — l'UI doit pouvoir afficher
+ * un plan invalide en cours d'édition) → messages dans `erreurs` :
+ *   - polygone invalide (validePolygone) → pièce écartée (ni calculée, ni voisine) ;
+ *   - deux pièces qui se chevauchent en surface (aireIntersectionRectilineaire > 0) → les deux
+ *     sont mises en quarantaine : ni calculées, NI offertes comme voisines aux pièces saines
+ *     (leur géométrie n'est pas fiable et provoquerait des doubles revendications de tronçons) ;
+ *   - double revendication d'un tronçon malgré tout (dessins dégénérés type aller-retour
+ *     colinéaire adjacent, invisibles pour validePolygone en v1) : le throw de
+ *     decomposeIntervalle est RATTRAPÉ et converti en erreur de dessin pour la pièce concernée,
+ *     qui est retirée de `parPiece` ; les autres pièces restent calculées.
+ * Entrées malformées (pas un tableau, id manquant/dupliqué, polygone absent) → throw thermique.
+ * @param {{id: (string|number), polygone: {x: number, y: number}[]}[]} pieces pièces d'UN niveau
+ * @returns {{parPiece: Map<*, {segmentIndex: number, de: number, a: number, longueur: number,
+ *   adjacent: *}[]>, erreurs: string[]}}
+ */
+export function adjacencesNiveau(pieces) {
+  if (!Array.isArray(pieces)) {
+    throw new Error('thermique: adjacencesNiveau : pieces doit être un tableau');
+  }
+  const idsVus = new Set();
+  for (const p of pieces) {
+    if (!p || typeof p !== 'object' || p.id === null || p.id === undefined || p.id === '') {
+      throw new Error('thermique: adjacencesNiveau : chaque pièce doit avoir un id');
+    }
+    if (idsVus.has(p.id)) {
+      throw new Error(`thermique: adjacencesNiveau : id de pièce dupliqué (${p.id})`);
+    }
+    idsVus.add(p.id);
+    if (!Array.isArray(p.polygone)) {
+      throw new Error(`thermique: adjacencesNiveau : pièce ${p.id} sans polygone`);
+    }
+  }
+
+  const erreurs = [];
+
+  // 1. Polygones invalides → erreur de dessin, pièce écartée.
+  const valides = [];
+  for (const p of pieces) {
+    const problemes = validePolygone(p.polygone);
+    if (problemes.length > 0) {
+      erreurs.push(`pièce « ${p.id} » : polygone invalide (${problemes.join(' ; ')})`);
+    } else {
+      valides.push({ id: p.id, polygone: p.polygone, segments: segmentsDe(normalisePolygone(p.polygone)) });
+    }
+  }
+
+  // 2. Chevauchement surfacique (toutes paires) → quarantaine des deux pièces.
+  const enQuarantaine = new Set();
+  for (let i = 0; i < valides.length; i++) {
+    for (let j = i + 1; j < valides.length; j++) {
+      if (aireIntersectionRectilineaire(valides[i].polygone, valides[j].polygone) > 0) {
+        erreurs.push(`pièces « ${valides[i].id} » et « ${valides[j].id} » : les polygones se chevauchent — corriger le dessin`);
+        enQuarantaine.add(valides[i].id);
+        enQuarantaine.add(valides[j].id);
+      }
+    }
+  }
+  const incluses = valides.filter((v) => !enQuarantaine.has(v.id));
+
+  // 3. Décomposition mur par mur contre les segments colinéaires des autres pièces incluses.
+  const parPiece = new Map();
+  for (const piece of incluses) {
+    try {
+      const sousSegments = [];
+      piece.segments.forEach((seg, segmentIndex) => {
+        const constante = seg.axe === 'v' ? seg.x1 : seg.y1; // ordonnée fixe du segment
+        const lo = seg.axe === 'v' ? Math.min(seg.y1, seg.y2) : Math.min(seg.x1, seg.x2);
+        const hi = seg.axe === 'v' ? Math.max(seg.y1, seg.y2) : Math.max(seg.x1, seg.x2);
+        const recouvrements = [];
+        for (const autre of incluses) {
+          if (autre.id === piece.id) continue;
+          for (const t of autre.segments) {
+            if (t.axe !== seg.axe) continue;
+            if ((t.axe === 'v' ? t.x1 : t.y1) !== constante) continue;
+            const tLo = t.axe === 'v' ? Math.min(t.y1, t.y2) : Math.min(t.x1, t.x2);
+            const tHi = t.axe === 'v' ? Math.max(t.y1, t.y2) : Math.max(t.x1, t.x2);
+            const de = Math.max(lo, tLo), a = Math.min(hi, tHi);
+            if (de < a) recouvrements.push({ de, a, ref: autre.id });
+          }
+        }
+        for (const m of decomposeIntervalle(lo, hi, recouvrements)) {
+          sousSegments.push({ segmentIndex, de: m.de, a: m.a, longueur: m.a - m.de, adjacent: m.ref });
+        }
+      });
+      parPiece.set(piece.id, sousSegments);
+    } catch (e) {
+      if (!(e instanceof Error) || !e.message.startsWith('thermique:')) throw e;
+      erreurs.push(`pièce « ${piece.id} » : dessin dégénéré — un tronçon de mur est revendiqué par deux voisines à la fois`);
+    }
+  }
+
+  return { parPiece, erreurs };
+}
+
+/**
+ * Secteur d'orientation (N|NE|E|SE|S|SO|O|NO) de la normale extérieure d'un segment de mur
+ * parcouru en CCW ; `nord` en degrés (0 = nord vers le haut du plan, sens horaire).
+ *
+ * Dérivation de la normale extérieure, verrouillée sur le rectangle normalisé de la Task 1
+ * ((0,0),(0,300),(400,300),(400,0), CCW en repère y-bas, centroïde (200,150)) :
+ *   (0,0)→(0,300)     d=(0,+1)  mur ouest → normale extérieure (−1, 0)
+ *   (0,300)→(400,300) d=(+1,0)  mur sud   → normale extérieure ( 0,+1)
+ *   (400,300)→(400,0) d=(0,−1)  mur est   → normale extérieure (+1, 0)
+ *   (400,0)→(0,0)     d=(−1,0)  mur nord  → normale extérieure ( 0,−1)
+ * Les quatre cas satisfont n = (−dy, dx) — rotation de d de +90° au sens trigonométrique du
+ * repère mathématique, qui apparaît comme un quart de tour HORAIRE à l'écran (y vers le bas) ;
+ * chaque n pointe bien à l'opposé du centroïde. Formule verrouillée ici.
+ *
+ * Cap « plan » d'un vecteur écran (vx, vy), 0 = haut de l'écran, sens horaire : atan2(vx, −vy).
+ * Cap boussole = cap plan − nord. Secteurs de 45° centrés sur les caps cardinaux (N = 0°,
+ * NE = 45°, …) ; une frontière exacte (22,5° + k·45°) bascule dans le secteur suivant en sens
+ * horaire (arrondi demi-supérieur de Math.round).
+ * @param {{x1: number, y1: number, x2: number, y2: number}} segment axis-aligné non nul
+ *   (les objets de segmentsDe conviennent), entiers requis
+ * @param {number} nord degrés (réel fini)
+ * @returns {'N'|'NE'|'E'|'SE'|'S'|'SO'|'O'|'NO'}
+ */
+export function orientationDe(segment, nord) {
+  if (!segment || typeof segment !== 'object'
+    || ![segment.x1, segment.y1, segment.x2, segment.y2].every(Number.isInteger)) {
+    throw new Error('thermique: orientationDe : segment {x1, y1, x2, y2} entier requis');
+  }
+  const dx = segment.x2 - segment.x1;
+  const dy = segment.y2 - segment.y1;
+  if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
+    throw new Error('thermique: orientationDe : segment axis-aligné de longueur non nulle requis');
+  }
+  if (typeof nord !== 'number' || !Number.isFinite(nord)) {
+    throw new Error('thermique: orientationDe : nord doit être un nombre fini (degrés)');
+  }
+  const nx = -Math.sign(dy); // normale extérieure n = (−dy, dx), réduite à son signe
+  const ny = Math.sign(dx);
+  const capPlan = (Math.atan2(nx, -ny) * 180) / Math.PI; // 0 = haut du plan, sens horaire
+  const capBoussole = (((capPlan - nord) % 360) + 360) % 360;
+  const SECTEURS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+  return SECTEURS[Math.round(capBoussole / 45) % 8];
+}
