@@ -43,6 +43,8 @@ export const POSTES = ['murs', 'menuiseries', 'plancherBas', 'plafondToiture', '
  * Paroi : { surface, u, deltaUtb, poste, b } (θréf = θext) OU { …, thetaAdjacente } (θréf explicite, b ignoré).
  * ΔUtb = majoration forfaitaire de ponts thermiques en W/(m²·K) (choix org/UI, plan 4) —
  * sa contribution est isolée dans parPoste.pontsThermiques (transparence du rapport PDF).
+ * ΔUtb sur une paroi à θadjacente explicite est calculé sur le ΔT interne — physiquement rare ;
+ * mettre deltaUtb à 0 sur les parois internes (l'assemblage Task 6 le fera).
  * poste ∈ POSTES (hors 'pontsThermiques'/'ventilation' qui sont calculés, pas déclarés).
  * @returns {{ total:number, parPoste:Record<string,number> }}
  */
@@ -62,6 +64,7 @@ export function transmissionPiece({ thetaInt, thetaExt, parois }) {
     if (Number.isFinite(p.thetaAdjacente)) {
       deltaT = thetaInt - p.thetaAdjacente;
     } else if (Number.isFinite(p.b)) {
+      if (p.b < 0 || p.b > 1) throw new Error(`thermique: b hors [0,1] (${p.b})`);
       deltaT = p.b * (thetaInt - thetaExt);
     } else {
       throw new Error('thermique: paroi sans b ni thetaAdjacente');

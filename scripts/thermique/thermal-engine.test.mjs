@@ -78,6 +78,11 @@ test('transmissionPiece : erreurs propres', () => {
   assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1, poste: 'murs' }] }), /thermique/);        // deltaUtb absent
   assert.throws(() => transmissionPiece({ thetaInt: NaN, thetaExt: -5, parois: [] }), /thermique/);
   assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1, deltaUtb: 0, poste: 'toiture' }] }), /thermique/); // poste hors POSTES
+  // b hors [0,1] rejeté ; bornes 0 et 1 acceptées
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: -0.5, deltaUtb: 0, poste: 'murs' }] }), /thermique/);
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1.4, deltaUtb: 0, poste: 'murs' }] }), /thermique/);
+  assert.doesNotThrow(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1, deltaUtb: 0, poste: 'murs' }] }));
+  assert.doesNotThrow(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 0, deltaUtb: 0, poste: 'murs' }] }));
 });
 
 test('POSTES : liste canonique des postes du rapport', () => {
