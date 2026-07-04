@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalisePolygone, surfaceCm2, perimetreCm, segmentsDe, validePolygone, decomposeIntervalle,
   rectanglesDe, aireIntersectionRectilineaire, adjacencesNiveau, orientationDe, intervalleAxial,
-  valideOuvertures, superposeNiveaux }
+  valideOuvertures, superposeNiveaux, deduireParois, DELTA_THETA_INTERNE }
   from '../../src/apps/thermique/lib/geometryEngine.js';
 
 // Rectangle 400×300 cm (séjour 12 m²), déclaré horaire → doit être renversé en anti-horaire
@@ -651,4 +651,443 @@ test('superposeNiveaux : fractions de surface nulle omises (pièce chauffée ent
   const r = superposeNiveaux(dessin);
   assert.deepEqual(r.get('sejour').sol, [{ surfaceCm2: 120000, sur: 'exterieur' }]);
   assert.deepEqual(r.get('sejour').plafond, [{ surfaceCm2: 120000, sous: 'exterieur' }]);
+});
+
+// ═══════════════ Task 6 : deduireParois ═══════════════
+//
+// Maison de référence du plan — TOUTES les surfaces dérivées à la main dans les tests.
+// RDC (hauteur 250 cm) : séjour 500×400 (θ20, chauffé) en (0,0) ; cuisine 300×400 (θ20 par
+// défaut, chauffée, « humide » sans effet ici) accolée à l'est ; garage 300×400 (non chauffé)
+// accolé à l'est de la cuisine. Étage (hauteur 250) : chambre 500×400 (θ18, chauffée) posée
+// EXACTEMENT sur le séjour ; le reste de l'étage = rien (comble au-dessus de cuisine et garage).
+// nord = 0, plancherBasType 'terre-plein', toitureType 'comble'.
+//
+// Polygones normalisés CCW (repère y-bas) et indices de segments :
+//   séjour  (0,0),(0,400),(500,400),(500,0)     → 0: ouest x=0 y 0→400 · 1: sud y=400 x 0→500
+//     (croissant) · 2: est x=500 y 400→0 (DÉCROISSANT) · 3: nord y=0 x 500→0 (DÉCROISSANT)
+//   cuisine (500,0),(500,400),(800,400),(800,0) → 0: ouest x=500 · 1: sud y=400 · 2: est x=800
+//     (décroissant) · 3: nord y=0 (décroissant)
+//   garage  (800,0),(800,400),(1100,400),(1100,0) ; chambre = même polygone que le séjour.
+//
+// Ouvertures (position = distance depuis le DÉBUT du segment, dans son sens de parcours) :
+//   fen-sejour   140×120 sur le mur SUD du séjour (segment 1, croissant depuis x=0), position 180
+//                → intervalle d'axe [0+180, 180+140] = [180, 320] ⊆ [0, 500]
+//   porte-entree 90×215 sur le mur NORD du séjour (segment 3, décroissant depuis x=500),
+//                position 200 → intervalle d'axe [500−200−90, 500−200] = [210, 300] ⊆ [0, 500]
+//   porte-cuisine (optionnelle) 90×215 sur le mur EST du séjour (segment 2, décroissant depuis
+//                y=400), position 100 → intervalle d'axe [400−100−90, 400−100] = [210, 300]
+//   porte-garage (optionnelle) 90×200 sur le mur EST de la cuisine (segment 2, décroissant depuis
+//                y=400), position 150 → intervalle d'axe [400−150−90, 400−150] = [160, 250]
+function maison({ thetaCuisine = 20, porteMitoyenne = false, porteGarage = false, fenetrePosition = 180 } = {}) {
+  const ouvertures = [
+    { id: 'fen-sejour', pieceId: 'sejour', segmentIndex: 1, type: 'fenetre', largeur: 140, hauteur: 120, position: fenetrePosition },
+    { id: 'porte-entree', pieceId: 'sejour', segmentIndex: 3, type: 'porte', largeur: 90, hauteur: 215, position: 200 },
+  ];
+  if (porteMitoyenne) {
+    ouvertures.push({ id: 'porte-cuisine', pieceId: 'sejour', segmentIndex: 2, type: 'porte', largeur: 90, hauteur: 215, position: 100 });
+  }
+  if (porteGarage) {
+    ouvertures.push({ id: 'porte-garage', pieceId: 'cuisine', segmentIndex: 2, type: 'porte', largeur: 90, hauteur: 200, position: 150 });
+  }
+  return {
+    nord: 0,
+    plancherBasType: 'terre-plein',
+    toitureType: 'comble',
+    niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }, { id: 'etage', nom: 'Étage', hauteur: 250 }],
+    pieces: [
+      { id: 'sejour', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 0, y: 400 }] },
+      { id: 'cuisine', niveauId: 'rdc', nom: 'Cuisine', typePiece: 'cuisine', chauffee: true, thetaInt: thetaCuisine,
+        polygone: [{ x: 500, y: 0 }, { x: 800, y: 0 }, { x: 800, y: 400 }, { x: 500, y: 400 }] },
+      { id: 'garage', niveauId: 'rdc', nom: 'Garage', typePiece: 'garage', chauffee: false, thetaInt: null,
+        polygone: [{ x: 800, y: 0 }, { x: 1100, y: 0 }, { x: 1100, y: 400 }, { x: 800, y: 400 }] },
+      { id: 'chambre', niveauId: 'etage', nom: 'Chambre', typePiece: 'chambre', chauffee: true, thetaInt: 18,
+        polygone: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 0, y: 400 }] },
+    ],
+    ouvertures,
+  };
+}
+
+const proche = (reel, attendu) => assert.ok(Math.abs(reel - attendu) < 1e-9, `${reel} ≉ ${attendu}`);
+function paroiSeule(parois, filtre, description) {
+  const candidates = parois.filter(filtre);
+  assert.equal(candidates.length, 1, `attendu exactement 1 paroi : ${description} (trouvé ${candidates.length})`);
+  return candidates[0];
+}
+
+test('deduireParois : maison complète — chaque paroi dérivée à la main', () => {
+  const { parois, erreurs, avertissements } = deduireParois(maison());
+  assert.deepEqual(erreurs, []);
+  assert.deepEqual(avertissements, []); // tout est sain : aucun avertissement
+
+  // ── Comptes par type ──
+  // séjour : 3 murs ext (l'est est mitoyen cuisine, θ20 ↔ θ20, ΔT = 0 ≤ 4 K → NON émis)
+  //          + fenêtre + porte + plancher-bas ; plafond 100 % sous la chambre chauffée → rien.
+  // cuisine : 2 murs ext (sud, nord) + mur-lnc (garage) + plancher-bas + plafond-comble
+  //          (rien au-dessus de la cuisine à l'étage) ; mur ouest mitoyen séjour → non émis.
+  // chambre : 4 murs ext + plafond-comble (dernier niveau) ; sol 100 % sur séjour chauffé → rien.
+  // garage : non chauffé → AUCUNE paroi.
+  const parType = (t) => parois.filter((p) => p.type === t);
+  assert.equal(parType('mur-exterieur').length, 9); // 3 séjour + 2 cuisine + 4 chambre
+  assert.equal(parType('mur-lnc').length, 1);
+  assert.equal(parType('mur-mitoyen-interne').length, 0);
+  assert.equal(parType('plancher-bas').length, 2); // séjour + cuisine
+  assert.equal(parType('plancher-sur-lnc').length, 0);
+  assert.equal(parType('plafond-comble').length, 2); // cuisine + chambre
+  assert.equal(parType('plafond-sur-lnc').length, 0);
+  assert.equal(parType('toiture-rampant').length, 0);
+  assert.equal(parType('fenetre').length, 1);
+  assert.equal(parType('porte').length, 1);
+  assert.equal(parType('porte-fenetre').length, 0);
+  assert.equal(parois.length, 16);
+
+  // ── Séjour ──
+  // Mur ouest (segment 0, plein) : 400 × 250 = 100000 cm² = 10 m², normale (−1,0) → O.
+  const sejOuest = paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.type === 'mur-exterieur' && p.orientation === 'O', 'séjour mur ouest');
+  proche(sejOuest.surfaceM2, 10);
+  assert.deepEqual(sejOuest.meta, { niveauId: 'rdc', segmentIndex: 0, de: 0, a: 400 });
+  // Mur sud (segment 1) : 500 × 250 = 125000 − fenêtre 140 × 120 = 16800 → 108200 cm² = 10.82 m².
+  const sejSud = paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.type === 'mur-exterieur' && p.orientation === 'S', 'séjour mur sud');
+  proche(sejSud.surfaceM2, 10.82);
+  assert.deepEqual(sejSud.meta, { niveauId: 'rdc', segmentIndex: 1, de: 0, a: 500 });
+  // Fenêtre : 140 × 120 = 16800 cm² = 1.68 m² ; ni orientation ni adjacentPieceId (mur ext porteur).
+  const fen = paroiSeule(parois, (p) => p.type === 'fenetre', 'fenêtre séjour');
+  assert.equal(fen.pieceId, 'sejour');
+  assert.equal(fen.ouvertureId, 'fen-sejour');
+  proche(fen.surfaceM2, 1.68);
+  assert.equal('orientation' in fen, false);
+  assert.equal('adjacentPieceId' in fen, false);
+  assert.deepEqual(fen.meta, { niveauId: 'rdc', segmentIndex: 1, de: 180, a: 320 });
+  // Mur nord (segment 3) : 125000 − porte 90 × 215 = 19350 → 105650 cm² = 10.565 m².
+  const sejNord = paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.type === 'mur-exterieur' && p.orientation === 'N', 'séjour mur nord');
+  proche(sejNord.surfaceM2, 10.565);
+  assert.deepEqual(sejNord.meta, { niveauId: 'rdc', segmentIndex: 3, de: 0, a: 500 });
+  // Porte d'entrée : 90 × 215 = 19350 cm² = 1.935 m², intervalle d'axe [210, 300] (parcours décroissant).
+  const porte = paroiSeule(parois, (p) => p.type === 'porte', 'porte d’entrée');
+  assert.equal(porte.pieceId, 'sejour');
+  assert.equal(porte.ouvertureId, 'porte-entree');
+  proche(porte.surfaceM2, 1.935);
+  assert.deepEqual(porte.meta, { niveauId: 'rdc', segmentIndex: 3, de: 210, a: 300 });
+  // ABSENCES séjour : mur est mitoyen NON émis (3 murs seulement) ; AUCUNE paroi de plafond.
+  assert.equal(parois.filter((p) => p.pieceId === 'sejour' && p.type.startsWith('mur')).length, 3);
+  assert.equal(parois.filter((p) => p.pieceId === 'sejour'
+    && (p.type.startsWith('plafond') || p.type === 'toiture-rampant')).length, 0);
+  // Plancher bas séjour : 500 × 400 = 200000 cm² = 20 m², type terre-plein dans meta.
+  const sejPlancher = paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.type === 'plancher-bas', 'plancher séjour');
+  proche(sejPlancher.surfaceM2, 20);
+  assert.deepEqual(sejPlancher.meta, { niveauId: 'rdc', plancherBasType: 'terre-plein' });
+  // Invariant : Σ (murs ext du séjour + ses ouvertures) = périmètre EXTÉRIEUR × hauteur.
+  // perimetreCm(séjour) = 2 × (500 + 400) = 1800 cm ; portion mitoyenne (mur est) = 400 cm
+  // → périmètre extérieur = 1400 cm ; × 250 cm = 350000 cm² = 35 m².
+  const sommeSejourVerticale = parois
+    .filter((p) => p.pieceId === 'sejour' && ['mur-exterieur', 'fenetre', 'porte'].includes(p.type))
+    .reduce((s, p) => s + p.surfaceM2, 0);
+  const sejourPolygone = maison().pieces.find((p) => p.id === 'sejour').polygone;
+  proche(sommeSejourVerticale, ((perimetreCm(sejourPolygone) - 400) * 250) / 10000); // = 35 m²
+
+  // ── Cuisine ──
+  // Murs sud et nord : 300 × 250 = 75000 cm² = 7.5 m² chacun.
+  proche(paroiSeule(parois, (p) => p.pieceId === 'cuisine' && p.orientation === 'S', 'cuisine sud').surfaceM2, 7.5);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'cuisine' && p.orientation === 'N', 'cuisine nord').surfaceM2, 7.5);
+  // Mur est → garage (LNC) : 400 × 250 = 100000 cm² = 10 m².
+  const lnc = paroiSeule(parois, (p) => p.type === 'mur-lnc', 'mur cuisine → garage');
+  assert.equal(lnc.pieceId, 'cuisine');
+  assert.equal(lnc.adjacentPieceId, 'garage');
+  proche(lnc.surfaceM2, 10);
+  assert.deepEqual(lnc.meta, { niveauId: 'rdc', segmentIndex: 2, de: 0, a: 400 });
+  // Plancher 300 × 400 = 12 m² ; plafond-comble 12 m² (rien au-dessus à l'étage).
+  proche(paroiSeule(parois, (p) => p.pieceId === 'cuisine' && p.type === 'plancher-bas', 'plancher cuisine').surfaceM2, 12);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'cuisine' && p.type === 'plafond-comble', 'plafond cuisine').surfaceM2, 12);
+
+  // ── Chambre ── 4 murs ext : O 400×250 = 10 · S 500×250 = 12.5 · E 10 · N 12.5 ; plafond 20 m².
+  const chambreExt = parois.filter((p) => p.pieceId === 'chambre' && p.type === 'mur-exterieur');
+  assert.equal(chambreExt.length, 4);
+  proche(chambreExt.find((p) => p.orientation === 'O').surfaceM2, 10);
+  proche(chambreExt.find((p) => p.orientation === 'S').surfaceM2, 12.5);
+  proche(chambreExt.find((p) => p.orientation === 'E').surfaceM2, 10);
+  proche(chambreExt.find((p) => p.orientation === 'N').surfaceM2, 12.5);
+  assert.equal(parois.filter((p) => p.pieceId === 'chambre' && p.type.startsWith('plancher')).length, 0); // sur chauffé
+  const chambrePlafond = paroiSeule(parois, (p) => p.pieceId === 'chambre' && p.type === 'plafond-comble', 'plafond chambre');
+  proche(chambrePlafond.surfaceM2, 20);
+  assert.deepEqual(chambrePlafond.meta, { niveauId: 'etage' });
+
+  // ── Garage : aucune paroi. ──
+  assert.equal(parois.filter((p) => p.pieceId === 'garage').length, 0);
+});
+
+test('deduireParois : quarantaine multi-niveaux — les pièces en chevauchement de l’étage sont exclues de la superposition (invariant Σ)', () => {
+  // RDC : séjour 500×400 chauffé θ20. Étage : chA [0,200]×[0,400] et chB [100,300]×[0,400]
+  // se chevauchent sur [100,200]×[0,400] = 40000 cm² → quarantaine des deux ;
+  // chC [300,500]×[0,400] est saine (contact bord à bord avec chB en x=300, aire nulle).
+  // Handoff Task 5 : deduireParois DOIT exclure chA et chB de TOUS les niveaux avant
+  // superposeNiveaux. Preuve par l'invariant Σ sur le plafond du séjour :
+  //   couvert par les SURVIVANTES de l'étage = chC ∩ séjour = [300,500]×[0,400] = 80000 cm²
+  //   ('chauffe' → non émis) ; reste = 200000 − 80000 = 120000 cm² = 12 m² → plafond-comble.
+  // Si chA et chB étaient passées : couvert = 80000 (chA) + 80000 (chB) + 80000 (chC) =
+  // 240000 > 200000 (double comptage) → reste négatif → AUCUN plafond-comble émis. Le 12 m²
+  // ci-dessous détecte donc toute violation de la précondition.
+  const dessin = {
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+    niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }, { id: 'etage', nom: 'Étage', hauteur: 250 }],
+    pieces: [
+      { id: 'sejour', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 0, y: 400 }] },
+      { id: 'chA', niveauId: 'etage', nom: 'Chambre A', typePiece: 'chambre', chauffee: true, thetaInt: 18,
+        polygone: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 400 }, { x: 0, y: 400 }] },
+      { id: 'chB', niveauId: 'etage', nom: 'Chambre B', typePiece: 'chambre', chauffee: true, thetaInt: 18,
+        polygone: [{ x: 100, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 400 }, { x: 100, y: 400 }] },
+      { id: 'chC', niveauId: 'etage', nom: 'Chambre C', typePiece: 'chambre', chauffee: true, thetaInt: 18,
+        polygone: [{ x: 300, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 300, y: 400 }] },
+    ],
+    ouvertures: [],
+  };
+  const { parois, erreurs, avertissements } = deduireParois(dessin);
+  // Erreur de dessin mentionnant la paire — pas de throw (le plan reste affichable).
+  assert.equal(erreurs.length, 1);
+  assert.match(erreurs[0], /chevauchent/);
+  assert.ok(erreurs[0].includes('chA') && erreurs[0].includes('chB'));
+  assert.deepEqual(avertissements, []); // l'étage A des pièces chauffées (avant quarantaine)
+  // chA et chB : exclues → aucune paroi.
+  assert.equal(parois.filter((p) => p.pieceId === 'chA' || p.pieceId === 'chB').length, 0);
+  // Séjour : plafond-comble = 12 m² EXACTEMENT (calculé contre les seules survivantes, cf. supra),
+  // et c'est sa SEULE paroi haute.
+  const sejPlafonds = parois.filter((p) => p.pieceId === 'sejour'
+    && (p.type.startsWith('plafond') || p.type === 'toiture-rampant'));
+  assert.equal(sejPlafonds.length, 1);
+  assert.equal(sejPlafonds[0].type, 'plafond-comble');
+  proche(sejPlafonds[0].surfaceM2, 12);
+  // Séjour : 4 murs ext pleins (O 400×250 = 10 · S 500×250 = 12.5 · E 10 · N 12.5) + plancher 20.
+  const sejExt = parois.filter((p) => p.pieceId === 'sejour' && p.type === 'mur-exterieur');
+  assert.equal(sejExt.length, 4);
+  proche(paroiSeule(sejExt, (p) => p.orientation === 'E', 'séjour est').surfaceM2, 10);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.type === 'plancher-bas', 'plancher séjour').surfaceM2, 20);
+  // chC : 4 murs ext (chB en quarantaine n'est PAS offerte comme voisine : son mur ouest x=300
+  // ressort extérieur) : O 400×250 = 10 · S 200×250 = 5 · E 10 · N 5 ; sol sur séjour chauffé →
+  // rien ; plafond-comble 200×400 = 80000 cm² = 8 m².
+  const chCExt = parois.filter((p) => p.pieceId === 'chC' && p.type === 'mur-exterieur');
+  assert.equal(chCExt.length, 4);
+  proche(paroiSeule(chCExt, (p) => p.orientation === 'O', 'chC ouest').surfaceM2, 10);
+  proche(paroiSeule(chCExt, (p) => p.orientation === 'S', 'chC sud').surfaceM2, 5);
+  assert.equal(parois.filter((p) => p.pieceId === 'chC' && p.type.startsWith('plancher')).length, 0);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'chC' && p.type === 'plafond-comble', 'plafond chC').surfaceM2, 8);
+  assert.equal(parois.length, 11); // séjour 4+1+1 = 6, chC 4+1 = 5
+});
+
+test('deduireParois : mitoyen interne émis si ΔT > 4 K, pour CHAQUE pièce chauffée, adjacentPieceId croisés', () => {
+  assert.equal(DELTA_THETA_INTERNE, 4);
+  // Cuisine à θ15 : |20 − 15| = 5 > 4 → le mur séjour↔cuisine (400 × 250 = 10 m²) est émis
+  // DEUX fois : une paroi pour le séjour (vers cuisine) ET une pour la cuisine (vers séjour).
+  const quinze = deduireParois(maison({ thetaCuisine: 15 }));
+  assert.deepEqual(quinze.erreurs, []);
+  assert.deepEqual(quinze.avertissements, []);
+  const mitoyens = quinze.parois.filter((p) => p.type === 'mur-mitoyen-interne');
+  assert.equal(mitoyens.length, 2);
+  const coteSejour = paroiSeule(mitoyens, (p) => p.pieceId === 'sejour', 'mitoyen côté séjour');
+  assert.equal(coteSejour.adjacentPieceId, 'cuisine');
+  proche(coteSejour.surfaceM2, 10);
+  assert.deepEqual(coteSejour.meta, { niveauId: 'rdc', segmentIndex: 2, de: 0, a: 400 });
+  const coteCuisine = paroiSeule(mitoyens, (p) => p.pieceId === 'cuisine', 'mitoyen côté cuisine');
+  assert.equal(coteCuisine.adjacentPieceId, 'sejour');
+  proche(coteCuisine.surfaceM2, 10);
+  assert.deepEqual(coteCuisine.meta, { niveauId: 'rdc', segmentIndex: 0, de: 0, a: 400 });
+  assert.equal(quinze.parois.length, 18); // les 16 de la maison de référence + 2 mitoyens
+  // ΔT = 4 exactement (θ16) : PAS émis (strictement supérieur requis).
+  const seize = deduireParois(maison({ thetaCuisine: 16 }));
+  assert.equal(seize.parois.filter((p) => p.type === 'mur-mitoyen-interne').length, 0);
+  assert.equal(seize.parois.length, 16);
+  // θint null d'un côté : pas d'émission non plus.
+  const sansTheta = deduireParois(maison({ thetaCuisine: null }));
+  assert.equal(sansTheta.parois.filter((p) => p.type === 'mur-mitoyen-interne').length, 0);
+});
+
+test('deduireParois : ouverture sur mitoyen non émis → ignorée avec avertissement ; sur mitoyen émis → émise et mur net', () => {
+  // porte-cuisine 90×215 sur le mur est du séjour (mitoyen cuisine). À θ20 ↔ θ20 le mur n'est
+  // pas déperditif → la porte est IGNORÉE (avertissement, aucune paroi) et rien d'autre ne change.
+  const ignoree = deduireParois(maison({ porteMitoyenne: true }));
+  assert.deepEqual(ignoree.erreurs, []);
+  assert.equal(ignoree.avertissements.length, 1);
+  assert.match(ignoree.avertissements[0], /ignorée/);
+  assert.ok(ignoree.avertissements[0].includes('porte-cuisine'));
+  assert.equal(ignoree.parois.filter((p) => p.ouvertureId === 'porte-cuisine').length, 0);
+  assert.equal(ignoree.parois.length, 16); // identique à la maison de référence
+  // Même porte avec cuisine à θ15 (mitoyen ÉMIS) : le mur côté séjour devient NET
+  // (400 × 250 = 100000 − 19350 = 80650 cm² = 8.065 m²) et la porte est émise (1.935 m²,
+  // adjacentPieceId du mur porteur). Côté cuisine : mur plein 10 m² (la porte appartient au
+  // dessin du séjour — imputation d'un seul côté, v1).
+  const emise = deduireParois(maison({ thetaCuisine: 15, porteMitoyenne: true }));
+  assert.deepEqual(emise.erreurs, []);
+  assert.deepEqual(emise.avertissements, []);
+  const coteSejour = paroiSeule(emise.parois, (p) => p.type === 'mur-mitoyen-interne' && p.pieceId === 'sejour', 'mitoyen net côté séjour');
+  proche(coteSejour.surfaceM2, 8.065);
+  const porteCuisine = paroiSeule(emise.parois, (p) => p.ouvertureId === 'porte-cuisine', 'porte mitoyenne');
+  assert.equal(porteCuisine.type, 'porte');
+  assert.equal(porteCuisine.pieceId, 'sejour');
+  assert.equal(porteCuisine.adjacentPieceId, 'cuisine');
+  proche(porteCuisine.surfaceM2, 1.935);
+  assert.deepEqual(porteCuisine.meta, { niveauId: 'rdc', segmentIndex: 2, de: 210, a: 300 });
+  const coteCuisine = paroiSeule(emise.parois, (p) => p.type === 'mur-mitoyen-interne' && p.pieceId === 'cuisine', 'mitoyen plein côté cuisine');
+  proche(coteCuisine.surfaceM2, 10);
+  assert.equal(emise.parois.length, 19); // 16 + 2 mitoyens + 1 porte
+});
+
+test('deduireParois : porte sur mur LNC → émise (paroi déperditive vers le garage), mur-lnc net', () => {
+  // porte-garage 90×200 = 18000 cm² = 1.8 m² sur le mur est de la cuisine (vers le garage).
+  // mur-lnc net = 400 × 250 − 18000 = 82000 cm² = 8.2 m² ; invariant : 8.2 + 1.8 = 10 m² (mur plein).
+  const { parois, erreurs, avertissements } = deduireParois(maison({ porteGarage: true }));
+  assert.deepEqual(erreurs, []);
+  assert.deepEqual(avertissements, []);
+  const lnc = paroiSeule(parois, (p) => p.type === 'mur-lnc', 'mur cuisine → garage net');
+  proche(lnc.surfaceM2, 8.2);
+  const porteGarage = paroiSeule(parois, (p) => p.ouvertureId === 'porte-garage', 'porte vers garage');
+  assert.equal(porteGarage.type, 'porte');
+  assert.equal(porteGarage.pieceId, 'cuisine');
+  assert.equal(porteGarage.adjacentPieceId, 'garage');
+  proche(porteGarage.surfaceM2, 1.8);
+  assert.deepEqual(porteGarage.meta, { niveauId: 'rdc', segmentIndex: 2, de: 160, a: 250 });
+  proche(lnc.surfaceM2 + porteGarage.surfaceM2, 10);
+  assert.equal(parois.length, 17); // 16 + la porte (le mur-lnc existait déjà, juste aminci)
+});
+
+test('deduireParois : pièce chauffée < 1 m² → avertissement ; toitureType rampant → toiture-rampant', () => {
+  // WC 90×90 = 8100 cm² = 0.81 m² < 1 m². toitureType 'rampant', plancher 'vide-sanitaire'.
+  const dessin = {
+    nord: 0, plancherBasType: 'vide-sanitaire', toitureType: 'rampant',
+    niveaux: [{ id: 'seul', nom: 'Unique', hauteur: 250 }],
+    pieces: [
+      { id: 'wc', niveauId: 'seul', nom: 'WC', typePiece: 'wc', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 90, y: 0 }, { x: 90, y: 90 }, { x: 0, y: 90 }] },
+    ],
+    ouvertures: [],
+  };
+  const { parois, erreurs, avertissements } = deduireParois(dessin);
+  assert.deepEqual(erreurs, []);
+  assert.equal(avertissements.length, 1);
+  assert.match(avertissements[0], /1 m²/);
+  assert.ok(avertissements[0].includes('wc'));
+  // 4 murs ext 90 × 250 = 22500 cm² = 2.25 m² ; plancher-bas 0.81 (vide-sanitaire) ; rampant 0.81.
+  assert.equal(parois.filter((p) => p.type === 'mur-exterieur').length, 4);
+  proche(parois.find((p) => p.type === 'mur-exterieur').surfaceM2, 2.25);
+  const plancher = paroiSeule(parois, (p) => p.type === 'plancher-bas', 'plancher WC');
+  proche(plancher.surfaceM2, 0.81);
+  assert.deepEqual(plancher.meta, { niveauId: 'seul', plancherBasType: 'vide-sanitaire' });
+  proche(paroiSeule(parois, (p) => p.type === 'toiture-rampant', 'rampant WC').surfaceM2, 0.81);
+  assert.equal(parois.filter((p) => p.type === 'plafond-comble').length, 0);
+});
+
+test('deduireParois : pièce chauffée totalement enclavée entre pièces chauffées → aucune paroi + avertissement', () => {
+  // Sandwich 3 niveaux d'empreinte 600×600 : n1 partitionné en b (centre [200,400]², 4 m²) +
+  // p1 (bande nord + bande est) + p2 (bande ouest + bas-centre) — cf. test « pièce enclavée »
+  // de la Task 3. TOUT est chauffé à θ20 : les murs de b sont mitoyens ΔT 0 → non émis ; son
+  // sol repose sur socle (chauffé) et son plafond est sous toit (chauffé) → ZÉRO paroi pour b.
+  const empreinte = [{ x: 0, y: 0 }, { x: 600, y: 0 }, { x: 600, y: 600 }, { x: 0, y: 600 }];
+  const dessin = {
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+    niveaux: [{ id: 'n0', nom: 'RDC', hauteur: 250 }, { id: 'n1', nom: 'R+1', hauteur: 250 },
+      { id: 'n2', nom: 'R+2', hauteur: 250 }],
+    pieces: [
+      { id: 'socle', niveauId: 'n0', nom: 'Socle', typePiece: 'sejour', chauffee: true, thetaInt: 20, polygone: empreinte },
+      { id: 'b', niveauId: 'n1', nom: 'Centre', typePiece: 'bureau', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 200, y: 200 }, { x: 400, y: 200 }, { x: 400, y: 400 }, { x: 200, y: 400 }] },
+      { id: 'p1', niveauId: 'n1', nom: 'P1', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 600, y: 0 }, { x: 600, y: 600 }, { x: 400, y: 600 },
+                   { x: 400, y: 200 }, { x: 0, y: 200 }] },
+      { id: 'p2', niveauId: 'n1', nom: 'P2', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 200 }, { x: 200, y: 200 }, { x: 200, y: 400 }, { x: 400, y: 400 },
+                   { x: 400, y: 600 }, { x: 0, y: 600 }] },
+      { id: 'toit', niveauId: 'n2', nom: 'Toit', typePiece: 'chambre', chauffee: true, thetaInt: 20, polygone: empreinte },
+    ],
+    ouvertures: [],
+  };
+  const { parois, erreurs, avertissements } = deduireParois(dessin);
+  assert.deepEqual(erreurs, []);
+  assert.equal(avertissements.length, 1);
+  assert.match(avertissements[0], /aucune paroi déperditive/);
+  assert.ok(avertissements[0].includes('« b »'));
+  assert.equal(parois.filter((p) => p.pieceId === 'b').length, 0);
+  // Socle : plancher-bas 36 m², AUCUNE paroi haute (plafond 100 % sous n1 chauffé : 4+20+12 = 36 m²).
+  proche(paroiSeule(parois, (p) => p.pieceId === 'socle' && p.type === 'plancher-bas', 'plancher socle').surfaceM2, 36);
+  assert.equal(parois.filter((p) => p.pieceId === 'socle' && p.type.startsWith('plafond')).length, 0);
+  // Toit : plafond-comble 36 m², aucune paroi basse.
+  proche(paroiSeule(parois, (p) => p.pieceId === 'toit' && p.type === 'plafond-comble', 'plafond toit').surfaceM2, 36);
+  assert.equal(parois.filter((p) => p.pieceId === 'toit' && p.type.startsWith('plancher')).length, 0);
+});
+
+test('deduireParois : pièce chauffée entre deux niveaux LNC → plancher-sur-lnc + plafond-sur-lnc + avertissements niveaux', () => {
+  // n0 garage (LNC), n1 studio chauffé, n2 grenier (LNC) — même empreinte 400×300 = 12 m².
+  // studio : sol sur LNC → plancher-sur-lnc 12 m² (garage) ; plafond sous LNC → plafond-sur-lnc
+  // 12 m² (grenier) ; 4 murs ext (O 300×250 = 7.5 · S 400×250 = 10 · E 7.5 · N 10).
+  // Avertissements : n0 et n2 n'ont aucune pièce chauffée.
+  const empreinte = [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 }];
+  const dessin = {
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+    niveaux: [{ id: 'n0', nom: 'Sous-sol', hauteur: 250 }, { id: 'n1', nom: 'RDC', hauteur: 250 },
+      { id: 'n2', nom: 'Combles', hauteur: 250 }],
+    pieces: [
+      { id: 'garage', niveauId: 'n0', nom: 'Garage', typePiece: 'garage', chauffee: false, thetaInt: null, polygone: empreinte },
+      { id: 'studio', niveauId: 'n1', nom: 'Studio', typePiece: 'sejour', chauffee: true, thetaInt: 20, polygone: empreinte },
+      { id: 'grenier', niveauId: 'n2', nom: 'Grenier', typePiece: 'grenier', chauffee: false, thetaInt: null, polygone: empreinte },
+    ],
+    ouvertures: [],
+  };
+  const { parois, erreurs, avertissements } = deduireParois(dessin);
+  assert.deepEqual(erreurs, []);
+  assert.equal(avertissements.length, 2);
+  assert.match(avertissements[0], /aucune pièce chauffée/);
+  assert.ok(avertissements[0].includes('n0'));
+  assert.match(avertissements[1], /aucune pièce chauffée/);
+  assert.ok(avertissements[1].includes('n2'));
+  const sol = paroiSeule(parois, (p) => p.type === 'plancher-sur-lnc', 'sol studio');
+  assert.equal(sol.pieceId, 'studio');
+  assert.equal(sol.adjacentPieceId, 'garage');
+  proche(sol.surfaceM2, 12);
+  assert.deepEqual(sol.meta, { niveauId: 'n1' });
+  const plafond = paroiSeule(parois, (p) => p.type === 'plafond-sur-lnc', 'plafond studio');
+  assert.equal(plafond.adjacentPieceId, 'grenier');
+  proche(plafond.surfaceM2, 12);
+  assert.equal(parois.filter((p) => p.type === 'mur-exterieur').length, 4);
+  assert.equal(parois.length, 6); // 4 murs + sol + plafond, rien pour garage/grenier
+});
+
+test('deduireParois : ouverture en erreur → erreur agrégée de valideOuvertures, non émise, mur PLEIN', () => {
+  // Fenêtre à position 400 : 400 + 140 = 540 > 500 (longueur du mur sud) → dépasse → erreur.
+  // Le mur sud reste PLEIN (12.5 m², pas de déduction d'une ouverture invalide) et la fenêtre
+  // n'est pas émise. La porte d'entrée, valide, reste émise et son mur reste net.
+  const { parois, erreurs, avertissements } = deduireParois(maison({ fenetrePosition: 400 }));
+  assert.equal(erreurs.length, 1);
+  assert.match(erreurs[0], /dépasse/);
+  assert.ok(erreurs[0].includes('fen-sejour'));
+  assert.deepEqual(avertissements, []);
+  assert.equal(parois.filter((p) => p.type === 'fenetre').length, 0);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.orientation === 'S', 'mur sud plein').surfaceM2, 12.5);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.orientation === 'N', 'mur nord net').surfaceM2, 10.565);
+  assert.equal(parois.length, 15); // 16 − la fenêtre
+});
+
+test('deduireParois : dessin malformé → throw thermique (seul cas de throw)', () => {
+  assert.throws(() => deduireParois(null), /thermique/);
+  assert.throws(() => deduireParois({ ...maison(), niveaux: [] }), /thermique/);
+  const dupNiveau = maison();
+  dupNiveau.niveaux = [{ id: 'rdc', nom: 'A', hauteur: 250 }, { id: 'rdc', nom: 'B', hauteur: 250 }];
+  assert.throws(() => deduireParois(dupNiveau), /thermique/);
+  const hauteurDecimale = maison();
+  hauteurDecimale.niveaux[0].hauteur = 250.5;
+  assert.throws(() => deduireParois(hauteurDecimale), /thermique/);
+  const sansNiveau = maison();
+  sansNiveau.pieces[0].niveauId = 'inconnu'; // pièce sans niveau
+  assert.throws(() => deduireParois(sansNiveau), /thermique/);
+  const dupPiece = maison();
+  dupPiece.pieces[3].id = 'sejour'; // id dupliqué inter-niveaux
+  assert.throws(() => deduireParois(dupPiece), /thermique/);
+  const ouvertureOrpheline = maison();
+  ouvertureOrpheline.ouvertures[0].pieceId = 'inconnue';
+  assert.throws(() => deduireParois(ouvertureOrpheline), /thermique/);
+  const typeInconnu = maison();
+  typeInconnu.ouvertures[0].type = 'velux';
+  assert.throws(() => deduireParois(typeInconnu), /thermique/);
+  const dupOuverture = maison();
+  dupOuverture.ouvertures[1].id = 'fen-sejour';
+  assert.throws(() => deduireParois(dupOuverture), /thermique/);
+  assert.throws(() => deduireParois({ ...maison(), nord: NaN }), /thermique/);
+  assert.throws(() => deduireParois({ ...maison(), plancherBasType: 'parquet' }), /thermique/);
+  assert.throws(() => deduireParois({ ...maison(), toitureType: 'plat' }), /thermique/);
 });

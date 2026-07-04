@@ -447,8 +447,12 @@ export function intervalleAxial(segment, position, largeur) {
  * @param {{segmentIndex: number, de: number, a: number, longueur: number, adjacent: *}[]}
  *   sousSegments sous-segments de la pièce (sortie adjacencesNiveau, bornes d'axe croissantes)
  * @param {number} hauteurNiveau hauteur du niveau en cm (entier > 0)
- * @returns {{erreurs: string[], surfacesOuvertures: Map<string, number>}} surfacesOuvertures :
- *   clé `${segmentIndex}:${de}:${a}` (sous-segment porteur) → cm² d'ouvertures imputées
+ * @returns {{erreurs: string[], surfacesOuvertures: Map<string, number>,
+ *   parOuverture: Map<*, {cle: string, de: number, a: number}>}} surfacesOuvertures :
+ *   clé `${segmentIndex}:${de}:${a}` (sous-segment porteur) → cm² d'ouvertures imputées ;
+ *   parOuverture (ajouté en Task 6 pour deduireParois) : id d'ouverture VALIDE → { cle :
+ *   sous-segment porteur (même format de clé), de/a : intervalle d'axe propre de l'ouverture }.
+ *   Une ouverture en erreur ne figure dans AUCUNE des deux maps.
  */
 export function valideOuvertures(piece, ouvertures, sousSegments, hauteurNiveau) {
   if (!piece || typeof piece !== 'object' || piece.id === null || piece.id === undefined
@@ -521,6 +525,7 @@ export function valideOuvertures(piece, ouvertures, sousSegments, hauteurNiveau)
   // de même adjacence étant fusionnés par decomposeIntervalle, une ouverture non contenue dans
   // UN sous-segment est nécessairement à cheval sur deux adjacences différentes.
   const surfacesOuvertures = new Map();
+  const parOuverture = new Map();
   for (const { o, intervalle, ok } of etats) {
     if (!ok || !intervalle) continue;
     const subs = sousSegments.filter((s) => s.segmentIndex === o.segmentIndex);
@@ -534,9 +539,10 @@ export function valideOuvertures(piece, ouvertures, sousSegments, hauteurNiveau)
     }
     const cle = `${o.segmentIndex}:${porteur.de}:${porteur.a}`;
     surfacesOuvertures.set(cle, (surfacesOuvertures.get(cle) || 0) + o.largeur * o.hauteur);
+    parOuverture.set(o.id, { cle, de: intervalle.de, a: intervalle.a });
   }
 
-  return { erreurs, surfacesOuvertures };
+  return { erreurs, surfacesOuvertures, parOuverture };
 }
 
 /** Rang de tri déterministe d'une catégorie de fraction sol/plafond : chauffe < lnc < exterieur. */
@@ -589,6 +595,10 @@ function decomposeFaceContreNiveau(piece, voisines) {
  *    ou rampant selon dessin.toitureType, résolu par le consommateur).
  * Les pièces NON chauffées n'apparaissent pas dans la sortie. Fractions de surface nulle omises.
  * Ordre déterministe : catégorie ('chauffe' < 'lnc' < 'exterieur') puis adjacentPieceId croissant.
+ * Précondition non vérifiée ici : les pièces de chaque niveau ne doivent pas se chevaucher en
+ * surface (cf. adjacencesNiveau qui les met en quarantaine). Si violée, Σ fractions > surface
+ * (double comptage). L'appelant (deduireParois) DOIT exclure les pièces en quarantaine de TOUS
+ * les niveaux avant l'appel.
  * Validation (erreurs de PROGRAMMATION, throw 'thermique:') : dessin.niveaux non vide ; toute
  * pièce référence un niveau existant.
  * @param {{niveaux: {id: *}[], pieces: {id: *, niveauId: *, chauffee: boolean,
@@ -635,4 +645,254 @@ export function superposeNiveaux(dessin) {
     }
   }
   return resultat;
+}
+
+export const DELTA_THETA_INTERNE = 4; // K — seuil d'émission des parois mitoyennes internes
+
+const PLANCHER_BAS_TYPES = new Set(['terre-plein', 'vide-sanitaire', 'sous-sol']);
+const TOITURE_TYPES = new Set(['comble', 'rampant']);
+const TYPES_OUVERTURE = new Set(['fenetre', 'porte', 'porte-fenetre']);
+
+/**
+ * Contrôle de forme du dessin pour deduireParois. Tout écart ici est une entrée MALFORMÉE
+ * (erreur de programmation → throw 'thermique:'), par opposition aux problèmes de DESSIN
+ * (polygones invalides, chevauchements, ouvertures hors mur) qui vont dans erreurs/avertissements.
+ * @returns {{niveauxParId: Map<*, object>, piecesParId: Map<*, object>,
+ *   ouverturesParPiece: Map<*, object[]>}}
+ */
+function indexeDessin(dessin) {
+  if (!dessin || typeof dessin !== 'object') {
+    throw new Error('thermique: deduireParois : dessin requis');
+  }
+  if (!Array.isArray(dessin.niveaux) || dessin.niveaux.length === 0) {
+    throw new Error('thermique: deduireParois : dessin.niveaux non vide requis');
+  }
+  if (!Array.isArray(dessin.pieces)) {
+    throw new Error('thermique: deduireParois : dessin.pieces doit être un tableau');
+  }
+  if (!Array.isArray(dessin.ouvertures)) {
+    throw new Error('thermique: deduireParois : dessin.ouvertures doit être un tableau');
+  }
+  if (typeof dessin.nord !== 'number' || !Number.isFinite(dessin.nord)) {
+    throw new Error('thermique: deduireParois : dessin.nord doit être un nombre fini (degrés)');
+  }
+  if (!PLANCHER_BAS_TYPES.has(dessin.plancherBasType)) {
+    throw new Error(`thermique: deduireParois : plancherBasType inconnu (${dessin.plancherBasType})`);
+  }
+  if (!TOITURE_TYPES.has(dessin.toitureType)) {
+    throw new Error(`thermique: deduireParois : toitureType inconnu (${dessin.toitureType})`);
+  }
+  const niveauxParId = new Map();
+  for (const n of dessin.niveaux) {
+    if (!n || typeof n !== 'object' || n.id === null || n.id === undefined || n.id === '') {
+      throw new Error('thermique: deduireParois : chaque niveau doit avoir un id');
+    }
+    if (niveauxParId.has(n.id)) {
+      throw new Error(`thermique: deduireParois : id de niveau dupliqué (${n.id})`);
+    }
+    if (!Number.isInteger(n.hauteur) || n.hauteur <= 0) {
+      throw new Error(`thermique: deduireParois : niveau « ${n.id} » — hauteur entière > 0 requise (cm)`);
+    }
+    niveauxParId.set(n.id, n);
+  }
+  const piecesParId = new Map();
+  for (const p of dessin.pieces) {
+    if (!p || typeof p !== 'object' || p.id === null || p.id === undefined || p.id === '') {
+      throw new Error('thermique: deduireParois : chaque pièce doit avoir un id');
+    }
+    if (piecesParId.has(p.id)) {
+      throw new Error(`thermique: deduireParois : id de pièce dupliqué (${p.id})`);
+    }
+    if (!niveauxParId.has(p.niveauId)) {
+      throw new Error(`thermique: deduireParois : pièce « ${p.id} » référence un niveau inconnu (${p.niveauId})`);
+    }
+    piecesParId.set(p.id, p);
+  }
+  const ouverturesParPiece = new Map();
+  const idsOuvertures = new Set();
+  for (const o of dessin.ouvertures) {
+    if (!o || typeof o !== 'object' || o.id === null || o.id === undefined || o.id === '') {
+      throw new Error('thermique: deduireParois : chaque ouverture doit avoir un id');
+    }
+    if (idsOuvertures.has(o.id)) {
+      throw new Error(`thermique: deduireParois : id d'ouverture dupliqué (${o.id})`);
+    }
+    idsOuvertures.add(o.id);
+    if (!piecesParId.has(o.pieceId)) {
+      throw new Error(`thermique: deduireParois : ouverture « ${o.id} » référence une pièce inconnue (${o.pieceId})`);
+    }
+    if (!TYPES_OUVERTURE.has(o.type)) {
+      throw new Error(`thermique: deduireParois : ouverture « ${o.id} » — type inconnu (${o.type})`);
+    }
+    if (!ouverturesParPiece.has(o.pieceId)) ouverturesParPiece.set(o.pieceId, []);
+    ouverturesParPiece.get(o.pieceId).push(o);
+  }
+  return { niveauxParId, piecesParId, ouverturesParPiece };
+}
+
+/**
+ * LA fonction du module : dessin complet → parois par pièce chauffée, prêtes pour l'assemblage
+ * (plan 4 : U/b/ΔUtb via refDataResolvers, puis calculeBatiment). Géométrie pure : AUCUNE
+ * résolution de U/b ici.
+ * Types émis : 'mur-exterieur' (orientation), 'mur-lnc' (adjacentPieceId), 'mur-mitoyen-interne'
+ * (adjacentPieceId — émis SEULEMENT si |θint A − θint B| > DELTA_THETA_INTERNE, une paroi pour
+ * CHAQUE pièce chauffée concernée, adjacentPieceId croisés ; θint null → pas d'émission),
+ * 'plancher-bas' (meta.plancherBasType — y compris la fraction de sol « sur rien » d'un niveau
+ * supérieur, porte-à-faux v1), 'plancher-sur-lnc' (adjacentPieceId), 'plafond-comble'|
+ * 'toiture-rampant' (selon dessin.toitureType, pour toute fraction de plafond sans rien au-dessus,
+ * quel que soit le niveau), 'plafond-sur-lnc' (adjacentPieceId), 'fenetre'|'porte'|'porte-fenetre'
+ * (ouvertureId, rattachées à leur mur porteur dont la surface est NETTE — déduite via
+ * valideOuvertures ; elles portent l'adjacentPieceId du mur porteur le cas échéant, pour la
+ * résolution du b au plan 4 — jamais d'orientation).
+ * Chaque paroi : { pieceId, type, surfaceM2, orientation?, adjacentPieceId?, ouvertureId?, meta }.
+ *   surfaceM2 = cm²/10000, NON arrondi. meta : { niveauId, segmentIndex?, de?, a? } (traçabilité
+ *   UI ; de/a d'un mur = bornes d'axe du sous-segment, de/a d'une ouverture = son intervalle
+ *   d'axe propre). Ordre déterministe : pièces dans l'ordre du dessin ; par pièce : murs (ordre
+ *   des sous-segments), ouvertures (ordre du dessin), sol, plafond.
+ * Murs : surface = longueur du sous-segment × hauteur du niveau − ouvertures imputées à ce
+ * sous-segment ; un mur entièrement couvert par ses ouvertures (surface nette nulle) n'émet pas
+ * de paroi de mur, ses ouvertures restent émises. Ouvertures des murs mitoyens/LNC : émises aussi
+ * (une porte vers un garage est une paroi déperditive) SAUF sur mitoyen-interne non émis
+ * (ouverture ignorée avec avertissement). Les ouvertures des pièces NON chauffées ne produisent
+ * aucune paroi (mais restent validées : leurs erreurs de dessin remontent) ; celles des pièces
+ * écartées (polygone invalide, quarantaine) ne sont pas validées — corriger la pièce d'abord.
+ * Orientation : orientationDe(segment, dessin.nord) pour les murs extérieurs uniquement.
+ * Quarantaine : les pièces écartées par adjacencesNiveau (polygone invalide, chevauchement,
+ * dessin dégénéré) sont collectées sur TOUS les niveaux puis exclues AVANT superposeNiveaux
+ * (précondition de celle-ci — sinon double comptage des fractions sol/plafond).
+ * Retour { parois, erreurs, avertissements } :
+ *   erreurs : agrégées de validePolygone (par pièce, via adjacencesNiveau), adjacencesNiveau
+ *   (quarantaine), valideOuvertures ;
+ *   avertissements : niveau sans pièce chauffée ; pièce chauffée sans paroi déperditive ;
+ *   pièce < 1 m² (polygone valide, chauffée ou non) ; ouverture ignorée sur mitoyen non émis.
+ * Throw 'thermique:' uniquement pour dessin malformé (niveaux vides, pièce sans niveau, ids
+ * dupliqués, type d'ouverture ou de plancher/toiture inconnu, nord non fini, etc.).
+ * @param {object} dessin modèle figé au plan 3 (cf. en-tête de module et décision n°6)
+ * @returns {{parois: object[], erreurs: string[], avertissements: string[]}}
+ */
+export function deduireParois(dessin) {
+  const { niveauxParId, piecesParId, ouverturesParPiece } = indexeDessin(dessin);
+  const erreurs = [];
+  const avertissements = [];
+
+  // ── 1. Adjacences niveau par niveau. Les pièces écartées (polygone invalide, quarantaine de
+  //       chevauchement, dessin dégénéré) de TOUS les niveaux sont collectées AVANT la
+  //       superposition : précondition de superposeNiveaux (sinon double comptage). ──
+  const sousSegmentsParPiece = new Map();
+  for (const niveau of dessin.niveaux) {
+    const duNiveau = dessin.pieces.filter((p) => p.niveauId === niveau.id);
+    const { parPiece, erreurs: erreursNiveau } = adjacencesNiveau(duNiveau);
+    erreurs.push(...erreursNiveau);
+    for (const [pieceId, sousSegments] of parPiece) sousSegmentsParPiece.set(pieceId, sousSegments);
+  }
+
+  // ── 2. Superposition des niveaux sur les seules survivantes (tous niveaux confondus). ──
+  const survivantes = dessin.pieces.filter((p) => sousSegmentsParPiece.has(p.id));
+  const faces = superposeNiveaux({ ...dessin, pieces: survivantes });
+
+  // ── Avertissements de complétude (sur le dessin BRUT : indépendants de la quarantaine,
+  //     qui a déjà ses erreurs). ──
+  for (const niveau of dessin.niveaux) {
+    if (!dessin.pieces.some((p) => p.niveauId === niveau.id && p.chauffee)) {
+      avertissements.push(`niveau « ${niveau.id} » : aucune pièce chauffée`);
+    }
+  }
+  for (const piece of dessin.pieces) {
+    if (validePolygone(piece.polygone).length === 0 && surfaceCm2(piece.polygone) < 10000) {
+      avertissements.push(`pièce « ${piece.id} » : surface inférieure à 1 m²`);
+    }
+  }
+
+  // ── 3. Parois pièce par pièce. ──
+  const parois = [];
+  for (const piece of survivantes) {
+    const niveau = niveauxParId.get(piece.niveauId);
+    const sousSegments = sousSegmentsParPiece.get(piece.id);
+    // Ouvertures validées pour TOUTES les survivantes (les erreurs de dessin d'une ouverture
+    // d'un LNC remontent aussi) ; seules les pièces chauffées émettent des parois.
+    const controle = valideOuvertures(piece, ouverturesParPiece.get(piece.id) || [], sousSegments, niveau.hauteur);
+    erreurs.push(...controle.erreurs);
+    if (!piece.chauffee) continue;
+
+    const nbParoisAvant = parois.length;
+    const segments = segmentsDe(normalisePolygone(piece.polygone));
+
+    // 3a. Murs — un sous-segment à la fois, surface NETTE des ouvertures imputées à sa clé.
+    //     emissionParCle mémorise la décision pour rattacher les ouvertures en 3b.
+    const emissionParCle = new Map();
+    for (const ss of sousSegments) {
+      const cle = `${ss.segmentIndex}:${ss.de}:${ss.a}`;
+      let emission;
+      if (ss.adjacent === null) {
+        emission = { emise: true, type: 'mur-exterieur', orientation: orientationDe(segments[ss.segmentIndex], dessin.nord) };
+      } else {
+        const voisine = piecesParId.get(ss.adjacent);
+        if (!voisine.chauffee) {
+          emission = { emise: true, type: 'mur-lnc', adjacentPieceId: voisine.id };
+        } else if (Number.isFinite(piece.thetaInt) && Number.isFinite(voisine.thetaInt)
+          && Math.abs(piece.thetaInt - voisine.thetaInt) > DELTA_THETA_INTERNE) {
+          emission = { emise: true, type: 'mur-mitoyen-interne', adjacentPieceId: voisine.id };
+        } else {
+          emission = { emise: false, adjacentPieceId: voisine.id }; // mitoyen interne non déperditif
+        }
+      }
+      emissionParCle.set(cle, emission);
+      if (!emission.emise) continue;
+      const netteCm2 = ss.longueur * niveau.hauteur - (controle.surfacesOuvertures.get(cle) || 0);
+      if (netteCm2 <= 0) continue; // mur entièrement couvert d'ouvertures : elles seules sont émises
+      const paroi = { pieceId: piece.id, type: emission.type, surfaceM2: netteCm2 / 10000 };
+      if (emission.orientation !== undefined) paroi.orientation = emission.orientation;
+      if (emission.adjacentPieceId !== undefined) paroi.adjacentPieceId = emission.adjacentPieceId;
+      paroi.meta = { niveauId: niveau.id, segmentIndex: ss.segmentIndex, de: ss.de, a: ss.a };
+      parois.push(paroi);
+    }
+
+    // 3b. Ouvertures valides — émises sur mur extérieur/LNC/mitoyen émis (avec l'adjacentPieceId
+    //     du mur porteur le cas échéant) ; ignorées avec avertissement sur mitoyen non émis ;
+    //     jamais émises si en erreur (déjà remontées, absentes de parOuverture).
+    for (const o of ouverturesParPiece.get(piece.id) || []) {
+      const porteur = controle.parOuverture.get(o.id);
+      if (!porteur) continue;
+      const emission = emissionParCle.get(porteur.cle);
+      if (!emission.emise) {
+        avertissements.push(`ouverture « ${o.id} » : ignorée — posée sur un mur mitoyen non déperditif (vers « ${emission.adjacentPieceId} »)`);
+        continue;
+      }
+      const paroi = { pieceId: piece.id, type: o.type, surfaceM2: (o.largeur * o.hauteur) / 10000 };
+      if (emission.adjacentPieceId !== undefined) paroi.adjacentPieceId = emission.adjacentPieceId;
+      paroi.ouvertureId = o.id;
+      paroi.meta = { niveauId: niveau.id, segmentIndex: o.segmentIndex, de: porteur.de, a: porteur.a };
+      parois.push(paroi);
+    }
+
+    // 3c. Sol et plafond — fractions de superposeNiveaux ; 'chauffe' = non déperditif, ignoré.
+    const face = faces.get(piece.id);
+    for (const f of face.sol) {
+      if (f.sur === 'chauffe') continue;
+      if (f.sur === 'lnc') {
+        parois.push({ pieceId: piece.id, type: 'plancher-sur-lnc', surfaceM2: f.surfaceCm2 / 10000,
+          adjacentPieceId: f.adjacentPieceId, meta: { niveauId: niveau.id } });
+      } else {
+        parois.push({ pieceId: piece.id, type: 'plancher-bas', surfaceM2: f.surfaceCm2 / 10000,
+          meta: { niveauId: niveau.id, plancherBasType: dessin.plancherBasType } });
+      }
+    }
+    for (const f of face.plafond) {
+      if (f.sous === 'chauffe') continue;
+      if (f.sous === 'lnc') {
+        parois.push({ pieceId: piece.id, type: 'plafond-sur-lnc', surfaceM2: f.surfaceCm2 / 10000,
+          adjacentPieceId: f.adjacentPieceId, meta: { niveauId: niveau.id } });
+      } else {
+        parois.push({ pieceId: piece.id,
+          type: dessin.toitureType === 'comble' ? 'plafond-comble' : 'toiture-rampant',
+          surfaceM2: f.surfaceCm2 / 10000, meta: { niveauId: niveau.id } });
+      }
+    }
+
+    if (parois.length === nbParoisAvant) {
+      avertissements.push(`pièce « ${piece.id} » : chauffée mais aucune paroi déperditive`);
+    }
+  }
+
+  return { parois, erreurs, avertissements };
 }
