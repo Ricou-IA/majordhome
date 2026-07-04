@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalisePolygone, surfaceCm2, perimetreCm, segmentsDe, validePolygone, decomposeIntervalle,
   rectanglesDe, aireIntersectionRectilineaire, adjacencesNiveau, orientationDe, intervalleAxial,
-  valideOuvertures }
+  valideOuvertures, superposeNiveaux }
   from '../../src/apps/thermique/lib/geometryEngine.js';
 
 // Rectangle 400×300 cm (séjour 12 m²), déclaré horaire → doit être renversé en anti-horaire
@@ -470,4 +470,185 @@ test('valideOuvertures : entrées malformées → throw thermique (erreurs de pr
   assert.throws(() => valideOuvertures(SEJOUR, 'pas un tableau', subs, HAUTEUR_NIVEAU), /thermique/);
   assert.throws(() => valideOuvertures(SEJOUR, [], subs, 0), /thermique/);                                // hauteurNiveau invalide
   assert.throws(() => valideOuvertures(SEJOUR, [ouv('f1', 1, 40)], [], HAUTEUR_NIVEAU), /thermique/);     // sous-segments absents pour le segment
+});
+
+// ═══════════════ Task 5 : superposeNiveaux ═══════════════
+//
+// Ordre déterministe documenté et testé : dans `sol` comme dans `plafond`, les fractions sont
+// triées par catégorie — 'chauffe' puis 'lnc' puis 'exterieur' — puis, à catégorie égale, par
+// `adjacentPieceId` croissant (ordre naturel de chaîne). 'exterieur' n'a pas d'adjacentPieceId
+// (toujours en dernier au sein de sa catégorie, unique de toute façon : une seule fraction
+// « rien » possible par pièce et par face après agrégation).
+
+// Cas de référence du plan : RDC = séjour (chauffé) 500×400 accolé au garage (non chauffé) 300×400 ;
+// étage = chambre (chauffée) 500×400 posée à cheval : moitié sur séjour, moitié sur garage.
+//   séjour (RDC) : (0,0),(500,0),(500,400),(0,400)   → 500×400 = 200000 cm²
+//   garage (RDC) : (500,0),(800,0),(800,400),(500,400) → 300×400 = 120000 cm², accolé à l'est du séjour
+//   chambre (étage) : (250,0),(750,0),(750,400),(250,400) → 500×400 = 200000 cm²
+// chambre ∩ séjour = x∈[250,500] (250) × y∈[0,400] (400) = 100000 cm²
+// chambre ∩ garage = x∈[500,750] (250, ⊆ [500,800]) × y∈[0,400] (400) = 100000 cm²
+// 100000 + 100000 = 200000 = surface chambre ✓ (chambre entièrement couverte, pas de porte-à-faux)
+function dessinReference() {
+  return {
+    nord: 0,
+    plancherBasType: 'terre-plein',
+    toitureType: 'comble',
+    niveaux: [
+      { id: 'rdc', nom: 'RDC', hauteur: 250 },
+      { id: 'etage', nom: 'Étage', hauteur: 250 },
+    ],
+    pieces: [
+      { id: 'sejour', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 0, y: 400 }] },
+      { id: 'garage', niveauId: 'rdc', nom: 'Garage', typePiece: 'garage', chauffee: false, thetaInt: null,
+        polygone: [{ x: 500, y: 0 }, { x: 800, y: 0 }, { x: 800, y: 400 }, { x: 500, y: 400 }] },
+      { id: 'chambre', niveauId: 'etage', nom: 'Chambre', typePiece: 'chambre', chauffee: true, thetaInt: 18,
+        polygone: [{ x: 250, y: 0 }, { x: 750, y: 0 }, { x: 750, y: 400 }, { x: 250, y: 400 }] },
+    ],
+    ouvertures: [],
+  };
+}
+
+test('superposeNiveaux : cas de référence — chambre à cheval séjour/garage, garage absent (non chauffé)', () => {
+  const r = superposeNiveaux(dessinReference());
+  assert.equal(r.size, 2); // séjour, chambre — garage non chauffé, absent
+  assert.equal(r.has('garage'), false);
+
+  // chambre.sol : posée sur séjour (chauffé) → 'chauffe' (non déperditif) ; posée sur garage (LNC) → 'lnc'.
+  assert.deepEqual(r.get('chambre').sol, [
+    { surfaceCm2: 100000, sur: 'chauffe', adjacentPieceId: 'sejour' },
+    { surfaceCm2: 100000, sur: 'lnc', adjacentPieceId: 'garage' },
+  ]);
+  // chambre.plafond : dernier niveau, rien au-dessus → 100 % extérieur (comble), surface entière groupée.
+  assert.deepEqual(r.get('chambre').plafond, [{ surfaceCm2: 200000, sous: 'exterieur' }]);
+
+  // séjour.sol : niveau 0, rien en dessous → 100 % extérieur (plancher bas, type résolu par le consommateur).
+  assert.deepEqual(r.get('sejour').sol, [{ surfaceCm2: 200000, sur: 'exterieur' }]);
+  // séjour.plafond : moitié (250×400=100000) sous la chambre chauffée → 'chauffe' ; moitié restante
+  // (500×400 − 100000 = 100000) sous rien → 'exterieur' (comble, la chambre ne couvre que jusqu'à x=500).
+  assert.deepEqual(r.get('sejour').plafond, [
+    { surfaceCm2: 100000, sous: 'chauffe', adjacentPieceId: 'chambre' },
+    { surfaceCm2: 100000, sous: 'exterieur' },
+  ]);
+
+  // Invariant Σ fractions === surfaceCm2(polygone) pour chaque pièce présente.
+  for (const id of ['sejour', 'chambre']) {
+    const piece = dessinReference().pieces.find((p) => p.id === id);
+    const surface = surfaceCm2(piece.polygone);
+    const { sol, plafond } = r.get(id);
+    assert.equal(sol.reduce((s, f) => s + f.surfaceCm2, 0), surface);
+    assert.equal(plafond.reduce((s, f) => s + f.surfaceCm2, 0), surface);
+  }
+});
+
+// Extension 3 niveaux : pièce du milieu chauffée entièrement encadrée par des pièces chauffées
+// (même empreinte 400×300 aux 3 niveaux) → sol ET plafond 100 % 'chauffe' des deux côtés.
+function dessinTroisNiveaux() {
+  const poly = [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 }]; // 120000 cm²
+  return {
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+    niveaux: [{ id: 'n0', nom: 'RDC', hauteur: 250 }, { id: 'n1', nom: 'R+1', hauteur: 250 },
+      { id: 'n2', nom: 'R+2', hauteur: 250 }],
+    pieces: [
+      { id: 'a', niveauId: 'n0', nom: 'A', typePiece: 'sejour', chauffee: true, thetaInt: 20, polygone: poly },
+      { id: 'b', niveauId: 'n1', nom: 'B', typePiece: 'sejour', chauffee: true, thetaInt: 20, polygone: poly },
+      { id: 'c', niveauId: 'n2', nom: 'C', typePiece: 'chambre', chauffee: true, thetaInt: 18, polygone: poly },
+    ],
+    ouvertures: [],
+  };
+}
+
+test('superposeNiveaux : 3 niveaux — pièce du milieu chauffée-chauffée des deux côtés (sol ET plafond)', () => {
+  const r = superposeNiveaux(dessinTroisNiveaux());
+  assert.equal(r.size, 3);
+  // a (niveau 0) : sol → extérieur (RDC) ; plafond → entièrement sous b (chauffé) → 'chauffe'.
+  assert.deepEqual(r.get('a').sol, [{ surfaceCm2: 120000, sur: 'exterieur' }]);
+  assert.deepEqual(r.get('a').plafond, [{ surfaceCm2: 120000, sous: 'chauffe', adjacentPieceId: 'b' }]);
+  // b (niveau intermédiaire) : sol sur a (chauffé) → 'chauffe' ; plafond sous c (chauffé) → 'chauffe'.
+  assert.deepEqual(r.get('b').sol, [{ surfaceCm2: 120000, sur: 'chauffe', adjacentPieceId: 'a' }]);
+  assert.deepEqual(r.get('b').plafond, [{ surfaceCm2: 120000, sous: 'chauffe', adjacentPieceId: 'c' }]);
+  // c (dernier niveau) : sol sur b (chauffé) → 'chauffe' ; plafond → rien au-dessus → extérieur (comble).
+  assert.deepEqual(r.get('c').sol, [{ surfaceCm2: 120000, sur: 'chauffe', adjacentPieceId: 'b' }]);
+  assert.deepEqual(r.get('c').plafond, [{ surfaceCm2: 120000, sous: 'exterieur' }]);
+});
+
+test('superposeNiveaux : pièce d’étage entièrement en porte-à-faux (sur rien) → sol 100 % extérieur', () => {
+  // RDC : petite pièce 200×300 en (0,0). Étage : pièce 200×300 décalée entièrement hors de son
+  // empreinte, en (1000,0) → aucune intersection avec quoi que ce soit du RDC → sol 100 % 'exterieur'.
+  const dessin = {
+    nord: 0, plancherBasType: 'vide-sanitaire', toitureType: 'rampant',
+    niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }, { id: 'etage', nom: 'Étage', hauteur: 250 }],
+    pieces: [
+      { id: 'bas', niveauId: 'rdc', nom: 'Bas', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }, { x: 0, y: 300 }] },
+      { id: 'porteAFaux', niveauId: 'etage', nom: 'Porte-à-faux', typePiece: 'chambre', chauffee: true, thetaInt: 18,
+        polygone: [{ x: 1000, y: 0 }, { x: 1200, y: 0 }, { x: 1200, y: 300 }, { x: 1000, y: 300 }] },
+    ],
+    ouvertures: [],
+  };
+  const r = superposeNiveaux(dessin);
+  assert.deepEqual(r.get('porteAFaux').sol, [{ surfaceCm2: 60000, sur: 'exterieur' }]); // 200×300
+  assert.deepEqual(r.get('porteAFaux').plafond, [{ surfaceCm2: 60000, sous: 'exterieur' }]); // dernier niveau
+  // 'bas' (RDC) : sol extérieur (niveau 0) ; plafond : rien au-dessus (porteAFaux ne le recouvre pas) → extérieur.
+  assert.deepEqual(r.get('bas').sol, [{ surfaceCm2: 60000, sur: 'exterieur' }]);
+  assert.deepEqual(r.get('bas').plafond, [{ surfaceCm2: 60000, sous: 'exterieur' }]);
+});
+
+test('superposeNiveaux : niveau sans pièce → toléré (pas d’erreur ici, l’avertissement viendra en Task 6)', () => {
+  const dessin = {
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+    niveaux: [
+      { id: 'rdc', nom: 'RDC', hauteur: 250 },
+      { id: 'videe', nom: 'Vide', hauteur: 250 }, // aucune pièce sur ce niveau
+    ],
+    pieces: [
+      { id: 'sejour', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 }] },
+    ],
+    ouvertures: [],
+  };
+  const r = superposeNiveaux(dessin);
+  assert.equal(r.size, 1);
+  // Séjour = niveau 0 ET dernier niveau AYANT une pièce, mais le dernier niveau du tableau ('videe')
+  // est vide : la superposition regarde le niveau suivant réel du tableau (videe), le trouve vide,
+  // donc rien au-dessus → plafond 100 % extérieur.
+  assert.deepEqual(r.get('sejour').sol, [{ surfaceCm2: 120000, sur: 'exterieur' }]);
+  assert.deepEqual(r.get('sejour').plafond, [{ surfaceCm2: 120000, sous: 'exterieur' }]);
+});
+
+test('superposeNiveaux : pièce référençant un niveau inconnu → throw thermique (erreur de programmation)', () => {
+  const dessin = {
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+    niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }],
+    pieces: [
+      { id: 'fantome', niveauId: 'inconnu', nom: 'Fantôme', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 }] },
+    ],
+    ouvertures: [],
+  };
+  assert.throws(() => superposeNiveaux(dessin), /thermique/);
+});
+
+test('superposeNiveaux : dessin.niveaux vide → throw thermique', () => {
+  assert.throws(() => superposeNiveaux({
+    nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble', niveaux: [], pieces: [], ouvertures: [],
+  }), /thermique/);
+});
+
+test('superposeNiveaux : fractions de surface nulle omises (pièce chauffée entièrement enclavée sans LNC)', () => {
+  // Un seul niveau : séjour chauffé seul → sol 100% extérieur (niveau 0 = dernier niveau aussi),
+  // plafond 100% extérieur (dernier niveau) — vérifie qu'aucune fraction à 0 cm² n'apparaît
+  // (ex. pas de fraction 'chauffe' à 0 quand aucune pièce chauffée ne se superpose).
+  const dessin = {
+    nord: 0, plancherBasType: 'sous-sol', toitureType: 'comble',
+    niveaux: [{ id: 'seul', nom: 'Unique', hauteur: 250 }],
+    pieces: [
+      { id: 'sejour', niveauId: 'seul', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+        polygone: [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 }] },
+    ],
+    ouvertures: [],
+  };
+  const r = superposeNiveaux(dessin);
+  assert.deepEqual(r.get('sejour').sol, [{ surfaceCm2: 120000, sur: 'exterieur' }]);
+  assert.deepEqual(r.get('sejour').plafond, [{ surfaceCm2: 120000, sous: 'exterieur' }]);
 });

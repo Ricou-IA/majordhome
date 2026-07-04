@@ -538,3 +538,101 @@ export function valideOuvertures(piece, ouvertures, sousSegments, hauteurNiveau)
 
   return { erreurs, surfacesOuvertures };
 }
+
+/** Rang de tri déterministe d'une catégorie de fraction sol/plafond : chauffe < lnc < exterieur. */
+const RANG_CATEGORIE = { chauffe: 0, lnc: 1, exterieur: 2 };
+
+/**
+ * Décompose la surface d'une pièce contre les pièces d'un niveau voisin (celui du dessous pour le
+ * sol, celui du dessus pour le plafond) via aireIntersectionRectilineaire. Chaque pièce voisine
+ * couverte devient une fraction { surfaceCm2, categorie: 'chauffe'|'lnc', adjacentPieceId } ; la
+ * surface non couverte devient une fraction { surfaceCm2, categorie: 'exterieur' } (omise si nulle).
+ * `voisines` = null signifie « aucun niveau voisin » (niveau 0 pour le sol, dernier niveau pour le
+ * plafond) → toujours 100 % 'exterieur'.
+ * @returns {{surfaceCm2: number, categorie: string, adjacentPieceId?: *}[]} trié déterministe
+ */
+function decomposeFaceContreNiveau(piece, voisines) {
+  const surfaceTotale = surfaceCm2(piece.polygone);
+  const fractions = [];
+  let couverte = 0;
+  if (voisines) {
+    for (const voisine of voisines) {
+      const aire = aireIntersectionRectilineaire(piece.polygone, voisine.polygone);
+      if (aire <= 0) continue;
+      couverte += aire;
+      fractions.push({
+        surfaceCm2: aire,
+        categorie: voisine.chauffee ? 'chauffe' : 'lnc',
+        adjacentPieceId: voisine.id,
+      });
+    }
+  }
+  const restant = surfaceTotale - couverte;
+  if (restant > 0) fractions.push({ surfaceCm2: restant, categorie: 'exterieur' });
+
+  fractions.sort((f1, f2) => {
+    const parCategorie = RANG_CATEGORIE[f1.categorie] - RANG_CATEGORIE[f2.categorie];
+    if (parCategorie !== 0) return parCategorie;
+    return String(f1.adjacentPieceId ?? '').localeCompare(String(f2.adjacentPieceId ?? ''));
+  });
+  return fractions;
+}
+
+/**
+ * Pour chaque pièce CHAUFFÉE, décompose sa surface de sol et de plafond en fractions selon ce
+ * qu'il y a dessous / dessus. Voir JSDoc du contrat (plan 3, Task 5) pour la sémantique complète :
+ *  - sol : niveau 0 (le plus bas) → 100 % 'exterieur' (plancher bas, type résolu par le
+ *    consommateur via dessin.plancherBasType) ; niveaux supérieurs → fractions contre CHAQUE
+ *    pièce du niveau inférieur qui la recouvre (chauffée → 'chauffe', non chauffée → 'lnc',
+ *    adjacentPieceId dans les deux cas), le reste non couvert → 'exterieur' (porte-à-faux, v1).
+ *  - plafond : symétrique contre le niveau au-dessus ; dernier niveau → 100 % 'exterieur' (comble
+ *    ou rampant selon dessin.toitureType, résolu par le consommateur).
+ * Les pièces NON chauffées n'apparaissent pas dans la sortie. Fractions de surface nulle omises.
+ * Ordre déterministe : catégorie ('chauffe' < 'lnc' < 'exterieur') puis adjacentPieceId croissant.
+ * Validation (erreurs de PROGRAMMATION, throw 'thermique:') : dessin.niveaux non vide ; toute
+ * pièce référence un niveau existant.
+ * @param {{niveaux: {id: *}[], pieces: {id: *, niveauId: *, chauffee: boolean,
+ *   polygone: {x:number,y:number}[]}[]}} dessin
+ * @returns {Map<*, {sol: {surfaceCm2: number, sur: string, adjacentPieceId?: *}[],
+ *   plafond: {surfaceCm2: number, sous: string, adjacentPieceId?: *}[]}>}
+ */
+export function superposeNiveaux(dessin) {
+  if (!dessin || typeof dessin !== 'object' || !Array.isArray(dessin.niveaux) || dessin.niveaux.length === 0) {
+    throw new Error('thermique: superposeNiveaux : dessin.niveaux non vide requis');
+  }
+  if (!Array.isArray(dessin.pieces)) {
+    throw new Error('thermique: superposeNiveaux : dessin.pieces doit être un tableau');
+  }
+
+  const idsNiveaux = new Set(dessin.niveaux.map((n) => n.id));
+  const piecesParNiveau = new Map(dessin.niveaux.map((n) => [n.id, []]));
+  for (const piece of dessin.pieces) {
+    if (!idsNiveaux.has(piece.niveauId)) {
+      throw new Error(`thermique: superposeNiveaux : pièce « ${piece.id} » référence un niveau inconnu (${piece.niveauId})`);
+    }
+    piecesParNiveau.get(piece.niveauId).push(piece);
+  }
+
+  const resultat = new Map();
+  for (let i = 0; i < dessin.niveaux.length; i++) {
+    const piecesNiveau = piecesParNiveau.get(dessin.niveaux[i].id);
+    const piecesDessous = i > 0 ? piecesParNiveau.get(dessin.niveaux[i - 1].id) : null;
+    const piecesDessus = i < dessin.niveaux.length - 1 ? piecesParNiveau.get(dessin.niveaux[i + 1].id) : null;
+
+    for (const piece of piecesNiveau) {
+      if (!piece.chauffee) continue;
+
+      const sol = decomposeFaceContreNiveau(piece, piecesDessous)
+        .map(({ surfaceCm2: s, categorie, adjacentPieceId }) => (
+          adjacentPieceId === undefined ? { surfaceCm2: s, sur: categorie } : { surfaceCm2: s, sur: categorie, adjacentPieceId }
+        ));
+      const plafond = decomposeFaceContreNiveau(piece, piecesDessus)
+        .map(({ surfaceCm2: s, categorie, adjacentPieceId }) => (
+          adjacentPieceId === undefined ? { surfaceCm2: s, sous: categorie } : { surfaceCm2: s, sous: categorie, adjacentPieceId }
+        ));
+
+      resultat.set(piece.id, { sol, plafond });
+    }
+  }
+  return resultat;
+}
