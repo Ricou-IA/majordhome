@@ -135,3 +135,82 @@ export function relancePiece({ surface, fRH }) {
   if (!Number.isFinite(fRH) || fRH < 0) throw new Error(`thermique: fRH invalide (${fRH})`);
   return fRH * surface;
 }
+
+/**
+ * Bilan complet du bâtiment. Entrée : bâtiment RÉSOLU (tous U, b, ΔUtb, θ déjà résolus en amont
+ * via refDataResolvers — le moteur reste pur, aucune résolution de données ici).
+ * batiment = {
+ *   thetaExt,                     // θe de base (°C)
+ *   systemeVentilation,           // objet systeme (cf. debitsParPiece)
+ *   debitTotal,                   // m³/h (mode 'debits') ou null (mode 'taux')
+ *   fRH,                          // W/m² (0 = relance désactivée)
+ *   plageVraisemblance,           // { min, max } en W/m² (alerte, non bloquant)
+ *   pieces: [{ id, nom, surface, volume, thetaInt, humide, parois: [...] }]  // parois au format transmissionPiece
+ * }
+ * Sortie : {
+ *   pieces: [{ id, nom, surface, transmission, ventilation, relance, total, parPoste }],
+ *   total, parPoste,              // agrégats bâtiment (parPoste inclut 'ventilation')
+ *   gv,                           // W/K = total / (θint_moyenne_pondérée_surface − θext) — pour la conso (Task 10)
+ *   ratioWm2,                     // total / Σ surfaces
+ *   fourchette: { min, max },     // arrondis W : min = round(total × 0.95), max = round(total × 1.10)
+ *                                 // (−5 %/+10 % assumé, asymétrique côté sécurité — spec « fiable sans suroptimisation »)
+ *   alerteVraisemblance,          // true si ratioWm2 hors plageVraisemblance
+ * }
+ * La relance (ΦRH) est comptée dans le total par pièce mais PAS dans gv (le GV est un coefficient
+ * de déperditions en régime établi ; la relance est une surpuissance transitoire). Elle apparaît
+ * dans parPoste sous la clé 'relance' pour la transparence du rapport.
+ * NB : 'relance' n'est PAS dans POSTES (liste canonique transmission+ventilation du rapport) —
+ * c'est une clé additionnelle documentée de parPoste, toujours présente (0 si fRH = 0).
+ * Invariant : total === Σ parPoste (relance incluse) === Σ pieces[].total.
+ * Rien n'est arrondi hormis fourchette (l'UI/rapport arrondit ; les flottants bruts sont conservés).
+ */
+export function calculeBatiment(batiment) {
+  if (batiment === null || typeof batiment !== 'object') throw new Error('thermique: batiment requis');
+  const { thetaExt, systemeVentilation, debitTotal, fRH, pieces } = batiment;
+  if (!Number.isFinite(thetaExt)) throw new Error(`thermique: thetaExt invalide (${thetaExt})`);
+  if (!Array.isArray(pieces) || pieces.length === 0) throw new Error('thermique: pieces requis (au moins une pièce)');
+  let surfaceTotale = 0;
+  let sommeThetaSurface = 0;
+  for (const p of pieces) {
+    if (p === null || typeof p !== 'object') throw new Error('thermique: pièce invalide (objet attendu)');
+    if (!Number.isFinite(p.surface) || p.surface <= 0) throw new Error(`thermique: surface de pièce invalide (${p.surface})`);
+    if (!Number.isFinite(p.volume) || p.volume <= 0) throw new Error(`thermique: volume de pièce invalide (${p.volume})`);
+    if (!Number.isFinite(p.thetaInt)) throw new Error(`thermique: thetaInt de pièce invalide (${p.thetaInt})`);
+    surfaceTotale += p.surface;
+    sommeThetaSurface += p.thetaInt * p.surface;
+  }
+  const thetaIntMoyenne = sommeThetaSurface / surfaceTotale;
+  if (thetaIntMoyenne <= thetaExt) {
+    throw new Error(`thermique: θint moyenne (${thetaIntMoyenne}) ≤ θext (${thetaExt}) — GV indéfini`);
+  }
+  const debits = debitsParPiece({ systeme: systemeVentilation, debitTotal, pieces });
+  const rendement = systemeVentilation.rendement ?? 0;
+  const parPoste = { ventilation: 0, relance: 0 };
+  const piecesOut = [];
+  let total = 0;
+  let relanceTotale = 0;
+  for (const p of pieces) {
+    const transmission = transmissionPiece({ thetaInt: p.thetaInt, thetaExt, parois: p.parois });
+    const ventilation = ventilationPiece({ debit: debits[p.id], thetaInt: p.thetaInt, thetaExt, rendement });
+    const relance = fRH === 0 ? 0 : relancePiece({ surface: p.surface, fRH });
+    const totalPiece = transmission.total + ventilation + relance;
+    for (const [poste, valeur] of Object.entries(transmission.parPoste)) {
+      parPoste[poste] = (parPoste[poste] ?? 0) + valeur;
+    }
+    parPoste.ventilation += ventilation;
+    parPoste.relance += relance;
+    relanceTotale += relance;
+    total += totalPiece;
+    piecesOut.push({
+      id: p.id, nom: p.nom, surface: p.surface,
+      transmission: transmission.total, ventilation, relance, total: totalPiece,
+      parPoste: { ...transmission.parPoste, ventilation, relance },
+    });
+  }
+  const gv = (total - relanceTotale) / (thetaIntMoyenne - thetaExt);
+  const ratioWm2 = total / surfaceTotale;
+  const fourchette = { min: Math.round(total * 0.95), max: Math.round(total * 1.10) };
+  const plage = batiment.plageVraisemblance ?? { min: 0, max: Infinity };
+  const alerteVraisemblance = ratioWm2 < plage.min || ratioWm2 > plage.max;
+  return { pieces: piecesOut, total, parPoste, gv, ratioWm2, fourchette, alerteVraisemblance };
+}

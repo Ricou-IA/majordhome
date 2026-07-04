@@ -1,7 +1,7 @@
 // scripts/thermique/thermal-engine.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculeUParoi, RSI_RSE, transmissionPiece, POSTES, debitsParPiece, ventilationPiece, relancePiece } from '../../src/apps/thermique/lib/thermalEngine.js';
+import { calculeUParoi, RSI_RSE, transmissionPiece, POSTES, debitsParPiece, ventilationPiece, relancePiece, calculeBatiment } from '../../src/apps/thermique/lib/thermalEngine.js';
 
 test('calculeUParoi : mur parpaing + laine de verre + placo', () => {
   // Rsi+Rse mur vertical = 0.13+0.04 = 0.17 (EN ISO 6946)
@@ -144,4 +144,122 @@ test('relancePiece : fRH × surface (0 si désactivée)', () => {
   assert.equal(relancePiece({ surface: 20, fRH: 0 }), 0);
   assert.throws(() => relancePiece({ surface: 0, fRH: 11 }), /thermique/);
   assert.throws(() => relancePiece({ surface: 20, fRH: -1 }), /thermique/);
+});
+
+// ————————————————————————————————————————————————————————————————————————————
+// calculeBatiment — cas de référence 2 pièces, chaque valeur dérivée à la main.
+// ————————————————————————————————————————————————————————————————————————————
+
+/** Bâtiment de référence (fabrique : chaque test reçoit un objet neuf, non muté par les autres). */
+function batimentReference() {
+  return {
+    thetaExt: -5,
+    systemeVentilation: { id: 'vmc-sf-auto', mode: 'debits', facteurDebit: 1, rendement: 0 },
+    debitTotal: 90,
+    fRH: 11,
+    plageVraisemblance: { min: 40, max: 160 },
+    pieces: [
+      {
+        id: 'sejour', nom: 'Séjour', surface: 20, volume: 50, thetaInt: 20, humide: false,
+        parois: [
+          { surface: 10, u: 0.5, b: 1, deltaUtb: 0.1, poste: 'murs' },      // mur extérieur
+          { surface: 2, u: 1.3, b: 1, deltaUtb: 0, poste: 'menuiseries' },  // fenêtre
+          { surface: 8, u: 0.5, b: 0.5, deltaUtb: 0.1, poste: 'murs' },     // mur sur garage (LNC, b 0.5)
+        ],
+      },
+      {
+        id: 'sdb', nom: 'Salle de bain', surface: 5, volume: 12.5, thetaInt: 24, humide: true,
+        parois: [
+          { surface: 6, u: 0.5, b: 1, deltaUtb: 0, poste: 'murs' },         // mur extérieur
+        ],
+      },
+    ],
+  };
+}
+
+test('calculeBatiment : bilan 2 pièces — cas de référence intégralement calculé à la main', () => {
+  // ——— Séjour (20 m², 50 m³, θint 20, sec) — ΔText = 20 − (−5) = 25 K ———
+  // Mur ext    : 10 × 0.5 × 1   × 25 = 125 W ; ΔUtb : 10 × 0.1 × 1   × 25 = 25 W
+  // Fenêtre    :  2 × 1.3 × 1   × 25 =  65 W ; ΔUtb 0
+  // Mur garage :  8 × 0.5 × 0.5 × 25 =  50 W ; ΔUtb :  8 × 0.1 × 0.5 × 25 = 10 W
+  // Transmission séjour = 125+25+65+50+10 = 275 W (murs 125+50=175, menuiseries 65, pontsThermiques 25+10=35)
+  // Ventilation : sdb humide → 0 ; volume sec = 50 m³ (séjour seul) → séjour reçoit 90 × 1 = 90 m³/h
+  //   ΦV = 0.34 × 90 × 25 × (1−0) = 765 W
+  // Relance : 20 × 11 = 220 W
+  // Total séjour = 275 + 765 + 220 = 1260 W
+  //
+  // ——— SdB (5 m², 12.5 m³, θint 24, humide) — ΔText = 24 − (−5) = 29 K ———
+  // Mur ext : 6 × 0.5 × 1 × 29 = 87 W ; ΔUtb 0
+  // Transmission sdb = 87 W (murs 87) ; ventilation 0 (pièce humide = extraction) ; relance 5 × 11 = 55 W
+  // Total sdb = 87 + 0 + 55 = 142 W
+  //
+  // ——— Bâtiment ———
+  // total = 1260 + 142 = 1402 W
+  // parPoste : murs 175+87 = 262 ; menuiseries 65 ; pontsThermiques 35 ; ventilation 765+0 = 765 ;
+  //            relance 220+55 = 275. Contrôle : 262+65+35+765+275 = 1402 ✓
+  // θint_moyenne = (20×20 + 24×5)/25 = (400+120)/25 = 520/25 = 20.8 °C
+  // gv (relance exclue — régime établi) = (1402 − 275)/(20.8 − (−5)) = 1127/25.8 ≈ 43.68217 W/K
+  // ratioWm2 = 1402/25 = 56.08 W/m² ∈ [40, 160] → alerteVraisemblance false
+  // fourchette : min = round(1402 × 0.95) = round(1331.9) = 1332 ; max = round(1402 × 1.10) = round(1542.2) = 1542
+  const r = calculeBatiment(batimentReference());
+
+  // Pièces
+  assert.equal(r.pieces.length, 2);
+  const [sejour, sdb] = r.pieces;
+  assert.equal(sejour.id, 'sejour');
+  assert.equal(sejour.nom, 'Séjour');
+  assert.equal(sejour.surface, 20);
+  assert.equal(sejour.transmission, 275);
+  assert.equal(sejour.ventilation, 765);
+  assert.equal(sejour.relance, 220);
+  assert.equal(sejour.total, 1260);
+  assert.deepEqual(sejour.parPoste, { murs: 175, menuiseries: 65, pontsThermiques: 35, ventilation: 765, relance: 220 });
+  assert.equal(sdb.id, 'sdb');
+  assert.equal(sdb.transmission, 87);
+  assert.equal(sdb.ventilation, 0);
+  assert.equal(sdb.relance, 55);
+  assert.equal(sdb.total, 142);
+  assert.deepEqual(sdb.parPoste, { murs: 87, ventilation: 0, relance: 55 });
+
+  // Agrégats bâtiment
+  assert.equal(r.total, 1402);
+  assert.deepEqual(r.parPoste, { murs: 262, menuiseries: 65, pontsThermiques: 35, ventilation: 765, relance: 275 });
+  // Invariant : total === Σ parPoste (relance incluse) === Σ pieces[].total
+  const sommePostes = Object.values(r.parPoste).reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(sommePostes - r.total) < 1e-9, `Σ parPoste=${sommePostes} ≠ total=${r.total}`);
+  const sommePieces = r.pieces.reduce((s, p) => s + p.total, 0);
+  assert.ok(Math.abs(sommePieces - r.total) < 1e-9, `Σ pièces=${sommePieces} ≠ total=${r.total}`);
+
+  // GV : mêmes opérations flottantes que le moteur → égalité exacte. 1127/25.8 ≈ 43.68217054263566
+  assert.equal(r.gv, 1127 / (520 / 25 - (-5)));
+  assert.ok(Math.abs(r.gv - 43.6821705) < 1e-6, `gv=${r.gv}`);
+  assert.equal(r.ratioWm2, 56.08); // 1402/25 — exact en IEEE 754 (division correctement arrondie)
+  assert.deepEqual(r.fourchette, { min: 1332, max: 1542 });
+  assert.equal(r.alerteVraisemblance, false);
+});
+
+test('calculeBatiment : alerteVraisemblance — ratio hors plage → true ; plage absente → false', () => {
+  // ratioWm2 = 56.08 (cf. cas de référence) ; plage [200, 300] → 56.08 < 200 → alerte true (non bloquant)
+  const horsPlage = calculeBatiment({ ...batimentReference(), plageVraisemblance: { min: 200, max: 300 } });
+  assert.equal(horsPlage.alerteVraisemblance, true);
+  assert.equal(horsPlage.total, 1402); // le reste du bilan est inchangé
+  // plageVraisemblance absente → défaut { min: 0, max: Infinity } → jamais d'alerte
+  const sansPlage = calculeBatiment({ ...batimentReference(), plageVraisemblance: undefined });
+  assert.equal(sansPlage.alerteVraisemblance, false);
+});
+
+test('calculeBatiment : erreurs propres', () => {
+  assert.throws(() => calculeBatiment({ ...batimentReference(), pieces: [] }), /thermique/);
+  assert.throws(() => calculeBatiment({ ...batimentReference(), thetaExt: NaN }), /thermique/);
+  // θint_moyenne (20.8) ≤ θext (25) → GV indéfini → échec fort
+  assert.throws(() => calculeBatiment({ ...batimentReference(), thetaExt: 25 }), /thermique/);
+  // pièce invalide : surface, volume, thetaInt
+  const avecPiece = (patch) => {
+    const b = batimentReference();
+    Object.assign(b.pieces[0], patch);
+    return b;
+  };
+  assert.throws(() => calculeBatiment(avecPiece({ surface: 0 })), /thermique/);
+  assert.throws(() => calculeBatiment(avecPiece({ volume: -1 })), /thermique/);
+  assert.throws(() => calculeBatiment(avecPiece({ thetaInt: NaN })), /thermique/);
 });
