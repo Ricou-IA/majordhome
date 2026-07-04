@@ -737,8 +737,10 @@ function indexeDessin(dessin) {
  * Types émis : 'mur-exterieur' (orientation), 'mur-lnc' (adjacentPieceId), 'mur-mitoyen-interne'
  * (adjacentPieceId — émis SEULEMENT si |θint A − θint B| > DELTA_THETA_INTERNE, une paroi pour
  * CHAQUE pièce chauffée concernée, adjacentPieceId croisés ; θint null → pas d'émission),
- * 'plancher-bas' (meta.plancherBasType — y compris la fraction de sol « sur rien » d'un niveau
- * supérieur, porte-à-faux v1), 'plancher-sur-lnc' (adjacentPieceId), 'plafond-comble'|
+ * 'plancher-bas' (meta.plancherBasType — niveau le plus bas UNIQUEMENT), 'plancher-sur-exterieur'
+ * (fraction de sol « sur rien » d'un niveau SUPÉRIEUR : porte-à-faux sur air extérieur, b = 1,
+ * pas de plancherBasType — assorti d'un avertissement), 'plancher-sur-lnc' (adjacentPieceId),
+ * 'plafond-comble'|
  * 'toiture-rampant' (selon dessin.toitureType, pour toute fraction de plafond sans rien au-dessus,
  * quel que soit le niveau), 'plafond-sur-lnc' (adjacentPieceId), 'fenetre'|'porte'|'porte-fenetre'
  * (ouvertureId, rattachées à leur mur porteur dont la surface est NETTE — déduite via
@@ -764,7 +766,8 @@ function indexeDessin(dessin) {
  *   erreurs : agrégées de validePolygone (par pièce, via adjacencesNiveau), adjacencesNiveau
  *   (quarantaine), valideOuvertures ;
  *   avertissements : niveau sans pièce chauffée ; pièce chauffée sans paroi déperditive ;
- *   pièce < 1 m² (polygone valide, chauffée ou non) ; ouverture ignorée sur mitoyen non émis.
+ *   pièce < 1 m² (polygone valide, chauffée ou non) ; ouverture ignorée sur mitoyen non émis ;
+ *   plancher en porte-à-faux sur l'extérieur.
  * Throw 'thermique:' uniquement pour dessin malformé (niveaux vides, pièce sans niveau, ids
  * dupliqués, type d'ouverture ou de plancher/toiture inconnu, nord non fini, etc.).
  * @param {object} dessin modèle figé au plan 3 (cf. en-tête de module et décision n°6)
@@ -866,15 +869,23 @@ export function deduireParois(dessin) {
     }
 
     // 3c. Sol et plafond — fractions de superposeNiveaux ; 'chauffe' = non déperditif, ignoré.
+    //     Sol « sur rien » : niveau le plus bas → plancher-bas (contact sol, plancherBasType) ;
+    //     niveau SUPÉRIEUR → plancher-sur-exterieur (porte-à-faux sur air extérieur, b = 1 —
+    //     souvent une erreur de dessin, parfois une vraie architecture → avertissement).
+    const estNiveauLePlusBas = piece.niveauId === dessin.niveaux[0].id;
     const face = faces.get(piece.id);
     for (const f of face.sol) {
       if (f.sur === 'chauffe') continue;
       if (f.sur === 'lnc') {
         parois.push({ pieceId: piece.id, type: 'plancher-sur-lnc', surfaceM2: f.surfaceCm2 / 10000,
           adjacentPieceId: f.adjacentPieceId, meta: { niveauId: niveau.id } });
-      } else {
+      } else if (estNiveauLePlusBas) {
         parois.push({ pieceId: piece.id, type: 'plancher-bas', surfaceM2: f.surfaceCm2 / 10000,
           meta: { niveauId: niveau.id, plancherBasType: dessin.plancherBasType } });
+      } else {
+        parois.push({ pieceId: piece.id, type: 'plancher-sur-exterieur', surfaceM2: f.surfaceCm2 / 10000,
+          meta: { niveauId: niveau.id } });
+        avertissements.push(`pièce « ${piece.id} » : plancher en porte-à-faux sur l'extérieur (${f.surfaceCm2 / 10000} m²) — vérifier le dessin`);
       }
     }
     for (const f of face.plafond) {

@@ -678,7 +678,9 @@ test('superposeNiveaux : fractions de surface nulle omises (pièce chauffée ent
 //                y=400), position 100 → intervalle d'axe [400−100−90, 400−100] = [210, 300]
 //   porte-garage (optionnelle) 90×200 sur le mur EST de la cuisine (segment 2, décroissant depuis
 //                y=400), position 150 → intervalle d'axe [400−150−90, 400−150] = [160, 250]
-function maison({ thetaCuisine = 20, porteMitoyenne = false, porteGarage = false, fenetrePosition = 180 } = {}) {
+// Variante chambreDecaleeSud : chambre décalée de 100 cm vers le sud (y ∈ [100, 500]) → porte-à-faux.
+function maison({ thetaCuisine = 20, porteMitoyenne = false, porteGarage = false, fenetrePosition = 180,
+  chambreDecaleeSud = false } = {}) {
   const ouvertures = [
     { id: 'fen-sejour', pieceId: 'sejour', segmentIndex: 1, type: 'fenetre', largeur: 140, hauteur: 120, position: fenetrePosition },
     { id: 'porte-entree', pieceId: 'sejour', segmentIndex: 3, type: 'porte', largeur: 90, hauteur: 215, position: 200 },
@@ -702,7 +704,9 @@ function maison({ thetaCuisine = 20, porteMitoyenne = false, porteGarage = false
       { id: 'garage', niveauId: 'rdc', nom: 'Garage', typePiece: 'garage', chauffee: false, thetaInt: null,
         polygone: [{ x: 800, y: 0 }, { x: 1100, y: 0 }, { x: 1100, y: 400 }, { x: 800, y: 400 }] },
       { id: 'chambre', niveauId: 'etage', nom: 'Chambre', typePiece: 'chambre', chauffee: true, thetaInt: 18,
-        polygone: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 0, y: 400 }] },
+        polygone: chambreDecaleeSud
+          ? [{ x: 0, y: 100 }, { x: 500, y: 100 }, { x: 500, y: 500 }, { x: 0, y: 500 }]
+          : [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 400 }, { x: 0, y: 400 }] },
     ],
     ouvertures,
   };
@@ -739,6 +743,9 @@ test('deduireParois : maison complète — chaque paroi dérivée à la main', (
   assert.equal(parType('fenetre').length, 1);
   assert.equal(parType('porte').length, 1);
   assert.equal(parType('porte-fenetre').length, 0);
+  // Pas de porte-à-faux dans la maison de référence (chambre exactement sur le séjour).
+  assert.equal(parType('plancher-sur-exterieur').length, 0);
+  assert.ok(!avertissements.some((a) => /porte-à-faux/.test(a)));
   assert.equal(parois.length, 16);
 
   // ── Séjour ──
@@ -813,6 +820,37 @@ test('deduireParois : maison complète — chaque paroi dérivée à la main', (
 
   // ── Garage : aucune paroi. ──
   assert.equal(parois.filter((p) => p.pieceId === 'garage').length, 0);
+});
+
+test('deduireParois : porte-à-faux — sol d’étage « sur rien » → plancher-sur-exterieur (b = 1) + avertissement', () => {
+  // Chambre décalée de 100 cm vers le SUD : polygone [0,500]×[100,500] (500×400 = 20 m²).
+  // Dérivation du sol de la chambre :
+  //   chambre ∩ séjour ([0,500]×[0,400])  = [0,500]×[100,400] = 500 × 300 = 150000 cm² 'chauffe' → rien ;
+  //   chambre ∩ cuisine ([500,800]×[0,400]) : x ∈ [500,500] → longueur nulle → rien ; garage idem ;
+  //   reste « sur rien » = 200000 − 150000 = 50000 cm² = 5 m² (bande [0,500]×[400,500] en
+  //   porte-à-faux au-delà de la façade sud du RDC) → 'plancher-sur-exterieur' (PAS 'plancher-bas' :
+  //   plancher sur air extérieur, b = 1, pas de contact terre-plein) + avertissement.
+  // Effet miroir sur le séjour : plafond couvert par la chambre sur 150000 cm² ('chauffe' → rien),
+  // reste 50000 cm² = 5 m² sans rien au-dessus (bande y ∈ [0,100]) → plafond-comble 5 m².
+  const { parois, erreurs, avertissements } = deduireParois(maison({ chambreDecaleeSud: true }));
+  assert.deepEqual(erreurs, []);
+  const porteAFaux = paroiSeule(parois, (p) => p.type === 'plancher-sur-exterieur', 'porte-à-faux chambre');
+  assert.equal(porteAFaux.pieceId, 'chambre');
+  proche(porteAFaux.surfaceM2, 5);
+  assert.deepEqual(porteAFaux.meta, { niveauId: 'etage' }); // PAS de plancherBasType
+  assert.equal(avertissements.length, 1);
+  assert.match(avertissements[0], /porte-à-faux/);
+  assert.ok(avertissements[0].includes('chambre') && avertissements[0].includes('5 m²'));
+  // Les plancher-bas du RDC (niveau le plus bas) sont INCHANGÉS : terre-plein, séjour 20 + cuisine 12.
+  const planchersBas = parois.filter((p) => p.type === 'plancher-bas');
+  assert.equal(planchersBas.length, 2);
+  assert.ok(planchersBas.every((p) => p.meta.plancherBasType === 'terre-plein'));
+  // Séjour : plafond-comble 5 m² (la chambre ne couvre plus la bande y ∈ [0,100]).
+  proche(paroiSeule(parois, (p) => p.pieceId === 'sejour' && p.type === 'plafond-comble', 'plafond séjour découvert').surfaceM2, 5);
+  // Chambre : murs inchangés (translation pure) et plafond-comble 20 m² (dernier niveau).
+  assert.equal(parois.filter((p) => p.pieceId === 'chambre' && p.type === 'mur-exterieur').length, 4);
+  proche(paroiSeule(parois, (p) => p.pieceId === 'chambre' && p.type === 'plafond-comble', 'plafond chambre').surfaceM2, 20);
+  assert.equal(parois.length, 18); // les 16 de référence + plafond-comble séjour + plancher-sur-exterieur
 });
 
 test('deduireParois : quarantaine multi-niveaux — les pièces en chevauchement de l’étage sont exclues de la superposition (invariant Σ)', () => {
