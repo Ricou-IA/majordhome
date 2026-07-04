@@ -153,3 +153,60 @@ export function pointBivalence({ pac, tDepart, charge, thetaBase, thetaNC }) {
     avertissementChargePartielle: !manuelle,
   };
 }
+
+const THETA_NON_CHAUFFAGE_DJU = 18; // base conventionnelle des DJU (18 °C), cf. spec Task 10
+const THETA_EXT_MOYENNE_MIN = -30, THETA_EXT_MOYENNE_MAX = 18;
+
+/**
+ * Consommation annuelle — méthode degrés-jours, simplification assumée (spec « pas de suroptimisation ») :
+ *   besoin (kWh) = 24 × DJU × GV / 1000 × facteurAjustement
+ *   θext_moyenne_saison = 18 − (DJU × 24 / heuresChauffage)   [DJU base 18 ; heures : climat.heuresChauffage]
+ *   COP saisonnier ≈ COP(θext_moyenne_saison, tDépart)         [pas de SCOP EN 14825 complet en v1]
+ *   consoElecKwh = besoinKwh / COP ; coutEuros = consoElecKwh × prixKwh
+ *   fourchette = { min: round(coutEuros × 0.85), max: round(coutEuros × 1.15) }  [±15 % : la conso cumule les hypothèses]
+ * facteurAjustement (défaut 1.0) : apports gratuits/intermittence, éditable org (plan 4), à calibrer en phase A/B.
+ * PAC manuelle ({type:'manuelle'}) : COP inconnu → throw 'thermique: conso indisponible pour une PAC manuelle sans COP'
+ *   SAUF si un champ scopManuel est fourni ({type:'manuelle', scopManuel: 3.5}) → utilisé directement.
+ * @returns {{ besoinKwh, thetaExtMoyenne, consoElecKwh, coutEuros, fourchette }}
+ */
+export function consoAnnuelle({ gv, dju, heuresChauffage, pac, tDepart, prixKwh, facteurAjustement = 1.0 }) {
+  if (!Number.isFinite(gv) || gv <= 0) throw new Error(`thermique: gv invalide (${gv})`);
+  if (dju == null || !Number.isFinite(dju)) {
+    throw new Error('thermique: DJU manquant ou invalide — un fallback départemental doit être résolu par l’UI avant l’appel');
+  }
+  if (!Number.isFinite(heuresChauffage) || heuresChauffage < 800 || heuresChauffage > 6000) {
+    throw new Error(`thermique: heuresChauffage invalide (${heuresChauffage}), attendu dans [800, 6000]`);
+  }
+  if (!Number.isFinite(prixKwh) || prixKwh <= 0) throw new Error(`thermique: prixKwh invalide (${prixKwh})`);
+  if (!Number.isFinite(facteurAjustement) || facteurAjustement <= 0 || facteurAjustement > 2) {
+    throw new Error(`thermique: facteurAjustement invalide (${facteurAjustement}), attendu dans (0, 2]`);
+  }
+
+  const besoinKwh = (24 * dju * gv / 1000) * facteurAjustement;
+  const thetaExtMoyenne = THETA_NON_CHAUFFAGE_DJU - (dju * 24 / heuresChauffage);
+  if (!Number.isFinite(thetaExtMoyenne) || thetaExtMoyenne <= THETA_EXT_MOYENNE_MIN || thetaExtMoyenne >= THETA_EXT_MOYENNE_MAX) {
+    throw new Error(`thermique: θext_moyenne incohérente (${thetaExtMoyenne}), attendue dans ]${THETA_EXT_MOYENNE_MIN}, ${THETA_EXT_MOYENNE_MAX}[`);
+  }
+
+  const manuelle = pac && pac.type === 'manuelle';
+  let cop;
+  if (manuelle) {
+    if (!Number.isFinite(pac.scopManuel) || pac.scopManuel <= 0) {
+      throw new Error('thermique: conso indisponible pour une PAC manuelle sans COP');
+    }
+    cop = pac.scopManuel;
+  } else {
+    cop = copAt(pac, thetaExtMoyenne, tDepart);
+  }
+
+  const consoElecKwh = besoinKwh / cop;
+  const coutEuros = consoElecKwh * prixKwh;
+
+  return {
+    besoinKwh,
+    thetaExtMoyenne,
+    consoElecKwh,
+    coutEuros,
+    fourchette: { min: Math.round(coutEuros * 0.85), max: Math.round(coutEuros * 1.15) },
+  };
+}

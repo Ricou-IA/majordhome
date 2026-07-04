@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { copAt, pThAt, pElRefDe, courbeCharge, pointBivalence } from '../../src/apps/thermique/lib/heatPumpEngine.js';
+import { copAt, pThAt, pElRefDe, courbeCharge, pointBivalence, consoAnnuelle } from '../../src/apps/thermique/lib/heatPumpEngine.js';
 
 const catalogue = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/pac-catalogue.json', import.meta.url), 'utf8'));
 const reelle = catalogue.pacs.find((p) => !p.generique && p.copRef != null);
 const generique = catalogue.pacs.find((p) => p.generique && p.modele.includes('average'));
+const climat = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/climat.json', import.meta.url), 'utf8'));
 
 test('copAt : formule hplib — COP = p1·Tin + p2·Tout + p3 + p4·Tamb (Tamb = Tin en air/eau)', () => {
   const [p1, p2, p3, p4] = reelle.coefCop;
@@ -95,4 +96,44 @@ test('pointBivalence + PAC manuelle : erreurs propres', () => {
   assert.throws(() => pointBivalence({ pac: { type: 'manuelle', points: [{ tExt: 0, pTh: 5000 }] }, tDepart: 35, charge, thetaBase: -5, thetaNC: 16 }), /thermique/); // 1 seul point
   assert.throws(() => pointBivalence({ pac: { type: 'manuelle', points: [{ tExt: 0, pTh: -1 }, { tExt: 5, pTh: 100 }] }, tDepart: 35, charge, thetaBase: -5, thetaNC: 16 }), /thermique/);
   assert.throws(() => pointBivalence({ pac: {}, tDepart: 35, charge: null, thetaBase: -5, thetaNC: 16 }), /thermique/); // charge pas une fonction
+});
+
+test('consoAnnuelle : méthode DJU, cas Gaillac (81)', () => {
+  // besoin = 24 × 1943 × 320 / 1000 = 14 922.24 kWh (facteur 1.0)
+  // θext_moyenne = 18 − (1943 × 24 / h81) — h81 lu dans climat.heuresChauffage (Part A, dept 81 = 5200 h)
+  const h81 = climat.heuresChauffage['81'];
+  assert.equal(h81, 5200); // ancre re-vérifiée contre la source (Part A)
+  const pac = reelle;
+  const r = consoAnnuelle({ gv: 320, dju: 1943, heuresChauffage: h81, pac, tDepart: 35, prixKwh: 0.1952 });
+  assert.ok(Math.abs(r.besoinKwh - 14922.24) < 0.01);
+  const thetaAttendue = 18 - (1943 * 24 / h81);
+  assert.ok(Math.abs(r.thetaExtMoyenne - thetaAttendue) < 1e-9);
+  assert.ok(Math.abs(r.consoElecKwh - r.besoinKwh / copAt(pac, r.thetaExtMoyenne, 35)) < 0.01);
+  assert.ok(Math.abs(r.coutEuros - r.consoElecKwh * 0.1952) < 0.01);
+  assert.deepEqual(r.fourchette, { min: Math.round(r.coutEuros * 0.85), max: Math.round(r.coutEuros * 1.15) });
+});
+
+test('consoAnnuelle : DJU null → erreur mentionnant le fallback départemental', () => {
+  const pac = reelle;
+  assert.throws(() => consoAnnuelle({ gv: 320, dju: null, heuresChauffage: 2000, pac, tDepart: 35, prixKwh: 0.2 }), /DJU/);
+});
+
+test('consoAnnuelle : facteurAjustement multiplie le besoin', () => {
+  const pac = reelle;
+  const args = { gv: 320, dju: 1943, heuresChauffage: 5200, pac, tDepart: 35, prixKwh: 0.1952 };
+  const r1 = consoAnnuelle(args);
+  const r2 = consoAnnuelle({ ...args, facteurAjustement: 0.85 });
+  assert.ok(Math.abs(r2.besoinKwh - r1.besoinKwh * 0.85) < 1e-9);
+  assert.ok(Math.abs(r2.consoElecKwh - r1.consoElecKwh * 0.85) < 1e-6);
+});
+
+test('consoAnnuelle : PAC manuelle sans scopManuel → throw ; avec scopManuel → utilisé', () => {
+  const args = { gv: 320, dju: 1943, heuresChauffage: 5200, tDepart: 35, prixKwh: 0.1952 };
+  const pacManuelleSansScop = { type: 'manuelle', points: [{ tExt: -7, pTh: 4000 }, { tExt: 7, pTh: 8000 }] };
+  assert.throws(() => consoAnnuelle({ ...args, pac: pacManuelleSansScop }), /thermique/);
+
+  const pacManuelleAvecScop = { type: 'manuelle', scopManuel: 3.5 };
+  const r = consoAnnuelle({ ...args, pac: pacManuelleAvecScop });
+  const besoinAttendu = 24 * args.dju * args.gv / 1000;
+  assert.ok(Math.abs(r.consoElecKwh - besoinAttendu / 3.5) < 1e-9);
 });
