@@ -102,3 +102,85 @@ function segmentsSeCroisent(poly) {
   }
   return false;
 }
+
+/**
+ * Décompose l'intervalle entier [de, a] en morceaux contigus ordonnés `{ de, a, ref }` selon une
+ * liste de recouvrements étiquetés `{ de, a, ref }` (ex. les segments des pièces voisines qui
+ * chevauchent un mur donné). `ref` vaut `null` sur les portions non couvertes (donnant sur
+ * l'extérieur). Les recouvrements sont tronqués aux bornes `[de, a]` ; ceux entièrement hors
+ * bornes sont ignorés. Deux morceaux contigus de même `ref` (y compris `null`) sont fusionnés ;
+ * les morceaux de longueur nulle après troncature sont supprimés silencieusement.
+ *
+ * Ne PAS présupposer que les polygones amont sont des anneaux de Jordan stricts : les cas
+ * dégénérés « pincement » (deux pièces qui se touchent en un seul point) et « fente » (un
+ * aller-retour colinéaire adjacent) passent `validePolygone` en v1 et peuvent produire ici des
+ * recouvrements de longueur nulle une fois tronqués — c'est pourquoi ils sont droppés en silence
+ * plutôt que de lever une erreur. Le consommateur (Task 3, `adjacencesNiveau`) doit rester
+ * tolérant à cette situation plutôt que de supposer une géométrie parfaitement propre.
+ *
+ * Deux recouvrements de RÉFÉRENCES DIFFÉRENTES qui se chevauchent (même partiellement) à
+ * l'intérieur des bornes constituent une violation de contrat de programmation (deux pièces
+ * distinctes revendiquant le même tronçon de mur) — cela doit être détecté en amont (dessin
+ * invalide, Task 3) ; ici c'est un throw `thermique:`, jamais une erreur de dessin retournée.
+ *
+ * @param {number} de borne basse entière (cm)
+ * @param {number} a borne haute entière (cm), > de
+ * @param {{de: number, a: number, ref: *}[]} recouvrements intervalles étiquetés (ref non null)
+ * @returns {{de: number, a: number, ref: *}[]} morceaux ordonnés, contigus, ref non-fusionnable adjacente distincte
+ */
+export function decomposeIntervalle(de, a, recouvrements) {
+  if (!Number.isInteger(de) || !Number.isInteger(a) || de >= a) {
+    throw new Error('thermique: decomposeIntervalle : bornes [de, a] entières avec de < a requises');
+  }
+  if (!Array.isArray(recouvrements)) {
+    throw new Error('thermique: decomposeIntervalle : recouvrements doit être un tableau');
+  }
+  for (const r of recouvrements) {
+    if (!Number.isInteger(r.de) || !Number.isInteger(r.a) || r.de >= r.a) {
+      throw new Error('thermique: decomposeIntervalle : chaque recouvrement doit avoir de < a entiers');
+    }
+    if (r.ref === null || r.ref === undefined) {
+      throw new Error('thermique: decomposeIntervalle : ref de recouvrement non nul requis');
+    }
+  }
+
+  // Tronque aux bornes [de, a] et écarte ce qui tombe entièrement hors bornes.
+  const troncs = [];
+  for (const r of recouvrements) {
+    const rd = Math.max(r.de, de);
+    const ra = Math.min(r.a, a);
+    if (rd < ra) troncs.push({ de: rd, a: ra, ref: r.ref });
+  }
+
+  // Trié par début : seuls des recouvrements consécutifs (après tri) peuvent se chevaucher.
+  troncs.sort((x, y) => x.de - y.de);
+  for (let i = 1; i < troncs.length; i++) {
+    const prev = troncs[i - 1], cur = troncs[i];
+    if (cur.de < prev.a && cur.ref !== prev.ref) {
+      throw new Error('thermique: decomposeIntervalle : recouvrements de refs différentes qui se chevauchent');
+    }
+  }
+
+  // Balayage : émet les segments libres entre/around les recouvrements, puis fusionne les
+  // morceaux contigus de même ref (y compris deux recouvrements adjacents identiques).
+  const bruts = [];
+  let curseur = de;
+  for (const t of troncs) {
+    if (t.de > curseur) bruts.push({ de: curseur, a: t.de, ref: null });
+    bruts.push({ de: t.de, a: t.a, ref: t.ref });
+    curseur = Math.max(curseur, t.a);
+  }
+  if (curseur < a) bruts.push({ de: curseur, a, ref: null });
+
+  const resultat = [];
+  for (const morceau of bruts) {
+    if (morceau.de >= morceau.a) continue; // longueur nulle après troncature → drop silencieux
+    const dernier = resultat[resultat.length - 1];
+    if (dernier && dernier.ref === morceau.ref && dernier.a === morceau.de) {
+      dernier.a = morceau.a;
+    } else {
+      resultat.push({ ...morceau });
+    }
+  }
+  return resultat;
+}

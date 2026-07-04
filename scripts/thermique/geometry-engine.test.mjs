@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalisePolygone, surfaceCm2, perimetreCm, segmentsDe, validePolygone }
+import { normalisePolygone, surfaceCm2, perimetreCm, segmentsDe, validePolygone, decomposeIntervalle }
   from '../../src/apps/thermique/lib/geometryEngine.js';
 
 // Rectangle 400×300 cm (séjour 12 m²), déclaré horaire → doit être renversé en anti-horaire
@@ -43,4 +43,43 @@ test('validePolygone : rectilinéaire, grille 10 cm, non dégénéré, non auto-
   const huit = [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 200 }, { x: 100, y: 200 },
                 { x: 100, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 300 }, { x: 0, y: 300 }];
   assert.ok(validePolygone(huit).some((e) => /intersect/.test(e)));
+});
+
+test('decomposeIntervalle : découpe un intervalle selon des recouvrements étiquetés', () => {
+  // Intervalle [0, 500] ; recouvrements : [100,300]→'A', [300,400]→'B'
+  // → [0,100] libre, [100,300] A, [300,400] B, [400,500] libre
+  const r = decomposeIntervalle(0, 500, [
+    { de: 100, a: 300, ref: 'A' },
+    { de: 300, a: 400, ref: 'B' },
+  ]);
+  assert.deepEqual(r, [
+    { de: 0, a: 100, ref: null },
+    { de: 100, a: 300, ref: 'A' },
+    { de: 300, a: 400, ref: 'B' },
+    { de: 400, a: 500, ref: null },
+  ]);
+});
+
+test('decomposeIntervalle : recouvrements hors bornes tronqués, contigus fusionnés si même ref', () => {
+  const r = decomposeIntervalle(100, 400, [{ de: 0, a: 200, ref: 'A' }, { de: 200, a: 600, ref: 'A' }]);
+  assert.deepEqual(r, [{ de: 100, a: 400, ref: 'A' }]);
+});
+
+test('decomposeIntervalle : chevauchement de deux refs → erreur (deux pièces sur le même mur au même endroit = dessin invalide, détecté en amont)', () => {
+  assert.throws(() => decomposeIntervalle(0, 100, [{ de: 0, a: 60, ref: 'A' }, { de: 40, a: 100, ref: 'B' }]), /thermique/);
+});
+
+test('decomposeIntervalle : recouvrement égal à l’intervalle entier → une seule pièce couverte', () => {
+  const r = decomposeIntervalle(0, 200, [{ de: 0, a: 200, ref: 'A' }]);
+  assert.deepEqual(r, [{ de: 0, a: 200, ref: 'A' }]);
+});
+
+test('decomposeIntervalle : recouvrement entièrement hors bornes → ignoré (tout libre)', () => {
+  const r = decomposeIntervalle(0, 100, [{ de: 200, a: 300, ref: 'A' }]);
+  assert.deepEqual(r, [{ de: 0, a: 100, ref: null }]);
+});
+
+test('decomposeIntervalle : deux refs différentes qui se touchent sans se chevaucher → pas d’erreur', () => {
+  const r = decomposeIntervalle(0, 100, [{ de: 0, a: 50, ref: 'A' }, { de: 50, a: 100, ref: 'B' }]);
+  assert.deepEqual(r, [{ de: 0, a: 50, ref: 'A' }, { de: 50, a: 100, ref: 'B' }]);
 });
