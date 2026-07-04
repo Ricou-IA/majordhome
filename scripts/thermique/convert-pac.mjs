@@ -58,6 +58,8 @@ const iTitel = col('Titel');
 const iType = col('Type');
 const iSubtype = col('Subtype');
 const iPthRef = col('P_th_h_ref [W]');
+const iPelRef = col('P_el_h_ref [W]');
+const iCopRef = col('COP_ref');
 const iP1PelH = col('p1_P_el_h [1/°C]');
 const iP2PelH = col('p2_P_el_h [1/°C]');
 const iP3PelH = col('p3_P_el_h [-]');
@@ -85,6 +87,8 @@ const filtered = rows.filter(
 );
 
 const pacs = [];
+let consistencyWarnCount = 0; // |P_el_h_ref - P_th_h_ref/COP_ref| > 1 % (incohérence interne CSV)
+let excludedGuardCount = 0; // lignes réelles exclues par les gardes pElRef/copRef (voir note)
 for (const r of filtered) {
   const fabricant = r[iManufacturer].trim();
   const modele = r[iTitel].trim();
@@ -94,6 +98,8 @@ for (const r of filtered) {
   const coefCop = [num(r[iP1Cop]), num(r[iP2Cop]), num(r[iP3Cop]), num(r[iP4Cop])];
 
   let pthRef;
+  let pElRef;
+  let copRef;
   if (generique) {
     // Les lignes "Generic" (Generic_top/average/bottom) n'ont pas de P_th_h_ref propre dans le
     // CSV : hplib.get_parameters() les dérive par ajustement least-square autour d'un p_th "set
@@ -104,15 +110,44 @@ for (const r of filtered) {
     // génériques (get_parameters('Generic_top'/'Generic_average'/'Generic_bottom', group_id=1,
     // t_in=-7, t_out=30 ou 40 ou 45, p_th=10000)) — valeur documentée dans la source, pas inventée.
     pthRef = 10000;
+    // P_el_h_ref [W] et COP_ref sont VIDES dans le CSV pour les 3 lignes Generic (vérifié) :
+    // hplib.get_parameters() les calcule au chargement (cop_ref via la courbe fittée au point
+    // de référence, p_el_ref = p_th_ref/cop_ref). Si un jour le CSV les renseigne, on les lit ;
+    // sinon pElRef est dérivé de copRef brut s'il existe, et à défaut les deux restent null
+    // (le moteur devra alors dériver P_el_ref = pthRef/COP(-7,52) via la courbe, comme hplib).
+    copRef = num(r[iCopRef]);
+    if (Number.isFinite(copRef)) {
+      const rawPel = num(r[iPelRef]);
+      pElRef = Number.isFinite(rawPel) ? rawPel : pthRef / copRef;
+    } else {
+      copRef = null;
+      pElRef = null;
+    }
   } else {
     pthRef = num(r[iPthRef]);
+    pElRef = num(r[iPelRef]);
+    copRef = num(r[iCopRef]);
   }
 
   if (!Number.isFinite(pthRef) || !coefPth.every(Number.isFinite) || !coefCop.every(Number.isFinite)) {
     continue; // ligne incomplète (rare) : exclue plutôt que d'inventer des valeurs
   }
 
-  pacs.push({ fabricant, modele, type: 'air-eau', pthRef, coefPth, coefCop, generique });
+  if (!generique) {
+    // Gardes sur les colonnes de référence brutes : pElRef fini > 200 W, copRef dans [1.5, 8].
+    // Les lignes hors bornes sont exclues (comptées et documentées), pas corrigées.
+    if (!(Number.isFinite(pElRef) && pElRef > 200) || !(Number.isFinite(copRef) && copRef >= 1.5 && copRef <= 8)) {
+      excludedGuardCount++;
+      continue;
+    }
+    // Cohérence interne CSV : P_el_h_ref doit valoir ~ P_th_h_ref / COP_ref (même point -7/52).
+    if (Math.abs(pElRef - pthRef / copRef) / pElRef > 0.01) {
+      consistencyWarnCount++;
+      console.warn(`  ⚠ incohérence P_el_h_ref vs P_th_h_ref/COP_ref (> 1 %) : ${fabricant} ${modele}`);
+    }
+  }
+
+  pacs.push({ fabricant, modele, type: 'air-eau', pthRef, pElRef, copRef, coefPth, coefCop, generique });
 }
 
 // --- Garde-fous ---
@@ -130,6 +165,8 @@ for (const p of pacs) {
 
 const generiqueCount = pacs.filter((p) => p.generique).length;
 console.log(`  ${pacs.length} PAC air/eau régulées (dont ${generiqueCount} génériques)`);
+console.log(`  ${excludedGuardCount} lignes réelles exclues par les gardes pElRef/copRef, ` +
+  `${consistencyWarnCount} avertissements de cohérence P_el_h_ref vs P_th_h_ref/COP_ref`);
 if (pacs.length > 800) {
   console.log(`  ⚠ ${pacs.length} modèles > 800 : catalogue volumineux, aucun échantillonnage appliqué (décision laissée à l'appelant).`);
 }
@@ -152,15 +189,24 @@ writeDataJson(
       "pour les PAC air/eau (Group 1), T_amb = T_in (l'air ambiant EST la température primaire). " +
       "COP(T_in,T_out) = p1_COP·T_in + p2_COP·T_out + p3_COP + p4_COP·T_amb " +
       "(coefPth/coefCop stockés ici dans l'ordre [p1,p2,p3,p4]). " +
-      "P_el(T_in,T_out) = P_el_ref · (p1_P_el_h·T_in + p2_P_el_h·T_out + p3_P_el_h + p4_P_el_h·T_amb), " +
-      "avec P_el_ref = pthRef / COP_ref et COP_ref = COP(-7, 52) (point de référence Keymark : " +
-      "T_in=-7°C, T_out=52°C — cf. README 'P_th_h_ref : Thermal heating output power at T_in=-7°C " +
-      "and T_out=52°C'). P_th(T_in,T_out) = P_el(T_in,T_out) · COP(T_in,T_out) — hplib précise " +
+      "P_el(T_in,T_out) = pElRef · (p1_P_el_h·T_in + p2_P_el_h·T_out + p3_P_el_h + p4_P_el_h·T_amb). " +
+      "ATTENTION : pElRef et copRef sont les colonnes BRUTES du CSV (P_el_h_ref [W] et COP_ref), " +
+      "mesurées au point de référence Keymark T_in=-7°C / T_out=52°C — hplib.py les lit " +
+      "directement du CSV (HeatPump.__init__, parameters['P_el_h_ref [W]']) et ne les dérive PAS " +
+      "de la courbe fittée : COP_ref brut diverge de COP fitté(-7,52) de ~34 % en médiane sur ce " +
+      "catalogue (résidus du fit least-square). Le moteur DOIT utiliser pElRef directement dans " +
+      "la formule P_el ci-dessus, PAS pthRef/COP_fitté(-7,52). En revanche pElRef ≈ pthRef/copRef " +
+      "(colonnes brutes entre elles) est vérifié à ±1 % sur 100 % des lignes retenues. " +
+      "P_th(T_in,T_out) = P_el(T_in,T_out) · COP(T_in,T_out) — hplib précise " +
       "explicitement (documentation.ipynb §4) que P_th est dérivé du PRODUIT P_el·COP (pas d'un " +
       "fit direct de P_th), car cette méthode donne de meilleurs résultats de validation que " +
       "l'inverse. pthRef stocké ici = P_th_h_ref [W] du CSV = P_th au point de référence (-7°C/52°C), " +
       "DÉJÀ en W (pas de conversion kW->W nécessaire, vérifié sur la plage CSV 2600-73840 W, " +
-      "cohérente avec le README '2400 à 69880 W'). " +
+      "cohérente avec le README '2400 à 69880 W') ; pElRef en W également (plage CSV 881-36920 W). " +
+      "GARDES appliquées aux lignes réelles : pElRef fini > 200 W et copRef dans [1.5, 8] — les " +
+      `lignes hors bornes sont EXCLUES du catalogue (${excludedGuardCount} lignes exclues à cette ` +
+      "conversion ; sur le CSV téléchargé le 2026-07-03, il s'agit de modèles à COP_ref = 1.4, " +
+      "juste sous le plancher de 1.5). " +
       "IMPORTANT (comportement EN14825 des PAC régulées, pas une anomalie de données) : hplib.py " +
       "(hplib_database.py ligne ~277) définit lui-même 'Regulated' comme les modèles dont P_th " +
       "déclaré N'EST PAS croissant avec la température extérieure sur les points EN14825 " +
@@ -180,12 +226,18 @@ writeDataJson(
       "point' choisi par l'appelant) — pthRef=10000 W retenu ici, valeur EXACTE utilisée par les " +
       "auteurs de hplib dans tous les exemples de leur notebook de documentation pour ces 3 " +
       "modèles (t_in=-7, t_out=30/40/45, p_th=10000), donc documentée dans la source et non " +
-      "inventée. fabricant = colonne Manufacturer (espaces de début/fin retirés, ex. ' Acond a.s.' " +
+      "inventée. Pour ces 3 génériques, les colonnes P_el_h_ref [W] et COP_ref sont VIDES dans le " +
+      "CSV (hplib.get_parameters() les calcule au chargement) : pElRef et copRef valent donc null " +
+      "— le moteur devra pour eux dériver P_el_ref = pthRef / COP(-7,52) via la courbe COP fittée, " +
+      "exactement comme le fait hplib.get_parameters() (cop_ref = p1_COP·(-7) + p2_COP·52 + p3_COP " +
+      "+ p4_COP·(-7), puis p_el_ref = p_th_ref/cop_ref). " +
+      "fabricant = colonne Manufacturer (espaces de début/fin retirés, ex. ' Acond a.s.' " +
       "-> 'Acond a.s.') ; modele = colonne Titel (identifiant unique par sous-modèle testé, " +
       "recommandé par le README : 'use titel name for simulating' — PAS la colonne Model, qui " +
       "regroupe plusieurs variantes Titel sous un même nom commercial). " +
       `${filtered.length} lignes après filtre Type/Subtype, ${pacs.length} retenues après validation ` +
-      "des champs numériques (P_th_h_ref/coefficients tous finis).",
+      "des champs numériques (P_th_h_ref/coefficients tous finis) et gardes pElRef/copRef ; " +
+      `${consistencyWarnCount} avertissement(s) de cohérence P_el_h_ref vs P_th_h_ref/COP_ref (> 1 %).`,
   },
   { pacs }
 );

@@ -18,11 +18,33 @@ test('catalogue : génériques présents + modèles air/eau, params complets', (
   }
 });
 
+test('références brutes : pElRef/copRef présents, bornés et cohérents entre eux', () => {
+  // pElRef et copRef sont les colonnes BRUTES du CSV hplib (P_el_h_ref [W] / COP_ref,
+  // point de référence Keymark -7°C/52°C) — PAS dérivables de la courbe COP fittée
+  // (divergence médiane ~34 %, cf. _meta.note). null autorisé pour les seuls génériques
+  // (colonnes vides dans le CSV, hplib.get_parameters() les calcule au chargement).
+  for (const p of d.pacs) {
+    if (p.generique) {
+      assert.ok(p.pElRef === null || Number.isFinite(p.pElRef), `${p.modele}: pElRef générique`);
+      assert.ok(p.copRef === null || Number.isFinite(p.copRef), `${p.modele}: copRef générique`);
+      continue;
+    }
+    assert.ok(Number.isFinite(p.pElRef) && p.pElRef > 200, `${p.modele}: pElRef=${p.pElRef}`);
+    assert.ok(Number.isFinite(p.copRef) && p.copRef >= 1.5 && p.copRef <= 8, `${p.modele}: copRef=${p.copRef}`);
+    // Cohérence interne CSV : P_el_h_ref ≈ P_th_h_ref / COP_ref (mêmes conditions -7/52).
+    assert.ok(
+      Math.abs(p.pElRef - p.pthRef / p.copRef) / p.pElRef <= 0.01,
+      `${p.modele}: pElRef=${p.pElRef} vs pthRef/copRef=${(p.pthRef / p.copRef).toFixed(0)}`
+    );
+  }
+});
+
 // Formule hplib (vérifiée dans hplib/hplib.py, simulate()/HeatPump.simulate(), cf. _meta.note) :
 // pour une PAC air/eau (Group 1), T_amb = T_in (température d'air extérieur).
 //   COP(T_in, T_out)  = p1_COP·T_in  + p2_COP·T_out  + p3_COP  + p4_COP·T_amb
-//   P_el(T_in, T_out) = P_el_ref · (p1_Pel·T_in + p2_Pel·T_out + p3_Pel + p4_Pel·T_amb)
-//   avec P_el_ref = pthRef / COP_ref, COP_ref = COP(-7, 52) (point de référence Keymark).
+//   P_el(T_in, T_out) = pElRef · (p1_Pel·T_in + p2_Pel·T_out + p3_Pel + p4_Pel·T_amb)
+// pElRef = colonne brute P_el_h_ref [W] du CSV, utilisée DIRECTEMENT (hplib.py la lit telle
+// quelle ; ne PAS la recalculer comme pthRef/COP_fitté(-7,52), qui diverge de ~34 % en médiane).
 function cop(pac, tIn, tOut) {
   const [p1, p2, p3, p4] = pac.coefCop;
   const tAmb = tIn;
@@ -30,11 +52,9 @@ function cop(pac, tIn, tOut) {
 }
 
 function pTh(pac, tIn, tOut) {
-  const copRef = cop(pac, -7, 52);
-  const pElRef = pac.pthRef / copRef;
   const [p1, p2, p3, p4] = pac.coefPth;
   const tAmb = tIn;
-  const pEl = pElRef * (p1 * tIn + p2 * tOut + p3 + p4 * tAmb);
+  const pEl = pac.pElRef * (p1 * tIn + p2 * tOut + p3 + p4 * tAmb);
   return pEl * cop(pac, tIn, tOut);
 }
 
@@ -59,7 +79,7 @@ test('sanité physique : P_th(-7°C, 35°C départ) positif et cohérent avec pt
   // Les PAC "Regulated" (vitesse variable) sont, par construction Keymark/EN14825, testées à
   // charge partielle modulée par palier de température extérieure : P_th(T_in,T_out) à T_out fixe
   // n'est PAS une courbe de capacité maximale croissante avec T_in (cf. _meta.note et
-  // hplib_database.py qui définit justement "Regulated" comme les modèles dont P_th décertifié
+  // hplib_database.py qui définit justement "Regulated" comme les modèles dont P_th certifié
   // n'est PAS croissant avec T_in, contrairement aux modèles "On-Off"). On vérifie donc seulement
   // que la grandeur reste dans un ordre de grandeur physique plausible (positive, du même ordre
   // que pthRef), pas une direction de variation.
@@ -70,12 +90,13 @@ test('sanité physique : P_th(-7°C, 35°C départ) positif et cohérent avec pt
 
   for (const pac of echantillon) {
     const pthM7 = pTh(pac, -7, 35);
-    // Bornes larges (x5) car ce sont des fits least-square (MAPE documenté ~10-20%, cf. README) :
-    // sur les 9244 modèles réels du catalogue, 99.9% des ratios P_th(-7,35)/pthRef sont < 3.2 et
-    // le maximum observé est 4.61 (queue de distribution de quelques fits moins bons) — x5 laisse
-    // une marge de sécurité tout en excluant une vraie erreur d'unité (kW/W donnerait un facteur ~1000).
+    // Bornes larges (x6) car ce sont des fits least-square (MAPE documenté ~10-20%, cf. README) :
+    // avec le pElRef BRUT, le ratio max P_th(-7,35)/pthRef mesuré sur tout le catalogue est 4.61
+    // (Clivet ELFOEnergy SHEEN EVO 18.2) ; avec l'approximation fittée pthRef/COP_fitté(-7,52)
+    // (à NE PAS utiliser), il monterait à 5.20 (2 modèles > 5x). La borne < 6 couvre les deux
+    // méthodes avec marge, tout en excluant une vraie erreur d'unité (kW/W donnerait ~1000x).
     assert.ok(
-      Number.isFinite(pthM7) && pthM7 > 0 && pthM7 < 5 * pac.pthRef,
+      Number.isFinite(pthM7) && pthM7 > 0 && pthM7 < 6 * pac.pthRef,
       `${pac.fabricant} ${pac.modele}: P_th(-7,35)=${pthM7}, pthRef=${pac.pthRef}`
     );
   }
