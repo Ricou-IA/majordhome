@@ -57,7 +57,7 @@ export function coefficientBPour(coefficientsB, categorie, indexValeur) {
   return v.b;
 }
 
-const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const norm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /** Recherche de communes par préfixe de nom (insensible accents/casse), filtre dept optionnel. */
 export function chercheCommunes(communes, saisie, dept = null) {
