@@ -1,0 +1,84 @@
+{
+  "_meta": {
+    "convertedAt": "2026-07-04",
+    "source": "C:\\Thermique\\Tarif Energie.txt (2025) — défauts, éditables par org (plan 4)",
+    "license": "proprietary-internal",
+    "note": "Fichier lu intégralement (latin1, 901 lignes, format verbeux 1 valeur/ligne entre guillemets). Puissance électrique retenue : 6 kVA (abonnement résidentiel monophasé le plus courant) pour base et HP/HC, tarifs 'Tarif au 01 août 2025 résidentiel'. Gaz naturel : niveau 'Base' (le plus bas palier de consommation, identique à B0 dans la source : 0.1284 €TTC/kWh sur les 6 niveaux). Bois/fioul/propane : prix €TTC/kWh donnés directement par la source (colonne '€TTC/kWh' explicite pour fioul, propane, bûches, granulés, déchiqueté) — aucune conversion inventée. PCI reportés en complément (colonnes 'PCI (kWh/unité de vente)' du bloc combustibles, lignes ~631-775 de la source) à titre informatif ; prixKwh reste la valeur directement lue en €TTC/kWh, pas une valeur recalculée depuis le prix à l'unité de vente."
+  },
+  "tarifs": [
+    {
+      "id": "elec-base",
+      "nom": "Électricité base (6 kVA)",
+      "prixKwh": 0.1952,
+      "sourceRaw": "Electricité. option base — Tarif au 01 août 2025 résidentiel — Puissance 6 kVA / Réglage disjoncteur 30 A : Prix de l'énergie 0.1627 €/kWh HT / 0.1952 €/kWh TTC"
+    },
+    {
+      "id": "elec-hphc-hp",
+      "nom": "Électricité heures pleines (6 kVA, option heures creuses)",
+      "prixKwh": 0.2146,
+      "sourceRaw": "Electricité. option heures creuses — Tarif au 01 août 2025 résidentiel — Puissance 6 kVA / Réglage disjoncteur 30 A : Heures Pleines 0.1788 €/kWh HT / 0.2146 €/kWh TTC"
+    },
+    {
+      "id": "elec-hphc-hc",
+      "nom": "Électricité heures creuses (6 kVA, option heures creuses)",
+      "prixKwh": 0.1696,
+      "sourceRaw": "Electricité. option heures creuses — Tarif au 01 août 2025 résidentiel — Puissance 6 kVA / Réglage disjoncteur 30 A : Heures Creuses 0.1413 €/kWh HT / 0.1696 €/kWh TTC"
+    },
+    {
+      "id": "gaz-naturel",
+      "nom": "Gaz naturel (niveau Base)",
+      "prixKwh": 0.1284,
+      "sourceRaw": "Gaz naturel — Tarif au 01 août 2025 — Prix du kWh PCS — Base : Abonnement 102.12 €TTC/an, prix 0.1284 €TTC/kWh (identique aux 6 niveaux de consommation Base/B0)"
+    },
+    {
+      "id": "fioul-domestique",
+      "nom": "Fioul domestique",
+      "prixKwh": 0.105,
+      "prixUnite": 1.047,
+      "unite": "litre",
+      "pci": 9.97,
+      "pciUnite": "kWh/l",
+      "sourceRaw": "Fioul domestique — Tarif au 02 août 2025 : 1.047 €TTC/litre, 0.105 €TTC/kWh, 9.97 kWh/l"
+    },
+    {
+      "id": "gaz-propane",
+      "nom": "Gaz propane",
+      "prixKwh": 0.1306,
+      "prixUnite": 1430,
+      "unite": "tonne",
+      "pci": 13800,
+      "pciUnite": "kWhPCS/tonne",
+      "sourceRaw": "Gaz propane — Tarif au 01 janvier 2025 : 1430 €TTC/T, 0.1306 €TTC/kWh, location/an 100 €, consigne/achat 13800 kWhPCS/T"
+    },
+    {
+      "id": "bois-buches",
+      "nom": "Bois bûches",
+      "prixKwh": 0.0536,
+      "prixUnite": 90,
+      "unite": "stère",
+      "pci": 1680,
+      "pciUnite": "kWh/stère",
+      "sourceRaw": "Bois bûches — Tarif en €TTC/stère au 01 janvier 2020 : 90 €TTC/stère, 0.0536 €TTC/kWh, 1680 kWh/stère"
+    },
+    {
+      "id": "bois-granules",
+      "nom": "Bois granulés",
+      "prixKwh": 0.087,
+      "prixUnite": 400,
+      "unite": "tonne",
+      "pci": 4600,
+      "pciUnite": "kWh/tonne",
+      "sourceRaw": "Bois Granulés — Tarif en €TTC/Tonne au 01 mars 2022 : 400 €TTC/Tonne, 0.0870 €TTC/kWh, 4600 kWh/tonne, densité 650 kg/m3"
+    },
+    {
+      "id": "bois-dechiquete",
+      "nom": "Bois déchiqueté",
+      "prixKwh": 0.0481,
+      "prixUnite": 133,
+      "unite": "map",
+      "pci": 2760,
+      "pciUnite": "kWh/Tonne",
+      "sourceRaw": "Bois déchiqueté — Tarif en €TTC/Map au 01 janvier 2020 : 133 €TTC/Map, 0.0481 €TTC/kWh, 2760 kWh/Tonne, 250 kg/map"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "convertedAt": "2026-07-04",
+    "source": "C:\\Thermique\\Ventilation\\Logements\\{Logements,T2,T3,T4,T5,T6,T7}.txt (export du logiciel Thermique historique) — fichiers identiques octet à octet entre C:\\Thermique et C:\\Thermique2, table des débits extraits réglementaires logement de l'arrêté du 24 mars 1982 modifié (arrêté du 28 octobre 1983, art. 4 et annexe)",
+    "license": "regulatory-table"
+  },
+  "systemes": [
+    { "id": "naturelle",   "nom": "Ventilation naturelle",  "mode": "taux",   "tauxParPiece": { "defaut": 0.5, "cuisine": 1.0, "sdb": 1.0, "wc": 1.0 } },
+    { "id": "vmc-sf-auto", "nom": "VMC simple flux autoréglable", "mode": "debits", "facteurDebit": 1.0, "rendement": 0 },
+    { "id": "vmc-sf-hygro","nom": "VMC simple flux hygroréglable", "mode": "debits", "facteurDebit": 0.75, "rendement": 0 },
+    { "id": "vmc-df",      "nom": "VMC double flux", "mode": "debits", "facteurDebit": 1.0, "rendement": 0.7 }
+  ],
+  "debitsExtraitsParTaille": [
+    { "piecesPrincipales": 1, "debitTotal": 35, "cuisine": 20, "bains": 15, "autreSdb": 15, "wcUnique": 15, "wcMultiple": 15 },
+    { "piecesPrincipales": 2, "debitTotal": 60, "cuisine": 30, "bains": 15, "autreSdb": 15, "wcUnique": 15, "wcMultiple": 15 },
+    { "piecesPrincipales": 3, "debitTotal": 75, "cuisine": 45, "bains": 30, "autreSdb": 15, "wcUnique": 15, "wcMultiple": 15 },
+    { "piecesPrincipales": 4, "debitTotal": 90, "cuisine": 45, "bains": 30, "autreSdb": 15, "wcUnique": 30, "wcMultiple": 15 },
+    { "piecesPrincipales": 5, "debitTotal": 105, "cuisine": 45, "bains": 30, "autreSdb": 15, "wcUnique": 30, "wcMultiple": 15 },
+    { "piecesPrincipales": 6, "debitTotal": 120, "cuisine": 45, "bains": 30, "autreSdb": 15, "wcUnique": 30, "wcMultiple": 15 },
+    { "piecesPrincipales": 7, "debitTotal": 135, "cuisine": 45, "bains": 30, "autreSdb": 15, "wcUnique": 30, "wcMultiple": 15 }
+  ],
+  "notes": "debitsExtraitsParTaille (débitTotal/cuisine/bains/autreSdb/wcUnique/wcMultiple, en m³/h) transcrit intégralement des 7 fichiers source (Logements.txt=T1 ... T7.txt), chacun listant 5 lignes 'Ventilation générale simple flux' (Cuisine mini/maxi, Bains, Autre salle d'eau, WC unique, WC multiple) avec en dernière colonne 'débit total / cuisine' (ex. T3 : '75 / 45'), cohérent avec la table réglementaire bien connue de l'arrêté du 24 mars 1982 modifié (débits extraits mini T1..T7 = 35,60,75,90,105,120,135 m³/h). Au-delà de T7 (7 pièces principales et plus), l'arrêté ne prévoit pas de palier supplémentaire (valeur T7 reconduite en pratique). Les objets 'systemes' (mode/facteurDebit/rendement/tauxParPiece pour ventilation naturelle et types de VMC) ne proviennent PAS des fichiers Thermique (qui ne couvrent que les débits extraits logement) : ce sont les valeurs de départ fournies par la tâche (ordre de grandeur EN 12831 usuel — hygroréglable 75% du débit autoréglable, DF à rendement de récupération 70%), à valider/ajuster ultérieurement si une source réglementaire plus précise est identifiée."
+}
