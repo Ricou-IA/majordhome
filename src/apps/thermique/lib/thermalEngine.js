@@ -183,6 +183,7 @@ export function calculeBatiment(batiment) {
   if (thetaIntMoyenne <= thetaExt) {
     throw new Error(`thermique: θint moyenne (${thetaIntMoyenne}) ≤ θext (${thetaExt}) — GV indéfini`);
   }
+  // debitTotal / rendement validés en aval (debitsParPiece / ventilationPiece respectivement)
   const debits = debitsParPiece({ systeme: systemeVentilation, debitTotal, pieces });
   const rendement = systemeVentilation.rendement ?? 0;
   const parPoste = { ventilation: 0, relance: 0 };
@@ -207,6 +208,7 @@ export function calculeBatiment(batiment) {
       parPoste: { ...transmission.parPoste, ventilation, relance },
     });
   }
+  // gv : relance exclue (cf. JSDoc) ; ratioWm2 : relance incluse (total)
   const gv = (total - relanceTotale) / (thetaIntMoyenne - thetaExt);
   const ratioWm2 = total / surfaceTotale;
   const fourchette = { min: Math.round(total * 0.95), max: Math.round(total * 1.10) };
