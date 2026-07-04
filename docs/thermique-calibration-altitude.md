@@ -35,6 +35,12 @@ Ce point est cohérent avec les données actuelles du dépôt : `communes.json` 
 710006, dept 71) à l'altitude 350 m, et `climat.json.thetaBase["71"]` vaut −10 °C. Il sert de
 première ligne au tableau de relevés ci-dessous.
 
+**Deuxième point acquis (plan 2, Task 11)** : le fichier exemple du logiciel
+(`Dossiers/232477 - Fichier exemple - Déperditions.dep`) est situé à **Ceyzériat** (dépt 01),
+altitude **300 m** : θe base **−10 °C** → corrigée **−11 °C** (lu et contre-vérifié dans le fichier,
+cf. `docs/thermique-validation.md`). Deux points cohérents avec une hypothèse « −1 K au-delà de
+200 m » — toujours insuffisant pour valider une règle (il faut des altitudes étagées, cf. §3-§4).
+
 ## 3. Protocole de relevés (phase A/B)
 
 Dans le logiciel historique, choisir **2 à 3 départements contrastés** en θe de base (ex. **71**,
@@ -57,6 +63,7 @@ premiers relevés ne permettent pas de trancher entre plusieurs règles candidat
 | Commune | Dépt | Altitude (m) | θe base (°C) | θe corrigée (°C) |
 |---|---|---|---|---|
 | Amanzé | 71 | 350 | −10 | −11 |
+| Ceyzériat | 01 | 300 | −10 | −11 |
 | | | | | |
 | | | | | |
 | | | | | |
