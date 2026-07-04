@@ -391,3 +391,150 @@ export function orientationDe(segment, nord) {
   const SECTEURS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
   return SECTEURS[Math.round(capBoussole / 45) % 8];
 }
+
+/**
+ * Intervalle occupé sur l'AXE du segment (bornes croissantes) par une ouverture posée à
+ * `position` cm du DÉBUT du segment, comptée dans son SENS DE PARCOURS (CCW). Les sous-segments
+ * d'`adjacencesNiveau` sont exprimés en coordonnées d'axe croissantes alors que `position` suit
+ * le parcours : la conversion dépend donc du sens du segment. Parcours en coordonnée CROISSANTE
+ * → de = min + position, a = de + largeur ; parcours DÉCROISSANT (murs est et nord d'un
+ * rectangle CCW en repère y-bas) → a = max − position, de = a − largeur.
+ * @param {{x1: number, y1: number, x2: number, y2: number, axe: 'h'|'v'}} segment segment
+ *   orienté (les objets de segmentsDe conviennent)
+ * @param {number} position distance entière (cm) depuis le début du segment, sens de parcours
+ * @param {number} largeur largeur entière (cm) de l'ouverture
+ * @returns {{de: number, a: number}} intervalle en coordonnée d'axe (x si 'h', y si 'v'), de < a
+ */
+export function intervalleAxial(segment, position, largeur) {
+  if (!segment || typeof segment !== 'object' || (segment.axe !== 'h' && segment.axe !== 'v')) {
+    throw new Error("thermique: intervalleAxial : segment orienté avec axe 'h'|'v' requis");
+  }
+  const debut = segment.axe === 'v' ? segment.y1 : segment.x1;
+  const fin = segment.axe === 'v' ? segment.y2 : segment.x2;
+  if (!Number.isInteger(debut) || !Number.isInteger(fin) || debut === fin) {
+    throw new Error('thermique: intervalleAxial : segment entier de longueur non nulle requis');
+  }
+  if (!Number.isInteger(position) || !Number.isInteger(largeur)) {
+    throw new Error('thermique: intervalleAxial : position et largeur entières (cm) requises');
+  }
+  if (fin > debut) {
+    const de = debut + position;
+    return { de, a: de + largeur };
+  }
+  const a = debut - position;
+  return { de: a - largeur, a };
+}
+
+/**
+ * Valide les ouvertures d'une pièce et impute leur surface au sous-segment porteur (pour le
+ * calcul des surfaces nettes de murs, Task 6). Règles de DESSIN (messages dans `erreurs`,
+ * jamais de throw — décision structurante n°5) :
+ *   - position ≥ 0 et position + largeur ≤ longueur du segment porteur ;
+ *   - hauteur > 0 et ≤ hauteurNiveau ; largeur > 0 ;
+ *   - deux ouvertures du même segment ne se chevauchent pas (comparaison en coordonnées d'axe ;
+ *     le simple contact bord à bord est toléré) — les deux fautives sont exclues de l'imputation
+ *     (aucune double imputation) ;
+ *   - une ouverture à cheval sur deux sous-segments d'adjacence différente = erreur (fenêtre
+ *     moitié mur extérieur / moitié mitoyen n'a pas de sens thermique).
+ * Une ouverture en erreur n'est JAMAIS imputée. Erreurs de PROGRAMMATION (throw 'thermique:') :
+ * segmentIndex hors bornes, pieceId ≠ piece.id, entrées malformées, sous-segments absents pour
+ * un segment porteur (incohérence avec la sortie d'adjacencesNiveau).
+ * @param {{id: (string|number), polygone: {x: number, y: number}[]}} piece pièce porteuse
+ *   (polygone normalisé CCW — re-normalisé ici par cohérence avec adjacencesNiveau)
+ * @param {{id: *, pieceId: *, segmentIndex: number, type: string, largeur: number,
+ *   hauteur: number, position: number}[]} ouvertures ouvertures de cette pièce (cm entiers ;
+ *   position = distance depuis le début du segment, dans son sens de parcours)
+ * @param {{segmentIndex: number, de: number, a: number, longueur: number, adjacent: *}[]}
+ *   sousSegments sous-segments de la pièce (sortie adjacencesNiveau, bornes d'axe croissantes)
+ * @param {number} hauteurNiveau hauteur du niveau en cm (entier > 0)
+ * @returns {{erreurs: string[], surfacesOuvertures: Map<string, number>}} surfacesOuvertures :
+ *   clé `${segmentIndex}:${de}:${a}` (sous-segment porteur) → cm² d'ouvertures imputées
+ */
+export function valideOuvertures(piece, ouvertures, sousSegments, hauteurNiveau) {
+  if (!piece || typeof piece !== 'object' || piece.id === null || piece.id === undefined
+    || piece.id === '' || !Array.isArray(piece.polygone)) {
+    throw new Error('thermique: valideOuvertures : piece { id, polygone } requise');
+  }
+  if (!Array.isArray(ouvertures)) {
+    throw new Error('thermique: valideOuvertures : ouvertures doit être un tableau');
+  }
+  if (!Array.isArray(sousSegments)) {
+    throw new Error('thermique: valideOuvertures : sousSegments doit être un tableau');
+  }
+  if (!Number.isInteger(hauteurNiveau) || hauteurNiveau <= 0) {
+    throw new Error('thermique: valideOuvertures : hauteurNiveau entier > 0 requis (cm)');
+  }
+
+  const segments = segmentsDe(normalisePolygone(piece.polygone));
+  const erreurs = [];
+  const etats = []; // { o, intervalle: {de, a}|null, ok } — intervalle nul si géométrie 1D inexploitable
+
+  for (const o of ouvertures) {
+    if (!o || typeof o !== 'object' || o.id === null || o.id === undefined || o.id === '') {
+      throw new Error('thermique: valideOuvertures : chaque ouverture doit avoir un id');
+    }
+    if (o.pieceId !== piece.id) {
+      throw new Error(`thermique: valideOuvertures : ouverture ${o.id} — pieceId inconnu (${o.pieceId} ≠ ${piece.id})`);
+    }
+    if (!Number.isInteger(o.segmentIndex) || o.segmentIndex < 0 || o.segmentIndex >= segments.length) {
+      throw new Error(`thermique: valideOuvertures : ouverture ${o.id} — segmentIndex hors bornes (${o.segmentIndex})`);
+    }
+    if (![o.largeur, o.hauteur, o.position].every(Number.isInteger)) {
+      throw new Error(`thermique: valideOuvertures : ouverture ${o.id} — largeur, hauteur et position entières (cm) requises`);
+    }
+
+    const seg = segments[o.segmentIndex];
+    let ok = true;
+    if (o.largeur <= 0) {
+      erreurs.push(`ouverture « ${o.id} » : largeur invalide (> 0 requis)`);
+      ok = false;
+    }
+    if (o.hauteur <= 0 || o.hauteur > hauteurNiveau) {
+      erreurs.push(`ouverture « ${o.id} » : hauteur invalide (> 0 et ≤ hauteur du niveau ${hauteurNiveau} cm)`);
+      ok = false;
+    }
+    let intervalle = null;
+    if (o.position < 0 || o.position + o.largeur > seg.longueur) {
+      erreurs.push(`ouverture « ${o.id} » : dépasse de son mur (position ${o.position} + largeur ${o.largeur} hors [0, ${seg.longueur}] cm)`);
+      ok = false;
+    } else if (o.largeur > 0) {
+      intervalle = intervalleAxial(seg, o.position, o.largeur);
+    }
+    etats.push({ o, intervalle, ok });
+  }
+
+  // Chevauchement entre ouvertures du même segment, en coordonnées d'axe (le sens de parcours
+  // est déjà résorbé par intervalleAxial). Contact bord à bord (max(de) = min(a)) toléré.
+  for (let i = 0; i < etats.length; i++) {
+    for (let j = i + 1; j < etats.length; j++) {
+      const u = etats[i], v = etats[j];
+      if (!u.intervalle || !v.intervalle || u.o.segmentIndex !== v.o.segmentIndex) continue;
+      if (Math.max(u.intervalle.de, v.intervalle.de) < Math.min(u.intervalle.a, v.intervalle.a)) {
+        erreurs.push(`ouvertures « ${u.o.id} » et « ${v.o.id} » : se chevauchent sur le même mur`);
+        u.ok = false;
+        v.ok = false;
+      }
+    }
+  }
+
+  // Imputation des ouvertures valides à leur sous-segment porteur. Les sous-segments contigus
+  // de même adjacence étant fusionnés par decomposeIntervalle, une ouverture non contenue dans
+  // UN sous-segment est nécessairement à cheval sur deux adjacences différentes.
+  const surfacesOuvertures = new Map();
+  for (const { o, intervalle, ok } of etats) {
+    if (!ok || !intervalle) continue;
+    const subs = sousSegments.filter((s) => s.segmentIndex === o.segmentIndex);
+    if (subs.length === 0) {
+      throw new Error(`thermique: valideOuvertures : aucun sous-segment pour le segment ${o.segmentIndex} — sousSegments incohérents avec la pièce`);
+    }
+    const porteur = subs.find((s) => s.de <= intervalle.de && intervalle.a <= s.a);
+    if (!porteur) {
+      erreurs.push(`ouverture « ${o.id} » : à cheval sur deux portions de mur d'adjacence différente (extérieur / mitoyen) — la déplacer d'un seul côté`);
+      continue;
+    }
+    const cle = `${o.segmentIndex}:${porteur.de}:${porteur.a}`;
+    surfacesOuvertures.set(cle, (surfacesOuvertures.get(cle) || 0) + o.largeur * o.hauteur);
+  }
+
+  return { erreurs, surfacesOuvertures };
+}

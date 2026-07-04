@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalisePolygone, surfaceCm2, perimetreCm, segmentsDe, validePolygone, decomposeIntervalle,
-  rectanglesDe, aireIntersectionRectilineaire, adjacencesNiveau, orientationDe }
+  rectanglesDe, aireIntersectionRectilineaire, adjacencesNiveau, orientationDe, intervalleAxial,
+  valideOuvertures }
   from '../../src/apps/thermique/lib/geometryEngine.js';
 
 // Rectangle 400×300 cm (séjour 12 m²), déclaré horaire → doit être renversé en anti-horaire
@@ -352,4 +353,121 @@ test('orientationDe : entrées malformées → throw thermique', () => {
   assert.throws(() => orientationDe({ x1: 0, y1: 0, x2: 0, y2: 0 }, 0), /thermique/);     // longueur nulle
   assert.throws(() => orientationDe({ x1: 0, y1: 0, x2: 100, y2: 0 }, NaN), /thermique/); // nord non fini
   assert.throws(() => orientationDe({ x1: 0, y1: 0, x2: 100, y2: 0 }, '0'), /thermique/); // nord non numérique
+});
+
+// ═══════════════ Task 4 : intervalleAxial / valideOuvertures ═══════════════
+
+// Séjour = RECT_HORAIRE normalisé CCW : (0,0),(0,300),(400,300),(400,0) → segments :
+//   0: ouest x=0, y 0→300 (parcours CROISSANT) · 1: sud y=300, x 0→400 (croissant)
+//   2: est x=400, y 300→0 (DÉCROISSANT)        · 3: nord y=0, x 400→0 (décroissant)
+// `position` d'une ouverture compte depuis le DÉBUT du segment dans son sens de parcours :
+// sur le mur est, position p ↦ point d'axe y = 300 − p (et l'ouverture occupe [300−p−l, 300−p]).
+const SEJOUR = { id: 'sejour', polygone: RECT_HORAIRE };
+const HAUTEUR_NIVEAU = 250; // cm
+// Layout de la Task 3 : cuisine accolée à l'est du séjour sur y∈[0,200] → le mur est du séjour
+// (segment 2) se scinde en coordonnées d'AXE croissantes : [0,200] mitoyen 'cuisine' + [200,300] extérieur.
+const CUISINE = { id: 'cuisine', polygone: [{ x: 400, y: 0 }, { x: 700, y: 0 }, { x: 700, y: 200 }, { x: 400, y: 200 }] };
+const sousSegmentsSeuls = () => adjacencesNiveau([SEJOUR]).parPiece.get('sejour');
+const sousSegmentsAccoles = () => adjacencesNiveau([SEJOUR, CUISINE]).parPiece.get('sejour');
+const ouv = (id, segmentIndex, position, largeur = 120, hauteur = 135) =>
+  ({ id, pieceId: 'sejour', segmentIndex, type: 'fenetre', largeur, hauteur, position });
+
+test('intervalleAxial : parcours croissant → de = min + position ; décroissant → a = max − position', () => {
+  const segs = segmentsDe(normalisePolygone(RECT_HORAIRE));
+  // seg1 sud (0,300)→(400,300), x croissant : de = 0 + 40 = 40, a = 160.
+  assert.deepEqual(intervalleAxial(segs[1], 40, 120), { de: 40, a: 160 });
+  // seg2 est (400,300)→(400,0), y DÉCROISSANT : a = 300 − 40 = 260, de = 260 − 120 = 140.
+  assert.deepEqual(intervalleAxial(segs[2], 40, 120), { de: 140, a: 260 });
+  // seg3 nord (400,0)→(0,0), x décroissant : a = 400 − 100 = 300, de = 250.
+  assert.deepEqual(intervalleAxial(segs[3], 100, 50), { de: 250, a: 300 });
+  // seg0 ouest (0,0)→(0,300), y croissant, ouverture pleine longueur : [0, 300].
+  assert.deepEqual(intervalleAxial(segs[0], 0, 300), { de: 0, a: 300 });
+  assert.throws(() => intervalleAxial(segs[1], 40.5, 120), /thermique/); // position non entière
+});
+
+test('valideOuvertures : fenêtre 120×135 à 40 cm sur segment croissant de 400 → 16200 cm² au bon sous-segment', () => {
+  const { erreurs, surfacesOuvertures } = valideOuvertures(
+    SEJOUR, [ouv('f1', 1, 40)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.deepEqual(erreurs, []);
+  assert.deepEqual([...surfacesOuvertures], [['1:0:400', 16200]]); // 120 × 135
+});
+
+test('valideOuvertures : dépassement du segment (et position négative) → erreur, aucune imputation', () => {
+  // position 300 + largeur 120 = 420 > 400 (longueur du segment 1).
+  const r = valideOuvertures(SEJOUR, [ouv('f1', 1, 300)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.equal(r.erreurs.length, 1);
+  assert.match(r.erreurs[0], /dépasse/);
+  assert.equal(r.surfacesOuvertures.size, 0);
+  const neg = valideOuvertures(SEJOUR, [ouv('f2', 1, -10)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.equal(neg.erreurs.length, 1);
+  assert.match(neg.erreurs[0], /dépasse/);
+  assert.equal(neg.surfacesOuvertures.size, 0);
+});
+
+test('valideOuvertures : deux fenêtres qui se chevauchent → erreur sans double imputation ; bord à bord toléré', () => {
+  // f1 occupe [40,160], f2 [100,200] sur le segment 1 → chevauchement [100,160] : les DEUX
+  // sont exclues de l'imputation (aucune surface comptée, a fortiori pas deux fois).
+  const r = valideOuvertures(SEJOUR, [ouv('f1', 1, 40), ouv('f2', 1, 100, 100)],
+    sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.equal(r.erreurs.length, 1);
+  assert.match(r.erreurs[0], /chevauchent/);
+  assert.equal(r.surfacesOuvertures.size, 0);
+  // f1 [40,160] et f3 [160,240] se TOUCHENT sans se chevaucher → valides, surfaces additionnées.
+  const ok = valideOuvertures(SEJOUR, [ouv('f1', 1, 40), ouv('f3', 1, 160, 80)],
+    sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.deepEqual(ok.erreurs, []);
+  assert.deepEqual([...ok.surfacesOuvertures], [['1:0:400', 16200 + 10800]]); // + 80 × 135
+});
+
+test('valideOuvertures : à cheval ext/mitoyen sur le mur est (parcours décroissant) → erreur', () => {
+  // Mur est (segment 2) parcouru de y=300 vers y=0, scindé en axe [0,200] cuisine / [200,300] ext.
+  // Fenêtre position 60, largeur 80 → intervalle d'axe [300−60−80, 300−60] = [160, 240] :
+  // chevauche la frontière y=200 → « à cheval » sur deux adjacences différentes.
+  const r = valideOuvertures(SEJOUR, [ouv('f1', 2, 60, 80)], sousSegmentsAccoles(), HAUTEUR_NIVEAU);
+  assert.equal(r.erreurs.length, 1);
+  assert.match(r.erreurs[0], /cheval/);
+  assert.equal(r.surfacesOuvertures.size, 0);
+});
+
+test('valideOuvertures : hauteur hors niveau, hauteur nulle, largeur nulle → erreurs ; hauteur = niveau tolérée', () => {
+  const trop = valideOuvertures(SEJOUR, [ouv('f1', 1, 40, 120, 260)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.equal(trop.erreurs.length, 1);
+  assert.match(trop.erreurs[0], /hauteur/);
+  assert.equal(trop.surfacesOuvertures.size, 0);
+  const l0 = valideOuvertures(SEJOUR, [ouv('f2', 1, 40, 0)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.ok(l0.erreurs.some((e) => /largeur/.test(e)));
+  assert.equal(l0.surfacesOuvertures.size, 0);
+  const h0 = valideOuvertures(SEJOUR, [ouv('f3', 1, 40, 120, 0)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.ok(h0.erreurs.some((e) => /hauteur/.test(e)));
+  assert.equal(h0.surfacesOuvertures.size, 0);
+  // hauteur exactement égale à la hauteur du niveau : ≤ → valide (porte toute hauteur).
+  const lim = valideOuvertures(SEJOUR, [ouv('f4', 1, 40, 120, 250)], sousSegmentsSeuls(), HAUTEUR_NIVEAU);
+  assert.deepEqual(lim.erreurs, []);
+  assert.deepEqual([...lim.surfacesOuvertures], [['1:0:400', 30000]]); // 120 × 250
+});
+
+test('valideOuvertures : cas direction — fenêtre dans la portion EXTÉRIEURE du mur est → clé [200,300], pas [0,100]', () => {
+  // Segment 2 parcouru en y décroissant depuis y=300 : position 10, largeur 80 → intervalle
+  // d'axe [300−10−80, 300−10] = [210, 290] ⊆ [200,300] (portion extérieure). Une implémentation
+  // naïve « min + position » donnerait [10, 90] ⊆ [0,200] (portion mitoyenne) — faux.
+  const r = valideOuvertures(SEJOUR, [ouv('f1', 2, 10, 80)], sousSegmentsAccoles(), HAUTEUR_NIVEAU);
+  assert.deepEqual(r.erreurs, []);
+  assert.deepEqual([...r.surfacesOuvertures], [['2:200:300', 10800]]); // 80 × 135
+  // Symétriquement : position 100, largeur 200 → axe [0,200] = exactement la portion mitoyenne.
+  const m = valideOuvertures(SEJOUR, [ouv('f2', 2, 100, 200, 210)], sousSegmentsAccoles(), HAUTEUR_NIVEAU);
+  assert.deepEqual(m.erreurs, []);
+  assert.deepEqual([...m.surfacesOuvertures], [['2:0:200', 42000]]); // 200 × 210
+});
+
+test('valideOuvertures : entrées malformées → throw thermique (erreurs de programmation)', () => {
+  const subs = sousSegmentsSeuls();
+  assert.throws(() => valideOuvertures(SEJOUR, [ouv('f1', 4, 40)], subs, HAUTEUR_NIVEAU), /thermique/);   // segmentIndex hors bornes
+  assert.throws(() => valideOuvertures(SEJOUR, [ouv('f1', -1, 40)], subs, HAUTEUR_NIVEAU), /thermique/);
+  assert.throws(() => valideOuvertures(SEJOUR,
+    [{ ...ouv('f1', 1, 40), pieceId: 'autre' }], subs, HAUTEUR_NIVEAU), /thermique/);                     // pieceId inconnu
+  assert.throws(() => valideOuvertures(SEJOUR,
+    [{ ...ouv('f1', 1, 40), id: undefined }], subs, HAUTEUR_NIVEAU), /thermique/);                        // ouverture sans id
+  assert.throws(() => valideOuvertures(SEJOUR, 'pas un tableau', subs, HAUTEUR_NIVEAU), /thermique/);
+  assert.throws(() => valideOuvertures(SEJOUR, [], subs, 0), /thermique/);                                // hauteurNiveau invalide
+  assert.throws(() => valideOuvertures(SEJOUR, [ouv('f1', 1, 40)], [], HAUTEUR_NIVEAU), /thermique/);     // sous-segments absents pour le segment
 });
