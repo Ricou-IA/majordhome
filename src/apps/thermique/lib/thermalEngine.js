@@ -6,6 +6,9 @@
 // refDataResolvers utilise mur|plancherBas|plafond|fenetre (tables U par défaut). Le mapping se
 // fait à l'assemblage (Task 6/plan 4) : plancherBas→plancher, fenetre→(pas de Rsi/Rse : U saisi
 // directement).
+//
+// Hors périmètre plan 2 : loi d'émission (exposant 1,3) pour la vérification des radiateurs à
+// 35/45/55 °C — livrée au plan 4 (écran résultats).
 
 /** Résistances superficielles Rsi+Rse (EN ISO 6946) par type de flux. */
 export const RSI_RSE = { mur: 0.17, plafond: 0.14, plancher: 0.21 };

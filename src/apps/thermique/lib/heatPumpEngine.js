@@ -43,7 +43,11 @@ export function pThAt(pac, tExt, tDepart) {
   return Math.max(0, pEl * copAt(pac, tExt, tDepart));
 }
 
-/** Courbe de charge : droite (θbase, Φtotal)→(θnc, 0), 0 au-delà de θnc, prolongée linéairement sous θbase. */
+/**
+ * Courbe de charge : droite (θbase, Φtotal)→(θnc, 0), 0 au-delà de θnc, prolongée linéairement sous θbase.
+ * phiTotal = le total de calculeBatiment (relance incluse — puissance de dimensionnement) ; ne pas
+ * passer gv×ΔT.
+ */
 export function courbeCharge({ phiTotal, thetaBase, thetaNC }) {
   if (!Number.isFinite(phiTotal) || phiTotal <= 0) throw new Error(`thermique: phiTotal invalide (${phiTotal})`);
   if (!Number.isFinite(thetaBase) || !Number.isFinite(thetaNC) || thetaNC <= thetaBase) throw new Error('thermique: θnc doit être > θbase');

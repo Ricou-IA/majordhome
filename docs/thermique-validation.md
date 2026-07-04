@@ -113,6 +113,10 @@ par le logiciel y sont bien présents et identifiables sans ambiguïté** :
 3. **Calibration du `facteurAjustement` de la consommation** (`consoAnnuelle`, défaut 1,0 —
    apports gratuits/intermittence) : comparer le besoin annuel DJU à la section « consommation »
    du logiciel (présente dans le fichier exemple) et/ou à des factures réelles.
+4. Vérification émetteurs 35/45/55 °C (loi d'émission exposant 1,3) — plan 4, écran résultats.
+5. TODO — Fallback DJU départemental à créer (`refDataResolvers.djuPour`) avant le câblage UI —
+   ~750 communes ont `dju` null (Var, Corse, DOM) ; règle à trancher (DJU du chef-lieu ou médiane
+   départementale).
 
 ## 3. Hypothèses assumées, à challenger pendant l'A/B
 
@@ -131,3 +135,8 @@ par le logiciel y sont bien présents et identifiables sans ambiguïté** :
   point certifié EN 14825 **en charge partielle adaptée**, pas la capacité maximale — le point de
   bivalence porte `avertissementChargePartielle` ; confronter aux données constructeur pendant
   l'A/B.
+- **Infiltrations/étanchéité** : non modélisées séparément en v1 — absorbées dans le terme
+  ventilation (taux/débits) ; un modulateur d'étanchéité qualitative pourra être ajouté à
+  l'assemblage (plan 4).
+- **Terre-plein** : pas de table U-équivalent en v1 (`coefficients-b` couvre vide sanitaire/sous-sol)
+  — saisie d'un U équivalent direct en attendant, table à ajouter si le besoin terrain le confirme.

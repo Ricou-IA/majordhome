@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import { copAt, pThAt, pElRefDe, courbeCharge, pointBivalence, consoAnnuelle } from '../../src/apps/thermique/lib/heatPumpEngine.js';
 
 const catalogue = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/pac-catalogue.json', import.meta.url), 'utf8'));
-const reelle = catalogue.pacs.find((p) => !p.generique && p.copRef != null);
+// PAC de référence épinglée par modèle (et non par 1er `find` order-dependent sur le catalogue,
+// dont l'ordre n'est pas garanti stable) — voir aussi pointBivalence ci-dessous qui refait le find.
+const reelle = catalogue.pacs.find((p) => p.modele === 'Acond Aconomis N');
+assert.ok(reelle, 'PAC de référence absente du catalogue — mettre à jour le modèle épinglé');
 const generique = catalogue.pacs.find((p) => p.generique && p.modele.includes('average'));
 const climat = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/climat.json', import.meta.url), 'utf8'));
 
