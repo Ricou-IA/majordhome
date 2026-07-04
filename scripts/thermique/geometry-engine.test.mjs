@@ -83,3 +83,12 @@ test('decomposeIntervalle : deux refs différentes qui se touchent sans se cheva
   const r = decomposeIntervalle(0, 100, [{ de: 0, a: 50, ref: 'A' }, { de: 50, a: 100, ref: 'B' }]);
   assert.deepEqual(r, [{ de: 0, a: 50, ref: 'A' }, { de: 50, a: 100, ref: 'B' }]);
 });
+
+test('decomposeIntervalle : chevauchement de la MÊME ref → erreur (un tronçon de mur revendiqué deux fois = géométrie amont corrompue)', () => {
+  assert.throws(() => decomposeIntervalle(0, 30, [{ de: 0, a: 15, ref: 'A' }, { de: 10, a: 20, ref: 'A' }]), /thermique/);
+});
+
+test('decomposeIntervalle : même ref qui se touche sans se chevaucher → fusion sans erreur', () => {
+  const r = decomposeIntervalle(0, 30, [{ de: 0, a: 15, ref: 'A' }, { de: 15, a: 30, ref: 'A' }]);
+  assert.deepEqual(r, [{ de: 0, a: 30, ref: 'A' }]);
+});

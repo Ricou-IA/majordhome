@@ -118,10 +118,13 @@ function segmentsSeCroisent(poly) {
  * plutôt que de lever une erreur. Le consommateur (Task 3, `adjacencesNiveau`) doit rester
  * tolérant à cette situation plutôt que de supposer une géométrie parfaitement propre.
  *
- * Deux recouvrements de RÉFÉRENCES DIFFÉRENTES qui se chevauchent (même partiellement) à
- * l'intérieur des bornes constituent une violation de contrat de programmation (deux pièces
- * distinctes revendiquant le même tronçon de mur) — cela doit être détecté en amont (dessin
- * invalide, Task 3) ; ici c'est un throw `thermique:`, jamais une erreur de dessin retournée.
+ * Deux recouvrements qui se chevauchent (même partiellement) à l'intérieur des bornes — QUE LES
+ * REFS SOIENT DIFFÉRENTES OU IDENTIQUES — constituent une violation de contrat de programmation :
+ * un tronçon de mur revendiqué deux fois trahit une géométrie amont corrompue, et l'accepter
+ * produirait des morceaux non contigus en sortie (contrat violé). Cela doit être détecté en
+ * amont (dessin invalide, Task 3, qui convertit en erreur de dessin) ; ici c'est un throw
+ * `thermique:`, jamais une erreur de dessin retournée. Se TOUCHER sans se chevaucher reste
+ * permis (et fusionné si même ref) ; la tolérance aux longueurs nulles ci-dessus est inchangée.
  *
  * @param {number} de borne basse entière (cm)
  * @param {number} a borne haute entière (cm), > de
@@ -152,16 +155,17 @@ export function decomposeIntervalle(de, a, recouvrements) {
     if (rd < ra) troncs.push({ de: rd, a: ra, ref: r.ref });
   }
 
-  // Trié par début : seuls des recouvrements consécutifs (après tri) peuvent se chevaucher.
+  // Trié par début : tout chevauchement implique un chevauchement entre consécutifs
+  // (si i < j se chevauchent, alors troncs[i+1].de ≤ troncs[j].de < troncs[i].a).
   troncs.sort((x, y) => x.de - y.de);
   for (let i = 1; i < troncs.length; i++) {
     const prev = troncs[i - 1], cur = troncs[i];
-    if (cur.de < prev.a && cur.ref !== prev.ref) {
-      throw new Error('thermique: decomposeIntervalle : recouvrements de refs différentes qui se chevauchent');
+    if (cur.de < prev.a) {
+      throw new Error(`thermique: decomposeIntervalle : recouvrements en conflit (${prev.ref} / ${cur.ref})`);
     }
   }
 
-  // Balayage : émet les segments libres entre/around les recouvrements, puis fusionne les
+  // Balayage : émet les segments libres entre/autour des recouvrements, puis fusionne les
   // morceaux contigus de même ref (y compris deux recouvrements adjacents identiques).
   const bruts = [];
   let curseur = de;
