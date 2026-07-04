@@ -74,6 +74,8 @@ writeDataJson('u-defauts.json',
       "Pour uph (plafond/toiture), colonne type_toiture='combles' retenue (vs 'terrasse'), cas résidentiel le plus courant. " +
       "Les enum_periode_construction_id '1|2' sont fusionnées par Open3CL en un seul libellé 'avant 1974 ou inconnu' " +
       "(même valeur pour avant 1948 et 1948-1974) : reporté ici comme période unique 'avant 1974'. " +
+      "Conséquence directe de cette fusion (sémantique 3CL) : une année de construction INCONNUE doit être résolue " +
+      "vers cette même période 'avant 1974' (le moteur ne doit pas inventer une autre valeur par défaut pour ce cas). " +
       "La dernière période Open3CL '>=2013' (reportée ici 'après 2012') couvre les enum_periode_construction " +
       "'2013-2021' et 'après 2021' (même valeur dans la table). " +
       "AUCUNE valeur fenêtre : la table Open3CL `uw` (tv.js) est indexée par type de baie/menuiserie/vitrage, " +

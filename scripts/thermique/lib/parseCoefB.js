@@ -16,6 +16,8 @@ export function parseCoefB(text) {
     const m = line.match(/^([01](?:[.,]\d+)?)(?:\s+(.+))?$/);
     if (m && current) {
       current.valeurs.push({ b: Number(m[1].replace(',', '.')), description: m[2] ? m[2].trim() : null });
+    } else if (m && !current) {
+      console.warn(`⚠ valeur "${line}" orpheline (aucune catégorie en cours) — ignorée`);
     } else if (!m) {
       current = { categorie: line, valeurs: [] };
       cats.push(current);

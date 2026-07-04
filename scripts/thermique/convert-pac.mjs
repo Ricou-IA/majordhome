@@ -134,9 +134,13 @@ for (const r of filtered) {
   }
 
   if (!generique) {
-    // Gardes sur les colonnes de référence brutes : pElRef fini > 200 W, copRef dans [1.5, 8].
+    // Gardes sur les colonnes de référence brutes : pElRef fini > 200 W, copRef dans [1.2, 8].
+    // Plancher abaissé de 1.5 à 1.2 (revue) : les lignes exclues sous 1.5 étaient une vraie
+    // famille Mitsubishi PXZ-5F85VG (COP_ref 1.4, interne cohérent avec P_th_h_ref/P_el_h_ref),
+    // pas des données aberrantes — 1.2 reste largement au-dessus de tout artefact de saisie
+    // (COP < 1 physiquement absurde pour une PAC) tout en les incluant.
     // Les lignes hors bornes sont exclues (comptées et documentées), pas corrigées.
-    if (!(Number.isFinite(pElRef) && pElRef > 200) || !(Number.isFinite(copRef) && copRef >= 1.5 && copRef <= 8)) {
+    if (!(Number.isFinite(pElRef) && pElRef > 200) || !(Number.isFinite(copRef) && copRef >= 1.2 && copRef <= 8)) {
       excludedGuardCount++;
       continue;
     }
@@ -203,10 +207,12 @@ writeDataJson(
       "l'inverse. pthRef stocké ici = P_th_h_ref [W] du CSV = P_th au point de référence (-7°C/52°C), " +
       "DÉJÀ en W (pas de conversion kW->W nécessaire, vérifié sur la plage CSV 2600-73840 W, " +
       "cohérente avec le README '2400 à 69880 W') ; pElRef en W également (plage CSV 881-36920 W). " +
-      "GARDES appliquées aux lignes réelles : pElRef fini > 200 W et copRef dans [1.5, 8] — les " +
+      "GARDES appliquées aux lignes réelles : pElRef fini > 200 W et copRef dans [1.2, 8] (plancher " +
+      "abaissé de 1.5 à 1.2 en revue : les lignes à COP_ref=1.4 exclues sous l'ancien plancher 1.5 " +
+      "sont une vraie famille Mitsubishi PXZ-5F85VG, cohérente en interne P_th_h_ref/P_el_h_ref/" +
+      "COP_ref — pas des données aberrantes) — les " +
       `lignes hors bornes sont EXCLUES du catalogue (${excludedGuardCount} lignes exclues à cette ` +
-      "conversion ; sur le CSV téléchargé le 2026-07-03, il s'agit de modèles à COP_ref = 1.4, " +
-      "juste sous le plancher de 1.5). " +
+      "conversion). " +
       "IMPORTANT (comportement EN14825 des PAC régulées, pas une anomalie de données) : hplib.py " +
       "(hplib_database.py ligne ~277) définit lui-même 'Regulated' comme les modèles dont P_th " +
       "déclaré N'EST PAS croissant avec la température extérieure sur les points EN14825 " +

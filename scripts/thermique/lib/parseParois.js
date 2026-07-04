@@ -45,6 +45,10 @@
 //    n'est PAS le U de la fenêtre (valeur de composant annexe : "2.00" alors que Uw=1.25).
 // Le texte "(Uw = X)" est tout de même extrait en corroboration quand il est présent : s'il
 // contredit la colonne 11, le bloc est rejeté plutôt que de publier une valeur douteuse.
+// ⚠ Cette corroboration textuelle ne couvre QUE les blocs fenêtre (FE./PF., texte "Uw = X").
+// Pour mur/plancher/plafond, un décalage de colonne qui laisserait un nombre plausible en
+// colonne 11 ne serait PAS détecté ici ; seul le garde-fou physique u∈[0.05,8] appliqué en
+// aval dans convert-parois-types.mjs sert alors de filet de sécurité.
 import { parseFrNumber } from './sourceFiles.js';
 
 const UW_RE = /Coefficients de la fen[eê]tre.*?\(\s*Uw\s*=\s*([\d.,]+)\s*\)/i;

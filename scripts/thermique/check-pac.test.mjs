@@ -30,7 +30,7 @@ test('références brutes : pElRef/copRef présents, bornés et cohérents entre
       continue;
     }
     assert.ok(Number.isFinite(p.pElRef) && p.pElRef > 200, `${p.modele}: pElRef=${p.pElRef}`);
-    assert.ok(Number.isFinite(p.copRef) && p.copRef >= 1.5 && p.copRef <= 8, `${p.modele}: copRef=${p.copRef}`);
+    assert.ok(Number.isFinite(p.copRef) && p.copRef >= 1.2 && p.copRef <= 8, `${p.modele}: copRef=${p.copRef}`);
     // Cohérence interne CSV : P_el_h_ref ≈ P_th_h_ref / COP_ref (mêmes conditions -7/52).
     assert.ok(
       Math.abs(p.pElRef - p.pthRef / p.copRef) / p.pElRef <= 0.01,
