@@ -46,7 +46,9 @@ export function segmentsDe(poly) {
 /** Erreurs de forme (tableau de messages FR, vide si valide). */
 export function validePolygone(poly) {
   const err = [];
-  if (!Array.isArray(poly) || poly.length < 4) return ['polygone : au moins 4 sommets requis (rectilinéaire fermé)'];
+  // < 3 (pas < 4) : un « polygone » à 3 sommets doit atteindre le contrôle d'angles droits
+  // pour produire le message précis « segment non rectiligne » (cf. test du plan).
+  if (!Array.isArray(poly) || poly.length < 3) return ['polygone : au moins 3 sommets requis'];
   for (const p of poly) {
     if (!Number.isInteger(p.x) || !Number.isInteger(p.y)) { err.push('coordonnées entières (cm) requises'); break; }
     if (p.x % GRILLE_CM !== 0 || p.y % GRILLE_CM !== 0) { err.push(`sommet hors grille ${GRILLE_CM} cm`); break; }
