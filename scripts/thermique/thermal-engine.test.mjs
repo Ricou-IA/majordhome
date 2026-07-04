@@ -1,7 +1,7 @@
 // scripts/thermique/thermal-engine.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculeUParoi, RSI_RSE } from '../../src/apps/thermique/lib/thermalEngine.js';
+import { calculeUParoi, RSI_RSE, transmissionPiece, POSTES } from '../../src/apps/thermique/lib/thermalEngine.js';
 
 test('calculeUParoi : mur parpaing + laine de verre + placo', () => {
   // Rsi+Rse mur vertical = 0.13+0.04 = 0.17 (EN ISO 6946)
@@ -35,4 +35,51 @@ test('calculeUParoi : erreurs propres', () => {
   // r ET e/lambda dans la même couche : ambigu → échec fort (erreur de saisie)
   assert.throws(() => calculeUParoi([{ r: 0.18, e: 0.1, lambda: 0.04 }], 'mur'), /ambiguë/);
   assert.throws(() => calculeUParoi([{ e: 0.1, lambda: 0.04, r: -1 }], 'mur'), /ambiguë/);
+  assert.throws(() => calculeUParoi([null], 'mur'), /thermique/);
+});
+
+test('transmissionPiece : séjour cas de référence (ΔUtb isolé en poste pontsThermiques)', () => {
+  // θint 20, θe −5 → ΔT 25.
+  // Mur ext :      10 m² × U 0.5 × b 1 × 25 = 125 W ; ΔUtb 0.1 → 10 × 0.1 × 1 × 25 = 25 W
+  // Fenêtre :       2 m² × U 1.3 × b 1 × 25 =  65 W ; ΔUtb 0.1 →  2 × 0.1 × 1 × 25 =  5 W
+  // Mur garage :    8 m² × U 0.5 × b 0.5 × 25 = 50 W ; ΔUtb 0.1 → 8 × 0.1 × 0.5 × 25 = 10 W
+  // Mitoyen même θ (b=0) : 12 m² × 2.0 × 0 = 0 W
+  // parPoste: murs 175, menuiseries 65, pontsThermiques 40 — total 280
+  const r = transmissionPiece({
+    thetaInt: 20, thetaExt: -5,
+    parois: [
+      { surface: 10, u: 0.5, b: 1, deltaUtb: 0.1, poste: 'murs' },
+      { surface: 2, u: 1.3, b: 1, deltaUtb: 0.1, poste: 'menuiseries' },
+      { surface: 8, u: 0.5, b: 0.5, deltaUtb: 0.1, poste: 'murs' },
+      { surface: 12, u: 2.0, b: 0, deltaUtb: 0, poste: 'murs' },
+    ],
+  });
+  assert.equal(r.total, 280);
+  assert.equal(r.parPoste.murs, 175);
+  assert.equal(r.parPoste.menuiseries, 65);
+  assert.equal(r.parPoste.pontsThermiques, 40);
+});
+
+test('transmissionPiece : ΔT interne (thetaAdjacente) — gain compté négatif, b ignoré', () => {
+  // 5 m² × 2.0 × (20−24) = −40 W
+  const r = transmissionPiece({
+    thetaInt: 20, thetaExt: -5,
+    parois: [{ surface: 5, u: 2.0, thetaAdjacente: 24, deltaUtb: 0, poste: 'murs' }],
+  });
+  assert.equal(r.total, -40);
+  assert.equal(r.parPoste.pontsThermiques ?? 0, 0); // pas de clé pontsThermiques si ΔUtb nul partout
+});
+
+test('transmissionPiece : erreurs propres', () => {
+  const base = { thetaInt: 20, thetaExt: -5 };
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 0, u: 1, b: 1, deltaUtb: 0, poste: 'murs' }] }), /thermique/);
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: -1, b: 1, deltaUtb: 0, poste: 'murs' }] }), /thermique/);
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, deltaUtb: 0, poste: 'murs' }] }), /thermique/); // ni b ni thetaAdjacente
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1, poste: 'murs' }] }), /thermique/);        // deltaUtb absent
+  assert.throws(() => transmissionPiece({ thetaInt: NaN, thetaExt: -5, parois: [] }), /thermique/);
+  assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1, deltaUtb: 0, poste: 'toiture' }] }), /thermique/); // poste hors POSTES
+});
+
+test('POSTES : liste canonique des postes du rapport', () => {
+  assert.deepEqual(POSTES, ['murs', 'menuiseries', 'plancherBas', 'plafondToiture', 'pontsThermiques', 'ventilation']);
 });
