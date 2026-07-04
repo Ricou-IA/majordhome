@@ -1,7 +1,7 @@
 // scripts/thermique/thermal-engine.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculeUParoi, RSI_RSE, transmissionPiece, POSTES } from '../../src/apps/thermique/lib/thermalEngine.js';
+import { calculeUParoi, RSI_RSE, transmissionPiece, POSTES, debitsParPiece, ventilationPiece, relancePiece } from '../../src/apps/thermique/lib/thermalEngine.js';
 
 test('calculeUParoi : mur parpaing + laine de verre + placo', () => {
   // Rsi+Rse mur vertical = 0.13+0.04 = 0.17 (EN ISO 6946)
@@ -83,8 +83,59 @@ test('transmissionPiece : erreurs propres', () => {
   assert.throws(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1.4, deltaUtb: 0, poste: 'murs' }] }), /thermique/);
   assert.doesNotThrow(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 1, deltaUtb: 0, poste: 'murs' }] }));
   assert.doesNotThrow(() => transmissionPiece({ ...base, parois: [{ surface: 1, u: 1, b: 0, deltaUtb: 0, poste: 'murs' }] }));
+  assert.throws(() => transmissionPiece({ thetaInt: 20, thetaExt: -5, parois: [null] }), /thermique/);
 });
 
 test('POSTES : liste canonique des postes du rapport', () => {
   assert.deepEqual(POSTES, ['murs', 'menuiseries', 'plancherBas', 'plafondToiture', 'pontsThermiques', 'ventilation']);
+});
+
+test('debitsParPiece : VMC — débit total réparti sur les pièces sèches au prorata du volume', () => {
+  // T3 → débit 75 m³/h (table plan 1), hygro facteurDebit 0.75 → 56.25 m³/h
+  // Pièces sèches : séjour 60 m³, chambre 30 m³ → séjour 37.5, chambre 18.75. Humides : 0.
+  const pieces = [
+    { id: 'sejour', volume: 60, humide: false },
+    { id: 'ch1', volume: 30, humide: false },
+    { id: 'sdb', volume: 12, humide: true },
+  ];
+  const d = debitsParPiece({ systeme: { id: 'vmc-sf-hygro', mode: 'debits', facteurDebit: 0.75, rendement: 0 },
+    debitTotal: 75, pieces });
+  assert.equal(d.sejour, 37.5);
+  assert.equal(d.ch1, 18.75);
+  assert.equal(d.sdb, 0);
+});
+
+test('debitsParPiece : naturelle — taux × volume par pièce', () => {
+  const pieces = [
+    { id: 'sejour', volume: 60, humide: false },
+    { id: 'sdb', volume: 12, humide: true },
+  ];
+  const d = debitsParPiece({ systeme: { id: 'naturelle', mode: 'taux', tauxParPiece: { defaut: 0.5, humide: 1.0 } },
+    debitTotal: null, pieces });
+  assert.equal(d.sejour, 30);  // 0.5 × 60
+  assert.equal(d.sdb, 12);     // 1.0 × 12
+});
+
+test('debitsParPiece : erreurs propres', () => {
+  const pieces = [{ id: 'a', volume: 10, humide: false }];
+  assert.throws(() => debitsParPiece({ systeme: { mode: 'debits' }, debitTotal: null, pieces }), /thermique/);
+  assert.throws(() => debitsParPiece({ systeme: { mode: 'debits' }, debitTotal: 75,
+    pieces: [{ id: 'sdb', volume: 12, humide: true }] }), /thermique/); // aucune pièce sèche
+  assert.throws(() => debitsParPiece({ systeme: { mode: 'autre' }, debitTotal: 75, pieces }), /thermique/);
+});
+
+test('ventilationPiece : ΦV = 0.34 × V̇ × ΔT × (1 − rendement DF)', () => {
+  // 37.5 m³/h × 0.34 × 25 = 318.75 W ; avec DF rendement 0.7 → 95.625 W
+  assert.equal(ventilationPiece({ debit: 37.5, thetaInt: 20, thetaExt: -5, rendement: 0 }), 318.75);
+  assert.equal(ventilationPiece({ debit: 37.5, thetaInt: 20, thetaExt: -5, rendement: 0.7 }), 95.625);
+  assert.equal(ventilationPiece({ debit: 0, thetaInt: 20, thetaExt: -5, rendement: 0 }), 0);
+  assert.throws(() => ventilationPiece({ debit: -1, thetaInt: 20, thetaExt: -5 }), /thermique/);
+  assert.throws(() => ventilationPiece({ debit: 10, thetaInt: 20, thetaExt: -5, rendement: 1.2 }), /thermique/); // rendement hors [0,1)
+});
+
+test('relancePiece : fRH × surface (0 si désactivée)', () => {
+  assert.equal(relancePiece({ surface: 20, fRH: 11 }), 220);
+  assert.equal(relancePiece({ surface: 20, fRH: 0 }), 0);
+  assert.throws(() => relancePiece({ surface: 0, fRH: 11 }), /thermique/);
+  assert.throws(() => relancePiece({ surface: 20, fRH: -1 }), /thermique/);
 });

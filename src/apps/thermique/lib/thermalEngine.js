@@ -54,6 +54,7 @@ export function transmissionPiece({ thetaInt, thetaExt, parois }) {
   const parPoste = {};
   let total = 0;
   for (const p of parois) {
+    if (p === null || typeof p !== 'object') throw new Error('thermique: paroi invalide (objet attendu)');
     if (!POSTES.includes(p.poste) || p.poste === 'pontsThermiques' || p.poste === 'ventilation') {
       throw new Error(`thermique: poste invalide « ${p.poste} »`);
     }
@@ -76,4 +77,48 @@ export function transmissionPiece({ thetaInt, thetaExt, parois }) {
     total += phiU + phiTb;
   }
   return { total, parPoste };
+}
+
+/**
+ * Répartition des débits de ventilation par pièce (m³/h).
+ * mode 'debits' (VMC) : l'air neuf entre par les pièces sèches → débit total × facteurDebit réparti
+ *   au prorata du volume des pièces sèches ; les pièces humides (extraction — l'air de transfert
+ *   arrive déjà à θint) sont à 0. Approche EN 12831 simplifiée assumée (spec §4).
+ * mode 'taux' (ventilation naturelle) : taux/h × volume, taux humide ≠ défaut.
+ * NB : le rendement du récupérateur (double flux) s'applique dans ventilationPiece, pas ici.
+ */
+export function debitsParPiece({ systeme, debitTotal, pieces }) {
+  const d = {};
+  if (systeme.mode === 'taux') {
+    for (const p of pieces) d[p.id] = (p.humide ? systeme.tauxParPiece.humide ?? 1.0 : systeme.tauxParPiece.defaut) * p.volume;
+    return d;
+  }
+  if (systeme.mode === 'debits') {
+    if (!Number.isFinite(debitTotal) || debitTotal <= 0) throw new Error('thermique: debitTotal requis en mode debits');
+    const seches = pieces.filter((p) => !p.humide);
+    const volSec = seches.reduce((s, p) => s + p.volume, 0);
+    if (volSec <= 0) throw new Error('thermique: aucune pièce sèche pour répartir la ventilation');
+    const debitEffectif = debitTotal * (systeme.facteurDebit ?? 1.0);
+    for (const p of pieces) d[p.id] = p.humide ? 0 : (debitEffectif * p.volume) / volSec;
+    return d;
+  }
+  throw new Error(`thermique: mode ventilation inconnu « ${systeme.mode} »`);
+}
+
+/** ΦV (W) = 0,34 Wh/(m³·K) × V̇ (m³/h) × ΔT (K) × (1 − rendement récupérateur). rendement ∈ [0,1). */
+export function ventilationPiece({ debit, thetaInt, thetaExt, rendement = 0 }) {
+  if (!Number.isFinite(debit) || debit < 0) throw new Error(`thermique: débit invalide (${debit})`);
+  if (!Number.isFinite(rendement) || rendement < 0 || rendement >= 1) throw new Error(`thermique: rendement hors [0,1) (${rendement})`);
+  if (!Number.isFinite(thetaInt) || !Number.isFinite(thetaExt)) throw new Error('thermique: θint/θext requis');
+  const brut = 0.34 * debit * (thetaInt - thetaExt) * (1 - rendement);
+  // Arrondi à 10 décimales : élimine le bruit d'arrondi IEEE 754 (ex. 1-0.7=0.30000000000000004)
+  // sans affecter la précision physique utile (Wh/m³·K a déjà 2 décimales significatives).
+  return Math.round(brut * 1e10) / 1e10;
+}
+
+/** Surpuissance de relance ΦRH (W) = fRH (W/m²) × surface. fRH = choix org/UI (EN 12831 annexe), 0 = désactivée. */
+export function relancePiece({ surface, fRH }) {
+  if (!Number.isFinite(surface) || surface <= 0) throw new Error(`thermique: surface invalide (${surface})`);
+  if (!Number.isFinite(fRH) || fRH < 0) throw new Error(`thermique: fRH invalide (${fRH})`);
+  return fRH * surface;
 }
