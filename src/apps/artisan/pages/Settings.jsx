@@ -82,7 +82,7 @@ export default function Settings() {
     {
       title: 'Thermique',
       icon: Thermometer,
-      description: 'Défauts de calcul des études de déperditions',
+      description: 'Paramètres de calcul des études de déperditions',
       href: '/settings/thermique',
       adminOnly: true,
     },
