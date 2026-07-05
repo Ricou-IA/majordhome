@@ -5,13 +5,32 @@
 import { supabase } from '@lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
 import { escapePostgrestSearchTerm } from '@lib/postgrestUtils';
+import { DEFAULT_PAGE_SIZE } from '@lib/constants';
 
 const VIEW = 'majordhome_thermal_studies';
 const LIST_COLUMNS = 'id, title, status, engine_version, client_id, lead_id, results, created_at, updated_at';
 
+/**
+ * Payload étude (camelCase wizard) → colonnes DB (snake_case).
+ * Champs absents (undefined) omis → update partiel OK, create inchangé.
+ * Allowlist implicite : org_id / created_by / id ne transitent jamais par un patch.
+ */
+function toRow({ title, clientId, leadId, input, results, engineVersion, status } = {}) {
+  const row = {
+    title: title === undefined ? undefined : (title || null),
+    client_id: clientId === undefined ? undefined : (clientId || null),
+    lead_id: leadId === undefined ? undefined : (leadId || null),
+    input,
+    results,
+    engine_version: engineVersion,
+    status,
+  };
+  return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
+}
+
 export const thermalService = {
   /** Liste paginée des études (recherche par titre). */
-  async list({ orgId, search = '', page = 0, pageSize = 25 }) {
+  async list({ orgId, search = '', page = 0, pageSize = DEFAULT_PAGE_SIZE }) {
     return withErrorHandling(async () => {
       let query = supabase
         .from(VIEW)
@@ -49,15 +68,17 @@ export const thermalService = {
       const { data, error } = await supabase
         .from(VIEW)
         .insert({
+          ...toRow({
+            title: title || null,
+            clientId: clientId || null,
+            leadId: leadId || null,
+            input,
+            results: results ?? null,
+            engineVersion,
+            status: status ?? 'draft',
+          }),
           org_id: orgId,
           created_by: userId,
-          title: title || null,
-          client_id: clientId || null,
-          lead_id: leadId || null,
-          input,
-          results: results ?? null,
-          engine_version: engineVersion,
-          status: status ?? 'draft',
         })
         .select('id')
         .single();
@@ -66,12 +87,16 @@ export const thermalService = {
     }, 'thermal.create');
   },
 
-  /** Met à jour partiellement une étude. */
+  /**
+   * Met à jour partiellement une étude.
+   * `patch` = payload camelCase, mêmes clés que create (title, clientId, leadId,
+   * input, results, engineVersion, status) — les champs absents ne sont pas touchés.
+   */
   async update(orgId, id, patch) {
     return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from(VIEW)
-        .update({ ...patch, updated_at: new Date().toISOString() })
+        .update({ ...toRow(patch), updated_at: new Date().toISOString() })
         .eq('org_id', orgId)
         .eq('id', id)
         .select('id')
