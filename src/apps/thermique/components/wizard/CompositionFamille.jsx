@@ -5,7 +5,10 @@
 // Chaque changement remonte la famille COMPLÈTE { mode, u } via onPatch → PATCH_COMPOSITIONS
 // (le reducer remplace la valeur de la famille — shape { mode, u } VERROUILLÉ, cf. wizardState.js :
 // c'est pourquoi la paroi bibliothèque choisie n'est PAS persistée, seul son U l'est ; la
-// sélection du <select> est un état local best-effort, ré-amorcé au remount par matching sur U).
+// sélection du <select> est un état local, ré-amorcé au remount par matching sur U SEULEMENT si
+// le match est unique — des U dupliqués existent dans les données réelles (ex. murs : 0.19 et
+// 0.15 partagés chacun par 2 parois) et un findIndex afficherait le mauvais nom au retour sur
+// l'étape ; sinon placeholder honnête, le U affiché en en-tête reste correct).
 // Exporte aussi InputU (input U commit-au-blur partagé avec Step3OuverturesCompositions :
 // menuiseries, exceptions par pièce, exceptions par ouverture).
 import { useEffect, useMemo, useState } from 'react';
@@ -91,8 +94,8 @@ export default function CompositionFamille({ famille, label, valeur, annee, onPa
 
   const [selIndex, setSelIndex] = useState(() => {
     if (valeur.mode !== 'bibliotheque' || !Number.isFinite(valeur.u)) return '';
-    const i = parois.findIndex((p) => p.u === valeur.u);
-    return i >= 0 ? String(i) : '';
+    const matches = parois.filter((p) => p.u === valeur.u);
+    return matches.length === 1 ? String(parois.indexOf(matches[0])) : '';
   });
 
   const setMode = (mode) => {

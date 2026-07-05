@@ -92,7 +92,11 @@ export default function Step3OuverturesCompositions({
     // et clampée [0, longueur − largeur] pour que l'ouverture tienne ENTIÈREMENT dans le mur.
     const piece = dessin.pieces.find((p) => p.id === sel.pieceId);
     const segment = piece ? segmentsDe(normalisePolygone(piece.polygone))[sel.segmentIndex] : null;
-    if (!segment) return; // pièce/segment introuvables (dessin modifié entre tap et pose) — no-op
+    if (!segment) {
+      // Pièce/segment introuvables (dessin modifié entre tap et pose) — échouer fort, pas en silence.
+      toast.error('Mur introuvable — reposez l’ouverture');
+      return;
+    }
     const position = positionOuvertureSnappee(segment, sel.position, l);
     if (position === null) {
       toast.error('Ouverture plus large que le mur');
