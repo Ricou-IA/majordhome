@@ -119,8 +119,10 @@ function GraphBivalence({ model, pac, machine, config }) {
             strokeDasharray="4 4"
             label={{ value: 'Bivalence', fontSize: 11, fill: '#b45309', position: 'top' }}
           />
-          <Line type="monotone" dataKey="besoin" name="Besoin" stroke="#334155" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="pacW" name="PAC" stroke="#3b82f6" strokeWidth={2} dot={false} />
+          {/* Sans animation : data recréé à chaque PATCH_PAC → la re-animation 1,5 s ferait
+              clignoter le graphe à chaque frappe (jank tablette). */}
+          <Line type="monotone" dataKey="besoin" name="Besoin" stroke="#334155" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="pacW" name="PAC" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -144,15 +146,21 @@ export default function PacSection({ pac, onPatchPac, model, config, pacCatalogu
     ? pacCatalogue.pacs.find((p) => pacId(p) === pac.pacId) ?? null
     : null;
 
+  // Index de recherche pré-normalisé UNE fois (NFD + strip accents sur les 9 247 entrées à
+  // chaque frappe serait coûteux) ; seule la requête est normalisée au filtrage.
+  const indexRecherche = useMemo(
+    () => pacCatalogue?.pacs.map((p) => ({ p, cle: normalise(`${p.fabricant} ${p.modele}`) })) ?? null,
+    [pacCatalogue],
+  );
+
   // Recherche fabricant + modèle normalisés, génériques en tête, 30 premiers résultats.
   const resultats = useMemo(() => {
-    if (!pacCatalogue) return [];
+    if (!indexRecherche) return [];
     const q = normalise(recherche.trim());
-    const liste = q === ''
-      ? pacCatalogue.pacs
-      : pacCatalogue.pacs.filter((p) => normalise(`${p.fabricant} ${p.modele}`).includes(q));
+    const liste = (q === '' ? indexRecherche : indexRecherche.filter((e) => e.cle.includes(q)))
+      .map((e) => e.p);
     return [...liste.filter((p) => p.generique), ...liste.filter((p) => !p.generique)].slice(0, 30);
-  }, [pacCatalogue, recherche]);
+  }, [indexRecherche, recherche]);
 
   const activeManuelle = () => {
     const patch = { mode: 'manuelle' };

@@ -48,7 +48,9 @@ export default function PlanResultats({ dessin, bilan }) {
   }, [bilan.pieces]);
   const couleurPiece = (piece) => {
     const r = parPiece.get(piece.id);
-    if (!r) return null;
+    // Pièce chauffée absente du bilan (mode figé R7 : pièce ajoutée après réouverture, bilan pas
+    // recalculé) → gris neutre — un fill absent rendrait le polygone NOIR (défaut SVG).
+    if (!r) return '#e2e8f0';
     const ratio = r.total / r.surface;
     const t = ratioMax > ratioMin ? (ratio - ratioMin) / (ratioMax - ratioMin) : 0.5;
     return couleurRatio(t);

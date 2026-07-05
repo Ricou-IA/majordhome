@@ -58,8 +58,11 @@ function Synthese({ bilan, thetaE, dept, periode, plage }) {
           <p className="text-2xl font-bold text-secondary-900">
             {(bilan.total / 1000).toFixed(1).replace('.', ',')} kW
           </p>
+          {/* Lecture défensive (même défense que parPoste?.[cle]) : un bilan figé d'un futur
+              moteur au shape différent doit afficher la bannière R7, pas jeter au rendu. */}
           <p className="text-xs text-secondary-500">
-            fourchette {fmtInt(bilan.fourchette.min)}–{fmtInt(bilan.fourchette.max)} W
+            fourchette {bilan.fourchette?.min != null ? fmtInt(bilan.fourchette.min) : '—'}
+            –{bilan.fourchette?.max != null ? fmtInt(bilan.fourchette.max) : '—'} W
           </p>
         </div>
         <div className="card">
