@@ -330,3 +330,11 @@ export const pvKeys = {
   list: (orgId, filters) => [...pvKeys.simulations(orgId), filters],
   detail: (orgId, id) => [...pvKeys.simulations(orgId), 'detail', id],
 };
+
+// --- Thermique (études de déperditions) ---
+export const thermalKeys = {
+  all: (orgId) => ['thermal', orgId],
+  studies: (orgId) => [...thermalKeys.all(orgId), 'studies'],
+  list: (orgId, filters) => [...thermalKeys.studies(orgId), filters],
+  detail: (orgId, id) => [...thermalKeys.studies(orgId), 'detail', id],
+};
