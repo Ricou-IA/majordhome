@@ -2,11 +2,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolvePeriode, uDefautPour, thetaBasePour, coefficientBPour, chercheCommunes } from '../../src/apps/thermique/lib/refDataResolvers.js';
+import { resolvePeriode, uDefautPour, thetaBasePour, coefficientBPour, chercheCommunes, djuDepartemental, debitVentilationPour, uwDepuisComposants } from '../../src/apps/thermique/lib/refDataResolvers.js';
 
 const uDefauts = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/u-defauts.json', import.meta.url), 'utf8'));
 const climat = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/climat.json', import.meta.url), 'utf8'));
 const coefB = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/coefficients-b.json', import.meta.url), 'utf8'));
+const ventilation = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/ventilation.json', import.meta.url), 'utf8'));
 
 test('resolvePeriode : bornes réelles des périodes 3CL', () => {
   assert.equal(resolvePeriode(1960), 'avant 1974');
@@ -68,4 +69,37 @@ test('chercheCommunes : par nom (insensible accents/casse) + dept', () => {
   assert.deepEqual(chercheCommunes(communes, undefined), []);
   // dept numérique (formulaires/JSON) coercé en chaîne
   assert.equal(chercheCommunes(communes, 'gaillac', 81).length, 1);
+});
+
+test('djuDepartemental : médiane des DJU non-null du département', () => {
+  const communes = [
+    { nom: 'A', dept: '81', dju: 1900 }, { nom: 'B', dept: '81', dju: 2100 },
+    { nom: 'C', dept: '81', dju: 2000 }, { nom: 'D', dept: '81', dju: null },
+    { nom: 'E', dept: '31', dju: 1500 },
+  ];
+  assert.equal(djuDepartemental(communes, '81'), 2000);          // médiane impaire
+  communes.push({ nom: 'F', dept: '81', dju: 2200 });
+  assert.equal(djuDepartemental(communes, '81'), 2050);          // paire → moyenne des 2 centraux
+  assert.throws(() => djuDepartemental(communes, '99'), /thermique/); // aucun DJU
+});
+
+test('debitVentilationPour : table réglementaire clampée [1, 7]', () => {
+  assert.equal(debitVentilationPour(ventilation, 'vmc-sf-auto', 3).debitTotal, 75);
+  assert.equal(debitVentilationPour(ventilation, 'vmc-sf-auto', 0).debitTotal, 35);   // clamp bas
+  assert.equal(debitVentilationPour(ventilation, 'vmc-sf-auto', 12).debitTotal, 135); // T7 reconduit
+  assert.equal(debitVentilationPour(ventilation, 'naturelle', 3).debitTotal, null);   // mode taux
+  assert.equal(debitVentilationPour(ventilation, 'naturelle', 3).systeme.mode, 'taux');
+  assert.equal(debitVentilationPour(ventilation, 'vmc-df', 4).systeme.rendement, 0.7);
+  assert.throws(() => debitVentilationPour(ventilation, 'vmc-triple-flux', 3), /thermique/);
+});
+
+test('uwDepuisComposants : forfait 0.7·Ug + 0.3·Uf, volet en résistance additionnelle', () => {
+  // Ug 1.1, Uf 1.5 → Uw = 0.7×1.1 + 0.3×1.5 = 0.77 + 0.45 = 1.22
+  const r = uwDepuisComposants({ ug: 1.1, uf: 1.5 });
+  assert.ok(Math.abs(r.uw - 1.22) < 1e-9);
+  assert.equal(r.ujn, null);
+  // Avec volet ΔR 0.25 : Ujn = 1/(1/1.22 + 0.25) = 1/1.06967… = 0.93487…
+  const v = uwDepuisComposants({ ug: 1.1, uf: 1.5, deltaR: 0.25 });
+  assert.ok(Math.abs(v.ujn - 1 / (1 / 1.22 + 0.25)) < 1e-9);
+  assert.throws(() => uwDepuisComposants({ ug: 0, uf: 1.5 }), /thermique/);
 });

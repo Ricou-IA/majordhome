@@ -89,3 +89,41 @@ export function chercheCommunes(communes, saisie, dept = null) {
     .filter((e) => e.nomNorm.startsWith(q) && (!d || e.ref.dept === d))
     .map((e) => e.ref);
 }
+
+/** DJU de repli départemental = MÉDIANE des DJU non-null du département (décision plan 4 R2). */
+export function djuDepartemental(communes, dept) {
+  const djus = communes.filter((c) => c.dept === String(dept) && Number.isFinite(c.dju))
+    .map((c) => c.dju).sort((a, b) => a - b);
+  if (djus.length === 0) throw new Error(`thermique: aucun DJU disponible pour le département ${dept}`);
+  const m = Math.floor(djus.length / 2);
+  return djus.length % 2 ? djus[m] : (djus[m - 1] + djus[m]) / 2;
+}
+
+/**
+ * Système + débit total réglementaire pour un type de ventilation et un nombre de pièces principales.
+ * Palier clampé aux bornes de la table (T7 reconduit au-delà — _meta.notes ventilation.json).
+ * @returns {{ systeme: object, debitTotal: number|null }} debitTotal null en mode 'taux'.
+ */
+export function debitVentilationPour(ventilation, systemeId, nbPiecesPrincipales) {
+  const systeme = ventilation.systemes.find((s) => s.id === systemeId);
+  if (!systeme) throw new Error(`thermique: système de ventilation inconnu « ${systemeId} »`);
+  if (systeme.mode === 'taux') return { systeme, debitTotal: null };
+  const table = ventilation.debitsExtraitsParTaille;
+  const n = Math.min(Math.max(1, nbPiecesPrincipales), table[table.length - 1].piecesPrincipales);
+  const row = table.find((r) => r.piecesPrincipales === n);
+  return { systeme, debitTotal: row.debitTotal };
+}
+
+/**
+ * Uw proposé depuis les composants menuiseries.json — forfait assumé (D3) :
+ * Uw ≈ 0.7·Ug + 0.3·Uf (répartition surfacique vitrage/châssis typique), sans ψ intercalaire.
+ * Volet : Ujn = 1/(1/Uw + ΔR) (résistance additionnelle fermée).
+ */
+export function uwDepuisComposants({ ug, uf, deltaR = null }) {
+  if (!Number.isFinite(ug) || ug <= 0 || !Number.isFinite(uf) || uf <= 0) {
+    throw new Error('thermique: ug et uf > 0 requis');
+  }
+  const uw = 0.7 * ug + 0.3 * uf;
+  const ujn = Number.isFinite(deltaR) && deltaR > 0 ? 1 / (1 / uw + deltaR) : null;
+  return { uw, ujn };
+}
