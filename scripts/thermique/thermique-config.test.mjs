@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { TYPES_PIECE, typePieceInfo, PLAGES_VRAISEMBLANCE, REGIMES_EAU,
   DIMENSIONS_OUVERTURES, DEFAULTS_THERMIQUE, buildThermiqueConfig }
   from '../../src/apps/thermique/lib/thermiqueConfig.js';
+import { resolvePeriode } from '../../src/apps/thermique/lib/refDataResolvers.js';
 
 test('TYPES_PIECE : flags cohérents avec D1/D2', () => {
   const principaux = TYPES_PIECE.filter((t) => t.principale).map((t) => t.id);
@@ -22,6 +23,20 @@ test('PLAGES_VRAISEMBLANCE : une plage par période 3CL, min < max, resserrées 
     assert.ok(p && p.min > 0 && p.min < p.max, l);
   }
   assert.ok(PLAGES_VRAISEMBLANCE['après 2012'].max < PLAGES_VRAISEMBLANCE['avant 1974'].max);
+});
+
+test('PLAGES_VRAISEMBLANCE : chaque label de resolvePeriode a une plage (invariant cross-module)', () => {
+  for (const y of [1960, 1976, 1980, 1985, 1995, 2003, 2010, 2020]) {
+    assert.ok(PLAGES_VRAISEMBLANCE[resolvePeriode(y)], String(y));
+  }
+});
+
+test('buildThermiqueConfig : settings.thermique malformé (string/array) → défauts propres', () => {
+  assert.deepEqual(buildThermiqueConfig({ thermique: 'nope' }), buildThermiqueConfig(undefined));
+  assert.deepEqual(buildThermiqueConfig({ thermique: [1, 2] }), buildThermiqueConfig(undefined));
+  const c = buildThermiqueConfig({ thermique: { theta_int_defauts: 'x', delta_utb: [0.1] } });
+  assert.equal(c.theta_int_defauts.sejour, 20);   // table malformée ignorée
+  assert.equal(c.delta_utb.iti, 0.10);
 });
 
 test('buildThermiqueConfig : défauts purs + merge org (deep sur les tables)', () => {

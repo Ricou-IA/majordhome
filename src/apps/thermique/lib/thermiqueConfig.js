@@ -57,13 +57,20 @@ export const DEFAULTS_THERMIQUE = Object.freeze({
   facteur_ajustement: 1.0,   // conso (apports gratuits/intermittence), à calibrer phase A/B
 });
 
-/** Config effective = défauts ⊕ settings.thermique (deep merge sur les 2 tables, shallow sinon). */
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Config effective = défauts ⊕ settings.thermique (deep merge sur les 2 tables, shallow sinon).
+ * settings.thermique / ses tables malformés (string, array) → ignorés (retour aux défauts). */
 export function buildThermiqueConfig(settings) {
-  const org = settings?.thermique ?? {};
+  const org = isPlainObject(settings?.thermique) ? settings.thermique : {};
+  const thetaOrg = isPlainObject(org.theta_int_defauts) ? org.theta_int_defauts : {};
+  const deltaOrg = isPlainObject(org.delta_utb) ? org.delta_utb : {};
   return {
     ...DEFAULTS_THERMIQUE,
     ...org,
-    theta_int_defauts: { ...DEFAULTS_THERMIQUE.theta_int_defauts, ...(org.theta_int_defauts ?? {}) },
-    delta_utb: { ...DEFAULTS_THERMIQUE.delta_utb, ...(org.delta_utb ?? {}) },
+    theta_int_defauts: { ...DEFAULTS_THERMIQUE.theta_int_defauts, ...thetaOrg },
+    delta_utb: { ...DEFAULTS_THERMIQUE.delta_utb, ...deltaOrg },
   };
 }
