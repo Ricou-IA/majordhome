@@ -35,10 +35,15 @@ export function PieceShape({ piece, selectionnee = false, enErreur = false, inte
 
   const patternId = `hachure-lnc-${piece.id}`;
 
-  let fillClassName = piece.chauffee ? 'fill-sky-100' : `fill-[url(#${patternId})]`;
+  // Remplissage : classes Tailwind pour les cas statiques uniquement — une classe arbitraire
+  // DYNAMIQUE (`fill-[url(#id)]`) n'est jamais extraite par le scanner Tailwind (pas de safelist
+  // dans ce repo) et rendrait le polygone en noir. Le pattern passe par l'attribut SVG direct.
+  let fillClassName = piece.chauffee ? 'fill-sky-100' : '';
+  let fillAttr = piece.chauffee ? undefined : `url(#${patternId})`;
   let strokeClassName = 'stroke-slate-500';
   if (enErreur) {
     fillClassName = 'fill-red-200';
+    fillAttr = undefined;
     strokeClassName = 'stroke-red-600';
   }
 
@@ -57,6 +62,7 @@ export function PieceShape({ piece, selectionnee = false, enErreur = false, inte
       )}
       <polygon
         points={points}
+        fill={fillAttr}
         className={`${fillClassName} ${strokeClassName} ${selectionnee ? 'stroke-blue-600' : ''}`}
         strokeWidth={(selectionnee ? 6 : 2) * echelle}
       />
