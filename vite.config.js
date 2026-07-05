@@ -22,6 +22,10 @@ export default defineConfig({
         // routes ne passent pas par le fallback. index.html est bien précaché par generateSW.
         navigateFallback: '/index.html',
         navigateFallbackAllowlist: [/^\/voice/],
+        // Gros chunks data du module Thermique (communes ~3.6 Mo, pac-catalogue ~4 Mo source),
+        // chargés en import() dynamique à la demande : exclus du precache SW (limite workbox
+        // 2 MiB, et inutile de les pousser à tous les users) — ils restent servis/cachés en HTTP.
+        globIgnores: ['**/communes-*.js', '**/pac-catalogue-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/[^/]+\.supabase\.co\/.*/i,
