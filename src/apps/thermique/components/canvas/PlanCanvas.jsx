@@ -1,5 +1,5 @@
 // src/apps/thermique/components/canvas/PlanCanvas.jsx
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   boiteEnglobante,
   pointDansPolygone,
@@ -74,13 +74,10 @@ function pointeurVersCm(event, svgEl) {
  * décomposition, adjacences…) est en revanche testée exhaustivement côté `node:test` dans
  * `canvasGeometry.js`/`geometryEngine.js` — ce composant ne fait que les appeler.
  *
- * Dette plan 4 (issues de la revue de code, à câbler au plan 4) :
- * - `enErreur` de PieceShape à brancher sur les erreurs de `valideDessin` (dessinOps.js) —
- *   actuellement toujours `false` ;
- * - guards/error-boundary autour de `boiteEnglobante`/`normalisePolygone`/`intervalleAxial`
- *   (elles throw 'thermique:' sur un dessin corrompu — l'UI wizard doit encaisser) ;
- * - ids de `<pattern>` via `useId` si plusieurs instances de PlanCanvas coexistent un jour
- *   (collision d'ids DOM globaux) ;
+ * Dette plan 3 soldée au plan 4 (Task 12) : `enErreur` branché via la prop `piecesEnErreur`
+ * (Set d'ids calculé par le wizard) ; error boundary côté wizard (`CanvasErrorBoundary`) ;
+ * ids de `<pattern>` via `useId` (multi-instance : étape 2 + futur plan résultats).
+ * Dette restante (plan 5) :
  * - centroïde d'AIRE (pas de sommets) pour le libellé des formes en L/U ;
  * - re-sélection/édition des ouvertures existantes (tap sur un OuvertureMarker).
  *
@@ -98,9 +95,17 @@ function pointeurVersCm(event, svgEl) {
  *   (jamais de mutation de la prop `dessin` — un nouvel objet est toujours construit)
  * @param {(selection: Object) => void} props.onSelect callback de sélection/désignation (voir
  *   modes ci-dessus pour la forme exacte de l'objet remonté)
+ * @param {Set<*>} [props.piecesEnErreur] ids des pièces à teinter en erreur (calculés par le
+ *   wizard — ce composant ne valide rien lui-même, il ne fait qu'afficher). Défaut : Set vide.
  */
-export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, onSelect }) {
+export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, onSelect, piecesEnErreur }) {
   const svgRef = useRef(null);
+  // Ids des <pattern> de grille uniques par instance (useId — plusieurs PlanCanvas coexistent :
+  // étape 2 du wizard + futur plan des résultats). Colons de useId strippés par prudence
+  // (référencés dans des url(#…) SVG).
+  const uid = useId().replace(/:/g, '');
+  const grilleMineureId = `grille-mineure-${uid}`;
+  const grilleMajeureId = `grille-majeure-${uid}`;
   // { pointerId, p1: {x,y}, p2: {x,y} } en cm, transitoire. `pointerId` identifie le doigt/
   // stylet/souris qui a initié le drag : les événements des AUTRES pointeurs (multi-touch) sont
   // ignorés tant que ce drag est actif.
@@ -229,16 +234,16 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
         <defs>
           {/* Grille 10 cm imbriquée dans une grille majeure 1 m — deux <pattern> simples plutôt
               qu'un calcul de zoom dynamique (garde le composant mince, cf. requirement Task 8). */}
-          <pattern id="grille-mineure" width="10" height="10" patternUnits="userSpaceOnUse">
+          <pattern id={grilleMineureId} width="10" height="10" patternUnits="userSpaceOnUse">
             <path d="M 10 0 L 0 0 0 10" fill="none" className="stroke-slate-200" strokeWidth="0.5" />
           </pattern>
-          <pattern id="grille-majeure" width="100" height="100" patternUnits="userSpaceOnUse">
-            <rect width="100" height="100" fill="url(#grille-mineure)" />
+          <pattern id={grilleMajeureId} width="100" height="100" patternUnits="userSpaceOnUse">
+            <rect width="100" height="100" fill={`url(#${grilleMineureId})`} />
             <path d="M 100 0 L 0 0 0 100" fill="none" className="stroke-slate-300" strokeWidth="1" />
           </pattern>
         </defs>
 
-        <rect x={boite.x} y={boite.y} width={boite.largeur} height={boite.hauteur} fill="url(#grille-majeure)" />
+        <rect x={boite.x} y={boite.y} width={boite.largeur} height={boite.hauteur} fill={`url(#${grilleMajeureId})`} />
 
         {/* Niveau inférieur en filigrane — repère de superposition, non interactif. */}
         {piecesNiveauInferieur.map((piece) => (
@@ -251,7 +256,7 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
             key={piece.id}
             piece={piece}
             selectionnee={pieceSelectionnee?.id === piece.id}
-            enErreur={false}
+            enErreur={!!piecesEnErreur?.has(piece.id)}
             echelle={echelle}
           />
         ))}

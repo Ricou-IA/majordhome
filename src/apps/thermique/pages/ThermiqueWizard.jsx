@@ -2,7 +2,7 @@
 // Orchestrateur du wizard d'étude de déperditions — 4 étapes (pattern Simulateur.jsx Solaire).
 // State machine useReducer (wizardState.js, pur), brouillon localStorage debounce 1 s,
 // rechargement ?etude=<id> (LOAD_STUDY), pré-remplissage ?client=<id>.
-// Étapes 2/3/4 : placeholders — livrées Tasks 12/13/14.
+// Étapes 3/4 : placeholders — livrées Tasks 13/14.
 import { useReducer, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { buildThermiqueConfig } from '../lib/thermiqueConfig';
 import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } from '../lib/wizardState';
 import { valideDessin } from '../lib/dessinOps';
 import Step1Contexte from '../components/wizard/Step1Contexte';
+import Step2Dessin from '../components/wizard/Step2Dessin';
 
 const STEPS = [
   { n: 1, label: 'Contexte' },
@@ -140,6 +141,9 @@ function WizardInner({ config }) {
   const handleNew = () => {
     clearDraft(userId);
     if (etudeId || clientId) setSearchParams({}, { replace: true });
+    // Autorise le rechargement de l'étude si on y revient (bouton précédent du navigateur
+    // après « Nouvelle » : sans ce reset, la garde one-shot de LOAD_STUDY bloquerait).
+    loadedStudyIdRef.current = null;
     setCommuneInitialQuery('');
     dispatch({ type: 'RESET', config });
   };
@@ -239,7 +243,14 @@ function WizardInner({ config }) {
           onCommune={({ commune, dju, djuFallback }) => dispatch({ type: 'SET_COMMUNE', commune, dju, djuFallback })}
         />
       )}
-      {state.step > 1 && (
+      {state.step === 2 && (
+        <Step2Dessin
+          dessin={state.dessin}
+          config={config}
+          onDessinChange={(dessin) => dispatch({ type: 'SET_DESSIN', dessin })}
+        />
+      )}
+      {state.step > 2 && (
         <div className="card text-center py-12 text-secondary-500 text-sm">
           Étape « {STEPS[state.step - 1].label} » — (étape livrée séparément)
         </div>
