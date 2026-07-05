@@ -12,6 +12,7 @@ import {
   Truck,
   Calculator,
   Sun,
+  Thermometer,
 } from 'lucide-react';
 
 // =============================================================================
@@ -76,6 +77,13 @@ export default function Settings() {
       icon: Sun,
       description: 'Paramètres du calculateur photovoltaïque et grille de coûts',
       href: '/settings/solaire',
+      adminOnly: true,
+    },
+    {
+      title: 'Thermique',
+      icon: Thermometer,
+      description: 'Défauts de calcul des études de déperditions',
+      href: '/settings/thermique',
       adminOnly: true,
     },
     {

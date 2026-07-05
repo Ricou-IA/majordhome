@@ -25,6 +25,7 @@ const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagemen
 const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'));
 const SolaireSettings = lazy(() => import('./pages/settings/SolaireSettings'));
+const ThermiqueSettings = lazy(() => import('./pages/settings/ThermiqueSettings'));
 
 // Certificat
 const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
@@ -57,6 +58,10 @@ const MetaAds = lazy(() => import('./pages/MetaAds'));
 // Solaire (calculateur PV)
 const SolaireSimulateur = lazy(() => import('@apps/solaire/pages/Simulateur'));
 const SolaireHistorique = lazy(() => import('@apps/solaire/pages/Historique'));
+
+// Thermique (étude de déperditions)
+const ThermiqueWizard = lazy(() => import('@apps/thermique/pages/ThermiqueWizard'));
+const ThermiqueHistorique = lazy(() => import('@apps/thermique/pages/ThermiqueHistorique'));
 
 // =============================================================================
 // LOADING COMPONENT
@@ -288,6 +293,16 @@ export const artisanRoutes = [
     ),
   },
   {
+    path: 'settings/thermique',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <ThermiqueSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
     path: 'profile',
     element: (
       <SuspenseWrapper>
@@ -410,6 +425,26 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="pv_calculator">
           <SolaireHistorique />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'thermique',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="thermal_study">
+          <ThermiqueWizard />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'thermique/historique',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="thermal_study">
+          <ThermiqueHistorique />
         </RouteGuard>
       </SuspenseWrapper>
     ),

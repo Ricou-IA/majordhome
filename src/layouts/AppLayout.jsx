@@ -32,6 +32,7 @@ import {
   Megaphone,
   Sun,
   ShoppingCart,
+  Thermometer,
 } from 'lucide-react';
 
 // =============================================================================
@@ -55,6 +56,7 @@ const navigation = [
   { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
   { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator' },
+  { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study' },
 ];
 
 // =============================================================================
