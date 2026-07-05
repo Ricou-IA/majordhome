@@ -6,8 +6,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  bLncParPiece, resoudParoi, bPlancherBasPour,
+  bLncParPiece, resoudParoi, bPlancherBasPour, assembleBatiment,
 } from '../../src/apps/thermique/lib/assembleBatiment.js';
+import { calculeBatiment } from '../../src/apps/thermique/lib/thermalEngine.js';
+import {
+  DONNEES_MAISON, dessinMaison, contexteMaison, compositionsMaison, reglagesMaison,
+} from './lib/fixtureMaison.mjs';
 
 const U_DEFAUTS = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/u-defauts.json', import.meta.url), 'utf8'));
 const COEFF_B = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/coefficients-b.json', import.meta.url), 'utf8'));
@@ -184,4 +188,94 @@ test('resoudParoi : U de menuiserie manquant → erreur listée, pas de throw', 
   const { paroi, erreur } = resoudParoi({ type: 'fenetre', surfaceM2: 1.5, pieceId: 'sejour' }, ctx);
   assert.equal(paroi, null);
   assert.match(erreur, /U manquant/);
+});
+
+// ── assembleBatiment : orchestration complète sur la maison de référence ──
+// Valeurs d'or dérivées à la main (voir integration-dessin-bilan.test.mjs, plan 3 Task 10) :
+// maison 1960, VMC SF auto (2 pièces principales → 60 m³/h), ΔUtb 0.1 (ITI), θe −5.
+
+const proche = (reel, attendu, label) =>
+  assert.ok(Math.abs(reel - attendu) < 1e-9, `${label}: obtenu ${reel}, attendu ${attendu}`);
+
+function assemble(overrides = {}) {
+  return assembleBatiment(dessinMaison(overrides.dessin ?? {}), {
+    data: DONNEES_MAISON,
+    contexte: contexteMaison(overrides.contexte ?? {}),
+    compositions: compositionsMaison(overrides.compositions ?? {}),
+    reglages: reglagesMaison(overrides.reglages ?? {}),
+  });
+}
+
+test('assembleBatiment : maison de référence — bâtiment résolu conforme', () => {
+  const { batiment, thetaE, erreurs, avertissements } = assemble();
+  assert.deepEqual(erreurs, []);
+  assert.deepEqual(avertissements, []);
+  assert.equal(thetaE, -5);
+  assert.equal(batiment.thetaExt, -5);
+  assert.equal(batiment.debitTotal, 60);
+  assert.equal(batiment.systemeVentilation.id, 'vmc-sf-auto');
+  assert.equal(batiment.fRH, 0);
+  assert.deepEqual(batiment.plageVraisemblance, { min: 60, max: 220 }); // « avant 1974 »
+  assert.deepEqual(batiment.pieces.map((p) => p.id), ['sejour', 'cuisine', 'chambre']);
+  assert.deepEqual(batiment.pieces.map((p) => p.humide), [false, true, false]);
+  assert.deepEqual(batiment.pieces.map((p) => p.volume), [50, 30, 50]); // D8
+  assert.deepEqual(batiment.pieces.map((p) => p.parois.length), [6, 5, 5]);
+});
+
+test('assembleBatiment → calculeBatiment : bilan complet reproduit les valeurs d’or', () => {
+  const { batiment } = assemble();
+  const r = calculeBatiment(batiment);
+  const [sejour, cuisine, chambre] = r.pieces;
+
+  proche(sejour.total, 3577.975, 'total séjour');
+  proche(cuisine.total, 2671, 'total cuisine');
+  assert.equal(cuisine.ventilation, 0); // humide, mode debits → extraction
+  proche(chambre.total, 3762.8, 'total chambre');
+
+  proche(r.total, 10011.775, 'total bâtiment');
+  proche(r.parPoste.murs, 5986.5625, 'murs');
+  proche(r.parPoste.menuiseries, 223.9125, 'menuiseries');
+  proche(r.parPoste.plancherBas, 1600, 'plancherBas');
+  proche(r.parPoste.plafondToiture, 1330, 'plafondToiture');
+  proche(r.parPoste.pontsThermiques, 381.7, 'pontsThermiques');
+  proche(r.parPoste.ventilation, 489.6, 'ventilation');
+  proche(r.gv, 10011.775 / (1000 / 52 + 5), 'gv');
+  proche(r.ratioWm2, 10011.775 / 52, 'ratioWm2');
+  assert.equal(r.alerteVraisemblance, false); // 192.5 W/m² ∈ [60, 220]
+  proche(r.pieces.reduce((s, p) => s + p.total, 0), r.total, 'Σ pièces');
+});
+
+test('assembleBatiment : le garage (3 murs ext) est mappé b 0.8 sur la paroi LNC de la cuisine', () => {
+  const { batiment } = assemble();
+  const cuisine = batiment.pieces.find((p) => p.id === 'cuisine');
+  const lnc = cuisine.parois.find((p) => p.type === 'mur-lnc');
+  assert.equal(lnc.b, 0.8); // b du garage (3 murs extérieurs) appliqué à la paroi LNC
+  assert.equal(lnc.poste, 'murs');
+});
+
+test('assembleBatiment : ventilation naturelle (mode taux) — la cuisine ventile aussi', () => {
+  const { batiment } = assemble({ contexte: { typeVentilation: 'naturelle' } });
+  assert.equal(batiment.systemeVentilation.mode, 'taux');
+  assert.equal(batiment.debitTotal, null);
+  const r = calculeBatiment(batiment);
+  // séjour 0.5×50×0.34×25 = 212.5 · cuisine (humide, taux 1.0) 1.0×30×0.34×25 = 255 ·
+  // chambre 0.5×50×0.34×23 = 195.5 → total ventilation 663 W (la cuisine ventile, ≠ mode debits).
+  proche(r.parPoste.ventilation, 663, 'ventilation naturelle');
+  assert.ok(r.pieces.find((p) => p.id === 'cuisine').ventilation > 0);
+});
+
+test('assembleBatiment : pièce chauffée sans θint → erreur listée, batiment null', () => {
+  const dessin = dessinMaison();
+  dessin.pieces.find((p) => p.id === 'chambre').thetaInt = null;
+  const { batiment, erreurs } = assembleBatiment(dessin, {
+    data: DONNEES_MAISON, contexte: contexteMaison(), compositions: compositionsMaison(), reglages: reglagesMaison(),
+  });
+  assert.equal(batiment, null);
+  assert.ok(erreurs.some((e) => /consigne manquante/.test(e)));
+});
+
+test('assembleBatiment : U fenêtre manquant → erreur listée, batiment null', () => {
+  const { batiment, erreurs } = assemble({ compositions: { uFenetre: null } });
+  assert.equal(batiment, null);
+  assert.ok(erreurs.some((e) => /U manquant/.test(e)));
 });

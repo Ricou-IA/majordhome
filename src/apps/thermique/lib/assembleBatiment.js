@@ -2,8 +2,9 @@
 // L'ASSEMBLEUR (plan 4) : dessin (plan 3) + données de référence (plan 1) + choix wizard
 // → bâtiment résolu pour calculeBatiment (plan 2). Module PUR (aucun import React/Supabase ni JSON).
 // Formalise D1-D11 de docs/thermique-plan4-handoff.md — chaque règle est marquée « Dn ».
-import { adjacencesNiveau } from './geometryEngine.js';
-import { uDefautPour, coefficientBPour } from './refDataResolvers.js';
+import { adjacencesNiveau, deduireParois, surfaceCm2 } from './geometryEngine.js';
+import { uDefautPour, coefficientBPour, resolvePeriode, thetaBasePour, debitVentilationPour } from './refDataResolvers.js';
+import { typePieceInfo, PLAGES_VRAISEMBLANCE } from './thermiqueConfig.js';
 
 // D4 : libellés exacts de coefficients-b.json (catégorie « Pièce »), vérifiés par test contre le JSON.
 const B_PIECE = {
@@ -134,4 +135,104 @@ export function bPlancherBasPour(coefficientsB, plancherBasType, sousSolAvecOuve
       sousSolAvecOuvertures ? 'Avec fenêtres ou portes extérieures' : 'Sans fenêtre ni porte extérieure');
   }
   return 1; // terre-plein (pas d'ISO 13370 v1 — assumé)
+}
+
+/**
+ * L'ASSEMBLEUR : dessin + données + choix → entrée de calculeBatiment (plan 2).
+ * @param {object} dessin — modèle plan 3 (le wizard a déjà affecté typePiece + thetaInt, R1)
+ * @param {object} options
+ *   data:        { climat, uDefauts, coefficientsB, ventilation }   (JSON du plan 1)
+ *   contexte:    { dept, altitude, annee, typeVentilation, isolation, combleIsolation,
+ *                  sousSolAvecOuvertures?, relance }
+ *   compositions:{ familles: { murs|plancherBas|plafondToiture: {mode, u}, fenetre|porteFenetre|porte: {u} },
+ *                  exceptions: { parois: {'pieceId:famille': {u}}, ouvertures: {ouvertureId: {u}} } }
+ *   reglages:    { deltaUtb (table par isolation), fRH }
+ * @returns {{ batiment: object|null, thetaE: number|null, parois: object[],
+ *   erreurs: string[], avertissements: string[] }} — batiment null si erreurs bloquantes
+ *   (l'UI affiche la liste, jamais de throw pour un problème d'étude).
+ */
+export function assembleBatiment(dessin, options) {
+  const { data, contexte, compositions, reglages } = options;
+  const erreurs = [];
+  const avertissements = [];
+
+  // 1. Géométrie (les erreurs/avertissements du dessin remontent tels quels)
+  const geo = deduireParois(dessin);
+  erreurs.push(...geo.erreurs);
+  avertissements.push(...geo.avertissements);
+
+  // 2. θe — ne destructurer QUE thetaE (forme transitoire, cf. passation)
+  let thetaE = null;
+  try {
+    thetaE = thetaBasePour(data.climat, contexte.dept, contexte.altitude).thetaE;
+  } catch (e) {
+    erreurs.push(e.message);
+  }
+
+  // 3. Pièces chauffées (θint obligatoire — R1)
+  const chauffees = dessin.pieces.filter((p) => p.chauffee);
+  if (chauffees.length === 0) erreurs.push('aucune pièce chauffée — dessinez au moins une pièce chauffée');
+  const thetaIntParPiece = new Map();
+  for (const p of chauffees) {
+    if (!Number.isFinite(p.thetaInt)) erreurs.push(`« ${p.nom ?? p.id} » : température de consigne manquante`);
+    else thetaIntParPiece.set(p.id, p.thetaInt);
+  }
+
+  // 4. Contexte de résolution des parois
+  const { bParPiece, avertissements: avB } = bLncParPiece(dessin, data.coefficientsB);
+  avertissements.push(...avB);
+  const deltaUtb = reglages.deltaUtb[contexte.isolation];
+  if (!Number.isFinite(deltaUtb)) erreurs.push(`type d'isolation inconnu « ${contexte.isolation} »`);
+  const ctx = {
+    annee: contexte.annee, uDefauts: data.uDefauts, coefficientsB: data.coefficientsB,
+    compositions, deltaUtb: deltaUtb ?? 0, bParPieceLnc: bParPiece, thetaIntParPiece,
+    combleIsolation: contexte.combleIsolation,
+    bPlancherBas: bPlancherBasPour(data.coefficientsB, dessin.plancherBasType, contexte.sousSolAvecOuvertures),
+  };
+
+  // 5. Résolution des parois, groupées par pièce
+  const paroisResolues = [];
+  const paroisParPiece = new Map(chauffees.map((p) => [p.id, []]));
+  const erreursU = new Set(); // dédup : 1 message par famille manquante
+  for (const paroi of geo.parois) {
+    if (!paroisParPiece.has(paroi.pieceId)) continue; // paroi d'une pièce non chauffée : rien à faire
+    const { paroi: resolue, erreur } = resoudParoi(paroi, ctx);
+    if (erreur) { erreursU.add(erreur.replace(/\(paroi .*\)$/, '').trim()); continue; }
+    paroisParPiece.get(paroi.pieceId).push(resolue);
+    paroisResolues.push(resolue);
+  }
+  erreurs.push(...erreursU);
+
+  // 6. Ventilation (D1) : pièces principales chauffées, palier clampé
+  let systemeVentilation = null;
+  let debitTotal = null;
+  try {
+    const nbPrincipales = chauffees.filter((p) => typePieceInfo(p.typePiece).principale).length;
+    ({ systeme: systemeVentilation, debitTotal } =
+      debitVentilationPour(data.ventilation, contexte.typeVentilation, Math.max(1, nbPrincipales)));
+  } catch (e) {
+    erreurs.push(e.message);
+  }
+
+  if (erreurs.length > 0) return { batiment: null, thetaE, parois: paroisResolues, erreurs, avertissements };
+
+  // 7. Bâtiment résolu
+  const hauteurParNiveau = new Map(dessin.niveaux.map((n) => [n.id, n.hauteur]));
+  const batiment = {
+    thetaExt: thetaE,
+    systemeVentilation,
+    debitTotal,
+    fRH: contexte.relance ? reglages.fRH : 0, // R4
+    plageVraisemblance: PLAGES_VRAISEMBLANCE[resolvePeriode(contexte.annee)], // R3
+    pieces: chauffees.map((p) => {
+      const surface = surfaceCm2(p.polygone) / 10000;                       // cm² → m²
+      const volume = surface * (hauteurParNiveau.get(p.niveauId) / 100);    // D8
+      return {
+        id: p.id, nom: p.nom, surface, volume, thetaInt: p.thetaInt,
+        humide: typePieceInfo(p.typePiece).humide,                          // D2
+        parois: paroisParPiece.get(p.id),
+      };
+    }),
+  };
+  return { batiment, thetaE, parois: paroisResolues, erreurs, avertissements };
 }
