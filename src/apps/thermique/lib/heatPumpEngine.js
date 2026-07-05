@@ -54,6 +54,14 @@ export function courbeCharge({ phiTotal, thetaBase, thetaNC }) {
   return (theta) => Math.max(0, (phiTotal * (thetaNC - theta)) / (thetaNC - thetaBase));
 }
 
+/** Filtre les points manuels exploitables par le moteur (mêmes règles que verifPointsManuels,
+ * SANS throw) — pour l'UI (Task 14 plan 4) : assainir une saisie en cours avant buildEtudeModel
+ * (un point incomplet ferait lever pointBivalence pendant la frappe). */
+export function pointsManuelsValides(points) {
+  return (Array.isArray(points) ? points : [])
+    .filter((pt) => pt && Number.isFinite(pt.tExt) && Number.isFinite(pt.pTh) && pt.pTh > 0);
+}
+
 function verifPointsManuels(points) {
   if (!Array.isArray(points) || points.length < 2) {
     throw new Error('thermique: pac manuelle doit avoir ≥ 2 points {tExt, pTh}');
@@ -65,8 +73,10 @@ function verifPointsManuels(points) {
   }
 }
 
-/** P_th (W) d'une PAC manuelle par interpolation linéaire sur les points constructeur, clampée aux extrêmes. */
-function pThManuelle(points, tExt) {
+/** P_th (W) d'une PAC manuelle par interpolation linéaire sur les points constructeur, clampée aux
+ * extrêmes. Exportée pour la série PAC du graphe de bivalence (PacSection, Task 14 plan 4) — même
+ * interpolation que le moteur, pas de duplication côté UI. */
+export function pThManuelle(points, tExt) {
   const tries = [...points].sort((a, b) => a.tExt - b.tExt);
   if (tExt <= tries[0].tExt) return tries[0].pTh;
   const dernier = tries[tries.length - 1];

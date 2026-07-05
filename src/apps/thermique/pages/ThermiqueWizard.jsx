@@ -2,7 +2,7 @@
 // Orchestrateur du wizard d'étude de déperditions — 4 étapes (pattern Simulateur.jsx Solaire).
 // State machine useReducer (wizardState.js, pur), brouillon localStorage debounce 1 s,
 // rechargement ?etude=<id> (LOAD_STUDY), pré-remplissage ?client=<id>.
-// Étape 4 : placeholder — livrée Task 14.
+// Étape 4 (Step4Resultats) : résultats + PAC + sauvegarde DB (create/update via studyId).
 import { useReducer, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import { valideDessin } from '../lib/dessinOps';
 import Step1Contexte from '../components/wizard/Step1Contexte';
 import Step2Dessin from '../components/wizard/Step2Dessin';
 import Step3OuverturesCompositions from '../components/wizard/Step3OuverturesCompositions';
+import Step4Resultats from '../components/wizard/Step4Resultats';
 
 const STEPS = [
   { n: 1, label: 'Contexte' },
@@ -264,9 +265,14 @@ function WizardInner({ config }) {
         />
       )}
       {state.step === 4 && (
-        <div className="card text-center py-12 text-secondary-500 text-sm">
-          Étape « {STEPS[state.step - 1].label} » — (étape livrée séparément)
-        </div>
+        <Step4Resultats
+          state={state}
+          config={config}
+          onPatchPac={(patch) => dispatch({ type: 'PATCH_PAC', patch })}
+          onClearSavedResults={() => dispatch({ type: 'CLEAR_SAVED_RESULTS' })}
+          onStudyId={(studyId) => dispatch({ type: 'SET_STUDY_ID', studyId })}
+          onBackToDessin={() => goToStep(2)}
+        />
       )}
 
       {/* Navigation Précédent / Suivant */}

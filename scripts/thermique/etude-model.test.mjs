@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildEtudeModel, ENGINE_VERSION, pacId } from '../../src/apps/thermique/lib/etudeModel.js';
+import { buildEtudeModel, ENGINE_VERSION, pacId, resultsPersistables } from '../../src/apps/thermique/lib/etudeModel.js';
 import { assembleBatiment } from '../../src/apps/thermique/lib/assembleBatiment.js';
 import { calculeBatiment } from '../../src/apps/thermique/lib/thermalEngine.js';
 import { buildThermiqueConfig } from '../../src/apps/thermique/lib/thermiqueConfig.js';
@@ -89,6 +89,15 @@ test('buildEtudeModel : PAC catalogue mais catalogue non chargé → pac null (r
   const model = buildEtudeModel(etude({ mode: 'catalogue', pacId: pacId(pac), regime: 45 }), env(null));
   assert.equal(model.ok, true);
   assert.equal(model.pac, null);
+});
+
+test('resultsPersistables : ne persiste que bilan + thetaE + pac (parois exclues)', () => {
+  const model = buildEtudeModel(etude(null), env(null));
+  const r = resultsPersistables(model);
+  assert.deepEqual(Object.keys(r).sort(), ['bilan', 'pac', 'thetaE']);
+  assert.equal(r.bilan, model.bilan);   // pas de copie : le résultat est sérialisé tel quel
+  assert.equal(r.thetaE, model.thetaE);
+  assert.equal(r.pac, null);
 });
 
 test('buildEtudeModel : dessin invalide (pièce chauffée sans θint) → ok false, bilan null', () => {

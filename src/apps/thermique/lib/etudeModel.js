@@ -12,6 +12,15 @@ export function pacId(pac) {
   return `${pac.fabricant}|${pac.modele}`;
 }
 
+/**
+ * Sous-ensemble du modèle persisté dans thermal_studies.results (Task 14) — vit ici (et pas dans
+ * wizardState.js) car son shape dérive du modèle, à côté d'ENGINE_VERSION qui le versionne.
+ * Les parois sont EXCLUES : re-dérivables du `input` persisté via buildEtudeModel.
+ */
+export function resultsPersistables(model) {
+  return { bilan: model.bilan, thetaE: model.thetaE, pac: model.pac };
+}
+
 function resolvePac(pac, pacCatalogue) {
   if (!pac || !pac.mode) return null;
   if (pac.mode === 'manuelle') {

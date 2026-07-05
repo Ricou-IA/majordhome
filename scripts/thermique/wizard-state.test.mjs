@@ -141,6 +141,29 @@ test('PATCH_PAC : merge partiel', () => {
   assert.equal(s.pac.prixKwh, 0.25); // le reste survit
 });
 
+test('SET_STUDY_ID : pose studyId sans toucher au reste', () => {
+  const before = frozen();
+  const s = wizardReducer(before, { type: 'SET_STUDY_ID', studyId: 'etude-42' });
+  assert.equal(s.studyId, 'etude-42');
+  assert.equal(s.contexte, before.contexte); // les branches non touchées gardent leur référence
+  assert.equal(s.pac, before.pac);
+  assert.equal(before.studyId, null);
+});
+
+test('CLEAR_SAVED_RESULTS : vide savedResults, le reste survit (références intactes)', () => {
+  const study = {
+    id: 'etude-1', engine_version: '1.0.0',
+    input: { contexte: { titre: 'Maison' } }, results: { bilan: { total: 8000 } },
+  };
+  const loaded = wizardReducer(frozen(), { type: 'LOAD_STUDY', study: deepFreeze(study), config: CONFIG });
+  assert.ok(loaded.savedResults); // pré-condition : l'étude rouverte porte des résultats figés
+  const s = wizardReducer(deepFreeze(loaded), { type: 'CLEAR_SAVED_RESULTS' });
+  assert.equal(s.savedResults, null);
+  assert.equal(s.studyId, 'etude-1');   // l'id reste : le save suivant fait UPDATE
+  assert.equal(s.contexte, loaded.contexte);
+  assert.equal(s.dessin, loaded.dessin);
+});
+
 test('LOAD_STUDY : hydrate depuis input, savedResults depuis results + engine_version, step 4', () => {
   const study = {
     id: 'etude-1',

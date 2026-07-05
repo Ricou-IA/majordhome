@@ -83,6 +83,14 @@ export function wizardReducer(state, action) {
       return avecException(state, 'ouvertures', action.ouvertureId, action.u);
     case 'PATCH_PAC':
       return { ...state, pac: { ...state.pac, ...action.patch } };
+    case 'SET_STUDY_ID':
+      // Après createStudy (Task 14) : mémorise l'id retourné → les saves suivants font UPDATE
+      // et l'autosave brouillon localStorage se coupe (garde `state.studyId` du wizard).
+      return { ...state, studyId: action.studyId };
+    case 'CLEAR_SAVED_RESULTS':
+      // « Recalculer avec le moteur actuel » (R7) : vide les résultats figés d'une étude
+      // rouverte → l'étape 4 bascule sur le calcul live (buildEtudeModel).
+      return { ...state, savedResults: null };
     case 'LOAD_STUDY': {
       // Hydrate depuis study.input par-dessus les défauts (robuste aux champs manquants —
       // études anciennes / moteur qui évolue), savedResults depuis results + engine_version (R7).

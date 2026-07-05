@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { copAt, pThAt, pElRefDe, courbeCharge, pointBivalence, consoAnnuelle } from '../../src/apps/thermique/lib/heatPumpEngine.js';
+import {
+  copAt, pThAt, pElRefDe, courbeCharge, pointBivalence, consoAnnuelle, pointsManuelsValides,
+} from '../../src/apps/thermique/lib/heatPumpEngine.js';
 
 const catalogue = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/pac-catalogue.json', import.meta.url), 'utf8'));
 // PAC de référence épinglée par modèle (et non par 1er `find` order-dependent sur le catalogue,
@@ -99,6 +101,17 @@ test('pointBivalence + PAC manuelle : erreurs propres', () => {
   assert.throws(() => pointBivalence({ pac: { type: 'manuelle', points: [{ tExt: 0, pTh: 5000 }] }, tDepart: 35, charge, thetaBase: -5, thetaNC: 16 }), /thermique/); // 1 seul point
   assert.throws(() => pointBivalence({ pac: { type: 'manuelle', points: [{ tExt: 0, pTh: -1 }, { tExt: 5, pTh: 100 }] }, tDepart: 35, charge, thetaBase: -5, thetaNC: 16 }), /thermique/);
   assert.throws(() => pointBivalence({ pac: {}, tDepart: 35, charge: null, thetaBase: -5, thetaNC: 16 }), /thermique/); // charge pas une fonction
+});
+
+test('pointsManuelsValides : filtre sans throw (mêmes règles que verifPointsManuels)', () => {
+  assert.deepEqual(pointsManuelsValides(null), []);
+  assert.deepEqual(pointsManuelsValides([
+    { tExt: -7, pTh: 5000 },      // valide
+    { tExt: 7, pTh: null },        // pTh manquant (saisie en cours)
+    { tExt: null, pTh: 3000 },     // tExt manquant
+    { tExt: 2, pTh: 0 },           // pTh ≤ 0
+    null,                          // ligne vide
+  ]), [{ tExt: -7, pTh: 5000 }]);
 });
 
 test('consoAnnuelle : méthode DJU, cas Gaillac (81)', () => {
