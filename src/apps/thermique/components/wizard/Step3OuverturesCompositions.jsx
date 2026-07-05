@@ -2,8 +2,10 @@
 // Étape 3 du wizard Thermique : pose des ouvertures + compositions des parois.
 // — Ouvertures : PlanCanvas mode 'ouverture' (contrat vérifié : le canevas N'AJOUTE RIEN, il émet
 //   onSelect({type:'pose-ouverture', pieceId, segmentIndex, position}) au tap près d'un mur) →
-//   cette étape applique ajouteOuverture(dessinOps) avec le type/dimensions choisis dans la barre
-//   (position arrondie : segmentLePlusProche renvoie un float, l'op exige un entier). Barre de
+//   cette étape applique ajouteOuverture(dessinOps) avec le type/dimensions choisis dans la barre.
+//   Position via positionOuvertureSnappee (canvasGeometry) : snap grille 10 cm + clamp
+//   [0, longueur − largeur] — un tap en fin de mur ne crée pas d'ouverture qui dépasse ;
+//   null (ouverture plus large que le mur) → toast + abandon de la pose. Barre de
 //   niveaux ALLÉGÉE (onglets seulement — l'édition des niveaux vit à l'étape 2). Suppression
 //   directe sans ConfirmDialog (non destructif au-delà de l'ouverture) + purge de son exception U.
 // — Compositions : 3 × CompositionFamille (murs / plancher bas / plafond-toiture) + 3 U
@@ -23,6 +25,8 @@ import CompositionFamille, { InputU } from './CompositionFamille';
 import UwHelperModal from './UwHelperModal';
 import { DIMENSIONS_OUVERTURES } from '../../lib/thermiqueConfig';
 import { ajouteOuverture, supprimeOuverture } from '../../lib/dessinOps';
+import { positionOuvertureSnappee } from '../../lib/canvasGeometry';
+import { segmentsDe, normalisePolygone } from '../../lib/geometryEngine';
 
 const TYPES_OUVERTURE = [
   { id: 'fenetre', label: 'Fenêtre' },
@@ -84,6 +88,16 @@ export default function Step3OuverturesCompositions({
       toast.error('Largeur et hauteur doivent être des entiers positifs (cm)');
       return;
     }
+    // Segment porteur (même parcours normalisé que le canevas) → position snappée grille 10 cm
+    // et clampée [0, longueur − largeur] pour que l'ouverture tienne ENTIÈREMENT dans le mur.
+    const piece = dessin.pieces.find((p) => p.id === sel.pieceId);
+    const segment = piece ? segmentsDe(normalisePolygone(piece.polygone))[sel.segmentIndex] : null;
+    if (!segment) return; // pièce/segment introuvables (dessin modifié entre tap et pose) — no-op
+    const position = positionOuvertureSnappee(segment, sel.position, l);
+    if (position === null) {
+      toast.error('Ouverture plus large que le mur');
+      return;
+    }
     const resultat = ajouteOuverture(dessin, {
       id: crypto.randomUUID(),
       pieceId: sel.pieceId,
@@ -91,7 +105,7 @@ export default function Step3OuverturesCompositions({
       type: typeOuverture,
       largeur: l,
       hauteur: h,
-      position: Math.round(sel.position),
+      position,
     });
     if (resultat.erreurs.length > 0) {
       toast.error(resultat.erreurs[0]);
