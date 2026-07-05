@@ -2,7 +2,7 @@
 // Orchestrateur du wizard d'étude de déperditions — 4 étapes (pattern Simulateur.jsx Solaire).
 // State machine useReducer (wizardState.js, pur), brouillon localStorage debounce 1 s,
 // rechargement ?etude=<id> (LOAD_STUDY), pré-remplissage ?client=<id>.
-// Étapes 3/4 : placeholders — livrées Tasks 13/14.
+// Étape 4 : placeholder — livrée Task 14.
 import { useReducer, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } f
 import { valideDessin } from '../lib/dessinOps';
 import Step1Contexte from '../components/wizard/Step1Contexte';
 import Step2Dessin from '../components/wizard/Step2Dessin';
+import Step3OuverturesCompositions from '../components/wizard/Step3OuverturesCompositions';
 
 const STEPS = [
   { n: 1, label: 'Contexte' },
@@ -250,7 +251,19 @@ function WizardInner({ config }) {
           onDessinChange={(dessin) => dispatch({ type: 'SET_DESSIN', dessin })}
         />
       )}
-      {state.step > 2 && (
+      {state.step === 3 && (
+        <Step3OuverturesCompositions
+          dessin={state.dessin}
+          compositions={state.compositions}
+          annee={state.contexte.annee}
+          dessinCheck={dessinCheck}
+          onDessinChange={(dessin) => dispatch({ type: 'SET_DESSIN', dessin })}
+          onPatchCompositions={(patch) => dispatch({ type: 'PATCH_COMPOSITIONS', patch })}
+          onExceptionParoi={(cle, u) => dispatch({ type: 'SET_EXCEPTION_PAROI', cle, u })}
+          onExceptionOuverture={(ouvertureId, u) => dispatch({ type: 'SET_EXCEPTION_OUVERTURE', ouvertureId, u })}
+        />
+      )}
+      {state.step === 4 && (
         <div className="card text-center py-12 text-secondary-500 text-sm">
           Étape « {STEPS[state.step - 1].label} » — (étape livrée séparément)
         </div>
