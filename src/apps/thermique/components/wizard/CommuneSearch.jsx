@@ -72,6 +72,12 @@ export default function CommuneSearch({ initialQuery = '', onSelect }) {
               setQuery(e.target.value);
               setOpen(true);
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && results.length > 0) {
+                e.preventDefault();
+                pick(results[0]);
+              }
+            }}
           />
           {loading && (
             <Loader2 className="w-4 h-4 animate-spin text-secondary-400 absolute right-3 top-1/2 -translate-y-1/2" />

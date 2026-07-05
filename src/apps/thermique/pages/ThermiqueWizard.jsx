@@ -26,6 +26,9 @@ const STEPS = [
 
 export default function ThermiqueWizard() {
   const { settings, isLoading } = useOrgSettings();
+  // Identité stable : sans useMemo, chaque re-render du wrapper fabriquerait une nouvelle
+  // config et re-déclencherait les effects de l'inner qui en dépendent (LOAD_STUDY notamment).
+  const config = useMemo(() => buildThermiqueConfig(settings), [settings]);
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -33,7 +36,7 @@ export default function ThermiqueWizard() {
       </div>
     );
   }
-  return <WizardInner config={buildThermiqueConfig(settings)} />;
+  return <WizardInner config={config} />;
 }
 
 function WizardInner({ config }) {
@@ -48,6 +51,7 @@ function WizardInner({ config }) {
   const [state, dispatch] = useReducer(wizardReducer, config, initialWizardState);
   const restoredRef = useRef(false);
   const clientPrefillRef = useRef(false);
+  const loadedStudyIdRef = useRef(null);
   // Ville du client pré-rempli → valeur initiale du champ de recherche commune
   const [communeInitialQuery, setCommuneInitialQuery] = useState('');
 
@@ -74,6 +78,11 @@ function WizardInner({ config }) {
   // --- Rechargement à l'identique depuis l'historique (?etude=<id>) ---
   useEffect(() => {
     if (!etudeId || !savedStudy) return;
+    // Une étude ne se charge qu'UNE fois : après une sauvegarde (Task 14), l'invalidation
+    // React Query refetch et change l'identité de savedStudy — sans cette garde, chaque save
+    // re-dispatcherait LOAD_STUDY et écraserait les modifications en cours.
+    if (loadedStudyIdRef.current === savedStudy.id) return;
+    loadedStudyIdRef.current = savedStudy.id;
     dispatch({ type: 'LOAD_STUDY', study: savedStudy, config });
     toast.success(`Étude${savedStudy.title ? ` « ${savedStudy.title} »` : ''} rechargée`);
   }, [etudeId, savedStudy, config]);
@@ -98,9 +107,12 @@ function WizardInner({ config }) {
     })();
   }, [clientId, etudeId]);
 
-  // --- Autosave brouillon (debounce 1 s — jamais en mode ?etude=) ---
+  // --- Autosave brouillon (debounce 1 s — jamais pour une étude chargée) ---
   useEffect(() => {
-    if (etudeId || !restoredRef.current) return undefined;
+    // state.studyId en plus de etudeId : naviguer de ?etude=<id> vers /thermique nu ne
+    // remonte pas le composant — sans ce garde, l'étude chargée fuirait dans le brouillon
+    // personnel (« Brouillon restauré » trompeur + risque d'UPDATE involontaire en Task 14).
+    if (etudeId || state.studyId || !restoredRef.current) return undefined;
     const t = setTimeout(() => saveDraft(userId, state), 1000);
     return () => clearTimeout(t);
   }, [state, userId, etudeId]);

@@ -89,7 +89,14 @@ export default function Step1Contexte({ contexte, dessin, communeInitialQuery, o
       {/* Localisation */}
       <div className="card space-y-4">
         <h2 className="font-semibold text-secondary-900">Localisation</h2>
-        <CommuneSearch initialQuery={communeInitialQuery || ''} onSelect={handleCommuneSelect} />
+        {/* L'étape est démontée au changement de step : la commune déjà sélectionnée
+            réamorce le champ au retour (sinon il repart vide alors que dept/DJU sont posés). */}
+        <CommuneSearch
+          initialQuery={contexte.commune
+            ? `${contexte.commune.nom} (${contexte.commune.dept})`
+            : (communeInitialQuery || '')}
+          onSelect={handleCommuneSelect}
+        />
         {contexte.dept != null && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <FormField label="Altitude (m)">
