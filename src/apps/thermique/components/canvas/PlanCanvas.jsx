@@ -62,9 +62,10 @@ function pointeurVersCm(event, svgEl) {
  *
  * Échelle des textes/traits : les tailles des composants enfants sont exprimées en unités du
  * viewBox (cm) — sur un grand plan (viewBox de 1500-2200 cm de large), une police « 22 » ferait
- * moins de 8 px à l'écran. PlanCanvas calcule donc `echelle = boite.largeur / 600` (≈ 1 pour un
- * petit plan) et le passe aux enfants, qui multiplient leurs fontSize/strokeWidth par ce facteur
- * → taille apparente CONSTANTE à l'écran quelle que soit l'étendue du plan.
+ * moins de 8 px à l'écran. PlanCanvas calcule donc `echelle = Math.max(boite.largeur, boite.hauteur)
+ * / 600` (≈ 1 pour un petit plan) et le passe aux enfants, qui multiplient leurs fontSize/
+ * strokeWidth par ce facteur → taille apparente CONSTANTE à l'écran quelle que soit l'étendue du
+ * plan, y compris pour un plan « en hauteur » (hauteur > largeur, ex. maison tout en longueur nord-sud).
  *
  * Dette de test assumée (documentée ici, cf. self-review du plan 3, Task 8) : il n'y a PAS
  * d'infrastructure de test React dans ce repo (aucun `@testing-library/react` ni équivalent
@@ -115,8 +116,9 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   const boite = boiteEnglobante([...piecesNiveauActif, ...piecesNiveauInferieur]);
   const viewBox = `${boite.x} ${boite.y} ${boite.largeur} ${boite.hauteur}`;
   // Facteur d'échelle des textes/traits des enfants (cf. JSDoc ci-dessus) : 1.0 pour un plan de
-  // 600 cm de large, proportionnel au-delà → taille apparente constante à l'écran.
-  const echelle = boite.largeur / 600;
+  // 600 cm dans sa plus grande dimension, proportionnel au-delà → taille apparente constante à
+  // l'écran, que le plan soit dominant en largeur ou en hauteur.
+  const echelle = Math.max(boite.largeur, boite.hauteur) / 600;
 
   const pieceSelectionnee = selection?.pieceId != null
     ? piecesNiveauActif.find((p) => p.id === selection.pieceId)

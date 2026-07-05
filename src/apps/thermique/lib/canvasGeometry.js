@@ -113,9 +113,14 @@ export function pointDansPolygone(pt, poly) {
  *   en cm)
  * @param {{x: number, y: number}[]} poly polygone rectilinéaire (sera normalisé en CCW — même
  *   parcours que segmentsDe/intervalleAxial dans geometryEngine.js)
- * @param {number} toleranceCm distance maximale (cm) pour considérer un segment « proche »
+ * @param {number} toleranceCm distance maximale (cm) pour considérer un segment « proche » —
+ *   BORNE INCLUSIVE : un segment à distance EXACTEMENT égale à `toleranceCm` est retenu (test
+ *   `distance > toleranceCm` pour rejeter, pas `>=`).
  * @returns {{segmentIndex: number, position: number, distance: number}|null} le segment le plus
- *   proche dans la tolérance, ou null si aucun segment n'est assez proche
+ *   proche dans la tolérance, ou null si aucun segment n'est assez proche. Égalité de distance
+ *   entre plusieurs segments (ex. point au coin exact entre deux murs) : le PREMIER rencontré dans
+ *   l'ordre de parcours l'emporte, c.-à-d. le plus petit `segmentIndex` (le test de remplacement
+ *   `distance < meilleur.distance` est strict — un ex æquo ne remplace jamais le meilleur déjà trouvé).
  */
 export function segmentLePlusProche(pt, poly, toleranceCm) {
   if (!pt || typeof pt !== 'object' || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) {
