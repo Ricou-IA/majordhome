@@ -19,8 +19,10 @@ const COULEURS = {
  * @param {{id: (string|number), segmentIndex: number, type: 'fenetre'|'porte'|'porte-fenetre',
  *   largeur: number, position: number}} props.ouverture ouverture à dessiner (cm entiers)
  * @param {boolean} [props.selectionnee=false] surligne l'ouverture (sélection courante)
+ * @param {number} [props.echelle=1] facteur d'échelle des épaisseurs de trait (calculé par
+ *   PlanCanvas depuis l'étendue du viewBox — épaisseur constante à l'écran quel que soit le plan)
  */
-export function OuvertureMarker({ piece, ouverture, selectionnee = false }) {
+export function OuvertureMarker({ piece, ouverture, selectionnee = false, echelle = 1 }) {
   const segments = segmentsDe(normalisePolygone(piece.polygone));
   const segment = segments[ouverture.segmentIndex];
   if (!segment) return null;
@@ -43,7 +45,7 @@ export function OuvertureMarker({ piece, ouverture, selectionnee = false }) {
       x2={x2}
       y2={y2}
       className={`${couleur} ${selectionnee ? 'opacity-100' : 'opacity-90'}`}
-      strokeWidth={selectionnee ? 16 : 12}
+      strokeWidth={(selectionnee ? 16 : 12) * echelle}
       strokeLinecap="butt"
     />
   );

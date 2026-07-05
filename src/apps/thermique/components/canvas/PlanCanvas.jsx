@@ -19,15 +19,19 @@ const TOLERANCE_MUR_CM = 30;
  * du navigateur et le redimensionnement du canevas, contrairement à un calcul manuel sur
  * `clientX`/`getBoundingClientRect`). Utilitaire interne à PlanCanvas (pas partagé, pas dans
  * canvasGeometry.js car il touche le DOM — les helpers purs n'importent rien du DOM).
+ * `getScreenCTM()` peut renvoyer `null` (svg détaché ou `display: none`) → retourne `null` ;
+ * chaque appelant DOIT gérer ce cas par un early return (jamais de crash).
  * @param {PointerEvent} event
  * @param {SVGSVGElement} svgEl élément `<svg>` racine du canevas
- * @returns {{x: number, y: number}} coordonnées en cm (non accrochées à la grille)
+ * @returns {{x: number, y: number}|null} coordonnées en cm (non accrochées à la grille), ou
+ *   null si la matrice écran n'est pas disponible
  */
 function pointeurVersCm(event, svgEl) {
+  const ctm = svgEl.getScreenCTM();
+  if (!ctm) return null;
   const pt = svgEl.createSVGPoint();
   pt.x = event.clientX;
   pt.y = event.clientY;
-  const ctm = svgEl.getScreenCTM();
   const local = pt.matrixTransform(ctm.inverse());
   return { x: local.x, y: local.y };
 }
@@ -56,12 +60,28 @@ function pointeurVersCm(event, svgEl) {
  *   assumée du plan 3 : le tracé polygone libre est livré au plan 4 si le besoin se confirme ;
  *   les rectangles accolés (mode 'rectangle' répété) couvrent les cas courants (L, T, etc.).
  *
+ * Échelle des textes/traits : les tailles des composants enfants sont exprimées en unités du
+ * viewBox (cm) — sur un grand plan (viewBox de 1500-2200 cm de large), une police « 22 » ferait
+ * moins de 8 px à l'écran. PlanCanvas calcule donc `echelle = boite.largeur / 600` (≈ 1 pour un
+ * petit plan) et le passe aux enfants, qui multiplient leurs fontSize/strokeWidth par ce facteur
+ * → taille apparente CONSTANTE à l'écran quelle que soit l'étendue du plan.
+ *
  * Dette de test assumée (documentée ici, cf. self-review du plan 3, Task 8) : il n'y a PAS
  * d'infrastructure de test React dans ce repo (aucun `@testing-library/react` ni équivalent
  * installé) — la validation de ce composant est donc VISUELLE, reportée au plan 4 (câblage
  * wizard + preview réelle). Toute la logique géométrique qu'il consomme (hit-test, snapping,
  * décomposition, adjacences…) est en revanche testée exhaustivement côté `node:test` dans
  * `canvasGeometry.js`/`geometryEngine.js` — ce composant ne fait que les appeler.
+ *
+ * Dette plan 4 (issues de la revue de code, à câbler au plan 4) :
+ * - `enErreur` de PieceShape à brancher sur les erreurs de `valideDessin` (dessinOps.js) —
+ *   actuellement toujours `false` ;
+ * - guards/error-boundary autour de `boiteEnglobante`/`normalisePolygone`/`intervalleAxial`
+ *   (elles throw 'thermique:' sur un dessin corrompu — l'UI wizard doit encaisser) ;
+ * - ids de `<pattern>` via `useId` si plusieurs instances de PlanCanvas coexistent un jour
+ *   (collision d'ids DOM globaux) ;
+ * - centroïde d'AIRE (pas de sommets) pour le libellé des formes en L/U ;
+ * - re-sélection/édition des ouvertures existantes (tap sur un OuvertureMarker).
  *
  * @param {Object} props
  * @param {Object} props.dessin dessin complet (cf. modèle de données figé au plan 3 : `nord`,
@@ -80,7 +100,10 @@ function pointeurVersCm(event, svgEl) {
  */
 export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, onSelect }) {
   const svgRef = useRef(null);
-  const [dragRect, setDragRect] = useState(null); // { p1: {x,y}, p2: {x,y} } en cm, transitoire
+  // { pointerId, p1: {x,y}, p2: {x,y} } en cm, transitoire. `pointerId` identifie le doigt/
+  // stylet/souris qui a initié le drag : les événements des AUTRES pointeurs (multi-touch) sont
+  // ignorés tant que ce drag est actif.
+  const [dragRect, setDragRect] = useState(null);
 
   const piecesNiveauActif = dessin.pieces.filter((p) => p.niveauId === niveauActifId);
   const indexNiveauActif = dessin.niveaux.findIndex((n) => n.id === niveauActifId);
@@ -91,6 +114,9 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
 
   const boite = boiteEnglobante([...piecesNiveauActif, ...piecesNiveauInferieur]);
   const viewBox = `${boite.x} ${boite.y} ${boite.largeur} ${boite.hauteur}`;
+  // Facteur d'échelle des textes/traits des enfants (cf. JSDoc ci-dessus) : 1.0 pour un plan de
+  // 600 cm de large, proportionnel au-delà → taille apparente constante à l'écran.
+  const echelle = boite.largeur / 600;
 
   const pieceSelectionnee = selection?.pieceId != null
     ? piecesNiveauActif.find((p) => p.id === selection.pieceId)
@@ -134,23 +160,26 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   }
 
   function handlePointerDown(event) {
-    if (mode !== 'rectangle') return;
+    if (mode !== 'rectangle' || dragRect) return; // drag déjà actif → 2ᵉ doigt ignoré
     const ptCm = pointeurVersCm(event, svgRef.current);
-    setDragRect({ p1: ptCm, p2: ptCm });
+    if (!ptCm) return; // CTM indisponible (cf. pointeurVersCm)
+    setDragRect({ pointerId: event.pointerId, p1: ptCm, p2: ptCm });
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function handlePointerMove(event) {
-    if (mode !== 'rectangle' || !dragRect) return;
+    if (mode !== 'rectangle' || !dragRect || event.pointerId !== dragRect.pointerId) return;
     const ptCm = pointeurVersCm(event, svgRef.current);
-    setDragRect((prev) => ({ ...prev, p2: ptCm }));
+    if (!ptCm) return;
+    setDragRect((prev) => (prev ? { ...prev, p2: ptCm } : prev));
   }
 
   function handlePointerUp(event) {
-    if (mode === 'rectangle' && dragRect) {
+    if (dragRect) {
+      if (event.pointerId !== dragRect.pointerId) return; // autre pointeur : ignoré
       const polygone = rectDepuisDrag(dragRect.p1, dragRect.p2);
       setDragRect(null);
-      if (polygone) {
+      if (mode === 'rectangle' && polygone) {
         const nouvellePiece = {
           id: crypto.randomUUID(),
           niveauId: niveauActifId,
@@ -166,12 +195,19 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
     }
 
     const ptCm = pointeurVersCm(event, svgRef.current);
+    if (!ptCm) return; // CTM indisponible (cf. pointeurVersCm)
     if (mode === 'selection') {
       gererSelectionTap(ptCm);
     } else if (mode === 'ouverture') {
       gererPoseOuvertureTap(ptCm);
     }
     // mode 'polygone' : v1 non implémenté, aucun traitement (cf. JSDoc ci-dessus).
+  }
+
+  function handlePointerCancel(event) {
+    // Geste interrompu (ex. le navigateur reprend la main sur un scroll/zoom tactile) : on
+    // abandonne le rectangle fantôme — uniquement si c'est LE pointeur du drag en cours.
+    if (dragRect && event.pointerId === dragRect.pointerId) setDragRect(null);
   }
 
   const rectFantome = dragRect ? rectDepuisDrag(dragRect.p1, dragRect.p2) : null;
@@ -186,6 +222,7 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       >
         <defs>
           {/* Grille 10 cm imbriquée dans une grille majeure 1 m — deux <pattern> simples plutôt
@@ -203,7 +240,7 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
 
         {/* Niveau inférieur en filigrane — repère de superposition, non interactif. */}
         {piecesNiveauInferieur.map((piece) => (
-          <PieceShape key={`fantome-${piece.id}`} piece={piece} interactive={false} />
+          <PieceShape key={`fantome-${piece.id}`} piece={piece} interactive={false} echelle={echelle} />
         ))}
 
         {/* Pièces du niveau actif. */}
@@ -213,6 +250,7 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
             piece={piece}
             selectionnee={pieceSelectionnee?.id === piece.id}
             enErreur={false}
+            echelle={echelle}
           />
         ))}
 
@@ -227,20 +265,21 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
                 piece={piece}
                 ouverture={ouverture}
                 selectionnee={selection?.type === 'pose-ouverture' && selection.pieceId === piece.id}
+                echelle={echelle}
               />
             );
           })}
 
         {/* Cotes de la pièce sélectionnée. */}
-        {pieceSelectionnee && <CotesPiece piece={pieceSelectionnee} />}
+        {pieceSelectionnee && <CotesPiece piece={pieceSelectionnee} echelle={echelle} />}
 
         {/* Rectangle fantôme pendant un drag en mode 'rectangle'. */}
         {rectFantome && (
           <polygon
             points={rectFantome.map((p) => `${p.x},${p.y}`).join(' ')}
             className="fill-blue-300/40 stroke-blue-500"
-            strokeWidth={4}
-            strokeDasharray="12 8"
+            strokeWidth={4 * echelle}
+            strokeDasharray={`${12 * echelle} ${8 * echelle}`}
           />
         )}
       </svg>

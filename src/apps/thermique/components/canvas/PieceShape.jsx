@@ -18,11 +18,14 @@ import { surfaceCm2 } from '../../lib/geometryEngine.js';
  * @param {boolean} [props.enErreur=false] applique la teinte d'erreur (dessin invalide)
  * @param {boolean} [props.interactive=true] si false, le polygone ignore les clics (watermark
  *   du niveau inférieur, `pointer-events: none`)
+ * @param {number} [props.echelle=1] facteur d'échelle des tailles de texte/trait (calculé par
+ *   PlanCanvas depuis l'étendue du viewBox — les tailles ci-dessous sont en unités viewBox (cm),
+ *   sans ce facteur elles deviendraient illisibles sur un grand plan)
  * @param {(id: (string|number)) => void} [props.onClick] callback clic pièce (mode sélection —
  *   le hit-test précis se fait dans PlanCanvas via `pointDansPolygone`, ce handler est un relai
  *   optionnel pour un clic natif SVG direct sur la forme)
  */
-export function PieceShape({ piece, selectionnee = false, enErreur = false, interactive = true, onClick }) {
+export function PieceShape({ piece, selectionnee = false, enErreur = false, interactive = true, echelle = 1, onClick }) {
   const points = piece.polygone.map((p) => `${p.x},${p.y}`).join(' ');
   const centroide = piece.polygone.reduce(
     (acc, p) => ({ x: acc.x + p.x / piece.polygone.length, y: acc.y + p.y / piece.polygone.length }),
@@ -55,23 +58,23 @@ export function PieceShape({ piece, selectionnee = false, enErreur = false, inte
       <polygon
         points={points}
         className={`${fillClassName} ${strokeClassName} ${selectionnee ? 'stroke-blue-600' : ''}`}
-        strokeWidth={selectionnee ? 6 : 2}
+        strokeWidth={(selectionnee ? 6 : 2) * echelle}
       />
       <text
         x={centroide.x}
-        y={centroide.y - 15}
+        y={centroide.y - 15 * echelle}
         textAnchor="middle"
         className="fill-slate-700 select-none"
-        style={{ fontSize: 22 }}
+        style={{ fontSize: 22 * echelle }}
       >
         {piece.nom}
       </text>
       <text
         x={centroide.x}
-        y={centroide.y + 15}
+        y={centroide.y + 15 * echelle}
         textAnchor="middle"
         className="fill-slate-500 select-none"
-        style={{ fontSize: 18 }}
+        style={{ fontSize: 18 * echelle }}
       >
         {surfaceM2}&nbsp;m²
       </text>

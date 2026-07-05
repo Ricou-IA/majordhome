@@ -15,8 +15,11 @@ const OFFSET_CM = 15;
  * @param {Object} props
  * @param {{polygone: {x: number, y: number}[]}} props.piece pièce sélectionnée dont on cote
  *   les segments (polygone en cm — sera normalisé CCW en interne)
+ * @param {number} [props.echelle=1] facteur d'échelle des tailles de texte (calculé par
+ *   PlanCanvas depuis l'étendue du viewBox) — appliqué aussi au décalage extérieur, pour que la
+ *   cote reste dégagée du mur quand la police grandit
  */
-export function CotesPiece({ piece }) {
+export function CotesPiece({ piece, echelle = 1 }) {
   const segments = segmentsDe(normalisePolygone(piece.polygone));
 
   return (
@@ -26,8 +29,8 @@ export function CotesPiece({ piece }) {
         const dy = s.y2 - s.y1;
         const longueur = Math.hypot(dx, dy) || 1;
         // Normale extérieure n = (−dy, dx) normalisée (CCW, repère y-bas — cf. orientationDe).
-        const nx = (-dy / longueur) * OFFSET_CM;
-        const ny = (dx / longueur) * OFFSET_CM;
+        const nx = (-dy / longueur) * OFFSET_CM * echelle;
+        const ny = (dx / longueur) * OFFSET_CM * echelle;
         const milieuX = (s.x1 + s.x2) / 2 + nx;
         const milieuY = (s.y1 + s.y2) / 2 + ny;
         const longueurM = (s.longueur / 100).toFixed(1);
@@ -40,7 +43,7 @@ export function CotesPiece({ piece }) {
             textAnchor="middle"
             dominantBaseline="middle"
             className="fill-blue-700 select-none"
-            style={{ fontSize: 16 }}
+            style={{ fontSize: 16 * echelle }}
           >
             {longueurM}&nbsp;m
           </text>

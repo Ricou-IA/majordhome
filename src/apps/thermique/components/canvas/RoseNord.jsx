@@ -4,15 +4,16 @@
  * Rose des vents cliquable, coin haut-droit du canevas — flèche N pointant vers `dessin.nord`
  * degrés (0 = haut du plan, sens horaire — même convention que `orientationDe` de
  * geometryEngine.js). Un clic fait pivoter le nord par pas de 45° et remonte le dessin complet
- * modifié via `onChange` (immutable — jamais de mutation de `dessin`).
+ * modifié via `onChange` (immutable — jamais de mutation de `dessin`). Double modulo pour
+ * garantir un résultat dans [0, 360[ même si un `nord` négatif arrive en entrée.
  * SVG simple (pas de dépendance icône) : un triangle + la lettre « N ».
  *
  * @param {Object} props
  * @param {{nord: number}} props.dessin dessin courant (seul `nord` est lu)
- * @param {(dessin: Object) => void} props.onChange callback avec le dessin complet mis à jour
+ * @param {(dessin: Object) => void} [props.onChange] callback avec le dessin complet mis à jour
  */
 export function RoseNord({ dessin, onChange }) {
-  const tourner = () => onChange({ ...dessin, nord: (dessin.nord + 45) % 360 });
+  const tourner = () => onChange?.({ ...dessin, nord: (((dessin.nord + 45) % 360) + 360) % 360 });
 
   return (
     <svg
