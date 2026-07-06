@@ -145,3 +145,62 @@ export function buildLoadCurve({ monthlyConsoTotals, baseShape, devices = [] }) 
   const byDevice = Object.fromEntries(deviceCurves.map(({ name, curve }) => [name, curve]));
   return { hourly, byDevice, residualMonthly, warnings };
 }
+
+/**
+ * Simulation horaire d'une batterie tampon (pas de temps = 1 h, donc kWh ≡ kW×1h).
+ * À chaque heure : l'autoconso directe min(prod, conso) est toujours comptée ;
+ *  - surplus (prod>conso) → charge la batterie (borné par capacité libre et maxChargeKw),
+ *    le reste est exporté ;
+ *  - déficit (conso>prod) → décharge (borné par SOC et maxDischargeKw), le manque
+ *    résiduel est importé.
+ * `roundTripEfficiency` (η) s'applique à la restitution : pour couvrir un besoin B,
+ * on tire B/η de la batterie et on restitue B (limité par le SOC). Surplus jamais
+ * valorisé en € : la batterie ne crée que de l'import évité.
+ */
+export function simulateBattery({
+  prodHourly, consoHourly, capacityKwh,
+  roundTripEfficiency = 0.9, maxChargeKw = Infinity, maxDischargeKw = Infinity, initialSoc = 0,
+}) {
+  if (prodHourly.length !== consoHourly.length) {
+    throw new Error('simulateBattery : longueurs prod/conso différentes');
+  }
+  const eta = roundTripEfficiency;
+  let soc = Math.min(initialSoc, capacityKwh);
+  let direct = 0, fromBattery = 0, exported = 0, imported = 0, prod = 0, conso = 0, charged = 0, discharged = 0;
+
+  for (let i = 0; i < prodHourly.length; i++) {
+    const p = prodHourly[i];
+    const c = consoHourly[i];
+    prod += p; conso += c;
+    direct += Math.min(p, c);
+    const net = p - c;
+    if (net > 0) {
+      const accepted = Math.min(net, capacityKwh - soc, maxChargeKw);
+      soc += accepted; charged += accepted;
+      exported += net - accepted;
+    } else if (net < 0) {
+      const need = -net;
+      const drawn = Math.min(need / eta, soc, maxDischargeKw); // énergie retirée de la batterie
+      const delivered = drawn * eta;                           // énergie rendue à la maison
+      soc -= drawn; discharged += drawn;
+      fromBattery += delivered;
+      imported += need - delivered;
+    }
+  }
+
+  const selfC = direct + fromBattery;
+  return {
+    capacityKwh,
+    prodKwh: prod,
+    consoKwh: conso,
+    selfConsumedDirectKwh: direct,
+    selfConsumedFromBatteryKwh: fromBattery,
+    selfConsumedKwh: selfC,
+    exportedKwh: exported,
+    importedKwh: imported,
+    chargedKwh: charged,
+    dischargedKwh: discharged,
+    autoconsoRate: prod > 0 ? selfC / prod : 0,
+    autoproductionRate: conso > 0 ? selfC / conso : 0,
+  };
+}

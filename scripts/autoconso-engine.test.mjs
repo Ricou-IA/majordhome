@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourToDate — bornes mois / heure de journée (année 365 j)', () => {
   assert.equal(HOURS_PER_YEAR, 8760);
@@ -96,4 +96,38 @@ test('buildLoadCurve — usages > conso du mois → warning + talon ramené à 0
   const { residualMonthly, warnings } = buildLoadCurve({ monthlyConsoTotals, baseShape, devices });
   assert.ok(warnings.length >= 1);
   assert.equal(residualMonthly[0], 0);
+});
+
+test('simulateBattery — capacité 0 ≡ autoconso directe', () => {
+  const prod  = [0, 2, 4, 0];
+  const conso = [1, 1, 1, 3];
+  const r = simulateBattery({ prodHourly: prod, consoHourly: conso, capacityKwh: 0 });
+  assert.equal(r.selfConsumedKwh, 2);
+  assert.equal(r.exportedKwh, 4);
+  assert.equal(r.importedKwh, 4);
+  assert.equal(r.selfConsumedFromBatteryKwh, 0);
+});
+
+test('simulateBattery — rendement 100 % : le tampon récupère tout le surplus utile', () => {
+  // Surplus PLACÉ AVANT les déficits (simulation linéaire, sans report cyclique
+  // fin d'année→début d'année) : sinon un déficit initial ne peut jamais être
+  // couvert par une batterie vide (soc=0 en h0). Écart signalé au plan (§Task 7).
+  const prod  = [4, 0, 0, 0];
+  const conso = [0, 1, 2, 1];
+  const r = simulateBattery({ prodHourly: prod, consoHourly: conso, capacityKwh: 10, roundTripEfficiency: 1 });
+  assert.ok(Math.abs(r.selfConsumedFromBatteryKwh - 4) < 1e-9); // 1 + 2 + 1 restitués
+  assert.ok(Math.abs(r.selfConsumedKwh - 4) < 1e-9);
+  assert.ok(Math.abs(r.exportedKwh - 0) < 1e-9);
+  assert.ok(Math.abs(r.importedKwh - 0) < 1e-9);
+  assert.ok(Math.abs(r.autoconsoRate - 1) < 1e-9);
+});
+
+test('simulateBattery — rendement 90 % : pertes reportées sur l\'import', () => {
+  const prod  = [10, 0];
+  const conso = [0, 10];
+  const r = simulateBattery({ prodHourly: prod, consoHourly: conso, capacityKwh: 10, roundTripEfficiency: 0.9 });
+  // charge 10 → décharge tirée 10, restitué 9 ; besoin 10 → import 1
+  assert.ok(Math.abs(r.selfConsumedFromBatteryKwh - 9) < 1e-9);
+  assert.ok(Math.abs(r.importedKwh - 1) < 1e-9);
+  assert.ok(Math.abs(r.exportedKwh - 0) < 1e-9);
 });
