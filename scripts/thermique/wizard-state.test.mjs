@@ -225,6 +225,32 @@ test('toStudyInput : strip step/studyId/savedResults', () => {
   assert.equal(input.dessin, state.dessin);
 });
 
+test('toStudyInput : purge les exceptions orphelines (pièce/ouverture supprimées), garde les valides', () => {
+  const base = initialWizardState(CONFIG);
+  const state = deepFreeze({
+    ...base,
+    dessin: {
+      ...base.dessin,
+      pieces: [{ id: 'p-vivante', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20, polygone: [] }],
+      ouvertures: [{ id: 'o-vivante', pieceId: 'p-vivante', segmentIndex: 0, type: 'fenetre', largeur: 120, hauteur: 130, position: 0 }],
+    },
+    compositions: {
+      ...base.compositions,
+      exceptions: {
+        parois: { 'p-vivante:murs': { u: 0.5 }, 'p-morte:murs': { u: 0.4 }, 'p-morte:plancherBas': { u: 0.3 } },
+        ouvertures: { 'o-vivante': { u: 1.1 }, 'o-morte': { u: 2.2 } },
+      },
+    },
+  });
+  const input = toStudyInput(state);
+  assert.deepEqual(input.compositions.exceptions.parois, { 'p-vivante:murs': { u: 0.5 } });
+  assert.deepEqual(input.compositions.exceptions.ouvertures, { 'o-vivante': { u: 1.1 } });
+  // Immutabilité : le state d'entrée (gelé) n'est pas touché, ses exceptions non plus
+  assert.equal(Object.keys(state.compositions.exceptions.parois).length, 3);
+  // Les familles ne sont pas copiées inutilement
+  assert.equal(input.compositions.familles, state.compositions.familles);
+});
+
 test('brouillon : round-trip via localStorage mocké, clé namespacée user', () => {
   const store = new Map();
   globalThis.localStorage = {

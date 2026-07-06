@@ -122,12 +122,22 @@ export function wizardReducer(state, action) {
   }
 }
 
-/** Le `input` jsonb à persister : strip des champs volatils step/studyId/savedResults. */
+/** Le `input` jsonb à persister : strip des champs volatils step/studyId/savedResults.
+ * Purge aussi les exceptions U orphelines (revue globale plan 4) : la suppression d'une pièce à
+ * l'étape 2 emporte ses ouvertures (dessinOps) mais pas ses exceptions — sans ce filtre, des
+ * clés mortes (`${pieceId}:famille`, ouvertureId) seraient persistées dans le jsonb. */
 export function toStudyInput(state) {
+  const pieceIds = new Set(state.dessin.pieces.map((p) => p.id));
+  const ouvertureIds = new Set(state.dessin.ouvertures.map((o) => o.id));
+  const exceptions = state.compositions.exceptions ?? {};
+  const parois = Object.fromEntries(Object.entries(exceptions.parois ?? {})
+    .filter(([cle]) => pieceIds.has(cle.slice(0, cle.lastIndexOf(':')))));
+  const ouvertures = Object.fromEntries(Object.entries(exceptions.ouvertures ?? {})
+    .filter(([id]) => ouvertureIds.has(id)));
   return {
     contexte: state.contexte,
     dessin: state.dessin,
-    compositions: state.compositions,
+    compositions: { ...state.compositions, exceptions: { parois, ouvertures } },
     pac: state.pac,
   };
 }

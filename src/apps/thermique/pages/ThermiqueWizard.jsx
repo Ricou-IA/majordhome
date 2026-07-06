@@ -13,7 +13,7 @@ import { useThermalStudy } from '@hooks/useThermalStudies';
 import { clientsService } from '@services/clients.service';
 import { logger } from '@lib/logger';
 import { buildThermiqueConfig } from '../lib/thermiqueConfig';
-import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } from '../lib/wizardState';
+import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft, toStudyInput } from '../lib/wizardState';
 import { valideDessin } from '../lib/dessinOps';
 import Step1Contexte from '../components/wizard/Step1Contexte';
 import Step2Dessin from '../components/wizard/Step2Dessin';
@@ -43,8 +43,9 @@ export default function ThermiqueWizard() {
 }
 
 function WizardInner({ config }) {
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
   const userId = user?.id;
+  const orgId = organization?.id;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const etudeId = searchParams.get('etude');
@@ -55,6 +56,10 @@ function WizardInner({ config }) {
   const restoredRef = useRef(false);
   const clientPrefillRef = useRef(false);
   const loadedStudyIdRef = useRef(null);
+  // Snapshot du dernier contenu écrit (ou de l'état de référence) : l'autosave n'écrit que si le
+  // CONTENU de l'étude a changé — un simple chargement de page (vierge, brouillon restauré ou
+  // pré-rempli ?client=) n'écrase jamais le brouillon personnel (fix B, revue globale plan 4).
+  const derniereEcritureRef = useRef(null);
   // Ville du client pré-rempli → valeur initiale du champ de recherche commune
   const [communeInitialQuery, setCommuneInitialQuery] = useState('');
 
@@ -72,6 +77,8 @@ function WizardInner({ config }) {
           onClick: () => {
             clearDraft(userId);
             dispatch({ type: 'RESET', config });
+            // L'état vierge redevient la référence : ne pas recréer un brouillon pristine 1 s après.
+            derniereEcritureRef.current = null;
           },
         },
       });
@@ -100,6 +107,14 @@ function WizardInner({ config }) {
         logger.warn('[thermique] pré-remplissage client impossible', error);
         return;
       }
+      // Défense multi-tenant (revue globale plan 4) : un membre de plusieurs orgs peut LIRE un
+      // client d'une autre org (RLS = membership) — ne jamais le rattacher à une étude de l'org
+      // courante. majordhome_clients.org_id porte l'org CORE, comme organization.id (vérifié :
+      // clientsService.getClients filtre .eq('org_id', organization.id)).
+      if (!data.org_id || data.org_id !== orgId) {
+        logger.warn('[thermique] client ignoré : org différente de la session', { clientId });
+        return;
+      }
       const nom = data.display_name || data.name
         || `${data.last_name || ''} ${data.first_name || ''}`.trim();
       dispatch({
@@ -107,8 +122,11 @@ function WizardInner({ config }) {
         patch: { clientId, ...(nom ? { titre: `Étude thermique — ${nom}` } : {}) },
       });
       if (data.city) setCommuneInitialQuery(data.city);
+      // Le state pré-rempli redevient l'état de référence de l'autosave : ouvrir ?client= sans
+      // rien saisir ne doit PAS écraser le brouillon personnel (fix B, revue globale).
+      derniereEcritureRef.current = null;
     })();
-  }, [clientId, etudeId]);
+  }, [clientId, etudeId, orgId]);
 
   // --- Autosave brouillon (debounce 1 s — jamais pour une étude chargée) ---
   useEffect(() => {
@@ -116,7 +134,18 @@ function WizardInner({ config }) {
     // remonte pas le composant — sans ce garde, l'étude chargée fuirait dans le brouillon
     // personnel (« Brouillon restauré » trompeur + risque d'UPDATE involontaire en Task 14).
     if (etudeId || state.studyId || !restoredRef.current) return undefined;
-    const t = setTimeout(() => saveDraft(userId, state), 1000);
+    const serialise = JSON.stringify(toStudyInput(state));
+    // Premier passage (ou re-référencement post-prefill) : on capture l'état de référence SANS
+    // écrire — seule une vraie modification du contenu déclenche une écriture.
+    if (derniereEcritureRef.current === null) {
+      derniereEcritureRef.current = serialise;
+      return undefined;
+    }
+    if (serialise === derniereEcritureRef.current) return undefined;
+    const t = setTimeout(() => {
+      saveDraft(userId, state);
+      derniereEcritureRef.current = serialise;
+    }, 1000);
     return () => clearTimeout(t);
   }, [state, userId, etudeId]);
 

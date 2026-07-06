@@ -163,6 +163,16 @@ export default function Step4Resultats({
 
   // --- Sauvegarde ---
   const [saving, setSaving] = useState(null); // null | 'draft' | 'completed'
+  // Garde (revue globale plan 4) : une PAC catalogue configurée mais non calculable (catalogue
+  // 4,6 Mo en cours de chargement, ou en erreur) persisterait results.pac = null en silence —
+  // l'étude rouverte n'aurait aucun volet PAC, sans message. On bloque la sauvegarde le temps
+  // du chargement ; pac.mode null (pas de PAC) ou 'manuelle' ne sont pas concernés.
+  const pacIncomplet = pac.mode === 'catalogue' && !model?.pac;
+  const raisonPacIncomplet = pacIncomplet
+    ? (catalogueErreur
+      ? 'Catalogue PAC indisponible — réessayez ou passez la PAC en saisie manuelle'
+      : 'Chargement du catalogue PAC en cours…')
+    : null;
   const handleSave = async (status) => {
     const payload = {
       title: contexte.titre,
@@ -326,10 +336,13 @@ export default function Step4Resultats({
 
       {/* Sauvegarde */}
       <div className="card flex items-center justify-end gap-2 flex-wrap">
+        {raisonPacIncomplet && (
+          <p className="text-xs text-amber-700 mr-auto">{raisonPacIncomplet}</p>
+        )}
         <button
           type="button"
           onClick={() => handleSave('draft')}
-          disabled={saving != null}
+          disabled={saving != null || pacIncomplet}
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-secondary-300 text-secondary-700 hover:bg-secondary-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -338,7 +351,7 @@ export default function Step4Resultats({
         <button
           type="button"
           onClick={() => handleSave('completed')}
-          disabled={saving != null}
+          disabled={saving != null || pacIncomplet}
           className="btn-primary flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving === 'completed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
