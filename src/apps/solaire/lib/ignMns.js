@@ -68,21 +68,45 @@ export async function fetchRoofPlaneFromIgn(polygon) {
     const pxE = (bMaxE - bMinE) / W;
     const pxN = (bMaxN - bMinN) / H;
 
-    // Polygone L93 pour test d'appartenance (turf en planaire).
-    const polyL93 = turf.polygon([ringL93]);
-
-    // Points (x=E, y=N, z) dont le centre pixel est DANS le toit et dont z est plausible.
-    const points = [];
-    for (let row = 0; row < H; row++) {
-      const N = bMaxN - (row + 0.5) * pxN; // ligne 0 = haut = maxN
-      for (let col = 0; col < W; col++) {
-        const E = bMinE + (col + 0.5) * pxE;
-        const z = elev[row * W + col];
-        if (!Number.isFinite(z) || z < -100 || z > 5000) continue;
-        if (turf.booleanPointInPolygon([E, N], polyL93)) points.push({ x: E, y: N, z });
+    // ── Échantillonnage pour la PENTE : noyau érodé, pas le tracé complet ──────────────────
+    // Le tracé sert à la SURFACE. Pour la pente, on reste au CENTRE du pan avec une marge
+    // généreuse de chaque côté (une pente est régulière → un noyau propre suffit et évite le
+    // bruit de bord : égout où le MNS plonge vers le mur/sol, cheminées, débords de toit).
+    const sampleInside = (ringForPip) => {
+      const poly = turf.polygon([ringForPip]);
+      const pts = [];
+      for (let row = 0; row < H; row++) {
+        const N = bMaxN - (row + 0.5) * pxN; // ligne 0 = haut = maxN
+        for (let col = 0; col < W; col++) {
+          const E = bMinE + (col + 0.5) * pxE;
+          const z = elev[row * W + col];
+          if (!Number.isFinite(z) || z < -100 || z > 5000) continue;
+          if (turf.booleanPointInPolygon([E, N], poly)) pts.push({ x: E, y: N, z });
+        }
       }
+      return pts;
+    };
+    // Anneau érodé de `marginM` mètres (en WGS84 via turf.buffer), reprojeté en L93. null si trop petit.
+    const erodedRingL93 = (marginM) => {
+      try {
+        const inner = turf.buffer(geom, -marginM, { units: 'meters' });
+        const g = inner?.geometry;
+        const ring = g?.type === 'Polygon' ? g.coordinates[0]
+          : g?.type === 'MultiPolygon' ? g.coordinates[0]?.[0] : null;
+        if (ring && ring.length >= 4) return ring.map(([lon, lat]) => toL93.forward([lon, lat]));
+      } catch { /* toit trop petit pour cette marge */ }
+      return null;
+    };
+    // On prend la plus grande marge qui laisse assez de pixels (noyau le plus propre possible).
+    let points = [];
+    for (const margin of [2.0, 1.5, 1.0, 0.5]) {
+      const ring = erodedRingL93(margin);
+      if (!ring) continue;
+      const pts = sampleInside(ring);
+      if (pts.length >= 12) { points = pts; break; }
     }
-    if (points.length < 5) return { data: { source: 'none' }, error: null }; // pas assez de pixels toit
+    if (points.length < 12) points = sampleInside(ringL93); // repli : tout le tracé
+    if (points.length < 5) return { data: { source: 'none' }, error: null };
 
     const fit = fitRoofPlane(points);
     if (!fit) return { data: { source: 'none' }, error: null };

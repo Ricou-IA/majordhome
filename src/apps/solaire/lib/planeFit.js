@@ -55,14 +55,13 @@ export function fitRoofPlane(points) {
   const resid = (p, pl) => p.z - (pl.a * p.x + pl.b * p.y + pl.c);
   const rmsOf = (arr, pl) => Math.sqrt(arr.reduce((s, p) => s + resid(p, pl) ** 2, 0) / arr.length);
   let rms = rmsOf(pts, plane);
-  // Rejet des points dont le résidu dépasse 2·RMS (une passe), si ça vaut le coup.
-  if (rms > 0.05) {
+  // Rejet itératif des points dont le résidu dépasse 2·RMS (cheminées, égout, végétation).
+  for (let pass = 0; pass < 3 && rms > 0.05; pass++) {
     const kept = pts.filter((p) => Math.abs(resid(p, plane)) <= 2 * rms);
-    if (kept.length >= 3 && kept.length < pts.length) {
-      pts = kept;
-      plane = fitPlane(pts) || plane;
-      rms = rmsOf(pts, plane);
-    }
+    if (kept.length < 3 || kept.length === pts.length) break;
+    pts = kept;
+    plane = fitPlane(pts) || plane;
+    rms = rmsOf(pts, plane);
   }
   return { ...plane, ...planeToOrientation(plane), residualRms: rms, nPoints: pts.length };
 }
