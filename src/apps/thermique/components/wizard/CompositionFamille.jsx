@@ -1,20 +1,17 @@
 // src/apps/thermique/components/wizard/CompositionFamille.jsx
 // Carte de composition d'une famille de parois (étape 3 du wizard Thermique) : 3 modes de
-// résolution du U — « Défaut période » (uDefautPour × année de construction), « Bibliothèque »
-// (parois-types.json filtrées par famille), « U saisi » (nombre libre borné [0.05, 6]).
-// Chaque changement remonte la famille COMPLÈTE { mode, u } via onPatch → PATCH_COMPOSITIONS
-// (le reducer remplace la valeur de la famille — shape { mode, u } VERROUILLÉ, cf. wizardState.js :
-// c'est pourquoi la paroi bibliothèque choisie n'est PAS persistée, seul son U l'est ; la
-// sélection du <select> est un état local, ré-amorcé au remount par matching sur U SEULEMENT si
-// le match est unique — des U dupliqués existent dans les données réelles (ex. murs : 0.19 et
-// 0.15 partagés chacun par 2 parois) et un findIndex afficherait le mauvais nom au retour sur
-// l'étape ; sinon placeholder honnête, le U affiché en en-tête reste correct).
+// résolution du U — « Défaut période » (uDefautPour × année de construction), « Composer » (couches
+// de matériaux → U via ComposeurParoiModal, transparent et vérifiable), « U saisi » (nombre libre
+// borné [0.05, 6]). Chaque changement remonte la famille COMPLÈTE { mode, u, couches? } via onPatch
+// → PATCH_COMPOSITIONS (le reducer remplace la valeur de la famille). Les couches sont mémorisées
+// dans la famille pour ré-édition/transparence (le moteur ne lit que `u`).
 // Exporte aussi InputU (input U commit-au-blur partagé avec Step3OuverturesCompositions :
 // menuiseries, exceptions par pièce, exceptions par ouverture).
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { uDefauts, paroisTypes } from '../../data';
+import { uDefauts } from '../../data';
 import { uDefautPour, resolvePeriode } from '../../lib/refDataResolvers';
+import ComposeurParoiModal from './ComposeurParoiModal';
 
 export const U_MIN = 0.05;
 export const U_MAX = 6;
@@ -67,60 +64,30 @@ export function InputU({ value, onCommit, allowEmpty = true, placeholder = '', d
 // famille wizard → type de table u-defauts.json (contrat TYPE_U_DEFAUT d'assembleBatiment).
 const TYPE_3CL = { murs: 'mur', plancherBas: 'plancherBas', plafondToiture: 'plafond' };
 
-// Familles réelles de parois-types.json (vérifiées) : 'Mur Ext.' / 'Mur Ent.' / 'Mur Int.' /
-// 'Fen. Porte et Porte-fen.' / 'Plan. TP, isol. continue.' / 'Plan. sur VS.' / 'Plaf. sous Comble.'
-// → mapping par préfixe ('Fen. …' jamais matchée : les menuiseries ont leurs propres champs U).
-const FILTRE_FAMILLE = {
-  murs: (f) => f.startsWith('Mur'),
-  plancherBas: (f) => f.startsWith('Plan.'),
-  plafondToiture: (f) => f.startsWith('Plaf.'),
-};
-
 /**
  * @param {Object} props
  * @param {'murs'|'plancherBas'|'plafondToiture'} props.famille clé de compositions.familles
  * @param {string} props.label titre affiché de la famille
- * @param {{mode: 'defaut'|'bibliotheque'|'saisi', u: number|null}} props.valeur famille courante
+ * @param {{mode: 'defaut'|'compose'|'saisi', u: number|null, couches?: object[]}} props.valeur
  * @param {number|null} props.annee année de construction (contexte) — pilote le U défaut/période
- * @param {(patch: {mode: string, u: number|null}) => void} props.onPatch remplace la famille
+ * @param {(patch: {mode: string, u: number|null, couches?: object[]}) => void} props.onPatch
  */
 export default function CompositionFamille({ famille, label, valeur, annee, onPatch }) {
-  const parois = useMemo(
-    () => paroisTypes.parois.filter((p) => FILTRE_FAMILLE[famille](p.famille)),
-    [famille],
-  );
   const uDefaut = uDefautPour(uDefauts, TYPE_3CL[famille], annee);
   const periode = resolvePeriode(annee);
-
-  const [selIndex, setSelIndex] = useState(() => {
-    if (valeur.mode !== 'bibliotheque' || !Number.isFinite(valeur.u)) return '';
-    const matches = parois.filter((p) => p.u === valeur.u);
-    return matches.length === 1 ? String(parois.indexOf(matches[0])) : '';
-  });
+  const [composeurOuvert, setComposeurOuvert] = useState(false);
 
   const setMode = (mode) => {
     if (mode === valeur.mode) return;
-    if (mode === 'defaut') {
-      onPatch({ mode: 'defaut', u: null });
-    } else if (mode === 'bibliotheque') {
-      const p = selIndex === '' ? null : parois[Number(selIndex)];
-      onPatch({ mode: 'bibliotheque', u: p ? p.u : null });
-    } else {
-      // Pré-rempli avec le U courant résolu (défaut période si rien) — point de départ éditable.
-      onPatch({ mode: 'saisi', u: Number.isFinite(valeur.u) ? valeur.u : uDefaut });
-    }
-  };
-
-  const handleSelectParoi = (e) => {
-    const v = e.target.value;
-    setSelIndex(v);
-    const p = v === '' ? null : parois[Number(v)];
-    onPatch({ mode: 'bibliotheque', u: p ? p.u : null });
+    if (mode === 'defaut') onPatch({ mode: 'defaut', u: null, couches: undefined });
+    else if (mode === 'compose') setComposeurOuvert(true); // le patch vient de onApply
+    else onPatch({ mode: 'saisi', u: Number.isFinite(valeur.u) ? valeur.u : uDefaut, couches: undefined });
   };
 
   const uResolu = valeur.mode === 'defaut' ? uDefaut : (Number.isFinite(valeur.u) ? valeur.u : null);
   const nomRadio = `composition-${famille}`;
   const radioClass = 'mt-0.5 border-secondary-300 text-primary-600 focus:ring-primary-500 flex-shrink-0';
+  const nbCouches = valeur.couches?.length ?? 0;
 
   return (
     <div className="card space-y-3">
@@ -131,6 +98,7 @@ export default function CompositionFamille({ famille, label, valeur, annee, onPa
         </span>
       </div>
 
+      {/* Défaut période */}
       <label className="flex items-start gap-2 text-sm text-secondary-700 cursor-pointer">
         <input
           type="radio"
@@ -145,33 +113,36 @@ export default function CompositionFamille({ famille, label, valeur, annee, onPa
         </span>
       </label>
 
+      {/* Composer (couches de matériaux) */}
       <div className="space-y-1.5">
         <label className="flex items-start gap-2 text-sm text-secondary-700 cursor-pointer">
           <input
             type="radio"
             name={nomRadio}
             className={radioClass}
-            checked={valeur.mode === 'bibliotheque'}
-            onChange={() => setMode('bibliotheque')}
+            checked={valeur.mode === 'compose'}
+            onChange={() => setMode('compose')}
           />
-          <span>Bibliothèque</span>
+          <span>Composer <span className="text-secondary-500">(couches de matériaux)</span></span>
         </label>
-        {valeur.mode === 'bibliotheque' && (
-          <select
-            value={selIndex}
-            onChange={handleSelectParoi}
-            className="w-full px-2 py-1.5 text-sm border border-secondary-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">— Choisir une paroi —</option>
-            {parois.map((p, i) => (
-              <option key={`${p.nom}-${i}`} value={String(i)}>
-                {p.nom} — U {p.u}
-              </option>
-            ))}
-          </select>
+        {valeur.mode === 'compose' && (
+          <div className="flex items-center gap-2 pl-6">
+            <span className="text-xs text-secondary-500">
+              {nbCouches} couche{nbCouches > 1 ? 's' : ''}
+              {Number.isFinite(valeur.u) ? ` · U = ${valeur.u}` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setComposeurOuvert(true)}
+              className="px-2 py-1 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg"
+            >
+              Composer / éditer
+            </button>
+          </div>
         )}
       </div>
 
+      {/* U saisi */}
       <div className="flex items-center gap-2">
         <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
           <input
@@ -192,6 +163,16 @@ export default function CompositionFamille({ famille, label, valeur, annee, onPa
           />
         )}
       </div>
+
+      {composeurOuvert && (
+        <ComposeurParoiModal
+          famille={famille}
+          label={label}
+          couchesInitiales={valeur.couches}
+          onApply={({ u, couches }) => { onPatch({ mode: 'compose', u, couches }); setComposeurOuvert(false); }}
+          onClose={() => setComposeurOuvert(false)}
+        />
+      )}
     </div>
   );
 }
