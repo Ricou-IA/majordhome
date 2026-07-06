@@ -19,6 +19,28 @@ export function orientationToAspect(orientation) {
   return ASPECT_BY_DIRECTION[orientation] ?? 0;
 }
 
+/** Normalise un angle en degrés sur l'intervalle demi-ouvert [-180, +180). */
+function normalizeDeg(deg) {
+  let d = ((deg + 180) % 360 + 360) % 360 - 180; // ramène dans [-180, +180)
+  if (Object.is(d, -0)) d = 0;
+  return d;
+}
+
+/**
+ * Azimut Google Solar (0=N, 90=E, 180=S, 270=O ; horaire 0–360)
+ * → aspect PVGIS (S=0, E=-90, O=+90, N=±180). Nord = -180 (intervalle demi-ouvert).
+ */
+export function googleAzimuthToPvgisAspect(azimuthDeg) {
+  return normalizeDeg(azimuthDeg - 180);
+}
+
+/** Pente en degrés → pente en % (langage BTP). Inverse de percentToDegrees. */
+export function degreesToPercent(deg) {
+  const pct = Math.tan((deg * Math.PI) / 180) * 100;
+  // Math.tan(π/4) renvoie 0,9999999999… → nettoyer le bruit flottant (45° = 100 % exact).
+  return Math.round(pct * 1e9) / 1e9;
+}
+
 /** Puissance max toiture (kWc) : floor(surface / surface_panneau) × puissance_panneau. */
 export function maxPowerKwc(surfaceM2, panelAreaM2, panelPowerWc) {
   return Math.floor(surfaceM2 / panelAreaM2) * (panelPowerWc / 1000);

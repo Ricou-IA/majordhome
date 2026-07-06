@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount,
+  percentToDegrees, orientationToAspect, googleAzimuthToPvgisAspect, degreesToPercent, maxPowerKwc, panelsCount,
   spreadAnnualToMonthly, evMonthlyConsumption, simultaneityCoeff, costFromGrid,
   computeMonthly, yearlyEconomy, monthlyPayment,
   buildYearlyTable, optimize, buildScenarios, defaultScenarioKwc,
@@ -309,4 +309,23 @@ test('buildEtudeModel — objectif pilotage en delta points / euros', async () =
   assert.equal(model.pilotageDeltaPoints, Math.max(0, expectedPoints));
   assert.ok(Math.abs(model.pilotageDeltaEuros - model.pilotageDeltaPoints * model.sensitivityPerAutoconsoPoint) < 1e-9);
   assert.ok(model.pilotageDeltaPoints > 0); // coeff 0,55 → marge réelle jusqu'au plafond 0,85
+});
+
+test('googleAzimuthToPvgisAspect — 4 cardinaux (Google 0=N,90=E,180=S,270=O)', () => {
+  assert.equal(googleAzimuthToPvgisAspect(180), 0);    // Sud → 0
+  assert.equal(googleAzimuthToPvgisAspect(90), -90);   // Est → -90
+  assert.equal(googleAzimuthToPvgisAspect(270), 90);   // Ouest → +90
+  assert.equal(googleAzimuthToPvgisAspect(0), -180);   // Nord → -180 (intervalle demi-ouvert [-180,+180))
+  assert.equal(googleAzimuthToPvgisAspect(360), -180); // 360 ≡ 0 ≡ Nord
+});
+
+test('googleAzimuthToPvgisAspect — cas intermédiaires normalisés', () => {
+  assert.equal(googleAzimuthToPvgisAspect(135), -45);  // Sud-Est
+  assert.equal(googleAzimuthToPvgisAspect(225), 45);   // Sud-Ouest
+});
+
+test('degreesToPercent — inverse de percentToDegrees', () => {
+  assert.equal(degreesToPercent(45), 100);             // 45° = 100 %
+  assert.ok(Math.abs(degreesToPercent(0)) < 1e-9);     // plat = 0 %
+  assert.ok(Math.abs(degreesToPercent(percentToDegrees(30)) - 30) < 1e-6);
 });
