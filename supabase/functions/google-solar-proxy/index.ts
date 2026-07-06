@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
         dsmTiff: encodeBase64(new Uint8Array(dsmBuf)),
         pixelSizeMeters: px,
         imageryQuality: dl.imageryQuality ?? null,
+        imageryDate: dl.imageryDate ?? null,           // { year, month, day } — fraîcheur de la donnée
       }, 200, req);
     }
 

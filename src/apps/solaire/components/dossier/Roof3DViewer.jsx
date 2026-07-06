@@ -251,6 +251,12 @@ export default function Roof3DViewer({ roof, onClose }) {
       <header className="flex items-center justify-between px-4 py-3 bg-slate-800 text-white flex-shrink-0">
         <div>
           <h3 className="font-semibold text-sm">Toiture 3D — Google Solar</h3>
+          <p className="text-[11px] text-amber-300/90">
+            {roof?.imageryDate
+              ? `Imagerie Google : ${String(roof.imageryDate.month ?? '').padStart(2, '0')}/${roof.imageryDate.year}`
+              : 'Imagerie Google'}
+            {roof?.imageryQuality ? ` · qualité ${roof.imageryQuality}` : ''}
+          </p>
           <p className="text-xs text-slate-400">
             {distance != null
               ? `Distance : ${distance.toFixed(2)} m`

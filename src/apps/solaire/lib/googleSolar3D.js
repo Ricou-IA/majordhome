@@ -75,6 +75,7 @@ export async function fetchRoof3D({ lat, lon, pixelSizeMeters = 0.5 }) {
         width: dsm.width, height: dsm.height,
         pixelSizeMeters: data.pixelSizeMeters ?? pixelSizeMeters,
         imageryQuality: data.imageryQuality ?? null,
+        imageryDate: data.imageryDate ?? null,
       },
       error: null,
     };
