@@ -7,6 +7,7 @@ import {
   rectDepuisDrag,
   zoomBoite,
   snapPoint,
+  decalageAncrage,
 } from '../../lib/canvasGeometry.js';
 import { PieceShape } from './PieceShape.jsx';
 import { CotesPiece } from './CotesPiece.jsx';
@@ -16,6 +17,11 @@ import MursOverlay from './MursOverlay.jsx';
 import ZoomControls from './ZoomControls.jsx';
 
 const TOLERANCE_MUR_CM = 30;
+// Glisser-déplacer d'une pièce : dead-zone (px ÉCRAN, indépendante du zoom) avant d'engager le
+// déplacement → un simple clic (jitter < seuil) ne bouge pas la pièce. Magnétisme d'alignement
+// (cm) : la pièce s'aimante au bord colinéaire d'une voisine dans ce rayon → ancrage facile.
+const SEUIL_DRAG_PX = 8;
+const SEUIL_MAGNET_CM = 40;
 
 /**
  * Convertit les coordonnées écran (px) d'un événement pointeur en coordonnées du dessin (cm),
@@ -114,8 +120,9 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   // stylet/souris qui a initié le drag : les événements des AUTRES pointeurs (multi-touch) sont
   // ignorés tant que ce drag est actif.
   const [dragRect, setDragRect] = useState(null);
-  // Déplacement d'une pièce par glisser en mode 'sélection' (pièce = objet manipulable). Transitoire,
-  // grid-quantisé : { pointerId, pieceId, startCm:{x,y}, lastDelta:{dx,dy}, moved }.
+  // Déplacement d'une pièce par glisser en mode 'sélection' (pièce = objet manipulable). Transitoire :
+  // { pointerId, pieceId, startCm, startClientX/Y (dead-zone px), startPolygone (base position
+  // absolue), engaged, lastDelta }.
   const [dragMove, setDragMove] = useState(null);
   // Facteur de zoom manuel du canevas (1 = auto-cadrage sur le contenu ; −/+/Ajuster = ZoomControls).
   const [zoom, setZoom] = useState(1);
@@ -189,11 +196,15 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
     }
     if (mode === 'selection') {
       // Glisser sur le CORPS d'une pièce = la déplacer (pièce = objet manipulable). On la sélectionne
-      // dès la prise ; le déplacement effectif ne démarre qu'au premier franchissement de cellule.
+      // dès la prise ; le déplacement ne s'engage qu'au-delà d'une dead-zone (anti-clic accidentel).
       const piece = piecesNiveauActif.find((p) => pointDansPolygone(ptCm, p.polygone));
       if (piece) {
         onSelect?.({ type: 'piece', id: piece.id });
-        setDragMove({ pointerId: event.pointerId, pieceId: piece.id, startCm: ptCm, lastDelta: { dx: 0, dy: 0 }, moved: false });
+        setDragMove({
+          pointerId: event.pointerId, pieceId: piece.id, startCm: ptCm,
+          startClientX: event.clientX, startClientY: event.clientY,
+          startPolygone: piece.polygone, engaged: false, lastDelta: { dx: 0, dy: 0 },
+        });
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       // Pas de pièce sous le curseur : on laisse pointerup gérer le tap (sélection mur / rien).
@@ -208,22 +219,34 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
       return;
     }
     if (dragMove && event.pointerId === dragMove.pointerId) {
+      // Dead-zone : tant que le geste n'a pas dépassé SEUIL_DRAG_PX à l'écran (indépendant du zoom),
+      // c'est un clic → la pièce ne bouge pas (anti-sensibilité).
+      if (!dragMove.engaged
+        && Math.hypot(event.clientX - dragMove.startClientX, event.clientY - dragMove.startClientY) < SEUIL_DRAG_PX) {
+        return;
+      }
       const ptCm = pointeurVersCm(event, svgRef.current);
       if (!ptCm) return;
-      // Delta depuis la prise, accroché à la grille : le déplacement est quantifié à la cellule
-      // (10 cm) → au plus quelques onChange par glisser, et l'overlay des murs se recolorie en
-      // direct (le mur commun devient slate dès que la continuité avec la voisine est atteinte).
-      const snapped = snapPoint({ x: ptCm.x - dragMove.startCm.x, y: ptCm.y - dragMove.startCm.y });
-      if (snapped.x === dragMove.lastDelta.dx && snapped.y === dragMove.lastDelta.dy) return;
-      const incDx = snapped.x - dragMove.lastDelta.dx;
-      const incDy = snapped.y - dragMove.lastDelta.dy;
+      // Position ABSOLUE depuis la prise, accrochée à la grille (10 cm), PUIS magnétisme : si un
+      // bord de la pièce tombe à moins de SEUIL_MAGNET_CM d'un bord colinéaire d'une voisine, on
+      // aimante l'alignement exact → ancrage facile, et la pièce glisse le long du mur en restant
+      // collée. L'overlay recolorie en direct (mur ambre→slate) dès que la continuité est atteinte.
+      const grid = snapPoint({ x: ptCm.x - dragMove.startCm.x, y: ptCm.y - dragMove.startCm.y });
+      const tentative = dragMove.startPolygone.map((pt) => ({ x: pt.x + grid.x, y: pt.y + grid.y }));
+      const autres = piecesNiveauActif.filter((p) => p.id !== dragMove.pieceId);
+      let dx = grid.x;
+      let dy = grid.y;
+      try {
+        const aimant = decalageAncrage({ id: dragMove.pieceId, polygone: tentative }, autres, SEUIL_MAGNET_CM);
+        if (aimant) { dx += aimant.dx; dy += aimant.dy; }
+      } catch { /* géométrie transitoire non indexable : pas d'aimantation ce frame */ }
+      if (dragMove.engaged && dx === dragMove.lastDelta.dx && dy === dragMove.lastDelta.dy) return;
+      const finalPoly = dragMove.startPolygone.map((pt) => ({ x: pt.x + dx, y: pt.y + dy }));
       onChange?.({
         ...dessin,
-        pieces: dessin.pieces.map((p) => (p.id === dragMove.pieceId
-          ? { ...p, polygone: p.polygone.map((pt) => ({ x: pt.x + incDx, y: pt.y + incDy })) }
-          : p)),
+        pieces: dessin.pieces.map((p) => (p.id === dragMove.pieceId ? { ...p, polygone: finalPoly } : p)),
       });
-      setDragMove((prev) => (prev ? { ...prev, lastDelta: { dx: snapped.x, dy: snapped.y }, moved: true } : prev));
+      setDragMove((prev) => (prev ? { ...prev, engaged: true, lastDelta: { dx, dy } } : prev));
     }
   }
 
@@ -250,8 +273,8 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
     if (dragMove) {
       if (event.pointerId !== dragMove.pointerId) return; // autre pointeur : ignoré
       // La pièce est déjà à sa position finale (appliquée en direct pendant le glisser) et
-      // sélectionnée. Un « glisser » qui n'a franchi aucune cellule (moved=false) = simple clic :
-      // la pièce a été sélectionnée au pointerdown, rien de plus à faire.
+      // sélectionnée. Un geste resté sous la dead-zone (engaged=false) = simple clic : la pièce a
+      // été sélectionnée au pointerdown, rien de plus à faire.
       setDragMove(null);
       return;
     }
