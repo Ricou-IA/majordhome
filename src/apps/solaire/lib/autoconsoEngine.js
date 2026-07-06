@@ -99,3 +99,49 @@ export function reconcileMonthly({ hourlyShape, monthlyTargets }) {
   }
   return out;
 }
+
+/**
+ * Reconstruit la courbe de charge horaire (8760) du foyer :
+ * budget par usage (devices) réparti sur sa forme déclarée, puis RÉSIDU (talon) =
+ * conso mensuelle − usages du mois, distribué par la forme Enedis normalisée et
+ * calé sur les 12 ancres. On soustrait les usages AVANT de caler le talon pour
+ * éviter le double comptage (l'archétype Enedis contient déjà un « foyer moyen »).
+ * - monthlyConsoTotals[12] : conso totale du foyer par mois (les 12 ancres).
+ * - baseShape[8760] : forme normalisée du talon (profil Enedis, poids relatifs).
+ * - devices[] : [{ name, annualKwh, hourOfDayWeights[24], monthWeights[12] }].
+ * Renvoie { hourly, byDevice, residualMonthly, warnings }.
+ */
+export function buildLoadCurve({ monthlyConsoTotals, baseShape, devices = [] }) {
+  const warnings = [];
+  const deviceCurves = devices.map((d) => ({ name: d.name, curve: distributeDeviceLoad(d) }));
+
+  // énergie des usages par mois
+  const deviceByMonth = new Array(12).fill(0);
+  for (const { curve } of deviceCurves) {
+    for (let h = 0; h < curve.length; h++) deviceByMonth[hourToDate(h).month] += curve[h];
+  }
+
+  // cible résiduelle mensuelle = conso totale du mois − usages du mois (bornée ≥ 0)
+  const residualMonthly = monthlyConsoTotals.map((total, m) => {
+    const r = total - deviceByMonth[m];
+    if (r < 0) {
+      warnings.push(
+        `Mois ${m + 1} : usages déclarés (${deviceByMonth[m].toFixed(0)} kWh) dépassent la conso totale (${total.toFixed(0)} kWh) — talon ramené à 0.`
+      );
+      return 0;
+    }
+    return r;
+  });
+
+  const residualCurve = reconcileMonthly({ hourlyShape: baseShape, monthlyTargets: residualMonthly });
+
+  const hourly = new Array(baseShape.length).fill(0);
+  for (let h = 0; h < hourly.length; h++) {
+    let v = residualCurve[h];
+    for (const { curve } of deviceCurves) v += curve[h];
+    hourly[h] = v;
+  }
+
+  const byDevice = Object.fromEntries(deviceCurves.map(({ name, curve }) => [name, curve]));
+  return { hourly, byDevice, residualMonthly, warnings };
+}

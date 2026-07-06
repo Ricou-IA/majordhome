@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourToDate — bornes mois / heure de journée (année 365 j)', () => {
   assert.equal(HOURS_PER_YEAR, 8760);
@@ -62,4 +62,38 @@ test('reconcileMonthly — mois de forme nulle mais cible > 0 → répartition u
   const out = reconcileMonthly({ hourlyShape: shape, monthlyTargets: targets });
   assert.ok(Math.abs(out[0] - 1) < 1e-9);
   assert.equal(out[8000], 0); // décembre cible 0 → 0
+});
+
+test('buildLoadCurve — talon + device, énergie totale et ancres mensuelles respectées', () => {
+  const monthlyConsoTotals = Array(12).fill(1000);          // 12 000 kWh/an
+  const baseShape = new Array(8760).fill(1);                // talon plat
+  const hourOfDayWeights = Array.from({ length: 24 }, (_, h) => (h < 6 ? 1 : 0));
+  const devices = [{ name: 've', annualKwh: 2400, hourOfDayWeights, monthWeights: Array(12).fill(1) }];
+  const { hourly, byDevice, residualMonthly, warnings } = buildLoadCurve({ monthlyConsoTotals, baseShape, devices });
+
+  assert.equal(hourly.length, 8760);
+  assert.equal(warnings.length, 0);
+  const total = hourly.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(total - 12000) < 1e-3);                // conso totale conservée
+  // somme de janvier ≈ ancre de janvier (1000)
+  const janSum = hourly.slice(0, 31 * 24).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(janSum - 1000) < 1e-3);
+  // le device VE représente 2400 kWh, exposé séparément
+  assert.ok(Math.abs(byDevice.ve.reduce((a, b) => a + b, 0) - 2400) < 1e-6);
+  // résidu mensuel = total − énergie VE du mois. Le VE est réparti à l'heure sur
+  // les heures de nuit : janvier (31 j × 6 h = 186 h actives sur 2190 h/an)
+  // porte 2400 × 186/2190 kWh, PAS 200 (les mois n'ont pas le même nb de jours).
+  const janVE = 2400 * (31 * 6) / (365 * 6);
+  assert.ok(Math.abs(residualMonthly[0] - (1000 - janVE)) < 1e-6);
+  // résidu annuel total = conso totale − VE total
+  assert.ok(Math.abs(residualMonthly.reduce((a, b) => a + b, 0) - (12000 - 2400)) < 1e-6);
+});
+
+test('buildLoadCurve — usages > conso du mois → warning + talon ramené à 0', () => {
+  const monthlyConsoTotals = Array(12).fill(100);
+  const baseShape = new Array(8760).fill(1);
+  const devices = [{ name: 've', annualKwh: 6000, hourOfDayWeights: Array(24).fill(1), monthWeights: Array(12).fill(1) }];
+  const { residualMonthly, warnings } = buildLoadCurve({ monthlyConsoTotals, baseShape, devices });
+  assert.ok(warnings.length >= 1);
+  assert.equal(residualMonthly[0], 0);
 });
