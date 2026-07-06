@@ -7,7 +7,7 @@
 // { u, couches } ; la bibliothèque ne stocke que des compositions nommées réutilisables.
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { X, Trash2, Save } from 'lucide-react';
+import { X, Trash2, Save, Plus } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import MateriauPicker from './MateriauPicker';
 import { uParoiDepuisCouches, ajouteParoiBibliotheque } from '../../lib/composeurParois';
@@ -19,6 +19,7 @@ export default function ComposeurParoiModal({ famille, label, couchesInitiales, 
     () => (Array.isArray(couchesInitiales) ? couchesInitiales.map((c) => ({ ...c })) : []),
   );
   const [nomBiblio, setNomBiblio] = useState('');
+  const [pickerOuvert, setPickerOuvert] = useState(false);
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -30,7 +31,10 @@ export default function ComposeurParoiModal({ famille, label, couchesInitiales, 
   const config = buildThermiqueConfig(settings);
   const bibliothequeFamille = config.parois_bibliotheque.filter((p) => p.famille === famille);
 
-  const ajoute = (m) => setCouches((prev) => [...prev, { materiauNom: m.nom, lambda: m.lambda, e: 10 }]);
+  const ajoute = (m) => {
+    setCouches((prev) => [...prev, { materiauNom: m.nom, lambda: m.lambda, e: 10 }]);
+    setPickerOuvert(false); // couche ajoutée → on referme le sélecteur (cause → effet clair)
+  };
   const setEpaisseur = (i, brut) => setCouches((prev) => prev.map((c, j) => (
     j === i ? { ...c, e: brut === '' ? '' : Number(brut) } : c
   )));
@@ -95,14 +99,10 @@ export default function ComposeurParoiModal({ famille, label, couchesInitiales, 
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-secondary-700">Ajouter une couche</label>
-          <MateriauPicker famille={null} onSelect={ajoute} />
-        </div>
-
+        {/* Couches de la paroi (de l'extérieur vers l'intérieur) */}
         {couches.length === 0 ? (
           <p className="text-sm text-secondary-500">
-            Ajoutez des couches (de l’extérieur vers l’intérieur).
+            Aucune couche pour l’instant. Ajoutez les matériaux de l’extérieur vers l’intérieur.
           </p>
         ) : (
           <ul className="divide-y divide-secondary-100 border border-secondary-100 rounded-lg">
@@ -138,6 +138,31 @@ export default function ComposeurParoiModal({ famille, label, couchesInitiales, 
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Ajouter une couche : bouton explicite « + » → sélecteur de matériau (auto-focus). */}
+        {pickerOuvert ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-secondary-700">Choisir un matériau</label>
+              <button
+                type="button"
+                onClick={() => setPickerOuvert(false)}
+                className="text-xs text-secondary-500 hover:text-secondary-700"
+              >
+                Fermer
+              </button>
+            </div>
+            <MateriauPicker famille={null} onSelect={ajoute} autoFocus />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPickerOuvert(true)}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-700 border border-dashed border-primary-300 rounded-lg hover:bg-primary-50"
+          >
+            <Plus className="w-4 h-4" /> Ajouter une couche
+          </button>
         )}
 
         <div

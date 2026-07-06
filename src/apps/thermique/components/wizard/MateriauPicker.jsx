@@ -6,9 +6,9 @@ import { Search } from 'lucide-react';
 import { materiaux } from '../../data';
 import { chercheMateriaux } from '../../lib/composeurParois';
 
-export default function MateriauPicker({ famille = null, onSelect, placeholder = 'Chercher un matériau…' }) {
+export default function MateriauPicker({ famille = null, onSelect, placeholder = 'Chercher un matériau…', autoFocus = false }) {
   const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoFocus); // ouvert d'emblée si auto-focus → la liste s'affiche
   // `materiaux` (data/index.js) est l'objet JSON complet { _meta, materiaux: [...] } — on cherche
   // dans le tableau `.materiaux` (même convention que menuiseries.vitrages dans UwHelperModal).
   const results = open ? chercheMateriaux(materiaux.materiaux, query, famille) : [];
@@ -20,6 +20,7 @@ export default function MateriauPicker({ famille = null, onSelect, placeholder =
           className="w-full pl-8 pr-2 py-1.5 text-sm border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           value={query}
           placeholder={placeholder}
+          autoFocus={autoFocus}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
