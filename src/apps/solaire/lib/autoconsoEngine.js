@@ -25,3 +25,31 @@ export function hourToDate(h) {
   }
   return { month, hourOfDay, dayOfYear };
 }
+
+/**
+ * Autoconsommation instantanée d'une production contre une consommation, au même
+ * pas de temps. selfConsumed = Σ min(prod, conso) ; export = Σ max(prod-conso, 0) ;
+ * import = Σ max(conso-prod, 0). Le surplus (export) n'est jamais valorisé en €.
+ */
+export function computeSelfConsumption({ prodHourly, consoHourly }) {
+  if (prodHourly.length !== consoHourly.length) {
+    throw new Error('computeSelfConsumption : longueurs prod/conso différentes');
+  }
+  let selfC = 0, exp = 0, imp = 0, prod = 0, conso = 0;
+  for (let i = 0; i < prodHourly.length; i++) {
+    const p = prodHourly[i];
+    const c = consoHourly[i];
+    prod += p; conso += c;
+    selfC += Math.min(p, c);
+    if (p > c) exp += p - c; else imp += c - p;
+  }
+  return {
+    prodKwh: prod,
+    consoKwh: conso,
+    selfConsumedKwh: selfC,
+    exportedKwh: exp,
+    importedKwh: imp,
+    autoconsoRate: prod > 0 ? selfC / prod : 0,
+    autoproductionRate: conso > 0 ? selfC / conso : 0,
+  };
+}
