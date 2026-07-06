@@ -60,7 +60,12 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     if (location.lat == null) return;
     setFluxLoading(true);
     setFluxMsg(null);
-    const { data } = await fetchFluxOverlay({ lat: location.lat, lon: location.lon });
+    // Le flux se récupère au centre de la TOITURE TRACÉE (pas au point géocodé, qui peut être
+    // ailleurs si l'utilisateur a déplacé la carte pour tracer une autre maison → décalage).
+    const [flng, flat] = roofGeometry?.polygon
+      ? turf.centroid(roofGeometry.polygon).geometry.coordinates
+      : [location.lon, location.lat];
+    const { data } = await fetchFluxOverlay({ lat: flat, lon: flng });
     setFluxLoading(false);
     if (data?.source === 'google') {
       setFluxOverlay({ imageUrl: data.imageUrl, coordinates: data.coordinates });
