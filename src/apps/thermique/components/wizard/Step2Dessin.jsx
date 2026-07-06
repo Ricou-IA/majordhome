@@ -237,6 +237,14 @@ export default function Step2Dessin({ dessin, config, onDessinChange }) {
               {mode === 'rectangle' ? 'Glissez pour tracer une pièce' : 'Touchez une pièce pour l’éditer'}
             </p>
           </div>
+          <div className="flex items-center gap-4 px-3 py-1.5 border-b border-secondary-100 text-xs text-secondary-500">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-4 h-1.5 rounded-full bg-amber-500" /> Mur extérieur
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-4 h-1 rounded-full bg-slate-400" /> Mur mitoyen
+            </span>
+          </div>
           <div className="h-[460px]">
             <CanvasErrorBoundary>
               <PlanCanvas

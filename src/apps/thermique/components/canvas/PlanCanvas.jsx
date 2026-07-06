@@ -5,11 +5,14 @@ import {
   pointDansPolygone,
   segmentLePlusProche,
   rectDepuisDrag,
+  zoomBoite,
 } from '../../lib/canvasGeometry.js';
 import { PieceShape } from './PieceShape.jsx';
 import { CotesPiece } from './CotesPiece.jsx';
 import { OuvertureMarker } from './OuvertureMarker.jsx';
 import { RoseNord } from './RoseNord.jsx';
+import MursOverlay from './MursOverlay.jsx';
+import ZoomControls from './ZoomControls.jsx';
 
 const TOLERANCE_MUR_CM = 30;
 
@@ -110,6 +113,8 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   // stylet/souris qui a initié le drag : les événements des AUTRES pointeurs (multi-touch) sont
   // ignorés tant que ce drag est actif.
   const [dragRect, setDragRect] = useState(null);
+  // Facteur de zoom manuel du canevas (1 = auto-cadrage sur le contenu ; −/+/Ajuster = ZoomControls).
+  const [zoom, setZoom] = useState(1);
 
   const piecesNiveauActif = dessin.pieces.filter((p) => p.niveauId === niveauActifId);
   const indexNiveauActif = dessin.niveaux.findIndex((n) => n.id === niveauActifId);
@@ -118,12 +123,14 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
     ? dessin.pieces.filter((p) => p.niveauId === niveauInferieur.id)
     : [];
 
-  const boite = boiteEnglobante([...piecesNiveauActif, ...piecesNiveauInferieur]);
+  const boiteFit = boiteEnglobante([...piecesNiveauActif, ...piecesNiveauInferieur]);
+  const boite = zoomBoite(boiteFit, zoom);
   const viewBox = `${boite.x} ${boite.y} ${boite.largeur} ${boite.hauteur}`;
   // Facteur d'échelle des textes/traits des enfants (cf. JSDoc ci-dessus) : 1.0 pour un plan de
   // 600 cm dans sa plus grande dimension, proportionnel au-delà → taille apparente constante à
-  // l'écran, que le plan soit dominant en largeur ou en hauteur.
-  const echelle = Math.max(boite.largeur, boite.hauteur) / 600;
+  // l'écran, que le plan soit dominant en largeur ou en hauteur. Calculé sur la boîte AJUSTÉE
+  // (boiteFit), PAS la boîte zoomée : la taille apparente du texte reste stable quand on zoome.
+  const echelle = Math.max(boiteFit.largeur, boiteFit.hauteur) / 600;
 
   const pieceSelectionnee = selection?.pieceId != null
     ? piecesNiveauActif.find((p) => p.id === selection.pieceId)
@@ -261,6 +268,9 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
           />
         ))}
 
+        {/* Surlignage de l'enveloppe : murs extérieurs (ambre) vs mitoyens (slate). */}
+        <MursOverlay piecesNiveauActif={piecesNiveauActif} echelle={echelle} />
+
         {/* Ouvertures du niveau actif. */}
         {dessin.ouvertures
           .filter((o) => piecesNiveauActif.some((p) => p.id === o.pieceId))
@@ -289,10 +299,40 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
             strokeDasharray={`${12 * echelle} ${8 * echelle}`}
           />
         )}
+
+        {/* Cotes live du rectangle en cours de tracé (L × l en m) — l'utilisateur voit la taille
+            qu'il dessine en temps réel. */}
+        {rectFantome && (() => {
+          const xs = rectFantome.map((p) => p.x);
+          const ys = rectFantome.map((p) => p.y);
+          const L = (Math.max(...xs) - Math.min(...xs)) / 100;
+          const l = (Math.max(...ys) - Math.min(...ys)) / 100;
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+          const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+          return (
+            <text
+              x={cx}
+              y={cy}
+              textAnchor="middle"
+              className="fill-blue-700 font-medium select-none"
+              style={{ fontSize: 20 * echelle }}
+            >
+              {L.toFixed(1)} × {l.toFixed(1)} m
+            </text>
+          );
+        })()}
       </svg>
 
       <div className="absolute top-2 right-2">
         <RoseNord dessin={dessin} onChange={onChange} />
+      </div>
+
+      <div className="absolute bottom-2 left-2">
+        <ZoomControls
+          onZoomIn={() => setZoom((z) => Math.min(5, z * 1.25))}
+          onZoomOut={() => setZoom((z) => Math.max(0.2, z / 1.25))}
+          onReset={() => setZoom(1)}
+        />
       </div>
     </div>
   );
