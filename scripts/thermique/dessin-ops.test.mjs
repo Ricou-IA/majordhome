@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   ajoutePiece, supprimePiece, deplacePiece, redimensionnePiece, renommePiece, basculeChauffee,
   regleThetaInt, ajouteOuverture, supprimeOuverture, ajouteNiveau, dupliqueNiveau, supprimeNiveau,
-  regleNord, regleHauteurNiveau, valideDessin,
+  regleNord, regleHauteurNiveau, valideDessin, validePorteAFaux,
 } from '../../src/apps/thermique/lib/dessinOps.js';
 
 // ── Fixture de référence : 2 niveaux, 3 pièces (adapté de l'idée de maison() du plan 3, Task 6) ──
@@ -605,4 +605,53 @@ test('redimensionnePiece : refuse une pièce non rectangulaire (forme en L)', ()
 test('redimensionnePiece : refuse un pieceId inconnu', () => {
   const { erreurs } = redimensionnePiece(rectDessin(POLY_400x300), 'inconnu', { largeur: 500, hauteur: 250 });
   assert.equal(erreurs.length, 1);
+});
+
+// ── Porte-à-faux (plan validation) : étage 600×400 sur RDC 400×400 → 8 m² sur extérieur ──
+const dessinPorteAFaux = (porteAFauxValide = false) => ({
+  nord: 0,
+  plancherBasType: 'terre-plein',
+  toitureType: 'comble',
+  niveaux: [
+    { id: 'rdc', nom: 'RDC', hauteur: 250 },
+    { id: 'etage', nom: 'Étage', hauteur: 250 },
+  ],
+  pieces: [
+    {
+      id: 'bas', niveauId: 'rdc', nom: 'Bas', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+      polygone: [{ x: 0, y: 0 }, { x: 0, y: 400 }, { x: 400, y: 400 }, { x: 400, y: 0 }],
+    },
+    {
+      id: 'haut', niveauId: 'etage', nom: 'Haut', typePiece: 'chambre', chauffee: true, thetaInt: 19,
+      porteAFauxValide,
+      polygone: [{ x: 0, y: 0 }, { x: 0, y: 400 }, { x: 600, y: 400 }, { x: 600, y: 0 }],
+    },
+  ],
+  ouvertures: [],
+});
+
+test('valideDessin : porte-à-faux non validé → exposé dans portesAFaux + avertissement présent', () => {
+  const { avertissements, portesAFaux } = valideDessin(dessinPorteAFaux(false));
+  assert.equal(portesAFaux.length, 1);
+  assert.equal(portesAFaux[0].pieceId, 'haut');
+  assert.equal(portesAFaux[0].nom, 'Haut');
+  assert.equal(portesAFaux[0].valide, false);
+  assert.ok(portesAFaux[0].surfaceM2 > 0);
+  assert.ok(avertissements.some((a) => a.includes('porte-à-faux')));
+});
+
+test('valideDessin : porte-à-faux VALIDÉ → avertissement masqué, condition conservée (valide:true)', () => {
+  const { avertissements, portesAFaux } = valideDessin(dessinPorteAFaux(true));
+  assert.equal(portesAFaux.length, 1);
+  assert.equal(portesAFaux[0].valide, true);
+  assert.ok(!avertissements.some((a) => a.includes('porte-à-faux')));
+});
+
+test('validePorteAFaux : pose le drapeau, refuse un pieceId inconnu', () => {
+  const d0 = dessinPorteAFaux(false);
+  const { dessin, erreurs } = validePorteAFaux(d0, 'haut', true);
+  assert.deepEqual(erreurs, []);
+  assert.equal(dessin.pieces.find((p) => p.id === 'haut').porteAFauxValide, true);
+  assert.equal(d0.pieces.find((p) => p.id === 'haut').porteAFauxValide, false); // entrée non mutée
+  assert.equal(validePorteAFaux(d0, 'inconnu').erreurs.length, 1);
 });

@@ -440,6 +440,7 @@ export function valideDessin(dessin) {
   exigeDessin(dessin, 'valideDessin');
   const erreurs = [];
   const avertissements = [];
+  let portesAFaux = [];
 
   const idsNiveaux = new Set();
   for (const n of dessin.niveaux) {
@@ -471,10 +472,44 @@ export function valideDessin(dessin) {
     const resultat = deduireParois(dessin);
     erreurs.push(...resultat.erreurs);
     avertissements.push(...resultat.avertissements);
+    // Porte-à-faux (plancher sur extérieur d'un niveau supérieur) exposé de façon STRUCTURÉE pour
+    // l'UI (bouton « Valider » + note confirmée) : regroupé par pièce, surfaces sommées, drapeau
+    // `valide` reflétant piece.porteAFauxValide. Indépendant de la chaîne d'avertissement (qui, elle,
+    // est suppriméе par deduireParois dès que le porte-à-faux est validé).
+    const surfParPiece = new Map();
+    for (const p of resultat.parois) {
+      if (p.type !== 'plancher-sur-exterieur') continue;
+      surfParPiece.set(p.pieceId, (surfParPiece.get(p.pieceId) ?? 0) + p.surfaceM2);
+    }
+    portesAFaux = [...surfParPiece.entries()].map(([pieceId, surfaceM2]) => {
+      const piece = dessin.pieces.find((pp) => pp.id === pieceId);
+      return { pieceId, nom: piece?.nom ?? String(pieceId), surfaceM2, valide: !!piece?.porteAFauxValide };
+    });
   } catch (e) {
     if (!(e instanceof Error) || !e.message.startsWith('thermique:')) throw e;
     erreurs.push(`dessin invalide : ${e.message}`);
   }
 
-  return { erreurs, avertissements };
+  return { erreurs, avertissements, portesAFaux };
+}
+
+/**
+ * Valide (ou invalide) le porte-à-faux d'une pièce = marque son plancher sur extérieur comme
+ * VOLONTAIRE. Effet : `deduireParois`/`valideDessin` cessent d'émettre l'avertissement « à vérifier »
+ * pour cette pièce (la paroi `plancher-sur-exterieur` b=1 reste émise — calcul inchangé). Le drapeau
+ * `porteAFauxValide` vit sur la pièce (persisté avec l'étude, disparaît si la pièce est supprimée).
+ * Refus : pieceId inconnu.
+ * @param {object} dessin dessin courant (jamais muté)
+ * @param {*} pieceId id de la pièce
+ * @param {boolean} [valide=true] true = validé (avertissement masqué), false = re-signalé
+ * @returns {{dessin: object, erreurs: string[]}}
+ */
+export function validePorteAFaux(dessin, pieceId, valide = true) {
+  exigeDessin(dessin, 'validePorteAFaux');
+  const piece = dessin.pieces.find((p) => p.id === pieceId);
+  if (!piece) return refuse(dessin, `pièce « ${pieceId} » : introuvable`);
+  return accepte({
+    ...dessin,
+    pieces: dessin.pieces.map((p) => (p.id === pieceId ? { ...p, porteAFauxValide: valide } : p)),
+  });
 }

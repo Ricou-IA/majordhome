@@ -15,10 +15,11 @@ import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { PlanCanvas } from '../canvas/PlanCanvas';
 import CanvasErrorBoundary from './CanvasErrorBoundary';
 import PieceInspector from './PieceInspector';
+import PortesAFauxPanel from './PortesAFauxPanel';
 import { typePieceInfo } from '../../lib/thermiqueConfig';
 import { validePolygone } from '../../lib/geometryEngine';
 import {
-  ajouteNiveau, dupliqueNiveau, supprimeNiveau, regleHauteurNiveau, valideDessin,
+  ajouteNiveau, dupliqueNiveau, supprimeNiveau, regleHauteurNiveau, valideDessin, validePorteAFaux,
 } from '../../lib/dessinOps';
 
 const HAUTEUR_NIVEAU_DEFAUT = 250; // cm — même défaut que le RDC initial (wizardState.js)
@@ -144,6 +145,11 @@ export default function Step2Dessin({ dessin, config, onDessinChange }) {
   const pieceSelectionnee = selection?.type === 'piece'
     ? dessin.pieces.find((p) => p.id === selection.id) ?? null
     : null;
+
+  // Porte-à-faux : rendus à part (bouton Valider / note confirmée) → on les retire de la liste
+  // générique d'avertissements pour ne pas les afficher deux fois.
+  const avertissementsHorsPaf = check.avertissements.filter((a) => !a.includes('porte-à-faux'));
+  const handleValiderPaf = (pieceId) => applique(validePorteAFaux(dessin, pieceId));
 
   return (
     <div className="space-y-3">
@@ -281,29 +287,35 @@ export default function Step2Dessin({ dessin, config, onDessinChange }) {
           ) : (
             <div className="card space-y-3">
               <h3 className="font-semibold text-secondary-900 text-sm">Validation du plan</h3>
-              {check.erreurs.length === 0 && check.avertissements.length === 0 ? (
-                <p className="flex items-start gap-2 text-sm text-secondary-600">
-                  <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  {dessin.pieces.length === 0
-                    ? 'Tracez une première pièce avec l’outil Rectangle.'
-                    : 'Aucun problème détecté.'}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {check.erreurs.map((e, i) => (
-                    <li key={`err-${i}`} className="flex items-start gap-2 text-sm text-red-700">
-                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>{e}</span>
-                    </li>
-                  ))}
-                  {check.avertissements.map((a, i) => (
-                    <li key={`warn-${i}`} className="flex items-start gap-2 text-sm text-amber-700">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>{a}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {check.erreurs.length === 0 && avertissementsHorsPaf.length === 0
+                && (check.portesAFaux?.length ?? 0) === 0 ? (
+                  <p className="flex items-start gap-2 text-sm text-secondary-600">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    {dessin.pieces.length === 0
+                      ? 'Tracez une première pièce avec l’outil Rectangle.'
+                      : 'Aucun problème détecté.'}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {(check.erreurs.length > 0 || avertissementsHorsPaf.length > 0) && (
+                      <ul className="space-y-2">
+                        {check.erreurs.map((e, i) => (
+                          <li key={`err-${i}`} className="flex items-start gap-2 text-sm text-red-700">
+                            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{e}</span>
+                          </li>
+                        ))}
+                        {avertissementsHorsPaf.map((a, i) => (
+                          <li key={`warn-${i}`} className="flex items-start gap-2 text-sm text-amber-700">
+                            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{a}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <PortesAFauxPanel portesAFaux={check.portesAFaux} onValider={handleValiderPaf} />
+                  </div>
+                )}
               <p className="text-xs text-secondary-400">
                 Sélectionnez une pièce sur le plan pour la renommer, changer son type ou sa consigne.
               </p>

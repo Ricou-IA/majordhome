@@ -23,8 +23,9 @@ import { PlanCanvas } from '../canvas/PlanCanvas';
 import CanvasErrorBoundary from './CanvasErrorBoundary';
 import CompositionFamille, { InputU } from './CompositionFamille';
 import UwHelperModal from './UwHelperModal';
+import PortesAFauxPanel from './PortesAFauxPanel';
 import { DIMENSIONS_OUVERTURES } from '../../lib/thermiqueConfig';
-import { ajouteOuverture, supprimeOuverture } from '../../lib/dessinOps';
+import { ajouteOuverture, supprimeOuverture, validePorteAFaux } from '../../lib/dessinOps';
 import { positionOuvertureSnappee } from '../../lib/canvasGeometry';
 import { segmentsDe, normalisePolygone } from '../../lib/geometryEngine';
 
@@ -136,6 +137,13 @@ export default function Step3OuverturesCompositions({
 
   const piecesChauffees = dessin.pieces.filter((p) => p.chauffee);
   const nomNiveau = (niveauId) => dessin.niveaux.find((n) => n.id === niveauId)?.nom ?? '';
+
+  // Porte-à-faux rendus à part (bouton Valider / note confirmée) → retirés de la liste générique.
+  const avertissementsHorsPaf = dessinCheck.avertissements.filter((a) => !a.includes('porte-à-faux'));
+  const handleValiderPaf = (pieceId) => {
+    const r = validePorteAFaux(dessin, pieceId);
+    if (r.erreurs.length === 0) onDessinChange(r.dessin);
+  };
 
   return (
     <div className="space-y-5">
@@ -276,27 +284,33 @@ export default function Step3OuverturesCompositions({
             {/* Validation du plan (les erreurs de pose vivent dans valideDessin) */}
             <div className="card space-y-3">
               <h3 className="font-semibold text-secondary-900 text-sm">Validation du plan</h3>
-              {dessinCheck.erreurs.length === 0 && dessinCheck.avertissements.length === 0 ? (
-                <p className="flex items-start gap-2 text-sm text-secondary-600">
-                  <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  Aucun problème détecté.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {dessinCheck.erreurs.map((e, i) => (
-                    <li key={`err-${i}`} className="flex items-start gap-2 text-sm text-red-700">
-                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>{e}</span>
-                    </li>
-                  ))}
-                  {dessinCheck.avertissements.map((a, i) => (
-                    <li key={`warn-${i}`} className="flex items-start gap-2 text-sm text-amber-700">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>{a}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {dessinCheck.erreurs.length === 0 && avertissementsHorsPaf.length === 0
+                && (dessinCheck.portesAFaux?.length ?? 0) === 0 ? (
+                  <p className="flex items-start gap-2 text-sm text-secondary-600">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    Aucun problème détecté.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {(dessinCheck.erreurs.length > 0 || avertissementsHorsPaf.length > 0) && (
+                      <ul className="space-y-2">
+                        {dessinCheck.erreurs.map((e, i) => (
+                          <li key={`err-${i}`} className="flex items-start gap-2 text-sm text-red-700">
+                            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{e}</span>
+                          </li>
+                        ))}
+                        {avertissementsHorsPaf.map((a, i) => (
+                          <li key={`warn-${i}`} className="flex items-start gap-2 text-sm text-amber-700">
+                            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{a}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <PortesAFauxPanel portesAFaux={dessinCheck.portesAFaux} onValider={handleValiderPaf} />
+                  </div>
+                )}
             </div>
           </div>
         </div>

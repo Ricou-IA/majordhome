@@ -885,7 +885,11 @@ export function deduireParois(dessin) {
       } else {
         parois.push({ pieceId: piece.id, type: 'plancher-sur-exterieur', surfaceM2: f.surfaceCm2 / 10000,
           meta: { niveauId: niveau.id } });
-        avertissements.push(`pièce « ${piece.id} » : plancher en porte-à-faux sur l'extérieur (${f.surfaceCm2 / 10000} m²) — vérifier le dessin`);
+        // Avertissement « à vérifier » SUPPRIMÉ si l'utilisateur a validé le porte-à-faux comme
+        // volontaire (piece.porteAFauxValide) — la paroi b=1 reste émise, le calcul est inchangé.
+        if (!piece.porteAFauxValide) {
+          avertissements.push(`pièce « ${piece.id} » : plancher en porte-à-faux sur l'extérieur (${f.surfaceCm2 / 10000} m²) — vérifier le dessin`);
+        }
       }
     }
     for (const f of face.plafond) {
