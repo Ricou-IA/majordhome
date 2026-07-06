@@ -116,6 +116,10 @@ Deno.serve(async (req) => {
     // Décodage impossible côté edge (node:vm). On fetch, base64, renvoie. Le navigateur
     // décode/reprojette/colorise (src/apps/solaire/lib/googleSolarFlux.js).
     if (mode === "data_layers_raw") {
+      // pixelSizeMeters paramétrable (0.5 par défaut) : le viewer 3D peut demander une grille
+      // plus/moins fine. DSM + flux + mask sortent tous de la MÊME grille à ce pas → alignés
+      // pixel-à-pixel (aucune reprojection nécessaire pour le drapé 3D).
+      const px = num(body.pixelSizeMeters) || 0.5;
       await enforceCap(supabase, orgId, "data_layers");
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 25_000);
@@ -124,7 +128,7 @@ Deno.serve(async (req) => {
         dlRes = await fetch(
           `${SOLAR}/dataLayers:get?location.latitude=${lat}&location.longitude=${lon}`
           + `&radiusMeters=50&view=IMAGERY_AND_ANNUAL_FLUX_LAYERS`
-          + `&requiredQuality=${requiredQuality}&pixelSizeMeters=0.5&key=${KEY}`,
+          + `&requiredQuality=${requiredQuality}&pixelSizeMeters=${px}&key=${KEY}`,
           { signal: ctrl.signal },
         );
       } finally { clearTimeout(timer); }
@@ -134,13 +138,17 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: `Google DL ${dlRes.status}`, detail }, 502, req);
       }
       const dl = await dlRes.json();
-      if (!dl.annualFluxUrl || !dl.maskUrl) return jsonResponse({ notFound: true }, 200, req);
-      const [fluxBuf, maskBuf] = await Promise.all([fetchGeoTiff(dl.annualFluxUrl), fetchGeoTiff(dl.maskUrl)]);
+      if (!dl.annualFluxUrl || !dl.maskUrl || !dl.dsmUrl) return jsonResponse({ notFound: true }, 200, req);
+      const [fluxBuf, maskBuf, dsmBuf] = await Promise.all([
+        fetchGeoTiff(dl.annualFluxUrl), fetchGeoTiff(dl.maskUrl), fetchGeoTiff(dl.dsmUrl),
+      ]);
       // Incrémente le compteur DL (quota) via flux_fetched_at.
       await upsertCache(supabase, orgId, key, { flux_fetched_at: new Date().toISOString() });
       return jsonResponse({
         fluxTiff: encodeBase64(new Uint8Array(fluxBuf)),
         maskTiff: encodeBase64(new Uint8Array(maskBuf)),
+        dsmTiff: encodeBase64(new Uint8Array(dsmBuf)),
+        pixelSizeMeters: px,
         imageryQuality: dl.imageryQuality ?? null,
       }, 200, req);
     }
