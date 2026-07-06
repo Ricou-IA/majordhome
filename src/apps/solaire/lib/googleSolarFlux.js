@@ -55,6 +55,11 @@ export async function fetchFluxOverlay({ lat, lon }) {
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
     if (data?.notFound) return { data: { source: 'none' }, error: null };
+    // Réponse sans octets GeoTIFF = edge pas (re)déployé avec le mode data_layers_raw → dégrade proprement.
+    if (!data?.fluxTiff || !data?.maskTiff) {
+      logger.warn('[flux] réponse sans données GeoTIFF — edge à redéployer ?', data);
+      return { data: { source: 'none' }, error: null };
+    }
 
     const flux = await readTiff(b64ToArrayBuffer(data.fluxTiff));
     const mask = await readTiff(b64ToArrayBuffer(data.maskTiff));
