@@ -426,14 +426,14 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               type="number"
               inputMode="decimal"
               className={inputClass}
-              value={tiltPercentVal ?? ''}
+              value={Number.isFinite(tilt) ? Math.round(tilt) : ''}
               min={0}
               step={1}
               disabled={inputsLocked}
               onChange={(e) => handleTiltChange(e.target.value)}
             />
             {tiltDeg !== null && (
-              <p className="text-xs text-secondary-500 mt-1">{tilt} % ≈ {tiltDeg}°</p>
+              <p className="text-xs text-secondary-500 mt-1">{Math.round(tilt)} % ≈ {Math.round(tiltDeg)}°</p>
             )}
           </FormField>
 
@@ -442,7 +442,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               type="number"
               inputMode="decimal"
               className={inputClass}
-              value={surfaceVal ?? ''}
+              value={Number.isFinite(surface) ? Math.round(surface) : ''}
               min={0}
               step={1}
               disabled={inputsLocked}
@@ -487,7 +487,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                 min={-180}
                 max={180}
                 disabled={inputsLocked}
-                value={panEditor ? (Number.isFinite(Number(orientationVal)) ? Number(orientationVal) : '') : (typeof roof.orientation === 'number' ? roof.orientation : '')}
+                value={panEditor ? (Number.isFinite(Number(orientationVal)) ? Math.round(Number(orientationVal)) : '') : (typeof roof.orientation === 'number' ? roof.orientation : '')}
                 placeholder={`${aspect}`}
                 onChange={(e) => handleOrientationDeg(e.target.value)}
               />
