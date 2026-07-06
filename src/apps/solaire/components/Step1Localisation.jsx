@@ -58,10 +58,12 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       return;
     }
     const d = data.dominant;
+    // Pente/orientation = pan dominant ; surface = TOUT le toit exploitable (pas un seul pan).
+    const surface = data.usableAreaM2 ?? d.area_m2;
     onRoof({
       tiltPercent: Math.max(0, Math.round(degreesToPercent(d.pitch_deg))),
       orientation: Math.round(d.aspect_pvgis),
-      surfaceM2: Math.round(d.area_m2),
+      surfaceM2: Math.round(surface),
     });
     onRoofGeometry({ ...data });
     setSolarStatus('filled');

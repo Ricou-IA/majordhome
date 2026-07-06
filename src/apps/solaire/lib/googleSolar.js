@@ -36,12 +36,18 @@ export async function fetchBuildingInsights({ lat, lon, requiredQuality = 'MEDIU
       d.pitch_deg = 0;
       d.aspect_pvgis = 0;
     }
+    // Surface exploitable = TOUT le toit (pas le seul pan dominant). Priorité : surface panneaux
+    // Google (setbacks déduits) → toit total → repli sur le pan dominant si rien d'autre.
+    const usableAreaM2 = bi?.max_array_area_m2 ?? bi?.whole_roof_area_m2 ?? d?.area_m2 ?? null;
     return {
       data: {
         source: 'google_solar',
         imageryQuality: data?.imageryQuality ?? bi?.imageryQuality ?? null,
         segments: bi?.segments ?? [],
         dominant: d,
+        usableAreaM2,
+        wholeRoofAreaM2: bi?.whole_roof_area_m2 ?? null,
+        maxPanels: bi?.max_array_panels_count ?? null,
         fluxImagePath: data?.fluxImagePath ?? null,
       },
       error: null,

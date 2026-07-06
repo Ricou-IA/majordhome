@@ -42,16 +42,27 @@ async function enforceCap(supabase: any, orgId: string, kind: "building_insights
   if ((d ?? 0) >= LIMITS[kind].daily) throw new QuotaError(`quota_daily_${kind}`);
 }
 
-// Parse la réponse buildingInsights → { imageryQuality, name, segments[], dominant }.
+// Parse la réponse buildingInsights → { imageryQuality, name, segments[], dominant, surfaces }.
+// dominant = pan le plus grand (pente/orientation). Surfaces = TOUT le toit (pas un seul pan) :
+// max_array_area_m2 = surface exploitable panneaux (setbacks déduits) ; whole_roof_area_m2 = toit total.
 function parseBuildingInsights(j: any) {
-  const stats = (j.solarPotential?.roofSegmentStats ?? []).map((s: any) => ({
+  const sp = j.solarPotential ?? {};
+  const stats = (sp.roofSegmentStats ?? []).map((s: any) => ({
     pitch_deg: s.pitchDegrees ?? null,
     azimuth_google_deg: s.azimuthDegrees ?? null,
     area_m2: s.stats?.areaMeters2 ?? null,
     center: s.center ?? null,
   }));
   const dominant = stats.slice().sort((a: any, b: any) => (b.area_m2 ?? 0) - (a.area_m2 ?? 0))[0] ?? null;
-  return { imageryQuality: j.imageryQuality ?? null, name: j.name ?? null, segments: stats, dominant };
+  return {
+    imageryQuality: j.imageryQuality ?? null,
+    name: j.name ?? null,
+    segments: stats,
+    dominant,
+    whole_roof_area_m2: sp.wholeRoofStats?.areaMeters2 ?? null,
+    max_array_area_m2: sp.maxArrayAreaMeters2 ?? null,
+    max_array_panels_count: sp.maxArrayPanelsCount ?? null,
+  };
 }
 
 async function readCache(supabase: any, orgId: string, key: string) {
