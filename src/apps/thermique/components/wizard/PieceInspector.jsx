@@ -108,6 +108,10 @@ export default function PieceInspector({
   // --- Position : décalage numérique H/V (A5) + ancrage sur une pièce voisine (B1) ---
   const [dxDraft, setDxDraft] = useState('0');
   const [dyDraft, setDyDraft] = useState('0');
+  // Resync au changement de pièce : PieceInspector n'a pas de key={piece.id}, l'instance est
+  // réutilisée au switch de sélection → sans ça, une valeur de décalage saisie mais non appliquée
+  // sur la pièce A fuirait sur la pièce B (cohérent avec nomDraft/thetaDraft/largeurDraft).
+  useEffect(() => { setDxDraft('0'); setDyDraft('0'); }, [piece.id]);
   const applyDecalage = () => {
     const dx = Number(dxDraft) || 0;
     const dy = Number(dyDraft) || 0;

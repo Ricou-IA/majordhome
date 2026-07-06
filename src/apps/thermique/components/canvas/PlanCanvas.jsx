@@ -128,9 +128,10 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   const viewBox = `${boite.x} ${boite.y} ${boite.largeur} ${boite.hauteur}`;
   // Facteur d'échelle des textes/traits des enfants (cf. JSDoc ci-dessus) : 1.0 pour un plan de
   // 600 cm dans sa plus grande dimension, proportionnel au-delà → taille apparente constante à
-  // l'écran, que le plan soit dominant en largeur ou en hauteur. Calculé sur la boîte AJUSTÉE
-  // (boiteFit), PAS la boîte zoomée : la taille apparente du texte reste stable quand on zoome.
-  const echelle = Math.max(boiteFit.largeur, boiteFit.hauteur) / 600;
+  // l'écran, que le plan soit dominant en largeur ou en hauteur. Calculé sur la boîte RÉELLEMENT
+  // RENDUE (boite = boiteFit / zoom) : la fontSize étant en unités viewBox, l'agrandir quand on
+  // dézoome (boîte plus grande) compense le viewBox élargi → taille apparente stable à TOUT zoom.
+  const echelle = Math.max(boite.largeur, boite.hauteur) / 600;
 
   const pieceSelectionnee = selection?.pieceId != null
     ? piecesNiveauActif.find((p) => p.id === selection.pieceId)
