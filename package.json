@@ -58,6 +58,7 @@
         "recharts": "^2.15.4",
         "sonner": "^1.7.4",
         "tailwind-merge": "^2.6.0",
+        "three": "^0.185.1",
         "vite-plugin-pwa": "^1.2.0",
         "zod": "^3.25.76"
     },

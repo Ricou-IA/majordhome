@@ -1,16 +1,20 @@
 // src/apps/solaire/components/Step1Localisation.jsx
 // Étape 1 du wizard : localisation (GPS ou adresse) + toiture (pente %, orientation, surface).
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import * as turf from '@turf/turf';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun, Box } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition } from '../lib/pvgis';
 import { fetchFluxOverlay } from '../lib/googleSolarFlux';
+import { fetchRoof3D } from '../lib/googleSolar3D';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
 import FluxHeatmap from './dossier/FluxHeatmap';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
+
+// Three.js est lourd → viewer 3D lazy-loadé (chunk séparé, hors bundle principal).
+const Roof3DViewer = lazy(() => import('./dossier/Roof3DViewer'));
 
 // Boussole 3×3 (centre vide) — ordre d'affichage
 const COMPASS = [
@@ -48,12 +52,17 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
   const [fluxMsg, setFluxMsg] = useState(null);
   const [fluxDebug, setFluxDebug] = useState(null); // diagnostic temporaire (alignement overlay)
 
+  // Viewer 3D (DSM + flux drapé) — chargé à la demande.
+  const [roof3d, setRoof3d] = useState(null);
+  const [roof3dLoading, setRoof3dLoading] = useState(false);
+
   // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
     onRoofGeometry(null);
     setSolarStatus(location.lat == null ? 'idle' : 'locate');
     setFluxOverlay(null);
     setFluxMsg(null);
+    setRoof3d(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lon]);
 
@@ -78,6 +87,24 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       setFluxMsg('Pas de couche de flux Google sur ce point.');
     } else {
       setFluxMsg('Flux Google indisponible.');
+    }
+  };
+
+  // Vue 3D : DSM + flux drapé, mesure au clic. Centroïde de la toiture tracée (comme loadFlux).
+  const openRoof3D = async () => {
+    if (location.lat == null) return;
+    setRoof3dLoading(true);
+    const [flng, flat] = roofGeometry?.polygon
+      ? turf.centroid(roofGeometry.polygon).geometry.coordinates
+      : [location.lon, location.lat];
+    const { data } = await fetchRoof3D({ lat: flat, lon: flng });
+    setRoof3dLoading(false);
+    if (data?.source === 'google') {
+      setRoof3d(data);
+    } else if (data?.source === 'none') {
+      toast.info('Pas de données 3D Google sur ce point.');
+    } else {
+      toast.error('Vue 3D Google indisponible.');
     }
   };
 
@@ -197,6 +224,15 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
             >
               {fluxLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sun className="w-4 h-4 text-[#F5C542]" />}
               {fluxLoading ? 'Chargement du flux…' : '☀️ Voir le flux solaire (Google)'}
+            </button>
+            <button
+              type="button"
+              onClick={openRoof3D}
+              disabled={roof3dLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-secondary-200 bg-white text-sm font-medium text-secondary-700 hover:border-secondary-400 disabled:opacity-60"
+            >
+              {roof3dLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Box className="w-4 h-4 text-[#1565C0]" />}
+              {roof3dLoading ? 'Chargement de la 3D…' : '🧊 Vue 3D + flux (Google)'}
             </button>
             {fluxMsg && (
               <p className="text-xs text-secondary-500 text-center">{fluxMsg}</p>
@@ -324,6 +360,12 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       >
         Continuer <ArrowRight className="w-4 h-4" />
       </button>
+
+      {roof3d && (
+        <Suspense fallback={null}>
+          <Roof3DViewer roof={roof3d} onClose={() => setRoof3d(null)} />
+        </Suspense>
+      )}
     </div>
   );
 }
