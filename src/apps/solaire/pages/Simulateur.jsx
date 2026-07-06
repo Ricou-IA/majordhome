@@ -8,6 +8,8 @@ import { History, RotateCcw, Loader2, Check } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { usePvSimulation, usePvSimulationMutations } from '@hooks/usePvSimulations';
+import { usePvDossierMutations } from '@hooks/usePvDossier';
+import { logger } from '@lib/logger';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { formatDateFR } from '@lib/utils';
 import { buildPvConfig } from '../lib/pvConfig';
@@ -47,6 +49,7 @@ function SimulateurInner({ config, settings }) {
   const simId = searchParams.get('sim');
   const { data: savedSim } = usePvSimulation(simId);
   const { createSimulation } = usePvSimulationMutations();
+  const { ensureDossier, patchBlock } = usePvDossierMutations();
 
   const [state, dispatch] = useReducer(wizardReducer, config, initialWizardState);
   const restoredRef = useRef(false);
@@ -131,7 +134,7 @@ function SimulateurInner({ config, settings }) {
 
   const handleSave = async ({ clientName, comment, results }) => {
     try {
-      await createSimulation.mutateAsync({
+      const sim = await createSimulation.mutateAsync({
         clientName,
         comment,
         clientAddress: state.location.address || null,
@@ -148,6 +151,17 @@ function SimulateurInner({ config, settings }) {
         pvgisMonthly: state.pvgis,
         results,
       });
+      // Dossier PV write-once : la géométrie Google Solar rejoint le dossier dès sa création LAZY.
+      if (state.roofGeometry && sim?.id) {
+        try {
+          const dossier = await ensureDossier.mutateAsync({ simulationId: sim.id });
+          if (dossier?.id) {
+            await patchBlock.mutateAsync({ id: dossier.id, patch: { roof_geometry: state.roofGeometry } });
+          }
+        } catch (dossierErr) {
+          logger.warn('[solaire] roof_geometry non persisté (dossier)', dossierErr); // non bloquant
+        }
+      }
       clearDraft(userId);
       toast.success(`Simulation « ${clientName} » enregistrée`);
     } catch (err) {
