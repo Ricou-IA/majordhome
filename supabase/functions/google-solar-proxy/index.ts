@@ -3,9 +3,12 @@
 // (coût marginal 0 sur ré-sim d'une même adresse). Hard cap mensuel/journalier par SKU.
 // mode: 'building_insights' (géométrie toit) | 'data_layers' (heatmap flux) | 'both'.
 import { requireOrgMembership, jsonResponse, sanitizeError, buildCorsHeaders } from "../_shared/auth.ts";
-// NB : la rasterisation GeoTIFF (./geotiff.ts) est DIFFÉRÉE — l'import esm.sh de `geotiff`
-// tire `node:vm`, indisponible dans le runtime Edge Supabase (spike §9.4). Le module reste
-// dans le repo ; la branche data_layers ci-dessous sert le cache ou renvoie null (jamais bloquant).
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+// NB : la rasterisation GeoTIFF côté edge est DIFFÉRÉE — l'import esm.sh de `geotiff`
+// tire `node:vm`, indisponible dans le runtime Edge Supabase (spike §9.4). On NE décode donc
+// PAS ici. Le mode `data_layers_raw` relaie les octets GeoTIFF bruts (base64) → décodage
+// navigateur (voir src/apps/solaire/lib/googleSolarFlux.js). La branche `data_layers`
+// historique sert le cache ou renvoie null (jamais bloquant).
 
 const SOLAR = "https://solar.googleapis.com/v1";
 const KEY = Deno.env.get("GOOGLE_SOLAR_API_KEY") || "";
@@ -27,6 +30,14 @@ function buildingKeyOf(lat: number, lon: number): string {
 }
 
 class QuotaError extends Error {}
+
+// Télécharge un GeoTIFF Google Solar (annualFlux / mask) en octets bruts (relayés au navigateur).
+async function fetchGeoTiff(url: string): Promise<ArrayBuffer> {
+  const withKey = url + (url.includes("?") ? "&" : "?") + "key=" + KEY;
+  const res = await fetch(withKey);
+  if (!res.ok) throw new Error(`geoTiff ${res.status}`);
+  return await res.arrayBuffer();
+}
 
 // Compte les fetchs Google réels (cache misses) du mois/jour en cours pour un SKU.
 async function enforceCap(supabase: any, orgId: string, kind: "building_insights" | "data_layers") {
@@ -100,6 +111,40 @@ Deno.serve(async (req) => {
     }
 
     const key = buildingKeyOf(lat, lon);
+
+    // ── Data Layers RAW (Étape B) : relaie les octets GeoTIFF flux+mask au navigateur ──────
+    // Décodage impossible côté edge (node:vm). On fetch, base64, renvoie. Le navigateur
+    // décode/reprojette/colorise (src/apps/solaire/lib/googleSolarFlux.js).
+    if (mode === "data_layers_raw") {
+      await enforceCap(supabase, orgId, "data_layers");
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 25_000);
+      let dlRes: Response;
+      try {
+        dlRes = await fetch(
+          `${SOLAR}/dataLayers:get?location.latitude=${lat}&location.longitude=${lon}`
+          + `&radiusMeters=50&view=IMAGERY_AND_ANNUAL_FLUX_LAYERS`
+          + `&requiredQuality=${requiredQuality}&pixelSizeMeters=0.5&key=${KEY}`,
+          { signal: ctrl.signal },
+        );
+      } finally { clearTimeout(timer); }
+      if (dlRes.status === 404) return jsonResponse({ notFound: true }, 200, req);
+      if (!dlRes.ok) {
+        const detail = (await dlRes.text().catch(() => "")).slice(0, 300);
+        return jsonResponse({ error: `Google DL ${dlRes.status}`, detail }, 502, req);
+      }
+      const dl = await dlRes.json();
+      if (!dl.annualFluxUrl || !dl.maskUrl) return jsonResponse({ notFound: true }, 200, req);
+      const [fluxBuf, maskBuf] = await Promise.all([fetchGeoTiff(dl.annualFluxUrl), fetchGeoTiff(dl.maskUrl)]);
+      // Incrémente le compteur DL (quota) via flux_fetched_at.
+      await upsertCache(supabase, orgId, key, { flux_fetched_at: new Date().toISOString() });
+      return jsonResponse({
+        fluxTiff: encodeBase64(new Uint8Array(fluxBuf)),
+        maskTiff: encodeBase64(new Uint8Array(maskBuf)),
+        imageryQuality: dl.imageryQuality ?? null,
+      }, 200, req);
+    }
+
     let cache = await readCache(supabase, orgId, key);
     const result: Record<string, unknown> = {};
 
