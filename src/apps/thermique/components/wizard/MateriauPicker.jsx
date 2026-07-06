@@ -9,7 +9,9 @@ import { chercheMateriaux } from '../../lib/composeurParois';
 export default function MateriauPicker({ famille = null, onSelect, placeholder = 'Chercher un matériau…' }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const results = open ? chercheMateriaux(materiaux, query, famille) : [];
+  // `materiaux` (data/index.js) est l'objet JSON complet { _meta, materiaux: [...] } — on cherche
+  // dans le tableau `.materiaux` (même convention que menuiseries.vitrages dans UwHelperModal).
+  const results = open ? chercheMateriaux(materiaux.materiaux, query, famille) : [];
   return (
     <div className="relative">
       <div className="relative">
