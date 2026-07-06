@@ -62,6 +62,10 @@ verify_jwt = true
 [functions.pvgis-proxy]
 verify_jwt = true
 
+# Solaire — proxy Google Solar (clé edge-only, cache write-through)
+[functions.google-solar-proxy]
+verify_jwt = true
+
 [functions.gsc-oauth-init]
 verify_jwt = true
 
