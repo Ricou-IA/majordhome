@@ -46,6 +46,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
   const [fluxOverlay, setFluxOverlay] = useState(null);
   const [fluxLoading, setFluxLoading] = useState(false);
   const [fluxMsg, setFluxMsg] = useState(null);
+  const [fluxDebug, setFluxDebug] = useState(null); // diagnostic temporaire (alignement overlay)
 
   // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     if (location.lat == null) return;
     setFluxLoading(true);
     setFluxMsg(null);
+    setFluxDebug(null);
     // Le flux se récupère au centre de la TOITURE TRACÉE (pas au point géocodé, qui peut être
     // ailleurs si l'utilisateur a déplacé la carte pour tracer une autre maison → décalage).
     const [flng, flat] = roofGeometry?.polygon
@@ -69,6 +71,9 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     setFluxLoading(false);
     if (data?.source === 'google') {
       setFluxOverlay({ imageUrl: data.imageUrl, coordinates: data.coordinates });
+      const c = data.coordinates; // [TL, TR, BR, BL] en [lng,lat]
+      const west = c[0][0]; const north = c[0][1]; const east = c[2][0]; const south = c[2][1];
+      setFluxDebug(`fetch ${flat.toFixed(5)}, ${flng.toFixed(5)} · overlay lng ${west.toFixed(5)}→${east.toFixed(5)} · lat ${south.toFixed(5)}→${north.toFixed(5)}`);
     } else if (data?.source === 'none') {
       setFluxMsg('Pas de couche de flux Google sur ce point.');
     } else {
@@ -200,6 +205,9 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               <p className="text-xs text-secondary-500 text-center">
                 Flux annuel Google Solar (indicatif) — bleu foncé = faible, clair/jaune = fort.
               </p>
+            )}
+            {fluxDebug && (
+              <p className="text-[10px] font-mono text-secondary-400 text-center break-all">{fluxDebug}</p>
             )}
           </div>
         )}
