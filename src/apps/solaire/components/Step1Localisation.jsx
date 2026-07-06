@@ -3,12 +3,13 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import * as turf from '@turf/turf';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun, Box } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun, Box, Ruler } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition } from '../lib/pvgis';
 import { fetchFluxOverlay } from '../lib/googleSolarFlux';
 import { fetchRoof3D } from '../lib/googleSolar3D';
+import { fetchRoofPlaneFromIgn } from '../lib/ignMns';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
 import FluxHeatmap from './dossier/FluxHeatmap';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
@@ -56,6 +57,10 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
   const [roof3d, setRoof3d] = useState(null);
   const [roof3dLoading, setRoof3dLoading] = useState(false);
 
+  // Pente/orientation depuis le MNS IGN LiDAR HD (plane-fit sur le toit tracé).
+  const [ignLoading, setIgnLoading] = useState(false);
+  const [ignMsg, setIgnMsg] = useState(null);
+
   // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
     onRoofGeometry(null);
@@ -63,6 +68,8 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     setFluxOverlay(null);
     setFluxMsg(null);
     setRoof3d(null);
+    setIgnLoading(false);
+    setIgnMsg(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lon]);
 
@@ -105,6 +112,27 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       toast.info('Pas de données 3D Google sur ce point.');
     } else {
       toast.error('Vue 3D Google indisponible.');
+    }
+  };
+
+  // Pente/orientation/surface depuis le MNS IGN LiDAR HD (bouton explicite, pas d'auto-run sur
+  // chaque édition de sommet). IGN écrase la surface avec la surface pentée du pan ajusté.
+  const computeIgnPlane = async () => {
+    if (!roofGeometry?.polygon) return;
+    setIgnLoading(true); setIgnMsg(null);
+    const { data } = await fetchRoofPlaneFromIgn(roofGeometry.polygon);
+    setIgnLoading(false);
+    if (data?.source === 'ign') {
+      onRoof({
+        tiltPercent: Math.max(0, Math.round(data.pitchPercent)),
+        orientation: Math.round(data.aspectPvgis),
+        surfaceM2: Math.round(data.slopeAreaM2),
+      });
+      setIgnMsg(`IGN LiDAR : pente ${Math.round(data.pitchDeg)}° · surface pentée ${Math.round(data.slopeAreaM2)} m² (ajustables ci-dessous)`);
+    } else if (data?.source === 'none') {
+      setIgnMsg('Pas de donnée IGN exploitable ici — saisissez pente/orientation à la main.');
+    } else {
+      setIgnMsg('Analyse IGN indisponible — saisie manuelle.');
     }
   };
 
@@ -234,6 +262,20 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               {roof3dLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Box className="w-4 h-4 text-[#1565C0]" />}
               {roof3dLoading ? 'Chargement de la 3D…' : '🧊 Vue 3D + flux (Google)'}
             </button>
+            {solarStatus === 'drawn' && (
+              <button
+                type="button"
+                onClick={computeIgnPlane}
+                disabled={ignLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-secondary-200 bg-white text-sm font-medium text-secondary-700 hover:border-secondary-400 disabled:opacity-60"
+              >
+                {ignLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ruler className="w-4 h-4 text-[#1565C0]" />}
+                {ignLoading ? 'Analyse IGN…' : '📐 Pente & orientation (IGN LiDAR)'}
+              </button>
+            )}
+            {ignMsg && (
+              <p className="text-xs text-secondary-500 text-center">{ignMsg}</p>
+            )}
             {fluxMsg && (
               <p className="text-xs text-secondary-500 text-center">{fluxMsg}</p>
             )}
