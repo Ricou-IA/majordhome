@@ -4,7 +4,9 @@
 // matériaux, la conversion cm→m et le mapping famille→type Rsi/Rse.
 import { calculeUParoi } from './thermalEngine.js';
 
-const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// Strip des marques combinantes (accents) après NFD via la propriété Unicode \p{M} + flag u —
+// robuste : pas de plage de caractères combinants LITTÉRAUX dans la source (invisibles, corruptibles).
+const norm = (s) => String(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 const MAX_RESULTATS = 60;
 
@@ -22,7 +24,10 @@ export function chercheMateriaux(materiaux, saisie, famille = null) {
 const TYPE_FLUX = { murs: 'mur', plancherBas: 'plancher', plafondToiture: 'plafond' };
 
 /** U d'une paroi composée de `couches` ({materiauNom, lambda, e en cm}) pour une famille wizard.
- * Retour DOUX (pas de throw — usage UI live) : { u, erreur }. u null si vide/invalide. */
+ * Retour DOUX (pas de throw — usage UI live) : { u, erreur }. u null si vide/invalide.
+ * Les couches viennent de l'UI (toujours e/lambda, jamais de résistance `r` directe) : le pré-check
+ * ci-dessous couvre donc tous les cas UI. Le try/catch reste un filet défensif si `calculeUParoi`
+ * venait à lever pour une raison non anticipée (évolution du moteur). */
 export function uParoiDepuisCouches(couches, famille) {
   const type = TYPE_FLUX[famille];
   if (!type) return { u: null, erreur: `famille inconnue « ${famille} »` };
