@@ -234,7 +234,7 @@ export default function Step2Dessin({ dessin, config, onDessinChange }) {
               <Square className="w-4 h-4" /> Rectangle
             </button>
             <p className="ml-auto text-xs text-secondary-400 pr-1 hidden sm:block">
-              {mode === 'rectangle' ? 'Glissez pour tracer une pièce' : 'Touchez une pièce pour l’éditer'}
+              {mode === 'rectangle' ? 'Glissez pour tracer une pièce' : 'Touchez pour éditer · glissez une pièce pour la déplacer'}
             </p>
           </div>
           <div className="flex items-center gap-4 px-3 py-1.5 border-b border-secondary-100 text-xs text-secondary-500">

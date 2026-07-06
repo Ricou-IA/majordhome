@@ -6,6 +6,7 @@ import {
   segmentLePlusProche,
   rectDepuisDrag,
   zoomBoite,
+  snapPoint,
 } from '../../lib/canvasGeometry.js';
 import { PieceShape } from './PieceShape.jsx';
 import { CotesPiece } from './CotesPiece.jsx';
@@ -113,6 +114,9 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   // stylet/souris qui a initié le drag : les événements des AUTRES pointeurs (multi-touch) sont
   // ignorés tant que ce drag est actif.
   const [dragRect, setDragRect] = useState(null);
+  // Déplacement d'une pièce par glisser en mode 'sélection' (pièce = objet manipulable). Transitoire,
+  // grid-quantisé : { pointerId, pieceId, startCm:{x,y}, lastDelta:{dx,dy}, moved }.
+  const [dragMove, setDragMove] = useState(null);
   // Facteur de zoom manuel du canevas (1 = auto-cadrage sur le contenu ; −/+/Ajuster = ZoomControls).
   const [zoom, setZoom] = useState(1);
 
@@ -175,18 +179,52 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
   }
 
   function handlePointerDown(event) {
-    if (mode !== 'rectangle' || dragRect) return; // drag déjà actif → 2ᵉ doigt ignoré
+    if (dragRect || dragMove) return; // un geste est déjà en cours (multi-touch : 2ᵉ doigt ignoré)
     const ptCm = pointeurVersCm(event, svgRef.current);
     if (!ptCm) return; // CTM indisponible (cf. pointeurVersCm)
-    setDragRect({ pointerId: event.pointerId, p1: ptCm, p2: ptCm });
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (mode === 'rectangle') {
+      setDragRect({ pointerId: event.pointerId, p1: ptCm, p2: ptCm });
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (mode === 'selection') {
+      // Glisser sur le CORPS d'une pièce = la déplacer (pièce = objet manipulable). On la sélectionne
+      // dès la prise ; le déplacement effectif ne démarre qu'au premier franchissement de cellule.
+      const piece = piecesNiveauActif.find((p) => pointDansPolygone(ptCm, p.polygone));
+      if (piece) {
+        onSelect?.({ type: 'piece', id: piece.id });
+        setDragMove({ pointerId: event.pointerId, pieceId: piece.id, startCm: ptCm, lastDelta: { dx: 0, dy: 0 }, moved: false });
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      // Pas de pièce sous le curseur : on laisse pointerup gérer le tap (sélection mur / rien).
+    }
   }
 
   function handlePointerMove(event) {
-    if (mode !== 'rectangle' || !dragRect || event.pointerId !== dragRect.pointerId) return;
-    const ptCm = pointeurVersCm(event, svgRef.current);
-    if (!ptCm) return;
-    setDragRect((prev) => (prev ? { ...prev, p2: ptCm } : prev));
+    if (dragRect && event.pointerId === dragRect.pointerId) {
+      const ptCm = pointeurVersCm(event, svgRef.current);
+      if (!ptCm) return;
+      setDragRect((prev) => (prev ? { ...prev, p2: ptCm } : prev));
+      return;
+    }
+    if (dragMove && event.pointerId === dragMove.pointerId) {
+      const ptCm = pointeurVersCm(event, svgRef.current);
+      if (!ptCm) return;
+      // Delta depuis la prise, accroché à la grille : le déplacement est quantifié à la cellule
+      // (10 cm) → au plus quelques onChange par glisser, et l'overlay des murs se recolorie en
+      // direct (le mur commun devient slate dès que la continuité avec la voisine est atteinte).
+      const snapped = snapPoint({ x: ptCm.x - dragMove.startCm.x, y: ptCm.y - dragMove.startCm.y });
+      if (snapped.x === dragMove.lastDelta.dx && snapped.y === dragMove.lastDelta.dy) return;
+      const incDx = snapped.x - dragMove.lastDelta.dx;
+      const incDy = snapped.y - dragMove.lastDelta.dy;
+      onChange?.({
+        ...dessin,
+        pieces: dessin.pieces.map((p) => (p.id === dragMove.pieceId
+          ? { ...p, polygone: p.polygone.map((pt) => ({ x: pt.x + incDx, y: pt.y + incDy })) }
+          : p)),
+      });
+      setDragMove((prev) => (prev ? { ...prev, lastDelta: { dx: snapped.x, dy: snapped.y }, moved: true } : prev));
+    }
   }
 
   function handlePointerUp(event) {
@@ -209,6 +247,15 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
       return;
     }
 
+    if (dragMove) {
+      if (event.pointerId !== dragMove.pointerId) return; // autre pointeur : ignoré
+      // La pièce est déjà à sa position finale (appliquée en direct pendant le glisser) et
+      // sélectionnée. Un « glisser » qui n'a franchi aucune cellule (moved=false) = simple clic :
+      // la pièce a été sélectionnée au pointerdown, rien de plus à faire.
+      setDragMove(null);
+      return;
+    }
+
     const ptCm = pointeurVersCm(event, svgRef.current);
     if (!ptCm) return; // CTM indisponible (cf. pointeurVersCm)
     if (mode === 'selection') {
@@ -221,8 +268,10 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
 
   function handlePointerCancel(event) {
     // Geste interrompu (ex. le navigateur reprend la main sur un scroll/zoom tactile) : on
-    // abandonne le rectangle fantôme — uniquement si c'est LE pointeur du drag en cours.
+    // abandonne le geste en cours — uniquement pour LE pointeur concerné. Une pièce en cours de
+    // déplacement reste à sa dernière position accrochée (déjà committée), pas de corruption.
     if (dragRect && event.pointerId === dragRect.pointerId) setDragRect(null);
+    if (dragMove && event.pointerId === dragMove.pointerId) setDragMove(null);
   }
 
   const rectFantome = dragRect ? rectDepuisDrag(dragRect.p1, dragRect.p2) : null;
@@ -232,7 +281,7 @@ export function PlanCanvas({ dessin, niveauActifId, selection, mode, onChange, o
       <svg
         ref={svgRef}
         viewBox={viewBox}
-        className="w-full h-full touch-none"
+        className={`w-full h-full touch-none ${dragMove ? 'cursor-grabbing' : ''}`}
         style={{ touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
