@@ -3,7 +3,7 @@
 // Coordonnées : ENTIERS en cm, grille 10 cm, x → droite, y → bas (SVG) — mêmes conventions
 // que geometryEngine.js (décisions structurantes du plan 3).
 
-import { GRILLE_CM, normalisePolygone, segmentsDe } from './geometryEngine.js';
+import { GRILLE_CM, normalisePolygone, segmentsDe, adjacencesNiveau } from './geometryEngine.js';
 
 /**
  * Accroche un point à la grille 10 cm : chaque coordonnée est arrondie au multiple de GRILLE_CM
@@ -233,4 +233,96 @@ export function boiteEnglobante(pieces) {
     largeur: xMax - xMin + 2 * MARGE_CM,
     hauteur: yMax - yMin + 2 * MARGE_CM,
   };
+}
+
+/**
+ * Segments de murs dessinables du niveau, classés extérieur/mitoyen. S'appuie sur
+ * adjacencesNiveau (adjacent === null ⇒ donne sur l'extérieur). Chaque sous-segment est reprojeté
+ * en coordonnées écran (x1,y1)-(x2,y2) depuis ses bornes d'axe (de/a). Pièces invalides / en
+ * quarantaine : absentes de la sortie d'adjacencesNiveau ⇒ non tracées (elles ont déjà leur teinte
+ * d'erreur). Module PUR.
+ * @param {{id: *, polygone: {x: number, y: number}[]}[]} piecesNiveau pièces d'UN niveau
+ * @returns {{pieceId: *, segmentIndex: number, x1: number, y1: number, x2: number, y2: number,
+ *   exterieur: boolean}[]}
+ */
+export function segmentsMursNiveau(piecesNiveau) {
+  if (!Array.isArray(piecesNiveau)) {
+    throw new Error('thermique: segmentsMursNiveau : piecesNiveau doit être un tableau');
+  }
+  const { parPiece } = adjacencesNiveau(piecesNiveau);
+  const out = [];
+  for (const piece of piecesNiveau) {
+    const sous = parPiece.get(piece.id);
+    if (!sous) continue; // pièce écartée (invalide / quarantaine) : déjà signalée en erreur
+    const segs = segmentsDe(normalisePolygone(piece.polygone));
+    for (const ss of sous) {
+      const seg = segs[ss.segmentIndex];
+      const coords = seg.axe === 'v'
+        ? { x1: seg.x1, y1: ss.de, x2: seg.x1, y2: ss.a }
+        : { x1: ss.de, y1: seg.y1, x2: ss.a, y2: seg.y1 };
+      out.push({ pieceId: piece.id, segmentIndex: ss.segmentIndex, ...coords, exterieur: ss.adjacent === null });
+    }
+  }
+  return out;
+}
+
+/**
+ * Applique un facteur de zoom à une boîte de cadrage (viewBox), recentré sur son centre.
+ * facteur > 1 = zoom avant (viewBox plus petit) ; facteur < 1 = zoom arrière (viewBox plus grand).
+ * Le centre de la boîte est invariant. Module PUR.
+ * @param {{x: number, y: number, largeur: number, hauteur: number}} boite
+ * @param {number} facteur strictement positif
+ * @returns {{x: number, y: number, largeur: number, hauteur: number}}
+ */
+export function zoomBoite(boite, facteur) {
+  if (!Number.isFinite(facteur) || facteur <= 0) {
+    throw new Error('thermique: zoomBoite : facteur numérique > 0 requis');
+  }
+  const cx = boite.x + boite.largeur / 2;
+  const cy = boite.y + boite.hauteur / 2;
+  const largeur = boite.largeur / facteur;
+  const hauteur = boite.hauteur / facteur;
+  return { x: cx - largeur / 2, y: cy - hauteur / 2, largeur, hauteur };
+}
+
+/**
+ * Plus petit décalage mono-axe (multiple de GRILLE_CM) qui aligne un bord de `piece` sur un bord
+ * parallèle d'une autre pièce, dans la limite `seuilCm`. Ne considère que les bords dont les
+ * étendues se recouvrent sur l'axe transverse (sinon « aligner » n'a pas de sens visuel). Retourne
+ * { dx, dy } (un seul non nul) ou null si aucun bord candidat. Module PUR — la translation est
+ * appliquée par le caller via deplacePiece (qui re-valide et accroche à la grille).
+ * @param {{id: *, polygone: {x: number, y: number}[]}} piece pièce à ancrer
+ * @param {{id: *, polygone: {x: number, y: number}[]}[]} autres autres pièces du niveau
+ * @param {number} seuilCm écart maximal toléré (cm)
+ * @returns {{dx: number, dy: number}|null}
+ */
+export function decalageAncrage(piece, autres, seuilCm) {
+  if (!piece || !Array.isArray(piece.polygone)) {
+    throw new Error('thermique: decalageAncrage : piece { polygone } requise');
+  }
+  if (!Array.isArray(autres)) {
+    throw new Error('thermique: decalageAncrage : autres doit être un tableau');
+  }
+  if (!Number.isFinite(seuilCm) || seuilCm < 0) {
+    throw new Error('thermique: decalageAncrage : seuilCm numérique ≥ 0 requis');
+  }
+  const bords = (poly) => segmentsDe(normalisePolygone(poly)).map((seg) => (seg.axe === 'v'
+    ? { axe: 'v', pos: seg.x1, lo: Math.min(seg.y1, seg.y2), hi: Math.max(seg.y1, seg.y2) }
+    : { axe: 'h', pos: seg.y1, lo: Math.min(seg.x1, seg.x2), hi: Math.max(seg.x1, seg.x2) }));
+  const mesBords = bords(piece.polygone);
+  let meilleur = null; // { delta, axe }
+  for (const autre of autres) {
+    if (autre.id === piece.id) continue;
+    for (const b of bords(autre.polygone)) {
+      for (const m of mesBords) {
+        if (m.axe !== b.axe) continue;
+        if (Math.max(m.lo, b.lo) >= Math.min(m.hi, b.hi)) continue; // pas de recouvrement transverse
+        const delta = b.pos - m.pos; // translation pour amener le bord de piece sur celui d'autre
+        if (delta === 0 || Math.abs(delta) > seuilCm || delta % GRILLE_CM !== 0) continue;
+        if (!meilleur || Math.abs(delta) < Math.abs(meilleur.delta)) meilleur = { delta, axe: m.axe };
+      }
+    }
+  }
+  if (!meilleur) return null;
+  return meilleur.axe === 'v' ? { dx: meilleur.delta, dy: 0 } : { dx: 0, dy: meilleur.delta };
 }

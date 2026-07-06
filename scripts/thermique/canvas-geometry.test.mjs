@@ -10,6 +10,9 @@ import {
   segmentLePlusProche,
   positionOuvertureSnappee,
   boiteEnglobante,
+  segmentsMursNiveau,
+  zoomBoite,
+  decalageAncrage,
 } from '../../src/apps/thermique/lib/canvasGeometry.js';
 import { normalisePolygone, segmentsDe } from '../../src/apps/thermique/lib/geometryEngine.js';
 
@@ -238,4 +241,77 @@ test('boiteEnglobante : une seule pièce → boîte = son étendue + marge', () 
 
 test('boiteEnglobante : aucune pièce → boîte par défaut 1000×800 à l’origine', () => {
   assert.deepEqual(boiteEnglobante([]), { x: 0, y: 0, largeur: 1000, hauteur: 800 });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// segmentsMursNiveau (plan 5, A1) — extérieur (adjacent null) vs mitoyen
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('segmentsMursNiveau : rectangle isolé → 4 murs extérieurs', () => {
+  const pieces = [{ id: 'p1', polygone: [
+    { x: 0, y: 0 }, { x: 0, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 0 },
+  ] }];
+  const murs = segmentsMursNiveau(pieces);
+  assert.equal(murs.length, 4);
+  assert.ok(murs.every((m) => m.exterieur === true));
+});
+
+test('segmentsMursNiveau : deux pièces accolées → tronçon partagé mitoyen (x=400)', () => {
+  // p1 = [0..400]x[0..300] ; p2 collée à droite = [400..700]x[0..300].
+  // Le mur x=400 (y0→y300) est mitoyen des deux côtés, le reste extérieur.
+  const pieces = [
+    { id: 'p1', polygone: [{ x: 0, y: 0 }, { x: 0, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 0 }] },
+    { id: 'p2', polygone: [{ x: 400, y: 0 }, { x: 400, y: 300 }, { x: 700, y: 300 }, { x: 700, y: 0 }] },
+  ];
+  const murs = segmentsMursNiveau(pieces);
+  const mitoyens = murs.filter((m) => !m.exterieur);
+  assert.equal(mitoyens.length, 2); // un pour p1, un pour p2, tous deux à x=400
+  assert.ok(mitoyens.every((m) => m.x1 === 400 && m.x2 === 400));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// zoomBoite (plan 5, A4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('zoomBoite : facteur 1 = identité', () => {
+  const b = { x: 0, y: 0, largeur: 1000, hauteur: 800 };
+  assert.deepEqual(zoomBoite(b, 1), b);
+});
+
+test('zoomBoite : facteur 0.5 double la vue, centre préservé', () => {
+  const b = { x: 0, y: 0, largeur: 1000, hauteur: 800 }; // centre (500, 400)
+  const z = zoomBoite(b, 0.5);
+  assert.equal(z.largeur, 2000);
+  assert.equal(z.hauteur, 1600);
+  assert.equal(z.x + z.largeur / 2, 500);
+  assert.equal(z.y + z.hauteur / 2, 400);
+});
+
+test('zoomBoite : facteur 2 divise la vue, centre préservé', () => {
+  const b = { x: 0, y: 0, largeur: 1000, hauteur: 800 };
+  const z = zoomBoite(b, 2);
+  assert.equal(z.largeur, 500);
+  assert.equal(z.hauteur, 400);
+  assert.equal(z.x + z.largeur / 2, 500);
+});
+
+test('zoomBoite : facteur invalide → throw', () => {
+  assert.throws(() => zoomBoite({ x: 0, y: 0, largeur: 1, hauteur: 1 }, 0), /facteur/);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// decalageAncrage (plan 5, B1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('decalageAncrage : colle une pièce séparée de 30 cm à sa voisine (dx = -30)', () => {
+  const p2 = [{ x: 430, y: 0 }, { x: 430, y: 300 }, { x: 730, y: 300 }, { x: 730, y: 0 }];
+  const p1 = [{ x: 0, y: 0 }, { x: 0, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 0 }];
+  const d = decalageAncrage({ id: 'p2', polygone: p2 }, [{ id: 'p1', polygone: p1 }], 50);
+  assert.deepEqual(d, { dx: -30, dy: 0 });
+});
+
+test('decalageAncrage : null si aucun bord aligné dans le seuil', () => {
+  const p2 = [{ x: 900, y: 0 }, { x: 900, y: 300 }, { x: 1200, y: 300 }, { x: 1200, y: 0 }];
+  const p1 = [{ x: 0, y: 0 }, { x: 0, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 0 }];
+  assert.equal(decalageAncrage({ id: 'p2', polygone: p2 }, [{ id: 'p1', polygone: p1 }], 50), null);
 });

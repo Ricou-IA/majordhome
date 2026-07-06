@@ -11,7 +11,7 @@
 // réservés aux entrées PROGRAMMATIQUEMENT malformées (ex. `dessin` qui n'est pas un objet, `piece`
 // sans champ `id`) — jamais à un refus « normal » d'opération métier.
 
-import { GRILLE_CM, validePolygone, segmentsDe, normalisePolygone, deduireParois } from './geometryEngine.js';
+import { GRILLE_CM, validePolygone, segmentsDe, normalisePolygone, deduireParois, surfaceCm2 } from './geometryEngine.js';
 
 const THETA_MIN = 5;
 const THETA_MAX = 30;
@@ -114,6 +114,47 @@ export function deplacePiece(dessin, pieceId, { dx, dy } = {}) {
   return accepte({
     ...dessin,
     pieces: dessin.pieces.map((p) => (p.id === pieceId ? { ...p, polygone: polygoneDeplace } : p)),
+  });
+}
+
+/**
+ * Redimensionne une pièce RECTANGULAIRE à `largeur` × `hauteur` (cm), ancrée à son coin haut-gauche
+ * (xMin, yMin inchangés). En v1 chaque pièce est un rectangle ; une pièce non rectangulaire (forme
+ * en L, etc.) est refusée plutôt que déformée à l'aveugle. Les ouvertures conservent leur
+ * segmentIndex/position — une ouverture qui déborderait du mur raccourci est signalée en aval par
+ * valideDessin (comportement assumé, pas de réécriture d'ouverture ici). Refus : pieceId inconnu,
+ * pièce non rectangulaire, largeur/hauteur non multiples entiers de GRILLE_CM ou ≤ 0.
+ * @param {object} dessin dessin courant (jamais muté)
+ * @param {*} pieceId id de la pièce à redimensionner
+ * @param {{largeur: number, hauteur: number}} dims dimensions cibles (cm)
+ * @returns {{dessin: object, erreurs: string[]}}
+ */
+export function redimensionnePiece(dessin, pieceId, { largeur, hauteur } = {}) {
+  exigeDessin(dessin, 'redimensionnePiece');
+  const piece = dessin.pieces.find((p) => p.id === pieceId);
+  if (!piece) return refuse(dessin, `pièce « ${pieceId} » : introuvable`);
+  if (!Number.isInteger(largeur) || !Number.isInteger(hauteur)
+    || largeur <= 0 || hauteur <= 0 || largeur % GRILLE_CM !== 0 || hauteur % GRILLE_CM !== 0) {
+    return refuse(dessin, `dimensions de « ${pieceId} » : largeur et hauteur doivent être des multiples entiers > 0 de ${GRILLE_CM} cm`);
+  }
+  const xs = piece.polygone.map((p) => p.x);
+  const ys = piece.polygone.map((p) => p.y);
+  const xMin = Math.min(...xs);
+  const yMin = Math.min(...ys);
+  const estRectangle = piece.polygone.length === 4
+    && surfaceCm2(piece.polygone) === (Math.max(...xs) - xMin) * (Math.max(...ys) - yMin);
+  if (!estRectangle) {
+    return refuse(dessin, `pièce « ${pieceId} » : redimensionnement disponible uniquement sur une pièce rectangulaire`);
+  }
+  const nouveau = [
+    { x: xMin, y: yMin },
+    { x: xMin, y: yMin + hauteur },
+    { x: xMin + largeur, y: yMin + hauteur },
+    { x: xMin + largeur, y: yMin },
+  ];
+  return accepte({
+    ...dessin,
+    pieces: dessin.pieces.map((p) => (p.id === pieceId ? { ...p, polygone: nouveau } : p)),
   });
 }
 

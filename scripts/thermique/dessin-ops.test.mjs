@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ajoutePiece, supprimePiece, deplacePiece, renommePiece, basculeChauffee, regleThetaInt,
-  ajouteOuverture, supprimeOuverture, ajouteNiveau, dupliqueNiveau, supprimeNiveau,
+  ajoutePiece, supprimePiece, deplacePiece, redimensionnePiece, renommePiece, basculeChauffee,
+  regleThetaInt, ajouteOuverture, supprimeOuverture, ajouteNiveau, dupliqueNiveau, supprimeNiveau,
   regleNord, regleHauteurNiveau, valideDessin,
 } from '../../src/apps/thermique/lib/dessinOps.js';
 
@@ -563,4 +563,46 @@ test('valideDessin : délègue et fusionne les avertissements de deduireParois (
   const gele = gelProfond(dessin);
   const { avertissements } = valideDessin(gele);
   assert.ok(avertissements.length > 0);
+});
+
+// ── redimensionnePiece (plan 5, A2) — rectangle-only, ancré coin haut-gauche ──
+const POLY_400x300 = [{ x: 0, y: 0 }, { x: 0, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 0 }];
+const rectDessin = (polygone) => ({
+  niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }],
+  pieces: [{ id: 'p1', niveauId: 'rdc', nom: 'P', typePiece: 'autre', chauffee: true, thetaInt: 19, polygone }],
+  ouvertures: [], nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
+});
+
+test('redimensionnePiece : redimensionne, ancré au coin haut-gauche', () => {
+  const { dessin, erreurs } = redimensionnePiece(rectDessin(POLY_400x300), 'p1', { largeur: 500, hauteur: 250 });
+  assert.deepEqual(erreurs, []);
+  const poly = dessin.pieces[0].polygone;
+  const xs = poly.map((p) => p.x);
+  const ys = poly.map((p) => p.y);
+  assert.equal(Math.min(...xs), 0);
+  assert.equal(Math.min(...ys), 0);
+  assert.equal(Math.max(...xs), 500);
+  assert.equal(Math.max(...ys), 250);
+});
+
+test('redimensionnePiece : refuse une dimension hors grille', () => {
+  const { erreurs } = redimensionnePiece(rectDessin(POLY_400x300), 'p1', { largeur: 505, hauteur: 250 });
+  assert.equal(erreurs.length, 1);
+});
+
+test('redimensionnePiece : refuse une dimension ≤ 0', () => {
+  const { erreurs } = redimensionnePiece(rectDessin(POLY_400x300), 'p1', { largeur: 0, hauteur: 250 });
+  assert.equal(erreurs.length, 1);
+});
+
+test('redimensionnePiece : refuse une pièce non rectangulaire (forme en L)', () => {
+  const L = [{ x: 0, y: 0 }, { x: 0, y: 300 }, { x: 200, y: 300 }, { x: 200, y: 150 },
+    { x: 400, y: 150 }, { x: 400, y: 0 }];
+  const { erreurs } = redimensionnePiece(rectDessin(L), 'p1', { largeur: 500, hauteur: 300 });
+  assert.equal(erreurs.length, 1);
+});
+
+test('redimensionnePiece : refuse un pieceId inconnu', () => {
+  const { erreurs } = redimensionnePiece(rectDessin(POLY_400x300), 'inconnu', { largeur: 500, hauteur: 250 });
+  assert.equal(erreurs.length, 1);
 });
