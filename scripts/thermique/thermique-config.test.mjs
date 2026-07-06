@@ -56,3 +56,12 @@ test('buildThermiqueConfig : défauts purs + merge org (deep sur les tables)', (
   assert.deepEqual(REGIMES_EAU, [35, 45, 55]);
   assert.ok(DIMENSIONS_OUVERTURES.fenetre.largeur > 0);
 });
+
+test('buildThermiqueConfig : parois_bibliotheque défaut [] et passthrough valide, malformé → []', () => {
+  assert.deepEqual(buildThermiqueConfig(undefined).parois_bibliotheque, []);
+  assert.deepEqual(
+    buildThermiqueConfig({ thermique: { parois_bibliotheque: [{ id: 'a' }] } }).parois_bibliotheque,
+    [{ id: 'a' }],
+  );
+  assert.deepEqual(buildThermiqueConfig({ thermique: { parois_bibliotheque: 'oops' } }).parois_bibliotheque, []);
+});

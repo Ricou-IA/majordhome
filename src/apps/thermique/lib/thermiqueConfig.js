@@ -55,6 +55,7 @@ export const DEFAULTS_THERMIQUE = Object.freeze({
   theta_non_chauffage: 16,   // °C (spec §5, défaut climat.json)
   prix_kwh: 0.1952,          // €/kWh élec base (tarifs-energie.json elec-base 2025)
   facteur_ajustement: 1.0,   // conso (apports gratuits/intermittence), à calibrer phase A/B
+  parois_bibliotheque: Object.freeze([]), // parois composées nommées, réutilisables (composeur, D4)
 });
 
 function isPlainObject(v) {
@@ -72,5 +73,7 @@ export function buildThermiqueConfig(settings) {
     ...org,
     theta_int_defauts: { ...DEFAULTS_THERMIQUE.theta_int_defauts, ...thetaOrg },
     delta_utb: { ...DEFAULTS_THERMIQUE.delta_utb, ...deltaOrg },
+    // Tableau malformé (string/objet) → retour au défaut [] (pas de crash côté consommateurs).
+    parois_bibliotheque: Array.isArray(org.parois_bibliotheque) ? org.parois_bibliotheque : DEFAULTS_THERMIQUE.parois_bibliotheque,
   };
 }

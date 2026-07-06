@@ -45,3 +45,21 @@ export function uParoiDepuisCouches(couches, famille) {
     return { u: null, erreur: e.message.replace(/^thermique:\s*/, '') };
   }
 }
+
+/** Ajoute une entrée nommée à la bibliothèque de parois (pure, immutable). `id` fourni par le
+ * caller (crypto.randomUUID côté UI — module pur sans effet de bord). Retour doux
+ * { bibliotheque, erreur } : erreur si nom vide ou u non fini (bibliotheque inchangée). */
+export function ajouteParoiBibliotheque(bibliotheque, entree, id) {
+  const base = Array.isArray(bibliotheque) ? bibliotheque : [];
+  const nom = typeof entree?.nom === 'string' ? entree.nom.trim() : '';
+  if (nom === '') return { bibliotheque: base, erreur: 'Nom requis' };
+  if (!Number.isFinite(entree?.u)) return { bibliotheque: base, erreur: 'U invalide' };
+  const item = { id, nom, famille: entree.famille, u: entree.u, couches: entree.couches ?? [] };
+  return { bibliotheque: [...base, item], erreur: null };
+}
+
+/** Retire une entrée par id (pure). id inconnu → tableau inchangé (nouvelle référence si retrait). */
+export function supprimeParoiBibliotheque(bibliotheque, id) {
+  const base = Array.isArray(bibliotheque) ? bibliotheque : [];
+  return base.filter((p) => p.id !== id);
+}

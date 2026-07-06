@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chercheMateriaux, uParoiDepuisCouches } from '../../src/apps/thermique/lib/composeurParois.js';
+import {
+  chercheMateriaux, uParoiDepuisCouches, ajouteParoiBibliotheque, supprimeParoiBibliotheque,
+} from '../../src/apps/thermique/lib/composeurParois.js';
 
 const MATS = [
   { nom: 'Béton plein', famille: 'Bétons', lambda: 1.65 },
@@ -42,4 +44,23 @@ test('uParoiDepuisCouches : couche invalide (lambda ≤ 0) → erreur douce', ()
   const { u, erreur } = uParoiDepuisCouches([{ materiauNom: 'X', lambda: 0, e: 10 }], 'murs');
   assert.equal(u, null);
   assert.ok(typeof erreur === 'string');
+});
+
+test('ajouteParoiBibliotheque : ajoute une entrée avec id, refuse nom vide et u non fini', () => {
+  const { bibliotheque, erreur } = ajouteParoiBibliotheque([], {
+    nom: 'Mur agglo + LDV 12', famille: 'murs', u: 0.25,
+    couches: [{ materiauNom: 'Agglo', lambda: 1.05, e: 20 }],
+  }, 'id-1');
+  assert.equal(erreur, null);
+  assert.equal(bibliotheque.length, 1);
+  assert.equal(bibliotheque[0].id, 'id-1');
+  assert.equal(bibliotheque[0].couches.length, 1);
+  assert.ok(ajouteParoiBibliotheque([], { nom: '  ', famille: 'murs', u: 0.25, couches: [] }, 'x').erreur !== null);
+  assert.ok(ajouteParoiBibliotheque([], { nom: 'X', famille: 'murs', u: null, couches: [] }, 'y').erreur !== null);
+});
+
+test('supprimeParoiBibliotheque : retire par id, id inconnu inchangé', () => {
+  const biblio = [{ id: 'a', nom: 'X', famille: 'murs', u: 1, couches: [] }];
+  assert.deepEqual(supprimeParoiBibliotheque(biblio, 'a'), []);
+  assert.equal(supprimeParoiBibliotheque(biblio, 'zzz').length, 1);
 });
