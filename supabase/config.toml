@@ -66,6 +66,10 @@ verify_jwt = true
 [functions.google-solar-proxy]
 verify_jwt = true
 
+# Solaire — proxy IGN LiDAR HD MNS (élévation, open data, CORS)
+[functions.ign-mns-proxy]
+verify_jwt = true
+
 [functions.gsc-oauth-init]
 verify_jwt = true
 
