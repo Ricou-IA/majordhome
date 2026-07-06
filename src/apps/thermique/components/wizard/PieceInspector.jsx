@@ -14,7 +14,10 @@ import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
 import { TYPES_PIECE, typePieceInfo } from '../../lib/thermiqueConfig';
 import { surfaceCm2 } from '../../lib/geometryEngine';
-import { renommePiece, basculeChauffee, regleThetaInt, supprimePiece } from '../../lib/dessinOps';
+import { decalageAncrage } from '../../lib/canvasGeometry';
+import {
+  renommePiece, basculeChauffee, regleThetaInt, supprimePiece, redimensionnePiece, deplacePiece,
+} from '../../lib/dessinOps';
 
 const TYPE_OPTIONS = TYPES_PIECE.map((t) => ({ value: t.id, label: t.label }));
 
@@ -80,6 +83,47 @@ export default function PieceInspector({
     if (applique(supprimePiece(dessin, piece.id))) onSupprimee(piece.id);
   };
 
+  // --- Dimensions (rectangle only) : édition numérique L × l, ancrée au coin haut-gauche (A2) ---
+  const xs = piece.polygone.map((p) => p.x);
+  const ys = piece.polygone.map((p) => p.y);
+  const largeurCm = Math.max(...xs) - Math.min(...xs);
+  const hauteurCm = Math.max(...ys) - Math.min(...ys);
+  const estRectangle = piece.polygone.length === 4 && surfaceCm2(piece.polygone) === largeurCm * hauteurCm;
+  const [largeurDraft, setLargeurDraft] = useState(String(largeurCm));
+  const [hauteurDraft, setHauteurDraft] = useState(String(hauteurCm));
+  useEffect(() => {
+    setLargeurDraft(String(largeurCm));
+    setHauteurDraft(String(hauteurCm));
+  }, [piece.id, largeurCm, hauteurCm]);
+  const commitDims = () => {
+    const L = Number(largeurDraft);
+    const l = Number(hauteurDraft);
+    if (L === largeurCm && l === hauteurCm) return;
+    if (!applique(redimensionnePiece(dessin, piece.id, { largeur: L, hauteur: l }))) {
+      setLargeurDraft(String(largeurCm));
+      setHauteurDraft(String(hauteurCm));
+    }
+  };
+
+  // --- Position : décalage numérique H/V (A5) + ancrage sur une pièce voisine (B1) ---
+  const [dxDraft, setDxDraft] = useState('0');
+  const [dyDraft, setDyDraft] = useState('0');
+  const applyDecalage = () => {
+    const dx = Number(dxDraft) || 0;
+    const dy = Number(dyDraft) || 0;
+    if (dx === 0 && dy === 0) return;
+    if (applique(deplacePiece(dessin, piece.id, { dx, dy }))) {
+      setDxDraft('0');
+      setDyDraft('0');
+    }
+  };
+  const SEUIL_ANCRAGE_CM = 50;
+  const autresDuNiveau = dessin.pieces.filter((p) => p.id !== piece.id && p.niveauId === piece.niveauId);
+  const ancrage = (() => {
+    try { return decalageAncrage(piece, autresDuNiveau, SEUIL_ANCRAGE_CM); } catch { return null; }
+  })();
+  const applyAncrage = () => { if (ancrage) applique(deplacePiece(dessin, piece.id, ancrage)); };
+
   const surfaceM2 = (surfaceCm2(piece.polygone) / 10000).toFixed(1);
   const nbOuvertures = dessin.ouvertures.filter((o) => o.pieceId === piece.id).length;
 
@@ -89,6 +133,39 @@ export default function PieceInspector({
         <h3 className="font-semibold text-secondary-900 text-sm">Pièce sélectionnée</h3>
         <span className="text-xs text-secondary-500">{surfaceM2} m²</span>
       </div>
+
+      {estRectangle ? (
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Largeur (cm)">
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              step={10}
+              min={10}
+              value={largeurDraft}
+              onChange={setLargeurDraft}
+              onBlur={commitDims}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            />
+          </FormField>
+          <FormField label="Longueur (cm)">
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              step={10}
+              min={10}
+              value={hauteurDraft}
+              onChange={setHauteurDraft}
+              onBlur={commitDims}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            />
+          </FormField>
+        </div>
+      ) : (
+        <p className="text-xs text-secondary-500">
+          Édition dimensionnelle disponible sur les pièces rectangulaires.
+        </p>
+      )}
 
       <FormField label="Nom">
         <TextInput
@@ -127,6 +204,37 @@ export default function PieceInspector({
           />
         </FormField>
       )}
+
+      <div className="pt-3 border-t border-secondary-100 space-y-2">
+        <p className="text-xs font-medium text-secondary-600">Position</p>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Horizontal (→ droite, cm)">
+            <TextInput type="number" inputMode="numeric" step={10} value={dxDraft} onChange={setDxDraft} />
+          </FormField>
+          <FormField label="Vertical (↓ bas, cm)">
+            <TextInput type="number" inputMode="numeric" step={10} value={dyDraft} onChange={setDyDraft} />
+          </FormField>
+        </div>
+        <button
+          type="button"
+          onClick={applyDecalage}
+          className="w-full px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg"
+        >
+          Décaler
+        </button>
+        <button
+          type="button"
+          onClick={applyAncrage}
+          disabled={!ancrage}
+          title="Coller au bord d'une pièce voisine proche"
+          className="w-full px-3 py-1.5 text-sm font-medium text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Ancrer à la voisine
+        </button>
+        {!ancrage && (
+          <p className="text-[11px] text-secondary-400">Aucun bord de voisine assez proche à aligner.</p>
+        )}
+      </div>
 
       <div className="pt-2 border-t border-secondary-100">
         <button
