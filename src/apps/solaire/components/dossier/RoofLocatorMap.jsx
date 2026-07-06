@@ -12,6 +12,24 @@ import { MAPBOX_CONFIG } from '@/lib/mapbox';
 
 const SATELLITE_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
 
+// Styles de tracé contrastés (bleu foncé + halo blanc) pour bien ressortir sur l'imagerie satellite.
+const DRAW_STYLES = [
+  { id: 'gl-draw-polygon-fill', type: 'fill', filter: ['==', '$type', 'Polygon'],
+    paint: { 'fill-color': '#1D4ED8', 'fill-opacity': 0.25 } },
+  { id: 'gl-draw-polygon-stroke', type: 'line', filter: ['==', '$type', 'Polygon'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0B1F4D', 'line-width': 3 } },
+  { id: 'gl-draw-line', type: 'line', filter: ['==', '$type', 'LineString'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0B1F4D', 'line-width': 3, 'line-dasharray': [0.2, 2] } },
+  { id: 'gl-draw-vertex-halo', type: 'circle', filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point']],
+    paint: { 'circle-radius': 6, 'circle-color': '#FFFFFF' } },
+  { id: 'gl-draw-vertex', type: 'circle', filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point']],
+    paint: { 'circle-radius': 4, 'circle-color': '#1D4ED8' } },
+  { id: 'gl-draw-midpoint', type: 'circle', filter: ['all', ['==', 'meta', 'midpoint'], ['==', '$type', 'Point']],
+    paint: { 'circle-radius': 3, 'circle-color': '#93C5FD' } },
+];
+
 export default function RoofLocatorMap({ center, initialPolygon, onPolygon }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -36,6 +54,7 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon }) {
       displayControlsDefault: false,
       controls: { polygon: true, trash: true },
       defaultMode: 'draw_polygon',
+      styles: DRAW_STYLES,
     });
     map.addControl(draw, 'top-left');
     drawRef.current = draw;
