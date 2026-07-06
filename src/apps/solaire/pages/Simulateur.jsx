@@ -151,12 +151,15 @@ function SimulateurInner({ config, settings }) {
         pvgisMonthly: state.pvgis,
         results,
       });
-      // Dossier PV write-once : la géométrie Google Solar rejoint le dossier dès sa création LAZY.
-      if (state.roofGeometry && sim?.id) {
+      // Dossier PV write-once : la géométrie (pans cartographiés OU tracé Google Solar) rejoint le dossier dès sa création LAZY.
+      const roofGeometryPatch = state.pans?.length
+        ? { source: 'drawn_pans', pans: state.pans }
+        : state.roofGeometry;
+      if (roofGeometryPatch && sim?.id) {
         try {
           const dossier = await ensureDossier.mutateAsync({ simulationId: sim.id });
           if (dossier?.id) {
-            await patchBlock.mutateAsync({ id: dossier.id, patch: { roof_geometry: state.roofGeometry } });
+            await patchBlock.mutateAsync({ id: dossier.id, patch: { roof_geometry: roofGeometryPatch } });
           }
         } catch (dossierErr) {
           logger.warn('[solaire] roof_geometry non persisté (dossier)', dossierErr); // non bloquant
@@ -267,9 +270,12 @@ function SimulateurInner({ config, settings }) {
           roof={state.roof}
           config={config}
           roofGeometry={state.roofGeometry}
+          pans={state.pans}
           onLocation={(patch) => dispatch({ type: 'SET_LOCATION', patch })}
           onRoof={(patch) => dispatch({ type: 'SET_ROOF', patch })}
           onRoofGeometry={(value) => dispatch({ type: 'SET_ROOF_GEOMETRY', value })}
+          onAddPan={(pan) => dispatch({ type: 'ADD_PAN', pan })}
+          onRemovePan={(id) => dispatch({ type: 'REMOVE_PAN', id })}
           onNext={() => goToStep(2)}
         />
       )}

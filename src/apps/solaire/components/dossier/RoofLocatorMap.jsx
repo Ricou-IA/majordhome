@@ -30,7 +30,7 @@ const DRAW_STYLES = [
     paint: { 'circle-radius': 3, 'circle-color': '#93C5FD' } },
 ];
 
-export default function RoofLocatorMap({ center, initialPolygon, onPolygon, fluxOverlay }) {
+export default function RoofLocatorMap({ center, initialPolygon, onPolygon, fluxOverlay, savedPans }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const drawRef = useRef(null);
@@ -77,6 +77,20 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, flux
       if (initialPolygon) {
         draw.add({ type: 'Feature', geometry: initialPolygon, properties: {} });
         draw.changeMode('simple_select');
+      }
+      // Pans déjà enregistrés → couche statique (la carte est remontée via `key` à chaque
+      // ajout de pan, donc construire une seule fois au load suffit).
+      const pans = savedPans ?? [];
+      if (pans.length > 0) {
+        map.addSource('saved-pans-src', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: pans.filter((p) => p?.polygon).map((p) => ({ type: 'Feature', geometry: p.polygon, properties: {} })),
+          },
+        });
+        map.addLayer({ id: 'saved-pans-fill', type: 'fill', source: 'saved-pans-src', paint: { 'fill-color': '#F5C542', 'fill-opacity': 0.35 } });
+        map.addLayer({ id: 'saved-pans-line', type: 'line', source: 'saved-pans-src', paint: { 'line-color': '#B45309', 'line-width': 2 } });
       }
     });
 

@@ -3,10 +3,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import * as turf from '@turf/turf';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun, Box, Ruler } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun, Box, Plus, Trash2, Star } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
-import { searchAddress, getDevicePosition } from '../lib/pvgis';
+import { searchAddress, getDevicePosition, fetchPvgis1kwc } from '../lib/pvgis';
 import { fetchFluxOverlay } from '../lib/googleSolarFlux';
 import { fetchRoof3D } from '../lib/googleSolar3D';
 import { fetchRoofPlaneFromIgn } from '../lib/ignMns';
@@ -24,7 +24,15 @@ const COMPASS = [
   ['SO', 'S', 'SE'],
 ];
 
-export default function Step1Localisation({ location, roof, config, roofGeometry, onLocation, onRoof, onRoofGeometry, onNext }) {
+// Étiquette boussole (8 points) depuis l'azimut compas 0..360 (0=N, sens horaire).
+const COMPASS_8 = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+function azimuthToCompassLabel(azimuthCompass) {
+  if (azimuthCompass == null || Number.isNaN(azimuthCompass)) return '—';
+  const idx = Math.round(((azimuthCompass % 360) + 360) % 360 / 45) % 8;
+  return COMPASS_8[idx];
+}
+
+export default function Step1Localisation({ location, roof, config, roofGeometry, pans, onLocation, onRoof, onRoofGeometry, onAddPan, onRemovePan, onNext }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -57,9 +65,8 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
   const [roof3d, setRoof3d] = useState(null);
   const [roof3dLoading, setRoof3dLoading] = useState(false);
 
-  // Pente/orientation depuis le MNS IGN LiDAR HD (plane-fit sur le toit tracé).
-  const [ignLoading, setIgnLoading] = useState(false);
-  const [ignMsg, setIgnMsg] = useState(null);
+  // Ajout d'un pan (géométrie IGN LiDAR + ensoleillement PVGIS par pan).
+  const [panLoading, setPanLoading] = useState(false);
 
   // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
@@ -68,8 +75,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     setFluxOverlay(null);
     setFluxMsg(null);
     setRoof3d(null);
-    setIgnLoading(false);
-    setIgnMsg(null);
+    setPanLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lon]);
 
@@ -115,26 +121,54 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     }
   };
 
-  // Pente/orientation/surface depuis le MNS IGN LiDAR HD (bouton explicite, pas d'auto-run sur
-  // chaque édition de sommet). IGN écrase la surface avec la surface pentée du pan ajusté.
-  const computeIgnPlane = async () => {
+  // Ajout d'un pan : géométrie IGN LiDAR (pente/orientation/surface pentée) + ensoleillement
+  // annuel PVGIS (kWh/kWc/an) calculé pour ce pan. Le pan rejoint la liste comparative.
+  const addPan = async () => {
     if (!roofGeometry?.polygon) return;
-    setIgnLoading(true); setIgnMsg(null);
-    const { data } = await fetchRoofPlaneFromIgn(roofGeometry.polygon);
-    setIgnLoading(false);
-    if (data?.source === 'ign') {
-      onRoof({
-        tiltPercent: Math.max(0, Math.round(data.pitchPercent)),
-        orientation: Math.round(data.aspectPvgis),
-        surfaceM2: Math.round(data.slopeAreaM2),
-      });
-      setIgnMsg(`IGN LiDAR : pente ${Math.round(data.pitchDeg)}° · surface pentée ${Math.round(data.slopeAreaM2)} m² (ajustables ci-dessous)`);
-    } else if (data?.source === 'none') {
-      setIgnMsg('Pas de donnée IGN exploitable ici — saisissez pente/orientation à la main.');
-    } else {
-      setIgnMsg('Analyse IGN indisponible — saisie manuelle.');
+    setPanLoading(true);
+    const { data: geo } = await fetchRoofPlaneFromIgn(roofGeometry.polygon);
+    if (geo?.source !== 'ign') {
+      setPanLoading(false);
+      toast.error('Géométrie IGN indisponible pour ce pan — réessayez ou tracez plus au centre.');
+      return;
     }
+    const [lon, lat] = turf.centroid(roofGeometry.polygon).geometry.coordinates;
+    const { data: pv } = await fetchPvgis1kwc({
+      lat, lon, loss: config.system_loss,
+      angleDeg: Math.round(geo.pitchDeg * 10) / 10, aspect: Math.round(geo.aspectPvgis),
+    });
+    setPanLoading(false);
+    onAddPan({
+      id: crypto.randomUUID(),
+      polygon: roofGeometry.polygon,
+      footprintM2: geo.footprintM2, slopeAreaM2: geo.slopeAreaM2,
+      pitchDeg: geo.pitchDeg, pitchPercent: geo.pitchPercent,
+      aspectPvgis: geo.aspectPvgis, azimuthCompass: geo.azimuthCompass,
+      eY: pv?.e_y ?? null,
+    });
+    onRoofGeometry(null); // vide le dessin courant pour le pan suivant
   };
+
+  // Agrégat pans → toiture single-roof (le sim aval reste mono-toiture) : surface totale +
+  // angles du meilleur pan (max ensoleillement, fallback max surface si eY tous null).
+  // TODO incrément 3 : simulation par pan (répartir les kWc entre pans selon leur eY).
+  useEffect(() => {
+    if (!pans || pans.length === 0) return;
+    const totalSlope = pans.reduce((s, p) => s + (p.slopeAreaM2 || 0), 0);
+    const withEy = pans.filter((p) => p.eY != null);
+    const best = (withEy.length ? withEy : pans).reduce(
+      (a, b) => (withEy.length ? (b.eY > a.eY ? b : a) : (b.slopeAreaM2 > a.slopeAreaM2 ? b : a)),
+    );
+    onRoof({
+      surfaceM2: Math.round(totalSlope),
+      tiltPercent: Math.max(0, Math.round(best.pitchPercent)),
+      orientation: Math.round(best.aspectPvgis),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pans]);
+
+  const bestEy = pans && pans.length ? Math.max(...pans.map((p) => (p.eY != null ? p.eY : -Infinity))) : null;
+  const totalPansSurface = pans ? pans.reduce((s, p) => s + (p.slopeAreaM2 || 0), 0) : 0;
 
   // Tracé du toit sur la vue aérienne → surface calculée par turf (empreinte au sol).
   const handlePolygon = (feature) => {
@@ -235,15 +269,27 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
         {hasLocation && (
           <RoofLocatorMap
-            key={`${location.lat},${location.lon}`}
+            key={`${location.lat},${location.lon},${pans?.length ?? 0}`}
             center={{ lat: location.lat, lon: location.lon }}
             initialPolygon={roofGeometry?.polygon}
             onPolygon={handlePolygon}
             fluxOverlay={fluxOverlay}
+            savedPans={pans}
           />
         )}
         {hasLocation && (
           <div className="space-y-2">
+            {solarStatus === 'drawn' && (
+              <button
+                type="button"
+                onClick={addPan}
+                disabled={panLoading}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 disabled:opacity-60"
+              >
+                {panLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {panLoading ? 'Analyse du pan…' : '➕ Ajouter ce pan'}
+              </button>
+            )}
             <button
               type="button"
               onClick={loadFlux}
@@ -262,20 +308,6 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               {roof3dLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Box className="w-4 h-4 text-[#1565C0]" />}
               {roof3dLoading ? 'Chargement de la 3D…' : '🧊 Vue 3D + flux (Google)'}
             </button>
-            {solarStatus === 'drawn' && (
-              <button
-                type="button"
-                onClick={computeIgnPlane}
-                disabled={ignLoading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-secondary-200 bg-white text-sm font-medium text-secondary-700 hover:border-secondary-400 disabled:opacity-60"
-              >
-                {ignLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ruler className="w-4 h-4 text-[#1565C0]" />}
-                {ignLoading ? 'Analyse IGN…' : '📐 Pente & orientation (IGN LiDAR)'}
-              </button>
-            )}
-            {ignMsg && (
-              <p className="text-xs text-secondary-500 text-center">{ignMsg}</p>
-            )}
             {fluxMsg && (
               <p className="text-xs text-secondary-500 text-center">{fluxMsg}</p>
             )}
@@ -289,6 +321,50 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
             )}
           </div>
         )}
+
+        {/* Pans cartographiés — comparaison (meilleur ensoleillement mis en avant) */}
+        {pans && pans.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-secondary-900">Pans de toiture</h3>
+            <ul className="space-y-2">
+              {pans.map((pan, i) => {
+                const isBest = pan.eY != null && bestEy != null && pan.eY === bestEy;
+                return (
+                  <li
+                    key={pan.id}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
+                      isBest ? 'border-[#F5C542] ring-1 ring-[#F5C542] bg-amber-50/40' : 'border-secondary-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 font-medium text-secondary-900">
+                        {isBest && <Star className="w-3.5 h-3.5 text-[#B45309] fill-[#F5C542] flex-shrink-0" />}
+                        Pan {i + 1}
+                        {isBest && <span className="text-xs font-normal text-[#B45309]">★ meilleur</span>}
+                      </div>
+                      <div className="text-xs text-secondary-500">
+                        pente {Math.round(pan.pitchDeg)}° · {azimuthToCompassLabel(pan.azimuthCompass)} · {Math.round(pan.slopeAreaM2)} m² ·{' '}
+                        {pan.eY != null ? `${Math.round(pan.eY)} kWh/kWc/an` : '—'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onRemovePan(pan.id)}
+                      className="p-1.5 text-secondary-400 hover:text-red-600 rounded-md hover:bg-red-50 flex-shrink-0"
+                      aria-label={`Supprimer le pan ${i + 1}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-xs text-secondary-600">
+              Total surface : {Math.round(totalPansSurface)} m² · {pans.length} pan(s)
+            </p>
+          </div>
+        )}
+
         {hasLocation && solarStatus === 'locate' && (
           <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
             <MapPin className="w-4 h-4 flex-shrink-0" /> Tracez le contour de votre toiture sur la vue aérienne pour calculer la surface.

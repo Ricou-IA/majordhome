@@ -12,6 +12,7 @@ export function initialWizardState(config) {
     ev: { enabled: false, kmPerYear: config.ev.default_km, kwhPer100km: config.ev.default_kwh_100km, pilotedCharge: false, addCharger: false },
     pvgis: null,            // { e_m, e_y, params } — posé à l'entrée du step 3
     roofGeometry: null,     // { source, imageryQuality, segments, dominant, flux_image_path } — Google Solar
+    pans: [],               // pans de toiture cartographiés : { id, polygon, footprintM2, slopeAreaM2, pitchDeg, pitchPercent, aspectPvgis, azimuthCompass, eY }
     selectedKwc: null,      // scénario sélectionné (null = recommandé)
     financing: { rate: config.default_loan_rate, years: config.default_loan_years, deposit: 0, manualCost: null },
   };
@@ -20,8 +21,11 @@ export function initialWizardState(config) {
 export function wizardReducer(state, action) {
   switch (action.type) {
     case 'SET_STEP': return { ...state, step: action.step };
-    case 'SET_LOCATION': return { ...state, location: { ...state.location, ...action.patch }, pvgis: null, roofGeometry: null };
+    case 'SET_LOCATION': return { ...state, location: { ...state.location, ...action.patch }, pvgis: null, roofGeometry: null, pans: [] };
     case 'SET_ROOF_GEOMETRY': return { ...state, roofGeometry: action.value };
+    case 'ADD_PAN': return { ...state, pans: [...state.pans, action.pan] };
+    case 'REMOVE_PAN': return { ...state, pans: state.pans.filter((p) => p.id !== action.id) };
+    case 'CLEAR_PANS': return { ...state, pans: [] };
     case 'SET_ROOF': return { ...state, roof: { ...state.roof, ...action.patch }, pvgis: null };
     case 'SET_CONSO': return { ...state, conso: { ...state.conso, ...action.patch } };
     case 'SET_EV': return { ...state, ev: { ...state.ev, ...action.patch } };
