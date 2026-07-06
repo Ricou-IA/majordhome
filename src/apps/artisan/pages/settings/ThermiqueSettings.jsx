@@ -8,7 +8,8 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { TYPES_PIECE, buildThermiqueConfig } from '@apps/thermique/lib/thermiqueConfig';
-import { Thermometer, Layers, Calculator, ChevronLeft, Loader2 } from 'lucide-react';
+import { supprimeParoiBibliotheque } from '@apps/thermique/lib/composeurParois';
+import { Thermometer, Layers, Calculator, Library, Trash2, ChevronLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, SectionTitle, inputClass } from '../../components/FormFields';
 
@@ -16,7 +17,10 @@ const TABS = [
   { key: 'temperatures', label: 'Températures', icon: Thermometer },
   { key: 'ponts', label: 'Ponts thermiques', icon: Layers },
   { key: 'calcul', label: 'Calcul', icon: Calculator },
+  { key: 'bibliotheque', label: 'Bibliothèque de parois', icon: Library },
 ];
+
+const FAMILLE_LABELS = { murs: 'Murs', plancherBas: 'Plancher bas', plafondToiture: 'Plafond / toiture' };
 
 const DELTA_UTB_FIELDS = [
   { key: 'non-isole', label: 'Non isolé' },
@@ -212,6 +216,72 @@ function CalculTab({ form, patch }) {
   );
 }
 
+function BibliothequeTab({ bibliotheque, onRename, onDelete, isSaving }) {
+  return (
+    <div className="card space-y-4">
+      <div>
+        <SectionTitle>Bibliothèque de parois</SectionTitle>
+        <p className="text-sm text-secondary-600 mt-1">
+          Parois composées (couches de matériaux), réutilisables dans les études. On en crée depuis
+          le composeur d’une étude (étape « Ouvertures & compositions » → mode « Composer » →
+          « Enregistrer ») ; ici on les renomme ou les supprime.
+        </p>
+      </div>
+      {bibliotheque.length === 0 ? (
+        <p className="text-sm text-secondary-500">
+          Aucune paroi enregistrée. Ouvrez le composeur dans une étude et cliquez « Enregistrer ».
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-secondary-500 border-b border-secondary-100">
+                <th className="py-2 pr-3 font-medium">Nom</th>
+                <th className="py-2 pr-3 font-medium">Famille</th>
+                <th className="py-2 pr-3 font-medium">U</th>
+                <th className="py-2 pr-3 font-medium">Couches</th>
+                <th className="py-2 font-medium" aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-secondary-100">
+              {bibliotheque.map((p) => (
+                <tr key={p.id}>
+                  <td className="py-2 pr-3">
+                    <input
+                      type="text"
+                      defaultValue={p.nom}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v && v !== p.nom) onRename(p.id, v);
+                      }}
+                      className={`${inputClass} w-full min-w-[140px]`}
+                      aria-label="Nom de la paroi"
+                    />
+                  </td>
+                  <td className="py-2 pr-3 text-secondary-600">{FAMILLE_LABELS[p.famille] ?? p.famille}</td>
+                  <td className="py-2 pr-3 text-secondary-900">{p.u}</td>
+                  <td className="py-2 pr-3 text-secondary-600">{p.couches?.length ?? 0}</td>
+                  <td className="py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onDelete(p.id)}
+                      disabled={isSaving}
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -223,7 +293,8 @@ export default function ThermiqueSettings() {
   const [activeTab, setActiveTab] = useState('temperatures');
   const [form, setForm] = useState(null);
 
-  const initial = useMemo(() => pickThermiqueForm(buildThermiqueConfig(settings)), [settings]);
+  const config = useMemo(() => buildThermiqueConfig(settings), [settings]);
+  const initial = useMemo(() => pickThermiqueForm(config), [config]);
 
   // Initialise le form quand les settings arrivent (pas pendant une édition)
   useEffect(() => {
@@ -246,12 +317,27 @@ export default function ThermiqueSettings() {
 
   const handleSave = async () => {
     try {
-      await save({ thermique: form });
+      // ⚠ merge JSONB niveau 1 : préserver parois_bibliotheque (absente de `form`) sinon la
+      // bibliothèque serait écrasée en enregistrant les réglages numériques.
+      await save({ thermique: { ...form, parois_bibliotheque: config.parois_bibliotheque } });
       toast.success('Paramètres thermique enregistrés');
     } catch (err) {
       toast.error(`Échec de l'enregistrement : ${err.message}`);
     }
   };
+
+  // Sauvegarde des ops bibliothèque : objet thermique COMPLET, réglages numériques ENREGISTRÉS
+  // (pickThermiqueForm(config), pas le `form` en cours d'édition) + nouvelle bibliothèque.
+  const saveBiblio = async (nouvelle) => {
+    try {
+      await save({ thermique: { ...pickThermiqueForm(config), parois_bibliotheque: nouvelle } });
+      toast.success('Bibliothèque mise à jour');
+    } catch (err) {
+      toast.error(`Échec de l'enregistrement : ${err.message}`);
+    }
+  };
+  const renommeBiblio = (id, nom) => saveBiblio(config.parois_bibliotheque.map((p) => (p.id === id ? { ...p, nom } : p)));
+  const supprimeBiblio = (id) => saveBiblio(supprimeParoiBibliotheque(config.parois_bibliotheque, id));
 
   return (
     <div className="space-y-6">
@@ -307,6 +393,14 @@ export default function ThermiqueSettings() {
             {activeTab === 'temperatures' && <TemperaturesTab form={form} patchTheta={patchTheta} />}
             {activeTab === 'ponts' && <PontsTab form={form} patchDelta={patchDelta} />}
             {activeTab === 'calcul' && <CalculTab form={form} patch={patch} />}
+            {activeTab === 'bibliotheque' && (
+              <BibliothequeTab
+                bibliotheque={config.parois_bibliotheque}
+                onRename={renommeBiblio}
+                onDelete={supprimeBiblio}
+                isSaving={isSaving}
+              />
+            )}
           </div>
         </div>
       )}
