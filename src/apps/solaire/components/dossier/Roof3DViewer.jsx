@@ -1,6 +1,7 @@
 // src/apps/solaire/components/dossier/Roof3DViewer.jsx
-// Viewer 3D toiture (modale plein écran) : maillage relief depuis le DSM Google Solar, heatmap
-// flux drapée par sommet (ironPalette), mesure de distance au clic (2 points → mètres réels).
+// Viewer 3D toiture (modale plein écran) : maillage construit UNIQUEMENT à partir des pixels toit
+// (masque Google Solar) — pas de terrain, pas de sol, pas de no-data. Heatmap flux drapée par
+// sommet (ironPalette), mesure de distance au clic (2 points → mètres réels).
 // Lazy-loadé (Three.js est lourd) → ne charge pas le bundle principal.
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -14,6 +15,9 @@ const MAX_FLUX = 1800;
 // DSM : sentinelle no-data = grande valeur négative. On garde le plausible [-100, 9000] m.
 const MIN_PLAUSIBLE = -100;
 const MAX_PLAUSIBLE = 9000;
+// Clamp anti-pic : une toiture est à quelques → dizaines de mètres au-dessus de sa base.
+const CLAMP_MIN = -5;
+const CLAMP_MAX = 40;
 
 function ramp(t) {
   const x = Math.max(0, Math.min(1, t)) * (RAMP.length - 1);
@@ -28,11 +32,13 @@ function ramp(t) {
   ];
 }
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const plausible = (h) => Number.isFinite(h) && h > MIN_PLAUSIBLE && h < MAX_PLAUSIBLE;
 
 export default function Roof3DViewer({ roof, onClose }) {
   const mountRef = useRef(null);
   const [distance, setDistance] = useState(null); // mètres ; null = pas encore 2 points
+  const [empty, setEmpty] = useState(false); // masque vide → pas de toit détecté
   const apiRef = useRef(null); // { resetMeasure } exposé par l'effet Three
 
   useEffect(() => {
@@ -41,24 +47,95 @@ export default function Roof3DViewer({ roof, onClose }) {
 
     const { dsm, flux, mask, width: w, height: h, pixelSizeMeters: px } = roof;
 
-    // ── Hauteur de référence : min plausible du DSM (relief remis à zéro) ────────────────
-    let minH = Infinity;
-    for (let i = 0; i < dsm.length; i++) if (plausible(dsm[i]) && dsm[i] < minH) minH = dsm[i];
-    if (!Number.isFinite(minH)) minH = 0;
-    logger.info('[roof3d] mesh', { w, h, px, minH });
+    // ── Sélection des pixels toit : mask truthy ET DSM plausible ──────────────────────────
+    // vertMap[i] = index du sommet (row-major i = y*w + x), -1 si non-toit.
+    const n = w * h;
+    const vertMap = new Int32Array(n).fill(-1);
+    const roofDsm = [];
+    for (let i = 0; i < n; i++) {
+      if (mask?.[i] && plausible(dsm[i])) roofDsm.push(dsm[i]);
+    }
+
+    if (roofDsm.length === 0) {
+      // Aucun pixel toit → on n'affiche rien, message dans la modale.
+      logger.info('[roof3d] no roof pixels (mask empty or DSM invalid)', { w, h });
+      setEmpty(true);
+      return undefined;
+    }
+    setEmpty(false);
+
+    // ── Baseline robuste = médiane des DSM toit (tue les pics résiduels via clamp) ─────────
+    const sorted = roofDsm.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const rawMin = sorted[0];
+    const rawMax = sorted[sorted.length - 1];
+    logger.info('[roof3d] roof DSM range', {
+      count: roofDsm.length, min: rawMin, max: rawMax, median,
+      clamp: [CLAMP_MIN, CLAMP_MAX], w, h, px,
+    });
+    const baseH = median;
+
+    // ── Construction des sommets (position + couleur) UNIQUEMENT pour les pixels toit ──────
+    // Orientation : on place directement z = (y - h/2) * px et on couche le mesh via
+    // rotation.x = -PI/2 (le plan XY → horizontal XZ). Row 0 du raster (haut) mappe à z le plus
+    // négatif ; après rotation cela correspond au fond de la scène. DÉCISION v1 : pas de Y-flip
+    // explicite. Si le rendu paraît miroir en test live, appliquer y -> (h-1-y). ⚠ à vérifier.
+    const positions = [];
+    const colors = [];
+    let vCount = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (!(mask?.[i] && plausible(dsm[i]))) continue;
+        vertMap[i] = vCount++;
+        const pxPos = (x - w / 2) * px;
+        const pzPos = (y - h / 2) * px;
+        const py = clamp(dsm[i] - baseH, CLAMP_MIN, CLAMP_MAX);
+        positions.push(pxPos, py, pzPos);
+        const [r, g, b] = ramp((flux?.[i] ?? 0) / MAX_FLUX);
+        colors.push(r, g, b);
+      }
+    }
+
+    // ── Faces (2 triangles/cellule) SEULEMENT quand les 4 coins sont des sommets toit ──────
+    const indices = [];
+    for (let y = 0; y < h - 1; y++) {
+      for (let x = 0; x < w - 1; x++) {
+        const a = vertMap[y * w + x];
+        const b = vertMap[y * w + (x + 1)];
+        const c = vertMap[(y + 1) * w + x];
+        const d = vertMap[(y + 1) * w + (x + 1)];
+        if (a === -1 || b === -1 || c === -1 || d === -1) continue;
+        // quad a b / c d → triangles (a, c, b) et (b, c, d) — CCW vu de dessus
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+
+    // Recentre le mesh sur l'origine (bbox centrée) pour un cadrage/orbite propres.
+    const bbox = geometry.boundingBox;
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+    geometry.translate(-center.x, -center.y, -center.z);
+    const size = new THREE.Vector3();
+    bbox.getSize(size);
+    const span = Math.max(size.x, size.z, 1); // étendue horizontale réelle (m)
 
     // ── Scène / caméra / renderer ────────────────────────────────────────────────────────
     const width = mount.clientWidth;
     const height = mount.clientHeight;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a); // slate-900
+    scene.background = new THREE.Color(0x0b1020); // bleu nuit — les couleurs toit ressortent
 
-    const spanX = (w - 1) * px; // largeur réelle (m)
-    const spanZ = (h - 1) * px; // profondeur réelle (m)
-    const diag = Math.hypot(spanX, spanZ);
-
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, diag * 10);
-    camera.position.set(0, diag * 0.9, diag * 0.9); // vue oblique en surplomb
+    const camDist = span * 1.4;
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, camDist * 20 + 100);
+    camera.position.set(0, camDist * 0.9, camDist * 0.9); // vue oblique en surplomb
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -66,35 +143,8 @@ export default function Roof3DViewer({ roof, onClose }) {
     renderer.setSize(width, height);
     mount.appendChild(renderer.domElement);
 
-    // ── Géométrie relief : PlaneGeometry(w-1, h-1, w-1, h-1) → w×h sommets row-major ──────
-    // z = hauteur DSM (m) zéroée sur minH ; sommets no-data → z=0 (baseline).
-    // Y-flip : PlaneGeometry ligne 0 = +Y (haut). Le raster a la ligne 0 en HAUT. Pour que la
-    // scène corresponde au raster on mappe raster row r → geometry row (h-1-r). DÉCISION v1 :
-    // on applique ce flip. Si le relief paraît miroir en test live, c'est le caveat connu.
-    const geometry = new THREE.PlaneGeometry(spanX, spanZ, w - 1, h - 1);
-    const pos = geometry.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    for (let gy = 0; gy < h; gy++) {
-      const ry = h - 1 - gy; // flip vertical raster→geometry
-      for (let gx = 0; gx < w; gx++) {
-        const vIdx = gy * w + gx;
-        const rIdx = ry * w + gx;
-        const raw = dsm[rIdx];
-        pos.setZ(vIdx, plausible(raw) ? raw - minH : 0);
-        const m = mask?.[rIdx] ?? 1;
-        if (m) {
-          const [r, g, b] = ramp((flux?.[rIdx] ?? 0) / MAX_FLUX);
-          colors[vIdx * 3] = r; colors[vIdx * 3 + 1] = g; colors[vIdx * 3 + 2] = b;
-        } else {
-          colors[vIdx * 3] = 0.18; colors[vIdx * 3 + 1] = 0.2; colors[vIdx * 3 + 2] = 0.26; // slate hors toit
-        }
-      }
-    }
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
-
     const material = new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide,
+      vertexColors: true, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI / 2; // le plan (XY) devient horizontal (XZ)
@@ -102,7 +152,7 @@ export default function Roof3DViewer({ roof, onClose }) {
 
     // ── Lumières : directionnelle (relief lisible) + ambiante douce ──────────────────────
     const dir = new THREE.DirectionalLight(0xffffff, 1.6);
-    dir.position.set(spanX * 0.5, diag, spanZ * 0.3);
+    dir.position.set(span * 0.5, span, span * 0.3);
     scene.add(dir);
     scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 
@@ -118,6 +168,7 @@ export default function Roof3DViewer({ roof, onClose }) {
     let picks = [];
     let lineObj = null;
     const markers = [];
+    const markerR = span * 0.008;
 
     const clearMeasure = () => {
       if (lineObj) { scene.remove(lineObj); lineObj.geometry.dispose(); lineObj.material.dispose(); lineObj = null; }
@@ -130,7 +181,7 @@ export default function Roof3DViewer({ roof, onClose }) {
 
     const addMarker = (p) => {
       const sph = new THREE.Mesh(
-        new THREE.SphereGeometry(diag * 0.006, 12, 12),
+        new THREE.SphereGeometry(markerR, 12, 12),
         new THREE.MeshBasicMaterial({ color: 0xffd400 }),
       );
       sph.position.copy(p);
@@ -224,9 +275,15 @@ export default function Roof3DViewer({ roof, onClose }) {
           </button>
         </div>
       </header>
-      <div ref={mountRef} className="flex-1 min-h-0" />
+      {empty ? (
+        <div className="flex-1 min-h-0 flex items-center justify-center text-slate-300 text-sm px-6 text-center">
+          Pas de surface toit détectée par Google ici.
+        </div>
+      ) : (
+        <div ref={mountRef} className="flex-1 min-h-0" />
+      )}
       <p className="px-4 py-2 text-[11px] text-slate-400 bg-slate-800 flex-shrink-0 text-center">
-        Relief depuis le DSM Google Solar · couleurs = flux annuel (bleu foncé faible → jaune fort).
+        Toiture reconstruite depuis le masque Google Solar · couleurs = flux annuel (bleu foncé faible → jaune fort).
         Faites pivoter avec la souris, zoomez à la molette. Mesure indicative à l'échelle réelle.
       </p>
     </div>
