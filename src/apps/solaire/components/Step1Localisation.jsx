@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as turf from '@turf/turf';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Plus, Trash2, Star } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Plus, Trash2, Star, Lock, Unlock } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition, fetchPvgis1kwc } from '../lib/pvgis';
@@ -26,7 +26,7 @@ function azimuthToCompassLabel(azimuthCompass) {
   return COMPASS_8[idx];
 }
 
-export default function Step1Localisation({ location, roof, config, roofGeometry, pans, onLocation, onRoof, onRoofGeometry, onAddPan, onRemovePan, onNext }) {
+export default function Step1Localisation({ location, roof, config, roofGeometry, pans, onLocation, onRoof, onRoofGeometry, onAddPan, onRemovePan, onUpdatePan, onNext }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -48,6 +48,11 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
   }, [debouncedQuery]);
 
   const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|drawn
+
+  // Sélection d'un pan (liste ↔ carte) : la carte Toiture devient l'éditeur du pan sélectionné.
+  const [selectedPanId, setSelectedPanId] = useState(null);
+  // Toiture verrouillée par défaut (valeurs IGN fiables) ; cadenas pour forçage manuel.
+  const [toitureUnlocked, setToitureUnlocked] = useState(false);
 
   // Ajout d'un pan (géométrie IGN LiDAR + ensoleillement PVGIS par pan).
   const [panLoading, setPanLoading] = useState(false);
@@ -110,6 +115,44 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pans]);
 
+  // Sélection par défaut : le meilleur pan (max ensoleillement). Re-sélectionne si le pan
+  // sélectionné disparaît (suppression) ; désélectionne si plus aucun pan.
+  useEffect(() => {
+    if (!pans || pans.length === 0) {
+      setSelectedPanId(null);
+      return;
+    }
+    if (selectedPanId == null || !pans.some((p) => p.id === selectedPanId)) {
+      const best = pans.reduce((a, b) => ((b.eY ?? -1) > (a.eY ?? -1) ? b : a));
+      setSelectedPanId(best.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pans]);
+
+  // Changement de sélection → re-verrouille (on repart des valeurs IGN fiables).
+  useEffect(() => {
+    setToitureUnlocked(false);
+  }, [selectedPanId]);
+
+  const activePan = pans ? pans.find((p) => p.id === selectedPanId) || null : null;
+
+  // Re-PVGIS pour tout pan « stale » (eY null suite à une édition manuelle pente/orientation).
+  // Debounce ~600 ms ; recalcule kWh/kWc/an pour l'angle/aspect édités.
+  useEffect(() => {
+    const stale = (pans ?? []).find((p) => p.eY == null && Number.isFinite(p.pitchDeg) && Number.isFinite(p.aspectPvgis));
+    if (!stale) return undefined;
+    const t = setTimeout(async () => {
+      const [lon, lat] = turf.centroid(stale.polygon).geometry.coordinates;
+      const { data } = await fetchPvgis1kwc({
+        lat, lon, loss: config.system_loss,
+        angleDeg: Math.round(stale.pitchDeg * 10) / 10, aspect: Math.round(stale.aspectPvgis),
+      });
+      if (data?.e_y != null) onUpdatePan(stale.id, { eY: data.e_y });
+    }, 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pans]);
+
   const bestEy = pans && pans.length ? Math.max(...pans.map((p) => (p.eY != null ? p.eY : -Infinity))) : null;
   const totalPansSurface = pans ? pans.reduce((s, p) => s + (p.slopeAreaM2 || 0), 0) : 0;
 
@@ -145,15 +188,62 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     setSuggestions([]);
   };
 
-  const tilt = Number(roof.tiltPercent);
+  // Mode « éditeur de pan » : la carte Toiture pilote le pan sélectionné (dès qu'un pan existe).
+  const panEditor = pans && pans.length > 0 && activePan;
+
+  // Valeurs affichées dans la carte Toiture : depuis le pan actif (mode éditeur) sinon roof.*.
+  const tiltPercentVal = panEditor ? activePan.pitchPercent : roof.tiltPercent;
+  const surfaceVal = panEditor ? activePan.slopeAreaM2 : roof.surfaceM2;
+  const orientationVal = panEditor ? activePan.aspectPvgis : roof.orientation;
+
+  const tilt = Number(tiltPercentVal);
   const tiltDeg = Number.isFinite(tilt) ? Math.round(percentToDegrees(tilt) * 10) / 10 : null;
-  const aspect = orientationToAspect(roof.orientation);
+  const aspect = panEditor
+    ? (Number.isFinite(Number(orientationVal)) ? Number(orientationVal) : 0)
+    : orientationToAspect(orientationVal);
   const isNorthFacing = Math.abs(aspect) > 135;
-  const surface = Number(roof.surfaceM2);
+  const surface = Number(surfaceVal);
   const hasSurface = Number.isFinite(surface) && surface > 0;
   const maxKwc = hasSurface ? maxPowerKwc(surface, config.panel_area_m2, config.panel_power_wc) : 0;
   const hasLocation = location.lat !== null && location.lon !== null;
   const canContinue = hasLocation && hasSurface && maxKwc > 0 && Number.isFinite(tilt);
+
+  // En mode éditeur les inputs sont désactivés tant que le cadenas n'est pas ouvert.
+  const inputsLocked = panEditor && !toitureUnlocked;
+
+  // Handlers d'édition : dispatch UPDATE_PAN (mode éditeur) sinon SET_ROOF (fallback).
+  const handleTiltChange = (raw) => {
+    const n = raw === '' ? '' : Number(raw);
+    const clean = Number.isNaN(n) ? '' : n;
+    if (panEditor) {
+      const deg = clean === '' ? null : Math.atan(clean / 100) * 180 / Math.PI;
+      onUpdatePan(activePan.id, { pitchPercent: clean, pitchDeg: deg, eY: null });
+    } else {
+      onRoof({ tiltPercent: clean });
+    }
+  };
+  const handleSurfaceChange = (raw) => {
+    const n = raw === '' ? '' : Number(raw);
+    const clean = Number.isNaN(n) ? '' : n;
+    if (panEditor) onUpdatePan(activePan.id, { slopeAreaM2: clean });
+    else onRoof({ surfaceM2: clean });
+  };
+  const handleOrientationDir = (dir) => {
+    if (panEditor) onUpdatePan(activePan.id, { aspectPvgis: orientationToAspect(dir), eY: null });
+    else onRoof({ orientation: dir });
+  };
+  const handleOrientationDeg = (raw) => {
+    if (panEditor) {
+      const n = raw === '' ? 0 : Number(raw);
+      onUpdatePan(activePan.id, { aspectPvgis: Number.isNaN(n) ? 0 : n, eY: null });
+    } else {
+      const n = raw === '' ? 'S' : Number(raw);
+      onRoof({ orientation: typeof n === 'number' && Number.isNaN(n) ? 'S' : n });
+    }
+  };
+  // Sélection de la boussole : en mode éditeur, la direction dont l'aspect correspond à celui du pan.
+  const selectedDir = panEditor ? null : roof.orientation;
+  const panActiveIndex = panEditor ? pans.findIndex((p) => p.id === activePan.id) : -1;
 
   return (
     <div className="space-y-5">
@@ -217,6 +307,8 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
             initialPolygon={roofGeometry?.polygon}
             onPolygon={handlePolygon}
             savedPans={pans}
+            selectedPanId={selectedPanId}
+            onSelectPan={setSelectedPanId}
             resetToken={resetToken}
           />
         )}
@@ -243,11 +335,17 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
             <ul className="space-y-2">
               {pans.map((pan, i) => {
                 const isBest = pan.eY != null && bestEy != null && pan.eY === bestEy;
+                const isSelected = pan.id === selectedPanId;
                 return (
                   <li
                     key={pan.id}
-                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
-                      isBest ? 'border-[#F5C542] ring-1 ring-[#F5C542] bg-amber-50/40' : 'border-secondary-200 bg-white'
+                    onClick={() => setSelectedPanId(pan.id)}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'border-primary-400 ring-2 ring-primary-400 bg-primary-50'
+                        : isBest
+                          ? 'border-[#F5C542] ring-1 ring-[#F5C542] bg-amber-50/40'
+                          : 'border-secondary-200 bg-white hover:border-secondary-400'
                     }`}
                   >
                     <div className="flex-1 min-w-0">
@@ -263,7 +361,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                     </div>
                     <button
                       type="button"
-                      onClick={() => onRemovePan(pan.id)}
+                      onClick={(e) => { e.stopPropagation(); onRemovePan(pan.id); }}
                       className="p-1.5 text-secondary-400 hover:text-red-600 rounded-md hover:bg-red-50 flex-shrink-0"
                       aria-label={`Supprimer le pan ${i + 1}`}
                     >
@@ -292,9 +390,35 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
         )}
       </div>
 
-      {/* Toiture */}
+      {/* Toiture — en mode éditeur (pans existants) = panneau du pan sélectionné, verrouillé */}
       <div className="card space-y-4">
-        <h2 className="font-semibold text-secondary-900">Toiture</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-secondary-900">
+            {panEditor ? `Toiture — Pan ${panActiveIndex + 1}` : 'Toiture'}
+          </h2>
+          {panEditor && (
+            <button
+              type="button"
+              onClick={() => setToitureUnlocked((v) => !v)}
+              title="Forcer les valeurs manuellement"
+              aria-label="Forcer les valeurs manuellement"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                toitureUnlocked
+                  ? 'bg-amber-50 text-[#B45309] border-[#F5C542]'
+                  : 'bg-white text-secondary-600 border-secondary-200 hover:border-secondary-400'
+              }`}
+            >
+              {toitureUnlocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              {toitureUnlocked ? 'Déverrouillé' : 'Forcer'}
+            </button>
+          )}
+        </div>
+        {panEditor && (
+          <p className="text-xs text-secondary-500">
+            Valeurs mesurées par IGN.{' '}
+            {toitureUnlocked ? 'Édition manuelle activée.' : 'Ouvrez le cadenas pour les forcer manuellement.'}
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField label="Pente (%)">
@@ -302,13 +426,11 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               type="number"
               inputMode="decimal"
               className={inputClass}
-              value={roof.tiltPercent ?? ''}
+              value={tiltPercentVal ?? ''}
               min={0}
               step={1}
-              onChange={(e) => {
-                const n = e.target.value === '' ? '' : Number(e.target.value);
-                onRoof({ tiltPercent: Number.isNaN(n) ? '' : n });
-              }}
+              disabled={inputsLocked}
+              onChange={(e) => handleTiltChange(e.target.value)}
             />
             {tiltDeg !== null && (
               <p className="text-xs text-secondary-500 mt-1">{tilt} % ≈ {tiltDeg}°</p>
@@ -320,13 +442,11 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               type="number"
               inputMode="decimal"
               className={inputClass}
-              value={roof.surfaceM2 ?? ''}
+              value={surfaceVal ?? ''}
               min={0}
               step={1}
-              onChange={(e) => {
-                const n = e.target.value === '' ? '' : Number(e.target.value);
-                onRoof({ surfaceM2: Number.isNaN(n) ? '' : n });
-              }}
+              disabled={inputsLocked}
+              onChange={(e) => handleSurfaceChange(e.target.value)}
             />
             {hasSurface && (
               <p className="text-xs text-secondary-500 mt-1">
@@ -345,9 +465,10 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                 ) : (
                   <button
                     key={dir}
-                    onClick={() => onRoof({ orientation: dir })}
-                    className={`h-11 rounded-lg text-sm font-medium border transition-colors ${
-                      roof.orientation === dir
+                    disabled={inputsLocked}
+                    onClick={() => handleOrientationDir(dir)}
+                    className={`h-11 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      (panEditor ? orientationToAspect(dir) === Number(orientationVal) : selectedDir === dir)
                         ? 'bg-primary-600 text-white border-primary-600'
                         : 'bg-white text-secondary-700 border-secondary-200 hover:border-secondary-400'
                     }`}
@@ -365,12 +486,10 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                 className={inputClass}
                 min={-180}
                 max={180}
-                value={typeof roof.orientation === 'number' ? roof.orientation : ''}
+                disabled={inputsLocked}
+                value={panEditor ? (Number.isFinite(Number(orientationVal)) ? Number(orientationVal) : '') : (typeof roof.orientation === 'number' ? roof.orientation : '')}
                 placeholder={`${aspect}`}
-                onChange={(e) => {
-                  const n = e.target.value === '' ? 'S' : Number(e.target.value);
-                  onRoof({ orientation: typeof n === 'number' && Number.isNaN(n) ? 'S' : n });
-                }}
+                onChange={(e) => handleOrientationDeg(e.target.value)}
               />
             </div>
           </div>

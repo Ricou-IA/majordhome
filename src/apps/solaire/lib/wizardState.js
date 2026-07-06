@@ -25,6 +25,8 @@ export function wizardReducer(state, action) {
     case 'SET_ROOF_GEOMETRY': return { ...state, roofGeometry: action.value };
     case 'ADD_PAN': return { ...state, pans: [...state.pans, action.pan] };
     case 'REMOVE_PAN': return { ...state, pans: state.pans.filter((p) => p.id !== action.id) };
+    case 'UPDATE_PAN':
+      return { ...state, pans: state.pans.map((p) => (p.id === action.id ? { ...p, ...action.patch } : p)) };
     case 'CLEAR_PANS': return { ...state, pans: [] };
     case 'SET_ROOF': return { ...state, roof: { ...state.roof, ...action.patch }, pvgis: null };
     case 'SET_CONSO': return { ...state, conso: { ...state.conso, ...action.patch } };

@@ -31,12 +31,14 @@ const DRAW_STYLES = [
     paint: { 'circle-radius': 3, 'circle-color': '#93C5FD' } },
 ];
 
-export default function RoofLocatorMap({ center, initialPolygon, onPolygon, savedPans, resetToken }) {
+export default function RoofLocatorMap({ center, initialPolygon, onPolygon, savedPans, selectedPanId, onSelectPan, resetToken }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const drawRef = useRef(null);
   const onPolygonRef = useRef(onPolygon);
   onPolygonRef.current = onPolygon; // dernière closure (évite le stale)
+  const onSelectPanRef = useRef(onSelectPan);
+  onSelectPanRef.current = onSelectPan; // dernière closure (évite le stale sur le click handler)
 
   // Init unique (le composant est remonté via `key` quand le lieu change → pas de tracé fantôme).
   useEffect(() => {
@@ -85,6 +87,14 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, save
       map.addSource('saved-pan-labels', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({ id: 'saved-pans-fill', type: 'fill', source: 'saved-pans', paint: { 'fill-color': '#F5C542', 'fill-opacity': 0.35 } });
       map.addLayer({ id: 'saved-pans-line', type: 'line', source: 'saved-pans', paint: { 'line-color': '#B45309', 'line-width': 2 } });
+      // Surbrillance du pan sélectionné (contour bleu épais) — filtre initialement vide.
+      map.addLayer({
+        id: 'saved-pan-highlight',
+        type: 'line',
+        source: 'saved-pans',
+        paint: { 'line-color': '#1D4ED8', 'line-width': 4 },
+        filter: ['==', ['get', 'id'], selectedPanId ?? ''],
+      });
       map.addLayer({
         id: 'saved-pans-labels',
         type: 'symbol',
@@ -92,6 +102,14 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, save
         layout: { 'text-field': ['get', 'label'], 'text-size': 14, 'text-allow-overlap': true },
         paint: { 'text-color': '#7C2D12', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.5 },
       });
+
+      // Sélection d'un pan en cliquant son polygone (ref → pas de stale closure).
+      map.on('click', 'saved-pans-fill', (e) => {
+        const id = e.features?.[0]?.properties?.id;
+        if (id) onSelectPanRef.current?.(id);
+      });
+      map.on('mouseenter', 'saved-pans-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'saved-pans-fill', () => { map.getCanvas().style.cursor = ''; });
     });
 
     mapRef.current = map;
@@ -111,7 +129,7 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, save
       const pans = (savedPans ?? []).filter((p) => p?.polygon);
       src.setData({
         type: 'FeatureCollection',
-        features: pans.map((p, i) => ({ type: 'Feature', geometry: p.polygon, properties: { label: String(i + 1) } })),
+        features: pans.map((p, i) => ({ type: 'Feature', geometry: p.polygon, properties: { id: p.id, label: String(i + 1) } })),
       });
       labelSrc.setData({
         type: 'FeatureCollection',
@@ -124,6 +142,19 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, save
     if (map.getSource('saved-pans')) apply(); else map.once('load', apply);
     return undefined;
   }, [savedPans]);
+
+  // Surbrillance : met à jour le filtre de la couche highlight sur le pan sélectionné.
+  // Attend le load si la couche n'existe pas encore (init pas terminée).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const apply = () => {
+      if (!map.getLayer('saved-pan-highlight')) return;
+      map.setFilter('saved-pan-highlight', ['==', ['get', 'id'], selectedPanId ?? '']);
+    };
+    if (map.getLayer('saved-pan-highlight')) apply(); else map.once('load', apply);
+    return undefined;
+  }, [selectedPanId]);
 
   // Effacement impératif du tracé en cours après enregistrement d'un pan (sans remonter la carte
   // → la vue/zoom de l'utilisateur est préservée).

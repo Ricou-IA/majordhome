@@ -276,6 +276,7 @@ function SimulateurInner({ config, settings }) {
           onRoofGeometry={(value) => dispatch({ type: 'SET_ROOF_GEOMETRY', value })}
           onAddPan={(pan) => dispatch({ type: 'ADD_PAN', pan })}
           onRemovePan={(id) => dispatch({ type: 'REMOVE_PAN', id })}
+          onUpdatePan={(id, patch) => dispatch({ type: 'UPDATE_PAN', id, patch })}
           onNext={() => goToStep(2)}
         />
       )}
