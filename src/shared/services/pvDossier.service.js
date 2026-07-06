@@ -25,8 +25,9 @@ export const pvDossierService = {
   /** Création LAZY idempotente : renvoie le dossier existant ou en crée un (status 'offre'). */
   async upsertForSimulation({ orgId, userId, simulationId, leadId = null, clientId = null }) {
     return withErrorHandling(async () => {
-      const existing = await pvDossierService.getBySimulation(orgId, simulationId);
-      if (existing?.data) return existing.data;
+      const { data: existing, error: exErr } = await pvDossierService.getBySimulation(orgId, simulationId);
+      if (exErr) throw exErr; // échec de lecture → ne PAS retomber sur un INSERT en aveugle
+      if (existing) return existing;
       const { data, error } = await supabase
         .from(VIEW)
         .insert({
