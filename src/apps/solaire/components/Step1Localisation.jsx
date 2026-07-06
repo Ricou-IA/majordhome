@@ -1,21 +1,15 @@
 // src/apps/solaire/components/Step1Localisation.jsx
 // Étape 1 du wizard : localisation (GPS ou adresse) + toiture (pente %, orientation, surface).
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as turf from '@turf/turf';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun, Box, Plus, Trash2, Star } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Plus, Trash2, Star } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition, fetchPvgis1kwc } from '../lib/pvgis';
-import { fetchFluxOverlay } from '../lib/googleSolarFlux';
-import { fetchRoof3D } from '../lib/googleSolar3D';
 import { fetchRoofPlaneFromIgn } from '../lib/ignMns';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
-import FluxHeatmap from './dossier/FluxHeatmap';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
-
-// Three.js est lourd → viewer 3D lazy-loadé (chunk séparé, hors bundle principal).
-const Roof3DViewer = lazy(() => import('./dossier/Roof3DViewer'));
 
 // Boussole 3×3 (centre vide) — ordre d'affichage
 const COMPASS = [
@@ -55,71 +49,19 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
   const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|drawn
 
-  // Étape B : overlay flux Google Solar (chargé à la demande).
-  const [fluxOverlay, setFluxOverlay] = useState(null);
-  const [fluxLoading, setFluxLoading] = useState(false);
-  const [fluxMsg, setFluxMsg] = useState(null);
-  const [fluxDebug, setFluxDebug] = useState(null); // diagnostic temporaire (alignement overlay)
-
-  // Viewer 3D (DSM + flux drapé) — chargé à la demande.
-  const [roof3d, setRoof3d] = useState(null);
-  const [roof3dLoading, setRoof3dLoading] = useState(false);
-
   // Ajout d'un pan (géométrie IGN LiDAR + ensoleillement PVGIS par pan).
   const [panLoading, setPanLoading] = useState(false);
+
+  // Effacement impératif du tracé en cours dans la carte (sans remonter la carte).
+  const [resetToken, setResetToken] = useState(0);
 
   // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
     onRoofGeometry(null);
     setSolarStatus(location.lat == null ? 'idle' : 'locate');
-    setFluxOverlay(null);
-    setFluxMsg(null);
-    setRoof3d(null);
     setPanLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lon]);
-
-  const loadFlux = async () => {
-    if (location.lat == null) return;
-    setFluxLoading(true);
-    setFluxMsg(null);
-    setFluxDebug(null);
-    // Le flux se récupère au centre de la TOITURE TRACÉE (pas au point géocodé, qui peut être
-    // ailleurs si l'utilisateur a déplacé la carte pour tracer une autre maison → décalage).
-    const [flng, flat] = roofGeometry?.polygon
-      ? turf.centroid(roofGeometry.polygon).geometry.coordinates
-      : [location.lon, location.lat];
-    const { data } = await fetchFluxOverlay({ lat: flat, lon: flng });
-    setFluxLoading(false);
-    if (data?.source === 'google') {
-      setFluxOverlay({ imageUrl: data.imageUrl, coordinates: data.coordinates });
-      const c = data.coordinates; // [TL, TR, BR, BL] en [lng,lat]
-      const west = c[0][0]; const north = c[0][1]; const east = c[2][0]; const south = c[2][1];
-      setFluxDebug(`fetch ${flat.toFixed(5)}, ${flng.toFixed(5)} · overlay lng ${west.toFixed(5)}→${east.toFixed(5)} · lat ${south.toFixed(5)}→${north.toFixed(5)}`);
-    } else if (data?.source === 'none') {
-      setFluxMsg('Pas de couche de flux Google sur ce point.');
-    } else {
-      setFluxMsg('Flux Google indisponible.');
-    }
-  };
-
-  // Vue 3D : DSM + flux drapé, mesure au clic. Centroïde de la toiture tracée (comme loadFlux).
-  const openRoof3D = async () => {
-    if (location.lat == null) return;
-    setRoof3dLoading(true);
-    const [flng, flat] = roofGeometry?.polygon
-      ? turf.centroid(roofGeometry.polygon).geometry.coordinates
-      : [location.lon, location.lat];
-    const { data } = await fetchRoof3D({ lat: flat, lon: flng });
-    setRoof3dLoading(false);
-    if (data?.source === 'google') {
-      setRoof3d(data);
-    } else if (data?.source === 'none') {
-      toast.info('Pas de données 3D Google sur ce point.');
-    } else {
-      toast.error('Vue 3D Google indisponible.');
-    }
-  };
 
   // Ajout d'un pan : géométrie IGN LiDAR (pente/orientation/surface pentée) + ensoleillement
   // annuel PVGIS (kWh/kWc/an) calculé pour ce pan. Le pan rejoint la liste comparative.
@@ -147,6 +89,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       eY: pv?.e_y ?? null,
     });
     onRoofGeometry(null); // vide le dessin courant pour le pan suivant
+    setResetToken((t) => t + 1); // efface le tracé dans la carte sans la remonter
   };
 
   // Agrégat pans → toiture single-roof (le sim aval reste mono-toiture) : surface totale +
@@ -269,12 +212,12 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
         {hasLocation && (
           <RoofLocatorMap
-            key={`${location.lat},${location.lon},${pans?.length ?? 0}`}
+            key={`${location.lat},${location.lon}`}
             center={{ lat: location.lat, lon: location.lon }}
             initialPolygon={roofGeometry?.polygon}
             onPolygon={handlePolygon}
-            fluxOverlay={fluxOverlay}
             savedPans={pans}
+            resetToken={resetToken}
           />
         )}
         {hasLocation && (
@@ -289,35 +232,6 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                 {panLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {panLoading ? 'Analyse du pan…' : '➕ Ajouter ce pan'}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={loadFlux}
-              disabled={fluxLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-secondary-200 bg-white text-sm font-medium text-secondary-700 hover:border-secondary-400 disabled:opacity-60"
-            >
-              {fluxLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sun className="w-4 h-4 text-[#F5C542]" />}
-              {fluxLoading ? 'Chargement du flux…' : '☀️ Voir le flux solaire (Google)'}
-            </button>
-            <button
-              type="button"
-              onClick={openRoof3D}
-              disabled={roof3dLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-secondary-200 bg-white text-sm font-medium text-secondary-700 hover:border-secondary-400 disabled:opacity-60"
-            >
-              {roof3dLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Box className="w-4 h-4 text-[#1565C0]" />}
-              {roof3dLoading ? 'Chargement de la 3D…' : '🧊 Vue 3D + flux (Google)'}
-            </button>
-            {fluxMsg && (
-              <p className="text-xs text-secondary-500 text-center">{fluxMsg}</p>
-            )}
-            {fluxOverlay && (
-              <p className="text-xs text-secondary-500 text-center">
-                Flux annuel Google Solar (indicatif) — bleu foncé = faible, clair/jaune = fort.
-              </p>
-            )}
-            {fluxDebug && (
-              <p className="text-[10px] font-mono text-secondary-400 text-center break-all">{fluxDebug}</p>
             )}
           </div>
         )}
@@ -469,8 +383,6 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
         </FormField>
       </div>
 
-      {roofGeometry?.flux_image_path && <FluxHeatmap fluxImagePath={roofGeometry.flux_image_path} />}
-
       <button
         onClick={onNext}
         disabled={!canContinue}
@@ -478,12 +390,6 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       >
         Continuer <ArrowRight className="w-4 h-4" />
       </button>
-
-      {roof3d && (
-        <Suspense fallback={null}>
-          <Roof3DViewer roof={roof3d} onClose={() => setRoof3d(null)} />
-        </Suspense>
-      )}
     </div>
   );
 }

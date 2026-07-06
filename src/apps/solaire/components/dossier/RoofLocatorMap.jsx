@@ -7,6 +7,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import * as turf from '@turf/turf';
 import { Pencil } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
 
@@ -30,7 +31,7 @@ const DRAW_STYLES = [
     paint: { 'circle-radius': 3, 'circle-color': '#93C5FD' } },
 ];
 
-export default function RoofLocatorMap({ center, initialPolygon, onPolygon, fluxOverlay, savedPans }) {
+export default function RoofLocatorMap({ center, initialPolygon, onPolygon, savedPans, resetToken }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const drawRef = useRef(null);
@@ -53,7 +54,7 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, flux
     const draw = new MapboxDraw({
       displayControlsDefault: false,
       controls: { polygon: true, trash: true },
-      defaultMode: 'draw_polygon',
+      defaultMode: 'simple_select',
       styles: DRAW_STYLES,
     });
     map.addControl(draw, 'top-left');
@@ -72,26 +73,25 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, flux
     map.on('draw.update', emitSingle);
     map.on('draw.delete', onDelete);
 
-    // Restauration d'un tracé existant (brouillon rechargé).
+    // Restauration d'un tracé existant (brouillon rechargé) + sources réactives des pans enregistrés.
     map.on('load', () => {
       if (initialPolygon) {
         draw.add({ type: 'Feature', geometry: initialPolygon, properties: {} });
         draw.changeMode('simple_select');
       }
-      // Pans déjà enregistrés → couche statique (la carte est remontée via `key` à chaque
-      // ajout de pan, donc construire une seule fois au load suffit).
-      const pans = savedPans ?? [];
-      if (pans.length > 0) {
-        map.addSource('saved-pans-src', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: pans.filter((p) => p?.polygon).map((p) => ({ type: 'Feature', geometry: p.polygon, properties: {} })),
-          },
-        });
-        map.addLayer({ id: 'saved-pans-fill', type: 'fill', source: 'saved-pans-src', paint: { 'fill-color': '#F5C542', 'fill-opacity': 0.35 } });
-        map.addLayer({ id: 'saved-pans-line', type: 'line', source: 'saved-pans-src', paint: { 'line-color': '#B45309', 'line-width': 2 } });
-      }
+      // Sources vides créées une fois ; l'effet [savedPans] les alimente ensuite via setData
+      // (la carte n'est plus remontée à chaque ajout de pan → rendu réactif).
+      map.addSource('saved-pans', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('saved-pan-labels', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'saved-pans-fill', type: 'fill', source: 'saved-pans', paint: { 'fill-color': '#F5C542', 'fill-opacity': 0.35 } });
+      map.addLayer({ id: 'saved-pans-line', type: 'line', source: 'saved-pans', paint: { 'line-color': '#B45309', 'line-width': 2 } });
+      map.addLayer({
+        id: 'saved-pans-labels',
+        type: 'symbol',
+        source: 'saved-pan-labels',
+        layout: { 'text-field': ['get', 'label'], 'text-size': 14, 'text-allow-overlap': true },
+        paint: { 'text-color': '#7C2D12', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.5 },
+      });
     });
 
     mapRef.current = map;
@@ -99,31 +99,46 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, flux
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Overlay flux Google Solar (Étape B) : image source + raster layer, ajouté/retiré à la volée.
-  // NB : la couche est ajoutée après `load` donc SOUS les contrôles de dessin (draw rend au-dessus).
-  // Si l'overlay masque le tracé en v1, c'est acceptable (note spike).
+  // Rendu réactif des pans enregistrés : polygones (fill+line) + numéros au centroïde (symbol).
+  // Alimente les sources créées au `load` ; attend le style prêt si l'init n'est pas terminée.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return undefined;
-    const SRC = 'flux-src';
-    const LYR = 'flux-lyr';
     const apply = () => {
-      if (map.getLayer(LYR)) map.removeLayer(LYR);
-      if (map.getSource(SRC)) map.removeSource(SRC);
-      if (fluxOverlay?.imageUrl) {
-        map.addSource(SRC, { type: 'image', url: fluxOverlay.imageUrl, coordinates: fluxOverlay.coordinates });
-        map.addLayer({ id: LYR, type: 'raster', source: SRC, paint: { 'raster-opacity': 0.85 } });
-      }
+      const src = map.getSource('saved-pans');
+      const labelSrc = map.getSource('saved-pan-labels');
+      if (!src || !labelSrc) return; // sources pas encore créées (load pas fini)
+      const pans = (savedPans ?? []).filter((p) => p?.polygon);
+      src.setData({
+        type: 'FeatureCollection',
+        features: pans.map((p, i) => ({ type: 'Feature', geometry: p.polygon, properties: { label: String(i + 1) } })),
+      });
+      labelSrc.setData({
+        type: 'FeatureCollection',
+        features: pans.map((p, i) => {
+          const c = turf.centroid(p.polygon);
+          return { type: 'Feature', geometry: c.geometry, properties: { label: String(i + 1) } };
+        }),
+      });
     };
-    if (map.isStyleLoaded()) apply(); else map.once('load', apply);
+    if (map.getSource('saved-pans')) apply(); else map.once('load', apply);
     return undefined;
-  }, [fluxOverlay]);
+  }, [savedPans]);
+
+  // Effacement impératif du tracé en cours après enregistrement d'un pan (sans remonter la carte
+  // → la vue/zoom de l'utilisateur est préservée).
+  useEffect(() => {
+    const draw = drawRef.current;
+    if (!draw) return;
+    draw.deleteAll();
+    draw.changeMode('simple_select');
+  }, [resetToken]);
 
   return (
     <div className="relative">
       <div ref={containerRef} className="w-full h-80 rounded-lg overflow-hidden border border-secondary-200" />
       <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/90 rounded-md px-2.5 py-1 text-xs font-medium text-secondary-700 pointer-events-none text-center">
-        <Pencil className="w-3.5 h-3.5 flex-shrink-0" /> Tracez le contour du toit — cliquez chaque coin, double-clic pour fermer
+        <Pencil className="w-3.5 h-3.5 flex-shrink-0" /> Cliquez l'outil ▱ (haut-gauche) puis tracez le toit — un clic par coin, double-clic pour fermer
       </div>
     </div>
   );
