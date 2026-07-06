@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourToDate — bornes mois / heure de journée (année 365 j)', () => {
   assert.equal(HOURS_PER_YEAR, 8760);
@@ -130,4 +130,30 @@ test('simulateBattery — rendement 90 % : pertes reportées sur l\'import', () 
   assert.ok(Math.abs(r.selfConsumedFromBatteryKwh - 9) < 1e-9);
   assert.ok(Math.abs(r.importedKwh - 1) < 1e-9);
   assert.ok(Math.abs(r.exportedKwh - 0) < 1e-9);
+});
+
+test('sizeBattery — courbe croissante + capacité recommandée au genou', () => {
+  // profil qui récompense la batterie puis sature : gros surplus jour, gros déficit nuit
+  const prod  = [];
+  const conso = [];
+  for (let d = 0; d < 10; d++) {
+    for (let h = 0; h < 24; h++) {
+      prod.push(h >= 10 && h < 16 ? 4 : 0);   // 24 kWh/j le jour
+      conso.push(h >= 18 || h < 6 ? 2 : 0);    // 24 kWh/j le soir/nuit
+    }
+  }
+  const { curve, recommendedCapacityKwh } = sizeBattery({
+    prodHourly: prod, consoHourly: conso,
+    capacities: [0, 4, 8, 12, 16, 20], roundTripEfficiency: 1, marginalThresholdKwhPerKwh: 5,
+  });
+  assert.equal(curve.length, 6);
+  // autoconso non décroissante avec la capacité
+  for (let i = 1; i < curve.length; i++) {
+    assert.ok(curve[i].selfConsumedKwh >= curve[i - 1].selfConsumedKwh - 1e-9);
+  }
+  // capacité 0 = aucune autoconso ici (jour et soir jamais simultanés)
+  assert.equal(curve[0].selfConsumedKwh, 0);
+  // recommandation dans la liste, > 0 (le tampon apporte quelque chose)
+  assert.ok(recommendedCapacityKwh > 0);
+  assert.ok(curve.some((pt) => pt.capacityKwh === recommendedCapacityKwh));
 });

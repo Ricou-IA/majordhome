@@ -204,3 +204,39 @@ export function simulateBattery({
     autoproductionRate: conso > 0 ? selfC / conso : 0,
   };
 }
+
+/**
+ * Balaye une liste de capacités → courbe autoconso = f(capacité), et détecte le
+ * « genou » (rendements décroissants) : la plus grande capacité tant que le gain
+ * marginal (kWh d'autoconso récupérés par kWh de capacité ajoutée) reste ≥
+ * marginalThresholdKwhPerKwh. Au-delà, chaque kWh de batterie rapporte trop peu.
+ * Sert de capacité recommandée par défaut (le commercial peut choisir un autre point).
+ */
+export function sizeBattery({
+  prodHourly, consoHourly, capacities,
+  roundTripEfficiency = 0.9, marginalThresholdKwhPerKwh = 50,
+}) {
+  const sorted = [...capacities].sort((a, b) => a - b);
+  const curve = sorted.map((cap) => {
+    const r = simulateBattery({ prodHourly, consoHourly, capacityKwh: cap, roundTripEfficiency });
+    return {
+      capacityKwh: cap,
+      autoconsoRate: r.autoconsoRate,
+      autoproductionRate: r.autoproductionRate,
+      selfConsumedKwh: r.selfConsumedKwh,
+      importedKwh: r.importedKwh,
+      exportedKwh: r.exportedKwh,
+    };
+  });
+
+  let recommendedCapacityKwh = curve.length ? curve[0].capacityKwh : 0;
+  for (let i = 1; i < curve.length; i++) {
+    const dCap = curve[i].capacityKwh - curve[i - 1].capacityKwh;
+    const dSelf = curve[i].selfConsumedKwh - curve[i - 1].selfConsumedKwh;
+    const marginal = dCap > 0 ? dSelf / dCap : 0;
+    if (marginal >= marginalThresholdKwhPerKwh) recommendedCapacityKwh = curve[i].capacityKwh;
+    else break;
+  }
+
+  return { curve, recommendedCapacityKwh };
+}
