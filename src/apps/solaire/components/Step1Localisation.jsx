@@ -1,14 +1,15 @@
 // src/apps/solaire/components/Step1Localisation.jsx
 // Étape 1 du wizard : localisation (GPS ou adresse) + toiture (pente %, orientation, surface).
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount, degreesToPercent } from '../lib/pvEngine';
-import { fetchBuildingInsights, fetchFluxHeatmap } from '../lib/googleSolar';
+import { fetchBuildingInsights } from '../lib/googleSolar';
 import FluxHeatmap from './dossier/FluxHeatmap';
+import RoofLocatorMap from './dossier/RoofLocatorMap';
 
 // Boussole 3×3 (centre vide) — ordre d'affichage
 const COMPASS = [
@@ -38,41 +39,33 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     };
   }, [debouncedQuery]);
 
-  const [solarStatus, setSolarStatus] = useState('idle'); // idle|loading|filled|manual
-  const solarFetchedRef = useRef(null);
+  const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|loading|filled|manual
+  const [pickedPoint, setPickedPoint] = useState(null);
 
-  // Auto-remplissage toiture via Google Solar au changement de coordonnées (repli manuel si 404).
+  // Nouveau lieu → on réinitialise la sélection de toit (l'user re-clique sur la vue aérienne).
   useEffect(() => {
-    if (location.lat == null || location.lon == null) return;
-    const coordKey = `${location.lat.toFixed(5)},${location.lon.toFixed(5)}`;
-    if (solarFetchedRef.current === coordKey) return; // déjà tenté pour ces coords
-    solarFetchedRef.current = coordKey;
-    let cancelled = false;
-    setSolarStatus('loading');
-    fetchBuildingInsights({ lat: location.lat, lon: location.lon }).then(({ data }) => {
-      if (cancelled) return;
-      if (!data || data.source === 'manual' || !data.dominant) {
-        setSolarStatus('manual');
-        return;
-      }
-      const d = data.dominant;
-      onRoof({
-        tiltPercent: Math.max(0, Math.round(degreesToPercent(d.pitch_deg))),
-        orientation: Math.round(d.aspect_pvgis),
-        surfaceM2: Math.round(d.area_m2),
-      });
-      onRoofGeometry({ ...data });
-      setSolarStatus('filled');
-      // Heatmap flux (non bloquant) — enrichit roofGeometry quand prête.
-      fetchFluxHeatmap({ lat: location.lat, lon: location.lon }).then(({ data: flux }) => {
-        if (!cancelled && flux?.fluxImagePath) {
-          onRoofGeometry({ ...data, flux_image_path: flux.fluxImagePath });
-        }
-      });
-    });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPickedPoint(null);
+    setSolarStatus(location.lat == null ? 'idle' : 'locate'); // 'locate' = carte prête, en attente du clic
   }, [location.lat, location.lon]);
+
+  // Clic sur la vue aérienne → Google Solar sur les coordonnées précises cliquées (repli manuel si 404).
+  const handlePickRoof = async (point) => {
+    setPickedPoint(point);
+    setSolarStatus('loading');
+    const { data } = await fetchBuildingInsights({ lat: point.lat, lon: point.lon });
+    if (!data || data.source === 'manual' || !data.dominant) {
+      setSolarStatus('manual');
+      return;
+    }
+    const d = data.dominant;
+    onRoof({
+      tiltPercent: Math.max(0, Math.round(degreesToPercent(d.pitch_deg))),
+      orientation: Math.round(d.aspect_pvgis),
+      surfaceM2: Math.round(d.area_m2),
+    });
+    onRoofGeometry({ ...data });
+    setSolarStatus('filled');
+  };
 
   const handleGps = async () => {
     setGpsLoading(true);
@@ -158,6 +151,18 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
           </div>
         )}
 
+        {hasLocation && (
+          <RoofLocatorMap
+            center={{ lat: location.lat, lon: location.lon }}
+            picked={pickedPoint}
+            onPick={handlePickRoof}
+          />
+        )}
+        {hasLocation && solarStatus === 'locate' && (
+          <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
+            <MapPin className="w-4 h-4 flex-shrink-0" /> Cliquez votre maison sur la vue aérienne pour l'analyser.
+          </div>
+        )}
         {hasLocation && solarStatus === 'loading' && (
           <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
             <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" /> Analyse de la toiture (Google Solar)…
@@ -171,7 +176,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
         )}
         {hasLocation && solarStatus === 'manual' && (
           <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
-            <MapPin className="w-4 h-4 flex-shrink-0" /> Bâtiment non couvert par Google Solar — saisie manuelle.
+            <MapPin className="w-4 h-4 flex-shrink-0" /> Toit non couvert par Google Solar ici — recliquez ailleurs sur le toit, ou saisissez la toiture à la main.
           </div>
         )}
       </div>
