@@ -169,6 +169,12 @@ export const mailSegmentKeys = {
 export const mailCampaignStatsKeys = {
   all: (orgId) => ['mail-campaign-stats', orgId],
   list: (orgId) => [...mailCampaignStatsKeys.all(orgId), 'list'],
+  recipients: (orgId, campaignName, mode) => [
+    ...mailCampaignStatsKeys.all(orgId),
+    'recipients',
+    campaignName,
+    mode,
+  ],
 };
 
 // --- SMS ---
@@ -329,6 +335,13 @@ export const pvKeys = {
   simulations: (orgId) => [...pvKeys.all(orgId), 'simulations'],
   list: (orgId, filters) => [...pvKeys.simulations(orgId), filters],
   detail: (orgId, id) => [...pvKeys.simulations(orgId), 'detail', id],
+};
+
+// --- Dossiers PV (chaînage administratif) ---
+export const pvDossierKeys = {
+  all: (orgId) => ['pvDossier', orgId],
+  bySimulation: (orgId, simulationId) => [...pvDossierKeys.all(orgId), 'bySimulation', simulationId],
+  detail: (orgId, id) => [...pvDossierKeys.all(orgId), 'detail', id],
 };
 
 // --- Thermique (études de déperditions) ---
