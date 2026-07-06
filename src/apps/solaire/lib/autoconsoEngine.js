@@ -53,3 +53,25 @@ export function computeSelfConsumption({ prodHourly, consoHourly }) {
     autoproductionRate: conso > 0 ? selfC / conso : 0,
   };
 }
+
+/**
+ * Répartit l'énergie annuelle d'un usage pilotable (VE, piscine…) sur 8760 h
+ * selon une forme déclarée : poids par heure-de-journée (24) × poids par mois (12).
+ * Les poids n'ont pas à être normalisés — la fonction renormalise pour que
+ * Σ = annualKwh. Aucun poids actif (Σ = 0) ou annualKwh ≤ 0 → tableau de zéros.
+ */
+export function distributeDeviceLoad({ annualKwh, hourOfDayWeights, monthWeights }) {
+  const out = new Array(HOURS_PER_YEAR).fill(0);
+  let totalWeight = 0;
+  for (let h = 0; h < HOURS_PER_YEAR; h++) {
+    const { month, hourOfDay } = hourToDate(h);
+    totalWeight += hourOfDayWeights[hourOfDay] * monthWeights[month];
+  }
+  if (totalWeight <= 0 || annualKwh <= 0) return out;
+  for (let h = 0; h < HOURS_PER_YEAR; h++) {
+    const { month, hourOfDay } = hourToDate(h);
+    const w = hourOfDayWeights[hourOfDay] * monthWeights[month];
+    out[h] = annualKwh * (w / totalWeight);
+  }
+  return out;
+}

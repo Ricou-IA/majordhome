@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourToDate — bornes mois / heure de journée (année 365 j)', () => {
   assert.equal(HOURS_PER_YEAR, 8760);
@@ -25,4 +25,19 @@ test('computeSelfConsumption — Σ min(prod, conso), export, import', () => {
   assert.equal(r.importedKwh, 4);       // (1-0) + (3-0)
   assert.ok(Math.abs(r.autoconsoRate - 2 / 6) < 1e-9);
   assert.ok(Math.abs(r.autoproductionRate - 2 / 6) < 1e-9);
+});
+
+test('distributeDeviceLoad — VE nuit : énergie annuelle conservée, jour à zéro', () => {
+  const hourOfDayWeights = Array.from({ length: 24 }, (_, h) => (h < 6 ? 1 : 0)); // 0h-5h
+  const monthWeights = Array(12).fill(1);
+  const curve = distributeDeviceLoad({ annualKwh: 3650, hourOfDayWeights, monthWeights });
+  assert.equal(curve.length, 8760);
+  const sum = curve.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(sum - 3650) < 1e-6);            // énergie conservée
+  // une heure de nuit (h=2) est chargée, une heure de jour (h=12) est nulle
+  assert.ok(curve[2] > 0);
+  assert.equal(curve[12], 0);
+  // poids nuls → tableau de zéros
+  const zero = distributeDeviceLoad({ annualKwh: 1000, hourOfDayWeights: Array(24).fill(0), monthWeights });
+  assert.equal(zero.reduce((a, b) => a + b, 0), 0);
 });
