@@ -344,6 +344,12 @@ export const pvDossierKeys = {
   detail: (orgId, id) => [...pvDossierKeys.all(orgId), 'detail', id],
 };
 
+// --- Google Solar (cache/quota) ---
+export const googleSolarKeys = {
+  all: (orgId) => ['googleSolar', orgId],
+  quota: (orgId) => [...googleSolarKeys.all(orgId), 'quota'],
+};
+
 // --- Thermique (études de déperditions) ---
 export const thermalKeys = {
   all: (orgId) => ['thermal', orgId],
