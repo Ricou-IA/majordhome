@@ -1,12 +1,14 @@
 // src/apps/solaire/components/Step1Localisation.jsx
 // Étape 1 du wizard : localisation (GPS ou adresse) + toiture (pente %, orientation, surface).
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition } from '../lib/pvgis';
-import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
+import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount, degreesToPercent } from '../lib/pvEngine';
+import { fetchBuildingInsights, fetchFluxHeatmap } from '../lib/googleSolar';
+import FluxHeatmap from './dossier/FluxHeatmap';
 
 // Boussole 3×3 (centre vide) — ordre d'affichage
 const COMPASS = [
@@ -15,7 +17,7 @@ const COMPASS = [
   ['SO', 'S', 'SE'],
 ];
 
-export default function Step1Localisation({ location, roof, config, onLocation, onRoof, onNext }) {
+export default function Step1Localisation({ location, roof, config, roofGeometry, onLocation, onRoof, onRoofGeometry, onNext }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -35,6 +37,42 @@ export default function Step1Localisation({ location, roof, config, onLocation, 
       cancelled = true;
     };
   }, [debouncedQuery]);
+
+  const [solarStatus, setSolarStatus] = useState('idle'); // idle|loading|filled|manual
+  const solarFetchedRef = useRef(null);
+
+  // Auto-remplissage toiture via Google Solar au changement de coordonnées (repli manuel si 404).
+  useEffect(() => {
+    if (location.lat == null || location.lon == null) return;
+    const coordKey = `${location.lat.toFixed(5)},${location.lon.toFixed(5)}`;
+    if (solarFetchedRef.current === coordKey) return; // déjà tenté pour ces coords
+    solarFetchedRef.current = coordKey;
+    let cancelled = false;
+    setSolarStatus('loading');
+    fetchBuildingInsights({ lat: location.lat, lon: location.lon }).then(({ data }) => {
+      if (cancelled) return;
+      if (!data || data.source === 'manual' || !data.dominant) {
+        setSolarStatus('manual');
+        return;
+      }
+      const d = data.dominant;
+      onRoof({
+        tiltPercent: Math.max(0, Math.round(degreesToPercent(d.pitch_deg))),
+        orientation: Math.round(d.aspect_pvgis),
+        surfaceM2: Math.round(d.area_m2),
+      });
+      onRoofGeometry({ ...data });
+      setSolarStatus('filled');
+      // Heatmap flux (non bloquant) — enrichit roofGeometry quand prête.
+      fetchFluxHeatmap({ lat: location.lat, lon: location.lon }).then(({ data: flux }) => {
+        if (!cancelled && flux?.fluxImagePath) {
+          onRoofGeometry({ ...data, flux_image_path: flux.fluxImagePath });
+        }
+      });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.lat, location.lon]);
 
   const handleGps = async () => {
     setGpsLoading(true);
@@ -117,6 +155,23 @@ export default function Step1Localisation({ location, roof, config, onLocation, 
               {' — '}
               {location.lat.toFixed(4)}, {location.lon.toFixed(4)}
             </span>
+          </div>
+        )}
+
+        {hasLocation && solarStatus === 'loading' && (
+          <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
+            <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" /> Analyse de la toiture (Google Solar)…
+          </div>
+        )}
+        {hasLocation && solarStatus === 'filled' && (
+          <div className="flex items-center gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
+            <Sparkles className="w-4 h-4 flex-shrink-0" />
+            Toiture pré-remplie via Google Solar{roofGeometry?.imageryQuality ? ` (qualité ${roofGeometry.imageryQuality})` : ''} — ajustable ci-dessous.
+          </div>
+        )}
+        {hasLocation && solarStatus === 'manual' && (
+          <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
+            <MapPin className="w-4 h-4 flex-shrink-0" /> Bâtiment non couvert par Google Solar — saisie manuelle.
           </div>
         )}
       </div>
@@ -211,6 +266,8 @@ export default function Step1Localisation({ location, roof, config, onLocation, 
           )}
         </FormField>
       </div>
+
+      {roofGeometry?.flux_image_path && <FluxHeatmap fluxImagePath={roofGeometry.flux_image_path} />}
 
       <button
         onClick={onNext}

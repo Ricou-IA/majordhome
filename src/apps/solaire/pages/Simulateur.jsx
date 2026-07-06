@@ -252,8 +252,10 @@ function SimulateurInner({ config, settings }) {
           location={state.location}
           roof={state.roof}
           config={config}
+          roofGeometry={state.roofGeometry}
           onLocation={(patch) => dispatch({ type: 'SET_LOCATION', patch })}
           onRoof={(patch) => dispatch({ type: 'SET_ROOF', patch })}
+          onRoofGeometry={(value) => dispatch({ type: 'SET_ROOF_GEOMETRY', value })}
           onNext={() => goToStep(2)}
         />
       )}
