@@ -30,7 +30,7 @@ const DRAW_STYLES = [
     paint: { 'circle-radius': 3, 'circle-color': '#93C5FD' } },
 ];
 
-export default function RoofLocatorMap({ center, initialPolygon, onPolygon }) {
+export default function RoofLocatorMap({ center, initialPolygon, onPolygon, fluxOverlay }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const drawRef = useRef(null);
@@ -84,6 +84,26 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon }) {
     return () => { map.remove(); mapRef.current = null; drawRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Overlay flux Google Solar (Étape B) : image source + raster layer, ajouté/retiré à la volée.
+  // NB : la couche est ajoutée après `load` donc SOUS les contrôles de dessin (draw rend au-dessus).
+  // Si l'overlay masque le tracé en v1, c'est acceptable (note spike).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const SRC = 'flux-src';
+    const LYR = 'flux-lyr';
+    const apply = () => {
+      if (map.getLayer(LYR)) map.removeLayer(LYR);
+      if (map.getSource(SRC)) map.removeSource(SRC);
+      if (fluxOverlay?.imageUrl) {
+        map.addSource(SRC, { type: 'image', url: fluxOverlay.imageUrl, coordinates: fluxOverlay.coordinates });
+        map.addLayer({ id: LYR, type: 'raster', source: SRC, paint: { 'raster-opacity': 0.85 } });
+      }
+    };
+    if (map.isStyleLoaded()) apply(); else map.once('load', apply);
+    return undefined;
+  }, [fluxOverlay]);
 
   return (
     <div className="relative">

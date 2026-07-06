@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as turf from '@turf/turf';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check } from 'lucide-react';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sun } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition } from '../lib/pvgis';
+import { fetchFluxOverlay } from '../lib/googleSolarFlux';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
 import FluxHeatmap from './dossier/FluxHeatmap';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
@@ -41,12 +42,34 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
   const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|drawn
 
+  // Étape B : overlay flux Google Solar (chargé à la demande).
+  const [fluxOverlay, setFluxOverlay] = useState(null);
+  const [fluxLoading, setFluxLoading] = useState(false);
+  const [fluxMsg, setFluxMsg] = useState(null);
+
   // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
     onRoofGeometry(null);
     setSolarStatus(location.lat == null ? 'idle' : 'locate');
+    setFluxOverlay(null);
+    setFluxMsg(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lon]);
+
+  const loadFlux = async () => {
+    if (location.lat == null) return;
+    setFluxLoading(true);
+    setFluxMsg(null);
+    const { data } = await fetchFluxOverlay({ lat: location.lat, lon: location.lon });
+    setFluxLoading(false);
+    if (data?.source === 'google') {
+      setFluxOverlay({ imageUrl: data.imageUrl, coordinates: data.coordinates });
+    } else if (data?.source === 'none') {
+      setFluxMsg('Pas de couche de flux Google sur ce point.');
+    } else {
+      setFluxMsg('Flux Google indisponible.');
+    }
+  };
 
   // Tracé du toit sur la vue aérienne → surface calculée par turf (empreinte au sol).
   const handlePolygon = (feature) => {
@@ -151,7 +174,29 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
             center={{ lat: location.lat, lon: location.lon }}
             initialPolygon={roofGeometry?.polygon}
             onPolygon={handlePolygon}
+            fluxOverlay={fluxOverlay}
           />
+        )}
+        {hasLocation && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={loadFlux}
+              disabled={fluxLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-secondary-200 bg-white text-sm font-medium text-secondary-700 hover:border-secondary-400 disabled:opacity-60"
+            >
+              {fluxLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sun className="w-4 h-4 text-[#F5C542]" />}
+              {fluxLoading ? 'Chargement du flux…' : '☀️ Voir le flux solaire (Google)'}
+            </button>
+            {fluxMsg && (
+              <p className="text-xs text-secondary-500 text-center">{fluxMsg}</p>
+            )}
+            {fluxOverlay && (
+              <p className="text-xs text-secondary-500 text-center">
+                Flux annuel Google Solar (indicatif) — bleu foncé = faible, clair/jaune = fort.
+              </p>
+            )}
+          </div>
         )}
         {hasLocation && solarStatus === 'locate' && (
           <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
