@@ -75,3 +75,27 @@ export function distributeDeviceLoad({ annualKwh, hourOfDayWeights, monthWeights
   }
   return out;
 }
+
+/**
+ * Cale une forme horaire sur 12 cibles mensuelles : chaque mois est mis à
+ * l'échelle pour que la somme de ses heures = monthlyTargets[m]. Un mois dont la
+ * forme somme 0 mais dont la cible > 0 → répartition uniforme sur ses heures
+ * (évite de perdre l'énergie du mois quand la forme est muette).
+ */
+export function reconcileMonthly({ hourlyShape, monthlyTargets }) {
+  const out = new Array(hourlyShape.length).fill(0);
+  const sumByMonth = new Array(12).fill(0);
+  const countByMonth = new Array(12).fill(0);
+  for (let h = 0; h < hourlyShape.length; h++) {
+    const { month } = hourToDate(h);
+    sumByMonth[month] += hourlyShape[h];
+    countByMonth[month] += 1;
+  }
+  for (let h = 0; h < hourlyShape.length; h++) {
+    const { month } = hourToDate(h);
+    const target = monthlyTargets[month] ?? 0;
+    if (sumByMonth[month] > 0) out[h] = hourlyShape[h] * (target / sumByMonth[month]);
+    else if (countByMonth[month] > 0) out[h] = target / countByMonth[month];
+  }
+  return out;
+}

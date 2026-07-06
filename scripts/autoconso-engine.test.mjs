@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourToDate — bornes mois / heure de journée (année 365 j)', () => {
   assert.equal(HOURS_PER_YEAR, 8760);
@@ -40,4 +40,26 @@ test('distributeDeviceLoad — VE nuit : énergie annuelle conservée, jour à z
   // poids nuls → tableau de zéros
   const zero = distributeDeviceLoad({ annualKwh: 1000, hourOfDayWeights: Array(24).fill(0), monthWeights });
   assert.equal(zero.reduce((a, b) => a + b, 0), 0);
+});
+
+test('reconcileMonthly — chaque mois calé sur sa cible', () => {
+  const shape = new Array(8760).fill(1); // forme plate
+  // cible = 2 kWh par heure du mois → target[m] = heures_du_mois × 2
+  const HOURS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31].map((d) => d * 24);
+  const targets = HOURS_IN_MONTH.map((h) => h * 2);
+  const out = reconcileMonthly({ hourlyShape: shape, monthlyTargets: targets });
+  assert.ok(Math.abs(out[0] - 2) < 1e-9);      // janvier : plat → 2/h
+  assert.ok(Math.abs(out[8000] - 2) < 1e-9);   // décembre : idem
+  // somme du mois de janvier = cible de janvier
+  const janSum = out.slice(0, HOURS_IN_MONTH[0]).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(janSum - targets[0]) < 1e-6);
+});
+
+test('reconcileMonthly — mois de forme nulle mais cible > 0 → répartition uniforme', () => {
+  const shape = new Array(8760).fill(0);
+  const targets = Array(12).fill(0);
+  targets[0] = 744; // janvier = 744 h → 1/h attendu
+  const out = reconcileMonthly({ hourlyShape: shape, monthlyTargets: targets });
+  assert.ok(Math.abs(out[0] - 1) < 1e-9);
+  assert.equal(out[8000], 0); // décembre cible 0 → 0
 });
