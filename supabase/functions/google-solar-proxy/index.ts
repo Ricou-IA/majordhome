@@ -3,12 +3,13 @@
 // (coût marginal 0 sur ré-sim d'une même adresse). Hard cap mensuel/journalier par SKU.
 // mode: 'building_insights' (géométrie toit) | 'data_layers' (heatmap flux) | 'both'.
 import { requireOrgMembership, jsonResponse, sanitizeError, buildCorsHeaders } from "../_shared/auth.ts";
-import { colorizeFluxToPng } from "./geotiff.ts";
+// NB : la rasterisation GeoTIFF (./geotiff.ts) est DIFFÉRÉE — l'import esm.sh de `geotiff`
+// tire `node:vm`, indisponible dans le runtime Edge Supabase (spike §9.4). Le module reste
+// dans le repo ; la branche data_layers ci-dessous sert le cache ou renvoie null (jamais bloquant).
 
 const SOLAR = "https://solar.googleapis.com/v1";
 const KEY = Deno.env.get("GOOGLE_SOLAR_API_KEY") || "";
 const CACHE_VIEW = "majordhome_google_solar_cache";
-const BUCKET = "product-documents";
 
 // Paliers gratuits Google (spec §5.1/§5.2) + cap journalier anti-emballement (≈ palier/30).
 const LIMITS = {
@@ -67,13 +68,6 @@ async function upsertCache(supabase: any, orgId: string, key: string, patch: Rec
   } else {
     await supabase.from(CACHE_VIEW).insert({ org_id: orgId, building_key: key, ...patch });
   }
-}
-
-async function fetchGeoTiff(url: string): Promise<ArrayBuffer> {
-  const withKey = url + (url.includes("?") ? "&" : "?") + "key=" + KEY;
-  const res = await fetch(withKey);
-  if (!res.ok) throw new Error(`geoTiff ${res.status}`);
-  return await res.arrayBuffer();
 }
 
 Deno.serve(async (req) => {
@@ -135,57 +129,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Data Layers (heatmap flux) ───────────────────────────────────────────────────────
+    // ── Data Layers (heatmap flux) — DIFFÉRÉ (spike GeoTIFF §9.4) ─────────────────────────
+    // La rasterisation GeoTIFF côté edge est bloquée par `node:vm` (runtime Deno Supabase).
+    // On sert le flux s'il est déjà en cache, sinon null → l'offre s'affiche sans heatmap
+    // (jamais bloquant, spec §5.3). Réactivation quand la voie de rasterisation est trouvée.
     if (mode === "data_layers" || mode === "both") {
-      if (cache?.flux_image_path) {
-        result.fluxImagePath = cache.flux_image_path;
-      } else {
-        try {
-          await enforceCap(supabase, orgId, "data_layers");
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 20_000);
-          let dlRes: Response;
-          try {
-            dlRes = await fetch(
-              `${SOLAR}/dataLayers:get?location.latitude=${lat}&location.longitude=${lon}`
-              + `&radiusMeters=50&view=IMAGERY_AND_ANNUAL_FLUX_LAYERS`
-              + `&requiredQuality=${requiredQuality}&pixelSizeMeters=0.5&key=${KEY}`,
-              { signal: ctrl.signal },
-            );
-          } finally { clearTimeout(timer); }
-
-          if (dlRes.status === 404) {
-            result.fluxImagePath = null; // pas de couche flux → offre sans heatmap (jamais bloquant)
-          } else if (!dlRes.ok) {
-            result.fluxImagePath = null;
-            result.fluxError = `Google DL ${dlRes.status}`;
-          } else {
-            const dl = await dlRes.json();
-            if (dl.annualFluxUrl && dl.maskUrl) {
-              const [fluxBuf, maskBuf] = await Promise.all([
-                fetchGeoTiff(dl.annualFluxUrl),
-                fetchGeoTiff(dl.maskUrl),
-              ]);
-              const png = await colorizeFluxToPng(fluxBuf, maskBuf);
-              const path = `${orgId}/solaire/flux/${key}.png`;
-              const { error: upErr } = await supabase.storage.from(BUCKET)
-                .upload(path, png, { contentType: "image/png", upsert: true });
-              if (upErr) throw upErr;
-              await upsertCache(supabase, orgId, key, {
-                flux_image_path: path, flux_fetched_at: new Date().toISOString(),
-              });
-              result.fluxImagePath = path;
-            } else {
-              result.fluxImagePath = null;
-            }
-          }
-        } catch (fluxErr) {
-          // La heatmap ne bloque JAMAIS le parcours (spec §5.3). On log, on renvoie sans flux.
-          if (fluxErr instanceof QuotaError) throw fluxErr; // le cap remonte en 429
-          result.fluxImagePath = null;
-          result.fluxError = sanitizeError(fluxErr, "flux error");
-        }
-      }
+      result.fluxImagePath = cache?.flux_image_path ?? null;
+      result.fluxDeferred = true;
     }
 
     return jsonResponse(result, 200, req);
