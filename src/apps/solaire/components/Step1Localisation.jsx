@@ -2,12 +2,12 @@
 // Étape 1 du wizard : localisation (GPS ou adresse) + toiture (pente %, orientation, surface).
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Sparkles } from 'lucide-react';
+import * as turf from '@turf/turf';
+import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { searchAddress, getDevicePosition } from '../lib/pvgis';
-import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount, degreesToPercent } from '../lib/pvEngine';
-import { fetchBuildingInsights } from '../lib/googleSolar';
+import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
 import FluxHeatmap from './dossier/FluxHeatmap';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
 
@@ -39,34 +39,26 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     };
   }, [debouncedQuery]);
 
-  const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|loading|filled|manual
-  const [pickedPoint, setPickedPoint] = useState(null);
+  const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|drawn
 
-  // Nouveau lieu → on réinitialise la sélection de toit (l'user re-clique sur la vue aérienne).
+  // Nouveau lieu → on efface tout tracé précédent (l'user retrace sur la vue aérienne).
   useEffect(() => {
-    setPickedPoint(null);
-    setSolarStatus(location.lat == null ? 'idle' : 'locate'); // 'locate' = carte prête, en attente du clic
+    onRoofGeometry(null);
+    setSolarStatus(location.lat == null ? 'idle' : 'locate');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lon]);
 
-  // Clic sur la vue aérienne → Google Solar sur les coordonnées précises cliquées (repli manuel si 404).
-  const handlePickRoof = async (point) => {
-    setPickedPoint(point);
-    setSolarStatus('loading');
-    const { data } = await fetchBuildingInsights({ lat: point.lat, lon: point.lon });
-    if (!data || data.source === 'manual' || !data.dominant) {
-      setSolarStatus('manual');
+  // Tracé du toit sur la vue aérienne → surface calculée par turf (empreinte au sol).
+  const handlePolygon = (feature) => {
+    if (!feature) {
+      onRoofGeometry(null);
+      setSolarStatus('locate');
       return;
     }
-    const d = data.dominant;
-    // Pente/orientation = pan dominant ; surface = TOUT le toit exploitable (pas un seul pan).
-    const surface = data.usableAreaM2 ?? d.area_m2;
-    onRoof({
-      tiltPercent: Math.max(0, Math.round(degreesToPercent(d.pitch_deg))),
-      orientation: Math.round(d.aspect_pvgis),
-      surfaceM2: Math.round(surface),
-    });
-    onRoofGeometry({ ...data });
-    setSolarStatus('filled');
+    const footprintM2 = turf.area(feature); // empreinte au sol (m²) — vue du dessus
+    onRoof({ surfaceM2: Math.round(footprintM2) });
+    onRoofGeometry({ source: 'drawn', polygon: feature.geometry, footprint_m2: footprintM2 });
+    setSolarStatus('drawn');
   };
 
   const handleGps = async () => {
@@ -155,30 +147,21 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
         {hasLocation && (
           <RoofLocatorMap
+            key={`${location.lat},${location.lon}`}
             center={{ lat: location.lat, lon: location.lon }}
-            picked={pickedPoint}
-            onPick={handlePickRoof}
+            initialPolygon={roofGeometry?.polygon}
+            onPolygon={handlePolygon}
           />
         )}
         {hasLocation && solarStatus === 'locate' && (
           <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
-            <MapPin className="w-4 h-4 flex-shrink-0" /> Cliquez votre maison sur la vue aérienne pour l'analyser.
+            <MapPin className="w-4 h-4 flex-shrink-0" /> Tracez le contour de votre toiture sur la vue aérienne pour calculer la surface.
           </div>
         )}
-        {hasLocation && solarStatus === 'loading' && (
-          <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
-            <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" /> Analyse de la toiture (Google Solar)…
-          </div>
-        )}
-        {hasLocation && solarStatus === 'filled' && (
+        {hasLocation && solarStatus === 'drawn' && roofGeometry?.footprint_m2 && (
           <div className="flex items-center gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
-            <Sparkles className="w-4 h-4 flex-shrink-0" />
-            Toiture pré-remplie via Google Solar{roofGeometry?.imageryQuality ? ` (qualité ${roofGeometry.imageryQuality})` : ''} — ajustable ci-dessous.
-          </div>
-        )}
-        {hasLocation && solarStatus === 'manual' && (
-          <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
-            <MapPin className="w-4 h-4 flex-shrink-0" /> Toit non couvert par Google Solar ici — recliquez ailleurs sur le toit, ou saisissez la toiture à la main.
+            <Check className="w-4 h-4 flex-shrink-0" />
+            Toiture tracée — surface {Math.round(roofGeometry.footprint_m2)} m² (empreinte au sol). Renseignez pente et orientation ci-dessous.
           </div>
         )}
       </div>

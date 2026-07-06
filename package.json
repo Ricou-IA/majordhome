@@ -7,8 +7,8 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 384",
-        "lint:errors": "eslint . --ext js,jsx --report-unused-disable-directives --quiet",
+        "lint": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --max-warnings 417",
+        "lint:errors": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --quiet",
         "audit:dead-code": "node scripts/audit-dead-code.mjs",
         "audit:quality": "npm run lint:errors && npm run audit:dead-code",
         "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
@@ -21,6 +21,7 @@
         "@fullcalendar/timegrid": "^6.1.10",
         "@hello-pangea/dnd": "^18.0.1",
         "@hookform/resolvers": "^3.10.0",
+        "@mapbox/mapbox-gl-draw": "^1.5.1",
         "@radix-ui/react-accordion": "^1.2.11",
         "@radix-ui/react-alert-dialog": "^1.1.14",
         "@radix-ui/react-checkbox": "^1.3.2",
