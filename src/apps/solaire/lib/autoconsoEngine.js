@@ -240,3 +240,28 @@ export function sizeBattery({
 
   return { curve, recommendedCapacityKwh };
 }
+
+/** Somme une série horaire (conso, prod…) par mois → 12 valeurs. Courbe annuelle client. */
+export function monthlyFromHourly(hourly) {
+  const out = new Array(12).fill(0);
+  for (let h = 0; h < hourly.length; h++) out[hourToDate(h).month] += hourly[h];
+  return out;
+}
+
+/**
+ * Journée-type : moyenne de la charge par heure-de-journée (24 valeurs).
+ * `months` (array de mois 0-11) restreint à une saison (ex. [11,0,1] = hiver,
+ * [5,6,7] = été) ; null/absent = moyenne sur toute l'année. Rendu client.
+ */
+export function dayTypeFromHourly(hourly, { months = null } = {}) {
+  const sum = new Array(24).fill(0);
+  const cnt = new Array(24).fill(0);
+  const set = months ? new Set(months) : null;
+  for (let h = 0; h < hourly.length; h++) {
+    const { month, hourOfDay } = hourToDate(h);
+    if (set && !set.has(month)) continue;
+    sum[hourOfDay] += hourly[h];
+    cnt[hourOfDay] += 1;
+  }
+  return sum.map((s, i) => (cnt[i] > 0 ? s / cnt[i] : 0));
+}

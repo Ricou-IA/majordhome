@@ -4,7 +4,28 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from '../src/apps/solaire/lib/autoconsoEngine.js';
+
+test('monthlyFromHourly — somme par mois (courbe annuelle)', () => {
+  const hourly = new Array(8760).fill(1); // 1 kWh/h plat
+  const m = monthlyFromHourly(hourly);
+  assert.equal(m.length, 12);
+  assert.equal(m[0], 31 * 24); // janvier = 744
+  assert.equal(m[1], 28 * 24); // février = 672
+  assert.ok(Math.abs(m.reduce((a, b) => a + b, 0) - 8760) < 1e-9);
+});
+
+test('dayTypeFromHourly — moyenne par heure de journée, filtrable par saison', () => {
+  const hourly = new Array(8760).fill(0);
+  for (let h = 0; h < 8760; h++) if (h % 24 === 12) hourly[h] = 2; // 2 à midi chaque jour
+  const day = dayTypeFromHourly(hourly);
+  assert.equal(day.length, 24);
+  assert.ok(Math.abs(day[12] - 2) < 1e-9);
+  assert.equal(day[0], 0);
+  // filtre saison (janvier) : même moyenne car charge constante
+  const jan = dayTypeFromHourly(hourly, { months: [0] });
+  assert.ok(Math.abs(jan[12] - 2) < 1e-9);
+});
 
 test('hourToDate — bornes mois / heure de journée (année 365 j)', () => {
   assert.equal(HOURS_PER_YEAR, 8760);
