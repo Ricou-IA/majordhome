@@ -22,15 +22,17 @@
 - **Pas de temps** : **demi-horaire** (horodates à `:00` / `:30`). Unité **Wh**.
 - **Filtrage segment** : `?where=profil='RES1' AND plage_de_puissance_souscrite='P0: Total <= 36 kVA'` (adapter le profil au foyer ; `RES1` base sans chauffage élec, `RES2*` avec HP/HC — cf. §Enedis du CLAUDE.md).
 
-### ⚠️ Point non tranché (à confirmer en Phase 2)
-- Le catalogue observé expose `RES4`, `RES2WE`, `ENT*`… — **vérifier que `RES1` / `RES2` (base résidentiel) sont bien présents** et lequel est le meilleur talon « fond de maison » neutre (hors VE/piscine, qu'on rajoute en couche déclarée). Requête à lancer : `?select=profil&group_by=profil` (ou `?facet=profil`).
+### ✅ RES1 confirmé + fixture GÉNÉRÉE (2026-07-07)
+- Profils publiés confirmés : `RES1 (+ RES1WE)`, `RES11 (+ RES11WE)`, `RES2 (+ RES5)`, `RES2WE`, `RES3`, `RES4`, PRO*, ENT*.
+- **Chaîne exacte stockée** : `profil = "RES1 (+ RES1WE)"` (pas `"RES1"` — l'API fusionne les libellés WE), plage `"P0: Total <= 36 kVA"`, champ talon `courbe_moyenne_ndeg1_ndeg2_wh` (Wh/½h). RES1 = base SANS chauffage élec → bon talon « fond de maison ».
+- **Fixture générée** : `scripts/fixtures/enedis-res1-base-normalized.json` via `scripts/fetch-enedis-res1-profile.mjs` (endpoint **`/exports/json`** — le records API cape l'offset à 10000, insuffisant pour 17520 lignes ½h). Année **2023** (non bissextile → 8760 h). 17520 lignes ½h, 0 trou, Σ=1.
+- **Silhouette validée** (moyenne par heure, 1,0=plat) : creux nuit 02-04h ≈ 0,64-0,65 ; pic soir 17-19h ≈ 1,43-1,52 ; saisonnalité janv. 11,3 % → juin 6,8 %. Vraie courbe résidentielle.
 
-### Méthode de génération de la fixture talon (DIFFÉRÉE)
-1. Pull une **année pleine** du segment choisi (`?where=profil=... AND plage_...`, `order_by=horodate`, pagination).
-2. Agréger **½ h → h** : sommer les 2 pas demi-horaires de chaque heure (Wh → Wh/h).
-3. Aligner sur 8760 h (année non bissextile — cf. calendrier du moteur) : retirer le 29 févr. si l'année source est bissextile.
-4. **Normaliser** : diviser chaque heure par la somme annuelle → forme `Σ = 1`.
-5. Écrire `scripts/fixtures/enedis-res-base-normalized.json` : `{ source, profil, plage, annee, hourly: [8760] }`.
+### Méthode de génération (implémentée dans `fetch-enedis-res1-profile.mjs`)
+1. Pull **export JSON** année pleine du segment (`where profil like "RES1%" and plage like "P0%"`, `select=horodate,courbe_moyenne_ndeg1_ndeg2_wh`).
+2. Agréger **½ h → h** : sommer les 2 pas demi-horaires (Wh → Wh/h) via l'index horaire `floor((horodate_UTC − yearStart)/3600s)`.
+3. Année non bissextile (2023) → 8760 h directement (pas de 29 févr. à retirer).
+4. **Normaliser** : `Σ = 1`. Horodate UTC (cohérent avec PVGIS UTC).
 
 ---
 
