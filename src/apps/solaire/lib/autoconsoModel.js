@@ -14,7 +14,7 @@
 // Déphasage BORNÉ À LA JOURNÉE (applySolarShift, corrigé 2026-07-07) : pas de report
 // d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
 import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from './autoconsoEngine.js';
-import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from './usageProfiles.js';
+import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, CLIM_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from './usageProfiles.js';
 import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift } from './scenarios.js';
 
 /** Défauts de cascade — « constatés » (fractions réalistes, à ajuster). */
@@ -24,6 +24,7 @@ export const CASCADE_DEFAULTS = {
   veWeekendShiftFraction: 0.7, // S2b VE : défaut si capacité batterie voiture non saisie
   weekdayChargeCap: 0.6,       // plafond de charge VE en semaine (le week-end complète sur solaire)
   poolMaxKwhPerHour: 3,        // PAC piscine — charge max absorbée par heure
+  climMaxKwhPerHour: 2.5,      // clim été (confort) — charge max absorbée par heure
   batteryCapacities: [0, 2, 4, 6, 8, 10, 12, 15],
   batteryEfficiency: 0.9,
   winterMonths: [11, 0, 1],
@@ -109,6 +110,15 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
     const scPool = sc(consoRunning);
     cascadeRows.push({ key: 'pool', label: 'PAC piscine', ...metrics(scPool), absorbedKwh: r.absorbedKwh, deltaKwh: scPool.selfConsumedKwh - prev });
     prev = scPool.selfConsumedKwh;
+  }
+
+  // S2d clim été (confort, optionnel) : le surplus finance le frais l'après-midi d'été
+  if (household.clim) {
+    const r = absorbSurplusWithLoad(consoRunning, prodHourly, { hourWeights: hoursMask(CLIM_HOURS), maxKwhPerHour: cascade.climMaxKwhPerHour, months: cascade.summerMonths });
+    consoRunning = r.consoHourly;
+    const scClim = sc(consoRunning);
+    cascadeRows.push({ key: 'clim', label: 'Climatisation (confort)', ...metrics(scClim), absorbedKwh: r.absorbedKwh, deltaKwh: scClim.selfConsumedKwh - prev });
+    prev = scClim.selfConsumedKwh;
   }
 
   // S3 batterie : dimensionnée sur la conso optimisée (post-leviers)

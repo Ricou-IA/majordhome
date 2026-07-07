@@ -82,17 +82,20 @@ export function applyVeWeekendShift(consoHourly, prodHourly, veCurve, { fraction
 }
 
 /**
- * Absorbe le surplus PV avec une charge de confort pilotée (ex. PAC piscine) placée
- * dans une fenêtre horaire (`hourWeights`, indexé par heure-de-journée 0-23), plafonnée
- * par `maxKwhPerHour`. Augmente la conso uniquement là où il y a du surplus (coût
- * marginal ≈ 0). Renvoie { consoHourly, absorbedKwh }. Valeur = confort, pas €.
+ * Absorbe le surplus PV avec une charge de confort pilotée (PAC piscine, clim été…)
+ * placée dans une fenêtre horaire (`hourWeights`, indexé par heure-de-journée 0-23)
+ * et optionnellement une saison (`months`, array 0-11), plafonnée par `maxKwhPerHour`.
+ * Augmente la conso uniquement là où il y a du surplus (coût marginal ≈ 0).
+ * Renvoie { consoHourly, absorbedKwh }. Valeur = CONFORT (le surplus finance le confort), pas €.
  */
-export function absorbSurplusWithLoad(consoHourly, prodHourly, { hourWeights, maxKwhPerHour = Infinity }) {
+export function absorbSurplusWithLoad(consoHourly, prodHourly, { hourWeights, maxKwhPerHour = Infinity, months = null }) {
   const n = consoHourly.length;
   const newConso = consoHourly.slice();
+  const monthSet = months ? new Set(months) : null;
   let absorbedKwh = 0;
   for (let h = 0; h < n; h++) {
     if (!hourWeights[h % 24]) continue;
+    if (monthSet && !monthSet.has(hourToDate(h).month)) continue;
     const surplus = prodHourly[h] - consoHourly[h];
     if (surplus <= 0) continue;
     const load = Math.min(surplus, maxKwhPerHour);

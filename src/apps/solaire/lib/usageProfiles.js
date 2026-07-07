@@ -22,6 +22,7 @@ export const ECS_SOLAR_HOURS = [11, 12, 13, 14, 15];
 export const VE_NIGHT_HOURS = [23, 0, 1, 2, 3, 4, 5];
 export const POOL_HOURS = [11, 12, 13, 14, 15, 16, 17];
 export const PAC_HEATING_HOURS = [6, 7, 8, 9, 18, 19, 20, 21, 22];
+export const CLIM_HOURS = [12, 13, 14, 15, 16, 17, 18]; // après-midi (pic de chaleur, sur le surplus PV)
 
 /** Eau froide réseau par mois (°C), saisonnière. Défaut FR (validé Eric). */
 export const COLD_WATER_TEMP_BY_MONTH = [10, 10, 11, 13, 15, 17, 18, 18, 17, 15, 12, 10];

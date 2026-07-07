@@ -24,6 +24,16 @@ test('applyVeWeekendShift — pas de surplus le week-end → charge inchangée',
   assert.ok(Math.abs(out[2] - 10) < 1e-9);
 });
 
+test('absorbSurplusWithLoad — filtre saison : clim absorbe seulement l\'été', () => {
+  const conso = new Array(8760).fill(0);
+  const prod = new Array(8760).fill(0);
+  prod[12] = 5;    // surplus midi en janvier (mois 0)
+  prod[4356] = 5;  // surplus midi le 1er juillet (mois 6 : 181 j × 24 + 12)
+  const hw = new Array(24).fill(0); hw[12] = 1;
+  const { absorbedKwh } = absorbSurplusWithLoad(conso, prod, { hourWeights: hw, maxKwhPerHour: 10, months: [6] });
+  assert.ok(Math.abs(absorbedKwh - 5) < 1e-9); // seul juillet absorbé, janvier ignoré
+});
+
 test('applySolarShift — borné à la journée : aucun transfert entre jours', () => {
   // 48 h = 2 jours. Jour 0 : usage 10 la nuit (h2), zéro soleil ce jour.
   // Jour 1 : soleil à h37 (13h du lendemain), mais aucun usage.
