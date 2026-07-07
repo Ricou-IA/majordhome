@@ -19,9 +19,9 @@ const { prodHourly, year } = pvgisToProdHourly(outputs.hourly, 1); // 1 kWc → 
 const annual = prodHourly.reduce((a, b) => a + b, 0);
 console.log('Année', year, '| pas', prodHourly.length, '| production', annual.toFixed(0), 'kWh/an/kWc');
 
-mkdirSync(new URL('./fixtures/', import.meta.url), { recursive: true });
+mkdirSync(new URL('../src/apps/solaire/data/', import.meta.url), { recursive: true });
 writeFileSync(
-  new URL('./fixtures/pvgis-gaillac-1kwc.json', import.meta.url),
+  new URL('../src/apps/solaire/data/pvgis-gaillac-1kwc.json', import.meta.url),
   JSON.stringify({
     source: 'PVGIS v5.2 seriescalc',
     location: 'Gaillac (81)', lat: LAT, lon: LON, angle: ANGLE, aspect: ASPECT,

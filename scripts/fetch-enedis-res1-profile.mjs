@@ -45,8 +45,8 @@ const normalized = hourly.map((x) => x / total); // Σ = 1
 
 console.log('Heures manquantes :', missing, '| lignes ignorées :', skipped, '| Σ avant normalisation (Wh) :', total);
 
-mkdirSync(new URL('./fixtures/', import.meta.url), { recursive: true });
-const outPath = new URL('./fixtures/enedis-res1-base-normalized.json', import.meta.url);
+mkdirSync(new URL('../src/apps/solaire/data/', import.meta.url), { recursive: true });
+const outPath = new URL('../src/apps/solaire/data/enedis-res1-base-normalized.json', import.meta.url);
 writeFileSync(
   outPath,
   JSON.stringify(

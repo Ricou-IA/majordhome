@@ -58,6 +58,7 @@ const MetaAds = lazy(() => import('./pages/MetaAds'));
 // Solaire (calculateur PV)
 const SolaireSimulateur = lazy(() => import('@apps/solaire/pages/Simulateur'));
 const SolaireHistorique = lazy(() => import('@apps/solaire/pages/Historique'));
+const SolaireAutoconso = lazy(() => import('@apps/solaire/pages/AutoconsoSimulateur'));
 
 // Thermique (étude de déperditions)
 const ThermiqueWizard = lazy(() => import('@apps/thermique/pages/ThermiqueWizard'));
@@ -415,6 +416,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="pv_calculator">
           <SolaireSimulateur />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'solaire/autoconso',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="pv_calculator">
+          <SolaireAutoconso />
         </RouteGuard>
       </SuspenseWrapper>
     ),
