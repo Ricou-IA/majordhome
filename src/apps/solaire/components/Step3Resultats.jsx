@@ -12,6 +12,7 @@ import MonthlyChart from './MonthlyChart';
 import FinancingModule from './FinancingModule';
 import TableauAnnuel from './TableauAnnuel';
 import SaveSimulationModal from './SaveSimulationModal';
+import AutoconsoOptimizationSection from './AutoconsoOptimizationSection';
 
 export default function Step3Resultats({
   state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing,
@@ -132,6 +133,9 @@ export default function Step3Resultats({
 
       {/* Graphique mensuel */}
       <MonthlyChart monthly={model.active} consoMonthly={model.consoMonthly} />
+
+      {/* Optimisation autoconsommation — moteur horaire (additif, n'altère pas buildEtudeModel) */}
+      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} />
 
       {/* Financement */}
       <FinancingModule

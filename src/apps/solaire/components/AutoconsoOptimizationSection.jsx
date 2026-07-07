@@ -1,0 +1,213 @@
+// src/apps/solaire/components/AutoconsoOptimizationSection.jsx
+// Section « Optimiser l'autoconsommation » greffée dans les Résultats (additif,
+// n'altère pas buildEtudeModel). Rebranche le moteur horaire sur les données que
+// le wizard a déjà : conso mensuelle (ancres) + prod (e_m réel × forme Gaillac).
+import { useState, useMemo } from 'react';
+import {
+  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  Sankey, Layer, Rectangle,
+} from 'recharts';
+import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { PV_COLORS } from '../lib/palette';
+import { buildAutoconsoModel } from '../lib/autoconsoModel';
+import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
+import { enedisProfile, pvgisExample } from '../data';
+
+const CASCADE_LABELS = {
+  constat: 'Constat', behavior: 'Comportement', piloted_ecs: 'Piloté ECS',
+  ve_weekend: 'VE week-end', pool: 'Piscine', clim: 'Clim', battery: 'Batterie',
+};
+const NODE_COLORS = {
+  Solaire: PV_COLORS.production, Réseau: PV_COLORS.surplus,
+  Batterie: PV_COLORS.autoconso, Maison: PV_COLORS.conso, Surplus: PV_COLORS.surplus,
+};
+
+function SankeyNode({ x, y, width, height, payload }) {
+  const name = payload.name;
+  const leftSide = name === 'Solaire' || name === 'Réseau';
+  const above = name === 'Batterie';
+  return (
+    <Layer>
+      <Rectangle x={x} y={y} width={width} height={height} fill={NODE_COLORS[name] || '#94a3b8'} fillOpacity={0.9} radius={2} />
+      {above ? (
+        <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={10} fill="#475569">{name}</text>
+      ) : (
+        <text
+          x={leftSide ? x + width + 5 : x - 5} y={y + height / 2}
+          textAnchor={leftSide ? 'start' : 'end'} dominantBaseline="middle"
+          fontSize={10} fill="#475569" style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}
+        >
+          {name} {Math.round(payload.value)}
+        </text>
+      )}
+    </Layer>
+  );
+}
+
+function buildSankey(rawNodes, rawLinks) {
+  const links = rawLinks.filter((l) => l.value > 0.5);
+  const used = new Set();
+  links.forEach((l) => { used.add(l.source); used.add(l.target); });
+  const idxMap = {};
+  const nodes = [];
+  rawNodes.forEach((n, i) => { if (used.has(i)) { idxMap[i] = nodes.length; nodes.push(n); } });
+  return { nodes, links: links.map((l) => ({ source: idxMap[l.source], target: idxMap[l.target], value: l.value })) };
+}
+
+function Slider({ label, value, min, max, step = 1, onChange, suffix }) {
+  return (
+    <label className="block">
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-secondary-700">{label}</span>
+        <span className="font-medium text-secondary-900">{value}{suffix}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-primary-600" />
+    </label>
+  );
+}
+
+function Toggle({ label, icon: Icon, active, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+        active ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium'
+          : 'border-secondary-200 bg-white text-secondary-600 hover:bg-secondary-50'
+      }`}>
+      <Icon size={16} />{label}
+    </button>
+  );
+}
+
+export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeKwc, ev }) {
+  const [open, setOpen] = useState(false);
+  const [persons, setPersons] = useState(3);
+  const [veBattery, setVeBattery] = useState(60);
+  const [pacKwh, setPacKwh] = useState(0);
+  const [pool, setPool] = useState(false);
+  const [clim, setClim] = useState(false);
+  const [batteryOn, setBatteryOn] = useState(true);
+
+  const prodHourly = useMemo(() => hourlyProdFromMonthly(eM, activeKwc, pvgisExample.hourly), [eM, activeKwc]);
+  const model = useMemo(() => buildAutoconsoModel({
+    household: {
+      persons,
+      veKmPerYear: ev.enabled ? (Number(ev.kmPerYear) || 0) : 0,
+      veBatteryKwh: veBattery,
+      pool: pool ? {} : undefined,
+      clim,
+      pacAnnualKwh: pacKwh,
+    },
+    monthlyConsoTotals: consoMonthly,
+    baseShape: enedisProfile.hourly,
+    prodHourly,
+  }), [persons, veBattery, pool, clim, pacKwh, ev, consoMonthly, prodHourly]);
+
+  const cascade = batteryOn ? model.cascade : model.cascade.filter((r) => r.key !== 'battery');
+  const final = cascade[cascade.length - 1];
+  const cascadeData = cascade.map((r) => ({
+    label: CASCADE_LABELS[r.key] || r.key,
+    autoconso: +(r.autoconsoRate * 100).toFixed(1),
+    couverture: +(r.autoproductionRate * 100).toFixed(1),
+  }));
+  const flux = batteryOn ? model.batteryFlux : model.flux;
+  const sankeyData = buildSankey(
+    batteryOn
+      ? [{ name: 'Solaire' }, { name: 'Réseau' }, { name: 'Batterie' }, { name: 'Maison' }, { name: 'Surplus' }]
+      : [{ name: 'Solaire' }, { name: 'Réseau' }, { name: 'Maison' }, { name: 'Surplus' }],
+    batteryOn
+      ? [
+        { source: 0, target: 3, value: Math.round(flux.directKwh) },
+        { source: 0, target: 2, value: Math.round(flux.chargedKwh) },
+        { source: 2, target: 3, value: Math.round(flux.fromBatteryKwh) },
+        { source: 0, target: 4, value: Math.round(flux.exportedKwh) },
+        { source: 1, target: 3, value: Math.round(flux.importedKwh) },
+      ]
+      : [
+        { source: 0, target: 2, value: Math.round(flux.directKwh) },
+        { source: 0, target: 3, value: Math.round(flux.exportedKwh) },
+        { source: 1, target: 2, value: Math.round(flux.importedKwh) },
+      ],
+  );
+
+  return (
+    <div className="card">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 font-semibold text-secondary-900">
+          <Sparkles className="w-5 h-5 text-primary-600" /> Optimiser l'autoconsommation
+        </span>
+        {open ? <ChevronUp className="w-4 h-4 text-secondary-400" /> : <ChevronDown className="w-4 h-4 text-secondary-400" />}
+      </button>
+
+      {open && (
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-5">
+          {/* Réglages usages */}
+          <div className="space-y-4">
+            <Slider label="Personnes" value={persons} min={1} max={6} onChange={setPersons} />
+            <Slider label="Chauffage PAC" value={pacKwh} min={0} max={8000} step={250} onChange={setPacKwh} suffix=" kWh/an" />
+            {ev.enabled && (
+              <Slider label="Batterie voiture" value={veBattery} min={20} max={100} step={5} onChange={setVeBattery} suffix=" kWh" />
+            )}
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-2">Confort <span className="text-xs text-secondary-500">(le surplus le finance)</span></div>
+              <div className="flex flex-wrap gap-2">
+                <Toggle label="Piscine" icon={Waves} active={pool} onClick={() => setPool(!pool)} />
+                <Toggle label="Clim été" icon={Snowflake} active={clim} onClick={() => setClim(!clim)} />
+                <Toggle label="Batterie" icon={BatteryCharging} active={batteryOn} onClick={() => setBatteryOn(!batteryOn)} />
+              </div>
+            </div>
+            {model.warnings.length > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Les usages déclarés dépassent la consommation de certains mois — ajustez les usages ou la conso.
+              </p>
+            )}
+          </div>
+
+          {/* Résultats */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-secondary-50 p-3">
+                <div className="text-xs text-secondary-600">Autoconsommation</div>
+                <div className="text-2xl font-semibold" style={{ color: PV_COLORS.blueMid }}>{(final.autoconsoRate * 100).toFixed(0)} %</div>
+              </div>
+              <div className="rounded-lg bg-secondary-50 p-3">
+                <div className="text-xs text-secondary-600">Couverture des besoins</div>
+                <div className="text-2xl font-semibold" style={{ color: PV_COLORS.production }}>{(final.autoproductionRate * 100).toFixed(0)} %</div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-1">Cascade « Cible »</div>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={cascadeData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
+                  <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip formatter={(v, n) => [`${v} %`, n === 'autoconso' ? 'Autoconso' : 'Couverture']} />
+                  <Bar dataKey="autoconso" name="Autoconso" fill={PV_COLORS.production} radius={[3, 3, 0, 0]} />
+                  <Line dataKey="couverture" name="Couverture" type="monotone" stroke={PV_COLORS.blueMid} strokeWidth={2} dot={{ r: 2 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-1">Où va votre électricité</div>
+              <ResponsiveContainer width="100%" height={210}>
+                <Sankey data={sankeyData} node={<SankeyNode />} nodePadding={24} nodeWidth={10}
+                  link={{ stroke: '#cbd5e1', strokeOpacity: 0.5 }} margin={{ left: 60, right: 70, top: 10, bottom: 10 }}>
+                  <Tooltip formatter={(v) => [`${v} kWh`, '']} />
+                </Sankey>
+              </ResponsiveContainer>
+            </div>
+
+            <p className="text-xs text-secondary-500">
+              Calcul horaire réel (talon Enedis + production du lieu). Le surplus n'est jamais valorisé en euros :
+              il finance de l'autoconsommation ou du confort (piscine, clim).
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
