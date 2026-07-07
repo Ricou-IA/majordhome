@@ -4,14 +4,52 @@
 // 100% navigateur sur fixtures réelles Enedis + PVGIS). Aucune écriture, aucun serveur.
 import { useState, useMemo } from 'react';
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, BarChart, LineChart,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer, ComposedChart, Bar, Line, LineChart,
+  XAxis, YAxis, Tooltip, CartesianGrid, Legend, Sankey, Layer, Rectangle,
 } from 'recharts';
 import { Sun, Car, Waves, Snowflake, BatteryCharging, Info } from 'lucide-react';
 import { PV_COLORS } from '../lib/palette';
 import { buildAutoconsoModel, buildDevices } from '../lib/autoconsoModel';
-import { devicesMonthlyKwh } from '../lib/autoconsoEngine';
+import { devicesMonthlyKwh, monthlyFromHourly } from '../lib/autoconsoEngine';
 import { enedisProfile, pvgisExample } from '../data';
+
+const NODE_COLORS = {
+  Solaire: PV_COLORS.production, Réseau: PV_COLORS.surplus,
+  Batterie: PV_COLORS.autoconso, Maison: PV_COLORS.conso, Surplus: PV_COLORS.surplus,
+};
+
+function SankeyNode({ x, y, width, height, payload }) {
+  const name = payload.name;
+  const leftSide = name === 'Solaire' || name === 'Réseau';
+  const above = name === 'Batterie';
+  return (
+    <Layer>
+      <Rectangle x={x} y={y} width={width} height={height} fill={NODE_COLORS[name] || '#94a3b8'} fillOpacity={0.9} radius={2} />
+      {above ? (
+        <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={10} fill="#475569">{name}</text>
+      ) : (
+        <text
+          x={leftSide ? x + width + 5 : x - 5} y={y + height / 2}
+          textAnchor={leftSide ? 'start' : 'end'} dominantBaseline="middle"
+          fontSize={10} fill="#475569" style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}
+        >
+          {name} {Math.round(payload.value)}
+        </text>
+      )}
+    </Layer>
+  );
+}
+
+// Construit les données Sankey en retirant les liens nuls et les nœuds orphelins (Recharts plante sinon).
+function buildSankey(rawNodes, rawLinks) {
+  const links = rawLinks.filter((l) => l.value > 0.5);
+  const used = new Set();
+  links.forEach((l) => { used.add(l.source); used.add(l.target); });
+  const idxMap = {};
+  const nodes = [];
+  rawNodes.forEach((n, i) => { if (used.has(i)) { idxMap[i] = nodes.length; nodes.push(n); } });
+  return { nodes, links: links.map((l) => ({ source: idxMap[l.source], target: idxMap[l.target], value: l.value })) };
+}
 
 // Répartition mensuelle par défaut (profil résidentiel RES1 mesuré, % de l'année).
 const MONTHLY_SHAPE = [11.3, 9.7, 9.5, 8.0, 7.3, 6.8, 7.0, 7.0, 6.8, 7.2, 9.0, 10.3];
@@ -102,13 +140,33 @@ export default function AutoconsoSimulateur() {
   const cascade = batteryOn ? model.cascade : model.cascade.filter((r) => r.key !== 'battery');
   const final = cascade[cascade.length - 1];
   const prodAnnual = Math.round(prodHourly.reduce((a, b) => a + b, 0));
+  const prodMonthly = monthlyFromHourly(prodHourly);
+  const flux = batteryOn ? model.batteryFlux : model.flux;
+  const sankeyData = buildSankey(
+    batteryOn
+      ? [{ name: 'Solaire' }, { name: 'Réseau' }, { name: 'Batterie' }, { name: 'Maison' }, { name: 'Surplus' }]
+      : [{ name: 'Solaire' }, { name: 'Réseau' }, { name: 'Maison' }, { name: 'Surplus' }],
+    batteryOn
+      ? [
+        { source: 0, target: 3, value: Math.round(flux.directKwh) },
+        { source: 0, target: 2, value: Math.round(flux.chargedKwh) },
+        { source: 2, target: 3, value: Math.round(flux.fromBatteryKwh) },
+        { source: 0, target: 4, value: Math.round(flux.exportedKwh) },
+        { source: 1, target: 3, value: Math.round(flux.importedKwh) },
+      ]
+      : [
+        { source: 0, target: 2, value: Math.round(flux.directKwh) },
+        { source: 0, target: 3, value: Math.round(flux.exportedKwh) },
+        { source: 1, target: 2, value: Math.round(flux.importedKwh) },
+      ],
+  );
 
   const cascadeData = cascade.map((r) => ({
     label: CASCADE_LABELS[r.key] || r.key,
     autoconso: +(r.autoconsoRate * 100).toFixed(1),
     couverture: +(r.autoproductionRate * 100).toFixed(1),
   }));
-  const monthlyData = model.annualByMonth.map((v, i) => ({ label: MONTHS[i], conso: Math.round(v) }));
+  const monthlyData = model.annualByMonth.map((v, i) => ({ label: MONTHS[i], conso: Math.round(v), production: Math.round(prodMonthly[i]) }));
   const dayData = model.dayTypeWinter.map((w, i) => ({
     h: `${i}h`, hiver: +w.toFixed(2), ete: +model.dayTypeSummer[i].toFixed(2),
   }));
@@ -182,17 +240,35 @@ export default function AutoconsoSimulateur() {
             </ResponsiveContainer>
           </div>
 
+          <div className="card p-4">
+            <h2 className="text-sm font-medium text-secondary-800 mb-1">Où va votre électricité</h2>
+            <p className="text-xs text-secondary-500 mb-2">
+              Flux annuel (kWh){batteryOn ? ' — avec batterie tampon' : ''}. Le surplus part au réseau sans être valorisé.
+            </p>
+            <ResponsiveContainer width="100%" height={230}>
+              <Sankey
+                data={sankeyData} node={<SankeyNode />} nodePadding={26} nodeWidth={10}
+                link={{ stroke: '#cbd5e1', strokeOpacity: 0.5 }}
+                margin={{ left: 62, right: 72, top: 12, bottom: 12 }}
+              >
+                <Tooltip formatter={(v) => [`${v} kWh`, '']} />
+              </Sankey>
+            </ResponsiveContainer>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="card p-4">
-              <h2 className="text-sm font-medium text-secondary-800 mb-3">Consommation par mois (kWh)</h2>
+              <h2 className="text-sm font-medium text-secondary-800 mb-3">Conso &amp; production par mois (kWh)</h2>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <ComposedChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v) => [`${v} kWh`, 'Conso']} />
-                  <Bar dataKey="conso" fill={PV_COLORS.conso} radius={[2, 2, 0, 0]} />
-                </BarChart>
+                  <Tooltip formatter={(v, n) => [`${v} kWh`, n === 'conso' ? 'Conso' : 'Production']} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="conso" name="Conso" fill={PV_COLORS.conso} radius={[2, 2, 0, 0]} />
+                  <Line dataKey="production" name="Production PV" type="monotone" stroke={PV_COLORS.production} strokeWidth={2.5} dot={false} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
 

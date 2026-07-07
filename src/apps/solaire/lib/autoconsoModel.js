@@ -127,10 +127,22 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
   const battResult = simulateBattery({ prodHourly, consoHourly: consoRunning, capacityKwh: battery.recommendedCapacityKwh, roundTripEfficiency: cascade.batteryEfficiency });
   cascadeRows.push({ key: 'battery', label: `Batterie ${battery.recommendedCapacityKwh} kWh`, ...metrics(battResult), deltaKwh: battResult.selfConsumedKwh - prev });
 
+  // Flux pour le Sankey (état optimisé, sans batterie et avec batterie recommandée)
+  const fluxNoBat = computeSelfConsumption({ prodHourly, consoHourly: consoRunning });
+
   return {
     baseline: metrics(scBase),
     cascade: cascadeRows,
     battery,
+    flux: {
+      prodKwh: fluxNoBat.prodKwh, consoKwh: fluxNoBat.consoKwh,
+      directKwh: fluxNoBat.selfConsumedKwh, exportedKwh: fluxNoBat.exportedKwh, importedKwh: fluxNoBat.importedKwh,
+    },
+    batteryFlux: {
+      prodKwh: battResult.prodKwh, consoKwh: battResult.consoKwh,
+      directKwh: battResult.selfConsumedDirectKwh, fromBatteryKwh: battResult.selfConsumedFromBatteryKwh,
+      chargedKwh: battResult.chargedKwh, exportedKwh: battResult.exportedKwh, importedKwh: battResult.importedKwh,
+    },
     byDevice,
     warnings,
     annualByMonth: monthlyFromHourly(baseline),
