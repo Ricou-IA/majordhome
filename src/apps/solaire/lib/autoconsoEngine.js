@@ -275,3 +275,16 @@ export function dayOfWeek(h) {
 export function isWeekend(h) {
   return dayOfWeek(h) >= 5;
 }
+
+/**
+ * Énergie mensuelle (12) cumulée d'une liste de devices. Sert à composer une conso
+ * totale COHÉRENTE = base foyer + usages (au lieu d'un total qui contredirait les usages).
+ */
+export function devicesMonthlyKwh(devices) {
+  const out = new Array(12).fill(0);
+  for (const d of devices) {
+    const curve = distributeDeviceLoad(d);
+    for (let h = 0; h < curve.length; h++) out[hourToDate(h).month] += curve[h];
+  }
+  return out;
+}

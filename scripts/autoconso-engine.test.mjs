@@ -4,7 +4,15 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh } from '../src/apps/solaire/lib/autoconsoEngine.js';
+
+test('devicesMonthlyKwh — somme mensuelle des devices, énergie conservée', () => {
+  const dev = { name: 'x', annualKwh: 1200, hourOfDayWeights: new Array(24).fill(1), monthWeights: new Array(12).fill(1) };
+  const m = devicesMonthlyKwh([dev]);
+  assert.equal(m.length, 12);
+  assert.ok(Math.abs(m.reduce((a, b) => a + b, 0) - 1200) < 1e-6);
+  assert.ok(m[0] > m[1]); // janvier (31 j) > février (28 j)
+});
 
 test('dayOfWeek / isWeekend — jour 0 = lundi, samedi/dimanche = week-end', () => {
   assert.equal(dayOfWeek(0), 0);            // lundi

@@ -24,6 +24,7 @@ export const CASCADE_DEFAULTS = {
   veWeekendShiftFraction: 0.7, // S2b VE : défaut si capacité batterie voiture non saisie
   weekdayChargeCap: 0.6,       // plafond de charge VE en semaine (le week-end complète sur solaire)
   poolMaxKwhPerHour: 3,        // PAC piscine — charge max absorbée par heure
+  poolMonths: [3, 4, 5, 6, 7, 8, 9], // saison chauffe piscine (avril-oct, pas l'hiver)
   climMaxKwhPerHour: 2.5,      // clim été (confort) — charge max absorbée par heure
   batteryCapacities: [0, 2, 4, 6, 8, 10, 12, 15],
   batteryEfficiency: 0.9,
@@ -105,7 +106,7 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
 
   // S2c PAC piscine : absorbe le surplus restant
   if (household.pool) {
-    const r = absorbSurplusWithLoad(consoRunning, prodHourly, { hourWeights: hoursMask(POOL_HOURS), maxKwhPerHour: cascade.poolMaxKwhPerHour });
+    const r = absorbSurplusWithLoad(consoRunning, prodHourly, { hourWeights: hoursMask(POOL_HOURS), maxKwhPerHour: cascade.poolMaxKwhPerHour, months: cascade.poolMonths });
     consoRunning = r.consoHourly;
     const scPool = sc(consoRunning);
     cascadeRows.push({ key: 'pool', label: 'PAC piscine', ...metrics(scPool), absorbedKwh: r.absorbedKwh, deltaKwh: scPool.selfConsumedKwh - prev });

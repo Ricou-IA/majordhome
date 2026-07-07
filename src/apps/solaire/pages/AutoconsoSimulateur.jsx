@@ -9,7 +9,8 @@ import {
 } from 'recharts';
 import { Sun, Car, Waves, Snowflake, BatteryCharging, Info } from 'lucide-react';
 import { PV_COLORS } from '../lib/palette';
-import { buildAutoconsoModel } from '../lib/autoconsoModel';
+import { buildAutoconsoModel, buildDevices } from '../lib/autoconsoModel';
+import { devicesMonthlyKwh } from '../lib/autoconsoEngine';
 import { enedisProfile, pvgisExample } from '../data';
 
 // Répartition mensuelle par défaut (profil résidentiel RES1 mesuré, % de l'année).
@@ -64,7 +65,7 @@ function Kpi({ label, value, accent }) {
 export default function AutoconsoSimulateur() {
   const [persons, setPersons] = useState(4);
   const [pvKwc, setPvKwc] = useState(6);
-  const [annualKwh, setAnnualKwh] = useState(9000);
+  const [baseKwh, setBaseKwh] = useState(2500);
   const [pacKwh, setPacKwh] = useState(4000);
   const [veOn, setVeOn] = useState(true);
   const [veKm, setVeKm] = useState(15000);
@@ -75,21 +76,27 @@ export default function AutoconsoSimulateur() {
 
   const talon = enedisProfile.hourly;
   const prodHourly = useMemo(() => pvgisExample.hourly.map((x) => x * pvKwc), [pvKwc]);
-  const monthlyConsoTotals = useMemo(() => MONTHLY_SHAPE.map((p) => (annualKwh * p) / 100), [annualKwh]);
+
+  const household = useMemo(() => ({
+    persons,
+    veKmPerYear: veOn ? veKm : 0,
+    veBatteryKwh: veBattery,
+    pool: pool ? {} : undefined,
+    clim,
+    pacAnnualKwh: pacKwh,
+  }), [persons, veOn, veKm, veBattery, pool, clim, pacKwh]);
+
+  // Conso totale COHÉRENTE = base foyer + usages (évite un total qui contredit les usages).
+  const deviceMonthly = useMemo(() => devicesMonthlyKwh(buildDevices(household)), [household]);
+  const monthlyConsoTotals = useMemo(
+    () => MONTHLY_SHAPE.map((p, m) => (baseKwh * p) / 100 + deviceMonthly[m]),
+    [baseKwh, deviceMonthly],
+  );
+  const totalConso = Math.round(monthlyConsoTotals.reduce((a, b) => a + b, 0));
 
   const model = useMemo(
-    () => buildAutoconsoModel({
-      household: {
-        persons,
-        veKmPerYear: veOn ? veKm : 0,
-        veBatteryKwh: veBattery,
-        pool: pool ? {} : undefined,
-        clim,
-        pacAnnualKwh: pacKwh,
-      },
-      monthlyConsoTotals, baseShape: talon, prodHourly,
-    }),
-    [persons, veOn, veKm, veBattery, pool, clim, pacKwh, monthlyConsoTotals, talon, prodHourly],
+    () => buildAutoconsoModel({ household, monthlyConsoTotals, baseShape: talon, prodHourly }),
+    [household, monthlyConsoTotals, talon, prodHourly],
   );
 
   const cascade = batteryOn ? model.cascade : model.cascade.filter((r) => r.key !== 'battery');
@@ -123,7 +130,8 @@ export default function AutoconsoSimulateur() {
         <div className="card p-4 space-y-4 h-fit">
           <h2 className="text-sm font-medium text-secondary-800">Le foyer</h2>
           <Slider label="Personnes" value={persons} min={1} max={6} onChange={setPersons} />
-          <Slider label="Consommation" value={annualKwh} min={3000} max={20000} step={500} onChange={setAnnualKwh} suffix=" kWh/an" />
+          <Slider label="Conso de base (hors gros usages)" value={baseKwh} min={1000} max={6000} step={250} onChange={setBaseKwh} suffix=" kWh/an" />
+          <div className="text-xs text-secondary-500 -mt-1">Conso totale ≈ <span className="font-medium text-secondary-700">{totalConso.toLocaleString('fr-FR')}</span> kWh/an (base + usages)</div>
           <Slider label="Puissance PV" value={pvKwc} min={3} max={9} step={0.5} onChange={setPvKwc} suffix=" kWc" />
           <Slider label="Chauffage PAC" value={pacKwh} min={0} max={8000} step={250} onChange={setPacKwh} suffix=" kWh/an" />
 
