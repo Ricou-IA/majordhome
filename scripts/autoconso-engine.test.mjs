@@ -4,7 +4,19 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh, hourlyProdFromMonthly } from '../src/apps/solaire/lib/autoconsoEngine.js';
+
+test('hourlyProdFromMonthly — distribue le mensuel réel par la forme, total mensuel exact', () => {
+  const shape = new Array(8760).fill(1); // forme plate
+  const eM = new Array(12).fill(100);    // 100 kWh/mois/kWc
+  const prod = hourlyProdFromMonthly(eM, 6, shape);
+  assert.equal(prod.length, 8760);
+  // janvier : total = 100 × 6 = 600
+  let jan = 0;
+  for (let h = 0; h < 8760; h++) if (hourToDate(h).month === 0) jan += prod[h];
+  assert.ok(Math.abs(jan - 600) < 1e-6);
+  assert.ok(Math.abs(prod[0] - 600 / 744) < 1e-9); // forme plate → réparti sur les 744 h de janvier
+});
 
 test('devicesMonthlyKwh — somme mensuelle des devices, énergie conservée', () => {
   const dev = { name: 'x', annualKwh: 1200, hourOfDayWeights: new Array(24).fill(1), monthWeights: new Array(12).fill(1) };

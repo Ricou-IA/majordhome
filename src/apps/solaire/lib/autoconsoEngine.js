@@ -277,6 +277,24 @@ export function isWeekend(h) {
 }
 
 /**
+ * Reconstruit une production horaire (8760) par adresse SANS appel PVGIS horaire :
+ * distribue la production mensuelle RÉELLE (`monthlyKwhPerKwc` = e_m du wizard,
+ * kWh/mois pour 1 kWc) selon une FORME horaire normalisée (`hourlyShape`, ex. fixture
+ * Gaillac seriescalc) × la puissance `kwc`. Chaque mois garde sa production réelle ;
+ * la forme dit seulement QUAND dans la journée. Total mensuel = e_m × kwc (exact).
+ */
+export function hourlyProdFromMonthly(monthlyKwhPerKwc, kwc, hourlyShape) {
+  const monthShapeSum = new Array(12).fill(0);
+  for (let h = 0; h < hourlyShape.length; h++) monthShapeSum[hourToDate(h).month] += hourlyShape[h];
+  const out = new Array(hourlyShape.length).fill(0);
+  for (let h = 0; h < hourlyShape.length; h++) {
+    const m = hourToDate(h).month;
+    if (monthShapeSum[m] > 0) out[h] = (monthlyKwhPerKwc[m] * kwc * hourlyShape[h]) / monthShapeSum[m];
+  }
+  return out;
+}
+
+/**
  * Énergie mensuelle (12) cumulée d'une liste de devices. Sert à composer une conso
  * totale COHÉRENTE = base foyer + usages (au lieu d'un total qui contredirait les usages).
  */
