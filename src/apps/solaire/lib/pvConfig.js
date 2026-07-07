@@ -13,18 +13,8 @@ export const PV_DEFAULTS = {
   default_tilt_percent: 18,
   autoconso_threshold: 0.85,
   max_power_kwc: 9,             // plafond offre résidentielle (régime réglementaire ≤ 9 kWc)
-  // Recalibrage prudence 2026-06-11 (Eric) : les valeurs initiales de la spec
-  // (0,70/0,55/0,45, bonus +0,10, plafond 0,85) empilées promettaient 75 %
-  // d'autoconso — jamais constaté. Base ~50 %, bonus halvés, plafond 0,75.
-  // Hypothèses déclaratives À CALIBRER avec les relevés réels (édit. admin).
-  simultaneity: {
-    presence_journee: 0.60,
-    presence_partielle: 0.50,
-    absent_journee: 0.40,
-    bonus_ecs: 0.05,
-    bonus_ve: 0.05,
-    cap: 0.75,
-  },
+  // (Le coefficient de simultanéité a été remplacé par le moteur horaire
+  // d'autoconsommation le 2026-07-07 — plus de config `simultaneity`.)
   cost_grid: [],                // [{ kwc, prix_ttc }] — 1 à 9 kWc, rempli par l'admin
   tech_docs: [],                // bibliothèque technique : [{ id, label, kind: 'panneau'|'borne'|'onduleur'|'autre', path, attach }]
   default_loan_rate: 0.045,

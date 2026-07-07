@@ -11,7 +11,7 @@ import { buildPvConfig } from '@apps/solaire/lib/pvConfig';
 import { TECH_DOCS_BUCKET } from '@apps/solaire/lib/etudeExport';
 import { storageService } from '@services/storage.service';
 import {
-  Calculator, Grid3x3, Users, ChevronLeft, Plus, X, Loader2,
+  Calculator, Grid3x3, Car, ChevronLeft, Plus, X, Loader2,
   FileText, Upload, ExternalLink, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ import { FormField, SectionTitle, inputClass, selectClass } from '../../componen
 const TABS = [
   { key: 'calcul', label: 'Paramètres calcul', icon: Calculator },
   { key: 'grille', label: 'Grille de coûts', icon: Grid3x3 },
-  { key: 'simultaneite', label: 'Simultanéité & VE', icon: Users },
+  { key: 'vehicule', label: 'Véhicule électrique', icon: Car },
   { key: 'bibliotheque', label: 'Bibliothèque technique', icon: FileText },
 ];
 
@@ -113,7 +113,7 @@ function CalculTab({ form, patch }) {
           <NumberField label="Pente toiture par défaut" value={form.default_tilt_percent} step={1} suffix="%"
             onChange={(v) => patch({ default_tilt_percent: v })} />
           <PctField label="Seuil de recouvrement (optimiseur)" value={form.autoconso_threshold} step={1}
-            hint="Part de la production qui doit rester sous la conso mensuelle (avant coefficient de simultanéité) — l'optimiseur retient la plus grande puissance qui respecte ce seuil"
+            hint="Part de la production qui doit rester sous la conso mensuelle — l'optimiseur retient la plus grande puissance qui respecte ce seuil"
             onChange={(v) => patch({ autoconso_threshold: v })} />
           <NumberField label="Puissance max recommandée" value={form.max_power_kwc} step={0.5} suffix="kWc"
             hint="Plafond de l'optimiseur et des scénarios (offre résidentielle ≤ 9 kWc — régime réglementaire différent au-delà)"
@@ -217,33 +217,11 @@ function GrilleTab({ form, patch }) {
   );
 }
 
-function SimultaneiteTab({ form, patch }) {
-  const sim = form.simultaneity ?? {};
+function VehiculeTab({ form, patch }) {
   const ev = form.ev ?? {};
-  const patchSim = (p) => patch({ simultaneity: { ...sim, ...p } });
   const patchEv = (p) => patch({ ev: { ...ev, ...p } });
   return (
     <div className="card space-y-6">
-      <div>
-        <SectionTitle>Coefficients de simultanéité</SectionTitle>
-        <p className="text-sm text-secondary-600 mt-1 mb-3">
-          Part du recouvrement production/consommation réellement simultanée à l'échelle de la journée.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <PctField label="Présence en journée (retraités, télétravail)" value={sim.presence_journee} step={1}
-            onChange={(v) => patchSim({ presence_journee: v })} />
-          <PctField label="Présence partielle (défaut)" value={sim.presence_partielle} step={1}
-            onChange={(v) => patchSim({ presence_partielle: v })} />
-          <PctField label="Absent en journée" value={sim.absent_journee} step={1}
-            onChange={(v) => patchSim({ absent_journee: v })} />
-          <PctField label="Bonus pilotage ECS / domotique" value={sim.bonus_ecs} step={1}
-            onChange={(v) => patchSim({ bonus_ecs: v })} />
-          <PctField label="Bonus recharge VE pilotée" value={sim.bonus_ve} step={1}
-            onChange={(v) => patchSim({ bonus_ve: v })} />
-          <PctField label="Plafond global" value={sim.cap} step={1}
-            onChange={(v) => patchSim({ cap: v })} />
-        </div>
-      </div>
       <div>
         <SectionTitle>Véhicule électrique</SectionTitle>
         <div className="grid sm:grid-cols-2 gap-4 mt-3">
@@ -402,9 +380,6 @@ function validatePvForm(form) {
     form.default_price_kwh, form.inflation_rate, form.degradation_rate, form.horizon_years,
     form.system_loss, form.panel_power_wc, form.panel_area_m2, form.default_tilt_percent,
     form.autoconso_threshold, form.max_power_kwc, form.default_loan_rate, form.default_loan_years, form.vat_rate,
-    form.simultaneity?.presence_journee, form.simultaneity?.presence_partielle,
-    form.simultaneity?.absent_journee, form.simultaneity?.bonus_ecs,
-    form.simultaneity?.bonus_ve, form.simultaneity?.cap,
     form.ev?.home_charge_share, form.ev?.default_km, form.ev?.default_kwh_100km,
   ];
   if (flatNums.some((v) => !isNum(v))) return false;
@@ -503,7 +478,7 @@ export default function SolaireSettings() {
           <div className="flex-1 min-w-0">
             {activeTab === 'calcul' && <CalculTab form={form} patch={patch} />}
             {activeTab === 'grille' && <GrilleTab form={form} patch={patch} />}
-            {activeTab === 'simultaneite' && <SimultaneiteTab form={form} patch={patch} />}
+            {activeTab === 'vehicule' && <VehiculeTab form={form} patch={patch} />}
             {activeTab === 'bibliotheque' && <BibliothequeTab form={form} patch={patch} orgId={organization?.id} />}
           </div>
         </div>

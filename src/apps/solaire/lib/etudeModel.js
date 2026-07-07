@@ -45,7 +45,7 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   // Conso horaire = talon Enedis calé sur les 12 ancres mensuelles (constat = conso
   // type AVANT PV ; la décomposition fine des usages vit dans l'étape Optimisation).
   const consoHourly = reconcileMonthly({ hourlyShape: baseShape, monthlyTargets: consoMonthly });
-  // Autoconso mensuelle réelle pour une puissance donnée (forme computeMonthly).
+  // Autoconso mensuelle réelle pour une puissance donnée (prod/conso/autoconso/surplus + totals).
   const monthlyForKwc = (kwc) => aggregateMonthlyFromHourly({
     prodHourly: hourlyProdFromMonthly(pvgis.e_m, kwc, prodShape),
     consoHourly,

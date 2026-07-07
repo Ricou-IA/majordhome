@@ -3,9 +3,6 @@
 // Formules : spec docs/superpowers/specs/2026-06-10-app-solaire-pv-design.md §8-§9.
 // RÈGLE ABSOLUE : le surplus n'est JAMAIS valorisé en € (spec §1).
 
-/** Profil de répartition mensuelle résidentiel standard (% du total annuel, janv→déc, Σ=100). */
-export const MONTHLY_PROFILE = [12, 11, 10, 8, 7, 6, 6, 6, 7, 8, 9, 10];
-
 /** Pente toiture % (langage BTP) → degrés PVGIS. */
 export function percentToDegrees(percent) {
   return (Math.atan(percent / 100) * 180) / Math.PI;
@@ -51,22 +48,9 @@ export function panelsCount(kwc, panelPowerWc) {
   return Math.round(kwc / (panelPowerWc / 1000));
 }
 
-/** Répartit un total annuel kWh sur 12 mois selon MONTHLY_PROFILE. */
-export function spreadAnnualToMonthly(totalKwh) {
-  return MONTHLY_PROFILE.map((pct) => (totalKwh * pct) / 100);
-}
-
 /** Surconsommation VE mensuelle (kWh/mois), linéarisée (spec §8.6). */
 export function evMonthlyConsumption({ kmPerYear, kwhPer100km, homeChargeShare }) {
   return (kmPerYear * kwhPer100km / 100 * homeChargeShare) / 12;
-}
-
-/** Coefficient de simultanéité : preset + bonus ECS + bonus VE, plafonné (spec §8.2). */
-export function simultaneityCoeff({ preset, ecsBonus, evBonus }, profiles) {
-  let coeff = profiles[preset] ?? profiles.presence_partielle;
-  if (ecsBonus) coeff += profiles.bonus_ecs;
-  if (evBonus) coeff += profiles.bonus_ve;
-  return Math.min(coeff, profiles.cap);
 }
 
 /**
@@ -87,25 +71,6 @@ export function costFromGrid(grid, powerKwc) {
   return lo.prix_ttc + (hi.prix_ttc - lo.prix_ttc) * t;
 }
 
-/**
- * Production / autoconsommation / surplus mensuels pour P kWc (spec §8.1, §8.3).
- * Le surplus est affiché « perdu » et valorisé 0 € — AUCUNE valorisation ailleurs.
- */
-export function computeMonthly({ eM1kwc, powerKwc, consoMonthly, coeff }) {
-  const prod = eM1kwc.map((e) => e * powerKwc);
-  const autoconso = prod.map((p, m) => Math.min(p, consoMonthly[m]) * coeff);
-  const surplus = prod.map((p, m) => p - autoconso[m]);
-  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
-  const totals = {
-    prod: sum(prod),
-    conso: sum(consoMonthly),
-    autoconso: sum(autoconso),
-    surplus: sum(surplus),
-  };
-  totals.tauxAutoconso = totals.prod > 0 ? totals.autoconso / totals.prod : 0;
-  totals.tauxAutoproduction = totals.conso > 0 ? totals.autoconso / totals.conso : 0;
-  return { prod, autoconso, surplus, totals };
-}
 
 /** Économie de l'année N (spec §8.4) : autoconso × dégradation^(N-1) × prix × inflation^(N-1). */
 export function yearlyEconomy({ autoconsoAnnual, priceKwh, inflationRate, degradationRate, yearN }) {

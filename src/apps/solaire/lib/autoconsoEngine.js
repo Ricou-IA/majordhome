@@ -296,7 +296,7 @@ export function hourlyProdFromMonthly(monthlyKwhPerKwc, kwc, hourlyShape) {
 
 /**
  * Agrège l'autoconsommation instantanée horaire (Σ min(prod, conso)) en une
- * ventilation MENSUELLE (12) à la forme de `computeMonthly` du pvEngine :
+ * ventilation MENSUELLE (12) :
  * { prod[12], conso[12], autoconso[12], surplus[12], totals{…} }. C'est le pont
  * entre le moteur horaire (autoconso réelle) et les consommateurs mensuels
  * existants (graphe mensuel, financier). autoconso[m] = Σ des heures du mois de

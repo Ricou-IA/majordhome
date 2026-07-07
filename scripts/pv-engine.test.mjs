@@ -6,11 +6,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   percentToDegrees, orientationToAspect, googleAzimuthToPvgisAspect, degreesToPercent, maxPowerKwc, panelsCount,
-  spreadAnnualToMonthly, evMonthlyConsumption, simultaneityCoeff, costFromGrid,
-  computeMonthly, yearlyEconomy, monthlyPayment,
+  evMonthlyConsumption, costFromGrid,
+  yearlyEconomy, monthlyPayment,
   buildYearlyTable, optimize, buildScenarios, defaultScenarioKwc,
 } from '../src/apps/solaire/lib/pvEngine.js';
-import { buildPvConfig, PV_DEFAULTS } from '../src/apps/solaire/lib/pvConfig.js';
+import { buildPvConfig } from '../src/apps/solaire/lib/pvConfig.js';
 
 test('percentToDegrees', () => {
   assert.ok(Math.abs(percentToDegrees(18) - 10.204) < 0.01);
@@ -29,29 +29,10 @@ test('maxPowerKwc / panelsCount', () => {
   assert.equal(panelsCount(8.5, 500), 17);
 });
 
-test('spreadAnnualToMonthly — profil résidentiel, somme exacte', () => {
-  const months = spreadAnnualToMonthly(12000);
-  assert.equal(months.length, 12);
-  assert.equal(months[0], 1440); // janvier 12 %
-  assert.equal(months[5], 720);  // juin 6 %
-  assert.ok(Math.abs(months.reduce((a, b) => a + b, 0) - 12000) < 0.001);
-});
-
 test('evMonthlyConsumption', () => {
   // 20 000 km × 20 kWh/100 km × 95 % = 3 800 kWh/an → 316,67 kWh/mois
   const m = evMonthlyConsumption({ kmPerYear: 20000, kwhPer100km: 20, homeChargeShare: 0.95 });
   assert.ok(Math.abs(m - 316.667) < 0.01);
-});
-
-test('simultaneityCoeff — presets, bonus, plafond (défauts prudents 2026-06-11)', () => {
-  const profiles = PV_DEFAULTS.simultaneity;
-  assert.ok(Math.abs(simultaneityCoeff({ preset: 'absent_journee', ecsBonus: false, evBonus: false }, profiles) - 0.40) < 1e-9);
-  assert.ok(Math.abs(simultaneityCoeff({ preset: 'presence_partielle', ecsBonus: true, evBonus: false }, profiles) - 0.55) < 1e-9);
-  // 0,60 + 0,05 + 0,05 = 0,70 — sous le plafond 0,75
-  assert.ok(Math.abs(simultaneityCoeff({ preset: 'presence_journee', ecsBonus: true, evBonus: true }, profiles) - 0.70) < 1e-9);
-  // Plafond : profil custom qui dépasse → clampé
-  const custom = { presence_journee: 0.70, presence_partielle: 0.50, absent_journee: 0.40, bonus_ecs: 0.10, bonus_ve: 0.10, cap: 0.75 };
-  assert.ok(Math.abs(simultaneityCoeff({ preset: 'presence_journee', ecsBonus: true, evBonus: true }, custom) - 0.75) < 1e-9);
 });
 
 test('costFromGrid — exact, interpolation, hors bornes, vide', () => {
@@ -74,19 +55,6 @@ test('buildPvConfig — merge profond settings.pv sur les défauts', () => {
   // Plafond d'offre résidentielle (régression 2026-06-11 : 20 kWc recommandés
   // pour un gros consommateur — l'optimiseur doit être borné à min(toiture, 9 kWc))
   assert.equal(buildPvConfig(undefined).max_power_kwc, 9);
-});
-
-test('computeMonthly — autoconso, surplus, taux', () => {
-  const eM1kwc = Array(12).fill(100);              // 1200 kWh/kWc/an (flat synthétique)
-  const consoMonthly = Array(12).fill(250);        // 3000 kWh/an
-  const r = computeMonthly({ eM1kwc, powerKwc: 2, consoMonthly, coeff: 0.7 });
-  assert.equal(r.prod[0], 200);
-  assert.equal(r.autoconso[0], 140);               // min(200,250) × 0,7
-  assert.equal(r.surplus[0], 60);
-  assert.equal(r.totals.prod, 2400);
-  assert.equal(r.totals.autoconso, 1680);
-  assert.ok(Math.abs(r.totals.tauxAutoconso - 0.7) < 1e-9);
-  assert.ok(Math.abs(r.totals.tauxAutoproduction - 0.56) < 1e-9);  // 1680 / 3000
 });
 
 test('yearlyEconomy — inflation + dégradation', () => {
