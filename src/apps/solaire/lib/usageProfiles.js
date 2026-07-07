@@ -52,3 +52,14 @@ export function ecsDevice({
     monthWeights: dailyByMonth,
   };
 }
+
+/** Device VE : énergie annuelle depuis le kilométrage, charge nuit par défaut. */
+export function veDevice({ kmPerYear, kwhPer100km = 18, homeChargeShare = 0.9 }) {
+  const annualKwh = ((kmPerYear * kwhPer100km) / 100) * homeChargeShare;
+  return {
+    name: 've',
+    annualKwh,
+    hourOfDayWeights: hoursMask(VE_NIGHT_HOURS),
+    monthWeights: new Array(12).fill(1),
+  };
+}

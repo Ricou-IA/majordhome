@@ -3,7 +3,7 @@
 // Run : node --test scripts/usage-profiles.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS } from '../src/apps/solaire/lib/usageProfiles.js';
+import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS } from '../src/apps/solaire/lib/usageProfiles.js';
 import { distributeDeviceLoad, hourToDate } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hoursMask — 1 sur les heures listées, 0 sinon', () => {
@@ -42,4 +42,12 @@ test('ecsDevice — mode solar = fenêtre midi', () => {
   const dev = ecsDevice({ persons: 3, mode: 'solar' });
   assert.equal(dev.hourOfDayWeights[12], 1); // midi actif
   assert.equal(dev.hourOfDayWeights[3], 0);  // nuit inactif
+});
+
+test('veDevice — énergie depuis le kilométrage, charge nuit', () => {
+  const dev = veDevice({ kmPerYear: 15000 }); // défauts 18 kWh/100km, 90% maison
+  assert.equal(dev.name, 've');
+  assert.ok(Math.abs(dev.annualKwh - (15000 * 18 / 100) * 0.9) < 1e-9); // 2430
+  assert.deepEqual(dev.hourOfDayWeights, hoursMask(VE_NIGHT_HOURS));
+  assert.deepEqual(dev.monthWeights, new Array(12).fill(1)); // uniforme
 });
