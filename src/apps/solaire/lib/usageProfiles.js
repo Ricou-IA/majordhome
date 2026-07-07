@@ -82,3 +82,15 @@ export function poolDevice({ pumpKw = 0.8, hoursPerDay = 8, seasonWeights = POOL
     monthWeights: dailyByMonth,
   };
 }
+
+/** Répartition mensuelle chauffage PAC par défaut (∝ degrés-jours). Validé Eric. */
+export const PAC_HEATING_MONTH_WEIGHTS = [1, 0.9, 0.7, 0.4, 0.1, 0, 0, 0, 0.1, 0.4, 0.7, 1];
+
+/**
+ * Device générique depuis un budget annuel saisi (PAC chauffage v1, autres usages).
+ * L'énergie annuelle est imposée telle quelle ; forme journalière + mensuelle fournies.
+ * Copies défensives des tableaux (l'appelant peut passer une constante partagée).
+ */
+export function fromAnnualBudget({ name, annualKwh, hourOfDayWeights, monthWeights }) {
+  return { name, annualKwh, hourOfDayWeights: [...hourOfDayWeights], monthWeights: [...monthWeights] };
+}

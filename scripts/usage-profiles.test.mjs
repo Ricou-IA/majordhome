@@ -3,7 +3,7 @@
 // Run : node --test scripts/usage-profiles.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS, poolDevice, POOL_HOURS, POOL_SEASON_WEIGHTS, DAYS_IN_MONTH } from '../src/apps/solaire/lib/usageProfiles.js';
+import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS, poolDevice, POOL_HOURS, POOL_SEASON_WEIGHTS, DAYS_IN_MONTH, fromAnnualBudget, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS } from '../src/apps/solaire/lib/usageProfiles.js';
 import { distributeDeviceLoad, hourToDate } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hoursMask — 1 sur les heures listées, 0 sinon', () => {
@@ -63,4 +63,21 @@ test('poolDevice — pompe midi, saisonnier, énergie conservée', () => {
   // annualKwh = Σ E_jour(m) × jours(m)
   const expected = POOL_SEASON_WEIGHTS.reduce((s, w, m) => s + (0.8 * 8 * w) * DAYS_IN_MONTH[m], 0);
   assert.ok(Math.abs(dev.annualKwh - expected) < 1e-6);
+});
+
+test('fromAnnualBudget — PAC chauffage : budget saisi, forme matin/soir + hiver', () => {
+  const dev = fromAnnualBudget({
+    name: 'pac',
+    annualKwh: 4000,
+    hourOfDayWeights: hoursMask(PAC_HEATING_HOURS),
+    monthWeights: PAC_HEATING_MONTH_WEIGHTS,
+  });
+  assert.equal(dev.name, 'pac');
+  assert.equal(dev.annualKwh, 4000); // budget imposé tel quel
+  assert.equal(dev.hourOfDayWeights[7], 1);  // matin actif
+  assert.equal(dev.hourOfDayWeights[13], 0); // midi inactif (chauffage)
+  assert.ok(dev.monthWeights[0] > dev.monthWeights[6]); // janvier > juillet (degrés-jours)
+  // copies défensives (pas la même référence que l'entrée)
+  const mw = PAC_HEATING_MONTH_WEIGHTS;
+  assert.notEqual(dev.monthWeights, mw);
 });
