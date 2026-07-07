@@ -50,3 +50,25 @@ export function absorbSurplusWithLoad(consoHourly, prodHourly, { hourWeights, ma
   }
   return { consoHourly: newConso, absorbedKwh };
 }
+
+/** Surplus injecté (export) sommé par mois (0-11), via le calendrier du moteur. */
+export function exportByMonth(prodHourly, consoHourly) {
+  const out = new Array(12).fill(0);
+  for (let h = 0; h < prodHourly.length; h++) {
+    const exp = prodHourly[h] - consoHourly[h];
+    if (exp > 0) out[hourToDate(h).month] += exp;
+  }
+  return out;
+}
+
+/**
+ * Mois d'épaule où le surplus PV couvre le besoin de chauffe piscine → « N mois de
+ * baignade en plus, alimentés par votre surplus ». shoulderMonths 0-indexés
+ * (avril=3, mai=4, sept=8, oct=9). Besoin de chauffe = sous-modèle externe (v1).
+ */
+export function poolExtraMonths(surplusByMonth, poolHeatDemandByMonth, { shoulderMonths = [3, 4, 8, 9] } = {}) {
+  const months = shoulderMonths.filter(
+    (m) => poolHeatDemandByMonth[m] > 0 && surplusByMonth[m] >= poolHeatDemandByMonth[m]
+  );
+  return { extraMonths: months.length, months };
+}

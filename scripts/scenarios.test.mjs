@@ -3,7 +3,7 @@
 // Run : node --test scripts/scenarios.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applySolarShift, absorbSurplusWithLoad } from '../src/apps/solaire/lib/scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths } from '../src/apps/solaire/lib/scenarios.js';
 import { computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('applySolarShift — déplace l\'usage vers le surplus, énergie conservée', () => {
@@ -59,4 +59,24 @@ test('absorbSurplusWithLoad — plafond maxKwhPerHour respecté', () => {
   const hw = new Array(24).fill(0); hw[1] = 1;
   const { absorbedKwh } = absorbSurplusWithLoad(conso, prod, { hourWeights: hw, maxKwhPerHour: 3 });
   assert.ok(Math.abs(absorbedKwh - 3) < 1e-9); // plafonné à 3 malgré 10 de surplus
+});
+
+test('exportByMonth — somme le surplus injecté par mois', () => {
+  const prod  = [10, 0, 0]; // 3 premières heures = janvier
+  const conso = [0, 0, 0];
+  const out = exportByMonth(prod, conso);
+  assert.equal(out.length, 12);
+  assert.equal(out[0], 10); // janvier
+  assert.equal(out[6], 0);
+});
+
+test('poolExtraMonths — mois d\'épaule où le surplus couvre le besoin de chauffe', () => {
+  const surplus = new Array(12).fill(0);
+  const demand  = new Array(12).fill(0);
+  surplus[3] = 100; demand[3] = 80; // avril : couvert
+  surplus[4] = 50;  demand[4] = 80; // mai : non couvert
+  surplus[8] = 90;  demand[8] = 90; // sept : couvert (égalité)
+  const r = poolExtraMonths(surplus, demand);
+  assert.deepEqual(r.months, [3, 8]);
+  assert.equal(r.extraMonths, 2);
 });
