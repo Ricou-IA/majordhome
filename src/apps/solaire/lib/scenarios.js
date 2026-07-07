@@ -72,3 +72,43 @@ export function poolExtraMonths(surplusByMonth, poolHeatDemandByMonth, { shoulde
   );
   return { extraMonths: months.length, months };
 }
+
+/**
+ * Compose la cascade « Cible » : part du constat (baseline) et applique les `steps`
+ * dans l'ordre, chaque étape cumulant sur la précédente. Types d'étape :
+ *  - 'shift'   : { usageCurve, fraction } → applySolarShift
+ *  - 'absorb'  : { hourWeights, maxKwhPerHour } → absorbSurplusWithLoad (expose absorbedKwh)
+ *  - 'battery' : { capacityKwh, roundTripEfficiency? } → simulateBattery (à mettre EN DERNIER :
+ *                ne modifie pas la conso pour les étapes suivantes).
+ * Renvoie [{ key, label, autoconsoRate, selfConsumedKwh, deltaKwh, absorbedKwh? }].
+ */
+export function runScenarios({ baselineConso, prodHourly, steps }) {
+  const results = [];
+  let conso = baselineConso.slice();
+  const base = computeSelfConsumption({ prodHourly, consoHourly: conso });
+  results.push({ key: 'constat', label: 'Constat', autoconsoRate: base.autoconsoRate, selfConsumedKwh: base.selfConsumedKwh, deltaKwh: 0 });
+  let prevSelf = base.selfConsumedKwh;
+
+  for (const step of steps) {
+    let metrics;
+    let absorbedKwh;
+    if (step.type === 'shift') {
+      conso = applySolarShift(conso, prodHourly, step.usageCurve, { fraction: step.fraction });
+      metrics = computeSelfConsumption({ prodHourly, consoHourly: conso });
+    } else if (step.type === 'absorb') {
+      const r = absorbSurplusWithLoad(conso, prodHourly, { hourWeights: step.hourWeights, maxKwhPerHour: step.maxKwhPerHour });
+      conso = r.consoHourly;
+      absorbedKwh = r.absorbedKwh;
+      metrics = computeSelfConsumption({ prodHourly, consoHourly: conso });
+    } else if (step.type === 'battery') {
+      metrics = simulateBattery({ prodHourly, consoHourly: conso, capacityKwh: step.capacityKwh, roundTripEfficiency: step.roundTripEfficiency ?? 0.9 });
+    } else {
+      throw new Error(`runScenarios : type d'étape inconnu « ${step.type} »`);
+    }
+    const row = { key: step.key, label: step.label, autoconsoRate: metrics.autoconsoRate, selfConsumedKwh: metrics.selfConsumedKwh, deltaKwh: metrics.selfConsumedKwh - prevSelf };
+    if (absorbedKwh !== undefined) row.absorbedKwh = absorbedKwh;
+    results.push(row);
+    prevSelf = metrics.selfConsumedKwh;
+  }
+  return results;
+}

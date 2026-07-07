@@ -3,7 +3,7 @@
 // Run : node --test scripts/scenarios.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths } from '../src/apps/solaire/lib/scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths, runScenarios } from '../src/apps/solaire/lib/scenarios.js';
 import { computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('applySolarShift — déplace l\'usage vers le surplus, énergie conservée', () => {
@@ -79,4 +79,37 @@ test('poolExtraMonths — mois d\'épaule où le surplus couvre le besoin de cha
   const r = poolExtraMonths(surplus, demand);
   assert.deepEqual(r.months, [3, 8]);
   assert.equal(r.extraMonths, 2);
+});
+
+test('runScenarios — cascade constat → déphasage → batterie, deltas cumulés', () => {
+  const baseline = [0, 0, 10]; // usage la nuit
+  const prod     = [0, 10, 0]; // soleil à h1
+  const usage    = [0, 0, 10];
+  const results = runScenarios({
+    baselineConso: baseline,
+    prodHourly: prod,
+    steps: [
+      { type: 'shift', key: 'piloted', label: 'Déphasage piloté', usageCurve: usage, fraction: 1 },
+      { type: 'battery', key: 'battery', label: 'Batterie', capacityKwh: 0 },
+    ],
+  });
+  assert.equal(results.length, 3); // constat + 2 étapes
+  assert.equal(results[0].key, 'constat');
+  assert.equal(results[0].selfConsumedKwh, 0);       // rien d'autoconsommé au départ
+  assert.ok(Math.abs(results[1].selfConsumedKwh - 10) < 1e-9); // après déphasage
+  assert.ok(Math.abs(results[1].deltaKwh - 10) < 1e-9);        // gain du levier
+  // batterie capacité 0 ne change rien de plus
+  assert.ok(Math.abs(results[2].deltaKwh - 0) < 1e-9);
+});
+
+test('runScenarios — étape absorb expose absorbedKwh', () => {
+  const baseline = [0, 1, 0];
+  const prod     = [0, 5, 0];
+  const hw = new Array(24).fill(0); hw[1] = 1;
+  const results = runScenarios({
+    baselineConso: baseline,
+    prodHourly: prod,
+    steps: [{ type: 'absorb', key: 'pool', label: 'PAC piscine', hourWeights: hw, maxKwhPerHour: 10 }],
+  });
+  assert.ok(Math.abs(results[1].absorbedKwh - 4) < 1e-9);
 });
