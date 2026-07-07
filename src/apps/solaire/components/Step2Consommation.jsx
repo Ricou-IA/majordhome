@@ -1,18 +1,19 @@
 // src/apps/solaire/components/Step2Consommation.jsx
-// Étape 2 du wizard : 12 consommations mensuelles, prix kWh, profil de
-// présence, bloc optionnel véhicule électrique (spec §3 et §8.6).
+// Étape 2 du wizard : profil de consommation (RES1/RES2), 12 consommations
+// mensuelles, prix kWh, bloc optionnel véhicule électrique. Le profil pilote le
+// talon horaire du constat d'autoconso (moteur horaire) ET la répartition
+// « depuis l'annuel ». (Les cartes « présence » + coefficient de simultanéité ont
+// été retirées à la bascule horaire du 2026-07-07.)
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Wand2, Car, ChevronDown, ChevronUp } from 'lucide-react';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
-import { spreadAnnualToMonthly, evMonthlyConsumption } from '../lib/pvEngine';
+import { evMonthlyConsumption } from '../lib/pvEngine';
+import { monthlyFromHourly } from '../lib/autoconsoEngine';
+import { CONSO_PROFILES, consoProfileHourly } from '../data';
 
 const MONTH_LABELS = ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
 
-const PRESETS = [
-  { key: 'presence_journee', label: 'Présence en journée', hint: 'Retraités, télétravail' },
-  { key: 'presence_partielle', label: 'Présence partielle', hint: 'Le plus courant' },
-  { key: 'absent_journee', label: 'Absent en journée', hint: 'Actifs hors domicile' },
-];
+const PROFILE_LIST = [CONSO_PROFILES.RES1, CONSO_PROFILES.RES2];
 
 export default function Step2Consommation({ conso, ev, config, onConso, onEv, onBack, onNext }) {
   const [annualInput, setAnnualInput] = useState('');
@@ -24,10 +25,13 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
     onConso({ monthly });
   };
 
+  // Répartit l'annuel selon la silhouette mensuelle du profil sélectionné (Σ des
+  // poids = 1, dérivée du talon Enedis RES1/RES2) — plus fidèle qu'un profil générique.
   const applySpread = () => {
     const total = Number(annualInput);
     if (!Number.isFinite(total) || total <= 0) return;
-    onConso({ monthly: spreadAnnualToMonthly(total).map((v) => Math.round(v)) });
+    const shares = monthlyFromHourly(consoProfileHourly(conso.profile)); // Σ = 1
+    onConso({ monthly: shares.map((w) => Math.round(total * w)) });
     setShowSpread(false);
     setAnnualInput('');
   };
@@ -102,7 +106,7 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
         </div>
       </div>
 
-      {/* Prix kWh + présence */}
+      {/* Prix kWh + profil de consommation */}
       <div className="card space-y-4">
         <FormField label="Prix actuel du kWh (€ TTC)">
           <input
@@ -119,14 +123,14 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
           />
         </FormField>
 
-        <FormField label="Profil de présence">
-          <div className="grid sm:grid-cols-3 gap-2">
-            {PRESETS.map((p) => (
+        <FormField label="Profil de consommation">
+          <div className="grid sm:grid-cols-2 gap-2">
+            {PROFILE_LIST.map((p) => (
               <button
                 key={p.key}
-                onClick={() => onConso({ preset: p.key })}
+                onClick={() => onConso({ profile: p.key })}
                 className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                  conso.preset === p.key
+                  conso.profile === p.key
                     ? 'border-primary-600 bg-primary-50 text-primary-800'
                     : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
                 }`}
@@ -136,17 +140,11 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
               </button>
             ))}
           </div>
+          <p className="text-xs text-secondary-500 mt-2">
+            Détermine la silhouette horaire de la consommation (talon Enedis) utilisée pour
+            estimer votre autoconsommation réelle. Un foyer chauffé en électrique consomme beaucoup plus en hiver.
+          </p>
         </FormField>
-
-        <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
-          <input
-            type="checkbox"
-            className="rounded border-secondary-300"
-            checked={conso.ecsBonus}
-            onChange={(e) => onConso({ ecsBonus: e.target.checked })}
-          />
-          Pilotage ECS / domotique (+{Math.round(config.simultaneity.bonus_ecs * 100)} % de simultanéité)
-        </label>
       </div>
 
       {/* Bloc VE repliable */}
@@ -202,16 +200,6 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
                 />
               </FormField>
             </div>
-
-            <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
-              <input
-                type="checkbox"
-                className="rounded border-secondary-300"
-                checked={ev.pilotedCharge}
-                onChange={(e) => onEv({ pilotedCharge: e.target.checked })}
-              />
-              Recharge pilotée en journée (+{Math.round(config.simultaneity.bonus_ve * 100)} % de simultanéité)
-            </label>
 
             <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
               <input

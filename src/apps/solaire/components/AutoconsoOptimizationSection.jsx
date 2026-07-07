@@ -11,7 +11,7 @@ import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, Al
 import { PV_COLORS } from '../lib/palette';
 import { buildAutoconsoModel } from '../lib/autoconsoModel';
 import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
-import { enedisProfile, pvgisExample } from '../data';
+import { pvgisExample } from '../data';
 
 const CASCADE_LABELS = {
   constat: 'Constat', behavior: 'Comportement', piloted_ecs: 'Piloté ECS',
@@ -79,7 +79,7 @@ function Toggle({ label, icon: Icon, active, onClick }) {
   );
 }
 
-export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeKwc, ev }) {
+export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeKwc, ev, baseShape }) {
   const [open, setOpen] = useState(false);
   const [persons, setPersons] = useState(3);
   const [veBattery, setVeBattery] = useState(60);
@@ -99,9 +99,9 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
       pacAnnualKwh: pacKwh,
     },
     monthlyConsoTotals: consoMonthly,
-    baseShape: enedisProfile.hourly,
+    baseShape,
     prodHourly,
-  }), [persons, veBattery, pool, clim, pacKwh, ev, consoMonthly, prodHourly]);
+  }), [persons, veBattery, pool, clim, pacKwh, ev, consoMonthly, prodHourly, baseShape]);
 
   const cascade = batteryOn ? model.cascade : model.cascade.filter((r) => r.key !== 'battery');
   const final = cascade[cascade.length - 1];

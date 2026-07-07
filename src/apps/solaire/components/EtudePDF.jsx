@@ -221,7 +221,7 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
               <Field label="Véhicule électrique" value={`+ ${kwh(model.evAnnual)}/an (${fmtInt(ev.kmPerYear)} km, ${numStr(ev.kwhPer100km)} kWh/100 km)`} />
             )}
             <Field label="Prix du kWh" value={`${numStr(model.priceKwh)} € TTC`} />
-            <Field label="Consommation type" value="Profil foyer Enedis calé sur vos 12 mois (calcul horaire)" />
+            <Field label="Consommation type" value={`Foyer ${conso.profile === 'RES2' ? 'avec' : 'sans'} chauffage électrique (talon Enedis horaire)`} />
             <Field label="Projection" value={`${config.horizon_years} ans · inflation élec +${numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an · dégradation -${numStr(config.degradation_rate * 100)} %/an`} />
           </View>
         </View>

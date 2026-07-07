@@ -13,7 +13,7 @@ import FinancingModule from './FinancingModule';
 import TableauAnnuel from './TableauAnnuel';
 import SaveSimulationModal from './SaveSimulationModal';
 import AutoconsoOptimizationSection from './AutoconsoOptimizationSection';
-import { enedisProfile, pvgisExample } from '../data';
+import { consoProfileHourly, pvgisExample } from '../data';
 
 export default function Step3Resultats({
   state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing,
@@ -23,12 +23,13 @@ export default function Step3Resultats({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
 
+  const baseShape = consoProfileHourly(conso.profile);
   const model = useMemo(
     () => buildEtudeModel({
       roof, conso, ev, financing, selectedKwc, pvgis, config,
-      prodShape: pvgisExample.hourly, baseShape: enedisProfile.hourly,
+      prodShape: pvgisExample.hourly, baseShape,
     }),
-    [roof, conso, ev, financing, selectedKwc, pvgis, config],
+    [roof, conso, ev, financing, selectedKwc, pvgis, config, baseShape],
   );
 
   // --- États PVGIS (critère #7 : jamais d'écran blanc) ---
@@ -139,7 +140,7 @@ export default function Step3Resultats({
       <MonthlyChart monthly={model.active} consoMonthly={model.consoMonthly} />
 
       {/* Optimisation autoconsommation — moteur horaire (additif, n'altère pas buildEtudeModel) */}
-      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} />
+      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
 
       {/* Financement */}
       <FinancingModule
