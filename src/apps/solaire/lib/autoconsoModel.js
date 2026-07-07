@@ -13,7 +13,7 @@
 // RÈGLE : surplus jamais valorisé en € (import évité / confort).
 // Déphasage BORNÉ À LA JOURNÉE (applySolarShift, corrigé 2026-07-07) : pas de report
 // d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
-import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, reconcileMonthly, distributeDeviceLoad } from './autoconsoEngine.js';
+import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, reconcileMonthly, distributeDeviceLoad, monthlyEnergyBreakdown } from './autoconsoEngine.js';
 import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, CLIM_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from './usageProfiles.js';
 import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift } from './scenarios.js';
 
@@ -225,6 +225,10 @@ function buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly
   }
 
   const fluxNoBat = sc(conso);
+  const batteryCapacity = levers.battery ? battery.recommendedCapacityKwh : 0;
+  // Graphe mensuel « qui bouge » : ventilation de l'état optimisé COURANT (leviers +
+  // batterie), pour la démo client (les barres autoconso montent quand on toggle).
+  const monthly = monthlyEnergyBreakdown({ prodHourly, consoHourly: conso, capacityKwh: batteryCapacity, roundTripEfficiency: cascade.batteryEfficiency });
   return {
     baseline: metrics(scBase),
     cascade: rows,
@@ -238,6 +242,14 @@ function buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly
       directKwh: battResult.selfConsumedDirectKwh, fromBatteryKwh: battResult.selfConsumedFromBatteryKwh,
       chargedKwh: battResult.chargedKwh, exportedKwh: battResult.exportedKwh, importedKwh: battResult.importedKwh,
     } : null,
+    monthly,
+    // Courbe de charge journée-type (24 h) : production, conso ACTUELLE (talon) et
+    // conso OPTIMISÉE — le client voit sa conso glisser sous la cloche solaire.
+    dayCurves: {
+      prod: dayTypeFromHourly(prodHourly),
+      consoBaseline: dayTypeFromHourly(talon),
+      conso: dayTypeFromHourly(conso),
+    },
     byDevice: {},
     warnings: [],
     annualByMonth: monthlyFromHourly(talon),

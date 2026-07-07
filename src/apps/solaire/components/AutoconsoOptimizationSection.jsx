@@ -4,7 +4,7 @@
 // le wizard a déjà : conso mensuelle (ancres) + prod (e_m réel × forme Gaillac).
 import { useState, useMemo } from 'react';
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   Sankey, Layer, Rectangle,
 } from 'recharts';
 import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle, Droplets, Car } from 'lucide-react';
@@ -17,6 +17,7 @@ const CASCADE_LABELS = {
   constat: 'Constat', pilotage_ecs: 'Pilotage ECS',
   ve_weekend: 'VE week-end', pool: 'Piscine', clim: 'Clim', battery: 'Batterie',
 };
+const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const NODE_COLORS = {
   Solaire: PV_COLORS.production, Réseau: PV_COLORS.surplus,
   Batterie: PV_COLORS.autoconso, Maison: PV_COLORS.conso, Surplus: PV_COLORS.surplus,
@@ -112,6 +113,22 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
     autoconso: +(r.autoconsoRate * 100).toFixed(1),
     couverture: +(r.autoproductionRate * 100).toFixed(1),
   }));
+
+  // Graphe mensuel « qui bouge » avec les toggles (démo client) : production /
+  // autoconsommée / surplus de l'état optimisé courant.
+  const monthlyData = model.monthly.prod.map((p, i) => ({
+    label: MONTH_LABELS[i],
+    production: Math.round(p),
+    autoconso: Math.round(model.monthly.selfConsumed[i]),
+    surplus: Math.round(model.monthly.surplus[i]),
+  }));
+  // Courbe de charge journée-type (24 h) : production + conso actuelle vs optimisée.
+  const dayData = model.dayCurves.prod.map((p, h) => ({
+    h: `${h}h`,
+    production: +p.toFixed(2),
+    actuelle: +model.dayCurves.consoBaseline[h].toFixed(2),
+    optimisee: +model.dayCurves.conso[h].toFixed(2),
+  }));
   // Sankey. Batterie : nœud tampon ÉQUILIBRÉ (entrée = sortie = énergie restituée) ;
   // les pertes (rendement η + reliquat SOC) sont fondues dans le puits « Surplus ».
   const flux = batteryOn ? model.batteryFlux : model.flux;
@@ -197,6 +214,43 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
                 <div className="text-xs text-secondary-600">Couverture des besoins</div>
                 <div className="text-2xl font-semibold" style={{ color: PV_COLORS.production }}>{(final.autoproductionRate * 100).toFixed(0)} %</div>
               </div>
+            </div>
+
+            {/* Graphe mensuel qui BOUGE avec les toggles (démo directe client) */}
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-1">
+                Production vs autoconsommation <span className="text-xs font-normal text-secondary-500">(bouge avec les optimisations)</span>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={monthlyData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v, n) => [`${v} kWh`, n]} />
+                  <Bar dataKey="production" name="Production" fill={PV_COLORS.production} radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="autoconso" name="Autoconsommée" fill={PV_COLORS.autoconso} radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="surplus" name="Surplus" fill={PV_COLORS.surplus} radius={[2, 2, 0, 0]} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Courbe de charge journée-type : la conso glisse sous la cloche solaire */}
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-1">
+                Journée-type <span className="text-xs font-normal text-secondary-500">(la conso se cale sous le soleil)</span>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={dayData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="h" tick={{ fontSize: 9 }} interval={2} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v, n) => [`${v} kWh`, n]} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Area dataKey="production" name="Production solaire" fill={PV_COLORS.production} stroke={PV_COLORS.production} fillOpacity={0.35} />
+                  <Line dataKey="actuelle" name="Conso actuelle" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+                  <Line dataKey="optimisee" name="Conso optimisée" stroke={PV_COLORS.blueMid} strokeWidth={2} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
 
             <div>

@@ -331,6 +331,54 @@ export function aggregateMonthlyFromHourly({ prodHourly, consoHourly }) {
 }
 
 /**
+ * Ventilation énergétique MENSUELLE (12) BATTERIE-AWARE, en une seule passe horaire :
+ * { prod, conso, selfConsumed, surplus, imported } par mois + totals. `selfConsumed`
+ * inclut l'autoconso directe (Σ min) ET la restitution batterie ; `surplus` = export
+ * réseau (après charge batterie) ; `imported` = manque tiré du réseau. `capacityKwh=0`
+ * ⇒ pas de batterie (≡ aggregateMonthlyFromHourly côté autoconso directe). La simu
+ * batterie est NON cyclique (soc=0 en h0) comme simulateBattery. Alimente le graphe
+ * mensuel « qui bouge » de la section optimisation.
+ */
+export function monthlyEnergyBreakdown({ prodHourly, consoHourly, capacityKwh = 0, roundTripEfficiency = 0.9 }) {
+  if (prodHourly.length !== consoHourly.length) {
+    throw new Error('monthlyEnergyBreakdown : longueurs prod/conso différentes');
+  }
+  const prod = new Array(12).fill(0);
+  const conso = new Array(12).fill(0);
+  const selfConsumed = new Array(12).fill(0);
+  const surplus = new Array(12).fill(0);
+  const imported = new Array(12).fill(0);
+  const eta = roundTripEfficiency;
+  let soc = 0;
+  for (let h = 0; h < prodHourly.length; h++) {
+    const m = hourToDate(h).month;
+    const p = prodHourly[h];
+    const c = consoHourly[h];
+    prod[m] += p;
+    conso[m] += c;
+    selfConsumed[m] += Math.min(p, c); // autoconso directe
+    const net = p - c;
+    if (net > 0) {
+      const accepted = Math.min(net, capacityKwh - soc);
+      soc += accepted;
+      surplus[m] += net - accepted; // export réseau
+    } else if (net < 0) {
+      const need = -net;
+      const drawn = Math.min(need / eta, soc);
+      const delivered = drawn * eta;
+      soc -= drawn;
+      selfConsumed[m] += delivered; // restitution batterie
+      imported[m] += need - delivered;
+    }
+  }
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  return {
+    prod, conso, selfConsumed, surplus, imported,
+    totals: { prod: sum(prod), conso: sum(conso), selfConsumed: sum(selfConsumed), surplus: sum(surplus), imported: sum(imported) },
+  };
+}
+
+/**
  * Énergie mensuelle (12) cumulée d'une liste de devices. Sert à composer une conso
  * totale COHÉRENTE = base foyer + usages (au lieu d'un total qui contredirait les usages).
  */

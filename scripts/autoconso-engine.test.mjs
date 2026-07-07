@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh, hourlyProdFromMonthly, aggregateMonthlyFromHourly } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh, hourlyProdFromMonthly, aggregateMonthlyFromHourly, monthlyEnergyBreakdown } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourlyProdFromMonthly — distribue le mensuel réel par la forme, total mensuel exact', () => {
   const shape = new Array(8760).fill(1); // forme plate
@@ -61,6 +61,36 @@ test('aggregateMonthlyFromHourly — décalage temporel : prod midi vs conso nui
 
 test('aggregateMonthlyFromHourly — longueurs différentes → throw', () => {
   assert.throws(() => aggregateMonthlyFromHourly({ prodHourly: [1, 2], consoHourly: [1] }));
+});
+
+test('monthlyEnergyBreakdown — sans batterie ≡ aggregateMonthlyFromHourly (autoconso directe)', () => {
+  const prodHourly = new Array(8760).fill(0);
+  for (let h = 0; h < 8760; h++) if (h % 24 >= 11 && h % 24 <= 14) prodHourly[h] = 3; // midi
+  const consoHourly = new Array(8760).fill(1);
+  const agg = aggregateMonthlyFromHourly({ prodHourly, consoHourly });
+  const brk = monthlyEnergyBreakdown({ prodHourly, consoHourly, capacityKwh: 0 });
+  for (let m = 0; m < 12; m++) {
+    assert.ok(Math.abs(brk.selfConsumed[m] - agg.autoconso[m]) < 1e-6);
+    assert.ok(Math.abs(brk.prod[m] - agg.prod[m]) < 1e-6);
+    assert.ok(Math.abs(brk.surplus[m] - agg.surplus[m]) < 1e-6); // surplus = export
+  }
+});
+
+test('monthlyEnergyBreakdown — batterie ↑ autoconso, ↓ import (surplus stocké restitué)', () => {
+  // prod midi (surplus), conso soir (déficit) → sans batterie 0 autoconso, avec batterie ↑
+  const prodHourly = new Array(8760).fill(0);
+  const consoHourly = new Array(8760).fill(0);
+  for (let h = 0; h < 8760; h++) {
+    const hod = h % 24;
+    if (hod >= 11 && hod <= 14) prodHourly[h] = 2;
+    if (hod >= 19 && hod <= 21) consoHourly[h] = 2;
+  }
+  const noBat = monthlyEnergyBreakdown({ prodHourly, consoHourly, capacityKwh: 0 });
+  const withBat = monthlyEnergyBreakdown({ prodHourly, consoHourly, capacityKwh: 10, roundTripEfficiency: 0.9 });
+  assert.ok(withBat.totals.selfConsumed > noBat.totals.selfConsumed);
+  assert.ok(withBat.totals.imported < noBat.totals.imported);
+  // conservation : selfConsumed + imported = conso ; selfConsumed(direct) + surplus + pertes = prod
+  assert.ok(Math.abs(withBat.totals.selfConsumed + withBat.totals.imported - withBat.totals.conso) < 1);
 });
 
 test('devicesMonthlyKwh — somme mensuelle des devices, énergie conservée', () => {
