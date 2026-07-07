@@ -3,7 +3,7 @@
 // Run : node --test scripts/usage-profiles.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS } from '../src/apps/solaire/lib/usageProfiles.js';
+import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS, poolDevice, POOL_HOURS, POOL_SEASON_WEIGHTS, DAYS_IN_MONTH } from '../src/apps/solaire/lib/usageProfiles.js';
 import { distributeDeviceLoad, hourToDate } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hoursMask — 1 sur les heures listées, 0 sinon', () => {
@@ -50,4 +50,17 @@ test('veDevice — énergie depuis le kilométrage, charge nuit', () => {
   assert.ok(Math.abs(dev.annualKwh - (15000 * 18 / 100) * 0.9) < 1e-9); // 2430
   assert.deepEqual(dev.hourOfDayWeights, hoursMask(VE_NIGHT_HOURS));
   assert.deepEqual(dev.monthWeights, new Array(12).fill(1)); // uniforme
+});
+
+test('poolDevice — pompe midi, saisonnier, énergie conservée', () => {
+  const dev = poolDevice({}); // défauts 0.8 kW × 8 h
+  assert.equal(dev.name, 'piscine');
+  assert.deepEqual(dev.hourOfDayWeights, hoursMask(POOL_HOURS));
+  // juin (index 5, saison=1) : E_jour = 0.8 × 8 × 1 = 6.4 kWh/jour
+  assert.ok(Math.abs(dev.monthWeights[5] - 6.4) < 1e-9);
+  // janvier hors saison = 0
+  assert.equal(dev.monthWeights[0], 0);
+  // annualKwh = Σ E_jour(m) × jours(m)
+  const expected = POOL_SEASON_WEIGHTS.reduce((s, w, m) => s + (0.8 * 8 * w) * DAYS_IN_MONTH[m], 0);
+  assert.ok(Math.abs(dev.annualKwh - expected) < 1e-6);
 });

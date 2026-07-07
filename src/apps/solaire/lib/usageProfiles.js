@@ -63,3 +63,22 @@ export function veDevice({ kmPerYear, kwhPer100km = 18, homeChargeShare = 0.9 })
     monthWeights: new Array(12).fill(1),
   };
 }
+
+/** Saison piscine par défaut (poids relatifs/jour, avril→oct, pic été). Validé Eric. */
+export const POOL_SEASON_WEIGHTS = [0, 0, 0, 0.2, 0.5, 1, 1, 1, 0.6, 0.2, 0, 0];
+
+/**
+ * Device piscine : pompe de filtration, fenêtre midi, saisonnier.
+ * monthWeights[m] = pumpKw × hoursPerDay × seasonWeights[m] (énergie/jour) ;
+ * annualKwh = Σ (pumpKw × hoursPerDay × seasonWeights[m]) × jours(m).
+ */
+export function poolDevice({ pumpKw = 0.8, hoursPerDay = 8, seasonWeights = POOL_SEASON_WEIGHTS }) {
+  const dailyByMonth = seasonWeights.map((s) => pumpKw * hoursPerDay * s);
+  const annualKwh = dailyByMonth.reduce((sum, e, m) => sum + e * DAYS_IN_MONTH[m], 0);
+  return {
+    name: 'piscine',
+    annualKwh,
+    hourOfDayWeights: hoursMask(POOL_HOURS),
+    monthWeights: dailyByMonth,
+  };
+}
