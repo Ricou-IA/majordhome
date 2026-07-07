@@ -4,27 +4,32 @@
 // rechargé) — garantit des chiffres strictement identiques partout.
 // PUR : aucun import React/Supabase (testé via node --test).
 import {
-  computeMonthly, yearlyEconomy, monthlyPayment, buildYearlyTable,
+  yearlyEconomy, monthlyPayment, buildYearlyTable,
   optimize, buildScenarios, defaultScenarioKwc, costFromGrid, maxPowerKwc, panelsCount,
-  simultaneityCoeff, evMonthlyConsumption,
+  evMonthlyConsumption,
 } from './pvEngine.js';
-
-export const PRESET_LABELS = {
-  presence_journee: 'Présence en journée',
-  presence_partielle: 'Présence partielle',
-  absent_journee: 'Absent en journée',
-};
+import {
+  reconcileMonthly, hourlyProdFromMonthly, aggregateMonthlyFromHourly,
+} from './autoconsoEngine.js';
 
 /** Note de prudence affichée à côté du point mort (UI + PDF). Le taux
- * d'autoconsommation est une HYPOTHÈSE déclarative (presets simultanéité),
- * pas une mesure — il sera calibré avec les relevés réels à l'usage. */
-export const NATIONAL_AUTOCONSO_BENCHMARK = 'hypothèse prudente, à confirmer par les relevés réels la première année';
+ * d'autoconsommation vient du moteur horaire (Σ min(prod, conso) sur 8760 h) mais
+ * repose sur une conso type (talon Enedis calé sur les 12 factures) — il sera
+ * affiné avec les relevés réels à l'usage. */
+export const NATIONAL_AUTOCONSO_BENCHMARK = 'estimation horaire prudente, à confirmer par les relevés réels la première année';
 
 /**
  * Construit le modèle complet d'une étude depuis les saisies + PVGIS + config.
  * Retourne null si les données sont incomplètes (pas de PVGIS, toiture < 1 panneau).
+ *
+ * Autoconsommation = MOTEUR HORAIRE (bascule 2026-07-07, remplace le coefficient
+ * de simultanéité) : la production mensuelle réelle (pvgis.e_m × kWc) est étalée
+ * sur 8760 h par `prodShape` (forme diurne de référence), la conso par mois (les
+ * 12 ancres) est étalée par `baseShape` (talon Enedis), puis autoconso = Σ des
+ * heures de min(prod, conso). `prodShape`/`baseShape` sont des formes horaires 8760
+ * passées par l'appelant (fixtures bundlées) — le module reste pur/testable.
  */
-export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis, config }) {
+export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis, config, prodShape, baseShape }) {
   if (!pvgis?.e_m) return null;
 
   // --- Conso effective (+ VE linéarisé AVANT l'optimiseur, spec §8.6) ---
@@ -37,25 +42,14 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     : 0;
   const consoMonthly = conso.monthly.map((v) => (Number(v) || 0) + evMonthly);
 
-  const coeff = simultaneityCoeff(
-    { preset: conso.preset, ecsBonus: conso.ecsBonus, evBonus: ev.enabled && ev.pilotedCharge },
-    config.simultaneity,
-  );
-
-  // Décomposition du coefficient (transparence du résultat, UI + PDF)
-  const coeffParts = {
-    preset: conso.preset,
-    presetValue: config.simultaneity[conso.preset] ?? config.simultaneity.presence_partielle,
-    ecsApplied: Boolean(conso.ecsBonus),
-    evApplied: Boolean(ev.enabled && ev.pilotedCharge),
-    bonusEcs: config.simultaneity.bonus_ecs,
-    bonusVe: config.simultaneity.bonus_ve,
-    cap: config.simultaneity.cap,
-  };
-  coeffParts.rawSum = coeffParts.presetValue
-    + (coeffParts.ecsApplied ? coeffParts.bonusEcs : 0)
-    + (coeffParts.evApplied ? coeffParts.bonusVe : 0);
-  coeffParts.capped = coeffParts.rawSum > coeffParts.cap + 1e-9;
+  // Conso horaire = talon Enedis calé sur les 12 ancres mensuelles (constat = conso
+  // type AVANT PV ; la décomposition fine des usages vit dans l'étape Optimisation).
+  const consoHourly = reconcileMonthly({ hourlyShape: baseShape, monthlyTargets: consoMonthly });
+  // Autoconso mensuelle réelle pour une puissance donnée (forme computeMonthly).
+  const monthlyForKwc = (kwc) => aggregateMonthlyFromHourly({
+    prodHourly: hourlyProdFromMonthly(pvgis.e_m, kwc, prodShape),
+    consoHourly,
+  });
 
   const priceKwh = Number(conso.priceKwh) || 0;
   const rate = typeof financing.rate === 'number' ? financing.rate : NaN;
@@ -78,7 +72,7 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   });
 
   const scenarios = buildScenarios({ recommendedKwc, maxKwc }).map((s) => {
-    const m = computeMonthly({ eM1kwc: pvgis.e_m, powerKwc: s.kwc, consoMonthly, coeff });
+    const m = monthlyForKwc(s.kwc);
     const economyYear1 = yearlyEconomy({
       autoconsoAnnual: m.totals.autoconso, priceKwh,
       inflationRate: config.inflation_rate, degradationRate: config.degradation_rate, yearN: 1,
@@ -109,13 +103,7 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   // choix explicite (selectedKwc) présent dans les scénarios prime.
   const defaultKwc = defaultScenarioKwc({ scenarios, recommendedKwc });
   const activeKwc = scenarios.some((s) => s.kwc === selectedKwc) ? selectedKwc : defaultKwc;
-  const active = computeMonthly({ eM1kwc: pvgis.e_m, powerKwc: activeKwc, consoMonthly, coeff });
-
-  // Recouvrement mensuel théorique (avant coefficient) : autoconso = Σ min × coeff
-  // → Σ min = autoconso / coeff. Affiché pour expliquer tauxAutoconso = recouvrement × coeff.
-  const overlapRatio = active.totals.prod > 0 && coeff > 0
-    ? active.totals.autoconso / coeff / active.totals.prod
-    : 0;
+  const active = monthlyForKwc(activeKwc);
 
   const gridCost = costFromGrid(config.cost_grid, activeKwc);
   const baseCost = financing.manualCost ?? (gridCost !== null ? Math.round(gridCost) : null);
@@ -146,8 +134,6 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   const breakEvenAutoconsoRate = table && active.totals.prod > 0 && priceKwh > 0
     ? table.rows[0].annuity / (active.totals.prod * priceKwh)
     : null;
-  // Plafond comportemental : recouvrement × coefficient max (pilotage parfait)
-  const maxAchievableAutoconso = overlapRatio * coeffParts.cap;
   // Type ROCE — rendement de l'actif : économie ÷ coût total, indépendant du financement
   const assetYieldYear1 = totalCost ? economyYear1 / totalCost : null;
   let horizonEconomies = 0;
@@ -165,18 +151,11 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     ? (economyYear1 - table.rows[0].annuity) / deposit
     : null;
   const fullCredit = financingOk && deposit === 0;
-  // Objectif pilotage : delta entre l'autoconso actuelle et le plafond
-  // atteignable, exprimé en points ET en €/an (vulgarisation Eric 2026-06-11)
-  const pilotageDeltaPoints = Math.max(0, Math.round((maxAchievableAutoconso - active.totals.tauxAutoconso) * 100));
-  const pilotageDeltaEuros = pilotageDeltaPoints * sensitivityPerAutoconsoPoint;
 
   return {
     evMonthly,
     evAnnual: Math.round(evMonthly * 12),
     consoMonthly,
-    coeff,
-    coeffParts,
-    overlapRatio,
     priceKwh,
     rate,
     years,
@@ -201,13 +180,10 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     table,
     sensitivityPerAutoconsoPoint,
     breakEvenAutoconsoRate,
-    maxAchievableAutoconso,
     assetYieldYear1,
     assetYieldAvg,
     netGainYear1,
     equityYieldYear1,
     fullCredit,
-    pilotageDeltaPoints,
-    pilotageDeltaEuros,
   };
 }

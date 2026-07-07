@@ -16,6 +16,7 @@ import { formatDateShortFR, formatDateFR, formatEuro } from '@lib/utils';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { buildPvConfig } from '../lib/pvConfig';
 import { buildEtudeModel } from '../lib/etudeModel';
+import { enedisProfile, pvgisExample } from '../data';
 import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
 import { generateEtudePdfBlob } from '../components/EtudePDF';
 
@@ -51,6 +52,7 @@ export default function Historique() {
         selectedKwc: sim.inputs.selectedKwc ?? null,
         pvgis: sim.pvgis_monthly,
         config,
+        prodShape: pvgisExample.hourly, baseShape: enedisProfile.hourly,
       });
       if (!model) throw new Error('Données incomplètes');
       const inputs = { roof: sim.inputs.roof, conso: sim.inputs.conso, ev: sim.inputs.ev };

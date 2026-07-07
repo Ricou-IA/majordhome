@@ -13,6 +13,7 @@ import FinancingModule from './FinancingModule';
 import TableauAnnuel from './TableauAnnuel';
 import SaveSimulationModal from './SaveSimulationModal';
 import AutoconsoOptimizationSection from './AutoconsoOptimizationSection';
+import { enedisProfile, pvgisExample } from '../data';
 
 export default function Step3Resultats({
   state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing,
@@ -23,7 +24,10 @@ export default function Step3Resultats({
   const [showPdfModal, setShowPdfModal] = useState(false);
 
   const model = useMemo(
-    () => buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis, config }),
+    () => buildEtudeModel({
+      roof, conso, ev, financing, selectedKwc, pvgis, config,
+      prodShape: pvgisExample.hourly, baseShape: enedisProfile.hourly,
+    }),
     [roof, conso, ev, financing, selectedKwc, pvgis, config],
   );
 
@@ -119,7 +123,7 @@ export default function Step3Resultats({
       </div>
 
       {/* Transparence du calcul */}
-      <TransparencyPanel model={model} config={config} conso={conso} ev={ev} roof={roof} />
+      <TransparencyPanel model={model} config={config} roof={roof} />
 
       {/* Scénarios */}
       <ScenarioCards scenarios={model.scenarios} activeKwc={model.activeKwc} onSelect={onSelectKwc} />

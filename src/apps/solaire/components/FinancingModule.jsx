@@ -135,9 +135,7 @@ export default function FinancingModule({
                 {' '}— au-dessus, l'installation rapporte plus qu'elle ne coûte. Cette simulation : {pct(model.active.totals.tauxAutoconso)}
                 {model.active.totals.tauxAutoconso >= model.breakEvenAutoconsoRate
                   ? ', gain dès la première année'
-                  : model.maxAchievableAutoconso >= model.breakEvenAutoconsoRate
-                    ? ', atteignable avec un meilleur pilotage'
-                    : ', atteint plus tard avec la hausse du prix de l\'électricité'}
+                  : ', atteint plus tard avec la hausse du prix de l\'électricité'}
                 {' '}({NATIONAL_AUTOCONSO_BENCHMARK}).
               </li>
             )}
@@ -145,13 +143,7 @@ export default function FinancingModule({
               <span className="font-semibold text-secondary-900">
                 Chaque point d'autoconsommation gagné = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an.
               </span>
-            </li>
-            <li>
-              <span className="font-semibold text-secondary-900">Objectif : {pct(model.maxAchievableAutoconso)} d'autoconsommation</span>
-              {' '}avec un bon pilotage (ECS, recharges en journée)
-              {model.pilotageDeltaPoints > 0
-                ? <> — soit jusqu'à <span className="font-semibold text-secondary-900">+{model.pilotageDeltaPoints} points = +{formatEuro(Math.round(model.pilotageDeltaEuros))}/an</span> par rapport à aujourd'hui.</>
-                : ' — vous y êtes déjà.'}
+              {' '}— le pilotage et l'optimisation (voir « Optimiser l'autoconsommation ») font monter cette part.
             </li>
           </ul>
         </div>

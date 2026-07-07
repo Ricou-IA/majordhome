@@ -17,6 +17,7 @@ import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } f
 import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
 import { buildEtudeModel } from '../lib/etudeModel';
+import { enedisProfile, pvgisExample } from '../data';
 import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
 import { generateEtudePdfBlob } from '../components/EtudePDF';
 import Step1Localisation from '../components/Step1Localisation';
@@ -180,6 +181,7 @@ function SimulateurInner({ config, settings }) {
         roof: state.roof, conso: state.conso, ev: state.ev,
         financing: state.financing, selectedKwc: state.selectedKwc,
         pvgis: state.pvgis, config,
+        prodShape: pvgisExample.hourly, baseShape: enedisProfile.hourly,
       });
       if (!model) throw new Error('Données incomplètes');
       const inputs = { roof: state.roof, conso: state.conso, ev: state.ev };

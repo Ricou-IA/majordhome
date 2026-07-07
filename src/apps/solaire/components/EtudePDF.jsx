@@ -9,7 +9,7 @@
 import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer';
 import { formatFullAddress, buildLegalFooter } from '@lib/orgBranding';
 import { percentToDegrees } from '../lib/pvEngine';
-import { PRESET_LABELS, NATIONAL_AUTOCONSO_BENCHMARK } from '../lib/etudeModel';
+import { NATIONAL_AUTOCONSO_BENCHMARK } from '../lib/etudeModel';
 
 const C = {
   jaune: '#F5C542',
@@ -192,12 +192,6 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
   const others = model.scenarios.filter((sc) => sc.kwc !== model.activeKwc);
   const ind = model.table?.indicators ?? null;
   const effortLabel = (v) => (v <= 0 ? `Gain ${eur(Math.abs(v))}` : `Effort ${eur(v)}`);
-  const parts = model.coeffParts;
-  const coeffFormula = [
-    `${PRESET_LABELS[parts.preset] || parts.preset} (${pct(parts.presetValue)})`,
-    parts.ecsApplied ? `pilotage ECS (+${pct(parts.bonusEcs)})` : null,
-    parts.evApplied ? `recharge VE pilotée (+${pct(parts.bonusVe)})` : null,
-  ].filter(Boolean).join(' + ');
 
   return (
     <Document title={`Étude photovoltaïque — ${meta.clientName}`} author={company.name}>
@@ -227,7 +221,7 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
               <Field label="Véhicule électrique" value={`+ ${kwh(model.evAnnual)}/an (${fmtInt(ev.kmPerYear)} km, ${numStr(ev.kwhPer100km)} kWh/100 km)`} />
             )}
             <Field label="Prix du kWh" value={`${numStr(model.priceKwh)} € TTC`} />
-            <Field label="Profil de présence" value={`${PRESET_LABELS[conso.preset] || conso.preset}${conso.ecsBonus ? ' + pilotage ECS' : ''}${ev.enabled && ev.pilotedCharge ? ' + recharge VE pilotée' : ''}`} />
+            <Field label="Consommation type" value="Profil foyer Enedis calé sur vos 12 mois (calcul horaire)" />
             <Field label="Projection" value={`${config.horizon_years} ans · inflation élec +${numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an · dégradation -${numStr(config.degradation_rate * 100)} %/an`} />
           </View>
         </View>
@@ -272,19 +266,17 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
           lieu (pente {numStr(roof.tiltPercent)} % soit {numStr(tiltDeg)}°, orientation {typeof roof.orientation === 'number' ? `${roof.orientation}°` : String(roof.orientation)}, pertes {numStr(config.system_loss)} %) × {numStr(model.activeKwc)} kWc.
         </Text>
         <Text style={s.calcLine}>
-          2. <Text style={s.calcStrong}>Recouvrement mensuel : {pct(model.overlapRatio)}</Text> — part de la production
-          qui reste sous la consommation, mois par mois.
+          2. <Text style={s.calcStrong}>Superposition heure par heure</Text> — la production est confrontée à une
+          consommation type reconstituée heure par heure (profil de foyer Enedis calé sur vos 12 factures). Le solaire ne
+          compte que quand un besoin existe au même instant : on ne compare pas des totaux annuels.
         </Text>
         <Text style={s.calcLine}>
-          3. <Text style={s.calcStrong}>Coefficient de simultanéité : {pct(model.coeff)}</Text> = {coeffFormula}
-          {parts.capped ? `, plafonné à ${pct(parts.cap)}` : ''} — part du recouvrement réellement consommée au fil de la
-          journée (la production de 11h-16h doit coïncider avec les usages).
+          3. <Text style={s.calcStrong}>Autoconsommation : {pct(totals.tauxAutoconso)}</Text> = somme, sur les 8 760 heures
+          annuelles, de la production réellement consommée sur place, soit {kwh(totals.autoconso)} autoconsommés
+          ({pct(totals.tauxAutoproduction)} de la facture couverte).
         </Text>
         <Text style={s.calcLine}>
-          4. <Text style={s.calcStrong}>Autoconsommation : {pct(totals.tauxAutoconso)}</Text> = {pct(model.overlapRatio)} × {pct(model.coeff)}, soit {kwh(totals.autoconso)} autoconsommés ({pct(totals.tauxAutoproduction)} de la facture couverte).
-        </Text>
-        <Text style={s.calcLine}>
-          5. <Text style={s.calcStrong}>Économie an 1 : {eur(model.economyYear1)}</Text> = {kwh(totals.autoconso)} × {numStr(model.priceKwh)} €/kWh — le surplus ({kwh(totals.surplus)}) est valorisé 0 €.
+          4. <Text style={s.calcStrong}>Économie an 1 : {eur(model.economyYear1)}</Text> = {kwh(totals.autoconso)} × {numStr(model.priceKwh)} €/kWh — le surplus ({kwh(totals.surplus)}) est valorisé 0 €.
         </Text>
 
         <Text style={s.sectionTitle}>Production vs consommation (kWh/mois)</Text>
@@ -347,14 +339,8 @@ function EtudeDocument({ model, config, company, inputs, meta, annexLabels }) {
               </Text>
             )}
             <Text style={s.calcLine}>
-              • <Text style={s.calcStrong}>Chaque point d'autoconsommation gagné = +{eur(model.sensitivityPerAutoconsoPoint)}/an.</Text>
-            </Text>
-            <Text style={s.calcLine}>
-              • <Text style={s.calcStrong}>Objectif : {pct(model.maxAchievableAutoconso)} d'autoconsommation</Text> avec un bon
-              pilotage (ECS, recharges en journée)
-              {model.pilotageDeltaPoints > 0
-                ? <Text> — soit jusqu'à <Text style={s.calcStrong}>+{model.pilotageDeltaPoints} points = +{eur(model.pilotageDeltaEuros)}/an</Text> par rapport à aujourd'hui.</Text>
-                : ' — déjà atteint.'}
+              • <Text style={s.calcStrong}>Chaque point d'autoconsommation gagné = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> — le
+              pilotage (ballon d'eau chaude, recharges en journée) et l'optimisation font monter cette part au-delà du constat.
             </Text>
           </>
         )}

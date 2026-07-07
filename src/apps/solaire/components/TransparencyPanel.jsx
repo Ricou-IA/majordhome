@@ -1,27 +1,21 @@
 // src/apps/solaire/components/TransparencyPanel.jsx
 // « Comment ces chiffres sont calculés ? » — décompose le résultat pour la
-// transparence commerciale : production PVGIS → recouvrement mensuel →
-// coefficient de simultanéité (preset + bonus) → autoconsommation → économie.
+// transparence commerciale : production PVGIS → superposition horaire avec la
+// conso type (talon Enedis calé sur les 12 factures) → autoconsommation réelle
+// (Σ min(prod, conso) sur 8760 h) → économie. Le coefficient de simultanéité a
+// été remplacé par ce moteur horaire (bascule 2026-07-07).
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { formatEuro } from '@lib/utils';
-import { PRESET_LABELS } from '../lib/etudeModel';
 import { percentToDegrees } from '../lib/pvEngine';
 
 const pct = (x) => `${Math.round(x * 100)} %`;
 const kwh = (n) => `${Math.round(n).toLocaleString('fr-FR')} kWh`;
 
-export default function TransparencyPanel({ model, config, conso, ev, roof }) {
+export default function TransparencyPanel({ model, config, roof }) {
   const [open, setOpen] = useState(false);
   const t = model.active.totals;
-  const parts = model.coeffParts;
   const tiltDeg = Math.round(percentToDegrees(Number(roof.tiltPercent) || 0) * 10) / 10;
-
-  const coeffFormula = [
-    `${PRESET_LABELS[parts.preset] || parts.preset} (${pct(parts.presetValue)})`,
-    parts.ecsApplied ? `pilotage ECS (+${pct(parts.bonusEcs)})` : null,
-    parts.evApplied ? `recharge VE pilotée (+${pct(parts.bonusVe)})` : null,
-  ].filter(Boolean).join(' + ');
 
   return (
     <div className="card">
@@ -44,25 +38,25 @@ export default function TransparencyPanel({ model, config, conso, ev, roof }) {
             orientation {String(roof.orientation)}, pertes système {config.system_loss} %) × {model.activeKwc} kWc.
           </li>
           <li>
-            <span className="font-semibold text-secondary-900">Recouvrement mensuel : {pct(model.overlapRatio)}</span>
-            {' '}— part de la production qui reste sous la consommation, mois par mois
-            {model.overlapRatio >= 0.999 ? ' (aucun débordement structurel : tout est consommable)' : ' (le reste déborde les mois d\'été)'}.
-          </li>
-          <li>
-            <span className="font-semibold text-secondary-900">Coefficient de simultanéité : {pct(model.coeff)}</span>
-            {' '}= {coeffFormula}{parts.capped ? `, plafonné à ${pct(parts.cap)}` : ''}.
-            C'est la part du recouvrement réellement consommée au fil de la journée
-            (la production de 11h-16h doit coïncider avec vos usages).
+            <span className="font-semibold text-secondary-900">Superposition heure par heure</span>
+            {' '}— la production est confrontée à une consommation type reconstituée heure par heure
+            (profil de foyer Enedis calé sur vos 12 factures mensuelles). On ne compare pas des
+            totaux annuels : le solaire ne compte que quand un besoin existe au même instant.
           </li>
           <li>
             <span className="font-semibold text-secondary-900">Autoconsommation : {pct(t.tauxAutoconso)}</span>
-            {' '}= {pct(model.overlapRatio)} × {pct(model.coeff)} → <span className="font-semibold text-secondary-900">{kwh(t.autoconso)}</span> autoconsommés
+            {' '}= somme, sur les 8 760 heures annuelles, de la part de production réellement
+            consommée sur place → <span className="font-semibold text-secondary-900">{kwh(t.autoconso)}</span> autoconsommés
             ({pct(t.tauxAutoproduction)} de votre consommation couverte).
           </li>
           <li>
             <span className="font-semibold text-secondary-900">Économie an 1 : {formatEuro(Math.round(model.economyYear1))}</span>
             {' '}= {kwh(t.autoconso)} × {model.priceKwh.toLocaleString('fr-FR')} €/kWh.
             Le surplus ({kwh(t.surplus)}) est volontairement valorisé 0 €.
+          </li>
+          <li className="list-none text-xs text-secondary-500 pl-0">
+            Ce constat suppose vos habitudes actuelles. La section « Optimiser l'autoconsommation »
+            montre combien le pilotage (ballon, recharges en journée…) peut faire grimper cette part.
           </li>
         </ol>
       )}

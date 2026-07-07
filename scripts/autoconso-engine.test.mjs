@@ -4,7 +4,7 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh, hourlyProdFromMonthly } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend, devicesMonthlyKwh, hourlyProdFromMonthly, aggregateMonthlyFromHourly } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hourlyProdFromMonthly — distribue le mensuel réel par la forme, total mensuel exact', () => {
   const shape = new Array(8760).fill(1); // forme plate
@@ -16,6 +16,51 @@ test('hourlyProdFromMonthly — distribue le mensuel réel par la forme, total m
   for (let h = 0; h < 8760; h++) if (hourToDate(h).month === 0) jan += prod[h];
   assert.ok(Math.abs(jan - 600) < 1e-6);
   assert.ok(Math.abs(prod[0] - 600 / 744) < 1e-9); // forme plate → réparti sur les 744 h de janvier
+});
+
+test('aggregateMonthlyFromHourly — overlap horaire agrégé par mois, forme computeMonthly', () => {
+  // prod = 2 partout, conso = 1 partout → min = 1 chaque heure
+  const prodHourly = new Array(8760).fill(2);
+  const consoHourly = new Array(8760).fill(1);
+  const r = aggregateMonthlyFromHourly({ prodHourly, consoHourly });
+  assert.equal(r.prod.length, 12);
+  assert.equal(r.autoconso.length, 12);
+  assert.equal(r.surplus.length, 12);
+  assert.equal(r.conso.length, 12);
+  // janvier = 744 h : prod 1488, autoconso 744, surplus 744, conso 744
+  assert.ok(Math.abs(r.prod[0] - 1488) < 1e-6);
+  assert.ok(Math.abs(r.autoconso[0] - 744) < 1e-6);
+  assert.ok(Math.abs(r.surplus[0] - 744) < 1e-6);
+  assert.ok(Math.abs(r.conso[0] - 744) < 1e-6);
+  // totaux + taux
+  assert.ok(Math.abs(r.totals.prod - 17520) < 1e-6);
+  assert.ok(Math.abs(r.totals.autoconso - 8760) < 1e-6);
+  assert.ok(Math.abs(r.totals.conso - 8760) < 1e-6);
+  assert.ok(Math.abs(r.totals.surplus - 8760) < 1e-6);
+  assert.ok(Math.abs(r.totals.tauxAutoconso - 0.5) < 1e-9);
+  assert.ok(Math.abs(r.totals.tauxAutoproduction - 1) < 1e-9);
+  // cohérence avec computeSelfConsumption (même selfConsumed que Σ autoconso)
+  const sc = computeSelfConsumption({ prodHourly, consoHourly });
+  assert.ok(Math.abs(sc.selfConsumedKwh - r.totals.autoconso) < 1e-6);
+});
+
+test('aggregateMonthlyFromHourly — décalage temporel : prod midi vs conso nuit → autoconso partiel, borné au mois', () => {
+  // prod uniquement en janvier (744 premières heures), conso partout
+  const prodHourly = new Array(8760).fill(0);
+  for (let h = 0; h < 744; h++) prodHourly[h] = 3;
+  const consoHourly = new Array(8760).fill(1);
+  const r = aggregateMonthlyFromHourly({ prodHourly, consoHourly });
+  // janvier : min(3,1)=1 par heure → autoconso 744 ; prod 2232 ; surplus 1488
+  assert.ok(Math.abs(r.autoconso[0] - 744) < 1e-6);
+  assert.ok(Math.abs(r.prod[0] - 2232) < 1e-6);
+  assert.ok(Math.abs(r.surplus[0] - 1488) < 1e-6);
+  // février : pas de prod → autoconso 0
+  assert.ok(Math.abs(r.autoconso[1]) < 1e-9);
+  assert.ok(Math.abs(r.prod[1]) < 1e-9);
+});
+
+test('aggregateMonthlyFromHourly — longueurs différentes → throw', () => {
+  assert.throws(() => aggregateMonthlyFromHourly({ prodHourly: [1, 2], consoHourly: [1] }));
 });
 
 test('devicesMonthlyKwh — somme mensuelle des devices, énergie conservée', () => {

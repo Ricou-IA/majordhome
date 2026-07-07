@@ -295,6 +295,42 @@ export function hourlyProdFromMonthly(monthlyKwhPerKwc, kwc, hourlyShape) {
 }
 
 /**
+ * Agrège l'autoconsommation instantanée horaire (Σ min(prod, conso)) en une
+ * ventilation MENSUELLE (12) à la forme de `computeMonthly` du pvEngine :
+ * { prod[12], conso[12], autoconso[12], surplus[12], totals{…} }. C'est le pont
+ * entre le moteur horaire (autoconso réelle) et les consommateurs mensuels
+ * existants (graphe mensuel, financier). autoconso[m] = Σ des heures du mois de
+ * min(prod, conso) ; surplus[m] = prod[m] − autoconso[m] (jamais valorisé en €).
+ */
+export function aggregateMonthlyFromHourly({ prodHourly, consoHourly }) {
+  if (prodHourly.length !== consoHourly.length) {
+    throw new Error('aggregateMonthlyFromHourly : longueurs prod/conso différentes');
+  }
+  const prod = new Array(12).fill(0);
+  const conso = new Array(12).fill(0);
+  const autoconso = new Array(12).fill(0);
+  for (let h = 0; h < prodHourly.length; h++) {
+    const m = hourToDate(h).month;
+    const p = prodHourly[h];
+    const c = consoHourly[h];
+    prod[m] += p;
+    conso[m] += c;
+    autoconso[m] += Math.min(p, c);
+  }
+  const surplus = prod.map((p, m) => p - autoconso[m]);
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const totals = {
+    prod: sum(prod),
+    conso: sum(conso),
+    autoconso: sum(autoconso),
+    surplus: sum(surplus),
+  };
+  totals.tauxAutoconso = totals.prod > 0 ? totals.autoconso / totals.prod : 0;
+  totals.tauxAutoproduction = totals.conso > 0 ? totals.autoconso / totals.conso : 0;
+  return { prod, conso, autoconso, surplus, totals };
+}
+
+/**
  * Énergie mensuelle (12) cumulée d'une liste de devices. Sert à composer une conso
  * totale COHÉRENTE = base foyer + usages (au lieu d'un total qui contredirait les usages).
  */
