@@ -7,14 +7,14 @@ import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   Sankey, Layer, Rectangle,
 } from 'recharts';
-import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle, Droplets, Car } from 'lucide-react';
 import { PV_COLORS } from '../lib/palette';
 import { buildAutoconsoModel } from '../lib/autoconsoModel';
 import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
 import { pvgisExample } from '../data';
 
 const CASCADE_LABELS = {
-  constat: 'Constat', behavior: 'Comportement', piloted_ecs: 'Piloté ECS',
+  constat: 'Constat', pilotage_ecs: 'Pilotage ECS',
   ve_weekend: 'VE week-end', pool: 'Piscine', clim: 'Clim', battery: 'Batterie',
 };
 const NODE_COLORS = {
@@ -83,33 +83,37 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
   const [open, setOpen] = useState(false);
   const [persons, setPersons] = useState(3);
   const [veBattery, setVeBattery] = useState(60);
-  const [pacKwh, setPacKwh] = useState(0);
+  // Optimisations PROPOSÉES (toggles) — le constat s'affiche sans, on les active
+  // avec le client. La batterie est une catégorie à part (stockage, pas confort).
+  const [pilotageEcs, setPilotageEcs] = useState(false);
+  const [veWeekend, setVeWeekend] = useState(false);
   const [pool, setPool] = useState(false);
   const [clim, setClim] = useState(false);
-  const [batteryOn, setBatteryOn] = useState(true);
+  const [batteryOn, setBatteryOn] = useState(false);
 
+  const veActive = ev.enabled && veWeekend;
   const prodHourly = useMemo(() => hourlyProdFromMonthly(eM, activeKwc, pvgisExample.hourly), [eM, activeKwc]);
   const model = useMemo(() => buildAutoconsoModel({
     household: {
       persons,
       veKmPerYear: ev.enabled ? (Number(ev.kmPerYear) || 0) : 0,
       veBatteryKwh: veBattery,
-      pool: pool ? {} : undefined,
-      clim,
-      pacAnnualKwh: pacKwh,
     },
     monthlyConsoTotals: consoMonthly,
     baseShape,
     prodHourly,
-  }), [persons, veBattery, pool, clim, pacKwh, ev, consoMonthly, prodHourly, baseShape]);
+    levers: { pilotageEcs, veWeekend: veActive, pool, clim, battery: batteryOn },
+  }), [persons, veBattery, pilotageEcs, veActive, pool, clim, batteryOn, ev, consoMonthly, prodHourly, baseShape]);
 
-  const cascade = batteryOn ? model.cascade : model.cascade.filter((r) => r.key !== 'battery');
+  const cascade = model.cascade;
   const final = cascade[cascade.length - 1];
   const cascadeData = cascade.map((r) => ({
     label: CASCADE_LABELS[r.key] || r.key,
     autoconso: +(r.autoconsoRate * 100).toFixed(1),
     couverture: +(r.autoproductionRate * 100).toFixed(1),
   }));
+  // Sankey. Batterie : nœud tampon ÉQUILIBRÉ (entrée = sortie = énergie restituée) ;
+  // les pertes (rendement η + reliquat SOC) sont fondues dans le puits « Surplus ».
   const flux = batteryOn ? model.batteryFlux : model.flux;
   const sankeyData = buildSankey(
     batteryOn
@@ -118,9 +122,9 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
     batteryOn
       ? [
         { source: 0, target: 3, value: Math.round(flux.directKwh) },
-        { source: 0, target: 2, value: Math.round(flux.chargedKwh) },
+        { source: 0, target: 2, value: Math.round(flux.fromBatteryKwh) },
         { source: 2, target: 3, value: Math.round(flux.fromBatteryKwh) },
-        { source: 0, target: 4, value: Math.round(flux.exportedKwh) },
+        { source: 0, target: 4, value: Math.round(flux.exportedKwh + (flux.chargedKwh - flux.fromBatteryKwh)) },
         { source: 1, target: 3, value: Math.round(flux.importedKwh) },
       ]
       : [
@@ -141,18 +145,36 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
 
       {open && (
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-5">
-          {/* Réglages usages */}
+          {/* Réglages + optimisations proposées (toggles) */}
           <div className="space-y-4">
             <Slider label="Personnes" value={persons} min={1} max={6} onChange={setPersons} />
-            <Slider label="Chauffage PAC" value={pacKwh} min={0} max={8000} step={250} onChange={setPacKwh} suffix=" kWh/an" />
-            {ev.enabled && (
-              <Slider label="Batterie voiture" value={veBattery} min={20} max={100} step={5} onChange={setVeBattery} suffix=" kWh" />
-            )}
+
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-2">Optimisations à proposer</div>
+              <div className="flex flex-wrap gap-2">
+                <Toggle label="Pilotage ECS" icon={Droplets} active={pilotageEcs} onClick={() => setPilotageEcs(!pilotageEcs)} />
+                {ev.enabled && (
+                  <Toggle label="Recharge VE week-end" icon={Car} active={veWeekend} onClick={() => setVeWeekend(!veWeekend)} />
+                )}
+              </div>
+              {ev.enabled && veWeekend && (
+                <div className="mt-3">
+                  <Slider label="Batterie voiture" value={veBattery} min={20} max={100} step={5} onChange={setVeBattery} suffix=" kWh" />
+                </div>
+              )}
+            </div>
+
             <div>
               <div className="text-sm font-medium text-secondary-800 mb-2">Confort <span className="text-xs text-secondary-500">(le surplus le finance)</span></div>
               <div className="flex flex-wrap gap-2">
                 <Toggle label="Piscine" icon={Waves} active={pool} onClick={() => setPool(!pool)} />
                 <Toggle label="Clim été" icon={Snowflake} active={clim} onClick={() => setClim(!clim)} />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium text-secondary-800 mb-2">Stockage</div>
+              <div className="flex flex-wrap gap-2">
                 <Toggle label="Batterie" icon={BatteryCharging} active={batteryOn} onClick={() => setBatteryOn(!batteryOn)} />
               </div>
             </div>

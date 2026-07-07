@@ -13,7 +13,7 @@
 // RÈGLE : surplus jamais valorisé en € (import évité / confort).
 // Déphasage BORNÉ À LA JOURNÉE (applySolarShift, corrigé 2026-07-07) : pas de report
 // d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
-import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from './autoconsoEngine.js';
+import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, reconcileMonthly, distributeDeviceLoad } from './autoconsoEngine.js';
 import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, CLIM_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from './usageProfiles.js';
 import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift } from './scenarios.js';
 
@@ -68,7 +68,12 @@ export function buildDevices(household) {
  * Renvoie { baseline, cascade[], battery, byDevice, warnings, annualByMonth,
  *           dayTypeWinter, dayTypeSummer }.
  */
-export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, prodHourly, cascade = CASCADE_DEFAULTS }) {
+export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, prodHourly, cascade = CASCADE_DEFAULTS, levers }) {
+  // Mode « leviers » (wizard) : le CONSTAT = talon pur (identique au calculateur,
+  // aucune décomposition d'usage), et les optimisations sont des toggles activés
+  // avec le client. L'ECS n'est PAS dans le constat — c'est un levier proposé.
+  if (levers) return buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly, cascade, levers });
+
   const devices = buildDevices(household);
   const { hourly: baseline, byDevice, warnings } = buildLoadCurve({ monthlyConsoTotals, baseShape, devices });
 
@@ -148,5 +153,95 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
     annualByMonth: monthlyFromHourly(baseline),
     dayTypeWinter: dayTypeFromHourly(baseline, { months: cascade.winterMonths }),
     dayTypeSummer: dayTypeFromHourly(baseline, { months: cascade.summerMonths }),
+  };
+}
+
+/**
+ * Mode « leviers » (section optimisation du WIZARD).
+ * CONSTAT = talon pur (Σ min(prod, talon)) = strictement l'autoconso du calculateur
+ * (`buildEtudeModel`) → cohérence garantie entre les cartes et l'optimisation.
+ * Les optimisations sont des toggles proposés au client (`levers`), chacun ajoutant
+ * son gain marginal :
+ *  - `pilotageEcs` : routeur solaire sur le ballon (décale l'eau chaude vers midi).
+ *  - `veWeekend`   : recharge VE reportée sur le week-end en journée (si VE).
+ *  - `pool`/`clim` : confort financé par le surplus (absorbe le surplus, pas d'€).
+ *  - `battery`     : stockage — CATÉGORIE À PART, appliqué en dernier.
+ * Les courbes ECS/VE des leviers de déphasage sont BORNÉES au talon (on ne déplace
+ * que ce qui est réellement consommé à ces heures → jamais de conso négative).
+ */
+function buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly, cascade, levers }) {
+  const talon = reconcileMonthly({ hourlyShape: baseShape, monthlyTargets: monthlyConsoTotals });
+  const sc = (c) => computeSelfConsumption({ prodHourly, consoHourly: c });
+
+  const scBase = sc(talon);
+  const rows = [{ key: 'constat', label: "Constat (aujourd'hui)", ...metrics(scBase), deltaKwh: 0 }];
+  let conso = talon;
+  let prev = scBase.selfConsumedKwh;
+
+  if (levers.pilotageEcs) {
+    const ecsRaw = distributeDeviceLoad(ecsDevice({ persons: household.persons }));
+    const ecsCurve = ecsRaw.map((v, h) => Math.min(v, talon[h])); // borné au talon
+    conso = applySolarShift(conso, prodHourly, ecsCurve, { fraction: cascade.pilotedShiftFraction });
+    const s = sc(conso);
+    rows.push({ key: 'pilotage_ecs', label: 'Pilotage ECS', ...metrics(s), deltaKwh: s.selfConsumedKwh - prev });
+    prev = s.selfConsumedKwh;
+  }
+
+  if (levers.veWeekend && household.veKmPerYear > 0) {
+    const veRaw = distributeDeviceLoad(veDevice({ kmPerYear: household.veKmPerYear }));
+    const veCurve = veRaw.map((v, h) => Math.min(v, conso[h])); // borné à la conso courante
+    const veAnnual = veCurve.reduce((a, b) => a + b, 0);
+    const frac = household.veBatteryKwh > 0
+      ? veWeekendDeferrableFraction({ veAnnualKwh: veAnnual, veBatteryKwh: household.veBatteryKwh, weekdayChargeCap: cascade.weekdayChargeCap })
+      : cascade.veWeekendShiftFraction;
+    conso = applyVeWeekendShift(conso, prodHourly, veCurve, { fraction: frac });
+    const s = sc(conso);
+    rows.push({ key: 've_weekend', label: 'Recharge VE week-end', ...metrics(s), deltaKwh: s.selfConsumedKwh - prev });
+    prev = s.selfConsumedKwh;
+  }
+
+  if (levers.pool) {
+    const r = absorbSurplusWithLoad(conso, prodHourly, { hourWeights: hoursMask(POOL_HOURS), maxKwhPerHour: cascade.poolMaxKwhPerHour, months: cascade.poolMonths });
+    conso = r.consoHourly;
+    const s = sc(conso);
+    rows.push({ key: 'pool', label: 'Piscine', ...metrics(s), absorbedKwh: r.absorbedKwh, deltaKwh: s.selfConsumedKwh - prev });
+    prev = s.selfConsumedKwh;
+  }
+
+  if (levers.clim) {
+    const r = absorbSurplusWithLoad(conso, prodHourly, { hourWeights: hoursMask(CLIM_HOURS), maxKwhPerHour: cascade.climMaxKwhPerHour, months: cascade.summerMonths });
+    conso = r.consoHourly;
+    const s = sc(conso);
+    rows.push({ key: 'clim', label: 'Climatisation', ...metrics(s), absorbedKwh: r.absorbedKwh, deltaKwh: s.selfConsumedKwh - prev });
+    prev = s.selfConsumedKwh;
+  }
+
+  let battery = { curve: [], recommendedCapacityKwh: 0 };
+  let battResult = null;
+  if (levers.battery) {
+    battery = sizeBattery({ prodHourly, consoHourly: conso, capacities: cascade.batteryCapacities, roundTripEfficiency: cascade.batteryEfficiency });
+    battResult = simulateBattery({ prodHourly, consoHourly: conso, capacityKwh: battery.recommendedCapacityKwh, roundTripEfficiency: cascade.batteryEfficiency });
+    rows.push({ key: 'battery', label: `Batterie ${battery.recommendedCapacityKwh} kWh`, ...metrics(battResult), deltaKwh: battResult.selfConsumedKwh - prev });
+  }
+
+  const fluxNoBat = sc(conso);
+  return {
+    baseline: metrics(scBase),
+    cascade: rows,
+    battery,
+    flux: {
+      prodKwh: fluxNoBat.prodKwh, consoKwh: fluxNoBat.consoKwh,
+      directKwh: fluxNoBat.selfConsumedKwh, exportedKwh: fluxNoBat.exportedKwh, importedKwh: fluxNoBat.importedKwh,
+    },
+    batteryFlux: battResult ? {
+      prodKwh: battResult.prodKwh, consoKwh: battResult.consoKwh,
+      directKwh: battResult.selfConsumedDirectKwh, fromBatteryKwh: battResult.selfConsumedFromBatteryKwh,
+      chargedKwh: battResult.chargedKwh, exportedKwh: battResult.exportedKwh, importedKwh: battResult.importedKwh,
+    } : null,
+    byDevice: {},
+    warnings: [],
+    annualByMonth: monthlyFromHourly(talon),
+    dayTypeWinter: dayTypeFromHourly(talon, { months: cascade.winterMonths }),
+    dayTypeSummer: dayTypeFromHourly(talon, { months: cascade.summerMonths }),
   };
 }

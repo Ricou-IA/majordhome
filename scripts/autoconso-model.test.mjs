@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDevices, buildAutoconsoModel, CASCADE_DEFAULTS } from '../src/apps/solaire/lib/autoconsoModel.js';
+import { computeSelfConsumption, reconcileMonthly } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 // Prod PVGIS synthétique : production aux heures 11-14 chaque jour (bell simplifiée).
 function midDayProd() {
@@ -13,6 +14,56 @@ function midDayProd() {
 }
 const FLAT_TALON = new Array(8760).fill(1);
 const MONTHLY = new Array(12).fill(300); // 3600 kWh/an
+
+// --- Mode « leviers » (wizard) : constat = talon pur, optimisations = toggles ---
+
+test('mode leviers — constat = talon pur, cohérent avec le calculateur (aucune décomposition)', () => {
+  const prod = midDayProd();
+  const talon = reconcileMonthly({ hourlyShape: FLAT_TALON, monthlyTargets: MONTHLY });
+  const scTalon = computeSelfConsumption({ prodHourly: prod, consoHourly: talon });
+  const m = buildAutoconsoModel({
+    household: { persons: 4 }, monthlyConsoTotals: MONTHLY, baseShape: FLAT_TALON, prodHourly: prod,
+    levers: {}, // aucun levier actif
+  });
+  assert.equal(m.cascade.length, 1);
+  assert.equal(m.cascade[0].key, 'constat');
+  // Constat identique à l'autoconso du calculateur (Σ min(prod, talon))
+  assert.ok(Math.abs(m.cascade[0].autoconsoRate - scTalon.autoconsoRate) < 1e-9, `constat ${m.cascade[0].autoconsoRate} ≠ talon ${scTalon.autoconsoRate}`);
+  assert.equal(m.warnings.length, 0);
+});
+
+test('mode leviers — pilotage ECS ajoute un levier (gain, borné, jamais négatif)', () => {
+  const prod = midDayProd();
+  const m = buildAutoconsoModel({
+    household: { persons: 4 }, monthlyConsoTotals: MONTHLY, baseShape: FLAT_TALON, prodHourly: prod,
+    levers: { pilotageEcs: true },
+  });
+  assert.equal(m.cascade.length, 2);
+  assert.equal(m.cascade[1].key, 'pilotage_ecs');
+  assert.ok(m.cascade[1].selfConsumedKwh >= m.cascade[0].selfConsumedKwh - 1e-6);
+});
+
+test('mode leviers — batterie = dernier étage, séparée des toggles confort', () => {
+  const prod = midDayProd();
+  const m = buildAutoconsoModel({
+    household: { persons: 3 }, monthlyConsoTotals: MONTHLY, baseShape: FLAT_TALON, prodHourly: prod,
+    levers: { pilotageEcs: true, pool: true, battery: true },
+  });
+  assert.equal(m.cascade[m.cascade.length - 1].key, 'battery');
+  assert.ok(m.cascade.some((r) => r.key === 'pool'));
+  assert.ok(m.battery.recommendedCapacityKwh >= 0);
+});
+
+test('mode leviers — batteryFlux équilibré (maison = direct+batterie+import ; solaire = direct+charge+export)', () => {
+  const prod = midDayProd();
+  const m = buildAutoconsoModel({
+    household: { persons: 3 }, monthlyConsoTotals: MONTHLY, baseShape: FLAT_TALON, prodHourly: prod,
+    levers: { battery: true },
+  });
+  const f = m.batteryFlux;
+  assert.ok(Math.abs((f.directKwh + f.fromBatteryKwh + f.importedKwh) - f.consoKwh) < 1);
+  assert.ok(Math.abs((f.directKwh + f.chargedKwh + f.exportedKwh) - f.prodKwh) < 1);
+});
 
 test('buildDevices — ECS toujours, VE/piscine/PAC conditionnels', () => {
   const only = buildDevices({ persons: 3 });
