@@ -3,7 +3,19 @@
 // Run : node --test scripts/usage-profiles.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS, poolDevice, POOL_HOURS, POOL_SEASON_WEIGHTS, DAYS_IN_MONTH, fromAnnualBudget, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS } from '../src/apps/solaire/lib/usageProfiles.js';
+import { hoursMask, ecsDevice, COLD_WATER_TEMP_BY_MONTH, ECS_NIGHT_HOURS, veDevice, VE_NIGHT_HOURS, poolDevice, POOL_HOURS, POOL_SEASON_WEIGHTS, DAYS_IN_MONTH, fromAnnualBudget, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from '../src/apps/solaire/lib/usageProfiles.js';
+
+test('veWeekendDeferrableFraction — dérivée capacité batterie voiture + besoin hebdo', () => {
+  // 15 000 km ~ 2430 kWh/an → 46,7 kWh/sem ; batterie 60 kWh → 0,4×60/46,7 ≈ 0,514
+  const f = veWeekendDeferrableFraction({ veAnnualKwh: 2430, veBatteryKwh: 60 });
+  assert.ok(Math.abs(f - (0.4 * 60) / (2430 / 52)) < 1e-9);
+  assert.ok(f > 0.5 && f < 0.53);
+  // petit rouleur, grosse batterie → tout reportable (plafonné à 1)
+  assert.equal(veWeekendDeferrableFraction({ veAnnualKwh: 1040, veBatteryKwh: 100 }), 1);
+  // pas de VE / pas de batterie → 0
+  assert.equal(veWeekendDeferrableFraction({ veAnnualKwh: 0, veBatteryKwh: 60 }), 0);
+  assert.equal(veWeekendDeferrableFraction({ veAnnualKwh: 2430, veBatteryKwh: 0 }), 0);
+});
 import { distributeDeviceLoad, hourToDate } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('hoursMask — 1 sur les heures listées, 0 sinon', () => {

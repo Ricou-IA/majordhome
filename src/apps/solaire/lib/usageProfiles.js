@@ -94,3 +94,17 @@ export const PAC_HEATING_MONTH_WEIGHTS = [1, 0.9, 0.7, 0.4, 0.1, 0, 0, 0, 0.1, 0
 export function fromAnnualBudget({ name, annualKwh, hourOfDayWeights, monthWeights }) {
   return { name, annualKwh, hourOfDayWeights: [...hourOfDayWeights], monthWeights: [...monthWeights] };
 }
+
+/**
+ * Part de l'énergie VE reportable sur la recharge week-end solaire, dérivée de la
+ * capacité batterie voiture (saisie au formulaire) et du besoin hebdo.
+ * Règle : en semaine on charge au plus à `weekdayChargeCap` (60 %) de la batterie ;
+ * le week-end on remonte à 100 % sur le surplus → le week-end couvre au plus
+ * (1 − cap) × capacité par semaine. fraction = min(1, (1−cap) × batterie / besoin_hebdo).
+ * Besoin ou capacité nuls → 0.
+ */
+export function veWeekendDeferrableFraction({ veAnnualKwh, veBatteryKwh, weekdayChargeCap = 0.6 }) {
+  const weekly = veAnnualKwh / 52;
+  if (weekly <= 0 || veBatteryKwh <= 0) return 0;
+  return Math.min(1, ((1 - weekdayChargeCap) * veBatteryKwh) / weekly);
+}

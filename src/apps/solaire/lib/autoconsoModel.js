@@ -14,14 +14,15 @@
 // Déphasage BORNÉ À LA JOURNÉE (applySolarShift, corrigé 2026-07-07) : pas de report
 // d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
 import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from './autoconsoEngine.js';
-import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS } from './usageProfiles.js';
+import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from './usageProfiles.js';
 import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift } from './scenarios.js';
 
 /** Défauts de cascade — « constatés » (fractions réalistes, à ajuster). */
 export const CASCADE_DEFAULTS = {
   behaviorShiftFraction: 0.3,  // S1 comportement (déphasage ECS manuel partiel)
   pilotedShiftFraction: 0.9,   // S2 piloté ECS (asservissement ballon sur surplus)
-  veWeekendShiftFraction: 0.7, // S2b recharge VE week-end (part reportable ; dérivable + tard)
+  veWeekendShiftFraction: 0.7, // S2b VE : défaut si capacité batterie voiture non saisie
+  weekdayChargeCap: 0.6,       // plafond de charge VE en semaine (le week-end complète sur solaire)
   poolMaxKwhPerHour: 3,        // PAC piscine — charge max absorbée par heure
   batteryCapacities: [0, 2, 4, 6, 8, 10, 12, 15],
   batteryEfficiency: 0.9,
@@ -91,7 +92,11 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
 
   // S2b recharge VE week-end (domotique) : report hebdo nuits-semaine → week-end journée
   if (veCurve) {
-    consoRunning = applyVeWeekendShift(consoRunning, prodHourly, veCurve, { fraction: cascade.veWeekendShiftFraction });
+    const veAnnualKwh = veCurve.reduce((a, b) => a + b, 0);
+    const veFraction = household.veBatteryKwh > 0
+      ? veWeekendDeferrableFraction({ veAnnualKwh, veBatteryKwh: household.veBatteryKwh, weekdayChargeCap: cascade.weekdayChargeCap })
+      : cascade.veWeekendShiftFraction;
+    consoRunning = applyVeWeekendShift(consoRunning, prodHourly, veCurve, { fraction: veFraction });
     const scVe = sc(consoRunning);
     cascadeRows.push({ key: 've_weekend', label: 'Recharge VE week-end', ...metrics(scVe), deltaKwh: scVe.selfConsumedKwh - prev });
     prev = scVe.selfConsumedKwh;
