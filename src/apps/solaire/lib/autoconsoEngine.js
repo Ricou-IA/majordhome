@@ -265,3 +265,13 @@ export function dayTypeFromHourly(hourly, { months = null } = {}) {
   }
   return sum.map((s, i) => (cnt[i] > 0 ? s / cnt[i] : 0));
 }
+
+/** Jour de la semaine d'une heure : 0=lundi … 6=dimanche (jour 0 de l'année = lundi, convention). */
+export function dayOfWeek(h) {
+  return Math.floor(h / 24) % 7;
+}
+
+/** Vrai si l'heure tombe un week-end (samedi=5 ou dimanche=6). */
+export function isWeekend(h) {
+  return dayOfWeek(h) >= 5;
+}

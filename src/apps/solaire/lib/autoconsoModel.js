@@ -15,13 +15,14 @@
 // d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
 import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from './autoconsoEngine.js';
 import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS } from './usageProfiles.js';
-import { applySolarShift, absorbSurplusWithLoad } from './scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift } from './scenarios.js';
 
 /** Défauts de cascade — « constatés » (fractions réalistes, à ajuster). */
 export const CASCADE_DEFAULTS = {
-  behaviorShiftFraction: 0.3, // S1 comportement (déphasage ECS manuel partiel)
-  pilotedShiftFraction: 0.9,  // S2 piloté (asservissement ECS + VE)
-  poolMaxKwhPerHour: 3,       // PAC piscine — charge max absorbée par heure
+  behaviorShiftFraction: 0.3,  // S1 comportement (déphasage ECS manuel partiel)
+  pilotedShiftFraction: 0.9,   // S2 piloté ECS (asservissement ballon sur surplus)
+  veWeekendShiftFraction: 0.7, // S2b recharge VE week-end (part reportable ; dérivable + tard)
+  poolMaxKwhPerHour: 3,        // PAC piscine — charge max absorbée par heure
   batteryCapacities: [0, 2, 4, 6, 8, 10, 12, 15],
   batteryEfficiency: 0.9,
   winterMonths: [11, 0, 1],
@@ -70,47 +71,45 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
 
   const ecsCurve = byDevice.ecs;
   const veCurve = byDevice.ve || null;
+  const sc = (c) => computeSelfConsumption({ prodHourly, consoHourly: c });
 
-  // S1 comportement : déphasage ECS partiel depuis la baseline
-  const consoBehavior = applySolarShift(baseline, prodHourly, ecsCurve, { fraction: cascade.behaviorShiftFraction });
-  // S2 piloté : déphasage ECS (+ VE) fort depuis la baseline
-  let consoPiloted = applySolarShift(baseline, prodHourly, ecsCurve, { fraction: cascade.pilotedShiftFraction });
-  if (veCurve) consoPiloted = applySolarShift(consoPiloted, prodHourly, veCurve, { fraction: cascade.pilotedShiftFraction });
+  // Cascade (modèle A) — chaque levier = optimisation vendable, gain MARGINAL affiché.
+  const scBase = sc(baseline);
+  const cascadeRows = [{ key: 'constat', label: 'Constat (sans changement)', ...metrics(scBase), deltaKwh: 0 }];
+  let prev = scBase.selfConsumedKwh;
 
-  // S2bis PAC piscine : absorbe le surplus au-dessus du tier piloté
-  let consoAfterPool = consoPiloted;
-  let poolAbsorbedKwh = 0;
-  if (household.pool) {
-    const r = absorbSurplusWithLoad(consoPiloted, prodHourly, { hourWeights: hoursMask(POOL_HOURS), maxKwhPerHour: cascade.poolMaxKwhPerHour });
-    consoAfterPool = r.consoHourly;
-    poolAbsorbedKwh = r.absorbedKwh;
+  // S1 comportement : déphasage ECS manuel partiel (depuis la baseline)
+  const scBeh = sc(applySolarShift(baseline, prodHourly, ecsCurve, { fraction: cascade.behaviorShiftFraction }));
+  cascadeRows.push({ key: 'behavior', label: 'Changement de comportement', ...metrics(scBeh), deltaKwh: scBeh.selfConsumedKwh - prev });
+  prev = scBeh.selfConsumedKwh;
+
+  // S2 piloté ECS : asservissement ballon sur le surplus (depuis la baseline)
+  let consoRunning = applySolarShift(baseline, prodHourly, ecsCurve, { fraction: cascade.pilotedShiftFraction });
+  const scPilEcs = sc(consoRunning);
+  cascadeRows.push({ key: 'piloted_ecs', label: 'Déphasage piloté ECS', ...metrics(scPilEcs), deltaKwh: scPilEcs.selfConsumedKwh - prev });
+  prev = scPilEcs.selfConsumedKwh;
+
+  // S2b recharge VE week-end (domotique) : report hebdo nuits-semaine → week-end journée
+  if (veCurve) {
+    consoRunning = applyVeWeekendShift(consoRunning, prodHourly, veCurve, { fraction: cascade.veWeekendShiftFraction });
+    const scVe = sc(consoRunning);
+    cascadeRows.push({ key: 've_weekend', label: 'Recharge VE week-end', ...metrics(scVe), deltaKwh: scVe.selfConsumedKwh - prev });
+    prev = scVe.selfConsumedKwh;
   }
 
-  // S3 batterie : dimensionnée sur la conso post-piloté (+ piscine)
-  const battery = sizeBattery({ prodHourly, consoHourly: consoAfterPool, capacities: cascade.batteryCapacities, roundTripEfficiency: cascade.batteryEfficiency });
-  const battResult = simulateBattery({ prodHourly, consoHourly: consoAfterPool, capacityKwh: battery.recommendedCapacityKwh, roundTripEfficiency: cascade.batteryEfficiency });
-
-  // Cascade (gains marginaux)
-  const scBase = computeSelfConsumption({ prodHourly, consoHourly: baseline });
-  const scBeh = computeSelfConsumption({ prodHourly, consoHourly: consoBehavior });
-  const scPil = computeSelfConsumption({ prodHourly, consoHourly: consoPiloted });
-  const scPool = computeSelfConsumption({ prodHourly, consoHourly: consoAfterPool });
-
-  const cascadeRows = [
-    { key: 'constat', label: 'Constat (sans changement)', ...metrics(scBase), deltaKwh: 0 },
-    { key: 'behavior', label: 'Changement de comportement', ...metrics(scBeh), deltaKwh: scBeh.selfConsumedKwh - scBase.selfConsumedKwh },
-    { key: 'piloted', label: `Déphasage piloté (ECS${veCurve ? ' + VE' : ''})`, ...metrics(scPil), deltaKwh: scPil.selfConsumedKwh - scBeh.selfConsumedKwh },
-  ];
+  // S2c PAC piscine : absorbe le surplus restant
   if (household.pool) {
-    cascadeRows.push({ key: 'pool', label: 'PAC piscine', ...metrics(scPool), absorbedKwh: poolAbsorbedKwh, deltaKwh: scPool.selfConsumedKwh - scPil.selfConsumedKwh });
+    const r = absorbSurplusWithLoad(consoRunning, prodHourly, { hourWeights: hoursMask(POOL_HOURS), maxKwhPerHour: cascade.poolMaxKwhPerHour });
+    consoRunning = r.consoHourly;
+    const scPool = sc(consoRunning);
+    cascadeRows.push({ key: 'pool', label: 'PAC piscine', ...metrics(scPool), absorbedKwh: r.absorbedKwh, deltaKwh: scPool.selfConsumedKwh - prev });
+    prev = scPool.selfConsumedKwh;
   }
-  const prevBeforeBattery = household.pool ? scPool.selfConsumedKwh : scPil.selfConsumedKwh;
-  cascadeRows.push({
-    key: 'battery',
-    label: `Batterie ${battery.recommendedCapacityKwh} kWh`,
-    ...metrics(battResult),
-    deltaKwh: battResult.selfConsumedKwh - prevBeforeBattery,
-  });
+
+  // S3 batterie : dimensionnée sur la conso optimisée (post-leviers)
+  const battery = sizeBattery({ prodHourly, consoHourly: consoRunning, capacities: cascade.batteryCapacities, roundTripEfficiency: cascade.batteryEfficiency });
+  const battResult = simulateBattery({ prodHourly, consoHourly: consoRunning, capacityKwh: battery.recommendedCapacityKwh, roundTripEfficiency: cascade.batteryEfficiency });
+  cascadeRows.push({ key: 'battery', label: `Batterie ${battery.recommendedCapacityKwh} kWh`, ...metrics(battResult), deltaKwh: battResult.selfConsumedKwh - prev });
 
   return {
     baseline: metrics(scBase),

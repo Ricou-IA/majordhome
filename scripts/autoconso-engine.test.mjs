@@ -4,7 +4,17 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € (comme pvEngine).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from '../src/apps/solaire/lib/autoconsoEngine.js';
+import { HOURS_PER_YEAR, hourToDate, computeSelfConsumption, distributeDeviceLoad, reconcileMonthly, buildLoadCurve, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, dayOfWeek, isWeekend } from '../src/apps/solaire/lib/autoconsoEngine.js';
+
+test('dayOfWeek / isWeekend — jour 0 = lundi, samedi/dimanche = week-end', () => {
+  assert.equal(dayOfWeek(0), 0);            // lundi
+  assert.equal(dayOfWeek(5 * 24), 5);       // samedi
+  assert.equal(dayOfWeek(6 * 24 + 23), 6);  // dimanche
+  assert.equal(dayOfWeek(7 * 24), 0);       // lundi suivant
+  assert.equal(isWeekend(0), false);
+  assert.equal(isWeekend(5 * 24), true);
+  assert.equal(isWeekend(6 * 24), true);
+});
 
 test('monthlyFromHourly — somme par mois (courbe annuelle)', () => {
   const hourly = new Array(8760).fill(1); // 1 kWh/h plat

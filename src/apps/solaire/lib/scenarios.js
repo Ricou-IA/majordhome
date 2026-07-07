@@ -2,7 +2,7 @@
 // Scénarios d'optimisation de l'autoconsommation (leviers de la « Cible »).
 // Importe le moteur pur autoconsoEngine.js. Testé node --test.
 // RÈGLE : le surplus n'est JAMAIS valorisé en € — import évité ou confort uniquement.
-import { computeSelfConsumption, simulateBattery, hourToDate } from './autoconsoEngine.js';
+import { computeSelfConsumption, simulateBattery, hourToDate, isWeekend } from './autoconsoEngine.js';
 
 const DAY_LENGTH = 24;
 
@@ -36,6 +36,47 @@ export function applySolarShift(consoHourly, prodHourly, usageCurve, { fraction 
       continue;
     }
     for (let h = d0; h < d1; h++) out[h] += (moved * surplus[h - d0]) / totalSurplus;
+  }
+  return out;
+}
+
+const WEEK_LENGTH = 168; // 7 jours × 24 h
+
+/**
+ * Recharge VE intelligente (optimisation domotique VENDUE au client, pas le
+ * comportement naturel) : report HEBDOMADAIRE de la charge VE des nuits de semaine
+ * vers le WEEK-END EN JOURNÉE, sur le surplus PV. La batterie voiture fait tampon
+ * sur la semaine (plafond de charge semaine abstrait dans `fraction`). Un week-end
+ * sans surplus (couvert) → charge inchangée cette semaine-là. Énergie conservée par
+ * semaine. `daytimeStart`/`daytimeEnd` = fenêtre solaire du week-end (heures 0-23).
+ */
+export function applyVeWeekendShift(consoHourly, prodHourly, veCurve, { fraction, daytimeStart = 10, daytimeEnd = 16 }) {
+  const n = consoHourly.length;
+  const out = consoHourly.slice();
+  for (let w0 = 0; w0 < n; w0 += WEEK_LENGTH) {
+    const w1 = Math.min(w0 + WEEK_LENGTH, n);
+    let moved = 0;
+    for (let h = w0; h < w1; h++) {
+      out[h] = consoHourly[h] - fraction * veCurve[h];
+      moved += fraction * veCurve[h];
+    }
+    const targets = [];
+    let totalSurplus = 0;
+    for (let h = w0; h < w1; h++) {
+      const hod = h % 24;
+      if (isWeekend(h) && hod >= daytimeStart && hod < daytimeEnd) {
+        const s = prodHourly[h] - out[h];
+        const surplus = s > 0 ? s : 0;
+        targets.push({ h, surplus });
+        totalSurplus += surplus;
+      }
+    }
+    if (moved <= 0) continue;
+    if (totalSurplus <= 0) {
+      for (let h = w0; h < w1; h++) out[h] = consoHourly[h]; // pas de surplus week-end → inchangé
+      continue;
+    }
+    for (const t of targets) out[t.h] += (moved * t.surplus) / totalSurplus;
   }
   return out;
 }

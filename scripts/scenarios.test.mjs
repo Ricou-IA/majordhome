@@ -3,8 +3,26 @@
 // Run : node --test scripts/scenarios.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths, runScenarios } from '../src/apps/solaire/lib/scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths, runScenarios, applyVeWeekendShift } from '../src/apps/solaire/lib/scenarios.js';
 import { computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
+
+test('applyVeWeekendShift — reporte la charge VE (nuit semaine) → week-end en journée', () => {
+  const conso = new Array(168).fill(0); conso[2] = 10;         // charge VE lundi nuit
+  const prod = new Array(168).fill(0); prod[5 * 24 + 12] = 10; // soleil samedi midi
+  const ve = new Array(168).fill(0); ve[2] = 10;
+  const out = applyVeWeekendShift(conso, prod, ve, { fraction: 1 });
+  assert.ok(Math.abs(out[2] - 0) < 1e-9);             // retiré de lundi nuit
+  assert.ok(Math.abs(out[5 * 24 + 12] - 10) < 1e-9);  // placé samedi midi
+  assert.ok(Math.abs(out.reduce((a, b) => a + b, 0) - 10) < 1e-9); // énergie conservée
+});
+
+test('applyVeWeekendShift — pas de surplus le week-end → charge inchangée', () => {
+  const conso = new Array(168).fill(0); conso[2] = 10;
+  const prod = new Array(168).fill(0); // aucun soleil
+  const ve = new Array(168).fill(0); ve[2] = 10;
+  const out = applyVeWeekendShift(conso, prod, ve, { fraction: 1 });
+  assert.ok(Math.abs(out[2] - 10) < 1e-9);
+});
 
 test('applySolarShift — borné à la journée : aucun transfert entre jours', () => {
   // 48 h = 2 jours. Jour 0 : usage 10 la nuit (h2), zéro soleil ce jour.
