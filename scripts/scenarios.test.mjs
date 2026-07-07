@@ -3,7 +3,7 @@
 // Run : node --test scripts/scenarios.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applySolarShift } from '../src/apps/solaire/lib/scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad } from '../src/apps/solaire/lib/scenarios.js';
 import { computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
 test('applySolarShift — déplace l\'usage vers le surplus, énergie conservée', () => {
@@ -40,4 +40,23 @@ test('applySolarShift — surplus insuffisant : sature le surplus, conserve l\'�
   // le surplus (4) est autoconsommé, le reste (6) reste en import à h0
   const r = computeSelfConsumption({ prodHourly: prod, consoHourly: out });
   assert.ok(Math.abs(r.selfConsumedKwh - 4) < 1e-9);
+});
+
+test('absorbSurplusWithLoad — la PAC piscine mange le surplus de midi', () => {
+  const conso = [0, 1, 0];
+  const prod  = [0, 5, 0];
+  const hw = new Array(24).fill(0); hw[1] = 1; // charge active à l'heure-de-journée 1
+  const { consoHourly: out, absorbedKwh } = absorbSurplusWithLoad(conso, prod, { hourWeights: hw, maxKwhPerHour: 10 });
+  assert.ok(Math.abs(absorbedKwh - 4) < 1e-9);       // surplus dispo = 5 − 1 = 4
+  assert.ok(Math.abs(out[1] - 5) < 1e-9);            // conso montée à 5
+  // export converti en autoconso (confort) : 4 → 0 d'export
+  assert.ok(Math.abs(computeSelfConsumption({ prodHourly: prod, consoHourly: out }).exportedKwh - 0) < 1e-9);
+});
+
+test('absorbSurplusWithLoad — plafond maxKwhPerHour respecté', () => {
+  const conso = [0, 0];
+  const prod  = [0, 10];
+  const hw = new Array(24).fill(0); hw[1] = 1;
+  const { absorbedKwh } = absorbSurplusWithLoad(conso, prod, { hourWeights: hw, maxKwhPerHour: 3 });
+  assert.ok(Math.abs(absorbedKwh - 3) < 1e-9); // plafonné à 3 malgré 10 de surplus
 });

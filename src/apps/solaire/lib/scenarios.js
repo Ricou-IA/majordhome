@@ -29,3 +29,24 @@ export function applySolarShift(consoHourly, prodHourly, usageCurve, { fraction 
   for (let h = 0; h < n; h++) newConso[h] += (moved * surplus[h]) / totalSurplus;
   return newConso;
 }
+
+/**
+ * Absorbe le surplus PV avec une charge de confort pilotée (ex. PAC piscine) placée
+ * dans une fenêtre horaire (`hourWeights`, indexé par heure-de-journée 0-23), plafonnée
+ * par `maxKwhPerHour`. Augmente la conso uniquement là où il y a du surplus (coût
+ * marginal ≈ 0). Renvoie { consoHourly, absorbedKwh }. Valeur = confort, pas €.
+ */
+export function absorbSurplusWithLoad(consoHourly, prodHourly, { hourWeights, maxKwhPerHour = Infinity }) {
+  const n = consoHourly.length;
+  const newConso = consoHourly.slice();
+  let absorbedKwh = 0;
+  for (let h = 0; h < n; h++) {
+    if (!hourWeights[h % 24]) continue;
+    const surplus = prodHourly[h] - consoHourly[h];
+    if (surplus <= 0) continue;
+    const load = Math.min(surplus, maxKwhPerHour);
+    newConso[h] += load;
+    absorbedKwh += load;
+  }
+  return { consoHourly: newConso, absorbedKwh };
+}
