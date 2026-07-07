@@ -3,8 +3,24 @@
 // Run : node --test scripts/scenarios.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths, runScenarios, applyVeWeekendShift } from '../src/apps/solaire/lib/scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths, runScenarios, applyVeWeekendShift, addEvChargingOnSolar } from '../src/apps/solaire/lib/scenarios.js';
 import { computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
+
+test('addEvChargingOnSolar — VE futur : énergie ajoutée, priorité au surplus week-end', () => {
+  const n = 8760;
+  const prod = new Array(n).fill(0);
+  const conso = new Array(n).fill(0.2); // petit talon
+  for (let h = 0; h < n; h++) { const hod = h % 24; if (hod >= 11 && hod <= 14) prod[h] = 3; } // gros surplus midi
+  const annualKwh = 2000;
+  const out = addEvChargingOnSolar(conso, prod, { annualKwh });
+  const added = out.reduce((a, b) => a + b, 0) - conso.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(added - annualKwh) < 1, `énergie ajoutée ${added} ≠ ${annualKwh}`); // conservation
+  // l'autoconso monte (le VE mange du surplus)
+  const before = computeSelfConsumption({ prodHourly: prod, consoHourly: conso });
+  const after = computeSelfConsumption({ prodHourly: prod, consoHourly: out });
+  assert.ok(after.selfConsumedKwh > before.selfConsumedKwh);
+  assert.ok(out.every((v) => v >= 0)); // jamais négatif
+});
 
 test('applyVeWeekendShift — reporte la charge VE (nuit semaine) → week-end en journée', () => {
   const conso = new Array(168).fill(0); conso[2] = 10;         // charge VE lundi nuit

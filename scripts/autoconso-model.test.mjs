@@ -43,6 +43,16 @@ test('mode leviers — pilotage ECS ajoute un levier (gain, borné, jamais néga
   assert.ok(m.cascade[1].selfConsumedKwh >= m.cascade[0].selfConsumedKwh - 1e-6);
 });
 
+test('mode leviers — VE futur (mode add) : conso augmente, autoconso monte', () => {
+  const prod = midDayProd();
+  const sans = buildAutoconsoModel({ household: { persons: 3 }, monthlyConsoTotals: MONTHLY, baseShape: FLAT_TALON, prodHourly: prod, levers: {} });
+  const avec = buildAutoconsoModel({ household: { persons: 3 }, monthlyConsoTotals: MONTHLY, baseShape: FLAT_TALON, prodHourly: prod, levers: { ve: { mode: 'add', kmPerYear: 12000 } } });
+  const veRow = avec.cascade.find((r) => r.key === 've');
+  assert.ok(veRow, 'ligne VE présente');
+  assert.ok(avec.monthly.totals.conso > sans.monthly.totals.conso); // VE ajouté → conso ↑
+  assert.ok(avec.monthly.totals.selfConsumed > sans.monthly.totals.selfConsumed); // autoconso ↑
+});
+
 test('mode leviers — batterie = dernier étage, séparée des toggles confort', () => {
   const prod = midDayProd();
   const m = buildAutoconsoModel({

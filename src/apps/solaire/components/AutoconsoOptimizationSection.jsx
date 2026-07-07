@@ -15,7 +15,7 @@ import { pvgisExample } from '../data';
 
 const CASCADE_LABELS = {
   constat: 'Constat', pilotage_ecs: 'Pilotage ECS',
-  ve_weekend: 'VE week-end', pool: 'Piscine', clim: 'Clim', battery: 'Batterie',
+  ve: 'VE', pool: 'Piscine', clim: 'Clim', battery: 'Batterie',
 };
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const NODE_COLORS = {
@@ -87,24 +87,28 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
   // Optimisations PROPOSÉES (toggles) — le constat s'affiche sans, on les active
   // avec le client. La batterie est une catégorie à part (stockage, pas confort).
   const [pilotageEcs, setPilotageEcs] = useState(false);
-  const [veWeekend, setVeWeekend] = useState(false);
+  const [veOn, setVeOn] = useState(false);
+  const [veSimKm, setVeSimKm] = useState(Number(ev.kmPerYear) || 12000);
   const [pool, setPool] = useState(false);
   const [clim, setClim] = useState(false);
   const [batteryOn, setBatteryOn] = useState(false);
 
-  const veActive = ev.enabled && veWeekend;
   const prodHourly = useMemo(() => hourlyProdFromMonthly(eM, activeKwc, pvgisExample.hourly), [eM, activeKwc]);
-  const model = useMemo(() => buildAutoconsoModel({
-    household: {
-      persons,
-      veKmPerYear: ev.enabled ? (Number(ev.kmPerYear) || 0) : 0,
-      veBatteryKwh: veBattery,
-    },
-    monthlyConsoTotals: consoMonthly,
-    baseShape,
-    prodHourly,
-    levers: { pilotageEcs, veWeekend: veActive, pool, clim, battery: batteryOn },
-  }), [persons, veBattery, pilotageEcs, veActive, pool, clim, batteryOn, ev, consoMonthly, prodHourly, baseShape]);
+  const model = useMemo(() => {
+    // VE : mode 'shift' si déjà déclaré au Step 2 (dans le constat), sinon 'add' (VE futur).
+    const ve = veOn ? (ev.enabled ? { mode: 'shift' } : { mode: 'add', kmPerYear: veSimKm }) : null;
+    return buildAutoconsoModel({
+      household: {
+        persons,
+        veKmPerYear: ev.enabled ? (Number(ev.kmPerYear) || 0) : 0,
+        veBatteryKwh: veBattery,
+      },
+      monthlyConsoTotals: consoMonthly,
+      baseShape,
+      prodHourly,
+      levers: { pilotageEcs, ve, pool, clim, battery: batteryOn },
+    });
+  }, [persons, veBattery, pilotageEcs, veOn, veSimKm, pool, clim, batteryOn, ev, consoMonthly, prodHourly, baseShape]);
 
   const cascade = model.cascade;
   const final = cascade[cascade.length - 1];
@@ -170,13 +174,17 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
               <div className="text-sm font-medium text-secondary-800 mb-2">Optimisations à proposer</div>
               <div className="flex flex-wrap gap-2">
                 <Toggle label="Pilotage ECS" icon={Droplets} active={pilotageEcs} onClick={() => setPilotageEcs(!pilotageEcs)} />
-                {ev.enabled && (
-                  <Toggle label="Recharge VE week-end" icon={Car} active={veWeekend} onClick={() => setVeWeekend(!veWeekend)} />
-                )}
+                <Toggle label={ev.enabled ? 'Recharge VE (solaire)' : 'Véhicule électrique'} icon={Car} active={veOn} onClick={() => setVeOn(!veOn)} />
               </div>
-              {ev.enabled && veWeekend && (
+              {veOn && ev.enabled && (
                 <div className="mt-3">
                   <Slider label="Batterie voiture" value={veBattery} min={20} max={100} step={5} onChange={setVeBattery} suffix=" kWh" />
+                </div>
+              )}
+              {veOn && !ev.enabled && (
+                <div className="mt-3">
+                  <Slider label="Kilométrage VE (projet)" value={veSimKm} min={5000} max={30000} step={1000} onChange={setVeSimKm} suffix=" km/an" />
+                  <p className="text-xs text-secondary-500 mt-1">Simule un futur véhicule électrique rechargé sur votre surplus solaire.</p>
                 </div>
               )}
             </div>

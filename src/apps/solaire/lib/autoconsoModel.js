@@ -15,7 +15,7 @@
 // d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
 import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly, reconcileMonthly, distributeDeviceLoad, monthlyEnergyBreakdown } from './autoconsoEngine.js';
 import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, CLIM_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS, veWeekendDeferrableFraction } from './usageProfiles.js';
-import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift } from './scenarios.js';
+import { applySolarShift, absorbSurplusWithLoad, applyVeWeekendShift, addEvChargingOnSolar } from './scenarios.js';
 
 /** Défauts de cascade — « constatés » (fractions réalistes, à ajuster). */
 export const CASCADE_DEFAULTS = {
@@ -187,7 +187,12 @@ function buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly
     prev = s.selfConsumedKwh;
   }
 
-  if (levers.veWeekend && household.veKmPerYear > 0) {
+  // Véhicule électrique — DEUX usages (précision Eric) :
+  //  - mode 'shift' : VE ACTUEL, déjà dans le constat (Step 2) → on décale sa recharge
+  //    vers le week-end solaire (conso inchangée).
+  //  - mode 'add'   : VE FUTUR (investissement simulé) → on AJOUTE sa charge, calée sur
+  //    le surplus solaire (conso augmente).
+  if (levers.ve?.mode === 'shift' && household.veKmPerYear > 0) {
     const veRaw = distributeDeviceLoad(veDevice({ kmPerYear: household.veKmPerYear }));
     const veCurve = veRaw.map((v, h) => Math.min(v, conso[h])); // borné à la conso courante
     const veAnnual = veCurve.reduce((a, b) => a + b, 0);
@@ -196,7 +201,13 @@ function buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly
       : cascade.veWeekendShiftFraction;
     conso = applyVeWeekendShift(conso, prodHourly, veCurve, { fraction: frac });
     const s = sc(conso);
-    rows.push({ key: 've_weekend', label: 'Recharge VE week-end', ...metrics(s), deltaKwh: s.selfConsumedKwh - prev });
+    rows.push({ key: 've', label: 'Recharge VE (solaire)', ...metrics(s), deltaKwh: s.selfConsumedKwh - prev });
+    prev = s.selfConsumedKwh;
+  } else if (levers.ve?.mode === 'add' && levers.ve.kmPerYear > 0) {
+    const annualKwh = veDevice({ kmPerYear: levers.ve.kmPerYear }).annualKwh;
+    conso = addEvChargingOnSolar(conso, prodHourly, { annualKwh });
+    const s = sc(conso);
+    rows.push({ key: 've', label: 'Véhicule électrique', ...metrics(s), deltaKwh: s.selfConsumedKwh - prev });
     prev = s.selfConsumedKwh;
   }
 

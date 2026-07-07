@@ -3,8 +3,46 @@
 // Importe le moteur pur autoconsoEngine.js. Testé node --test.
 // RÈGLE : le surplus n'est JAMAIS valorisé en € — import évité ou confort uniquement.
 import { computeSelfConsumption, simulateBattery, hourToDate, isWeekend } from './autoconsoEngine.js';
+import { VE_NIGHT_HOURS } from './usageProfiles.js';
 
 const DAY_LENGTH = 24;
+
+/**
+ * VE FUTUR (investissement simulé, ≠ VE déjà dans le constat) : AJOUTE la charge d'un
+ * véhicule électrique à la conso, calée en PRIORITÉ sur le surplus PV du week-end en
+ * journée (charge domicile réaliste : la semaine la voiture est souvent absente), le
+ * reste en heures creuses semaine (réseau). Budget hebdomadaire = annualKwh au prorata.
+ * Le gain d'autoconso = la part de la charge couverte par le surplus. Énergie ajoutée
+ * = annualKwh (conservation). Ne descend jamais la conso (ajout pur).
+ */
+export function addEvChargingOnSolar(consoHourly, prodHourly, { annualKwh, daytimeStart = 10, daytimeEnd = 16, nightHours = VE_NIGHT_HOURS }) {
+  const n = consoHourly.length;
+  const out = consoHourly.slice();
+  if (annualKwh <= 0) return out;
+  const nightSet = new Set(nightHours);
+  for (let w0 = 0; w0 < n; w0 += WEEK_LENGTH) {
+    const w1 = Math.min(w0 + WEEK_LENGTH, n);
+    let remaining = annualKwh * ((w1 - w0) / n);
+    // 1. surplus week-end en journée d'abord (auto-consommé)
+    for (let h = w0; h < w1 && remaining > 1e-9; h++) {
+      const hod = h % 24;
+      if (isWeekend(h) && hod >= daytimeStart && hod < daytimeEnd) {
+        const surplus = prodHourly[h] - out[h];
+        if (surplus <= 0) continue;
+        const add = Math.min(surplus, remaining);
+        out[h] += add;
+        remaining -= add;
+      }
+    }
+    // 2. reste en heures creuses semaine (charge réseau)
+    if (remaining > 1e-9) {
+      const slots = [];
+      for (let h = w0; h < w1; h++) if (!isWeekend(h) && nightSet.has(h % 24)) slots.push(h);
+      if (slots.length) { const per = remaining / slots.length; for (const h of slots) out[h] += per; }
+    }
+  }
+  return out;
+}
 
 /**
  * Déphasage BORNÉ À LA JOURNÉE : pour chaque jour, retire `fraction` de l'énergie
