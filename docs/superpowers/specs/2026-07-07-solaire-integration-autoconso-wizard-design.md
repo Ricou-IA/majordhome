@@ -13,7 +13,7 @@
 **Aujourd'hui** (`buildEtudeModel`) : `autoconso = computeMonthly(prod, conso, coeff)` où `coeff = simultaneityCoeff(preset, ecsBonus, evBonus)` — un **coefficient forfaitaire** piloté par les cartes « présence » (Step2). C'est l'estimation grossière à remplacer.
 
 **Cible** : le **constat d'autoconso** = `computeSelfConsumption(prodHourly, consoHourly)` du moteur horaire, où :
-- `prodHourly` = `state.pvgis` (déjà là, 1 kWc) × `activeKwc`. ⚠️ le wizard a `pvgis.e_m` (mensuel PVGIS **PVcalc**) → il faudra la **série horaire `seriescalc`** (branchement #2, edge — ou fixture en attendant).
+- `prodHourly` = **prod mensuelle RÉELLE par adresse** (`pvgis.e_m` déjà fetché par le wizard) × `activeKwc` × **forme horaire normalisée** (part de chaque heure dans son mois, tirée de la fixture Gaillac `seriescalc`). → magnitude/saisonnalité réelles de l'adresse + forme diurne réaliste, **sans edge**. (Le moteur tourne déjà sur du `seriescalc` horaire ; ici on distribue le mensuel réel par la forme.) L'edge #2 (`seriescalc` par adresse) = raffinement d'exactitude ultérieur, PAS une dépendance bloquante.
 - `consoHourly` = talon Enedis RES1 réconcilié sur les **12 conso mensuelles** du wizard (= les ancres, déjà saisies). C'est la « conso type » pour le constat.
 
 Puis **tout le financier** (`economyYear1`, `table`, `mensualite`) consomme ce **vrai autoconso kWh** au lieu de `active.totals.autoconso` (coeff). Le bloc « pilotage/coefficient » (`coeffParts`, `overlapRatio`, `maxAchievableAutoconso`, `pilotageDelta*`) est **remplacé** par le gain de la **cascade** (étape 4).
@@ -34,7 +34,7 @@ Puis **tout le financier** (`economyYear1`, `table`, `mensualite`) consomme ce *
 **wizardState** : retirer `conso.preset`/`conso.ecsBonus`/`ev.pilotedCharge` ; ajouter les usages d'optimisation (`persons`, `pool`, `clim`, `pacAnnualKwh`).
 
 ## 5. Plan phasé (pour ne pas tout casser d'un coup)
-- **P1** — `seriescalc` dispo (edge #2 sign-off, ou fixture temporaire) + helper `buildConsoHourlyFromMonthly(monthly, talon)`.
+- **P1** — helpers purs (TDD) : `hourlyProdFromMonthly(e_m, kwc, hourlyShape)` (mensuel réel par adresse × forme Gaillac normalisée) + `consoHourlyFromMonthly(monthly, talon)`. **Aucune dépendance edge.**
 - **P2** — `buildEtudeModel` : autoconso constat depuis le horaire, financier rebranché dessus. Tests `node --test` (les chiffres changent → mettre à jour les tests attendus). **Feature-flag** possible pour bascule progressive.
 - **P3** — Step2 : retirer cartes présence + « Répartir » Enedis RES1/RES2.
 - **P4** — Step3 : section « Optimisation autoconso » (cascade + Sankey).
@@ -42,4 +42,4 @@ Puis **tout le financier** (`economyYear1`, `table`, `mensualite`) consomme ce *
 - **P6** — nettoyage : `simultaneityCoeff`/`config.simultaneity`/admin.
 
 ## 6. Reco
-C'est une intégration **structurante et livrée** (calcul + PDF). Je recommande de l'exécuter **phase par phase avec checkpoints**, pas d'un bloc. P2 (le cœur) + le fait que **les chiffres changent** = le sign-off le plus important. Dépendance dure : **P1 nécessite la prod horaire** (`seriescalc`) — soit l'edge #2, soit une fixture temporaire (comme le simulateur).
+C'est une intégration **structurante et livrée** (calcul + PDF). Je recommande de l'exécuter **phase par phase avec checkpoints**, pas d'un bloc. **Sign-off principal = les chiffres changent** (coeff → horaire) sur le calculateur + PDF. **Plus de dépendance edge** : la prod horaire se reconstruit du mensuel réel (par adresse, déjà fetché) × la forme Gaillac normalisée. L'edge #2 (`seriescalc` par adresse) = raffinement d'exactitude ultérieur.
