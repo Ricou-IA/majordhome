@@ -11,13 +11,8 @@
 // ici car les 2 tiers de déphasage sont des alternatives → staging explicite.)
 //
 // RÈGLE : surplus jamais valorisé en € (import évité / confort).
-//
-// ⚠️ LIMITATION CONNUE (WIP 2026-07-07) : `applySolarShift` (scenarios.js) redistribue
-// l'énergie déplacée sur le surplus ANNUEL → il « déplace » de l'ECS d'une nuit d'hiver
-// vers un midi d'été (physiquement impossible : le ballon stocke ~1 jour). Les % de la
-// cascade sont donc SUR-ESTIMÉS (déphasage piloté ~+50% observé vs +5-10% réaliste). Fix
-// requis avant mise en prod : déphasage BORNÉ À LA JOURNÉE. La plomberie ci-dessous est
-// correcte ; seul le primitive de déphasage doit être rendu journalier.
+// Déphasage BORNÉ À LA JOURNÉE (applySolarShift, corrigé 2026-07-07) : pas de report
+// d'énergie entre jours (le ballon/VE stocke ~1 jour) → cascade réaliste.
 import { buildLoadCurve, computeSelfConsumption, simulateBattery, sizeBattery, monthlyFromHourly, dayTypeFromHourly } from './autoconsoEngine.js';
 import { ecsDevice, veDevice, poolDevice, fromAnnualBudget, hoursMask, POOL_HOURS, PAC_HEATING_HOURS, PAC_HEATING_MONTH_WEIGHTS } from './usageProfiles.js';
 import { applySolarShift, absorbSurplusWithLoad } from './scenarios.js';

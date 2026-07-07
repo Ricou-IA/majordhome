@@ -6,6 +6,19 @@ import assert from 'node:assert/strict';
 import { applySolarShift, absorbSurplusWithLoad, exportByMonth, poolExtraMonths, runScenarios } from '../src/apps/solaire/lib/scenarios.js';
 import { computeSelfConsumption } from '../src/apps/solaire/lib/autoconsoEngine.js';
 
+test('applySolarShift — borné à la journée : aucun transfert entre jours', () => {
+  // 48 h = 2 jours. Jour 0 : usage 10 la nuit (h2), zéro soleil ce jour.
+  // Jour 1 : soleil à h37 (13h du lendemain), mais aucun usage.
+  const conso = new Array(48).fill(0); conso[2] = 10;
+  const prod = new Array(48).fill(0); prod[37] = 10;
+  const usage = new Array(48).fill(0); usage[2] = 10;
+  const out = applySolarShift(conso, prod, usage, { fraction: 1 });
+  // le jour 0 n'a pas de surplus → l'usage reste à sa place (pas reporté à demain)
+  assert.ok(Math.abs(out[2] - 10) < 1e-9);
+  assert.ok(Math.abs(out[37] - 0) < 1e-9);
+  assert.ok(Math.abs(out.reduce((a, b) => a + b, 0) - 10) < 1e-9);
+});
+
 test('applySolarShift — déplace l\'usage vers le surplus, énergie conservée', () => {
   // usage de 10 kWh à h2 (nuit, pas de prod) ; prod à h1 (soleil).
   const conso = [0, 0, 10];

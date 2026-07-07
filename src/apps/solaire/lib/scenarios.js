@@ -4,30 +4,40 @@
 // RÈGLE : le surplus n'est JAMAIS valorisé en € — import évité ou confort uniquement.
 import { computeSelfConsumption, simulateBattery, hourToDate } from './autoconsoEngine.js';
 
+const DAY_LENGTH = 24;
+
 /**
- * Déphasage : retire `fraction` de l'énergie d'un usage de ses heures actuelles et
- * la redistribue proportionnellement au SURPLUS PV disponible. Énergie conservée
- * (Σ newConso = Σ conso). Si moved ≤ Σsurplus → tout devient autoconsommé ; sinon
- * le surplus est saturé et l'excédent reste en import. Aucun surplus → conso inchangée.
+ * Déphasage BORNÉ À LA JOURNÉE : pour chaque jour, retire `fraction` de l'énergie
+ * d'un usage de ses heures et la redistribue proportionnellement au surplus PV
+ * DU MÊME JOUR. Un jour sans surplus (ciel couvert / hiver) → aucun déphasage ce
+ * jour-là. Physique : le ballon/VE stocke ~1 jour, on ne reporte PAS l'énergie
+ * d'une nuit d'hiver vers un midi d'été. Énergie conservée jour par jour.
+ * (Ancienne version annuelle-globale sur-estimait massivement — fix 2026-07-07.)
  */
 export function applySolarShift(consoHourly, prodHourly, usageCurve, { fraction }) {
   const n = consoHourly.length;
-  const newConso = new Array(n);
-  let moved = 0;
-  for (let h = 0; h < n; h++) {
-    newConso[h] = consoHourly[h] - fraction * usageCurve[h];
-    moved += fraction * usageCurve[h];
+  const out = consoHourly.slice();
+  for (let d0 = 0; d0 < n; d0 += DAY_LENGTH) {
+    const d1 = Math.min(d0 + DAY_LENGTH, n);
+    let moved = 0;
+    for (let h = d0; h < d1; h++) {
+      out[h] = consoHourly[h] - fraction * usageCurve[h];
+      moved += fraction * usageCurve[h];
+    }
+    let totalSurplus = 0;
+    const surplus = new Array(d1 - d0);
+    for (let h = d0; h < d1; h++) {
+      const s = prodHourly[h] - out[h];
+      surplus[h - d0] = s > 0 ? s : 0;
+      totalSurplus += surplus[h - d0];
+    }
+    if (totalSurplus <= 0) {
+      for (let h = d0; h < d1; h++) out[h] = consoHourly[h]; // pas de déphasage ce jour
+      continue;
+    }
+    for (let h = d0; h < d1; h++) out[h] += (moved * surplus[h - d0]) / totalSurplus;
   }
-  const surplus = new Array(n);
-  let totalSurplus = 0;
-  for (let h = 0; h < n; h++) {
-    const s = prodHourly[h] - newConso[h];
-    surplus[h] = s > 0 ? s : 0;
-    totalSurplus += surplus[h];
-  }
-  if (totalSurplus <= 0) return consoHourly.slice();
-  for (let h = 0; h < n; h++) newConso[h] += (moved * surplus[h]) / totalSurplus;
-  return newConso;
+  return out;
 }
 
 /**
