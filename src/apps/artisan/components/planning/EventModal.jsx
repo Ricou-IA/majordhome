@@ -19,7 +19,7 @@ import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatL
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards, leadKeys } from '@hooks/useLeads';
-import { leadsService } from '@services/leads.service';
+import { leadsService, BOUCLABLE_STATUS_IDS } from '@services/leads.service';
 import { resolveCardForAppointment } from '@services/appointmentActivation.service';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
 import { useQueryClient } from '@tanstack/react-query';
@@ -117,7 +117,10 @@ export function EventModal({
     searching: leadSearching,
     search: searchLead,
     clear: clearLeadSearch,
-  } = useLeadSearch(orgId);
+  } = useLeadSearch(orgId, {
+    // Bouclage R2 : la recherche ne remonte que des cartes bouclables (comme la liste).
+    statusIds: formData.appointment_type === 'rdv_closing' ? BOUCLABLE_STATUS_IDS : null,
+  });
   // Liste parcourable des cartes pipeline (mode Bouclage R2 uniquement) — surfacée
   // dès l'ouverture du champ, filtrée en live par la recherche.
   const { cards: recentPipelineCards } = useRecentPipelineCards(orgId, {

@@ -28,6 +28,15 @@ import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { clientsService } from '@services/clients.service';
 import { technicalVisitService } from '@services/technicalVisit.service';
 
+// Statuts « bouclables » = cartes éligibles à un RDV Bouclage R2 (2ᵉ RDV commercial).
+// RDV planifié / Devis envoyé / Gagné uniquement. Nouveau & Contacté relèvent du R1
+// (1ère visite), Perdu est clôturé → aucun des deux n'apparaît dans le picker R2.
+export const BOUCLABLE_STATUS_IDS = [
+  'e23d04b8-da2e-4477-8e1c-b92868b682ae', // RDV planifié
+  '47937391-5ffa-4804-9b5d-72f3fec6f4fe', // Devis envoyé
+  'c717780c-0ba7-4bf1-9e1e-5f014c1e9e2f', // Gagné
+];
+
 // ============================================================================
 // CONSTANTES
 // ============================================================================
@@ -807,7 +816,7 @@ export const leadsService = {
   // ============================================================================
   // Recherche legere de leads (pour EventModal / recherche unifiee)
   // ============================================================================
-  async searchLeads(orgId, query, limit = 10) {
+  async searchLeads(orgId, query, limit = 10, statusIds = null) {
     if (!orgId || !query || query.length < 2) {
       return { data: [], error: null };
     }
@@ -817,12 +826,15 @@ export const leadsService = {
       const safe = escapePostgrestSearchTerm(query);
       if (!safe) return [];
       const term = `%${safe}%`;
-      const { data, error } = await supabase
+      let q = supabase
         .from('majordhome_leads')
         .select('id, first_name, last_name, email, phone, city, postal_code, address, client_id, status_label, source_name, status_color')
         .eq('org_id', orgId)
         .eq('is_deleted', false)
-        .or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`)
+        .or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`);
+      // Filtre statut optionnel (RDV Bouclage R2 : cartes bouclables uniquement).
+      if (statusIds?.length) q = q.in('status_id', statusIds);
+      const { data, error } = await q
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -840,9 +852,9 @@ export const leadsService = {
   // ============================================================================
   // Liste parcourable des cartes pipeline (RDV Bouclage R2 : champ leadOnly)
   // Surfacée dès l'ouverture du champ, sans terme de recherche, pour « voir et
-  // filtrer » les cartes existantes. Ordre = activité la plus récente (updated_at)
-  // → fait remonter les affaires en cours (devis envoyé / RDV posé), pas les
-  // prospects fraîchement créés. Même shape que searchLeads.
+  // filtrer » les cartes bouclables. Restreinte aux statuts BOUCLABLE_STATUS_IDS
+  // (RDV planifié / Devis envoyé / Gagné). Ordre = activité la plus récente
+  // (updated_at). Même shape que searchLeads.
   // ============================================================================
   async getRecentPipelineCards(orgId, limit = 30) {
     if (!orgId) return { data: [], error: null };
@@ -853,6 +865,7 @@ export const leadsService = {
         .select('id, first_name, last_name, email, phone, city, postal_code, address, client_id, status_label, source_name, status_color')
         .eq('org_id', orgId)
         .eq('is_deleted', false)
+        .in('status_id', BOUCLABLE_STATUS_IDS)
         .order('updated_at', { ascending: false, nullsFirst: false })
         .limit(limit);
 

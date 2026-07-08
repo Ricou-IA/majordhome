@@ -389,7 +389,7 @@ export function useLeadMutations() {
 // HOOK - useLeadSearch (recherche légère pour EventModal)
 // ============================================================================
 
-export function useLeadSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) {
+export function useLeadSearch(orgId, { debounceMs = 300, minChars = 2, statusIds = null } = {}) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -400,9 +400,9 @@ export function useLeadSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) {
   }, [query, debounceMs]);
 
   const { data: results, isLoading: searching } = useQuery({
-    queryKey: leadKeys.search(orgId, debouncedQuery),
+    queryKey: leadKeys.search(orgId, debouncedQuery, statusIds),
     queryFn: async () => {
-      const { data, error } = await leadsService.searchLeads(orgId, debouncedQuery);
+      const { data, error } = await leadsService.searchLeads(orgId, debouncedQuery, 10, statusIds);
       if (error) throw error;
       return data || [];
     },

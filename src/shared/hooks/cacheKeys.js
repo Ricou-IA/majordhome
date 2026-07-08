@@ -72,7 +72,7 @@ export const leadKeys = {
   sources: (orgId) => [...leadKeys.all(orgId), 'sources'],
   statuses: (orgId) => [...leadKeys.all(orgId), 'statuses'],
   commercials: (orgId) => [...leadKeys.all(orgId), 'commercials'],
-  search: (orgId, query) => [...leadKeys.all(orgId), 'search', query],
+  search: (orgId, query, statusIds = null) => [...leadKeys.all(orgId), 'search', query, statusIds],
   recentCards: (orgId) => [...leadKeys.all(orgId), 'recent-cards'],
   longTerm: (orgId, filters) => [...leadKeys.all(orgId), 'longTerm', filters],
 };
