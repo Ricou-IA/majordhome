@@ -33,7 +33,12 @@ export { COMMERCIAL_TYPES, TECHNICIAN_TYPES } from '@/lib/planningEvents';
  */
 export const APPOINTMENT_TYPES = [
   { value: 'rdv_agency', label: 'RDV Commercial', color: '#F59E0B', bgClass: 'bg-amber-500' },
-  { value: 'rdv_technical', label: 'Visite Technique', color: '#3B82F6', bgClass: 'bg-blue-500' },
+  { value: 'rdv_technical', label: 'Visite Technique R1', color: '#3B82F6', bgClass: 'bg-blue-500' },
+  // RDV Bouclage R2 : 2ᵉ RDV commercial rattaché à une carte pipeline EXISTANTE
+  // (valider options / signer / caler la suite). Ne crée jamais de lead — cf.
+  // resolveCardForAppointment + sélection lead-only (EventModal). Couleur = icône
+  // modale uniquement (le calendrier colore par intervenant, cf. planningEvents).
+  { value: 'rdv_closing', label: 'RDV Bouclage R2', color: '#6366F1', bgClass: 'bg-indigo-500' },
   { value: 'installation', label: 'Installation', color: '#8B5CF6', bgClass: 'bg-violet-500' },
   { value: 'maintenance', label: 'Entretien', color: '#10B981', bgClass: 'bg-emerald-500' },
   { value: 'service', label: 'SAV', color: '#EF4444', bgClass: 'bg-red-500' },
@@ -92,7 +97,10 @@ const STATUS_DISPLAY_ORDER = {
 // ordre des états chantier — garde forward-only installation
 const CHANTIER_ORDER = { gagne: 1, commande_a_faire: 2, commande_recue: 3, planification: 4, realise: 5 };
 
-const VT_TYPES = ['rdv_technical', 'rdv_agency'];
+// Types « commerciaux pipeline » pour le sync forward-only du statut de lead.
+// rdv_closing (Bouclage R2) inclus : sur un lead déjà en aval (Devis envoyé / Gagné)
+// la garde `order < 3` laisse le statut intact ; il ne peut jamais le régresser.
+const VT_TYPES = ['rdv_technical', 'rdv_agency', 'rdv_closing'];
 
 /**
  * Prise de RDV : avance la carte liée en colonne « planifiée » (forward-only).

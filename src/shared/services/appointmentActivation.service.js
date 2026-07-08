@@ -49,6 +49,12 @@ export async function resolveCardForAppointment({
   if (leadId) return { lead_id: leadId };
   if (interventionId) return { intervention_id: interventionId };
 
+  // 1bis. Bouclage R2 : rattachement STRICT à une carte pipeline existante. Le leadId
+  // est toujours fourni via la sélection lead-only de l'EventModal (passthrough ci-dessus).
+  // Si on arrive ici sans leadId, l'UI a laissé passer un R2 orphelin -> refus explicite,
+  // JAMAIS de création de lead (c'est tout l'intérêt du motif : zéro doublon).
+  if (type === 'rdv_closing') return { error: 'bouclage_requiert_carte' };
+
   // 2. Type calendaire pur
   if (type === 'other') return {};
 

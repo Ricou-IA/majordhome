@@ -184,6 +184,9 @@ export const SectionClient = ({
   handleUnlinkClient,
   handleUnlinkLead,
   showContactDetails = false,
+  // leadOnly : mode « RDV Bouclage R2 » — on ne propose QUE des cartes pipeline
+  // existantes (leads). Ni résultats clients, ni saisie manuelle, ni client libre.
+  leadOnly = false,
   // Search
   clientSearchQuery,
   searchClient,
@@ -234,8 +237,8 @@ export const SectionClient = ({
       </div>
     )}
 
-    {/* Bannière client lié */}
-    {selectedClient && (
+    {/* Bannière client lié (masquée en mode leadOnly : R2 raisonne par carte, pas par client) */}
+    {selectedClient && !leadOnly && (
       <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-3">
         <UserCircle className="w-5 h-5 text-blue-500 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -303,8 +306,9 @@ export const SectionClient = ({
       </div>
     )}
 
-    {/* Recherche unifiée clients + leads */}
-    {!selectedClient && !selectedLead && !isCancelled && (
+    {/* Recherche unifiée clients + leads (leadOnly : leads seuls, le client implicite
+        d'une fiche n'empêche pas de choisir la carte à boucler). */}
+    {(leadOnly ? !selectedLead : (!selectedClient && !selectedLead)) && !isCancelled && (
       <div className="relative mb-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -322,16 +326,16 @@ export const SectionClient = ({
             }}
             onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
             className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm outline-none transition-colors bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Rechercher un client ou un lead..."
+            placeholder={leadOnly ? 'Rechercher une carte du pipeline…' : 'Rechercher un client ou un lead...'}
           />
           {(clientSearching || leadSearching) && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
           )}
         </div>
-        {/* Dropdown résultats unifiés */}
-        {showClientDropdown && (clientSearchResults.length > 0 || leadSearchResults.length > 0) && (
+        {/* Dropdown résultats unifiés (leadOnly : ne dépend que des leads) */}
+        {showClientDropdown && (leadOnly ? leadSearchResults.length > 0 : (clientSearchResults.length > 0 || leadSearchResults.length > 0)) && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-            {clientSearchResults.length > 0 && (
+            {clientSearchResults.length > 0 && !leadOnly && (
               <>
                 <div className="px-3 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
                   Clients ({clientSearchResults.length})
@@ -391,22 +395,23 @@ export const SectionClient = ({
             )}
           </div>
         )}
-        {showClientDropdown && clientSearchQuery.length >= 2 && !clientSearching && !leadSearching && clientSearchResults.length === 0 && leadSearchResults.length === 0 && (
+        {showClientDropdown && clientSearchQuery.length >= 2 && !clientSearching && !leadSearching
+          && leadSearchResults.length === 0 && (leadOnly || clientSearchResults.length === 0) && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-3 text-sm text-gray-500 italic">
-            Aucun client ou lead trouvé
+            {leadOnly ? 'Aucune carte du pipeline trouvée' : 'Aucun client ou lead trouvé'}
           </div>
         )}
       </div>
     )}
 
-    {/* Séparateur saisie manuelle */}
-    {!selectedClient && !selectedLead && !isCancelled && (
+    {/* Séparateur saisie manuelle (jamais en leadOnly : R2 exige une carte existante) */}
+    {!selectedClient && !selectedLead && !isCancelled && !leadOnly && (
       <p className="text-xs text-gray-400 mb-2 text-center">— ou saisie manuelle —</p>
     )}
 
     {/* Saisie manuelle / compact : masquée dès qu'un client ou lead est lié
-        (le banner ci-dessus tient lieu de « client implicite ») */}
-    {!selectedClient && !selectedLead && (
+        (le banner ci-dessus tient lieu de « client implicite »), et jamais en leadOnly (R2). */}
+    {!selectedClient && !selectedLead && !leadOnly && (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Nom" required error={errors.client_name}>

@@ -10,7 +10,7 @@
  * - Prédicats de filtre (bucket + équipe).
  */
 
-export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical'];
+export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical', 'rdv_closing'];
 export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
 
 // Violet foncé — RDV facturé (override). Réservé : aucune personne ne doit l'avoir.

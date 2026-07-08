@@ -142,6 +142,9 @@ export function EventModal({
   // - « Autre » → colonnes = tous les membres (soi en 1ʳᵉ colonne), client optionnel.
   // --------------------------------------------------------------------------
   const isCommercialType = COMMERCIAL_TYPES.includes(formData.appointment_type);
+  // RDV Bouclage R2 : rattachement STRICT à une carte pipeline existante (leadOnly).
+  // On ne saisit jamais un client libre ; on ne crée jamais de lead (zéro doublon).
+  const isClosing = formData.appointment_type === 'rdv_closing';
   // Tous les types en CRÉATION utilisent l'assistant (grille jour × colonnes par personne),
   // y compris « Autre » (colonnes = tous les membres). En édition, l'assistant revient
   // via « Modifier le RDV » (rescheduleMode) ; sinon la planification est en lecture seule.
@@ -489,9 +492,12 @@ export function EventModal({
   const resolveActivation = useCallback(async ({ rdvDate } = {}) => {
     const fallbackInterventionId = attachContext?.interventionId || null;
 
-    // Walk-in inconnu (Planning, ni client ni lead, type commercial) -> vrai prospect
+    // Walk-in inconnu (Planning, ni client ni lead, type commercial) -> vrai prospect.
+    // Restreint au R1 (rdv_technical/rdv_agency) : un Bouclage R2 ne fabrique JAMAIS
+    // de prospect (il exige une carte existante, cf. isClosing).
     const isWalkInProspect = !selectedClient && !selectedLead && !attachContext
-      && COMMERCIAL_TYPES.includes(formData.appointment_type);
+      && COMMERCIAL_TYPES.includes(formData.appointment_type)
+      && !isClosing;
 
     if (isWalkInProspect) {
       const result = await leadsService.createLead({
@@ -542,7 +548,7 @@ export function EventModal({
       error: null,
     };
   }, [
-    selectedClient, selectedLead, attachContext, formData.appointment_type,
+    selectedClient, selectedLead, attachContext, formData.appointment_type, isClosing,
     formData.client_first_name, formData.client_name, formData.client_email,
     formData.client_phone, formData.client_address, formData.client_postal_code,
     formData.client_city, orgId, userId,
@@ -553,6 +559,8 @@ export function EventModal({
     if (!error) return false;
     if (error === 'client_sans_projet') {
       toast.error("Ce client n'a pas de fiche projet — impossible de créer l'entretien.");
+    } else if (error === 'bouclage_requiert_carte') {
+      toast.error('Sélectionnez la carte du pipeline à boucler.');
     } else if (error === 'prospect') {
       toast.error('Erreur lors de la création du prospect');
     } else {
@@ -657,9 +665,14 @@ export function EventModal({
       toast.error('Choisissez au moins un créneau');
       return;
     }
+    // Bouclage R2 : une carte pipeline existante DOIT être sélectionnée (jamais de doublon).
+    if (isClosing && !selectedLead) {
+      toast.error('Sélectionnez la carte du pipeline à boucler.');
+      return;
+    }
     // Nom client requis pour les RDV liés à un client (VT/entretien/SAV/install) hors fiche.
-    // « Autre » : client optionnel (RDV perso / interne).
-    if (formData.appointment_type !== 'other' && !fromFiche && !formData.client_name?.trim()) {
+    // « Autre » : client optionnel (RDV perso / interne). R2 : identité portée par la carte.
+    if (formData.appointment_type !== 'other' && !isClosing && !fromFiche && !formData.client_name?.trim()) {
       setErrors((prev) => ({ ...prev, client_name: 'Nom requis' }));
       toast.error('Nom du client requis');
       return;
@@ -727,7 +740,7 @@ export function EventModal({
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [assistantSlots, fromFiche, resolveActivation, reportActivationError, isCommercialType, orgId, formData, selectedClient, queryClient, onClose]);
+  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, reportActivationError, isCommercialType, orgId, formData, selectedClient, queryClient, onClose]);
 
   // --------------------------------------------------------------------------
   // Re-planifier (édition) : 1 créneau choisi dans l'assistant → update du RDV
@@ -821,7 +834,7 @@ export function EventModal({
     if (attachContext?.lockedType) {
       return APPOINTMENT_TYPES.filter(t => t.value === attachContext.lockedType);
     }
-    const allowed = ['rdv_technical', 'maintenance', 'service', 'other'];
+    const allowed = ['rdv_technical', 'rdv_closing', 'maintenance', 'service', 'other'];
     return APPOINTMENT_TYPES.filter(
       t => allowed.includes(t.value) || t.value === formData.appointment_type
     );
@@ -936,14 +949,17 @@ export function EventModal({
               )}
 
               {/* Client : masqué si on vient d'une fiche (implicite). Sinon recherche/lien
-                  (« Autre » inclus → lié au client, sans carte kanban). */}
-              {!fromFiche && (
+                  (« Autre » inclus → lié au client, sans carte kanban).
+                  Bouclage R2 : toujours affiché (même depuis une fiche) en mode leadOnly —
+                  la sélection d'une carte pipeline existante est obligatoire. */}
+              {(!fromFiche || isClosing) && (
                 <SectionClient
                   formData={formData}
                   updateField={updateField}
                   errors={errors}
                   isCancelled={isCancelled}
                   showContactDetails={isEdit}
+                  leadOnly={isClosing}
                   selectedClient={selectedClient}
                   selectedLead={selectedLead}
                   navigate={navigate}
@@ -1083,7 +1099,7 @@ export function EventModal({
                 usesAssistant ? (
                   <button
                     onClick={rescheduleMode ? handleRescheduleSave : handleCreateFromAssistant}
-                    disabled={batchSaving || assistantSlots.length === 0}
+                    disabled={batchSaving || assistantSlots.length === 0 || (isClosing && !rescheduleMode && !selectedLead)}
                     className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {batchSaving ? (
