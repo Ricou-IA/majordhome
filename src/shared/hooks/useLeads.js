@@ -426,6 +426,26 @@ export function useLeadSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) {
 }
 
 // ============================================================================
+// HOOK - useRecentPipelineCards (liste parcourable pour RDV Bouclage R2)
+// Cartes pipeline récentes, surfacées dès l'ouverture du champ leadOnly (sans
+// terme de recherche). `enabled` évite tout fetch tant que le mode R2 est inactif.
+// ============================================================================
+export function useRecentPipelineCards(orgId, { enabled = true, limit = 30 } = {}) {
+  const { data, isLoading } = useQuery({
+    queryKey: leadKeys.recentCards(orgId),
+    queryFn: async () => {
+      const { data: rows, error } = await leadsService.getRecentPipelineCards(orgId, limit);
+      if (error) throw error;
+      return rows || [];
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 30_000,
+  });
+
+  return { cards: data || [], loading: isLoading };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 

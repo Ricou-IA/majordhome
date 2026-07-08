@@ -837,6 +837,34 @@ export const leadsService = {
     }, 'leads.searchLeads');
   },
 
+  // ============================================================================
+  // Liste parcourable des cartes pipeline (RDV Bouclage R2 : champ leadOnly)
+  // Surfacée dès l'ouverture du champ, sans terme de recherche, pour « voir et
+  // filtrer » les cartes existantes. Ordre = activité la plus récente (updated_at)
+  // → fait remonter les affaires en cours (devis envoyé / RDV posé), pas les
+  // prospects fraîchement créés. Même shape que searchLeads.
+  // ============================================================================
+  async getRecentPipelineCards(orgId, limit = 30) {
+    if (!orgId) return { data: [], error: null };
+
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase
+        .from('majordhome_leads')
+        .select('id, first_name, last_name, email, phone, city, postal_code, address, client_id, status_label, source_name, status_color')
+        .eq('org_id', orgId)
+        .eq('is_deleted', false)
+        .order('updated_at', { ascending: false, nullsFirst: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      return (data || []).map(l => ({
+        ...l,
+        display_name: `${l.last_name || ''} ${l.first_name || ''}`.trim(),
+      }));
+    }, 'leads.getRecentPipelineCards');
+  },
+
   // ==========================================================================
   // LONG TERM PROJECT (MT-LT)
   // ==========================================================================

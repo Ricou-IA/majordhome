@@ -187,6 +187,9 @@ export const SectionClient = ({
   // leadOnly : mode « RDV Bouclage R2 » — on ne propose QUE des cartes pipeline
   // existantes (leads). Ni résultats clients, ni saisie manuelle, ni client libre.
   leadOnly = false,
+  // browseLeads : cartes pipeline récentes affichées d'emblée en leadOnly (champ vide),
+  // la recherche (>= 2 car.) prenant le relais dès qu'on tape.
+  browseLeads = [],
   // Search
   clientSearchQuery,
   searchClient,
@@ -199,7 +202,13 @@ export const SectionClient = ({
   leadSearchResults,
   handleSelectClient,
   handleSelectLead,
-}) => (
+}) => {
+  // Cartes affichées dans le dropdown leadOnly : recherche dès 2 caractères, sinon
+  // liste parcourable des cartes récentes. Hors leadOnly : recherche unifiée classique.
+  const displayLeads = leadOnly
+    ? (clientSearchQuery.length >= 2 ? leadSearchResults : browseLeads)
+    : leadSearchResults;
+  return (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
       <User className="w-4 h-4 text-gray-500" />
@@ -322,7 +331,8 @@ export const SectionClient = ({
               setShowClientDropdown(true);
             }}
             onFocus={() => {
-              if (clientSearchQuery.length >= 2) setShowClientDropdown(true);
+              // leadOnly : ouvre d'emblée pour montrer la liste des cartes récentes.
+              if (leadOnly || clientSearchQuery.length >= 2) setShowClientDropdown(true);
             }}
             onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
             className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm outline-none transition-colors bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -332,8 +342,8 @@ export const SectionClient = ({
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
           )}
         </div>
-        {/* Dropdown résultats unifiés (leadOnly : ne dépend que des leads) */}
-        {showClientDropdown && (leadOnly ? leadSearchResults.length > 0 : (clientSearchResults.length > 0 || leadSearchResults.length > 0)) && (
+        {/* Dropdown résultats unifiés (leadOnly : cartes récentes ou recherche) */}
+        {showClientDropdown && (leadOnly ? displayLeads.length > 0 : (clientSearchResults.length > 0 || leadSearchResults.length > 0)) && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
             {clientSearchResults.length > 0 && !leadOnly && (
               <>
@@ -358,12 +368,14 @@ export const SectionClient = ({
                 ))}
               </>
             )}
-            {leadSearchResults.length > 0 && (
+            {displayLeads.length > 0 && (
               <>
                 <div className="px-3 py-1.5 bg-violet-50 text-xs font-semibold text-violet-600 uppercase tracking-wide border-b border-gray-100">
-                  Leads ({leadSearchResults.length})
+                  {leadOnly && clientSearchQuery.length < 2
+                    ? `Cartes récentes (${displayLeads.length})`
+                    : `Leads (${displayLeads.length})`}
                 </div>
-                {leadSearchResults.map((lead) => (
+                {displayLeads.map((lead) => (
                   <button
                     key={`lead-${lead.id}`}
                     type="button"
@@ -480,7 +492,8 @@ export const SectionClient = ({
     </div>
     )}
   </div>
-);
+  );
+};
 
 // ============================================================================
 // SECTION COMMERCIAL

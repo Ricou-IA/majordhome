@@ -18,7 +18,7 @@ import { X, Save, Loader2, Trash2, Ban, CalendarDays, ClipboardCheck } from 'luc
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
-import { useLeadSearch, leadKeys } from '@hooks/useLeads';
+import { useLeadSearch, useRecentPipelineCards, leadKeys } from '@hooks/useLeads';
 import { leadsService } from '@services/leads.service';
 import { resolveCardForAppointment } from '@services/appointmentActivation.service';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
@@ -118,6 +118,11 @@ export function EventModal({
     search: searchLead,
     clear: clearLeadSearch,
   } = useLeadSearch(orgId);
+  // Liste parcourable des cartes pipeline (mode Bouclage R2 uniquement) — surfacée
+  // dès l'ouverture du champ, filtrée en live par la recherche.
+  const { cards: recentPipelineCards } = useRecentPipelineCards(orgId, {
+    enabled: formData.appointment_type === 'rdv_closing',
+  });
 
   const queryClient = useQueryClient();
   const { isOrgAdmin } = useAuth();
@@ -960,6 +965,7 @@ export function EventModal({
                   isCancelled={isCancelled}
                   showContactDetails={isEdit}
                   leadOnly={isClosing}
+                  browseLeads={recentPipelineCards}
                   selectedClient={selectedClient}
                   selectedLead={selectedLead}
                   navigate={navigate}
