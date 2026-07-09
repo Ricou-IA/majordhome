@@ -15,6 +15,10 @@ import {
 const CATALOGUE = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/pac-catalogue.json', import.meta.url), 'utf8'));
 const CONFIG = buildThermiqueConfig(undefined);
 const DJU_GAILLAC = 1943;
+const CLIMAT = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/climat.json', import.meta.url), 'utf8'));
+const U_DEFAUTS = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/u-defauts.json', import.meta.url), 'utf8'));
+const COEFF_B = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/coefficients-b.json', import.meta.url), 'utf8'));
+const VENTIL = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/ventilation.json', import.meta.url), 'utf8'));
 
 /** etude wizard : maison de référence + dju résolu, avec un volet PAC optionnel. */
 function etude(pac = null) {
@@ -108,4 +112,24 @@ test('buildEtudeModel : dessin invalide (pièce chauffée sans θint) → ok fal
   assert.equal(model.bilan, null);
   assert.ok(model.erreurs.some((m) => /consigne manquante/.test(m)));
   assert.equal(model.engineVersion, ENGINE_VERSION);
+});
+
+const saisieParam = {
+  modeSaisie: 'parametrique', plancherBasType: 'terre-plein', toitureType: 'comble',
+  niveaux: [{ id: 'rdc', nom: 'RDC', rang: 0, hauteur: 250, emprise: { polygone: [{x:0,y:0},{x:500,y:0},{x:500,y:400},{x:0,y:400}] } }],
+  pieces: [{ id: 'sej', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20, longueur: 500, largeur: 400, hauteur: 250, mlMurExterieur: 900, mlMurLocalNonChauffe: 0, bLocalNonChauffe: 0.6, surfaceOuverture: 3, typeMenuiserie: 'fenetre' }],
+};
+const etudeParam = {
+  contexte: { dept: '81', altitude: 200, annee: 2010, dju: 2200, typeVentilation: 'vmc-sf-auto', isolation: 'iti', combleIsolation: 'isole', sousSolAvecOuvertures: false, relance: false },
+  saisie: saisieParam,
+  compositions: { familles: { murs: { mode: 'valeur', u: 0.4 }, plancherBas: { mode: 'valeur', u: 0.3 }, plafondToiture: { mode: 'valeur', u: 0.2 }, fenetre: { u: 1.3 }, porteFenetre: { u: 1.4 }, porte: { u: 3.5 } }, exceptions: { parois: {}, ouvertures: {} } },
+  pac: { regime: 45, mode: null, pacId: null, points: [], scopManuel: null, prixKwh: 0.1952 },
+};
+
+test('buildEtudeModel : mode paramétrique → ok + puissance émetteur (foisonnement 1.2)', () => {
+  const config = buildThermiqueConfig({ thermique: { foisonnement_emetteur: 1.2 } });
+  const model = buildEtudeModel(etudeParam, { config, data: { climat: CLIMAT, uDefauts: U_DEFAUTS, coefficientsB: COEFF_B, ventilation: VENTIL, pacCatalogue: null } });
+  assert.equal(model.ok, true);
+  const p = model.bilan.pieces[0];
+  assert.ok(Math.abs(p.puissanceEmetteur - p.total * 1.2) < 1e-6);
 });

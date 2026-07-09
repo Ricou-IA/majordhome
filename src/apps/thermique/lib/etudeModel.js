@@ -2,6 +2,7 @@
 // buildEtudeModel = SOURCE DE CALCUL UNIQUE (pattern Solaire) : l'écran résultats (plan 4) et le PDF
 // (plan 5) consomment le même modèle. Module PUR — les données JSON sont passées en paramètres.
 import { assembleBatiment } from './assembleBatiment.js';
+import { assembleBatimentParametrique } from './assembleBatimentParametrique.js';
 import { calculeBatiment } from './thermalEngine.js';
 import { courbeCharge, pointBivalence, consoAnnuelle } from './heatPumpEngine.js';
 
@@ -42,9 +43,13 @@ function resolvePac(pac, pacCatalogue) {
  *   sinon { bivalence, conso: {...}|null, consoErreur: string|null }.
  */
 export function buildEtudeModel(etude, { config, data }) {
-  const { contexte, dessin, compositions } = etude;
+  const { contexte, compositions } = etude;
   const reglages = { thetaIntDefauts: config.theta_int_defauts, deltaUtb: config.delta_utb, fRH: config.f_rh };
-  const assemblage = assembleBatiment(dessin, { data, contexte, compositions, reglages });
+  const modeParametrique = etude.saisie?.modeSaisie === 'parametrique'
+    && (etude.saisie.pieces?.length > 0 || !etude.dessin?.pieces?.length);
+  const assemblage = modeParametrique
+    ? assembleBatimentParametrique(etude.saisie, { data, contexte, compositions, reglages })
+    : assembleBatiment(etude.dessin, { data, contexte, compositions, reglages });
   const base = {
     erreurs: assemblage.erreurs, avertissements: assemblage.avertissements,
     thetaE: assemblage.thetaE, parois: assemblage.parois, engineVersion: ENGINE_VERSION,
@@ -52,6 +57,8 @@ export function buildEtudeModel(etude, { config, data }) {
   if (!assemblage.batiment) return { ...base, ok: false, bilan: null, pac: null };
 
   const bilan = calculeBatiment(assemblage.batiment);
+  const foisonnement = Number.isFinite(config.foisonnement_emetteur) ? config.foisonnement_emetteur : 1.0;
+  bilan.pieces = bilan.pieces.map((p) => ({ ...p, puissanceEmetteur: p.total * foisonnement }));
   const pacResolue = resolvePac(etude.pac, data.pacCatalogue);
   if (!pacResolue) return { ...base, ok: true, bilan, pac: null };
 
