@@ -55,6 +55,7 @@ export const DEFAULTS_THERMIQUE = Object.freeze({
   theta_non_chauffage: 16,   // °C (spec §5, défaut climat.json)
   prix_kwh: 0.1952,          // €/kWh élec base (tarifs-energie.json elec-base 2025)
   facteur_ajustement: 1.0,   // conso (apports gratuits/intermittence), à calibrer phase A/B
+  foisonnement_emetteur: 1.0,   // coefficient de dimensionnement émetteur par pièce (R6)
   parois_bibliotheque: Object.freeze([]), // parois composées nommées, réutilisables (composeur, D4)
 });
 
@@ -75,5 +76,25 @@ export function buildThermiqueConfig(settings) {
     delta_utb: { ...DEFAULTS_THERMIQUE.delta_utb, ...deltaOrg },
     // Tableau malformé (string/objet) → retour au défaut [] (pas de crash côté consommateurs).
     parois_bibliotheque: Array.isArray(org.parois_bibliotheque) ? org.parois_bibliotheque : DEFAULTS_THERMIQUE.parois_bibliotheque,
+  };
+}
+
+/** Presets de coefficient b pour un local non chauffé adjacent (valeurs coefficients-b.json,
+ * catégorie « Pièce ») — éditable/override par pièce dans la saisie paramétrique. */
+export const LNC_PRESETS = [
+  { id: 'garage',  label: 'Garage',           b: 0.6 },
+  { id: 'cellier', label: 'Cellier / réserve', b: 0.5 },
+  { id: 'veranda', label: 'Véranda',          b: 0.8 },
+  { id: 'combles', label: 'Combles perdus',   b: 0.6 },
+];
+
+/** État `saisie` par défaut (modèle paramétrique). Le shape fait partie du input jsonb persisté. */
+export function defautSaisie() {
+  return {
+    modeSaisie: 'parametrique',
+    plancherBasType: 'terre-plein',   // terre-plein | vide-sanitaire | sous-sol (b plancher bas, D5)
+    toitureType: 'comble',
+    niveaux: [{ id: 'rdc', nom: 'RDC', rang: 0, hauteur: 250, emprise: { polygone: [] } }],
+    pieces: [],
   };
 }

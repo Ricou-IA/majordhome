@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TYPES_PIECE, typePieceInfo, PLAGES_VRAISEMBLANCE, REGIMES_EAU,
-  DIMENSIONS_OUVERTURES, DEFAULTS_THERMIQUE, buildThermiqueConfig }
+  DIMENSIONS_OUVERTURES, DEFAULTS_THERMIQUE, buildThermiqueConfig, LNC_PRESETS, defautSaisie }
   from '../../src/apps/thermique/lib/thermiqueConfig.js';
 import { resolvePeriode } from '../../src/apps/thermique/lib/refDataResolvers.js';
 
@@ -64,4 +64,32 @@ test('buildThermiqueConfig : parois_bibliotheque défaut [] et passthrough valid
     [{ id: 'a' }],
   );
   assert.deepEqual(buildThermiqueConfig({ thermique: { parois_bibliotheque: 'oops' } }).parois_bibliotheque, []);
+});
+
+// --- Ajouts saisie paramétrique (2026-07-09) ---
+
+test('foisonnement_emetteur défaut = 1.0', () => {
+  const cfg = buildThermiqueConfig(null);
+  assert.equal(cfg.foisonnement_emetteur, 1.0);
+});
+
+test('foisonnement_emetteur pris depuis settings.thermique', () => {
+  const cfg = buildThermiqueConfig({ thermique: { foisonnement_emetteur: 1.2 } });
+  assert.equal(cfg.foisonnement_emetteur, 1.2);
+});
+
+test('LNC_PRESETS : garage/cellier/veranda ont un b dans [0,1]', () => {
+  for (const p of LNC_PRESETS) {
+    assert.ok(p.b >= 0 && p.b <= 1, `${p.id} b hors [0,1]`);
+    assert.ok(typeof p.label === 'string' && p.label.length > 0);
+  }
+});
+
+test('defautSaisie : 1 niveau rez avec emprise vide, pièces vide', () => {
+  const s = defautSaisie();
+  assert.equal(s.modeSaisie, 'parametrique');
+  assert.equal(s.niveaux.length, 1);
+  assert.equal(s.niveaux[0].rang, 0);
+  assert.deepEqual(s.niveaux[0].emprise.polygone, []);
+  assert.deepEqual(s.pieces, []);
 });
