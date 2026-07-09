@@ -51,3 +51,70 @@ test('resoudUFamille : U absent → null', () => {
   const c = { familles: { murs: { mode: 'valeur', u: null } }, exceptions: { parois: {}, ouvertures: {} } };
   assert.equal(resoudUFamille(c, 'murs', 'ch1', { uDefauts: U_DEFAUTS, annee: 2010 }), null);
 });
+
+import { paroisPieceParametrique } from '../../src/apps/thermique/lib/assembleBatimentParametrique.js';
+
+const ctxBase = {
+  compositions: {
+    familles: {
+      murs: { mode: 'valeur', u: 0.4 }, plancherBas: { mode: 'valeur', u: 0.3 },
+      plafondToiture: { mode: 'valeur', u: 0.2 }, fenetre: { u: 1.3 }, porteFenetre: { u: 1.4 }, porte: { u: 3.5 },
+    },
+    exceptions: { parois: {}, ouvertures: {} },
+  },
+  uDefauts: U_DEFAUTS, annee: 2010, deltaUtb: 0.1, bPlancherBas: 1, bComble: 0.9,
+  estRez: true, estDernier: true,
+};
+// Pièce 5×4×2.5 m, 9 m de mur ext, 3 m² d'ouverture (fenêtre), pas de LNC.
+const pieceRef = {
+  id: 'sej', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+  longueur: 500, largeur: 400, hauteur: 250,
+  mlMurExterieur: 900, mlMurLocalNonChauffe: 0, bLocalNonChauffe: 0.6,
+  surfaceOuverture: 3, typeMenuiserie: 'fenetre',
+};
+
+test('parois : mur ext = 9×2.5 − 3 = 19.5 m², b=1, poste murs', () => {
+  const { parois, erreurs } = paroisPieceParametrique(pieceRef, ctxBase);
+  assert.deepEqual(erreurs, []);
+  const murExt = parois.find((p) => p.type === 'mur-exterieur');
+  assert.equal(murExt.surface, 19.5);
+  assert.equal(murExt.u, 0.4);
+  assert.equal(murExt.b, 1);
+  assert.equal(murExt.poste, 'murs');
+  assert.equal(murExt.deltaUtb, 0.1);
+});
+test('parois : menuiserie = 3 m² × U 1.3, poste menuiseries', () => {
+  const { parois } = paroisPieceParametrique(pieceRef, ctxBase);
+  const men = parois.find((p) => p.poste === 'menuiseries');
+  assert.equal(men.surface, 3);
+  assert.equal(men.u, 1.3);
+  assert.equal(men.b, 1);
+});
+test('parois : plancher bas + plafond présents au rez+dernier (surface 20 m²)', () => {
+  const { parois } = paroisPieceParametrique(pieceRef, ctxBase);
+  assert.equal(parois.find((p) => p.type === 'plancher-bas').surface, 20);
+  assert.equal(parois.find((p) => p.type === 'plancher-bas').b, 1);
+  assert.equal(parois.find((p) => p.type === 'plafond-comble').surface, 20);
+  assert.equal(parois.find((p) => p.type === 'plafond-comble').b, 0.9);
+});
+test('parois : niveau intermédiaire (ni rez ni dernier) → ni plancher ni plafond', () => {
+  const { parois } = paroisPieceParametrique(pieceRef, { ...ctxBase, estRez: false, estDernier: false });
+  assert.equal(parois.some((p) => p.poste === 'plancherBas'), false);
+  assert.equal(parois.some((p) => p.poste === 'plafondToiture'), false);
+});
+test('parois : mur sur LNC = ml × H, b = bLocalNonChauffe', () => {
+  const { parois } = paroisPieceParametrique({ ...pieceRef, mlMurLocalNonChauffe: 400, bLocalNonChauffe: 0.6 }, ctxBase);
+  const lnc = parois.find((p) => p.type === 'mur-lnc');
+  assert.equal(lnc.surface, 10);   // 4 m × 2.5 m
+  assert.equal(lnc.b, 0.6);
+});
+test('parois : ouverture > mur ext → erreur pièce', () => {
+  const { parois, erreurs } = paroisPieceParametrique({ ...pieceRef, surfaceOuverture: 100 }, ctxBase);
+  assert.equal(parois.length, 0);
+  assert.ok(erreurs[0].includes('ouverture'));
+});
+test('parois : U manquant (famille murs null) → erreur', () => {
+  const ctx = { ...ctxBase, compositions: { familles: { ...ctxBase.compositions.familles, murs: { mode: 'valeur', u: null } }, exceptions: { parois: {}, ouvertures: {} } } };
+  const { erreurs } = paroisPieceParametrique(pieceRef, ctx);
+  assert.ok(erreurs.some((e) => e.includes('murs')));
+});
