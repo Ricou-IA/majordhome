@@ -4,6 +4,7 @@
 // ⚠ Le shape hors champs volatils (step/studyId/savedResults) EST le `input` jsonb persisté dans
 // majordhome.thermal_studies — VERROUILLÉ, Tasks 14/15 en dépendent (toStudyInput ci-dessous).
 // Brouillon localStorage `thermal-draft:${userId}` (convention P1.9 — clé suffixée userId).
+import { defautSaisie } from './thermiqueConfig.js';
 
 export function initialWizardState(config) {
   return {
@@ -18,6 +19,7 @@ export function initialWizardState(config) {
       nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
       niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }], pieces: [], ouvertures: [],
     },
+    saisie: defautSaisie(),
     compositions: {
       familles: {
         murs: { mode: 'defaut', u: null }, plancherBas: { mode: 'defaut', u: null },
@@ -68,6 +70,8 @@ export function wizardReducer(state, action) {
       };
     case 'SET_DESSIN':
       return { ...state, dessin: action.dessin };
+    case 'SET_SAISIE':
+      return { ...state, saisie: action.saisie };
     case 'PATCH_COMPOSITIONS':
       // Merge au niveau des familles (chaque valeur du patch REMPLACE la famille).
       return {
@@ -102,6 +106,7 @@ export function wizardReducer(state, action) {
         studyId: action.study?.id ?? null,
         contexte: { ...base.contexte, ...(input.contexte ?? {}) },
         dessin: input.dessin ?? base.dessin,
+        saisie: input.saisie ?? base.saisie,
         compositions: {
           familles: { ...base.compositions.familles, ...(input.compositions?.familles ?? {}) },
           exceptions: {
@@ -137,6 +142,7 @@ export function toStudyInput(state) {
   return {
     contexte: state.contexte,
     dessin: state.dessin,
+    saisie: state.saisie,
     compositions: { ...state.compositions, exceptions: { parois, ouvertures } },
     pac: state.pac,
   };

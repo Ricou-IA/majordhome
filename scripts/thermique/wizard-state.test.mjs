@@ -7,8 +7,10 @@ import {
   initialWizardState, wizardReducer, toStudyInput,
   draftKey, loadDraft, saveDraft, clearDraft,
 } from '../../src/apps/thermique/lib/wizardState.js';
+import { buildThermiqueConfig } from '../../src/apps/thermique/lib/thermiqueConfig.js';
 
 const CONFIG = { prix_kwh: 0.25 };
+const CFG = buildThermiqueConfig(null);
 
 function deepFreeze(obj) {
   Object.freeze(obj);
@@ -220,7 +222,7 @@ test('action inconnue : même référence d’état', () => {
 test('toStudyInput : strip step/studyId/savedResults', () => {
   const state = frozen();
   const input = toStudyInput(state);
-  assert.deepEqual(Object.keys(input).sort(), ['compositions', 'contexte', 'dessin', 'pac']);
+  assert.deepEqual(Object.keys(input).sort(), ['compositions', 'contexte', 'dessin', 'pac', 'saisie']);
   assert.equal(input.contexte, state.contexte); // pas de copie inutile (le state est immuable)
   assert.equal(input.dessin, state.dessin);
 });
@@ -289,4 +291,25 @@ test('brouillon : localStorage indisponible (node nu) → null / no-op sans cras
   assert.equal(loadDraft('u1'), null);
   assert.doesNotThrow(() => saveDraft('u1', { step: 1 }));
   assert.doesNotThrow(() => clearDraft('u1'));
+});
+
+test('initialWizardState : saisie paramétrique par défaut', () => {
+  const s = initialWizardState(CFG);
+  assert.equal(s.saisie.modeSaisie, 'parametrique');
+  assert.equal(s.saisie.niveaux[0].rang, 0);
+  assert.deepEqual(s.saisie.pieces, []);
+});
+
+test('SET_SAISIE remplace la saisie', () => {
+  const s0 = initialWizardState(CFG);
+  const saisie = { ...s0.saisie, pieces: [{ id: 'x', niveauId: 'rdc', chauffee: true }] };
+  const s1 = wizardReducer(s0, { type: 'SET_SAISIE', saisie });
+  assert.equal(s1.saisie.pieces.length, 1);
+});
+
+test('toStudyInput inclut saisie', () => {
+  const s = initialWizardState(CFG);
+  const input = toStudyInput(s);
+  assert.ok(input.saisie);
+  assert.equal(input.saisie.modeSaisie, 'parametrique');
 });
