@@ -118,3 +118,49 @@ test('parois : U manquant (famille murs null) → erreur', () => {
   const { erreurs } = paroisPieceParametrique(pieceRef, ctx);
   assert.ok(erreurs.some((e) => e.includes('murs')));
 });
+
+import { assembleBatimentParametrique } from '../../src/apps/thermique/lib/assembleBatimentParametrique.js';
+import { calculeBatiment } from '../../src/apps/thermique/lib/thermalEngine.js';
+const CLIMAT = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/climat.json', import.meta.url), 'utf8'));
+const COEFF_B = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/coefficients-b.json', import.meta.url), 'utf8'));
+const VENTIL = JSON.parse(readFileSync(new URL('../../src/apps/thermique/data/ventilation.json', import.meta.url), 'utf8'));
+
+const saisieRef = {
+  modeSaisie: 'parametrique', plancherBasType: 'terre-plein', toitureType: 'comble',
+  niveaux: [{ id: 'rdc', nom: 'RDC', rang: 0, hauteur: 250, emprise: { polygone: rect(0, 0, 500, 400) } }],
+  pieces: [{
+    id: 'sej', niveauId: 'rdc', nom: 'Séjour', typePiece: 'sejour', chauffee: true, thetaInt: 20,
+    longueur: 500, largeur: 400, hauteur: 250, mlMurExterieur: 900, mlMurLocalNonChauffe: 0,
+    bLocalNonChauffe: 0.6, surfaceOuverture: 3, typeMenuiserie: 'fenetre',
+  }],
+};
+const optionsRef = {
+  data: { climat: CLIMAT, uDefauts: U_DEFAUTS, coefficientsB: COEFF_B, ventilation: VENTIL },
+  contexte: { dept: '81', altitude: 200, annee: 2010, typeVentilation: 'vmc-sf-auto', isolation: 'iti', combleIsolation: 'isole', sousSolAvecOuvertures: false, relance: false },
+  compositions: { familles: { murs: { mode: 'valeur', u: 0.4 }, plancherBas: { mode: 'valeur', u: 0.3 }, plafondToiture: { mode: 'valeur', u: 0.2 }, fenetre: { u: 1.3 }, porteFenetre: { u: 1.4 }, porte: { u: 3.5 } }, exceptions: { parois: {}, ouvertures: {} } },
+  reglages: { deltaUtb: { 'non-isole': 0.15, iti: 0.10, ite: 0.05 }, fRH: 0 },
+};
+
+test('assembleBatimentParametrique : batiment consommable par calculeBatiment', () => {
+  const { batiment, thetaE, erreurs } = assembleBatimentParametrique(saisieRef, optionsRef);
+  assert.deepEqual(erreurs, []);
+  assert.ok(Number.isFinite(thetaE));
+  const bilan = calculeBatiment(batiment);
+  assert.ok(bilan.total > 0);
+  assert.equal(bilan.pieces.length, 1);
+  assert.ok(bilan.pieces[0].parPoste.murs > 0);
+  assert.ok(bilan.pieces[0].parPoste.menuiseries > 0);
+});
+
+test('assembleBatimentParametrique : aucune pièce chauffée → erreur', () => {
+  const s = { ...saisieRef, pieces: [{ ...saisieRef.pieces[0], chauffee: false }] };
+  const { batiment, erreurs } = assembleBatimentParametrique(s, optionsRef);
+  assert.equal(batiment, null);
+  assert.ok(erreurs.some((e) => e.includes('chauffée')));
+});
+
+test('assembleBatimentParametrique : θint manquante sur pièce chauffée → erreur', () => {
+  const s = { ...saisieRef, pieces: [{ ...saisieRef.pieces[0], thetaInt: null }] };
+  const { erreurs } = assembleBatimentParametrique(s, optionsRef);
+  assert.ok(erreurs.some((e) => e.includes('consigne')));
+});

@@ -3,7 +3,9 @@
 // pour calculeBatiment. Module PUR. Remplace la chaîne géométrique deduireParois/assembleBatiment
 // pour le mode 'parametrique' — le moteur physique (thermalEngine) reste inchangé.
 import { surfaceCm2, perimetreCm } from './geometryEngine.js';
-import { uDefautPour } from './refDataResolvers.js';
+import { uDefautPour, thetaBasePour, resolvePeriode, debitVentilationPour, coefficientBPour } from './refDataResolvers.js';
+import { typePieceInfo, PLAGES_VRAISEMBLANCE } from './thermiqueConfig.js';
+import { bPlancherBasPour } from './assembleBatiment.js';
 
 /** Dérivés d'une emprise dessinée : surface au sol (m²) et périmètre extérieur (m). */
 export function empriseDerives(emprise) {
@@ -66,4 +68,66 @@ export function paroisPieceParametrique(piece, ctx) {
   if (ctx.estDernier) pousse('plafondToiture', 'plafond-comble', surfaceSol, { b: ctx.bComble });
 
   return { parois, erreurs };
+}
+
+const B_COMBLE = {
+  isole: 'Toiture isolée',
+  'non-isole': 'Autres toitures non isolée',
+  'fortement-ventile': 'Espace sous toiture fortement ventilé sans feutre ni panneau en sous face',
+};
+
+/**
+ * Assembleur paramétrique : saisie + données + choix → entrée de calculeBatiment.
+ * Même shape de sortie qu'assembleBatiment. batiment null si erreurs bloquantes (l'UI liste, jamais throw).
+ */
+export function assembleBatimentParametrique(saisie, options) {
+  const { data, contexte, compositions, reglages } = options;
+  const erreurs = [];
+  const avertissements = [];
+
+  let thetaE = null;
+  try { thetaE = thetaBasePour(data.climat, contexte.dept, contexte.altitude).thetaE; }
+  catch (e) { erreurs.push(e.message); }
+
+  const deltaUtb = reglages.deltaUtb[contexte.isolation];
+  if (!Number.isFinite(deltaUtb)) erreurs.push(`type d'isolation inconnu « ${contexte.isolation} »`);
+  const bComble = coefficientBPour(data.coefficientsB, 'Espace sous toiture', B_COMBLE[contexte.combleIsolation] ?? B_COMBLE.isole);
+  const bPlancherBas = bPlancherBasPour(data.coefficientsB, saisie.plancherBasType, contexte.sousSolAvecOuvertures);
+  const rangMax = Math.max(...saisie.niveaux.map((n) => n.rang ?? 0));
+
+  const chauffees = saisie.pieces.filter((p) => p.chauffee);
+  if (chauffees.length === 0) erreurs.push('aucune pièce chauffée — ajoutez au moins une pièce chauffée');
+
+  const paroisResolues = [];
+  const piecesBat = [];
+  for (const p of chauffees) {
+    if (!Number.isFinite(p.thetaInt)) { erreurs.push(`« ${p.nom ?? p.id} » : température de consigne manquante`); continue; }
+    const niveau = saisie.niveaux.find((n) => n.id === p.niveauId);
+    const ctx = {
+      compositions, uDefauts: data.uDefauts, annee: contexte.annee, deltaUtb: deltaUtb ?? 0,
+      bPlancherBas, bComble, estRez: (niveau?.rang ?? 0) === 0, estDernier: (niveau?.rang ?? 0) === rangMax,
+    };
+    const { parois, erreurs: errP } = paroisPieceParametrique(p, ctx);
+    erreurs.push(...errP);
+    paroisResolues.push(...parois);
+    const surface = (p.longueur / 100) * (p.largeur / 100);
+    const volume = surface * (p.hauteur / 100);
+    piecesBat.push({ id: p.id, nom: p.nom, surface, volume, thetaInt: p.thetaInt, humide: typePieceInfo(p.typePiece).humide, parois });
+  }
+
+  let systemeVentilation = null; let debitTotal = null;
+  try {
+    const nbPrincipales = chauffees.filter((p) => typePieceInfo(p.typePiece).principale).length;
+    ({ systeme: systemeVentilation, debitTotal } = debitVentilationPour(data.ventilation, contexte.typeVentilation, Math.max(1, nbPrincipales)));
+  } catch (e) { erreurs.push(e.message); }
+
+  if (erreurs.length > 0) return { batiment: null, thetaE, parois: paroisResolues, erreurs, avertissements };
+
+  const batiment = {
+    thetaExt: thetaE, systemeVentilation, debitTotal,
+    fRH: contexte.relance ? reglages.fRH : 0,
+    plageVraisemblance: PLAGES_VRAISEMBLANCE[resolvePeriode(contexte.annee)],
+    pieces: piecesBat,
+  };
+  return { batiment, thetaE, parois: paroisResolues, erreurs, avertissements };
 }
