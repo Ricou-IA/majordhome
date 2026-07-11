@@ -27,6 +27,7 @@ import { PLAGES_VRAISEMBLANCE } from '../../lib/thermiqueConfig';
 import { resolvePeriode } from '../../lib/refDataResolvers';
 import { pointsManuelsValides } from '../../lib/heatPumpEngine';
 import PlanResultats from './PlanResultats';
+import ResultatsPiecesGrid from './ResultatsPiecesGrid';
 import PacSection, { PacResultats } from './PacSection';
 
 const fmtInt = (v) => Math.round(v).toLocaleString('fr-FR');
@@ -224,19 +225,23 @@ export default function Step4Resultats({
             Étude enregistrée avec le moteur v{savedResults.engineVersion ?? '?'}
             {!memeVersion && ` — moteur actuel v${ENGINE_VERSION}`}
           </span>
-          <button
-            type="button"
-            onClick={onClearSavedResults}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white border border-secondary-300 text-secondary-700 hover:bg-secondary-50 rounded-lg"
-          >
-            <RefreshCw className="w-4 h-4" /> Recalculer avec le moteur actuel
-          </button>
+          {state.saisie?.pieces?.length > 0 && (
+            <button
+              type="button"
+              onClick={onClearSavedResults}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white border border-secondary-300 text-secondary-700 hover:bg-secondary-50 rounded-lg"
+            >
+              <RefreshCw className="w-4 h-4" /> Recalculer avec le moteur actuel
+            </button>
+          )}
         </div>
 
         {figes.bilan ? (
           <>
             <Synthese bilan={figes.bilan} thetaE={figes.thetaE} dept={contexte.dept} periode={periode} plage={plage} />
-            <PlanResultats dessin={dessin} bilan={figes.bilan} />
+            {state.saisie?.pieces?.length > 0
+              ? <ResultatsPiecesGrid bilan={figes.bilan} />
+              : <PlanResultats dessin={dessin} bilan={figes.bilan} />}
             {figes.pac && (
               <div className="card space-y-3">
                 <h3 className="font-semibold text-secondary-900 text-sm">Pompe à chaleur</h3>
@@ -295,7 +300,9 @@ export default function Step4Resultats({
         </ul>
       )}
 
-      <PlanResultats dessin={dessin} bilan={model.bilan} />
+      {state.saisie?.pieces?.length > 0
+        ? <ResultatsPiecesGrid bilan={model.bilan} />
+        : <PlanResultats dessin={dessin} bilan={model.bilan} />}
 
       {/* Volet PAC — le catalogue (~4,6 Mo) ne se charge qu'à l'ouverture */}
       <div className="card space-y-4">
