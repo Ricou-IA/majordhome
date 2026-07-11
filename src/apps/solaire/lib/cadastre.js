@@ -112,8 +112,14 @@ export async function fetchParcelleAtPoint(lon, lat) {
 }
 
 /** Parcelles voisines (carré de `meters`) pour la sélection multi-parcelles sur carte. */
-export async function fetchParcellesAround(lon, lat, meters = 45) {
+export async function fetchParcellesAround(lon, lat, meters = 120) {
   const json = await postApicarto('/cadastre/parcelle', { geom: makeSquareAround(lon, lat, meters) });
+  return (json.features ?? []).map(normalizeParcelle);
+}
+
+/** Parcelles intersectant un polygone arbitraire (ex. l'emprise visible de la carte). */
+export async function fetchParcellesInPolygon(geom) {
+  const json = await postApicarto('/cadastre/parcelle', { geom });
   return (json.features ?? []).map(normalizeParcelle);
 }
 

@@ -5,12 +5,13 @@
 // + statut ABF via GPU. Fail-loud : échec GPU = « à vérifier manuellement », jamais un faux
 // « non protégé ». Remonté via key={lat,lon} par le parent (état neuf à chaque lieu).
 import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Landmark, Loader2, AlertTriangle, ShieldAlert, ShieldCheck, X } from 'lucide-react';
+import { Landmark, Loader2, AlertTriangle, ShieldAlert, ShieldCheck, X, Search } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
 import { logger } from '@lib/logger';
-import { fetchParcelleAtPoint, fetchParcellesAround, fetchAbfAtPoint } from '../../lib/cadastre';
+import { fetchParcelleAtPoint, fetchParcellesAround, fetchParcellesInPolygon, fetchAbfAtPoint } from '../../lib/cadastre';
 
 const SATELLITE_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
 const CERFA_MAX_PARCELLES = 3;
@@ -22,6 +23,7 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
   const [around, setAround] = useState([]); // parcelles voisines (UI locale, non persistée)
   const [status, setStatus] = useState('loading'); // loading | ok | empty | error
   const [abfStatus, setAbfStatus] = useState(abf ? 'ok' : 'loading'); // loading | ok | error
+  const [searching, setSearching] = useState(false); // recherche des parcelles de la vue courante
 
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -74,15 +76,45 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
 
   const toggleParcelle = (idu) => {
     const cur = selectedRef.current;
+    const found = around.find((p) => p.idu === idu);
     if (cur.some((p) => p.idu === idu)) {
       onCadastreRef.current(cur.filter((p) => p.idu !== idu));
-    } else {
-      const found = around.find((p) => p.idu === idu);
-      if (found) onCadastreRef.current([...cur, found]);
+    } else if (found) {
+      onCadastreRef.current([...cur, found]);
     }
   };
   const toggleRef = useRef(toggleParcelle);
   toggleRef.current = toggleParcelle;
+
+  // Charge les parcelles de l'emprise visible de la carte (le géocodage d'adresse tombe souvent
+  // à côté en zone rurale → la parcelle voulue est hors de la fenêtre initiale ; l'utilisateur
+  // pane vers son bâti et clique « rechercher cette zone »). Merge dans `around` (dédup par idu).
+  const searchInView = async () => {
+    const map = mapRef.current;
+    if (!map) return;
+    setSearching(true);
+    try {
+      const b = map.getBounds();
+      const geom = {
+        type: 'Polygon',
+        coordinates: [[
+          [b.getWest(), b.getSouth()],
+          [b.getEast(), b.getSouth()],
+          [b.getEast(), b.getNorth()],
+          [b.getWest(), b.getNorth()],
+          [b.getWest(), b.getSouth()],
+        ]],
+      };
+      const found = await fetchParcellesInPolygon(geom);
+      setAround((prev) => [...new Map([...prev, ...found].map((p) => [p.idu, p])).values()]);
+      if (!found.length) toast.info('Aucune parcelle dans cette zone — déplacez la carte.');
+    } catch (err) {
+      logger.error('[solaire] recherche parcelles zone', err);
+      toast.error('Recherche des parcelles impossible.');
+    } finally {
+      setSearching(false);
+    }
+  };
 
   // Carte : parcelles voisines en liseré, sélectionnées en jaune, clic = toggle.
   // ⚠️ Le container n'est rendu QUE quand status==='ok' → l'init doit se déclencher sur [status]
@@ -101,7 +133,7 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
     map.on('load', () => {
       map.addSource('parcelles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({ id: 'parcelles-fill', type: 'fill', source: 'parcelles', paint: { 'fill-color': '#FFFFFF', 'fill-opacity': 0.08 } });
+      map.addLayer({ id: 'parcelles-fill', type: 'fill', source: 'parcelles', paint: { 'fill-color': '#FFFFFF', 'fill-opacity': 0.14 } });
       map.addLayer({ id: 'parcelles-line', type: 'line', source: 'parcelles', paint: { 'line-color': '#FFFFFF', 'line-width': 1.5, 'line-dasharray': [2, 1.5] } });
       map.addLayer({
         id: 'parcelles-selected-fill', type: 'fill', source: 'parcelles',
@@ -201,7 +233,19 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
 
       {(status === 'ok') && (
         <>
-          <div ref={containerRef} className="w-full h-56 rounded-lg overflow-hidden border border-secondary-200" />
+          <div ref={containerRef} className="w-full h-72 rounded-lg overflow-hidden border border-secondary-200" />
+          <button
+            type="button"
+            onClick={searchInView}
+            disabled={searching}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-secondary-200 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
+          >
+            {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Rechercher les parcelles de cette zone
+          </button>
+          <p className="text-xs text-secondary-500 -mt-2">
+            Déplacez la carte vers votre bâtiment puis lancez la recherche pour charger d'autres parcelles à sélectionner.
+          </p>
           {selected.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {selected.map((p) => (
