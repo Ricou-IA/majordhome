@@ -29,14 +29,17 @@ function azimuthToCompassLabel(azimuthCompass) {
 
 export default function Step1Localisation({ location, roof, config, roofGeometry, pans, cadastre, abf, onLocation, onRoof, onRoofGeometry, onAddPan, onRemovePan, onUpdatePan, onCadastre, onAbf, onNext }) {
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [addressQuery, setAddressQuery] = useState('');
+  const [addressQuery, setAddressQuery] = useState(location.address || '');
   const [suggestions, setSuggestions] = useState([]);
   const debouncedQuery = useDebounce(addressQuery, 300);
 
-  // Autocomplétion adresse (data.gouv)
+  // Autocomplétion adresse (data.gouv). On ne supprime le pop-up que si l'adresse est DÉJÀ validée
+  // (choisie dans la liste) : après un GPS approximatif, on laisse au contraire les suggestions
+  // s'afficher pour que l'utilisateur sélectionne l'adresse exacte (avec le n° de rue).
   useEffect(() => {
     let cancelled = false;
-    if (debouncedQuery.trim().length < 3) {
+    const q = debouncedQuery.trim();
+    if (q.length < 3 || (debouncedQuery === location.address && location.source === 'adresse')) {
       setSuggestions([]);
       return undefined;
     }
@@ -46,7 +49,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery]);
+  }, [debouncedQuery, location.address]);
 
   const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|drawn
 
@@ -174,10 +177,12 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     setGpsLoading(true);
     try {
       const pos = await getDevicePosition();
-      // Géocodage inverse : renseigne l'adresse (le terrain du dossier CERFA en a besoin). Best effort.
+      // Géocodage inverse : pré-remplit l'adresse (approximative, source 'gps') — l'utilisateur la
+      // confirme/complète ensuite via l'autocomplétion (le CERFA exige le n° de rue exact).
       const { data: rev } = await reverseGeocode(pos.lon, pos.lat);
       onLocation({ lat: pos.lat, lon: pos.lon, accuracy: pos.accuracy, source: 'gps', address: rev?.label || '' });
-      toast.success(rev?.label ? `Position : ${rev.label}` : `Position trouvée (±${Math.round(pos.accuracy)} m)`);
+      setAddressQuery(rev?.label || '');
+      toast.success(rev?.label ? `Position : ${rev.label} — vérifiez l'adresse` : `Position trouvée (±${Math.round(pos.accuracy)} m)`);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -187,7 +192,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
   const pickSuggestion = (s) => {
     onLocation({ lat: s.lat, lon: s.lon, address: s.label, accuracy: null, source: 'adresse' });
-    setAddressQuery('');
+    setAddressQuery(s.label); // adresse confirmée affichée dans le champ (validée pour le dossier)
     setSuggestions([]);
   };
 
@@ -209,6 +214,9 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
   const hasSurface = Number.isFinite(surface) && surface > 0;
   const maxKwc = hasSurface ? maxPowerKwc(surface, config.panel_area_m2, config.panel_power_wc) : 0;
   const hasLocation = location.lat !== null && location.lon !== null;
+  // Adresse « validée » = choisie dans l'autocomplétion BAN (exacte). Le GPS reverse-géocode
+  // ne donne qu'une adresse approximative → à confirmer par l'utilisateur pour le dossier.
+  const addressValidated = location.source === 'adresse' && !!location.address;
   const canContinue = hasLocation && hasSurface && maxKwc > 0 && Number.isFinite(tilt);
 
   // En mode éditeur les inputs sont désactivés tant que le cadenas n'est pas ouvert.
@@ -264,7 +272,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
         </button>
 
         <div className="relative">
-          <FormField label="Ou saisir une adresse">
+          <FormField label="Adresse exacte du logement">
             <input
               className={inputClass}
               value={addressQuery}
@@ -291,15 +299,26 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
         </div>
 
         {hasLocation && (
-          <div className="flex items-center gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
-            <Check className="w-4 h-4 flex-shrink-0" />
-            <span>
-              {location.source === 'gps'
-                ? `Position GPS${location.accuracy ? ` (±${Math.round(location.accuracy)} m)` : ''}`
-                : location.address}
-              {' — '}
-              {location.lat.toFixed(4)}, {location.lon.toFixed(4)}
-            </span>
+          <div className="space-y-2">
+            {/* Statut de validation de l'adresse (exigence dossier : adresse exacte confirmée) */}
+            {addressValidated ? (
+              <div className="flex items-start gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
+                <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Adresse validée : {location.address}</span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 text-sm text-[#B45309] bg-amber-50 border border-[#F5C542] rounded-lg px-3 py-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  Adresse à confirmer pour le dossier — sélectionnez l'adresse exacte (avec le n° de rue)
+                  dans la liste ci-dessus. La position GPS est approximative.
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-secondary-500">
+              Position : {location.lat.toFixed(5)}, {location.lon.toFixed(5)}
+              {location.source === 'gps' && location.accuracy ? ` (±${Math.round(location.accuracy)} m)` : ''}
+            </p>
           </div>
         )}
 
