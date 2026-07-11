@@ -94,7 +94,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                     <input
                       type="number" value={p.thetaInt ?? ''} min={5} max={30}
                       onChange={(e) => majPiece(p.id, { thetaInt: num(e.target.value) })}
-                      className={`${champ} w-14`}
+                      className={`${champ} w-14 text-right`}
                     />
                   ) : (
                     <span className="text-xs text-secondary-400">—</span>
@@ -104,35 +104,35 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                   <input
                     type="number" value={p.longueur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { longueur: num(e.target.value) })}
-                    className={`${champ} w-16`}
+                    className={`${champ} w-16 text-right`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.largeur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { largeur: num(e.target.value) })}
-                    className={`${champ} w-16`}
+                    className={`${champ} w-16 text-right`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.hauteur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { hauteur: num(e.target.value) })}
-                    className={`${champ} w-16`}
+                    className={`${champ} w-16 text-right`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.mlMurExterieur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { mlMurExterieur: num(e.target.value) })}
-                    className={`${champ} w-16`}
+                    className={`${champ} w-16 text-right`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.mlMurLocalNonChauffe ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { mlMurLocalNonChauffe: num(e.target.value) })}
-                    className={`${champ} w-16`}
+                    className={`${champ} w-16 text-right`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
@@ -151,7 +151,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                     <input
                       type="number" value={p.bLocalNonChauffe ?? ''} min={0} max={1} step={0.05}
                       onChange={(e) => majPiece(p.id, { bLocalNonChauffe: num(e.target.value) })}
-                      className={`${champ} w-14`}
+                      className={`${champ} w-14 text-right`}
                     />
                   </div>
                 </td>
@@ -159,7 +159,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                   <input
                     type="number" value={p.surfaceOuverture ?? ''} min={0} step={0.1}
                     onChange={(e) => majPiece(p.id, { surfaceOuverture: num(e.target.value) })}
-                    className={`${champ} w-16`}
+                    className={`${champ} w-16 text-right`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
