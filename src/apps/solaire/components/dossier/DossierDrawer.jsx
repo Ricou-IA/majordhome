@@ -145,13 +145,15 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       });
 
       // Octets PNG de la signature (URL signée → fetch), apposés dans le cadre 7.
+      // Fail-loud : une signature attendue mais illisible NE DOIT PAS produire un CERFA « validé »
+      // sans le tracé manuscrit (document légal défectueux, échec silencieux interdit — Posture #6).
       let signaturePngBytes = null;
       if (cons?.signature_path) {
-        const { url } = await storageService.getSignedUrl(DOCS_BUCKET, cons.signature_path);
-        if (url) {
-          const r = await fetch(url);
-          if (r.ok) signaturePngBytes = new Uint8Array(await r.arrayBuffer());
-        }
+        const { url, error: sigErr } = await storageService.getSignedUrl(DOCS_BUCKET, cons.signature_path);
+        if (sigErr || !url) throw new Error(`Signature illisible : ${sigErr?.message ?? 'URL signée introuvable'}`);
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Signature illisible (HTTP ${r.status})`);
+        signaturePngBytes = new Uint8Array(await r.arrayBuffer());
       }
 
       const { blob: cerfaBlob, missedFields } = await fillCerfa16702(fields, { signaturePngBytes });
@@ -388,7 +390,13 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                 </div>
               ) : (
                 <button
-                  onClick={() => (declarantOk && consentOk ? generate() : setShowValidate(true))}
+                  onClick={() => {
+                    // Route vers l'étape manquante (déclarant → consentement → génération), même
+                    // quand des documents existent déjà (rows legacy ou nouvel item de consentement).
+                    if (!declarantOk) setShowValidate(true);
+                    else if (!consentOk) setShowConsent(true);
+                    else generate();
+                  }}
                   disabled={busy}
                   className="w-full py-2.5 flex items-center justify-center gap-2 rounded-lg border border-secondary-200 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
                 >
