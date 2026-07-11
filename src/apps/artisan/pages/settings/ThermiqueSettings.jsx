@@ -36,6 +36,7 @@ const BOUNDS = {
   theta_non_chauffage: { min: 10, max: 20 },
   prix_kwh: { min: 0.05, max: 1 },
   facteur_ajustement: { min: 0.5, max: 1.5 },
+  foisonnement_emetteur: { min: 1, max: 1.5 },
 };
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -54,6 +55,7 @@ function pickThermiqueForm(config) {
     theta_non_chauffage: config.theta_non_chauffage,
     prix_kwh: config.prix_kwh,
     facteur_ajustement: config.facteur_ajustement,
+    foisonnement_emetteur: config.foisonnement_emetteur,
   };
 }
 
@@ -63,7 +65,8 @@ function validateThermiqueForm(form) {
   return inRange(form.f_rh, BOUNDS.f_rh)
     && inRange(form.theta_non_chauffage, BOUNDS.theta_non_chauffage)
     && inRange(form.prix_kwh, BOUNDS.prix_kwh)
-    && inRange(form.facteur_ajustement, BOUNDS.facteur_ajustement);
+    && inRange(form.facteur_ajustement, BOUNDS.facteur_ajustement)
+    && inRange(form.foisonnement_emetteur, BOUNDS.foisonnement_emetteur);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +212,21 @@ function CalculTab({ form, patch }) {
             max={BOUNDS.facteur_ajustement.max}
             hint="Correction du besoin annuel — apports gratuits/intermittence, à calibrer"
             onChange={(v) => patch({ facteur_ajustement: v })}
+          />
+        </div>
+      </div>
+      <div>
+        <SectionTitle>Dimensionnement émetteurs</SectionTitle>
+        <div className="grid sm:grid-cols-2 gap-4 mt-3">
+          <NumberField
+            label="Foisonnement émetteur"
+            value={form.foisonnement_emetteur}
+            step={0.05}
+            min={BOUNDS.foisonnement_emetteur.min}
+            max={BOUNDS.foisonnement_emetteur.max}
+            suffix="×"
+            hint="Coefficient de surdimensionnement appliqué par émetteur (radiateur/plancher) à partir de la déperdition de la pièce"
+            onChange={(v) => patch({ foisonnement_emetteur: v })}
           />
         </div>
       </div>
