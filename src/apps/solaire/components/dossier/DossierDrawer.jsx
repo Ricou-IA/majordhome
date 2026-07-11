@@ -6,27 +6,40 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
-  X, FileCheck, Loader2, Check, Minus, AlertTriangle, ShieldAlert, ShieldCheck,
+  X, FileCheck, FileSignature, Loader2, Check, Minus, AlertTriangle, ShieldAlert, ShieldCheck,
   FileDown, RefreshCw, FolderOpen,
 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { usePvDossier, usePvDossierMutations } from '@hooks/usePvDossier';
 import { pvService } from '@services/pv.service';
+import { pvDossierService } from '@services/pvDossier.service';
 import { storageService } from '@services/storage.service';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { formatDateFR, formatDateShortFR } from '@lib/utils';
 import { logger } from '@lib/logger';
 import { buildPvConfig } from '../../lib/pvConfig';
 import { downloadBlob } from '../../lib/etudeExport';
+import { buildConsentItems } from '../../lib/consentItems';
 import { buildCerfaFields } from '../../lib/cerfa16702';
 import { fillCerfa16702 } from '../../lib/fillCerfa';
 import { buildNoticeModel, parseAddressFR } from '../../lib/dossierDocs';
 import { PV_DOSSIER_STATUS_LABELS } from '../../lib/pvDossierStatus';
 import { generateNoticePdfBlob } from './NoticePDF';
 import ValidateDossierModal from './ValidateDossierModal';
+import ConsentSignatureModal from './ConsentSignatureModal';
 
 const DOCS_BUCKET = 'product-documents';
+
+/** data:image/png;base64,… → Blob (upload signature). */
+function dataUrlToBlob(dataUrl) {
+  const [head, b64] = dataUrl.split(',');
+  const mime = (head.match(/:(.*?);/) || [])[1] || 'image/png';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
 
 function ChecklistRow({ ok, warn, label, detail }) {
   const Icon = ok ? Check : warn ? AlertTriangle : Minus;
@@ -49,6 +62,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
   const { data: dossier, isLoading } = usePvDossier(open ? simulation?.id : null);
   const { patchBlock, advance } = usePvDossierMutations();
   const [showValidate, setShowValidate] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState(null);
 
@@ -61,66 +75,103 @@ export default function DossierDrawer({ open, onClose, simulation }) {
   // naissance. Sinon la régénération réutiliserait un déclarant partiel (date vide → CERFA incomplet).
   const d = dossier?.declarant;
   const declarantOk = Boolean(d?.nom && d?.prenom && d?.date_naissance && d?.naissance_commune);
+  const consent = dossier?.consent ?? null;
+  const consentItems = buildConsentItems(buildCompanyInfo(settings).name);
+  const consentOk = Boolean(
+    consent?.signature_path
+    && consentItems.filter((c) => c.required).every((c) => consent.items?.[c.key]?.accepted),
+  );
   const docs = dossier?.documents ?? null;
   const abf = dossier?.abf ?? null;
 
-  // Génération complète — appelée à la validation (et à la régénération, déclarant déjà connu).
-  const generate = async (declarant) => {
+  // Étape 1 — persiste l'état civil du déclarant (sans générer).
+  const saveDeclarant = async (declarant) => {
     setBusy(true);
     try {
-      // 1. Persiste le déclarant (write-once : réutilisé aux régénérations)
-      const patched = await patchBlock.mutateAsync({ id: dossier.id, patch: { declarant } });
+      await patchBlock.mutateAsync({ id: dossier.id, patch: { declarant } });
+      setShowValidate(false);
+      toast.success('État civil enregistré');
+    } catch (err) {
+      toast.error(`Échec : ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-      // 2. Simulation complète (inputs pas toujours présents dans la ligne de liste)
+  // Étape 2 — upload de la signature (Storage org-scopé) + persistance du consentement.
+  const saveConsent = async (block, dataUrl) => {
+    setBusy(true);
+    try {
+      const path = `${orgId}/solaire/dossiers/${dossier.id}/signature.png`;
+      const up = await storageService.uploadFile(DOCS_BUCKET, path, dataUrlToBlob(dataUrl), {
+        upsert: true, contentType: 'image/png',
+      });
+      if (up.error) throw new Error(`Upload signature : ${up.error.message}`);
+      await patchBlock.mutateAsync({ id: dossier.id, patch: { consent: { ...block, signature_path: path } } });
+      setShowConsent(false);
+      toast.success('Consentement & signature enregistrés');
+    } catch (err) {
+      toast.error(`Échec : ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Étape 3 — génère CERFA + notice depuis les blocs déjà persistés (relit le dossier frais).
+  const generate = async () => {
+    setBusy(true);
+    try {
+      const { data: fresh, error: dErr } = await pvDossierService.getBySimulation(orgId, simulation.id);
+      if (dErr || !fresh) throw dErr || new Error('Dossier introuvable');
       const { data: sim, error: simErr } = await pvService.getById(orgId, simulation.id);
       if (simErr || !sim) throw simErr || new Error('Simulation introuvable');
 
-      // 3. Modèle notice + champs CERFA (description partagée)
       const config = buildPvConfig(settings);
-      const freshDossier = { ...dossier, ...patched, declarant };
-      const noticeModel = buildNoticeModel({ dossier: freshDossier, simulation: sim, config });
-      // Adresse du terrain : l'adresse saisie ; sinon (localisation GPS = pas d'adresse) on retombe
-      // sur l'adresse du déclarant (le terrain EST la résidence pour une pose en toiture).
+      const declarant = fresh.declarant;
+      const cons = fresh.consent;
+      const noticeModel = buildNoticeModel({ dossier: fresh, simulation: sim, config });
+      // Adresse du terrain : l'adresse saisie ; sinon (GPS) on retombe sur l'adresse du déclarant.
       const terrainParsed = parseAddressFR(sim.client_address ?? '');
-      const terrain = terrainParsed.localite ? terrainParsed : (declarant.adresse ?? terrainParsed);
+      const terrain = terrainParsed.localite ? terrainParsed : (declarant?.adresse ?? terrainParsed);
       const fields = buildCerfaFields({
         declarant,
         terrain,
-        parcelles: freshDossier.cadastre?.parcelles ?? [],
-        abf: freshDossier.abf,
+        parcelles: fresh.cadastre?.parcelles ?? [],
+        abf: fresh.abf,
         description: noticeModel.projet.description,
         todayIso: new Date().toISOString().slice(0, 10),
+        signedAtIso: cons?.signed_at,
+        signatureLieu: cons?.lieu,
       });
 
-      // 4. CERFA rempli + notice brandée
-      const { blob: cerfaBlob, missedFields } = await fillCerfa16702(fields);
+      // Octets PNG de la signature (URL signée → fetch), apposés dans le cadre 7.
+      let signaturePngBytes = null;
+      if (cons?.signature_path) {
+        const { url } = await storageService.getSignedUrl(DOCS_BUCKET, cons.signature_path);
+        if (url) {
+          const r = await fetch(url);
+          if (r.ok) signaturePngBytes = new Uint8Array(await r.arrayBuffer());
+        }
+      }
+
+      const { blob: cerfaBlob, missedFields } = await fillCerfa16702(fields, { signaturePngBytes });
       if (missedFields.length) {
-        // Échec partiel surfacé, jamais silencieux — le PDF reste utilisable, à compléter à la main.
         toast.warning(`${missedFields.length} champ(s) CERFA non remplis automatiquement — à vérifier sur le PDF.`);
         logger.warn('[dossier] champs CERFA manqués', missedFields);
       }
       if (fields.overflowParcelles) {
-        // 3 slots seulement sur le formulaire — les suivantes exigent la fiche complémentaire papier.
         toast.warning('Le CERFA ne porte que 3 références cadastrales — joindre la fiche complémentaire pour les parcelles restantes (toutes listées dans la notice).');
-        logger.warn('[dossier] parcelles au-delà des 3 slots CERFA', freshDossier.cadastre?.parcelles?.length);
+        logger.warn('[dossier] parcelles au-delà des 3 slots CERFA', fresh.cadastre?.parcelles?.length);
       }
       const company = buildCompanyInfo(settings);
-      const noticeBlob = await generateNoticePdfBlob({
-        model: noticeModel, company, dateLabel: formatDateFR(new Date()),
-      });
+      const noticeBlob = await generateNoticePdfBlob({ model: noticeModel, company, dateLabel: formatDateFR(new Date()) });
 
-      // 5. Upload Storage (préfixe orgId obligatoire — policies bucket)
       const base = `${orgId}/solaire/dossiers/${dossier.id}`;
-      const up1 = await storageService.uploadFile(DOCS_BUCKET, `${base}/cerfa-dp.pdf`, cerfaBlob, {
-        upsert: true, contentType: 'application/pdf',
-      });
+      const up1 = await storageService.uploadFile(DOCS_BUCKET, `${base}/cerfa-dp.pdf`, cerfaBlob, { upsert: true, contentType: 'application/pdf' });
       if (up1.error) throw new Error(`Upload CERFA : ${up1.error.message}`);
-      const up2 = await storageService.uploadFile(DOCS_BUCKET, `${base}/notice-descriptive.pdf`, noticeBlob, {
-        upsert: true, contentType: 'application/pdf',
-      });
+      const up2 = await storageService.uploadFile(DOCS_BUCKET, `${base}/notice-descriptive.pdf`, noticeBlob, { upsert: true, contentType: 'application/pdf' });
       if (up2.error) throw new Error(`Upload notice : ${up2.error.message}`);
 
-      // 6. Références documents + avancée de statut (idempotent, forward-only)
       await patchBlock.mutateAsync({
         id: dossier.id,
         patch: {
@@ -134,7 +185,6 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       if (dossier.status === 'offre') {
         await advance.mutateAsync({ id: dossier.id, targetStatus: 'dossier_valide' });
       }
-      setShowValidate(false);
       toast.success('CERFA + notice générés — dossier validé');
     } catch (err) {
       toast.error(`Génération interrompue : ${err.message}`);
@@ -246,6 +296,13 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                   label="État civil du déclarant"
                   detail={declarantOk ? `${dossier.declarant.prenom} ${dossier.declarant.nom}` : 'Complété à la validation'}
                 />
+                <ChecklistRow
+                  ok={consentOk}
+                  label="Consentement & signature"
+                  detail={consentOk
+                    ? `Signé par ${consent.signataire_nom} — ${formatDateShortFR(consent.signed_at)}`
+                    : 'Recueilli sur la tablette avec le client'}
+                />
               </div>
 
               {/* Bandeau ABF (rappel visuel) */}
@@ -292,30 +349,52 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                 </div>
               )}
 
-              {/* CTA validation / régénération */}
+              {/* Étapes séquentielles : état civil → consentement+signature → génération */}
               {!docs?.cerfa_pdf_path ? (
-                <button
-                  onClick={() => setShowValidate(true)}
-                  disabled={!cadastreOk || busy}
-                  className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
-                  Valider le dossier (CERFA + notice)
-                </button>
+                <div className="space-y-2">
+                  {!declarantOk && (
+                    <button
+                      onClick={() => setShowValidate(true)}
+                      disabled={!cadastreOk || busy}
+                      className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <FileCheck className="w-4 h-4" /> Compléter l'état civil du déclarant
+                    </button>
+                  )}
+                  {declarantOk && !consentOk && (
+                    <button
+                      onClick={() => setShowConsent(true)}
+                      disabled={busy}
+                      className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <FileSignature className="w-4 h-4" /> Recueillir le consentement & la signature
+                    </button>
+                  )}
+                  {declarantOk && consentOk && (
+                    <button
+                      onClick={generate}
+                      disabled={!cadastreOk || busy}
+                      className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
+                      Générer le CERFA + la notice
+                    </button>
+                  )}
+                  {!cadastreOk && (
+                    <p className="text-xs text-secondary-500 text-center">
+                      Les références cadastrales sont requises (étape Localisation).
+                    </p>
+                  )}
+                </div>
               ) : (
                 <button
-                  onClick={() => (declarantOk ? generate(dossier.declarant) : setShowValidate(true))}
+                  onClick={() => (declarantOk && consentOk ? generate() : setShowValidate(true))}
                   disabled={busy}
                   className="w-full py-2.5 flex items-center justify-center gap-2 rounded-lg border border-secondary-200 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   Régénérer les documents
                 </button>
-              )}
-              {!cadastreOk && !docs?.cerfa_pdf_path && (
-                <p className="text-xs text-secondary-500 text-center -mt-2">
-                  Les références cadastrales sont requises avant validation.
-                </p>
               )}
             </>
           )}
@@ -329,7 +408,18 @@ export default function DossierDrawer({ open, onClose, simulation }) {
         initialDeclarant={dossier?.declarant ?? null}
         clientName={simulation.client_name}
         terrainAdresse={parseAddressFR(simulation.client_address ?? '')}
-        onSubmit={generate}
+        onSubmit={saveDeclarant}
+      />
+
+      <ConsentSignatureModal
+        open={showConsent}
+        onClose={() => setShowConsent(false)}
+        isSubmitting={busy}
+        consentItems={consentItems}
+        initialConsent={consent}
+        signataireDefaut={dossier?.declarant ? `${dossier.declarant.prenom} ${dossier.declarant.nom}` : (simulation.client_name || '')}
+        lieuDefaut={parseAddressFR(simulation.client_address ?? '').localite}
+        onSubmit={saveConsent}
       />
     </div>
   );
