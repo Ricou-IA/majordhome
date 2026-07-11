@@ -14,6 +14,11 @@
 //   (fiche complémentaire papier à joindre).
 // - Champs vides : ABSENTS du mapping (on ne setText('') jamais — laisse le PDF vierge).
 
+// Champs à aligner à DROITE au remplissage : leur texte doit toucher un séparateur imprimé
+// juste à leur droite. D5GE1_email (partie locale avant « @ ») est un champ large aligné à
+// gauche → « e.pudebat » flotte loin du « @ » imprimé ; aligné à droite, il colle au @.
+export const CERFA_RIGHT_ALIGNED = ['D5GE1_email'];
+
 const DATE_ISO_RE = /^(\d{4})-(\d{2})-(\d{2})/;
 
 /** '1980-03-07' → '07031980' (les champs date du CERFA font 8 chars, JJMMAAAA). */

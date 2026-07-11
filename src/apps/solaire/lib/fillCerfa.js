@@ -2,10 +2,12 @@
 // Remplissage runtime du CERFA 16702*03 (AcroForm) via pdf-lib, depuis le PDF officiel
 // commité en asset (version figée — pas de fetch service-public à la volée).
 // Le field map est pur et testé dans cerfa16702.js ; ici : I/O + pdf-lib uniquement.
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, TextAlignment } from 'pdf-lib';
 import { logger } from '@lib/logger';
 import cerfaUrl from '../assets/cerfa_16702-03.pdf?url';
-import { sanitizeWinAnsi } from './cerfa16702';
+import { sanitizeWinAnsi, CERFA_RIGHT_ALIGNED } from './cerfa16702';
+
+const RIGHT_ALIGNED = new Set(CERFA_RIGHT_ALIGNED);
 
 /**
  * Remplit puis aplatit le CERFA. Un champ introuvable/récalcitrant ne bloque pas les
@@ -27,6 +29,7 @@ export async function fillCerfa16702(fields) {
       const safe = sanitizeWinAnsi(value);
       const max = field.getMaxLength();
       field.setText(max != null && safe.length > max ? safe.slice(0, max) : safe);
+      if (RIGHT_ALIGNED.has(name)) field.setAlignment(TextAlignment.Right);
     } catch (err) {
       missedFields.push(name);
       logger.warn(`[cerfa] champ texte non rempli : ${name}`, err);
