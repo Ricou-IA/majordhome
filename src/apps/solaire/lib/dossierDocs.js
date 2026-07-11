@@ -15,7 +15,9 @@ export function compassLabel(azimuthCompass) {
 
 // « 12 bis rue X 81600 Gaillac » (format BAN) → composantes du CERFA. Best effort :
 // les champs restent éditables dans la modale de validation, jamais bloquant.
-const ADDR_FULL_RE = /^(\d+\s?(?:bis|ter|quater)?)\s+(.+?)\s+(\d{5})\s+(.+)$/i;
+// Le n° accepte un suffixe : bis/ter/quater (avec ou sans espace) OU une lettre accolée (7b, 12B).
+// L'ordre des alternatives compte : bis/ter/quater d'abord (sinon « [a-zA-Z] » n'attraperait que le « b »).
+const ADDR_FULL_RE = /^(\d+(?:\s*(?:bis|ter|quater)|[a-zA-Z])?)\s+(.+?)\s+(\d{5})\s+(.+)$/i;
 const ADDR_CP_RE = /^(.+?)\s+(\d{5})\s+(.+)$/;
 
 export function parseAddressFR(raw) {

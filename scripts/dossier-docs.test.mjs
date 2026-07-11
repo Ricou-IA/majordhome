@@ -78,6 +78,17 @@ test('parseAddressFR — formats BAN courants → { numero, voie, code_postal, l
   assert.deepEqual(parseAddressFR('4 bis Chemin des Vignes 81150 Marssac-sur-Tarn'), {
     numero: '4 bis', voie: 'Chemin des Vignes', lieudit: '', code_postal: '81150', localite: 'Marssac-sur-Tarn',
   });
+  // numéro avec lettre accolée (7b, 12B) : le n° ne doit PAS être avalé par la voie
+  assert.deepEqual(parseAddressFR('7b Route des Bardis 31320 Rebigue'), {
+    numero: '7b', voie: 'Route des Bardis', lieudit: '', code_postal: '31320', localite: 'Rebigue',
+  });
+  assert.deepEqual(parseAddressFR('12B Avenue Foch 31000 Toulouse'), {
+    numero: '12B', voie: 'Avenue Foch', lieudit: '', code_postal: '31000', localite: 'Toulouse',
+  });
+  // « bis » accolé sans espace
+  assert.deepEqual(parseAddressFR('7bis Rue du Pont 81000 Albi'), {
+    numero: '7bis', voie: 'Rue du Pont', lieudit: '', code_postal: '81000', localite: 'Albi',
+  });
   // sans numéro : tout dans la voie, CP/ville extraits
   assert.deepEqual(parseAddressFR('Lieu-dit Les Fargues 81300 Graulhet'), {
     numero: '', voie: 'Lieu-dit Les Fargues', lieudit: '', code_postal: '81300', localite: 'Graulhet',

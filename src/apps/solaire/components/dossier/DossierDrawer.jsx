@@ -130,9 +130,11 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       const declarant = fresh.declarant;
       const cons = fresh.consent;
       const noticeModel = buildNoticeModel({ dossier: fresh, simulation: sim, config });
-      // Adresse du terrain : l'adresse saisie ; sinon (GPS) on retombe sur l'adresse du déclarant.
-      const terrainParsed = parseAddressFR(sim.client_address ?? '');
-      const terrain = terrainParsed.localite ? terrainParsed : (declarant?.adresse ?? terrainParsed);
+      // Adresse du terrain : l'adresse STRUCTURÉE confirmée par l'utilisateur (modale déclarant)
+      // FAIT FOI — le n° y est saisi/validé explicitement. On ne retombe sur le reparse du libellé
+      // (best effort, peut manquer le n°) que si le déclarant n'a pas d'adresse.
+      const declAdr = declarant?.adresse;
+      const terrain = (declAdr && (declAdr.voie || declAdr.localite)) ? declAdr : parseAddressFR(sim.client_address ?? '');
       const fields = buildCerfaFields({
         declarant,
         terrain,
