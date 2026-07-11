@@ -14,17 +14,14 @@ import { clientsService } from '@services/clients.service';
 import { logger } from '@lib/logger';
 import { buildThermiqueConfig } from '../lib/thermiqueConfig';
 import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft, toStudyInput } from '../lib/wizardState';
-import { valideDessin } from '../lib/dessinOps';
 import Step1Contexte from '../components/wizard/Step1Contexte';
-import Step2Dessin from '../components/wizard/Step2Dessin';
-import Step3OuverturesCompositions from '../components/wizard/Step3OuverturesCompositions';
+import Step2EmprisePieces from '../components/wizard/Step2EmprisePieces';
 import Step4Resultats from '../components/wizard/Step4Resultats';
 
 const STEPS = [
   { n: 1, label: 'Contexte' },
-  { n: 2, label: 'Dessin' },
-  { n: 3, label: 'Ouvertures & compositions' },
-  { n: 4, label: 'Résultats' },
+  { n: 2, label: 'Emprise & pièces' },
+  { n: 3, label: 'Résultats' },
 ];
 
 export default function ThermiqueWizard() {
@@ -150,24 +147,20 @@ function WizardInner({ config }) {
   }, [state, userId, etudeId]);
 
   // --- Gating navigation ---
-  const dessinCheck = useMemo(() => valideDessin(state.dessin), [state.dessin]);
-  const hasPieceChauffee = state.dessin.pieces.some((p) => p.chauffee);
+  const hasPieceChauffeeValide = state.saisie.pieces.some((p) => p.chauffee && Number.isFinite(p.thetaInt));
 
   const blockedReason = (targetStep) => {
     if (targetStep >= 2 && state.contexte.dept == null) {
       return 'Sélectionnez une commune pour continuer';
     }
-    if (targetStep >= 4) {
-      if (dessinCheck.erreurs.length > 0) {
-        return `Corrigez le dessin (${dessinCheck.erreurs.length} erreur${dessinCheck.erreurs.length > 1 ? 's' : ''})`;
-      }
-      if (!hasPieceChauffee) return 'Ajoutez au moins une pièce chauffée au dessin';
+    if (targetStep >= 3 && !hasPieceChauffeeValide) {
+      return 'Ajoutez au moins une pièce chauffée avec sa consigne';
     }
     return null;
   };
 
   const goToStep = (n) => dispatch({ type: 'SET_STEP', step: n });
-  const nextBlocked = state.step < 4 ? blockedReason(state.step + 1) : null;
+  const nextBlocked = state.step < 3 ? blockedReason(state.step + 1) : null;
 
   const handleNew = () => {
     clearDraft(userId);
@@ -208,7 +201,7 @@ function WizardInner({ config }) {
   }
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <div className={`space-y-5 mx-auto ${state.step === 2 ? 'max-w-7xl' : 'max-w-4xl'}`}>
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -267,33 +260,25 @@ function WizardInner({ config }) {
       {state.step === 1 && (
         <Step1Contexte
           contexte={state.contexte}
-          dessin={state.dessin}
+          saisie={state.saisie}
           communeInitialQuery={communeInitialQuery}
           onPatchContexte={(patch) => dispatch({ type: 'PATCH_CONTEXTE', patch })}
-          onSetDessin={(dessin) => dispatch({ type: 'SET_DESSIN', dessin })}
+          onSetSaisie={(saisie) => dispatch({ type: 'SET_SAISIE', saisie })}
           onCommune={({ commune, dju, djuFallback }) => dispatch({ type: 'SET_COMMUNE', commune, dju, djuFallback })}
         />
       )}
       {state.step === 2 && (
-        <Step2Dessin
-          dessin={state.dessin}
+        <Step2EmprisePieces
+          saisie={state.saisie}
+          compositions={state.compositions}
           config={config}
-          onDessinChange={(dessin) => dispatch({ type: 'SET_DESSIN', dessin })}
+          annee={state.contexte.annee}
+          onSaisieChange={(saisie) => dispatch({ type: 'SET_SAISIE', saisie })}
+          onPatchCompositions={(patch) => dispatch({ type: 'PATCH_COMPOSITIONS', patch })}
+          onExceptionParoi={(cle, u) => dispatch({ type: 'SET_EXCEPTION_PAROI', cle, u })}
         />
       )}
       {state.step === 3 && (
-        <Step3OuverturesCompositions
-          dessin={state.dessin}
-          compositions={state.compositions}
-          annee={state.contexte.annee}
-          dessinCheck={dessinCheck}
-          onDessinChange={(dessin) => dispatch({ type: 'SET_DESSIN', dessin })}
-          onPatchCompositions={(patch) => dispatch({ type: 'PATCH_COMPOSITIONS', patch })}
-          onExceptionParoi={(cle, u) => dispatch({ type: 'SET_EXCEPTION_PAROI', cle, u })}
-          onExceptionOuverture={(ouvertureId, u) => dispatch({ type: 'SET_EXCEPTION_OUVERTURE', ouvertureId, u })}
-        />
-      )}
-      {state.step === 4 && (
         <Step4Resultats
           state={state}
           config={config}
@@ -317,7 +302,7 @@ function WizardInner({ config }) {
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
-          {state.step < 4 && (
+          {state.step < 3 && (
             <button
               onClick={() => goToStep(state.step + 1)}
               disabled={!!nextBlocked}

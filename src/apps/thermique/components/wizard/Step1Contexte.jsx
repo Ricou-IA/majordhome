@@ -1,7 +1,7 @@
 // src/apps/thermique/components/wizard/Step1Contexte.jsx
 // Étape 1 du wizard Thermique : titre, commune (→ θe/DJU), bâtiment (année, isolation,
 // toiture, plancher bas, ventilation, relance). Les choix géométriques structurels
-// (plancherBasType, toitureType) vivent dans `dessin` → SET_DESSIN ; le reste → PATCH_CONTEXTE.
+// (plancherBasType, toitureType) vivent dans `saisie` → SET_SAISIE ; le reste → PATCH_CONTEXTE.
 import { useRef } from 'react';
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
 import { climat, ventilation } from '../../data';
@@ -45,7 +45,7 @@ function thetaEDerive(dept, altitude) {
   }
 }
 
-export default function Step1Contexte({ contexte, dessin, communeInitialQuery, onPatchContexte, onSetDessin, onCommune }) {
+export default function Step1Contexte({ contexte, saisie, communeInitialQuery, onPatchContexte, onSetSaisie, onCommune }) {
   // Auto-défaut isolation : appliqué au PREMIER remplissage de l'année (au blur, pour ne pas
   // réagir aux frappes intermédiaires « 1 », « 19 »…), jamais après un choix manuel.
   const isolationTouchedRef = useRef(false);
@@ -168,13 +168,13 @@ export default function Step1Contexte({ contexte, dessin, communeInitialQuery, o
 
           <FormField label="Type de toiture">
             <SelectInput
-              value={dessin.toitureType}
-              onChange={(v) => v && onSetDessin({ ...dessin, toitureType: v })}
+              value={saisie.toitureType}
+              onChange={(v) => v && onSetSaisie({ ...saisie, toitureType: v })}
               options={TOITURE_OPTIONS}
             />
           </FormField>
 
-          {dessin.toitureType === 'comble' && (
+          {saisie.toitureType === 'comble' && (
             <FormField label="Type de comble">
               <SelectInput
                 value={contexte.combleIsolation}
@@ -186,8 +186,8 @@ export default function Step1Contexte({ contexte, dessin, communeInitialQuery, o
 
           <FormField label="Type de plancher bas">
             <SelectInput
-              value={dessin.plancherBasType}
-              onChange={(v) => v && onSetDessin({ ...dessin, plancherBasType: v })}
+              value={saisie.plancherBasType}
+              onChange={(v) => v && onSetSaisie({ ...saisie, plancherBasType: v })}
               options={PLANCHER_BAS_OPTIONS}
             />
           </FormField>
@@ -201,7 +201,7 @@ export default function Step1Contexte({ contexte, dessin, communeInitialQuery, o
           </FormField>
         </div>
 
-        {dessin.plancherBasType === 'sous-sol' && (
+        {saisie.plancherBasType === 'sous-sol' && (
           <label className="flex items-center gap-2 text-sm text-secondary-700">
             <input
               type="checkbox"
