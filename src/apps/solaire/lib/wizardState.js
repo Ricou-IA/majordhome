@@ -24,7 +24,14 @@ export function initialWizardState(config) {
 export function wizardReducer(state, action) {
   switch (action.type) {
     case 'SET_STEP': return { ...state, step: action.step };
-    case 'SET_LOCATION': return { ...state, location: { ...state.location, ...action.patch }, pvgis: null, roofGeometry: null, pans: [], cadastre: null, abf: null };
+    case 'SET_LOCATION': {
+      // Ne purge l'état dérivé (pvgis/toiture/cadastre/abf) que si les coords changent VRAIMENT :
+      // re-sélectionner la même adresse ne doit pas détruire les captures (pas de remount par key).
+      const nextLoc = { ...state.location, ...action.patch };
+      const moved = nextLoc.lat !== state.location.lat || nextLoc.lon !== state.location.lon;
+      if (!moved) return { ...state, location: nextLoc };
+      return { ...state, location: nextLoc, pvgis: null, roofGeometry: null, pans: [], cadastre: null, abf: null };
+    }
     case 'SET_ROOF_GEOMETRY': return { ...state, roofGeometry: action.value };
     case 'SET_CADASTRE': return { ...state, cadastre: action.parcelles };
     case 'SET_ABF': return { ...state, abf: action.abf };

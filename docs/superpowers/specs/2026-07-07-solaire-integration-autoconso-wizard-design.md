@@ -1,6 +1,6 @@
 # Design — Intégration du moteur horaire d'autoconso dans le wizard solaire
 
-> Statut : **À VALIDER par Eric** (touche du code LIVRÉ : `buildEtudeModel`, Step2, Step3, PDF). Décision de flux : **option A** (optimisation dans Résultats). Contexte : [[project_solaire_autoconso_batterie]].
+> Statut : **LIVRÉ** (P1→P6 exécutés, commits `93f97c4`→`b606917` + affinages `c8c4220`/`f47fd1c`/`1248565` — constat 2026-07-11). Restent hors périmètre : Sankey/cascade dans le PDF, edge `seriescalc` par adresse (raffinement). Décision de flux : **option A** (optimisation dans Résultats). Contexte : [[project_solaire_autoconso_batterie]].
 
 ## 1. Flux cible (validé Eric)
 1. **Capacité productive** — Localisation + map/pans → kWc (PVGIS). *[existant]*

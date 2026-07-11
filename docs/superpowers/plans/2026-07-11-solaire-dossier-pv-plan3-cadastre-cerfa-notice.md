@@ -1,5 +1,7 @@
 # Dossier PV — Cadastre + ABF + CERFA 16702 + Notice (Tranche 1 · Plans 3-4/4) — Implementation Plan
 
+> **Statut : LIVRÉ 2026-07-11** — Tasks 1-7 exécutées (commits `fc5c32e` → fixes revue). 20 tests node verts, build + lint OK. Revue adversariale 12 agents : 6 findings confirmés, tous corrigés (init carte cadastre sur [status], downloadBlob au lieu de window.open, purge SET_LOCATION seulement si coords changent, overflow parcelles surfacé à la génération, aspect matériel persisté hors défaut, échec patch dossier toasté en prod). Reste côté humain : test end-to-end dans l'app (capturer parcelle → valider dossier → contrôler le CERFA généré).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Boucler le réglementaire de la tranche 1 du chaînage dossier PV : capture cadastre (parcelles apicarto IGN, sélection multi-parcelles sur carte) + statut ABF (GPU), config matériel dans l'offre, validation du dossier (état civil déclarant) et génération du **CERFA 16702\*03 pré-rempli** + **notice descriptive** brandée — sans aucune resaisie (write-once).

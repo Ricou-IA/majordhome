@@ -18,6 +18,7 @@ import { buildCompanyInfo } from '@lib/orgBranding';
 import { formatDateFR, formatDateShortFR } from '@lib/utils';
 import { logger } from '@lib/logger';
 import { buildPvConfig } from '../../lib/pvConfig';
+import { downloadBlob } from '../../lib/etudeExport';
 import { buildCerfaFields } from '../../lib/cerfa16702';
 import { fillCerfa16702 } from '../../lib/fillCerfa';
 import { buildNoticeModel, parseAddressFR } from '../../lib/dossierDocs';
@@ -91,6 +92,11 @@ export default function DossierDrawer({ open, onClose, simulation }) {
         toast.warning(`${missedFields.length} champ(s) CERFA non remplis automatiquement — à vérifier sur le PDF.`);
         logger.warn('[dossier] champs CERFA manqués', missedFields);
       }
+      if (fields.overflowParcelles) {
+        // 3 slots seulement sur le formulaire — les suivantes exigent la fiche complémentaire papier.
+        toast.warning('Le CERFA ne porte que 3 références cadastrales — joindre la fiche complémentaire pour les parcelles restantes (toutes listées dans la notice).');
+        logger.warn('[dossier] parcelles au-delà des 3 slots CERFA', freshDossier.cadastre?.parcelles?.length);
+      }
       const company = buildCompanyInfo(settings);
       const noticeBlob = await generateNoticePdfBlob({
         model: noticeModel, company, dateLabel: formatDateFR(new Date()),
@@ -135,7 +141,11 @@ export default function DossierDrawer({ open, onClose, simulation }) {
     try {
       const { url, error } = await storageService.getSignedUrl(DOCS_BUCKET, path);
       if (error || !url) throw error || new Error('URL signée introuvable');
-      window.open(url, '_blank', 'noopener');
+      // Pas de window.open post-await : popup bloquée = échec silencieux (iPad terrain).
+      // downloadBlob (ancre programmatique) est fiable et tout échec fetch throw → toast.
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      downloadBlob(await res.blob(), path.split('/').pop());
     } catch (err) {
       toast.error(`Téléchargement ${label} impossible : ${err.message}`);
     } finally {

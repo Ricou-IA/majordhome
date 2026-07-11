@@ -85,8 +85,11 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
   toggleRef.current = toggleParcelle;
 
   // Carte : parcelles voisines en liseré, sélectionnées en jaune, clic = toggle.
+  // ⚠️ Le container n'est rendu QUE quand status==='ok' → l'init doit se déclencher sur [status]
+  // (avec deps [], l'effet tournerait pendant 'loading' sur un containerRef null et la carte ne
+  // serait JAMAIS créée). Idempotent via mapRef ; status est terminal après 'ok'.
   useEffect(() => {
-    if (!containerRef.current || !MAPBOX_CONFIG.accessToken || location.lat == null) return undefined;
+    if (status !== 'ok' || mapRef.current || !containerRef.current || !MAPBOX_CONFIG.accessToken || location.lat == null) return undefined;
     mapboxgl.accessToken = MAPBOX_CONFIG.accessToken;
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -123,7 +126,7 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [status]);
 
   // Alimente la source (voisines) — attend le style prêt si l'init n'est pas finie.
   useEffect(() => {

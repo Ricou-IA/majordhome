@@ -163,7 +163,13 @@ function SimulateurInner({ config, settings }) {
       const roofGeometryPatch = state.pans?.length
         ? { source: 'drawn_pans', pans: state.pans }
         : state.roofGeometry;
-      const materialFilled = state.material && (state.material.module_marque || state.material.module_modele);
+      // Persisté dès qu'un champ diffère du défaut (un aspect non-défaut choisi sans marque
+      // doit atteindre le dossier, sinon la notice affirmerait « full black » à tort).
+      const materialFilled = state.material && (
+        state.material.module_marque
+        || state.material.module_modele
+        || (state.material.module_aspect && state.material.module_aspect !== 'full_black')
+      );
       const dossierPatch = {
         ...(roofGeometryPatch ? { roof_geometry: roofGeometryPatch } : {}),
         ...(state.cadastre?.length ? { cadastre: toDbCadastre(state.cadastre) } : {}),
@@ -177,7 +183,10 @@ function SimulateurInner({ config, settings }) {
             await patchBlock.mutateAsync({ id: dossier.id, patch: dossierPatch });
           }
         } catch (dossierErr) {
-          logger.warn('[solaire] blocs dossier non persistés', dossierErr); // non bloquant
+          // Non bloquant pour la sauvegarde, mais JAMAIS silencieux (logger.warn est no-op en prod) :
+          // le commercial doit savoir que la parcelle n'est pas au dossier + le geste de récupération.
+          logger.error('[solaire] blocs dossier non persistés', dossierErr);
+          toast.warning("Simulation enregistrée, mais le dossier PV (cadastre/ABF/matériel) n'a pas pu être mis à jour — rechargez-la depuis l'historique et ré-enregistrez.");
         }
       }
       clearDraft(userId);
