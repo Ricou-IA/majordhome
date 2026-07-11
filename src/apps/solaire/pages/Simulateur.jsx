@@ -273,12 +273,16 @@ function SimulateurInner({ config, settings }) {
           config={config}
           roofGeometry={state.roofGeometry}
           pans={state.pans}
+          cadastre={state.cadastre}
+          abf={state.abf}
           onLocation={(patch) => dispatch({ type: 'SET_LOCATION', patch })}
           onRoof={(patch) => dispatch({ type: 'SET_ROOF', patch })}
           onRoofGeometry={(value) => dispatch({ type: 'SET_ROOF_GEOMETRY', value })}
           onAddPan={(pan) => dispatch({ type: 'ADD_PAN', pan })}
           onRemovePan={(id) => dispatch({ type: 'REMOVE_PAN', id })}
           onUpdatePan={(id, patch) => dispatch({ type: 'UPDATE_PAN', id, patch })}
+          onCadastre={(parcelles) => dispatch({ type: 'SET_CADASTRE', parcelles })}
+          onAbf={(abf) => dispatch({ type: 'SET_ABF', abf })}
           onNext={() => goToStep(2)}
         />
       )}

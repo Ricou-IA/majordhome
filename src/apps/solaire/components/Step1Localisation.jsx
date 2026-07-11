@@ -10,6 +10,7 @@ import { searchAddress, getDevicePosition, fetchPvgis1kwc } from '../lib/pvgis';
 import { fetchRoofPlaneFromIgn } from '../lib/ignMns';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
+import CadastreSection from './dossier/CadastreSection';
 
 // Boussole 3×3 (centre vide) — ordre d'affichage
 const COMPASS = [
@@ -26,7 +27,7 @@ function azimuthToCompassLabel(azimuthCompass) {
   return COMPASS_8[idx];
 }
 
-export default function Step1Localisation({ location, roof, config, roofGeometry, pans, onLocation, onRoof, onRoofGeometry, onAddPan, onRemovePan, onUpdatePan, onNext }) {
+export default function Step1Localisation({ location, roof, config, roofGeometry, pans, cadastre, abf, onLocation, onRoof, onRoofGeometry, onAddPan, onRemovePan, onUpdatePan, onCadastre, onAbf, onNext }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -389,6 +390,18 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
           </div>
         )}
       </div>
+
+      {/* Cadastre + ABF — capture write-once pour le dossier PV (remonté à chaque lieu) */}
+      {hasLocation && (
+        <CadastreSection
+          key={`cad-${location.lat},${location.lon}`}
+          location={location}
+          cadastre={cadastre}
+          abf={abf}
+          onCadastre={onCadastre}
+          onAbf={onAbf}
+        />
+      )}
 
       {/* Toiture — en mode éditeur (pans existants) = panneau du pan sélectionné, verrouillé */}
       <div className="card space-y-4">
