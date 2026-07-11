@@ -22,6 +22,23 @@ export function usePvDossier(simulationId) {
   });
 }
 
+/** Dossiers de plusieurs simulations → Map(pv_simulation_id → dossier) pour les badges. */
+export function usePvDossiersBySimulations(simulationIds) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const ids = simulationIds ?? [];
+  return useQuery({
+    queryKey: pvDossierKeys.bySimulations(orgId, ids),
+    queryFn: async () => {
+      const { data, error } = await pvDossierService.getForSimulations(orgId, ids);
+      if (error) throw error;
+      return new Map((data ?? []).map((d) => [d.pv_simulation_id, d]));
+    },
+    enabled: !!orgId && ids.length > 0,
+    staleTime: 30_000,
+  });
+}
+
 export function usePvDossierMutations() {
   const { organization, user } = useAuth();
   const orgId = organization?.id;

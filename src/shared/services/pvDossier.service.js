@@ -22,6 +22,20 @@ export const pvDossierService = {
     }, 'pvDossier.getBySimulation');
   },
 
+  /** Dossiers de plusieurs simulations (badges Historique) — 1 requête IN. */
+  async getForSimulations(orgId, simulationIds) {
+    return withErrorHandling(async () => {
+      if (!simulationIds?.length) return [];
+      const { data, error } = await supabase
+        .from(VIEW)
+        .select('id, pv_simulation_id, status, documents')
+        .eq('org_id', orgId)
+        .in('pv_simulation_id', simulationIds);
+      if (error) throw error;
+      return data ?? [];
+    }, 'pvDossier.getForSimulations');
+  },
+
   /** Création LAZY idempotente : renvoie le dossier existant ou en crée un (status 'offre'). */
   async upsertForSimulation({ orgId, userId, simulationId, leadId = null, clientId = null }) {
     return withErrorHandling(async () => {

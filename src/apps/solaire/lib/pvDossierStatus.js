@@ -12,6 +12,17 @@ export const PV_DOSSIER_STATUSES = [
   'projet_en_service',
 ];
 
+/** Libellés UI (badges Historique / drawer Dossier). */
+export const PV_DOSSIER_STATUS_LABELS = {
+  offre: 'Offre',
+  dossier_valide: 'Dossier validé',
+  urbanisme_depose: 'DP déposée',
+  urbanisme_valide: 'DP accordée',
+  raccordement_enedis: 'Raccordement Enedis',
+  consuel_demande: 'Consuel demandé',
+  projet_en_service: 'En service',
+};
+
 /** Rang de l'état dans l'ordre canonique, ou null si inconnu. */
 export function statusRank(status) {
   const i = PV_DOSSIER_STATUSES.indexOf(status);

@@ -342,6 +342,7 @@ export const pvKeys = {
 export const pvDossierKeys = {
   all: (orgId) => ['pvDossier', orgId],
   bySimulation: (orgId, simulationId) => [...pvDossierKeys.all(orgId), 'bySimulation', simulationId],
+  bySimulations: (orgId, simulationIds) => [...pvDossierKeys.all(orgId), 'bySimulations', simulationIds],
   detail: (orgId, id) => [...pvDossierKeys.all(orgId), 'detail', id],
 };
 

@@ -4,10 +4,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Sun, MapPin, RotateCw, Trash2, Loader2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react';
+import { Sun, MapPin, RotateCw, Trash2, Loader2, ChevronLeft, ChevronRight, FileDown, FolderOpen } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { usePvSimulations, usePvSimulationMutations } from '@hooks/usePvSimulations';
+import { usePvDossiersBySimulations } from '@hooks/usePvDossier';
 import { useDebounce } from '@hooks/useDebounce';
 import { pvService } from '@services/pv.service';
 import { SearchBar } from '@apps/artisan/components/shared/SearchBar';
@@ -19,6 +20,8 @@ import { buildEtudeModel } from '../lib/etudeModel';
 import { consoProfileHourly, pvgisExample } from '../data';
 import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
 import { generateEtudePdfBlob } from '../components/EtudePDF';
+import { PV_DOSSIER_STATUS_LABELS } from '../lib/pvDossierStatus';
+import DossierDrawer from '../components/dossier/DossierDrawer';
 
 const PAGE_SIZE = 25;
 
@@ -31,10 +34,12 @@ export default function Historique() {
   const [page, setPage] = useState(0);
   const [toDelete, setToDelete] = useState(null);
   const [pdfBusyId, setPdfBusyId] = useState(null);
+  const [dossierSim, setDossierSim] = useState(null); // simulation dont le drawer Dossier est ouvert
   const debouncedSearch = useDebounce(search, 300);
 
   const { data, isLoading } = usePvSimulations({ search: debouncedSearch, page });
   const { deleteSimulation } = usePvSimulationMutations();
+  const { data: dossiersBySim } = usePvDossiersBySimulations((data?.rows ?? []).map((r) => r.id));
 
   // Régénère l'étude PDF depuis la simulation persistée (pvgis_monthly inclus
   // → AUCUN nouvel appel PVGIS, chiffres identiques des mois plus tard).
@@ -129,6 +134,7 @@ export default function Historique() {
         <div className="space-y-3">
           {rows.map((sim) => {
             const r = sim.results ?? {};
+            const dossier = dossiersBySim?.get(sim.id);
             return (
               <div key={sim.id} className="card flex items-center gap-4 flex-wrap">
                 <div className="flex-1 min-w-[180px]">
@@ -138,7 +144,14 @@ export default function Historique() {
                       <MapPin className="w-3 h-3 flex-shrink-0" /> {sim.client_address}
                     </p>
                   )}
-                  <p className="text-xs text-secondary-500 mt-0.5">{formatDateShortFR(sim.created_at)}</p>
+                  <p className="text-xs text-secondary-500 mt-0.5">
+                    {formatDateShortFR(sim.created_at)}
+                    {dossier && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 text-[#1565C0] font-medium px-2 py-0.5">
+                        {PV_DOSSIER_STATUS_LABELS[dossier.status] ?? dossier.status}
+                      </span>
+                    )}
+                  </p>
                 </div>
 
                 <div className="text-sm text-right">
@@ -158,6 +171,13 @@ export default function Historique() {
                     className="btn-primary flex items-center gap-1.5 text-sm"
                   >
                     <RotateCw className="w-3.5 h-3.5" /> Recharger
+                  </button>
+                  <button
+                    onClick={() => setDossierSim(sim)}
+                    className={`p-2 rounded-lg hover:bg-secondary-100 ${dossier ? 'text-[#1565C0] hover:text-[#0D47A1]' : 'text-secondary-400 hover:text-secondary-700'}`}
+                    title="Dossier PV (déclaration préalable)"
+                  >
+                    <FolderOpen className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handlePdf(sim)}
@@ -202,6 +222,12 @@ export default function Historique() {
           )}
         </div>
       )}
+
+      <DossierDrawer
+        open={dossierSim !== null}
+        onClose={() => setDossierSim(null)}
+        simulation={dossierSim}
+      />
 
       <ConfirmDialog
         open={toDelete !== null}
