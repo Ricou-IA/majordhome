@@ -23,6 +23,8 @@ export function CertificatSignaturePad({
   isSaving = false,
   existingSignature = null,
   disclaimerText = null,
+  nomLabel = 'Nom du technicien', // paramétrable : « Nom du client » côté dossier PV
+  signatureLabel = 'Signature du technicien',
 }) {
   const sigCanvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -108,13 +110,13 @@ export function CertificatSignaturePad({
       {/* Nom du signataire */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Nom du technicien <span className="text-red-500">*</span>
+          {nomLabel} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={signataireNom || ''}
           onChange={(e) => onSignataireNomChange?.(e.target.value)}
-          placeholder="Nom du technicien"
+          placeholder={nomLabel}
           disabled={disabled || isSaving}
           className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
         />
@@ -123,7 +125,7 @@ export function CertificatSignaturePad({
       {/* Zone de signature */}
       <div ref={containerRef} className="relative">
         <p className="text-sm font-medium text-gray-700 mb-1">
-          Signature du technicien <span className="text-red-500">*</span>
+          {signatureLabel} <span className="text-red-500">*</span>
         </p>
         <div
           className={`border-2 rounded-lg bg-white ${

@@ -87,13 +87,15 @@ export default function ConsentSignatureModal({
           />
         </FormField>
 
-        {/* Pad de signature (gère nom + tracé, sortie base64) */}
+        {/* Pad de signature (gère nom + tracé, sortie base64) — c'est le CLIENT qui signe la DP */}
         <CertificatSignaturePad
           signataireNom={signataireNom}
           onSignataireNomChange={setSignataireNom}
           onSign={setSignatureDataUrl}
           onClear={() => setSignatureDataUrl(null)}
           isSaving={isSubmitting}
+          nomLabel="Nom du client"
+          signatureLabel="Signature du client"
           disclaimerText="En signant, le client accepte les autorisations ci-dessus et atteste l'exactitude des informations de la déclaration préalable."
         />
 
