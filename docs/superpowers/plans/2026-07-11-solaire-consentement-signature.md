@@ -1,5 +1,7 @@
 # Module « Consentement & signature » (dossier PV) — Implementation Plan
 
+> **Statut : LIVRÉ 2026-07-11** — Tasks 2-7 exécutées (commits `7515acf`→`2f60dc7`). 24 tests node, build+lint clean, preuve e2e signature (image page 11). Revue adversariale 13 agents : 3 findings confirmés corrigés — **migration critique** (recréer la vue `majordhome_pv_dossiers`, le `SELECT *` fige les colonnes → `ADD COLUMN` n'y remonte pas), signature **fail-loud** (échec fetch → throw avant advance), régénération routée vers l'étape manquante. **Task 1 (migration) reste à appliquer en prod par Eric.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Capturer sur tablette la signature manuscrite du client + ses consentements (dépôt DP, raccordement ENEDIS), une fois par dossier, et apposer l'image de signature + date/lieu dans le cadre 7 du CERFA 16702.
