@@ -3,13 +3,17 @@
 // niveau actif. Chaque édition produit une nouvelle `saisie` (immuable) remontée via onChange.
 // Re-défaut θint/chauffée au changement de type (v1 simple : re-défaute θint seulement si vide).
 import { Plus, Trash2 } from 'lucide-react';
-import { inputClass, selectClass } from '@apps/artisan/components/FormFields';
 import { TYPES_PIECE, typePieceInfo, LNC_PRESETS } from '../../lib/thermiqueConfig';
 
 const MENUISERIES = [
   { id: 'fenetre', label: 'Fenêtre' }, { id: 'porteFenetre', label: 'Porte-fenêtre' }, { id: 'porte', label: 'Porte' },
 ];
 const num = (v) => (v === '' || v == null ? null : Number(v));
+
+// Classes locales SANS `w-full` (contrairement à inputClass/selectClass de FormFields, dont le
+// `w-full` écrasait les largeurs de colonne w-16/w-20/…) + padding dense adapté à une table.
+const champ = 'px-2 py-1 text-sm bg-white border border-secondary-300 rounded-lg text-secondary-900 outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+const champSelect = `${champ} appearance-none`;
 
 export default function PiecesTable({ saisie, config, onChange, niveauActifId }) {
   const niveau = saisie.niveaux.find((n) => n.id === niveauActifId);
@@ -65,13 +69,13 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                 <td className="py-1.5 pr-2">
                   <input
                     type="text" value={p.nom} onChange={(e) => majPiece(p.id, { nom: e.target.value })}
-                    className={`${inputClass} w-32`}
+                    className={`${champ} w-32`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <select
                     value={p.typePiece} onChange={(e) => majType(p.id, e.target.value)}
-                    className={`${selectClass} w-36`}
+                    className={`${champSelect} w-36`}
                   >
                     {TYPES_PIECE.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                   </select>
@@ -88,7 +92,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                     <input
                       type="number" value={p.thetaInt ?? ''} min={5} max={30}
                       onChange={(e) => majPiece(p.id, { thetaInt: num(e.target.value) })}
-                      className={`${inputClass} w-16`}
+                      className={`${champ} w-16`}
                     />
                   ) : (
                     <span className="text-xs text-secondary-400">—</span>
@@ -98,35 +102,35 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                   <input
                     type="number" value={p.longueur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { longueur: num(e.target.value) })}
-                    className={`${inputClass} w-20`}
+                    className={`${champ} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.largeur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { largeur: num(e.target.value) })}
-                    className={`${inputClass} w-20`}
+                    className={`${champ} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.hauteur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { hauteur: num(e.target.value) })}
-                    className={`${inputClass} w-20`}
+                    className={`${champ} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.mlMurExterieur ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { mlMurExterieur: num(e.target.value) })}
-                    className={`${inputClass} w-20`}
+                    className={`${champ} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <input
                     type="number" value={p.mlMurLocalNonChauffe ?? ''} min={0} step={10}
                     onChange={(e) => majPiece(p.id, { mlMurLocalNonChauffe: num(e.target.value) })}
-                    className={`${inputClass} w-20`}
+                    className={`${champ} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
@@ -137,7 +141,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                         const preset = LNC_PRESETS.find((x) => x.id === e.target.value);
                         if (preset) majPiece(p.id, { bLocalNonChauffe: preset.b });
                       }}
-                      className={`${selectClass} w-28`}
+                      className={`${champSelect} w-28`}
                     >
                       <option value="">Perso</option>
                       {LNC_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
@@ -145,7 +149,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                     <input
                       type="number" value={p.bLocalNonChauffe ?? ''} min={0} max={1} step={0.05}
                       onChange={(e) => majPiece(p.id, { bLocalNonChauffe: num(e.target.value) })}
-                      className={`${inputClass} w-16`}
+                      className={`${champ} w-16`}
                     />
                   </div>
                 </td>
@@ -153,13 +157,13 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                   <input
                     type="number" value={p.surfaceOuverture ?? ''} min={0} step={0.1}
                     onChange={(e) => majPiece(p.id, { surfaceOuverture: num(e.target.value) })}
-                    className={`${inputClass} w-20`}
+                    className={`${champ} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <select
                     value={p.typeMenuiserie} onChange={(e) => majPiece(p.id, { typeMenuiserie: e.target.value })}
-                    className={`${selectClass} w-32`}
+                    className={`${champSelect} w-32`}
                   >
                     {MENUISERIES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
