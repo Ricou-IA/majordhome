@@ -15,6 +15,15 @@ import UwHelperModal from './UwHelperModal';
 
 const HAUTEUR_NIVEAU_DEFAUT = 250; // cm — même défaut que le RDC initial (wizardState.js)
 
+/** Renumérote les niveaux (rang 0..n contigus + nom cohérent) après ajout/suppression : le plus
+ * bas = « RDC », les suivants « Niveau 2, 3… », sans trou. Les `id` sont préservés (les pièces
+ * référencent niveauId, jamais le rang) ; emprise/hauteur conservées. */
+function renumeroteNiveaux(niveaux) {
+  return [...niveaux]
+    .sort((a, b) => (a.rang ?? 0) - (b.rang ?? 0))
+    .map((n, i) => ({ ...n, rang: i, nom: i === 0 ? 'RDC' : `Niveau ${i + 1}` }));
+}
+
 const CHAMPS_MENUISERIES = [
   { cle: 'fenetre', label: 'Fenêtre', proposer: true },
   { cle: 'porteFenetre', label: 'Porte-fenêtre', proposer: true },
@@ -53,11 +62,9 @@ export default function Step2EmprisePieces({
   const handleAjouteNiveau = () => {
     const id = crypto.randomUUID();
     const maxRang = saisie.niveaux.reduce((m, n) => Math.max(m, n.rang ?? 0), -1);
-    const nouveau = {
-      id, nom: `Niveau ${saisie.niveaux.length + 1}`, rang: maxRang + 1,
-      hauteur: HAUTEUR_NIVEAU_DEFAUT, emprise: { polygone: [] },
-    };
-    onSaisieChange({ ...saisie, niveaux: [...saisie.niveaux, nouveau] });
+    // rang provisoire au sommet ; renumeroteNiveaux fixe nom + rang contigus.
+    const nouveau = { id, nom: '', rang: maxRang + 1, hauteur: HAUTEUR_NIVEAU_DEFAUT, emprise: { polygone: [] } };
+    onSaisieChange({ ...saisie, niveaux: renumeroteNiveaux([...saisie.niveaux, nouveau]) });
     setNiveauActifId(id);
   };
 
@@ -67,7 +74,7 @@ export default function Step2EmprisePieces({
     setConfirmNiveau(false);
     onSaisieChange({
       ...saisie,
-      niveaux: saisie.niveaux.filter((n) => n.id !== niveauActifId),
+      niveaux: renumeroteNiveaux(saisie.niveaux.filter((n) => n.id !== niveauActifId)),
       pieces: saisie.pieces.filter((p) => p.niveauId !== niveauActifId),
     });
     // Le repointage du niveau actif est géré par l'effect de cohérence ci-dessus.
