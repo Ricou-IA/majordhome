@@ -169,3 +169,22 @@ test('buildCerfaFields — sans ABF, sans email, sans opt-in → pas de cases l�
   assert.equal(t2.T2T_superficie, undefined);
   assert.equal(t2.D5T_total, undefined); // total inconnu si une superficie manque
 });
+
+test('buildCerfaFields — signedAtIso + signatureLieu pilotent E1D_date / E1L_lieu (cadre 7)', () => {
+  const { text } = buildCerfaFields({
+    declarant: DECLARANT, terrain: TERRAIN, parcelles: [PARCELLES[0]], abf: null,
+    description: 'x', todayIso: '2026-07-11',
+    signedAtIso: '2026-07-09T10:00:00.000Z', signatureLieu: 'Rebigue',
+  });
+  assert.equal(text.E1D_date, '09072026'); // date de signature, pas aujourd'hui
+  assert.equal(text.E1L_lieu, 'Rebigue');  // lieu de signature
+});
+
+test('buildCerfaFields — sans signature → fallback aujourd\'hui + localité déclarant', () => {
+  const { text } = buildCerfaFields({
+    declarant: DECLARANT, terrain: TERRAIN, parcelles: [PARCELLES[0]], abf: null,
+    description: 'x', todayIso: '2026-07-11',
+  });
+  assert.equal(text.E1D_date, '11072026');
+  assert.equal(text.E1L_lieu, 'Gaillac'); // adresse déclarant
+});

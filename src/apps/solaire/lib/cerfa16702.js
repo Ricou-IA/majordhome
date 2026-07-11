@@ -94,7 +94,7 @@ const put = (obj, key, value) => {
  * Données du dossier → champs du CERFA 16702*03.
  * @returns {{ text: Record<string,string>, checks: string[], overflowParcelles: boolean }}
  */
-export function buildCerfaFields({ declarant, terrain, parcelles, abf, description, todayIso }) {
+export function buildCerfaFields({ declarant, terrain, parcelles, abf, description, todayIso, signedAtIso, signatureLieu }) {
   const text = {};
   const checks = [];
 
@@ -154,9 +154,9 @@ export function buildCerfaFields({ declarant, terrain, parcelles, abf, descripti
     if (box && !checks.includes(box)) checks.push(box);
   }
 
-  // --- 7. Engagement du déclarant (lieu + date ; signature = papier) ---
-  put(text, 'E1L_lieu', adr.localite);
-  put(text, 'E1D_date', toJJMMAAAA(todayIso));
+  // --- 7. Engagement du déclarant (lieu + date du consentement si signé, sinon aujourd'hui) ---
+  put(text, 'E1L_lieu', signatureLieu || adr.localite);
+  put(text, 'E1D_date', toJJMMAAAA(signedAtIso || todayIso));
 
   return { text, checks, overflowParcelles: list.length > PARCELLE_SLOTS.length };
 }

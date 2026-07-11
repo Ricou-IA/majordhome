@@ -14,9 +14,10 @@ const RIGHT_ALIGNED = new Set(CERFA_RIGHT_ALIGNED);
  * autres (warn + compteur) — mais le caller DOIT surfacer `missedFields` s'il y en a
  * (échec silencieux interdit).
  * @param {{ text: Record<string,string>, checks: string[] }} fields
+ * @param {{ signaturePngBytes?: Uint8Array }} [opts] Image de signature à apposer (cadre 7).
  * @returns {Promise<{ blob: Blob, missedFields: string[] }>}
  */
-export async function fillCerfa16702(fields) {
+export async function fillCerfa16702(fields, opts = {}) {
   const res = await fetch(cerfaUrl);
   if (!res.ok) throw new Error(`Chargement du formulaire CERFA impossible (HTTP ${res.status})`);
   const doc = await PDFDocument.load(await res.arrayBuffer());
@@ -41,6 +42,32 @@ export async function fillCerfa16702(fields) {
     } catch (err) {
       missedFields.push(name);
       logger.warn(`[cerfa] case non cochée : ${name}`, err);
+    }
+  }
+
+  // Signature manuscrite (cadre 7) : apposée AVANT flatten (le rect du widget disparaît ensuite).
+  // Le champ texte E1S_signature reste vide → il s'efface au flatten, l'image reste dessinée.
+  if (opts.signaturePngBytes) {
+    try {
+      const png = await doc.embedPng(opts.signaturePngBytes);
+      const widget = form.getTextField('E1S_signature').acroField.getWidgets()[0];
+      const rect = widget.getRectangle();
+      const pageRef = widget.P();
+      const page = doc.getPages().find((p) => p.ref === pageRef);
+      if (!page) throw new Error('page signature introuvable');
+      const m = 4; // marge intérieure (pt)
+      const scale = Math.min((rect.width - 2 * m) / png.width, (rect.height - 2 * m) / png.height);
+      const w = png.width * scale;
+      const h = png.height * scale;
+      page.drawImage(png, {
+        x: rect.x + (rect.width - w) / 2,
+        y: rect.y + (rect.height - h) / 2,
+        width: w,
+        height: h,
+      });
+    } catch (err) {
+      missedFields.push('E1S_signature');
+      logger.warn('[cerfa] signature non apposée', err);
     }
   }
 
