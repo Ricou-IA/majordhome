@@ -63,9 +63,13 @@ export function paroisPieceParametrique(piece, ctx) {
   // Mur sur local non chauffé (b = bLocalNonChauffe)
   const surfLnc = (piece.mlMurLocalNonChauffe ?? 0) / 100 * H;
   pousse('murs', 'mur-lnc', surfLnc, { b: Number.isFinite(piece.bLocalNonChauffe) ? piece.bLocalNonChauffe : 1 });
-  // Plancher bas (si rez) / plafond (si dernier niveau)
+  // Plancher bas (si rez) / plafond (si dernier niveau). Toiture : comble → b comble ;
+  // rampant → b=1 (pas d'espace tampon), même mapping que l'assembleur géométrique legacy.
   if (ctx.estRez) pousse('plancherBas', 'plancher-bas', surfaceSol, { b: ctx.bPlancherBas });
-  if (ctx.estDernier) pousse('plafondToiture', 'plafond-comble', surfaceSol, { b: ctx.bComble });
+  if (ctx.estDernier) {
+    if (ctx.toitureRampant) pousse('plafondToiture', 'toiture-rampant', surfaceSol, { b: 1 });
+    else pousse('plafondToiture', 'plafond-comble', surfaceSol, { b: ctx.bComble });
+  }
 
   return { parois, erreurs };
 }
@@ -93,7 +97,12 @@ export function assembleBatimentParametrique(saisie, options) {
   if (!Number.isFinite(deltaUtb)) erreurs.push(`type d'isolation inconnu « ${contexte.isolation} »`);
   const bComble = coefficientBPour(data.coefficientsB, 'Espace sous toiture', B_COMBLE[contexte.combleIsolation] ?? B_COMBLE.isole);
   const bPlancherBas = bPlancherBasPour(data.coefficientsB, saisie.plancherBasType, contexte.sousSolAvecOuvertures);
-  const rangMax = Math.max(...saisie.niveaux.map((n) => n.rang ?? 0));
+  const rangs = saisie.niveaux.map((n) => n.rang ?? 0);
+  const rangMax = Math.max(...rangs);
+  // rangMin (pas 0 en dur) : le niveau le plus bas EXISTANT porte le plancher bas — sinon
+  // supprimer le niveau rez ferait disparaître silencieusement les déperditions plancher (R6/#3).
+  const rangMin = Math.min(...rangs);
+  const toitureRampant = saisie.toitureType === 'rampant';
 
   const chauffees = saisie.pieces.filter((p) => p.chauffee);
   if (chauffees.length === 0) erreurs.push('aucune pièce chauffée — ajoutez au moins une pièce chauffée');
@@ -105,7 +114,8 @@ export function assembleBatimentParametrique(saisie, options) {
     const niveau = saisie.niveaux.find((n) => n.id === p.niveauId);
     const ctx = {
       compositions, uDefauts: data.uDefauts, annee: contexte.annee, deltaUtb: deltaUtb ?? 0,
-      bPlancherBas, bComble, estRez: (niveau?.rang ?? 0) === 0, estDernier: (niveau?.rang ?? 0) === rangMax,
+      bPlancherBas, bComble, toitureRampant,
+      estRez: (niveau?.rang ?? 0) === rangMin, estDernier: (niveau?.rang ?? 0) === rangMax,
     };
     const { parois, erreurs: errP } = paroisPieceParametrique(p, ctx);
     erreurs.push(...errP);

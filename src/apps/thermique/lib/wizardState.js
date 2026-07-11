@@ -132,7 +132,12 @@ export function wizardReducer(state, action) {
  * l'étape 2 emporte ses ouvertures (dessinOps) mais pas ses exceptions — sans ce filtre, des
  * clés mortes (`${pieceId}:famille`, ouvertureId) seraient persistées dans le jsonb. */
 export function toStudyInput(state) {
-  const pieceIds = new Set(state.dessin.pieces.map((p) => p.id));
+  // Union dessin (legacy) + saisie (paramétrique) : sinon les exceptions U par pièce d'une étude
+  // paramétrique (clés `${saisie piece.id}:famille`) seraient filtrées à la sauvegarde (#2).
+  const pieceIds = new Set([
+    ...state.dessin.pieces.map((p) => p.id),
+    ...(state.saisie?.pieces ?? []).map((p) => p.id),
+  ]);
   const ouvertureIds = new Set(state.dessin.ouvertures.map((o) => o.id));
   const exceptions = state.compositions.exceptions ?? {};
   const parois = Object.fromEntries(Object.entries(exceptions.parois ?? {})

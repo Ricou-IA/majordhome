@@ -313,3 +313,17 @@ test('toStudyInput inclut saisie', () => {
   assert.ok(input.saisie);
   assert.equal(input.saisie.modeSaisie, 'parametrique');
 });
+
+test('#2 toStudyInput conserve les exceptions U d une pièce paramétrique (union dessin+saisie)', () => {
+  const s0 = initialWizardState(CFG);
+  const state = {
+    ...s0,
+    saisie: { ...s0.saisie, pieces: [{ id: 'sej', niveauId: 'rdc', chauffee: true, thetaInt: 20 }] },
+    compositions: {
+      ...s0.compositions,
+      exceptions: { parois: { 'sej:murs': { u: 0.25 } }, ouvertures: {} },
+    },
+  };
+  const input = toStudyInput(state);
+  assert.deepEqual(input.compositions.exceptions.parois, { 'sej:murs': { u: 0.25 } });
+});

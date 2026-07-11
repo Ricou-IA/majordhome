@@ -107,7 +107,7 @@ function Synthese({ bilan, thetaE, dept, periode, plage }) {
 export default function Step4Resultats({
   state, config, onPatchPac, onClearSavedResults, onStudyId, onBackToDessin,
 }) {
-  const { contexte, dessin, compositions, pac, savedResults, studyId } = state;
+  const { contexte, dessin, saisie, compositions, pac, savedResults, studyId } = state;
   const { user } = useAuth();
   const userId = user?.id;
   const navigate = useNavigate();
@@ -142,7 +142,7 @@ export default function Step4Resultats({
     // = toStudyInput(state) avec un volet PAC assaini : pointBivalence LÈVE sur un point manuel
     // incomplet (saisie en cours dans PacSection) — seuls les points valides passent au moteur,
     // l'état (donc l'input persisté) garde la saisie brute. < 2 points valides → model.pac null.
-    const input = { contexte, dessin, compositions, pac: { ...pac, points: pointsManuelsValides(pac.points) } };
+    const input = { contexte, dessin, saisie, compositions, pac: { ...pac, points: pointsManuelsValides(pac.points) } };
     try {
       return buildEtudeModel(input, {
         config,
@@ -157,7 +157,7 @@ export default function Step4Resultats({
         thetaE: null, bilan: null, parois: [], pac: null, engineVersion: ENGINE_VERSION,
       };
     }
-  }, [contexte, dessin, compositions, pac, pacCatalogue, config]);
+  }, [contexte, dessin, saisie, compositions, pac, pacCatalogue, config]);
 
   const periode = resolvePeriode(contexte.annee);
   const plage = PLAGES_VRAISEMBLANCE[periode] ?? null;

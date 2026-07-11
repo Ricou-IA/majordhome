@@ -164,3 +164,35 @@ test('assembleBatimentParametrique : θint manquante sur pièce chauffée → er
   const { erreurs } = assembleBatimentParametrique(s, optionsRef);
   assert.ok(erreurs.some((e) => e.includes('consigne')));
 });
+
+// --- Régressions revue finale (2026-07-09) ---
+
+test('#3 plancher bas : niveau le plus bas EXISTANT (rang non nul) porte le plancher — pas de rang 0 en dur', () => {
+  // Un seul niveau restant à rang 3 (ex. après suppression du rez) → il doit être estRez ET estDernier.
+  const s = {
+    ...saisieRef,
+    niveaux: [{ id: 'n3', nom: 'Niveau', rang: 3, hauteur: 250, emprise: { polygone: rect(0, 0, 500, 400) } }],
+    pieces: [{ ...saisieRef.pieces[0], niveauId: 'n3' }],
+  };
+  const { batiment, erreurs } = assembleBatimentParametrique(s, optionsRef);
+  assert.deepEqual(erreurs, []);
+  const types = batiment.pieces[0].parois.map((p) => p.type);
+  assert.ok(types.includes('plancher-bas'), 'plancher bas absent alors que niveau le plus bas');
+  assert.ok(types.includes('plafond-comble'), 'plafond absent alors que dernier niveau');
+});
+
+test('#4 toiture rampant : plafond en type toiture-rampant, b=1 (pas de tampon comble)', () => {
+  const s = { ...saisieRef, toitureType: 'rampant' };
+  const { batiment, erreurs } = assembleBatimentParametrique(s, optionsRef);
+  assert.deepEqual(erreurs, []);
+  const plafond = batiment.pieces[0].parois.find((p) => p.poste === 'plafondToiture');
+  assert.equal(plafond.type, 'toiture-rampant');
+  assert.equal(plafond.b, 1);
+});
+
+test('#4 toiture comble (défaut) : plafond-comble avec b = bComble (< 1)', () => {
+  const { batiment } = assembleBatimentParametrique(saisieRef, optionsRef);
+  const plafond = batiment.pieces[0].parois.find((p) => p.poste === 'plafondToiture');
+  assert.equal(plafond.type, 'plafond-comble');
+  assert.ok(plafond.b > 0 && plafond.b < 1);
+});
