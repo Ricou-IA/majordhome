@@ -14,6 +14,7 @@ import { buildCompanyInfo } from '@lib/orgBranding';
 import { formatDateFR } from '@lib/utils';
 import { buildPvConfig } from '../lib/pvConfig';
 import { initialWizardState, wizardReducer, loadDraft, saveDraft, clearDraft } from '../lib/wizardState';
+import { toDbCadastre } from '../lib/cadastre';
 import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
 import { buildEtudeModel } from '../lib/etudeModel';
@@ -148,22 +149,35 @@ function SimulateurInner({ config, settings }) {
           ev: state.ev,
           financing: state.financing,
           selectedKwc: results.selectedKwc,
+          // Snapshot wizard (restauration au rechargement ?sim=) — le dossier reste canonique pour les documents.
+          cadastre: state.cadastre,
+          abf: state.abf,
+          material: state.material,
         },
         pvgisMonthly: state.pvgis,
         results,
       });
-      // Dossier PV write-once : la géométrie (pans cartographiés OU tracé Google Solar) rejoint le dossier dès sa création LAZY.
+      // Dossier PV write-once : chaque bloc renseigné dans le wizard rejoint le dossier (création LAZY).
+      // Patch non-null only : ne clobber JAMAIS un bloc dossier existant quand le wizard ne le porte pas
+      // (ex. simulation rechargée sans re-capture cadastre) — patchBlock remplace le bloc entier.
       const roofGeometryPatch = state.pans?.length
         ? { source: 'drawn_pans', pans: state.pans }
         : state.roofGeometry;
-      if (roofGeometryPatch && sim?.id) {
+      const materialFilled = state.material && (state.material.module_marque || state.material.module_modele);
+      const dossierPatch = {
+        ...(roofGeometryPatch ? { roof_geometry: roofGeometryPatch } : {}),
+        ...(state.cadastre?.length ? { cadastre: toDbCadastre(state.cadastre) } : {}),
+        ...(state.abf ? { abf: state.abf } : {}),
+        ...(materialFilled ? { material: state.material } : {}),
+      };
+      if (Object.keys(dossierPatch).length > 0 && sim?.id) {
         try {
           const dossier = await ensureDossier.mutateAsync({ simulationId: sim.id });
           if (dossier?.id) {
-            await patchBlock.mutateAsync({ id: dossier.id, patch: { roof_geometry: roofGeometryPatch } });
+            await patchBlock.mutateAsync({ id: dossier.id, patch: dossierPatch });
           }
         } catch (dossierErr) {
-          logger.warn('[solaire] roof_geometry non persisté (dossier)', dossierErr); // non bloquant
+          logger.warn('[solaire] blocs dossier non persistés', dossierErr); // non bloquant
         }
       }
       clearDraft(userId);
@@ -310,6 +324,7 @@ function SimulateurInner({ config, settings }) {
             dispatch({ type: 'SET_FINANCING', patch: { manualCost: null } });
           }}
           onFinancing={(patch) => dispatch({ type: 'SET_FINANCING', patch })}
+          onMaterial={(patch) => dispatch({ type: 'SET_MATERIAL', patch })}
           onBack={() => goToStep(2)}
           onSave={handleSave}
           isSaving={createSimulation.isPending}

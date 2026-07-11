@@ -3,8 +3,9 @@
 // (source unique partagée avec le PDF étude — chiffres identiques garantis).
 // Le surplus n'est JAMAIS valorisé en € (spec §1).
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save, FileDown } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save, FileDown, PanelsTopLeft } from 'lucide-react';
 import { formatEuro } from '@lib/utils';
+import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
 import { buildEtudeModel } from '../lib/etudeModel';
 import ScenarioCards from './ScenarioCards';
 import TransparencyPanel from './TransparencyPanel';
@@ -16,10 +17,12 @@ import AutoconsoOptimizationSection from './AutoconsoOptimizationSection';
 import { consoProfileHourly, pvgisExample } from '../data';
 
 export default function Step3Resultats({
-  state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing,
+  state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onMaterial,
   onBack, onSave, isSaving, onGeneratePdf, isGeneratingPdf, defaultClientName,
 }) {
   const { conso, ev, roof, pvgis, selectedKwc, financing } = state;
+  // Fallback pour les brouillons/simulations antérieurs à la config matériel.
+  const material = state.material ?? { module_marque: '', module_modele: '', module_aspect: 'full_black' };
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
 
@@ -164,6 +167,43 @@ export default function Step3Resultats({
           Renseigner le coût de l'installation (et un taux/durée valides) pour générer le tableau annuel.
         </div>
       )}
+
+      {/* Matériel proposé — saisi dans l'offre (write-once), alimente la notice du dossier PV */}
+      <div className="card space-y-4">
+        <div className="flex items-center gap-2">
+          <PanelsTopLeft className="w-4 h-4 text-secondary-500" />
+          <h2 className="font-semibold text-secondary-900">Matériel proposé</h2>
+          <span className="text-xs text-secondary-500">pour la déclaration préalable (optionnel)</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <FormField label="Marque des modules">
+            <input
+              className={inputClass}
+              value={material.module_marque}
+              placeholder="DualSun, Voltec…"
+              onChange={(e) => onMaterial({ module_marque: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Modèle">
+            <input
+              className={inputClass}
+              value={material.module_modele}
+              placeholder="Flash 500 Half-Cut…"
+              onChange={(e) => onMaterial({ module_modele: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Aspect">
+            <select
+              className={selectClass}
+              value={material.module_aspect}
+              onChange={(e) => onMaterial({ module_aspect: e.target.value })}
+            >
+              <option value="full_black">Full black (noir uniforme)</option>
+              <option value="standard">Standard (cadre alu)</option>
+            </select>
+          </FormField>
+        </div>
+      </div>
 
       <div className="flex gap-3 flex-wrap">
         <button
