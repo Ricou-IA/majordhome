@@ -15,13 +15,16 @@ import UwHelperModal from './UwHelperModal';
 
 const HAUTEUR_NIVEAU_DEFAUT = 250; // cm — même défaut que le RDC initial (wizardState.js)
 
-/** Renumérote les niveaux (rang 0..n contigus + nom cohérent) après ajout/suppression : le plus
- * bas = « RDC », les suivants « Niveau 2, 3… », sans trou. Les `id` sont préservés (les pièces
- * référencent niveauId, jamais le rang) ; emprise/hauteur conservées. */
-function renumeroteNiveaux(niveaux) {
-  return [...niveaux]
-    .sort((a, b) => (a.rang ?? 0) - (b.rang ?? 0))
-    .map((n, i) => ({ ...n, rang: i, nom: i === 0 ? 'RDC' : `Niveau ${i + 1}` }));
+/** Nom par défaut d'un nouveau niveau : « Niveau N » sans collision (max des « Niveau X »
+ * existants + 1). Éditable ensuite par l'utilisateur (les noms sont libres). Le `rang` gère
+ * l'ordre physique (plus bas = plancher, plus haut = plafond), indépendamment du nom. */
+function nomNiveauDefaut(niveaux) {
+  const nums = niveaux
+    .map((n) => /^Niveau (\d+)$/.exec(n.nom ?? '')?.[1])
+    .filter(Boolean)
+    .map(Number);
+  const suivant = nums.length ? Math.max(...nums) + 1 : niveaux.length + 1;
+  return `Niveau ${suivant}`;
 }
 
 const CHAMPS_MENUISERIES = [
@@ -59,22 +62,45 @@ export default function Step2EmprisePieces({
     setHauteurDraft(hauteurActive == null ? '' : String(hauteurActive));
   }, [niveauActifId, hauteurActive]);
 
+  // Draft nom du niveau actif (commit au blur/Enter — nom éditable, vide refusé).
+  const [nomDraft, setNomDraft] = useState(niveauActif?.nom ?? '');
+  const nomActif = niveauActif?.nom;
+  useEffect(() => { setNomDraft(nomActif ?? ''); }, [niveauActifId, nomActif]);
+
   const handleAjouteNiveau = () => {
     const id = crypto.randomUUID();
     const maxRang = saisie.niveaux.reduce((m, n) => Math.max(m, n.rang ?? 0), -1);
-    // rang provisoire au sommet ; renumeroteNiveaux fixe nom + rang contigus.
-    const nouveau = { id, nom: '', rang: maxRang + 1, hauteur: HAUTEUR_NIVEAU_DEFAUT, emprise: { polygone: [] } };
-    onSaisieChange({ ...saisie, niveaux: renumeroteNiveaux([...saisie.niveaux, nouveau]) });
+    // Nouveau niveau au sommet (rang le plus haut = plafond). Nom par défaut éditable.
+    const nouveau = {
+      id, nom: nomNiveauDefaut(saisie.niveaux), rang: maxRang + 1,
+      hauteur: HAUTEUR_NIVEAU_DEFAUT, emprise: { polygone: [] },
+    };
+    onSaisieChange({ ...saisie, niveaux: [...saisie.niveaux, nouveau] });
     setNiveauActifId(id);
+  };
+
+  const commitNom = () => {
+    if (!niveauActif) return;
+    const valeur = nomDraft.trim();
+    if (valeur === '' || valeur === niveauActif.nom) {
+      setNomDraft(niveauActif.nom);   // vide refusé → on restaure le nom courant
+      return;
+    }
+    onSaisieChange({
+      ...saisie,
+      niveaux: saisie.niveaux.map((n) => (n.id === niveauActifId ? { ...n, nom: valeur } : n)),
+    });
   };
 
   const piecesNiveauActif = saisie.pieces.filter((p) => p.niveauId === niveauActifId);
 
   const handleSupprimeNiveau = () => {
     setConfirmNiveau(false);
+    // Simple filtre : les noms sont libres (pas de renumérotation), et rangMin/rangMax du moteur
+    // tolèrent les rangs non contigus (le plus bas restant porte le plancher).
     onSaisieChange({
       ...saisie,
-      niveaux: renumeroteNiveaux(saisie.niveaux.filter((n) => n.id !== niveauActifId)),
+      niveaux: saisie.niveaux.filter((n) => n.id !== niveauActifId),
       pieces: saisie.pieces.filter((p) => p.niveauId !== niveauActifId),
     });
     // Le repointage du niveau actif est géré par l'effect de cohérence ci-dessus.
@@ -125,6 +151,19 @@ export default function Step2EmprisePieces({
           <Plus className="w-4 h-4" /> Niveau
         </button>
         <div className="flex items-center gap-2 ml-auto">
+          <label className="text-sm text-secondary-600 flex items-center gap-1.5">
+            Nom
+            <input
+              type="text"
+              value={nomDraft}
+              onChange={(e) => setNomDraft(e.target.value)}
+              onBlur={commitNom}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              disabled={!niveauActif}
+              className="w-32 px-2 py-1.5 text-sm border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+              aria-label="Nom du niveau"
+            />
+          </label>
           <label className="text-sm text-secondary-600 flex items-center gap-1.5">
             Hauteur
             <input
