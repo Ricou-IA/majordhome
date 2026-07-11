@@ -12,7 +12,9 @@ const num = (v) => (v === '' || v == null ? null : Number(v));
 
 // Classes locales SANS `w-full` (contrairement à inputClass/selectClass de FormFields, dont le
 // `w-full` écrasait les largeurs de colonne w-16/w-20/…) + padding dense adapté à une table.
-const champ = 'px-2 py-1 text-sm bg-white border border-secondary-300 rounded-lg text-secondary-900 outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+// Spinners des inputs number masqués ([appearance:textfield] + pseudo-éléments webkit) → gain de
+// largeur, saisie numérique conservée. Sans effet sur l'input texte (Nom) qui n'a pas de spinner.
+const champ = 'px-2 py-1 text-sm bg-white border border-secondary-300 rounded-lg text-secondary-900 outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:[-webkit-appearance:none] [&::-webkit-outer-spin-button]:[-webkit-appearance:none]';
 const champSelect = `${champ} appearance-none`;
 
 export default function PiecesTable({ saisie, config, onChange, niveauActifId }) {
