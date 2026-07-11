@@ -41,9 +41,9 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
     <div className="card space-y-3">
       <h3 className="font-semibold text-secondary-900 text-sm">Pièces — {niveau?.nom ?? niveauActifId}</h3>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="text-sm border-collapse">
           <thead>
-            <tr className="text-left text-xs text-secondary-500 border-b border-secondary-100">
+            <tr className="text-left text-xs text-secondary-500 border-b border-secondary-100 whitespace-nowrap">
               <th className="py-1.5 pr-2 font-medium">Nom</th>
               <th className="py-1.5 pr-2 font-medium">Type</th>
               <th className="py-1.5 pr-2 font-medium text-center">Chauffée</th>
@@ -71,7 +71,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                 <td className="py-1.5 pr-2">
                   <select
                     value={p.typePiece} onChange={(e) => majType(p.id, e.target.value)}
-                    className={`${selectClass} w-32`}
+                    className={`${selectClass} w-36`}
                   >
                     {TYPES_PIECE.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                   </select>
@@ -137,7 +137,7 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                         const preset = LNC_PRESETS.find((x) => x.id === e.target.value);
                         if (preset) majPiece(p.id, { bLocalNonChauffe: preset.b });
                       }}
-                      className={`${selectClass} w-24`}
+                      className={`${selectClass} w-28`}
                     >
                       <option value="">Perso</option>
                       {LNC_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
@@ -153,13 +153,13 @@ export default function PiecesTable({ saisie, config, onChange, niveauActifId })
                   <input
                     type="number" value={p.surfaceOuverture ?? ''} min={0} step={0.1}
                     onChange={(e) => majPiece(p.id, { surfaceOuverture: num(e.target.value) })}
-                    className={`${inputClass} w-16`}
+                    className={`${inputClass} w-20`}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
                   <select
                     value={p.typeMenuiserie} onChange={(e) => majPiece(p.id, { typeMenuiserie: e.target.value })}
-                    className={`${selectClass} w-28`}
+                    className={`${selectClass} w-32`}
                   >
                     {MENUISERIES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
