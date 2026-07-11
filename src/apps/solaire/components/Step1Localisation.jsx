@@ -6,7 +6,7 @@ import * as turf from '@turf/turf';
 import { MapPin, LocateFixed, Loader2, AlertTriangle, ArrowRight, Check, Plus, Trash2, Star, Lock, Unlock } from 'lucide-react';
 import { useDebounce } from '@hooks/useDebounce';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
-import { searchAddress, getDevicePosition, fetchPvgis1kwc } from '../lib/pvgis';
+import { searchAddress, getDevicePosition, fetchPvgis1kwc, reverseGeocode } from '../lib/pvgis';
 import { fetchRoofPlaneFromIgn } from '../lib/ignMns';
 import { percentToDegrees, orientationToAspect, maxPowerKwc, panelsCount } from '../lib/pvEngine';
 import RoofLocatorMap from './dossier/RoofLocatorMap';
@@ -174,8 +174,10 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     setGpsLoading(true);
     try {
       const pos = await getDevicePosition();
-      onLocation({ lat: pos.lat, lon: pos.lon, accuracy: pos.accuracy, source: 'gps', address: '' });
-      toast.success(`Position trouvée (±${Math.round(pos.accuracy)} m)`);
+      // Géocodage inverse : renseigne l'adresse (le terrain du dossier CERFA en a besoin). Best effort.
+      const { data: rev } = await reverseGeocode(pos.lon, pos.lat);
+      onLocation({ lat: pos.lat, lon: pos.lon, accuracy: pos.accuracy, source: 'gps', address: rev?.label || '' });
+      toast.success(rev?.label ? `Position : ${rev.label}` : `Position trouvée (±${Math.round(pos.accuracy)} m)`);
     } catch (err) {
       toast.error(err.message);
     } finally {

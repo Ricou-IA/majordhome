@@ -57,7 +57,10 @@ export default function DossierDrawer({ open, onClose, simulation }) {
   const cadastreOk = (dossier?.cadastre?.parcelles?.length ?? 0) > 0;
   const roofOk = Boolean(dossier?.roof_geometry);
   const materialOk = Boolean(dossier?.material?.module_marque || dossier?.material?.module_modele);
-  const declarantOk = Boolean(dossier?.declarant?.nom);
+  // Déclarant COMPLET (pas juste le nom) : le CERFA cadre 1 exige nom+prénom+date+commune de
+  // naissance. Sinon la régénération réutiliserait un déclarant partiel (date vide → CERFA incomplet).
+  const d = dossier?.declarant;
+  const declarantOk = Boolean(d?.nom && d?.prenom && d?.date_naissance && d?.naissance_commune);
   const docs = dossier?.documents ?? null;
   const abf = dossier?.abf ?? null;
 
@@ -76,9 +79,13 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       const config = buildPvConfig(settings);
       const freshDossier = { ...dossier, ...patched, declarant };
       const noticeModel = buildNoticeModel({ dossier: freshDossier, simulation: sim, config });
+      // Adresse du terrain : l'adresse saisie ; sinon (localisation GPS = pas d'adresse) on retombe
+      // sur l'adresse du déclarant (le terrain EST la résidence pour une pose en toiture).
+      const terrainParsed = parseAddressFR(sim.client_address ?? '');
+      const terrain = terrainParsed.localite ? terrainParsed : (declarant.adresse ?? terrainParsed);
       const fields = buildCerfaFields({
         declarant,
-        terrain: parseAddressFR(sim.client_address ?? ''),
+        terrain,
         parcelles: freshDossier.cadastre?.parcelles ?? [],
         abf: freshDossier.abf,
         description: noticeModel.projet.description,

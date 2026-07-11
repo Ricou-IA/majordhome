@@ -43,6 +43,29 @@ export async function searchAddress(query) {
   }
 }
 
+/**
+ * Géocodage inverse (lon/lat → adresse) via api-adresse.data.gouv.fr (CORS OK, direct).
+ * Sert à renseigner l'adresse après une localisation GPS (le CERFA/terrain en a besoin).
+ * → { data: { label, city, postcode } | null, error }
+ */
+export async function reverseGeocode(lon, lat) {
+  try {
+    const url = `https://api-adresse.data.gouv.fr/reverse/?lon=${lon}&lat=${lat}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`api-adresse reverse ${res.status}`);
+    const json = await res.json();
+    const f = json.features?.[0];
+    if (!f) return { data: null, error: null };
+    return {
+      data: { label: f.properties.label, city: f.properties.city, postcode: f.properties.postcode },
+      error: null,
+    };
+  } catch (err) {
+    logger.error('[pvgis] reverseGeocode', err);
+    return { data: null, error: err };
+  }
+}
+
 /** Position GPS du device → Promise<{ lat, lon, accuracy }>. Rejette si refus/indispo. */
 export function getDevicePosition() {
   return new Promise((resolve, reject) => {
