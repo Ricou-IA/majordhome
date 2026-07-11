@@ -130,11 +130,18 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       const declarant = fresh.declarant;
       const cons = fresh.consent;
       const noticeModel = buildNoticeModel({ dossier: fresh, simulation: sim, config });
-      // Adresse du terrain : l'adresse STRUCTURÉE confirmée par l'utilisateur (modale déclarant)
-      // FAIT FOI — le n° y est saisi/validé explicitement. On ne retombe sur le reparse du libellé
-      // (best effort, peut manquer le n°) que si le déclarant n'a pas d'adresse.
-      const declAdr = declarant?.adresse;
-      const terrain = (declAdr && (declAdr.voie || declAdr.localite)) ? declAdr : parseAddressFR(sim.client_address ?? '');
+      // Adresse du terrain : merge par champ — l'adresse STRUCTURÉE confirmée par l'utilisateur
+      // (modale déclarant) FAIT FOI, mais tout champ laissé vide (ex. n° non pré-rempli par l'ancien
+      // parseur sur un dossier déjà créé) se complète depuis le libellé re-parsé (best effort).
+      const declAdr = declarant?.adresse ?? {};
+      const parsed = parseAddressFR(sim.client_address ?? '');
+      const terrain = {
+        numero: declAdr.numero || parsed.numero,
+        voie: declAdr.voie || parsed.voie,
+        lieudit: declAdr.lieudit || parsed.lieudit,
+        code_postal: declAdr.code_postal || parsed.code_postal,
+        localite: declAdr.localite || parsed.localite,
+      };
       const fields = buildCerfaFields({
         declarant,
         terrain,
