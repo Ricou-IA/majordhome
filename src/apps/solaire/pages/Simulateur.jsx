@@ -24,6 +24,7 @@ import { generateEtudePdfBlob } from '../components/EtudePDF';
 import Step1Localisation from '../components/Step1Localisation';
 import Step2Consommation from '../components/Step2Consommation';
 import Step3Resultats from '../components/Step3Resultats';
+import DossierDrawer from '../components/dossier/DossierDrawer';
 
 const STEPS = [
   { n: 1, label: 'Localisation' },
@@ -57,6 +58,10 @@ function SimulateurInner({ config, settings }) {
   const restoredRef = useRef(false);
   const [pvgisLoading, setPvgisLoading] = useState(false);
   const [pvgisError, setPvgisError] = useState(null);
+  // Simulation dont le dossier réglementaire est ouvrable depuis les Résultats (après save
+  // OU rechargement ?sim=) — le wizard ne connaît sinon pas d'id de simulation.
+  const [savedDossierSim, setSavedDossierSim] = useState(null);
+  const [dossierOpen, setDossierOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // --- Brouillon : restauration au mount (sauf rechargement ?sim=) ---
@@ -91,6 +96,7 @@ function SimulateurInner({ config, settings }) {
         step: 3,
       },
     });
+    setSavedDossierSim(savedSim); // dossier ouvrable depuis les Résultats sur une simu rechargée
     toast.success(`Simulation${savedSim.client_name ? ` « ${savedSim.client_name} »` : ''} rechargée`);
   }, [simId, savedSim, config]);
 
@@ -190,6 +196,10 @@ function SimulateurInner({ config, settings }) {
         }
       }
       clearDraft(userId);
+      // Débloque le module réglementaire dans les Résultats (CERFA + notice) sans détour Historique.
+      if (sim?.id) {
+        setSavedDossierSim({ id: sim.id, client_name: clientName, client_address: state.location.address || null });
+      }
       toast.success(`Simulation « ${clientName} » enregistrée`);
     } catch (err) {
       toast.error(`Échec de l'enregistrement : ${err.message}`);
@@ -340,8 +350,16 @@ function SimulateurInner({ config, settings }) {
           onGeneratePdf={handleGeneratePdf}
           isGeneratingPdf={isGeneratingPdf}
           defaultClientName={savedSim?.client_name ?? ''}
+          dossierSim={savedDossierSim}
+          onOpenDossier={() => setDossierOpen(true)}
         />
       )}
+
+      <DossierDrawer
+        open={dossierOpen}
+        onClose={() => setDossierOpen(false)}
+        simulation={savedDossierSim}
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // (source unique partagée avec le PDF étude — chiffres identiques garantis).
 // Le surplus n'est JAMAIS valorisé en € (spec §1).
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save, FileDown, PanelsTopLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCw, AlertTriangle, Zap, Car, Save, FileDown, PanelsTopLeft, FolderOpen, FileCheck } from 'lucide-react';
 import { formatEuro } from '@lib/utils';
 import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
 import { buildEtudeModel } from '../lib/etudeModel';
@@ -19,6 +19,7 @@ import { consoProfileHourly, pvgisExample } from '../data';
 export default function Step3Resultats({
   state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onMaterial,
   onBack, onSave, isSaving, onGeneratePdf, isGeneratingPdf, defaultClientName,
+  dossierSim, onOpenDossier,
 }) {
   const { conso, ev, roof, pvgis, selectedKwc, financing } = state;
   // Fallback pour les brouillons/simulations antérieurs à la config matériel.
@@ -203,6 +204,36 @@ export default function Step3Resultats({
             </select>
           </FormField>
         </div>
+      </div>
+
+      {/* Dossier réglementaire — déclaration préalable (CERFA 16702 + notice) */}
+      <div className="card space-y-3">
+        <div className="flex items-center gap-2">
+          <FolderOpen className="w-4 h-4 text-secondary-500" />
+          <h2 className="font-semibold text-secondary-900">Dossier réglementaire</h2>
+          <span className="text-xs text-secondary-500">déclaration préalable d'urbanisme</span>
+        </div>
+        {dossierSim ? (
+          <>
+            <p className="text-sm text-secondary-600">
+              Génère le <span className="font-medium text-secondary-800">CERFA 16702</span> pré-rempli
+              (déclarant, terrain, parcelles) et la <span className="font-medium text-secondary-800">notice descriptive</span> —
+              à partir des données déjà saisies.
+            </p>
+            <button
+              onClick={onOpenDossier}
+              className="btn-primary w-full py-3 flex items-center justify-center gap-2"
+            >
+              <FileCheck className="w-4 h-4" /> Constituer le dossier PV
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-secondary-600 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#B45309]" />
+            Enregistrez d'abord la simulation (bouton ci-dessous) pour générer le CERFA 16702 et la notice.
+            La parcelle cadastrale (étape Localisation) est requise.
+          </p>
+        )}
       </div>
 
       <div className="flex gap-3 flex-wrap">
