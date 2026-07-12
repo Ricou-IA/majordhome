@@ -7,9 +7,9 @@ import {
   ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   Sankey, Layer, Rectangle,
 } from 'recharts';
-import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle, Droplets, Car } from 'lucide-react';
+import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle, Droplets, Car, HelpCircle } from 'lucide-react';
 import { PV_COLORS } from '../lib/palette';
-import { buildAutoconsoModel } from '../lib/autoconsoModel';
+import { buildAutoconsoModel, CASCADE_DEFAULTS } from '../lib/autoconsoModel';
 import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
 import { pvgisExample } from '../data';
 
@@ -31,7 +31,9 @@ function SankeyNode({ x, y, width, height, payload }) {
     <Layer>
       <Rectangle x={x} y={y} width={width} height={height} fill={NODE_COLORS[name] || '#94a3b8'} fillOpacity={0.9} radius={2} />
       {above ? (
-        <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={10} fill="#475569">{name}</text>
+        <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={10} fill="#475569">
+          {name} {Math.round(payload.value)}
+        </text>
       ) : (
         <text
           x={leftSide ? x + width + 5 : x - 5} y={y + height / 2}
@@ -68,6 +70,103 @@ function Slider({ label, value, min, max, step = 1, onChange, suffix }) {
   );
 }
 
+const kwhFmt = (n) => `${Math.round(n).toLocaleString('fr-FR')} kWh`;
+
+/** « Détail du calcul » — transparence commerciale du moteur horaire (style TransparencyPanel). */
+function CalcDetails({ model, batteryOn }) {
+  const [open, setOpen] = useState(false);
+  const flux = batteryOn && model.batteryFlux ? model.batteryFlux : model.flux;
+  const battLossesKwh = batteryOn && model.batteryFlux
+    ? Math.max(0, model.batteryFlux.chargedKwh - model.batteryFlux.fromBatteryKwh)
+    : 0;
+  return (
+    <div className="rounded-lg border border-secondary-200 bg-secondary-50/50 p-3">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 text-sm font-medium text-secondary-700"
+      >
+        <span className="flex items-center gap-2">
+          <HelpCircle className="w-4 h-4 text-[#1565C0]" /> Détail du calcul (cascade, flux, hypothèses)
+        </span>
+        {open ? <ChevronUp className="w-4 h-4 text-secondary-400" /> : <ChevronDown className="w-4 h-4 text-secondary-400" />}
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-4 text-sm text-secondary-700">
+          {/* Cascade chiffrée : chaque levier activé, avec son gain marginal */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[440px]">
+              <thead>
+                <tr className="text-left text-xs text-secondary-500 border-b border-secondary-200">
+                  <th className="py-1.5 pr-2 font-medium">Étape</th>
+                  <th className="py-1.5 pr-2 font-medium text-right">Autoconso</th>
+                  <th className="py-1.5 pr-2 font-medium text-right">Couverture</th>
+                  <th className="py-1.5 pr-2 font-medium text-right">Autoconsommé</th>
+                  <th className="py-1.5 font-medium text-right">Gain marginal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.cascade.map((r) => (
+                  <tr key={r.key} className="border-b border-secondary-100 last:border-0">
+                    <td className="py-1.5 pr-2 font-medium text-secondary-800">{r.label}</td>
+                    <td className="py-1.5 pr-2 text-right">{Math.round(r.autoconsoRate * 100)} %</td>
+                    <td className="py-1.5 pr-2 text-right">{Math.round(r.autoproductionRate * 100)} %</td>
+                    <td className="py-1.5 pr-2 text-right">{kwhFmt(r.selfConsumedKwh)}</td>
+                    <td className="py-1.5 text-right">{r.deltaKwh > 0.5 ? `+${kwhFmt(r.deltaKwh)}` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Flux annuels de l'état optimisé courant (mêmes chiffres que le Sankey) */}
+          <div>
+            <p className="font-medium text-secondary-800 mb-1">Flux annuels (état optimisé courant)</p>
+            <ul className="space-y-0.5 text-xs text-secondary-600">
+              <li>Production : {kwhFmt(flux.prodKwh)} · Consommation : {kwhFmt(flux.consoKwh)}</li>
+              <li>
+                Autoconsommé en direct : {kwhFmt(flux.directKwh)}
+                {batteryOn && model.batteryFlux ? <> · via batterie : {kwhFmt(model.batteryFlux.fromBatteryKwh)}</> : null}
+              </li>
+              <li>
+                Importé du réseau : {kwhFmt(flux.importedKwh)} · Surplus exporté : {kwhFmt(flux.exportedKwh)}
+                {battLossesKwh > 0.5 ? <> · pertes batterie : {kwhFmt(battLossesKwh)}</> : null}
+              </li>
+            </ul>
+          </div>
+
+          {/* Hypothèses du moteur — mêmes constantes que autoconsoModel (CASCADE_DEFAULTS) */}
+          <div>
+            <p className="font-medium text-secondary-800 mb-1">Hypothèses du moteur horaire</p>
+            <ul className="space-y-0.5 text-xs text-secondary-600 list-disc list-inside">
+              <li>
+                Consommation reconstituée heure par heure : talon Enedis (profil choisi à l’étape 2) calé sur
+                les 12 consommations mensuelles ; production PVGIS du lieu × puissance retenue.
+                Autoconsommation = somme de min(production, consommation) sur les 8 760 heures.
+              </li>
+              <li>
+                Pilotage ECS : {Math.round(CASCADE_DEFAULTS.pilotedShiftFraction * 100)} % de l’eau chaude décalée
+                sous le soleil, borné à la journée (pas de report d’énergie entre jours).
+              </li>
+              <li>
+                Piscine : jusqu’à {CASCADE_DEFAULTS.poolMaxKwhPerHour} kWh/h absorbés sur le surplus (avril à octobre)
+                · Clim : {CASCADE_DEFAULTS.climMaxKwhPerHour} kWh/h (été). Confort financé par le surplus, pas d’euros.
+              </li>
+              {batteryOn && (
+                <li>
+                  Batterie : capacité recommandée {model.battery.recommendedCapacityKwh} kWh, rendement aller-retour
+                  {' '}{Math.round(CASCADE_DEFAULTS.batteryEfficiency * 100)} % — les pertes restent comptées en surplus.
+                </li>
+              )}
+              <li>Le surplus n’est jamais valorisé en euros (approche conservatrice).</li>
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Toggle({ label, icon: Icon, active, onClick }) {
   return (
     <button type="button" onClick={onClick}
@@ -81,7 +180,8 @@ function Toggle({ label, icon: Icon, active, onClick }) {
 }
 
 export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeKwc, ev, baseShape }) {
-  const [open, setOpen] = useState(false);
+  // Chapitre à part entière dans les Résultats → ouvert par défaut (démo client).
+  const [open, setOpen] = useState(true);
   const [persons, setPersons] = useState(3);
   const [veBattery, setVeBattery] = useState(60);
   // Optimisations PROPOSÉES (toggles) — le constat s'affiche sans, on les active
@@ -133,8 +233,10 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
     actuelle: +model.dayCurves.consoBaseline[h].toFixed(2),
     optimisee: +model.dayCurves.conso[h].toFixed(2),
   }));
-  // Sankey. Batterie : nœud tampon ÉQUILIBRÉ (entrée = sortie = énergie restituée) ;
-  // les pertes (rendement η + reliquat SOC) sont fondues dans le puits « Surplus ».
+  // Sankey. Batterie : nœud tampon à sa taille réelle — entrée = énergie CHARGÉE,
+  // sorties = restitution → Maison + pertes (rendement η + reliquat SOC) → Surplus.
+  // Le lien Batterie → Surplus pousse aussi « Surplus » en dernière colonne (sinon
+  // recharts le laissait flotter en colonne du milieu, rubans croisés illisibles).
   const flux = batteryOn ? model.batteryFlux : model.flux;
   const sankeyData = buildSankey(
     batteryOn
@@ -143,9 +245,10 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
     batteryOn
       ? [
         { source: 0, target: 3, value: Math.round(flux.directKwh) },
-        { source: 0, target: 2, value: Math.round(flux.fromBatteryKwh) },
+        { source: 0, target: 2, value: Math.round(flux.chargedKwh) },
         { source: 2, target: 3, value: Math.round(flux.fromBatteryKwh) },
-        { source: 0, target: 4, value: Math.round(flux.exportedKwh + (flux.chargedKwh - flux.fromBatteryKwh)) },
+        { source: 2, target: 4, value: Math.round(Math.max(0, flux.chargedKwh - flux.fromBatteryKwh)) },
+        { source: 0, target: 4, value: Math.round(flux.exportedKwh) },
         { source: 1, target: 3, value: Math.round(flux.importedKwh) },
       ]
       : [
@@ -289,6 +392,9 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
               Calcul horaire réel (talon Enedis + production du lieu). Le surplus n'est jamais valorisé en euros :
               il finance de l'autoconsommation ou du confort (piscine, clim).
             </p>
+
+            {/* Détail des calculs — cascade chiffrée, flux annuels, hypothèses */}
+            <CalcDetails model={model} batteryOn={batteryOn} />
           </div>
         </div>
       )}

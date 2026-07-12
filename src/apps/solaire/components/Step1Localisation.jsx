@@ -258,9 +258,10 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
   return (
     <div className="space-y-5">
-      {/* Écran large (xl) : carte dominante à gauche (sticky), saisie à droite. Tablette/mobile : empilé. */}
+      {/* Écran large (xl) : carte dominante à gauche, saisie à droite. Tablette/mobile : empilé.
+          Pas de sticky ici : la colonne carte dépasse le viewport → deux zones de scroll désynchronisées. */}
       <div className="grid grid-cols-1 xl:grid-cols-3 xl:items-start gap-5">
-        <div className="xl:col-span-2 xl:sticky xl:top-20">
+        <div className="xl:col-span-2">
           {/* Localisation */}
           <div className="card space-y-4">
             <h2 className="font-semibold text-secondary-900">Localisation du logement</h2>

@@ -65,6 +65,30 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
           </button>
         </div>
 
+        {/* Profil AVANT la saisie : il pilote la répartition depuis l'annuel ET le talon horaire */}
+        <FormField label="Profil de consommation">
+          <div className="grid sm:grid-cols-2 gap-2">
+            {PROFILE_LIST.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => onConso({ profile: p.key })}
+                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  conso.profile === p.key
+                    ? 'border-primary-600 bg-primary-50 text-primary-800'
+                    : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
+                }`}
+              >
+                <span className="block text-sm font-medium">{p.label}</span>
+                <span className="block text-xs text-secondary-500">{p.hint}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-secondary-500 mt-2">
+            Détermine la silhouette mensuelle utilisée par « Répartir depuis l’annuel » et la silhouette
+            horaire (talon Enedis) de l’autoconsommation. Un foyer chauffé en électrique consomme beaucoup plus en hiver.
+          </p>
+        </FormField>
+
         {showSpread && (
           <div className="flex items-center gap-2 bg-secondary-50 rounded-lg p-3">
             <input
@@ -108,7 +132,7 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
 
       {/* Écran large (xl) : prix/profil et VE côte à côte. Tablette/mobile : empilé. */}
       <div className="grid grid-cols-1 xl:grid-cols-2 xl:items-start gap-5">
-        {/* Prix kWh + profil de consommation */}
+        {/* Prix kWh */}
         <div className="card space-y-4">
           <FormField label="Prix actuel du kWh (€ TTC)">
             <input
@@ -123,29 +147,6 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
                 onConso({ priceKwh: Number.isNaN(n) ? '' : n });
               }}
             />
-          </FormField>
-
-          <FormField label="Profil de consommation">
-            <div className="grid sm:grid-cols-2 gap-2">
-              {PROFILE_LIST.map((p) => (
-                <button
-                  key={p.key}
-                  onClick={() => onConso({ profile: p.key })}
-                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                    conso.profile === p.key
-                      ? 'border-primary-600 bg-primary-50 text-primary-800'
-                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
-                  }`}
-                >
-                  <span className="block text-sm font-medium">{p.label}</span>
-                  <span className="block text-xs text-secondary-500">{p.hint}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-secondary-500 mt-2">
-              Détermine la silhouette horaire de la consommation (talon Enedis) utilisée pour
-              estimer votre autoconsommation réelle. Un foyer chauffé en électrique consomme beaucoup plus en hiver.
-            </p>
           </FormField>
         </div>
 

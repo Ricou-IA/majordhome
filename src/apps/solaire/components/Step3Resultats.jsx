@@ -146,9 +146,6 @@ export default function Step3Resultats({
           {/* Graphique mensuel */}
           <MonthlyChart monthly={model.active} consoMonthly={model.consoMonthly} />
 
-          {/* Optimisation autoconsommation — moteur horaire (additif, n'altère pas buildEtudeModel) */}
-          <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
-
           {/* Financement */}
           <FinancingModule
             financing={financing}
@@ -266,6 +263,10 @@ export default function Step3Resultats({
           </div>
         </div>
       </div>
+
+      {/* Optimiser l'autoconsommation — chapitre pleine largeur (démo client + détail des calculs).
+          Moteur horaire additif : n'altère pas buildEtudeModel. */}
+      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
 
       <SaveSimulationModal
         open={showSaveModal}
