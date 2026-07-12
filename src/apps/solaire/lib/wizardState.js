@@ -9,7 +9,9 @@ export function initialWizardState(config) {
     location: { lat: null, lon: null, address: '', accuracy: null, source: null }, // source: 'gps'|'adresse'
     roof: { tiltPercent: config.default_tilt_percent, orientation: 'S', surfaceM2: '' },
     conso: { monthly: Array(12).fill(''), priceKwh: config.default_price_kwh, profile: 'RES1' },
-    ev: { enabled: false, kmPerYear: config.ev.default_km, kwhPer100km: config.ev.default_kwh_100km, addCharger: false },
+    // owned=false : VE en projet (ajouté au modèle) ; owned=true : déjà équipé (déjà
+    // dans les factures — rien d'ajouté, « Répartir depuis l'annuel » lisse sa part).
+    ev: { enabled: false, owned: false, kmPerYear: config.ev.default_km, kwhPer100km: config.ev.default_kwh_100km, addCharger: false },
     pvgis: null,            // { e_m, e_y, params } — posé à l'entrée du step 3
     roofGeometry: null,     // { source, imageryQuality, segments, dominant, flux_image_path } — Google Solar
     pans: [],               // pans de toiture cartographiés : { id, polygon, footprintM2, slopeAreaM2, pitchDeg, pitchPercent, aspectPvgis, azimuthCompass, eY }

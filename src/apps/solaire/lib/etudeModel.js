@@ -33,7 +33,9 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
   if (!pvgis?.e_m) return null;
 
   // --- Conso effective (+ VE linéarisé AVANT l'optimiseur, spec §8.6) ---
-  const evMonthly = ev.enabled
+  // VE « déjà équipé » (ev.owned) : sa conso est DÉJÀ dans les 12 factures → rien
+  // n'est ajouté (l'ajout ne vaut que pour un VE en projet, non reflété aux factures).
+  const evMonthly = ev.enabled && !ev.owned
     ? evMonthlyConsumption({
         kmPerYear: Number(ev.kmPerYear) || 0,
         kwhPer100km: Number(ev.kwhPer100km) || 0,

@@ -25,21 +25,6 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
     onConso({ monthly });
   };
 
-  // Répartit l'annuel selon la silhouette mensuelle du profil sélectionné (Σ des
-  // poids = 1, dérivée du talon Enedis RES1/RES2) — plus fidèle qu'un profil générique.
-  const applySpread = () => {
-    const total = Number(annualInput);
-    if (!Number.isFinite(total) || total <= 0) return;
-    const shares = monthlyFromHourly(consoProfileHourly(conso.profile)); // Σ = 1
-    onConso({ monthly: shares.map((w) => Math.round(total * w)) });
-    setShowSpread(false);
-    setAnnualInput('');
-  };
-
-  const totalAnnual = conso.monthly.reduce((a, v) => a + (Number(v) || 0), 0);
-  const allMonthsFilled = conso.monthly.every((v) => v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0);
-  const priceOk = Number.isFinite(Number(conso.priceKwh)) && Number(conso.priceKwh) > 0;
-
   const evAnnual = ev.enabled
     ? Math.round(evMonthlyConsumption({
         kmPerYear: Number(ev.kmPerYear) || 0,
@@ -47,6 +32,25 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
         homeChargeShare: config.ev.home_charge_share,
       }) * 12)
     : 0;
+
+  // Répartit l'annuel selon la silhouette mensuelle du profil sélectionné (Σ des
+  // poids = 1, dérivée du talon Enedis RES1/RES2) — plus fidèle qu'un profil générique.
+  // VE « déjà équipé » : sa part (recharge domicile, non saisonnière) est DANS le total
+  // mais ne suit pas la silhouette Enedis → lissée uniformément, le reste suit le profil.
+  const applySpread = () => {
+    const total = Number(annualInput);
+    if (!Number.isFinite(total) || total <= 0) return;
+    const shares = monthlyFromHourly(consoProfileHourly(conso.profile)); // Σ = 1
+    const evFlatAnnual = ev.enabled && ev.owned ? Math.min(evAnnual, total) : 0;
+    const rest = total - evFlatAnnual;
+    onConso({ monthly: shares.map((w) => Math.round(rest * w + evFlatAnnual / 12)) });
+    setShowSpread(false);
+    setAnnualInput('');
+  };
+
+  const totalAnnual = conso.monthly.reduce((a, v) => a + (Number(v) || 0), 0);
+  const allMonthsFilled = conso.monthly.every((v) => v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0);
+  const priceOk = Number.isFinite(Number(conso.priceKwh)) && Number(conso.priceKwh) > 0;
 
   const canContinue = allMonthsFilled && priceOk
     && (!ev.enabled || ((Number(ev.kmPerYear) || 0) > 0 && (Number(ev.kwhPer100km) || 0) > 0));
@@ -124,7 +128,11 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
           <span className="font-semibold text-secondary-900">
             {totalAnnual.toLocaleString('fr-FR')} kWh
             {ev.enabled && evAnnual > 0 && (
-              <span className="font-normal text-secondary-500"> + {evAnnual.toLocaleString('fr-FR')} kWh VE</span>
+              <span className="font-normal text-secondary-500">
+                {ev.owned
+                  ? ` dont ~${evAnnual.toLocaleString('fr-FR')} kWh VE`
+                  : ` + ${evAnnual.toLocaleString('fr-FR')} kWh VE`}
+              </span>
             )}
           </span>
         </div>
@@ -170,8 +178,38 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
 
           {ev.enabled && (
             <div className="space-y-4">
+              {/* La nuance qui change le calcul : déjà équipé = déjà dans les factures
+                  (rien d'ajouté, répartition lissée) ; en projet = surconsommation ajoutée. */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEv({ owned: false })}
+                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    !ev.owned
+                      ? 'border-primary-600 bg-primary-50 text-primary-800'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
+                  }`}
+                >
+                  <span className="block text-sm font-medium">En projet d’achat</span>
+                  <span className="block text-xs text-secondary-500">pas encore dans les factures</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEv({ owned: true })}
+                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    ev.owned
+                      ? 'border-primary-600 bg-primary-50 text-primary-800'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
+                  }`}
+                >
+                  <span className="block text-sm font-medium">Déjà équipé</span>
+                  <span className="block text-xs text-secondary-500">déjà dans les factures</span>
+                </button>
+              </div>
               <p className="text-xs text-secondary-500">
-                Projet d'achat ou véhicule non reflété dans les factures — la surconsommation est ajoutée au modèle.
+                {ev.owned
+                  ? 'Sa consommation est déjà dans vos factures — rien n’est ajouté au calcul. « Répartir depuis l’annuel » lisse sa part uniformément sur l’année (la recharge n’est pas saisonnière), le reste suit le profil Enedis.'
+                  : 'Véhicule non reflété dans les factures — sa surconsommation est ajoutée au modèle.'}
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Kilométrage annuel (km)">
@@ -221,7 +259,8 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
 
               {evAnnual > 0 && (
                 <p className="text-sm text-secondary-700">
-                  dont véhicule électrique : <span className="font-semibold">{evAnnual.toLocaleString('fr-FR')} kWh/an</span>
+                  {ev.owned ? 'part VE estimée dans vos factures : ' : 'véhicule électrique ajouté au modèle : '}
+                  <span className="font-semibold">{evAnnual.toLocaleString('fr-FR')} kWh/an</span>
                   {' '}({config.ev.home_charge_share * 100} % rechargé à domicile)
                 </p>
               )}
