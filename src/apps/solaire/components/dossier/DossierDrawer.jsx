@@ -224,7 +224,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
   return (
     <div className="fixed inset-0 z-40">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl overflow-y-auto">
+      <div className="absolute right-0 top-0 h-full w-full max-w-lg xl:max-w-2xl bg-white shadow-xl overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-secondary-200 px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <FolderOpen className="w-5 h-5 text-secondary-500 flex-shrink-0" />

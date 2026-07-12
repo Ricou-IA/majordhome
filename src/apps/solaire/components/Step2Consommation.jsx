@@ -80,7 +80,7 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-3">
           {MONTH_LABELS.map((label, i) => (
             <FormField key={label} label={label}>
               <input
@@ -106,124 +106,127 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
         </div>
       </div>
 
-      {/* Prix kWh + profil de consommation */}
-      <div className="card space-y-4">
-        <FormField label="Prix actuel du kWh (€ TTC)">
-          <input
-            type="number"
-            inputMode="decimal"
-            className={inputClass}
-            value={conso.priceKwh ?? ''}
-            step={0.01}
-            min={0}
-            onChange={(e) => {
-              const n = e.target.value === '' ? '' : Number(e.target.value);
-              onConso({ priceKwh: Number.isNaN(n) ? '' : n });
-            }}
-          />
-        </FormField>
+      {/* Écran large (xl) : prix/profil et VE côte à côte. Tablette/mobile : empilé. */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 xl:items-start gap-5">
+        {/* Prix kWh + profil de consommation */}
+        <div className="card space-y-4">
+          <FormField label="Prix actuel du kWh (€ TTC)">
+            <input
+              type="number"
+              inputMode="decimal"
+              className={inputClass}
+              value={conso.priceKwh ?? ''}
+              step={0.01}
+              min={0}
+              onChange={(e) => {
+                const n = e.target.value === '' ? '' : Number(e.target.value);
+                onConso({ priceKwh: Number.isNaN(n) ? '' : n });
+              }}
+            />
+          </FormField>
 
-        <FormField label="Profil de consommation">
-          <div className="grid sm:grid-cols-2 gap-2">
-            {PROFILE_LIST.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => onConso({ profile: p.key })}
-                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                  conso.profile === p.key
-                    ? 'border-primary-600 bg-primary-50 text-primary-800'
-                    : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
-                }`}
-              >
-                <span className="block text-sm font-medium">{p.label}</span>
-                <span className="block text-xs text-secondary-500">{p.hint}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-secondary-500 mt-2">
-            Détermine la silhouette horaire de la consommation (talon Enedis) utilisée pour
-            estimer votre autoconsommation réelle. Un foyer chauffé en électrique consomme beaucoup plus en hiver.
-          </p>
-        </FormField>
-      </div>
-
-      {/* Bloc VE repliable */}
-      <div className="card space-y-4">
-        <button
-          onClick={() => onEv({ enabled: !ev.enabled })}
-          className="w-full flex items-center justify-between gap-2"
-        >
-          <span className="flex items-center gap-2 font-semibold text-secondary-900">
-            <Car className="w-5 h-5 text-secondary-500" /> Véhicule électrique
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              ev.enabled ? 'bg-primary-100 text-primary-700' : 'bg-secondary-100 text-secondary-500'
-            }`}
-            >
-              {ev.enabled ? 'Activé' : 'Désactivé'}
-            </span>
-          </span>
-          {ev.enabled ? <ChevronUp className="w-4 h-4 text-secondary-400" /> : <ChevronDown className="w-4 h-4 text-secondary-400" />}
-        </button>
-
-        {ev.enabled && (
-          <div className="space-y-4">
-            <p className="text-xs text-secondary-500">
-              Projet d'achat ou véhicule non reflété dans les factures — la surconsommation est ajoutée au modèle.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Kilométrage annuel (km)">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className={inputClass}
-                  value={ev.kmPerYear ?? ''}
-                  min={0}
-                  step={1000}
-                  onChange={(e) => {
-                    const n = e.target.value === '' ? '' : Number(e.target.value);
-                    onEv({ kmPerYear: Number.isNaN(n) ? '' : n });
-                  }}
-                />
-              </FormField>
-              <FormField label="Conso véhicule (kWh/100 km)">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  className={inputClass}
-                  value={ev.kwhPer100km ?? ''}
-                  min={0}
-                  step={0.5}
-                  onChange={(e) => {
-                    const n = e.target.value === '' ? '' : Number(e.target.value);
-                    onEv({ kwhPer100km: Number.isNaN(n) ? '' : n });
-                  }}
-                />
-              </FormField>
+          <FormField label="Profil de consommation">
+            <div className="grid sm:grid-cols-2 gap-2">
+              {PROFILE_LIST.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => onConso({ profile: p.key })}
+                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    conso.profile === p.key
+                      ? 'border-primary-600 bg-primary-50 text-primary-800'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
+                  }`}
+                >
+                  <span className="block text-sm font-medium">{p.label}</span>
+                  <span className="block text-xs text-secondary-500">{p.hint}</span>
+                </button>
+              ))}
             </div>
+            <p className="text-xs text-secondary-500 mt-2">
+              Détermine la silhouette horaire de la consommation (talon Enedis) utilisée pour
+              estimer votre autoconsommation réelle. Un foyer chauffé en électrique consomme beaucoup plus en hiver.
+            </p>
+          </FormField>
+        </div>
 
-            <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
-              <input
-                type="checkbox"
-                className="rounded border-secondary-300"
-                checked={ev.addCharger}
-                onChange={(e) => onEv({ addCharger: e.target.checked })}
-              />
-              Ajouter la borne de recharge à l'investissement
-            </label>
-            {ev.addCharger && config.ev.charger_price === null && (
-              <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2">
-                Prix borne non configuré dans l'admin — il sera ajouté manuellement au coût de l'installation.
-              </p>
-            )}
+        {/* Bloc VE repliable */}
+        <div className="card space-y-4">
+          <button
+            onClick={() => onEv({ enabled: !ev.enabled })}
+            className="w-full flex items-center justify-between gap-2"
+          >
+            <span className="flex items-center gap-2 font-semibold text-secondary-900">
+              <Car className="w-5 h-5 text-secondary-500" /> Véhicule électrique
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                ev.enabled ? 'bg-primary-100 text-primary-700' : 'bg-secondary-100 text-secondary-500'
+              }`}
+              >
+                {ev.enabled ? 'Activé' : 'Désactivé'}
+              </span>
+            </span>
+            {ev.enabled ? <ChevronUp className="w-4 h-4 text-secondary-400" /> : <ChevronDown className="w-4 h-4 text-secondary-400" />}
+          </button>
 
-            {evAnnual > 0 && (
-              <p className="text-sm text-secondary-700">
-                dont véhicule électrique : <span className="font-semibold">{evAnnual.toLocaleString('fr-FR')} kWh/an</span>
-                {' '}({config.ev.home_charge_share * 100} % rechargé à domicile)
+          {ev.enabled && (
+            <div className="space-y-4">
+              <p className="text-xs text-secondary-500">
+                Projet d'achat ou véhicule non reflété dans les factures — la surconsommation est ajoutée au modèle.
               </p>
-            )}
-          </div>
-        )}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Kilométrage annuel (km)">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputClass}
+                    value={ev.kmPerYear ?? ''}
+                    min={0}
+                    step={1000}
+                    onChange={(e) => {
+                      const n = e.target.value === '' ? '' : Number(e.target.value);
+                      onEv({ kmPerYear: Number.isNaN(n) ? '' : n });
+                    }}
+                  />
+                </FormField>
+                <FormField label="Conso véhicule (kWh/100 km)">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    className={inputClass}
+                    value={ev.kwhPer100km ?? ''}
+                    min={0}
+                    step={0.5}
+                    onChange={(e) => {
+                      const n = e.target.value === '' ? '' : Number(e.target.value);
+                      onEv({ kwhPer100km: Number.isNaN(n) ? '' : n });
+                    }}
+                  />
+                </FormField>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="rounded border-secondary-300"
+                  checked={ev.addCharger}
+                  onChange={(e) => onEv({ addCharger: e.target.checked })}
+                />
+                Ajouter la borne de recharge à l'investissement
+              </label>
+              {ev.addCharger && config.ev.charger_price === null && (
+                <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2">
+                  Prix borne non configuré dans l'admin — il sera ajouté manuellement au coût de l'installation.
+                </p>
+              )}
+
+              {evAnnual > 0 && (
+                <p className="text-sm text-secondary-700">
+                  dont véhicule électrique : <span className="font-semibold">{evAnnual.toLocaleString('fr-FR')} kWh/an</span>
+                  {' '}({config.ev.home_charge_share * 100} % rechargé à domicile)
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-3">

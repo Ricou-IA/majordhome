@@ -233,7 +233,7 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
 
       {(status === 'ok') && (
         <>
-          <div ref={containerRef} className="w-full h-72 rounded-lg overflow-hidden border border-secondary-200" />
+          <div ref={containerRef} className="w-full h-72 lg:h-[420px] rounded-lg overflow-hidden border border-secondary-200" />
           <button
             type="button"
             onClick={searchInView}

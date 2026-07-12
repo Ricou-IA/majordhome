@@ -95,168 +95,176 @@ export default function Step3Resultats({
 
   return (
     <div className="space-y-5">
-      {/* Récap */}
-      <div className="card">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-          <div>
-            <p className="text-xs text-secondary-500">Production an 1</p>
-            <p className="font-bold text-secondary-900">{Math.round(model.active.totals.prod).toLocaleString('fr-FR')} kWh</p>
+      {/* Écran large (xl) : analyses à gauche (2/3), actions sticky à droite (1/3). Sinon empilé. */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 xl:items-start gap-5">
+        <div className="xl:col-span-2 space-y-5">
+          {/* Récap */}
+          <div className="card">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div>
+                <p className="text-xs text-secondary-500">Production an 1</p>
+                <p className="font-bold text-secondary-900">{Math.round(model.active.totals.prod).toLocaleString('fr-FR')} kWh</p>
+              </div>
+              <div>
+                <p className="text-xs text-secondary-500">Consommation</p>
+                <p className="font-bold text-secondary-900">{Math.round(model.active.totals.conso).toLocaleString('fr-FR')} kWh</p>
+                {model.evAnnual > 0 && (
+                  <p className="text-[11px] text-secondary-500 flex items-center justify-center gap-1">
+                    <Car className="w-3 h-3" /> dont VE : {model.evAnnual.toLocaleString('fr-FR')} kWh/an
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-secondary-500">Autoconsommation</p>
+                <p className="font-bold text-secondary-900">{Math.round(model.active.totals.tauxAutoconso * 100)} %</p>
+              </div>
+              <div>
+                <p className="text-xs text-secondary-500">Facture couverte</p>
+                <p className="font-bold text-secondary-900">{Math.round(model.active.totals.tauxAutoproduction * 100)} %</p>
+              </div>
+            </div>
+            <p className="text-xs text-secondary-500 mt-3 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 flex-shrink-0 text-[#F5C542]" />
+              Économie an 1 : <span className="font-semibold text-secondary-800">{formatEuro(Math.round(model.economyYear1))}</span>
+              — le surplus est compté comme perdu (0 €), approche volontairement conservatrice.
+            </p>
           </div>
-          <div>
-            <p className="text-xs text-secondary-500">Consommation</p>
-            <p className="font-bold text-secondary-900">{Math.round(model.active.totals.conso).toLocaleString('fr-FR')} kWh</p>
-            {model.evAnnual > 0 && (
-              <p className="text-[11px] text-secondary-500 flex items-center justify-center gap-1">
-                <Car className="w-3 h-3" /> dont VE : {model.evAnnual.toLocaleString('fr-FR')} kWh/an
+
+          {/* Transparence du calcul */}
+          <TransparencyPanel model={model} config={config} roof={roof} />
+
+          {/* Scénarios */}
+          <ScenarioCards scenarios={model.scenarios} activeKwc={model.activeKwc} onSelect={onSelectKwc} />
+          {model.cappedByOffer && (
+            <p className="text-xs text-secondary-500 flex items-center gap-1.5 -mt-2">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              Dimensionnement plafonné à {config.max_power_kwc} kWc (offre résidentielle — régime réglementaire
+              différent au-delà). La toiture permettrait {model.roofMaxKwc} kWc.
+            </p>
+          )}
+
+          {/* Graphique mensuel */}
+          <MonthlyChart monthly={model.active} consoMonthly={model.consoMonthly} />
+
+          {/* Optimisation autoconsommation — moteur horaire (additif, n'altère pas buildEtudeModel) */}
+          <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
+
+          {/* Financement */}
+          <FinancingModule
+            financing={financing}
+            onFinancing={onFinancing}
+            gridCost={model.gridCost}
+            chargerPrice={model.chargerPrice}
+            totalCost={model.totalCost}
+            capital={model.capital}
+            mensualite={model.mensualite}
+            economyYear1={model.economyYear1}
+            model={model}
+            horizonYears={config.horizon_years}
+          />
+
+          {/* Tableau annuel + cumul */}
+          {model.table ? (
+            <TableauAnnuel table={model.table} loanYears={model.years} horizonYears={config.horizon_years} />
+          ) : (
+            <div className="card text-sm text-secondary-600">
+              Renseigner le coût de l'installation (et un taux/durée valides) pour générer le tableau annuel.
+            </div>
+          )}
+        </div>
+
+        {/* Colonne actions — matériel, dossier, enregistrement (sticky sur écran large) */}
+        <div className="space-y-5 xl:sticky xl:top-20">
+          {/* Matériel proposé — saisi dans l'offre (write-once), alimente la notice du dossier PV */}
+          <div className="card space-y-4">
+            <div className="flex items-center gap-2">
+              <PanelsTopLeft className="w-4 h-4 text-secondary-500" />
+              <h2 className="font-semibold text-secondary-900">Matériel proposé</h2>
+              <span className="text-xs text-secondary-500">pour la déclaration préalable (optionnel)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-4">
+              <FormField label="Marque des modules">
+                <input
+                  className={inputClass}
+                  value={material.module_marque}
+                  placeholder="DualSun, Voltec…"
+                  onChange={(e) => onMaterial({ module_marque: e.target.value })}
+                />
+              </FormField>
+              <FormField label="Modèle">
+                <input
+                  className={inputClass}
+                  value={material.module_modele}
+                  placeholder="Flash 500 Half-Cut…"
+                  onChange={(e) => onMaterial({ module_modele: e.target.value })}
+                />
+              </FormField>
+              <FormField label="Aspect">
+                <select
+                  className={selectClass}
+                  value={material.module_aspect}
+                  onChange={(e) => onMaterial({ module_aspect: e.target.value })}
+                >
+                  <option value="full_black">Full black (noir uniforme)</option>
+                  <option value="standard">Standard (cadre alu)</option>
+                </select>
+              </FormField>
+            </div>
+          </div>
+
+          {/* Dossier réglementaire — déclaration préalable (CERFA 16702 + notice) */}
+          <div className="card space-y-3">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-secondary-500" />
+              <h2 className="font-semibold text-secondary-900">Dossier réglementaire</h2>
+              <span className="text-xs text-secondary-500">déclaration préalable d'urbanisme</span>
+            </div>
+            {dossierSim ? (
+              <>
+                <p className="text-sm text-secondary-600">
+                  Génère le <span className="font-medium text-secondary-800">CERFA 16702</span> pré-rempli
+                  (déclarant, terrain, parcelles) et la <span className="font-medium text-secondary-800">notice descriptive</span> —
+                  à partir des données déjà saisies.
+                </p>
+                <button
+                  onClick={onOpenDossier}
+                  className="btn-primary w-full py-3 flex items-center justify-center gap-2"
+                >
+                  <FileCheck className="w-4 h-4" /> Constituer le dossier PV
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-secondary-600 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#B45309]" />
+                Enregistrez d'abord la simulation (bouton ci-dessous) pour générer le CERFA 16702 et la notice.
+                La parcelle cadastrale (étape Localisation) est requise.
               </p>
             )}
           </div>
-          <div>
-            <p className="text-xs text-secondary-500">Autoconsommation</p>
-            <p className="font-bold text-secondary-900">{Math.round(model.active.totals.tauxAutoconso * 100)} %</p>
-          </div>
-          <div>
-            <p className="text-xs text-secondary-500">Facture couverte</p>
-            <p className="font-bold text-secondary-900">{Math.round(model.active.totals.tauxAutoproduction * 100)} %</p>
-          </div>
-        </div>
-        <p className="text-xs text-secondary-500 mt-3 flex items-center gap-1.5">
-          <Zap className="w-3.5 h-3.5 flex-shrink-0 text-[#F5C542]" />
-          Économie an 1 : <span className="font-semibold text-secondary-800">{formatEuro(Math.round(model.economyYear1))}</span>
-          — le surplus est compté comme perdu (0 €), approche volontairement conservatrice.
-        </p>
-      </div>
 
-      {/* Transparence du calcul */}
-      <TransparencyPanel model={model} config={config} roof={roof} />
-
-      {/* Scénarios */}
-      <ScenarioCards scenarios={model.scenarios} activeKwc={model.activeKwc} onSelect={onSelectKwc} />
-      {model.cappedByOffer && (
-        <p className="text-xs text-secondary-500 flex items-center gap-1.5 -mt-2">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-          Dimensionnement plafonné à {config.max_power_kwc} kWc (offre résidentielle — régime réglementaire
-          différent au-delà). La toiture permettrait {model.roofMaxKwc} kWc.
-        </p>
-      )}
-
-      {/* Graphique mensuel */}
-      <MonthlyChart monthly={model.active} consoMonthly={model.consoMonthly} />
-
-      {/* Optimisation autoconsommation — moteur horaire (additif, n'altère pas buildEtudeModel) */}
-      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
-
-      {/* Financement */}
-      <FinancingModule
-        financing={financing}
-        onFinancing={onFinancing}
-        gridCost={model.gridCost}
-        chargerPrice={model.chargerPrice}
-        totalCost={model.totalCost}
-        capital={model.capital}
-        mensualite={model.mensualite}
-        economyYear1={model.economyYear1}
-        model={model}
-        horizonYears={config.horizon_years}
-      />
-
-      {/* Tableau annuel + cumul */}
-      {model.table ? (
-        <TableauAnnuel table={model.table} loanYears={model.years} horizonYears={config.horizon_years} />
-      ) : (
-        <div className="card text-sm text-secondary-600">
-          Renseigner le coût de l'installation (et un taux/durée valides) pour générer le tableau annuel.
-        </div>
-      )}
-
-      {/* Matériel proposé — saisi dans l'offre (write-once), alimente la notice du dossier PV */}
-      <div className="card space-y-4">
-        <div className="flex items-center gap-2">
-          <PanelsTopLeft className="w-4 h-4 text-secondary-500" />
-          <h2 className="font-semibold text-secondary-900">Matériel proposé</h2>
-          <span className="text-xs text-secondary-500">pour la déclaration préalable (optionnel)</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <FormField label="Marque des modules">
-            <input
-              className={inputClass}
-              value={material.module_marque}
-              placeholder="DualSun, Voltec…"
-              onChange={(e) => onMaterial({ module_marque: e.target.value })}
-            />
-          </FormField>
-          <FormField label="Modèle">
-            <input
-              className={inputClass}
-              value={material.module_modele}
-              placeholder="Flash 500 Half-Cut…"
-              onChange={(e) => onMaterial({ module_modele: e.target.value })}
-            />
-          </FormField>
-          <FormField label="Aspect">
-            <select
-              className={selectClass}
-              value={material.module_aspect}
-              onChange={(e) => onMaterial({ module_aspect: e.target.value })}
-            >
-              <option value="full_black">Full black (noir uniforme)</option>
-              <option value="standard">Standard (cadre alu)</option>
-            </select>
-          </FormField>
-        </div>
-      </div>
-
-      {/* Dossier réglementaire — déclaration préalable (CERFA 16702 + notice) */}
-      <div className="card space-y-3">
-        <div className="flex items-center gap-2">
-          <FolderOpen className="w-4 h-4 text-secondary-500" />
-          <h2 className="font-semibold text-secondary-900">Dossier réglementaire</h2>
-          <span className="text-xs text-secondary-500">déclaration préalable d'urbanisme</span>
-        </div>
-        {dossierSim ? (
-          <>
-            <p className="text-sm text-secondary-600">
-              Génère le <span className="font-medium text-secondary-800">CERFA 16702</span> pré-rempli
-              (déclarant, terrain, parcelles) et la <span className="font-medium text-secondary-800">notice descriptive</span> —
-              à partir des données déjà saisies.
-            </p>
+          <div className="flex gap-3 flex-wrap">
             <button
-              onClick={onOpenDossier}
-              className="btn-primary w-full py-3 flex items-center justify-center gap-2"
+              onClick={onBack}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-secondary-200 text-secondary-700 font-medium hover:bg-secondary-50"
             >
-              <FileCheck className="w-4 h-4" /> Constituer le dossier PV
+              <ArrowLeft className="w-4 h-4" /> Retour
             </button>
-          </>
-        ) : (
-          <p className="text-sm text-secondary-600 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#B45309]" />
-            Enregistrez d'abord la simulation (bouton ci-dessous) pour générer le CERFA 16702 et la notice.
-            La parcelle cadastrale (étape Localisation) est requise.
-          </p>
-        )}
-      </div>
-
-      <div className="flex gap-3 flex-wrap">
-        <button
-          onClick={onBack}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-secondary-200 text-secondary-700 font-medium hover:bg-secondary-50"
-        >
-          <ArrowLeft className="w-4 h-4" /> Retour
-        </button>
-        <button
-          onClick={() => setShowPdfModal(true)}
-          disabled={isGeneratingPdf}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-secondary-200 text-secondary-700 font-medium hover:bg-secondary-50 disabled:opacity-50"
-        >
-          {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-          Étude PDF
-        </button>
-        <button
-          onClick={() => setShowSaveModal(true)}
-          className="btn-primary flex-1 min-w-[180px] py-3 flex items-center justify-center gap-2"
-        >
-          <Save className="w-4 h-4" /> Enregistrer la simulation
-        </button>
+            <button
+              onClick={() => setShowPdfModal(true)}
+              disabled={isGeneratingPdf}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-secondary-200 text-secondary-700 font-medium hover:bg-secondary-50 disabled:opacity-50"
+            >
+              {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              Étude PDF
+            </button>
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="btn-primary flex-1 min-w-[180px] py-3 flex items-center justify-center gap-2"
+            >
+              <Save className="w-4 h-4" /> Enregistrer la simulation
+            </button>
+          </div>
+        </div>
       </div>
 
       <SaveSimulationModal

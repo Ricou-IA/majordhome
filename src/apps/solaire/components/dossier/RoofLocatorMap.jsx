@@ -167,7 +167,7 @@ export default function RoofLocatorMap({ center, initialPolygon, onPolygon, save
 
   return (
     <div className="relative">
-      <div ref={containerRef} className="w-full h-80 rounded-lg overflow-hidden border border-secondary-200" />
+      <div ref={containerRef} className="w-full h-80 lg:h-[480px] xl:h-[560px] rounded-lg overflow-hidden border border-secondary-200" />
       <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white/90 rounded-md px-2.5 py-1 text-xs font-medium text-secondary-700 pointer-events-none text-center">
         <Pencil className="w-3.5 h-3.5 flex-shrink-0" /> Cliquez l'outil ▱ (haut-gauche) puis tracez le toit — un clic par coin, double-clic pour fermer
       </div>

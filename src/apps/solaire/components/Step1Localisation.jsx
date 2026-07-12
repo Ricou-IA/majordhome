@@ -258,85 +258,86 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
 
   return (
     <div className="space-y-5">
-      {/* Localisation */}
-      <div className="card space-y-4">
-        <h2 className="font-semibold text-secondary-900">Localisation du logement</h2>
+      {/* Écran large (xl) : carte dominante à gauche (sticky), saisie à droite. Tablette/mobile : empilé. */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 xl:items-start gap-5">
+        <div className="xl:col-span-2 xl:sticky xl:top-20">
+          {/* Localisation */}
+          <div className="card space-y-4">
+            <h2 className="font-semibold text-secondary-900">Localisation du logement</h2>
 
-        <button
-          onClick={handleGps}
-          disabled={gpsLoading}
-          className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-60"
-        >
-          {gpsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LocateFixed className="w-5 h-5" />}
-          {gpsLoading ? 'Localisation en cours…' : '📍 Me localiser'}
-        </button>
+            <button
+              onClick={handleGps}
+              disabled={gpsLoading}
+              className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-60"
+            >
+              {gpsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LocateFixed className="w-5 h-5" />}
+              {gpsLoading ? 'Localisation en cours…' : '📍 Me localiser'}
+            </button>
 
-        <div className="relative">
-          <FormField label="Adresse exacte du logement">
-            <input
-              className={inputClass}
-              value={addressQuery}
-              placeholder="12 rue de la République, Gaillac"
-              onChange={(e) => setAddressQuery(e.target.value)}
-              autoComplete="off"
-            />
-          </FormField>
-          {suggestions.length > 0 && (
-            <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg overflow-hidden">
-              {suggestions.map((s) => (
-                <li key={`${s.lat}-${s.lon}`}>
-                  <button
-                    onClick={() => pickSuggestion(s)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-secondary-50 flex items-center gap-2"
-                  >
-                    <MapPin className="w-4 h-4 text-secondary-400 flex-shrink-0" />
-                    {s.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            <div className="relative">
+              <FormField label="Adresse exacte du logement">
+                <input
+                  className={inputClass}
+                  value={addressQuery}
+                  placeholder="12 rue de la République, Gaillac"
+                  onChange={(e) => setAddressQuery(e.target.value)}
+                  autoComplete="off"
+                />
+              </FormField>
+              {suggestions.length > 0 && (
+                <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg overflow-hidden">
+                  {suggestions.map((s) => (
+                    <li key={`${s.lat}-${s.lon}`}>
+                      <button
+                        onClick={() => pickSuggestion(s)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-secondary-50 flex items-center gap-2"
+                      >
+                        <MapPin className="w-4 h-4 text-secondary-400 flex-shrink-0" />
+                        {s.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-        {hasLocation && (
-          <div className="space-y-2">
-            {/* Statut de validation de l'adresse (exigence dossier : adresse exacte confirmée) */}
-            {addressValidated ? (
-              <div className="flex items-start gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
-                <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Adresse validée : {location.address}</span>
-              </div>
-            ) : (
-              <div className="flex items-start gap-2 text-sm text-[#B45309] bg-amber-50 border border-[#F5C542] rounded-lg px-3 py-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>
-                  Adresse à confirmer pour le dossier — sélectionnez l'adresse exacte (avec le n° de rue)
-                  dans la liste ci-dessus. La position GPS est approximative.
-                </span>
+            {hasLocation && (
+              <div className="space-y-2">
+                {/* Statut de validation de l'adresse (exigence dossier : adresse exacte confirmée) */}
+                {addressValidated ? (
+                  <div className="flex items-start gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>Adresse validée : {location.address}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 text-sm text-[#B45309] bg-amber-50 border border-[#F5C542] rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>
+                      Adresse à confirmer pour le dossier — sélectionnez l'adresse exacte (avec le n° de rue)
+                      dans la liste ci-dessus. La position GPS est approximative.
+                    </span>
+                  </div>
+                )}
+                <p className="text-xs text-secondary-500">
+                  Position : {location.lat.toFixed(5)}, {location.lon.toFixed(5)}
+                  {location.source === 'gps' && location.accuracy ? ` (±${Math.round(location.accuracy)} m)` : ''}
+                </p>
               </div>
             )}
-            <p className="text-xs text-secondary-500">
-              Position : {location.lat.toFixed(5)}, {location.lon.toFixed(5)}
-              {location.source === 'gps' && location.accuracy ? ` (±${Math.round(location.accuracy)} m)` : ''}
-            </p>
-          </div>
-        )}
 
-        {hasLocation && (
-          <RoofLocatorMap
-            key={`${location.lat},${location.lon}`}
-            center={{ lat: location.lat, lon: location.lon }}
-            initialPolygon={roofGeometry?.polygon}
-            onPolygon={handlePolygon}
-            savedPans={pans}
-            selectedPanId={selectedPanId}
-            onSelectPan={setSelectedPanId}
-            resetToken={resetToken}
-          />
-        )}
-        {hasLocation && (
-          <div className="space-y-2">
-            {solarStatus === 'drawn' && (
+            {hasLocation && (
+              <RoofLocatorMap
+                key={`${location.lat},${location.lon}`}
+                center={{ lat: location.lat, lon: location.lon }}
+                initialPolygon={roofGeometry?.polygon}
+                onPolygon={handlePolygon}
+                savedPans={pans}
+                selectedPanId={selectedPanId}
+                onSelectPan={setSelectedPanId}
+                resetToken={resetToken}
+              />
+            )}
+            {hasLocation && solarStatus === 'drawn' && (
               <button
                 type="button"
                 onClick={addPan}
@@ -347,193 +348,196 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                 {panLoading ? 'Analyse du pan…' : '➕ Ajouter ce pan'}
               </button>
             )}
-          </div>
-        )}
 
-        {/* Pans cartographiés — comparaison (meilleur ensoleillement mis en avant) */}
-        {pans && pans.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-secondary-900">Pans de toiture</h3>
-            <ul className="space-y-2">
-              {pans.map((pan, i) => {
-                const isBest = pan.eY != null && bestEy != null && pan.eY === bestEy;
-                const isSelected = pan.id === selectedPanId;
-                return (
-                  <li
-                    key={pan.id}
-                    onClick={() => setSelectedPanId(pan.id)}
-                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'border-primary-400 ring-2 ring-primary-400 bg-primary-50'
-                        : isBest
-                          ? 'border-[#F5C542] ring-1 ring-[#F5C542] bg-amber-50/40'
-                          : 'border-secondary-200 bg-white hover:border-secondary-400'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 font-medium text-secondary-900">
-                        {isBest && <Star className="w-3.5 h-3.5 text-[#B45309] fill-[#F5C542] flex-shrink-0" />}
-                        Pan {i + 1}
-                        {isBest && <span className="text-xs font-normal text-[#B45309]">★ meilleur</span>}
-                      </div>
-                      <div className="text-xs text-secondary-500">
-                        pente {Math.round(pan.pitchDeg)}° · {azimuthToCompassLabel(pan.azimuthCompass)} · {Math.round(pan.slopeAreaM2)} m² ·{' '}
-                        {pan.eY != null ? `${Math.round(pan.eY)} kWh/kWc/an` : '—'}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onRemovePan(pan.id); }}
-                      className="p-1.5 text-secondary-400 hover:text-red-600 rounded-md hover:bg-red-50 flex-shrink-0"
-                      aria-label={`Supprimer le pan ${i + 1}`}
+            {hasLocation && solarStatus === 'locate' && (
+              <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
+                <MapPin className="w-4 h-4 flex-shrink-0" /> Tracez le contour de votre toiture sur la vue aérienne pour calculer la surface.
+              </div>
+            )}
+            {hasLocation && solarStatus === 'drawn' && roofGeometry?.footprint_m2 && (
+              <div className="flex items-center gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
+                <Check className="w-4 h-4 flex-shrink-0" />
+                Toiture tracée — surface {Math.round(roofGeometry.footprint_m2)} m² (empreinte au sol). Renseignez pente et orientation dans le panneau Toiture.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Colonne saisie : pans tracés, panneau Toiture, cadastre */}
+        <div className="space-y-5">
+          {/* Pans cartographiés — comparaison (meilleur ensoleillement mis en avant) */}
+          {pans && pans.length > 0 && (
+            <div className="card space-y-2">
+              <h3 className="text-sm font-semibold text-secondary-900">Pans de toiture</h3>
+              <ul className="space-y-2">
+                {pans.map((pan, i) => {
+                  const isBest = pan.eY != null && bestEy != null && pan.eY === bestEy;
+                  const isSelected = pan.id === selectedPanId;
+                  return (
+                    <li
+                      key={pan.id}
+                      onClick={() => setSelectedPanId(pan.id)}
+                      className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'border-primary-400 ring-2 ring-primary-400 bg-primary-50'
+                          : isBest
+                            ? 'border-[#F5C542] ring-1 ring-[#F5C542] bg-amber-50/40'
+                            : 'border-secondary-200 bg-white hover:border-secondary-400'
+                      }`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="text-xs text-secondary-600">
-              Total surface : {Math.round(totalPansSurface)} m² · {pans.length} pan(s)
-            </p>
-          </div>
-        )}
-
-        {hasLocation && solarStatus === 'locate' && (
-          <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
-            <MapPin className="w-4 h-4 flex-shrink-0" /> Tracez le contour de votre toiture sur la vue aérienne pour calculer la surface.
-          </div>
-        )}
-        {hasLocation && solarStatus === 'drawn' && roofGeometry?.footprint_m2 && (
-          <div className="flex items-center gap-2 text-sm text-[#1565C0] bg-blue-50 rounded-lg px-3 py-2">
-            <Check className="w-4 h-4 flex-shrink-0" />
-            Toiture tracée — surface {Math.round(roofGeometry.footprint_m2)} m² (empreinte au sol). Renseignez pente et orientation ci-dessous.
-          </div>
-        )}
-      </div>
-
-      {/* Cadastre + ABF — capture write-once pour le dossier PV (remonté à chaque lieu) */}
-      {hasLocation && (
-        <CadastreSection
-          key={`cad-${location.lat},${location.lon}`}
-          location={location}
-          cadastre={cadastre}
-          abf={abf}
-          onCadastre={onCadastre}
-          onAbf={onAbf}
-        />
-      )}
-
-      {/* Toiture — en mode éditeur (pans existants) = panneau du pan sélectionné, verrouillé */}
-      <div className="card space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-secondary-900">
-            {panEditor ? `Toiture — Pan ${panActiveIndex + 1}` : 'Toiture'}
-          </h2>
-          {panEditor && (
-            <button
-              type="button"
-              onClick={() => setToitureUnlocked((v) => !v)}
-              title="Forcer les valeurs manuellement"
-              aria-label="Forcer les valeurs manuellement"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                toitureUnlocked
-                  ? 'bg-amber-50 text-[#B45309] border-[#F5C542]'
-                  : 'bg-white text-secondary-600 border-secondary-200 hover:border-secondary-400'
-              }`}
-            >
-              {toitureUnlocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-              {toitureUnlocked ? 'Déverrouillé' : 'Forcer'}
-            </button>
-          )}
-        </div>
-        {panEditor && (
-          <p className="text-xs text-secondary-500">
-            Valeurs mesurées par IGN.{' '}
-            {toitureUnlocked ? 'Édition manuelle activée.' : 'Ouvrez le cadenas pour les forcer manuellement.'}
-          </p>
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Pente (%)">
-            <input
-              type="number"
-              inputMode="decimal"
-              className={inputClass}
-              value={Number.isFinite(tilt) ? Math.round(tilt) : ''}
-              min={0}
-              step={1}
-              disabled={inputsLocked}
-              onChange={(e) => handleTiltChange(e.target.value)}
-            />
-            {tiltDeg !== null && (
-              <p className="text-xs text-secondary-500 mt-1">{Math.round(tilt)} % ≈ {Math.round(tiltDeg)}°</p>
-            )}
-          </FormField>
-
-          <FormField label="Surface disponible (m²)">
-            <input
-              type="number"
-              inputMode="decimal"
-              className={inputClass}
-              value={Number.isFinite(surface) ? Math.round(surface) : ''}
-              min={0}
-              step={1}
-              disabled={inputsLocked}
-              onChange={(e) => handleSurfaceChange(e.target.value)}
-            />
-            {hasSurface && (
-              <p className="text-xs text-secondary-500 mt-1">
-                → max {panelsCount(maxKwc, config.panel_power_wc)} panneaux soit {maxKwc} kWc
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 font-medium text-secondary-900">
+                          {isBest && <Star className="w-3.5 h-3.5 text-[#B45309] fill-[#F5C542] flex-shrink-0" />}
+                          Pan {i + 1}
+                          {isBest && <span className="text-xs font-normal text-[#B45309]">★ meilleur</span>}
+                        </div>
+                        <div className="text-xs text-secondary-500">
+                          pente {Math.round(pan.pitchDeg)}° · {azimuthToCompassLabel(pan.azimuthCompass)} · {Math.round(pan.slopeAreaM2)} m² ·{' '}
+                          {pan.eY != null ? `${Math.round(pan.eY)} kWh/kWc/an` : '—'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRemovePan(pan.id); }}
+                        className="p-1.5 text-secondary-400 hover:text-red-600 rounded-md hover:bg-red-50 flex-shrink-0"
+                        aria-label={`Supprimer le pan ${i + 1}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-xs text-secondary-600">
+                Total surface : {Math.round(totalPansSurface)} m² · {pans.length} pan(s)
               </p>
-            )}
-          </FormField>
-        </div>
+            </div>
+          )}
 
-        <FormField label="Orientation">
-          <div className="flex items-start gap-4 flex-wrap">
-            <div className="grid grid-cols-3 gap-1 w-40 flex-shrink-0">
-              {COMPASS.flat().map((dir, i) =>
-                dir === null ? (
-                  <div key={`c-${i}`} className="h-11" />
-                ) : (
-                  <button
-                    key={dir}
-                    disabled={inputsLocked}
-                    onClick={() => handleOrientationDir(dir)}
-                    className={`h-11 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      (panEditor ? orientationToAspect(dir) === Number(orientationVal) : selectedDir === dir)
-                        ? 'bg-primary-600 text-white border-primary-600'
-                        : 'bg-white text-secondary-700 border-secondary-200 hover:border-secondary-400'
-                    }`}
-                  >
-                    {dir}
-                  </button>
-                ),
+          {/* Toiture — en mode éditeur (pans existants) = panneau du pan sélectionné, verrouillé */}
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-secondary-900">
+                {panEditor ? `Toiture — Pan ${panActiveIndex + 1}` : 'Toiture'}
+              </h2>
+              {panEditor && (
+                <button
+                  type="button"
+                  onClick={() => setToitureUnlocked((v) => !v)}
+                  title="Forcer les valeurs manuellement"
+                  aria-label="Forcer les valeurs manuellement"
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    toitureUnlocked
+                      ? 'bg-amber-50 text-[#B45309] border-[#F5C542]'
+                      : 'bg-white text-secondary-600 border-secondary-200 hover:border-secondary-400'
+                  }`}
+                >
+                  {toitureUnlocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                  {toitureUnlocked ? 'Déverrouillé' : 'Forcer'}
+                </button>
               )}
             </div>
-            <div className="flex-1 min-w-[140px]">
-              <p className="text-xs text-secondary-500 mb-1">Ou en degrés (Sud = 0, Est = −90, Ouest = +90)</p>
-              <input
-                type="number"
-                inputMode="numeric"
-                className={inputClass}
-                min={-180}
-                max={180}
-                disabled={inputsLocked}
-                value={panEditor ? (Number.isFinite(Number(orientationVal)) ? Math.round(Number(orientationVal)) : '') : (typeof roof.orientation === 'number' ? roof.orientation : '')}
-                placeholder={`${aspect}`}
-                onChange={(e) => handleOrientationDeg(e.target.value)}
-              />
+            {panEditor && (
+              <p className="text-xs text-secondary-500">
+                Valeurs mesurées par IGN.{' '}
+                {toitureUnlocked ? 'Édition manuelle activée.' : 'Ouvrez le cadenas pour les forcer manuellement.'}
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Pente (%)">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className={inputClass}
+                  value={Number.isFinite(tilt) ? Math.round(tilt) : ''}
+                  min={0}
+                  step={1}
+                  disabled={inputsLocked}
+                  onChange={(e) => handleTiltChange(e.target.value)}
+                />
+                {tiltDeg !== null && (
+                  <p className="text-xs text-secondary-500 mt-1">{Math.round(tilt)} % ≈ {Math.round(tiltDeg)}°</p>
+                )}
+              </FormField>
+
+              <FormField label="Surface disponible (m²)">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className={inputClass}
+                  value={Number.isFinite(surface) ? Math.round(surface) : ''}
+                  min={0}
+                  step={1}
+                  disabled={inputsLocked}
+                  onChange={(e) => handleSurfaceChange(e.target.value)}
+                />
+                {hasSurface && (
+                  <p className="text-xs text-secondary-500 mt-1">
+                    → max {panelsCount(maxKwc, config.panel_power_wc)} panneaux soit {maxKwc} kWc
+                  </p>
+                )}
+              </FormField>
             </div>
+
+            <FormField label="Orientation">
+              <div className="flex items-start gap-4 flex-wrap">
+                <div className="grid grid-cols-3 gap-1 w-40 flex-shrink-0">
+                  {COMPASS.flat().map((dir, i) =>
+                    dir === null ? (
+                      <div key={`c-${i}`} className="h-11" />
+                    ) : (
+                      <button
+                        key={dir}
+                        disabled={inputsLocked}
+                        onClick={() => handleOrientationDir(dir)}
+                        className={`h-11 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          (panEditor ? orientationToAspect(dir) === Number(orientationVal) : selectedDir === dir)
+                            ? 'bg-primary-600 text-white border-primary-600'
+                            : 'bg-white text-secondary-700 border-secondary-200 hover:border-secondary-400'
+                        }`}
+                      >
+                        {dir}
+                      </button>
+                    ),
+                  )}
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <p className="text-xs text-secondary-500 mb-1">Ou en degrés (Sud = 0, Est = −90, Ouest = +90)</p>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputClass}
+                    min={-180}
+                    max={180}
+                    disabled={inputsLocked}
+                    value={panEditor ? (Number.isFinite(Number(orientationVal)) ? Math.round(Number(orientationVal)) : '') : (typeof roof.orientation === 'number' ? roof.orientation : '')}
+                    placeholder={`${aspect}`}
+                    onChange={(e) => handleOrientationDeg(e.target.value)}
+                  />
+                </div>
+              </div>
+              {isNorthFacing && (
+                <div className="flex items-center gap-2 text-sm text-secondary-800 bg-secondary-100 rounded-lg px-3 py-2 mt-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  Orientation défavorable — production fortement réduite
+                </div>
+              )}
+            </FormField>
           </div>
-          {isNorthFacing && (
-            <div className="flex items-center gap-2 text-sm text-secondary-800 bg-secondary-100 rounded-lg px-3 py-2 mt-2">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              Orientation défavorable — production fortement réduite
-            </div>
+
+          {/* Cadastre + ABF — capture write-once pour le dossier PV (remonté à chaque lieu) */}
+          {hasLocation && (
+            <CadastreSection
+              key={`cad-${location.lat},${location.lon}`}
+              location={location}
+              cadastre={cadastre}
+              abf={abf}
+              onCadastre={onCadastre}
+              onAbf={onAbf}
+            />
           )}
-        </FormField>
+        </div>
       </div>
 
       <button

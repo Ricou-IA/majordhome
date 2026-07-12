@@ -98,7 +98,7 @@ export default function Historique() {
   };
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
+    <div className="space-y-5 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">Historique des simulations</h1>
