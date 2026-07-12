@@ -145,29 +145,6 @@ export default function Step3Resultats({
 
           {/* Graphique mensuel */}
           <MonthlyChart monthly={model.active} consoMonthly={model.consoMonthly} />
-
-          {/* Financement */}
-          <FinancingModule
-            financing={financing}
-            onFinancing={onFinancing}
-            gridCost={model.gridCost}
-            chargerPrice={model.chargerPrice}
-            totalCost={model.totalCost}
-            capital={model.capital}
-            mensualite={model.mensualite}
-            economyYear1={model.economyYear1}
-            model={model}
-            horizonYears={config.horizon_years}
-          />
-
-          {/* Tableau annuel + cumul */}
-          {model.table ? (
-            <TableauAnnuel table={model.table} loanYears={model.years} horizonYears={config.horizon_years} />
-          ) : (
-            <div className="card text-sm text-secondary-600">
-              Renseigner le coût de l'installation (et un taux/durée valides) pour générer le tableau annuel.
-            </div>
-          )}
         </div>
 
         {/* Colonne actions — matériel, dossier, enregistrement (sticky sur écran large) */}
@@ -267,6 +244,29 @@ export default function Step3Resultats({
       {/* Optimiser l'autoconsommation — chapitre pleine largeur (démo client + détail des calculs).
           Moteur horaire additif : n'altère pas buildEtudeModel. */}
       <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
+
+      {/* Financement — chapitre pleine largeur : module + tableau annuel (qui en dépend) */}
+      <FinancingModule
+        financing={financing}
+        onFinancing={onFinancing}
+        gridCost={model.gridCost}
+        chargerPrice={model.chargerPrice}
+        totalCost={model.totalCost}
+        capital={model.capital}
+        mensualite={model.mensualite}
+        economyYear1={model.economyYear1}
+        model={model}
+        horizonYears={config.horizon_years}
+      />
+
+      {/* Tableau annuel + cumul */}
+      {model.table ? (
+        <TableauAnnuel table={model.table} loanYears={model.years} horizonYears={config.horizon_years} />
+      ) : (
+        <div className="card text-sm text-secondary-600">
+          Renseigner le coût de l'installation (et un taux/durée valides) pour générer le tableau annuel.
+        </div>
+      )}
 
       <SaveSimulationModal
         open={showSaveModal}
