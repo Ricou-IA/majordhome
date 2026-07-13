@@ -1,11 +1,11 @@
 // src/apps/solaire/components/Step2Consommation.jsx
-// Étape 2 du wizard : profil de consommation (RES1/RES2), 12 consommations
-// mensuelles, prix kWh, bloc optionnel véhicule électrique. Le profil pilote le
-// talon horaire du constat d'autoconso (moteur horaire) ET la répartition
-// « depuis l'annuel ». (Les cartes « présence » + coefficient de simultanéité ont
-// été retirées à la bascule horaire du 2026-07-07.)
+// Étape 2 du wizard : les HYPOTHÈSES d'abord (profil RES1/RES2 puis VE en 3 états
+// Pas de VE / En projet / Déjà équipé), ensuite les 12 consommations mensuelles,
+// puis le prix kWh. Le profil pilote le talon horaire du constat d'autoconso ET la
+// répartition « depuis l'annuel » ; l'hypothèse VE conditionne cette répartition
+// (déjà équipé = part lissée) et le calcul (en projet = ajouté au modèle).
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Wand2, Car, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Wand2 } from 'lucide-react';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { evMonthlyConsumption } from '../lib/pvEngine';
 import { monthlyFromHourly } from '../lib/autoconsoEngine';
@@ -93,6 +93,95 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
           </p>
         </FormField>
 
+        {/* Hypothèse VE — AVANT la saisie des mois : elle conditionne la répartition
+            (déjà équipé = part lissée hors silhouette Enedis) et le calcul (en projet = ajouté). */}
+        <FormField label="Véhicule électrique">
+          <div className="grid sm:grid-cols-3 gap-2">
+            {[
+              { key: 'none', title: 'Pas de VE', hint: 'aucun véhicule électrique', active: !ev.enabled, patch: { enabled: false } },
+              { key: 'projet', title: 'En projet d’achat', hint: 'pas encore dans les factures — ajouté au calcul', active: ev.enabled && !ev.owned, patch: { enabled: true, owned: false } },
+              { key: 'owned', title: 'Déjà équipé', hint: 'déjà dans les factures — part lissée', active: ev.enabled && !!ev.owned, patch: { enabled: true, owned: true } },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => onEv(opt.patch)}
+                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  opt.active
+                    ? 'border-primary-600 bg-primary-50 text-primary-800'
+                    : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
+                }`}
+              >
+                <span className="block text-sm font-medium">{opt.title}</span>
+                <span className="block text-xs text-secondary-500">{opt.hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {ev.enabled && (
+            <div className="mt-3 space-y-3">
+              <p className="text-xs text-secondary-500">
+                {ev.owned
+                  ? 'Sa consommation est déjà dans vos factures — rien n’est ajouté au calcul. « Répartir depuis l’annuel » lisse sa part uniformément sur l’année (la recharge n’est pas saisonnière), le reste suit le profil Enedis.'
+                  : 'Véhicule non reflété dans les factures — sa surconsommation est ajoutée au modèle.'}
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Kilométrage annuel (km)">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={inputClass}
+                    value={ev.kmPerYear ?? ''}
+                    min={0}
+                    step={1000}
+                    onChange={(e) => {
+                      const n = e.target.value === '' ? '' : Number(e.target.value);
+                      onEv({ kmPerYear: Number.isNaN(n) ? '' : n });
+                    }}
+                  />
+                </FormField>
+                <FormField label="Conso véhicule (kWh/100 km)">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    className={inputClass}
+                    value={ev.kwhPer100km ?? ''}
+                    min={0}
+                    step={0.5}
+                    onChange={(e) => {
+                      const n = e.target.value === '' ? '' : Number(e.target.value);
+                      onEv({ kwhPer100km: Number.isNaN(n) ? '' : n });
+                    }}
+                  />
+                </FormField>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="rounded border-secondary-300"
+                  checked={ev.addCharger}
+                  onChange={(e) => onEv({ addCharger: e.target.checked })}
+                />
+                Ajouter la borne de recharge à l’investissement
+              </label>
+              {ev.addCharger && config.ev.charger_price === null && (
+                <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2">
+                  Prix borne non configuré dans l’admin — il sera ajouté manuellement au coût de l’installation.
+                </p>
+              )}
+
+              {evAnnual > 0 && (
+                <p className="text-sm text-secondary-700">
+                  {ev.owned ? 'part VE estimée dans vos factures : ' : 'véhicule électrique ajouté au modèle : '}
+                  <span className="font-semibold">{evAnnual.toLocaleString('fr-FR')} kWh/an</span>
+                  {' '}({config.ev.home_charge_share * 100} % rechargé à domicile)
+                </p>
+              )}
+            </div>
+          )}
+        </FormField>
+
         {showSpread && (
           <div className="flex items-center gap-2 bg-secondary-50 rounded-lg p-3">
             <input
@@ -138,135 +227,22 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
         </div>
       </div>
 
-      {/* Écran large (xl) : prix/profil et VE côte à côte. Tablette/mobile : empilé. */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 xl:items-start gap-5">
-        {/* Prix kWh */}
-        <div className="card space-y-4">
-          <FormField label="Prix actuel du kWh (€ TTC)">
-            <input
-              type="number"
-              inputMode="decimal"
-              className={inputClass}
-              value={conso.priceKwh ?? ''}
-              step={0.01}
-              min={0}
-              onChange={(e) => {
-                const n = e.target.value === '' ? '' : Number(e.target.value);
-                onConso({ priceKwh: Number.isNaN(n) ? '' : n });
-              }}
-            />
-          </FormField>
-        </div>
-
-        {/* Bloc VE repliable */}
-        <div className="card space-y-4">
-          <button
-            onClick={() => onEv({ enabled: !ev.enabled })}
-            className="w-full flex items-center justify-between gap-2"
-          >
-            <span className="flex items-center gap-2 font-semibold text-secondary-900">
-              <Car className="w-5 h-5 text-secondary-500" /> Véhicule électrique
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                ev.enabled ? 'bg-primary-100 text-primary-700' : 'bg-secondary-100 text-secondary-500'
-              }`}
-              >
-                {ev.enabled ? 'Activé' : 'Désactivé'}
-              </span>
-            </span>
-            {ev.enabled ? <ChevronUp className="w-4 h-4 text-secondary-400" /> : <ChevronDown className="w-4 h-4 text-secondary-400" />}
-          </button>
-
-          {ev.enabled && (
-            <div className="space-y-4">
-              {/* La nuance qui change le calcul : déjà équipé = déjà dans les factures
-                  (rien d'ajouté, répartition lissée) ; en projet = surconsommation ajoutée. */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onEv({ owned: false })}
-                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                    !ev.owned
-                      ? 'border-primary-600 bg-primary-50 text-primary-800'
-                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
-                  }`}
-                >
-                  <span className="block text-sm font-medium">En projet d’achat</span>
-                  <span className="block text-xs text-secondary-500">pas encore dans les factures</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onEv({ owned: true })}
-                  className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                    ev.owned
-                      ? 'border-primary-600 bg-primary-50 text-primary-800'
-                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
-                  }`}
-                >
-                  <span className="block text-sm font-medium">Déjà équipé</span>
-                  <span className="block text-xs text-secondary-500">déjà dans les factures</span>
-                </button>
-              </div>
-              <p className="text-xs text-secondary-500">
-                {ev.owned
-                  ? 'Sa consommation est déjà dans vos factures — rien n’est ajouté au calcul. « Répartir depuis l’annuel » lisse sa part uniformément sur l’année (la recharge n’est pas saisonnière), le reste suit le profil Enedis.'
-                  : 'Véhicule non reflété dans les factures — sa surconsommation est ajoutée au modèle.'}
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Kilométrage annuel (km)">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    className={inputClass}
-                    value={ev.kmPerYear ?? ''}
-                    min={0}
-                    step={1000}
-                    onChange={(e) => {
-                      const n = e.target.value === '' ? '' : Number(e.target.value);
-                      onEv({ kmPerYear: Number.isNaN(n) ? '' : n });
-                    }}
-                  />
-                </FormField>
-                <FormField label="Conso véhicule (kWh/100 km)">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className={inputClass}
-                    value={ev.kwhPer100km ?? ''}
-                    min={0}
-                    step={0.5}
-                    onChange={(e) => {
-                      const n = e.target.value === '' ? '' : Number(e.target.value);
-                      onEv({ kwhPer100km: Number.isNaN(n) ? '' : n });
-                    }}
-                  />
-                </FormField>
-              </div>
-
-              <label className="flex items-center gap-2 text-sm text-secondary-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded border-secondary-300"
-                  checked={ev.addCharger}
-                  onChange={(e) => onEv({ addCharger: e.target.checked })}
-                />
-                Ajouter la borne de recharge à l'investissement
-              </label>
-              {ev.addCharger && config.ev.charger_price === null && (
-                <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2">
-                  Prix borne non configuré dans l'admin — il sera ajouté manuellement au coût de l'installation.
-                </p>
-              )}
-
-              {evAnnual > 0 && (
-                <p className="text-sm text-secondary-700">
-                  {ev.owned ? 'part VE estimée dans vos factures : ' : 'véhicule électrique ajouté au modèle : '}
-                  <span className="font-semibold">{evAnnual.toLocaleString('fr-FR')} kWh/an</span>
-                  {' '}({config.ev.home_charge_share * 100} % rechargé à domicile)
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+      {/* Prix kWh */}
+      <div className="card space-y-4">
+        <FormField label="Prix actuel du kWh (€ TTC)">
+          <input
+            type="number"
+            inputMode="decimal"
+            className={inputClass}
+            value={conso.priceKwh ?? ''}
+            step={0.01}
+            min={0}
+            onChange={(e) => {
+              const n = e.target.value === '' ? '' : Number(e.target.value);
+              onConso({ priceKwh: Number.isNaN(n) ? '' : n });
+            }}
+          />
+        </FormField>
       </div>
 
       <div className="flex gap-3">
