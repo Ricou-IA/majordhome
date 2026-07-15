@@ -57,7 +57,11 @@ export function buildEtudeModel(etude, { config, data }) {
   if (!assemblage.batiment) return { ...base, ok: false, bilan: null, pac: null };
 
   const bilan = calculeBatiment(assemblage.batiment);
-  const foisonnement = Number.isFinite(config.foisonnement_emetteur) ? config.foisonnement_emetteur : 1.0;
+  // Foisonnement émetteur : valeur PAR ÉTUDE prioritaire (etude.foisonnement, éditable étape
+  // Résultats), sinon défaut org (config.foisonnement_emetteur), sinon 1.0.
+  const foisonnement = Number.isFinite(etude.foisonnement)
+    ? etude.foisonnement
+    : (Number.isFinite(config.foisonnement_emetteur) ? config.foisonnement_emetteur : 1.0);
   bilan.pieces = bilan.pieces.map((p) => ({ ...p, puissanceEmetteur: p.total * foisonnement }));
   const pacResolue = resolvePac(etude.pac, data.pacCatalogue);
   if (!pacResolue) return { ...base, ok: true, bilan, pac: null };

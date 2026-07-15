@@ -20,7 +20,7 @@ import Step4Resultats from '../components/wizard/Step4Resultats';
 
 const STEPS = [
   { n: 1, label: 'Contexte' },
-  { n: 2, label: 'Emprise & pièces' },
+  { n: 2, label: 'Pièces' },
   { n: 3, label: 'Résultats' },
 ];
 
@@ -285,7 +285,8 @@ function WizardInner({ config }) {
           onPatchPac={(patch) => dispatch({ type: 'PATCH_PAC', patch })}
           onClearSavedResults={() => dispatch({ type: 'CLEAR_SAVED_RESULTS' })}
           onStudyId={(studyId) => dispatch({ type: 'SET_STUDY_ID', studyId })}
-          onBackToDessin={() => goToStep(2)}
+          onSetFoisonnement={(value) => dispatch({ type: 'SET_FOISONNEMENT', value })}
+          onBackToSaisie={() => goToStep(2)}
         />
       )}
 

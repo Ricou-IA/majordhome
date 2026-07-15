@@ -105,9 +105,9 @@ function Synthese({ bilan, thetaE, dept, periode, plage }) {
 }
 
 export default function Step4Resultats({
-  state, config, onPatchPac, onClearSavedResults, onStudyId, onBackToDessin,
+  state, config, onPatchPac, onClearSavedResults, onStudyId, onBackToSaisie, onSetFoisonnement,
 }) {
-  const { contexte, dessin, saisie, compositions, pac, savedResults, studyId } = state;
+  const { contexte, dessin, saisie, compositions, pac, savedResults, studyId, foisonnement } = state;
   const { user } = useAuth();
   const userId = user?.id;
   const navigate = useNavigate();
@@ -142,7 +142,7 @@ export default function Step4Resultats({
     // = toStudyInput(state) avec un volet PAC assaini : pointBivalence LÈVE sur un point manuel
     // incomplet (saisie en cours dans PacSection) — seuls les points valides passent au moteur,
     // l'état (donc l'input persisté) garde la saisie brute. < 2 points valides → model.pac null.
-    const input = { contexte, dessin, saisie, compositions, pac: { ...pac, points: pointsManuelsValides(pac.points) } };
+    const input = { contexte, dessin, saisie, foisonnement, compositions, pac: { ...pac, points: pointsManuelsValides(pac.points) } };
     try {
       return buildEtudeModel(input, {
         config,
@@ -157,7 +157,21 @@ export default function Step4Resultats({
         thetaE: null, bilan: null, parois: [], pac: null, engineVersion: ENGINE_VERSION,
       };
     }
-  }, [contexte, dessin, saisie, compositions, pac, pacCatalogue, config]);
+  }, [contexte, dessin, saisie, foisonnement, compositions, pac, pacCatalogue, config]);
+
+  // --- Foisonnement émetteur par projet (draft commit au blur, borné [1 ; 1,5]) ---
+  const [foisDraft, setFoisDraft] = useState(String(foisonnement ?? config.foisonnement_emetteur ?? 1));
+  useEffect(() => {
+    setFoisDraft(foisonnement == null ? String(config.foisonnement_emetteur ?? 1) : String(foisonnement));
+  }, [foisonnement, config.foisonnement_emetteur]);
+  const commitFoisonnement = () => {
+    const n = Number(foisDraft.trim().replace(',', '.'));
+    if (!Number.isFinite(n) || n < 1 || n > 1.5) {
+      setFoisDraft(String(foisonnement ?? config.foisonnement_emetteur ?? 1)); // hors bornes → revert
+      return;
+    }
+    if (n !== foisonnement) onSetFoisonnement(n);
+  };
 
   const periode = resolvePeriode(contexte.annee);
   const plage = PLAGES_VRAISEMBLANCE[periode] ?? null;
@@ -277,8 +291,8 @@ export default function Step4Resultats({
             </li>
           ))}
         </ul>
-        <button type="button" onClick={onBackToDessin} className="btn-primary inline-flex items-center gap-1.5">
-          <ArrowLeft className="w-4 h-4" /> Retourner au dessin
+        <button type="button" onClick={onBackToSaisie} className="btn-primary inline-flex items-center gap-1.5">
+          <ArrowLeft className="w-4 h-4" /> Retourner à la saisie
         </button>
       </div>
     );
@@ -298,6 +312,30 @@ export default function Step4Resultats({
             </li>
           ))}
         </ul>
+      )}
+
+      {state.saisie?.pieces?.length > 0 && (
+        <div className="card flex flex-wrap items-center gap-3">
+          <label htmlFor="foisonnement-emetteur" className="text-sm font-medium text-secondary-700">
+            Foisonnement émetteur
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              id="foisonnement-emetteur"
+              type="number" inputMode="decimal" min={1} max={1.5} step={0.05}
+              value={foisDraft}
+              onChange={(e) => setFoisDraft(e.target.value)}
+              onBlur={commitFoisonnement}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              className="w-20 px-2 py-1.5 text-sm text-right border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:[-webkit-appearance:none]"
+            />
+            <span className="text-sm text-secondary-500">×</span>
+          </div>
+          <p className="text-xs text-secondary-500 flex-1 min-w-[220px]">
+            Surdimensionnement appliqué à la puissance émetteur de chaque pièce (colonne ci-dessous).
+            Défaut de l’organisation : {config.foisonnement_emetteur ?? 1} ×.
+          </p>
+        </div>
       )}
 
       {state.saisie?.pieces?.length > 0

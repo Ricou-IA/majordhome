@@ -4,7 +4,7 @@
 // pour le mode 'parametrique' — le moteur physique (thermalEngine) reste inchangé.
 import { surfaceCm2, perimetreCm } from './geometryEngine.js';
 import { uDefautPour, thetaBasePour, resolvePeriode, debitVentilationPour, coefficientBPour } from './refDataResolvers.js';
-import { typePieceInfo, PLAGES_VRAISEMBLANCE } from './thermiqueConfig.js';
+import { typePieceInfo, PLAGES_VRAISEMBLANCE, normaliseOuvertures } from './thermiqueConfig.js';
 import { bPlancherBasPour } from './assembleBatiment.js';
 
 /** Dérivés d'une emprise dessinée : surface au sol (m²) et périmètre extérieur (m). */
@@ -40,15 +40,23 @@ export function paroisPieceParametrique(piece, ctx) {
   const surfaceSol = L * l;
   const nom = piece.nom ?? piece.id;
 
-  const surfMurExt = (piece.mlMurExterieur ?? 0) / 100 * H - (piece.surfaceOuverture ?? 0);
+  // Ouvertures multiples (2026-07-15) : une pièce peut porter plusieurs menuiseries de U distincts.
+  // `u` d'une ouverture prime ; sinon défaut de la famille du type. Rétro-compat via normaliseOuvertures.
+  const ouvertures = normaliseOuvertures(piece);
+  const surfOuvTotale = ouvertures.reduce((s, o) => s + (Number.isFinite(o.surface) ? o.surface : 0), 0);
+
+  const surfMurExt = (piece.mlMurExterieur ?? 0) / 100 * H - surfOuvTotale;
   if (surfMurExt < 0) {
-    erreurs.push(`« ${nom} » : surface d'ouverture (${piece.surfaceOuverture} m²) supérieure au mur extérieur déclaré`);
+    const surfArrondie = Math.round(surfOuvTotale * 100) / 100;
+    erreurs.push(`« ${nom} » : surface d'ouverture (${surfArrondie} m²) supérieure au mur extérieur déclaré`);
     return { parois, erreurs };
   }
 
-  const pousse = (famille, type, surface, refTemp) => {
+  const pousse = (famille, type, surface, refTemp, uForce) => {
     if (surface <= 0) return;
-    const u = resoudUFamille(ctx.compositions, famille, piece.id, { uDefauts: ctx.uDefauts, annee: ctx.annee });
+    const u = Number.isFinite(uForce)
+      ? uForce
+      : resoudUFamille(ctx.compositions, famille, piece.id, { uDefauts: ctx.uDefauts, annee: ctx.annee });
     if (!Number.isFinite(u) || u <= 0) { erreurs.push(`« ${nom} » : U manquant pour « ${famille} »`); return; }
     const poste = famille === 'murs' ? 'murs'
       : famille === 'plancherBas' ? 'plancherBas'
@@ -56,10 +64,13 @@ export function paroisPieceParametrique(piece, ctx) {
     parois.push({ surface, u, deltaUtb: ctx.deltaUtb, poste, type, pieceId: piece.id, ...refTemp });
   };
 
-  // Mur extérieur (b=1) et menuiserie (b=1)
+  // Mur extérieur (b=1)
   pousse('murs', 'mur-exterieur', surfMurExt, { b: 1 });
-  const famMenu = MENU_FAMILLE[piece.typeMenuiserie] ?? 'fenetre';
-  pousse(famMenu, 'menuiserie', piece.surfaceOuverture ?? 0, { b: 1 });
+  // Menuiseries : une paroi par ouverture (b=1), U = override d'ouverture ou défaut famille du type
+  for (const o of ouvertures) {
+    const famMenu = MENU_FAMILLE[o.type] ?? 'fenetre';
+    pousse(famMenu, 'menuiserie', Number.isFinite(o.surface) ? o.surface : 0, { b: 1 }, o.u);
+  }
   // Mur sur local non chauffé (b = bLocalNonChauffe)
   const surfLnc = (piece.mlMurLocalNonChauffe ?? 0) / 100 * H;
   pousse('murs', 'mur-lnc', surfLnc, { b: Number.isFinite(piece.bLocalNonChauffe) ? piece.bLocalNonChauffe : 1 });
@@ -89,9 +100,16 @@ export function assembleBatimentParametrique(saisie, options) {
   const erreurs = [];
   const avertissements = [];
 
+  // θe : forçage manuel opérateur prioritaire (contexte.thetaEForce) — bypass thetaBasePour, donc
+  // fonctionne même si la table climat manque pour le département. Sinon θe départementale brute
+  // (correction d'altitude non calibrée, cf. docs/thermique-calibration-altitude.md).
   let thetaE = null;
-  try { thetaE = thetaBasePour(data.climat, contexte.dept, contexte.altitude).thetaE; }
-  catch (e) { erreurs.push(e.message); }
+  if (Number.isFinite(contexte.thetaEForce)) {
+    thetaE = contexte.thetaEForce;
+  } else {
+    try { thetaE = thetaBasePour(data.climat, contexte.dept, contexte.altitude).thetaE; }
+    catch (e) { erreurs.push(e.message); }
+  }
 
   const deltaUtb = reglages.deltaUtb[contexte.isolation];
   if (!Number.isFinite(deltaUtb)) erreurs.push(`type d'isolation inconnu « ${contexte.isolation} »`);

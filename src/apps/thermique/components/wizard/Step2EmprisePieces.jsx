@@ -1,15 +1,13 @@
 // src/apps/thermique/components/wizard/Step2EmprisePieces.jsx
 // Étape 2 du wizard Thermique (mode paramétrique) : assemble la barre de niveaux (opérant sur
-// `saisie.niveaux`, sans dessinOps — mutation immuable directe), l'EmpriseCanvas du niveau actif,
-// le tableau des pièces (PiecesTable), le panneau de cohérence emprise↔pièces (PanneauCoherence)
-// et le bloc Compositions (3× CompositionFamille + 3 U menuiseries + exceptions par pièce —
-// repris à l'identique de Step3OuverturesCompositions, qui reste la source legacy/dessin).
+// `saisie.niveaux`, mutation immuable directe), le tableau des pièces (PiecesTable) et le bloc
+// Compositions (3× CompositionFamille + 3 U menuiseries + exceptions par pièce).
+// Le dessin d'emprise + le panneau de cohérence emprise↔pièces ont été retirés (2026-07-15) :
+// la saisie est 100 % paramétrique (métrés déclarés par pièce, plus aucune dépendance au dessin).
 import { useEffect, useState } from 'react';
 import { Calculator, Layers, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import EmpriseCanvas from '../canvas/EmpriseCanvas';
 import PiecesTable from './PiecesTable';
-import PanneauCoherence from './PanneauCoherence';
 import CompositionFamille, { InputU } from './CompositionFamille';
 import UwHelperModal from './UwHelperModal';
 
@@ -73,7 +71,7 @@ export default function Step2EmprisePieces({
     // Nouveau niveau au sommet (rang le plus haut = plafond). Nom par défaut éditable.
     const nouveau = {
       id, nom: nomNiveauDefaut(saisie.niveaux), rang: maxRang + 1,
-      hauteur: HAUTEUR_NIVEAU_DEFAUT, emprise: { polygone: [] },
+      hauteur: HAUTEUR_NIVEAU_DEFAUT,
     };
     onSaisieChange({ ...saisie, niveaux: [...saisie.niveaux, nouveau] });
     setNiveauActifId(id);
@@ -192,26 +190,8 @@ export default function Step2EmprisePieces({
         </div>
       </div>
 
-      {/* Emprise au sol du niveau actif */}
-      <div className="card p-0 overflow-hidden">
-        <div className="h-[460px]">
-          <EmpriseCanvas
-            polygone={niveauActif?.emprise?.polygone ?? []}
-            onChange={(polygone) => onSaisieChange({
-              ...saisie,
-              niveaux: saisie.niveaux.map((n) => (
-                n.id === niveauActifId ? { ...n, emprise: { polygone } } : n
-              )),
-            })}
-          />
-        </div>
-      </div>
-
       {/* Pièces du niveau actif */}
-      <PiecesTable saisie={saisie} config={config} onChange={onSaisieChange} niveauActifId={niveauActifId} />
-
-      {/* Cohérence emprise ↔ pièces */}
-      <PanneauCoherence saisie={saisie} />
+      <PiecesTable saisie={saisie} config={config} compositions={compositions} onChange={onSaisieChange} niveauActifId={niveauActifId} />
 
       {/* ===== Compositions par famille ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TYPES_PIECE, typePieceInfo, PLAGES_VRAISEMBLANCE, REGIMES_EAU,
-  DIMENSIONS_OUVERTURES, DEFAULTS_THERMIQUE, buildThermiqueConfig, LNC_PRESETS, defautSaisie }
+  DIMENSIONS_OUVERTURES, DEFAULTS_THERMIQUE, buildThermiqueConfig, LNC_PRESETS, defautSaisie,
+  normaliseOuvertures }
   from '../../src/apps/thermique/lib/thermiqueConfig.js';
 import { resolvePeriode } from '../../src/apps/thermique/lib/refDataResolvers.js';
 
@@ -85,11 +86,22 @@ test('LNC_PRESETS : garage/cellier/veranda ont un b dans [0,1]', () => {
   }
 });
 
-test('defautSaisie : 1 niveau rez avec emprise vide, pièces vide', () => {
+test('defautSaisie : 1 niveau rez sans dessin d’emprise, pièces vide', () => {
   const s = defautSaisie();
   assert.equal(s.modeSaisie, 'parametrique');
   assert.equal(s.niveaux.length, 1);
   assert.equal(s.niveaux[0].rang, 0);
-  assert.deepEqual(s.niveaux[0].emprise.polygone, []);
+  assert.equal(s.niveaux[0].emprise, undefined);  // plus de dessin d'emprise (2026-07-15)
   assert.deepEqual(s.pieces, []);
+});
+
+test('normaliseOuvertures : liste existante conservée, legacy converti, vide sinon', () => {
+  const liste = [{ id: 'o1', type: 'fenetre', surface: 2, u: null }];
+  assert.equal(normaliseOuvertures({ ouvertures: liste }), liste);  // déjà une liste → identité
+  assert.deepEqual(
+    normaliseOuvertures({ id: 'sej', surfaceOuverture: 3.2, typeMenuiserie: 'porteFenetre' }),
+    [{ id: 'sej-legacy', type: 'porteFenetre', surface: 3.2, u: null }],
+  );
+  assert.deepEqual(normaliseOuvertures({ id: 'x', surfaceOuverture: 0 }), []);  // pas d'ouverture
+  assert.deepEqual(normaliseOuvertures({ id: 'y' }), []);                        // rien de renseigné
 });

@@ -113,6 +113,42 @@ test('parois : ouverture > mur ext → erreur pièce', () => {
   assert.equal(parois.length, 0);
   assert.ok(erreurs[0].includes('ouverture'));
 });
+
+// --- 2026-07-15 : ouvertures multiples avec U différents ---
+
+test('parois : plusieurs ouvertures — 1 paroi/ouverture, U hérité vs override, surfaces sommées', () => {
+  const piece = {
+    ...pieceRef,
+    ouvertures: [
+      { id: 'o1', type: 'fenetre', surface: 2, u: null },  // hérite famille fenetre = 1.3
+      { id: 'o2', type: 'porte', surface: 1, u: 2.0 },     // override par ouverture (famille porte = 3.5)
+    ],
+  };
+  const { parois, erreurs } = paroisPieceParametrique(piece, ctxBase);
+  assert.deepEqual(erreurs, []);
+  const menus = parois.filter((p) => p.poste === 'menuiseries');
+  assert.equal(menus.length, 2);
+  assert.equal(menus.find((p) => p.surface === 2).u, 1.3);  // défaut famille fenetre
+  assert.equal(menus.find((p) => p.surface === 1).u, 2.0);  // override d'ouverture
+  // mur ext net = 9 m × 2.5 m − (2 + 1) = 19.5 m²
+  assert.equal(parois.find((p) => p.type === 'mur-exterieur').surface, 19.5);
+});
+
+test('parois : garde-fou basé sur la SOMME des ouvertures (message = surface totale)', () => {
+  const piece = {
+    ...pieceRef, mlMurExterieur: 100,   // 1 m × 2.5 m = 2.5 m² de mur brut
+    ouvertures: [{ id: 'o1', type: 'fenetre', surface: 2, u: null }, { id: 'o2', type: 'fenetre', surface: 2, u: null }],
+  };
+  const { parois, erreurs } = paroisPieceParametrique(piece, ctxBase);  // 4 m² > 2.5 m²
+  assert.equal(parois.length, 0);
+  assert.ok(erreurs[0].includes('(4 m²)'));
+});
+
+test('parois : liste ouvertures vide → aucune menuiserie, mur ext = pleine surface', () => {
+  const { parois } = paroisPieceParametrique({ ...pieceRef, ouvertures: [] }, ctxBase);
+  assert.equal(parois.filter((p) => p.poste === 'menuiseries').length, 0);
+  assert.equal(parois.find((p) => p.type === 'mur-exterieur').surface, 22.5);  // 9 × 2.5
+});
 test('parois : U manquant (famille murs null) → erreur', () => {
   const ctx = { ...ctxBase, compositions: { familles: { ...ctxBase.compositions.familles, murs: { mode: 'valeur', u: null } }, exceptions: { parois: {}, ouvertures: {} } } };
   const { erreurs } = paroisPieceParametrique(pieceRef, ctx);
@@ -163,6 +199,21 @@ test('assembleBatimentParametrique : θint manquante sur pièce chauffée → er
   const s = { ...saisieRef, pieces: [{ ...saisieRef.pieces[0], thetaInt: null }] };
   const { erreurs } = assembleBatimentParametrique(s, optionsRef);
   assert.ok(erreurs.some((e) => e.includes('consigne')));
+});
+
+test('assembleBatimentParametrique : thetaEForce force θe (bypass table climat)', () => {
+  const opt = { ...optionsRef, contexte: { ...optionsRef.contexte, thetaEForce: -12 } };
+  const { thetaE, erreurs } = assembleBatimentParametrique(saisieRef, opt);
+  assert.deepEqual(erreurs, []);
+  assert.equal(thetaE, -12);
+});
+
+test('assembleBatimentParametrique : thetaEForce marche même si département inconnu (pas d’erreur climat)', () => {
+  const opt = { ...optionsRef, contexte: { ...optionsRef.contexte, dept: '999', thetaEForce: -8 } };
+  const { thetaE, erreurs, batiment } = assembleBatimentParametrique(saisieRef, opt);
+  assert.deepEqual(erreurs, []);
+  assert.equal(thetaE, -8);
+  assert.ok(batiment);
 });
 
 // --- Régressions revue finale (2026-07-09) ---

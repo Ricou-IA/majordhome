@@ -71,6 +71,8 @@ export default function Step1Contexte({ contexte, saisie, communeInitialQuery, o
   };
 
   const { thetaE, erreur: thetaErreur } = thetaEDerive(contexte.dept, contexte.altitude);
+  // θe affichée = forçage manuel opérateur si posé, sinon θe départementale dérivée.
+  const thetaEAffiche = contexte.thetaEForce != null ? contexte.thetaEForce : thetaE;
 
   return (
     <div className="space-y-5">
@@ -112,10 +114,33 @@ export default function Step1Contexte({ contexte, saisie, communeInitialQuery, o
               />
             </FormField>
             <FormField label="Température de base θe">
-              <div className="px-3 py-2 rounded-lg bg-secondary-50 border border-secondary-200 text-sm text-secondary-900">
-                {thetaE != null ? `${thetaE} °C` : '—'}
+              <div className="flex items-center gap-2">
+                <TextInput
+                  type="number"
+                  inputMode="decimal"
+                  // String() : θe peut valoir 0 (climat doux), à préserver face au `value || ''` de TextInput
+                  value={thetaEAffiche == null ? '' : String(thetaEAffiche)}
+                  onChange={(v) => {
+                    const n = v === '' ? null : Number(v);
+                    onPatchContexte({ thetaEForce: (v === '' || Number.isNaN(n)) ? null : n });
+                  }}
+                />
+                <span className="text-sm text-secondary-500 flex-shrink-0">°C</span>
               </div>
-              {thetaErreur && <p className="text-xs text-red-600 mt-1">{thetaErreur}</p>}
+              {contexte.thetaEForce != null ? (
+                <button
+                  type="button"
+                  onClick={() => onPatchContexte({ thetaEForce: null })}
+                  className="text-xs text-primary-600 hover:underline mt-1"
+                >
+                  ↺ Revenir à l’auto{thetaE != null ? ` (${thetaE} °C)` : ''}
+                </button>
+              ) : (
+                <p className="text-xs text-secondary-500 mt-1">Valeur départementale — éditable pour forcer</p>
+              )}
+              {thetaErreur && contexte.thetaEForce == null && (
+                <p className="text-xs text-red-600 mt-1">{thetaErreur} — saisissez une valeur manuelle</p>
+              )}
             </FormField>
             <FormField label="DJU (base 18)">
               <div className="px-3 py-2 rounded-lg bg-secondary-50 border border-secondary-200 text-sm text-secondary-900 flex items-center gap-2 flex-wrap">

@@ -133,3 +133,46 @@ test('buildEtudeModel : mode paramétrique → ok + puissance émetteur (foisonn
   const p = model.bilan.pieces[0];
   assert.ok(Math.abs(p.puissanceEmetteur - p.total * 1.2) < 1e-6);
 });
+
+const DATA_PARAM = { climat: CLIMAT, uDefauts: U_DEFAUTS, coefficientsB: COEFF_B, ventilation: VENTIL, pacCatalogue: null };
+
+test('buildEtudeModel : foisonnement de l’étude prioritaire sur le défaut org', () => {
+  const config = buildThermiqueConfig({ thermique: { foisonnement_emetteur: 1.2 } }); // défaut org = 1.2
+  const model = buildEtudeModel({ ...etudeParam, foisonnement: 1.5 }, { config, data: DATA_PARAM });
+  assert.equal(model.ok, true);
+  const p = model.bilan.pieces[0];
+  assert.ok(Math.abs(p.puissanceEmetteur - p.total * 1.5) < 1e-6, 'foisonnement étude 1.5 prime sur org 1.2');
+});
+
+test('buildEtudeModel : exception murs par pièce appliquée end-to-end (poste murs baisse)', () => {
+  const config = buildThermiqueConfig(undefined);
+  const sansExc = buildEtudeModel(etudeParam, { config, data: DATA_PARAM });
+  const avecExc = buildEtudeModel({
+    ...etudeParam,
+    compositions: { ...etudeParam.compositions, exceptions: { parois: { 'sej:murs': { u: 0.1 } }, ouvertures: {} } },
+  }, { config, data: DATA_PARAM });
+  assert.equal(sansExc.ok, true);
+  assert.equal(avecExc.ok, true);
+  // U murs 0.4 → 0.1 sur la seule pièce : le poste murs global doit chuter (exception effective).
+  assert.ok(avecExc.bilan.parPoste.murs < sansExc.bilan.parPoste.murs,
+    `exception murs sans effet : ${avecExc.bilan.parPoste.murs} vs ${sansExc.bilan.parPoste.murs}`);
+});
+
+test('buildEtudeModel : ouvertures multiples (liste) — deux menuiseries de U différents dans le bilan', () => {
+  const config = buildThermiqueConfig(undefined);
+  const saisieMulti = {
+    ...saisieParam,
+    pieces: [{
+      ...saisieParam.pieces[0], surfaceOuverture: undefined, typeMenuiserie: undefined,
+      ouvertures: [
+        { id: 'o1', type: 'fenetre', surface: 2, u: null },  // famille fenetre 1.3
+        { id: 'o2', type: 'porte', surface: 1.5, u: 2.5 },   // override
+      ],
+    }],
+  };
+  const model = buildEtudeModel({ ...etudeParam, saisie: saisieMulti }, { config, data: DATA_PARAM });
+  assert.equal(model.ok, true);
+  const menus = model.parois.filter((p) => p.poste === 'menuiseries');
+  assert.equal(menus.length, 2);
+  assert.deepEqual(menus.map((p) => p.u).sort((a, b) => a - b), [1.3, 2.5]);
+});

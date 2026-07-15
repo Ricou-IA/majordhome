@@ -88,13 +88,41 @@ export const LNC_PRESETS = [
   { id: 'combles', label: 'Combles perdus',   b: 0.6 },
 ];
 
-/** État `saisie` par défaut (modèle paramétrique). Le shape fait partie du input jsonb persisté. */
+/** État `saisie` par défaut (modèle paramétrique). Le shape fait partie du input jsonb persisté.
+ * Plus de dessin d'emprise (retiré 2026-07-15) : le niveau ne porte que { id, nom, rang, hauteur }. */
 export function defautSaisie() {
   return {
     modeSaisie: 'parametrique',
     plancherBasType: 'terre-plein',   // terre-plein | vide-sanitaire | sous-sol (b plancher bas, D5)
     toitureType: 'comble',
-    niveaux: [{ id: 'rdc', nom: 'RDC', rang: 0, hauteur: 250, emprise: { polygone: [] } }],
+    niveaux: [{ id: 'rdc', nom: 'RDC', rang: 0, hauteur: 250 }],
     pieces: [],
   };
+}
+
+/** Types de menuiserie d'une ouverture → famille U (compositions.familles). */
+export const TYPES_MENUISERIE = [
+  { id: 'fenetre', label: 'Fenêtre' },
+  { id: 'porteFenetre', label: 'Porte-fenêtre' },
+  { id: 'porte', label: 'Porte' },
+];
+
+/**
+ * Liste d'ouvertures normalisée d'une pièce (migration douce 2026-07-15) : chaque ouverture =
+ * { id, type, surface (m²), u (number|null → défaut global du type) }. Rétro-compat des pièces
+ * legacy portant l'ancien couple `surfaceOuverture` + `typeMenuiserie` (→ une ouverture unique).
+ * Module PUR : id déterministe (pas de crypto — les tests node en dépendent).
+ */
+export function normaliseOuvertures(piece) {
+  if (Array.isArray(piece?.ouvertures)) return piece.ouvertures;
+  const s = piece?.surfaceOuverture;
+  if (Number.isFinite(s) && s > 0) {
+    return [{
+      id: `${piece?.id ?? 'ouv'}-legacy`,
+      type: piece?.typeMenuiserie ?? 'fenetre',
+      surface: s,
+      u: null,
+    }];
+  }
+  return [];
 }

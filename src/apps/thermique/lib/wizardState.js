@@ -4,7 +4,12 @@
 // ⚠ Le shape hors champs volatils (step/studyId/savedResults) EST le `input` jsonb persisté dans
 // majordhome.thermal_studies — VERROUILLÉ, Tasks 14/15 en dépendent (toStudyInput ci-dessous).
 // Brouillon localStorage `thermal-draft:${userId}` (convention P1.9 — clé suffixée userId).
-import { defautSaisie } from './thermiqueConfig.js';
+import { defautSaisie, normaliseOuvertures } from './thermiqueConfig.js';
+
+/** Foisonnement émetteur d'une étude neuve = défaut org (fallback 1.0). Éditable par étude. */
+function foisonnementDefaut(config) {
+  return Number.isFinite(config?.foisonnement_emetteur) ? config.foisonnement_emetteur : 1.0;
+}
 
 export function initialWizardState(config) {
   return {
@@ -14,12 +19,14 @@ export function initialWizardState(config) {
       titre: '', clientId: null, leadId: null, commune: null, dept: null, altitude: null,
       dju: null, djuFallback: false, annee: null, typeVentilation: 'vmc-sf-auto',
       isolation: 'non-isole', combleIsolation: 'isole', sousSolAvecOuvertures: false, relance: false,
+      thetaEForce: null,  // forçage manuel θe (null = θe départementale automatique)
     },
     dessin: {
       nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
       niveaux: [{ id: 'rdc', nom: 'RDC', hauteur: 250 }], pieces: [], ouvertures: [],
     },
     saisie: defautSaisie(),
+    foisonnement: foisonnementDefaut(config),  // coefficient émetteur par étude (D — 2026-07-15)
     compositions: {
       familles: {
         murs: { mode: 'defaut', u: null }, plancherBas: { mode: 'defaut', u: null },
@@ -72,6 +79,8 @@ export function wizardReducer(state, action) {
       return { ...state, dessin: action.dessin };
     case 'SET_SAISIE':
       return { ...state, saisie: action.saisie };
+    case 'SET_FOISONNEMENT':
+      return { ...state, foisonnement: action.value };
     case 'PATCH_COMPOSITIONS':
       // Merge au niveau des familles (chaque valeur du patch REMPLACE la famille).
       return {
@@ -100,13 +109,21 @@ export function wizardReducer(state, action) {
       // études anciennes / moteur qui évolue), savedResults depuis results + engine_version (R7).
       const base = initialWizardState(action.config);
       const input = action.study?.input ?? {};
+      // Normalisation ouvertures : une étude legacy (surfaceOuverture/typeMenuiserie) est convertie
+      // en liste `ouvertures` à l'hydratation → l'UI et le calcul consomment un shape unique.
+      const rawSaisie = input.saisie ?? base.saisie;
+      const saisie = {
+        ...rawSaisie,
+        pieces: (rawSaisie.pieces ?? []).map((p) => ({ ...p, ouvertures: normaliseOuvertures(p) })),
+      };
       return {
         ...base,
         step: 4,
         studyId: action.study?.id ?? null,
         contexte: { ...base.contexte, ...(input.contexte ?? {}) },
         dessin: input.dessin ?? base.dessin,
-        saisie: input.saisie ?? base.saisie,
+        saisie,
+        foisonnement: Number.isFinite(input.foisonnement) ? input.foisonnement : base.foisonnement,
         compositions: {
           familles: { ...base.compositions.familles, ...(input.compositions?.familles ?? {}) },
           exceptions: {
@@ -148,6 +165,7 @@ export function toStudyInput(state) {
     contexte: state.contexte,
     dessin: state.dessin,
     saisie: state.saisie,
+    foisonnement: state.foisonnement,
     compositions: { ...state.compositions, exceptions: { parois, ouvertures } },
     pac: state.pac,
   };

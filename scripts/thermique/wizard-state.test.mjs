@@ -33,6 +33,7 @@ test('initialWizardState : shape verrouillé (= input jsonb) + prix kWh depuis c
     titre: '', clientId: null, leadId: null, commune: null, dept: null, altitude: null,
     dju: null, djuFallback: false, annee: null, typeVentilation: 'vmc-sf-auto',
     isolation: 'non-isole', combleIsolation: 'isole', sousSolAvecOuvertures: false, relance: false,
+    thetaEForce: null,
   });
   assert.deepEqual(s.dessin, {
     nord: 0, plancherBasType: 'terre-plein', toitureType: 'comble',
@@ -222,9 +223,10 @@ test('action inconnue : même référence d’état', () => {
 test('toStudyInput : strip step/studyId/savedResults', () => {
   const state = frozen();
   const input = toStudyInput(state);
-  assert.deepEqual(Object.keys(input).sort(), ['compositions', 'contexte', 'dessin', 'pac', 'saisie']);
+  assert.deepEqual(Object.keys(input).sort(), ['compositions', 'contexte', 'dessin', 'foisonnement', 'pac', 'saisie']);
   assert.equal(input.contexte, state.contexte); // pas de copie inutile (le state est immuable)
   assert.equal(input.dessin, state.dessin);
+  assert.equal(input.foisonnement, state.foisonnement);
 });
 
 test('toStudyInput : purge les exceptions orphelines (pièce/ouverture supprimées), garde les valides', () => {
@@ -326,4 +328,47 @@ test('#2 toStudyInput conserve les exceptions U d une pièce paramétrique (unio
   };
   const input = toStudyInput(state);
   assert.deepEqual(input.compositions.exceptions.parois, { 'sej:murs': { u: 0.25 } });
+});
+
+// --- 2026-07-15 : foisonnement projet + normalisation ouvertures ---
+
+test('foisonnement : défaut = config (fallback 1.0) + SET_FOISONNEMENT', () => {
+  assert.equal(initialWizardState({ prix_kwh: 0.2 }).foisonnement, 1.0);          // config sans foisonnement
+  assert.equal(initialWizardState({ prix_kwh: 0.2, foisonnement_emetteur: 1.25 }).foisonnement, 1.25);
+  const s0 = initialWizardState(CFG);
+  const s1 = wizardReducer(deepFreeze(s0), { type: 'SET_FOISONNEMENT', value: 1.3 });
+  assert.equal(s1.foisonnement, 1.3);
+  assert.equal(s1.contexte, s0.contexte);  // le reste survit (référence intacte)
+});
+
+test('toStudyInput : porte la valeur de foisonnement de l’étude', () => {
+  const s = { ...initialWizardState(CFG), foisonnement: 1.15 };
+  assert.equal(toStudyInput(s).foisonnement, 1.15);
+});
+
+test('LOAD_STUDY : hydrate foisonnement (défaut si absent) + normalise les ouvertures legacy', () => {
+  const study = {
+    id: 'e-legacy', engine_version: 3,
+    input: {
+      contexte: { titre: 'Legacy', dept: '81' },
+      foisonnement: 1.4,
+      saisie: {
+        modeSaisie: 'parametrique', plancherBasType: 'terre-plein', toitureType: 'comble',
+        niveaux: [{ id: 'rdc', nom: 'RDC', rang: 0, hauteur: 250 }],
+        // pièce legacy : surfaceOuverture/typeMenuiserie → doit devenir une liste `ouvertures`
+        pieces: [{ id: 'sej', niveauId: 'rdc', chauffee: true, thetaInt: 20, surfaceOuverture: 3.2, typeMenuiserie: 'porteFenetre' }],
+      },
+    },
+    results: null,
+  };
+  const s = wizardReducer(frozen(), { type: 'LOAD_STUDY', study: deepFreeze(study), config: CONFIG });
+  assert.equal(s.foisonnement, 1.4);
+  assert.deepEqual(s.saisie.pieces[0].ouvertures, [{ id: 'sej-legacy', type: 'porteFenetre', surface: 3.2, u: null }]);
+  // étude sans foisonnement → défaut config
+  const s2 = wizardReducer(frozen(), {
+    type: 'LOAD_STUDY',
+    study: deepFreeze({ ...study, input: { ...study.input, foisonnement: undefined } }),
+    config: CONFIG,
+  });
+  assert.equal(s2.foisonnement, initialWizardState(CONFIG).foisonnement);
 });
