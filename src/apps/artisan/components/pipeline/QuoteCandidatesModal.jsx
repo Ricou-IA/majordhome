@@ -11,8 +11,10 @@
  *   - Bouton "Attacher la sélection (N)" désactivé si 0 cochés (strict blocage)
  *   - Message d'aide si 0 suggestion ET Exploration non révélée
  *
- * Différences vs LinkPennylaneQuoteModal (chantier post-vente) :
- *   - Multi-select au lieu de single (1 click = 1 attach)
+ * Seul point de rattachement d'un devis PL à un lead depuis 2026-07-16 (la
+ * modale équivalente côté chantier a été retirée : le chantier reprend les
+ * devis validés du pipeline, il n'en rattache pas) :
+ *   - Multi-select (1 click = 1 attach)
  *   - Bascule lead → "Devis envoyé" via RPC PR 2 (transactionnel)
  *   - Strict : impossible de fermer sans attacher au moins 1 devis
  * ============================================================================

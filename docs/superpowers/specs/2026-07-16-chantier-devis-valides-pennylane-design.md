@@ -99,17 +99,48 @@ Le ✕ « retirer ce devis du chantier » **reste** : seul recours quand le cron
 ## 5. Critère de succès (vérifiable)
 
 1. **OBIERTI** : carte Gagné pipeline = 2 devis / **5 717 €**, carte chantier = **5 717 €**.
-2. **Zéro divergence** — pour tout lead avec devis rattachés :
+2. **Zéro divergence** — tout chantier ayant des devis validés affiche exactement sa carte Gagné :
    ```sql
-   SELECT count(*) FROM majordhome.leads l
-     JOIN public.majordhome_chantiers ch ON ch.id = l.id
-     JOIN public.majordhome_kanban_cards kc ON kc.lead_id = l.id AND kc.column_key = 'gagne'
-   WHERE ROUND(ch.linked_quotes_amount_ht) IS DISTINCT FROM kc.total_amount;
+   SELECT count(*) AS divergences
+     FROM public.majordhome_chantiers ch
+     JOIN public.majordhome_kanban_cards kc ON kc.lead_id = ch.id AND kc.column_key = 'gagne'
+    WHERE ch.validated_quotes_count > 0
+      AND ROUND(COALESCE(NULLIF(ch.linked_quotes_amount_ht,0), ch.order_amount_ht, ch.estimated_revenue, 0))
+          IS DISTINCT FROM ROUND(kc.total_amount);
    -- attendu : 0
    ```
-3. **Trigger** : aucune ligne `is_winning_quote = true AND quote_status IN ('refused','denied','canceled')` après passage du cron (l'invariant tient toujours, mais par PL, plus par écrasement).
-4. Les 9 chantiers du §3 affichent le montant de leur carte Gagné.
-5. `npx vite build` OK · `npm run lint:errors` OK · `npm run audit:dead-code` ne signale pas de nouvel orphelin.
+   > **Deux pièges dans lesquels la 1ʳᵉ version de ce critère est tombée** (corrigé 2026-07-16 après revue) :
+   > - Elle comparait `linked_quotes_amount_ht` **brut** alors que l'UI affiche la cascade de `getChantierAmount` → faux positif sur un lead sans aucun devis PL (VEOLIA : colonne à 0, écran à 5 300 € via `order_amount_ht`, identique à sa carte — aucun écart réel).
+   > - Son `INNER JOIN … column_key = 'gagne'` **exclut** les chantiers dont la carte est partie en Perdu — c'est-à-dire exactement la population que le critère 3 ci-dessous surveille. Un critère qui ne peut pas voir son propre cas d'échec ne prouve rien (Posture #6).
+3. **Chantiers sans devis validé** — à **relever et arbitrer**, pas à asserter :
+   ```sql
+   SELECT ch.id, ch.last_name, ch.chantier_status, ch.validated_quotes_count, ch.order_amount_ht
+     FROM public.majordhome_chantiers ch WHERE ch.validated_quotes_count = 0;
+   ```
+   Attendu aujourd'hui : **1 ligne** (VEOLIA ENVIRONNEMENT — aucun devis PL rattaché, le repli sur `order_amount_ht` est légitime). Toute AUTRE ligne = un chantier vivant pour une vente que Pennylane dit refusée → **arbitrage humain**, jamais de correction automatique.
+4. **Trigger** : aucune ligne `is_winning_quote = true AND quote_status IN ('refused','denied','canceled')` après passage du cron (l'invariant tient toujours, mais par PL, plus par écrasement).
+5. Les 9 chantiers du §3 affichent le montant de leur carte Gagné.
+6. `npx vite build` OK · `npm run lint:errors` OK · `npm run audit:dead-code` ne signale pas de nouvel orphelin.
+
+## 5 bis. Résultat mesuré (2026-07-17)
+
+Tous les critères sont tenus. Le cron a réaligné la prod seul, sans backfill, dans les 15 min suivant la migration du trigger.
+
+| Critère | Attendu | Mesuré |
+|---|---|---|
+| OBIERTI, carte Gagné | 2 devis / 5 717 € | ✅ 2 / 5 717 € (`D-2026-07301` passé `denied`, flag gagnant reposé sur `D-2026-07302`) |
+| OBIERTI, carte chantier | 5 717 € | ✅ 5 717 € |
+| Divergence chantier ↔ carte Gagné | 0 | ✅ 0 / 43 |
+| Lignes gagnantes sur un refus | 0 | ✅ 0 |
+| Chantiers sans devis validé | 1 (VEOLIA) | ✅ 1 |
+| Colonne Planification | ≈ 194 930 € | **187 892 €** — réconcilié à l'euro (−32 507 € refusés, −18 349 € en attente). L'estimation de la spec datait d'avant la correction du trigger, qui a laissé atterrir davantage de refus PL. |
+| Colonne Commande à faire | ≈ 31 316 € | ✅ 31 316 € |
+
+Chantiers corrigés : RENOU 21 190 → 5 600 € · TACHON 15 790 → 4 752 € · BUHL 14 498 → 3 821 € · CHAUVIERE 10 428 → 5 214 € · ASTRUC 9 000 → 4 645 € · DUVAL 7 056 → 2 523 € · CHENE 12 553 → 7 155 € · BALARAN 6 058 → 3 652 € · DELPECH-GAUDIN 4 785 → 2 511 € · OBIERTI 6 950 → 5 717 €.
+
+**Corrections issues de la revue de code** (commits `08477c8`, `7f11f6c`, `4d38bc0`) — deux manques de cette spec, pas des extensions de périmètre :
+- Le ✕ d'éjection était devenu **inatteignable** pour les devis non validés, alors que c'est le seul de l'app et le seul recours quand le cron rattache un devis au mauvais lead (§4.4 ne l'avait vu que pour un devis *validé* mal rattaché ; or le mauvais rattachement le plus probable porte sur un `pending`). → sous-liste repliée « Devis non validés (N) », bandeau + ✕, sans lignes ni réception.
+- `getChantierAmount` : `linked_quotes_amount_ht = 0` signifie **deux choses** (aucun devis validé / aucun devis rattaché) et la cascade `||` retombait sur `order_amount_ht`. → colonne `validated_quotes_count` ajoutée à `majordhome_chantiers`, branchement explicite.
 
 Ordre imposé : **§4.1 avant §4.2** — filtrer sur un statut corrompu laisserait OBIERTI à 6 950 €. Vérifier le point 1 après un passage de cron avant d'enchaîner.
 
