@@ -3,15 +3,24 @@
  * ============================================================================
  * Section "Gestion des Appro" dans la fiche chantier (multi-devis).
  *
- * 2 états :
- *  - Aucun devis validé → renvoi vers le pipeline (seul lieu de rattachement)
+ * 3 états :
+ *  - Aucun devis rattaché → renvoi vers le pipeline (seul lieu de rattachement)
+ *  - Devis rattachés mais aucun validé → même renvoi, + sous-liste repliée
  *  - ≥1 devis validé → header collapsible avec compteur détaillé par devis
  *                    + 1 bloc par devis (bandeau + tableau lignes inline)
+ *                    + sous-liste repliée
  *
  * Source de vérité : vue majordhome_lead_pennylane_quotes (FK direct
  * leads.pennylane_quote_id ignoré côté UI), filtrée sur is_validated : le
  * chantier ne reprend que les devis validés dans Pennylane, même définition
  * que la colonne Gagné du pipeline.
+ *
+ * Les devis non validés restent listés (repliés, sans lignes ni réception) :
+ * le cron pennylane-sync-quote-status rattache un nouveau devis PL au lead
+ * « assigné le plus récemment », donc il peut viser le mauvais lead — et c'est
+ * le seul cas que Pennylane ne peut pas corriger de lui-même. L'éjection est
+ * l'unique recours, et le mauvais rattachement le plus probable est un devis
+ * pending. Les masquer supprimerait le seul ✕ d'éjection de l'application.
  *
  * Pilote chantier_status via la RPC chantier_recompute_order_status :
  *  - Toutes les lignes de tous les devis 100% reçues → 'commande_recue'
@@ -21,7 +30,7 @@
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Package,
   FileText,
@@ -30,10 +39,11 @@ import {
   ChevronDown,
   ChevronRight,
   AlertCircle,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDateShortFR, formatDateForInput } from '@/lib/utils';
+import { formatDateShortFR, formatDateForInput, formatEuro } from '@/lib/utils';
 import {
   useMultiplePennylaneQuoteLines,
   useLinkedPennylaneQuotes,
@@ -42,11 +52,89 @@ import {
 import { useChantierReceptions } from '@hooks/useChantierReceptions';
 import { QuoteBlock } from './QuoteBlock';
 
+// Statuts Pennylane non validés (buckets 'pending' / 'refused' / 'other' de
+// majordhome.quote_status_bucket) — les seuls à pouvoir atterrir dans la
+// sous-liste, 'accepted'/'invoiced' étant filtrés en amont par is_validated.
+const PL_STATUS_LABELS = {
+  pending: 'En attente',
+  draft: 'Brouillon',
+  expired: 'Expiré',
+  refused: 'Refusé',
+  denied: 'Refusé',
+  canceled: 'Annulé',
+};
+
+/**
+ * Sous-liste repliée des devis rattachés au lead mais non validés dans PL.
+ * Volontairement minimale : libellé, statut, montant, ✕ d'éjection. Pas de
+ * lignes PL (elles ne sont pas chargées pour ces devis) ni de réception.
+ */
+function NonValidatedQuotesList({
+  quotes,
+  open,
+  onToggle,
+  canEjectQuote,
+  isEjecting,
+  onEjectQuote,
+}) {
+  if (!quotes.length) return null;
+
+  return (
+    <details open={open} onToggle={onToggle} className="text-xs">
+      <summary className="cursor-pointer text-gray-500 hover:text-gray-700 inline-flex items-center gap-1 list-none select-none">
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? '' : '-rotate-90'}`} />
+        Devis non validés ({quotes.length})
+      </summary>
+      <ul className="mt-2 space-y-1 pl-4">
+        {quotes.map((q) => {
+          const qid = q.pennylane_quote_id;
+          const label = q.quote_label || `#${qid}`;
+          const canEject = canEjectQuote(qid);
+          return (
+            <li
+              key={qid}
+              className="flex items-center justify-between gap-2 py-1.5 border-b border-gray-50 last:border-b-0"
+            >
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-gray-700">{label}</span>
+                <span className="text-gray-400">
+                  {' '}
+                  · {PL_STATUS_LABELS[q.quote_status] || q.quote_status || '—'}
+                </span>
+              </div>
+              {q.quote_amount_ht != null && (
+                <span className="text-gray-500 tabular-nums shrink-0">
+                  {formatEuro(Number(q.quote_amount_ht))}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => onEjectQuote(qid, q.quote_label)}
+                disabled={!canEject || isEjecting}
+                title={
+                  canEject
+                    ? 'Retirer ce devis du chantier'
+                    : 'Impossible : des réceptions existent déjà sur ce devis'
+                }
+                className="text-gray-400 hover:text-amber-600 transition-colors p-1 disabled:opacity-30 disabled:hover:text-gray-400 disabled:cursor-not-allowed shrink-0"
+                aria-label={`Retirer le devis ${label}`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
 export function ChantierReceptionSection({ chantier, onUpdated, disabled = false }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [nonValidatedOpen, setNonValidatedOpen] = useState(false);
   const [globalExpanded, setGlobalExpanded] = useState(false);
 
   // Inline edit state — qty drafts par ligne PL + détails (date/notes) sur 1 ligne max
@@ -72,6 +160,11 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     [allLinkedQuotes]
   );
 
+  const nonValidatedQuotes = useMemo(
+    () => (allLinkedQuotes || []).filter((q) => !q.is_validated),
+    [allLinkedQuotes]
+  );
+
   const { ejectQuote, isEjecting } = useLinkedPennylaneQuotesMutations(orgId, chantier?.id);
 
   // Charge en parallèle les lignes de tous les devis liés
@@ -92,6 +185,18 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     isCreating,
     isDeleting,
   } = useChantierReceptions(chantier?.id);
+
+  // Un devis n'est éjectable que si aucune réception ne s'y rattache — un devis
+  // accepté puis passé en refusé côté PL peut porter des réceptions, il bascule
+  // alors dans la sous-liste non validée sans devenir éjectable pour autant.
+  const canEjectQuote = useCallback(
+    (pennylaneQuoteId) =>
+      !disabled &&
+      !(receptions || []).some(
+        (r) => Number(r.pennylane_quote_id) === Number(pennylaneQuoteId)
+      ),
+    [disabled, receptions]
+  );
 
   // Snapshot global des lignes attendues (toutes lignes de tous les devis)
   // pour la RPC recompute. La RPC ne filtre PAS par quote_id, donc on passe l'union.
@@ -153,7 +258,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
   const totalReceptions = (receptions || []).length;
 
   // ============================================================================
-  // ÉTAT NON LIÉ
+  // CHARGEMENT
   // ============================================================================
 
   if (isLoadingLinks) {
@@ -170,29 +275,9 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     );
   }
 
-  if (!linkedQuotes || linkedQuotes.length === 0) {
-    return (
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
-          <Package className="w-4 h-4" />
-          Gestion des Appro
-        </h3>
-        <div className="text-center py-6 px-4 bg-gray-50 border border-gray-200 rounded-lg">
-          <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-600">
-            Aucun devis validé sur ce chantier
-          </p>
-          <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto">
-            Le chantier reprend les devis acceptés dans Pennylane. Le rattachement
-            se fait depuis le pipeline.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // ============================================================================
-  // ÉTAT LIÉ (≥1 devis)
+  // HANDLERS (définis avant les retours : la sous-liste « non validés » a
+  // besoin de handleEjectQuote y compris quand aucun devis n'est validé)
   // ============================================================================
 
   const handleValidateLine = async (line, pennylaneQuoteId) => {
@@ -286,6 +371,66 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     }
   };
 
+  const nonValidatedList = (
+    <NonValidatedQuotesList
+      quotes={nonValidatedQuotes}
+      open={nonValidatedOpen}
+      onToggle={(e) => setNonValidatedOpen(e.currentTarget.open)}
+      canEjectQuote={canEjectQuote}
+      isEjecting={isEjecting}
+      onEjectQuote={handleEjectQuote}
+    />
+  );
+
+  // ============================================================================
+  // ÉTAT SANS DEVIS VALIDÉ
+  // « aucun devis rattaché » et « des devis rattachés, aucun validé » sont deux
+  // situations distinctes : la seconde doit montrer les devis (et leur ✕), sans
+  // quoi un mauvais rattachement du cron reste invisible ET inéjectable.
+  // ============================================================================
+
+  if (linkedQuotes.length === 0) {
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
+          <Package className="w-4 h-4" />
+          Gestion des Appro
+        </h3>
+        <div className="text-center py-6 px-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          {nonValidatedQuotes.length > 0 ? (
+            <>
+              <p className="text-sm text-gray-600">
+                Aucun devis validé sur ce chantier
+              </p>
+              <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto">
+                {nonValidatedQuotes.length === 1
+                  ? '1 devis est rattaché mais n’est pas validé dans Pennylane.'
+                  : `${nonValidatedQuotes.length} devis sont rattachés mais aucun n’est validé dans Pennylane.`}{' '}
+                Les lignes apparaîtront ici dès l’acceptation.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600">
+                Aucun devis rattaché à ce chantier
+              </p>
+              <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto">
+                Le chantier reprend les devis acceptés dans Pennylane. Le rattachement
+                se fait depuis le pipeline.
+              </p>
+            </>
+          )}
+        </div>
+        {nonValidatedList}
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // ÉTAT LIÉ (≥1 devis validé)
+  // ============================================================================
+
   return (
     <div className="space-y-3">
       {/* Header collapsible */}
@@ -326,10 +471,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
           {linkedQuotes.map((lq) => {
             const qid = lq.pennylane_quote_id;
             const meta = linesByQuote[qid];
-            const receptionsForQuote = (receptions || []).filter(
-              (r) => Number(r.pennylane_quote_id) === Number(qid)
-            );
-            const canEject = !disabled && receptionsForQuote.length === 0;
+            const canEject = canEjectQuote(qid);
 
             return (
               <QuoteBlock
@@ -354,6 +496,9 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
               />
             );
           })}
+
+          {/* Devis rattachés mais non validés — ✕ d'éjection conservé */}
+          {nonValidatedList}
 
           {/* Historique */}
           {totalReceptions > 0 && (
