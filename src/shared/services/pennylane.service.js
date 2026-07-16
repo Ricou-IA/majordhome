@@ -999,7 +999,7 @@ async function getLedgerAccounts() {
 async function getLinkedQuotesByLead(leadId) {
   const { data, error } = await supabase
     .from('majordhome_lead_pennylane_quotes')
-    .select('id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_amount_ht, quote_label, quote_date, quote_status, is_winning_quote, assigned_at, pdf_url')
+    .select('id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_amount_ht, quote_label, quote_date, quote_status, is_winning_quote, is_validated, assigned_at, pdf_url')
     .eq('lead_id', leadId)
     .is('ejected_at', null)
     .order('quote_date', { ascending: false, nullsFirst: false })
@@ -1715,8 +1715,7 @@ async function importPennylaneCustomerToMdh(orgId, plCustomer, userId) {
 
   // 3. Pose le mapping pennylane_sync (upsert idempotent)
   const { error: syncErr } = await supabase
-    .schema('majordhome')
-    .from('pennylane_sync')
+    .from('majordhome_pennylane_sync')
     .upsert(
       {
         org_id: orgId,

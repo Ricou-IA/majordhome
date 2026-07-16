@@ -4,13 +4,14 @@
  * Section "Gestion des Appro" dans la fiche chantier (multi-devis).
  *
  * 2 états :
- *  - Aucun devis lié → bouton "Lier un devis Pennylane"
- *  - ≥1 devis lié → header collapsible avec compteur détaillé par devis
- *                 + 1 bloc par devis (bandeau + tableau lignes inline)
- *                 + footer "+ Ajouter un devis"
+ *  - Aucun devis validé → renvoi vers le pipeline (seul lieu de rattachement)
+ *  - ≥1 devis validé → header collapsible avec compteur détaillé par devis
+ *                    + 1 bloc par devis (bandeau + tableau lignes inline)
  *
  * Source de vérité : vue majordhome_lead_pennylane_quotes (FK direct
- * leads.pennylane_quote_id ignoré côté UI).
+ * leads.pennylane_quote_id ignoré côté UI), filtrée sur is_validated : le
+ * chantier ne reprend que les devis validés dans Pennylane, même définition
+ * que la colonne Gagné du pipeline.
  *
  * Pilote chantier_status via la RPC chantier_recompute_order_status :
  *  - Toutes les lignes de tous les devis 100% reçues → 'commande_recue'
@@ -28,9 +29,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
-  Link2,
   AlertCircle,
-  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,14 +40,12 @@ import {
   useLinkedPennylaneQuotesMutations,
 } from '@hooks/usePennylane';
 import { useChantierReceptions } from '@hooks/useChantierReceptions';
-import { LinkPennylaneQuoteModal } from './LinkPennylaneQuoteModal';
 import { QuoteBlock } from './QuoteBlock';
 
 export function ChantierReceptionSection({ chantier, onUpdated, disabled = false }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [globalExpanded, setGlobalExpanded] = useState(false);
 
@@ -62,9 +59,18 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
 
   // Devis liés au chantier (source de vérité = pivot lead_pennylane_quotes)
   const {
-    linkedQuotes,
+    linkedQuotes: allLinkedQuotes,
     isLoading: isLoadingLinks,
   } = useLinkedPennylaneQuotes(chantier?.id);
+
+  // Le chantier ne reprend que les devis validés par le client dans Pennylane
+  // (is_validated = quote_status_bucket() côté DB — même définition que la
+  // colonne Gagné du pipeline). Les autres restent dans le pivot : on filtre à
+  // l'affichage, on n'éjecte pas, pour ne pas déplacer la carte pipeline.
+  const linkedQuotes = useMemo(
+    () => (allLinkedQuotes || []).filter((q) => q.is_validated),
+    [allLinkedQuotes]
+  );
 
   const { ejectQuote, isEjecting } = useLinkedPennylaneQuotesMutations(orgId, chantier?.id);
 
@@ -75,7 +81,6 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
   );
   const {
     resultsById: linesByQuote,
-    isLoading: isLoadingLines,
     isError: linesError,
   } = useMultiplePennylaneQuoteLines(linkedQuoteIds);
 
@@ -174,30 +179,14 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
         </h3>
         <div className="text-center py-6 px-4 bg-gray-50 border border-gray-200 rounded-lg">
           <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-600 mb-3">
-            Aucun devis Pennylane lié à ce chantier
+          <p className="text-sm text-gray-600">
+            Aucun devis validé sur ce chantier
           </p>
-          <button
-            type="button"
-            onClick={() => setLinkModalOpen(true)}
-            disabled={disabled}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50"
-          >
-            <Link2 className="w-4 h-4" />
-            Lier un devis Pennylane
-          </button>
+          <p className="text-xs text-gray-400 mt-2 max-w-sm mx-auto">
+            Le chantier reprend les devis acceptés dans Pennylane. Le rattachement
+            se fait depuis le pipeline.
+          </p>
         </div>
-
-        {linkModalOpen && (
-          <LinkPennylaneQuoteModal
-            isOpen={linkModalOpen}
-            onClose={() => setLinkModalOpen(false)}
-            chantierId={chantier.id}
-            clientId={chantier.client_id}
-            linkedQuoteIds={[]}
-            onLinked={() => onUpdated?.()}
-          />
-        )}
       </div>
     );
   }
@@ -366,19 +355,6 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
             );
           })}
 
-          {/* Footer : ajouter un devis */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setLinkModalOpen(true)}
-              disabled={disabled || isLoadingLines}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-dashed border-blue-300 text-blue-700 bg-blue-50/50 hover:bg-blue-50 transition-colors disabled:opacity-50"
-            >
-              <Plus className="w-4 h-4" />
-              Ajouter un devis / option validé
-            </button>
-          </div>
-
           {/* Historique */}
           {totalReceptions > 0 && (
             <details
@@ -425,17 +401,6 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
             </details>
           )}
         </>
-      )}
-
-      {linkModalOpen && (
-        <LinkPennylaneQuoteModal
-          isOpen={linkModalOpen}
-          onClose={() => setLinkModalOpen(false)}
-          chantierId={chantier.id}
-          clientId={chantier.client_id}
-          linkedQuoteIds={linkedQuoteIds}
-          onLinked={() => onUpdated?.()}
-        />
       )}
     </div>
   );
