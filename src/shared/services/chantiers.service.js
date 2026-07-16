@@ -57,16 +57,18 @@ export function getChantierStatusConfig(status) {
 
 /**
  * Montant d'affichage d'un chantier (carte Kanban, total colonne, modal).
- * Cascade : somme devis Pennylane liés (vue calculée) → montant figé Gagné → estimation initiale.
+ * Les devis validés dans Pennylane font foi — même définition que la carte
+ * Gagné du pipeline (majordhome.lead_quote_stats).
+ * `linked_quotes_amount_ht` vaut 0 aussi bien pour « aucun devis validé » que
+ * pour « aucun devis rattaché » : seul validated_quotes_count les distingue,
+ * d'où le branchement explicite plutôt qu'une cascade ||.
  */
 export function getChantierAmount(chantier) {
   if (!chantier) return 0;
-  return (
-    Number(chantier.linked_quotes_amount_ht) ||
-    Number(chantier.order_amount_ht) ||
-    Number(chantier.estimated_revenue) ||
-    0
-  );
+  if (Number(chantier.validated_quotes_count) > 0) {
+    return Number(chantier.linked_quotes_amount_ht) || 0;
+  }
+  return Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
 }
 
 function shouldAutoTransitionToCommandeRecue(equipmentStatus, materialsStatus) {
