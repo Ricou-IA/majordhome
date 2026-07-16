@@ -1022,24 +1022,10 @@ async function getLinkedQuotesByLead(leadId) {
   return rows;
 }
 
-/**
- * Lie un devis Pennylane à un lead via la RPC SECURITY DEFINER.
- * @param {string} orgId
- * @param {number|string} pennylaneQuoteId — id PL (bigint)
- * @param {string} leadId
- * @param {object} [quoteData] — métadonnées (label, amount_ht, date, status, customer_id)
- * @returns {Promise<object>} action: 'inserted' | 'already_assigned' | 'moved'
- */
-async function assignQuoteToLead(orgId, pennylaneQuoteId, leadId, quoteData = null) {
-  const { data, error } = await supabase.rpc('assign_pennylane_quote_to_lead', {
-    p_org_id: orgId,
-    p_quote_pl_id: Number(pennylaneQuoteId),
-    p_target_lead_id: leadId,
-    p_quote_data: quoteData,
-  });
-  if (error) throw error;
-  return data;
-}
+// NOTE : le wrapper JS de `assign_pennylane_quote_to_lead` a été retiré — plus
+// aucun appelant côté front depuis le retrait de la modale d'attache à la main
+// (le rattachement se fait dans le pipeline). La RPC reste vivante et appelée
+// par les edge functions pennylane-sync-cron et pennylane-backfill-quotes.
 
 // ============================================================================
 // BRIDGE PIPELINE ↔ PENNYLANE (spec 2026-05-23 §8)
@@ -1777,7 +1763,6 @@ export const pennylaneService = {
 
   // Liaison lead ↔ devis (multi-devis par chantier)
   getLinkedQuotesByLead: (leadId) => withErrorHandling(() => getLinkedQuotesByLead(leadId), 'pennylane.getLinkedQuotesByLead'),
-  assignQuoteToLead: (orgId, pennylaneQuoteId, leadId, quoteData) => withErrorHandling(() => assignQuoteToLead(orgId, pennylaneQuoteId, leadId, quoteData), 'pennylane.assignQuoteToLead'),
   ejectQuoteFromLead: (orgId, pennylaneQuoteId, reason) => withErrorHandling(() => ejectQuoteFromLead(orgId, pennylaneQuoteId, reason), 'pennylane.ejectQuoteFromLead'),
 
   // Bridge Pipeline ↔ Pennylane (spec 2026-05-23 PR 4+)

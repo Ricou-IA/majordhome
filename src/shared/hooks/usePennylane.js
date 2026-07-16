@@ -331,8 +331,10 @@ export function usePrefetchLinkedPennylaneQuotes() {
 }
 
 /**
- * Mutations attach/eject d'un devis Pennylane sur un lead.
+ * Mutation d'éjection d'un devis Pennylane rattaché à un lead.
  * Invalide la liste des devis liés ET le statut chantier (la cascade côté UI).
+ * Le pendant attach n'existe plus côté front (le rattachement se fait dans le
+ * pipeline) : seules les edge functions appellent encore la RPC d'attache.
  */
 export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
   const queryClient = useQueryClient();
@@ -346,20 +348,6 @@ export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
     // Vue kanban_cards recalculée — placement et compteurs colonnes
     queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
   }, [queryClient, leadId, orgId]);
-
-  const assignMutation = useMutation({
-    mutationFn: async ({ pennylaneQuoteId, quoteData }) => {
-      const { data, error } = await pennylaneService.assignQuoteToLead(
-        orgId,
-        pennylaneQuoteId,
-        leadId,
-        quoteData
-      );
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: invalidate,
-  });
 
   const ejectMutation = useMutation({
     mutationFn: async ({ pennylaneQuoteId, reason }) => {
@@ -375,17 +363,11 @@ export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
   });
 
   return {
-    assignQuote: useCallback(
-      (pennylaneQuoteId, quoteData) =>
-        assignMutation.mutateAsync({ pennylaneQuoteId, quoteData }),
-      [assignMutation]
-    ),
     ejectQuote: useCallback(
       (pennylaneQuoteId, reason) =>
         ejectMutation.mutateAsync({ pennylaneQuoteId, reason }),
       [ejectMutation]
     ),
-    isAssigning: assignMutation.isPending,
     isEjecting: ejectMutation.isPending,
   };
 }
