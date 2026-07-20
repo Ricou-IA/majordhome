@@ -23,9 +23,13 @@ import { downloadBlob } from '../../lib/etudeExport';
 import { buildConsentItems } from '../../lib/consentItems';
 import { buildCerfaFields } from '../../lib/cerfa16702';
 import { fillCerfa16702 } from '../../lib/fillCerfa';
-import { buildNoticeModel, parseAddressFR } from '../../lib/dossierDocs';
+import { buildNoticeModel, parseAddressFR, healAddress } from '../../lib/dossierDocs';
+import { docPath, docsGeneratedAt, DOSSIER_PIECES } from '../../lib/dossierDocuments';
+import { assembleDossierBlob } from '../../lib/assembleDossier';
 import { PV_DOSSIER_STATUS_LABELS } from '../../lib/pvDossierStatus';
 import { generateNoticePdfBlob } from './NoticePDF';
+import { generatePlanSituationBlob } from './PlanSituationPDF';
+import { generatePlanMasseBlob } from './PlanMassePDF';
 import ValidateDossierModal from './ValidateDossierModal';
 import ConsentSignatureModal from './ConsentSignatureModal';
 
@@ -117,7 +121,10 @@ export default function DossierDrawer({ open, onClose, simulation }) {
     }
   };
 
-  // Étape 3 — génère CERFA + notice depuis les blocs déjà persistés (relit le dossier frais).
+  // Étape 3 — génère TOUTES les pièces du dossier depuis les blocs déjà persistés
+  // (relit le dossier frais) : CERFA + notice + plans DPC1/DPC2 + assemblé. Chaque pièce
+  // est indépendante (échec de l'une ⇒ les autres se génèrent, la manquante est signalée) ;
+  // seuls CERFA et notice restent bloquants (cœur légal du dossier).
   const generate = async () => {
     setBusy(true);
     try {
@@ -129,28 +136,48 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       const config = buildPvConfig(settings);
       const declarant = fresh.declarant;
       const cons = fresh.consent;
+      const company = buildCompanyInfo(settings);
+      const dateLabel = formatDateFR(new Date());
       const noticeModel = buildNoticeModel({ dossier: fresh, simulation: sim, config });
-      // Adresse du terrain : merge par champ — l'adresse STRUCTURÉE confirmée par l'utilisateur
-      // (modale déclarant) FAIT FOI, mais tout champ laissé vide (ex. n° non pré-rempli par l'ancien
-      // parseur sur un dossier déjà créé) se complète depuis le libellé re-parsé (best effort).
-      const declAdr = declarant?.adresse ?? {};
-      const parsed = parseAddressFR(sim.client_address ?? '');
-      const terrain = {
-        numero: declAdr.numero || parsed.numero,
-        voie: declAdr.voie || parsed.voie,
-        lieudit: declAdr.lieudit || parsed.lieudit,
-        code_postal: declAdr.code_postal || parsed.code_postal,
-        localite: declAdr.localite || parsed.localite,
+      // Adresse auto-cicatrisante (déclarant ET terrain) : l'adresse STRUCTURÉE confirmée
+      // par l'utilisateur FAIT FOI, mais tout champ vide se complète depuis le libellé
+      // re-parsé, et un n° resté dans la voie (dossier créé avant les correctifs du
+      // parseur) est extrait — sinon le cadre 2 du CERFA sort avec une adresse trouée.
+      const adresse = healAddress(declarant?.adresse, parseAddressFR(sim.client_address ?? ''));
+
+      // Pièces graphiques D'ABORD : leur présence pilote le bordereau du CERFA.
+      const missingPieces = [];
+      const tryPiece = async (label, fn) => {
+        try {
+          return await fn();
+        } catch (err) {
+          missingPieces.push(label);
+          logger.warn(`[dossier] pièce « ${label} » non générée`, err);
+          return null;
+        }
       };
+      const planSituationBlob = await tryPiece('plan de situation', () => generatePlanSituationBlob({
+        location: sim.inputs?.location, cadastre: fresh.cadastre, company,
+        clientName: sim.client_name, dateLabel,
+      }));
+      const planMasseBlob = await tryPiece('plan de masse', () => generatePlanMasseBlob({
+        location: sim.inputs?.location, cadastre: fresh.cadastre, roofGeometry: fresh.roof_geometry,
+        panelsCount: noticeModel.projet.panels, company, clientName: sim.client_name, dateLabel,
+      }));
+
       const fields = buildCerfaFields({
-        declarant,
-        terrain,
+        declarant: { ...declarant, adresse },
+        terrain: adresse,
         parcelles: fresh.cadastre?.parcelles ?? [],
         abf: fresh.abf,
         description: noticeModel.projet.description,
         todayIso: new Date().toISOString().slice(0, 10),
         signedAtIso: cons?.signed_at,
         signatureLieu: cons?.lieu,
+        piecesPresentes: [
+          ...(planSituationBlob ? ['dpc1'] : []),
+          ...(planMasseBlob ? ['dpc2'] : []),
+        ],
       });
 
       // Octets PNG de la signature (URL signée → fetch), apposés dans le cadre 7.
@@ -174,29 +201,44 @@ export default function DossierDrawer({ open, onClose, simulation }) {
         toast.warning('Le CERFA ne porte que 3 références cadastrales — joindre la fiche complémentaire pour les parcelles restantes (toutes listées dans la notice).');
         logger.warn('[dossier] parcelles au-delà des 3 slots CERFA', fresh.cadastre?.parcelles?.length);
       }
-      const company = buildCompanyInfo(settings);
-      const noticeBlob = await generateNoticePdfBlob({ model: noticeModel, company, dateLabel: formatDateFR(new Date()) });
+      const noticeBlob = await generateNoticePdfBlob({ model: noticeModel, company, dateLabel });
 
+      // Assemblage final (ordre réglementaire) — une pièce illisible est ignorée mais surfacée.
+      const assembled = await tryPiece('dossier assemblé', () => assembleDossierBlob([
+        { label: 'CERFA', blob: cerfaBlob },
+        { label: 'notice', blob: noticeBlob },
+        { label: 'plan de situation', blob: planSituationBlob },
+        { label: 'plan de masse', blob: planMasseBlob },
+      ]));
+
+      // Upload + modèle `documents` orienté-pièces (les clés legacy sont re-normalisées ici).
       const base = `${orgId}/solaire/dossiers/${dossier.id}`;
-      const up1 = await storageService.uploadFile(DOCS_BUCKET, `${base}/cerfa-dp.pdf`, cerfaBlob, { upsert: true, contentType: 'application/pdf' });
-      if (up1.error) throw new Error(`Upload CERFA : ${up1.error.message}`);
-      const up2 = await storageService.uploadFile(DOCS_BUCKET, `${base}/notice-descriptive.pdf`, noticeBlob, { upsert: true, contentType: 'application/pdf' });
-      if (up2.error) throw new Error(`Upload notice : ${up2.error.message}`);
+      const stamp = new Date().toISOString();
+      const documents = {};
+      const uploadPiece = async (key, filename, blob, kind = 'generated') => {
+        if (!blob) return;
+        const path = `${base}/${filename}`;
+        const up = await storageService.uploadFile(DOCS_BUCKET, path, blob, { upsert: true, contentType: 'application/pdf' });
+        if (up.error) throw new Error(`Upload ${filename} : ${up.error.message}`);
+        documents[key] = { path, generated_at: stamp, kind };
+      };
+      await uploadPiece('cerfa', 'cerfa-dp.pdf', cerfaBlob);
+      await uploadPiece('notice', 'notice-descriptive.pdf', noticeBlob);
+      await uploadPiece('plan_situation', 'plan-situation-dpc1.pdf', planSituationBlob);
+      await uploadPiece('plan_masse', 'plan-masse-dpc2.pdf', planMasseBlob);
+      await uploadPiece('assembled', 'dossier-dp-complet.pdf', assembled?.blob, 'assembled');
 
-      await patchBlock.mutateAsync({
-        id: dossier.id,
-        patch: {
-          documents: {
-            cerfa_pdf_path: `${base}/cerfa-dp.pdf`,
-            notice_pdf_path: `${base}/notice-descriptive.pdf`,
-            generated_at: new Date().toISOString(),
-          },
-        },
-      });
+      await patchBlock.mutateAsync({ id: dossier.id, patch: { documents } });
       if (dossier.status === 'offre') {
         await advance.mutateAsync({ id: dossier.id, targetStatus: 'dossier_valide' });
       }
-      toast.success('CERFA + notice générés — dossier validé');
+      if (missingPieces.length) {
+        toast.warning(`Pièce(s) non générée(s) : ${missingPieces.join(', ')} — à produire ou joindre manuellement.`);
+      }
+      if (assembled?.skipped?.length) {
+        toast.warning(`Pièce(s) absentes du dossier assemblé : ${assembled.skipped.join(', ')}.`);
+      }
+      toast.success('Dossier généré — CERFA, notice et pièces graphiques');
     } catch (err) {
       toast.error(`Génération interrompue : ${err.message}`);
     } finally {
@@ -330,38 +372,47 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                 </div>
               )}
 
-              {/* Documents générés */}
-              {docs?.cerfa_pdf_path && (
+              {/* Documents générés — 1 bouton par pièce + dossier assemblé */}
+              {docPath(docs, 'cerfa') && (
                 <div className="card space-y-2">
                   <h3 className="text-sm font-semibold text-secondary-900">
                     Documents générés
-                    {docs.generated_at && (
-                      <span className="font-normal text-xs text-secondary-500"> — {formatDateShortFR(docs.generated_at)}</span>
+                    {docsGeneratedAt(docs) && (
+                      <span className="font-normal text-xs text-secondary-500"> — {formatDateShortFR(docsGeneratedAt(docs))}</span>
                     )}
                   </h3>
                   <div className="flex gap-2 flex-wrap">
-                    <button
-                      onClick={() => download(docs.cerfa_pdf_path, 'CERFA')}
-                      disabled={downloadBusy !== null}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-secondary-200 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
-                    >
-                      {downloadBusy === docs.cerfa_pdf_path ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                      CERFA 16702
-                    </button>
-                    <button
-                      onClick={() => download(docs.notice_pdf_path, 'notice')}
-                      disabled={downloadBusy !== null}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-secondary-200 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
-                    >
-                      {downloadBusy === docs.notice_pdf_path ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                      Notice descriptive
-                    </button>
+                    {DOSSIER_PIECES.map(({ key, label }) => {
+                      const path = docPath(docs, key);
+                      if (!path) return null;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => download(path, label)}
+                          disabled={downloadBusy !== null}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-secondary-200 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50"
+                        >
+                          {downloadBusy === path ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
+                  {docPath(docs, 'assembled') && (
+                    <button
+                      onClick={() => download(docPath(docs, 'assembled'), 'dossier complet')}
+                      disabled={downloadBusy !== null}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-primary-200 bg-primary-50 text-sm font-medium text-primary-800 hover:bg-primary-100 disabled:opacity-50"
+                    >
+                      {downloadBusy === docPath(docs, 'assembled') ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                      Dossier DP complet (toutes pièces fusionnées)
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* Étapes séquentielles : état civil → consentement+signature → génération */}
-              {!docs?.cerfa_pdf_path ? (
+              {!docPath(docs, 'cerfa') ? (
                 <div className="space-y-2">
                   {!declarantOk && (
                     <button
@@ -388,7 +439,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                       className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
-                      Générer le CERFA + la notice
+                      Générer le dossier (CERFA, notice, plans)
                     </button>
                   )}
                   {!cadastreOk && (
@@ -411,6 +462,18 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                 >
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                   Régénérer les documents
+                </button>
+              )}
+
+              {/* Correction d'un état civil / d'une adresse déjà enregistrés (write-once ≠ figé
+                  à jamais : une coquille sur un document légal doit rester corrigeable). */}
+              {declarantOk && (
+                <button
+                  onClick={() => setShowValidate(true)}
+                  disabled={busy}
+                  className="w-full text-center text-xs text-secondary-500 hover:text-secondary-700 underline disabled:opacity-50"
+                >
+                  Modifier l'état civil / l'adresse du déclarant
                 </button>
               )}
             </>

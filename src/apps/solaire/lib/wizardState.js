@@ -8,7 +8,9 @@ export function initialWizardState(config) {
     step: 1,
     location: { lat: null, lon: null, address: '', accuracy: null, source: null }, // source: 'gps'|'adresse'
     roof: { tiltPercent: config.default_tilt_percent, orientation: 'S', surfaceM2: '' },
-    conso: { monthly: Array(12).fill(''), priceKwh: config.default_price_kwh, profile: 'RES1' },
+    // source: 'reel' (12 relevés factures) | 'annuel' (total annuel réparti selon le
+    // schéma Enedis du profil — la grille mensuelle devient dérivée, non éditable).
+    conso: { monthly: Array(12).fill(''), priceKwh: config.default_price_kwh, profile: 'RES1', source: 'reel', annualKwh: '' },
     // owned=false : VE en projet (ajouté au modèle) ; owned=true : déjà équipé (déjà
     // dans les factures — rien d'ajouté, « Répartir depuis l'annuel » lisse sa part).
     ev: { enabled: false, owned: false, kmPerYear: config.ev.default_km, kwhPer100km: config.ev.default_kwh_100km, addCharger: false },
@@ -20,6 +22,19 @@ export function initialWizardState(config) {
     material: { module_marque: '', module_modele: '', module_aspect: 'full_black' }, // config offre → pv_dossiers.material
     selectedKwc: null,      // scénario sélectionné (null = recommandé)
     financing: { rate: config.default_loan_rate, years: config.default_loan_years, deposit: 0, manualCost: null },
+    // Toggles de la section « Optimiser l'autoconsommation » (Résultats). Remontés
+    // ici pour être FIGÉS à la génération PDF (option A) et persistés dans `inputs`
+    // au save → une simu rechargée régénère le MÊME PDF (état de la démo client).
+    optim: {
+      persons: 3,
+      veBattery: 60,
+      pilotageEcs: false,
+      veOn: false,
+      veSimKm: config.ev.default_km,
+      pool: false,
+      clim: false,
+      batteryOn: false,
+    },
   };
 }
 
@@ -49,6 +64,7 @@ export function wizardReducer(state, action) {
     case 'SET_PVGIS': return { ...state, pvgis: action.pvgis };
     case 'SELECT_KWC': return { ...state, selectedKwc: action.kwc };
     case 'SET_FINANCING': return { ...state, financing: { ...state.financing, ...action.patch } };
+    case 'SET_OPTIM': return { ...state, optim: { ...state.optim, ...action.patch } };
     case 'LOAD': return { ...action.state };
     case 'RESET': return initialWizardState(action.config);
     default: return state;

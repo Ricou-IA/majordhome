@@ -11,11 +11,16 @@
  *   - majordhome_pricing_extras
  *   - majordhome_contract_pricing_items  (enrichie : JOIN zones + equipment_types)
  *
- * Écritures via vues publiques writable :
+ * Écritures via vues publiques writable (majordhome non exposé par PostgREST) :
  *   - majordhome_contract_pricing_items_write (INSERT/DELETE)
  *   - majordhome_contracts_write (UPDATE amount)
- *   - majordhome_pricing_zones / _equipment_types / _rates / _discounts / _extras (CRUD UI Tarification)
+ *   - majordhome_pricing_zones / _equipment_types / _discounts / _extras (CRUD UI Tarification :
+ *     vues de lecture déjà miroirs updatable, on écrit directement dessus)
+ *   - majordhome_pricing_rates_write (CRUD UI Tarification : la vue _rates est JOINée donc
+ *     non-updatable → miroir plat dédié, même pattern que _contract_pricing_items_write)
  *
+ * @version 1.4.0 - Fix CRUD Tarification : écritures via vues publiques (plus de .schema('majordhome')
+ *                  qui renvoyait PGRST106 — schema non exposé). Ajout vue _pricing_rates_write.
  * @version 1.3.0 - Pricing per-org (P0.0.6 reste) : ajout org_id partout + CRUD UI
  * @version 1.2.0 - Passage complet vues publiques (lecture + écriture, plus de .schema())
  * @version 1.1.0 - Passage aux vues publiques pour la lecture
@@ -530,8 +535,7 @@ export const pricingService = {
   async createZone(orgId, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_zones')
+        .from('majordhome_pricing_zones')
         .insert({ ...payload, org_id: orgId })
         .select()
         .single();
@@ -545,8 +549,7 @@ export const pricingService = {
   async updateZone(id, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_zones')
+        .from('majordhome_pricing_zones')
         .update(payload)
         .eq('id', id)
         .select()
@@ -561,8 +564,7 @@ export const pricingService = {
   async deleteZone(id) {
     try {
       const { error } = await supabase
-        .schema('majordhome')
-        .from('pricing_zones')
+        .from('majordhome_pricing_zones')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -577,8 +579,7 @@ export const pricingService = {
   async createEquipmentType(orgId, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_equipment_types')
+        .from('majordhome_pricing_equipment_types')
         .insert({ ...payload, org_id: orgId })
         .select()
         .single();
@@ -592,8 +593,7 @@ export const pricingService = {
   async updateEquipmentType(id, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_equipment_types')
+        .from('majordhome_pricing_equipment_types')
         .update(payload)
         .eq('id', id)
         .select()
@@ -608,8 +608,7 @@ export const pricingService = {
   async deleteEquipmentType(id) {
     try {
       const { error } = await supabase
-        .schema('majordhome')
-        .from('pricing_equipment_types')
+        .from('majordhome_pricing_equipment_types')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -624,8 +623,7 @@ export const pricingService = {
   async upsertRate(orgId, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_rates')
+        .from('majordhome_pricing_rates_write')
         .upsert(
           { ...payload, org_id: orgId },
           { onConflict: 'org_id,zone_id,equipment_type_id' }
@@ -642,8 +640,7 @@ export const pricingService = {
   async deleteRate(id) {
     try {
       const { error } = await supabase
-        .schema('majordhome')
-        .from('pricing_rates')
+        .from('majordhome_pricing_rates_write')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -658,8 +655,7 @@ export const pricingService = {
   async createExtra(orgId, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_extras')
+        .from('majordhome_pricing_extras')
         .insert({ ...payload, org_id: orgId })
         .select()
         .single();
@@ -673,8 +669,7 @@ export const pricingService = {
   async updateExtra(id, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_extras')
+        .from('majordhome_pricing_extras')
         .update(payload)
         .eq('id', id)
         .select()
@@ -689,8 +684,7 @@ export const pricingService = {
   async deleteExtra(id) {
     try {
       const { error } = await supabase
-        .schema('majordhome')
-        .from('pricing_extras')
+        .from('majordhome_pricing_extras')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -705,8 +699,7 @@ export const pricingService = {
   async createDiscount(orgId, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_discounts')
+        .from('majordhome_pricing_discounts')
         .insert({ ...payload, org_id: orgId })
         .select()
         .single();
@@ -720,8 +713,7 @@ export const pricingService = {
   async updateDiscount(id, payload) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('pricing_discounts')
+        .from('majordhome_pricing_discounts')
         .update(payload)
         .eq('id', id)
         .select()
@@ -736,8 +728,7 @@ export const pricingService = {
   async deleteDiscount(id) {
     try {
       const { error } = await supabase
-        .schema('majordhome')
-        .from('pricing_discounts')
+        .from('majordhome_pricing_discounts')
         .delete()
         .eq('id', id);
       if (error) throw error;

@@ -30,6 +30,7 @@ const DOC_KINDS = [
   { value: 'panneau', label: 'Panneau' },
   { value: 'borne', label: 'Borne de recharge' },
   { value: 'onduleur', label: 'Onduleur' },
+  { value: 'cgv', label: 'CGV / conditions' },
   { value: 'autre', label: 'Autre' },
 ];
 
@@ -301,8 +302,9 @@ function BibliothequeTab({ form, patch, orgId }) {
         <div>
           <SectionTitle>Bibliothèque technique</SectionTitle>
           <p className="text-sm text-secondary-600 mt-1">
-            Fiches techniques (PDF) jointes en annexe des études : panneaux, borne, onduleur…
-            Les fiches « Borne de recharge » ne sont jointes que si l'option borne est cochée dans la simulation.
+            Fiches techniques (PDF) jointes en annexe des études : panneaux, borne, onduleur, CGV…
+            Les fiches « Borne de recharge » ne sont jointes que si l'option borne est cochée dans la
+            simulation ; les « CGV / conditions » sont toujours placées en dernière position.
           </p>
         </div>
         <button

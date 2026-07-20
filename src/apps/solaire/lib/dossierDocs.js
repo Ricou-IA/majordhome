@@ -31,6 +31,35 @@ export function parseAddressFR(raw) {
   return { ...empty, voie: s };
 }
 
+// N° de rue en tête de voie (« 7b Route des Bardis », « 12 bis rue X ») — même
+// convention de suffixe que ADDR_FULL_RE.
+const VOIE_LEADING_NUM_RE = /^(\d+(?:\s*(?:bis|ter|quater)|[a-zA-Z])?)\s+(.+)$/i;
+
+/**
+ * Répare une adresse structurée persistée (déclarant write-once) : les dossiers créés
+ * avant les correctifs du parseur peuvent avoir numero vide (n° resté dans la voie) ou
+ * des champs vides. Chaque champ vide se complète depuis `parsed` (re-parse du libellé
+ * BAN) — jamais l'inverse : une valeur saisie par l'utilisateur fait toujours foi.
+ */
+export function healAddress(adr, parsed) {
+  const a = { numero: '', voie: '', lieudit: '', code_postal: '', localite: '', ...(adr ?? {}) };
+  const p = { numero: '', voie: '', lieudit: '', code_postal: '', localite: '', ...(parsed ?? {}) };
+  if (!a.numero && a.voie) {
+    const m = VOIE_LEADING_NUM_RE.exec(String(a.voie).trim());
+    if (m) {
+      a.numero = m[1];
+      a.voie = m[2];
+    }
+  }
+  return {
+    numero: a.numero || p.numero,
+    voie: a.voie || p.voie,
+    lieudit: a.lieudit || p.lieudit,
+    code_postal: a.code_postal || p.code_postal,
+    localite: a.localite || p.localite,
+  };
+}
+
 const ASPECT_LABELS = {
   full_black: 'noir uniforme (full black), cadre et fond noirs',
   standard: 'standard (cellules sombres, cadre aluminium)',

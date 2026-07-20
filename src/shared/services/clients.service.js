@@ -940,8 +940,7 @@ export const clientsService = {
       if (tenantClientId === ownerClientId) throw new Error('Un client ne peut pas être son propre propriétaire');
 
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('clients')
+        .from('majordhome_clients')
         .update({ owner_client_id: ownerClientId })
         .eq('id', tenantClientId)
         .select()
@@ -960,8 +959,7 @@ export const clientsService = {
       if (!clientId) throw new Error('clientId requis');
 
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('clients')
+        .from('majordhome_clients')
         .update({ owner_client_id: null })
         .eq('id', clientId)
         .select()

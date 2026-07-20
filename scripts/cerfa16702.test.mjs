@@ -188,3 +188,21 @@ test('buildCerfaFields — sans signature → fallback aujourd\'hui + localité 
   assert.equal(text.E1D_date, '11072026');
   assert.equal(text.E1L_lieu, 'Gaillac'); // adresse déclarant
 });
+
+test('buildCerfaFields — bordereau : pièces présentes → cases P5 cochées, inconnues ignorées', () => {
+  const { checks } = buildCerfaFields({
+    declarant: DECLARANT, terrain: TERRAIN, parcelles: [PARCELLES[0]], abf: null,
+    description: 'x', todayIso: '2026-07-13',
+    piecesPresentes: ['dpc1', 'dpc2', 'dpc1', 'photo_inconnue'],
+  });
+  assert.ok(checks.includes('P5PA2')); // plan de situation
+  assert.ok(checks.includes('P5PB1')); // plan de masse
+  assert.equal(checks.filter((c) => c === 'P5PA2').length, 1); // pas de doublon
+  assert.ok(!checks.some((c) => c.startsWith('P5PC'))); // pièce inconnue → rien
+  // sans pièces : aucune case bordereau
+  const { checks: none } = buildCerfaFields({
+    declarant: DECLARANT, terrain: TERRAIN, parcelles: [PARCELLES[0]], abf: null,
+    description: 'x', todayIso: '2026-07-13',
+  });
+  assert.ok(!none.includes('P5PA2') && !none.includes('P5PB1'));
+});

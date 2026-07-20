@@ -13,12 +13,14 @@ export const TECH_DOCS_BUCKET = 'product-documents';
  * Fiches à joindre à une étude :
  * - `attach` coché dans la bibliothèque
  * - les fiches « borne » uniquement si l'option borne est active dans la simulation
+ * - les CGV (`kind: 'cgv'`) toujours en DERNIÈRE position (fin de document, comme un devis)
  */
 export function selectAnnexDocs(config, inputs) {
   const docs = Array.isArray(config.tech_docs) ? config.tech_docs : [];
-  return docs.filter(
+  const selected = docs.filter(
     (d) => d.attach && d.path && (d.kind !== 'borne' || (inputs.ev?.enabled && inputs.ev?.addCharger)),
   );
+  return [...selected.filter((d) => d.kind !== 'cgv'), ...selected.filter((d) => d.kind === 'cgv')];
 }
 
 /** Fusionne les fiches techniques (PDF Storage) à la suite du blob étude. */

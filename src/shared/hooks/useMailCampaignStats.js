@@ -23,3 +23,23 @@ export function useMailCampaignStats(orgId) {
 
   return { stats: data || [], isLoading, error, refetch };
 }
+
+/**
+ * Détail des destinataires d'une campagne pour un type d'event donné
+ * (drill-down du drawer Stats). `enabled` permet de ne fetcher qu'à l'ouverture
+ * du drawer.
+ */
+export function useMailCampaignRecipients(orgId, campaignName, mode, enabled = true) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: mailCampaignStatsKeys.recipients(orgId, campaignName, mode),
+    queryFn: async () => {
+      const { data, error } = await mailCampaignStatsService.listRecipients(orgId, campaignName, mode);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!campaignName && !!mode && enabled,
+    staleTime: 30_000,
+  });
+
+  return { recipients: data || [], isLoading, error };
+}

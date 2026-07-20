@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { Sparkles, Waves, Snowflake, BatteryCharging, ChevronDown, ChevronUp, AlertTriangle, Droplets, Car, HelpCircle } from 'lucide-react';
 import { PV_COLORS } from '../lib/palette';
-import { buildAutoconsoModel, CASCADE_DEFAULTS } from '../lib/autoconsoModel';
+import { buildOptimModel, CASCADE_DEFAULTS } from '../lib/autoconsoModel';
 import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
 import { pvgisExample } from '../data';
 
@@ -179,36 +179,18 @@ function Toggle({ label, icon: Icon, active, onClick }) {
   );
 }
 
-export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeKwc, ev, baseShape }) {
+export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeKwc, ev, baseShape, optim, onOptim }) {
   // Chapitre à part entière dans les Résultats → ouvert par défaut (démo client).
   const [open, setOpen] = useState(true);
-  const [persons, setPersons] = useState(3);
-  const [veBattery, setVeBattery] = useState(60);
-  // Optimisations PROPOSÉES (toggles) — le constat s'affiche sans, on les active
-  // avec le client. La batterie est une catégorie à part (stockage, pas confort).
-  const [pilotageEcs, setPilotageEcs] = useState(false);
-  const [veOn, setVeOn] = useState(false);
-  const [veSimKm, setVeSimKm] = useState(Number(ev.kmPerYear) || 12000);
-  const [pool, setPool] = useState(false);
-  const [clim, setClim] = useState(false);
-  const [batteryOn, setBatteryOn] = useState(false);
+  // State CONTRÔLÉ par le wizard (`state.optim`) : figé à la génération PDF et
+  // persisté au save. `persons`/`veBattery` = réglages ; le reste = toggles.
+  const { persons, veBattery, pilotageEcs, veOn, veSimKm, pool, clim, batteryOn } = optim;
 
   const prodHourly = useMemo(() => hourlyProdFromMonthly(eM, activeKwc, pvgisExample.hourly), [eM, activeKwc]);
-  const model = useMemo(() => {
-    // VE : mode 'shift' si déjà déclaré au Step 2 (dans le constat), sinon 'add' (VE futur).
-    const ve = veOn ? (ev.enabled ? { mode: 'shift' } : { mode: 'add', kmPerYear: veSimKm }) : null;
-    return buildAutoconsoModel({
-      household: {
-        persons,
-        veKmPerYear: ev.enabled ? (Number(ev.kmPerYear) || 0) : 0,
-        veBatteryKwh: veBattery,
-      },
-      monthlyConsoTotals: consoMonthly,
-      baseShape,
-      prodHourly,
-      levers: { pilotageEcs, ve, pool, clim, battery: batteryOn },
-    });
-  }, [persons, veBattery, pilotageEcs, veOn, veSimKm, pool, clim, batteryOn, ev, consoMonthly, prodHourly, baseShape]);
+  const model = useMemo(
+    () => buildOptimModel({ optim, ev, consoMonthly, baseShape, prodHourly }),
+    [optim, ev, consoMonthly, baseShape, prodHourly],
+  );
 
   const cascade = model.cascade;
   const final = cascade[cascade.length - 1];
@@ -271,22 +253,22 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-5">
           {/* Réglages + optimisations proposées (toggles) */}
           <div className="space-y-4">
-            <Slider label="Personnes" value={persons} min={1} max={6} onChange={setPersons} />
+            <Slider label="Personnes" value={persons} min={1} max={6} onChange={(v) => onOptim({ persons: v })} />
 
             <div>
               <div className="text-sm font-medium text-secondary-800 mb-2">Optimisations à proposer</div>
               <div className="flex flex-wrap gap-2">
-                <Toggle label="Pilotage ECS" icon={Droplets} active={pilotageEcs} onClick={() => setPilotageEcs(!pilotageEcs)} />
-                <Toggle label={ev.enabled ? 'Recharge VE (solaire)' : 'Véhicule électrique'} icon={Car} active={veOn} onClick={() => setVeOn(!veOn)} />
+                <Toggle label="Pilotage ECS" icon={Droplets} active={pilotageEcs} onClick={() => onOptim({ pilotageEcs: !pilotageEcs })} />
+                <Toggle label={ev.enabled ? 'Recharge VE (solaire)' : 'Véhicule électrique'} icon={Car} active={veOn} onClick={() => onOptim({ veOn: !veOn })} />
               </div>
               {veOn && ev.enabled && (
                 <div className="mt-3">
-                  <Slider label="Batterie voiture" value={veBattery} min={20} max={100} step={5} onChange={setVeBattery} suffix=" kWh" />
+                  <Slider label="Batterie voiture" value={veBattery} min={20} max={100} step={5} onChange={(v) => onOptim({ veBattery: v })} suffix=" kWh" />
                 </div>
               )}
               {veOn && !ev.enabled && (
                 <div className="mt-3">
-                  <Slider label="Kilométrage VE (projet)" value={veSimKm} min={5000} max={30000} step={1000} onChange={setVeSimKm} suffix=" km/an" />
+                  <Slider label="Kilométrage VE (projet)" value={veSimKm} min={5000} max={30000} step={1000} onChange={(v) => onOptim({ veSimKm: v })} suffix=" km/an" />
                   <p className="text-xs text-secondary-500 mt-1">Simule un futur véhicule électrique rechargé sur votre surplus solaire.</p>
                 </div>
               )}
@@ -295,15 +277,15 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
             <div>
               <div className="text-sm font-medium text-secondary-800 mb-2">Confort <span className="text-xs text-secondary-500">(le surplus le finance)</span></div>
               <div className="flex flex-wrap gap-2">
-                <Toggle label="Piscine" icon={Waves} active={pool} onClick={() => setPool(!pool)} />
-                <Toggle label="Clim été" icon={Snowflake} active={clim} onClick={() => setClim(!clim)} />
+                <Toggle label="Piscine" icon={Waves} active={pool} onClick={() => onOptim({ pool: !pool })} />
+                <Toggle label="Clim été" icon={Snowflake} active={clim} onClick={() => onOptim({ clim: !clim })} />
               </div>
             </div>
 
             <div>
               <div className="text-sm font-medium text-secondary-800 mb-2">Stockage</div>
               <div className="flex flex-wrap gap-2">
-                <Toggle label="Batterie" icon={BatteryCharging} active={batteryOn} onClick={() => setBatteryOn(!batteryOn)} />
+                <Toggle label="Batterie" icon={BatteryCharging} active={batteryOn} onClick={() => onOptim({ batteryOn: !batteryOn })} />
               </div>
             </div>
             {model.warnings.length > 0 && (

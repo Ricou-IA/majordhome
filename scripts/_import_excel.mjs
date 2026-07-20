@@ -9,7 +9,7 @@
  * ============================================================================
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import XLSX from 'xlsx';
 
@@ -62,7 +62,7 @@ function esc(val) {
 }
 
 /** Escape SQL string, mais retourne la valeur même vide (pas NULL) */
-function escForce(val) {
+function _escForce(val) {
   if (val === null || val === undefined) return "''";
   const str = String(val).trim();
   return `'${str.replace(/'/g, "''")}'`;
@@ -101,7 +101,7 @@ function parseEquipments(typeContrat) {
   if (!typeContrat || typeof typeContrat !== 'string') return [];
   const result = [];
   // Séparer par + ou /
-  const parts = typeContrat.split(/\s*[+\/]\s*/);
+  const parts = typeContrat.split(/\s*[+/]\s*/);
 
   for (let part of parts) {
     part = part.trim().toUpperCase();

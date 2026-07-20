@@ -115,3 +115,21 @@ test('buildNoticeModel — sans matériel ni ABF ni pans → fallbacks propres, 
   assert.equal(m.insertion.abfProtege, false);
   assert.doesNotMatch(JSON.stringify(m), /undefined/);
 });
+
+test('healAddress — répare une adresse persistée partielle (dossiers pré-correctifs)', async () => {
+  const { healAddress } = await import('../src/apps/solaire/lib/dossierDocs.js');
+  const parsed = { numero: '7b', voie: 'Route des Bardis', lieudit: '', code_postal: '31320', localite: 'Rebigue' };
+  // n° resté dans la voie (ancien parseur) → extrait
+  assert.deepEqual(healAddress({ numero: '', voie: '7b Route des Bardis', lieudit: '', code_postal: '31320', localite: 'Rebigue' }, parsed), {
+    numero: '7b', voie: 'Route des Bardis', lieudit: '', code_postal: '31320', localite: 'Rebigue',
+  });
+  // champs vides → complétés depuis le libellé re-parsé
+  assert.deepEqual(healAddress({ numero: '', voie: '', lieudit: '', code_postal: '31320', localite: 'Rebigue' }, parsed), parsed);
+  assert.deepEqual(healAddress(null, parsed), parsed);
+  // une valeur saisie par l'utilisateur fait toujours foi (jamais écrasée)
+  assert.deepEqual(healAddress({ numero: '9', voie: 'Chemin Neuf', lieudit: 'Les Prés', code_postal: '81600', localite: 'Gaillac' }, parsed), {
+    numero: '9', voie: 'Chemin Neuf', lieudit: 'Les Prés', code_postal: '81600', localite: 'Gaillac',
+  });
+  // voie sans n° en tête : pas de fausse extraction (« 1er Boulevard » intact)
+  assert.equal(healAddress({ numero: '', voie: 'Route des Bardis' }, {}).numero, '');
+});

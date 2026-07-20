@@ -169,6 +169,33 @@ export function buildAutoconsoModel({ household, monthlyConsoTotals, baseShape, 
  * Les courbes ECS/VE des leviers de déphasage sont BORNÉES au talon (on ne déplace
  * que ce qui est réellement consommé à ces heures → jamais de conso négative).
  */
+/**
+ * Traduit l'état des toggles d'optimisation du wizard (`state.optim`) en modèle
+ * autoconso complet. SOURCE UNIQUE partagée par la section « Optimiser
+ * l'autoconsommation » (Résultats, live) ET la génération PDF (état FIGÉ au
+ * moment où le commercial valide l'étude) — garantit un rendu identique.
+ *
+ * `optim` = { persons, veBattery, pilotageEcs, veOn, veSimKm, pool, clim, batteryOn }.
+ * `ev` = state.ev (enabled/kmPerYear) — arbitre le mode VE : 'shift' (VE déjà au
+ * constat → on décale sa recharge) vs 'add' (VE en projet → on ajoute sa charge).
+ */
+export function buildOptimModel({ optim, ev, consoMonthly, baseShape, prodHourly }) {
+  const veArg = optim.veOn
+    ? (ev.enabled ? { mode: 'shift' } : { mode: 'add', kmPerYear: optim.veSimKm })
+    : null;
+  return buildAutoconsoModel({
+    household: {
+      persons: optim.persons,
+      veKmPerYear: ev.enabled ? (Number(ev.kmPerYear) || 0) : 0,
+      veBatteryKwh: optim.veBattery,
+    },
+    monthlyConsoTotals: consoMonthly,
+    baseShape,
+    prodHourly,
+    levers: { pilotageEcs: optim.pilotageEcs, ve: veArg, pool: optim.pool, clim: optim.clim, battery: optim.batteryOn },
+  });
+}
+
 function buildLeversModel({ household, monthlyConsoTotals, baseShape, prodHourly, cascade, levers }) {
   const talon = reconcileMonthly({ hourlyShape: baseShape, monthlyTargets: monthlyConsoTotals });
   const sc = (c) => computeSelfConsumption({ prodHourly, consoHourly: c });

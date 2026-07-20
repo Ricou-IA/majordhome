@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useMailCampaignStats } from '@hooks/useMailCampaignStats';
 import { formatDateTimeFR } from '@/lib/utils';
+import { CampaignRecipientsDrawer } from './CampaignRecipientsDrawer';
 
 /**
  * Onglet Stats — KPIs agrégés par campagne mailing.
@@ -11,6 +13,8 @@ export default function StatsTab() {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const { stats, isLoading, refetch } = useMailCampaignStats(orgId);
+  // Drill-down : { campaignName, mode } | null
+  const [drawer, setDrawer] = useState(null);
 
   if (isLoading) {
     return (
@@ -61,7 +65,11 @@ export default function StatsTab() {
           </thead>
           <tbody className="divide-y divide-secondary-100 bg-white">
             {stats.map((row) => (
-              <CampaignRow key={`${row.org_id}-${row.campaign_name}`} row={row} />
+              <CampaignRow
+                key={`${row.org_id}-${row.campaign_name}`}
+                row={row}
+                onDrill={(mode) => setDrawer({ campaignName: row.campaign_name, mode })}
+              />
             ))}
           </tbody>
         </table>
@@ -70,12 +78,22 @@ export default function StatsTab() {
       <div className="text-xs text-secondary-400 px-1">
         Open rate calculé sur les délivrés. Bounce / désabos / spam calculés sur les envois.
         Benchmarks B2C : open &gt;25% excellent · &gt;18% bon · click &gt;2,5% bon · bounce &lt;2% · spam &lt;0,1%.
+        <br />
+        Astuce : cliquez sur un chiffre Ouverts / Cliqués / Bounce / Désabos pour voir le détail des destinataires.
       </div>
+
+      <CampaignRecipientsDrawer
+        orgId={orgId}
+        campaignName={drawer?.campaignName}
+        mode={drawer?.mode}
+        isOpen={!!drawer}
+        onClose={() => setDrawer(null)}
+      />
     </div>
   );
 }
 
-function CampaignRow({ row }) {
+function CampaignRow({ row, onDrill }) {
   const sent = row.total_sent || 0;
   const delivered = row.total_delivered || 0;
   const opened = row.total_opened || 0;
@@ -104,16 +122,16 @@ function CampaignRow({ row }) {
         <span className="text-secondary-400">({fmtPct(deliveryRate)})</span>
       </td>
       <td className="px-4 py-3 text-sm text-right tabular-nums">
-        <Pct value={openRate} count={opened} thresholds={{ good: 25, ok: 18 }} />
+        <Pct value={openRate} count={opened} thresholds={{ good: 25, ok: 18 }} onClick={() => onDrill('opened')} />
       </td>
       <td className="px-4 py-3 text-sm text-right tabular-nums">
-        <Pct value={clickRate} count={clicked} thresholds={{ good: 2.5, ok: 1 }} />
+        <Pct value={clickRate} count={clicked} thresholds={{ good: 2.5, ok: 1 }} onClick={() => onDrill('clicked')} />
       </td>
       <td className="px-4 py-3 text-sm text-right tabular-nums">
-        <Pct value={bounceRate} count={bounced} thresholds={{ good: 1, ok: 2 }} reverse />
+        <Pct value={bounceRate} count={bounced} thresholds={{ good: 1, ok: 2 }} reverse onClick={() => onDrill('bounced')} />
       </td>
       <td className="px-4 py-3 text-sm text-right tabular-nums">
-        <Pct value={unsubRate} count={unsubscribed} thresholds={{ good: 0.5, ok: 1 }} reverse />
+        <Pct value={unsubRate} count={unsubscribed} thresholds={{ good: 0.5, ok: 1 }} reverse onClick={() => onDrill('unsubscribed')} />
       </td>
       <td className="px-4 py-3 text-sm text-right tabular-nums">
         <Pct value={complaintRate} count={complained} thresholds={{ good: 0.1, ok: 0.3 }} reverse />
@@ -137,14 +155,29 @@ function Th({ children, align = 'left' }) {
   );
 }
 
-function Pct({ value, count, thresholds, reverse = false }) {
+function Pct({ value, count, thresholds, reverse = false, onClick }) {
   const colorClass = colorFor(value, thresholds, reverse);
-  return (
-    <span>
+  const inner = (
+    <>
       <span className="text-secondary-700">{count.toLocaleString('fr-FR')}</span>{' '}
       <span className={`text-xs font-semibold ${colorClass}`}>({fmtPct(value)})</span>
-    </span>
+    </>
   );
+  // Cliquable uniquement si un handler est fourni ET qu'il y a au moins 1 destinataire
+  // (pas de drawer vide → on ne casse pas la confiance dans le chiffre).
+  if (onClick && count > 0) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title="Voir le détail des destinataires"
+        className="inline-flex items-center rounded px-1 -mx-1 hover:bg-secondary-100 hover:underline decoration-dotted underline-offset-2 transition-colors cursor-pointer"
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <span>{inner}</span>;
 }
 
 function colorFor(value, { good, ok }, reverse) {

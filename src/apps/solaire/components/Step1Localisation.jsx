@@ -261,7 +261,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
       {/* Écran large (xl) : carte dominante à gauche, saisie à droite. Tablette/mobile : empilé.
           Pas de sticky ici : la colonne carte dépasse le viewport → deux zones de scroll désynchronisées. */}
       <div className="grid grid-cols-1 xl:grid-cols-3 xl:items-start gap-5">
-        <div className="xl:col-span-2">
+        <div className="xl:col-span-2 space-y-5">
           {/* Localisation */}
           <div className="card space-y-4">
             <h2 className="font-semibold text-secondary-900">Localisation du logement</h2>
@@ -362,15 +362,12 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               </div>
             )}
           </div>
-        </div>
 
-        {/* Colonne saisie : pans tracés, panneau Toiture, cadastre */}
-        <div className="space-y-5">
-          {/* Pans cartographiés — comparaison (meilleur ensoleillement mis en avant) */}
+          {/* Pans cartographiés — sous la carte (comble le bas de colonne, lecture horizontale) */}
           {pans && pans.length > 0 && (
             <div className="card space-y-2">
               <h3 className="text-sm font-semibold text-secondary-900">Pans de toiture</h3>
-              <ul className="space-y-2">
+              <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
                 {pans.map((pan, i) => {
                   const isBest = pan.eY != null && bestEy != null && pan.eY === bestEy;
                   const isSelected = pan.id === selectedPanId;
@@ -414,7 +411,10 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
               </p>
             </div>
           )}
+        </div>
 
+        {/* Colonne saisie : panneau Toiture, cadastre */}
+        <div className="space-y-5">
           {/* Toiture — en mode éditeur (pans existants) = panneau du pan sélectionné, verrouillé */}
           <div className="card space-y-4">
             <div className="flex items-center justify-between">

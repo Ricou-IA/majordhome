@@ -18,9 +18,13 @@ import { toDbCadastre } from '../lib/cadastre';
 import { fetchPvgis1kwc } from '../lib/pvgis';
 import { percentToDegrees, orientationToAspect } from '../lib/pvEngine';
 import { buildEtudeModel } from '../lib/etudeModel';
+import { buildOptimModel } from '../lib/autoconsoModel';
+import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
 import { consoProfileHourly, pvgisExample } from '../data';
 import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
+import { buildSatelliteRoofModel } from '../lib/roofMapModel';
 import { generateEtudePdfBlob } from '../components/EtudePDF';
+import { SYNTHESE_MAP_SIZE } from '../components/etude/SynthesePage';
 import Step1Localisation from '../components/Step1Localisation';
 import Step2Consommation from '../components/Step2Consommation';
 import Step3Resultats from '../components/Step3Resultats';
@@ -155,6 +159,8 @@ function SimulateurInner({ config, settings }) {
           ev: state.ev,
           financing: state.financing,
           selectedKwc: results.selectedKwc,
+          // État figé des optimisations (démo autoconso) → régénère le MÊME PDF au rechargement.
+          optim: state.optim,
           // Snapshot wizard (restauration au rechargement ?sim=) — le dossier reste canonique pour les documents.
           cadastre: state.cadastre,
           abf: state.abf,
@@ -217,17 +223,43 @@ function SimulateurInner({ config, settings }) {
         prodShape: pvgisExample.hourly, baseShape: consoProfileHourly(state.conso.profile),
       });
       if (!model) throw new Error('Données incomplètes');
+      // Autoconsommation optimisée FIGÉE : reflète l'état courant des toggles de la
+      // section « Optimiser l'autoconsommation » (la démo que le commercial vient de
+      // faire au client). Source de calcul identique à l'écran (buildOptimModel).
+      const autoconso = buildOptimModel({
+        optim: state.optim,
+        ev: state.ev,
+        consoMonthly: model.consoMonthly,
+        baseShape: consoProfileHourly(state.conso.profile),
+        prodHourly: hourlyProdFromMonthly(state.pvgis.e_m, model.activeKwc, pvgisExample.hourly),
+      });
       const inputs = { roof: state.roof, conso: state.conso, ev: state.ev };
       const annexes = selectAnnexDocs(config, inputs);
       const company = buildCompanyInfo(settings);
+      // Vue satellite du toit (page synthèse) — best effort, jamais bloquante pour l'étude.
+      let roofMap = null;
+      try {
+        roofMap = await buildSatelliteRoofModel({
+          location: state.location,
+          cadastre: state.cadastre?.length ? toDbCadastre(state.cadastre) : null,
+          roofGeometry: state.pans?.length ? { source: 'drawn_pans', pans: state.pans } : state.roofGeometry,
+          panelsCount: model.activePanels,
+          ...SYNTHESE_MAP_SIZE,
+        });
+      } catch (roofErr) {
+        logger.warn('[solaire] vue satellite du toit indisponible pour l\'étude', roofErr);
+      }
       const studyBlob = await generateEtudePdfBlob({
-        model, config, company, inputs,
+        model, autoconso, config, company, inputs,
         meta: {
           clientName,
           clientAddress: state.location.address || '',
           dateLabel: formatDateFR(new Date()),
+          simRef: savedSim?.id ? savedSim.id.slice(0, 8).toUpperCase() : null,
         },
         annexLabels: annexes.map((d) => d.label),
+        roofMap,
+        material: state.material,
       });
       const finalBlob = await attachAnnexes(studyBlob, annexes);
       downloadBlob(finalBlob, buildEtudeFilename(clientName));
@@ -344,6 +376,7 @@ function SimulateurInner({ config, settings }) {
           }}
           onFinancing={(patch) => dispatch({ type: 'SET_FINANCING', patch })}
           onMaterial={(patch) => dispatch({ type: 'SET_MATERIAL', patch })}
+          onOptim={(patch) => dispatch({ type: 'SET_OPTIM', patch })}
           onBack={() => goToStep(2)}
           onSave={handleSave}
           isSaving={createSimulation.isPending}

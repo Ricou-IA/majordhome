@@ -22,6 +22,11 @@ const rasters = await img.readRasters();
 const data = rasters[0];
 console.log('dims', img.getWidth() + 'x' + img.getHeight(), '· bands', rasters.length,
   '· bitsPerSample', img.getBitsPerSample(), '· sampleFormat', img.getSampleFormat?.());
+// Géoréférence : confirme l'ordre d'axe + l'écho de bbox (risques spike #1/#2).
+console.log('bbox demandée   ', bbox);
+console.log('getBoundingBox  ', img.getBoundingBox());       // [minX,minY,maxX,maxY]
+console.log('getOrigin (TL)  ', img.getOrigin());            // coin haut-gauche
+console.log('getResolution   ', img.getResolution());        // [resX, resY] (resY<0 si Nord en haut)
 let min = Infinity, max = -Infinity, sum = 0, n = 0;
 for (const v of data) { if (Number.isFinite(v) && v > -1000) { min = Math.min(min, v); max = Math.max(max, v); sum += v; n++; } }
 console.log('ÉLÉVATION min/max/moy (m)', min.toFixed(2), '/', max.toFixed(2), '/', (sum / n).toFixed(2), '· pixels', n);

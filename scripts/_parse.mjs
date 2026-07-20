@@ -9,7 +9,7 @@ for(const t of tables){
     const req=def.required||[];
     for(const[c,i]of Object.entries(def.properties)){
       const parts=[c,i.format+"("+i.type+")",req.includes(c)?"NOT NULL":"nullable"];
-      if(i.default\!==undefined)parts.push("default="+JSON.stringify(i.default));
+      if(i.default!==undefined)parts.push("default="+JSON.stringify(i.default));
       if(i.description)parts.push(i.description);
       if(i.maxLength)parts.push("maxLen="+i.maxLength);
       if(i.enum)parts.push("enum="+JSON.stringify(i.enum));

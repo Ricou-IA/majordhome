@@ -1,7 +1,7 @@
 // scripts/verify-permissions-registry.mjs
 // Vérifie la structure du registre + des cas de résolution clés.
 // Lancement : node scripts/verify-permissions-registry.mjs
-import { REGISTRY, EDITABLE_ROLES, resolvePermission, appDefault, tableScope, iterAppDefaults }
+import { REGISTRY, EDITABLE_ROLES, resolvePermission, tableScope, iterAppDefaults }
   from '../src/lib/permissionsRegistry.js';
 import { hasPermission } from '../src/lib/permissions.js';
 

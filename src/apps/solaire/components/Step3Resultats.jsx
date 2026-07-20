@@ -17,7 +17,7 @@ import AutoconsoOptimizationSection from './AutoconsoOptimizationSection';
 import { consoProfileHourly, pvgisExample } from '../data';
 
 export default function Step3Resultats({
-  state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onMaterial,
+  state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onMaterial, onOptim,
   onBack, onSave, isSaving, onGeneratePdf, isGeneratingPdf, defaultClientName,
   dossierSim, onOpenDossier,
 }) {
@@ -243,7 +243,7 @@ export default function Step3Resultats({
 
       {/* Optimiser l'autoconsommation — chapitre pleine largeur (démo client + détail des calculs).
           Moteur horaire additif : n'altère pas buildEtudeModel. */}
-      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} />
+      <AutoconsoOptimizationSection consoMonthly={model.consoMonthly} eM={pvgis.e_m} activeKwc={model.activeKwc} ev={ev} baseShape={baseShape} optim={state.optim} onOptim={onOptim} />
 
       {/* Financement — chapitre pleine largeur : module + tableau annuel (qui en dépend) */}
       <FinancingModule

@@ -11,15 +11,22 @@ import { usePvSimulations, usePvSimulationMutations } from '@hooks/usePvSimulati
 import { usePvDossiersBySimulations } from '@hooks/usePvDossier';
 import { useDebounce } from '@hooks/useDebounce';
 import { pvService } from '@services/pv.service';
+import { pvDossierService } from '@services/pvDossier.service';
+import { logger } from '@lib/logger';
 import { SearchBar } from '@apps/artisan/components/shared/SearchBar';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { formatDateShortFR, formatDateFR, formatEuro } from '@lib/utils';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { buildPvConfig } from '../lib/pvConfig';
 import { buildEtudeModel } from '../lib/etudeModel';
+import { buildOptimModel } from '../lib/autoconsoModel';
+import { hourlyProdFromMonthly } from '../lib/autoconsoEngine';
 import { consoProfileHourly, pvgisExample } from '../data';
 import { selectAnnexDocs, attachAnnexes, buildEtudeFilename, downloadBlob } from '../lib/etudeExport';
+import { buildSatelliteRoofModel } from '../lib/roofMapModel';
+import { toDbCadastre } from '../lib/cadastre';
 import { generateEtudePdfBlob } from '../components/EtudePDF';
+import { SYNTHESE_MAP_SIZE } from '../components/etude/SynthesePage';
 import { PV_DOSSIER_STATUS_LABELS } from '../lib/pvDossierStatus';
 import DossierDrawer from '../components/dossier/DossierDrawer';
 
@@ -60,18 +67,50 @@ export default function Historique() {
         prodShape: pvgisExample.hourly, baseShape: consoProfileHourly(sim.inputs.conso?.profile),
       });
       if (!model) throw new Error('Données incomplètes');
+      // Autoconsommation optimisée FIGÉE (état des leviers persisté au save) → régénère
+      // la MÊME page « Optimiser l'autoconsommation ». Simus antérieures sans `optim` :
+      // pas d'autoconso → page optimisation simplement absente (dégradation propre).
+      const autoconso = sim.inputs.optim
+        ? buildOptimModel({
+            optim: sim.inputs.optim,
+            ev: sim.inputs.ev,
+            consoMonthly: model.consoMonthly,
+            baseShape: consoProfileHourly(sim.inputs.conso?.profile),
+            prodHourly: hourlyProdFromMonthly(sim.pvgis_monthly.e_m, model.activeKwc, pvgisExample.hourly),
+          })
+        : undefined;
       const inputs = { roof: sim.inputs.roof, conso: sim.inputs.conso, ev: sim.inputs.ev };
       const annexes = selectAnnexDocs(config, inputs);
+      // Vue satellite du toit (page synthèse) : géométries depuis le dossier PV (canonique),
+      // fallback snapshot wizard — best effort, jamais bloquante pour l'étude.
+      let roofMap = null;
+      let material = sim.inputs.material ?? null;
+      try {
+        const { data: dossier } = await pvDossierService.getBySimulation(orgId, simRow.id);
+        material = dossier?.material ?? material;
+        roofMap = await buildSatelliteRoofModel({
+          location: sim.inputs.location,
+          cadastre: dossier?.cadastre ?? (sim.inputs.cadastre?.length ? toDbCadastre(sim.inputs.cadastre) : null),
+          roofGeometry: dossier?.roof_geometry,
+          panelsCount: model.activePanels,
+          ...SYNTHESE_MAP_SIZE,
+        });
+      } catch (roofErr) {
+        logger.warn('[solaire] vue satellite du toit indisponible pour l\'étude', roofErr);
+      }
       const studyBlob = await generateEtudePdfBlob({
-        model, config,
+        model, autoconso, config,
         company: buildCompanyInfo(settings),
         inputs,
         meta: {
           clientName: sim.client_name || 'Client',
           clientAddress: sim.client_address || '',
           dateLabel: formatDateFR(sim.created_at),
+          simRef: sim.id ? sim.id.slice(0, 8).toUpperCase() : null,
         },
         annexLabels: annexes.map((d) => d.label),
+        roofMap,
+        material,
       });
       const finalBlob = await attachAnnexes(studyBlob, annexes);
       downloadBlob(finalBlob, buildEtudeFilename(sim.client_name));

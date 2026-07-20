@@ -85,6 +85,12 @@ const ABF_CHECKBOX_BY_SUPTYPE = {
   ac4: 'X2R_remarquable', // site patrimonial remarquable
 };
 
+// Bordereau des pièces jointes ← pièces effectivement générées (tranche 3).
+const BORDEREAU_CHECKBOX_BY_PIECE = {
+  dpc1: 'P5PA2', // plan de situation
+  dpc2: 'P5PB1', // plan de masse
+};
+
 const put = (obj, key, value) => {
   const v = value == null ? '' : String(value).trim();
   if (v) obj[key] = v;
@@ -94,7 +100,7 @@ const put = (obj, key, value) => {
  * Données du dossier → champs du CERFA 16702*03.
  * @returns {{ text: Record<string,string>, checks: string[], overflowParcelles: boolean }}
  */
-export function buildCerfaFields({ declarant, terrain, parcelles, abf, description, todayIso, signedAtIso, signatureLieu }) {
+export function buildCerfaFields({ declarant, terrain, parcelles, abf, description, todayIso, signedAtIso, signatureLieu, piecesPresentes }) {
   const text = {};
   const checks = [];
 
@@ -151,6 +157,12 @@ export function buildCerfaFields({ declarant, terrain, parcelles, abf, descripti
   // --- 5. Périmètres de protection connus via le GPU ---
   for (const p of abf?.protections ?? []) {
     const box = ABF_CHECKBOX_BY_SUPTYPE[String(p.suptype ?? '').toLowerCase()];
+    if (box && !checks.includes(box)) checks.push(box);
+  }
+
+  // --- Bordereau des pièces jointes : cochées uniquement si la pièce est réellement générée ---
+  for (const piece of piecesPresentes ?? []) {
+    const box = BORDEREAU_CHECKBOX_BY_PIECE[String(piece).toLowerCase()];
     if (box && !checks.includes(box)) checks.push(box);
   }
 

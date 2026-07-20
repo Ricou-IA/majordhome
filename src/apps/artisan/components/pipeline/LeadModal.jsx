@@ -791,7 +791,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       const [apptRes, mailRes, interactRes] = await Promise.all([
         supabase.from('majordhome_appointments').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
         supabase.from('majordhome_mailing_logs').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
-        supabase.schema('majordhome').from('lead_interactions').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
+        supabase.from('majordhome_lead_interactions').select('id', { count: 'exact', head: true }).eq('lead_id', leadId),
       ]);
       setHardDeleteCounts({
         appointments: apptRes.count ?? 0,

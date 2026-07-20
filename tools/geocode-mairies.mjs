@@ -15,7 +15,7 @@ const API = 'https://api-adresse.data.gouv.fr/search/';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sqlStr = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 
-const raw = readFileSync(CSV, 'utf8').replace(/^﻿/, '');
+const raw = readFileSync(CSV, 'utf8').replace(/^\uFEFF/, ''); // strip BOM
 const lines = raw.split(/\r?\n/).filter((l) => l.trim());
 lines.shift(); // header
 

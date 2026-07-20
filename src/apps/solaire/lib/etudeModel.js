@@ -138,14 +138,25 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     : null;
   // Type ROCE — rendement de l'actif : économie ÷ coût total, indépendant du financement
   const assetYieldYear1 = totalCost ? economyYear1 / totalCost : null;
+  // Projection année par année (1 seule boucle) : économie, coût élec « sans »
+  // (facture inflatée) et « avec » (sans − économie). Sert au comparatif moyen
+  // ET au graphe année-par-année du PDF (page Coûts). Surplus toujours à 0 €.
   let horizonEconomies = 0;
+  let horizonCostWithout = 0;
+  const costSeries = [];
   for (let n = 1; n <= config.horizon_years; n++) {
-    horizonEconomies += yearlyEconomy({
+    const eco = yearlyEconomy({
       autoconsoAnnual: active.totals.autoconso, priceKwh,
       inflationRate: config.inflation_rate, degradationRate: config.degradation_rate, yearN: n,
     });
+    const costWithout = active.totals.conso * priceKwh * (1 + config.inflation_rate) ** (n - 1);
+    horizonEconomies += eco;
+    horizonCostWithout += costWithout;
+    costSeries.push({ year: n, costWithout, costWith: Math.max(0, costWithout - eco), economy: eco });
   }
   const assetYieldAvg = totalCost ? horizonEconomies / config.horizon_years / totalCost : null;
+  const avgAnnualCostWithout = horizonCostWithout / config.horizon_years;
+  const avgAnnualCostWith = avgAnnualCostWithout - horizonEconomies / config.horizon_years;
   // Type ROE — rendement des fonds propres : gain net après crédit ÷ apport.
   // Apport 0 = effet de levier maximal (aucun capital immobilisé), ROE non défini.
   const netGainYear1 = table ? -table.rows[0].effortNet : null;
@@ -184,6 +195,9 @@ export function buildEtudeModel({ roof, conso, ev, financing, selectedKwc, pvgis
     breakEvenAutoconsoRate,
     assetYieldYear1,
     assetYieldAvg,
+    costSeries,
+    avgAnnualCostWithout,
+    avgAnnualCostWith,
     netGainYear1,
     equityYieldYear1,
     fullCredit,

@@ -1,11 +1,15 @@
 // src/apps/solaire/components/Step2Consommation.jsx
-// Étape 2 du wizard : les HYPOTHÈSES d'abord (profil RES1/RES2 puis VE en 3 états
-// Pas de VE / En projet / Déjà équipé), ensuite les 12 consommations mensuelles,
-// puis le prix kWh. Le profil pilote le talon horaire du constat d'autoconso ET la
-// répartition « depuis l'annuel » ; l'hypothèse VE conditionne cette répartition
-// (déjà équipé = part lissée) et le calcul (en projet = ajouté au modèle).
-import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Wand2 } from 'lucide-react';
+// Étape 2 du wizard : le MODE d'enregistrement d'abord (Réel = 12 relevés factures /
+// Schéma Enedis = annuel réparti selon la silhouette du profil), puis les hypothèses
+// (profil RES1/RES2, VE en 3 états Pas de VE / En projet / Déjà équipé), la grille
+// mensuelle (éditable en Réel, dérivée en Schéma), enfin le prix kWh.
+// Règle VE (Enedis ne publie pas de schéma avec VE) :
+//   - Déjà équipé + Schéma : part VE DÉDUITE de l'annuel → solde réparti selon le
+//     schéma → part VE ré-ajoutée LISSÉE sur 12 mois (recharge non saisonnière).
+//   - Déjà équipé + Réel : déjà dans les factures, rien à faire.
+//   - En projet (les 2 modes) : la surconsommation VE est ajoutée au modèle (moteur).
+import { useEffect } from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { evMonthlyConsumption } from '../lib/pvEngine';
 import { monthlyFromHourly } from '../lib/autoconsoEngine';
@@ -15,9 +19,17 @@ const MONTH_LABELS = ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Ao
 
 const PROFILE_LIST = [CONSO_PROFILES.RES1, CONSO_PROFILES.RES2];
 
+/** Annuel → 12 mois : solde (hors part VE lissée) selon la silhouette Enedis du profil. */
+function spreadFromAnnual({ total, profileKey, evFlatAnnual }) {
+  const shares = monthlyFromHourly(consoProfileHourly(profileKey)); // Σ = 1
+  const evFlat = Math.min(evFlatAnnual, total);
+  const rest = total - evFlat;
+  return shares.map((w) => Math.round(rest * w + evFlat / 12));
+}
+
 export default function Step2Consommation({ conso, ev, config, onConso, onEv, onBack, onNext }) {
-  const [annualInput, setAnnualInput] = useState('');
-  const [showSpread, setShowSpread] = useState(false);
+  const source = conso.source ?? 'reel'; // rétro-compat : simulations sans le champ = saisie réelle
+  const isSchema = source === 'annuel';
 
   const setMonth = (index, value) => {
     const n = value === '' ? '' : Number(value);
@@ -33,22 +45,31 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
       }) * 12)
     : 0;
 
-  // Répartit l'annuel selon la silhouette mensuelle du profil sélectionné (Σ des
-  // poids = 1, dérivée du talon Enedis RES1/RES2) — plus fidèle qu'un profil générique.
-  // VE « déjà équipé » : sa part (recharge domicile, non saisonnière) est DANS le total
-  // mais ne suit pas la silhouette Enedis → lissée uniformément, le reste suit le profil.
-  const applySpread = () => {
-    const total = Number(annualInput);
-    if (!Number.isFinite(total) || total <= 0) return;
-    const shares = monthlyFromHourly(consoProfileHourly(conso.profile)); // Σ = 1
-    const evFlatAnnual = ev.enabled && ev.owned ? Math.min(evAnnual, total) : 0;
-    const rest = total - evFlatAnnual;
-    onConso({ monthly: shares.map((w) => Math.round(rest * w + evFlatAnnual / 12)) });
-    setShowSpread(false);
-    setAnnualInput('');
-  };
-
   const totalAnnual = conso.monthly.reduce((a, v) => a + (Number(v) || 0), 0);
+
+  // Mode Schéma : la grille mensuelle est DÉRIVÉE en continu de (annuel, profil, VE).
+  // « Déjà équipé » : sa part (recharge domicile, non saisonnière) est DANS le total
+  // mais ne suit pas la silhouette Enedis → déduite, solde réparti, part ré-ajoutée lissée.
+  const annualTarget = Number(conso.annualKwh);
+  useEffect(() => {
+    if (!isSchema || !Number.isFinite(annualTarget) || annualTarget <= 0) return;
+    const monthly = spreadFromAnnual({
+      total: annualTarget,
+      profileKey: conso.profile,
+      evFlatAnnual: ev.enabled && ev.owned ? evAnnual : 0,
+    });
+    if (monthly.some((v, i) => v !== Number(conso.monthly[i]))) onConso({ monthly });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSchema, annualTarget, conso.profile, ev.enabled, ev.owned, evAnnual]);
+
+  // Bascule vers le mode Schéma : pré-remplit l'annuel avec le total courant (si absent).
+  const switchSource = (next) => {
+    if (next === 'annuel' && !Number(conso.annualKwh) && totalAnnual > 0) {
+      onConso({ source: next, annualKwh: totalAnnual });
+    } else {
+      onConso({ source: next });
+    }
+  };
   const allMonthsFilled = conso.monthly.every((v) => v !== '' && Number.isFinite(Number(v)) && Number(v) >= 0);
   const priceOk = Number.isFinite(Number(conso.priceKwh)) && Number(conso.priceKwh) > 0;
 
@@ -59,15 +80,31 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
     <div className="space-y-5">
       {/* Consommation mensuelle */}
       <div className="card space-y-4">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="font-semibold text-secondary-900">Consommation mensuelle (kWh)</h2>
-          <button
-            onClick={() => setShowSpread((s) => !s)}
-            className="flex items-center gap-1.5 text-sm font-medium text-primary-700 hover:text-primary-800"
-          >
-            <Wand2 className="w-4 h-4" /> Répartir depuis l'annuel
-          </button>
-        </div>
+        <h2 className="font-semibold text-secondary-900">Consommation (kWh)</h2>
+
+        {/* Mode d'enregistrement — pilote l'éditabilité de la grille mensuelle */}
+        <FormField label="Enregistrement de la consommation">
+          <div className="grid sm:grid-cols-2 gap-2">
+            {[
+              { key: 'reel', title: 'Relevés réels', hint: '12 mois saisis depuis les factures / Enedis' },
+              { key: 'annuel', title: 'Schéma Enedis', hint: 'total annuel réparti selon le profil' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => switchSource(opt.key)}
+                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  source === opt.key
+                    ? 'border-primary-600 bg-primary-50 text-primary-800'
+                    : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-400'
+                }`}
+              >
+                <span className="block text-sm font-medium">{opt.title}</span>
+                <span className="block text-xs text-secondary-500">{opt.hint}</span>
+              </button>
+            ))}
+          </div>
+        </FormField>
 
         {/* Profil AVANT la saisie : il pilote la répartition depuis l'annuel ET le talon horaire */}
         <FormField label="Profil de consommation">
@@ -122,7 +159,9 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
             <div className="mt-3 space-y-3">
               <p className="text-xs text-secondary-500">
                 {ev.owned
-                  ? 'Sa consommation est déjà dans vos factures — rien n’est ajouté au calcul. « Répartir depuis l’annuel » lisse sa part uniformément sur l’année (la recharge n’est pas saisonnière), le reste suit le profil Enedis.'
+                  ? (isSchema
+                      ? 'Le schéma Enedis ne connaît pas le VE : sa part est déduite du total annuel, le solde suit le schéma, puis la part VE est ré-ajoutée lissée sur 12 mois (la recharge n’est pas saisonnière).'
+                      : 'Sa consommation est déjà dans vos relevés — rien n’est ajouté au calcul.')
                   : 'Véhicule non reflété dans les factures — sa surconsommation est ajoutée au modèle.'}
               </p>
               <div className="grid grid-cols-2 gap-4">
@@ -182,19 +221,25 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
           )}
         </FormField>
 
-        {showSpread && (
-          <div className="flex items-center gap-2 bg-secondary-50 rounded-lg p-3">
+        {isSchema && (
+          <FormField label="Consommation annuelle totale (kWh, factures)">
             <input
               type="number"
               inputMode="numeric"
               className={inputClass}
-              placeholder="Total annuel kWh (ex : 12000)"
-              value={annualInput}
+              placeholder="ex : 12000"
+              value={conso.annualKwh ?? ''}
               min={0}
-              onChange={(e) => setAnnualInput(e.target.value)}
+              onChange={(e) => {
+                const n = e.target.value === '' ? '' : Number(e.target.value);
+                onConso({ annualKwh: Number.isNaN(n) ? '' : n });
+              }}
             />
-            <button onClick={applySpread} className="btn-primary flex-shrink-0">Appliquer</button>
-          </div>
+            <p className="text-xs text-secondary-500 mt-1">
+              Répartie selon le schéma Enedis du profil sélectionné
+              {ev.enabled && ev.owned ? ' (part VE déduite puis lissée)' : ''} — la grille ci-dessous est calculée automatiquement.
+            </p>
+          </FormField>
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-3">
@@ -206,6 +251,7 @@ export default function Step2Consommation({ conso, ev, config, onConso, onEv, on
                 className={inputClass}
                 value={conso.monthly[i] ?? ''}
                 min={0}
+                disabled={isSchema}
                 onChange={(e) => setMonth(i, e.target.value)}
               />
             </FormField>

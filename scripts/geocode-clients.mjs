@@ -80,7 +80,7 @@ async function fetchUngeocodedClients() {
   let offset = 0;
   const pageSize = 1000;
 
-  while (true) {
+  for (;;) {
     const { data, error } = await query.range(offset, offset + pageSize - 1);
     if (error) throw new Error(`Erreur Supabase: ${error.message}`);
     if (!data || data.length === 0) break;
@@ -289,7 +289,7 @@ async function main() {
 
   const allResults = [];
   let batchNum = 0;
-  let failedSingle = 0;
+  let _failedSingle = 0;
 
   for (let i = 0; i < clients.length; i += BATCH_SIZE) {
     const batch = clients.slice(i, i + BATCH_SIZE);
@@ -307,7 +307,7 @@ async function main() {
       for (const client of batch) {
         const r = await geocodeSingle(client);
         if (r) results.push(r);
-        else failedSingle++;
+        else _failedSingle++;
         await sleep(100);
       }
     }
