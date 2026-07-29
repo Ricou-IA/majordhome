@@ -17,6 +17,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { contractsService } from '@services/contracts.service';
 import { equipmentsService } from '@services/equipments.service';
+import { savService } from '@services/sav.service';
 import { useCertificatChildren, useCertificatEntretienMutations } from '@hooks/useCertificatEntretien';
 import { useAuth } from '@/contexts/AuthContext';
 import { CertificatEquipmentRow } from './CertificatEquipmentRow';
@@ -43,13 +44,17 @@ export function CertificatsSection({ item, onCloseModal }) {
   const creatingRef = useRef(false);
   const selfHealRef = useRef(false);
 
+  // Contrat effectif : photo `contract_id` si posée, sinon contrat actif du client
+  // dérivé par la vue (migration 20260728_1). Voir EntretienSAVModal pour le détail.
+  const contractId = item?.effective_contract_id || item?.contract_id || null;
+
   // --- Charger les équipements du contrat (fallback: équipements du client) ---
   useEffect(() => {
-    if (!item?.contract_id) {
+    if (!contractId) {
       setEquipmentsLoading(false);
       return;
     }
-    contractsService.getContractEquipments(item.contract_id).then(async ({ data }) => {
+    contractsService.getContractEquipments(contractId).then(async ({ data }) => {
       if (data && data.length > 0) {
         setEquipments(data);
       } else if (item.client_id) {
@@ -59,7 +64,7 @@ export function CertificatsSection({ item, onCloseModal }) {
       }
       setEquipmentsLoading(false);
     });
-  }, [item?.contract_id, item?.client_id]);
+  }, [contractId, item?.client_id]);
 
   // --- Lazy create children si absents ---
   useEffect(() => {
@@ -76,9 +81,19 @@ export function CertificatsSection({ item, onCloseModal }) {
     createChildren(item.id, equipments, {
       projectId: item.project_id || item.client_project_id,
       clientId: item.client_id,
-      contractId: item.contract_id,
-    }).then(() => refetch());
-  }, [childrenLoading, equipmentsLoading, children.length, equipments.length, item, createChildren, refetch]);
+      contractId,
+    }).then(() => {
+      // Rattrapage de la photo : la carte a été créée avant que le contrat n'existe
+      // (ou avant qu'il ne passe en `active`). On grave le lien maintenant qu'il est
+      // dérivé et réellement utilisé — les certificats enfants viennent d'être créés
+      // dessus. Best effort : la vue continue de dériver si l'écriture échoue.
+      if (contractId && !item.contract_id) {
+        savService.updateFields(item.id, { contract_id: contractId })
+          .catch((err) => console.warn('[CertificatsSection] backfill contract_id:', err));
+      }
+      refetch();
+    });
+  }, [childrenLoading, equipmentsLoading, children.length, equipments.length, item, contractId, createChildren, refetch]);
 
   // --- Handlers ---
   const handleMarkNeant = useCallback(async (childId) => {

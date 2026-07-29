@@ -95,19 +95,27 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
 
   // --- Certificats multi-équipements ---
   const isEntretien = item?.intervention_type === 'entretien';
+
+  // Contrat EFFECTIF (vue `majordhome_entretien_sav`, migration 20260728_1) :
+  // `interventions.contract_id` n'est qu'une photo prise à la création de la carte.
+  // Elle est vide quand le contrat a été saisi APRÈS le RDV — la vue retombe alors
+  // sur le contrat actif du client. Tout ce qui suit doit consommer CETTE valeur,
+  // jamais `item.contract_id` brut, sinon la section certificats reste muette.
+  const contractId = item?.effective_contract_id || item?.contract_id || null;
+
   // Certificats : seulement une fois le RDV planifié (déclencheur de la suite),
   // pas en "Demande de contrat" ni "À planifier"
-  const showCertificatsSection = isEntretien && item?.contract_id
+  const showCertificatsSection = isEntretien && contractId
     && !['demande_contrat', 'a_planifier'].includes(item?.workflow_status);
 
   // Charger la date du dernier entretien réalisé via maintenance_visits (source de vérité)
   useEffect(() => {
-    if (!item?.contract_id) return;
+    if (!contractId) return;
 
     supabase
       .from('majordhome_maintenance_visits')
       .select('visit_date')
-      .eq('contract_id', item.contract_id)
+      .eq('contract_id', contractId)
       .eq('status', 'completed')
       .order('visit_date', { ascending: false })
       .limit(1)
@@ -116,23 +124,23 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
           setLastEntretienDate(data[0].visit_date);
         }
       });
-  }, [item?.contract_id]);
+  }, [contractId]);
 
   // Charger les équipements du contrat
   const [contractEquipments, setContractEquipments] = useState([]);
   useEffect(() => {
-    if (!item?.contract_id) return;
+    if (!contractId) return;
 
     supabase
       .from('majordhome_contract_pricing_items')
       .select('quantity, equipment_type_label')
-      .eq('contract_id', item.contract_id)
+      .eq('contract_id', contractId)
       .then(({ data }) => {
         if (data && data.length > 0) {
           setContractEquipments(data);
         }
       });
-  }, [item?.contract_id]);
+  }, [contractId]);
 
   // --- Dirty check : savoir si quelque chose a changé ---
   // (déclaré AVANT early return — règle React Hooks : ordre stable)
@@ -313,9 +321,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
         postal_code: item.client_postal_code,
         city: item.client_city,
         project_id: item.project_id,
-        has_active_contract: !!item.contract_id,
+        has_active_contract: !!contractId,
       },
-      contractId: item.contract_id,
+      contractId,
     });
   };
 
@@ -353,7 +361,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     const snapshot = {
       orgId,
       clientId: item.client_id,
-      contractId: item.contract_id || null,
+      contractId,
       projectId: item.project_id || item.client_project_id,
       scheduledDate: item.scheduled_date || null,
     };

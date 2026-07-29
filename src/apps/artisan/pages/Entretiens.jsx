@@ -203,11 +203,14 @@ export default function Entretiens() {
     queryFn: async () => {
       const { data } = await supabase
         .from('majordhome_entretien_sav')
-        .select('contract_id')
+        .select('effective_contract_id')
         .eq('org_id', orgId)
         .eq('intervention_type', 'entretien')
         .neq('workflow_status', 'realise');
-      return new Set((data || []).map(r => r.contract_id).filter(Boolean));
+      // Contrat EFFECTIF : une carte créée avant la saisie du contrat a `contract_id`
+      // NULL et serait absente du Set → l'outil de Programmation reproposerait de la
+      // planifier, créant une 2ᵉ carte pour le même contrat (migration 20260728_1).
+      return new Set((data || []).map(r => r.effective_contract_id).filter(Boolean));
     },
     enabled: !!orgId,
     staleTime: 30_000,

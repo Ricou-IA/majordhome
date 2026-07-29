@@ -100,7 +100,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
     const snapshot = {
       orgId,
       clientId: item.client_id,
-      contractId: item.contract_id || null,
+      contractId: item.effective_contract_id || item.contract_id || null,
       projectId: item.project_id || item.client_project_id,
       scheduledDate: item.scheduled_date || null,
     };
@@ -191,7 +191,9 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                 Web
               </span>
             )}
-            {item.tags?.includes('Contrat') && (
+            {/* `tags` est un marqueur figé à la création — vide si le contrat a été saisi
+                après. On retombe sur le contrat effectif dérivé par la vue. */}
+            {(item.tags?.includes('Contrat') || item.effective_contract_id) && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
                 Contrat
               </span>
@@ -224,8 +226,12 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             </div>
           )}
 
-          {/* Badge "Certificat à faire" — entretien + SAV avec entretien inclus uniquement */}
-          {(type === 'entretien' || (type === 'sav' && item.includes_entretien)) && item.workflow_status === 'planifie' && (
+          {/* Badge "Certificat à faire" — entretien + SAV avec entretien inclus uniquement.
+              Conditionné au contrat EFFECTIF (comme la section de la modale) : sans contrat
+              il n'y a pas d'équipements à certifier, et le badge promettait un écran vide. */}
+          {(type === 'entretien' || (type === 'sav' && item.includes_entretien))
+            && item.workflow_status === 'planifie'
+            && (item.effective_contract_id || item.contract_id) && (
             <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-[#1B4F72] text-white text-[10px] font-medium rounded-md">
               <ClipboardCheck className="w-3 h-3" />
               Certificat à faire

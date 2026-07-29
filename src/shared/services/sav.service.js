@@ -588,6 +588,10 @@ export const savService = {
       if (fields.includes_entretien !== undefined) updates.includes_entretien = !!fields.includes_entretien;
       if (fields.invoiced_at !== undefined) updates.invoiced_at = fields.invoiced_at;
       if (fields.scheduled_date !== undefined) updates.scheduled_date = fields.scheduled_date || null;
+      // Rattrapage du rattachement contrat (carte créée avant la saisie du contrat).
+      // Volontairement NON destructif : on ne pose que du renseigné, jamais de NULL —
+      // un détachement doit rester un geste explicite, pas un effet de bord.
+      if (fields.contract_id) updates.contract_id = fields.contract_id;
 
       if (Object.keys(updates).length === 0) {
         return { data: null, error: null };
