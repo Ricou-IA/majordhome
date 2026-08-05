@@ -57,6 +57,9 @@ interface AttachedQuote {
   pennylane_quote_id: number;
   pennylane_customer_id: number | null;
   quote_status: string | null;
+  quote_amount_ht: number | string | null;
+  quote_label: string | null;
+  quote_date: string | null;
   is_winning_quote: boolean;
   pdf_url: string | null;
   assigned_at: string;
@@ -80,10 +83,11 @@ function unwrapPennylaneResource<T>(
   return null;
 }
 
-// Seuil pipeline : devis < 1000€ HT = SAV/entretien hors pipeline commercial.
+// Seuil pipeline : devis < 500€ HT = SAV/entretien hors pipeline commercial.
 // Pas d'auto-attach pour ces devis (alignement constante frontend
 // PIPELINE_MIN_AMOUNT_HT dans QuoteCandidatesModal).
-const PIPELINE_MIN_AMOUNT_HT = 1000;
+// 2026-08-05 : descendu de 1000 à 500 (demande equipe — le SAV est sous 500).
+const PIPELINE_MIN_AMOUNT_HT = 500;
 
 // ---------------------------------------------------------------------------
 // Appel direct Pennylane (sans passer par pennylane-proxy)
@@ -277,7 +281,7 @@ async function syncOrgQuotes(
   const { data: attachedRows, error: aqErr } = await supabase
     .from("majordhome_lead_pennylane_quotes")
     .select(
-      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, is_winning_quote, pdf_url, assigned_at",
+      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, quote_amount_ht, quote_label, quote_date, is_winning_quote, pdf_url, assigned_at",
     )
     .eq("org_id", orgId)
     .is("ejected_at", null);
@@ -388,15 +392,31 @@ async function syncAttachedQuoteFields(
 
       const plStatus = plQuote.status ?? null;
       const plPdfUrl = plQuote.public_file_url ?? null;
+      const plAmountHt = plQuote.currency_amount_before_tax ?? null;
+      const plLabel = plQuote.quote_number || plQuote.label || null;
+      const plQuoteDate = plQuote.date ?? null;
+
       const statusDiffers = plStatus && plStatus !== aq.quote_status;
       const pdfDiffers = plPdfUrl && plPdfUrl !== aq.pdf_url;
+      // Comparaison numerique : quote_amount_ht revient en string depuis PostgREST.
+      const amountDiffers =
+        plAmountHt !== null && Number(plAmountHt) !== Number(aq.quote_amount_ht);
+      const labelDiffers = plLabel && plLabel !== aq.quote_label;
+      const dateDiffers = plQuoteDate && plQuoteDate !== aq.quote_date;
 
-      if (statusDiffers || pdfDiffers) {
-        const { error: updErr } = await supabase.rpc('pennylane_sync_update_quote_fields', {
-          p_quote_id: aq.id,
-          p_new_status: plStatus,
-          p_pdf_url: plPdfUrl,
-        });
+      if (statusDiffers || pdfDiffers || amountDiffers || labelDiffers || dateDiffers) {
+        const { data: updResult, error: updErr } = await supabase.rpc(
+          'pennylane_sync_update_quote_fields',
+          {
+            p_quote_id: aq.id,
+            p_new_status: plStatus,
+            p_pdf_url: plPdfUrl,
+            p_amount_ht: plAmountHt,
+            p_label: plLabel,
+            p_quote_date: plQuoteDate,
+            p_pipeline_min_ht: PIPELINE_MIN_AMOUNT_HT,
+          },
+        );
 
         if (updErr) {
           console.warn(
@@ -405,6 +425,12 @@ async function syncAttachedQuoteFields(
           );
         } else {
           updates++;
+          if (updResult?.revision) {
+            console.log(
+              `[pennylane-sync] revision quote ${aq.pennylane_quote_id}: ` +
+                `delta ${updResult.amount_delta}€ (${updResult.source}) flags=${JSON.stringify(updResult.anomaly_flags)}`,
+            );
+          }
         }
       }
     } catch (e) {
