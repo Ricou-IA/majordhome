@@ -32,7 +32,9 @@ const PENNYLANE_BASE_URL =
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
-const LEAD_THRESHOLD_HT = 1000;
+// 2026-08-05 : descendu de 1000 a 500 (demande equipe — le SAV est sous 500).
+// Aligne sur PIPELINE_MIN_AMOUNT_HT (QuoteCandidatesModal, pennylane-sync-quote-status).
+const LEAD_THRESHOLD_HT = 500;
 
 const plHeaders = {
   Authorization: `Bearer ${PENNYLANE_API_TOKEN}`,
