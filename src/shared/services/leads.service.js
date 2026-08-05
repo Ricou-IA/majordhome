@@ -69,6 +69,7 @@ export const ACTIVITY_CONFIG = {
   followup: { icon: 'PhoneForwarded', color: 'bg-purple-100 text-purple-700' },
   email_sent: { icon: 'Mail', color: 'bg-blue-100 text-blue-700' },
   email_received: { icon: 'MailOpen', color: 'bg-blue-100 text-blue-700' },
+  quote_revised: { icon: 'FileText', color: 'bg-amber-100 text-amber-700' },
 };
 
 // ============================================================================

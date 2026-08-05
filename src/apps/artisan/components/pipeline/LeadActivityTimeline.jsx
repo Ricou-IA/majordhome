@@ -17,6 +17,7 @@ import {
   Phone,
   Mail,
   MailOpen,
+  FileText,
   Loader2,
   Send,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ const ICON_MAP = {
   Phone,
   Mail,
   MailOpen,
+  FileText,
 };
 
 /**
