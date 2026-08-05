@@ -23,6 +23,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
+import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
+import { buildExplorerRows } from '@/lib/quotesExplorer';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================
@@ -1348,9 +1350,119 @@ function formatQuoteForCandidate(q, customer) {
 }
 
 /**
+ * Scan unique des devis PL de la fenêtre, enrichi des rattachements et des
+ * écartements. Alimente À LA FOIS le compteur Dashboard et la page /devis
+ * (même queryKey) — un compteur calculé à part dériverait des filtres de la
+ * liste et le voyant perdrait toute crédibilité.
+ *
+ * Tout le raisonnement métier (allowlist statuts, seuil, fenêtre, tri, tagging
+ * orphelin/écarté) vit dans `buildExplorerRows` (module pur testé). Cette
+ * fonction ne fait QUE de l'I/O — ne jamais y réintroduire de filtre.
+ *
+ * ⚠️ orgId = org CORE (useAuth().organization.id) : c'est ce que porte
+ * lead_pennylane_quotes.org_id. NE PAS passer par getMajordhomeOrgId().
+ *
+ * @param {string} orgId
+ * @param {object} [opts]
+ * @param {number} [opts.sinceDays=90]
+ * @returns {Promise<{rows: Array, truncated: boolean, scanned: number}>}
+ */
+async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
+  if (!orgId) return { rows: [], truncated: false, scanned: 0 };
+
+  // 1. Rattachements actifs (org core) → Map<quote_pl_id, {lead_id}>
+  const { data: links } = await supabase
+    .from('majordhome_lead_pennylane_quotes')
+    .select('pennylane_quote_id, lead_id')
+    .eq('org_id', orgId)
+    .is('ejected_at', null);
+
+  const linkByQuoteId = new Map();
+  for (const l of links || []) {
+    linkByQuoteId.set(Number(l.pennylane_quote_id), { lead_id: l.lead_id, lead_name: null });
+  }
+
+  // 2. Noms des leads rattachés (1 requête, pas N)
+  const leadIds = [...new Set([...linkByQuoteId.values()].map(v => v.lead_id).filter(Boolean))];
+  if (leadIds.length > 0) {
+    const { data: leads } = await supabase
+      .from('majordhome_leads')
+      .select('id, first_name, last_name')
+      .in('id', leadIds);
+    const nameById = new Map(
+      (leads || []).map(l => [l.id, [l.first_name, l.last_name].filter(Boolean).join(' ').trim() || null]),
+    );
+    for (const v of linkByQuoteId.values()) {
+      v.lead_name = nameById.get(v.lead_id) || null;
+    }
+  }
+
+  // 3. Écartements
+  const { data: dismissals } = await supabase
+    .from('majordhome_pennylane_quote_dismissals')
+    .select('pennylane_quote_id')
+    .eq('org_id', orgId);
+  const dismissedIds = new Set((dismissals || []).map(d => Number(d.pennylane_quote_id)));
+
+  // 4. Scan paginé /quotes (même plafond que getUnlinkedQuotes)
+  const allQuotes = [];
+  let cursor = null;
+  let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 10;
+
+  while (hasMore && pageCount < MAX_PAGES) {
+    let path = '/quotes?limit=100';
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+    const result = await apiCall('GET', path);
+    const items = result?.items || [];
+    allQuotes.push(...items);
+    hasMore = result?.has_more && !!result?.next_cursor;
+    cursor = result?.next_cursor || null;
+    pageCount++;
+  }
+
+  // truncated = le scan s'est arrêté sur le plafond alors que PL en avait encore.
+  // Doit être affiché (règle « pas de cap muet »).
+  const truncated = hasMore;
+
+  // 5. Noms clients (la LISTE /quotes n'embarque que customer.id — cf ef7c175)
+  const namesById = await resolveCustomerNames(orgId, allQuotes.map(q => q.customer?.id));
+
+  const formatted = allQuotes.map(q => ({
+    id: q.id,
+    quote_number: q.quote_number || q.label || null,
+    label: q.label || null,
+    subject: q.pdf_invoice_subject || null,
+    date: q.date || null,
+    amount_ht: q.currency_amount_before_tax ?? null,
+    amount_ttc: q.amount ?? q.currency_amount ?? null,
+    status: q.status || null,
+    pdf_url: q.public_file_url || null,
+    customer_id: q.customer?.id || null,
+    customer_name: formatPennylaneCustomerName(q.customer)
+      || (q.customer?.id ? namesById.get(String(q.customer.id)) : null)
+      || null,
+  }));
+
+  const rows = buildExplorerRows({
+    quotes: formatted,
+    linkByQuoteId,
+    dismissedIds,
+    minAmountHt: PIPELINE_MIN_AMOUNT_HT,
+    sinceDays,
+  });
+
+  return { rows, truncated, scanned: allQuotes.length };
+}
+
+/**
  * Devis PL des N derniers jours sans rattachement actif en MDH.
- * Sert à la section "Explorer les devis non rattachés" de QuoteCandidatesModal
- * et au calcul de `countUnlinkedQuotes` (voyant de discipline).
+ * Sert à la section "Explorer les devis non rattachés" de QuoteCandidatesModal.
+ *
+ * Volontairement distinct de `getQuotesExplorer` : fenêtre (60 j) et plafond
+ * `limit` propres, aucun filtre statut/montant. Ne PAS le réécrire par-dessus
+ * l'explorateur — ça changerait le comportement de QuoteCandidatesModal.
  *
  * Note : `since_days` filtre sur `quote.date` (date du devis Pennylane), pas
  * sur `assigned_at` (qui n'existe que si déjà rattaché).
@@ -1435,60 +1547,6 @@ async function getUnlinkedQuotes(orgId, { sinceDays = 60, limit = 100 } = {}) {
       || (q.customer?.id ? namesById.get(String(q.customer.id)) : null)
       || null,
   }));
-}
-
-/**
- * Compteur "devis PL non rattachés des N derniers jours".
- * Voyant de discipline org_admin (Dashboard + Pipeline header).
- *
- * Variante minimale : pagine /quotes + filtre attached set, RIEN d'autre.
- * Pas de fetch /customers/{id} (le compteur n'a pas besoin des noms).
- * Plafond `softCap` pour éviter timeout edge function et capper l'usage proxy
- * — au-delà on retourne `softCap` (le voyant doit juste signaler "beaucoup").
- *
- * @param {string} orgId
- * @param {object} [opts]
- * @param {number} [opts.sinceDays=30]
- * @param {number} [opts.softCap=500]
- * @returns {Promise<number>}
- */
-async function countUnlinkedQuotes(orgId, { sinceDays = 30, softCap = 500 } = {}) {
-  if (!orgId) return 0;
-
-  const { data: existingLinks } = await supabase
-    .from('majordhome_lead_pennylane_quotes')
-    .select('pennylane_quote_id')
-    .eq('org_id', orgId)
-    .is('ejected_at', null);
-  const attachedSet = new Set((existingLinks || []).map(l => l.pennylane_quote_id));
-
-  const cutoffMs = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
-  let cursor = null;
-  let hasMore = true;
-  let pageCount = 0;
-  let count = 0;
-  const MAX_PAGES = 10;
-
-  while (hasMore && pageCount < MAX_PAGES && count < softCap) {
-    let path = '/quotes?limit=100';
-    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
-    const result = await apiCall('GET', path);
-    const items = result?.items || [];
-    for (const q of items) {
-      if (attachedSet.has(q.id)) continue;
-      if (q.date) {
-        const d = new Date(q.date).getTime();
-        if (!Number.isNaN(d) && d < cutoffMs) continue;
-      }
-      count++;
-      if (count >= softCap) break;
-    }
-    hasMore = result?.has_more && !!result?.next_cursor;
-    cursor = result?.next_cursor || null;
-    pageCount++;
-  }
-
-  return count;
 }
 
 /**
@@ -1768,7 +1826,7 @@ export const pennylaneService = {
   // Bridge Pipeline ↔ Pennylane (spec 2026-05-23 PR 4+)
   getCandidateQuotesForLead: (leadId, orgId) => withErrorHandling(() => getCandidateQuotesForLead(leadId, orgId), 'pennylane.getCandidateQuotesForLead'),
   getUnlinkedQuotes: (orgId, opts) => withErrorHandling(() => getUnlinkedQuotes(orgId, opts), 'pennylane.getUnlinkedQuotes'),
-  countUnlinkedQuotes: (orgId, opts) => withErrorHandling(() => countUnlinkedQuotes(orgId, opts), 'pennylane.countUnlinkedQuotes'),
+  getQuotesExplorer: (orgId, opts) => withErrorHandling(() => getQuotesExplorer(orgId, opts), 'pennylane.getQuotesExplorer'),
   attachQuotesAndSendLead: (orgId, leadId, quotes) => withErrorHandling(() => attachQuotesAndSendLead(orgId, leadId, quotes), 'pennylane.attachQuotesAndSendLead'),
   markLeadWonWithQuote: (orgId, leadId, winningQuotePlId) => withErrorHandling(() => markLeadWonWithQuote(orgId, leadId, winningQuotePlId), 'pennylane.markLeadWonWithQuote'),
 

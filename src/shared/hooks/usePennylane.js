@@ -447,34 +447,6 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
 }
 
 /**
- * Compteur "devis PL non rattachés des N derniers jours".
- * Voyant de discipline (Dashboard + Pipeline header, org_admin only).
- * StaleTime long (5 min) — pas besoin de fraîcheur temps réel.
- */
-export function useUnlinkedQuoteCount({ sinceDays = 30, enabled = true } = {}) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-
-  const query = useQuery({
-    queryKey: pennylaneKeys.unlinkedQuotesCount(orgId, sinceDays),
-    queryFn: async () => {
-      const { data, error } = await pennylaneService.countUnlinkedQuotes(orgId, { sinceDays });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && enabled,
-    staleTime: 5 * 60_000,
-  });
-
-  return {
-    count: query.data ?? null,
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
-  };
-}
-
-/**
  * Construit un patch lead = champs contact PL à reporter sur le lead.
  * Sémantique OVERWRITE (décision produit 2026-05-27) : une fois qu'un
  * devis PL est attaché, Pennylane est canonique pour l'identité — on
