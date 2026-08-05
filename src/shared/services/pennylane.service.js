@@ -1371,11 +1371,18 @@ async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
   if (!orgId) return { rows: [], truncated: false, scanned: 0 };
 
   // 1. Rattachements actifs (org core) → Map<quote_pl_id, {lead_id}>
-  const { data: links } = await supabase
+  //
+  // ⚠️ Les 3 SELECT ci-dessous THROW sur erreur au lieu d'avaler le `{ error }`.
+  // Un échec silencieux ici (RLS, réseau) renverrait une Map/Set vide → TOUS les
+  // devis ressortiraient `is_orphan: true` : voyant Dashboard en fausse alerte
+  // massive et campagne de rattachement sur des devis déjà rattachés. Une page
+  // en erreur est très préférable à une page qui ment.
+  const { data: links, error: linksError } = await supabase
     .from('majordhome_lead_pennylane_quotes')
     .select('pennylane_quote_id, lead_id')
     .eq('org_id', orgId)
     .is('ejected_at', null);
+  if (linksError) throw linksError;
 
   const linkByQuoteId = new Map();
   for (const l of links || []) {
@@ -1385,10 +1392,11 @@ async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
   // 2. Noms des leads rattachés (1 requête, pas N)
   const leadIds = [...new Set([...linkByQuoteId.values()].map(v => v.lead_id).filter(Boolean))];
   if (leadIds.length > 0) {
-    const { data: leads } = await supabase
+    const { data: leads, error: leadsError } = await supabase
       .from('majordhome_leads')
       .select('id, first_name, last_name')
       .in('id', leadIds);
+    if (leadsError) throw leadsError;
     const nameById = new Map(
       (leads || []).map(l => [l.id, [l.first_name, l.last_name].filter(Boolean).join(' ').trim() || null]),
     );
@@ -1398,10 +1406,11 @@ async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
   }
 
   // 3. Écartements
-  const { data: dismissals } = await supabase
+  const { data: dismissals, error: dismissalsError } = await supabase
     .from('majordhome_pennylane_quote_dismissals')
     .select('pennylane_quote_id')
     .eq('org_id', orgId);
+  if (dismissalsError) throw dismissalsError;
   const dismissedIds = new Set((dismissals || []).map(d => Number(d.pennylane_quote_id)));
 
   // 4. Scan paginé /quotes (même plafond que getUnlinkedQuotes)
@@ -1426,11 +1435,12 @@ async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
   // Doit être affiché (règle « pas de cap muet »).
   const truncated = hasMore;
 
-  // 5. Noms clients (la LISTE /quotes n'embarque que customer.id — cf ef7c175)
-  const namesById = await resolveCustomerNames(orgId, allQuotes.map(q => q.customer?.id));
-
+  // 5. Formatage. `Number(q.id)` : la clé de lookup doit être du même type que
+  // linkByQuoteId / dismissedIds (déjà normalisés en Number).
+  // Le nom client n'est ici renseigné que s'il est présent dans le payload PL
+  // (gratuit) — la résolution coûteuse est faite APRÈS filtrage (étape 6).
   const formatted = allQuotes.map(q => ({
-    id: q.id,
+    id: Number(q.id),
     quote_number: q.quote_number || q.label || null,
     label: q.label || null,
     subject: q.pdf_invoice_subject || null,
@@ -1440,9 +1450,7 @@ async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
     status: q.status || null,
     pdf_url: q.public_file_url || null,
     customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer)
-      || (q.customer?.id ? namesById.get(String(q.customer.id)) : null)
-      || null,
+    customer_name: formatPennylaneCustomerName(q.customer) || null,
   }));
 
   const rows = buildExplorerRows({
@@ -1452,6 +1460,22 @@ async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
     minAmountHt: PIPELINE_MIN_AMOUNT_HT,
     sinceDays,
   });
+
+  // 6. Noms clients des SURVIVANTS uniquement (la LISTE /quotes n'embarque que
+  // customer.id — cf ef7c175). resolveCustomerNames borne son fallback live à
+  // CUSTOMER_NAME_LIVE_CAP : dépenser ce budget avant filtrage le gaspillait sur
+  // des devis écartés (draft, < seuil, hors fenêtre) et laissait des lignes
+  // VISIBLES sans nom. Résoudre après filtrage = moins d'appels PL, et le budget
+  // va aux lignes réellement affichées.
+  const namesById = await resolveCustomerNames(
+    orgId,
+    rows.filter(r => !r.customer_name).map(r => r.customer_id),
+  );
+  for (const r of rows) {
+    if (!r.customer_name && r.customer_id) {
+      r.customer_name = namesById.get(String(r.customer_id)) || null;
+    }
+  }
 
   return { rows, truncated, scanned: allQuotes.length };
 }
