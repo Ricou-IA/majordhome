@@ -33,17 +33,11 @@ import {
   useAttachQuotesAndSend,
 } from '@hooks/usePennylane';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
+import { PIPELINE_MIN_AMOUNT_HT } from '@lib/constants';
 
 // ============================================================================
 // Statuts Pennylane (palette deutan-friendly — pas de rouge/vert)
 // ============================================================================
-
-// Seuil min pour qu'un devis Pennylane soit considéré "pipeline" (vs SAV/entretien).
-// Les devis < 500€ HT sont quasi-toujours du SAV ou de l'entretien et n'ont pas
-// vocation à être rattachés à un lead du pipeline commercial.
-// Les devis déjà attachés sont préservés (informatif) même s'ils sont sous le seuil.
-// 2026-08-05 : descendu de 1000 à 500 (demande équipe — le SAV est sous 500).
-const PIPELINE_MIN_AMOUNT_HT = 500;
 
 const QUOTE_STATUS_CONFIG = {
   accepted: { label: 'Accepté', color: '#1d4ed8', bgColor: '#dbeafe' },

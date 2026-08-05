@@ -83,9 +83,8 @@ function unwrapPennylaneResource<T>(
   return null;
 }
 
-// Seuil pipeline : devis < 500€ HT = SAV/entretien hors pipeline commercial.
-// Pas d'auto-attach pour ces devis (alignement constante frontend
-// PIPELINE_MIN_AMOUNT_HT dans QuoteCandidatesModal).
+// Seuil pipeline commercial. ⚠️ COPIE de src/lib/constants.js — Deno ne peut pas
+// importer le code frontend. Toute modification du seuil doit toucher LES DEUX.
 // 2026-08-05 : descendu de 1000 à 500 (demande equipe — le SAV est sous 500).
 const PIPELINE_MIN_AMOUNT_HT = 500;
 
