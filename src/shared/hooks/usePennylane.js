@@ -12,11 +12,13 @@ import { useCallback, useState } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
 import { leadsService } from '@services/leads.service';
+import { quoteDismissalsService } from '@services/quoteDismissals.service';
 import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { cleanPhone } from '@/lib/phoneUtils';
+import { filterExplorerRows, EXPLORER_VIEWS } from '@/lib/quotesExplorer';
 
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
@@ -443,6 +445,87 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
+  };
+}
+
+/**
+ * Explorateur de devis PL : source UNIQUE du compteur KPI Dashboard et de la
+ * page /devis. staleTime long (15 min) — le scan PL est coûteux et les devis
+ * bougent peu.
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.sinceDays=90]
+ * @param {boolean} [opts.enabled=true]
+ */
+export function useQuotesExplorer({ sinceDays = 90, enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const query = useQuery({
+    queryKey: pennylaneKeys.quotesExplorer(orgId, sinceDays),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getQuotesExplorer(orgId, { sinceDays });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 15 * 60_000,
+  });
+
+  const rows = query.data?.rows || [];
+
+  return {
+    rows,
+    // Dérivé de filterExplorerRows (module pur), PAS recopié : garantit que ce
+    // compteur compte exactement ce que la vue "Orphelins" de la page affiche.
+    orphanCount: filterExplorerRows(rows, EXPLORER_VIEWS.ORPHANS).length,
+    truncated: query.data?.truncated || false,
+    scanned: query.data?.scanned || 0,
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Écarter (unitaire ou en lot) et réintégrer un devis.
+ * Invalide l'explorateur pour que la carte disparaisse/réapparaisse.
+ */
+export function useQuoteDismissals() {
+  const queryClient = useQueryClient();
+  const { organization, user } = useAuth();
+  const orgId = organization?.id;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: pennylaneKeys.all(orgId) });
+  };
+
+  const dismiss = useMutation({
+    mutationFn: async ({ quoteIds, reason }) => {
+      const { data, error } = await quoteDismissalsService.dismiss(orgId, quoteIds, {
+        reason,
+        userId: user?.id,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+
+  const restore = useMutation({
+    mutationFn: async (quoteId) => {
+      const { data, error } = await quoteDismissalsService.restore(orgId, quoteId);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+
+  return {
+    dismissQuotes: dismiss.mutateAsync,
+    isDismissing: dismiss.isPending,
+    restoreQuote: restore.mutateAsync,
+    isRestoring: restore.isPending,
   };
 }
 
