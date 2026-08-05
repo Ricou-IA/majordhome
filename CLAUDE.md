@@ -436,12 +436,13 @@ GscPanel : non-connecté (CTA OAuth) ou connecté (sélecteur période 7j/30j/3m
 
 ## Module Pennylane quote-driven (WIP) → `docs/MODULE_PENNYLANE.md`
 Règles qui mordent :
-- Post-attache, **PL fait foi** pour l'identité du lead (OVERWRITE ; contact lead en lecture seule).
+- Post-attache, **PL fait foi** pour l'identité du lead (OVERWRITE ; contact lead en lecture seule) ET pour le **contenu du devis** : montant/numéro/date resynchronisés en continu (cron 15 min). Toute modif de contenu écrit une ligne `lead_quote_revisions` + une activité `quote_revised`. Corollaire assumé : pas de date de coupe stable pour les stats.
 - « Gagner un lead » = UNIQUEMENT `lead_mark_won_with_quote` (statut + won_date + chantier). Ne jamais dupliquer la logique de gain ailleurs.
 - « Devis envoyé » / « Gagné » / « Perdu » manuels **interdits sans devis PL rattaché** sur orgs PL (trigger DB + gardes board/drawer/fiche). Perte directe (sans devis) reste OK.
 - Liens devis = `q.public_file_url` / `pdf_url` — **jamais** construire `app.pennylane.com/quotes/{id}` (404 multi-cabinet).
 - Rate limit V2 25 req/5s → `pLimit(5)`. Single GET = ressource au **root** (pas wrappée). LISTE `/quotes` n'embarque QUE `customer.id` (pas le nom → `resolveCustomerNames`).
-- Seuil pipeline 1000€ HT. Tie-break chrono = `pennylane_quote_id DESC`.
+- `pennylane_sync_ensure_winning_quotes` déclenche sur `accepted` **uniquement** — garde-fou délibéré contre les chantiers rétroactifs sur de vieux `invoiced`. Ne pas l'élargir (tenté et reverté le 2026-08-05).
+- Seuil pipeline **500€ HT** (2026-08-05, était 1000). Source `src/lib/constants.js` + 2 copies Deno (`pennylane-sync-quote-status`, `pennylane-backfill-quotes`). ⚠️ `pennylane-sync-cron` a sa propre constante `LEAD_THRESHOLD_HT` qui **crée des leads** (pas seulement filtre). Tie-break chrono = `pennylane_quote_id DESC`.
 ## Module Appels sortants (cerveau livré — mock, câblage Kanban à faire)
 
 > 🔧 **WIP** — moteur de campagne d'appels sortants V1 (entretien). DB + frontend (service/hook/UI) livrés en **mock** (rien ne téléphone encore). Reste : câblage Kanban + V2 téléphonie réelle. Plan : `docs/superpowers/plans/2026-06-03-campagne-appels-sortants-moteur.md` · Spec : `docs/superpowers/specs/2026-06-03-campagne-appels-sortants-moteur-design.md`.

@@ -5,7 +5,7 @@
 // Détecte les nouveaux clients Pennylane (sans mapping pennylane_sync)
 // et crée automatiquement :
 //   1. Le client dans majordhome.clients (+ code 411)
-//   2. Un lead en "Devis envoyé" SI le client a un devis > 1000€ HT
+//   2. Un lead en "Devis envoyé" SI le client a un devis > 500€ HT
 //
 // Appelé toutes les heures via N8N ou pg_cron.
 //
@@ -30,7 +30,10 @@ const PENNYLANE_BASE_URL =
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
-const LEAD_THRESHOLD_HT = 1000;
+// ⚠️ Cette constante ne FILTRE pas, elle decide de CREER un lead (cf ligne ~328).
+// 2026-08-05 : descendue de 1000 a 500 (demande equipe — le SAV est sous 500).
+// Alignee sur PIPELINE_MIN_AMOUNT_HT (src/lib/constants.js + copies Deno).
+const LEAD_THRESHOLD_HT = 500;
 const STATUS_DEVIS_ENVOYE = "47937391-5ffa-4804-9b5d-72f3fec6f4fe";
 
 const plHeaders = {
