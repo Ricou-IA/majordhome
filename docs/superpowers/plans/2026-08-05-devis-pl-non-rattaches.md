@@ -71,8 +71,20 @@ Dans `src/lib/constants.js`, à la suite du bloc Pagination :
 // pipeline commercial (sélecteur de rattachement + explorateur de devis).
 // ⚠️ Valeur DUPLIQUÉE dans supabase/functions/pennylane-sync-quote-status/index.ts
 // (Deno ne peut pas importer src/lib/). Toute modification doit toucher les deux.
-export const PIPELINE_MIN_AMOUNT_HT = 1000;
+export const PIPELINE_MIN_AMOUNT_HT = 500;
 ```
+
+> ⚠️ **La valeur est 500, pas 1000.** L'edge function est passée de 1000 à 500 le
+> 2026-08-05 (commit d'une session parallèle). Poser 1000 ici **désalignerait le
+> front de l'edge** : le cron auto-attacherait des devis à 500 € que l'explorateur
+> et le sélecteur de rattachement masqueraient — exactement le désalignement que
+> cette tâche vise à supprimer. **Avant d'écrire, vérifier la valeur réelle :**
+>
+> ```bash
+> grep -n "PIPELINE_MIN_AMOUNT_HT = " supabase/functions/pennylane-sync-quote-status/index.ts
+> ```
+>
+> et recopier CE nombre.
 
 - [ ] **Step 2: Remplacer la const locale du composant**
 
@@ -86,13 +98,16 @@ Les deux usages existants (lignes ~201 et ~250) restent inchangés.
 
 - [ ] **Step 3: Poser le commentaire croisé côté edge**
 
-Dans `supabase/functions/pennylane-sync-quote-status/index.ts`, remplacer le commentaire au-dessus de `const PIPELINE_MIN_AMOUNT_HT = 1000;` par :
+Dans `supabase/functions/pennylane-sync-quote-status/index.ts`, le commentaire pointe encore l'ancien emplacement de la constante (`QuoteCandidatesModal`). Le remplacer — **sans toucher à la valeur**, qui vient d'être arbitrée à 500 :
 
 ```typescript
 // Seuil pipeline commercial. ⚠️ COPIE de src/lib/constants.js — Deno ne peut pas
 // importer le code frontend. Toute modification du seuil doit toucher LES DEUX.
-const PIPELINE_MIN_AMOUNT_HT = 1000;
+// 2026-08-05 : descendu de 1000 à 500 (demande equipe — le SAV est sous 500).
+const PIPELINE_MIN_AMOUNT_HT = 500;
 ```
+
+⚠️ Ce fichier est touché par une session parallèle. Vérifier `git status` avant d'éditer, et **committer par pathspec** (jamais `git add -A`).
 
 - [ ] **Step 4: Vérifier**
 
