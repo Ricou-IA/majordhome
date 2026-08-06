@@ -1,17 +1,25 @@
 // src/apps/thermique/pages/ThermiqueHistorique.jsx
 // Historique des études thermiques (pattern Historique.jsx Solaire) : liste paginée
 // avec recherche par titre, réouverture à l'identique via /thermique?etude=<id>
-// (LOAD_STUDY côté wizard) et suppression avec confirmation.
+// (LOAD_STUDY côté wizard), rapport PDF direct et suppression avec confirmation.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Thermometer, Plus, FolderOpen, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Thermometer, Plus, FolderOpen, FileDown, Trash2, Loader2, ChevronLeft, ChevronRight,
+} from 'lucide-react';
+import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useThermalStudies, useThermalStudyMutations } from '@hooks/useThermalStudies';
 import { useDebounce } from '@hooks/useDebounce';
+import { thermalService } from '@services/thermal.service';
 import { SearchBar } from '@apps/artisan/components/shared/SearchBar';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { formatDateShortFR } from '@lib/utils';
+import { logger } from '@lib/logger';
 import { DEFAULT_PAGE_SIZE } from '@lib/constants';
+import { buildThermiqueConfig } from '../lib/thermiqueConfig';
+import { telechargerRapportThermique, resoudMachineRapport } from '../lib/rapportExport';
 
 const STATUS_BADGES = {
   draft: { label: 'Brouillon', className: 'bg-amber-100 text-amber-800' },
@@ -29,9 +37,12 @@ function StatusBadge({ status }) {
 
 export default function ThermiqueHistorique() {
   const navigate = useNavigate();
+  const { organization } = useAuth();
+  const { settings } = useOrgSettings();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [toDelete, setToDelete] = useState(null);
+  const [pdfId, setPdfId] = useState(null); // étude dont le rapport est en cours de génération
   const debouncedSearch = useDebounce(search, 300);
 
   const { data, isLoading } = useThermalStudies({ search: debouncedSearch, page });
@@ -40,6 +51,36 @@ export default function ThermiqueHistorique() {
   const rows = data?.rows ?? [];
   const count = data?.count ?? 0;
   const pageCount = Math.max(1, Math.ceil(count / DEFAULT_PAGE_SIZE));
+
+  // Le rapport se génère depuis les résultats FIGÉS de l'étude — mêmes chiffres qu'à
+  // l'enregistrement, sans repasser par le wizard. La liste ne charge pas la colonne `input`
+  // (jsonb lourd × 20 lignes) : on récupère l'étude complète au clic seulement.
+  const handlePdf = async (study) => {
+    setPdfId(study.id);
+    try {
+      const { data: full, error } = await thermalService.getById(organization?.id, study.id);
+      if (error || !full) throw error || new Error('étude introuvable');
+      if (!full.results?.bilan) throw new Error('cette étude ne porte pas de résultats enregistrés');
+      await telechargerRapportThermique({
+        input: full.input ?? {},
+        resultats: {
+          bilan: full.results.bilan,
+          thetaE: full.results.thetaE,
+          pac: full.results.pac ?? null,
+          engineVersion: full.engine_version ?? null,
+        },
+        config: buildThermiqueConfig(settings),
+        settings,
+        machine: await resoudMachineRapport(full.input?.pac),
+      });
+      toast.success('Rapport PDF généré');
+    } catch (err) {
+      logger.error('[thermique] rapport PDF depuis l’historique échoué', err);
+      toast.error(`Rapport PDF impossible : ${err?.message ?? 'erreur inconnue'}`);
+    } finally {
+      setPdfId(null);
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -138,6 +179,19 @@ export default function ThermiqueHistorique() {
                             className="btn-primary flex items-center gap-1.5 text-sm"
                           >
                             <FolderOpen className="w-3.5 h-3.5" /> Ouvrir
+                          </button>
+                          <button
+                            onClick={() => handlePdf(study)}
+                            disabled={pdfId != null || total == null}
+                            title={total == null
+                              ? 'Aucun résultat enregistré pour cette étude'
+                              : 'Télécharger le rapport PDF'}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-secondary-300 text-secondary-700 rounded-lg hover:bg-secondary-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {pdfId === study.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <FileDown className="w-3.5 h-3.5" />}
+                            PDF
                           </button>
                           <button
                             onClick={() => setToDelete(study)}

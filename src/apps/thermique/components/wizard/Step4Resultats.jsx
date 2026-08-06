@@ -20,14 +20,11 @@ import {
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useThermalStudyMutations } from '@hooks/useThermalStudies';
-import { clientsService } from '@services/clients.service';
-import { buildCompanyInfo } from '@lib/orgBranding';
-import { formatDateFR } from '@lib/utils';
 import { logger } from '@lib/logger';
 import { climat, uDefauts, coefficientsB, ventilation, loadPacCatalogue } from '../../data';
 import { buildEtudeModel, resultsPersistables, pacId, ENGINE_VERSION } from '../../lib/etudeModel';
-import { buildRapportModel, POSTES_LABELS } from '../../lib/rapportModel';
-import { buildRapportFilename, downloadBlob } from '../../lib/rapportExport';
+import { POSTES_LABELS } from '../../lib/rapportModel';
+import { telechargerRapportThermique } from '../../lib/rapportExport';
 import { toStudyInput, clearDraft } from '../../lib/wizardState';
 import { PLAGES_VRAISEMBLANCE } from '../../lib/thermiqueConfig';
 import { resolvePeriode } from '../../lib/refDataResolvers';
@@ -196,30 +193,9 @@ export default function Step4Resultats({
   const handleRapportPdf = async () => {
     setPdfEnCours(true);
     try {
-      // Nom du client : best effort (une étude peut n'être rattachée à aucune fiche).
-      let clientName = '';
-      if (contexte.clientId) {
-        const { data, error } = await clientsService.getClientById(contexte.clientId);
-        if (error) logger.warn('[thermique] nom du client indisponible pour le rapport', error);
-        else if (data) {
-          clientName = data.display_name || data.name
-            || `${data.last_name || ''} ${data.first_name || ''}`.trim();
-        }
-      }
-      const rapport = buildRapportModel(toStudyInput(state), resultatsRapport, {
-        config,
-        data: { climat, uDefauts, coefficientsB, ventilation },
-        machine,
-        dateLabel: formatDateFR(new Date()),
-        clientName,
+      await telechargerRapportThermique({
+        input: toStudyInput(state), resultats: resultatsRapport, config, settings, machine,
       });
-      // Import dynamique : @react-pdf/renderer ne pèse dans le bundle que si un rapport est demandé.
-      const { generateRapportThermiquePdfBlob } = await import('../etude/EtudeThermiquePDF');
-      const blob = await generateRapportThermiquePdfBlob({
-        rapport,
-        company: buildCompanyInfo(settings),
-      });
-      downloadBlob(blob, buildRapportFilename(clientName || contexte.titre));
       toast.success('Rapport PDF généré');
     } catch (e) {
       logger.error('[thermique] génération du rapport PDF échouée', e);
