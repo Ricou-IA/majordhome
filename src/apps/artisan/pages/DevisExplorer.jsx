@@ -17,6 +17,7 @@ import { useQuotesExplorer, useQuoteDismissals } from '@hooks/usePennylane';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { QuoteExplorerCard } from '@apps/artisan/components/devis/QuoteExplorerCard';
 import { AttachQuoteToLeadModal } from '@apps/artisan/components/devis/AttachQuoteToLeadModal';
+import { CreateLeadFromQuoteModal } from '@apps/artisan/components/devis/CreateLeadFromQuoteModal';
 import { EXPLORER_VIEWS, filterExplorerRows } from '@/lib/quotesExplorer';
 import { formatEuro } from '@/lib/utils';
 
@@ -182,8 +183,13 @@ export default function DevisExplorer() {
         />
       )}
 
-      {/* La modale Créer le lead est branchée ici par la Task 10.
-          `createRow` est déjà câblé sur les boutons de carte. */}
+      {createRow && (
+        <CreateLeadFromQuoteModal
+          quote={createRow}
+          onClose={() => setCreateRow(null)}
+          onCreated={() => { setCreateRow(null); refetch(); }}
+        />
+      )}
     </div>
   );
 }
