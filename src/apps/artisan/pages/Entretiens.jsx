@@ -218,16 +218,21 @@ export default function Entretiens() {
 
   // Clients ayant déjà reçu le SMS de rappel cette année (campagne 'rappel_entretien').
   // Dérivé de sms_logs (option A — pas de colonne dédiée). Réinit. au 01/01.
+  // ⚠️ Cette liste EST le seul garde-fou anti-doublon de la bulle SMS : une erreur avalée
+  // renverrait un Set vide, donc « personne n'a été relancé », donc réenvoi à tout le monde
+  // en silence. On lève → React Query retente, `remindedClientIds` reste undefined, et
+  // SectorGroupView verrouille la bulle tant qu'il ne sait pas.
   const { data: remindedClientIds } = useQuery({
     queryKey: smsKeys.remindedClients(orgId, currentYear),
     queryFn: async () => {
       const yearStart = new Date(currentYear, 0, 1).toISOString();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('majordhome_sms_logs')
         .select('client_id')
         .eq('org_id', orgId)
         .eq('campaign_name', 'rappel_entretien')
         .gte('sent_at', yearStart);
+      if (error) throw error;
       return new Set((data || []).map((r) => r.client_id).filter(Boolean));
     },
     enabled: !!orgId,

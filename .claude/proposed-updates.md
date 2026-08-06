@@ -15,12 +15,6 @@
 **À faire** : graver la doc complète dans CLAUDE.md § Rôles & Permissions quand Phases 4-6 atterrissent. Spec : `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`.
 ---
 
-## [À INTÉGRER] SMS rappel entretien — état "déjà relancé" = dérivé sms_logs/an (option A)
-**Statut** : PENDING → CLAUDE.md § Module Mailing/SMS (le gros est déjà couvert via phoneUtils ; manque CE détail)
-**Commits** : ba7c732 / 93f606b / b59054b / 70225d7 (poussés main, testé end-to-end) · détail : archive [2026-06-16 09:50]
-**À graver** : 2ème campagne SMS (distincte de `avis_j1`). Bulle SMS sur l'onglet Programmation (`SectorGroupView`), uniquement contrats « à planifier », permission `can('entretiens','create')`. État « déjà relancé cet an » = **option A** : dérivé de `majordhome_sms_logs` (`campaign_name='rappel_entretien'`, `sent_at ≥ 01/01`), pas de colonne dédiée, reset implicite au 01/01, cache key `smsKeys.remindedClients(orgId, year)`. Webhook `VITE_N8N_WEBHOOK_SMS_RAPPEL`. Gotcha : `sms_logs` sans `contract_id` → état indexé par `client_id` (un multi-contrats est marqué après 1 envoi, acceptable V1).
----
-
 ## [2026-06-19 00:22] Solaire — scénarios par paliers commerciaux 3/6/9 + carte « Optimisé »
 **Statut** : PENDING
 **Commit** : f2c2cbb974013e9e8915e3e81c655b0df3ad0b2c

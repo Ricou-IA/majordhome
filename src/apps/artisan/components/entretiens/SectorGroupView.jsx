@@ -136,9 +136,16 @@ function ContractRow({
   const canShowReminder =
     canSendReminder && !isAlreadyPlanned && visitStatus !== 'completed';
   const [smsLoading, setSmsLoading] = useState(false);
-  const [smsSent, setSmsSent] = useState(
-    remindedClientIds?.has(contract.client_id) ?? false,
-  );
+  // « Déjà relancé » = DÉRIVÉ de la liste à chaque rendu, jamais figé dans un useState : la ligne
+  // peut se monter avant que la requête `remindedClients` ait répondu (les deux requêtes sont
+  // indépendantes), et un initialiseur de useState ne se réévalue pas à l'arrivée des données —
+  // la bulle serait restée cliquable sur un client déjà relancé.
+  const [justSent, setJustSent] = useState(false); // envoi de CETTE session, avant refetch
+  // remindedClientIds null/undefined = liste indisponible (chargement ou échec) : on ne SAIT PAS
+  // qui a déjà été relancé → on verrouille la bulle plutôt que de risquer un doublon (échouer
+  // fort, pas en silence). Un Set vide, lui, est une réponse valide (personne relancé).
+  const remindedInconnu = remindedClientIds == null;
+  const smsSent = justSent || (remindedClientIds?.has(contract.client_id) ?? false);
 
   const handleReminderClick = async (e) => {
     e.stopPropagation();
@@ -149,7 +156,7 @@ function ContractRow({
     if (error) {
       toast.error(error.message || 'Échec de l\'envoi du SMS');
     } else {
-      setSmsSent(true);
+      setJustSent(true);
       toast.success('Rappel envoyé par SMS');
     }
   };
@@ -200,11 +207,13 @@ function ContractRow({
       {canShowReminder && (
         <button
           onClick={handleReminderClick}
-          disabled={smsLoading || smsSent}
+          disabled={smsLoading || smsSent || remindedInconnu}
           title={
-            smsSent
-              ? 'Rappel déjà envoyé cette année'
-              : 'Envoyer un rappel d\'entretien par SMS'
+            remindedInconnu
+              ? 'Historique des rappels indisponible — envoi bloqué pour éviter un doublon'
+              : smsSent
+                ? 'Rappel déjà envoyé cette année'
+                : 'Envoyer un rappel d\'entretien par SMS'
           }
           className={`inline-flex items-center justify-center p-1.5 rounded border transition-colors flex-shrink-0 ${
             smsSent
