@@ -17,6 +17,8 @@ import {
   sanitizeError,
   buildCorsHeaders,
 } from "../_shared/auth.ts";
+// Seuil pipeline commercial — source unique Deno (cf. en-tête du module).
+import { PIPELINE_MIN_AMOUNT_HT } from "../_shared/pipelineConstants.ts";
 
 // ---------------------------------------------------------------------------
 // Types Pennylane (subset)
@@ -82,11 +84,6 @@ function unwrapPennylaneResource<T>(
   if ("id" in obj) return obj as T;
   return null;
 }
-
-// Seuil pipeline commercial. ⚠️ COPIE de src/lib/constants.js — Deno ne peut pas
-// importer le code frontend. Toute modification du seuil doit toucher LES DEUX.
-// 2026-08-05 : descendu de 1000 à 500 (demande equipe — le SAV est sous 500).
-const PIPELINE_MIN_AMOUNT_HT = 500;
 
 // ---------------------------------------------------------------------------
 // Appel direct Pennylane (sans passer par pennylane-proxy)

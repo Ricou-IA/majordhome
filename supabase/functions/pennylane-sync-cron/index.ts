@@ -22,6 +22,9 @@ import {
   jsonResponse,
   requireSharedSecret,
 } from "../_shared/auth.ts";
+// Seuil pipeline commercial — source unique Deno (cf. en-tête du module).
+// ⚠️ Ici le seuil ne FILTRE pas, il décide de CRÉER un lead (cf. usage ~ligne 328).
+import { PIPELINE_MIN_AMOUNT_HT } from "../_shared/pipelineConstants.ts";
 
 const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
 const PENNYLANE_BASE_URL =
@@ -30,10 +33,6 @@ const PENNYLANE_BASE_URL =
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
-// ⚠️ Cette constante ne FILTRE pas, elle decide de CREER un lead (cf ligne ~328).
-// 2026-08-05 : descendue de 1000 a 500 (demande equipe — le SAV est sous 500).
-// Alignee sur PIPELINE_MIN_AMOUNT_HT (src/lib/constants.js + copies Deno).
-const LEAD_THRESHOLD_HT = 500;
 const STATUS_DEVIS_ENVOYE = "47937391-5ffa-4804-9b5d-72f3fec6f4fe";
 
 const plHeaders = {
@@ -324,11 +323,12 @@ Deno.serve(async (req: Request) => {
           { onConflict: "org_id,entity_type,local_id" }
         );
 
-        // Vérifier si un lead est nécessaire (devis principal > 1000€) — lookup local (sans appel API)
+        // Vérifier si un lead est nécessaire (devis principal >= seuil pipeline)
+        // — lookup local (sans appel API). ⚠️ Sous le seuil, AUCUN lead n'est créé.
         const customerQuotes = quotesByCustomer.get(plCustomer.id) || [];
         const { amount: maxQuoteHT, label: quoteLabel } = pickMaxQuote(customerQuotes);
 
-        if (maxQuoteHT >= LEAD_THRESHOLD_HT) {
+        if (maxQuoteHT >= PIPELINE_MIN_AMOUNT_HT) {
           // 1) RPC création/maj du lead avec le devis principal
           const { data: leadResult, error: leadRpcError } = await supabase.rpc(
             "upsert_pennylane_lead",
@@ -392,7 +392,7 @@ Deno.serve(async (req: Request) => {
           }
         } else {
           log.push(
-            `[no-lead] ${displayName} — max devis ${maxQuoteHT}€ HT < seuil ${LEAD_THRESHOLD_HT}€`
+            `[no-lead] ${displayName} — max devis ${maxQuoteHT}€ HT < seuil ${PIPELINE_MIN_AMOUNT_HT}€`
           );
         }
       } catch (err) {
