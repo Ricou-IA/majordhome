@@ -300,6 +300,8 @@ Pour les entités où un soft-delete + restauration ne suffisent pas (planning f
 ## Module Mailing → `docs/MODULE_MAILING.md`
 Règles qui mordent :
 - Provider **Resend**. Envoi via edge `mailing-send` — **jamais de SQL brut côté front** (RPC `mail_fetch_recipients` membership-checked, compile côté DB).
+- **Segment d'audience leads = placement Pennylane, pas `leads.status_id`** (2026-06-16) : les statuts PL-driven (Devis envoyé / Gagné / Perdu) filtrent sur `majordhome_kanban_cards.column_key`. `leads.status_id` est figé et diverge du board dès qu'un devis est rattaché — c'est ce qui faisait annoncer 69 destinataires « Devis envoyé » pour 59 réels (poêle 34→27). L'amont (Nouveau / Contacté / RDV planifié) reste sur `status_id` : pas de devis PL, donc canonique. Branche PL active seulement si `p_org_id` non NULL (sinon fallback `status_id`).
+- **`mail_segment_compile` = source unique de la clause WHERE** : `mail_segment_count` (compteur live), `mail_segment_preview` (aperçu destinataires) et `mail_segment_compile_safe` (envoi) l'appellent à l'exécution au lieu d'en recopier la logique. Patcher `compile` propage donc partout — et **ne JAMAIS recopier un filtre dans l'une des trois** : compteur affiché ≠ liste envoyée est le pire bug possible sur un envoi de masse.
 - Scheduler auto = **pg_cron → edge `mailing-scheduler`** (PAS N8n). `mail_campaign_mark_run` SEULEMENT si `mailing-send` renvoie HTTP 2xx (sinon fenêtre consommée à vide).
 - `is_transactional=true` → exclu du broadcast (onglet Envoi).
 - Webhook `resend-webhook` (Svix HMAC) idempotent via `svix_id` UNIQUE ; priorité statuts sent<delivered<opened<clicked, bounce/complaint=terminal.

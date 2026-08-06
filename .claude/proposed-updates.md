@@ -15,12 +15,6 @@
 **À faire** : graver la doc complète dans CLAUDE.md § Rôles & Permissions quand Phases 4-6 atterrissent. Spec : `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`.
 ---
 
-## [À INTÉGRER] mail_segment_compile — appartenance segment = placement Pennylane
-**Statut** : PENDING → CLAUDE.md § Module Mailing > RPCs (sous `mail_segment_compile`)
-**Commit** : 3916c1c · détail complet : archive, entrée [2026-06-16 01:49]
-**À graver** : pour les statuts PL-driven (Devis envoyé / Gagné / Perdu), `mail_segment_compile` dérive l'appartenance d'un segment leads de `majordhome_kanban_cards.column_key` (MT-LT inclus), PAS de `leads.status_id` (figé). Branche PL active seulement si `p_org_id` non NULL (sinon fallback `status_id`). Mapping label→column_key (devis_envoye / gagne / perdu). Vérifié : poêle 34→27, Devis envoyé 69→59, Contacté inchangé. Question ouverte : `mail_segment_count`/`preview` héritent-ils bien de la même RPC ?
----
-
 ## [À INTÉGRER] SMS rappel entretien — état "déjà relancé" = dérivé sms_logs/an (option A)
 **Statut** : PENDING → CLAUDE.md § Module Mailing/SMS (le gros est déjà couvert via phoneUtils ; manque CE détail)
 **Commits** : ba7c732 / 93f606b / b59054b / 70225d7 (poussés main, testé end-to-end) · détail : archive [2026-06-16 09:50]
