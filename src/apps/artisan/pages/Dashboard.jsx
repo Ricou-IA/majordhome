@@ -13,6 +13,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useLeadCommercials } from '@hooks/useLeads';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { useQuotesExplorer } from '@hooks/usePennylane';
 import { supabase } from '@lib/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -23,6 +25,7 @@ import {
   ArrowRight,
   Sparkles,
   FileText,
+  FileSearch,
   HardHat,
   ClipboardList,
   MapPin,
@@ -199,7 +202,7 @@ function PlanningRow({ appointment }) {
 // =============================================================================
 
 export default function Dashboard() {
-  const { profile, organization, user, effectiveRole } = useAuth();
+  const { profile, organization, user, effectiveRole, isOrgAdmin } = useAuth();
   const { can } = useCanAccess();
   const navigate = useNavigate();
   const orgId = organization?.id;
@@ -212,6 +215,12 @@ export default function Dashboard() {
   }, [effectiveRole, user?.id, commercials]);
 
   const { kpis, todayAppointments, isLoading } = useDashboardHome(orgId, effectiveRole, user?.id, myCommercialId);
+
+  // Voyant devis non rattachés — org_admin + Pennylane actif uniquement.
+  // Même queryKey que la page /devis : le compteur ne peut pas diverger.
+  const pennylaneActive = usePennylaneEnabled();
+  const showQuotesKpi = isOrgAdmin && pennylaneActive;
+  const { orphanCount, error: quotesError } = useQuotesExplorer({ enabled: showQuotesKpi });
 
   // LeadModal state
   const [showLeadModal, setShowLeadModal] = useState(false);
@@ -260,7 +269,11 @@ export default function Dashboard() {
 
       {/* KPI Cards — masquer pipeline KPIs pour technicien */}
       {/* Grid adapté : 4 cols admin/TL, 2 cols commercial (pipeline only), 2 cols technicien (chantiers only) */}
-      <div className={`grid grid-cols-2 ${can('pipeline', 'view') && effectiveRole !== 'commercial' ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
+      <div className={`grid grid-cols-2 ${
+        can('pipeline', 'view') && effectiveRole !== 'commercial'
+          ? (showQuotesKpi ? 'lg:grid-cols-5' : 'lg:grid-cols-4')
+          : 'lg:grid-cols-2'
+      } gap-4`}>
         {can('pipeline', 'view') && (
           <>
             <KpiCard
@@ -297,6 +310,17 @@ export default function Dashboard() {
               onClick={() => navigate('/chantiers')}
             />
           </>
+        )}
+        {/* Devis PL non rattachés — masqué si Pennylane est injoignable
+            (afficher « 0 » serait un mensonge, pas une information) */}
+        {showQuotesKpi && !quotesError && (
+          <KpiCard
+            label="Devis non rattachés"
+            value={orphanCount}
+            icon={FileSearch}
+            color="bg-rose-500"
+            onClick={() => navigate('/devis')}
+          />
         )}
       </div>
 
