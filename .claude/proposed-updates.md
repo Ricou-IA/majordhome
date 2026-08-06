@@ -27,18 +27,6 @@
 **À graver** : 2ème campagne SMS (distincte de `avis_j1`). Bulle SMS sur l'onglet Programmation (`SectorGroupView`), uniquement contrats « à planifier », permission `can('entretiens','create')`. État « déjà relancé cet an » = **option A** : dérivé de `majordhome_sms_logs` (`campaign_name='rappel_entretien'`, `sent_at ≥ 01/01`), pas de colonne dédiée, reset implicite au 01/01, cache key `smsKeys.remindedClients(orgId, year)`. Webhook `VITE_N8N_WEBHOOK_SMS_RAPPEL`. Gotcha : `sms_logs` sans `contract_id` → état indexé par `client_id` (un multi-contrats est marqué après 1 envoi, acceptable V1).
 ---
 
-## [À INTÉGRER] Invariant « Gagné » piloté par Pennylane sur toutes les surfaces
-**Statut** : PENDING → CLAUDE.md § Règles métier Pipeline ↔ PL
-**Commit** : 667384b · détail : archive [2026-06-17 22:22]
-**À graver** : sur une org PL-enabled, passage manuel en « Gagné » interdit sur TOUTES les surfaces — seule voie = `lead_mark_won_with_quote`. Board (`LeadKanban`) : drag vers Gagné refusé dès `pennylaneActive` (avec/sans devis). Drawer Long Terme (`LongTermLeadDrawer`) : bouton « Gagné » ouvre `MarkWonQuoteModal` si ≥1 devis, sinon toast exigeant un rattachement. Le Long Terme n'est qu'un autre affichage de « Devis envoyé », jamais plus permissif. Org sans PL : bascule manuelle conservée (autonomie multi-tenant).
----
-
-## [À INTÉGRER] Invariant « Perdu » piloté par Pennylane si devis attaché
-**Statut** : PENDING → CLAUDE.md § Règles métier Pipeline ↔ PL
-**Commit** : fa8880b · détail : archive [2026-06-17 22:30]
-**À graver** : sur une org PL-enabled, passage manuel en « Perdu » bloqué UNIQUEMENT si ≥1 devis attaché (marquer refusés dans PL → bascule quand 100% refused/denied/canceled via `majordhome_kanban_cards`). **Asymétrie volontaire avec Gagné** : perte DIRECTE (lead SANS devis : RDV non pertinent, ghost) reste autorisée partout (bouton Perdu conservé sur Nouveau/Contacté/RDV planifié). Surfaces gardées : board (`pennylaneActive && hasDevisPl`), drawer LT (`pennylaneActive && linkedQuotes.length>0`), fiche lead (déjà conforme via `PL_DRIVEN_STATUSES`). Org sans PL : conservé.
----
-
 ## [2026-06-19 00:22] Solaire — scénarios par paliers commerciaux 3/6/9 + carte « Optimisé »
 **Statut** : PENDING
 **Commit** : f2c2cbb974013e9e8915e3e81c655b0df3ad0b2c
@@ -87,4 +75,41 @@
 > - **`linked_quotes_amount_ht = 0` a deux sens** (aucun devis validé / aucun devis rattaché) : seul `validated_quotes_count` les distingue. Toute cascade `||` sur ce champ retombe sur `order_amount_ht` et réaffiche le montant d'avant-refus.
 
 À trancher : ces 3 points vont-ils dans `CLAUDE.md` (règles qui mordent) ou restent-ils dans `docs/MODULE_PENNYLANE.md`, où ils sont déjà documentés en détail ?
+---
+
+## [2026-08-05] Invariant : 1 membre d'org actif = 1 ressource planning (team_members)
+**Statut** : PENDING
+**Commit** : (non commite — session Gestion de l'equipe)
+**Contexte** : L'edge function `create-user` (invitation d'un membre) cree `auth.users` + `core.profiles` + `core.organization_members`, mais JAMAIS la ligne `majordhome.team_members` qui sert de ressource planning. Consequence : le membre invite n'apparait dans aucune assignation RDV, n'a pas de colonne planning et sa couleur n'est pas editable (`—` dans Gestion de l'equipe). Vecu sur 2 membres Mayer (Mohammed, Mathis Daguts). Corrige par une RPC idempotente `public.team_member_ensure_for_user(p_core_org_id, p_user_id, p_color)` (SECURITY DEFINER, org_admin only, relie une ressource orpheline de meme email avant d'inserer) + auto-appel depuis `TeamManagement.jsx` pour tout membre sans ressource. Index unique partiel `team_members (org_id, user_id) WHERE user_id IS NOT NULL`.
+**Proposition** : ajouter au module Planning (CLAUDE.md ou `docs/MODULE_PLANNING.md`) :
+> - **1 membre d'org actif = 1 ressource planning `majordhome.team_members`** (colonne calendrier, assignation RDV, couleur). `create-user` ne la cree PAS : elle est garantie par la RPC idempotente `team_member_ensure_for_user(core_org_id, user_id, color)` (org_admin only), auto-appelee depuis `/settings/team` pour tout membre qui n'en a pas. Toute nouvelle voie de creation de membre (SSO, import, edge function) doit appeler cette RPC, sinon le membre est invisible du planning — echec silencieux.
+> - Mapping role effectif → `team_members.role` : `org_admin`→`admin`, `team_leader`/`Commercial`→`commercial`, sinon `technician` (c'est ce que filtre `SectionAssignee` : types commerciaux → `['commercial','admin']`, types techniques → `technician`).
+> - Gotcha : `team_members.display_name` est une colonne **GENERATED** (`first_name || ' ' || last_name`) → ne jamais l'inclure dans un INSERT (erreur 428C9).
+
+> - **Le role planning suit le role du membre** : tout changement de role dans Gestion de l'equipe appelle `public.team_member_sync_role_for_user(core_org_id, user_id)` (depuis `permissions.service.updateMemberRole`). Derivation centralisee dans `majordhome.planning_role_for(app_role, business_role, membership_role)` — seule source, utilisee par ensure ET sync. Ne pas recopier le CASE ailleurs.
+
+A trancher : ces points vont-ils dans CLAUDE.md ou dans `docs/MODULE_PLANNING.md` ?
+---
+
+## [2026-08-06] Module Thermique — section absente de CLAUDE.md
+**Statut** : PENDING
+**Commits** : 79bccc9 (rapport PDF) · f409b19 (PDF depuis l'historique) · module livré depuis 2026-07-06
+**Contexte** : CLAUDE.md n'a AUCUNE section « Module Thermique », alors que le module est en prod et substantiel (wizard 3 étapes, 4 moteurs purs, 331 tests node, rapport PDF, page `/settings/thermique`). Une session qui ouvre le repo à froid ne connaît ni les règles qui mordent, ni l'existence du rapport PDF — risque de recréer ce qui existe ou de casser la cohérence écran ↔ PDF. Les mémoires inter-sessions y font référence mais elles ne sont pas chargées comme CLAUDE.md.
+**Proposition** : ajouter une section (après « Module Solaire », qui est son plus proche voisin) :
+
+> ## Module Thermique (étude de déperditions + dimensionnement PAC)
+>
+> Outil terrain pour installateur **non-ingénieur** : déperditions EN 12831 pièce par pièce, dimensionnement PAC (bivalence, conso), rapport PDF client. Routes `/thermique` (wizard 3 étapes : Contexte → Pièces → Résultats) + `/thermique/historique`, RouteGuard `resource=thermal_study`. Page admin `/settings/thermique` (org_admin). Spec : `docs/superpowers/specs/2026-07-03-module-thermique-deperditions-design.md`.
+>
+> - **Moteurs PURS** (aucun import React/Supabase/alias) : `thermalEngine.js` (EN 12831), `heatPumpEngine.js` (bivalence + conso degrés-jours), `geometryEngine.js`, `assembleBatimentParametrique.js`. Testés via `node --test "scripts/thermique/*.test.mjs"` (331 tests). Toute règle de calcul se teste là, pas dans un composant.
+> - **`buildEtudeModel` (`lib/etudeModel.js`) = SOURCE DE CALCUL UNIQUE** écran ↔ PDF (pattern Solaire). `ENGINE_VERSION` versionne les règles : à incrémenter à tout changement de calcul.
+> - **Résultats FIGÉS (R7)** : une étude rouverte affiche `thermal_studies.results` tel qu'enregistré (bannière ambre si la version moteur diffère), pas un recalcul. `resultsPersistables(model)` définit le sous-ensemble persisté (`bilan`/`thetaE`/`pac`) — les parois sont re-dérivables de l'`input`. **Règle générale** (même esprit que les contrats signés) : un artefact remis au client lit les valeurs ENREGISTRÉES.
+> - **Rapport PDF** (2026-08-06) : `lib/rapportModel.js` (PUR) met en forme le modèle SANS jamais recalculer → un chiffre du PDF absent de l'écran est un bug de ce module. `couleurRatio` y vit aussi : **source unique** de l'échelle de couleur écran (`ResultatsPiecesGrid`) ↔ PDF. Génération via `telechargerRapportThermique()` de `lib/rapportExport.js` — **point d'entrée unique** des 2 boutons (étape Résultats + ligne d'historique) ; ne pas réimplémenter la chaîne dans un 3ᵉ écran. `@react-pdf/renderer` en import dynamique (chunk séparé). Le catalogue PAC (4,6 Mo) n'est chargé qu'à la demande : absent → le graphe de bivalence disparaît, jamais le rapport.
+> - **⚠️ Glyphes PDF (Helvetica/WinAnsi)** : dans tout texte du rapport, les lettres grecques (θ, Δ, Φ), les flèches et `≈ ≥ ≤ −` sortent en artefact → écrire « T° extérieure de base », « majoration Utb » en toutes lettres. `° ² · × — – ’ « » € %` passent. Formatters PDF-safe obligatoires (`components/etude/pdfShared.jsx`) : `toLocaleString('fr-FR')` insère une espace fine U+202F.
+> - **Palette deutan (R12)** : bleu → ambre pour l'intensité des déperditions, **jamais rouge/vert**, et la couleur ne porte jamais l'information seule (bornes chiffrées systématiques).
+> - **DB** : `majordhome.thermal_studies` + vue publique `majordhome_thermal_studies` (security_invoker, auto-updatable). `input` jsonb = état wizard (shape VERROUILLÉ, cf. `toStudyInput`), `results` jsonb + `engine_version`. La liste ne sélectionne PAS `input` (jsonb lourd) : le récupérer via `getById` quand on en a besoin. Brouillon `localStorage thermal-draft:${userId}`.
+> - **Config org** : `core.organizations.settings.thermique` via `buildThermiqueConfig(settings)`. ⚠️ `org_update_settings` merge JSONB niveau 1 → toujours sauver l'objet `thermique` COMPLET.
+> - **⚠️ L'étude est aujourd'hui INDÉPENDANTE du pipeline** : les rails existent (colonnes `client_id`/`lead_id`, `contexte.clientId`/`leadId` dans l'état, pré-remplissage `/thermique?client=<id>`) mais **rien ne les alimente** — aucun écran ne produit l'URL `?client=`, `leadId` n'est jamais renseigné, et ni la fiche client ni le lead n'affichent les études. Seule porte d'entrée : la sidebar. **Chantier phase 2 (décidé avec Eric le 2026-08-06)** : brancher l'étude sur le lead. Ne pas considérer le lien comme fonctionnel avant.
+
+À trancher : tout dans CLAUDE.md, ou une section courte « règles qui mordent » + un `docs/MODULE_THERMIQUE.md` pour le détail (comme Mailing / Planning / Entretiens / Pennylane) ?
 ---
