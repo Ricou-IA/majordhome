@@ -16,6 +16,7 @@ import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useQuotesExplorer, useQuoteDismissals } from '@hooks/usePennylane';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { QuoteExplorerCard } from '@apps/artisan/components/devis/QuoteExplorerCard';
+import { AttachQuoteToLeadModal } from '@apps/artisan/components/devis/AttachQuoteToLeadModal';
 import { EXPLORER_VIEWS, filterExplorerRows } from '@/lib/quotesExplorer';
 import { formatEuro } from '@/lib/utils';
 
@@ -173,9 +174,16 @@ export default function DevisExplorer() {
         />
       )}
 
-      {/* Les modales Rattacher / Créer le lead sont branchées ici par les
-          Tasks 9 et 10. `attachRow` / `createRow` sont déjà câblés sur les
-          boutons de carte — la page reste buildable en attendant. */}
+      {attachRow && (
+        <AttachQuoteToLeadModal
+          quote={attachRow}
+          onClose={() => setAttachRow(null)}
+          onAttached={() => { setAttachRow(null); refetch(); }}
+        />
+      )}
+
+      {/* La modale Créer le lead est branchée ici par la Task 10.
+          `createRow` est déjà câblé sur les boutons de carte. */}
     </div>
   );
 }
