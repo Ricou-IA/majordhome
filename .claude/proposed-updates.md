@@ -15,13 +15,6 @@
 **À faire** : graver la doc complète dans CLAUDE.md § Rôles & Permissions quand Phases 4-6 atterrissent. Spec : `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`.
 ---
 
-## [2026-06-19 00:22] Solaire — scénarios par paliers commerciaux 3/6/9 + carte « Optimisé »
-**Statut** : PENDING
-**Commit** : f2c2cbb974013e9e8915e3e81c655b0df3ad0b2c
-**Contexte** : Refonte du dimensionnement du calculateur PV (`pvEngine.js`). Les 3 scénarios Sobre/Recommandé/Confort (paliers ±0,5 kWc autour de l'optimum, jugés irréalistes) sont remplacés par les paliers commerciaux réels (multiples de 3 : 3/6/9 kWc, bornés `min(toiture, plafond 9)`) PLUS une carte « Optimisé » = `recommendedKwc` de `optimize()`. `buildScenarios({recommendedKwc, maxKwc, increment=OFFER_INCREMENT_KWC})` perd le param `stepKwc` ; nouvelle fonction `defaultScenarioKwc({scenarios, recommendedKwc})` choisit le palier pré-sélectionné. Fusion si l'optimum tombe pile sur un palier (pas de carte doublon) ; petite toiture (<3 kWc) → carte Optimisé seule.
-**Proposition** : Ajouter au § Module Solaire de CLAUDE.md : « **Scénarios = paliers commerciaux + Optimisé (révision 2026-06-18)** : `buildScenarios({recommendedKwc, maxKwc, increment=OFFER_INCREMENT_KWC=3})` retourne les paliers multiples de 3 (3/6/9, bornés `min(toiture, max_power_kwc)`) + une carte « Optimisé » flaggée `isOptimum` (= `recommendedKwc` de `optimize()`). Si l'optimum tombe pile sur un palier → fusion (le palier porte `isOptimum`, pas de doublon). Petite toiture (<3 kWc) → carte Optimisé seule. Défaut sélectionné = `defaultScenarioKwc({scenarios, recommendedKwc})` = palier le plus proche de l'optimum (égalité → le plus grand, ne pas sous-dimensionner) ; un `selectedKwc` explicite présent dans les scénarios prime (`etudeModel.js`). Carte UI : étoile sur l'Optimisé (`ScenarioCards.jsx`), grille `lg:grid-cols-4`. » — OU : juger si cette granularité a sa place dans CLAUDE.md vs uniquement la mémoire `project_solaire_calculateur_pv.md`.
----
-
 ## [2026-06-20 09:51] Planning — couleurs calendrier par personne (source = team_members.calendar_color)
 **Statut** : PENDING
 **Commit** : 1a0b8888d8a6a2c9da5e98957a9655a4ffc80e52
