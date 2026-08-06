@@ -46,6 +46,9 @@ const CommercialPipeline = lazy(() => import('@apps/prospection/commercial/Comme
 // Pipeline Contrats
 const PipelineContrats = lazy(() => import('./pages/PipelineContrats'));
 
+// Explorateur de devis Pennylane
+const DevisExplorer = lazy(() => import('./pages/DevisExplorer'));
+
 // Webshop (commandes site web + tarifs produits)
 const Webshop = lazy(() => import('./pages/Webshop'));
 
@@ -188,6 +191,17 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <PipelineContrats />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    // Explorateur de devis PL — garde fine org_admin in-component
+    path: 'devis',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="pipeline">
+          <DevisExplorer />
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },
