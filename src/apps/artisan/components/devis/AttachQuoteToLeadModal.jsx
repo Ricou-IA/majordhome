@@ -14,6 +14,31 @@ import { useDebounce } from '@hooks/useDebounce';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { formatEuro } from '@/lib/utils';
 
+/**
+ * Découpe la saisie en tokens cherchables.
+ *
+ * POURQUOI tokeniser (ne pas « simplifier » en une clause unique) : les noms
+ * sont stockés en DEUX colonnes séparées et majuscules (`first_name`="JEAN",
+ * `last_name`="DUPONT"), alors que la recherche est pré-remplie avec le nom
+ * COMPLET venu de Pennylane ("Jean Dupont"). Un `ilike.%Jean Dupont%` ne
+ * matche donc AUCUNE des deux colonnes → 0 résultat à l'ouverture, ce qui
+ * laisse croire à tort qu'aucun lead n'existe.
+ *
+ * Volontairement large : sur une liste bornée à 20 lignes que l'humain relit
+ * avant de cliquer, rappeler trop coûte bien moins cher que ne rien rappeler.
+ *
+ * L'escape P0.26 s'applique par TOKEN (et non à la chaîne entière) : sinon on
+ * réintroduit l'injection de filtre PostgREST que le helper existe pour couvrir.
+ * Tokens < 2 caractères ignorés (particules, initiales) — sinon on ramène la
+ * moitié de la base.
+ */
+function buildSearchTokens(raw) {
+  return String(raw || '')
+    .split(/\s+/)
+    .flatMap((t) => escapePostgrestSearchTerm(t).split(' '))
+    .filter((t) => t.length >= 2);
+}
+
 /** Bouton monté une fois le lead choisi → leadId stable pour le hook. */
 function AttachButton({ orgId, leadId, quote, onDone }) {
   const { attachQuotes, isAttaching } = useAttachQuotesAndSend(orgId, leadId);
@@ -56,23 +81,26 @@ export function AttachQuoteToLeadModal({ quote, onClose, onAttached }) {
   const [query, setQuery] = useState(quote.customer_name || '');
   const [selected, setSelected] = useState(null);
   const debounced = useDebounce(query, 300);
+  const tokens = buildSearchTokens(debounced);
 
   const { data: leads = [], isFetching } = useQuery({
     queryKey: ['devis-attach-lead-search', orgId, debounced],
     queryFn: async () => {
-      const term = escapePostgrestSearchTerm(debounced.trim());
-      if (!term) return [];
+      // Chaque token est testé sur les deux colonnes de nom.
+      const orClause = tokens
+        .flatMap((t) => [`first_name.ilike.%${t}%`, `last_name.ilike.%${t}%`])
+        .join(',');
       const { data, error } = await supabase
         .from('majordhome_leads')
         .select('id, first_name, last_name, city, status_label, order_amount_ht')
         .eq('org_id', orgId)
         .eq('is_deleted', false)
-        .or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`)
+        .or(orClause)
         .limit(20);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!orgId && debounced.trim().length >= 2,
+    enabled: !!orgId && debounced.trim().length >= 2 && tokens.length > 0,
   });
 
   return (
@@ -105,7 +133,9 @@ export function AttachQuoteToLeadModal({ quote, onClose, onAttached }) {
 
         <div className="flex-1 overflow-y-auto p-2">
           {isFetching && <p className="text-sm text-gray-400 p-3">Recherche...</p>}
-          {!isFetching && debounced.trim().length >= 2 && leads.length === 0 && (
+          {/* Gaté sur `tokens` : ne jamais annoncer « aucun lead » quand aucune
+              requête n'a été lancée (même défaut que celui qu'on corrige ici). */}
+          {!isFetching && tokens.length > 0 && leads.length === 0 && (
             <p className="text-sm text-gray-400 p-3">
               Aucun lead trouvé. Utilise « Créer le lead » depuis la carte.
             </p>
