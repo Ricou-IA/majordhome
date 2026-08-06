@@ -2,20 +2,13 @@
 // Rendu paramétrique des résultats par pièce (étape 4, saisie paramétrique) — pas de polygone
 // dessiné (aucune emprise pièce par pièce en mode paramétrique), donc chaque pièce = vignette
 // proportionnelle à sa surface (côté √surface), disposées en grille flex, colorée par ratio W/m²
-// (interpolation linéaire bleu #3b82f6 → ambre #f59e0b, palette et fmtW copiés de PlanResultats —
+// (interpolation linéaire bleu → ambre —
 // JAMAIS rouge/vert, règle produit R12, palette deutan). Tableau détaillé par pièce sous la
 // grille, avec la colonne Puissance émetteur (= total × foisonnement, posée par buildEtudeModel).
 // Seules les pièces chauffées figurent dans bilan.pieces (cf. calculeBatiment).
+// `couleurRatio` vient de rapportModel : SOURCE UNIQUE de l'échelle écran ↔ rapport PDF.
 import { useMemo } from 'react';
-
-const BLEU = [59, 130, 246];   // #3b82f6 — pièce la moins déperditive (W/m²)
-const AMBRE = [245, 158, 11];  // #f59e0b — pièce la plus déperditive (W/m²)
-
-/** Interpolation linéaire bleu → ambre, t ∈ [0, 1]. */
-function couleurRatio(t) {
-  const c = BLEU.map((v, i) => Math.round(v + (AMBRE[i] - v) * t));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-}
+import { couleurRatio } from '../../lib/rapportModel';
 
 const fmtW = (v) => `${Math.round(v).toLocaleString('fr-FR')} W`;
 
@@ -71,7 +64,7 @@ export default function ResultatsPiecesGrid({ bilan }) {
         <span>{Math.round(ratioMin)} W/m²</span>
         <span
           className="h-2 flex-1 max-w-[160px] rounded-full"
-          style={{ background: 'linear-gradient(to right, #3b82f6, #f59e0b)' }}
+          style={{ background: `linear-gradient(to right, ${couleurRatio(0)}, ${couleurRatio(1)})` }}
         />
         <span>{Math.round(ratioMax)} W/m²</span>
       </div>

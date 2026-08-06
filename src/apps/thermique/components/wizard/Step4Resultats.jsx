@@ -15,13 +15,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-  AlertCircle, AlertTriangle, ArrowLeft, CheckCircle2, Info, Loader2, RefreshCw, Save,
+  AlertCircle, AlertTriangle, ArrowLeft, CheckCircle2, FileDown, Info, Loader2, RefreshCw, Save,
 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useThermalStudyMutations } from '@hooks/useThermalStudies';
+import { clientsService } from '@services/clients.service';
+import { buildCompanyInfo } from '@lib/orgBranding';
+import { formatDateFR } from '@lib/utils';
 import { logger } from '@lib/logger';
 import { climat, uDefauts, coefficientsB, ventilation, loadPacCatalogue } from '../../data';
-import { buildEtudeModel, resultsPersistables, ENGINE_VERSION } from '../../lib/etudeModel';
+import { buildEtudeModel, resultsPersistables, pacId, ENGINE_VERSION } from '../../lib/etudeModel';
+import { buildRapportModel, POSTES_LABELS } from '../../lib/rapportModel';
+import { buildRapportFilename, downloadBlob } from '../../lib/rapportExport';
 import { toStudyInput, clearDraft } from '../../lib/wizardState';
 import { PLAGES_VRAISEMBLANCE } from '../../lib/thermiqueConfig';
 import { resolvePeriode } from '../../lib/refDataResolvers';
@@ -31,17 +37,6 @@ import ResultatsPiecesGrid from './ResultatsPiecesGrid';
 import PacSection, { PacResultats } from './PacSection';
 
 const fmtInt = (v) => Math.round(v).toLocaleString('fr-FR');
-
-// Ordre et libellés FR des postes de bilan.parPoste (clés du moteur, cf. calculeBatiment).
-const POSTES_LABELS = [
-  ['murs', 'Murs'],
-  ['menuiseries', 'Menuiseries'],
-  ['plancherBas', 'Plancher bas'],
-  ['plafondToiture', 'Plafond & toiture'],
-  ['pontsThermiques', 'Ponts thermiques'],
-  ['ventilation', 'Ventilation'],
-  ['relance', 'Relance'],
-];
 
 /** Synthèse : 3 cartes (Φtotal / W/m² / θe) + décomposition par poste (barres Tailwind —
  * plus simple qu'un BarChart horizontal Recharts pour 7 lignes fixes, choix assumé du plan). */
@@ -112,6 +107,9 @@ export default function Step4Resultats({
   const userId = user?.id;
   const navigate = useNavigate();
   const { createStudy, updateStudy } = useThermalStudyMutations();
+  // Branding du rapport PDF — canal canonique des settings d'org (déjà en cache : le wizard
+  // appelle useOrgSettings pour construire `config`).
+  const { settings } = useOrgSettings();
 
   // --- Catalogue PAC (lazy, ~4,6 Mo) — chargé à l'ouverture du volet PAC ---
   const [pacCatalogue, setPacCatalogue] = useState(null);
@@ -176,6 +174,73 @@ export default function Step4Resultats({
   const periode = resolvePeriode(contexte.annee);
   const plage = PLAGES_VRAISEMBLANCE[periode] ?? null;
 
+  // --- Rapport PDF ---
+  // Résultats consommés par le rapport : les MÊMES que ceux affichés — figés (étude rouverte, R7)
+  // ou live. Le PDF ne recalcule donc jamais un chiffre que l'écran n'a pas montré.
+  const figes = savedResults?.results ?? null;
+  const resultatsRapport = savedResults
+    ? {
+      bilan: figes?.bilan ?? null,
+      thetaE: figes?.thetaE ?? null,
+      pac: figes?.pac ?? null,
+      engineVersion: savedResults.engineVersion ?? null,
+    }
+    : { bilan: model.bilan, thetaE: model.thetaE, pac: model.pac, engineVersion: ENGINE_VERSION };
+  // Machine résolue pour le graphe de bivalence — nécessite le catalogue (4,6 Mo, chargé à
+  // l'ouverture du volet PAC). Absente → le rapport se rabat sur les seuls indicateurs.
+  const machine = pac.mode === 'catalogue' && pac.pacId && pacCatalogue
+    ? pacCatalogue.pacs.find((p) => pacId(p) === pac.pacId) ?? null
+    : null;
+
+  const [pdfEnCours, setPdfEnCours] = useState(false);
+  const handleRapportPdf = async () => {
+    setPdfEnCours(true);
+    try {
+      // Nom du client : best effort (une étude peut n'être rattachée à aucune fiche).
+      let clientName = '';
+      if (contexte.clientId) {
+        const { data, error } = await clientsService.getClientById(contexte.clientId);
+        if (error) logger.warn('[thermique] nom du client indisponible pour le rapport', error);
+        else if (data) {
+          clientName = data.display_name || data.name
+            || `${data.last_name || ''} ${data.first_name || ''}`.trim();
+        }
+      }
+      const rapport = buildRapportModel(toStudyInput(state), resultatsRapport, {
+        config,
+        data: { climat, uDefauts, coefficientsB, ventilation },
+        machine,
+        dateLabel: formatDateFR(new Date()),
+        clientName,
+      });
+      // Import dynamique : @react-pdf/renderer ne pèse dans le bundle que si un rapport est demandé.
+      const { generateRapportThermiquePdfBlob } = await import('../etude/EtudeThermiquePDF');
+      const blob = await generateRapportThermiquePdfBlob({
+        rapport,
+        company: buildCompanyInfo(settings),
+      });
+      downloadBlob(blob, buildRapportFilename(clientName || contexte.titre));
+      toast.success('Rapport PDF généré');
+    } catch (e) {
+      logger.error('[thermique] génération du rapport PDF échouée', e);
+      toast.error(`Rapport PDF impossible : ${e?.message ?? 'erreur inconnue'}`);
+    } finally {
+      setPdfEnCours(false);
+    }
+  };
+
+  const boutonRapport = (
+    <button
+      type="button"
+      onClick={handleRapportPdf}
+      disabled={pdfEnCours || !resultatsRapport.bilan}
+      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-secondary-300 text-secondary-700 hover:bg-secondary-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {pdfEnCours ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+      Rapport PDF
+    </button>
+  );
+
   // --- Sauvegarde ---
   const [saving, setSaving] = useState(null); // null | 'draft' | 'completed'
   // Garde (revue globale plan 4) : une PAC catalogue configurée mais non calculable (catalogue
@@ -224,7 +289,6 @@ export default function Step4Resultats({
 
   // ====== Mode « étude rouverte » (R7) : résultats figés + bannière moteur ======
   if (savedResults) {
-    const figes = savedResults.results ?? {};
     const memeVersion = savedResults.engineVersion === ENGINE_VERSION;
     return (
       <div className="space-y-4">
@@ -250,7 +314,7 @@ export default function Step4Resultats({
           )}
         </div>
 
-        {figes.bilan ? (
+        {figes?.bilan ? (
           <>
             <Synthese bilan={figes.bilan} thetaE={figes.thetaE} dept={contexte.dept} periode={periode} plage={plage} />
             {state.saisie?.pieces?.length > 0
@@ -262,6 +326,8 @@ export default function Step4Resultats({
                 <PacResultats pacModel={figes.pac} />
               </div>
             )}
+            {/* Le rapport reprend les résultats FIGÉS — mêmes chiffres que ci-dessus. */}
+            <div className="card flex items-center justify-end">{boutonRapport}</div>
           </>
         ) : (
           <p className="card text-sm text-secondary-500">
@@ -384,6 +450,7 @@ export default function Step4Resultats({
         {raisonPacIncomplet && (
           <p className="text-xs text-amber-700 mr-auto">{raisonPacIncomplet}</p>
         )}
+        {boutonRapport}
         <button
           type="button"
           onClick={() => handleSave('draft')}
