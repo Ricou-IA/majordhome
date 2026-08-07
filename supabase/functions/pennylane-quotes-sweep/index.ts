@@ -141,8 +141,11 @@ async function sweepOrg(
       });
       if (error) throw error;
 
-      for (const r of (rows ?? []) as { pennylane_quote_id: number; target_deadline: string }[]) {
-        toNormalize.push({ id: r.pennylane_quote_id, target: r.target_deadline });
+      // quote_pl_id (et non pennylane_quote_id) : la colonne de sortie de la RPC
+      // est nommee distinctement de la colonne table, sinon ON CONFLICT devient
+      // ambigu cote PL/pgSQL (42702, migration 20260807_1c).
+      for (const r of (rows ?? []) as { quote_pl_id: number; target_deadline: string }[]) {
+        toNormalize.push({ id: r.quote_pl_id, target: r.target_deadline });
       }
     }
 
