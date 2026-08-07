@@ -154,6 +154,37 @@ async function sweepOrg(
     if (pages >= MAX_PAGES) truncated = true;
   }
 
+  // --- Normalisation des échéances -----------------------------------------
+  // Un seul PUT par devis : le statut `expired` est DÉRIVÉ de `deadline` côté
+  // Pennylane (établi par test le 2026-08-07), il se recalcule seul. Ne PAS
+  // appeler /update_status.
+  //
+  // La cible vient de la RPC (majordhome.pl_quote_target_deadline), qui ne
+  // renvoie que des allongements : une échéance prolongée à la main n'est
+  // jamais raccourcie par ce balayage (garde posée en migration 20260807_1d).
+  let normalized = 0;
+  let normalizeErrors = 0;
+
+  if (applyDeadlines && toNormalize.length > 0) {
+    // Rate limit PL V2 = 25 req / 5 s → 5 en vol maximum.
+    const CONCURRENCY = 5;
+    for (let i = 0; i < toNormalize.length; i += CONCURRENCY) {
+      const batch = toNormalize.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async ({ id, target }) => {
+        try {
+          const { status } = await callPennylane(`/quotes/${id}`, apiToken, {
+            method: "PUT",
+            body: JSON.stringify({ deadline: target }),
+          });
+          if (status >= 200 && status < 300) normalized++;
+          else normalizeErrors++;
+        } catch {
+          normalizeErrors++;
+        }
+      }));
+    }
+  }
+
   // Devis absents de ce balayage
   const { data: missing, error: missErr } = await supabase.rpc("pennylane_quotes_mark_missing", {
     p_org_id: orgId,
@@ -167,8 +198,8 @@ async function sweepOrg(
     truncated,
     statuses_seen: [...statusSeen],
     to_normalize: toNormalize.length,
-    normalized: 0,          // Task 4
-    normalize_errors: 0,    // Task 4
+    normalized,
+    normalize_errors: normalizeErrors,
     marked_missing: missing ?? 0,
     apply_deadlines: applyDeadlines,
   };
@@ -191,9 +222,25 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: "PENNYLANE_API_TOKEN not configured" }, 500, req);
   }
 
-  // Interrupteur d'écriture. Tant qu'il est absent/false, la fonction ne touche
-  // PAS aux devis Pennylane : elle matérialise et compte seulement.
-  const applyDeadlines = Deno.env.get("PL_APPLY_DEADLINES") === "true";
+  // Interrupteurs d'écriture. Tant qu'aucun des deux n'est vrai, la fonction ne
+  // touche PAS aux devis Pennylane : elle matérialise et compte seulement.
+  //
+  // Les deux canaux sont volontairement distincts :
+  //   - corps `{ "apply_deadlines": true }` → passage MANUEL délibéré, décidé
+  //     appel par appel (campagnes de normalisation pilotées à la main) ;
+  //   - env `PL_APPLY_DEADLINES` → gouvernera le CRON planifié, le jour où on
+  //     décidera de l'activer.
+  //
+  // Le cron envoie `{}` : il reste donc en lecture seule tant que la variable
+  // d'environnement n'est pas posée. Autoriser une campagne manuelle ne rend
+  // PAS le balayage automatique écrivain — c'est la propriété qu'on protège.
+  let bodyFlag = false;
+  try {
+    const body = await req.json();
+    bodyFlag = body?.apply_deadlines === true;
+  } catch { /* corps vide ou non-JSON : lecture seule */ }
+
+  const applyDeadlines = Deno.env.get("PL_APPLY_DEADLINES") === "true" || bodyFlag;
 
   const supabase = getAdminClient();
 
