@@ -293,9 +293,10 @@ export const pennylaneKeys = {
   // PR 4 bridge : candidats fuzzy + devis PL non rattachés (exploration + compteur)
   candidatesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'candidates', leadId],
   unlinkedQuotes: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'unlinked-quotes', sinceDays],
-  // Explorateur de devis : compteur KPI Dashboard ET page /devis partagent
-  // CETTE key — deux sources divergeraient sur les filtres.
-  quotesExplorer: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'quotes-explorer', sinceDays],
+  // Explorateur : plus de fenêtre temporelle, la table jumelle porte tout
+  // l'historique. Compteur KPI Dashboard ET page /devis partagent CETTE key —
+  // deux sources divergeraient sur les filtres.
+  quotesExplorer: (orgId) => [...pennylaneKeys.all(orgId), 'quotes-explorer'],
   quoteDismissals: (orgId) => [...pennylaneKeys.all(orgId), 'quote-dismissals'],
   // Bug #5 ROGERO : recherche customer PL (cache D.5 + live)
   customerSearch: (orgId, query) => [...pennylaneKeys.all(orgId), 'customer-search', query],

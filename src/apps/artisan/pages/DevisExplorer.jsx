@@ -19,7 +19,7 @@ import { QuoteExplorerCard } from '@apps/artisan/components/devis/QuoteExplorerC
 import { AttachQuoteToLeadModal } from '@apps/artisan/components/devis/AttachQuoteToLeadModal';
 import { CreateLeadFromQuoteModal } from '@apps/artisan/components/devis/CreateLeadFromQuoteModal';
 import { EXPLORER_VIEWS, filterExplorerRows } from '@/lib/quotesExplorer';
-import { formatEuro } from '@/lib/utils';
+import { formatEuro, formatRelativeFR } from '@/lib/utils';
 
 const COLUMNS = [
   { id: 'pending', label: 'En attente', color: '#d97706' },
@@ -27,6 +27,10 @@ const COLUMNS = [
   { id: 'accepted', label: 'Accepté', color: '#1d4ed8' },
   { id: 'invoiced', label: 'Facturé', color: '#0f766e' },
 ];
+
+// Le balayage tourne toutes les 5 min : au-delà d'une heure, ce ne sont plus
+// des données un peu en retard, c'est une douzaine de passages manqués.
+const STALE_AFTER_MS = 60 * 60 * 1000;
 
 const VIEW_TABS = [
   { id: EXPLORER_VIEWS.ORPHANS, label: 'Orphelins' },
@@ -43,7 +47,7 @@ export default function DevisExplorer() {
   const [attachRow, setAttachRow] = useState(null);
   const [createRow, setCreateRow] = useState(null);
 
-  const { rows, truncated, scanned, isLoading, error, refetch } = useQuotesExplorer({
+  const { rows, syncedAt, isLoading, error, refetch } = useQuotesExplorer({
     enabled: isOrgAdmin && pennylaneActive,
   });
   const { dismissQuotes, isDismissing, restoreQuote } = useQuoteDismissals();
@@ -86,7 +90,7 @@ export default function DevisExplorer() {
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">Devis Pennylane</h1>
           <p className="text-secondary-600">
-            Devis des 90 derniers jours et leur rattachement au pipeline.
+            Tous les devis Pennylane et leur rattachement au pipeline.
           </p>
         </div>
       </div>
@@ -95,7 +99,9 @@ export default function DevisExplorer() {
         <div className="p-4 rounded-lg bg-amber-50 text-amber-800 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-medium">Pennylane injoignable</p>
+            {/* La page ne lit plus Pennylane en direct mais la table jumelle :
+                une erreur ici vient de Supabase (RLS, réseau), pas de PL. */}
+            <p className="text-sm font-medium">Devis indisponibles</p>
             <p className="text-sm">{error?.message || 'Erreur inconnue'}</p>
           </div>
           <button type="button" onClick={() => refetch()}
@@ -103,10 +109,30 @@ export default function DevisExplorer() {
         </div>
       )}
 
-      {truncated && (
-        <div className="p-3 rounded-lg bg-blue-50 text-blue-800 text-sm">
-          Affichage partiel : {scanned} devis analysés (plafond de scan atteint).
-          Les devis les plus anciens de la fenêtre peuvent manquer.
+      {/* Fraîcheur de la projection. La page ne lit plus Pennylane en direct :
+          si le balayage s'arrête, elle continuerait d'afficher des données
+          périmées avec assurance — « aucun nouveau devis » là où il faut lire
+          « je ne sais plus ». Ce bandeau est ce qui rend la table jumelle
+          acceptable, pas un ornement. */}
+      {!isLoading && !error && (
+        syncedAt ? (
+          <p className="text-xs text-gray-400">
+            Dernière synchronisation {formatRelativeFR(syncedAt)}
+          </p>
+        ) : (
+          <div className="p-3 rounded-lg bg-amber-50 text-amber-800 text-sm flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            Aucune synchronisation Pennylane connue — cette page ne reflète
+            peut-être rien du tout.
+          </div>
+        )
+      )}
+
+      {syncedAt && (Date.now() - new Date(syncedAt).getTime()) > STALE_AFTER_MS && (
+        <div className="p-3 rounded-lg bg-amber-50 text-amber-800 text-sm flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          Les devis affichés datent de plus d&apos;une heure — la synchronisation
+          Pennylane est peut-être arrêtée.
         </div>
       )}
 

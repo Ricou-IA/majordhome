@@ -8,9 +8,10 @@
  * ============================================================================
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
+import { pennylaneQuotesService } from '@services/pennylaneQuotes.service';
 import { leadsService } from '@services/leads.service';
 import { quoteDismissalsService } from '@services/quoteDismissals.service';
 import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
@@ -18,7 +19,8 @@ import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { cleanPhone } from '@/lib/phoneUtils';
-import { filterExplorerRows, EXPLORER_VIEWS } from '@/lib/quotesExplorer';
+import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
+import { buildExplorerRows, filterExplorerRows, EXPLORER_VIEWS } from '@/lib/quotesExplorer';
 
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
@@ -450,37 +452,53 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
 
 /**
  * Explorateur de devis PL : source UNIQUE du compteur KPI Dashboard et de la
- * page /devis. staleTime long (15 min) — le scan PL est coûteux et les devis
- * bougent peu.
+ * page /devis. Lit la table jumelle (alimentée toutes les 5 min par l'edge
+ * pennylane-quotes-sweep) et NON plus Pennylane en direct : ouverture
+ * instantanée, historique complet, plus de fenêtre glissante.
+ *
+ * `syncedAt` DOIT être affiché par la page : sans lui, un balayage arrêté fait
+ * afficher des données périmées avec assurance (cf. spec §9).
  *
  * @param {object} [opts]
- * @param {number} [opts.sinceDays=90]
  * @param {boolean} [opts.enabled=true]
  */
-export function useQuotesExplorer({ sinceDays = 90, enabled = true } = {}) {
+export function useQuotesExplorer({ enabled = true } = {}) {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
   const query = useQuery({
-    queryKey: pennylaneKeys.quotesExplorer(orgId, sinceDays),
+    queryKey: pennylaneKeys.quotesExplorer(orgId),
     queryFn: async () => {
-      const { data, error } = await pennylaneService.getQuotesExplorer(orgId, { sinceDays });
+      const { data, error } = await pennylaneQuotesService.getAll(orgId);
       if (error) throw error;
       return data;
     },
     enabled: !!orgId && enabled,
-    staleTime: 15 * 60_000,
+    staleTime: 60_000,
   });
 
-  const rows = query.data?.rows || [];
+  const rawRows = query.data?.rows || [];
+
+  // `sinceDays: Infinity` neutralise le filtre temporel du module pur sans le
+  // modifier (cutoffMs devient -Infinity) : la table jumelle porte déjà tout
+  // l'historique, la fenêtre n'a plus d'objet.
+  const rows = useMemo(
+    () => buildExplorerRows({
+      quotes: rawRows,
+      linkByQuoteId: query.data?.linkByQuoteId || new Map(),
+      dismissedIds: query.data?.dismissedIds || new Set(),
+      minAmountHt: PIPELINE_MIN_AMOUNT_HT,
+      sinceDays: Number.POSITIVE_INFINITY,
+    }),
+    [rawRows, query.data],
+  );
 
   return {
     rows,
     // Dérivé de filterExplorerRows (module pur), PAS recopié : garantit que ce
     // compteur compte exactement ce que la vue "Orphelins" de la page affiche.
     orphanCount: filterExplorerRows(rows, EXPLORER_VIEWS.ORPHANS).length,
-    truncated: query.data?.truncated || false,
-    scanned: query.data?.scanned || 0,
+    syncedAt: query.data?.syncedAt || null,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,

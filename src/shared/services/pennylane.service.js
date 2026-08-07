@@ -23,8 +23,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
-import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
-import { buildExplorerRows } from '@/lib/quotesExplorer';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================
@@ -1350,142 +1348,12 @@ function formatQuoteForCandidate(q, customer) {
 }
 
 /**
- * Scan unique des devis PL de la fenêtre, enrichi des rattachements et des
- * écartements. Alimente À LA FOIS le compteur Dashboard et la page /devis
- * (même queryKey) — un compteur calculé à part dériverait des filtres de la
- * liste et le voyant perdrait toute crédibilité.
- *
- * Tout le raisonnement métier (allowlist statuts, seuil, fenêtre, tri, tagging
- * orphelin/écarté) vit dans `buildExplorerRows` (module pur testé). Cette
- * fonction ne fait QUE de l'I/O — ne jamais y réintroduire de filtre.
- *
- * ⚠️ orgId = org CORE (useAuth().organization.id) : c'est ce que porte
- * lead_pennylane_quotes.org_id. NE PAS passer par getMajordhomeOrgId().
- *
- * @param {string} orgId
- * @param {object} [opts]
- * @param {number} [opts.sinceDays=90]
- * @returns {Promise<{rows: Array, truncated: boolean, scanned: number}>}
- */
-async function getQuotesExplorer(orgId, { sinceDays = 90 } = {}) {
-  if (!orgId) return { rows: [], truncated: false, scanned: 0 };
-
-  // 1. Rattachements actifs (org core) → Map<quote_pl_id, {lead_id}>
-  //
-  // ⚠️ Les 3 SELECT ci-dessous THROW sur erreur au lieu d'avaler le `{ error }`.
-  // Un échec silencieux ici (RLS, réseau) renverrait une Map/Set vide → TOUS les
-  // devis ressortiraient `is_orphan: true` : voyant Dashboard en fausse alerte
-  // massive et campagne de rattachement sur des devis déjà rattachés. Une page
-  // en erreur est très préférable à une page qui ment.
-  const { data: links, error: linksError } = await supabase
-    .from('majordhome_lead_pennylane_quotes')
-    .select('pennylane_quote_id, lead_id')
-    .eq('org_id', orgId)
-    .is('ejected_at', null);
-  if (linksError) throw linksError;
-
-  const linkByQuoteId = new Map();
-  for (const l of links || []) {
-    linkByQuoteId.set(Number(l.pennylane_quote_id), { lead_id: l.lead_id, lead_name: null });
-  }
-
-  // 2. Noms des leads rattachés (1 requête, pas N)
-  const leadIds = [...new Set([...linkByQuoteId.values()].map(v => v.lead_id).filter(Boolean))];
-  if (leadIds.length > 0) {
-    const { data: leads, error: leadsError } = await supabase
-      .from('majordhome_leads')
-      .select('id, first_name, last_name')
-      .in('id', leadIds);
-    if (leadsError) throw leadsError;
-    const nameById = new Map(
-      (leads || []).map(l => [l.id, [l.first_name, l.last_name].filter(Boolean).join(' ').trim() || null]),
-    );
-    for (const v of linkByQuoteId.values()) {
-      v.lead_name = nameById.get(v.lead_id) || null;
-    }
-  }
-
-  // 3. Écartements
-  const { data: dismissals, error: dismissalsError } = await supabase
-    .from('majordhome_pennylane_quote_dismissals')
-    .select('pennylane_quote_id')
-    .eq('org_id', orgId);
-  if (dismissalsError) throw dismissalsError;
-  const dismissedIds = new Set((dismissals || []).map(d => Number(d.pennylane_quote_id)));
-
-  // 4. Scan paginé /quotes (même plafond que getUnlinkedQuotes)
-  const allQuotes = [];
-  let cursor = null;
-  let hasMore = true;
-  let pageCount = 0;
-  const MAX_PAGES = 10;
-
-  while (hasMore && pageCount < MAX_PAGES) {
-    let path = '/quotes?limit=100';
-    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
-    const result = await apiCall('GET', path);
-    const items = result?.items || [];
-    allQuotes.push(...items);
-    hasMore = result?.has_more && !!result?.next_cursor;
-    cursor = result?.next_cursor || null;
-    pageCount++;
-  }
-
-  // truncated = le scan s'est arrêté sur le plafond alors que PL en avait encore.
-  // Doit être affiché (règle « pas de cap muet »).
-  const truncated = hasMore;
-
-  // 5. Formatage. `Number(q.id)` : la clé de lookup doit être du même type que
-  // linkByQuoteId / dismissedIds (déjà normalisés en Number).
-  // Le nom client n'est ici renseigné que s'il est présent dans le payload PL
-  // (gratuit) — la résolution coûteuse est faite APRÈS filtrage (étape 6).
-  const formatted = allQuotes.map(q => ({
-    id: Number(q.id),
-    quote_number: q.quote_number || q.label || null,
-    label: q.label || null,
-    subject: q.pdf_invoice_subject || null,
-    date: q.date || null,
-    amount_ht: q.currency_amount_before_tax ?? null,
-    amount_ttc: q.amount ?? q.currency_amount ?? null,
-    status: q.status || null,
-    pdf_url: q.public_file_url || null,
-    customer_id: q.customer?.id || null,
-    customer_name: formatPennylaneCustomerName(q.customer) || null,
-  }));
-
-  const rows = buildExplorerRows({
-    quotes: formatted,
-    linkByQuoteId,
-    dismissedIds,
-    minAmountHt: PIPELINE_MIN_AMOUNT_HT,
-    sinceDays,
-  });
-
-  // 6. Noms clients des SURVIVANTS uniquement (la LISTE /quotes n'embarque que
-  // customer.id — cf ef7c175). resolveCustomerNames borne son fallback live à
-  // CUSTOMER_NAME_LIVE_CAP : dépenser ce budget avant filtrage le gaspillait sur
-  // des devis écartés (draft, < seuil, hors fenêtre) et laissait des lignes
-  // VISIBLES sans nom. Résoudre après filtrage = moins d'appels PL, et le budget
-  // va aux lignes réellement affichées.
-  const namesById = await resolveCustomerNames(
-    orgId,
-    rows.filter(r => !r.customer_name).map(r => r.customer_id),
-  );
-  for (const r of rows) {
-    if (!r.customer_name && r.customer_id) {
-      r.customer_name = namesById.get(String(r.customer_id)) || null;
-    }
-  }
-
-  return { rows, truncated, scanned: allQuotes.length };
-}
-
-/**
  * Devis PL des N derniers jours sans rattachement actif en MDH.
  * Sert à la section "Explorer les devis non rattachés" de QuoteCandidatesModal.
  *
- * Volontairement distinct de `getQuotesExplorer` : fenêtre (60 j) et plafond
- * `limit` propres, aucun filtre statut/montant. Ne PAS le réécrire par-dessus
+ * Volontairement distinct de l'explorateur `/devis` (qui lit désormais la table
+ * jumelle via pennylaneQuotes.service) : fenêtre (60 j) et plafond `limit`
+ * propres, aucun filtre statut/montant. Ne PAS le réécrire par-dessus
  * l'explorateur — ça changerait le comportement de QuoteCandidatesModal.
  *
  * Note : `since_days` filtre sur `quote.date` (date du devis Pennylane), pas
@@ -1850,7 +1718,6 @@ export const pennylaneService = {
   // Bridge Pipeline ↔ Pennylane (spec 2026-05-23 PR 4+)
   getCandidateQuotesForLead: (leadId, orgId) => withErrorHandling(() => getCandidateQuotesForLead(leadId, orgId), 'pennylane.getCandidateQuotesForLead'),
   getUnlinkedQuotes: (orgId, opts) => withErrorHandling(() => getUnlinkedQuotes(orgId, opts), 'pennylane.getUnlinkedQuotes'),
-  getQuotesExplorer: (orgId, opts) => withErrorHandling(() => getQuotesExplorer(orgId, opts), 'pennylane.getQuotesExplorer'),
   attachQuotesAndSendLead: (orgId, leadId, quotes) => withErrorHandling(() => attachQuotesAndSendLead(orgId, leadId, quotes), 'pennylane.attachQuotesAndSendLead'),
   markLeadWonWithQuote: (orgId, leadId, winningQuotePlId) => withErrorHandling(() => markLeadWonWithQuote(orgId, leadId, winningQuotePlId), 'pennylane.markLeadWonWithQuote'),
 
