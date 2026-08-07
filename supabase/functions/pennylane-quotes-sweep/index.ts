@@ -29,6 +29,11 @@ const PAGE_LIMIT = 100;
 const MAX_PAGES = 200;          // garde-fou : 20 000 devis
 const UPSERT_CHUNK = 200;
 
+// Borne dure de la résolution de noms. Ce balayage tourne toutes les 5 min :
+// on refuse d'y empiler des centaines d'appels unitaires. Le reliquat part au
+// cycle suivant — le cache se remplit en quelques passages.
+const RESOLVE_MAX_PER_SWEEP = 40;
+
 interface PennylaneQuoteListItem {
   id: number;
   quote_number?: string;
@@ -47,7 +52,29 @@ interface PennylaneQuoteListItem {
   customer?: { id?: number; name?: string; first_name?: string; last_name?: string };
 }
 
-function formatCustomerName(c?: PennylaneQuoteListItem["customer"]): string | null {
+// Shape de GET /customers/{id}. ATTENTION : Pennylane V2 renvoie la ressource
+// DIRECTEMENT AU ROOT, elle n'est PAS enveloppée dans { customer: … }.
+// Assumer l'enveloppe a déjà fait sauter 155 devis en silence sur ce projet.
+interface PennylaneCustomer {
+  id?: number;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  customer_type?: string;
+  billing_email?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  postal_code?: string;
+  city?: string;
+  reference?: string;
+  external_reference?: string;
+}
+
+// `name` est absent pour un particulier → composer depuis first_name/last_name.
+function formatCustomerName(
+  c?: { name?: string; first_name?: string; last_name?: string } | null,
+): string | null {
   if (!c) return null;
   if (c.name) return c.name;
   const full = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
@@ -204,6 +231,106 @@ async function sweepOrg(
     }
   }
 
+  // --- Résolution des noms clients manquants ---------------------------------
+  // L'endpoint LISTE /quotes n'embarque QUE `customer.id`, jamais le nom : seul
+  // le GET unitaire /customers/{id} le porte. Les devis dont le client n'est pas
+  // encore dans majordhome.pennylane_customer_lookup ressortent donc sans
+  // customer_name (« Client inconnu » sur /devis).
+  //
+  // On fetche ces clients et on alimente LE CACHE — magasin canonique des noms
+  // (write-through D.5) qui sert aussi resolveCustomerNames, la recherche
+  // « Client existant » et le rapprochement de devis. Le COALESCE de
+  // pennylane_quotes_upsert_batch reprendra la valeur au passage suivant : la
+  // table jumelle se répare seule en 2-3 cycles de 5 min.
+  //
+  // On ne réinjecte volontairement PAS les lignes de devis pour converger en un
+  // seul passage : une seule voie de résolution vaut mieux que deux mécanismes
+  // concurrents.
+  //
+  // NB : la RPC appelée ici est la jumelle service_role de
+  // upsert_pennylane_customer_lookup(), inappelable depuis une edge function
+  // (elle vérifie auth.uid(), NULL hors contexte utilisateur). Cf. migration
+  // 20260807_5.
+  //
+  // JAMAIS bloquante : un nom non résolu est cosmétique, une matérialisation
+  // ratée ne l'est pas. D'où le try/catch qui compte l'échec sans le propager.
+  let customersResolved = 0;
+  let customersPending = 0;
+  let resolveError: string | null = null;
+
+  try {
+    const { data: missingRows, error: missingErr } = await supabase
+      .from("majordhome_pennylane_quotes")
+      .select("customer_id")
+      .eq("org_id", orgId)
+      .is("customer_name", null)
+      .not("customer_id", "is", null)
+      .limit(200);
+    if (missingErr) throw missingErr;
+
+    const uniqueIds = [
+      ...new Set(
+        (missingRows ?? [])
+          .map((r) => Number((r as { customer_id: number | string }).customer_id))
+          .filter((n) => Number.isFinite(n) && n > 0),
+      ),
+    ];
+    const batch = uniqueIds.slice(0, RESOLVE_MAX_PER_SWEEP);
+
+    const payloads: Record<string, unknown>[] = [];
+    const CONCURRENCY = 5; // rate limit PL V2 = 25 req / 5 s
+    for (let i = 0; i < batch.length; i += CONCURRENCY) {
+      const slice = batch.slice(i, i + CONCURRENCY);
+      const fetched = await Promise.all(slice.map(async (id) => {
+        // Un client qui échoue ne doit pas emporter les 4 autres du lot.
+        try {
+          const { status, data } = await callPennylane(`/customers/${id}`, apiToken);
+          if (status !== 200 || !data || typeof data !== "object") return null;
+          return { id, customer: data as PennylaneCustomer };
+        } catch {
+          return null;
+        }
+      }));
+
+      for (const f of fetched) {
+        if (!f) continue;
+        const c = f.customer;
+        const name = formatCustomerName(c);
+        if (!name) continue; // rien d'exploitable : ne pas polluer le cache
+        payloads.push({
+          pennylane_id: Number(c.id ?? f.id),
+          name,
+          first_name: c.first_name ?? null,
+          last_name: c.last_name ?? null,
+          customer_type: c.customer_type ?? null,
+          email: c.billing_email ?? c.email ?? null,
+          phone: c.phone ?? null,
+          address: c.address ?? null,
+          postal_code: c.postal_code ?? null,
+          city: c.city ?? null,
+          external_reference: c.reference ?? c.external_reference ?? null,
+          raw_payload: c,
+        });
+      }
+    }
+
+    // Reste à traiter : dépassement du plafond ET clients non résolus (fetch
+    // KO ou sans nom exploitable). Le passage suivant les recomptera depuis la
+    // base — ce compteur sert à voir si le mécanisme converge.
+    customersPending = uniqueIds.length - payloads.length;
+
+    if (payloads.length > 0) {
+      const { error: cacheErr } = await supabase.rpc(
+        "pennylane_customer_lookup_upsert_batch",
+        { p_org_id: orgId, p_rows: payloads },
+      );
+      if (cacheErr) throw cacheErr;
+      customersResolved = payloads.length;
+    }
+  } catch (e) {
+    resolveError = sanitizeError(e, "customer resolution failed");
+  }
+
   // Devis absents de ce balayage
   const { data: missing, error: missErr } = await supabase.rpc("pennylane_quotes_mark_missing", {
     p_org_id: orgId,
@@ -222,6 +349,9 @@ async function sweepOrg(
     normalize_failures: normalizeFailures,
     marked_missing: missing ?? 0,
     apply_deadlines: applyDeadlines,
+    customers_resolved: customersResolved,
+    customers_pending: customersPending,
+    ...(resolveError ? { customers_resolve_error: resolveError } : {}),
   };
 }
 
