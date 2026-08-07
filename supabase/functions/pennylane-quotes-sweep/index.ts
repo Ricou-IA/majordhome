@@ -164,6 +164,11 @@ async function sweepOrg(
   // jamais raccourcie par ce balayage (garde posée en migration 20260807_1d).
   let normalized = 0;
   let normalizeErrors = 0;
+  // Détail des échecs. Sans lui, un devis que Pennylane refuse durablement est
+  // retenté à CHAQUE passage sans qu'on sache pourquoi : le compteur d'erreurs
+  // ne revient jamais à zéro et perd toute valeur d'alarme. Borné à 5 pour ne
+  // pas gonfler la réponse.
+  const normalizeFailures: { id: number; target: string; status: number; detail: string }[] = [];
 
   if (applyDeadlines && toNormalize.length > 0) {
     // Rate limit PL V2 = 25 req / 5 s → 5 en vol maximum.
@@ -172,14 +177,28 @@ async function sweepOrg(
       const batch = toNormalize.slice(i, i + CONCURRENCY);
       await Promise.all(batch.map(async ({ id, target }) => {
         try {
-          const { status } = await callPennylane(`/quotes/${id}`, apiToken, {
+          const { status, data } = await callPennylane(`/quotes/${id}`, apiToken, {
             method: "PUT",
             body: JSON.stringify({ deadline: target }),
           });
-          if (status >= 200 && status < 300) normalized++;
-          else normalizeErrors++;
-        } catch {
+          if (status >= 200 && status < 300) {
+            normalized++;
+          } else {
+            normalizeErrors++;
+            if (normalizeFailures.length < 5) {
+              normalizeFailures.push({
+                id,
+                target,
+                status,
+                detail: typeof data === "string" ? data.slice(0, 300) : JSON.stringify(data).slice(0, 300),
+              });
+            }
+          }
+        } catch (e) {
           normalizeErrors++;
+          if (normalizeFailures.length < 5) {
+            normalizeFailures.push({ id, target, status: 0, detail: sanitizeError(e, "PUT failed") });
+          }
         }
       }));
     }
@@ -200,6 +219,7 @@ async function sweepOrg(
     to_normalize: toNormalize.length,
     normalized,
     normalize_errors: normalizeErrors,
+    normalize_failures: normalizeFailures,
     marked_missing: missing ?? 0,
     apply_deadlines: applyDeadlines,
   };
