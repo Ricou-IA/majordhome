@@ -1,19 +1,43 @@
 /**
  * CreateLeadFromQuoteModal.jsx — crée un lead depuis un devis PL orphelin.
- * Le contact vient de Pennylane (canonical post-attache) ; l'admin ne choisit
- * QUE le commercial. Puis on enchaîne sur l'attache : le lead naît directement
- * en « Devis envoyé » avec son devis rattaché.
+ * Le contact vient de Pennylane (canonical post-attache) ; l'admin renseigne
+ * ce que Pennylane ne sait pas : commercial, source et équipement. Puis on
+ * enchaîne sur l'attache : le lead naît en « Devis envoyé » avec son devis.
+ *
+ * Source et équipement portent ici les MÊMES libellés que dans LeadModal
+ * (« Source », « Équipement concerné ») et alimentent les mêmes colonnes
+ * (`source_id`, `equipment_type_id`) : sans quoi la carte Kanban issue de cet
+ * écran serait plus pauvre que celle d'un lead créé normalement.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, ChevronDown } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
-import { useLeadCommercials } from '@hooks/useLeads';
+import { useLeadCommercials, useLeadSources } from '@hooks/useLeads';
+import { usePricingEquipmentTypes } from '@hooks/useClients';
 import { useAttachQuotesAndSend } from '@hooks/usePennylane';
 import { leadsService } from '@services/leads.service';
 import { pennylaneService } from '@services/pennylane.service';
+import { EQUIPMENT_CATEGORY_LABELS } from '@apps/artisan/components/pipeline/LeadStatusConfig';
 import { formatEuro } from '@/lib/utils';
+
+const selectClass =
+  'w-full px-3 py-2 pr-9 border border-secondary-200 rounded-lg text-sm appearance-none bg-white';
+
+function Field({ id, label, children }) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-secondary-700 mb-1">
+        {label}
+      </label>
+      <div className="relative">
+        {children}
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+      </div>
+    </div>
+  );
+}
 
 /** Monté une fois le lead créé → leadId stable pour le hook d'attache. */
 function AttachAfterCreate({ orgId, leadId, quote, onDone }) {
@@ -56,9 +80,31 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
   const orgId = organization?.id;
 
   const { commercials } = useLeadCommercials(orgId);
+  const { sources } = useLeadSources();
+  const { equipmentTypes } = usePricingEquipmentTypes();
+
   const [commercialId, setCommercialId] = useState('');
+  const [sourceId, setSourceId] = useState('');
+  const [equipmentTypeId, setEquipmentTypeId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createdLeadId, setCreatedLeadId] = useState(null);
+
+  // Même regroupement par catégorie que LeadModal.
+  const groupedEquipmentTypes = useMemo(() => {
+    const groups = {};
+    for (const type of equipmentTypes || []) {
+      const cat = type.category || 'autre';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(type);
+    }
+    return groups;
+  }, [equipmentTypes]);
+
+  // Intitulé du devis : c'est ce qui permet de choisir le bon équipement sans
+  // aller ouvrir le PDF. L'information est déjà dans la ligne, autant la montrer.
+  const quoteHint = [quote.quote_number, quote.subject || quote.label]
+    .filter(Boolean)
+    .join(' · ');
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -91,6 +137,8 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
         // assigned_user_id porte l'ID de la table commercials (dual-ID bridge,
         // cf. Dashboard.jsx) — donc bien `commercial.id`, pas `profile_id`.
         assigned_user_id: commercialId || null,
+        source_id: sourceId || null,
+        equipment_type_id: equipmentTypeId || null,
       };
 
       const { data: lead, error } = await leadsService.createLead(leadData);
@@ -124,25 +172,61 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
           <>
             <div className="p-4 space-y-3">
               <p className="text-sm text-secondary-600">
-                Le contact sera repris depuis Pennylane. Choisis le commercial à qui
-                affecter ce lead.
+                Le contact sera repris depuis Pennylane. Renseigne ce que Pennylane
+                ne sait pas — ces trois champs alimentent la carte du pipeline.
               </p>
-              <div>
-                <label htmlFor="commercial" className="block text-sm font-medium text-secondary-700 mb-1">
-                  Commercial
-                </label>
+
+              {quoteHint && (
+                <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2">
+                  {quoteHint}
+                </p>
+              )}
+
+              <Field id="commercial" label="Commercial">
                 <select
                   id="commercial"
                   value={commercialId}
                   onChange={(e) => setCommercialId(e.target.value)}
-                  className="w-full px-3 py-2 border border-secondary-200 rounded-lg text-sm"
+                  className={selectClass}
                 >
                   <option value="">Non assigné</option>
                   {(commercials || []).map((c) => (
                     <option key={c.id} value={c.id}>{c.full_name || c.email || c.id}</option>
                   ))}
                 </select>
-              </div>
+              </Field>
+
+              <Field id="source" label="Source">
+                <select
+                  id="source"
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">— Source —</option>
+                  {(sources || []).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field id="equipment" label="Équipement concerné">
+                <select
+                  id="equipment"
+                  value={equipmentTypeId}
+                  onChange={(e) => setEquipmentTypeId(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">—</option>
+                  {Object.entries(groupedEquipmentTypes).map(([category, types]) => (
+                    <optgroup key={category} label={EQUIPMENT_CATEGORY_LABELS[category] || category}>
+                      {types.map((type) => (
+                        <option key={type.id} value={type.id}>{type.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </Field>
             </div>
 
             <div className="flex items-center justify-end gap-2 p-4 border-t border-secondary-200">
