@@ -378,8 +378,11 @@ Deno.serve(async (req) => {
   // Les deux canaux sont volontairement distincts :
   //   - corps `{ "apply_deadlines": true }` → passage MANUEL délibéré, décidé
   //     appel par appel (campagnes de normalisation pilotées à la main) ;
-  //   - env `PL_APPLY_DEADLINES` → gouvernera le CRON planifié, le jour où on
-  //     décidera de l'activer.
+  //   - env `MDH_PL_APPLY_DEADLINES` → gouverne le CRON planifié.
+  //
+  // Préfixe MDH_ obligatoire : les secrets d'edge functions Supabase sont au
+  // niveau du PROJET, et cette instance est partagée avec Pack Vendeur, Baikal
+  // et Arpet. Un nom sans préfixe vit dans un espace de noms commun aux quatre.
   //
   // Le cron envoie `{}` : il reste donc en lecture seule tant que la variable
   // d'environnement n'est pas posée. Autoriser une campagne manuelle ne rend
@@ -390,7 +393,7 @@ Deno.serve(async (req) => {
     bodyFlag = body?.apply_deadlines === true;
   } catch { /* corps vide ou non-JSON : lecture seule */ }
 
-  const applyDeadlines = Deno.env.get("PL_APPLY_DEADLINES") === "true" || bodyFlag;
+  const applyDeadlines = Deno.env.get("MDH_PL_APPLY_DEADLINES") === "true" || bodyFlag;
 
   const supabase = getAdminClient();
 
