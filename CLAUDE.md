@@ -28,8 +28,9 @@ L'app cohabite avec d'autres sur une **instance Supabase partagée** → toute f
 
 **Règles imposées par le multi-tenant** :
 - Toute mutation Supabase doit explicitement filtrer par `org_id` (défense en profondeur, même si RLS s'applique via `security_invoker`)
-- Tout nouveau RPC SECURITY DEFINER doit `REVOKE EXECUTE FROM anon` immédiatement après création (sauf webhooks publics légitimes)
+- Tout nouveau RPC SECURITY DEFINER doit `REVOKE EXECUTE FROM PUBLIC, anon` immédiatement après création (sauf webhooks publics légitimes). **`PUBLIC` n'est PAS optionnel** : PostgreSQL accorde `EXECUTE` à `PUBLIC` par défaut sur toute fonction créée, et `anon` en hérite → un `REVOKE … FROM anon` seul **réussit sans rien retirer** (échec silencieux, la commande ne signale rien). Auditer l'effet réel via `has_function_privilege('anon', p.oid, 'EXECUTE')` sur `pg_proc`, **jamais** en relisant le texte de la migration. Vécu le 2026-08-08 : 10 RPC Majord'home ouvertes à `anon` de cette façon (dont la garde tolérante `find_or_create_client`), plus `gtm_get_secret` d'Agent Marketing — dont la migration portait pourtant `revoke … from anon, authenticated` — qui exposait tout le Vault de l'instance partagée à la clé publique
 - **RPC SECURITY DEFINER qui prend `org_id` dans son payload** (sans le dériver d'`auth.uid()`) : `REVOKE FROM PUBLIC, anon, authenticated`, accessible seulement à `service_role`. Sinon un attaquant authentifié peut forger un `org_id` arbitraire et écrire cross-org. Exemple : `record_voice_memo_extraction` (P0.5)
+- **Une garde d'autorisation doit AUTORISER positivement, jamais interdire négativement.** `IF NOT (autorisé) THEN refuser` s'ouvre en grand dès que « autorisé » vaut NULL — en SQL `NOT NULL` = NULL, et un `IF` sur NULL **n'exécute pas son bloc** : le refus est sauté et la fonction poursuit. Écrire `IF (autorisé) IS NOT TRUE THEN refuser`. Trois variantes du même piège vues en prod le 2026-08-08 : garde tolérante `IF v_user IS NOT NULL AND NOT EXISTS (…)` (10 RPC, dont `find_or_create_client`) ; comparaison `IF v_caller_role != 'super_admin'` avec un rôle NULL (`core.create_organization` — un appelant sans profil passait) ; délégation `IF NOT core.is_super_admin()` quand le helper peut renvoyer NULL. **Corollaire** : ne jamais faire dépendre une garde d'`auth.uid()` sans traiter explicitement le cas NULL — soit `IF auth.uid() IS NULL THEN refuser` en première instruction (posture frontend), soit pas d'`auth.uid()` du tout et `service_role` only (posture serveur). Le mélange des deux est ce qui produit un fail-open
 - Tout nouveau bucket Storage doit utiliser `${orgId}/...` en préfixe de path + policies `(storage.foldername(name))[1]::uuid IN (org_members)`
 - Toute nouvelle table `majordhome.*` doit avoir RLS activée + policies CRUD scopées org_id dès la création
 - Toute nouvelle vue `public.majordhome_*` doit être créée avec `WITH (security_invoker=true)`
@@ -97,7 +98,7 @@ Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit quali
 
 ### Sécurité (charte multi-tenant — cf. section ci-dessus)
 - Toute mutation Supabase doit explicitement filtrer par `org_id`
-- Tout nouveau RPC SECURITY DEFINER : `REVOKE FROM anon` immédiat. Si payload contient `org_id` → `REVOKE FROM authenticated` aussi (service_role only)
+- Tout nouveau RPC SECURITY DEFINER : `REVOKE FROM PUBLIC, anon` immédiat (**`PUBLIC` obligatoire**, sinon le REVOKE ne retire rien — cf. charte multi-tenant). Si payload contient `org_id` → `REVOKE FROM authenticated` aussi (service_role only)
 - Tout nouveau bucket Storage : path `${orgId}/...` + policies `(storage.foldername(name))[1]::uuid IN (org_members)`
 - Toute clause PostgREST `.or()` / `.ilike()` interpolant un input user : passer par `escapePostgrestSearchTerm()`
 - Toute edge function : utiliser `requireOrgMembership` ou `requireSharedSecret` du helper `_shared/auth.ts`
