@@ -119,12 +119,15 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
           )}
         </div>
 
-        {/* Ligne 3 : Type équipement */}
-        {chantier.equipment_type_label && (
-          <span className="inline-block text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium truncate max-w-full mt-1.5">
-            {chantier.equipment_type_label}
-          </span>
-        )}
+        {/* Ligne 3 : Type équipement — toujours rendue (hauteur réservée) pour
+            uniformiser la taille des cartes même sans type d'équipement */}
+        <div className="mt-1.5 h-[22px]">
+          {chantier.equipment_type_label && (
+            <span className="inline-block text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium truncate max-w-full">
+              {chantier.equipment_type_label}
+            </span>
+          )}
+        </div>
 
         {/* Ligne 4 : Dates estimative + planification */}
         <p className="text-[10px] text-gray-400 mt-1">

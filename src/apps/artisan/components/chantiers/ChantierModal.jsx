@@ -180,6 +180,23 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     }
   };
 
+  // Échappatoire : passer en « Réceptionné » sans PV signé (chantier terminé
+  // mais PV non récupéré). Contourne volontairement le garde-fou PV.
+  const handleValidateReceptionWithoutPv = async () => {
+    if (!window.confirm(
+      'Passer ce chantier en « Réceptionné » sans PV de réception signé ?\n\n'
+      + 'Le PV pourra toujours être signé plus tard depuis la fiche.'
+    )) return;
+    try {
+      await updateChantierStatus(chantier.id, 'realise');
+      toast.success('Chantier réceptionné');
+      onUpdated?.();
+      onClose();
+    } catch {
+      toast.error('Erreur de transition');
+    }
+  };
+
   // Objet « lead-like » pour l'assistant (pré-remplit le nom dans l'objet du RDV).
   const schedulingLead = {
     last_name: chantier.last_name || '',
@@ -428,14 +445,27 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                     Le PV de réception signé est requis pour passer en « Réceptionné ».
                   </p>
                   {canEditChantier && (
-                    <button
-                      type="button"
-                      onClick={handleSignPv}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-green-300 text-green-700 hover:bg-green-50 bg-green-50 transition-colors"
-                    >
-                      <PenTool className="w-4 h-4" />
-                      Signer le PV de réception
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSignPv}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-green-300 text-green-700 hover:bg-green-50 bg-green-50 transition-colors"
+                      >
+                        <PenTool className="w-4 h-4" />
+                        Signer le PV de réception
+                      </button>
+                      {chantier.chantier_status === 'planification' && (
+                        <button
+                          type="button"
+                          onClick={handleValidateReceptionWithoutPv}
+                          disabled={isUpdatingStatus}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-100 transition-colors disabled:opacity-50"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Valider la réception sans PV
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
