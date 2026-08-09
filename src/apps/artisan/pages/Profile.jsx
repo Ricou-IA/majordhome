@@ -14,7 +14,7 @@ function GoogleCalendarSection() {
   const orgId = organization?.id;
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isConnected, googleEmail, isLoading, refetch } = useGoogleCalendarStatus(orgId);
+  const { isConnected, googleEmail, needsReconnect, isLoading, refetch } = useGoogleCalendarStatus(orgId);
   const { connect, disconnect, isConnecting, isDisconnecting } = useGoogleCalendarConnection(orgId);
 
   // Handle OAuth redirect back from Google → ?gcal=success or ?gcal=error
@@ -79,22 +79,54 @@ function GoogleCalendarSection() {
         </div>
       ) : isConnected ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-green-800">Connecté</p>
-              <p className="text-sm text-green-600 truncate">{googleEmail}</p>
+          {needsReconnect ? (
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-800">Synchronisation interrompue</p>
+                <p className="text-sm text-amber-700 truncate">{googleEmail}</p>
+              </div>
+              <button
+                onClick={() => refetch()}
+                className="p-1.5 text-amber-600 hover:bg-amber-100 rounded"
+                title="Vérifier la connexion"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
             </div>
+          ) : (
+            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-green-800">Connecté</p>
+                <p className="text-sm text-green-600 truncate">{googleEmail}</p>
+              </div>
+              <button
+                onClick={() => refetch()}
+                className="p-1.5 text-green-600 hover:bg-green-100 rounded"
+                title="Vérifier la connexion"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {needsReconnect ? (
             <button
-              onClick={() => refetch()}
-              className="p-1.5 text-green-600 hover:bg-green-100 rounded"
-              title="Vérifier la connexion"
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm font-medium"
             >
-              <RefreshCw className="w-4 h-4" />
+              {isConnecting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Redirection…</>
+              ) : (
+                <><Link2 className="w-4 h-4" /> Reconnecter Google Calendar</>
+              )}
             </button>
-          </div>
+          ) : null}
           <p className="text-xs text-secondary-500">
-            Les nouveaux RDV et modifications sont automatiquement synchronisés vers votre Google Calendar.
+            {needsReconnect
+              ? "Google n'accepte plus votre autorisation : vos RDV ne partent plus dans votre agenda. Reconnectez votre compte pour reprendre la synchronisation."
+              : 'Les nouveaux RDV et modifications sont automatiquement synchronisés vers votre Google Calendar.'}
           </p>
           <button
             onClick={handleDisconnect}

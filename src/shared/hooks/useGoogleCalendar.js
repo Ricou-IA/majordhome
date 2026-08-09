@@ -25,6 +25,11 @@ export function useGoogleCalendarStatus(orgId) {
     isConnected: query.data?.connected ?? false,
     googleEmail: query.data?.google_email ?? null,
     connectedAt: query.data?.connected_at ?? null,
+    // « Connecté » ne suffit pas : Google peut avoir invalidé le refresh token
+    // (révocation, app OAuth en statut Testing…). L'edge le teste réellement.
+    // Sans ce signal, la sync s'arrête sans que l'écran ne change (98 RDV
+    // perdus en silence entre avril et août 2026).
+    needsReconnect: query.data?.needs_reconnect ?? false,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,

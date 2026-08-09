@@ -71,11 +71,16 @@ async function refreshTokenIfNeeded(admin: ReturnType<typeof getAdminClient>, to
   });
   if (!res.ok) { console.error(`[gcal-sync] Refresh failed:`, await res.text()); return null; }
   const data = await res.json();
-  await admin.rpc('gcal_update_token', {
+  // { error } destructure : sans ca, un echec de persistance laisse
+  // token_expires_at fige et on retente un refresh a chaque appel, en silence.
+  const { error: updateError } = await admin.rpc('gcal_update_token', {
     p_token_id: token.id,
     p_access_token: data.access_token,
     p_token_expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
   });
+  if (updateError) {
+    console.error("[gcal-sync] gcal_update_token failed:", JSON.stringify(updateError));
+  }
   return data.access_token;
 }
 
@@ -147,7 +152,29 @@ async function deleteGcalEvent(token: string, calId: string, evId: string) {
 // Standard sync for create/update
 async function syncForUser(admin: ReturnType<typeof getAdminClient>, token: TokenRecord, action: string, appt: AppointmentData) {
   const accessToken = await refreshTokenIfNeeded(admin, token);
-  if (!accessToken) return { success: false, error: "Token refresh failed" };
+  if (!accessToken) {
+    // Ce chemin sortait AVANT d'ecrire quoi que ce soit : un refresh token mort
+    // ne laissait donc aucune trace, ni ici ni cote client (l'appel est en
+    // fire-and-forget avec .catch(() => {})). Resultat vecu : 98 RDV non
+    // synchronises entre le 11/04 et le 09/08/2026, zero ligne d'erreur en
+    // base, personne au courant. On enregistre l'echec avant de sortir.
+    const failure = "Token refresh failed — reconnexion Google requise";
+    const { error: logError } = await admin.rpc('gcal_upsert_sync', {
+      p_appointment_id: appt.id,
+      p_user_id: token.user_id,
+      p_google_event_id: null,
+      p_google_calendar_id: token.calendar_id || "primary",
+      p_sync_status: "error",
+      p_sync_action: action,
+      p_error_message: failure,
+      p_synced_at: null,
+    });
+    if (logError) {
+      console.error("[gcal-sync] impossible d'enregistrer l'echec:", JSON.stringify(logError));
+    }
+    console.error(`[gcal-sync] ${failure} (user ${token.user_id}, appt ${appt.id})`);
+    return { success: false, error: failure };
+  }
 
   const calId = token.calendar_id || "primary";
   const { data: syncRec } = await admin.from("majordhome_google_calendar_sync")
