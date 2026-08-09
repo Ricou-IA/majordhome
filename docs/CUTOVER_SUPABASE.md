@@ -32,7 +32,9 @@ Le Pro est facturé **par organisation** (25 $, incluant 10 $ de crédit compute
 - Les 25 $ ne financent pas l'ambition SaaS. Mayer Énergie tourne aujourd'hui sur un projet **gratuit, sans aucune sauvegarde**, à 55 % du plafond de 500 MB. On paierait ces 25 $ même sans jamais vendre le produit.
 - Les 10 $ du projet dédié financent, eux, ce que la cohabitation empêche : faire évoluer le schéma `core` sans risquer 5 apps voisines (chantier 3), ranger les secrets clients dans un Vault qui n'est pas partagé (chantier 1b), et ne plus partager un quota de base avec le RAG de Baikal.
 
-**Secrets : régénérer, ne pas recopier.** Le Vault de l'instance partagée a été exposé le 2026-08-08 (`gtm_get_secret`, Agent Marketing). Tous les secrets qui y vivent sont à considérer comme fuités. Recopier des secrets suspects sur une instance neuve annulerait la moitié du bénéfice du déménagement — la rotation se fait au passage, pas plus tard.
+**Secrets : audit du Vault fait le 2026-08-10, la portée est étroite.** L'exposition du 2026-08-08 (`gtm_get_secret`, Agent Marketing) concernait `vault.secrets`, dont le contenu réel était : `mdh_cron_secret` (seul secret Majord'home), `GTM_INTERNAL_KEY`, `GTM_UNSUB_SECRET`, `pv_cleanup_cron_secret`, `pv_scrape_cron_secret`, `supabase_anon_key` (publique par conception).
+
+Les secrets des edge functions vivent dans un **magasin distinct** (variables d'environnement Edge Functions) que cet incident n'a pas touché. Conclusion : **un seul secret à régénérer pour cause de fuite** — `MDH_CRON_SECRET` — et un second qui change mécaniquement, `RESEND_WEBHOOK_SECRET` (nouvelle URL d'edge ⇒ nouveau webhook Resend ⇒ nouveau `whsec_`). Les autres peuvent être recopiés.
 
 ## Méthode — le point qui décide de tout
 
@@ -50,18 +52,18 @@ Fournis automatiquement par Supabase, **rien à faire** : `SUPABASE_URL`, `SUPAB
 
 À recréer sur le nouveau projet :
 
-| Secret | Utilisé par | Note |
-|---|---|---|
-| `MDH_CRON_SECRET` | 9 fonctions | **Aussi à poser dans `vault.secrets`** — c'est là que pg_cron le lit |
-| `RESEND_WEBHOOK_SECRET` | 6 | Double usage : vérification Svix **et** clé de signature des états OAuth (GSC + Google Calendar) |
-| `PENNYLANE_API_TOKEN` | 5 | Mono-tenant aujourd'hui — devient un secret par org au chantier 1b |
-| `RESEND_API_KEY` | 4 | |
-| `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` | 3 / 2 | App OAuth Search Console |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 2 / 2 | App OAuth Google Calendar — **distincte de GSC** |
-| `GOOGLE_PLACES_API_KEY` | 1 | GeoGrid (projet GCP *Towercontrol*) |
-| `GOOGLE_SOLAR_API_KEY` | 1 | Module Solaire |
-| `OPENAI_API_KEY` | 1 | Whisper + fallback extraction voice |
-| `ANTHROPIC_API_KEY` | 1 | Extraction voice |
+| Secret | Utilisé par | Action | Note |
+|---|---|---|---|
+| `MDH_CRON_SECRET` | 9 fonctions | 🔴 **régénérer** | Exposé le 08/08. Chaîne aléatoire, aucun tiers. **Aussi à poser dans `vault.secrets`** — c'est là que pg_cron le lit |
+| `RESEND_WEBHOOK_SECRET` | 6 | 🔴 **change** | Nouvelle URL d'edge ⇒ nouveau webhook Resend ⇒ nouveau `whsec_`. Double usage : vérification Svix **et** clé de signature des états OAuth (GSC + Google Calendar) |
+| `RESEND_API_KEY` | 4 | copier | Dashboard Resend |
+| `PENNYLANE_API_TOKEN` | 5 | copier | Mono-tenant aujourd'hui — devient un secret par org au chantier 1b |
+| `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` | 3 / 2 | copier | App OAuth Search Console |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 2 / 2 | copier | App OAuth Google Calendar — **distincte de GSC** |
+| `GOOGLE_PLACES_API_KEY` | 1 | copier | GeoGrid (projet GCP *Towercontrol*) |
+| `GOOGLE_SOLAR_API_KEY` | 1 | copier | Module Solaire |
+| `OPENAI_API_KEY` | 1 | copier | Whisper + fallback extraction voice |
+| `ANTHROPIC_API_KEY` | 1 | copier | Extraction voice |
 
 Optionnels, valeur par défaut dans le code si absents : `PENNYLANE_BASE_URL`, `FRONTEND_ORIGINS`, `DENO_ENV`, `ENVIRONMENT`, `VOICE_DAILY_LIMIT`, `MAILING_MAX_PER_RUN`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `MDH_PL_APPLY_DEADLINES`.
 
