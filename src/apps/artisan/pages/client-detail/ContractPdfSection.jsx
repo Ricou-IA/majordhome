@@ -218,7 +218,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       toast.success('Contrat signé téléversé avec succès');
     } catch (err) {
       console.error('[ContractPdfSection] upload signed error:', err);
-      toast.error('Erreur lors du téléversement');
+      // Surfacer la cause : le bucket `contracts` filtre les mime types et la taille
+      // (400 « mime type … is not supported » sinon invisible côté UI).
+      toast.error(`Erreur lors du téléversement : ${err?.message || 'erreur inconnue'}`);
     } finally {
       setIsUploading(false);
     }
