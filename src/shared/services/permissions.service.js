@@ -159,6 +159,15 @@ export const permissionsService = {
         p_business_role: businessRole, p_membership_role: membershipRole,
       });
       if (error) throw error;
+
+      // Le rôle planning (team_members.role) pilote l'assignation des RDV
+      // (commercial/admin vs technician) → il doit suivre le rôle du membre.
+      // No-op si le membre n'a pas encore de ressource planning.
+      const { error: syncError } = await supabase.rpc('team_member_sync_role_for_user', {
+        p_core_org_id: orgId, p_user_id: userId,
+      });
+      if (syncError) throw syncError;
+
       return null;
     }, 'permissions.updateMemberRole');
   },

@@ -11,11 +11,12 @@
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
-import { useTeamMembers, useSetTeamMemberColor } from '@hooks/useAppointments';
+import { useTeamMembers, useSetTeamMemberColor, useEnsureTeamMember } from '@hooks/useAppointments';
+import { logger } from '@lib/logger';
 import {
   EFFECTIVE_ROLES,
   ROLE_LABELS,
@@ -326,7 +327,10 @@ function MemberRow({ member, teamMember, canEditColor, isCurrentUser, isUpdating
       {/* Couleur planning */}
       <td className="py-4 px-4">
         {!teamMember ? (
-          <span className="text-xs text-secondary-400">—</span>
+          // Ressource planning en cours de création (auto) côté org_admin
+          canEditColor
+            ? <Loader2 className="w-4 h-4 text-secondary-300 animate-spin" />
+            : <span className="text-xs text-secondary-400">—</span>
         ) : canEditColor ? (
           <MemberColorPicker
             color={teamMember.calendar_color}
@@ -361,14 +365,56 @@ export default function TeamManagement() {
   } = useOrgMembers(orgId);
 
   // Couleurs planning : team_members reliés aux membres par user_id.
-  const { members: teamMembers } = useTeamMembers(orgId);
+  const { members: teamMembers, isLoading: isLoadingTeam } = useTeamMembers(orgId);
   const { setColor } = useSetTeamMemberColor(orgId);
+  const { ensureTeamMember } = useEnsureTeamMember(orgId);
   const tmByUser = useMemo(() => {
     const map = new Map();
     (teamMembers || []).forEach((t) => { if (t.user_id) map.set(t.user_id, t); });
     return map;
   }, [teamMembers]);
   const [savingColorId, setSavingColorId] = useState(null);
+
+  // ---------------------------------------------------------------------------
+  // Ressource planning auto : un membre invité n'a pas de ligne team_members
+  // (create-user ne crée que profile + membership) → pas de couleur, absent du
+  // planning. On la crée ici (RPC idempotente, org_admin only) avec une couleur
+  // libre de la palette. Couvre les invitations ET les comptes créés hors app.
+  // ---------------------------------------------------------------------------
+  const ensuredRef = useRef(new Set());
+  useEffect(() => {
+    if (!isOrgAdmin || !orgId || isLoading || isLoadingTeam) return;
+
+    const missing = members.filter(
+      (m) => m.user_id && !tmByUser.has(m.user_id) && !ensuredRef.current.has(m.user_id)
+    );
+    if (missing.length === 0) return;
+
+    const used = new Set(
+      (teamMembers || []).map((t) => (t.calendar_color || '').toUpperCase())
+    );
+
+    (async () => {
+      for (const m of missing) {
+        ensuredRef.current.add(m.user_id);
+        const color =
+          PLANNING_COLORS.find((c) => !used.has(c)) ||
+          PLANNING_COLORS[used.size % PLANNING_COLORS.length];
+        used.add(color);
+
+        const { error } = await ensureTeamMember({ userId: m.user_id, color });
+        if (error) {
+          logger.error('[TeamManagement] ensureTeamMember failed', m.user_id, error);
+          toast.error(
+            `Ressource planning non créée pour ${m.profile?.full_name || 'ce membre'}`
+          );
+        }
+      }
+    })();
+  }, [
+    isOrgAdmin, orgId, isLoading, isLoadingTeam,
+    members, teamMembers, tmByUser, ensureTeamMember,
+  ]);
 
   const [updatingUserId, setUpdatingUserId] = useState(null);
 

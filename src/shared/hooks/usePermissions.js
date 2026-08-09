@@ -16,7 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { permissionsService } from '@services/permissions.service';
 import { buildPermissionMap, hasPermission } from '@lib/permissions';
-import { permissionKeys } from '@hooks/cacheKeys';
+import { permissionKeys, appointmentKeys } from '@hooks/cacheKeys';
 
 // Re-export for backward compatibility
 export { permissionKeys } from '@hooks/cacheKeys';
@@ -135,6 +135,8 @@ export function useOrgMembers(orgId) {
       permissionsService.updateMemberRole(orgId, userId, appRole, businessRole, membershipRole),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: permissionKeys.members(orgId) });
+      // Le rôle planning a pu être resynchronisé → recharger les ressources planning
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.teamMembers(orgId) });
     },
   });
 

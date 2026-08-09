@@ -598,6 +598,33 @@ export const appointmentsService = {
   },
 
   /**
+   * Garantit la ressource planning (team_member) d'un membre de l'organisation.
+   * Idempotent : ne crée que si absente. RPC SECURITY DEFINER org_admin only.
+   *
+   * @param {Object} params
+   * @param {string} params.coreOrgId - core.organizations.id
+   * @param {string} params.userId - auth.users.id du membre
+   * @param {string} [params.color] - couleur planning souhaitée (#RRGGBB)
+   */
+  async ensureTeamMemberForUser({ coreOrgId, userId, color = null }) {
+    try {
+      const { data, error } = await supabase.rpc('team_member_ensure_for_user', {
+        p_core_org_id: coreOrgId,
+        p_user_id: userId,
+        p_color: color,
+      });
+      if (error) {
+        console.error('[appointments] ensureTeamMemberForUser error:', error);
+        return { data: null, error };
+      }
+      return { data, error: null };
+    } catch (err) {
+      console.error('[appointments] ensureTeamMemberForUser error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
    * Récupérer les techniciens assignés à un RDV
    */
   async getAppointmentTechnicians(appointmentId) {

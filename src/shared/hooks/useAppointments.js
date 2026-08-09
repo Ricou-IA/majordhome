@@ -360,6 +360,27 @@ export function useSetTeamMemberColor(orgId) {
 }
 
 // ============================================================================
+// HOOK - useEnsureTeamMember (ressource planning d'un membre)
+// ============================================================================
+
+/**
+ * Mutation : garantit la ressource planning (team_member) d'un membre d'org.
+ * Idempotent — appelée automatiquement quand un membre n'en a pas encore
+ * (invitation récente, compte créé hors app).
+ */
+export function useEnsureTeamMember(orgId) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ userId, color }) =>
+      appointmentsService.ensureTeamMemberForUser({ coreOrgId: orgId, userId, color }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.teamMembers(orgId) });
+    },
+  });
+  return { ensureTeamMember: mutation.mutateAsync, isEnsuring: mutation.isPending };
+}
+
+// ============================================================================
 // HOOK - useTeamDayAvailability (dispo d'un jour par membre)
 // ============================================================================
 
