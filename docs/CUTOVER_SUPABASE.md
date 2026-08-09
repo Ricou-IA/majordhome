@@ -4,6 +4,27 @@
 > Établi le 2026-08-09. Projet source : `odspcxgafcqxjzrarsqf` (instance partagée avec Pack Vendeur, Baikal, Arpet, Agent Marketing, Voirie).
 > Précédent réussi : Pack Vendeur, migré vers `ycmavnmtyvodqawvwrrd`, ancien projet conservé en fallback.
 
+## Destination et coût (arbitré le 2026-08-09)
+
+**Nouveau projet Pro dédié, dans l'organisation Supabase existante `kssnsyagibfxthtwmpds`.**
+
+Le tier gratuit plafonne à 2 projets par organisation, et les deux sont pris (`odspcxgafcqxjzrarsqf`, `ycmavnmtyvodqawvwrrd`). Créer un projet Majord'home **impose** donc le passage en Pro : ce n'est pas un choix.
+
+| État | Projets | Coût mensuel |
+|---|---|---|
+| Aujourd'hui (Free) | 2 | 0 € |
+| Pro, sans rien déménager | 2 | ~35 $ |
+| Pro + projet Majord'home dédié | 3 | ~45 $ |
+
+Le Pro est facturé **par organisation** (25 $, incluant 10 $ de crédit compute), pas par projet. Les autres apps — Baikal, Arpet, Agent Marketing, Voirie — restent ensemble sur `odspcxgafcqxjzrarsqf` : elles n'ajoutent aucun coût.
+
+**Deux dépenses distinctes, deux urgences distinctes :**
+
+- Les 25 $ ne financent pas l'ambition SaaS. Mayer Énergie tourne aujourd'hui sur un projet **gratuit, sans aucune sauvegarde**, à 55 % du plafond de 500 MB. On paierait ces 25 $ même sans jamais vendre le produit.
+- Les 10 $ du projet dédié financent, eux, ce que la cohabitation empêche : faire évoluer le schéma `core` sans risquer 5 apps voisines (chantier 3), ranger les secrets clients dans un Vault qui n'est pas partagé (chantier 1b), et ne plus partager un quota de base avec le RAG de Baikal.
+
+**Secrets : régénérer, ne pas recopier.** Le Vault de l'instance partagée a été exposé le 2026-08-08 (`gtm_get_secret`, Agent Marketing). Tous les secrets qui y vivent sont à considérer comme fuités. Recopier des secrets suspects sur une instance neuve annulerait la moitié du bénéfice du déménagement — la rotation se fait au passage, pas plus tard.
+
 ## Méthode — le point qui décide de tout
 
 **Dump/restore de la base vivante. Jamais un rejeu des migrations du repo.**
