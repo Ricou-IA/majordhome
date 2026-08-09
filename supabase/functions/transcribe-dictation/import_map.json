@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "openai": "npm:openai@^4.0.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.0.0",
+    "@google/generative-ai": "npm:@google/generative-ai",
+    "@google/generative-ai/server": "npm:@google/generative-ai/server"
+  }
+}

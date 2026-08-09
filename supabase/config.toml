@@ -28,6 +28,13 @@ verify_jwt = false
 [functions.gsc-oauth-callback]
 verify_jwt = false
 
+# Google Calendar OAuth (init + callback dans la même fonction, routée par ?action=).
+# ⚠️ Contrairement à gsc-oauth-*, son `state` n'est PAS signé (HMAC absent) et le
+# callback interpole `state.org_id` dans un appel `exec_sql` en service_role.
+# Fonction récupérée depuis la prod le 2026-08-09, à durcir avant tout onboarding.
+[functions.google-calendar-auth]
+verify_jwt = false
+
 # Crons N8n / job one-shot — protégés par MDH_CRON_SECRET (P0.2)
 [functions.pennylane-sync-cron]
 verify_jwt = false
@@ -92,6 +99,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.invite-client]
+verify_jwt = true
+
+# Sync RDV -> Google Calendar (appelée par googleCalendar.service.js)
+[functions.google-calendar-sync]
 verify_jwt = true
 
 [functions.transcribe-dictation]
