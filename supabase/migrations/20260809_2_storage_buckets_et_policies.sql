@@ -288,7 +288,10 @@ using (bucket_id = 'project-recordings')
 with check (bucket_id = 'project-recordings');
 
 -- ---------------------------------------------------------------------------
--- 3. Controle : 6 buckets, 22 policies. Echoue si le compte ne tombe pas juste.
+-- 3. Controle : 6 buckets, 23 policies. Echoue si le compte ne tombe pas juste.
+--    (a servi des le premier essai : le compte annonce etait 22, la prod en a 23
+--     — la migration a refuse de s'appliquer plutot que de laisser passer un
+--     inventaire incomplet.)
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -310,7 +313,7 @@ begin
   if n_buckets <> 6 then
     raise exception 'storage_buckets: % buckets au lieu de 6', n_buckets;
   end if;
-  if n_policies <> 22 then
-    raise exception 'storage_buckets: % policies au lieu de 22', n_policies;
+  if n_policies <> 23 then
+    raise exception 'storage_buckets: % policies au lieu de 23', n_policies;
   end if;
 end $$;

@@ -43,7 +43,7 @@ Optionnels, valeur par défaut dans le code si absents : `PENNYLANE_BASE_URL`, `
 
 ## 3. Storage
 
-6 buckets + 22 policies, scriptés dans `supabase/migrations/20260809_2_storage_buckets_et_policies.sql`. **Le contenu des buckets est à copier séparément** — la migration ne crée que les contenants et les règles.
+6 buckets + 23 policies, scriptés dans `supabase/migrations/20260809_2_storage_buckets_et_policies.sql`. **Le contenu des buckets est à copier séparément** — la migration ne crée que les contenants et les règles.
 
 Deux anomalies transcrites telles quelles, à instruire séparément (détail en commentaire dans la migration) : les policies `interventions` filtrent sur le nom du projet au lieu du chemin de l'objet ; `project-recordings` dérive l'org de `core.profiles` au lieu de `core.organization_members`.
 
