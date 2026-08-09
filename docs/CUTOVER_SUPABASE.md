@@ -1,8 +1,17 @@
 # Cutover — projet Supabase dédié (chantier 0)
 
 > Checklist de préparation et d'exécution du déménagement de Majord'home vers son propre projet Supabase.
-> Établi le 2026-08-09. Projet source : `odspcxgafcqxjzrarsqf` (instance partagée avec Pack Vendeur, Baikal, Arpet, Agent Marketing, Voirie).
-> Précédent réussi : Pack Vendeur, migré vers `ycmavnmtyvodqawvwrrd`, ancien projet conservé en fallback.
+> Établi le 2026-08-09. Précédent réussi : Pack Vendeur, migré vers `ycmavnmtyvodqawvwrrd`, ancien projet conservé en fallback.
+
+| | Projet | Organisation | Plan |
+|---|---|---|---|
+| **Source** | `odspcxgafcqxjzrarsqf` — partagé avec Baikal, Arpet, Agent Marketing, Voirie | `Confer` / `kssnsyagibfxthtwmpds` | free |
+| **Cible** | `ejqqqwudmizqisdkxohw` — `Majordhome`, `eu-west-3`, créé le 2026-08-09 | `Confer` (temporairement) | free |
+| **Destination finale** | la cible, après transfert | `confer-saas` / `sswhrsezyvlutwqlyvrw` | Pro |
+
+Le projet cible est volontairement créé dans l'org **gratuite** : tout le chantier (restore, répétition, cutover) s'y déroule sans payer de compute. Le transfert vers `confer-saas` se fait **après** la bascule réussie — c'est un changement de propriété, pas une migration.
+
+⚠️ **Accès outillage** : le connecteur MCP Supabase n'est autorisé que sur l'org `Confer`. Après le transfert vers `confer-saas`, l'exécution SQL à la volée (`execute_sql`, `apply_migration`, advisors) ne sera plus disponible — seule la CLI, authentifiée au niveau du compte, continuera de fonctionner (déploiement d'edge functions, dumps). À ré-autoriser depuis les réglages de connecteurs claude.ai sur la nouvelle org.
 
 ## Destination et coût (arbitré le 2026-08-09)
 
