@@ -106,7 +106,20 @@ Contrôle après bascule : `select jobname, schedule from cron.job`. Une edge d�
 
 ## 6. Dépendances externes (hors Supabase)
 
-- **Google Cloud** : réenregistrer les redirect URI OAuth sur la nouvelle URL de projet — Calendar **et** Search Console. Sans ça les deux connexions cassent silencieusement.
+- **Google Cloud — les identifiants sont répartis sur DEUX projets GCP**, vérifié le 2026-08-10 (les empreintes des secrets en prod confirment qu'aucune clé n'est partagée) :
+
+  | Projet GCP | Contient | Secret |
+  |---|---|---|
+  | **Mayer Energie Automation** | *Maps Platform API Key* (créée le 06/07, 35 API autorisées) | `GOOGLE_SOLAR_API_KEY` |
+  | | client OAuth *Majord'home Calendar Sync* (créé le 07/04, appli web) | `GOOGLE_CLIENT_ID` / `_SECRET` |
+  | **Towercontrol** (`eric.pudebat@gmail.com`) | clé API GeoGrid | `GOOGLE_PLACES_API_KEY` |
+  | | client OAuth Search Console | `GSC_CLIENT_ID` / `_SECRET` |
+
+  Redirect URI à ajouter sur **chacun des deux clients OAuth** (sans retirer l'ancien, les deux coexistent le temps de la bascule) :
+  - Calendar → `https://ejqqqwudmizqisdkxohw.supabase.co/functions/v1/google-calendar-auth?action=callback` — ✅ ajouté le 2026-08-10
+  - Search Console → `https://ejqqqwudmizqisdkxohw.supabase.co/functions/v1/gsc-oauth-callback` — ⬜
+
+  Sans ça, les deux connexions cassent **silencieusement**.
 - **N8N — deux sens à traiter, ne pas oublier le second** :
   - *Majord'home → N8N* : les 6 webhooks `VITE_N8N_WEBHOOK_*` (SMS avis, SMS rappel, PDF contrat, PDF intervention, signature, voice). Leur URL ne change pas, mais les identifiants SMS qu'ils utilisent restent les tiens (sujet du chantier 1b, pas du cutover).
   - *N8N → Majord'home* : **c'est là que ça casse en silence.** Les workflows appellent directement des edge functions (`transcribe-dictation` pour la transcription Whisper de la chaîne vocale, `voice-extract-fieldreport`) et écrivent en base via RPC. Ils embarquent donc trois choses liées à l'ancien projet, toutes à mettre à jour : **l'URL** (le ref du projet est dedans), le **`MDH_CRON_SECRET`** en Bearer (qu'on régénère), et la **clé `service_role`**, présente en clair dans certains nodes. Sans ça, la chaîne vocale et l'ingestion de leads Meta s'arrêtent sans message d'erreur.
