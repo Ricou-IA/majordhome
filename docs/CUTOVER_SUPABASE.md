@@ -160,6 +160,19 @@ Exécutée de bout en bout sur `ejqqqwudmizqisdkxohw`. Tout ce qui suit est **v�
 
 **L'isolation est démontrée.** Supprimer les cinq apps voisines ne retire aucun objet Majord'home : il n'existe pas de dépendance cachée vers `pack_vendeur`, `rag`, `arpet`, `voirie` ou les schémas vestiges.
 
+### ⚠️ Le piège majeur : `pg_dump` ne transporte pas les privilèges posés hors migration
+
+**Constaté en production le 2026-08-10, vingt minutes après la bascule** : 169 RPC SECURITY DEFINER exécutables par `anon` sur le projet cible, contre 112 sur la source. **57 fonctions avaient perdu leur REVOKE** — dont `find_or_create_client`, `client_hard_delete`, `org_update_settings`, `gtm_get_secret`, `record_voice_memo_extraction`.
+
+Mécanique : le durcissement Sem 0 a été appliqué via `execute_sql`, hors migration. Un dump transporte la *définition* des fonctions, pas les privilèges attribués après coup. À la restauration, PostgreSQL applique son défaut — `EXECUTE` à `PUBLIC` — et `anon` en hérite. Rien ne le signale : les fonctions marchent, l'app marche, seul un audit le voit.
+
+C'est exactement le risque que ce document annonçait (« un restore ne garantit pas que le hardening a suivi »). **Il s'est réalisé.** Corrigé par la migration `restaurer_privileges_rpc_post_migration`, qui réplique l'état relevé sur la source via `has_function_privilege`.
+
+Deux points de méthode à retenir :
+
+- **Révoquer `PUBLIC` seul ne suffit pas** et **révoquer sans re-attribuer casse le frontend**. Le REVOKE doit porter sur `public, anon, authenticated`, suivi d'un GRANT explicite aux rôles que la source accorde réellement. Sur les 59 fonctions concernées, 27 ont besoin d'`authenticated`, 31 de `service_role` seul, 1 d'`authenticated` seul.
+- **L'audit de privilèges est le premier geste post-bascule, pas le dernier.** Entre la bascule et la correction, le projet a tourné en production avec ces fonctions ouvertes à la clé publique.
+
 ### Trois pièges rencontrés, à connaître le jour J
 
 1. **`pg_dump` signale des clés étrangères circulaires** (`appointments`). Un chargement de données seules échoue sans `SET session_replication_role = replica` autour de l'insertion. Les contraintes ne sont pas supprimées, seulement non vérifiées pendant le chargement.
