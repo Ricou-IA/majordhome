@@ -67,6 +67,10 @@ Fournis automatiquement par Supabase, **rien à faire** : `SUPABASE_URL`, `SUPAB
 
 Optionnels, valeur par défaut dans le code si absents : `PENNYLANE_BASE_URL`, `FRONTEND_ORIGINS`, `DENO_ENV`, `ENVIRONMENT`, `VOICE_DAILY_LIMIT`, `MAILING_MAX_PER_RUN`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `MDH_PL_APPLY_DEADLINES`.
 
+**`GEMINI_API_KEY` — posée le 2026-08-10, aucun consommateur à ce jour.** Aucune ligne de Majord'home n'appelle Gemini : ni les 27 edge functions, ni le frontend. Provisionnée en anticipation d'un usage non arrêté. Trois pistes évoquées : second moteur derrière Claude dans `voice-extract-fieldreport` (à la place de GPT-4o), transcription audio native en remplacement de Whisper dans `transcribe-dictation` (ce qui supprimerait la dépendance OpenAI), ou tout autre besoin. **Si elle n'a toujours aucun consommateur au moment du cutover, ne pas la reporter machinalement** — la reposer seulement quand un usage existe.
+
+> Ne pas confondre avec les entrées `@google/generative-ai` de `supabase/functions/transcribe-dictation/import_map.json` : elles sont héritées du bundle partagé d'une app voisine (Pack Vendeur utilise Gemini), pas d'un usage Majord'home.
+
 ## 2. Edge functions
 
 27 fonctions, **toutes versionnées** depuis le commit `889157a` (5 tournaient sans exister dans le repo). `supabase/config.toml` porte leur `verify_jwt`.
