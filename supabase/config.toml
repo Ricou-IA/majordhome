@@ -108,5 +108,9 @@ verify_jwt = true
 [functions.transcribe-dictation]
 verify_jwt = true
 
-[functions.meeting-extract]
-verify_jwt = true
+# meeting-extract retiree le 2026-08-10 : elle appartient a Arpet
+# (majordhome n'a aucun appelant), son source n'est pas dans ce repo, et sa
+# presence ici cassait `supabase functions deploy` — l'erreur s'est produite au
+# deploiement du nouveau projet. Elle etait de surcroit declaree verify_jwt=true
+# alors que la prod la sert en false : un deploy global depuis ce repo vers
+# l'instance partagee aurait pu la basculer et casser une app voisine.

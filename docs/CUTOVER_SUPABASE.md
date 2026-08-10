@@ -75,7 +75,9 @@ Optionnels, valeur par défaut dans le code si absents : `PENNYLANE_BASE_URL`, `
 
 27 fonctions, **toutes versionnées** depuis le commit `889157a` (5 tournaient sans exister dans le repo). `supabase/config.toml` porte leur `verify_jwt`.
 
-⚠️ `config.toml` déclare encore `meeting-extract` (Arpet, 0 appelant Majord'home) en `verify_jwt = true` alors que la prod est en `false` — à retirer avant tout `functions deploy` global, sous peine de casser une app voisine.
+✅ **Déployées sur le projet cible le 2026-08-10** — les 27, en une passe (`supabase functions deploy --project-ref ejqqqwudmizqisdkxohw`). `verify_jwt` vérifié après coup : 14 fonctions sans JWT, exactement celles attendues (webhooks tiers, callbacks OAuth, crons protégés par `MDH_CRON_SECRET`). Aucune exposée à tort, aucune verrouillée à tort.
+
+`meeting-extract` a été **retirée de `config.toml`** au passage : elle appartient à Arpet, son source n'est pas dans ce repo, et sa présence faisait échouer le déploiement global. Elle y était de surcroît déclarée `verify_jwt = true` alors que la prod la sert en `false` — un deploy global depuis ce repo vers l'instance partagée aurait pu la basculer et casser une app voisine.
 
 ## 3. Storage
 
