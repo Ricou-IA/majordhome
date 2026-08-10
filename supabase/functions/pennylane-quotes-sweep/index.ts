@@ -20,10 +20,19 @@ import {
 
 const PENNYLANE_BASE_URL = "https://app.pennylane.com/api/external/v2";
 
-// Statuts balayés. `denied` est exclu : un devis refusé n'a pas à être
-// matérialisé ni normalisé. `draft` n'est pas dans l'énumération filtrable
-// documentée par Pennylane — cf. Task 3, à constater avant de l'ajouter.
-const SWEEP_STATUSES = ["pending", "expired", "accepted", "invoiced"];
+// Statuts balayés. `denied` A ÉTÉ RÉINTÉGRÉ le 2026-08-11 : le refus n'est pas
+// une information morte, Majord'home la traite — c'est lui qui place la carte
+// en Perdu (`majordhome_kanban_cards`). L'exclure avait trois conséquences :
+// l'explorateur de devis ne pouvait pas montrer les devis perdus ; le miroir
+// n'était qu'une copie partielle, donc inexploitable comme source de lecture ;
+// et surtout `missing_since` devenait ambigu — passer au statut refusé faisait
+// sortir un devis du périmètre et le marquait « disparu » exactement comme une
+// suppression réelle (cf. 20260807_2_mark_missing_refuse_wipe.sql). Périmètre
+// élargi = ce faux positif n'existe plus, une absence redevient une suppression.
+//
+// `draft` reste exclu : il n'est pas dans l'énumération filtrable documentée
+// par Pennylane (renvoyé par l'API ≠ filtrable — les deux diffèrent chez eux).
+const SWEEP_STATUSES = ["pending", "expired", "accepted", "invoiced", "denied"];
 
 const PAGE_LIMIT = 100;
 const MAX_PAGES = 200;          // garde-fou : 20 000 devis

@@ -22,35 +22,6 @@ import {
 // Types Pennylane (subset)
 // ---------------------------------------------------------------------------
 
-interface PennylaneQuote {
-  id: number;
-  quote_number?: string;
-  label?: string;
-  date?: string;
-  status?: string;
-  currency_amount_before_tax?: number;
-  public_file_url?: string;
-  customer?: { id?: number };
-}
-
-interface PennylaneCustomer {
-  id: number;
-  name?: string;
-  first_name?: string;
-  last_name?: string;
-  emails?: Array<string | { label?: string; value?: string; is_default?: boolean }>;
-  billing_email?: string;
-  phone?: string;
-  billing_phone?: string;
-  billing_iban?: string;
-  billing_address?: {
-    street?: string;
-    address?: string;
-    postal_code?: string;
-    city?: string;
-  };
-}
-
 interface AttachedQuote {
   id: string;
   lead_id: string;
@@ -65,28 +36,84 @@ interface AttachedQuote {
   assigned_at: string;
 }
 
-// Bug-fix 2026-05-27 : PL V2 single GET retourne au ROOT, pas dans { quote: ... }.
-function unwrapPennylaneResource<T>(
-  rawData: unknown,
-  expectedKey: string,
-): T | null {
-  if (!rawData || typeof rawData !== "object") return null;
-  const obj = rawData as Record<string, unknown>;
-  if (
-    expectedKey in obj &&
-    obj[expectedKey] &&
-    typeof obj[expectedKey] === "object"
-  ) {
-    return obj[expectedKey] as T;
-  }
-  if ("id" in obj) return obj as T;
-  return null;
-}
-
 // Seuil pipeline commercial. ⚠️ COPIE de src/lib/constants.js — Deno ne peut pas
 // importer le code frontend. Toute modification du seuil doit toucher LES DEUX.
 // 2026-08-05 : descendu de 1000 à 500 (demande equipe — le SAV est sous 500).
 const PIPELINE_MIN_AMOUNT_HT = 500;
+
+// ---------------------------------------------------------------------------
+// Miroir local — source de LECTURE (refonte 2026-08-11)
+// ---------------------------------------------------------------------------
+//
+// Cette fonction interrogeait Pennylane entité par entité : 363 devis + 209
+// clients + 209 listes = 781 appels ≈ 322 s, contre un wall-clock de 150 s
+// (plan Free ; 400 s en Pro). Elle était donc tuée dans sa 1ʳᵉ étape à CHAQUE
+// exécution, depuis des semaines, sur l'ancien projet comme sur le neuf — les
+// étapes 3 à 5 n'ont jamais tourné. Échec parfaitement silencieux : pg_cron
+// affiche `succeeded` parce que net.http_post est asynchrone.
+//
+// Or `pennylane-quotes-sweep` récupère les mêmes devis en 3 appels et 2 s,
+// toutes les 5 min, et les range dans `majordhome_pennylane_quotes` — miroir
+// déjà lu par 3 écrans (DevisExplorer, Dashboard, TabDevisPL). PRINCIPE :
+// **Pennylane fait foi pour l'écriture, on lit le miroir.**
+//
+// Le miroir couvre pending | expired | accepted | invoiced | denied (`denied`
+// réintégré le 2026-08-11 : le refus place la carte en Perdu, ce n'est pas une
+// info morte). `draft` reste dehors — non filtrable côté PL. Un devis passé en
+// draft n'est donc pas auto-attaché tant qu'il n'est pas envoyé : acceptable,
+// un brouillon n'a rien à faire dans le pipeline commercial.
+
+// Au-delà, les données du sweep sont considérées périmées : on s'abstient
+// plutôt que d'appliquer du vieux. Le sweep tourne toutes les 5 min — 30 min
+// signifie qu'il est cassé, et écrire sur la foi d'un miroir figé est pire que
+// ne rien faire.
+const MIRROR_MAX_AGE_MINUTES = 30;
+
+// Seuls appels Pennylane restants : lever le doute sur un devis marqué disparu
+// du périmètre balayé. Plafonné pour que la durée d'exécution reste bornée.
+const MISSING_VERIFY_MAX_PER_RUN = 20;
+
+const MIRROR_PAGE = 1000;
+
+interface MirrorQuote {
+  pennylane_quote_id: number;
+  quote_number: string | null;
+  label: string | null;
+  status: string | null;
+  quote_date: string | null;
+  amount_ht: number | string | null;
+  pdf_url: string | null;
+  customer_id: number | null;
+  missing_since: string | null;
+  synced_at: string;
+}
+
+interface CachedCustomer {
+  pennylane_id: number;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
+
+// Pagination explicite : PostgREST plafonne silencieusement à 1000 lignes. Une
+// troncature muette ici ferait passer des devis pour absents du miroir — donc
+// non synchronisés, sans le moindre signal. On pagine jusqu'à épuisement.
+async function fetchAllPages<T>(
+  query: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += MIRROR_PAGE) {
+    const { data, error } = await query(from, from + MIRROR_PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < MIRROR_PAGE) return out;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Appel direct Pennylane (sans passer par pennylane-proxy)
@@ -132,50 +159,13 @@ async function callPennylaneApi(
   return { status: 429, data: { error: "Rate limit after retries" } };
 }
 
-// PL V2 : `emails` peut etre un array de strings (["x@y.fr"]) OU d'objets
-// ({ value, is_default }). On gere les deux formes (mirror frontend
-// extractCustomerEmail). Bug 2026-06-10 : la forme string-array etait ignoree
-// (lecture .value sur une string -> undefined), l'email n'etait jamais synced.
-function extractEmail(c: PennylaneCustomer): string | undefined {
-  if (c.billing_email?.trim()) return c.billing_email.trim();
-  if (Array.isArray(c.emails)) {
-    const def = c.emails.find(
-      (e) => e && typeof e === "object" && e.is_default && e.value?.trim(),
-    );
-    if (def && typeof def === "object" && def.value) return def.value.trim();
-    for (const e of c.emails) {
-      if (typeof e === "string" && e.trim()) return e.trim();
-      if (e && typeof e === "object" && e.value?.trim()) return e.value.trim();
-    }
-  }
-  return undefined;
-}
-
-// Helpers extraction non-vide depuis customer PL (mirror frontend service)
-function extractUpdatePayload(c: PennylaneCustomer): Record<string, string> {
-  const p: Record<string, string> = {};
-
-  if (c.first_name?.trim()) p.first_name = c.first_name.trim();
-  if (c.last_name?.trim()) p.last_name = c.last_name.trim();
-
-  const email = extractEmail(c);
-  if (email) p.email = email;
-
-  const phone = (c.billing_phone || c.phone)?.trim();
-  if (phone) p.phone = phone;
-
-  // PL V2 : billing_address.address (et non .street). Fallback .street par securite.
-  const addr = c.billing_address?.address?.trim() || c.billing_address?.street?.trim();
-  if (addr) p.address = addr;
-  if (c.billing_address?.postal_code?.trim()) {
-    p.postal_code = c.billing_address.postal_code.trim();
-  }
-  if (c.billing_address?.city?.trim()) {
-    p.city = c.billing_address.city.trim();
-  }
-
-  return p;
-}
+// NOTE — l'extraction des champs client depuis la réponse Pennylane brute
+// (billing_email, `emails` en array de strings OU d'objets, billing_address
+// .address avec fallback .street) vivait ici. Elle est désormais faite EN AMONT,
+// une seule fois, par le sweep qui aplatit `pennylane_customer_lookup` : on lit
+// des colonnes déjà normalisées. Le cas `emails` string-array — bug corrigé le
+// 2026-06-10, l'email n'était jamais synchronisé — est donc traité une fois pour
+// toutes côté sweep au lieu d'être dupliqué dans chaque consommateur.
 
 // ---------------------------------------------------------------------------
 // Main handler
@@ -277,16 +267,17 @@ async function syncOrgQuotes(
   let winning_quotes_set = 0;
 
   // 1. Recuperer tous les devis actifs (non ejectes) de cette org
-  const { data: attachedRows, error: aqErr } = await supabase
-    .from("majordhome_lead_pennylane_quotes")
-    .select(
-      "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, quote_amount_ht, quote_label, quote_date, is_winning_quote, pdf_url, assigned_at",
-    )
-    .eq("org_id", orgId)
-    .is("ejected_at", null);
+  const attachedQuotes = await fetchAllPages<AttachedQuote>((from, to) =>
+    supabase
+      .from("majordhome_lead_pennylane_quotes")
+      .select(
+        "id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_status, quote_amount_ht, quote_label, quote_date, is_winning_quote, pdf_url, assigned_at",
+      )
+      .eq("org_id", orgId)
+      .is("ejected_at", null)
+      .range(from, to)
+  );
 
-  if (aqErr) throw aqErr;
-  const attachedQuotes: AttachedQuote[] = (attachedRows ?? []) as AttachedQuote[];
   if (attachedQuotes.length === 0) {
     return {
       quote_status_updates: 0,
@@ -295,12 +286,65 @@ async function syncOrgQuotes(
       auto_attached_quotes: 0,
       ejections: 0,
       winning_quotes_set: 0,
+      skipped_stale_mirror: false,
     };
   }
 
-  // 2. Sync quote_status + pdf_url pour chaque devis attache
+  // 1bis. Charger le miroir local — la source de lecture de toute la suite.
+  const mirrorRows = await fetchAllPages<MirrorQuote>((from, to) =>
+    supabase
+      .from("majordhome_pennylane_quotes")
+      .select(
+        "pennylane_quote_id, quote_number, label, status, quote_date, amount_ht, pdf_url, customer_id, missing_since, synced_at",
+      )
+      .eq("org_id", orgId)
+      .range(from, to)
+  );
+
+  // Garde-fou de fraicheur : le sweep tourne toutes les 5 min. Au-dela de 30,
+  // il est cassé — on s'abstient au lieu d'écrire sur la foi d'un miroir figé.
+  // On rend 200 (le job a fait son travail : constater et refuser d'agir), en
+  // marquant explicitement l'abstention pour qu'elle soit lisible côté cron.
+  const freshest = mirrorRows.reduce<string | null>(
+    (acc, r) => (!acc || r.synced_at > acc ? r.synced_at : acc),
+    null,
+  );
+  const ageMinutes = freshest
+    ? (Date.now() - new Date(freshest).getTime()) / 60000
+    : Infinity;
+
+  if (ageMinutes > MIRROR_MAX_AGE_MINUTES) {
+    console.error(
+      `[pennylane-sync] miroir périmé pour org ${orgId} : ` +
+        `${freshest ? `${Math.round(ageMinutes)} min` : "aucune donnée"} ` +
+        `(seuil ${MIRROR_MAX_AGE_MINUTES} min). Vérifier pennylane-quotes-sweep. ` +
+        `Abstention volontaire — aucune écriture.`,
+    );
+    return {
+      quote_status_updates: 0,
+      customer_field_updates: 0,
+      lead_field_updates: 0,
+      auto_attached_quotes: 0,
+      ejections: 0,
+      winning_quotes_set: 0,
+      skipped_stale_mirror: true,
+    };
+  }
+
+  const mirrorByQuoteId = new Map<number, MirrorQuote>(
+    mirrorRows.map((r) => [r.pennylane_quote_id, r]),
+  );
+
+  // 2. Sync quote_status + pdf_url depuis le miroir — zéro appel Pennylane.
   quote_status_updates = await syncAttachedQuoteFields(
-    supabase, orgId, apiToken, attachedQuotes, ejections_ref,
+    supabase, attachedQuotes, mirrorByQuoteId,
+  );
+
+  // 2bis. Lever le doute sur les devis sortis du périmètre balayé. SEULS appels
+  // Pennylane restants, et plafonnés. Voir le commentaire de la fonction : un
+  // devis absent du miroir n'est PAS un devis supprimé.
+  await verifyMissingQuotes(
+    supabase, apiToken, attachedQuotes, mirrorByQuoteId, ejections_ref,
   );
 
   // 3. Pose is_winning_quote sur le plus recent accepted
@@ -324,13 +368,15 @@ async function syncOrgQuotes(
     );
   }
 
-  // 4. Sync identite PL -> MDH (clients + leads, mode OVERWRITE)
+  // 4. Sync identite PL -> MDH (clients + leads, mode OVERWRITE) — depuis le
+  //    cache clients, alimenté par le sweep. Zéro appel Pennylane.
   const { customer_field_updates, lead_field_updates } =
-    await syncIdentityFromPennylane(supabase, orgId, apiToken, attachedQuotes);
+    await syncIdentityFromPennylane(supabase, orgId, attachedQuotes);
 
   // 5. Auto-attach nouveaux devis PL pour bridges existants (bridge canonique)
+  //    — depuis le miroir. Zéro appel Pennylane.
   const auto_attached_quotes = await autoAttachNewQuotes(
-    supabase, orgId, apiToken, attachedQuotes,
+    supabase, orgId, attachedQuotes, mirrorRows,
   );
 
   return {
@@ -340,27 +386,152 @@ async function syncOrgQuotes(
     auto_attached_quotes,
     ejections: ejections_ref.v,
     winning_quotes_set,
+    skipped_stale_mirror: false,
   };
 }
 
 // ---------------------------------------------------------------------------
 // syncAttachedQuoteFields — etape 2 : sync status + pdf_url des devis attaches
+//
+// Lit le miroir, n'appelle plus Pennylane. Les RPC d'écriture sont inchangées :
+// seule la SOURCE des valeurs change, pas ce qui est écrit ni comment.
+//
+// Un devis absent du miroir n'est PAS traité — et surtout PAS éjecté. Absence
+// = aucune information (brouillon hors périmètre, devis antérieur au miroir),
+// jamais « supprimé ». Le doute se lève dans verifyMissingQuotes, sur preuve.
 // ---------------------------------------------------------------------------
 
 async function syncAttachedQuoteFields(
   supabase: ReturnType<typeof getAdminClient>,
-  orgId: string,
-  apiToken: string,
   attachedQuotes: AttachedQuote[],
-  ejections_ref: { v: number },
+  mirrorByQuoteId: Map<number, MirrorQuote>,
 ): Promise<number> {
   let updates = 0;
+  let notInMirror = 0;
 
   for (const aq of attachedQuotes) {
     if (!aq.pennylane_quote_id) continue;
 
+    const m = mirrorByQuoteId.get(aq.pennylane_quote_id);
+    if (!m) {
+      notInMirror++;
+      continue;
+    }
+
+    const plStatus = m.status ?? null;
+    const plPdfUrl = m.pdf_url ?? null;
+    const plAmountHt = m.amount_ht === null ? null : Number(m.amount_ht);
+    const plLabel = m.quote_number || m.label || null;
+    const plQuoteDate = m.quote_date ?? null;
+
+    const statusDiffers = plStatus && plStatus !== aq.quote_status;
+
+    // ⚠️ Le jeton `encrypted_id` de l'URL PDF est régénéré par Pennylane à
+    // CHAQUE lecture : deux appels sur le même devis renvoient deux URL
+    // différentes. Comparer les URL faisait donc diverger les 364 devis en
+    // permanence — réécrits toutes les 15 min pour rien, et surtout compteur de
+    // changements bloqué à « tous », donc aveugle aux vrais mouvements.
+    // Les anciens jetons restent valides (vérifié le 2026-08-11 : une URL
+    // stockée depuis des semaines renvoie toujours 200 application/pdf), on ne
+    // pose donc le lien que s'il manque. Il est de toute façon rafraîchi dès
+    // qu'un autre champ bouge, puisqu'il fait partie du même UPDATE.
+    const pdfDiffers = !!plPdfUrl && !aq.pdf_url;
+    // Comparaison numerique : quote_amount_ht revient en string depuis PostgREST.
+    const amountDiffers =
+      plAmountHt !== null && Number(plAmountHt) !== Number(aq.quote_amount_ht);
+    const labelDiffers = plLabel && plLabel !== aq.quote_label;
+    const dateDiffers = plQuoteDate && plQuoteDate !== aq.quote_date;
+
+    if (!(statusDiffers || pdfDiffers || amountDiffers || labelDiffers || dateDiffers)) {
+      continue;
+    }
+
+    const { data: updResult, error: updErr } = await supabase.rpc(
+      'pennylane_sync_update_quote_fields',
+      {
+        p_quote_id: aq.id,
+        p_new_status: plStatus,
+        p_pdf_url: plPdfUrl,
+        p_amount_ht: plAmountHt,
+        p_label: plLabel,
+        p_quote_date: plQuoteDate,
+        p_pipeline_min_ht: PIPELINE_MIN_AMOUNT_HT,
+      },
+    );
+
+    if (updErr) {
+      console.warn(
+        `[pennylane-sync] fields update failed for quote ${aq.id}:`,
+        sanitizeError(updErr, 'fields update failed'),
+      );
+      continue;
+    }
+
+    updates++;
+    if (updResult?.revision) {
+      console.log(
+        `[pennylane-sync] revision quote ${aq.pennylane_quote_id}: ` +
+          `delta ${updResult.amount_delta}€ (${updResult.source}) flags=${JSON.stringify(updResult.anomaly_flags)}`,
+      );
+    }
+  }
+
+  // Jamais silencieux : une couverture qui se dégrade doit se voir dans les logs
+  // avant de se voir dans le pipeline.
+  if (notInMirror > 0) {
+    console.warn(
+      `[pennylane-sync] ${notInMirror}/${attachedQuotes.length} devis attachés ` +
+        `absents du miroir — non synchronisés (ni éjectés). Périmètre du sweep ?`,
+    );
+  }
+
+  return updates;
+}
+
+// ---------------------------------------------------------------------------
+// verifyMissingQuotes — etape 2bis : SEULS appels Pennylane restants
+//
+// `missing_since` signifie « sorti du périmètre balayé », PAS « supprimé ».
+// Avant le 2026-08-11 il était même posé sur tout devis passant en refusé
+// (cf. 20260807_2_mark_missing_refuse_wipe.sql) : brancher une éjection dessus
+// aurait détaché 142 devis du pipeline en silence. Le périmètre élargi supprime
+// ce faux positif, mais `draft` reste dehors — donc on ne déduit rien, on
+// vérifie. Un GET tranche : 404 = supprimé (éjection), 2xx = toujours là.
+// ---------------------------------------------------------------------------
+
+async function verifyMissingQuotes(
+  supabase: ReturnType<typeof getAdminClient>,
+  apiToken: string,
+  attachedQuotes: AttachedQuote[],
+  mirrorByQuoteId: Map<number, MirrorQuote>,
+  ejections_ref: { v: number },
+): Promise<void> {
+  const candidates = attachedQuotes
+    .filter((aq) => {
+      const m = aq.pennylane_quote_id
+        ? mirrorByQuoteId.get(aq.pennylane_quote_id)
+        : undefined;
+      return !!m?.missing_since;
+    })
+    .sort((a, b) => {
+      const ma = mirrorByQuoteId.get(a.pennylane_quote_id)!.missing_since!;
+      const mb = mirrorByQuoteId.get(b.pennylane_quote_id)!.missing_since!;
+      return ma < mb ? -1 : ma > mb ? 1 : 0;
+    });
+
+  if (candidates.length === 0) return;
+
+  const batch = candidates.slice(0, MISSING_VERIFY_MAX_PER_RUN);
+  if (candidates.length > batch.length) {
+    console.log(
+      `[pennylane-sync] ${candidates.length} devis à vérifier, ` +
+        `${batch.length} traités ce passage (les plus anciens d'abord)`,
+    );
+  }
+
+  for (const aq of batch) {
     try {
-      const { status: httpStatus, data: rawData } = await callPennylaneApi(
+      const { status: httpStatus } = await callPennylaneApi(
         `/quotes/${aq.pennylane_quote_id}`,
         apiToken,
       );
@@ -370,77 +541,24 @@ async function syncAttachedQuoteFields(
           p_quote_id: aq.id,
           p_reason: 'deleted_in_pennylane',
         });
-
         if (ejectErr) {
-          console.warn(`[pennylane-sync] eject failed for quote ${aq.id}:`, sanitizeError(ejectErr, 'eject failed'));
+          console.warn(
+            `[pennylane-sync] eject failed for quote ${aq.id}:`,
+            sanitizeError(ejectErr, 'eject failed'),
+          );
         } else {
           ejections_ref.v++;
         }
-        continue;
       }
-
-      if (httpStatus < 200 || httpStatus >= 300) {
-        console.warn(
-          `[pennylane-sync] quote ${aq.pennylane_quote_id} returned HTTP ${httpStatus}`,
-        );
-        continue;
-      }
-
-      const plQuote = unwrapPennylaneResource<PennylaneQuote>(rawData, "quote");
-      if (!plQuote) continue;
-
-      const plStatus = plQuote.status ?? null;
-      const plPdfUrl = plQuote.public_file_url ?? null;
-      const plAmountHt = plQuote.currency_amount_before_tax ?? null;
-      const plLabel = plQuote.quote_number || plQuote.label || null;
-      const plQuoteDate = plQuote.date ?? null;
-
-      const statusDiffers = plStatus && plStatus !== aq.quote_status;
-      const pdfDiffers = plPdfUrl && plPdfUrl !== aq.pdf_url;
-      // Comparaison numerique : quote_amount_ht revient en string depuis PostgREST.
-      const amountDiffers =
-        plAmountHt !== null && Number(plAmountHt) !== Number(aq.quote_amount_ht);
-      const labelDiffers = plLabel && plLabel !== aq.quote_label;
-      const dateDiffers = plQuoteDate && plQuoteDate !== aq.quote_date;
-
-      if (statusDiffers || pdfDiffers || amountDiffers || labelDiffers || dateDiffers) {
-        const { data: updResult, error: updErr } = await supabase.rpc(
-          'pennylane_sync_update_quote_fields',
-          {
-            p_quote_id: aq.id,
-            p_new_status: plStatus,
-            p_pdf_url: plPdfUrl,
-            p_amount_ht: plAmountHt,
-            p_label: plLabel,
-            p_quote_date: plQuoteDate,
-            p_pipeline_min_ht: PIPELINE_MIN_AMOUNT_HT,
-          },
-        );
-
-        if (updErr) {
-          console.warn(
-            `[pennylane-sync] fields update failed for quote ${aq.id}:`,
-            sanitizeError(updErr, 'fields update failed'),
-          );
-        } else {
-          updates++;
-          if (updResult?.revision) {
-            console.log(
-              `[pennylane-sync] revision quote ${aq.pennylane_quote_id}: ` +
-                `delta ${updResult.amount_delta}€ (${updResult.source}) flags=${JSON.stringify(updResult.anomaly_flags)}`,
-            );
-          }
-        }
-      }
+      // 2xx : le devis existe, il a juste quitté le périmètre balayé (draft).
+      // Rien à faire — surtout pas l'éjecter.
     } catch (e) {
       console.warn(
-        `[pennylane-sync] error fetching quote ${aq.pennylane_quote_id}:`,
-        sanitizeError(e, 'quote fetch error'),
+        `[pennylane-sync] verify failed for quote ${aq.pennylane_quote_id}:`,
+        sanitizeError(e, 'verify failed'),
       );
     }
   }
-
-  return updates;
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +571,6 @@ async function syncAttachedQuoteFields(
 async function syncIdentityFromPennylane(
   supabase: ReturnType<typeof getAdminClient>,
   orgId: string,
-  apiToken: string,
   attachedQuotes: AttachedQuote[],
 ): Promise<{ customer_field_updates: number; lead_field_updates: number }> {
   let customer_field_updates = 0;
@@ -471,24 +588,46 @@ async function syncIdentityFromPennylane(
     set.add(aq.lead_id);
   }
 
+  // Cache clients, alimenté en write-through par le sweep (qui en résout 40 par
+  // passage — les manquants se comblent seuls en quelques cycles). Ses colonnes
+  // à plat sont EXACTEMENT les 7 champs qu'on écrivait auparavant après parsing
+  // de la réponse Pennylane brute : first_name, last_name, email, phone,
+  // address, postal_code, city. Aucune conversion n'est réécrite ici — c'est ce
+  // qui garantit qu'on écrit la même chose qu'avant.
+  const cacheRows = await fetchAllPages<CachedCustomer>((from, to) =>
+    supabase
+      .from("majordhome_pennylane_customer_lookup")
+      .select("pennylane_id, first_name, last_name, email, phone, address, postal_code, city")
+      .eq("org_id", orgId)
+      .range(from, to)
+  );
+  const cacheById = new Map<number, CachedCustomer>(
+    cacheRows.map((c) => [c.pennylane_id, c]),
+  );
+
+  let notInCache = 0;
+
   for (const [customerId, leadIds] of bridgeMap) {
     try {
-      const { status: httpStatus, data: rawData } = await callPennylaneApi(
-        `/customers/${customerId}`,
-        apiToken,
-      );
-
-      if (httpStatus !== 200) {
-        console.warn(
-          `[pennylane-sync] customer ${customerId} returned HTTP ${httpStatus}`,
-        );
+      const cached = cacheById.get(customerId);
+      if (!cached) {
+        notInCache++;
         continue;
       }
 
-      const plCustomer = unwrapPennylaneResource<PennylaneCustomer>(rawData, "customer");
-      if (!plCustomer) continue;
-
-      const updatePayload = extractUpdatePayload(plCustomer);
+      // Même règle qu'avant : on n'écrase qu'avec une valeur non vide.
+      const updatePayload: Record<string, string> = {};
+      for (const [key, value] of Object.entries({
+        first_name: cached.first_name,
+        last_name: cached.last_name,
+        email: cached.email,
+        phone: cached.phone,
+        address: cached.address,
+        postal_code: cached.postal_code,
+        city: cached.city,
+      })) {
+        if (typeof value === "string" && value.trim()) updatePayload[key] = value.trim();
+      }
       if (Object.keys(updatePayload).length === 0) continue;
 
       // 4a. Sync client MDH (si mapping pennylane_sync existe)
@@ -547,15 +686,24 @@ async function syncIdentityFromPennylane(
     }
   }
 
+  // Dégradation temporaire attendue, pas une panne : le sweep comble le cache à
+  // raison de 40 clients par passage. Loggé pour que « temporaire » reste vérifiable.
+  if (notInCache > 0) {
+    console.log(
+      `[pennylane-sync] ${notInCache}/${bridgeMap.size} clients absents du cache — ` +
+        `identité non synchronisée ce passage (le sweep les résout progressivement)`,
+    );
+  }
+
   return { customer_field_updates, lead_field_updates };
 }
 
 // ---------------------------------------------------------------------------
 // autoAttachNewQuotes — etape 5 : auto-attach nouveaux devis PL pour bridges
 // existants. Pour chaque customer ayant deja un bridge (>=1 devis attache),
-// fetch tous ses devis PL et attache ceux qui ne sont pas en base.
+// attache les devis du miroir qui ne sont pas encore en base.
 //
-// Respecte le seuil pipeline 1000€ HT (SAV/entretien exclus).
+// Respecte le seuil pipeline PIPELINE_MIN_AMOUNT_HT (SAV/entretien exclus).
 // Respecte les ejections manuelles (RPC pennylane_sync_auto_attach_quote
 // no-op si quote_pl_id existe en base, meme ejected).
 //
@@ -563,28 +711,11 @@ async function syncIdentityFromPennylane(
 // customer (assigned_at DESC).
 // ---------------------------------------------------------------------------
 
-interface PennylaneQuoteListItem {
-  id: number;
-  quote_number?: string;
-  label?: string;
-  date?: string;
-  status?: string;
-  currency_amount_before_tax?: number;
-  public_file_url?: string;
-  customer?: { id?: number };
-}
-
-interface PennylaneQuotesListResponse {
-  items?: PennylaneQuoteListItem[];
-  has_more?: boolean;
-  next_cursor?: string;
-}
-
 async function autoAttachNewQuotes(
   supabase: ReturnType<typeof getAdminClient>,
   orgId: string,
-  apiToken: string,
   attachedQuotes: AttachedQuote[],
+  mirrorRows: MirrorQuote[],
 ): Promise<number> {
   let attached = 0;
 
@@ -606,73 +737,62 @@ async function autoAttachNewQuotes(
     }
   }
 
-  for (const [customerId, bridge] of bridgeMap) {
+  // Le miroir contient déjà tous les devis de l'org : un seul parcours en
+  // mémoire remplace une requête Pennylane par client. Un devis est candidat
+  // s'il appartient à un client déjà bridgé et n'est pas déjà attaché.
+  //
+  // Limite assumée : `draft` étant hors périmètre du sweep, un brouillon n'est
+  // pas auto-attaché tant qu'il n'est pas envoyé. C'est le comportement voulu —
+  // un brouillon n'a rien à faire dans le pipeline commercial.
+  for (const q of mirrorRows) {
+    const customerId = q.customer_id;
+    if (!customerId) continue;
+
+    const bridge = bridgeMap.get(customerId);
+    if (!bridge) continue;                                  // client sans bridge
+    if (attachedPlIds.has(q.pennylane_quote_id)) continue;  // deja attache
+
+    const amountHt = Number(q.amount_ht ?? 0);
+    if (amountHt < PIPELINE_MIN_AMOUNT_HT) continue; // SAV/entretien hors pipeline
+
+    const label = q.quote_number || q.label || `Q-${q.pennylane_quote_id}`;
+    const quoteDate = q.quote_date || new Date().toISOString().slice(0, 10);
+
     try {
-      // Fetch tous les devis PL pour ce customer via filter natif V2
-      const filter = encodeURIComponent(
-        JSON.stringify([{ field: "customer_id", operator: "eq", value: customerId }]),
-      );
-      const { status: httpStatus, data: rawData } = await callPennylaneApi(
-        `/quotes?filter=${filter}&limit=100`,
-        apiToken,
+      const { data: result, error: attachErr } = await supabase.rpc(
+        'pennylane_sync_auto_attach_quote',
+        {
+          p_org_id: orgId,
+          p_lead_id: bridge.lead_id,
+          p_quote_pl_id: q.pennylane_quote_id,
+          p_customer_id: customerId,
+          p_amount_ht: amountHt,
+          p_label: label,
+          p_quote_date: quoteDate,
+          p_status: q.status ?? null,
+          p_pdf_url: q.pdf_url ?? null,
+        },
       );
 
-      if (httpStatus !== 200) {
+      if (attachErr) {
         console.warn(
-          `[pennylane-sync] customer ${customerId} quotes list HTTP ${httpStatus}`,
+          `[pennylane-sync] auto-attach failed for quote ${q.pennylane_quote_id}:`,
+          sanitizeError(attachErr, 'auto-attach failed'),
         );
         continue;
       }
 
-      const list = (rawData as PennylaneQuotesListResponse) ?? {};
-      const items = list.items ?? [];
-
-      for (const q of items) {
-        if (!q.id) continue;
-        if (attachedPlIds.has(q.id)) continue; // deja attache
-
-        const amountHt = Number(q.currency_amount_before_tax ?? 0);
-        if (amountHt < PIPELINE_MIN_AMOUNT_HT) continue; // SAV/entretien hors pipeline
-
-        const label = q.quote_number || q.label || `Q-${q.id}`;
-        const quoteDate = q.date || new Date().toISOString().slice(0, 10);
-        const status = q.status || null;
-        const pdfUrl = q.public_file_url || null;
-
-        const { data: result, error: attachErr } = await supabase.rpc(
-          'pennylane_sync_auto_attach_quote',
-          {
-            p_org_id: orgId,
-            p_lead_id: bridge.lead_id,
-            p_quote_pl_id: q.id,
-            p_customer_id: customerId,
-            p_amount_ht: amountHt,
-            p_label: label,
-            p_quote_date: quoteDate,
-            p_status: status,
-            p_pdf_url: pdfUrl,
-          },
+      const wasAttached = (result as { attached?: boolean } | null)?.attached === true;
+      if (wasAttached) {
+        attached++;
+        console.log(
+          `[pennylane-sync] auto-attached quote ${q.pennylane_quote_id} ` +
+            `(${label}, ${amountHt}€) to lead ${bridge.lead_id}`,
         );
-
-        if (attachErr) {
-          console.warn(
-            `[pennylane-sync] auto-attach failed for quote ${q.id}:`,
-            sanitizeError(attachErr, 'auto-attach failed'),
-          );
-          continue;
-        }
-
-        const wasAttached = (result as { attached?: boolean } | null)?.attached === true;
-        if (wasAttached) {
-          attached++;
-          console.log(
-            `[pennylane-sync] auto-attached quote ${q.id} (${label}, ${amountHt}€) to lead ${bridge.lead_id}`,
-          );
-        }
       }
     } catch (e) {
       console.warn(
-        `[pennylane-sync] auto-attach exception for customer ${customerId}:`,
+        `[pennylane-sync] auto-attach exception for quote ${q.pennylane_quote_id}:`,
         sanitizeError(e, 'auto-attach exception'),
       );
     }
