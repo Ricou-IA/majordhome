@@ -173,6 +173,28 @@ Deux points de méthode à retenir :
 - **Révoquer `PUBLIC` seul ne suffit pas** et **révoquer sans re-attribuer casse le frontend**. Le REVOKE doit porter sur `public, anon, authenticated`, suivi d'un GRANT explicite aux rôles que la source accorde réellement. Sur les 59 fonctions concernées, 27 ont besoin d'`authenticated`, 31 de `service_role` seul, 1 d'`authenticated` seul.
 - **L'audit de privilèges est le premier geste post-bascule, pas le dernier.** Entre la bascule et la correction, le projet a tourné en production avec ces fonctions ouvertes à la clé publique.
 
+### ⚠️ Le second piège : les « Exposed schemas » ne sont pas dans le dump
+
+Après bascule, **24 réponses HTTP 500** sur les crons :
+
+```
+PGRST106 — Invalid schema: core
+Only the following schemas are exposed: public, graphql_public
+```
+
+Un projet neuf n'expose que `public` et `graphql_public` à PostgREST. Toute edge function lisant `core.organization_members` ou `core.organizations` échoue donc — c'est-à-dire la quasi-totalité, puisque c'est le socle du contrôle de membership.
+
+**Et pg_cron affichait `succeeded` à chaque exécution.** `net.http_post` est asynchrone : le statut du job ne reflète que l'émission de la requête, jamais la réponse. Le vrai verdict est dans `net._http_response` — à interroger systématiquement après une bascule :
+
+```sql
+select status_code, count(*), max(created), left(max(content), 200)
+from net._http_response group by status_code order by 2 desc;
+```
+
+Source exposée : `public, rag, core, sources, config, legifrance, invoicing, arpet, perfec, linktrack, karedas`. Retenu pour la cible, les autres appartenant aux apps voisines : **`public, graphql_public, core, sources, config`** (`sources` parce que `majordhome.equipments` y référence manuels et factures ; `config` parce que `core.organizations.app_id` y pointe).
+
+Correctif appliqué par la migration `exposer_schemas_postgrest`. Vérifié ensuite : le sweep Pennylane renvoie 200 et scanne 250 devis sur 3 pages.
+
 ### Trois pièges rencontrés, à connaître le jour J
 
 1. **`pg_dump` signale des clés étrangères circulaires** (`appointments`). Un chargement de données seules échoue sans `SET session_replication_role = replica` autour de l'insertion. Les contraintes ne sont pas supprimées, seulement non vérifiées pendant le chargement.
