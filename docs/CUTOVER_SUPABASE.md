@@ -101,7 +101,9 @@ Contrôle après bascule : `select jobname, schedule from cron.job`. Une edge d�
 ## 6. Dépendances externes (hors Supabase)
 
 - **Google Cloud** : réenregistrer les redirect URI OAuth sur la nouvelle URL de projet — Calendar **et** Search Console. Sans ça les deux connexions cassent silencieusement.
-- **N8N** : 6 webhooks (`VITE_N8N_WEBHOOK_*`) et les workflows qui écrivent en base via RPC.
+- **N8N — deux sens à traiter, ne pas oublier le second** :
+  - *Majord'home → N8N* : les 6 webhooks `VITE_N8N_WEBHOOK_*` (SMS avis, SMS rappel, PDF contrat, PDF intervention, signature, voice). Leur URL ne change pas, mais les identifiants SMS qu'ils utilisent restent les tiens (sujet du chantier 1b, pas du cutover).
+  - *N8N → Majord'home* : **c'est là que ça casse en silence.** Les workflows appellent directement des edge functions (`transcribe-dictation` pour la transcription Whisper de la chaîne vocale, `voice-extract-fieldreport`) et écrivent en base via RPC. Ils embarquent donc trois choses liées à l'ancien projet, toutes à mettre à jour : **l'URL** (le ref du projet est dedans), le **`MDH_CRON_SECRET`** en Bearer (qu'on régénère), et la **clé `service_role`**, présente en clair dans certains nodes. Sans ça, la chaîne vocale et l'ingestion de leads Meta s'arrêtent sans message d'erreur.
 - **Vercel** : `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
 - **Resend** : vérifier que le webhook pointe vers la nouvelle edge.
 
