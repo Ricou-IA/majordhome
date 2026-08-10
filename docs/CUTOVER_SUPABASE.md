@@ -207,6 +207,40 @@ Correctif appliqué par la migration `exposer_schemas_postgrest`. Vérifié ensu
 - Bascule du frontend (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` sur Vercel)
 - Les 6 critères de succès applicatifs ci-dessous, qui supposent le frontend branché
 
+## ✅ BASCULE EFFECTUÉE — 2026-08-10
+
+Majord'home tourne en production sur `ejqqqwudmizqisdkxohw`. Fenêtre choisie : congés de Mayer Énergie, aucun utilisateur actif.
+
+**Contrôle final avant transfert vers l'org Pro**, tout vérifié en base :
+
+| | |
+|---|---|
+| 85 tables `majordhome`, 10 `core`, 93 vues, 0 sans `security_invoker` | conformes |
+| clients 3564 · contracts 768 · mailing_logs 9173 | identiques à la source |
+| 33 comptes · 62 fichiers · 6 buckets · 23 policies | conformes |
+| 7 crons actifs, 0 pointant vers l'ancien projet | conformes |
+| RPC SECDEF ouvertes à `anon` : 110 (source : 112) | conforme |
+| Erreurs HTTP depuis le correctif PostgREST | 0 |
+| Sync Pennylane | 250 devis scannés, HTTP 200 |
+
+### Ce qui reste — aucun de ces points n'est affecté par le transfert d'org
+
+1. **Trois workflows N8N écrivent encore dans l'ANCIENNE base** — `Mayer - SMS Avis Client`, `Mayer - SMS RDV`, `Mayer Entretien Web - Souscription Contrat`. Ils passent par des nœuds Postgres et un identifiant partagé (« Postgres account »), commun avec Baikal et Pack Vendeur — d'où le choix de ne pas le modifier. **Décision : les convertir en edge functions plutôt que repointer** (cf. [[project-sortie-n8n-vers-edge-functions]]). Dormants pendant les congés : déclenchés depuis l'app pour les SMS, et le formulaire web est jugé sans trafic en août.
+2. **Redirect URI Search Console** pas encore posé sur GCP (`https://ejqqqwudmizqisdkxohw.supabase.co/functions/v1/gsc-oauth-callback`). N'empêche pas la synchro existante — seulement une reconnexion.
+3. **Deux critères non exercés** : génération d'un PDF de contrat vers le bucket, et un envoi mailing avec retour de webhook Resend. Demandent une action dans l'app.
+4. **Deux tables `majordhome` sans RLS** — identiques à la source, antérieures à la migration.
+5. **Ancien projet conservé en fallback.** Ses 5 crons Majord'home ont été **désactivés** (`cron.alter_job(..., active := false)`, réversible) pour geler la source et préserver le fallback intact.
+
+### Déjà fait côté N8N
+
+- 6 workflows repointés vers le nouveau projet par `scripts/migrate-n8n-refs.mjs` (URL, clé anon, `MDH_CRON_SECRET`). L'API publie en même temps qu'elle enregistre — vérifié, `versionId` = `activeVersionId`.
+- `Major - Pennylane Sync Cron` **converti en pg_cron et désactivé dans N8N** — première sortie de N8N, aucun code écrit : le workflow ne faisait qu'un POST horaire vers une edge function existante.
+
+### Pour reprendre à froid
+
+- Scripts réutilisables : `scripts/migrate-storage.mjs` (contenu des buckets), `scripts/migrate-n8n-refs.mjs` (repointage N8N, liste de workflows explicite).
+- ⚠️ Après transfert vers `confer-saas`, le connecteur MCP Supabase — autorisé sur l'org `Confer` uniquement — perd l'accès au projet. **À ré-autoriser sur la nouvelle org**, sinon plus d'`execute_sql` ni d'`apply_migration` ; seule la CLI, authentifiée au niveau du compte, continue de fonctionner.
+
 ## État de la préparation
 
 - [x] Edge functions non versionnées récupérées (`889157a`)
