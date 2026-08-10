@@ -83,9 +83,7 @@ Même piège que les autres PDFs du projet. Dans tout texte du rapport :
 
 Intensité des déperditions : **bleu `#3b82f6` → ambre `#f59e0b`**, interpolation linéaire entre le min et le max du **bâtiment entier** (pas du niveau, pour que deux niveaux restent comparables). **Jamais rouge/vert.** La couleur ne porte jamais l'information seule : bornes chiffrées systématiques.
 
-L'échelle est `couleurRatio` de `rapportModel.js` — source unique écran ↔ PDF, consommée par `ResultatsPiecesGrid` et `EtudeThermiquePDF`.
-
-> ⚠️ **Dette connue** : `components/wizard/PlanResultats.jsx` contient encore une **copie locale identique** de `couleurRatio` (avec ses propres constantes `BLEU`/`AMBRE`). Tant qu'elle est là, un changement d'échelle dans `rapportModel` ne se propage pas au plan de résultats. À supprimer au profit de l'import.
+L'échelle est `couleurRatio` de `rapportModel.js` — source unique écran ↔ PDF, consommée par `ResultatsPiecesGrid`, `PlanResultats` et `EtudeThermiquePDF`. Aucune copie locale : toute nouvelle surface qui colore un ratio W/m² (y compris le dégradé de légende, via `couleurRatio(0)`/`couleurRatio(1)`) l'importe de là.
 
 Autre piège de rendu : les pièces non chauffées sont hachurées via un **pattern SVG en attribut `fill`**, pas une classe Tailwind dynamique — le scanner Tailwind n'extrait pas les classes construites à l'exécution.
 

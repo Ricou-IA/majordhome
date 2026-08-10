@@ -6,18 +6,11 @@
 // hachurées gris (pattern SVG en ATTRIBUT fill, pas de classe Tailwind dynamique — jamais
 // extraite par le scanner, cf. PieceShape). Label au centroïde (moyenne des sommets, même
 // approximation documentée que PieceShape) : « nom · NNN W ». Tableau par pièce sous le plan.
+// `couleurRatio` vient de rapportModel : SOURCE UNIQUE de l'échelle écran ↔ rapport PDF.
 import { useEffect, useMemo, useState } from 'react';
 import { Layers } from 'lucide-react';
 import { boiteEnglobante } from '../../lib/canvasGeometry';
-
-const BLEU = [59, 130, 246];   // #3b82f6 — pièce la moins déperditive (W/m²)
-const AMBRE = [245, 158, 11];  // #f59e0b — pièce la plus déperditive (W/m²)
-
-/** Interpolation linéaire bleu → ambre, t ∈ [0, 1]. */
-function couleurRatio(t) {
-  const c = BLEU.map((v, i) => Math.round(v + (AMBRE[i] - v) * t));
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-}
+import { couleurRatio } from '../../lib/rapportModel';
 
 const fmtW = (v) => `${Math.round(v).toLocaleString('fr-FR')} W`;
 
@@ -151,7 +144,7 @@ export default function PlanResultats({ dessin, bilan }) {
         <span>{Math.round(ratioMin)} W/m²</span>
         <span
           className="h-2 flex-1 max-w-[160px] rounded-full"
-          style={{ background: 'linear-gradient(to right, #3b82f6, #f59e0b)' }}
+          style={{ background: `linear-gradient(to right, ${couleurRatio(0)}, ${couleurRatio(1)})` }}
         />
         <span>{Math.round(ratioMax)} W/m²</span>
         <span className="ml-1">— pièces non chauffées hachurées</span>
