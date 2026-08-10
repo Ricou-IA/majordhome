@@ -143,10 +143,42 @@ Sur le nouveau projet, après restauration :
 
 Le point 6 n'est pas optionnel : une partie du durcissement Sem 0 a été appliquée hors migrations, via `execute_sql`. **Un restore ne garantit pas qu'il a suivi — il faut le vérifier, pas le présumer.**
 
+## Répétition à blanc — résultats (2026-08-10)
+
+Exécutée de bout en bout sur `ejqqqwudmizqisdkxohw`. Tout ce qui suit est **vérifié en base**, pas déduit d'un journal — les journaux PowerShell sont écrits en UTF-16 et le comptage d'erreurs par `grep` y renvoie 0 quoi qu'il arrive.
+
+| Étape | Résultat |
+|---|---|
+| Edge functions | 27 déployées en une passe ; `verify_jwt` conforme (14 sans JWT, exactement les attendues) |
+| Secrets | 12 posés + `mdh_cron_secret` dans le Vault (44 car., cohérent avec du base64 de 32 octets) |
+| Schéma | 85 tables `majordhome`, 10 `core`, 93 vues `majordhome_*` — **0 erreur** sur 6664 lignes |
+| Données | 13 tables comparées ligne à ligne, **0 divergence** (clients 3564, contracts 768, mailing_logs 9173) |
+| Isolation | 13 schémas voisins supprimés en CASCADE, **Majord'home n'a perdu ni table ni vue** |
+| Storage | 6 buckets + 23 policies (migration rejouée avec succès sur un 2ᵉ projet) |
+| Crons | 4 actifs, aucun ne pointe vers l'ancien projet, secret présent |
+| Comptes | 33 utilisateurs, 28 identités, 7 membres Mayer, tous avec mot de passe |
+
+**L'isolation est démontrée.** Supprimer les cinq apps voisines ne retire aucun objet Majord'home : il n'existe pas de dépendance cachée vers `pack_vendeur`, `rag`, `arpet`, `voirie` ou les schémas vestiges.
+
+### Trois pièges rencontrés, à connaître le jour J
+
+1. **`pg_dump` signale des clés étrangères circulaires** (`appointments`). Un chargement de données seules échoue sans `SET session_replication_role = replica` autour de l'insertion. Les contraintes ne sont pas supprimées, seulement non vérifiées pendant le chargement.
+2. **La CLI ne sait pas télécharger un bucket distant** — `supabase storage cp` ne fait que du local vers local (`LegacyStorageUnsupportedOperationError`). Le transfert des 161 fichiers (15 Mo) demandera un script utilisant les clés `service_role` des deux projets. **Seul poste non validé par la répétition.**
+3. **`auth` est commun à l'instance** : le dump emporte les 33 comptes, dont 5 sans profil `core` qui appartiennent aux apps voisines. Sans conséquence fonctionnelle, mais ce sont des e-mails et des empreintes de mots de passe tiers à élaguer après bascule.
+
+### Ce que la répétition n'a pas couvert
+
+- Transfert du contenu des buckets (cf. piège 2)
+- Bascule du frontend (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` sur Vercel)
+- Les 6 critères de succès applicatifs ci-dessous, qui supposent le frontend branché
+
 ## État de la préparation
 
 - [x] Edge functions non versionnées récupérées (`889157a`)
-- [x] Buckets Storage + policies scriptés (`20260809_2`)
+- [x] Buckets Storage + policies scriptés (`20260809_2`), rejoués avec succès sur un 2ᵉ projet
 - [x] Inventaire des secrets (ce document)
-- [ ] Répétition à blanc chronométrée sur projet jetable
+- [x] Projet cible créé et peuplé : schéma, données, comptes, buckets, crons, 27 edge functions
+- [x] Isolation démontrée (suppression des 13 schémas voisins sans perte)
+- [ ] Script de transfert du contenu des buckets (161 fichiers)
+- [ ] Bascule frontend + les 6 critères de succès
 - [ ] Date de bascule
