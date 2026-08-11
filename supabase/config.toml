@@ -68,6 +68,12 @@ verify_jwt = false
 [functions.pennylane-proxy]
 verify_jwt = true
 
+# SMS/WhatsApp transactionnel multi-org (remplace 2 workflows N8N).
+# Twilio mutualisé côté plateforme, identité d'expéditeur par org dans
+# settings.sms. Appelée par le frontend authentifié.
+[functions.sms-send]
+verify_jwt = true
+
 # Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
 [functions.pvgis-proxy]
 verify_jwt = true

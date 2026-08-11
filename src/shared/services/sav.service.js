@@ -130,6 +130,38 @@ async function maybeCompleteParent(parentId) {
   }
 }
 
+/**
+ * Envoi d'un SMS/WhatsApp transactionnel via l'edge `sms-send`.
+ *
+ * Remplace les webhooks N8N `VITE_N8N_WEBHOOK_SMS_*` (2026-08-11). Un workflow
+ * N8N ne sait pas être multi-client : numéro d'expéditeur, texte et clés y sont
+ * posés en dur, et il écrivait dans `sms_logs` par SQL brut sur une connexion
+ * partagée qui contourne la RLS. L'edge résout l'org depuis le jeton de
+ * l'utilisateur et lit l'identité d'expéditeur + les gabarits dans
+ * `core.organizations.settings.sms`.
+ *
+ * ⚠ Le « timeout = succès » des webhooks N8N a été RETIRÉ, volontairement.
+ * Il se justifiait parce que N8N traitait en arrière-plan : la requête pouvait
+ * expirer alors que l'envoi partait. L'edge, elle, est synchrone — et surtout
+ * elle écrit la trace AVANT d'appeler Twilio. Un échec est donc un vrai échec,
+ * et l'état réel reste lisible dans `sms_logs`. Annoncer un succès qu'on n'a
+ * pas constaté est exactement ce qu'on cherche à supprimer partout ailleurs.
+ */
+async function invokeSmsSend(body) {
+  const { data, error } = await supabase.functions.invoke('sms-send', { body });
+  if (!error) return { data, error: null };
+
+  // supabase-js enveloppe les réponses non-2xx : le détail est dans le contexte.
+  let detail = error.message;
+  try {
+    const payload = await error.context?.json?.();
+    if (payload?.error) detail = payload.error;
+  } catch {
+    // Corps non-JSON : on garde le message brut plutôt que de le masquer.
+  }
+  return { data: null, error: new Error(detail) };
+}
+
 // ============================================================================
 // SERVICE PRINCIPAL
 // ============================================================================
@@ -827,12 +859,6 @@ export const savService = {
    * Envoie une demande d'avis client (WhatsApp + fallback SMS) via N8N
    */
   async sendAvisRequest({ interventionId, clientId, clientFirstName, clientPhone, clientPhoneSecondary, orgId }) {
-    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_SMS_AVIS;
-    if (!webhookUrl) {
-      console.error('[sav] VITE_N8N_WEBHOOK_SMS_AVIS non configuré');
-      return { data: null, error: new Error('Webhook SMS non configuré') };
-    }
-
     // Normaliser pour dédupliquer (ex: "06 12..." et "0612...")
     const normalize = (phone) => String(phone || '').replace(/[\s.-]/g, '');
 
@@ -856,43 +882,25 @@ export const savService = {
       return { data: null, error: new Error('Aucun numéro mobile (06/07) disponible pour ce client') };
     }
 
-    // Envoi séquentiel pour éviter les collisions N8N en parallèle
+    // Envoi séquentiel : un destinataire = un appel = une ligne dans sms_logs.
     let successCount = 0;
     let firstError = null;
 
     for (const phone of mobiles) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const { error } = await invokeSmsSend({
+        campaign: 'avis_j1',
+        phone,
+        org_id: orgId,
+        client_id: clientId,
+        intervention_id: interventionId,
+        vars: { first_name: clientFirstName || '' },
+      });
 
-      try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            intervention_id: interventionId,
-            client_id: clientId,
-            client_first_name: clientFirstName,
-            client_phone: phone,
-            org_id: orgId,
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          throw new Error(`Webhook error: ${response.status}`);
-        }
-        await response.json();
+      if (error) {
+        console.error(`[sav] sendAvisRequest error for ${phone}:`, error);
+        if (!firstError) firstError = error;
+      } else {
         successCount++;
-      } catch (err) {
-        clearTimeout(timeout);
-        if (err.name === 'AbortError') {
-          // Timeout = N8N traite en background, considéré comme succès
-          successCount++;
-        } else {
-          console.error(`[sav] sendAvisRequest error for ${phone}:`, err);
-          if (!firstError) firstError = err;
-        }
       }
     }
 
@@ -913,12 +921,6 @@ export const savService = {
    * N8N envoie le SMS ET log dans sms_logs (campaign_name='rappel_entretien').
    */
   async sendEntretienReminder({ contractId, clientId, clientFirstName, clientName, clientPhone, orgId }) {
-    const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_SMS_RAPPEL;
-    if (!webhookUrl) {
-      console.error('[sav] VITE_N8N_WEBHOOK_SMS_RAPPEL non configuré');
-      return { data: null, error: new Error('Webhook SMS rappel non configuré') };
-    }
-
     if (!isMobileFR(clientPhone)) {
       const reason = clientPhone
         ? 'Aucun numéro mobile (06/07) disponible pour ce client'
@@ -926,37 +928,36 @@ export const savService = {
       return { data: null, error: new Error(reason) };
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contract_id: contractId,
-          client_id: clientId,
-          client_first_name: clientFirstName,
-          client_name: clientName,
-          client_phone: clientPhone,
-          org_id: orgId,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!response.ok) {
-        throw new Error(`Webhook error: ${response.status}`);
-      }
-      await response.json();
-      return { data: { success: true }, error: null };
-    } catch (err) {
-      clearTimeout(timeout);
-      if (err.name === 'AbortError') {
-        // Timeout = N8N traite en background, considéré comme succès
-        return { data: { success: true }, error: null };
-      }
-      console.error('[sav] sendEntretienReminder error:', err);
-      return { data: null, error: err };
+    // ⚠ `contractId` n'est pas transmis : sms_logs ne porte pas de contract_id.
+    // L'état « déjà relancé cette année » reste donc indexé par CLIENT — limite
+    // connue et assumée (un client multi-contrats est marqué relancé après un
+    // seul SMS). Le paramètre est conservé dans la signature pour ne pas
+    // toucher les appelants, et parce que c'est lui qu'il faudra passer le jour
+    // où la colonne existera.
+    // `full_name` en MAJUSCULES : les noms sont stockés ainsi en base, et c'est
+    // ce que produisait le workflow N8N — on ne change pas le texte reçu par le
+    // client au passage. Vide si les deux champs manquent : le gabarit recolle
+    // la ponctuation orpheline côté edge.
+    const fullName = [clientFirstName, clientName]
+      .filter(Boolean).join(' ').trim().toUpperCase();
+
+    const { error } = await invokeSmsSend({
+      campaign: 'rappel_entretien',
+      phone: clientPhone,
+      org_id: orgId,
+      client_id: clientId,
+      vars: {
+        first_name: clientFirstName || '',
+        name: clientName || '',
+        full_name: fullName,
+      },
+    });
+
+    if (error) {
+      console.error('[sav] sendEntretienReminder error:', error);
+      return { data: null, error };
     }
+    return { data: { success: true }, error: null };
   },
 };
 
