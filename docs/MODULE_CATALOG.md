@@ -91,16 +91,20 @@ Ce que ce fichier a corrigé, et qui n'était pas devinable :
 2. **`MTYP` est un mot seul** (`FICHE`, `NOTICE`, `PHOTO`, `SCHEMA`, `ARGUC`, `PLUSPROD`, `VIDEO`, `VIDEOTU`, `PHOTOA`, `PHOTO3D`) — une regex qui attendait « fiche technique » ne captait rien.
 3. **Trois colonnes de libellé coexistent** (`LIBELLE40/80/240`) et le format 40 arrive tronqué, sans espaces (« CuvefioulRothalen700 »). D'où l'arbitrage par **priorité d'alias** : la position dans `aliases` fait foi, pas l'ordre des colonnes.
 
-Résultat sur ce fichier : **6 269/6 269 articles**, 31 731 médias, 63 substitutions résolues. Les 357 articles sans GTIN ont la colonne vide à la source — vérifié, la validation GS1 n'a produit aucun faux rejet. Insertion en base contrôlée sur un échantillon : accents, `Ø`, guillemets doubles et décimales intacts.
+Résultat sur ce fichier : **6 269/6 269 articles**, 31 731 médias, 63 substitutions résolues, 3 282 fiches techniques et 2 405 notices rattachées, 6 266 prix. Les 357 articles sans GTIN ont la colonne vide à la source — vérifié, la validation GS1 n'a produit aucun faux rejet. Insertion en base contrôlée sur un échantillon : accents, `Ø`, guillemets doubles et décimales intacts.
 
 ### Deux constats qui touchent au §5
 
 - **`C04_ETIM` et `C02_CORRESPONDANCE` sont VIDES** dans ce fichier, pourtant complet et conforme. Un fabricant peut donc livrer un FAB-DIS 3.00 sans une seule caractéristique ETIM ni un seul lien d'accessoire. **La couche 2 du moteur d'assemblage ne peut pas reposer sur le seul FAB-DIS** : il faudra une saisie interne ou une autre source pour les accessoires obligatoires.
 - **`C06` pointe majoritairement vers des références absentes de `B01`** (627 sur 690) : l'ancienne référence n'est plus commercialisée, elle vit dans `C05_ARRET`. Le rejet est correct, mais il confirme l'intérêt d'exploiter `C05_ARRET`.
 
-### Reste à normaliser
+### Unités de vente
 
-`UB` vaut `EA` (each) là où le modèle attend `PCE`. Une table de correspondance des unités FAB-DIS est à poser avant le premier import en production.
+`UB` porte un code UN/ECE. Sur le fichier de calage : `EA` (each) pour 6 240 articles, `PKI` pour 27, `MTK` (m²) pour 2.
+
+**Seuls les codes unitaires sont convertis en `PCE`** (`EA`, `NAR`, `C62`, et les écritures déjà unitaires). Toute autre unité — surface, longueur, conditionnement — est **conservée telle quelle et signalée** par un avertissement agrégé. Convertir en « pièce » un article vendu au m² ferait facturer une quantité pour une autre, et la correspondance quantité/unité n'est pas dans les colonnes lues (elle vit dans `B02_LOGISTIQUE`, non exploité).
+
+Attention en lisant un fichier à la main : `UB` (unité de base) et `UC` (unité de conditionnement) sont deux colonnes distinctes, et `UC` n'est renseignée que pour une minorité d'articles. Se fier au mapping par nom de colonne, jamais à une position.
 
 ### Le parser mappe par ALIAS, jamais par noms de colonnes figés
 

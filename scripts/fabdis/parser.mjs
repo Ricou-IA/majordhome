@@ -243,6 +243,45 @@ export const SHEET_SPECS = {
 };
 
 /**
+ * Unites de vente FAB-DIS (codes UN/ECE Rec. 20) → unite du referentiel.
+ *
+ * ⚠️ SEULS LES CODES UNITAIRES SONT CONVERTIS. « each », « number of
+ * articles » et « one » designent bien une piece. Tout autre code — surface
+ * (MTK), longueur (MTR), conditionnement (CT, SA, PKI…) — est conserve TEL
+ * QUEL et signale.
+ *
+ * Convertir en « piece » un article vendu au metre carre ou au carton ferait
+ * facturer une quantite pour une autre. La correspondance quantite/unite ne
+ * figure pas dans les colonnes lues ici (il faudrait B02_LOGISTIQUE) : sans
+ * cette information, convertir serait inventer.
+ *
+ * Sur le fichier de calage : UB vaut EA pour 6 240 articles, PKI pour 27 et
+ * MTK pour 2 — soit 29 articles a verifier avant toute facturation a l'unite.
+ */
+export const UNIT_MAP = {
+  // Codes UN/ECE Rec. 20 designant l'article unitaire
+  ea: 'PCE',   // each
+  nar: 'PCE',  // number of articles
+  c62: 'PCE',  // one (unit)
+  // Ecritures deja unitaires rencontrees dans les fichiers et dans l'app
+  pce: 'PCE', pcs: 'PCE', piece: 'PCE', 'pièce': 'PCE',
+  u: 'PCE', un: 'PCE', unite: 'PCE', 'unité': 'PCE',
+};
+
+/**
+ * Unite normalisee d'un article, et indication de conditionnement.
+ * @param {unknown} raw code UB du fichier
+ * @returns {{unit: string, isPackaging: boolean}}
+ */
+export function normalizeUnit(raw) {
+  const code = toText(raw);
+  if (!code) return { unit: 'PCE', isPackaging: false };
+  const mapped = UNIT_MAP[code.toLowerCase()];
+  if (mapped) return { unit: mapped, isPackaging: false };
+  return { unit: code.toUpperCase(), isPackaging: true };
+}
+
+/**
  * Valeurs rencontrees dans la colonne « type de relation » de C02, ramenees
  * a l'allowlist de catalog.product_relations. Une valeur non reconnue n'est
  * PAS transformee en OPTIONAL par defaut : la ligne est rejetee et signalee
@@ -434,7 +473,7 @@ export function assembleProducts(sheets = {}, options = {}) {
       manufacturer_ref: toText(rec.manufacturer_ref),
       label: toText(rec.label),
       description_text: toText(rec.description_text),
-      unit: toText(rec.unit) || 'PCE',
+      unit: normalizeUnit(rec.unit).unit,
       public_price_ht: toNumber(rec.public_price_ht),
       currency: toText(rec.currency) || 'EUR',
       etim_class_code: null,
@@ -583,6 +622,27 @@ export function assembleProducts(sheets = {}, options = {}) {
       { gtin: rec.parent_gtin, ref: rec.parent_ref, brand: rec.parent_brand },
       { gtin: rec.child_gtin, ref: rec.child_ref, brand: rec.child_brand },
       'SUBSTITUTION', 1, 'C06',
+    );
+  }
+
+  // Avertissement agrege : une ligne par article noierait le rapport, mais
+  // taire l'information exposerait a facturer au prix d'une piece un article
+  // vendu au metre carre ou au carton.
+  const parUnite = new Map();
+  for (const rec of sheets.B01_COMMERCE || []) {
+    const { unit, isPackaging } = normalizeUnit(rec.unit);
+    if (isPackaging) parUnite.set(unit, (parUnite.get(unit) || 0) + 1);
+  }
+  if (parUnite.size > 0) {
+    const total = [...parUnite.values()].reduce((a, b) => a + b, 0);
+    const detail = [...parUnite.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([u, n]) => `${u}=${n}`)
+      .join(', ');
+    warnings.push(
+      `${total} article(s) vendus dans une unite autre que la piece (${detail}). `
+      + 'Unite conservee telle quelle : la correspondance avec la piece '
+      + "n'est pas dans les colonnes lues. Ne pas facturer a l'unite sans verifier.",
     );
   }
 

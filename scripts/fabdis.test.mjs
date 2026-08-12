@@ -18,6 +18,7 @@ import {
   assembleProducts,
   buildAiDescription,
   hashAiDescription,
+  normalizeUnit,
   SHEET_SPECS,
 } from './fabdis/parser.mjs';
 
@@ -143,6 +144,42 @@ test('aucun alias d onglet n est partage entre deux specifications', () => {
       vus.set(alias, cle);
     }
   }
+});
+
+// ----------------------------------------------------------------------------
+// Unites de vente
+// ----------------------------------------------------------------------------
+
+test('seule l unite « each » devient une piece, les conditionnements sont preserves', () => {
+  assert.deepEqual(normalizeUnit('EA'), { unit: 'PCE', isPackaging: false });
+  assert.deepEqual(normalizeUnit('ea'), { unit: 'PCE', isPackaging: false });
+
+  // Un carton ou un metre carre ne sont PAS une piece : les convertir ferait
+  // facturer une quantite pour une autre.
+  assert.deepEqual(normalizeUnit('CT'), { unit: 'CT', isPackaging: true });
+  assert.deepEqual(normalizeUnit('SA'), { unit: 'SA', isPackaging: true });
+  assert.deepEqual(normalizeUnit('ZZZ'), { unit: 'ZZZ', isPackaging: true });
+
+  // Colonne absente : defaut du referentiel, sans alerte.
+  assert.deepEqual(normalizeUnit(null), { unit: 'PCE', isPackaging: false });
+
+  // « PCE » est notre propre code d'unite : le compter comme un
+  // conditionnement declencherait une alerte sur tout le catalogue.
+  assert.deepEqual(normalizeUnit('PCE'), { unit: 'PCE', isPackaging: false });
+  assert.deepEqual(normalizeUnit('NAR'), { unit: 'PCE', isPackaging: false });
+});
+
+test('les articles vendus dans une autre unite sont signales une seule fois', () => {
+  const sheets = sampleSheets();
+  sheets.B01_COMMERCE[0].unit = 'CT';
+  sheets.B01_COMMERCE[1].unit = 'CT';
+  const { products, warnings } = assembleProducts(sheets);
+
+  assert.equal(products.find((p) => p.manufacturer_ref === 'ATL-ALFEA-8').unit, 'CT');
+  const avis = warnings.filter((w) => /unite autre que la piece/.test(w));
+  assert.equal(avis.length, 1, 'un seul avertissement agrege, pas un par article');
+  assert.match(avis[0], /2 article/);
+  assert.match(avis[0], /CT=2/);
 });
 
 // ----------------------------------------------------------------------------
