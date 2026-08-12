@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus } from 'lucide-react';
+import { User, Phone, MapPin, Home, FileText, ExternalLink, Link2, X, Search, Loader2, UserCheck, Users, Plus, ScanSearch } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
@@ -288,7 +288,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
 // COMPOSANT PRINCIPAL — TabInfo
 // ============================================================================
 
-export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId }) => {
+export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate }) => {
   const u = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
 
   return (
@@ -388,10 +388,23 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId }) =>
 
       {/* Logement */}
       <section>
-        <h3 className="text-sm font-semibold text-secondary-900 mb-4 flex items-center gap-2">
-          <Home className="w-4 h-4 text-secondary-500" />
-          Logement
-        </h3>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h3 className="text-sm font-semibold text-secondary-900 flex items-center gap-2">
+            <Home className="w-4 h-4 text-secondary-500" />
+            Logement
+          </h3>
+          {onInvestigate && (
+            <button
+              type="button"
+              onClick={onInvestigate}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-lg transition-colors"
+              title="Interroger la donnée bâtiment publique (BAN + DPE) pour cette adresse"
+            >
+              <ScanSearch className="w-3.5 h-3.5" />
+              Investiguer
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField label="Type">
             <SelectInput value={formData.housingType} onChange={(v) => u('housingType', v)} options={HOUSING_TYPES} placeholder="Sélectionner..." disabled={isLocked} />
@@ -402,13 +415,16 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId }) =>
           <FormField label="N° DPE ADEME">
             <div className="flex gap-2">
               <TextInput value={formData.dpeNumber} onChange={(v) => u('dpeNumber', v)} placeholder="2341E0000000X" disabled={isLocked} />
+              {/* Lien PROFOND vers le DPE (vérifié 200 le 2026-08-12) plutôt que
+                  la page de recherche `observatoire-dpe.ademe.fr/trouver-dpe`,
+                  qui obligeait à re-saisir le numéro à la main. */}
               {formData.dpeNumber && (
                 <a
-                  href={`https://observatoire-dpe.ademe.fr/trouver-dpe#${formData.dpeNumber}`}
+                  href={`https://observatoire-dpe-audit.ademe.fr/afficher-dpe/${formData.dpeNumber}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-shrink-0 p-2 text-primary-600 hover:bg-primary-50 rounded-lg"
-                  title="Voir sur ADEME"
+                  title="Ouvrir ce DPE sur l'observatoire ADEME"
                 >
                   <ExternalLink className="w-5 h-5" />
                 </a>

@@ -363,3 +363,17 @@ export const thermalKeys = {
   list: (orgId, filters) => [...thermalKeys.studies(orgId), filters],
   detail: (orgId, id) => [...thermalKeys.studies(orgId), 'detail', id],
 };
+
+// --- Investigation bâtiment (donnée publique DPE, lecture seule) ---
+// La donnée interrogée est nationale et publique, donc identique d'une org à
+// l'autre : `orgId` n'est ici que la convention P0.11 (isolation du cache au
+// switch d'org), pas un filtre métier.
+export const investigationKeys = {
+  all: (orgId) => ['investigation', orgId],
+  // `scope` fait partie de la clé ('exact' ou 'nearby:<rayon>') : la recherche
+  // élargie est un AUTRE résultat (les DPE des voisins), pas un rafraîchissement
+  // du précédent — et changer de rayon change encore le jeu de résultats.
+  byAddress: (orgId, addressKey, scope = 'exact') => [
+    ...investigationKeys.all(orgId), 'address', addressKey, scope,
+  ],
+};
