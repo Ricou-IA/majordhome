@@ -183,7 +183,7 @@ src/
 - **`public.exec_sql(text)` → SECURITY INVOKER** (P0.0.1, ✅ 2026-05-20) : avant le fix, cette fonction était SECURITY DEFINER exécutable par `authenticated` → permettait à n'importe quel user front authentifié de lire toute la DB via une requête SQL arbitraire. Maintenant en INVOKER, restreinte aux droits du caller. **NE PAS rajouter d'appels à cette fonction depuis le frontend** ou des edge functions exposées au public.
 - **Gotcha `DROP SCHEMA` + Exposed schemas PostgREST** (incident 2026-05-21, 30 min downtime) : Ne JAMAIS `DROP SCHEMA xxx CASCADE` sans avoir d'abord vérifié que le schéma n'est PAS listé dans **Dashboard Supabase → API Settings → "Exposed schemas"**. Si oui : (1) retirer le schéma de la liste exposée, (2) attendre le re-deploy PostgREST (~30s), (3) puis seulement DROP. Sinon → 503 sur TOUTE l'API REST de l'instance (toutes les apps cohabitantes impactées). Symptôme : PGRST002 "Could not query the database for the schema cache" côté frontend, `ERROR: schema "xxx" does not exist` côté logs postgres. Fix d'urgence : `CREATE SCHEMA IF NOT EXISTS xxx; NOTIFY pgrst, 'reload schema';`. **Un schéma vide listé en exposed schemas EST une dépendance même sans objet dedans.**
 - **RPC `public.update_majordhome_lead(p_lead_id uuid, p_updates jsonb)`** : RPC SECURITY DEFINER générique pour patcher partiellement un lead côté frontend. Préférable à `supabase.schema('majordhome').from('leads').update(...)` qui renvoie 406 (schema non exposé). Pattern : `supabase.rpc('update_majordhome_lead', { p_lead_id, p_updates: { client_id, updated_at: new Date().toISOString() } })`. Utilisée dans ~15 endroits (leads.service, geocoding.service, hook ensureClientForLeadFromPennylane, etc.). Le filtre `org_id` est appliqué côté RPC (check membership).
-- **Gotcha `pennylane_sync` peu peuplé** : `majordhome.pennylane_sync` n'est alimentée que par les flux MDH→PL (création client via `usePennylaneSyncClient`) ou backfills explicites. Les clients créés directement dans Pennylane (avant intégration, ou hors MDH) n'ont JAMAIS leur mapping posé. **Pattern préféré pour matcher entité PL ↔ entité MDH** : partir des entités PL (paginé), fetcher leurs détails en batch (avec `pLimit` pour éviter le rate limit), comparer leurs fields avec le lead/client. Cf. `getCandidateQuotesForLead` dans `pennylane.service.js`. **Bridge prioritaire** : quand un mapping existe (`bridgeCustomerId` résolu), faire 1 appel direct `/quotes?filter=[{customer_id eq}]` SANS fenêtre temporelle pour ramener exhaustivement les devis du customer.
+- **Gotcha `pennylane_sync` peu peuplé** : `majordhome.pennylane_sync` n'est alimentée que par les flux MDH→PL (création client via `usePennylaneSyncClient`) ou backfills explicites. Les clients créés directement dans Pennylane (avant intégration, ou hors MDH) n'ont JAMAIS leur mapping posé. **Pour matcher entité PL ↔ entité MDH, partir du MIROIR LOCAL** (cf. Module Pennylane) et non de l'API PL paginée — l'ancien pattern « paginer PL + fetch détails en batch » est ce qui tuait `pennylane-sync-quote-status` à chaque exécution. **Bridge prioritaire** : quand un mapping existe (`bridgeCustomerId` résolu), faire 1 appel direct `/quotes?filter=[{customer_id eq}]` SANS fenêtre temporelle pour ramener exhaustivement les devis du customer.
 - **Tie-break Pennylane** : pour départager 2 devis PL créés le même jour, trier sur `pennylane_quote_id DESC` (ID interne PL, strictement incrémental dans le temps de création) — PAS sur `amount_ht DESC` ni `assigned_at`. Pattern utilisé dans la RPC `lead_attach_quotes_and_send` pour calculer `most_recent_*` et propager `order_amount_ht` sur `leads`. À généraliser pour tout tri chronologique d'entités PL (factures, paiements).
 - **Vue `majordhome_appointments` = miroir simple auto-updatable** : ne JAMAIS l'étendre en LATERAL+window (ex. pré-agréger `technician_ids`/`technician_names`) — la vue perd `is_insertable_into=YES` et les INSERT/UPDATE/DELETE via PostgREST cassent. Pour exposer la relation N:N techniciens, faire une 2ᵉ requête côté service sur `majordhome_appointment_technicians` puis merger en mémoire (pattern `getTeamDayAvailability` / `useAppointments` / `getAppointmentById`). Règle générale : **miroir simple = updatable, agrégat/LATERAL = read-only** (régression Bloc B, hotfix 2026-06-03). Ajouter une colonne scalaire simple reste OK mais `CREATE OR REPLACE VIEW` n'autorise l'ajout qu'**EN FIN de liste** (ex. `appointments.grand_secteur` après `target_invoiced`, migration `20260617_4`) — sinon "cannot change name of view column". `grand_secteur` = photo du grand secteur figée à la création du RDV (même clustering que la Programmation, via `entretiensService.getGrandSecteurMaps(coreOrgId)` cache module 30 min ; snapshot non bloquant côté `appointmentsService.createAppointment`). **⚠️ `getGrandSecteurMaps` attend l'org CORE (3c68…), PAS l'org majordhome (`orgId`, 7825…) utilisée pour l'insert appointment** — il filtre `majordhome_contracts.org_id` = org core ; passer le mauvais org_id renvoie des maps vides et le grand secteur ne se résout jamais (fix 2026-06-17).
 - **Intervention org = client OU contrat** : `majordhome.interventions` peut être rattachée à un client (`client_id`) OU à un contrat (`contract_id`) sans client direct. Toute RPC SECURITY DEFINER qui dérive `org_id` d'une intervention doit faire `COALESCE(c.org_id, ct.org_id)` (via `LEFT JOIN clients c … LEFT JOIN contracts ct …`) — sinon faux `not_authorized` sur les interventions sans client mais liées à un contrat. Pattern : `call_get_card_context`, `call_attempt_record` (2026-06-03).
@@ -450,7 +450,11 @@ Règles qui mordent :
 - « Gagner un lead » = UNIQUEMENT `lead_mark_won_with_quote` (statut + won_date + chantier). Ne jamais dupliquer la logique de gain ailleurs.
 - « Devis envoyé » / « Gagné » / « Perdu » manuels **interdits sans devis PL rattaché** sur orgs PL. Filet DB **uniquement sur « Devis envoyé »** (`enforce_devis_envoye_requires_quote` : `RETURN NEW` dès que la cible n'est pas `display_order = 4`) ; Gagné/Perdu ne tiennent que par 3 gardes front recopiées (board `LeadKanban`, fiche `LeadModal` via `PL_DRIVEN_STATUSES`, drawer `LongTermLeadDrawer`) — toute nouvelle surface qui change un statut de lead doit recopier la garde, sinon divergence silencieuse entre `leads.status_id` et `majordhome_kanban_cards`. Perte directe (sans devis) reste OK.
 - Liens devis = `q.public_file_url` / `pdf_url` — **jamais** construire `app.pennylane.com/quotes/{id}` (404 multi-cabinet).
-- Rate limit V2 25 req/5s → `pLimit(5)`. Single GET = ressource au **root** (pas wrappée). LISTE `/quotes` n'embarque QUE `customer.id` (pas le nom → `resolveCustomerNames`).
+- **Le miroir local est la source de LECTURE, Pennylane la source d'ÉCRITURE** (2026-08-11). Toute lecture d'entité PL part de `majordhome_pennylane_quotes` / `majordhome_pennylane_customer_lookup` (alimentés par `pennylane-quotes-sweep`, 5 min). Un `apiCall('GET', …)` en direct doit se justifier (entité non miroitée : `ledger_accounts`, factures). Reste ~15 lectures directes à instruire dans `pennylane.service.js` (contre 3 écritures). Mesure qui a tranché : `pennylane-sync-quote-status` faisait 781 appels PL (≈ 322 s) contre un plafond de 150 s en plan Free — **tuée à CHAQUE exécution pendant des semaines** — là où le sweep ramenait les mêmes données en 3 appels et 2 s.
+- **Périmètre du miroir** : `pending | expired | accepted | invoiced | denied`. `denied` réintégré le 2026-08-11 (un refus place la carte en Perdu, ce n'est pas une info morte). `draft` reste dehors : renvoyé par l'API PL mais absent de son énumération filtrable — **« renvoyé » ≠ « filtrable »** chez Pennylane, à vérifier avant d'ajouter un statut.
+- **Absence du miroir ≠ suppression.** `missing_since` signifie « sorti du périmètre balayé ». Avant l'élargissement, passer en refusé en était une cause (`20260807_2_mark_missing_refuse_wipe.sql`) : y brancher une éjection aurait détaché 142 devis du pipeline en silence. Ne jamais éjecter sur une absence — vérifier par un GET ciblé (404 = supprimé).
+- **Fraîcheur** : miroir daté de plus de 30 min ⇒ s'abstenir et le signaler, plutôt qu'écrire sur la foi de données figées.
+- Rate limit V2 25 req/5s → `pLimit(5)`. **Vrai pour les ÉCRITURES ; ce n'est pas un feu vert pour paralléliser des lectures massives** — à 5 req/s, 781 appels font 156 s de plancher, au-dessus du plafond Free. Single GET = ressource au **root** (pas wrappée). LISTE `/quotes` n'embarque QUE `customer.id` (pas le nom → `resolveCustomerNames`).
 - `pennylane_sync_ensure_winning_quotes` déclenche sur `accepted` **uniquement** — garde-fou délibéré contre les chantiers rétroactifs sur de vieux `invoiced`. Ne pas l'élargir (tenté et reverté le 2026-08-05).
 - Seuil pipeline **500€ HT** (2026-08-05, était 1000). Source `src/lib/constants.js` + 2 copies Deno (`pennylane-sync-quote-status`, `pennylane-backfill-quotes`). ⚠️ `pennylane-sync-cron` a sa propre constante `LEAD_THRESHOLD_HT` qui **crée des leads** (pas seulement filtre). Tie-break chrono = `pennylane_quote_id DESC`.
 - **Une seule définition de « devis validé »** : `majordhome.quote_status_bucket()` → vue `majordhome.lead_quote_stats` → consommée par `majordhome_kanban_cards` ET `majordhome_chantiers`. Ne JAMAIS recopier l'allowlist (vue, RPC ou JS) — le chantier a divergé du pipeline pendant des mois exactement comme ça (9 à 12 chantiers /43 affichaient un montant ≠ de leur propre carte Gagné). **Le chantier ne définit rien** : il reprend les devis validés du pipeline, et le rattachement se fait uniquement depuis le pipeline (la modale d'attache côté chantier a été retirée).
@@ -494,6 +498,54 @@ Outil terrain pour installateur **non-ingénieur** : déperditions pièce par pi
 - **Palette deutan (R12)** : bleu → ambre pour l'intensité des déperditions, **jamais rouge/vert**, et la couleur ne porte jamais l'information seule (bornes chiffrées systématiques). Échelle = `couleurRatio` de `rapportModel.js`, source unique écran ↔ PDF (importée par `ResultatsPiecesGrid`, `PlanResultats`, `EtudeThermiquePDF` — plus aucune copie locale, y compris pour les dégradés de légende).
 - **DB** : `majordhome.thermal_studies` + vue `majordhome_thermal_studies` (security_invoker, auto-updatable). `input` jsonb = état wizard (shape VERROUILLÉ, cf. `toStudyInput`), `results` jsonb + `engine_version`. La liste ne sélectionne PAS `input` (jsonb lourd) → `getById` à la demande. Brouillon `localStorage thermal-draft:${userId}`. Config org : `settings.thermique` via `buildThermiqueConfig(settings)` (⚠️ merge JSONB niveau 1 → sauver l'objet COMPLET).
 - **⚠️ L'étude est aujourd'hui INDÉPENDANTE du pipeline** : les rails existent (colonnes `client_id`/`lead_id`, `contexte.clientId`/`leadId`, pré-remplissage `/thermique?client=<id>`) mais **rien ne les alimente** — aucun écran ne produit l'URL, `leadId` n'est jamais renseigné, ni la fiche client ni le lead n'affichent les études. Seule porte d'entrée : la sidebar. **Phase 2 (décidée avec Eric le 2026-08-06)** = brancher l'étude sur le lead. Ne pas considérer le lien comme fonctionnel avant.
+
+## Module Investigation bâtiment (fiche client → BAN + DPE ADEME)
+
+Bouton « Investiguer » dans la section Logement de `ClientDetail` : interroge la BAN
+(`api-adresse.data.gouv.fr`) puis le fichier DPE de l'ADEME (dataset `meg-83tjwtg8dyz4vv7h1dqe`,
+~15,3 M de diagnostics) pour l'adresse du client. Deux APIs publiques, sans clé, CORS ouvert —
+appels directs navigateur, pas d'edge function. Spec :
+`docs/superpowers/specs/2026-08-12-investigation-batiment-client-design.md`.
+
+Règles qui mordent :
+- **Zéro écriture en base.** Lecture seule, à la demande (`enabled` = panneau ouvert), résultat
+  en cache React Query. Abandonner la piste = supprimer les fichiers, aucune migration à défaire.
+- **La recherche par voisinage ne se déclenche JAMAIS toute seule** (`includeNearby`, faux par
+  défaut). Un DPE à 51 m est celui du voisin ; la version initiale y repliait automatiquement et
+  l'affichait comme « le » résultat avec un bandeau — personne ne lit le bandeau. Rayon au choix
+  (`NEARBY_RADII_M` = 150/300/600 m), carte interactive, un repère par diagnostic.
+- **Aucun `sort` sur une requête `geo_distance`** : data-fair ordonne alors par distance
+  croissante. Trier par date faisait rater les voisins immédiats (DPE à 79 m absent des 6
+  premiers résultats). `_geo_distance` n'est pas triable explicitement (400).
+- **Toute troncature s'affiche.** `total` ≠ `records.length` doit être écrit à l'écran, sinon
+  « 40 sur 75 » se lit « le secteur est vide ».
+- **Le schéma ADEME ne documente AUCUN de ses 230 champs** (`description` vide partout) : toute
+  sémantique se vérifie statistiquement, jamais depuis le nom de la colonne. Pièges mesurés :
+  `isolation_toiture` est un **booléen 0/1** (utiliser les `qualite_isolation_plancher_haut_*`) ;
+  le champ générateur passe de 7,3 % de remplissage (DPE 2021) à 98,7 % (DPE 2026), donc l'âge
+  d'équipement n'est exploitable que sur les diagnostics récents ; `cout_total_5_usages` ≠ somme
+  des 5 usages sur ~2 % des cas. `deperditions_enveloppe` **est** la somme des 7 postes (vérifié,
+  écart médian 0,000 %).
+- **Pas de parcelle cadastrale.** Les coordonnées d'un DPE viennent de la BAN, donc de l'axe de la
+  voie : `fetchParcelleAtPoint` renvoie souvent la parcelle de la VOIRIE (vérifié — « AM 0078 ·
+  2056 m² » dessinait la rue). Pour identifier le bâti il faudrait une emprise de BÂTIMENT
+  (BDNB `batiment_groupe`, BD TOPO), pas une parcelle.
+- **Fiabilité du rattachement** : `adresse_brut` (ce que le diagnostiqueur a écrit) est toujours
+  affichée — c'est le seul élément qu'un humain compare d'un coup d'œil. `assessMatch` avertit
+  quand le géocodage ADEME est approximatif : 23 % des DPE du Tarn ont un `score_ban` sous 0,5,
+  avec de vraies erreurs de rue (« Impasse de Laborie » → « Impasse de la Borie »).
+- **⚠️ Marqueurs Mapbox** : ne JAMAIS écrire dans `style.transform` de l'élément racine d'un
+  `mapboxgl.Marker` — Mapbox y place son `translate()` de positionnement. Styler une pastille
+  interne (cf. `markerElement` de `DpeNeighbourhoodMap`).
+- Modules PURS testés (`node --test scripts/dpe-api.test.mjs scripts/dpe-report-model.test.mjs`) :
+  `src/lib/dpeApi.js` (accès + mapping) et `src/lib/dpeReportModel.js` (mise en forme et
+  recommandations de prestations — **ne calcule jamais**). Synthèse PDF client via
+  `dpeSyntheseExport.js` (point d'entrée unique), socle graphique emprunté à
+  `@apps/thermique/components/etude/pdfShared`.
+- **Mayer ne vend ni isolation ni menuiseries** : `OUT_OF_SCOPE_POSTS` verrouille la règle, et un
+  test vérifie qu'aucune recommandation ne mentionne isolation/menuiserie/fenêtre. Quand les murs
+  dominent les pertes, le document l'énonce en « En toute transparence » au lieu de renvoyer vers
+  une prestation non assurée.
 
 ## Module Meta Ads (dashboard ROI)
 
