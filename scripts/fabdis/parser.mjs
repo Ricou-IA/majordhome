@@ -4,12 +4,22 @@
  * Traduit les onglets d'un fichier FAB-DIS fabricant en enregistrements
  * canoniques prets a etre inseres dans le schema `catalog`.
  *
- * Onglets couverts (section 2.1 du cahier des charges) :
+ * Onglets couverts, NOMMES SELON LA NORME FAB-DIS 3.0 :
  *   B01_COMMERCE       identite, libelles, prix public, unite de vente
- *   B04_MEDIA          visuels, fiches techniques, notices, certificats
- *   B05_ETIM           classe ETIM et couples caracteristique/valeur
- *   C02_CORRESPONDANCE accessoires obligatoires, compatibilites
- *   C06_SUBSTITUTION   obsolescence et produits de remplacement
+ *   B03_MEDIA          visuels, fiches techniques, notices, certificats
+ *   C04_ETIM           classe ETIM et couples caracteristique/valeur
+ *   C02_CORRESPONDANCE accessoires, compatibilites, produits complementaires
+ *   C06_SUBSTITUTION   produits de remplacement
+ *
+ * ⚠️ ECART AVEC LE CAHIER DES CHARGES — verifie sur la norme le 2026-08-12 :
+ * le document designe le media par « B04_MEDIA » et l'ETIM par « B05_ETIM ».
+ * Or en FAB-DIS 3.0 le media est en B03, l'ETIM en C04, et B04 est l'onglet
+ * REGLEMENTAIRE. Suivre le document aurait fait lire des donnees
+ * reglementaires comme des medias. Les intitules du document restent acceptes
+ * comme alias, mais les codes NUS ambigus sont refuses.
+ *
+ * Onglets de la norme non exploites a ce jour : B00_CARTOUCHE, B02_LOGISTIQUE,
+ * B04_REGLEMENTAIRE, C01_EXTENSION, C03_VARIANTE, C05_ARRET, F01_PYRAMIDE.
  *
  * ⚠️ POURQUOI UN MAPPING PAR ALIAS, ET PAS DES NOMS DE COLONNES EN DUR
  * -------------------------------------------------------------------
@@ -138,8 +148,11 @@ export const SHEET_SPECS = {
     ],
   },
 
-  B04_MEDIA: {
-    sheetAliases: ['b04 media', 'b04', 'media', 'medias'],
+  // Onglet B03 en FAB-DIS 3.0. L'alias nu « b04 » est VOLONTAIREMENT absent :
+  // en 3.0, B04 est l'onglet REGLEMENTAIRE. L'accepter ici ferait lire des
+  // donnees reglementaires comme des medias, sans lever la moindre erreur.
+  B03_MEDIA: {
+    sheetAliases: ['b03 media', 'b04 media', 'media', 'medias'],
     fields: [
       { key: 'manufacturer_ref', required: true,
         aliases: ['reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article'] },
@@ -152,8 +165,10 @@ export const SHEET_SPECS = {
     ],
   },
 
-  B05_ETIM: {
-    sheetAliases: ['b05 etim', 'b05', 'etim', 'caracteristiques'],
+  // Onglet C04 en FAB-DIS 3.0. « B05_ETIM » ne figure pas dans la norme ;
+  // l'alias est conserve par tolerance pour les fichiers non conformes.
+  C04_ETIM: {
+    sheetAliases: ['c04 etim', 'c04', 'b05 etim', 'etim', 'caracteristiques'],
     fields: [
       { key: 'manufacturer_ref', required: true,
         aliases: ['reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article'] },
@@ -320,8 +335,8 @@ function lookupProduct(index, rec) {
  *
  * @param {object} sheets enregistrements par onglet (sorties de parseSheet)
  * @param {object[]} [sheets.B01_COMMERCE]
- * @param {object[]} [sheets.B04_MEDIA]
- * @param {object[]} [sheets.B05_ETIM]
+ * @param {object[]} [sheets.B03_MEDIA]
+ * @param {object[]} [sheets.C04_ETIM]
  * @param {object[]} [sheets.C02_CORRESPONDANCE]
  * @param {object[]} [sheets.C06_SUBSTITUTION]
  * @param {object} [options]
@@ -371,7 +386,7 @@ export function assembleProducts(sheets = {}, options = {}) {
   }
 
   // --- B04 : documents et visuels -------------------------------------------
-  for (const rec of sheets.B04_MEDIA || []) {
+  for (const rec of sheets.B03_MEDIA || []) {
     const product = lookupProduct(index, rec);
     if (!product) continue;
 
@@ -396,7 +411,7 @@ export function assembleProducts(sheets = {}, options = {}) {
   // --- B05 : classification et caracteristiques ETIM -------------------------
   const resolveEtim = typeof options.resolveEtim === 'function' ? options.resolveEtim : null;
 
-  for (const rec of sheets.B05_ETIM || []) {
+  for (const rec of sheets.C04_ETIM || []) {
     const product = lookupProduct(index, rec);
     if (!product) continue;
 

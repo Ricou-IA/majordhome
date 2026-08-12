@@ -1,9 +1,13 @@
 /**
  * scripts/fabdis/make-sample.mjs — Jeu d'essai FAB-DIS
  * ============================================================================
- * Genere un classeur conforme a la STRUCTURE decrite par le cahier des charges
- * (onglets B01/B04/B05/C02/C06), couvrant les quatre familles retenues :
- * PAC air/eau, poele a granules, fumisterie, climatisation.
+ * Genere un classeur dont les onglets suivent le nommage de la NORME FAB-DIS
+ * 3.0 (B01_COMMERCE, B03_MEDIA, C02_CORRESPONDANCE, C04_ETIM,
+ * C06_SUBSTITUTION) et non celui du cahier des charges, qui designe le media
+ * par « B04_MEDIA » et l'ETIM par « B05_ETIM » — deux intitules que la norme
+ * n'emploie pas, B04 y etant l'onglet REGLEMENTAIRE.
+ * Couvre les quatre familles retenues : PAC air/eau, poele a granules,
+ * fumisterie, climatisation.
  *
  * ⚠️ CE QUE CE FICHIER PROUVE, ET CE QU'IL NE PROUVE PAS
  * ------------------------------------------------------
@@ -91,7 +95,7 @@ const B01 = {
   ],
 };
 
-const B04 = {
+const B03_MEDIA_DATA = {
   headers: ['Référence fabricant', 'Type de média', 'URL', 'Libellé'],
   rows: [
     ['ATL-ALFEA-8', 'Fiche technique', 'https://exemple.test/fabdis/alfea8-ft.pdf', 'Fiche technique Alfea 8'],
@@ -109,7 +113,7 @@ const B04 = {
 // Codes ETIM plausibles. Les libelles ne sont PAS renseignes ici : ils viennent
 // de l'API ETIM a l'ingestion (section 2.2). Un fichier FAB-DIS ne porte que
 // les codes.
-const B05 = {
+const C04_ETIM_DATA = {
   headers: ['Référence fabricant', 'Classe ETIM', 'Code caractéristique',
             'Code valeur', 'Valeur numérique', 'Code unité'],
   rows: [
@@ -165,8 +169,8 @@ async function main() {
   workbook.created = new Date('2026-08-12T00:00:00Z');
 
   addSheet(workbook, 'B01_COMMERCE', B01);
-  addSheet(workbook, 'B04_MEDIA', B04);
-  addSheet(workbook, 'B05_ETIM', B05);
+  addSheet(workbook, 'B03_MEDIA', B03_MEDIA_DATA);
+  addSheet(workbook, 'C04_ETIM', C04_ETIM_DATA);
   addSheet(workbook, 'C02_CORRESPONDANCE', C02);
   addSheet(workbook, 'C06_SUBSTITUTION', C06);
 
@@ -174,8 +178,8 @@ async function main() {
 
   console.log(`Jeu d'essai FAB-DIS ecrit : ${outPath}`);
   console.log(`  B01_COMMERCE       ${B01.rows.length} produits (4 familles)`);
-  console.log(`  B04_MEDIA          ${B04.rows.length} documents`);
-  console.log(`  B05_ETIM           ${B05.rows.length} caracteristiques`);
+  console.log(`  B03_MEDIA          ${B03_MEDIA_DATA.rows.length} documents`);
+  console.log(`  C04_ETIM           ${C04_ETIM_DATA.rows.length} caracteristiques`);
   console.log(`  C02_CORRESPONDANCE ${C02.rows.length} relations`);
   console.log(`  C06_SUBSTITUTION   ${C06.rows.length} substitution`);
 }

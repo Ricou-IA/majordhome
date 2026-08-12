@@ -110,6 +110,42 @@ test('parseSheet ignore les lignes dont un champ requis est vide', () => {
 });
 
 // ----------------------------------------------------------------------------
+// Nommage des onglets (norme FAB-DIS 3.0)
+// ----------------------------------------------------------------------------
+
+test('l onglet reglementaire B04 n est jamais confondu avec le media B03', () => {
+  // En FAB-DIS 3.0, B03 = MEDIA et B04 = REGLEMENTAIRE. Le cahier des charges
+  // designe le media par « B04_MEDIA » : accepter le code nu « b04 » ferait
+  // lire des donnees reglementaires comme des medias, sans aucune erreur.
+  const aliasesMedia = SHEET_SPECS.B03_MEDIA.sheetAliases;
+
+  assert.ok(!aliasesMedia.includes('b04'), 'le code nu b04 ne doit pas etre un alias media');
+  assert.ok(!aliasesMedia.includes('b04 reglementaire'));
+  assert.ok(aliasesMedia.includes('b03 media'));
+  // L'intitule du cahier des charges reste tolere : il est non ambigu.
+  assert.ok(aliasesMedia.includes('b04 media'));
+});
+
+test('l onglet ETIM est reconnu sous son nom de norme C04 comme sous celui du document', () => {
+  const aliases = SHEET_SPECS.C04_ETIM.sheetAliases;
+  assert.ok(aliases.includes('c04 etim'));
+  assert.ok(aliases.includes('b05 etim'));
+});
+
+test('aucun alias d onglet n est partage entre deux specifications', () => {
+  // Deux onglets qui repondent au meme alias, c'est un import qui depend de
+  // l'ordre des feuilles dans le classeur.
+  const vus = new Map();
+  for (const [cle, spec] of Object.entries(SHEET_SPECS)) {
+    for (const alias of spec.sheetAliases) {
+      assert.equal(vus.get(alias), undefined,
+        `alias « ${alias} » partage entre ${vus.get(alias)} et ${cle}`);
+      vus.set(alias, cle);
+    }
+  }
+});
+
+// ----------------------------------------------------------------------------
 // Assemblage multi-onglets
 // ----------------------------------------------------------------------------
 
@@ -122,7 +158,7 @@ function sampleSheets() {
       { manufacturer_ref: 'ATL-VASE-18', gtin: GTIN_VASE, brand_code: 'ATLANTIC',
         label: 'Vase d expansion 18 L', public_price_ht: '89,90' },
     ],
-    B04_MEDIA: [
+    B03_MEDIA: [
       { manufacturer_ref: 'ATL-ALFEA-8', media_type: 'Fiche technique',
         url: 'https://example.test/alfea8.pdf', media_label: 'FT Alfea 8' },
       { manufacturer_ref: 'ATL-ALFEA-8', media_type: 'Notice de pose',
@@ -130,7 +166,7 @@ function sampleSheets() {
       { manufacturer_ref: 'ATL-ALFEA-8', media_type: 'Certificat CE',
         url: 'https://example.test/alfea8-ce.pdf' },
     ],
-    B05_ETIM: [
+    C04_ETIM: [
       { manufacturer_ref: 'ATL-ALFEA-8', etim_class_code: 'EC010912',
         feature_code: 'EF000008', value_numeric: '8', unit_code: 'EU570448' },
       { manufacturer_ref: 'ATL-ALFEA-8', feature_code: 'EF000199', value_numeric: '111' },
@@ -258,7 +294,7 @@ test('une modification technique change l empreinte, donc declenche un nouvel em
     .find((p) => p.manufacturer_ref === 'ATL-ALFEA-8');
 
   const sheetsApres = sampleSheets();
-  sheetsApres.B05_ETIM[0].value_numeric = '11';
+  sheetsApres.C04_ETIM[0].value_numeric = '11';
   const apres = assembleProducts(sheetsApres).products
     .find((p) => p.manufacturer_ref === 'ATL-ALFEA-8');
 
