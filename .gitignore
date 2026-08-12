@@ -78,3 +78,7 @@ supabase/.branches/
 *.pem
 .vercel
 .netlify
+
+# Jeu d'essai FAB-DIS (regenerable : node scripts/fabdis/make-sample.mjs)
+docs/imports/fabdis-echantillon.xlsx
+fabdis-payload.json
