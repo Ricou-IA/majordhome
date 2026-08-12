@@ -29,6 +29,7 @@ import { EventModal } from '../components/planning/EventModal';
 
 // Sous-composants extraits
 import { InviteClientButton } from '../components/clients/InviteClientButton';
+import { ClientInvestigationPanel } from '../components/clients/ClientInvestigationPanel';
 import { ClientCategoryBadge } from './client-detail/ClientCategoryBadge';
 import { TabInfo } from './client-detail/TabInfo';
 import { TabEquipments } from './client-detail/TabEquipments';
@@ -69,6 +70,7 @@ export default function ClientDetail() {
   const [isCreatingAppointment, setIsCreatingAppointment] = useState(false);
   const [showHardDelete, setShowHardDelete] = useState(false);
   const [hardDeleteCounts, setHardDeleteCounts] = useState(null);
+  const [showInvestigation, setShowInvestigation] = useState(false);
 
   const { can } = useCanAccess();
   const canCreateAppointment = can('planning', 'create');
@@ -121,6 +123,16 @@ export default function ClientDetail() {
     }
     setIsLocked(!isLocked);
   }, [isLocked, initialData]);
+
+  // Pré-remplissage depuis l'investigation bâtiment. On déverrouille au lieu
+  // d'enregistrer : la donnée DPE peut être fausse ou porter sur un autre
+  // logement du même immeuble, elle passe donc par une relecture humaine.
+  const handleApplyInvestigation = useCallback((patch) => {
+    setFormData((prev) => ({ ...prev, ...patch }));
+    setIsLocked(false);
+    setShowInvestigation(false);
+    toast.success('Champs pré-remplis depuis le DPE — vérifiez puis Enregistrer');
+  }, []);
 
   const handleSave = async () => {
     if (!formData.lastName?.trim()) {
@@ -442,7 +454,7 @@ export default function ClientDetail() {
 
       {/* Contenu des onglets */}
       <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
-        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} />}
+        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} onInvestigate={() => setShowInvestigation(true)} />}
         {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
         {activeTab === 'devis-pl' && client.pennylane_account_number && <TabDevisPL clientId={id} orgId={organization?.id} />}
         {activeTab === 'devis-pl' && !client.pennylane_account_number && (
@@ -466,6 +478,16 @@ export default function ClientDetail() {
         {activeTab === 'mailings' && <TabMailings clientId={id} />}
         {activeTab === 'sms' && <TabSms clientId={id} />}
       </div>
+
+      {/* Investigation bâtiment — panneau latéral, lecture seule.
+          « Renseigner la fiche » ne fait que PRÉ-REMPLIR le formulaire et le
+          déverrouiller : rien n'est écrit en base sans un Enregistrer explicite. */}
+      <ClientInvestigationPanel
+        client={client}
+        isOpen={showInvestigation}
+        onClose={() => setShowInvestigation(false)}
+        onApply={handleApplyInvestigation}
+      />
 
       {/* Modale création RDV (pré-remplie avec les infos du client) */}
       <EventModal
