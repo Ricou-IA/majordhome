@@ -2,7 +2,7 @@
 
 > Référentiel produit mutualisé alimentant **Majord'home** (assemblage d'ouvrages, devis) et **Arpet.ai** (recherche sémantique, conseil technique).
 > Source : cahier des charges « Spécifications techniques et architecture data : Arpet.ai & Majord'home », sections 2 à 5.
-> **État : socle livré, catalogue non alimenté en données réelles** (cf. « Ce qui manque » en fin de document).
+> **État : socle livré, premier catalogue réel ingéré** — 6 269 articles Roth France (FAB-DIS 3.00), ingestion complète en 23 s, idempotence vérifiée. Reste bloquant : la traduction ETIM (cf. « Ce qui manque »).
 
 ## Ce que c'est, et ce que ce n'est pas
 
@@ -151,6 +151,25 @@ Le premier est inexploitable en recherche sémantique. **L'ouverture du compte E
 
 **Ce qu'il prouve** : la chaîne complète, de la lecture du classeur à l'assemblage requêtable en base.
 **Ce qu'il ne prouve pas** : la compatibilité avec un vrai FAB-DIS. Les intitulés de colonnes y sont plausibles, **pas certifiés**. Les GTIN portent une clé de contrôle valide (pour exercer réellement la validation) mais n'identifient aucun article du commerce.
+
+## Premier import réel (2026-08-12)
+
+Catalogue Roth France COMPLET du 01/07/2026, via `--apply` :
+
+| | |
+|---|---:|
+| Produits insérés | **6 269** |
+| Lignes de prix | 6 216 |
+| Fiches techniques rattachées | 3 282 |
+| Notices d'installation | 2 407 |
+| Articles avec au moins un média | 5 454 |
+| Substitutions (C06) | 63 |
+| Articles avec caractéristique ETIM | **0** |
+| Durée, en 32 lots de 200 | **23 s** |
+
+**Idempotence vérifiée en conditions réelles** : le ré-import du même fichier donne `products_inserted: 0`, `prices_added: 0`, `embeddings_invalidated: 0`. Un passage nocturne sans changement ne crée donc ni doublon, ni ligne de prix, ni le moindre appel d'API payante.
+
+Le zéro sur la colonne ETIM n'est pas un défaut d'import : l'onglet `C04_ETIM` est vide dans le fichier source. C'est la démonstration la plus nette de ce que le compte ETIM apportera — et de ce qu'aucun pipeline ne peut fabriquer sans lui.
 
 ## Retirer un import
 
