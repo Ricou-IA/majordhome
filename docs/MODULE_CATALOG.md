@@ -51,7 +51,7 @@ node scripts/fabdis-import.mjs <fichier.xlsx> \
      --source "Tarif Atlantic 2026"                  # produit un payload JSON
 node scripts/fabdis-import.mjs <fichier.xlsx> --limit 50 --apply   # premier essai prudent
 node scripts/fabdis-import.mjs <fichier.xlsx> --apply # ingere (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
-node --test scripts/fabdis.test.mjs                   # 18 tests
+node --test scripts/fabdis.test.mjs                   # 20 tests
 ```
 
 ### ⚠️ Nommage des onglets : le cahier des charges diverge de la norme
