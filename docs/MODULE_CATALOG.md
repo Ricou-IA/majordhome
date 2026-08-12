@@ -71,6 +71,37 @@ Structure complète de la norme — 5 onglets obligatoires (`B00_CARTOUCHE`, `B0
 
 **Non exploités à ce jour**, par ordre d'intérêt : `C05_ARRET` (fin de commercialisation → `is_active = false`), `B04_REGLEMENTAIRE` (matière du §6), `C03_VARIANTE` (déclinaisons taille/couleur), `B02_LOGISTIQUE` (conditionnements), `B00_CARTOUCHE`, `C01_EXTENSION`, `F01_PYRAMIDE`.
 
+### Calage sur un fichier FAB-DIS 3.00 réel (2026-08-12)
+
+Les alias ne sont plus des suppositions : ils sont relevés sur un **vrai fichier fabricant**, publié en libre accès par Roth France (`professionnels.roth-france.fr/fabdis/liste`) — 6 269 articles, les 12 onglets de la norme.
+
+Colonnes réelles, par onglet :
+
+| Onglet | Colonnes utiles |
+|---|---|
+| `B01_COMMERCE` | `MARQUE`, `REFCIALE`, `GTIN`, `LIBELLE40/80/240`, `TARIF`, `UB`, `GAMME` |
+| `B03_MEDIA` | `REFCIALE`, `MTYP`, `MURL`, `MNOM` |
+| `C04_ETIM` | `MARQUE`, `REFCIALE`, `ARTCLASSID`, `FEATUREID`, `FVALUE`, `ETIMV` |
+| `C02_CORRESPONDANCE` | `REFCIALE`, `CORTYP`, `CORQ`, `REFCIALECOR`, `MARQUECOR` |
+| `C06_SUBSTITUTION` | `MQEREFOLD`, `REFOLD`, `REFCIALESUB`, `MARQUESUB` |
+
+Ce que ce fichier a corrigé, et qui n'était pas devinable :
+
+1. **Les relations sont exprimées en RÉFÉRENCE, pas en GTIN** — alors que `catalog.product_relations` pointe sur des GTIN. `assembleProducts` résout donc `(marque, référence) → GTIN` depuis `B01`. Une référence portée par deux produits distincts est écartée de l'index : mieux vaut ne pas résoudre que résoudre vers le mauvais article.
+2. **`MTYP` est un mot seul** (`FICHE`, `NOTICE`, `PHOTO`, `SCHEMA`, `ARGUC`, `PLUSPROD`, `VIDEO`, `VIDEOTU`, `PHOTOA`, `PHOTO3D`) — une regex qui attendait « fiche technique » ne captait rien.
+3. **Trois colonnes de libellé coexistent** (`LIBELLE40/80/240`) et le format 40 arrive tronqué, sans espaces (« CuvefioulRothalen700 »). D'où l'arbitrage par **priorité d'alias** : la position dans `aliases` fait foi, pas l'ordre des colonnes.
+
+Résultat sur ce fichier : **6 269/6 269 articles**, 31 731 médias, 63 substitutions résolues. Les 357 articles sans GTIN ont la colonne vide à la source — vérifié, la validation GS1 n'a produit aucun faux rejet. Insertion en base contrôlée sur un échantillon : accents, `Ø`, guillemets doubles et décimales intacts.
+
+### Deux constats qui touchent au §5
+
+- **`C04_ETIM` et `C02_CORRESPONDANCE` sont VIDES** dans ce fichier, pourtant complet et conforme. Un fabricant peut donc livrer un FAB-DIS 3.00 sans une seule caractéristique ETIM ni un seul lien d'accessoire. **La couche 2 du moteur d'assemblage ne peut pas reposer sur le seul FAB-DIS** : il faudra une saisie interne ou une autre source pour les accessoires obligatoires.
+- **`C06` pointe majoritairement vers des références absentes de `B01`** (627 sur 690) : l'ancienne référence n'est plus commercialisée, elle vit dans `C05_ARRET`. Le rejet est correct, mais il confirme l'intérêt d'exploiter `C05_ARRET`.
+
+### Reste à normaliser
+
+`UB` vaut `EA` (each) là où le modèle attend `PCE`. Une table de correspondance des unités FAB-DIS est à poser avant le premier import en production.
+
 ### Le parser mappe par ALIAS, jamais par noms de colonnes figés
 
 Les intitulés réels varient d'un fabricant à l'autre (accents, casse, abréviations, colonnes absentes). Chaque champ déclare une liste d'alias dans `SHEET_SPECS`, et le rapport de lecture remonte **les colonnes non reconnues** ainsi que **les colonnes requises manquantes**. Un onglet auquel il manque une colonne requise est rejeté **en bloc** : jamais d'import mutilé en silence.

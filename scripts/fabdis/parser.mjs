@@ -130,21 +130,30 @@ export const SHEET_SPECS = {
     sheetAliases: ['b01 commerce', 'b01', 'commerce'],
     fields: [
       { key: 'manufacturer_ref', required: true,
-        aliases: ['reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article', 'article', 'reference article'] },
+        aliases: ['refciale', 'reference fabricant', 'ref fabricant', 'refinfor',
+                  'reference', 'ref', 'code article', 'article', 'reference article'] },
       { key: 'gtin',
         aliases: ['gtin', 'ean', 'code ean', 'ean13', 'gtin ean', 'code barre', 'gencod'] },
       { key: 'brand_code',
-        aliases: ['code marque', 'marque', 'brand', 'code fabricant', 'fabricant'] },
+        aliases: ['marque', 'code marque', 'brand', 'code fabricant', 'fabricant'] },
+      // Ordre = priorite. LIBELLE80 avant LIBELLE40 : le format 40 caracteres
+      // arrive tronque et sans espaces dans les fichiers reels
+      // (« CuvefioulRothalen700 »).
       { key: 'label', required: true,
-        aliases: ['libelle court', 'designation', 'libelle', 'denomination', 'libelle commercial', 'nom', 'label'] },
+        aliases: ['libelle80', 'libelle40', 'libelle court', 'designation', 'libelle',
+                  'denomination', 'libelle commercial', 'nom', 'label'] },
       { key: 'description_text',
-        aliases: ['libelle long', 'description', 'descriptif', 'libelle etendu', 'description longue'] },
+        aliases: ['libelle240', 'libelle long', 'description', 'descriptif',
+                  'libelle etendu', 'description longue'] },
       { key: 'public_price_ht',
-        aliases: ['prix public ht', 'prix public', 'tarif public', 'prix ht', 'prix de base ht', 'pvpc ht'] },
+        aliases: ['tarif', 'prix public ht', 'prix public', 'tarif public', 'prix ht',
+                  'prix de base ht', 'pvpc ht'] },
       { key: 'currency',
-        aliases: ['devise', 'currency', 'monnaie'] },
+        aliases: ['dev', 'devise', 'currency', 'monnaie'] },
       { key: 'unit',
-        aliases: ['unite de vente', 'unite', 'uv', 'unite facturation', 'conditionnement'] },
+        aliases: ['ub', 'unite de vente', 'unite', 'uv', 'unite facturation', 'conditionnement'] },
+      { key: 'range_name',
+        aliases: ['gamme', 'famille commerciale'] },
     ],
   },
 
@@ -155,13 +164,14 @@ export const SHEET_SPECS = {
     sheetAliases: ['b03 media', 'b04 media', 'media', 'medias'],
     fields: [
       { key: 'manufacturer_ref', required: true,
-        aliases: ['reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article'] },
+        aliases: ['refciale', 'reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article'] },
       { key: 'gtin', aliases: ['gtin', 'ean', 'code ean'] },
       { key: 'media_type', required: true,
-        aliases: ['type de media', 'type media', 'type', 'nature du document', 'categorie media'] },
+        aliases: ['mtyp', 'type de media', 'type media', 'type', 'nature du document', 'categorie media'] },
       { key: 'url', required: true,
-        aliases: ['url', 'lien', 'adresse', 'url media', 'lien fichier', 'http'] },
-      { key: 'media_label', aliases: ['libelle', 'description', 'titre', 'nom du fichier'] },
+        aliases: ['murl', 'url', 'lien', 'adresse', 'url media', 'lien fichier', 'http'] },
+      { key: 'media_label',
+        aliases: ['mnom', 'mtexte', 'libelle', 'description', 'titre', 'nom du fichier'] },
     ],
   },
 
@@ -171,41 +181,62 @@ export const SHEET_SPECS = {
     sheetAliases: ['c04 etim', 'c04', 'b05 etim', 'etim', 'caracteristiques'],
     fields: [
       { key: 'manufacturer_ref', required: true,
-        aliases: ['reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article'] },
+        aliases: ['refciale', 'reference fabricant', 'ref fabricant', 'reference', 'ref', 'code article'] },
       { key: 'gtin', aliases: ['gtin', 'ean', 'code ean'] },
+      { key: 'brand_code', aliases: ['marque', 'code marque'] },
       { key: 'etim_class_code',
-        aliases: ['classe etim', 'code classe', 'etim class', 'classe', 'code classe etim'] },
+        aliases: ['artclassid', 'classe etim', 'code classe', 'etim class', 'classe', 'code classe etim'] },
       { key: 'feature_code', required: true,
-        aliases: ['code caracteristique', 'caracteristique', 'code feature', 'feature', 'ef'] },
+        aliases: ['featureid', 'code caracteristique', 'caracteristique', 'code feature', 'feature', 'ef'] },
+      // FVALUE porte indifferemment un code valeur (EV…) ou une valeur brute :
+      // `assembleProducts` tranche selon que le contenu est numerique ou non.
       { key: 'value_code',
-        aliases: ['code valeur', 'valeur code', 'value', 'ev'] },
+        aliases: ['fvalue', 'code valeur', 'valeur code', 'value', 'ev'] },
       { key: 'value_numeric',
         aliases: ['valeur numerique', 'valeur num', 'numeric value', 'valeur'] },
       { key: 'unit_code',
         aliases: ['code unite', 'unite', 'unit', 'eu'] },
+      { key: 'etim_version', aliases: ['etimv', 'version etim'] },
     ],
   },
 
+  // ⚠️ Les onglets de relations designent les produits par REFERENCE
+  // COMMERCIALE, pas par GTIN — verifie sur un fichier fabricant reel. Les
+  // deux sont acceptes ; `assembleProducts` resout les references en GTIN a
+  // partir de B01, seul moyen de satisfaire les cles etrangeres de
+  // catalog.product_relations.
   C02_CORRESPONDANCE: {
     sheetAliases: ['c02 correspondance', 'c02', 'correspondance', 'correspondances'],
+    requiredAny: [['parent_gtin', 'parent_ref'], ['child_gtin', 'child_ref']],
     fields: [
-      { key: 'parent_gtin', required: true,
+      { key: 'parent_ref',
+        aliases: ['refciale', 'reference principale', 'ref principale'] },
+      { key: 'parent_brand', aliases: ['marque'] },
+      { key: 'parent_gtin',
         aliases: ['gtin principal', 'gtin parent', 'ean principal', 'gtin', 'ean'] },
-      { key: 'child_gtin', required: true,
+      { key: 'child_ref',
+        aliases: ['refcialecor', 'reference associee', 'ref associee'] },
+      { key: 'child_brand', aliases: ['marquecor'] },
+      { key: 'child_gtin',
         aliases: ['gtin associe', 'gtin lie', 'ean associe', 'gtin accessoire', 'gtin enfant'] },
       { key: 'relation_type',
-        aliases: ['type de relation', 'type relation', 'nature', 'type', 'type association'] },
+        aliases: ['cortyp', 'type de relation', 'type relation', 'nature', 'type', 'type association'] },
       { key: 'quantity_required',
-        aliases: ['quantite', 'qte', 'quantity', 'nombre'] },
+        aliases: ['corq', 'quantite', 'qte', 'quantity', 'nombre'] },
     ],
   },
 
   C06_SUBSTITUTION: {
     sheetAliases: ['c06 substitution', 'c06', 'substitution', 'substitutions', 'remplacement'],
+    requiredAny: [['parent_gtin', 'parent_ref'], ['child_gtin', 'child_ref']],
     fields: [
-      { key: 'parent_gtin', required: true,
+      { key: 'parent_ref', aliases: ['refold', 'reference remplacee', 'ancienne reference'] },
+      { key: 'parent_brand', aliases: ['mqerefold', 'marque'] },
+      { key: 'parent_gtin',
         aliases: ['gtin remplace', 'gtin origine', 'ancien gtin', 'gtin', 'ean'] },
-      { key: 'child_gtin', required: true,
+      { key: 'child_ref', aliases: ['refcialesub', 'reference remplacante', 'nouvelle reference'] },
+      { key: 'child_brand', aliases: ['marquesub'] },
+      { key: 'child_gtin',
         aliases: ['gtin remplacant', 'nouveau gtin', 'gtin substitution', 'gtin de remplacement'] },
     ],
   },
@@ -239,22 +270,52 @@ export const RELATION_TYPE_MAP = {
  */
 export function buildHeaderMap(headers, spec) {
   const map = {};
-  const seen = new Set();
   const unknown = [];
+  // key → { index, rank } : rang de l'alias qui a gagne, pour arbitrer les
+  // doublons. Un fichier reel porte souvent plusieurs colonnes candidates pour
+  // le meme champ (LIBELLE40 / LIBELLE80 / LIBELLE240) : sans arbitrage c'est
+  // l'ordre des colonnes qui tranche, donc le libelle tronque a 40 caracteres
+  // qui l'emporte. La position dans `aliases` fait foi : le premier gagne.
+  const chosen = new Map();
 
   headers.forEach((raw, index) => {
     const norm = normalizeHeader(raw);
     if (!norm) return;
-    const field = spec.fields.find((f) => f.aliases.includes(norm));
-    if (field && !seen.has(field.key)) {
-      map[index] = field.key;
-      seen.add(field.key);
-    } else if (!field) {
-      unknown.push(String(raw));
+
+    let matched = null;
+    for (const field of spec.fields) {
+      const rank = field.aliases.indexOf(norm);
+      if (rank !== -1) { matched = { field, rank }; break; }
     }
+
+    if (!matched) {
+      unknown.push(String(raw));
+      return;
+    }
+
+    const previous = chosen.get(matched.field.key);
+    if (!previous) {
+      chosen.set(matched.field.key, { index, rank: matched.rank });
+    } else if (matched.rank < previous.rank) {
+      delete map[previous.index];
+      chosen.set(matched.field.key, { index, rank: matched.rank });
+    } else {
+      return;
+    }
+    map[index] = matched.field.key;
   });
 
-  const missing = spec.fields.filter((f) => f.required && !seen.has(f.key)).map((f) => f.key);
+  const missing = spec.fields
+    .filter((f) => f.required && !chosen.has(f.key))
+    .map((f) => f.key);
+
+  // `requiredAny` : groupes dont AU MOINS un membre doit etre present. Sert aux
+  // onglets de relations, qui designent les produits tantot par GTIN, tantot
+  // par reference commerciale selon le fabricant.
+  for (const group of spec.requiredAny || []) {
+    if (!group.some((key) => chosen.has(key))) missing.push(group.join('|'));
+  }
+
   return { map, unknown, missing };
 }
 
@@ -286,7 +347,8 @@ export function parseSheet(rows, spec) {
     }
     const hasRequired = spec.fields
       .filter((f) => f.required)
-      .every((f) => toText(rec[f.key]) !== null);
+      .every((f) => toText(rec[f.key]) !== null)
+      && (spec.requiredAny || []).every((g) => g.some((k) => toText(rec[k]) !== null));
     if (hasRequired) records.push(rec);
     else skipped += 1;
   }
@@ -394,9 +456,13 @@ export function assembleProducts(sheets = {}, options = {}) {
     if (!url) continue;
     const type = normalizeHeader(rec.media_type);
 
-    if (/fiche technique|technical|datasheet|documentation technique/.test(type)) {
+    // Codes MTYP releves sur un fichier FAB-DIS 3.0 reel : FICHE, NOTICE,
+    // PHOTO, PHOTOA, PHOTO3D, SCHEMA, ARGUC, PLUSPROD, VIDEO, VIDEOTU.
+    // Le code est un mot seul (« FICHE »), pas une phrase : une regex qui
+    // exigeait « fiche technique » ne captait rien.
+    if (/^fiche$|fiche technique|technical|datasheet|documentation technique/.test(type)) {
       product.technical_pdf_url = product.technical_pdf_url || url;
-    } else if (/notice|installation|manuel|montage|pose/.test(type)) {
+    } else if (/^notice$|notice|installation|manuel|montage|pose/.test(type)) {
       product.installation_manual_url = product.installation_manual_url || url;
     }
 
@@ -442,14 +508,45 @@ export function assembleProducts(sheets = {}, options = {}) {
   }
 
   // --- C02 / C06 : relations -------------------------------------------------
+  // Ces onglets designent les produits par reference commerciale, alors que
+  // catalog.product_relations pointe sur des GTIN. On construit donc un index
+  // de resolution a partir de B01. Une reference portee par deux produits
+  // distincts est ecartee de l'index : mieux vaut ne pas resoudre que resoudre
+  // vers le mauvais article.
+  const refToGtin = new Map();
+  const ambiguousRefs = new Set();
+  for (const product of byKey.values()) {
+    if (!product.gtin || !product.manufacturer_ref) continue;
+    const ref = product.manufacturer_ref;
+    const brandKey = product.brand_code ? `b:${product.brand_code}|${ref}` : null;
+    if (brandKey) refToGtin.set(brandKey, product.gtin);
+
+    const bare = `r:${ref}`;
+    if (refToGtin.has(bare) && refToGtin.get(bare) !== product.gtin) ambiguousRefs.add(bare);
+    else refToGtin.set(bare, product.gtin);
+  }
+  for (const key of ambiguousRefs) refToGtin.delete(key);
+
+  /** GTIN d'une extremite de relation, par GTIN direct ou par reference. */
+  const resolveEndpoint = (rawGtin, rawRef, rawBrand) => {
+    const direct = normalizeGtin(rawGtin);
+    if (direct) return direct;
+    const ref = toText(rawRef);
+    if (!ref) return null;
+    const brand = toText(rawBrand);
+    if (brand && refToGtin.has(`b:${brand}|${ref}`)) return refToGtin.get(`b:${brand}|${ref}`);
+    return refToGtin.get(`r:${ref}`) || null;
+  };
+
   const relations = [];
   const seenRelations = new Set();
 
-  const pushRelation = (parentRaw, childRaw, type, qty, origin) => {
-    const parent = normalizeGtin(parentRaw);
-    const child = normalizeGtin(childRaw);
+  const pushRelation = (parentRec, childRec, type, qty, origin) => {
+    const parent = resolveEndpoint(parentRec.gtin, parentRec.ref, parentRec.brand);
+    const child = resolveEndpoint(childRec.gtin, childRec.ref, childRec.brand);
     if (!parent || !child) {
-      warnings.push(`${origin} : relation ignoree, GTIN invalide (${toText(parentRaw)} → ${toText(childRaw)})`);
+      const shown = (r) => toText(r.gtin) || toText(r.ref) || '(vide)';
+      warnings.push(`${origin} : relation ignoree, extremite non resolue (${shown(parentRec)} → ${shown(childRec)})`);
       return;
     }
     if (parent === child) {
@@ -474,11 +571,19 @@ export function assembleProducts(sheets = {}, options = {}) {
       warnings.push(`C02 : type de relation non reconnu, ligne ignoree — « ${toText(rec.relation_type) ?? '(vide)'} »`);
       continue;
     }
-    pushRelation(rec.parent_gtin, rec.child_gtin, type, toNumber(rec.quantity_required), 'C02');
+    pushRelation(
+      { gtin: rec.parent_gtin, ref: rec.parent_ref, brand: rec.parent_brand },
+      { gtin: rec.child_gtin, ref: rec.child_ref, brand: rec.child_brand },
+      type, toNumber(rec.quantity_required), 'C02',
+    );
   }
 
   for (const rec of sheets.C06_SUBSTITUTION || []) {
-    pushRelation(rec.parent_gtin, rec.child_gtin, 'SUBSTITUTION', 1, 'C06');
+    pushRelation(
+      { gtin: rec.parent_gtin, ref: rec.parent_ref, brand: rec.parent_brand },
+      { gtin: rec.child_gtin, ref: rec.child_ref, brand: rec.child_brand },
+      'SUBSTITUTION', 1, 'C06',
+    );
   }
 
   return { products: [...byKey.values()], relations, warnings };
