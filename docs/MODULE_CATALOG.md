@@ -49,6 +49,7 @@ node scripts/fabdis/make-sample.mjs                  # regenere le jeu d'essai
 node scripts/fabdis-import.mjs <fichier.xlsx> \
      --etim scripts/fabdis/etim-dictionary.json \
      --source "Tarif Atlantic 2026"                  # produit un payload JSON
+node scripts/fabdis-import.mjs <fichier.xlsx> --limit 50 --apply   # premier essai prudent
 node scripts/fabdis-import.mjs <fichier.xlsx> --apply # ingere (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
 node --test scripts/fabdis.test.mjs                   # 18 tests
 ```
@@ -150,6 +151,22 @@ Le premier est inexploitable en recherche sémantique. **L'ouverture du compte E
 
 **Ce qu'il prouve** : la chaîne complète, de la lecture du classeur à l'assemblage requêtable en base.
 **Ce qu'il ne prouve pas** : la compatibilité avec un vrai FAB-DIS. Les intitulés de colonnes y sont plausibles, **pas certifiés**. Les GTIN portent une clé de contrôle valide (pour exercer réellement la validation) mais n'identifient aucun article du commerce.
+
+## Retirer un import
+
+`source_name` identifie chaque passe : un import se défait sans toucher au reste du référentiel.
+
+```sql
+delete from catalog.product_relations r
+ where exists (select 1 from catalog.products p
+                where p.source_name = '<nom de la source>'
+                  and (p.gtin = r.parent_gtin or p.gtin = r.child_gtin));
+delete from catalog.product_prices where product_id in
+  (select id from catalog.products where source_name = '<nom de la source>');
+delete from catalog.products where source_name = '<nom de la source>';
+delete from catalog.brands b
+ where not exists (select 1 from catalog.products p where p.brand_id = b.id);
+```
 
 ## Ce qui manque
 

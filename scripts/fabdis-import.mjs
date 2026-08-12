@@ -13,6 +13,11 @@
  *   --apply             envoie directement a la RPC ; exige SUPABASE_URL et
  *                       SUPABASE_SERVICE_ROLE_KEY dans l'environnement
  *   --batch <n>         taille des lots en mode --apply (defaut 200)
+ *   --limit <n>         n'ingere que les n premiers produits — a utiliser pour
+ *                       un premier essai sur une base partagee avant la passe
+ *                       complete. Les relations dont une extremite tombe hors
+ *                       du lot sont ignorees par la RPC et comptees dans
+ *                       `relations_skipped`, sans faire echouer l'import.
  *
  * TRADUCTION ETIM
  * ---------------
@@ -31,7 +36,8 @@ import { readFabdisWorkbook, formatReport } from './fabdis/workbook.mjs';
 import { assembleProducts, buildAiDescription, hashAiDescription } from './fabdis/parser.mjs';
 
 function parseArgs(argv) {
-  const args = { file: null, json: 'fabdis-payload.json', source: null, etim: null, apply: false, batch: 200 };
+  const args = { file: null, json: 'fabdis-payload.json', source: null, etim: null,
+                 apply: false, batch: 200, limit: null };
   const rest = argv.slice(2);
 
   for (let i = 0; i < rest.length; i++) {
@@ -41,6 +47,7 @@ function parseArgs(argv) {
     else if (a === '--source') args.source = rest[++i];
     else if (a === '--etim') args.etim = rest[++i];
     else if (a === '--batch') args.batch = Number(rest[++i]) || 200;
+    else if (a === '--limit') args.limit = Number(rest[++i]) || null;
     else if (!a.startsWith('--')) args.file = a;
   }
   return args;
@@ -144,10 +151,17 @@ async function main() {
     warnings.forEach((w) => console.log(`  - ${w}`));
   }
 
+  let retenus = products;
+  if (args.limit && args.limit < products.length) {
+    retenus = products.slice(0, args.limit);
+    console.log('');
+    console.log(`--limit ${args.limit} : ${products.length - args.limit} produit(s) ecarte(s) de cette passe.`);
+  }
+
   const payload = {
     source_name: args.source || basename(args.file),
     source_file: args.file,
-    products,
+    products: retenus,
     relations,
   };
 
