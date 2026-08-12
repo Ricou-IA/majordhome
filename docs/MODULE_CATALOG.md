@@ -50,7 +50,7 @@ node scripts/fabdis-import.mjs <fichier.xlsx> \
      --etim scripts/fabdis/etim-dictionary.json \
      --source "Tarif Atlantic 2026"                  # produit un payload JSON
 node scripts/fabdis-import.mjs <fichier.xlsx> --apply # ingere (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
-node --test scripts/fabdis.test.mjs                   # 15 tests
+node --test scripts/fabdis.test.mjs                   # 18 tests
 ```
 
 ### ⚠️ Nommage des onglets : le cahier des charges diverge de la norme
