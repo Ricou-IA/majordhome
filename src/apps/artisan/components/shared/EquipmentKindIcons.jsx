@@ -29,8 +29,8 @@ const KIND_EMOJI = {
 // Tailles compensées : leading-none + marge verticale négative sur le conteneur
 // pour que l'emoji grossi ne modifie ni la hauteur de ligne ni celle des cartes.
 const SIZE_CLASSES = {
-  xs: 'text-[13px]',
-  sm: 'text-base',
+  xs: 'text-sm',
+  sm: 'text-lg',
 };
 
 /**
