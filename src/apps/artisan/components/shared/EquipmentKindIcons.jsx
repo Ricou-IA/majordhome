@@ -2,9 +2,13 @@
  * EquipmentKindIcons.jsx - Majord'home Artisan
  * ============================================================================
  * Icônes d'identité visuelle des équipements d'un client :
- *   bûche (bois) / flamme (granulés) / flocon (clim & PAC).
+ *   🪵 bûche (bois) / 🔥 flamme (granulés) / ❄️ flocon (clim & PAC).
  * 1 icône par équipement identifiable — rien si le type n'est pas saisi
  * (règle produit : jamais de devinette bois vs granulés).
+ *
+ * Emoji natifs (pas de Lucide) : rendus colorés par la police système,
+ * lisibles aussi sur les blocs planning colorés. ⚠️ 🪵 (U+1FAB5, Unicode 13)
+ * n'existe pas sous Windows 10 (carré vide) — assumé, parc Mayer = Win11/tablettes.
  *
  * Autonome : lit le cache partagé useClientEquipmentKinds (1 requête par org,
  * dédoublonnée par React Query) — se pose dans n'importe quelle carte/ligne
@@ -14,28 +18,26 @@
  * ============================================================================
  */
 
-import { Flame, FlameKindling, Snowflake } from 'lucide-react';
 import { useClientEquipmentKinds } from '@hooks/useClients';
 
-const KIND_ICONS = {
-  buche: { Icon: FlameKindling, colorClass: 'text-amber-700' },
-  flamme: { Icon: Flame, colorClass: 'text-orange-600' },
-  flocon: { Icon: Snowflake, colorClass: 'text-sky-600' },
+const KIND_EMOJI = {
+  buche: '\u{1FAB5}', // 🪵
+  flamme: '\u{1F525}', // 🔥
+  flocon: '❄️', // ❄️ (VS16 : force le rendu emoji coloré)
 };
 
 const SIZE_CLASSES = {
-  xs: 'w-3 h-3',
-  sm: 'w-3.5 h-3.5',
+  xs: 'text-[11px]',
+  sm: 'text-[13px]',
 };
 
 /**
  * @param {Object} props
  * @param {string} props.clientId - Client dont on affiche les équipements
  * @param {'xs'|'sm'} [props.size='sm'] - Taille des icônes
- * @param {boolean} [props.monochrome=false] - Hérite la couleur du texte (planning : blanc sur bloc coloré)
  * @param {string} [props.className]
  */
-export function EquipmentKindIcons({ clientId, size = 'sm', monochrome = false, className = '' }) {
+export function EquipmentKindIcons({ clientId, size = 'sm', className = '' }) {
   const { kindsByClientId } = useClientEquipmentKinds();
   const kinds = clientId ? kindsByClientId?.get(clientId) : null;
 
@@ -44,14 +46,13 @@ export function EquipmentKindIcons({ clientId, size = 'sm', monochrome = false, 
   const sizeClass = SIZE_CLASSES[size] || SIZE_CLASSES.sm;
 
   return (
-    <span className={`inline-flex items-center gap-0.5 flex-shrink-0 ${className}`}>
+    <span className={`inline-flex items-center gap-0.5 flex-shrink-0 leading-none ${sizeClass} ${className}`}>
       {kinds.map(({ kind, label }, i) => {
-        const conf = KIND_ICONS[kind];
-        if (!conf) return null;
-        const { Icon, colorClass } = conf;
+        const emoji = KIND_EMOJI[kind];
+        if (!emoji) return null;
         return (
-          <span key={`${kind}-${i}`} title={label} className="inline-flex">
-            <Icon className={`${sizeClass} ${monochrome ? '' : colorClass}`} aria-label={label} />
+          <span key={`${kind}-${i}`} title={label} role="img" aria-label={label}>
+            {emoji}
           </span>
         );
       })}

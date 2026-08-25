@@ -342,7 +342,7 @@ function PlanningEventContent({ eventInfo }) {
           <span className="mr-1">{eventInfo.timeText}</span>
         )}
         {typeLabel}
-        <EquipmentKindIcons clientId={client_id} size="xs" monochrome />
+        <EquipmentKindIcons clientId={client_id} size="xs" />
       </div>
       {(fullName || grand_secteur) && eventInfo.view.type !== 'dayGridMonth' && (
         <div className="text-xs truncate opacity-80">
