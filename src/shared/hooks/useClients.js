@@ -12,6 +12,8 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@services/clients.service';
+import { equipmentsService } from '@services/equipments.service';
+import { buildKindsByClient } from '@/lib/equipmentIcons';
 import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
@@ -271,6 +273,37 @@ export function useClientEquipments(clientId) {
     isDeleting: deleteMutation.isPending,
     refresh: refetch,
   };
+}
+
+// ============================================================================
+// HOOK - useClientEquipmentKinds (icônes bûche/flamme/flocon par client)
+// ============================================================================
+
+/**
+ * Charge en 1 requête les équipements de l'org (vue majordhome_client_equipment_kinds)
+ * et les classe en kinds visuels par client (src/lib/equipmentIcons.js).
+ * Consommé par EquipmentKindIcons — appelé depuis chaque carte : React Query
+ * dédoublonne (une seule requête par org, cache 5 min).
+ *
+ * @returns {{ kindsByClientId: Map<string, Array<{kind: string, label: string}>>|undefined, isLoading: boolean }}
+ */
+export function useClientEquipmentKinds() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const { data: kindsByClientId, isLoading } = useQuery({
+    queryKey: clientKeys.equipmentKinds(orgId),
+    queryFn: async () => {
+      const { data, error } = await equipmentsService.getEquipmentKindsByOrg(orgId);
+      if (error) throw error;
+      return data || [];
+    },
+    select: buildKindsByClient,
+    enabled: !!orgId,
+    staleTime: 5 * 60_000,
+  });
+
+  return { kindsByClientId, isLoading };
 }
 
 // ============================================================================

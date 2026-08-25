@@ -30,6 +30,7 @@ import {
 import { toast } from 'sonner';
 import { VisitBadge } from './VisitBadge';
 import { SearchBar } from '../shared/SearchBar';
+import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
 
 // ============================================================================
 // CONSTANTES
@@ -170,10 +171,16 @@ function ContractRow({
       {/* Nom (cliquable) */}
       <span
         onClick={() => onContractClick?.(contract)}
-        className="font-medium text-gray-900 truncate flex-1 min-w-0 cursor-pointer hover:text-blue-600 transition-colors"
+        className="font-medium text-gray-900 truncate min-w-0 cursor-pointer hover:text-blue-600 transition-colors"
       >
         {contract.client_name || 'Sans nom'}
       </span>
+
+      {/* Icônes équipements (bûche/flamme/flocon) */}
+      <EquipmentKindIcons clientId={contract.client_id} />
+
+      {/* Spacer : pousse le reste à droite (le nom garde son truncate) */}
+      <span className="flex-1 min-w-0" />
 
       {/* Commune réelle du client */}
       {contract.client_city && (

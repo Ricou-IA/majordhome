@@ -46,6 +46,25 @@ export const equipmentsService = {
   },
 
   /**
+   * Récupère tous les équipements de l'org, à plat par client, pour les icônes
+   * d'identité visuelle (bûche/flamme/flocon — cf. src/lib/equipmentIcons.js).
+   * Vue read-only majordhome_client_equipment_kinds (~880 lignes chez Mayer).
+   */
+  async getEquipmentKindsByOrg(orgId) {
+    return withErrorHandling(async () => {
+      if (!orgId) throw new Error('[equipmentsService] orgId est requis');
+
+      const { data, error } = await supabase
+        .from('majordhome_client_equipment_kinds')
+        .select('client_id, category, type_code, type_label')
+        .eq('org_id', orgId);
+
+      if (error) throw error;
+      return data || [];
+    }, 'equipments.getEquipmentKindsByOrg');
+  },
+
+  /**
    * Ajoute un équipement à un client
    */
   async addEquipment(clientId, equipmentData = {}) {

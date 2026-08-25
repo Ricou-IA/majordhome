@@ -27,6 +27,7 @@ import {
   Archive,
   FileText,
 } from 'lucide-react';
+import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -168,6 +169,7 @@ export function ClientCard({
           <h3 className="font-medium text-gray-900 truncate">
             {displayName}
           </h3>
+          <EquipmentKindIcons clientId={id} />
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {isArchived && (

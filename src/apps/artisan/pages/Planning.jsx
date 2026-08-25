@@ -35,6 +35,7 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
+import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
 
 // ============================================================================
@@ -317,10 +318,12 @@ function CalendarFilters({ filters, setFilters, teamList }) {
 }
 
 /**
- * Rendu custom d'un événement dans le calendrier
+ * Rendu custom d'un événement dans le calendrier.
+ * Vrai composant React (pas une simple render function) : EquipmentKindIcons
+ * lit le cache useClientEquipmentKinds via hook.
  */
-function renderEventContent(eventInfo) {
-  const { typeConfig, client_name, client_first_name, status, lead_id, grand_secteur } = eventInfo.event.extendedProps;
+function PlanningEventContent({ eventInfo }) {
+  const { typeConfig, client_name, client_first_name, status, lead_id, grand_secteur, client_id } = eventInfo.event.extendedProps;
   const isCancelled = status === 'cancelled';
   const fullName = [client_name, client_first_name].filter(Boolean).join(' ');
   // Ligne 1 = type (plus le nom), ligne 2 = nom · grand secteur → le nom n'apparaît
@@ -339,6 +342,7 @@ function renderEventContent(eventInfo) {
           <span className="mr-1">{eventInfo.timeText}</span>
         )}
         {typeLabel}
+        <EquipmentKindIcons clientId={client_id} size="xs" monochrome />
       </div>
       {(fullName || grand_secteur) && eventInfo.view.type !== 'dayGridMonth' && (
         <div className="text-xs truncate opacity-80">
@@ -668,7 +672,7 @@ export default function Planning() {
             slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
             // Événements
             events={events}
-            eventContent={renderEventContent}
+            eventContent={(eventInfo) => <PlanningEventContent eventInfo={eventInfo} />}
             // Interactions
             editable={canCreateAppointment}
             selectable={canCreateAppointment}

@@ -14,6 +14,7 @@
 
 import { FileCheck, Clock, Archive, MapPin, Phone, ChevronRight, Globe } from 'lucide-react';
 import { VisitBadge } from './VisitBadge';
+import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -60,6 +61,7 @@ export function ContractCard({ contract, onClick, selected = false }) {
   if (!contract) return null;
 
   const {
+    client_id,
     client_name,
     client_address,
     client_postal_code,
@@ -105,6 +107,7 @@ export function ContractCard({ contract, onClick, selected = false }) {
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <StatusIcon status={status} />
           <h3 className="font-medium text-gray-900 truncate">{client_name || 'Sans nom'}</h3>
+          <EquipmentKindIcons clientId={client_id} />
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {source === 'web' && (
