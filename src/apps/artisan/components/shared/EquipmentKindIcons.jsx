@@ -26,9 +26,11 @@ const KIND_EMOJI = {
   flocon: '❄️', // ❄️ (VS16 : force le rendu emoji coloré)
 };
 
+// Tailles compensées : leading-none + marge verticale négative sur le conteneur
+// pour que l'emoji grossi ne modifie ni la hauteur de ligne ni celle des cartes.
 const SIZE_CLASSES = {
-  xs: 'text-[11px]',
-  sm: 'text-[13px]',
+  xs: 'text-[13px]',
+  sm: 'text-base',
 };
 
 /**
@@ -46,7 +48,7 @@ export function EquipmentKindIcons({ clientId, size = 'sm', className = '' }) {
   const sizeClass = SIZE_CLASSES[size] || SIZE_CLASSES.sm;
 
   return (
-    <span className={`inline-flex items-center gap-0.5 flex-shrink-0 leading-none ${sizeClass} ${className}`}>
+    <span className={`inline-flex items-center gap-px flex-shrink-0 leading-none -my-0.5 ${sizeClass} ${className}`}>
       {kinds.map(({ kind, label }, i) => {
         const emoji = KIND_EMOJI[kind];
         if (!emoji) return null;
