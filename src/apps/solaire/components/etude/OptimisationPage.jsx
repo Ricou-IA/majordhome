@@ -42,7 +42,7 @@ export function OptimisationPage({ autoconso, company }) {
 
       <Text style={sharedStyles.sectionTitle}>Optimiser votre autoconsommation</Text>
       <Text style={s.intro}>
-        Le taux d'autoconsommation n'est pas figé : en calant les usages sous le soleil (ballon d'eau chaude
+        Le taux d&apos;autoconsommation n&apos;est pas figé : en calant les usages sous le soleil (ballon d&apos;eau chaude
         piloté, recharge du véhicule en journée, confort financé par le surplus{hasBattery ? ', stockage batterie' : ''}),
         on augmente la part de solaire réellement consommée. Voici la cible retenue avec vous.
       </Text>
@@ -86,7 +86,7 @@ export function OptimisationPage({ autoconso, company }) {
       <View style={s.legendRow}>
         <View style={s.legendItem}>
           <View style={[s.legendSwatch, { backgroundColor: C.jaune }]} />
-          <Text style={s.legendText}>Taux d'autoconsommation</Text>
+          <Text style={s.legendText}>Taux d&apos;autoconsommation</Text>
         </View>
         <View style={s.legendItem}>
           <View style={[s.legendSwatch, { backgroundColor: C.bleuM }]} />
@@ -118,7 +118,7 @@ export function OptimisationPage({ autoconso, company }) {
       <View style={s.noteBox}>
         <Text style={s.noteText}>
           Calcul horaire réel (talon Enedis calé sur vos 12 factures + production PVGIS du lieu). Le surplus
-          n'est jamais valorisé en euros : il finance de l'autoconsommation ou du confort (piscine, climatisation).
+          n&apos;est jamais valorisé en euros : il finance de l&apos;autoconsommation ou du confort (piscine, climatisation).
           {hasBattery ? ` Batterie ${autoconso.battery.recommendedCapacityKwh} kWh — les pertes de stockage restent comptées en surplus.` : ''}
         </Text>
       </View>

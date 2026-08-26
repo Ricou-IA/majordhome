@@ -4,7 +4,7 @@
 // (une propriété peut chevaucher plusieurs parcelles — le CERFA exige TOUTES les références),
 // + statut ABF via GPU. Fail-loud : échec GPU = « à vérifier manuellement », jamais un faux
 // « non protégé ». Remonté via key={lat,lon} par le parent (état neuf à chaque lieu).
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -19,7 +19,7 @@ const CERFA_MAX_PARCELLES = 3;
 const fmtM2 = (n) => (n == null ? '—' : `${Math.round(n).toLocaleString('fr-FR')} m²`);
 
 export default function CadastreSection({ location, cadastre, abf, onCadastre, onAbf }) {
-  const selected = cadastre ?? [];
+  const selected = useMemo(() => cadastre ?? [], [cadastre]);
   const [around, setAround] = useState([]); // parcelles voisines (UI locale, non persistée)
   const [status, setStatus] = useState('loading'); // loading | ok | empty | error
   const [abfStatus, setAbfStatus] = useState(abf ? 'ok' : 'loading'); // loading | ok | error
@@ -244,7 +244,7 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
             Rechercher les parcelles de cette zone
           </button>
           <p className="text-xs text-secondary-500 -mt-2">
-            Déplacez la carte vers votre bâtiment puis lancez la recherche pour charger d'autres parcelles à sélectionner.
+            Déplacez la carte vers votre bâtiment puis lancez la recherche pour charger d&apos;autres parcelles à sélectionner.
           </p>
           {selected.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -301,7 +301,7 @@ export default function CadastreSection({ location, cadastre, abf, onCadastre, o
       {abf && !abf.secteur_protege && (
         <div className="flex items-center gap-2 text-sm text-secondary-600 bg-secondary-50 rounded-lg px-3 py-2">
           <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-          Aucune protection patrimoniale recensée au Géoportail de l'Urbanisme.
+          Aucune protection patrimoniale recensée au Géoportail de l&apos;Urbanisme.
         </div>
       )}
     </div>

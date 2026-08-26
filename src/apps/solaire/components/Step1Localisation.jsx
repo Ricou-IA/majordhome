@@ -49,7 +49,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, location.address]);
+  }, [debouncedQuery, location.address, location.source]);
 
   const [solarStatus, setSolarStatus] = useState('idle'); // idle|locate|drawn
 
@@ -314,7 +314,7 @@ export default function Step1Localisation({ location, roof, config, roofGeometry
                   <div className="flex items-start gap-2 text-sm text-[#B45309] bg-amber-50 border border-[#F5C542] rounded-lg px-3 py-2">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <span>
-                      Adresse à confirmer pour le dossier — sélectionnez l'adresse exacte (avec le n° de rue)
+                      Adresse à confirmer pour le dossier — sélectionnez l&apos;adresse exacte (avec le n° de rue)
                       dans la liste ci-dessus. La position GPS est approximative.
                     </span>
                   </div>

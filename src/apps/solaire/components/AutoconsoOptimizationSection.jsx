@@ -244,7 +244,7 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
     <div className="card">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 font-semibold text-secondary-900">
-          <Sparkles className="w-5 h-5 text-primary-600" /> Optimiser l'autoconsommation
+          <Sparkles className="w-5 h-5 text-primary-600" /> Optimiser l&apos;autoconsommation
         </span>
         {open ? <ChevronUp className="w-4 h-4 text-secondary-400" /> : <ChevronDown className="w-4 h-4 text-secondary-400" />}
       </button>
@@ -371,8 +371,8 @@ export default function AutoconsoOptimizationSection({ consoMonthly, eM, activeK
             </div>
 
             <p className="text-xs text-secondary-500">
-              Calcul horaire réel (talon Enedis + production du lieu). Le surplus n'est jamais valorisé en euros :
-              il finance de l'autoconsommation ou du confort (piscine, clim).
+              Calcul horaire réel (talon Enedis + production du lieu). Le surplus n&apos;est jamais valorisé en euros :
+              il finance de l&apos;autoconsommation ou du confort (piscine, clim).
             </p>
 
             {/* Détail des calculs — cascade chiffrée, flux annuels, hypothèses */}

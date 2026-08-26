@@ -2,6 +2,7 @@
 // Socle commun des pages de l'étude PDF : palette deutan, formatters PDF-safe
 // (Helvetica ne couvre pas tous les glyphes Unicode — espace fine U+202F, U+2212…),
 // cartouche société et footer légal. Consommé par EtudePDF et ses pages annexes.
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 import { Text, View, Image, StyleSheet } from '@react-pdf/renderer';
 import { formatFullAddress, buildLegalFooter } from '@lib/orgBranding';
 
@@ -69,7 +70,7 @@ export function Footer({ company }) {
       <Text style={sharedStyles.footerText}>
         Étude indicative, non contractuelle — production estimée via PVGIS (Commission européenne).
         Les données de consommation sont fournies par le client ; les résultats réels peuvent varier
-        (météo, prix de l'électricité, comportement de consommation).
+        (météo, prix de l&apos;électricité, comportement de consommation).
       </Text>
     </View>
   );

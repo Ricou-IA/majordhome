@@ -138,7 +138,7 @@ export default function ValidateDossierModal({ open, onClose, onSubmit, isSubmit
             onChange={(e) => set({ notif_electronique: e.target.checked })}
           />
           <span>
-            Le déclarant accepte de recevoir les réponses de l'administration par voie électronique
+            Le déclarant accepte de recevoir les réponses de l&apos;administration par voie électronique
             <span className="block text-xs text-secondary-500">Coche la case correspondante du CERFA (cadre 2).</span>
           </span>
         </label>

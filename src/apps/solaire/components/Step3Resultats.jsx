@@ -191,7 +191,7 @@ export default function Step3Resultats({
             <div className="flex items-center gap-2">
               <FolderOpen className="w-4 h-4 text-secondary-500" />
               <h2 className="font-semibold text-secondary-900">Dossier réglementaire</h2>
-              <span className="text-xs text-secondary-500">déclaration préalable d'urbanisme</span>
+              <span className="text-xs text-secondary-500">déclaration préalable d&apos;urbanisme</span>
             </div>
             {dossierSim ? (
               <>
@@ -210,7 +210,7 @@ export default function Step3Resultats({
             ) : (
               <p className="text-sm text-secondary-600 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#B45309]" />
-                Enregistrez d'abord la simulation (bouton ci-dessous) pour générer le CERFA 16702 et la notice.
+                Enregistrez d&apos;abord la simulation (bouton ci-dessous) pour générer le CERFA 16702 et la notice.
                 La parcelle cadastrale (étape Localisation) est requise.
               </p>
             )}
@@ -264,7 +264,7 @@ export default function Step3Resultats({
         <TableauAnnuel table={model.table} loanYears={model.years} horizonYears={config.horizon_years} />
       ) : (
         <div className="card text-sm text-secondary-600">
-          Renseigner le coût de l'installation (et un taux/durée valides) pour générer le tableau annuel.
+          Renseigner le coût de l&apos;installation (et un taux/durée valides) pour générer le tableau annuel.
         </div>
       )}
 

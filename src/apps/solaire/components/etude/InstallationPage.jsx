@@ -53,7 +53,7 @@ export function InstallationPage({ model, config, company, inputs }) {
     <Page size="A4" style={sharedStyles.page}>
       <CompanyHeader company={company} />
 
-      <Text style={sharedStyles.sectionTitle}>Hypothèses de l'étude</Text>
+      <Text style={sharedStyles.sectionTitle}>Hypothèses de l&apos;étude</Text>
       <View style={s.row2}>
         <View style={s.col}>
           <Field label="Pente toiture" value={`${numStr(roof.tiltPercent)} % (soit ${numStr(tiltDeg)}°)`} />

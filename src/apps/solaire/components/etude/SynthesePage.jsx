@@ -2,6 +2,7 @@
 // Page d'ouverture de l'étude « Votre projet en un coup d'œil » : chiffres clés,
 // vue satellite du toit avec l'implantation PV (modèle partagé roofMapModel),
 // matériel proposé et prestations incluses. Inspirée du rendu concurrent (Sorel/Reonic).
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 import { Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { C, fmtInt, numStr, eur, pct, accentOf, CompanyHeader, Footer, sharedStyles } from './pdfShared';
 import { RoofMapOverlay } from '../dossier/PlanMassePDF';
@@ -69,7 +70,7 @@ export function SynthesePage({ model, config, company, meta, roofMap, material, 
       <CompanyHeader company={company} />
 
       <View style={[s.titleBand, { backgroundColor: accentOf(company) }]}>
-        <Text style={s.title}>VOTRE PROJET PHOTOVOLTAÏQUE EN UN COUP D'ŒIL</Text>
+        <Text style={s.title}>VOTRE PROJET PHOTOVOLTAÏQUE EN UN COUP D&apos;ŒIL</Text>
         <Text style={s.subtitle}>
           {meta.clientName}{meta.clientAddress ? ` — ${meta.clientAddress}` : ''} · {meta.dateLabel}
         </Text>

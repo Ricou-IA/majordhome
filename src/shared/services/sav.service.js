@@ -920,7 +920,7 @@ export const savService = {
    * Déclenché depuis l'onglet Programmation (SectorGroupView).
    * N8N envoie le SMS ET log dans sms_logs (campaign_name='rappel_entretien').
    */
-  async sendEntretienReminder({ contractId, clientId, clientFirstName, clientName, clientPhone, orgId }) {
+  async sendEntretienReminder({ contractId: _contractId, clientId, clientFirstName, clientName, clientPhone, orgId }) {
     if (!isMobileFR(clientPhone)) {
       const reason = clientPhone
         ? 'Aucun numéro mobile (06/07) disponible pour ce client'
