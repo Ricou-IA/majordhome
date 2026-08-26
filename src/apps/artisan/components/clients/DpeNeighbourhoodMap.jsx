@@ -127,6 +127,7 @@ export function DpeNeighbourhoodMap({ records = [], clientPoint, selectedId, onS
     };
     // Les coordonnées définissent la carte : on la reconstruit si elles changent,
     // pas à chaque changement de sélection (géré dans l'effet suivant).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeable.map((r) => `${r.id}:${r.lon},${r.lat}`).join('|'), clientPoint?.lon, clientPoint?.lat]);
 
   // Mise en évidence du repère sélectionné. La carte ne bouge PAS : la vue

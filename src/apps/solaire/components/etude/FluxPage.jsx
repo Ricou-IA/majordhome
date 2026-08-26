@@ -40,10 +40,10 @@ export function FluxPage({ model, company }) {
         colors={[C.jaune, C.grisBar]}
       />
 
-      <Text style={sharedStyles.sectionTitle}>D'où vient l'électricité de votre foyer ?</Text>
+      <Text style={sharedStyles.sectionTitle}>D&apos;où vient l&apos;électricité de votre foyer ?</Text>
       <Text style={s.intro}>
         Même avec une production annuelle élevée, le réseau reste nécessaire la nuit et en hiver : le taux
-        d'autonomie mesure la part de votre consommation couverte par le solaire.
+        d&apos;autonomie mesure la part de votre consommation couverte par le solaire.
       </Text>
       <FlowDiagram
         reverse

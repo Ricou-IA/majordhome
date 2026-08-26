@@ -284,7 +284,7 @@ function Body({
   if (!hasAddress) {
     return (
       <EmptyState icon={MapPin} title="Pas d'adresse sur cette fiche">
-        L'investigation part de l'adresse postale. Renseignez-la dans l'onglet
+        L&apos;investigation part de l&apos;adresse postale. Renseignez-la dans l&apos;onglet
         Informations pour pouvoir interroger la donnée bâtiment.
       </EmptyState>
     );
@@ -304,7 +304,7 @@ function Body({
   if (result.status === 'error') {
     return (
       <EmptyState icon={AlertCircle} title="Service indisponible">
-        Impossible d'interroger la donnée publique ({result.error}). Rien n'est
+        Impossible d&apos;interroger la donnée publique ({result.error}). Rien n&apos;est
         cassé côté fiche client — réessayez dans un instant.
       </EmptyState>
     );
@@ -322,9 +322,9 @@ function Body({
   if (result.status === 'no_dpe') {
     return (
       <EmptyState icon={Home} title="Aucun DPE à cette adresse">
-        Ce n'est pas une erreur : un logement n'apparaît au fichier DPE que s'il
+        Ce n&apos;est pas une erreur : un logement n&apos;apparaît au fichier DPE que s&apos;il
         en a fait établir un — vente, location ou audit. Environ un logement sur
-        deux n'y figure pas.
+        deux n&apos;y figure pas.
         {onSearchNearby && !nearbySearched && (
           <>
             {/* Surtout PAS `onClick={onSearchNearby}` : React passerait

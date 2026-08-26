@@ -6,6 +6,7 @@
 // Limite documentée : pas de cotation orthogonale réglementaire (distances aux limites
 // séparatives) — tranche ultérieure, même géométrie cadastre en dessous.
 // Fail-loud : échec du fond de carte → throw (le caller signale la pièce manquante).
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 import { Document, Page, Text, View, Image, Svg, Path, Polygon, Rect, StyleSheet, pdf } from '@react-pdf/renderer';
 import { formatFullAddress, buildLegalFooter } from '@lib/orgBranding';
 import { buildSatelliteRoofModel } from '../../lib/roofMapModel';
@@ -96,7 +97,7 @@ function PlanMasseDocument({ roofMap, company, model }) {
 
         <View style={s.legend}>
           <Text style={s.legendTxt}>
-            Parcelle(s) en trait blanc · zone d'implantation PV en jaune{model.hasPans ? '' : ' (emprise toiture à préciser)'} · plan d'offre sans cotation réglementaire
+            Parcelle(s) en trait blanc · zone d&apos;implantation PV en jaune{model.hasPans ? '' : ' (emprise toiture à préciser)'} · plan d&apos;offre sans cotation réglementaire
           </Text>
           <Text style={s.legendTxt}>Fond © Mapbox © Maxar</Text>
         </View>

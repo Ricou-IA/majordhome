@@ -175,10 +175,10 @@ export default function AutoconsoSimulateur() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="mb-5">
         <h1 className="text-xl font-semibold text-secondary-900 flex items-center gap-2">
-          <Sun className="text-yellow-500" size={22} /> Simulateur d'autoconsommation
+          <Sun className="text-yellow-500" size={22} /> Simulateur d&apos;autoconsommation
         </h1>
         <p className="text-sm text-secondary-600 mt-1">
-          Ajustez les usages du foyer et construisez l'optimal avec le client. Recalcul instantané —
+          Ajustez les usages du foyer et construisez l&apos;optimal avec le client. Recalcul instantané —
           données réelles (talon Enedis RES1 + production PVGIS Gaillac).
         </p>
       </div>
@@ -292,8 +292,8 @@ export default function AutoconsoSimulateur() {
             <Info size={14} className="mt-0.5 shrink-0" />
             <span>
               Production {prodAnnual} kWh/an ({pvKwc} kWc). Les leviers confort (piscine, clim) puisent dans le
-              même surplus — activez-les pour voir l'arbitrage. Le surplus n'est jamais valorisé en euros :
-              il finance de l'autoconsommation ou du confort.
+              même surplus — activez-les pour voir l&apos;arbitrage. Le surplus n&apos;est jamais valorisé en euros :
+              il finance de l&apos;autoconsommation ou du confort.
             </span>
           </div>
         </div>

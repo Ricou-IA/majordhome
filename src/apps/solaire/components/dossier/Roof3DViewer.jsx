@@ -290,7 +290,7 @@ export default function Roof3DViewer({ roof, onClose }) {
       )}
       <p className="px-4 py-2 text-[11px] text-slate-400 bg-slate-800 flex-shrink-0 text-center">
         Toiture reconstruite depuis le masque Google Solar · couleurs = flux annuel (bleu foncé faible → jaune fort).
-        Faites pivoter avec la souris, zoomez à la molette. Mesure indicative à l'échelle réelle.
+        Faites pivoter avec la souris, zoomez à la molette. Mesure indicative à l&apos;échelle réelle.
       </p>
     </div>
   );

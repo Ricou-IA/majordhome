@@ -477,20 +477,18 @@ export function useQuotesExplorer({ enabled = true } = {}) {
     staleTime: 60_000,
   });
 
-  const rawRows = query.data?.rows || [];
-
   // `sinceDays: Infinity` neutralise le filtre temporel du module pur sans le
   // modifier (cutoffMs devient -Infinity) : la table jumelle porte déjà tout
   // l'historique, la fenêtre n'a plus d'objet.
   const rows = useMemo(
     () => buildExplorerRows({
-      quotes: rawRows,
+      quotes: query.data?.rows || [],
       linkByQuoteId: query.data?.linkByQuoteId || new Map(),
       dismissedIds: query.data?.dismissedIds || new Set(),
       minAmountHt: PIPELINE_MIN_AMOUNT_HT,
       sinceDays: Number.POSITIVE_INFINITY,
     }),
-    [rawRows, query.data],
+    [query.data],
   );
 
   return {

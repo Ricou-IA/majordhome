@@ -62,10 +62,10 @@ export function CoutsPage({ model, config, company, annexLabels }) {
     <Page size="A4" style={sharedStyles.page}>
       <CompanyHeader company={company} />
 
-      <Text style={sharedStyles.sectionTitle}>Vos coûts d'électricité sur {config.horizon_years} ans</Text>
+      <Text style={sharedStyles.sectionTitle}>Vos coûts d&apos;électricité sur {config.horizon_years} ans</Text>
       <Text style={s.intro}>
-        Coût annuel d'électricité prévu, avec et sans installation. Sans installation, la facture grimpe avec
-        l'inflation (+{numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an) ; avec, l'autoconsommation en absorbe une large part.
+        Coût annuel d&apos;électricité prévu, avec et sans installation. Sans installation, la facture grimpe avec
+        l&apos;inflation (+{numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an) ; avec, l&apos;autoconsommation en absorbe une large part.
       </Text>
       <CostProjectionChart costSeries={model.costSeries} width={CHART_W} height={168} />
       <View style={s.legendRow}>
@@ -79,7 +79,7 @@ export function CoutsPage({ model, config, company, annexLabels }) {
         </View>
       </View>
       <Text style={s.savings}>
-        Soit <Text style={s.savingsStrong}>{eur(savingsAvg)}/an d'économie moyenne (-{pct(savingsPct)})</Text> sur {config.horizon_years} ans
+        Soit <Text style={s.savingsStrong}>{eur(savingsAvg)}/an d&apos;économie moyenne (-{pct(savingsPct)})</Text> sur {config.horizon_years} ans
         — le surplus de production reste valorisé 0 €.
       </Text>
 
@@ -103,20 +103,20 @@ export function CoutsPage({ model, config, company, annexLabels }) {
         <>
           <Text style={sharedStyles.sectionTitle}>Rentabilité</Text>
           <Text style={s.calcLine}>
-            • <Text style={s.calcStrong}>Rentabilité : {pct1Pdf(model.assetYieldYear1)} par an</Text> — l'installation
+            • <Text style={s.calcStrong}>Rentabilité : {pct1Pdf(model.assetYieldYear1)} par an</Text> — l&apos;installation
             rapporte {eur(model.economyYear1)}/an pour {eur(model.totalCost)} investis
             {model.assetYieldAvg !== null ? `. En moyenne ${pct1Pdf(model.assetYieldAvg)}/an sur ${config.horizon_years} ans (le prix de l'électricité augmente, pas les mensualités)` : ''}.
           </Text>
           {model.breakEvenAutoconsoRate !== null && (
             <Text style={s.calcLine}>
-              • <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</Text> — au-dessus,
-              l'installation rapporte plus qu'elle ne coûte. Cette étude : {pct(totals.tauxAutoconso)}
+              • <Text style={s.calcStrong}>Point mort : {pct(model.breakEvenAutoconsoRate)} d&apos;autoconsommation</Text> — au-dessus,
+              l&apos;installation rapporte plus qu&apos;elle ne coûte. Cette étude : {pct(totals.tauxAutoconso)}
               {totals.tauxAutoconso >= model.breakEvenAutoconsoRate ? ', gain dès la première année' : ''} ({NATIONAL_AUTOCONSO_BENCHMARK}).
             </Text>
           )}
           <Text style={s.calcLine}>
-            • <Text style={s.calcStrong}>Chaque point d'autoconsommation gagné = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> — le
-            pilotage (ballon d'eau chaude, recharges en journée) et l'optimisation font monter cette part au-delà du constat.
+            • <Text style={s.calcStrong}>Chaque point d&apos;autoconsommation gagné = +{eur(model.sensitivityPerAutoconsoPoint)}/an</Text> — le
+            pilotage (ballon d&apos;eau chaude, recharges en journée) et l&apos;optimisation font monter cette part au-delà du constat.
           </Text>
         </>
       )}
@@ -185,7 +185,7 @@ export function CoutsPage({ model, config, company, annexLabels }) {
         </>
       ) : (
         <Text style={[s.altLine, { marginTop: 8 }]}>
-          Tableau annuel non calculé : le coût de l'installation n'a pas été renseigné lors de la simulation.
+          Tableau annuel non calculé : le coût de l&apos;installation n&apos;a pas été renseigné lors de la simulation.
         </Text>
       )}
 
@@ -193,8 +193,8 @@ export function CoutsPage({ model, config, company, annexLabels }) {
         <Text style={s.noteTitle}>Une approche volontairement conservatrice</Text>
         <Text style={s.noteText}>
           Le surplus de production non autoconsommé est valorisé 0 € dans toute cette étude (revente non prise en
-          compte — arrêté du 1er juin 2026). Les économies proviennent uniquement de l'électricité autoconsommée.
-          Hypothèses : inflation du prix de l'électricité +{numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an, dégradation
+          compte — arrêté du 1er juin 2026). Les économies proviennent uniquement de l&apos;électricité autoconsommée.
+          Hypothèses : inflation du prix de l&apos;électricité +{numStr(Math.round(config.inflation_rate * 1000) / 10)} %/an, dégradation
           des panneaux -{numStr(config.degradation_rate * 100)} %/an, horizon {config.horizon_years} ans.
         </Text>
         {annexLabels?.length > 0 && (

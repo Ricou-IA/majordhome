@@ -295,7 +295,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
             <div className="text-sm text-secondary-600 bg-secondary-50 rounded-lg px-4 py-6 text-center space-y-1">
               <p className="font-medium text-secondary-800">Aucun dossier pour cette simulation.</p>
               <p className="text-xs">
-                Le dossier naît avec l'offre : rechargez la simulation, capturez la parcelle
+                Le dossier naît avec l&apos;offre : rechargez la simulation, capturez la parcelle
                 cadastrale (étape Localisation) et ré-enregistrez.
               </p>
             </div>
@@ -362,7 +362,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
               {abf?.secteur_protege && (
                 <div className="flex items-start gap-2 text-sm text-[#B45309] bg-amber-50 border border-[#F5C542] rounded-lg px-3 py-2">
                   <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>Secteur protégé — avis ABF probable, délai d'instruction porté à 2 mois.</span>
+                  <span>Secteur protégé — avis ABF probable, délai d&apos;instruction porté à 2 mois.</span>
                 </div>
               )}
               {abf && !abf.secteur_protege && (
@@ -420,7 +420,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                       disabled={!cadastreOk || busy}
                       className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      <FileCheck className="w-4 h-4" /> Compléter l'état civil du déclarant
+                      <FileCheck className="w-4 h-4" /> Compléter l&apos;état civil du déclarant
                     </button>
                   )}
                   {declarantOk && !consentOk && (
@@ -473,7 +473,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
                   disabled={busy}
                   className="w-full text-center text-xs text-secondary-500 hover:text-secondary-700 underline disabled:opacity-50"
                 >
-                  Modifier l'état civil / l'adresse du déclarant
+                  Modifier l&apos;état civil / l&apos;adresse du déclarant
                 </button>
               )}
             </>

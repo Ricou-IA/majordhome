@@ -2,6 +2,7 @@
 // Notice descriptive du projet PV (pièce jointe de la déclaration préalable) —
 // @react-pdf/renderer, brandée buildCompanyInfo, modèle pur buildNoticeModel (dossierDocs.js).
 // ⚠️ Helvetica ne couvre pas tous les glyphes Unicode → formatters PDF-safe (charte projet).
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer';
 import { formatFullAddress, buildLegalFooter } from '@lib/orgBranding';
 
@@ -101,7 +102,7 @@ function NoticeDocument({ model, company, dateLabel }) {
         <Text style={[s.p, { marginTop: 6 }]}>{model.projet.description}</Text>
 
         {/* Insertion paysagère */}
-        <Text style={s.sectionTitle}>3. Insertion dans l'environnement</Text>
+        <Text style={s.sectionTitle}>3. Insertion dans l&apos;environnement</Text>
         {model.insertion.paragraphs.map((para, i) => (
           <Text key={i} style={s.p}>{para}</Text>
         ))}
@@ -111,7 +112,7 @@ function NoticeDocument({ model, company, dateLabel }) {
               Secteur protégé — {model.insertion.protectionsLabel || 'périmètre patrimonial'}
             </Text>
             <Text style={{ fontSize: 8, marginTop: 2, lineHeight: 1.4 }}>
-              Délai d'instruction susceptible d'être porté à 2 mois (avis de l'Architecte des Bâtiments de France).
+              Délai d&apos;instruction susceptible d&apos;être porté à 2 mois (avis de l&apos;Architecte des Bâtiments de France).
             </Text>
           </View>
         )}

@@ -3,6 +3,7 @@
 // Fond Mapbox Static (streets, échelle quartier/commune) + contour parcelle(s) superposé
 // via geoProject (alignement Web Mercator exact), repère Nord, échelle, cartouche société.
 // Fail-loud : échec du fond de carte → throw (le caller signale la pièce manquante).
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 import { Document, Page, Text, View, Image, Svg, Path, Polygon, Circle, Rect, StyleSheet, pdf } from '@react-pdf/renderer';
 import { formatFullAddress, buildLegalFooter } from '@lib/orgBranding';
 import {
