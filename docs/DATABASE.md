@@ -25,7 +25,6 @@
 | `public.majordhome_contracts` | `majordhome.contracts` JOIN `majordhome.clients` | `supabase.from('majordhome_contracts')` — vue enrichie avec client_name, client_address, client_postal_code, client_city, client_phone, client_email, client_project_id |
 | `public.majordhome_contract_equipments` | `majordhome.contract_equipments` | `supabase.from('majordhome_contract_equipments')` — pivot contrat↔équipement |
 | `public.majordhome_chantiers` | `majordhome.leads` (filtrés) + JOINs | `supabase.from('majordhome_chantiers')` — leads avec chantier_status IS NOT NULL + equipment_type_label + intervention parent |
-| `public.majordhome_intervention_slots` | `majordhome.interventions` (enfants) | `supabase.from('majordhome_intervention_slots')` — slots intervention + techniciens agrégés JSON |
 | `public.majordhome_intervention_technicians` | `majordhome.intervention_technicians` | `supabase.from('majordhome_intervention_technicians')` — junction intervention↔team_members |
 | `public.majordhome_maintenance_visits` | `majordhome.maintenance_visits` | `supabase.from('majordhome_maintenance_visits')` — visites de maintenance |
 | `public.projects` | `core.projects` | Legacy — ne plus utiliser pour les clients |
