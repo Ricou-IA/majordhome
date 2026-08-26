@@ -32,7 +32,7 @@ export default function ClientContrat() {
         <FileText className="w-12 h-12 text-gray-300 mx-auto" />
         <h2 className="mt-4 text-lg font-semibold text-gray-900">Aucun contrat</h2>
         <p className="mt-2 text-sm text-gray-500">
-          Vous n'avez pas de contrat d'entretien actif. Contactez Mayer Energie pour en souscrire un.
+          Vous n&apos;avez pas de contrat d&apos;entretien actif. Contactez Mayer Energie pour en souscrire un.
         </p>
       </div>
     );
@@ -43,7 +43,7 @@ export default function ClientContrat() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Mon contrat d'entretien</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Mon contrat d&apos;entretien</h1>
 
       {/* Carte contrat */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

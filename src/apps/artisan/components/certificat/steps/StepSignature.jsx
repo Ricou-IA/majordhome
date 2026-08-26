@@ -55,7 +55,7 @@ export function StepSignature({
   return (
     <div className="space-y-6">
       {/* Résumé compact */}
-      <SectionTitle>Résumé de l'intervention</SectionTitle>
+      <SectionTitle>Résumé de l&apos;intervention</SectionTitle>
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500">Client</span>
@@ -155,7 +155,7 @@ export function StepSignature({
           <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
           <p className="text-lg font-semibold text-green-800">Certificat généré avec succès</p>
           <p className="text-sm text-green-700">
-            Le document a été signé et sauvegardé. L'entretien est marqué comme réalisé.
+            Le document a été signé et sauvegardé. L&apos;entretien est marqué comme réalisé.
           </p>
           <a
             href={pdfUrl}

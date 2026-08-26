@@ -69,7 +69,7 @@ export function AcceptQuoteModal({ isOpen, onClose, onConfirm, loading = false, 
           {/* Date d'acceptation */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Date d'acceptation
+              Date d&apos;acceptation
             </label>
             <input
               type="date"

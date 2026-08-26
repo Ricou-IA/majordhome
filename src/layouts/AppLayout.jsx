@@ -147,7 +147,7 @@ export default function AppLayout() {
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b border-secondary-800">
         <h1 className="text-xl font-bold text-white">
-          Majord'home
+          Majord&apos;home
         </h1>
       </div>
 

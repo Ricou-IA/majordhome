@@ -201,7 +201,7 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
               <p className="text-sm text-secondary-500 mb-3">Choisissez un fournisseur</p>
               {suppliers.length === 0 && (
                 <p className="text-sm text-secondary-400 text-center py-6">
-                  Aucun fournisseur n'a de produits dans cette catégorie
+                  Aucun fournisseur n&apos;a de produits dans cette catégorie
                 </p>
               )}
               {suppliers.map((s) => (

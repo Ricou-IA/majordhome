@@ -141,7 +141,7 @@ export default function VoiceRecorder() {
         <AlertCircle className="w-12 h-12 text-orange-400 mb-4" />
         <h1 className="text-xl font-semibold mb-2">Navigateur incompatible</h1>
         <p className="text-secondary-300 max-w-sm">
-          Ton navigateur ne supporte pas l'enregistrement audio. Utilise Safari (iOS), Chrome ou
+          Ton navigateur ne supporte pas l&apos;enregistrement audio. Utilise Safari (iOS), Chrome ou
           Firefox récent.
         </p>
       </div>
@@ -191,10 +191,10 @@ export default function VoiceRecorder() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
         <AlertCircle className="w-16 h-16 text-red-400 mb-6" />
-        <h1 className="text-2xl font-semibold mb-2">Échec de l'envoi</h1>
+        <h1 className="text-2xl font-semibold mb-2">Échec de l&apos;envoi</h1>
         <p className="text-secondary-300 mb-2 max-w-md break-words">{submitError}</p>
         <p className="text-secondary-500 text-sm mb-8">
-          L'enregistrement audio est conservé localement, tu peux retenter.
+          L&apos;enregistrement audio est conservé localement, tu peux retenter.
         </p>
         <button
           onClick={handleSubmit}

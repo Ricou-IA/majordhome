@@ -461,7 +461,7 @@ export default function ClientDetail() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Receipt className="w-10 h-10 text-secondary-300 mb-3" />
             <p className="text-sm font-medium text-secondary-600">Client non synchronise avec Pennylane</p>
-            <p className="text-xs text-secondary-400 mt-1">Ce client n'a pas encore de code comptable Pennylane</p>
+            <p className="text-xs text-secondary-400 mt-1">Ce client n&apos;a pas encore de code comptable Pennylane</p>
           </div>
         )}
         {activeTab === 'factures-pl' && client.pennylane_account_number && <TabFacturesPL clientId={id} orgId={organization?.id} />}
@@ -469,7 +469,7 @@ export default function ClientDetail() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Receipt className="w-10 h-10 text-secondary-300 mb-3" />
             <p className="text-sm font-medium text-secondary-600">Client non synchronisé avec Pennylane</p>
-            <p className="text-xs text-secondary-400 mt-1">Ce client n'a pas encore de code comptable Pennylane</p>
+            <p className="text-xs text-secondary-400 mt-1">Ce client n&apos;a pas encore de code comptable Pennylane</p>
           </div>
         )}
         {activeTab === 'equipments' && <TabEquipments clientId={id} />}
@@ -520,7 +520,7 @@ export default function ClientDetail() {
             </div>
             <p className="text-sm text-secondary-600 mb-6">
               Le client <strong>{displayName}</strong> sera archivé et ne sera plus visible dans la liste principale.
-              Vous pourrez le retrouver en activant le filtre "Clients archivés".
+              Vous pourrez le retrouver en activant le filtre &quot;Clients archivés&quot;.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button

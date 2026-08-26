@@ -72,7 +72,7 @@ export default function TableauAnnuel({ table, loanYears, horizonYears }) {
         </ResponsiveContainer>
         {neutralityRow && (
           <p className="text-xs text-secondary-500 mt-1">
-            ● Point de bascule : année {neutralityRow.year} — l'opération devient gagnante.
+            ● Point de bascule : année {neutralityRow.year} — l&apos;opération devient gagnante.
           </p>
         )}
       </div>

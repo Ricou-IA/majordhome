@@ -240,7 +240,7 @@ export function TabMailings({ clientId }) {
           )}
         </p>
         <p className="text-xs text-orange-600 mt-1">
-          Ce client n'apparaît plus dans les segments de campagne et ne recevra plus d'emails commerciaux.
+          Ce client n&apos;apparaît plus dans les segments de campagne et ne recevra plus d&apos;emails commerciaux.
           Les emails transactionnels (contrat, intervention) restent possibles.
         </p>
       </div>

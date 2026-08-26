@@ -477,7 +477,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-secondary-500 uppercase tracking-wider flex items-center gap-2">
                 <ScrollText className="w-4 h-4" />
-                Contrat d'entretien
+                Contrat d&apos;entretien
               </h3>
               <button
                 type="button"
@@ -493,7 +493,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                 ) : (
                   <>
                     <ScrollText className="w-4 h-4" />
-                    Proposer un contrat d'entretien
+                    Proposer un contrat d&apos;entretien
                   </>
                 )}
               </button>

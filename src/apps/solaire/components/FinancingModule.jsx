@@ -42,7 +42,7 @@ export default function FinancingModule({
           />
           {gridCost === null && financing.manualCost === null && (
             <p className="text-xs text-secondary-500 mt-1">
-              Grille non renseignée pour cette puissance — saisir le montant de l'offre
+              Grille non renseignée pour cette puissance — saisir le montant de l&apos;offre
             </p>
           )}
         </FormField>
@@ -100,7 +100,7 @@ export default function FinancingModule({
 
       <div className="rounded-xl bg-secondary-50 p-4 flex items-center justify-between gap-3 flex-wrap">
         {mensualite === null ? (
-          <p className="text-sm text-secondary-600">Saisir le coût de l'installation pour calculer la mensualité.</p>
+          <p className="text-sm text-secondary-600">Saisir le coût de l&apos;installation pour calculer la mensualité.</p>
         ) : (
           <>
             <div>
@@ -126,13 +126,13 @@ export default function FinancingModule({
           <ul className="space-y-1.5 text-sm text-secondary-700">
             <li>
               <span className="font-semibold text-secondary-900">Rentabilité : {pct1(model.assetYieldYear1)} par an</span>
-              {' '}— l'installation rapporte {formatEuro(Math.round(model.economyYear1))}/an pour {formatEuro(model.totalCost)} investis
+              {' '}— l&apos;installation rapporte {formatEuro(Math.round(model.economyYear1))}/an pour {formatEuro(model.totalCost)} investis
               {model.assetYieldAvg !== null && `. En moyenne ${pct1(model.assetYieldAvg)}/an sur ${horizonYears} ans (le prix de l'électricité augmente, pas vos mensualités)`}.
             </li>
             {model.breakEvenAutoconsoRate !== null && (
               <li>
-                <span className="font-semibold text-secondary-900">Point mort : {pct(model.breakEvenAutoconsoRate)} d'autoconsommation</span>
-                {' '}— au-dessus, l'installation rapporte plus qu'elle ne coûte. Cette simulation : {pct(model.active.totals.tauxAutoconso)}
+                <span className="font-semibold text-secondary-900">Point mort : {pct(model.breakEvenAutoconsoRate)} d&apos;autoconsommation</span>
+                {' '}— au-dessus, l&apos;installation rapporte plus qu&apos;elle ne coûte. Cette simulation : {pct(model.active.totals.tauxAutoconso)}
                 {model.active.totals.tauxAutoconso >= model.breakEvenAutoconsoRate
                   ? ', gain dès la première année'
                   : ', atteint plus tard avec la hausse du prix de l\'électricité'}
@@ -141,9 +141,9 @@ export default function FinancingModule({
             )}
             <li>
               <span className="font-semibold text-secondary-900">
-                Chaque point d'autoconsommation gagné = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an.
+                Chaque point d&apos;autoconsommation gagné = +{formatEuro(Math.round(model.sensitivityPerAutoconsoPoint))}/an.
               </span>
-              {' '}— le pilotage et l'optimisation (voir « Optimiser l'autoconsommation ») font monter cette part.
+              {' '}— le pilotage et l&apos;optimisation (voir « Optimiser l&apos;autoconsommation ») font monter cette part.
             </li>
           </ul>
         </div>

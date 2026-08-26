@@ -103,7 +103,7 @@ export default function Login() {
               Votre confort,
             </p>
             <p className="text-lg font-semibold text-primary-600">
-              toute l'année
+              toute l&apos;année
             </p>
           </div>
         </div>

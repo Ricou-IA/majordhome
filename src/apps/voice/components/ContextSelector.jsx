@@ -54,7 +54,7 @@ export default function ContextSelector({
       <section className="mb-4">
         <h2 className="flex items-center gap-2 text-secondary-300 text-sm font-medium mb-2">
           <Calendar className="w-4 h-4" />
-          Tes RDV aujourd'hui
+          Tes RDV aujourd&apos;hui
         </h2>
 
         {isLoading && (
@@ -65,7 +65,7 @@ export default function ContextSelector({
 
         {!isLoading && appointments.length === 0 && (
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center text-secondary-400 text-sm">
-            Aucun RDV planifié aujourd'hui
+            Aucun RDV planifié aujourd&apos;hui
           </div>
         )}
 

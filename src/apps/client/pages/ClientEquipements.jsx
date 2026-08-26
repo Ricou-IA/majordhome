@@ -72,7 +72,7 @@ export default function ClientEquipements() {
                 {eq.installation_year && !eq.install_date && (
                   <div className="flex items-center gap-2 text-gray-600">
                     <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                    Année d'installation : {eq.installation_year}
+                    Année d&apos;installation : {eq.installation_year}
                   </div>
                 )}
               </div>

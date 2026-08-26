@@ -276,7 +276,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
           {/* Si déjà locataire (a un owner), pas de bouton "lier propriétaire" */}
           {/* Si propriétaire, on peut ajouter d'autres locataires */}
           {!isLocked && owner && !tenants.length && (
-            <p className="text-xs text-secondary-400">Ce client est un locataire. Pour ajouter d'autres liens, délier d'abord le propriétaire.</p>
+            <p className="text-xs text-secondary-400">Ce client est un locataire. Pour ajouter d&apos;autres liens, délier d&apos;abord le propriétaire.</p>
           )}
         </div>
       )}

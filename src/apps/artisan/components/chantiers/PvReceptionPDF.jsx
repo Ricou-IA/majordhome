@@ -391,7 +391,7 @@ function PvReceptionDocument({ data, company }) {
             <Text style={s.partyLine}>{COMPANY.email}</Text>
           </View>
           <View style={s.party}>
-            <Text style={s.partyLabel}>Client (Maître d'ouvrage)</Text>
+            <Text style={s.partyLabel}>Client (Maître d&apos;ouvrage)</Text>
             <Text style={s.partyLineBold}>{clientName}</Text>
             <Text style={s.partyLine}>{clientAddress}</Text>
             <Text style={s.partyLine}>{clientPostalCode} {clientCity}</Text>
@@ -422,8 +422,8 @@ function PvReceptionDocument({ data, company }) {
         <Text style={s.sectionTitle}>Déclaration de Réception</Text>
         <View style={s.receptionBox}>
           <Text style={{ fontSize: 8, color: C.gris, marginBottom: 8, lineHeight: 1.5 }}>
-            Je soussigné(e), {clientName}, maître de l'ouvrage, après avoir procédé à la visite
-            des travaux effectués par l'entreprise {COMPANY.name}, déclare :
+            Je soussigné(e), {clientName}, maître de l&apos;ouvrage, après avoir procédé à la visite
+            des travaux effectués par l&apos;entreprise {COMPANY.name}, déclare :
           </Text>
 
           <View style={s.checkRow}>
@@ -472,13 +472,13 @@ function PvReceptionDocument({ data, company }) {
           <View style={s.checkRow}>
             <Checkbox checked={noticesRecues} />
             <Text style={s.checkLabel}>
-              Les notices d'utilisation en français des matériels installés
+              Les notices d&apos;utilisation en français des matériels installés
             </Text>
           </View>
           <View style={s.checkRow}>
             <Checkbox checked={entretienRecues} />
             <Text style={s.checkLabel}>
-              Les informations relatives à l'entretien et la maintenance des matériels installés
+              Les informations relatives à l&apos;entretien et la maintenance des matériels installés
             </Text>
           </View>
         </View>
@@ -493,7 +493,7 @@ function PvReceptionDocument({ data, company }) {
         {/* Signatures */}
         <View style={s.signaturesRow}>
           <View style={s.signatureBlock}>
-            <Text style={s.signatureLabel}>Signature de l'entreprise</Text>
+            <Text style={s.signatureLabel}>Signature de l&apos;entreprise</Text>
             {signatureTechBase64 ? (
               <Image src={signatureTechBase64} style={s.signatureImage} />
             ) : (

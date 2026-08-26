@@ -237,7 +237,7 @@ export default function SendTab() {
   if (campaigns.length === 0) {
     return (
       <div className="card p-8 text-center text-secondary-500">
-        Aucune campagne enregistrée. Utilise l'éditeur pour en créer une.
+        Aucune campagne enregistrée. Utilise l&apos;éditeur pour en créer une.
       </div>
     );
   }
@@ -352,7 +352,7 @@ export default function SendTab() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-primary-600">
-                  Garde cet onglet ouvert jusqu'à la fin. En cas d'interruption, relancer reprend sans doublon.
+                  Garde cet onglet ouvert jusqu&apos;à la fin. En cas d&apos;interruption, relancer reprend sans doublon.
                 </p>
               </div>
             )}

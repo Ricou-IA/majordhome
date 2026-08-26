@@ -46,7 +46,7 @@ export function StepEquipementType({ formData, onChange, equipment, clientEquipm
   // Si pas d'équipement lié → sélection manuelle
   return (
     <div className="space-y-4">
-      <SectionTitle>Type d'équipement</SectionTitle>
+      <SectionTitle>Type d&apos;équipement</SectionTitle>
 
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />

@@ -142,7 +142,7 @@ export const TabTimeline = ({ clientId, orgId, userId }) => {
         <div className="text-center py-12">
           <History className="w-12 h-12 text-secondary-300 mx-auto" />
           <p className="mt-4 text-secondary-700 font-medium">Aucune activité</p>
-          <p className="mt-1 text-sm text-secondary-500">L'historique des actions apparaîtra ici.</p>
+          <p className="mt-1 text-sm text-secondary-500">L&apos;historique des actions apparaîtra ici.</p>
         </div>
       ) : (
         <div className="space-y-4">

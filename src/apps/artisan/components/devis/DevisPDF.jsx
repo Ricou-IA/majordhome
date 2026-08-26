@@ -349,7 +349,7 @@ function DevisDocument({ data, company }) {
         {/* Validity */}
         {validityDate && (
           <Text style={s.validityText}>
-            Ce devis est valable jusqu'au {formatDate(validityDate)}.
+            Ce devis est valable jusqu&apos;au {formatDate(validityDate)}.
           </Text>
         )}
 

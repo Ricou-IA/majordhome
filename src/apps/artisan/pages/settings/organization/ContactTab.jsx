@@ -163,7 +163,7 @@ export default function ContactTab() {
               className={INPUT_CLASS}
             />
             {errors.from_email && <p className={ERROR_CLASS}>{errors.from_email}</p>}
-            <p className={HINT_CLASS}>Son domaine doit être vérifié sur Resend (voir « Domaine d'envoi » ci-dessous).</p>
+            <p className={HINT_CLASS}>Son domaine doit être vérifié sur Resend (voir « Domaine d&apos;envoi » ci-dessous).</p>
           </div>
         </div>
         <div className="mt-4">
@@ -176,7 +176,7 @@ export default function ContactTab() {
             className={INPUT_CLASS}
           />
           {errors.reply_to && <p className={ERROR_CLASS}>{errors.reply_to}</p>}
-          <p className={HINT_CLASS}>Laisse vide pour utiliser l'email expéditeur.</p>
+          <p className={HINT_CLASS}>Laisse vide pour utiliser l&apos;email expéditeur.</p>
         </div>
       </section>
 

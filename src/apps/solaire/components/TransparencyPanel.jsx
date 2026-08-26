@@ -55,7 +55,7 @@ export default function TransparencyPanel({ model, config, roof }) {
             Le surplus ({kwh(t.surplus)}) est volontairement valorisé 0 €.
           </li>
           <li className="list-none text-xs text-secondary-500 pl-0">
-            Ce constat suppose vos habitudes actuelles. La section « Optimiser l'autoconsommation »
+            Ce constat suppose vos habitudes actuelles. La section « Optimiser l&apos;autoconsommation »
             montre combien le pilotage (ballon, recharges en journée…) peut faire grimper cette part.
           </li>
         </ol>

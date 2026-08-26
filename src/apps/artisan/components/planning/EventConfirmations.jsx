@@ -49,7 +49,7 @@ export function CancelConfirmation({ onConfirm, onBack, isSaving }) {
           className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
         >
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-          Confirmer l'annulation
+          Confirmer l&apos;annulation
         </button>
       </div>
     </div>

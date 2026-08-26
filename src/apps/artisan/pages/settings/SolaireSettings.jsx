@@ -303,7 +303,7 @@ function BibliothequeTab({ form, patch, orgId }) {
           <SectionTitle>Bibliothèque technique</SectionTitle>
           <p className="text-sm text-secondary-600 mt-1">
             Fiches techniques (PDF) jointes en annexe des études : panneaux, borne, onduleur, CGV…
-            Les fiches « Borne de recharge » ne sont jointes que si l'option borne est cochée dans la
+            Les fiches « Borne de recharge » ne sont jointes que si l&apos;option borne est cochée dans la
             simulation ; les « CGV / conditions » sont toujours placées en dernière position.
           </p>
         </div>

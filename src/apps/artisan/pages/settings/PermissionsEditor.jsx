@@ -109,10 +109,10 @@ export default function PermissionsEditor() {
         <div>
           <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
             <Shield className="w-7 h-7 text-primary-600" />
-            Droits d'accès
+            Droits d&apos;accès
           </h1>
           <p className="text-sm text-secondary-600 mt-1">
-            Configurez les permissions par rôle. L'administrateur a toujours accès à tout.
+            Configurez les permissions par rôle. L&apos;administrateur a toujours accès à tout.
           </p>
         </div>
       </div>
@@ -229,7 +229,7 @@ export default function PermissionsEditor() {
               </li>
             </ul>
             <p className="mt-2 text-blue-600 italic">
-              L'administrateur a toujours accès à tout, indépendamment de cette matrice.
+              L&apos;administrateur a toujours accès à tout, indépendamment de cette matrice.
             </p>
           </div>
         </div>

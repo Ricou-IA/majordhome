@@ -210,7 +210,7 @@ export default function TerritoryTab() {
         </div>
         <p className={HINT_CLASS}>
           ℹ️ Identifiant unique de ta fiche Google Business. Sert au <strong>suivi de positionnement local</strong> (module GeoGrid).
-          Clique "Trouver" et cherche <strong>ton entreprise</strong> (pas l'adresse postale).
+          Clique &quot;Trouver&quot; et cherche <strong>ton entreprise</strong> (pas l&apos;adresse postale).
         </p>
       </section>
 
@@ -251,7 +251,7 @@ export default function TerritoryTab() {
 
         {state.branches.length === 0 ? (
           <div className="text-center text-secondary-400 text-sm py-6 border border-dashed border-secondary-200 rounded-md">
-            Ajoute une antenne si tu as un commercial basé ailleurs qu'au siège.
+            Ajoute une antenne si tu as un commercial basé ailleurs qu&apos;au siège.
           </div>
         ) : (
           <div className="space-y-3">

@@ -109,7 +109,7 @@ function CalendarToolbar({
           onClick={goToday}
           className="px-3 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          Aujourd'hui
+          Aujourd&apos;hui
         </button>
         <div className="flex items-center">
           <button

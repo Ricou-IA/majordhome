@@ -434,7 +434,7 @@ export default function SearchSireneModal({
         <div className="text-center py-16">
           <Search className="w-10 h-10 text-secondary-200 mx-auto mb-3" />
           <p className="text-sm text-secondary-500">Recherchez par nom/SIREN ou sélectionnez des codes NAF ci-dessus</p>
-          <p className="text-xs text-secondary-400 mt-1">Cochez des codes NAF pour lister toutes les entreprises d'un secteur</p>
+          <p className="text-xs text-secondary-400 mt-1">Cochez des codes NAF pour lister toutes les entreprises d&apos;un secteur</p>
         </div>
       )}
     </div>

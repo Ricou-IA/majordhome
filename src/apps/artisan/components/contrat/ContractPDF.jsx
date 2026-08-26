@@ -381,7 +381,7 @@ function ContractDocument({ data, company }) {
             <Image src={LOGO_BASE64} style={s.logo} />
           </View>
           <View style={s.headerRight}>
-            <Text style={s.title}>CONTRAT D'ENTRETIEN</Text>
+            <Text style={s.title}>CONTRAT D&apos;ENTRETIEN</Text>
             <Text style={s.subtitle}>Chauffage, Climatisation & Energies Renouvelables</Text>
           </View>
         </View>
@@ -395,13 +395,13 @@ function ContractDocument({ data, company }) {
         {/* INSTRUCTIONS */}
         <View style={s.instructions}>
           <Text style={s.instructionText}>
-            En souscrivant à ce contrat, {COMPANY.name} s'engage à vous proposer chaque année un rendez-vous d'entretien dans les 12 mois suivant la dernière intervention.
+            En souscrivant à ce contrat, {COMPANY.name} s&apos;engage à vous proposer chaque année un rendez-vous d&apos;entretien dans les 12 mois suivant la dernière intervention.
           </Text>
           <Text style={s.instructionText}>
-            Lors de chaque visite, notre technicien vérifiera l'état de vos équipements. Si des pièces défectueuses sont constatées, un devis de remplacement vous sera proposé afin de maintenir votre installation en bon état de fonctionnement.
+            Lors de chaque visite, notre technicien vérifiera l&apos;état de vos équipements. Si des pièces défectueuses sont constatées, un devis de remplacement vous sera proposé afin de maintenir votre installation en bon état de fonctionnement.
           </Text>
           <Text style={s.instructionText}>
-            Des recommandations pourront être émises à l'issue de l'entretien. Nous vous invitons à les suivre afin de garantir la conformité de votre installation et la validité de l'attestation d'entretien délivrée.
+            Des recommandations pourront être émises à l&apos;issue de l&apos;entretien. Nous vous invitons à les suivre afin de garantir la conformité de votre installation et la validité de l&apos;attestation d&apos;entretien délivrée.
           </Text>
         </View>
 
@@ -493,7 +493,7 @@ function ContractDocument({ data, company }) {
         {/* Notes */}
         <View style={s.notes}>
           <Text>
-            * Les tarifs mentionnés sont à titre indicatif pour l'année en cours.
+            * Les tarifs mentionnés sont à titre indicatif pour l&apos;année en cours.
             Pour les années suivantes, consulter les tarifs actualisés sur {COMPANY.domain}.
           </Text>
           <Text>
@@ -548,21 +548,21 @@ function ContractDocument({ data, company }) {
           </View>
           <View style={s.headerRight}>
             <Text style={s.titleCGV}>CONDITIONS GÉNÉRALES</Text>
-            <Text style={s.subtitle}>Contrat d'entretien annuel</Text>
+            <Text style={s.subtitle}>Contrat d&apos;entretien annuel</Text>
           </View>
         </View>
 
-        <Text style={s.cgvTitle}>Conditions générales du contrat d'entretien annuel</Text>
+        <Text style={s.cgvTitle}>Conditions générales du contrat d&apos;entretien annuel</Text>
         <Text style={s.cgvIntro}>
           {COMPANY.assurance}.{'\n'}
-          Une visite d'entretien devra être effectuée chaque année.
+          Une visite d&apos;entretien devra être effectuée chaque année.
         </Text>
 
         {/* Article 1 */}
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 1 – Objet du contrat</Text>
           <Text style={s.cgvText}>
-            Le contrat d'entretien comprend uniquement 1 visite annuelle contractuelle de contrôle technique et de maintenance préventive de l'installation. Les dépannages et réparations ne font pas partie du présent contrat. Seule la maintenance préventive est incluse.
+            Le contrat d&apos;entretien comprend uniquement 1 visite annuelle contractuelle de contrôle technique et de maintenance préventive de l&apos;installation. Les dépannages et réparations ne font pas partie du présent contrat. Seule la maintenance préventive est incluse.
           </Text>
         </View>
 
@@ -570,7 +570,7 @@ function ContractDocument({ data, company }) {
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 2 – Accès aux équipements</Text>
           <Text style={s.cgvText}>
-            Le client s'engage à permettre au technicien de {COMPANY.name} d'intervenir dans les meilleures conditions en lui laissant un libre accès au matériel et un espace suffisant nécessaire à l'exécution des travaux de maintenance.
+            Le client s&apos;engage à permettre au technicien de {COMPANY.name} d&apos;intervenir dans les meilleures conditions en lui laissant un libre accès au matériel et un espace suffisant nécessaire à l&apos;exécution des travaux de maintenance.
           </Text>
           <View style={s.cgvIndent}>
             <Text style={s.cgvHighlight}>→ Dans le cas où le technicien ne pourrait pas avoir accès aux équipements, le déplacement sera facturé.</Text>
@@ -581,7 +581,7 @@ function ContractDocument({ data, company }) {
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 3 – État des équipements</Text>
           <Text style={s.cgvText}>
-            Les appareils concernés devront impérativement être à l'arrêt et froids au moment de l'intervention du technicien.
+            Les appareils concernés devront impérativement être à l&apos;arrêt et froids au moment de l&apos;intervention du technicien.
           </Text>
           <View style={s.cgvIndent}>
             <Text style={s.cgvHighlight}>→ Dans le cas contraire, le déplacement sera facturé.</Text>
@@ -592,7 +592,7 @@ function ContractDocument({ data, company }) {
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 4 – Interventions hors contrat</Text>
           <Text style={s.cgvText}>
-            En cas d'intervention d'un technicien de {COMPANY.name} sur appel du client pour des prestations sortant du contrat d'entretien et du cadre de la garantie, il sera appliqué le barème de facturation en vigueur pour le déplacement et la main d'œuvre.
+            En cas d&apos;intervention d&apos;un technicien de {COMPANY.name} sur appel du client pour des prestations sortant du contrat d&apos;entretien et du cadre de la garantie, il sera appliqué le barème de facturation en vigueur pour le déplacement et la main d&apos;œuvre.
           </Text>
           <Text style={s.cgvIndent}>
             Fournitures et pièces de rechange : prix suivant devis et accord préalable du client.
@@ -603,7 +603,7 @@ function ContractDocument({ data, company }) {
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 5 – Garantie constructeur</Text>
           <Text style={s.cgvText}>
-            Toutes les demandes pendant la période de garantie de l'appareil devront être faites auprès de l'entreprise qui a vendu et/ou installé celui-ci.
+            Toutes les demandes pendant la période de garantie de l&apos;appareil devront être faites auprès de l&apos;entreprise qui a vendu et/ou installé celui-ci.
           </Text>
         </View>
 
@@ -611,29 +611,29 @@ function ContractDocument({ data, company }) {
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 6 – Durée et reconduction</Text>
           <Text style={s.cgvText}>
-            Le présent contrat est conclu pour une durée de 1 an à compter de la date du premier entretien. Il se poursuivra ensuite par tacite reconduction par périodes de 1 an, sauf dénonciation par l'une ou l'autre des parties, en respectant un préavis d'un mois avant la fin de la période en cours, notifiée par Lettre Recommandée avec Accusé de Réception.
+            Le présent contrat est conclu pour une durée de 1 an à compter de la date du premier entretien. Il se poursuivra ensuite par tacite reconduction par périodes de 1 an, sauf dénonciation par l&apos;une ou l&apos;autre des parties, en respectant un préavis d&apos;un mois avant la fin de la période en cours, notifiée par Lettre Recommandée avec Accusé de Réception.
           </Text>
         </View>
 
         {/* Article 7 */}
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 7 – Prestations incluses</Text>
-          <Text style={s.cgvText}>La visite annuelle d'entretien comprend selon le type d'équipement :</Text>
-          <Text style={s.cgvListItem}>• Contrôle général de l'installation et vérification du bon fonctionnement</Text>
+          <Text style={s.cgvText}>La visite annuelle d&apos;entretien comprend selon le type d&apos;équipement :</Text>
+          <Text style={s.cgvListItem}>• Contrôle général de l&apos;installation et vérification du bon fonctionnement</Text>
           <Text style={s.cgvListItem}>• Nettoyage des composants principaux et pièces de fumée</Text>
           <Text style={s.cgvListItem}>• Ramonage des conduits (si applicable)</Text>
           <Text style={s.cgvListItem}>• Vérification des éléments de sécurité et connexions électriques</Text>
-          <Text style={s.cgvListItem}>• Vérification de l'étanchéité et des joints</Text>
+          <Text style={s.cgvListItem}>• Vérification de l&apos;étanchéité et des joints</Text>
           <Text style={s.cgvListItem}>• Mesure des performances et réglages si nécessaire</Text>
-          <Text style={s.cgvListItem}>• Délivrance du certificat de conformité / attestation d'entretien</Text>
-          <Text style={s.cgvListItem}>• Établissement d'un rapport de visite avec recommandations</Text>
+          <Text style={s.cgvListItem}>• Délivrance du certificat de conformité / attestation d&apos;entretien</Text>
+          <Text style={s.cgvListItem}>• Établissement d&apos;un rapport de visite avec recommandations</Text>
         </View>
 
         {/* Article 8 */}
         <View style={s.cgvSection}>
           <Text style={s.cgvSectionTitle}>Article 8 – Données personnelles</Text>
           <Text style={s.cgvText}>
-            Les données collectées sont traitées conformément au RGPD et sont utilisées exclusivement pour la gestion du contrat d'entretien. Le client dispose d'un droit d'accès, de rectification et de suppression de ses données en contactant {COMPANY.email}.
+            Les données collectées sont traitées conformément au RGPD et sont utilisées exclusivement pour la gestion du contrat d&apos;entretien. Le client dispose d&apos;un droit d&apos;accès, de rectification et de suppression de ses données en contactant {COMPANY.email}.
           </Text>
         </View>
 

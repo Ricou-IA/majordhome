@@ -33,7 +33,7 @@ export default function PricingSettings() {
   if (!admin.orgId) {
     return (
       <div className="card text-center py-12 text-secondary-500">
-        Chargement de l'organisation...
+        Chargement de l&apos;organisation...
       </div>
     );
   }
@@ -49,7 +49,7 @@ export default function PricingSettings() {
 
       <div>
         <h1 className="text-2xl font-bold text-secondary-900">Tarification</h1>
-        <p className="text-secondary-600">Gérez la grille tarifaire de votre organisation : zones, types d'équipement, tarifs, remises et options.</p>
+        <p className="text-secondary-600">Gérez la grille tarifaire de votre organisation : zones, types d&apos;équipement, tarifs, remises et options.</p>
       </div>
 
       {/* Tabs */}
@@ -349,7 +349,7 @@ function EquipmentTypesPanel({ admin }) {
       {admin.equipmentTypes.length === 0 ? (
         <div className="text-center py-12 text-secondary-500">
           <Wrench className="w-10 h-10 mx-auto mb-2 opacity-40" />
-          <p>Aucun type d'équipement</p>
+          <p>Aucun type d&apos;équipement</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -523,7 +523,7 @@ function RatesPanel({ admin }) {
     return (
       <div className="text-center py-12 text-secondary-500">
         <Grid3x3 className="w-10 h-10 mx-auto mb-2 opacity-40" />
-        <p>Créez d'abord au moins une zone et un type d'équipement pour saisir des tarifs.</p>
+        <p>Créez d&apos;abord au moins une zone et un type d&apos;équipement pour saisir des tarifs.</p>
       </div>
     );
   }
@@ -531,7 +531,7 @@ function RatesPanel({ admin }) {
   return (
     <div>
       <p className="text-sm text-secondary-500 mb-4">
-        Cliquez sur une cellule pour saisir ou modifier le tarif (zone × type d'équipement).
+        Cliquez sur une cellule pour saisir ou modifier le tarif (zone × type d&apos;équipement).
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -683,7 +683,7 @@ function DiscountsPanel({ admin }) {
         addLabel="Remise"
         onAdd={() => { setEditing(null); setShowModal(true); }}
       />
-      <p className="text-xs text-secondary-400 mb-4">La remise applicable est celle dont le seuil "min équipements" est le plus élevé (et atteint).</p>
+      <p className="text-xs text-secondary-400 mb-4">La remise applicable est celle dont le seuil &quot;min équipements&quot; est le plus élevé (et atteint).</p>
 
       {admin.discounts.length === 0 ? (
         <div className="text-center py-12 text-secondary-500">

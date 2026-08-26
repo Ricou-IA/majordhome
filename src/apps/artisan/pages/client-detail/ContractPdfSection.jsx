@@ -468,7 +468,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
                   </p>
                 </div>
                 <p className="text-sm text-gray-500">
-                  Un email professionnel sera envoyé avec le contrat en PDF. Le client pourra le consulter directement depuis l'email.
+                  Un email professionnel sera envoyé avec le contrat en PDF. Le client pourra le consulter directement depuis l&apos;email.
                 </p>
               </div>
 

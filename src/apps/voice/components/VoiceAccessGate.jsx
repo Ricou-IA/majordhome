@@ -33,8 +33,8 @@ export default function VoiceAccessGate({ children }) {
         <Lock className="w-12 h-12 text-orange-400 mb-4" />
         <h1 className="text-2xl font-semibold mb-2">Accès restreint</h1>
         <p className="text-secondary-300 max-w-sm">
-          La PWA Compte-rendu vocal n'est pas activée sur ton compte. Demande
-          à un administrateur d'activer la permission « Compte-rendu vocal »
+          La PWA Compte-rendu vocal n&apos;est pas activée sur ton compte. Demande
+          à un administrateur d&apos;activer la permission « Compte-rendu vocal »
           pour ton rôle dans Paramètres → Permissions.
         </p>
       </div>

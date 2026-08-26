@@ -159,7 +159,7 @@ export default function Settings() {
           </div>
           <div>
             <h3 className="font-medium text-secondary-900">
-              Besoin d'aide ?
+              Besoin d&apos;aide ?
             </h3>
             <p className="text-sm text-secondary-600 mt-1">
               Consultez notre documentation ou contactez le support.

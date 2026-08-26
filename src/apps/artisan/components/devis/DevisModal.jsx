@@ -316,7 +316,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
           {/* Dates */}
           <div className="flex gap-6 text-sm text-secondary-500">
             <span>Créé le {formatDateFR(quote.created_at)}</span>
-            {quote.validity_date && <span>Valable jusqu'au {formatDateFR(quote.validity_date)}</span>}
+            {quote.validity_date && <span>Valable jusqu&apos;au {formatDateFR(quote.validity_date)}</span>}
             {quote.sent_at && <span>Envoyé le {formatDateFR(quote.sent_at)}</span>}
             {quote.accepted_at && <span>Accepté le {formatDateFR(quote.accepted_at)}</span>}
           </div>

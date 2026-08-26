@@ -440,7 +440,7 @@ export default function BenchmarkLauncher({ orgId, lists, quota, onClose, onLaun
                   {progress.current} / {progress.total} keywords scannés
                 </span>
                 <span className="text-secondary-500 text-xs">
-                  Cliquer "Annuler" pour arrêter après le scan en cours
+                  Cliquer &quot;Annuler&quot; pour arrêter après le scan en cours
                 </span>
               </div>
               <div className="h-2 bg-secondary-100 rounded-full overflow-hidden">

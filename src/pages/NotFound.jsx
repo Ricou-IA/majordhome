@@ -17,7 +17,7 @@ export default function NotFound() {
           Page non trouvée
         </h2>
         <p className="mt-2 text-secondary-600 max-w-md mx-auto">
-          Désolé, la page que vous recherchez n'existe pas ou a été déplacée.
+          Désolé, la page que vous recherchez n&apos;existe pas ou a été déplacée.
         </p>
 
         {/* Actions */}
@@ -27,7 +27,7 @@ export default function NotFound() {
             className="btn-primary"
           >
             <Home className="w-5 h-5" />
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Link>
           <button
             onClick={() => window.history.back()}

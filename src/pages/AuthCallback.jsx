@@ -49,7 +49,7 @@ export default function AuthCallback() {
             <AlertCircle className="w-8 h-8 text-red-600" />
           </div>
           <h1 className="mt-4 text-xl font-semibold text-secondary-900">
-            Erreur d'authentification
+            Erreur d&apos;authentification
           </h1>
           <p className="mt-2 text-secondary-600">{error}</p>
           <button

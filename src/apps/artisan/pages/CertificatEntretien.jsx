@@ -207,7 +207,7 @@ export default function CertificatEntretien() {
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Certificat d'entretien</h1>
+            <h1 className="text-xl font-bold text-gray-900">Certificat d&apos;entretien</h1>
             <p className="text-sm text-gray-500">{certificat.reference}</p>
           </div>
         </div>
@@ -249,7 +249,7 @@ export default function CertificatEntretien() {
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Certificat d'entretien</h1>
+          <h1 className="text-xl font-bold text-gray-900">Certificat d&apos;entretien</h1>
           <p className="text-sm text-gray-500">
             {client?.display_name || client?.last_name || 'Client'}
             {equipment ? ` — ${equipment.brand || ''} ${equipment.model || ''}`.trim() : ''}

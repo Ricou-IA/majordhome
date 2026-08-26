@@ -213,7 +213,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
           Tarification
         </h4>
         <p className="text-sm text-secondary-500 italic py-2">
-          Associez des équipements au contrat depuis l'onglet Équipements pour calculer le tarif.
+          Associez des équipements au contrat depuis l&apos;onglet Équipements pour calculer le tarif.
         </p>
       </div>
     );
@@ -228,7 +228,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
           Tarification
         </h4>
         <p className="text-sm text-amber-600 py-2">
-          Zone tarifaire non déterminée. Renseignez l'adresse du client pour calculer le tarif.
+          Zone tarifaire non déterminée. Renseignez l&apos;adresse du client pour calculer le tarif.
         </p>
       </div>
     );
@@ -244,7 +244,7 @@ export function ContractPricingSection({ contractId, contract, client }) {
         </h4>
         <p className="text-sm text-amber-600 py-2 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          Les équipements sous contrat n'ont pas de type tarifaire associé. Modifiez les équipements pour renseigner leur type.
+          Les équipements sous contrat n&apos;ont pas de type tarifaire associé. Modifiez les équipements pour renseigner leur type.
         </p>
       </div>
     );

@@ -522,10 +522,10 @@ export default function TeamManagement() {
           <div>
             <h1 className="text-2xl font-bold text-secondary-900 flex items-center gap-3">
               <Users className="w-7 h-7 text-primary-600" />
-              Gestion de l'équipe
+              Gestion de l&apos;équipe
             </h1>
             <p className="text-sm text-secondary-600 mt-1">
-              Gérez les membres et leurs rôles dans l'organisation
+              Gérez les membres et leurs rôles dans l&apos;organisation
             </p>
           </div>
         </div>
@@ -611,8 +611,8 @@ export default function TeamManagement() {
           <div className="text-sm text-blue-800">
             <p className="font-medium">À propos des rôles</p>
             <ul className="mt-1 space-y-1 text-blue-700">
-              <li><strong>Administrateur</strong> — Accès complet, gestion des paramètres et de l'équipe</li>
-              <li><strong>Responsable</strong> — Vision globale, supervision de l'équipe</li>
+              <li><strong>Administrateur</strong> — Accès complet, gestion des paramètres et de l&apos;équipe</li>
+              <li><strong>Responsable</strong> — Vision globale, supervision de l&apos;équipe</li>
               <li><strong>Commercial</strong> — Pipeline, ses leads et chantiers, planning</li>
               <li><strong>Technicien</strong> — Clients, chantiers planifiés, entretiens, planning</li>
             </ul>

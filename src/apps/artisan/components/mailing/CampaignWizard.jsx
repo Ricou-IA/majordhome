@@ -249,7 +249,7 @@ function StepIdentity({ form, update, segments }) {
       {/* Section Automatisation */}
       <Section title="Automatisation">
         <p className="text-xs text-secondary-500 -mt-1">
-          Active pour laisser le scheduler N8n envoyer cette campagne automatiquement à cadence régulière. Sinon, envoi manuel depuis l'onglet "Envoi".
+          Active pour laisser le scheduler N8n envoyer cette campagne automatiquement à cadence régulière. Sinon, envoi manuel depuis l&apos;onglet &quot;Envoi&quot;.
         </p>
         <label className="flex items-center gap-2 text-sm text-secondary-700">
           <input
@@ -259,7 +259,7 @@ function StepIdentity({ form, update, segments }) {
             className="rounded border-gray-300"
           />
           <Zap className="w-4 h-4 text-amber-500" />
-          Activer l'envoi automatique
+          Activer l&apos;envoi automatique
         </label>
 
         <Field label={form.is_automated ? 'Segment ciblé (obligatoire en auto)' : 'Segment par défaut (utilisé à l\'ouverture de l\'onglet Envoi)'} hint="Choisis un segment du catalogue">
@@ -331,7 +331,7 @@ function StepIdentity({ form, update, segments }) {
             </details>
             <p className="text-xs text-amber-800">
               <Filter className="w-3 h-3 inline mr-1" />
-              Le scheduler N8n lit les campagnes dont <code className="text-[10px]">next_run_at ≤ NOW()</code> toutes les 10 min et déclenche l'envoi.
+              Le scheduler N8n lit les campagnes dont <code className="text-[10px]">next_run_at ≤ NOW()</code> toutes les 10 min et déclenche l&apos;envoi.
             </p>
           </div>
         )}
@@ -361,7 +361,7 @@ function StepBrief({ form, update }) {
     <div className="space-y-4">
       <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-900">
         Décris en langage naturel ce que tu veux dire dans ce mail.
-        L'IA structurera toute seule en blocs pertinents
+        L&apos;IA structurera toute seule en blocs pertinents
         (offre, news, conseil, contact) selon ce qui fait sens.
       </div>
 
@@ -376,7 +376,7 @@ function StepBrief({ form, update }) {
       </Field>
 
       <div className="pt-2 border-t">
-        <p className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-2">Facultatif — l'IA propose sinon</p>
+        <p className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-2">Facultatif — l&apos;IA propose sinon</p>
         <div className="space-y-3">
           <Field label="Objet du mail" hint="Si vide, l'IA proposera un objet dans le HTML généré">
             <input
@@ -486,7 +486,7 @@ function StepGenerate({ form, update, promptText, jsonText, copyToClipboard }) {
             Prévisualiser
           </Button>
         </div>
-        <p className="text-xs text-secondary-500 mb-1">Colle ici le HTML complet renvoyé par Claude. L'objet et le preheader seront extraits automatiquement du commentaire en tête.</p>
+        <p className="text-xs text-secondary-500 mb-1">Colle ici le HTML complet renvoyé par Claude. L&apos;objet et le preheader seront extraits automatiquement du commentaire en tête.</p>
         <textarea
           value={form.html_body}
           onChange={(e) => handleHtmlChange(e.target.value)}

@@ -60,11 +60,11 @@ export default function NewProspectForm({ onClose, onSubmit }) {
           className="w-full mt-6 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-medium transition disabled:bg-white/10 disabled:text-secondary-500 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <UserPlus className="w-4 h-4" />
-          Continuer vers l'enregistrement
+          Continuer vers l&apos;enregistrement
         </button>
 
         <p className="text-secondary-500 text-xs text-center">
-          Le prospect sera créé en base APRÈS l'envoi du vocal.
+          Le prospect sera créé en base APRÈS l&apos;envoi du vocal.
         </p>
       </form>
     </div>

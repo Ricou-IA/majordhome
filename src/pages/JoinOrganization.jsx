@@ -85,7 +85,7 @@ export default function JoinOrganization() {
             Rejoindre une organisation
           </h1>
           <p className="mt-2 text-secondary-600">
-            Entrez le code d'invitation fourni par votre responsable
+            Entrez le code d&apos;invitation fourni par votre responsable
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export default function JoinOrganization() {
               {/* Code invitation */}
               <div>
                 <label htmlFor="inviteCode" className="label">
-                  Code d'invitation
+                  Code d&apos;invitation
                 </label>
                 <input
                   type="text"
@@ -182,7 +182,7 @@ export default function JoinOrganization() {
 
         {/* Footer */}
         <p className="mt-8 text-center text-xs text-secondary-500">
-          Vous n'avez pas de code ? Contactez votre responsable.
+          Vous n&apos;avez pas de code ? Contactez votre responsable.
         </p>
       </div>
     </div>

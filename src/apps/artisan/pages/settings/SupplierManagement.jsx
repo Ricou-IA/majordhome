@@ -235,7 +235,7 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
 
             {computedPurchase !== null && (
               <p className="text-xs text-secondary-500">
-                Prix d'achat HT calculé : <span className="font-medium text-secondary-700">{formatEuro(computedPurchase)}</span>
+                Prix d&apos;achat HT calculé : <span className="font-medium text-secondary-700">{formatEuro(computedPurchase)}</span>
               </p>
             )}
 

@@ -38,9 +38,9 @@ export function StepFGaz({ formData, onChange }) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
         <p className="text-xs text-blue-800">
-          <strong>Règlement EU 517/2014</strong> — Contrôle d'étanchéité obligatoire
+          <strong>Règlement EU 517/2014</strong> — Contrôle d&apos;étanchéité obligatoire
           pour les équipements contenant ≥ 5 tonnes équivalent CO₂ de gaz fluorés.
-          Les opérations doivent être consignées au carnet de l'équipement.
+          Les opérations doivent être consignées au carnet de l&apos;équipement.
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export function StepFGaz({ formData, onChange }) {
             onChange={(e) => updateFGaz({ certificat_aptitude_verifie: e.target.checked })}
             className="w-5 h-5 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-800">Certificat d'aptitude vérifié</span>
+          <span className="text-sm text-gray-800">Certificat d&apos;aptitude vérifié</span>
         </label>
 
         <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
@@ -72,7 +72,7 @@ export function StepFGaz({ formData, onChange }) {
             onChange={(e) => updateFGaz({ enregistrement_carnet: e.target.checked })}
             className="w-5 h-5 rounded border-gray-300 text-blue-600"
           />
-          <span className="text-sm text-gray-800">Enregistrement au carnet de l'équipement</span>
+          <span className="text-sm text-gray-800">Enregistrement au carnet de l&apos;équipement</span>
         </label>
       </div>
 

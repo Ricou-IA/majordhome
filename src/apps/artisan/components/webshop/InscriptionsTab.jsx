@@ -80,7 +80,7 @@ function InscriptionRow({ insc }) {
             <p className="text-xs text-secondary-400">Inscrit le {formatDateTime(insc.created_at)} · source : {insc.source || '—'}</p>
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-secondary-400">Détails de l'offre</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-secondary-400">Détails de l&apos;offre</p>
             {extra.length === 0 ? (
               <p className="text-sm text-secondary-400 italic">Aucun champ supplémentaire</p>
             ) : (

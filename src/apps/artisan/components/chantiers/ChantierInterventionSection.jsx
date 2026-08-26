@@ -45,7 +45,7 @@ export function ChantierInterventionSection({
       </h3>
 
       {appointments.length === 0 ? (
-        <p className="text-sm text-gray-400 italic py-1">Aucun jour d'installation planifié</p>
+        <p className="text-sm text-gray-400 italic py-1">Aucun jour d&apos;installation planifié</p>
       ) : (
         <div className="space-y-2">
           {appointments.map((apt) => (
@@ -66,7 +66,7 @@ export function ChantierInterventionSection({
           className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Planifier l'installation
+          Planifier l&apos;installation
         </button>
       )}
     </div>

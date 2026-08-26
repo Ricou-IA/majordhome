@@ -82,7 +82,7 @@ export function SAVQuoteModal({ isOpen, onClose, onConfirm, loading = false, cli
           {/* Date d'envoi */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Date d'envoi
+              Date d&apos;envoi
             </label>
             <input
               type="date"

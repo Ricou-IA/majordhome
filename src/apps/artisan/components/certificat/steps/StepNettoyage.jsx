@@ -39,7 +39,7 @@ export function StepNettoyage({ formData, onChange }) {
     <div className="space-y-4">
       <SectionTitle>Nettoyage des composants</SectionTitle>
       <p className="text-sm text-gray-500">
-        Indiquez l'état de propreté après intervention.
+        Indiquez l&apos;état de propreté après intervention.
       </p>
 
       <div className="space-y-2">

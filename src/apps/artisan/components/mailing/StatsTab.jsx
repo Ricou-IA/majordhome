@@ -28,7 +28,7 @@ export default function StatsTab() {
   if (!stats.length) {
     return (
       <div className="card p-8 text-center text-secondary-500">
-        Aucune campagne envoyée pour l'instant. Lance une campagne depuis l'onglet « Envoi » pour voir les stats arriver ici.
+        Aucune campagne envoyée pour l&apos;instant. Lance une campagne depuis l&apos;onglet « Envoi » pour voir les stats arriver ici.
       </div>
     );
   }

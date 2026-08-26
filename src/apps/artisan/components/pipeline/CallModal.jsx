@@ -62,7 +62,7 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
           {/* Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Date de l'appel
+              Date de l&apos;appel
             </label>
             <input
               type="date"
@@ -75,7 +75,7 @@ export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title =
           {/* Résultat */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Résultat de l'appel
+              Résultat de l&apos;appel
             </label>
             <div className="grid grid-cols-2 gap-2">
               {CALL_RESULTS.map((opt) => {

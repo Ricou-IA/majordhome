@@ -64,7 +64,7 @@ export default function BenchmarksPanel({ orgId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-secondary-600">
-          Un benchmark = un run d'une liste de keywords sur une zone locale et/ou les communes{orgDepartmentLabel ? ` du ${orgDepartmentLabel}` : ' du département'}. Lancement mensuel = thermomètre SEO.
+          Un benchmark = un run d&apos;une liste de keywords sur une zone locale et/ou les communes{orgDepartmentLabel ? ` du ${orgDepartmentLabel}` : ' du département'}. Lancement mensuel = thermomètre SEO.
         </p>
         <button
           onClick={() => setLauncherOpen(true)}

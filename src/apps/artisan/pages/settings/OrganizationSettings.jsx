@@ -44,7 +44,7 @@ export default function OrganizationSettings() {
         </button>
         <h1 className="text-2xl font-bold text-secondary-900">Organisation</h1>
         <p className="text-secondary-600">
-          Configure l'identité, les coordonnées et le territoire de ton entreprise.
+          Configure l&apos;identité, les coordonnées et le territoire de ton entreprise.
         </p>
       </div>
 

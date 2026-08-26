@@ -405,7 +405,7 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
       ) : (
         <div className="text-center py-8 text-secondary-500 text-sm">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          Sélectionnez une famille à l'étape précédente pour commencer
+          Sélectionnez une famille à l&apos;étape précédente pour commencer
         </div>
       )}
 

@@ -157,7 +157,7 @@ export function StepInfosGenerales({ formData, onChange, client, technicians = [
       </div>
 
       {/* ── Date intervention ── */}
-      <SectionTitle>Date d'intervention</SectionTitle>
+      <SectionTitle>Date d&apos;intervention</SectionTitle>
       <FormField label="Date" required>
         <TextInput
           type="date"

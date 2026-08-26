@@ -143,8 +143,8 @@ function GoogleCalendarSection() {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-secondary-600">
-            Connectez votre compte Google pour voir vos RDV Majord'home directement dans Google Calendar.
-            Idéal pour consulter votre planning sur mobile sans ouvrir l'application.
+            Connectez votre compte Google pour voir vos RDV Majord&apos;home directement dans Google Calendar.
+            Idéal pour consulter votre planning sur mobile sans ouvrir l&apos;application.
           </p>
           <button
             onClick={handleConnect}
@@ -287,7 +287,7 @@ export default function Profile() {
               />
             </div>
             <p className="mt-1 text-xs text-secondary-500">
-              L'email ne peut pas être modifié
+              L&apos;email ne peut pas être modifié
             </p>
           </div>
 

@@ -75,7 +75,7 @@ export function MoveToLongTermModal({
         </div>
 
         <p className="text-sm text-gray-600 mb-3">
-          Le lead sortira du pipeline et apparaîtra dans l'onglet <strong>Suivi MT-LT</strong>.
+          Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Suivi MT-LT</strong>.
           Vous pourrez ajouter des interactions et le ramener en Gagné à tout moment.
         </p>
 

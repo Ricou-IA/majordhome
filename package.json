@@ -7,7 +7,7 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "lint": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --max-warnings 392",
+        "lint": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --max-warnings 190",
         "lint:errors": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --quiet",
         "audit:dead-code": "node scripts/audit-dead-code.mjs",
         "audit:quality": "npm run lint:errors && npm run audit:dead-code",

@@ -349,7 +349,7 @@ export const TabInterventions = ({ projectId, clientId }) => {
         <div className="text-center py-12">
           <Wrench className="w-12 h-12 text-secondary-300 mx-auto" />
           <p className="mt-4 text-secondary-700 font-medium">Aucune intervention</p>
-          <p className="mt-1 text-sm text-secondary-500">Cliquez sur "Nouvelle intervention" pour en créer une.</p>
+          <p className="mt-1 text-sm text-secondary-500">Cliquez sur &quot;Nouvelle intervention&quot; pour en créer une.</p>
         </div>
       ) : (
         <div className="space-y-3">

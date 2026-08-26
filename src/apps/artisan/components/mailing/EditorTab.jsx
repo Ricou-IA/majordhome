@@ -123,7 +123,7 @@ export default function EditorTab() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-secondary-900">Campagnes</h2>
-            <p className="text-sm text-secondary-500">Tout ce qui peut partir par email, regroupé par mode d'envoi.</p>
+            <p className="text-sm text-secondary-500">Tout ce qui peut partir par email, regroupé par mode d&apos;envoi.</p>
           </div>
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" />
@@ -134,7 +134,7 @@ export default function EditorTab() {
         {campaigns.length === 0 ? (
           <div className="card p-8 text-center text-secondary-500">
             <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>Aucune campagne pour l'instant.</p>
+            <p>Aucune campagne pour l&apos;instant.</p>
             <Button onClick={openCreate} className="mt-4">
               <Plus className="w-4 h-4 mr-2" />
               Créer la première
@@ -246,7 +246,7 @@ function CampaignMeta({ campaign, nature, segment }) {
     <MetaRow icon={Target}>
       {segment?.name
         ? <>Cible par défaut&nbsp;: {segment.name}</>
-        : <span className="text-secondary-500">Cible choisie au moment de l'envoi</span>}
+        : <span className="text-secondary-500">Cible choisie au moment de l&apos;envoi</span>}
     </MetaRow>
   );
 }

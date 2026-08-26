@@ -229,7 +229,7 @@ export default function ScanConfigPanel({ onLaunch, isScanning, orgId }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1">
-            Nom de l'établissement
+            Nom de l&apos;établissement
           </label>
           <input
             type="text"

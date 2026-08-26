@@ -162,7 +162,7 @@ export default function Territoire() {
           <div>
             <h1 className="text-xl font-semibold text-secondary-900">Territoire</h1>
             <p className="text-sm text-secondary-500">
-              Carte interactive de l'activité CRM
+              Carte interactive de l&apos;activité CRM
             </p>
           </div>
         </div>

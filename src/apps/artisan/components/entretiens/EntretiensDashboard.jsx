@@ -90,7 +90,7 @@ export function EntretiensDashboard({ stats, savStats, isLoading }) {
       {stats && (
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Contrats d'entretien
+            Contrats d&apos;entretien
           </h3>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <InfoCard

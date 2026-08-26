@@ -314,7 +314,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                 </div>
                 {computedPurchase !== null && (
                   <p className="text-xs text-secondary-500">
-                    Prix d'achat HT calculé : <span className="font-medium text-secondary-700">{formatEuro(computedPurchase)}</span>
+                    Prix d&apos;achat HT calculé : <span className="font-medium text-secondary-700">{formatEuro(computedPurchase)}</span>
                   </p>
                 )}
                 <div className="grid grid-cols-3 gap-3">
@@ -344,7 +344,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                   />
                   <span className="text-sm text-secondary-700 inline-flex items-center gap-1">
                     {form.clientVisible ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-secondary-400" />}
-                    Visible sur l'espace client
+                    Visible sur l&apos;espace client
                   </span>
                 </label>
                 <p className="text-xs text-secondary-400 pl-6">

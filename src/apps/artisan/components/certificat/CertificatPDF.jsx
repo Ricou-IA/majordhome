@@ -161,7 +161,7 @@ function CertificatDocument({ data, company }) {
           </View>
           <View style={s.headerCenter}>
             <Text style={s.title}>{companyHeader}</Text>
-            <Text style={s.subtitle}>CERTIFICAT D'ENTRETIEN{config.showRamonage ? ' & RAMONAGE' : ''}</Text>
+            <Text style={s.subtitle}>CERTIFICAT D&apos;ENTRETIEN{config.showRamonage ? ' & RAMONAGE' : ''}</Text>
           </View>
         </View>
 

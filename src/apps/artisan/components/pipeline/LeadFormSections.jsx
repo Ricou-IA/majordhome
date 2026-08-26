@@ -208,7 +208,7 @@ export const SectionClientLinking = ({
                 && !clientSearching && !pennylaneSearching
                 && clientResults.length === 0 && pennylaneResults.length === 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-3 text-sm text-gray-500 italic">
-                  Aucun client trouvé (Majord'home + Pennylane)
+                  Aucun client trouvé (Majord&apos;home + Pennylane)
                 </div>
               )}
             </div>

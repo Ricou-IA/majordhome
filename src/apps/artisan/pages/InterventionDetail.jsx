@@ -427,7 +427,7 @@ export default function InterventionDetail() {
                   Intervention non démarrée
                 </p>
                 <p className="text-sm text-blue-600 mt-1">
-                  Cliquez sur "Commencer l'intervention" pour débloquer le rapport,
+                  Cliquez sur &quot;Commencer l&apos;intervention&quot; pour débloquer le rapport,
                   les photos et la signature.
                 </p>
               </div>
@@ -629,7 +629,7 @@ export default function InterventionDetail() {
         <TabsContent value="signature" className="mt-4 space-y-6">
           {/* Étape 1 : Générer le PV */}
           <div className="bg-white rounded-lg border p-4 space-y-3">
-            <h3 className="font-semibold text-base">1. Générer le PV d'intervention</h3>
+            <h3 className="font-semibold text-base">1. Générer le PV d&apos;intervention</h3>
             <p className="text-sm text-gray-600">
               Le rapport sera compilé en PDF pour relecture avant signature.
             </p>
@@ -648,7 +648,7 @@ export default function InterventionDetail() {
             </Button>
             {!hasReport && (
               <p className="text-xs text-amber-600">
-                Complétez d'abord le rapport (onglet Rapport) avant de générer le PV.
+                Complétez d&apos;abord le rapport (onglet Rapport) avant de générer le PV.
               </p>
             )}
           </div>

@@ -142,7 +142,7 @@ export default function Historique() {
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">Historique des simulations</h1>
           <p className="text-secondary-600 text-sm">
-            {count} simulation{count > 1 ? 's' : ''} — rechargeables à l'identique
+            {count} simulation{count > 1 ? 's' : ''} — rechargeables à l&apos;identique
           </p>
         </div>
         <button onClick={() => navigate('/solaire')} className="btn-primary flex items-center gap-1.5">

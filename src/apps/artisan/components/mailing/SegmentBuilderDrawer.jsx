@@ -466,7 +466,7 @@ function LeadsBaseFields({ filters, set, leadStatuses }) {
       </div>
       {hasDevis && (
         <div>
-          <p className="text-xs text-secondary-500 mb-1">Filtre basé sur la date d'envoi du devis (colonne dédiée)</p>
+          <p className="text-xs text-secondary-500 mb-1">Filtre basé sur la date d&apos;envoi du devis (colonne dédiée)</p>
           <div className="grid grid-cols-2 gap-2">
             <NumberInput
               label="Devis envoyé il y a au moins (jours)"
@@ -630,7 +630,7 @@ function AttributesFields({ filters, set, audience, leadSources, leadCommercials
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-secondary-600 mb-1">Créé jusqu'au</label>
+          <label className="block text-xs font-medium text-secondary-600 mb-1">Créé jusqu&apos;au</label>
           <input
             type="date"
             value={a.created_between?.to || ''}

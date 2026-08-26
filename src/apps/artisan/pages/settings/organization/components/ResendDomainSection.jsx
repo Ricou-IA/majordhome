@@ -184,7 +184,7 @@ export default function ResendDomainSection() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-secondary-400" />
-          <h3 className={SECTION_TITLE + ' mb-0'}>Domaine d'envoi (Resend)</h3>
+          <h3 className={SECTION_TITLE + ' mb-0'}>Domaine d&apos;envoi (Resend)</h3>
         </div>
         {domain && (
           <span className={`text-[11px] font-medium px-2 py-1 rounded-full ${meta.cls}`}>
@@ -195,8 +195,8 @@ export default function ResendDomainSection() {
 
       {!domain ? (
         <p className={HINT_CLASS}>
-          Renseigne et enregistre d'abord l'<strong>email expéditeur</strong> ci-dessus. Le domaine
-          d'envoi en sera dérivé, puis tu pourras le vérifier ici.
+          Renseigne et enregistre d&apos;abord l&apos;<strong>email expéditeur</strong> ci-dessus. Le domaine
+          d&apos;envoi en sera dérivé, puis tu pourras le vérifier ici.
         </p>
       ) : (
         <>
@@ -211,7 +211,7 @@ export default function ResendDomainSection() {
             <div className="flex items-start gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2">
               <ShieldCheck className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
               <p className="text-xs text-green-800">
-                <strong>{domain}</strong> est vérifié — l'org peut envoyer ses campagnes.
+                <strong>{domain}</strong> est vérifié — l&apos;org peut envoyer ses campagnes.
               </p>
             </div>
           )}

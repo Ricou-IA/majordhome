@@ -107,7 +107,7 @@ function TemperaturesTab({ form, patchTheta }) {
       <div>
         <SectionTitle>Températures intérieures par défaut (θint)</SectionTitle>
         <p className="text-sm text-secondary-600 mt-1">
-          Consigne proposée pour chaque type de pièce à la création d'une étude.
+          Consigne proposée pour chaque type de pièce à la création d&apos;une étude.
           Les pièces non chauffées par défaut (garage, cellier) utilisent cette valeur si on les chauffe.
         </p>
       </div>
@@ -143,7 +143,7 @@ function PontsTab({ form, patchDelta }) {
         <SectionTitle>Ponts thermiques (ΔUtb)</SectionTitle>
         <p className="text-sm text-secondary-600 mt-1">
           Majoration forfaitaire ΔUtb appliquée à toutes les parois déperditives
-          selon le type d'isolation des murs.
+          selon le type d&apos;isolation des murs.
         </p>
       </div>
       <div className="grid sm:grid-cols-3 gap-4">

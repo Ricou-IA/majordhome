@@ -76,7 +76,7 @@ const ContractEquipmentsSection = ({ contractId }) => {
         </div>
       ) : equipments.length === 0 ? (
         <p className="text-sm text-secondary-500 italic py-2">
-          Aucun équipement lié à ce contrat. Associez des équipements depuis l'onglet Équipements.
+          Aucun équipement lié à ce contrat. Associez des équipements depuis l&apos;onglet Équipements.
         </p>
       ) : (
         <div className="space-y-2">
@@ -185,7 +185,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
     <div className="pt-6 border-t border-secondary-200">
       <h4 className="text-sm font-semibold text-secondary-900 mb-3 flex items-center gap-2">
         <ClipboardList className="w-4 h-4 text-secondary-500" />
-        Visites d'entretien
+        Visites d&apos;entretien
       </h4>
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
@@ -193,7 +193,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
         </div>
       ) : years.length === 0 ? (
         <p className="text-sm text-secondary-500 italic py-2">
-          Renseignez la date de début du contrat pour voir l'historique des visites.
+          Renseignez la date de début du contrat pour voir l&apos;historique des visites.
         </p>
       ) : (
         <div className="space-y-1">
@@ -398,8 +398,8 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
     return (
       <div className="text-center py-12">
         <FileText className="w-12 h-12 text-secondary-300 mx-auto" />
-        <p className="mt-4 text-secondary-700 font-medium">Aucun contrat d'entretien</p>
-        <p className="mt-1 text-sm text-secondary-500">Ce client n'a pas encore de contrat.</p>
+        <p className="mt-4 text-secondary-700 font-medium">Aucun contrat d&apos;entretien</p>
+        <p className="mt-1 text-sm text-secondary-500">Ce client n&apos;a pas encore de contrat.</p>
         <button
           onClick={() => setShowCreateModal(true)}
           className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
@@ -538,7 +538,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Mois d'entretien</p>
+            <p className="text-xs font-medium text-secondary-500 uppercase tracking-wider">Mois d&apos;entretien</p>
             <p className="mt-1 text-sm text-secondary-900">
               {contract.maintenance_month ? MAINTENANCE_MONTHS.find((m) => m.value === contract.maintenance_month)?.label : '-'}
             </p>

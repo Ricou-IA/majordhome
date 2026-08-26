@@ -98,7 +98,7 @@ export default function ThermiqueHistorique() {
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">Historique des études thermiques</h1>
           <p className="text-secondary-600 text-sm">
-            {count} étude{count > 1 ? 's' : ''} — rechargeables à l'identique
+            {count} étude{count > 1 ? 's' : ''} — rechargeables à l&apos;identique
           </p>
         </div>
         <button onClick={() => navigate('/thermique')} className="btn-primary flex items-center gap-1.5">

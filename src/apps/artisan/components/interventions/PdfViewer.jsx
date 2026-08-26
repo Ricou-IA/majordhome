@@ -52,7 +52,7 @@ export function PdfViewer({
         <FileText className="h-10 w-10 text-gray-400" />
         <p className="text-sm text-gray-500">Aucun PV généré</p>
         <p className="text-xs text-gray-400">
-          Cliquez sur "Générer le PV" une fois le rapport complété
+          Cliquez sur &quot;Générer le PV&quot; une fois le rapport complété
         </p>
       </div>
     );
@@ -93,7 +93,7 @@ export function PdfViewer({
         <div className="w-full aspect-[3/4] rounded-lg border bg-gray-50 flex flex-col items-center justify-center gap-3">
           <FileText className="h-10 w-10 text-gray-400" />
           <p className="text-sm text-gray-500">
-            Impossible d'afficher le PDF dans le navigateur
+            Impossible d&apos;afficher le PDF dans le navigateur
           </p>
           <a href={pdfUrl} target="_blank" rel="noopener noreferrer" download>
             <Button type="button" className="min-h-[44px] text-base gap-2">

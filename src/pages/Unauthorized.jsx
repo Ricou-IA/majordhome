@@ -22,7 +22,7 @@ export default function Unauthorized() {
           Accès non autorisé
         </h1>
         <p className="mt-2 text-secondary-600 max-w-md mx-auto">
-          Vous n'avez pas les permissions nécessaires pour accéder à cette page.
+          Vous n&apos;avez pas les permissions nécessaires pour accéder à cette page.
         </p>
 
         {/* Rôles requis */}
@@ -39,7 +39,7 @@ export default function Unauthorized() {
             className="btn-primary"
           >
             <Home className="w-5 h-5" />
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Link>
           <button
             onClick={() => window.history.back()}

@@ -29,7 +29,7 @@ export default function CampaignIdentityPanel({ campaign, defaultOpen = true }) 
       >
         <span className="flex items-center gap-2">
           <Info className="w-4 h-4 text-primary-600" />
-          Carte d'identité
+          Carte d&apos;identité
         </span>
         {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
