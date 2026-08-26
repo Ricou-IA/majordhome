@@ -16,11 +16,16 @@
 set -e
 
 echo "[pre-commit] Running ESLint check (errors + warnings ceiling)..."
-npm run lint --silent || {
+# Sortie capturée : silencieux si OK (sinon ~400 lignes de warnings à chaque
+# commit), affichée (fin du rapport) uniquement en cas de blocage.
+# ⚠️ Ne pas remplacer par --quiet : sur ESLint 8 il filtre les warnings AVANT
+# le comptage → --max-warnings ne compte plus rien, le plafond devient inerte.
+out=$(npm run lint --silent 2>&1) || {
+  echo "$out" | tail -60
   echo ""
   echo "❌ ESLint errors détectées ou plafond de warnings dépassé — commit bloqué."
-  echo "   Fix les problèmes (un nouveau warning se corrige, il ne se stocke pas)"
-  echo "   ou utilise --no-verify pour bypass (déconseillé)."
+  echo "   Détail complet : npm run lint. Un nouveau warning se corrige, il ne se stocke pas."
+  echo "   Bypass d'urgence : --no-verify (déconseillé)."
   exit 1
 }
 
