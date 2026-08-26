@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { X, Upload, FileText, Trash2, Loader2, Download, AlertCircle } from 'lucide-react';
+import { X, Upload, FileText, Trash2, Loader2, Download } from 'lucide-react';
 import { useProductDocuments, useProductDocumentMutations } from '@hooks/useSuppliers';
 import { storageService } from '@services/storage.service';
 import { useAuth } from '@contexts/AuthContext';

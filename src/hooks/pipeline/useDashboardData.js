@@ -59,6 +59,10 @@ export const useDashboardData = (filters, profile) => {
     fetchIdRef.current += 1;
   }, []);
 
+  // Clés primitives pour le tableau de deps (la règle exige des expressions simples)
+  const monthsKey = filters?.months?.join(',');
+  const sourceIdsKey = filters?.sourceIds?.join(',');
+
   useEffect(() => {
     if (!profile || !profile.orgId) {
       setLoading(false);
@@ -276,8 +280,8 @@ export const useDashboardData = (filters, profile) => {
     profile?.id,
     profile?.orgId,
     profile?.role,
-    filters?.months?.join(','),
-    filters?.sourceIds?.join(','),
+    monthsKey,
+    sourceIdsKey,
   ]);
 
   return { data, loading, refetch };

@@ -40,7 +40,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
 
   // Templates
   const [templates, setTemplates] = useState([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [, setLoadingTemplates] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
 

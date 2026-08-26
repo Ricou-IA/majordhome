@@ -79,7 +79,7 @@ import { devisService } from '@services/devis.service';
 export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false, autoQuote = false, onOpenLead = null }) {
   const isEditing = !!leadId;
   const { organization, user, effectiveRole } = useAuth();
-  const { can, canEdit, isOwner } = useCanAccess();
+  const { can } = useCanAccess();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const orgId = organization?.id;
@@ -258,6 +258,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     if (isOpen && !isEditing && defaultCommercialId && !form.assigned_user_id) {
       setForm((prev) => ({ ...prev, assigned_user_id: defaultCommercialId }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form.assigned_user_id volontairement omis : le défaut ne s'applique qu'à l'ouverture/chargement, pas quand l'utilisateur vide le champ
   }, [isOpen, isEditing, defaultCommercialId]);
 
   // Auto-schedule : ouvrir directement l'assistant de planification après chargement du lead

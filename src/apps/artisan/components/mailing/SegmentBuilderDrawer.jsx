@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { X, Loader2, Users, Filter, History, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@components/ui/button';

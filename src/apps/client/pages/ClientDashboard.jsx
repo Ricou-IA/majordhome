@@ -10,7 +10,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useClient } from '@hooks/useClients';
 import { useClientContract } from '@hooks/useContracts';
 import {
-  FileText, Wrench, ClipboardList, CheckCircle2, AlertCircle, Loader2, Clock,
+  FileText, Wrench, ClipboardList, CheckCircle2, AlertCircle, Loader2,
 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
 import logoMayer from '@/assets/logo-mayer.png';

@@ -354,9 +354,6 @@ export function CertificatWizard({
   const isLastStep = currentStepConfig?.id === 'signature';
   const isFirstStep = currentStep === 0;
 
-  // Si step 0 (équipement) et l'équipement est déjà connu → skip auto
-  const shouldAutoSkipEquipement = currentStep === 0 && equipment?.category && formData.equipement_type;
-
   return (
     <div className="space-y-6">
       {/* Stepper */}

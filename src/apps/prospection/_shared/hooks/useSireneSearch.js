@@ -10,7 +10,7 @@
  * entreprises réellement basées dans le département cible.
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchSirene, mapResultToProspect } from '../lib/sireneApi';
 
@@ -81,7 +81,6 @@ export function useSireneSearch({
     defaultDepartements.length === 1 ? defaultDepartements[0] : ''
   );
   const [communeCode, setCommuneCodeRaw] = useState(''); // Code INSEE commune
-  const abortRef = useRef(null);
 
   // Wrappers pour reset page à chaque changement de filtre
   const setNafCodes = useCallback((codes) => {

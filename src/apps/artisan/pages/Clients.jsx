@@ -13,17 +13,15 @@
  * ============================================================================
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
-  Filter,
   Plus,
   Users,
   FileText,
   X,
   ChevronDown,
-  Loader2,
   AlertCircle,
   RefreshCw,
   CheckCircle2,
@@ -139,21 +137,6 @@ const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
     </div>
   );
 };
-
-/**
- * Badge filtre actif
- */
-const ActiveFilterBadge = ({ label, onClear }) => (
-  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-    {label}
-    <button 
-      onClick={onClear}
-      className="p-0.5 hover:bg-blue-200 rounded-full"
-    >
-      <X className="w-3 h-3" />
-    </button>
-  </span>
-);
 
 /**
  * Carte statistiques
@@ -390,7 +373,7 @@ export function Clients() {
     setSearchInput('');
     setActiveStatCard(null);
     reset();
-  }, [reset]);
+  }, [reset, setActiveStatCard]);
 
   const handleSortChange = useCallback((value) => {
     const [orderBy, order] = value.split(':');
@@ -455,7 +438,7 @@ export function Clients() {
           break;
       }
     }
-  }, [activeStatCard, filters.orderBy, filters.ascending, setFilters]);
+  }, [activeStatCard, filters.orderBy, filters.ascending, setFilters, setActiveStatCard]);
 
   // Calcul des filtres actifs
   const activeFilters = [];

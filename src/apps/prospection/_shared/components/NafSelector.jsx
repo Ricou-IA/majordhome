@@ -12,7 +12,7 @@ import {
   X,
   Filter,
 } from 'lucide-react';
-import { NAF_SECTIONS, searchNafCodes, NAF_LABELS } from '../lib/nafGlossary';
+import { NAF_SECTIONS, searchNafCodes } from '../lib/nafGlossary';
 
 // ============================================================================
 // MAIN COMPONENT

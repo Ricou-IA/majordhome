@@ -129,7 +129,7 @@ function useDashboardHome(orgId, effectiveRole, userId, commercialId) {
 // KPI CARD
 // =============================================================================
 
-function KpiCard({ label, value, icon: Icon, color, bgLight, onClick }) {
+function KpiCard({ label, value, icon: Icon, color, onClick }) {
   return (
     <button
       type="button"

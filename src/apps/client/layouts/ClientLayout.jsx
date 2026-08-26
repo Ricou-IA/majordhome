@@ -12,7 +12,6 @@ import { useAuth } from '@contexts/AuthContext';
 import {
   Home, FileText, Wrench, ClipboardList, LogOut, Menu, X, Loader2, KeyRound,
 } from 'lucide-react';
-import logoMayer from '@/assets/logo-mayer.png';
 
 const ClientChangePassword = lazy(() => import('../pages/ClientChangePassword'));
 

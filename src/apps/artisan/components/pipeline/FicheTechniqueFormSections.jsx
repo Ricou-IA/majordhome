@@ -47,7 +47,6 @@ function AutoSaveField({
   label,
   field,
   value,
-  onChange,
   onAutoSave,
   disabled,
   required,
@@ -90,7 +89,7 @@ function CheckboxField({ label, checked, onChange, disabled }) {
 // SECTION 1 — CONTEXTE (READ-ONLY)
 // ============================================================================
 
-export function SectionContexte({ lead, form, disabled }) {
+export function SectionContexte({ lead, form }) {
   // Nom complet : Prénom NOM
   const clientName = [lead?.first_name, lead?.last_name].filter(Boolean).join(' ') || '—';
 

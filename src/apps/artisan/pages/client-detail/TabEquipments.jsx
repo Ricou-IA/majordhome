@@ -6,7 +6,6 @@ import { useClientEquipments, clientKeys } from '@hooks/useClients';
 import { useClientContract, useContractEquipments, contractKeys } from '@hooks/useContracts';
 import { useProductDocumentsByProductIds } from '@hooks/useSuppliers';
 import { contractsService } from '@services/contracts.service';
-import { storageService } from '@services/storage.service';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';

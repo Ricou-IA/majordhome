@@ -140,7 +140,7 @@ export default function ClientDetail() {
       return;
     }
 
-    const { data, error: err } = await updateClient({
+    const { error: err } = await updateClient({
       firstName: formData.firstName,
       lastName: formData.lastName,
       clientCategory: formData.clientCategory,

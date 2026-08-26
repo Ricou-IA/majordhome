@@ -93,7 +93,7 @@ export function CertificatsSection({ item, onCloseModal }) {
       }
       refetch();
     });
-  }, [childrenLoading, equipmentsLoading, children.length, equipments.length, item, contractId, createChildren, refetch]);
+  }, [childrenLoading, equipmentsLoading, children.length, equipments, item, contractId, createChildren, refetch]);
 
   // --- Handlers ---
   const handleMarkNeant = useCallback(async (childId) => {

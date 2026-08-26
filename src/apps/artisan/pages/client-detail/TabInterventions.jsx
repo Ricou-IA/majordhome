@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Wrench, HardHat, Package, CalendarDays, Ban } from 'lucide-react';
+import { Loader2, Plus, Wrench, HardHat, Ban } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectInterventions, useCreateIntervention } from '@hooks/useInterventions';

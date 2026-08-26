@@ -4,6 +4,7 @@
  * Placeholder — sera complété en Phase 6
  * ============================================================================
  */
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import { formatEuro } from '@/lib/utils';

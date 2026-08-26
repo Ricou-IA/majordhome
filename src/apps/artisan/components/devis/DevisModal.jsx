@@ -27,8 +27,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const { quote, isLoading: loadingQuote } = useDevisDetail(quoteId);
   const { lines, isLoading: loadingLines } = useDevisLines(quoteId);
   const {
-    sendQuote, acceptQuote, refuseQuote, duplicateQuote, deleteQuote,
-    isSending, isDeleting,
+    acceptQuote, refuseQuote, duplicateQuote, deleteQuote,
+    isDeleting,
   } = useDevisMutations(leadId);
 
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -54,17 +54,6 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const totals = computeQuoteTotals(lines, quote.global_discount_percent);
   const isBrouillon = quote.status === 'brouillon';
   const isEnvoye = quote.status === 'envoye';
-
-  const handleSend = async () => {
-    try {
-      const result = await sendQuote(quoteId);
-      if (result?.error) throw result.error;
-      toast.success('Devis marqué comme envoyé');
-      onStatusChange?.();
-    } catch (err) {
-      toast.error(err?.message || 'Erreur');
-    }
-  };
 
   const handleAccept = async () => {
     try {

@@ -10,7 +10,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { Camera, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react';
+import { Camera, Trash2, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**

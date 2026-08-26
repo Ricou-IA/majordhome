@@ -57,7 +57,7 @@ export default function SearchSireneModal({
     page, totalPages, nextPage, prevPage,
     nafCodes, setNafCodes,
     departement, setDepartement,
-    communeCode, setCommuneCode,
+    setCommuneCode,
   } = useSireneSearch({ module, defaultNafCodes, defaultDepartements });
 
   const { createProspect, isCreating } = useProspectMutations();

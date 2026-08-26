@@ -354,8 +354,6 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const {
     contract,
     isLoading,
-    createContract,
-    isCreating,
     updateContract,
     isUpdating,
     closeContract,
@@ -372,7 +370,7 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
   const [closeReasonDetail, setCloseReasonDetail] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [openDevisId, setOpenDevisId] = useState(null);
-  const { quotes: clientQuotes, isLoading: loadingQuotes } = useDevisByClient(clientId);
+  const { quotes: clientQuotes } = useDevisByClient(clientId);
 
   const initForm = useCallback((c) => {
     setContractForm({

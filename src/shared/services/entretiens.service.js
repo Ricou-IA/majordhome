@@ -416,7 +416,7 @@ export const entretiensService = {
   /**
    * Stats agrégées pour le dashboard entretiens
    */
-  async getStats(orgId, year) {
+  async getStats(orgId, _year) {
     try {
 
       // Tous les contrats de l'org SAUF archivés (vue enrichie avec current_year_visit_status)

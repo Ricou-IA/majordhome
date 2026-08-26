@@ -332,6 +332,7 @@ export function AuthProvider({ children }) {
 // HOOK
 // =============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components -- pattern contexte React standard : hook useAuth co-localisé avec son Provider
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth doit être utilisé dans un AuthProvider');

@@ -17,7 +17,6 @@ const CALL_RESULTS = [
 
 export const CallModal = ({ isOpen, onClose, onConfirm, loading = false, title = 'Enregistrer un appel', variant = 'call' }) => {
   const isFollowup = variant === 'followup';
-  const accentColor = isFollowup ? 'purple' : 'amber';
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [result, setResult] = useState('');
 

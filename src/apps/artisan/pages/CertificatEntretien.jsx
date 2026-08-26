@@ -17,7 +17,6 @@
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle, FileText, Download } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIntervention } from '@hooks/useInterventions';
 import { useCertificat } from '@hooks/useCertificats';

@@ -367,7 +367,7 @@ export const suppliersService = {
 
   async createProduct({
     supplierId, orgId, reference, name, description, category,
-    purchasePriceHt, sellingPriceHt, defaultTvaRate, unit,
+    sellingPriceHt, defaultTvaRate, unit,
     codeFamille, gamme, codeEan, tarifPublic, tauxRemise, diametre,
     // Enrichissement
     fuelType, brand, variantOf, variantLabel, imageUrl, imageSourceUrl,

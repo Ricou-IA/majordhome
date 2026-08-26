@@ -50,7 +50,6 @@ export function InterventionHeader({
 
   const isScheduled = intervention.status === 'scheduled';
   const isInProgress = intervention.status === 'in_progress';
-  const isCompleted = intervention.status === 'completed';
   const isCancelled = intervention.status === 'cancelled';
 
   // Formatage date

@@ -8,7 +8,6 @@
 
 import {
   FileText,
-  ExternalLink,
   Loader2,
   AlertCircle,
   RefreshCw,

@@ -16,7 +16,7 @@ import DevisTvaSummary from './DevisTvaSummary';
 import { formatEuro } from '@/lib/utils';
 import {
   Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
-  Wrench, Type, Package, ChevronRight,
+  Package,
 } from 'lucide-react';
 
 // =============================================================================

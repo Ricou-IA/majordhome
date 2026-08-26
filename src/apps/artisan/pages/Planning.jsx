@@ -17,14 +17,12 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import {
   Plus,
-  Filter,
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
   Loader2,
   AlertCircle,
   RefreshCw,
-  X,
   ChevronDown,
   Wrench,
   Briefcase,
@@ -32,7 +30,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
-import { APPOINTMENT_TYPES, getAppointmentTypeConfig } from '@services/appointments.service';
+import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
@@ -389,7 +387,6 @@ export default function Planning() {
     deleteAppointment,
     isCreating,
     isUpdating,
-    isMoving,
     refresh,
   } = useAppointments({
     orgId,

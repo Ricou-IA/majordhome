@@ -47,6 +47,7 @@ export default function GeoGridMap({ results, centerLat, centerLng, isLoading, s
       }
       setMapLoaded(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- init carte au montage : centerLat/Lng ne servent qu'au centre initial, le recentrage vit dans l'effet flyTo ci-dessous
   }, []);
 
   // Update center when config changes

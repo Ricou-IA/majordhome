@@ -18,9 +18,7 @@ import {
   X,
   ChevronDown,
   CheckCircle2,
-  Loader2,
   FileText,
-  RefreshCw,
   Archive,
 } from 'lucide-react';
 import { ContractCard, ContractCardSkeleton } from './ContractCard';
@@ -116,7 +114,6 @@ const FilterDropdown = ({ label, icon: Icon, value, options, onChange }) => {
 
 export function ContractsList({
   contracts,
-  totalCount,
   isLoading,
   loadingMore,
   hasMore,

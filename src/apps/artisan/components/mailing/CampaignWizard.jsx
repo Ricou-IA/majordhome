@@ -528,10 +528,6 @@ function StepGenerate({ form, update, promptText, jsonText, copyToClipboard }) {
 
 const inputClass = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500';
 
-function Row({ children }) {
-  return <div className="grid sm:grid-cols-2 gap-4">{children}</div>;
-}
-
 function SelectWithCustom({ value, onChange, options, placeholder }) {
   const isPreset = options.includes(value);
   const [showCustom, setShowCustom] = useState(!isPreset && !!value);

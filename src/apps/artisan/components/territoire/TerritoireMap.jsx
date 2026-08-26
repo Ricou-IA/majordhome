@@ -145,6 +145,7 @@ export default function TerritoireMap({
       mapRef.current = null;
       setMapLoaded(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- init carte au montage : initialCenter/initialZoom/settings ne servent qu'aux valeurs initiales
   }, []);
 
   // ========================================================================
@@ -159,7 +160,7 @@ export default function TerritoireMap({
     markersRef.current = [];
 
     // P0.19 — centres territoriaux depuis settings org (fallback {} si non configuré)
-    Object.entries(orgCenters).forEach(([key, center]) => {
+    Object.entries(orgCenters).forEach(([_key, center]) => {
       // Créer l'élément HTML du marqueur
       const el = document.createElement('div');
       el.className = 'territoire-center-marker';

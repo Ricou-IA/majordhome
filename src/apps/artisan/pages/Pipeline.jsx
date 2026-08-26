@@ -54,7 +54,7 @@ const getProfileForDashboard = (profile, organization, effectiveRole) => {
 // ============================================================================
 
 export default function Pipeline() {
-  const { profile, user, organization, loading: authLoading, effectiveRole } =
+  const { profile, organization, loading: authLoading, effectiveRole } =
     useAuth();
   const { can } = useCanAccess();
 
@@ -81,9 +81,11 @@ export default function Pipeline() {
   }, [searchParams, setSearchParams]);
 
   // Dashboard data
+  const profileKey = profile?.id ?? profile?.user_id;
   const dashboardProfile = useMemo(
     () => getProfileForDashboard(profile, organization, effectiveRole),
-    [profile?.id ?? profile?.user_id, profile?.app_role, profile?.business_role, organization?.id, effectiveRole],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mémo volontaire sur les champs consommés : l'identité des objets profile/organization (AuthContext) est instable et dashboardProfile pilote le fetch du dashboard
+    [profileKey, profile?.app_role, profile?.business_role, organization?.id, effectiveRole],
   );
   const { filters, updateMonths, updateSourceIds, resetFilters } =
     useDashboardFilters();

@@ -16,7 +16,6 @@ import { EQUIPMENT_CATEGORY_LABELS } from '../constants';
 export function StepSignature({
   formData,
   client,
-  certificatId,
   onSign,
   onGeneratePdf,
   isSigning,

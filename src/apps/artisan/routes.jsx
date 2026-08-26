@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier de routes : wrappers locaux + export de config, l'édition recharge l'app entière, fast refresh sans objet */
 import { lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';

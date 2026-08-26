@@ -8,6 +8,7 @@
  * Exporté : generatePvReceptionPdfBlob(data) → Blob
  * ============================================================================
  */
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 
 import {
   Document,

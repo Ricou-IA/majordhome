@@ -9,7 +9,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers, useSupplierMutations, useSupplierProducts, useProductMutations } from '@hooks/useSuppliers';
-import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@services/suppliers.service';
+import { PRODUCT_CATEGORIES } from '@services/suppliers.service';
 import { suppliersService } from '@services/suppliers.service';
 import { TVA_RATES } from '@services/devis.service';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea, SectionTitle } from '../../components/FormFields';
@@ -28,7 +28,6 @@ import {
   Loader2,
   Upload,
   FileSpreadsheet,
-  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';

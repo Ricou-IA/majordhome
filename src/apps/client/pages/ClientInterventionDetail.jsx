@@ -11,7 +11,7 @@ import { useIntervention, useInterventionFileUrls } from '@hooks/useIntervention
 import { useCertificat } from '@hooks/useCertificats';
 import { certificatsService } from '@services/certificats.service';
 import {
-  ArrowLeft, Calendar, User, Wrench, Clock, FileText,
+  ArrowLeft, Calendar, User, Wrench, Clock,
   CheckCircle2, Download, Loader2, Image as ImageIcon,
 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
@@ -26,7 +26,7 @@ export default function ClientInterventionDetail() {
   const { id } = useParams();
   const { intervention, equipment, isLoading } = useIntervention(id);
   const { certificat, isLoading: certLoading } = useCertificat(id);
-  const { photoBeforeUrl, photoAfterUrl, signatureUrl } = useInterventionFileUrls(intervention);
+  const { photoBeforeUrl, photoAfterUrl } = useInterventionFileUrls(intervention);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   if (isLoading) {

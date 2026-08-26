@@ -22,7 +22,7 @@ import { POELE_FUEL_TYPES, supportsEnrichment } from '@/shared/specs';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   X, Loader2, Save, FileSliders, Image as ImageIcon,
-  Layers, FileText, User, Sparkles, Eye, EyeOff, Link2, Package,
+  Layers, FileText, User, Sparkles, Eye, EyeOff, Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, TextInput, SelectInput, TextArea } from '../../components/FormFields';
@@ -59,7 +59,7 @@ const EMPTY_FORM = {
 
 
 export default function ProductDetailDrawer({ productId, supplierId, orgId, onClose }) {
-  const { user } = useAuth();
+  useAuth();
   const { product, isLoading } = useProductDetail(productId);
   const [form, setForm] = useState(EMPTY_FORM);
   const [specs, setSpecs] = useState({ canonical: {}, extras: [] });

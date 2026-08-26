@@ -12,7 +12,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Plus, X, Loader2, Info, Package, Link2 } from 'lucide-react';
+import { Plus, X, Loader2, Info, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSupplierProducts, useAccessoriesForProduct } from '@hooks/useSuppliers';
 import { suppliersService } from '@services/suppliers.service';
@@ -45,7 +45,7 @@ function AccessoryView({ product, orgId }) {
     search,
   });
 
-  const currentIds = product.compatible_with_ids || [];
+  const currentIds = useMemo(() => product.compatible_with_ids || [], [product.compatible_with_ids]);
   const currentProducts = useMemo(() => allMain.filter((p) => currentIds.includes(p.id)), [allMain, currentIds]);
   const candidates = useMemo(() => allMain.filter((p) => !currentIds.includes(p.id)), [allMain, currentIds]);
 

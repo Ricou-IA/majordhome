@@ -106,7 +106,7 @@ export function LongTermLeadDrawer({
   const leadId = lead?.id;
 
   const { interactions, isLoading: loadingInteractions, refresh: refreshInteractions } = useLeadInteractions(leadId);
-  const { createInteraction, deleteInteraction, isCreating, isDeleting } = useLeadInteractionMutations();
+  const { createInteraction, deleteInteraction, isCreating } = useLeadInteractionMutations();
   const { reactivateFromLongTerm, isReactivating } = useLongTermMutations();
   const { updateLeadStatus, isChangingStatus } = useLeadMutations();
   const { statuses } = useLeadStatuses();

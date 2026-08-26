@@ -8,6 +8,7 @@
  * Exporté : generateContractPdfBlob(data) → Blob
  * ============================================================================
  */
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 
 import {
   Document,
@@ -312,11 +313,6 @@ const fmtDate = (d) => {
   }
 };
 
-const MONTHS_FR = [
-  '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
-
 // ============================================================================
 // DOCUMENT
 // ============================================================================
@@ -344,8 +340,6 @@ function ContractDocument({ data, company }) {
     : DEFAULT_LEGAL_FOOTER;
   const {
     contractNumber,
-    startDate,
-    maintenanceMonth,
     clientName,
     clientAddress,
     clientPostalCode,
@@ -358,7 +352,6 @@ function ContractDocument({ data, company }) {
     discountAmount,
     extraDiscountAmount = 0,
     total,
-    zoneName,
     notes,
     signatureBase64,
     signataireNom,

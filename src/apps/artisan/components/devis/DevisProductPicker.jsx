@@ -58,6 +58,20 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
     setStep('gamme');
   }, [category]);
 
+  // Charger produits filtrés
+  const loadProducts = useCallback(async (gamme, diametre) => {
+    if (diametre !== undefined) setSelectedDiametre(diametre);
+    setLoading(true);
+    const { data } = await suppliersService.getFilteredProducts(
+      selectedSupplier.id,
+      { gamme: gamme || selectedGamme, diametre: diametre, category }
+    );
+    setProducts(data || []);
+    setQuantities({});
+    setLoading(false);
+    setStep('products');
+  }, [selectedSupplier, selectedGamme, category]);
+
   // Charger diamètres quand gamme sélectionnée
   const loadDiametres = useCallback(async (gamme) => {
     setSelectedGamme(gamme);
@@ -71,21 +85,7 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
     } else {
       setStep('diametre');
     }
-  }, [selectedSupplier, category]);
-
-  // Charger produits filtrés
-  const loadProducts = useCallback(async (gamme, diametre) => {
-    if (diametre !== undefined) setSelectedDiametre(diametre);
-    setLoading(true);
-    const { data } = await suppliersService.getFilteredProducts(
-      selectedSupplier.id,
-      { gamme: gamme || selectedGamme, diametre: diametre, category }
-    );
-    setProducts(data || []);
-    setQuantities({});
-    setLoading(false);
-    setStep('products');
-  }, [selectedSupplier, selectedGamme]);
+  }, [selectedSupplier, category, loadProducts]);
 
   // Gestion quantités
   const setQty = (productId, qty) => {

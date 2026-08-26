@@ -74,7 +74,7 @@ export default function InterventionDetail() {
   const [signedByName, setSignedByName] = useState('');
 
   // État PDF
-  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfUrl] = useState(null);
   const [pdfError, setPdfError] = useState(null);
 
   // État modal SAV
@@ -306,7 +306,6 @@ export default function InterventionDetail() {
 
   // Vérifier la complétion pour le bouton "Envoyer"
   const hasReport = !!(formData.work_performed);
-  const hasPhotos = !!(intervention?.photo_before_url || intervention?.photo_after_url);
   const hasSignature = !!intervention?.signature_url;
   const canSend = hasReport && hasSignature;
 

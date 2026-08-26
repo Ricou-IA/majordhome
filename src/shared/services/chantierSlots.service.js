@@ -11,7 +11,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
+import { withErrorHandling } from '@/lib/serviceHelpers';
 
 export const chantierSlotsService = {
   /**

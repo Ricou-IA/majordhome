@@ -62,7 +62,7 @@ export default function PvReceptionSign() {
   const queryClient = useQueryClient();
   const { user, organization } = useAuth();
   const orgId = organization?.id;
-  const company = buildCompanyInfo(organization?.settings);
+  const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
 
   // -- Données --
   const { chantier, isLoading } = useChantier(leadId);
@@ -177,7 +177,7 @@ export default function PvReceptionSign() {
     } finally {
       setIsSaving(false);
     }
-  }, [chantier, canSubmit, isSaving, clientName, amount, receptionType, reservesNature, reservesTravaux, infoRecues, noticesRecues, entretienRecues, sigClientBase64, sigClientNom, sigTechBase64, sigTechNom, queryClient, navigate]);
+  }, [chantier, canSubmit, isSaving, clientName, amount, receptionType, reservesNature, reservesTravaux, infoRecues, noticesRecues, entretienRecues, sigClientBase64, sigClientNom, sigTechBase64, sigTechNom, queryClient, navigate, company, orgId]);
 
   // -- Loading --
   if (isLoading) {

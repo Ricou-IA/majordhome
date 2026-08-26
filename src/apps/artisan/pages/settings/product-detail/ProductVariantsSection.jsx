@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { Plus, Trash2, Copy, Loader2, Save } from 'lucide-react';
+import { Plus, Trash2, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProductVariants } from '@hooks/useSuppliers';
 import { suppliersService } from '@services/suppliers.service';

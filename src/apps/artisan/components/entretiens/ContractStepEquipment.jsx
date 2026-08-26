@@ -25,7 +25,7 @@ import { EQUIPMENT_TYPE_CATEGORIES } from '@services/pricing.service';
 // ============================================================================
 
 export function Step2Equipment({ pricingData, calculator, clientAddress }) {
-  const { equipmentTypes, zones, isLoading: loadingPricing, error: pricingError } = pricingData;
+  const { equipmentTypes, isLoading: loadingPricing, error: pricingError } = pricingData;
   const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity, isDetectingZone, durationMinutes, hqLabel } = calculator;
   const zoneSupplement = parseFloat(activeZone?.supplement || 0);
 

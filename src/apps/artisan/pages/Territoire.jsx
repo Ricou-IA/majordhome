@@ -140,7 +140,7 @@ export default function Territoire() {
   // HANDLERS
   // ========================================================================
 
-  const handlePointClick = useCallback((point) => {
+  const handlePointClick = useCallback((_point) => {
   }, []);
 
   const handleZoneClick = useCallback(() => {

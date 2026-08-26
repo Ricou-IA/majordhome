@@ -9,7 +9,7 @@
 import { Component } from 'react';
 import { useDevisByLead } from '@hooks/useDevis';
 
-import { formatEuro, formatDateFR } from '@/lib/utils';
+import { formatEuro } from '@/lib/utils';
 import { FileText, Plus, ChevronRight, Loader2, Send } from 'lucide-react';
 
 // Error boundary pour isoler les erreurs

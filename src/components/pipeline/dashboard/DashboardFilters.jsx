@@ -88,13 +88,6 @@ const MonthPicker = ({ selectedMonths, onChange }) => {
     setDragEnd(null);
   };
 
-  // Clic simple (mouseDown + mouseUp sur le même mois sans drag)
-  const handleClick = (index, isFuture) => {
-    if (isFuture) return;
-    // Si on a dragué sur plusieurs mois, handleMouseUp a déjà géré
-    // Ce handler ne se déclenche que pour un clic simple (pas de drag)
-  };
-
   return (
     <div
       className="w-[280px] select-none"

@@ -8,7 +8,6 @@
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { FormField, TextArea, SelectInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
-import { TVA_OPTIONS, SECTIONS_PAR_EQUIPEMENT, EQUIPMENT_CATEGORY_LABELS } from '../constants';
 
 const BILAN_OPTIONS = [
   {
@@ -44,7 +43,6 @@ const ACTION_CORRECTIVE_OPTIONS = [
 ];
 
 export function StepBilan({ formData, onChange }) {
-  const config = SECTIONS_PAR_EQUIPEMENT[formData.equipement_type] || SECTIONS_PAR_EQUIPEMENT.autre;
   const showAnomalie = formData.bilan_conformite === 'anomalie' || formData.bilan_conformite === 'arret_urgence';
 
   return (

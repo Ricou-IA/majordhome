@@ -63,7 +63,7 @@ const TYPE_LABELS = {
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpenClient, onOpenCertificats }) {
+export function EntretienSAVModal({ item, onClose, onUpdated }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useAuth();
@@ -174,7 +174,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
   const typeConfig = TYPE_LABELS[type] || TYPE_LABELS.entretien;
   const statusConfig = getStatusConfig(type, item.workflow_status);
   const canEditSAV = can('sav', 'edit') || can('entretiens', 'edit');
-  const canCreateSAV = can('sav', 'create');
+  const _canCreateSAV = can('sav', 'create');
 
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
 
@@ -312,21 +312,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     }
   };
 
-  const handleCreateSAVFromEntretien = () => {
-    onCreateSAV?.({
-      clientId: item.client_id,
-      client: {
-        id: item.client_id,
-        display_name: item.client_name,
-        postal_code: item.client_postal_code,
-        city: item.client_city,
-        project_id: item.project_id,
-        has_active_contract: !!contractId,
-      },
-      contractId,
-    });
-  };
-
   // Toggle "Réaliser Entretien" — tag la carte + ajoute/retire montant contrat au devis
   const handleToggleEntretien = () => {
     const contractAmount = Number(item.contract_amount) || 0;
@@ -409,10 +394,6 @@ export function EntretienSAVModal({ item, onClose, onUpdated, onCreateSAV, onOpe
     if (!col) return true;
     return KANBAN_COLUMNS.indexOf(col) > currentOrder;
   });
-
-  // Afficher le bouton certificat si entretien (ou SAV+entretien) planifié ou réalisé
-  const hasEntretien = type === 'entretien' || (type === 'sav' && item.includes_entretien);
-  const showCertificatButton = hasEntretien && (item.workflow_status === 'planifie' || item.workflow_status === 'realise');
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8">

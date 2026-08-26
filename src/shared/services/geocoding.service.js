@@ -166,7 +166,6 @@ export async function batchGeocodeClients(clients, onProgress) {
   const results = { success: 0, failed: 0, errors: [] };
   const BATCH_SIZE = 15; // Petit batch pour éviter les timeouts
   const DELAY_MS = 500;  // Pause entre batches
-  const FETCH_TIMEOUT = 15000; // 15s timeout par requête CSV
 
   for (let i = 0; i < clients.length; i += BATCH_SIZE) {
     const batch = clients.slice(i, i + BATCH_SIZE);

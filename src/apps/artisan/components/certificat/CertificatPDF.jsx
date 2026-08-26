@@ -5,6 +5,7 @@
  * Palette Mayer Énergie : bleu #1B4F72, orange #E67E22.
  * ============================================================================
  */
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 
 import {
   Document,
@@ -18,7 +19,6 @@ import {
 import {
   EQUIPMENT_CATEGORY_LABELS,
   CONTROLES_SECURITE_ITEMS,
-  NETTOYAGE_ITEMS,
   MESURES_PAR_TYPE,
   SECTIONS_PAR_EQUIPEMENT,
   getNettoyageItems,

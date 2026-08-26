@@ -11,7 +11,7 @@
  * ============================================================================
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { permissionsService } from '@services/permissions.service';

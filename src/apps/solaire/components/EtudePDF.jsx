@@ -17,6 +17,7 @@
  * Socle partagé : etude/pdfShared.jsx (palette, formatters, header, footer, accent).
  * ============================================================================
  */
+/* eslint-disable react-refresh/only-export-components -- react-pdf : jamais monté dans le DOM, le fast refresh ne s'applique pas */
 import { Document, pdf } from '@react-pdf/renderer';
 import { CoverPage } from './etude/CoverPage';
 import { SynthesePage } from './etude/SynthesePage';

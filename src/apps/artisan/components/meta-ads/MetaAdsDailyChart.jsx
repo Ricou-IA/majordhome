@@ -20,7 +20,7 @@ const EVENT_STYLES = {
 
 function formatTick(dateStr) {
   if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
+  const [, m, d] = dateStr.split('-');
   return `${d}/${m}`;
 }
 

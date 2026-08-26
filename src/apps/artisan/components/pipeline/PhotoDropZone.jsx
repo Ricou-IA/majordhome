@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { Camera, Trash2, Loader2, Upload, X, ImagePlus } from 'lucide-react';
+import { Trash2, Loader2, Upload, X, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
  * @param {number} props.maxFiles - Nombre max de photos (défaut 5)
  */
 export function PhotoDropZone({
-  category,
   label,
   photos = [],
   onUpload,

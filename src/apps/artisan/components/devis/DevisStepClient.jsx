@@ -2,7 +2,7 @@
  * DevisStepClient.jsx — Étape 1 du wizard : infos client + objet
  */
 
-import { FormField, TextInput, TextArea } from '../../components/FormFields';
+import { FormField, TextInput } from '../../components/FormFields';
 import { User, MapPin, Phone, Mail } from 'lucide-react';
 
 export default function DevisStepClient({ lead, form, setField }) {

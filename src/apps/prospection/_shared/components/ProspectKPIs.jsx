@@ -2,7 +2,7 @@
  * ProspectKPIs.jsx — Cartes KPI pour le module Prospection
  */
 
-import { Users, Star, Phone, TrendingUp, ArrowRight, UserCheck } from 'lucide-react';
+import { Users, Star, Phone, TrendingUp, UserCheck } from 'lucide-react';
 
 const CEDANTS_KPIS = [
   { key: 'total', label: 'Total prospects', icon: Users, color: 'bg-[#2196F3]' },

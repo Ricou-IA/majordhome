@@ -26,7 +26,7 @@ function genUUID() {
 }
 
 export default function VoiceRecorder() {
-  const { user, organization, profile } = useAuth();
+  const { user, organization } = useAuth();
   const {
     isRecording, isSupported, durationSeconds, audioBlob, audioUrl,
     error: recError, start, stop, reset,

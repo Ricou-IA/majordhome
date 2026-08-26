@@ -50,7 +50,6 @@ export function useLeads({ orgId, limit = 25 } = {}) {
     data,
     isLoading,
     error,
-    refetch,
     isFetching,
   } = useQuery({
     queryKey: leadKeys.list(orgId, { ...filters, offset, limit }),

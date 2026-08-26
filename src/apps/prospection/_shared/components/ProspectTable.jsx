@@ -66,8 +66,6 @@ export default function ProspectTable({
   isLoading,
   onRowClick,
   onSort,
-  sortField,
-  sortAsc,
 }) {
   const handleSort = (field) => {
     if (onSort) onSort(field);

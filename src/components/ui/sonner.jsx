@@ -18,4 +18,5 @@ const Toaster = ({ ...props }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- ré-export du toast sonner avec son Toaster, indissociables
 export { Toaster, toast };

@@ -11,13 +11,13 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle, FileText, CheckCircle2, Archive, Clock, MapPin, Phone } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Archive, Clock, MapPin, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { contractKeys } from '@hooks/cacheKeys';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
 import { supabase } from '@/lib/supabaseClient';
-import { formatEuroCeil, formatDateShortFR } from '@/lib/utils';
+import { formatEuroCeil } from '@/lib/utils';
 
 // ============================================================================
 // STAT CARD (léger, inline)
@@ -101,7 +101,7 @@ function useContractStats(orgId) {
 // ============================================================================
 
 function useContractsPipeline(orgId) {
-  const { data, isLoading, error, refetch } = useQueryClient() ? {} : {};
+  useQueryClient();
 
   // Query directe pour simplicité
   const [contracts, setContracts] = useState([]);

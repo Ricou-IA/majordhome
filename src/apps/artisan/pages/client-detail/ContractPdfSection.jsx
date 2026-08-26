@@ -174,7 +174,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     } finally {
       setIsGenerating(false);
     }
-  }, [contract, isGenerating, buildPdfData]);
+  }, [contract, isGenerating, buildPdfData, company]);
 
   // Upload du contrat signé papier (scan/photo)
   const handleUploadSigned = useCallback(async (e) => {
@@ -310,7 +310,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
     } finally {
       setIsSending(false);
     }
-  }, [contract, client, clientId, orgId, computedPricing, billableTotal, isSending, buildPdfData, queryClient]);
+  }, [contract, client, clientId, orgId, computedPricing, billableTotal, isSending, buildPdfData, queryClient, company]);
 
   const isSigned = !!contract.signed_at;
   const hasPdf = !!contract.contract_pdf_path;

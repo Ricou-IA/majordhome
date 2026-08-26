@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, MapPin, Loader2, FileCheck } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, MapPin, Loader2 } from 'lucide-react';
 import { CRM_POINT_TYPES, CONTRACT_COLOR } from '@/lib/territoire-config';
 
 export default function MapControls({

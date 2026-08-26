@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { X, Loader2, Lock, Unlock, FileText, Download } from 'lucide-react';
+import { X, Loader2, Lock, FileText, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,7 +95,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
 
   // Données
   const { visit, isLoading, refresh } = useTechnicalVisit(lead?.id);
-  const { photos, refresh: refreshPhotos } = useTechnicalVisitPhotos(visit?.id);
+  const { photos } = useTechnicalVisitPhotos(visit?.id);
   const { commercials } = useLeadCommercials(orgId);
 
   // Résoudre le nom du commercial assigné au lead
@@ -106,18 +106,13 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
   }, [lead?.assigned_user_id, commercials]);
   const {
     createVisit,
-    updateVisit,
     autoSave,
-    lockVisit,
     unlockVisit,
     uploadPhoto,
     deletePhoto,
     isCreating,
     isSaving,
-    isLocking,
     isUnlocking,
-    isUploadingPhoto,
-    isDeletingPhoto,
   } = useTechnicalVisitMutations();
 
   // État local
@@ -299,7 +294,7 @@ export function FicheTechniqueModal({ lead, isOpen, onClose }) {
     setIsGeneratingPdf(true);
     try {
       // Lazy import pour ne pas alourdir le bundle
-      const { pdf, createElement } = await import('@react-pdf/renderer');
+      const { pdf } = await import('@react-pdf/renderer');
       const { default: React } = await import('react');
       const { FicheTechniquePdf } = await import('./FicheTechniquePdf');
 

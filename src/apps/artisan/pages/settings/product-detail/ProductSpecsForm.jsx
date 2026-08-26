@@ -22,10 +22,10 @@ import { inputClass } from '../../../components/FormFields';
 
 export default function ProductSpecsForm({ category, fuelType, value, onChange }) {
   const schema = getSchemaForCategory(category);
-  const canonical = value?.canonical || {};
-  const extras = value?.extras || [];
+  const canonical = useMemo(() => value?.canonical || {}, [value]);
+  const extras = useMemo(() => value?.extras || [], [value]);
 
-  const { groupedFields, filterByFuelType, groupFields } = useMemo(() => {
+  const { groupedFields } = useMemo(() => {
     if (!schema) return { groupedFields: [], filterByFuelType: null, groupFields: null };
     const fields = schema.filterByFuelType(fuelType);
     const groups = schema.groupFields(fields);

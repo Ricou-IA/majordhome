@@ -1,11 +1,9 @@
 import { useState, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgMembers } from '@hooks/usePermissions';
 import { useTaskMutations } from '@hooks/useTasks';
-import { ROLE_LABELS } from '@lib/permissions';
 import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
 import {
   Plus,
@@ -19,7 +17,6 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   ChevronDown,
   Building2,
   User,
@@ -65,7 +62,7 @@ const navigation = [
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, profile, organization, membership, effectiveRole, signOut } = useAuth();
+  const { user, profile, organization, effectiveRole, signOut } = useAuth();
   const { can } = useCanAccess();
 
   // État sidebar mobile

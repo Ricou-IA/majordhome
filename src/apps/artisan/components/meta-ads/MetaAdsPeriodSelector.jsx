@@ -7,6 +7,7 @@ const PRESETS = [
   { key: 'all', label: 'Tout', days: null },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components -- helper pur co-localisé avec son sélecteur (consommé par MetaAds.jsx)
 export function computeRange(presetKey, customStart, customEnd) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

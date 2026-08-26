@@ -19,7 +19,6 @@ import {
   View,
   Image,
   StyleSheet,
-  Font,
 } from '@react-pdf/renderer';
 import {
   BUILDING_TYPES,

@@ -105,6 +105,16 @@ export function EntretienSAVKanban() {
   // HANDLERS — DRAG & DROP
   // =========================================================================
 
+  const handleDirectTransition = useCallback(async (item, newStatus) => {
+    try {
+      await updateWorkflowStatus(item.id, newStatus);
+      toast.success('Statut mis à jour');
+      refresh();
+    } catch {
+      toast.error('Erreur de transition');
+    }
+  }, [updateWorkflowStatus, refresh]);
+
   const handleDragEnd = useCallback((result) => {
     const { draggableId, source, destination } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
@@ -137,17 +147,7 @@ export function EntretienSAVKanban() {
     } else {
       handleDirectTransition(item, newStatus);
     }
-  }, [roleFilteredItems]);
-
-  const handleDirectTransition = useCallback(async (item, newStatus) => {
-    try {
-      await updateWorkflowStatus(item.id, newStatus);
-      toast.success('Statut mis à jour');
-      refresh();
-    } catch {
-      toast.error('Erreur de transition');
-    }
-  }, [updateWorkflowStatus, refresh]);
+  }, [roleFilteredItems, handleDirectTransition]);
 
   const handleCancelTransition = useCallback(() => {
     setPendingTransition(null);
@@ -157,7 +157,7 @@ export function EntretienSAVKanban() {
   // HANDLERS — MODALES DE TRANSITION
   // =========================================================================
 
-  const handleConfirmQuote = useCallback(async ({ amount, date }) => {
+  const handleConfirmQuote = useCallback(async ({ amount, date: _date }) => {
     if (!pendingTransition) return;
     setTransitionLoading(true);
     try {
@@ -175,7 +175,7 @@ export function EntretienSAVKanban() {
     }
   }, [pendingTransition, updateFields, updateWorkflowStatus, refresh]);
 
-  const handleConfirmAcceptQuote = useCallback(async ({ date }) => {
+  const handleConfirmAcceptQuote = useCallback(async ({ date: _date }) => {
     if (!pendingTransition) return;
     setTransitionLoading(true);
     try {

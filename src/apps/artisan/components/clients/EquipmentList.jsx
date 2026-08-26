@@ -14,7 +14,7 @@
  * ============================================================================
  */
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Wrench,
   Flame,
@@ -205,14 +205,12 @@ const EquipmentCard = ({
   const [showMenu, setShowMenu] = useState(false);
 
   const {
-    id,
     equipment_type,
     brand,
     model,
     serial_number,
     installation_date,
     warranty_end_date,
-    contract_status,
     last_maintenance_date,
     next_maintenance_date,
     notes,

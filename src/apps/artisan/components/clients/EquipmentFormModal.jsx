@@ -34,7 +34,7 @@
  * ============================================================================
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
 import { usePricingEquipmentTypes } from '@hooks/useClients';
 import { useSuppliers, useAllProducts } from '@hooks/useSuppliers';

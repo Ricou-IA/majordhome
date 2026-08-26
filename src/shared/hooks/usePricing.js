@@ -11,7 +11,7 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   pricingService,
@@ -404,10 +404,9 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
   const [asyncZone, setAsyncZone] = useState(null);
   const [isDetectingZone, setIsDetectingZone] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(null);
-  const detectAbortRef = useRef(null);
 
+  const { address, postalCode, city } = clientAddress;
   useEffect(() => {
-    const { address, postalCode, city } = clientAddress;
     if (!postalCode || !zones?.length) {
       setAsyncZone(null);
       setDurationMinutes(null);
@@ -429,7 +428,7 @@ export function usePricingCalculator(pricingData, clientAddressOrPostalCode) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [clientAddress.address, clientAddress.postalCode, clientAddress.city, zones, orgHq]);
+  }, [address, postalCode, city, zones, orgHq]);
 
   // Zone effective : async (Mapbox) > sync (département) > manual override
   const detectedZone = asyncZone || syncZone;

@@ -314,7 +314,7 @@ export default function ContractSign() {
     } finally {
       setIsSaving(false);
     }
-  }, [contract, signatureBase64, signataireNom, isSaving, client, presentation, activeZone, queryClient]);
+  }, [contract, signatureBase64, signataireNom, isSaving, client, presentation, activeZone, queryClient, clientId, company, navigate, orgId]);
 
   // -- Loading --
   const isLoading = loadingClient || loadingContract || loadingEquipments || loadingPricing;
