@@ -25,6 +25,8 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { formatPhoneForSearch } from '@/lib/phoneUtils';
+import { buildDuplicateProbe, matchLeadDuplicates } from '@/lib/leadDuplicateMatch';
 import { clientsService } from '@services/clients.service';
 import { technicalVisitService } from '@services/technicalVisit.service';
 
@@ -877,6 +879,57 @@ export const leadsService = {
         display_name: `${l.last_name || ''} ${l.first_name || ''}`.trim(),
       }));
     }, 'leads.getRecentPipelineCards');
+  },
+
+  // ==========================================================================
+  // Filet anti-doublon à la création (kanban « Nouveau lead » + walk-in Planning)
+  // Requête large sur 3 axes (téléphone avec/sans espaces, email, nom+prénom),
+  // puis CONFIRMATION par le module pur leadDuplicateMatch (élimine les faux
+  // positifs du ILIKE, annote matchReasons pour le dialogue).
+  // ==========================================================================
+  async findPotentialDuplicates({ orgId, phone, email, firstName, lastName }) {
+    if (!orgId) return { data: [], error: null };
+
+    const probe = buildDuplicateProbe({ phone, email, firstName, lastName });
+    if (!probe) return { data: [], error: null };
+
+    return withErrorHandling(async () => {
+      // P0.26 : chaque terme interpolé dans .or() passe par escapePostgrestSearchTerm.
+      const orClauses = [];
+      if (probe.phoneKey) {
+        // La base stocke majoritairement « 06 10 36 56 72 » ; on couvre aussi le brut.
+        const spaced = escapePostgrestSearchTerm(formatPhoneForSearch(probe.phoneKey) || '');
+        const raw = escapePostgrestSearchTerm(probe.phoneKey);
+        if (spaced) orClauses.push(`phone.ilike.%${spaced}%`);
+        if (raw) orClauses.push(`phone.ilike.%${raw}%`);
+      }
+      if (probe.emailKey) {
+        const term = escapePostgrestSearchTerm(probe.emailKey);
+        if (term) orClauses.push(`email.ilike.${term}`);
+      }
+      if (probe.nameKey) {
+        const first = escapePostgrestSearchTerm(probe.nameKey.first);
+        const last = escapePostgrestSearchTerm(probe.nameKey.last);
+        if (first && last) orClauses.push(`and(last_name.ilike.${last},first_name.ilike.${first})`);
+      }
+      if (!orClauses.length) return [];
+
+      const { data, error } = await supabase
+        .from('majordhome_leads')
+        .select('id, first_name, last_name, email, phone, city, status_label, status_color, source_name, created_at')
+        .eq('org_id', orgId)
+        .eq('is_deleted', false)
+        .or(orClauses.join(','))
+        .order('created_at', { ascending: false })
+        .limit(8);
+
+      if (error) throw error;
+
+      return matchLeadDuplicates(data || [], probe).map(l => ({
+        ...l,
+        display_name: `${l.last_name || ''} ${l.first_name || ''}`.trim(),
+      }));
+    }, 'leads.findPotentialDuplicates');
   },
 
   // ==========================================================================

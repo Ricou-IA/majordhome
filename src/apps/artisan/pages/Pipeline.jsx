@@ -196,6 +196,7 @@ export default function Pipeline() {
         onSaved={handleModalSaved}
         autoSchedule={autoSchedule}
         autoQuote={autoQuote}
+        onOpenLead={(id) => handleLeadClick({ id })}
       />
     </div>
   );

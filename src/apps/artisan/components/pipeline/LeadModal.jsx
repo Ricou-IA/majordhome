@@ -58,6 +58,7 @@ import { QuoteModal } from './QuoteModal';
 import { QuoteCandidatesModal } from './QuoteCandidatesModal';
 import { MarkWonQuoteModal } from './MarkWonQuoteModal';
 import { LinkedQuotesPanel } from './LinkedQuotesPanel';
+import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useLinkedPennylaneQuotes, usePennylaneClientSearch, useImportPennylaneCustomer } from '@hooks/usePennylane';
 import CreateDevisModal from '../devis/CreateDevisModal';
@@ -75,7 +76,7 @@ import { devisService } from '@services/devis.service';
  * @param {Function} props.onClose - Fermer
  * @param {Function} props.onSaved - Callback après save/create
  */
-export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false, autoQuote = false }) {
+export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false, autoQuote = false, onOpenLead = null }) {
   const isEditing = !!leadId;
   const { organization, user, effectiveRole } = useAuth();
   const { can, canEdit, isOwner } = useCanAccess();
@@ -84,6 +85,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const orgId = organization?.id;
   const userId = user?.id;
   const [isRequalifying, setIsRequalifying] = useState(false);
+  // Filet anti-doublon à la création : candidats actifs partageant téléphone/email/nom
+  const [duplicateCandidates, setDuplicateCandidates] = useState(null);
 
   // Données
   const { lead, isLoading: loadingLead } = useLead(isEditing ? leadId : null);
@@ -407,12 +410,30 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     client_id: linkedClient?.id || null,
   }), [form, linkedClient]);
 
-  const handleSave = async () => {
+  const handleSave = async (maybeDecision) => {
+    // Reprise après le dialogue doublon (l'event DOM d'un onClick n'a pas d'action)
+    const skipDupCheck = maybeDecision?.action === 'create';
     if (!form.last_name.trim()) {
       toast.error('Le nom de famille est requis');
       return;
     }
     try {
+      // Filet anti-doublon (création uniquement) : un lead actif partageant
+      // téléphone / email / nom+prénom doit être un choix explicite, pas un accident.
+      // Best-effort : une erreur de la recherche ne bloque pas la création.
+      if (!isEditing && !skipDupCheck) {
+        const dup = await leadsService.findPotentialDuplicates({
+          orgId,
+          phone: form.phone,
+          email: form.email,
+          firstName: form.first_name,
+          lastName: form.last_name,
+        });
+        if (dup.data?.length) {
+          setDuplicateCandidates(dup.data);
+          return;
+        }
+      }
       const payload = buildPayload();
       let savedLeadId = leadId;
       if (isEditing) {
@@ -1337,6 +1358,22 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           </p>
         </div>
       </ConfirmDialog>
+
+      {/* Filet anti-doublon à la création : ouvrir la carte existante ou créer quand même */}
+      <DuplicateLeadDialog
+        open={!!duplicateCandidates}
+        candidates={duplicateCandidates || []}
+        primaryActionLabel={onOpenLead ? 'Ouvrir cette carte' : null}
+        onPrimaryAction={onOpenLead ? (c) => {
+          setDuplicateCandidates(null);
+          onOpenLead(c.id);
+        } : null}
+        onCreateAnyway={() => {
+          setDuplicateCandidates(null);
+          handleSave({ action: 'create' });
+        }}
+        onCancel={() => setDuplicateCandidates(null)}
+      />
     </>
   );
 }

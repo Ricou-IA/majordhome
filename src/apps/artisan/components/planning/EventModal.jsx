@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
 import { SchedulingAssistant } from './scheduling/SchedulingAssistant';
+import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
 import {
   SectionType,
   SectionDateTime,
@@ -102,6 +103,9 @@ export function EventModal({
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  // Filet anti-doublon walk-in : { candidates, source: 'save'|'assistant'|'reschedule' }
+  // — candidats trouvés au moment de sauver + chemin de reprise après décision.
+  const [duplicatePrompt, setDuplicatePrompt] = useState(null);
   const navigate = useNavigate();
 
   // Hooks recherche client + lead (recherche unifiée)
@@ -497,17 +501,36 @@ export function EventModal({
   // silencieux : le seul prospect créé est le walk-in inconnu (Planning, ni
   // client ni lead, type commercial). Renvoie { leadId, interventionId, error }.
   // --------------------------------------------------------------------------
-  const resolveActivation = useCallback(async ({ rdvDate } = {}) => {
+  const resolveActivation = useCallback(async ({ rdvDate, dupDecision } = {}) => {
     const fallbackInterventionId = attachContext?.interventionId || null;
+
+    // Décision du filet anti-doublon : « lier » désamorce le walk-in, la carte du
+    // lead existant est résolue par le chemin standard resolveCardForAppointment.
+    const linkLeadId = dupDecision?.action === 'link' ? dupDecision.leadId : null;
 
     // Walk-in inconnu (Planning, ni client ni lead, type commercial) -> vrai prospect.
     // Restreint au R1 (rdv_technical/rdv_agency) : un Bouclage R2 ne fabrique JAMAIS
     // de prospect (il exige une carte existante, cf. isClosing).
-    const isWalkInProspect = !selectedClient && !selectedLead && !attachContext
+    const isWalkInProspect = !linkLeadId && !selectedClient && !selectedLead && !attachContext
       && COMMERCIAL_TYPES.includes(formData.appointment_type)
       && !isClosing;
 
     if (isWalkInProspect) {
+      // Filet anti-doublon : pas de création silencieuse si un lead actif partage
+      // téléphone / email / nom+prénom — le choix (lier / créer) revient à l'humain.
+      // Best-effort : une erreur de la recherche ne bloque pas la création.
+      if (dupDecision?.action !== 'create') {
+        const dup = await leadsService.findPotentialDuplicates({
+          orgId,
+          phone: formData.client_phone,
+          email: formData.client_email,
+          firstName: formData.client_first_name,
+          lastName: formData.client_name,
+        });
+        if (dup.data?.length) {
+          return { leadId: null, interventionId: null, error: 'duplicate', candidates: dup.data };
+        }
+      }
       const result = await leadsService.createLead({
         orgId,
         userId,
@@ -537,7 +560,7 @@ export function EventModal({
       userId,
       type: formData.appointment_type,
       clientId: selectedClient?.id || null,
-      leadId: selectedLead?.id || attachContext?.leadId || null,
+      leadId: linkLeadId || selectedLead?.id || attachContext?.leadId || null,
       interventionId: fallbackInterventionId,
     });
     if (resolved.error) {
@@ -582,7 +605,10 @@ export function EventModal({
   // Les types VT/entretien/SAV/install en création passent par l'assistant
   // intégré (handleCreateFromAssistant), bouton « Créer le RDV ».
   // --------------------------------------------------------------------------
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (maybeDecision) => {
+    // Reprise après le dialogue doublon (l'event DOM d'un onClick n'a pas d'action)
+    const dupDecision = maybeDecision?.action === 'link' || maybeDecision?.action === 'create'
+      ? maybeDecision : null;
     if (!validate()) return;
 
     let leadId = selectedLead?.id || attachContext?.leadId || null;
@@ -599,12 +625,20 @@ export function EventModal({
     let subject = formData.subject?.trim() || null;
 
     if (!isEdit) {
-      const act = await resolveActivation({ rdvDate: formData.scheduled_date });
+      const act = await resolveActivation({ rdvDate: formData.scheduled_date, dupDecision });
+      if (act.error === 'duplicate') {
+        setDuplicatePrompt({ candidates: act.candidates, source: 'save' });
+        return;
+      }
       if (reportActivationError(act.error)) return;
       leadId = act.leadId;
       interventionId = act.interventionId;
     } else if (typeChangedInEdit) {
-      const act = await resolveActivation({ rdvDate: formData.scheduled_date });
+      const act = await resolveActivation({ rdvDate: formData.scheduled_date, dupDecision });
+      if (act.error === 'duplicate') {
+        setDuplicatePrompt({ candidates: act.candidates, source: 'save' });
+        return;
+      }
       if (reportActivationError(act.error)) return;
       leadId = act.leadId;
       interventionId = act.interventionId;
@@ -668,7 +702,10 @@ export function EventModal({
   // createAppointment → syncCardStateOnCreate + sync Google par RDV, cycle Bloc A préservé).
   // Objet/notes/description viennent de la modale (SectionType/SectionNotes), pas de l'assistant.
   // --------------------------------------------------------------------------
-  const handleCreateFromAssistant = useCallback(async () => {
+  const handleCreateFromAssistant = useCallback(async (maybeDecision) => {
+    // Reprise après le dialogue doublon (l'event DOM d'un onClick n'a pas d'action)
+    const dupDecision = maybeDecision?.action === 'link' || maybeDecision?.action === 'create'
+      ? maybeDecision : null;
     if (assistantSlots.length === 0) {
       toast.error('Choisissez au moins un créneau');
       return;
@@ -687,7 +724,12 @@ export function EventModal({
     }
     setBatchSaving(true);
     try {
-      const act = await resolveActivation({ rdvDate: assistantSlots[0]?.date });
+      const act = await resolveActivation({ rdvDate: assistantSlots[0]?.date, dupDecision });
+      if (act.error === 'duplicate') {
+        setDuplicatePrompt({ candidates: act.candidates, source: 'assistant' });
+        setBatchSaving(false);
+        return;
+      }
       if (reportActivationError(act.error)) { setBatchSaving(false); return; }
 
       // VT depuis EventModal = commercial sélectionnable → le commercial choisi
@@ -756,7 +798,10 @@ export function EventModal({
   // et appointments.service refait le sync carte (reflux ancienne / avancée nouvelle).
   // Le drag & drop calendrier reste l'autre chemin (date/heure uniquement).
   // --------------------------------------------------------------------------
-  const handleRescheduleSave = useCallback(async () => {
+  const handleRescheduleSave = useCallback(async (maybeDecision) => {
+    // Reprise après le dialogue doublon (l'event DOM d'un onClick n'a pas d'action)
+    const dupDecision = maybeDecision?.action === 'link' || maybeDecision?.action === 'create'
+      ? maybeDecision : null;
     const slot = assistantSlots[0];
     if (!slot) {
       toast.error('Choisissez un créneau');
@@ -769,7 +814,12 @@ export function EventModal({
       let interventionId = appointment?.intervention_id || null;
 
       if (typeChanged) {
-        const act = await resolveActivation({ rdvDate: slot.date });
+        const act = await resolveActivation({ rdvDate: slot.date, dupDecision });
+        if (act.error === 'duplicate') {
+          setDuplicatePrompt({ candidates: act.candidates, source: 'reschedule' });
+          setBatchSaving(false);
+          return;
+        }
         if (reportActivationError(act.error)) {
           setBatchSaving(false);
           return;
@@ -822,6 +872,16 @@ export function EventModal({
     assistantSlots, formData, appointment, resolveActivation, reportActivationError,
     isCommercialType, onSave, orgId, queryClient,
   ]);
+
+  // Reprise après décision du dialogue doublon : relance le chemin d'origine
+  // avec la décision ({ action: 'link', leadId } ou { action: 'create' }).
+  const resumeDuplicate = useCallback((decision) => {
+    const source = duplicatePrompt?.source;
+    setDuplicatePrompt(null);
+    if (source === 'assistant') handleCreateFromAssistant(decision);
+    else if (source === 'reschedule') handleRescheduleSave(decision);
+    else handleSave(decision);
+  }, [duplicatePrompt, handleCreateFromAssistant, handleRescheduleSave, handleSave]);
 
   // Type config pour le badge coloré
   const typeConfig = useMemo(
@@ -1147,6 +1207,16 @@ export function EventModal({
           </div>
         )}
       </div>
+
+      {/* Filet anti-doublon walk-in : lier la carte existante ou créer quand même */}
+      <DuplicateLeadDialog
+        open={!!duplicatePrompt}
+        candidates={duplicatePrompt?.candidates || []}
+        primaryActionLabel="Lier le RDV à cette carte"
+        onPrimaryAction={(c) => resumeDuplicate({ action: 'link', leadId: c.id })}
+        onCreateAnyway={() => resumeDuplicate({ action: 'create' })}
+        onCancel={() => setDuplicatePrompt(null)}
+      />
     </>
   );
 }
