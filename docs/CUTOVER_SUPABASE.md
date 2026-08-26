@@ -61,7 +61,6 @@ Fournis automatiquement par Supabase, **rien à faire** : `SUPABASE_URL`, `SUPAB
 | `GSC_CLIENT_ID` / `GSC_CLIENT_SECRET` | 3 / 2 | copier | App OAuth Search Console |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 2 / 2 | copier | App OAuth Google Calendar — **distincte de GSC** |
 | `GOOGLE_PLACES_API_KEY` | 1 | copier | GeoGrid (projet GCP *Towercontrol*) |
-| `GOOGLE_SOLAR_API_KEY` | 1 | copier | Module Solaire |
 | `OPENAI_API_KEY` | 1 | copier | Whisper + fallback extraction voice |
 | `ANTHROPIC_API_KEY` | 1 | copier | Extraction voice |
 
@@ -110,7 +109,7 @@ Contrôle après bascule : `select jobname, schedule from cron.job`. Une edge d�
 
   | Projet GCP | Contient | Secret |
   |---|---|---|
-  | **Mayer Energie Automation** | *Maps Platform API Key* (créée le 06/07, 35 API autorisées) | `GOOGLE_SOLAR_API_KEY` |
+  | **Mayer Energie Automation** | *Maps Platform API Key* (créée le 06/07, 35 API autorisées) | ~~`GOOGLE_SOLAR_API_KEY`~~ — secret supprimé de Supabase le 2026-08-26 (retrait Google Solar). **La clé GCP elle-même n'a PAS été révoquée** : 35 API y sont autorisées, vérifier ses métriques d'usage dans la console avant de la supprimer |
   | | client OAuth *Majord'home Calendar Sync* (créé le 07/04, appli web) | `GOOGLE_CLIENT_ID` / `_SECRET` |
   | **Towercontrol** (`eric.pudebat@gmail.com`) | clé API GeoGrid | `GOOGLE_PLACES_API_KEY` |
   | | client OAuth Search Console | `GSC_CLIENT_ID` / `_SECRET` |
