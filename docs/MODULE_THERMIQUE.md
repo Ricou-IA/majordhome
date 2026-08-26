@@ -24,8 +24,7 @@ src/apps/thermique/
 ├── components/
 │   ├── wizard/       Step1Contexte · Step2EmprisePieces · Step4Resultats · PiecesTable
 │   │                 ResultatsPiecesGrid · PlanResultats · ComposeurParoiModal · MateriauPicker
-│   │                 CompositionFamille · PacSection · PanneauCoherence · UwHelperModal · CommuneSearch
-│   ├── canvas/       EmpriseCanvas.jsx (dessin du plan)
+│   │                 CompositionFamille · PacSection · UwHelperModal · CommuneSearch
 │   └── etude/        EtudeThermiquePDF · BilanPage · HypothesesPage · PacPage · PiecesSection · pdfShared
 └── data/             référentiels JSON (cf. § Données de référence)
 ```
