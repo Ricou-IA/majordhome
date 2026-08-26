@@ -10,7 +10,7 @@
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BarChart3, Columns3, Hourglass, Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -66,8 +66,19 @@ export default function Pipeline() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Onglet actif (supporte ?tab=kanban depuis le dashboard)
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
+
+  // Création directe depuis le Dashboard (?new=1) : ouvre la modale en création
+  // puis retire le param de l'URL pour éviter la réouverture au refresh/navigation
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setSelectedLeadId(null);
+    setModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Dashboard data
   const dashboardProfile = useMemo(

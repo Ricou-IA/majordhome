@@ -8,7 +8,7 @@
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -31,7 +31,6 @@ import {
   MapPin,
 } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
-import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
 
 // =============================================================================
 // HOOK — Données dashboard (KPIs + planning du jour)
@@ -222,9 +221,6 @@ export default function Dashboard() {
   const showQuotesKpi = isOrgAdmin && pennylaneActive;
   const { orphanCount, error: quotesError } = useQuotesExplorer({ enabled: showQuotesKpi });
 
-  // LeadModal state
-  const [showLeadModal, setShowLeadModal] = useState(false);
-
   // Alertes (scopées par rôle)
   const alerts = useMemo(() => {
     const list = [];
@@ -398,7 +394,7 @@ export default function Dashboard() {
               <div className="space-y-2">
                 <button
                   type="button"
-                  onClick={() => setShowLeadModal(true)}
+                  onClick={() => navigate('/pipeline?tab=kanban&new=1')}
                   className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-secondary-50 text-secondary-700 transition-colors"
                 >
                   <Plus className="w-4 h-4 text-blue-500" />
@@ -409,15 +405,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-      {/* LeadModal pour action rapide */}
-      {showLeadModal && (
-        <LeadModal
-          lead={null}
-          onClose={() => setShowLeadModal(false)}
-          onUpdated={() => setShowLeadModal(false)}
-        />
-      )}
     </div>
   );
 }
