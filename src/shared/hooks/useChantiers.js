@@ -10,8 +10,7 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@services/chantiers.service';
-import { interventionsService } from '@services/interventions.service';
-import { chantierKeys, interventionKeys } from '@hooks/cacheKeys';
+import { chantierKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -82,40 +81,6 @@ export function useChantierMutations() {
     onSuccess: invalidateChantiers,
   });
 
-  // Mutation : créer intervention parent
-  const createInterventionMutation = useMutation({
-    mutationFn: (params) =>
-      interventionsService.createChantierIntervention(params),
-    onSuccess: (_, variables) => {
-      invalidateChantiers();
-      queryClient.invalidateQueries({
-        queryKey: interventionKeys.byProject(orgId, variables.projectId),
-      });
-    },
-  });
-
-  // Mutation : créer un slot
-  const createSlotMutation = useMutation({
-    mutationFn: (params) =>
-      interventionsService.createInterventionSlot(params),
-    onSuccess: (_, variables) => {
-      invalidateChantiers();
-      queryClient.invalidateQueries({
-        queryKey: interventionKeys.slots(orgId, variables.parentId),
-      });
-    },
-  });
-
-  // Mutation : supprimer un slot
-  const deleteSlotMutation = useMutation({
-    mutationFn: (slotId) =>
-      interventionsService.deleteInterventionSlot(slotId),
-    onSuccess: () => {
-      invalidateChantiers();
-      queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
-    },
-  });
-
   // Mutation : upload PV de réception
   const pvMutation = useMutation({
     mutationFn: ({ leadId, file }) =>
@@ -140,18 +105,6 @@ export function useChantierMutations() {
       (leadId, notes) => notesMutation.mutateAsync({ leadId, notes }),
       [notesMutation]
     ),
-    createChantierIntervention: useCallback(
-      (params) => createInterventionMutation.mutateAsync(params),
-      [createInterventionMutation]
-    ),
-    createSlot: useCallback(
-      (params) => createSlotMutation.mutateAsync(params),
-      [createSlotMutation]
-    ),
-    deleteSlot: useCallback(
-      (slotId) => deleteSlotMutation.mutateAsync(slotId),
-      [deleteSlotMutation]
-    ),
     uploadPvReception: useCallback(
       (leadId, file) => pvMutation.mutateAsync({ leadId, file }),
       [pvMutation]
@@ -160,36 +113,8 @@ export function useChantierMutations() {
     // États
     isUpdatingStatus: statusMutation.isPending,
     isUpdatingOrder: orderMutation.isPending,
-    isCreatingIntervention: createInterventionMutation.isPending,
-    isCreatingSlot: createSlotMutation.isPending,
     isUploadingPv: pvMutation.isPending,
 
     invalidate: invalidateChantiers,
-  };
-}
-
-// ============================================================================
-// HOOK - useInterventionSlots
-// ============================================================================
-
-export function useInterventionSlots(parentId) {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: interventionKeys.slots(orgId, parentId),
-    queryFn: async () => {
-      const { data, error } = await interventionsService.getInterventionSlots(parentId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && !!parentId,
-    staleTime: 15_000,
-  });
-
-  return {
-    slots: data || [],
-    isLoading,
-    error,
-    refresh: refetch,
   };
 }

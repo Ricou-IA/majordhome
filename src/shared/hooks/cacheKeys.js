@@ -107,7 +107,6 @@ export const interventionKeys = {
   detail: (orgId, id) => [...interventionKeys.all(orgId), 'detail', id],
   fileUrls: (orgId, id) => [...interventionKeys.all(orgId), 'files', id],
   byProject: (orgId, projectId) => [...interventionKeys.all(orgId), 'project', projectId],
-  slots: (orgId, parentId) => [...interventionKeys.all(orgId), 'slots', parentId],
 };
 
 // --- Chantiers ---
@@ -115,19 +114,6 @@ export const chantierKeys = {
   all: (orgId) => ['chantiers', orgId],
   lists: (orgId) => [...chantierKeys.all(orgId), 'list'],
   list: (orgId) => [...chantierKeys.lists(orgId)],
-};
-
-// --- Chantier Receptions (réceptions ligne par ligne) ---
-export const chantierReceptionKeys = {
-  all: (orgId) => ['chantier-receptions', orgId],
-  byChantier: (orgId, chantierId) => [...chantierReceptionKeys.all(orgId), 'byChantier', chantierId],
-};
-
-// --- Chantier Slots (Phase 0 transitoire — supprimé en Phase 1) ---
-export const chantierSlotKeys = {
-  all: (orgId) => ['chantier-slots', orgId],
-  lists: (orgId) => [...chantierSlotKeys.all(orgId), 'list'],
-  list: (orgId, dateRange) => [...chantierSlotKeys.lists(orgId), dateRange],
 };
 
 // --- Prospects ---

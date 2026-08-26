@@ -41,7 +41,7 @@ Refonte du service de prise de RDV. **Principe unique** : un RDV (`appointments`
 
 ### Gotcha & reste à faire
 - **⚠️ Backfill entretien** : un RDV `maintenance` sans `intervention_id` ne veut PAS dire entretien non fait — il peut déjà être `realise`/`facture`. Un backfill ne gardant que `workflow_status NOT IN (realise,facture)` crée des doublons « planifié » pour des entretiens déjà faits. **Scope correct = RDV À VENIR uniquement** (régression vécue & corrigée le 2026-06-03 : 24 doublons supprimés).
-- **Reste (Bloc B stage 5)** : nettoyage des services orphelins post-convergence chantier (`chantierSlots.service.js`, `chantierSlotKeys`, `useInterventionSlots`, `getChantierInterventionByLeadId`, mutations `createChantierIntervention/createSlot/deleteSlot`) + DROP vue `intervention_slots` (5 slots historiques non migrés — décision Eric : repartir propre). À faire après validation prod.
+- **Bloc B stage 5** : nettoyage frontend FAIT (2026-08-26) — `chantierSlots.service.js`, `chantierSlotKeys`, `useInterventionSlots`, `getChantierInterventionByLeadId`, mutations `createChantierIntervention/createSlot/deleteSlot` et méthodes slots du service supprimés. **Reste côté DB** : DROP vue `majordhome_intervention_slots` (5 slots historiques non migrés — décision Eric : repartir propre).
 - Spec Bloc A : `docs/superpowers/specs/2026-06-03-rdv-kanban-unifie-bloc-a-design.md` · Plan : `docs/superpowers/plans/2026-06-03-rdv-kanban-unifie-bloc-a.md` · mémoire `project_refonte_rdv_kanban_bloc_a.md`.
 - Spec Bloc B (assistant créneaux multi-tech, à implémenter) : `docs/superpowers/specs/2026-06-03-rdv-kanban-assistant-creneaux-bloc-b-design.md` · Plan : `docs/superpowers/plans/2026-06-03-rdv-kanban-assistant-creneaux-bloc-b.md`.
 

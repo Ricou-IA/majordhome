@@ -44,7 +44,6 @@ Couche de liaison entre les chantiers du Kanban (`majordhome.leads`) et les devi
 - Pattern général : **Cron sans JWT user → appel API tierce direct. Filtrer orgs activées via `settings.<integration>.enabled` côté JS quand PostgREST ne suffit pas (jsonb imbriqué).**
 
 ### Composants frontend
-- `src/apps/artisan/components/chantiers/QuoteBlock.jsx` (257 LOC) — affiché sur **ChantierCard** (compact) + **ChantierModal** (détail). Liste les devis attachés, statut, montant, lien Pennylane.
 - `src/apps/artisan/components/pipeline/QuoteCandidatesModal.jsx` — modale multi-attach au pivot lead "Devis envoyé". Sections Suggestions (`useCandidateQuotesForLead`) + Exploration 60j (`useUnlinkedQuotes`).
 - `ChantierReceptionSection.jsx` — intègre les devis liés dans le flow de réception chantier.
 - **Branchement conditionnel** : si `usePennylaneEnabled()` true (lecture `settings.pennylane.enabled`) ET target="Devis envoyé" → `QuoteCandidatesModal`. Sinon flow MDH classique (`QuoteModal`). Préserve le mode 100% MDH pour les orgs sans Pennylane.
