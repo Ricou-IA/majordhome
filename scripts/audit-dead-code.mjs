@@ -89,6 +89,7 @@ function isReferenced(targetFile, allFiles) {
 const ALLOW_ORPHAN = new Set([
   'src/lib/logger.js',          // P1.7 — wrapper créé, migration au fil de l'eau
   'src/lib/permissionsRegistry.js', // Phase 1 — inerte (seed only) ; consommé par can() en Phase 3
+  'src/apps/solaire/lib/pvgisHourly.js', // cœur moteur autoconso horaire (testé scripts/pvgis-hourly.test.mjs) — branchement UI à venir
 ]);
 
 const allFiles = walk(SRC);

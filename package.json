@@ -43,7 +43,6 @@
         "date-fns": "^3.6.0",
         "exceljs": "^4.4.0",
         "geotiff": "^3.0.5",
-        "geotiff-geokeys-to-proj4": "^2024.4.13",
         "lucide-react": "^0.462.0",
         "mapbox-gl": "^3.19.1",
         "pdf-lib": "^1.17.1",
@@ -58,7 +57,6 @@
         "recharts": "^2.15.4",
         "sonner": "^1.7.4",
         "tailwind-merge": "^2.6.0",
-        "three": "^0.185.1",
         "vite-plugin-pwa": "^1.2.0",
         "zod": "^3.25.76"
     },
