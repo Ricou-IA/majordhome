@@ -1,7 +1,7 @@
 /**
  * AlertesTournees.jsx - Majord'home Artisan
  * ============================================================================
- * Les trois filets du module Tournées (spec §3.7 et §10) : sans eux, des
+ * Les quatre filets du module Tournées (spec §3.7 et §10) : sans eux, des
  * échecs deviennent des silences.
  *   - Journées sous-remplies qui approchent (J-7) : une graine isolée qui
  *     reste isolée jusqu'au jour J fait un aller-retour pour un seul client.
@@ -9,6 +9,13 @@
  *     que tout le monde ait son entretien (le mail n'en est pas une).
  *   - Équipements non typés : sans type, la durée est un fallback ; le
  *     compteur rend visible ce que le fallback masque.
+ *   - Clients non géolocalisés : `filtreProximite` (geo.js) écarte tout candidat
+ *     sans coordonnées — aucun trajet n'est calculable, donc aucune proposition
+ *     possible. Ces contrats sont dus, ils n'apparaissent NULLE PART dans
+ *     l'onglet, et rien ne le disait : un client peut ainsi passer une saison
+ *     entière sans être proposé. Le géocodage tourne côté serveur (edge
+ *     `geocode-sweep`, 3 tentatives max), donc un client qui reste ici est un
+ *     client dont l'adresse est à corriger à la main.
  *
  * ⚠️ `journees`/`candidats` peuvent valoir `undefined` pendant que le parent
  * (TourneesTab) charge ses deux requêtes, ou en cas d'échec de l'une d'elles.
@@ -37,7 +44,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, Clock, Tag, Loader2, ChevronDown,
+  AlertTriangle, Clock, Tag, Loader2, ChevronDown, MapPinOff,
 } from 'lucide-react';
 import { retardStatus } from '@/lib/tournee/eligibilite.js';
 import { formatDateFR } from '@/lib/utils';
@@ -148,6 +155,13 @@ export function AlertesTournees({
     [candidats],
   );
 
+  // Contrats dus dont le client n'a pas de coordonnées : invisibles dans tout
+  // l'onglet, sans le moindre signal jusqu'ici.
+  const sansPosition = useMemo(
+    () => (candidats || []).filter((c) => c.lat == null || c.lng == null),
+    [candidats],
+  );
+
   // Pas encore de données du tout (1er chargement, ou échec avant tout succès) :
   // ces deux cas sont mutuellement exclusifs avec la suite (rien à afficher en
   // dessous puisque journees/candidats sont `undefined`), donc un retour
@@ -179,7 +193,8 @@ export function AlertesTournees({
   // se taire comme si de rien n'était — d'où le `&& !erreurChargement` : sans
   // lui, un refetch en échec après une pose ferait disparaître silencieusement
   // toute alerte devenue entre-temps vraie.
-  const rien = sousRemplies.length === 0 && retardataires.length === 0 && aTyper === 0;
+  const rien = sousRemplies.length === 0 && retardataires.length === 0 && aTyper === 0
+    && sansPosition.length === 0;
   if (rien && !erreurChargement) return null;
 
   return (
@@ -192,7 +207,7 @@ export function AlertesTournees({
         </div>
       )}
       {!rien && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {sousRemplies.length > 0 && (
             <AlerteCard
               icon={AlertTriangle}
@@ -233,6 +248,30 @@ export function AlertesTournees({
                   {c.retard === 'sans_date' && (
                     <span className="ml-1.5 text-xs text-amber-600 font-medium">(date inconnue)</span>
                   )}
+                </button>
+              ))}
+            </AlerteCard>
+          )}
+
+          {sansPosition.length > 0 && (
+            <AlerteCard
+              icon={MapPinOff}
+              color="bg-orange-100 text-orange-600"
+              title="client(s) sans adresse localisée"
+              count={sansPosition.length}
+            >
+              <p className="px-2 pb-1 text-xs text-gray-500">
+                Sans coordonnées, aucun trajet n&apos;est calculable : ces contrats ne sont
+                jamais proposés. Corrigez l&apos;adresse sur la fiche client.
+              </p>
+              {sansPosition.map((c) => (
+                <button
+                  key={c.contractId}
+                  type="button"
+                  onClick={() => onOpenContract?.(c.contractId)}
+                  className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50 truncate"
+                >
+                  {c.clientName} — {c.ville || 'ville inconnue'}
                 </button>
               ))}
             </AlerteCard>

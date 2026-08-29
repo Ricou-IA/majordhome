@@ -112,39 +112,30 @@ export function RemplirJourneePanel({
   const [survole, setSurvole] = useState(null);
 
   const {
-    selectedIds, toggleSelection, recalcul, calculatingReel, posing, resultatPose,
+    selectedIds, toggleSelection, recalcul, recalculSurvol, heureDe,
+    calculatingReel, posing, resultatPose,
     confirmOpen, handlePoserClick, handleConfirmApprox, handleCancelApprox,
     confirmEstime,
   } = useJourneePose({
     journee: journeeAjustee, depot, reglages, arretsExistants, propositions,
     coreOrgId, user, onClose, decalages, retirerDecalages, paires: data?.paires,
+    survoleId: survole,
   });
 
-  // Ce que la barre montre en surimpression : les entretiens cochés à leur
-  // place d'ensemble (recalculée dès qu'un second est coché), plus le candidat
-  // survolé à sa place solo. Un candidat coché prime sur le survol — sinon la
-  // même ligne serait dessinée deux fois à deux endroits.
+  // Ce que la barre montre en surimpression. Une seule simulation la remplit :
+  // celle qui inclut le candidat survolé s'il y en a un, sinon celle de la
+  // sélection. Mélanger deux simulations replacerait les blocs déjà cochés à
+  // des heures qui ne tiennent pas compte du survolé.
   const apercus = useMemo(() => {
-    const liste = (recalcul?.places || []).map((p) => ({
+    const source = recalculSurvol || recalcul;
+    return (source?.places || []).map((p) => ({
       id: p.candidat.id,
       debutMinutes: p.placement.arriveeMinutes,
       finMinutes: p.placement.departMinutes,
       label: p.candidat.meta?.clientName || 'Client',
+      pressenti: p.candidat.id === survole,
     }));
-    if (survole && !selectedIds.has(survole)) {
-      const p = (propositions || []).find((x) => x.candidat.id === survole);
-      if (p?.placement?.faisable) {
-        liste.push({
-          id: p.candidat.id,
-          debutMinutes: p.placement.arriveeMinutes,
-          finMinutes: p.placement.departMinutes,
-          label: p.candidat.meta?.clientName || 'Client',
-          pressenti: true,
-        });
-      }
-    }
-    return liste;
-  }, [recalcul, survole, selectedIds, propositions]);
+  }, [recalcul, recalculSurvol, survole]);
 
   if (!journee) return null;
 
@@ -262,15 +253,9 @@ export function RemplirJourneePanel({
                   disabled={posing || calculatingReel}
                   onToggle={() => toggleSelection(p.candidat.id)}
                   onSurvol={setSurvole}
-                  // I3 — dès que ≥2 candidats sont cochés, l'heure de passage
-                  // calculée pour CHAQUE ligne à la proposition initiale (en
-                  // supposant CE candidat seul ajouté) devient mutuellement
-                  // incompatible avec les autres lignes cochées. Au-delà d'1
-                  // sélection, on fournit le recalcul d'ENSEMBLE (aperçu local
-                  // déjà affiché au pied de panneau) : PropositionRow n'affiche
-                  // alors l'heure que pour les lignes qu'il y retrouve
-                  // (cochées), jamais l'estimation solo devenue caduque.
-                  recalculEnsemble={selectedIds.size >= 2 ? recalcul : null}
+                  // Source UNIQUE de l'heure affichée, partagée avec la barre :
+                  // la ligne ne choisit plus elle-même entre plusieurs calculs.
+                  passage={heureDe(p.candidat.id)}
                 />
               ))}
             </ul>

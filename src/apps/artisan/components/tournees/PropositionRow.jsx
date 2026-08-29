@@ -11,22 +11,19 @@ import { Clock } from 'lucide-react';
 import { Checkbox } from '@components/ui/checkbox';
 import { minutesEnHHMM } from './tourneesPanelUtils';
 
+/**
+ * @param {object} props
+ * @param {object|null} props.passage  heure de passage à afficher — calculée
+ *   par `useJourneePose.heureDe`, source UNIQUE partagée avec la barre. La
+ *   ligne ne la dérive plus elle-même : elle le faisait depuis le `placement`
+ *   du classement, un autre contexte de calcul, et l'heure changeait de
+ *   quelques minutes entre le survol et le clic.
+ */
 export function PropositionRow({
-  proposition, checked, disabled, onToggle, recalculEnsemble = null, onSurvol,
+  proposition, checked, disabled, onToggle, onSurvol, passage,
 }) {
-  const { candidat, detourMinutes, placement } = proposition;
+  const { candidat, detourMinutes } = proposition;
   const meta = candidat.meta || {};
-  // I3 — `placement` suppose CE candidat seul ajouté à la tournée : dès que ≥2
-  // candidats sont cochés (RemplirJourneePanel passe alors `recalculEnsemble`),
-  // cette hypothèse est fausse pour toutes les lignes en même temps, et les
-  // afficher produirait des heures mutuellement incompatibles sans le dire. On
-  // bascule sur le recalcul d'ENSEMBLE, en n'affichant l'heure que pour les
-  // lignes qu'il couvre réellement (les cochées) — une ligne non cochée
-  // n'affiche alors plus rien plutôt qu'une estimation solo devenue caduque, et
-  // un candidat que l'ensemble ne place plus n'affiche pas d'heure du tout.
-  const passage = recalculEnsemble
-    ? recalculEnsemble.planning?.find((p) => p.id === candidat.id)
-    : placement;
   const horsSaison = meta.eligibilite?.saisonDefavorable === true;
   // "Hors fenêtre anniversaire" ne veut dire quelque chose que pour un contrat
   // qui A une date anniversaire : sans elle, l'éligibilité par défaut porte

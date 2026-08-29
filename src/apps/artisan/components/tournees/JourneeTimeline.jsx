@@ -43,6 +43,13 @@ import { minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 /** Pas de déplacement. Au pixel près, on écrirait « 09:07 » à un client. */
 export const PAS_DECALAGE_MINUTES = 15;
 
+/**
+ * Largeur minimale (% de la barre) pour écrire l'heure dans un bloc. En dessous,
+ * seule l'infobulle la porte. 8 % ≈ 48 min sur une journée de 10 h : un
+ * entretien d'une heure garde donc son heure lisible.
+ */
+const SEUIL_ETIQUETTE_PCT = 8;
+
 // Un entretien est ce que ce module pose : il se distingue du reste de la
 // journée (installation, SAV, visite technique), qui n'est ici qu'un obstacle
 // à contourner. La couleur ne porte jamais l'information seule — l'infobulle
@@ -219,8 +226,12 @@ export function JourneeTimeline({
             + (s.deborde ? ' (déborde de la journée)' : '')
             + (decale ? ` · décalé de ${formatDuree(decale)}` : '')
             + (interactif ? ' — glisser ou flèches ← → pour décaler' : '');
-          // Un libellé dans un bloc étroit serait tronqué en bouillie.
-          const etiquette = s.widthPct >= 12 ? minutesEnHHMM(s.debutMinutes) : null;
+          // Un libellé dans un bloc étroit serait tronqué en bouillie — mais un
+          // bloc VIDE se lit comme une donnée manquante (« ce client n'a pas
+          // d'heure ? »), ce qui est pire. Seuil calé sur ce que « 13:37 » exige
+          // réellement : un entretien d'une heure sur une journée de dix ne doit
+          // pas passer pour un trou d'information.
+          const etiquette = s.widthPct >= SEUIL_ETIQUETTE_PCT ? minutesEnHHMM(s.debutMinutes) : null;
 
           if (!interactif) {
             return (
@@ -269,7 +280,7 @@ export function JourneeTimeline({
               style={{ left: `${gauche}%`, width: `${Math.max(largeur, 1.5)}%` }}
               title={`À poser · ${minutesEnHHMM(a.debutMinutes)}–${minutesEnHHMM(a.finMinutes)} · ${a.label}`}
             >
-              {largeur >= 12 && (
+              {largeur >= SEUIL_ETIQUETTE_PCT && (
                 <span className="text-[10px] font-semibold text-emerald-900 pointer-events-none">
                   {minutesEnHHMM(a.debutMinutes)}
                 </span>

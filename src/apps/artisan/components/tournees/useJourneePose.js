@@ -42,7 +42,9 @@ import { savService } from '@services/sav.service';
 import { trajetsService } from '@services/trajets.service';
 import { supabase } from '@lib/supabaseClient';
 import { logger } from '@lib/logger';
-import { placerPlusieurs, finDeJournee, chargeExistante } from '@/lib/tournee/creneaux.js';
+import {
+  placerPlusieurs, placerCandidat, finDeJournee, chargeExistante,
+} from '@/lib/tournee/creneaux.js';
 import { cleCoord } from '@/lib/tournee/geo.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
 import { RAISON_LABELS, minutesEnHHMM, messageErreur } from './tourneesPanelUtils';
@@ -62,6 +64,9 @@ import { ecrireDecalages } from './useDecalagesJournee';
  *   classement (`usePropositions`). L'aperçu calcule DESSUS, complétée au vol
  *   d'oiseau pour les seules paires qu'elle n'a pas — sans quoi la barre et la
  *   liste affichent deux heures différentes pour le même client.
+ * @param {string|null} [params.survoleId]  candidat survolé dans la liste — son
+ *   heure est calculée COMME S'IL ÉTAIT COCHÉ en plus des autres, pour que
+ *   survoler puis cliquer ne change pas le chiffre affiché.
  * @param {Map<string, number>} [params.decalages]  décalages manuels en attente
  *   (useDecalagesJournee) — `journee` est DÉJÀ ajustée, ceci ne sert qu'à savoir
  *   quels RDV existants doivent être RÉÉCRITS en base au moment de poser.
@@ -69,7 +74,7 @@ import { ecrireDecalages } from './useDecalagesJournee';
  */
 export function useJourneePose({
   journee, depot, reglages, arretsExistants, propositions, coreOrgId, user, onClose,
-  decalages, retirerDecalages, paires,
+  decalages, retirerDecalages, paires, survoleId,
 }) {
   const queryClient = useQueryClient();
 
@@ -127,12 +132,9 @@ export function useJourneePose({
   // Même modèle que le classement (creneaux.js) : les RDV posés sont fixes, on
   // insère dans les trous. Utiliser un modèle différent ici ferait dire à
   // l'aperçu le contraire de ce que la liste vient de proposer.
-  const recalcul = useMemo(() => {
-    if (!depot || !journee) return null;
+  const simulerAvec = useCallback((candidats) => {
     const ctx = contexte(trajetApercu);
-    const { places, refuses, arretsFinaux } = placerPlusieurs(
-      arretsExistants, selectionnees.map((p) => p.candidat), ctx,
-    );
+    const { places, refuses, arretsFinaux } = placerPlusieurs(arretsExistants, candidats, ctx);
     return {
       places,
       refuses,
@@ -145,7 +147,57 @@ export function useJourneePose({
       finMinutes: finDeJournee(arretsFinaux, ctx),
       chargeMinutes: chargeExistante(arretsFinaux, ctx),
     };
-  }, [depot, journee, arretsExistants, selectionnees, contexte, trajetApercu]);
+  }, [arretsExistants, contexte, trajetApercu]);
+
+  const recalcul = useMemo(() => {
+    if (!depot || !journee) return null;
+    return simulerAvec(selectionnees.map((p) => p.candidat));
+  }, [depot, journee, selectionnees, simulerAvec]);
+
+  // Même simulation, avec le candidat survolé ajouté à la sélection : survoler
+  // répond à « et si je cochais celui-ci ? ». Passer par un autre calcul pour
+  // le survol produisait un écart avec le clic — 13 h 35 au survol, 13 h 32 une
+  // fois coché (vu le 2026-08-29). Un chiffre qui bouge entre le moment où on
+  // le lit et celui où on l'accepte ne peut pas servir à décider.
+  const recalculSurvol = useMemo(() => {
+    if (!depot || !journee || !survoleId || selectedIds.has(survoleId)) return null;
+    const survole = (propositions || []).find((p) => p.candidat.id === survoleId);
+    if (!survole) return null;
+    return simulerAvec([...selectionnees.map((p) => p.candidat), survole.candidat]);
+  }, [depot, journee, survoleId, selectedIds, propositions, selectionnees, simulerAvec]);
+
+  // Heure de passage de CHAQUE candidat pris seul, pour les lignes ni cochées
+  // ni survolées. Calculée ici et nulle part ailleurs : le `placement` que
+  // remonte le classement sert à ORDONNER (coût), pas à afficher une heure —
+  // il vient d'un autre contexte de calcul, et deux contextes finissent
+  // toujours par diverger de quelques minutes.
+  const placementsSolo = useMemo(() => {
+    if (!depot || !journee) return new Map();
+    const ctx = contexte(trajetApercu);
+    const m = new Map();
+    for (const p of propositions || []) {
+      const place = placerCandidat({ arrets: arretsExistants, candidat: p.candidat, ...ctx });
+      if (place.faisable) m.set(p.candidat.id, place);
+    }
+    return m;
+  }, [depot, journee, propositions, arretsExistants, contexte, trajetApercu]);
+
+  /**
+   * Heure à afficher pour un candidat — SOURCE UNIQUE de tous les horaires du
+   * panneau (lignes et barre). Priorité : la simulation qui le contient déjà.
+   */
+  const heureDe = useCallback((candidatId) => {
+    if (recalculSurvol) {
+      const p = recalculSurvol.planning.find((x) => x.id === candidatId);
+      if (p) return p;
+    }
+    const dansSelection = recalcul?.planning.find((x) => x.id === candidatId);
+    if (dansSelection) return dansSelection;
+    // Une ligne cochée que la sélection ne place plus n'affiche AUCUNE heure :
+    // son placement solo serait faux, et le pied de panneau la nomme déjà.
+    if (selectedIds.has(candidatId)) return null;
+    return placementsSolo.get(candidatId) || null;
+  }, [recalculSurvol, recalcul, selectedIds, placementsSolo]);
 
   const calculerHorairesReels = useCallback(async () => {
     const noyau = [
@@ -407,6 +459,8 @@ export function useJourneePose({
     calculatingReel,
     posing,
     resultatPose,
+    recalculSurvol,
+    heureDe,
     confirmOpen,
     // Ce qui a déclenché la confirmation, pour que le dialogue dise exactement
     // ce qu'on s'apprête à faire plutôt qu'un avertissement générique.
