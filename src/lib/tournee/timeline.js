@@ -210,33 +210,79 @@ export function bornesDeplacement(segments, id, amplitude, trajet = trajetLocal)
 }
 
 /**
- * Applique des décalages (en minutes, signés) à des RDV bruts : seul
- * `scheduled_start` bouge, la durée est inchangée.
+ * Jusqu'où la DURÉE d'un RDV peut être ajustée sans mordre sur le suivant ni
+ * sortir de la journée. Symétrique de `bornesDeplacement` : raccourcir une
+ * intervention est l'autre façon de faire de la place.
  *
- * Point d'injection UNIQUE du décalage : tout ce qui suit (arrêts existants,
- * séquencement, aperçu, trajets réels de la pose) consomme le résultat sans
- * savoir qu'un décalage a eu lieu. Une seconde voie qui contournerait cette
- * fonction ferait diverger ce qu'on montre de ce qu'on calcule.
+ * @param {Array} segments   sortie de `construireSegments`, triée
+ * @param {string} id
+ * @param {{debut: number, fin: number}} amplitude
+ * @param {Function} [trajet=trajetLocal]
+ * @param {number} [minimum=15]  durée plancher — une intervention de 0 min
+ *   n'existe pas, et un bloc invisible ne se rattrape plus à la souris.
+ * @returns {{minDuree: number, maxDuree: number}|null}
+ */
+export function bornesDuree(segments, id, amplitude, trajet = trajetLocal, minimum = 15) {
+  const i = (segments || []).findIndex((s) => s.id === id);
+  if (i === -1) return null;
+  const s = segments[i];
+  const dureeActuelle = s.finMinutes - s.debutMinutes;
+
+  const suivant = segments[i + 1];
+  const route = (a, b) => ((a && b) ? trajet(a, b) : 0);
+  const butoir = suivant
+    ? suivant.debutMinutes - route(s.key, suivant.key)
+    : (amplitude?.fin ?? s.finMinutes);
+
+  return {
+    minDuree: Math.min(minimum, dureeActuelle),
+    // La durée actuelle reste toujours atteignable : un RDV qui déborde déjà ne
+    // doit pas se voir raccourci d'office à la première prise en main.
+    maxDuree: Math.max(butoir - s.debutMinutes, dureeActuelle),
+  };
+}
+
+/**
+ * Applique les ajustements manuels à des RDV bruts : décalage de l'heure de
+ * début et/ou nouvelle durée.
  *
- * Un RDV sans heure exploitable n'est pas décalable : il est rendu tel quel
+ * Point d'injection UNIQUE : tout ce qui suit (arrêts existants, placement,
+ * aperçu, trajets réels de la pose) consomme le résultat sans savoir qu'un
+ * ajustement a eu lieu. Une seconde voie qui contournerait cette fonction ferait
+ * diverger ce qu'on montre de ce qu'on calcule.
+ *
+ * Un RDV sans heure exploitable n'est pas ajustable : il est rendu tel quel
  * plutôt que de lui inventer un horaire à partir de rien.
  *
  * @param {Array<object>} rdvs
- * @param {Map<string, number>|null} decalages
- * @returns {Array<object>}  `decalageMinutes` porté sur les RDV touchés
+ * @param {Map<string, number>|null} decalages  minutes signées
+ * @param {Map<string, number>|null} durees     nouvelle durée en minutes
+ * @returns {Array<object>}  `decalageMinutes` / `dureeInitialeMinutes` portés
+ *   sur les RDV touchés
  */
-export function appliquerDecalages(rdvs, decalages) {
-  if (!decalages || decalages.size === 0) return rdvs || [];
+export function appliquerAjustements(rdvs, decalages, durees) {
+  const aDecalages = decalages && decalages.size > 0;
+  const aDurees = durees && durees.size > 0;
+  if (!aDecalages && !aDurees) return rdvs || [];
+
   return (rdvs || []).map((r) => {
-    const delta = decalages.get(r.id);
-    if (!delta) return r;
+    const delta = aDecalages ? (decalages.get(r.id) || 0) : 0;
+    const dureeVoulue = aDurees ? durees.get(r.id) : undefined;
+    if (!delta && dureeVoulue == null) return r;
+
     const debut = minutesDepuisMinuit(r.scheduled_start);
     if (debut == null) return r;
+
+    const dureeInitiale = r.duration_minutes || 60;
+    const duree = dureeVoulue ?? dureeInitiale;
     return {
       ...r,
       scheduled_start: minutesVersHeure(debut + delta),
-      scheduled_end: minutesVersHeure(debut + delta + (r.duration_minutes || 60)),
-      decalageMinutes: delta,
+      scheduled_end: minutesVersHeure(debut + delta + duree),
+      duration_minutes: duree,
+      ...(delta ? { decalageMinutes: delta } : {}),
+      ...(dureeVoulue != null && dureeVoulue !== dureeInitiale
+        ? { dureeInitialeMinutes: dureeInitiale } : {}),
     };
   });
 }

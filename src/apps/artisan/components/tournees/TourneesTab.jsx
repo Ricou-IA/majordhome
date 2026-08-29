@@ -46,7 +46,7 @@ import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal
 import { AlertesTournees } from './AlertesTournees';
 import { RemplirJourneePanel } from './RemplirJourneePanel';
 import { JourneeTimeline } from './JourneeTimeline';
-import { useDecalagesJournee, ecrireDecalages } from './useDecalagesJournee';
+import { useAjustementsJournee, ecrireAjustements } from './useAjustementsJournee';
 import { formatDuree } from './tourneesPanelUtils';
 
 // Marge de recherche des journées déjà amorcées AU-DELÀ de l'horizon ferme
@@ -110,29 +110,29 @@ function JourneeCard({ journee, onClick }) {
   const coreOrgId = organization?.id;
 
   const {
-    decalages, journeeAjustee, decaler, reinitialiser,
-  } = useDecalagesJournee(journee);
+    decalages, durees, nbAjustements, journeeAjustee, ajuster, reinitialiser,
+  } = useAjustementsJournee(journee);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [enregistrement, setEnregistrement] = useState(false);
 
   const appliquer = async () => {
     setEnregistrement(true);
     try {
-      const { ids, echec } = await ecrireDecalages(journeeAjustee.rdvs, decalages);
+      const { ids, echec } = await ecrireAjustements(journeeAjustee.rdvs, decalages, durees);
       if (ids.length > 0) {
         await queryClient.invalidateQueries({ queryKey: tourneeKeys.all(coreOrgId) });
         await queryClient.invalidateQueries({ queryKey: appointmentKeys.all(coreOrgId) });
-        // Les décalages écrits sortent de l'attente : les données rafraîchies
+        // Les ajustements écrits sortent de l'attente : les données rafraîchies
         // portent désormais la nouvelle heure, les rejouer la doublerait.
         reinitialiser();
       }
       if (echec) {
         toast.error(
-          `Déplacement impossible (${echec.nom}) : ${echec.message}`
-          + (ids.length > 0 ? ` — ${ids.length} déjà déplacé${ids.length > 1 ? 's' : ''}.` : ''),
+          `Modification impossible (${echec.nom}) : ${echec.message}`
+          + (ids.length > 0 ? ` — ${ids.length} déjà modifié${ids.length > 1 ? 's' : ''}.` : ''),
         );
       } else {
-        toast.success(`${ids.length} rendez-vous déplacé${ids.length > 1 ? 's' : ''}`);
+        toast.success(`${ids.length} rendez-vous modifié${ids.length > 1 ? 's' : ''}`);
       }
     } finally {
       setEnregistrement(false);
@@ -171,15 +171,15 @@ function JourneeCard({ journee, onClick }) {
       <JourneeTimeline
         amplitude={journee.amplitude}
         rdvs={journeeAjustee.rdvs}
-        onDecaler={enregistrement ? undefined : decaler}
+        onAjuster={enregistrement ? undefined : ajuster}
       />
 
-      {decalages.size > 0 && (
+      {nbAjustements > 0 && (
         <div className="mt-2 flex items-center justify-between gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
           <span className="text-xs text-emerald-800 truncate">
-            {decalages.size} déplacement{decalages.size > 1 ? 's' : ''} en attente (
-            {[...decalages.values()].map((d) => (d > 0 ? `+${formatDuree(d)}` : formatDuree(d))).join(', ')}
-            )
+            {nbAjustements} ajustement{nbAjustements > 1 ? 's' : ''} en attente
+            {decalages.size > 0 && ` (${
+              [...decalages.values()].map((d) => (d > 0 ? `+${formatDuree(d)}` : formatDuree(d))).join(', ')})`}
           </span>
           <span className="flex items-center gap-1 flex-shrink-0">
             <button
@@ -205,12 +205,12 @@ function JourneeCard({ journee, onClick }) {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={(open) => { if (!open) setConfirmOpen(false); }}
-        title="Déplacer des rendez-vous existants ?"
+        title="Modifier des rendez-vous existants ?"
         description={
-          `${decalages.size} rendez-vous déjà planifié${decalages.size > 1 ? 's seront déplacés' : ' sera déplacé'}. `
+          `${nbAjustements} rendez-vous déjà planifié${nbAjustements > 1 ? 's seront modifiés' : ' sera modifié'}. `
           + 'Leur horaire a pu être annoncé aux clients concernés.'
         }
-        confirmLabel="Déplacer"
+        confirmLabel="Modifier"
         cancelLabel="Annuler"
         variant="default"
         onConfirm={appliquer}

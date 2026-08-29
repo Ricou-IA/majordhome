@@ -48,7 +48,7 @@ import {
 import { cleCoord } from '@/lib/tournee/geo.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
 import { RAISON_LABELS, minutesEnHHMM, messageErreur } from './tourneesPanelUtils';
-import { ecrireDecalages } from './useDecalagesJournee';
+import { ecrireAjustements } from './useAjustementsJournee';
 
 /**
  * @param {object} params
@@ -68,13 +68,14 @@ import { ecrireDecalages } from './useDecalagesJournee';
  *   heure est calculée COMME S'IL ÉTAIT COCHÉ en plus des autres, pour que
  *   survoler puis cliquer ne change pas le chiffre affiché.
  * @param {Map<string, number>} [params.decalages]  décalages manuels en attente
- *   (useDecalagesJournee) — `journee` est DÉJÀ ajustée, ceci ne sert qu'à savoir
- *   quels RDV existants doivent être RÉÉCRITS en base au moment de poser.
- * @param {Function} [params.retirerDecalages]  (ids[]) => void
+ *   (useAjustementsJournee) — `journee` est DÉJÀ ajustée, ceci ne sert qu'à
+ *   savoir quels RDV existants doivent être RÉÉCRITS en base au moment de poser.
+ * @param {Map<string, number>} [params.durees]  durées manuelles en attente
+ * @param {Function} [params.retirerAjustements]  (ids[]) => void
  */
 export function useJourneePose({
   journee, depot, reglages, arretsExistants, propositions, coreOrgId, user, onClose,
-  decalages, retirerDecalages, paires, survoleId,
+  decalages, durees, retirerAjustements, paires, survoleId,
 }) {
   const queryClient = useQueryClient();
 
@@ -253,12 +254,12 @@ export function useJourneePose({
       .filter((p) => p.meta);
   }, [selectedIds, selectionnees]);
 
-  // Écriture des décalages : implémentation PARTAGÉE avec la carte de la liste
-  // (useDecalagesJournee.js). Bloquante par construction dans ce contexte — les
+  // Écriture des ajustements : implémentation PARTAGÉE avec la carte de la liste
+  // (useAjustementsJournee.js). Bloquante par construction dans ce contexte — les
   // horaires calculés pour les nouveaux RDV supposent que les anciens ont bougé.
-  const appliquerDecalagesEnBase = useCallback(
-    () => ecrireDecalages(journee?.rdvs, decalages),
-    [decalages, journee],
+  const appliquerAjustementsEnBase = useCallback(
+    () => ecrireAjustements(journee?.rdvs, decalages, durees),
+    [decalages, durees, journee],
   );
 
   const executerPose = useCallback(async (resultat) => {
@@ -269,14 +270,14 @@ export function useJourneePose({
       if (ordonnees.length === 0) return;
 
       // Les RDV existants d'abord : les créneaux des nouveaux en dépendent.
-      const { ids: idsDecales, echec: echecDecalage } = await appliquerDecalagesEnBase();
-      if (idsDecales.length > 0) retirerDecalages?.(idsDecales);
-      if (echecDecalage) {
-        setResultatPose({ posesCount: 0, decalesCount: idsDecales.length, echecs: [echecDecalage] });
+      const { ids: idsAjustes, echec: echecAjustement } = await appliquerAjustementsEnBase();
+      if (idsAjustes.length > 0) retirerAjustements?.(idsAjustes);
+      if (echecAjustement) {
+        setResultatPose({ posesCount: 0, decalesCount: idsAjustes.length, echecs: [echecAjustement] });
         await queryClient.invalidateQueries({ queryKey: tourneeKeys.all(coreOrgId) });
         toast.error(
-          `Déplacement impossible (${echecDecalage.nom}) — aucun rendez-vous posé`
-          + (idsDecales.length > 0 ? `, ${idsDecales.length} RDV déjà déplacé${idsDecales.length > 1 ? 's' : ''}.` : '.'),
+          `Déplacement impossible (${echecAjustement.nom}) — aucun rendez-vous posé`
+          + (idsAjustes.length > 0 ? `, ${idsAjustes.length} RDV déjà déplacé${idsAjustes.length > 1 ? 's' : ''}.` : '.'),
         );
         return;
       }
@@ -348,9 +349,9 @@ export function useJourneePose({
       // qu'il soit arrivé pendant celle-ci — plus aucun `continue`/exception
       // interne ne peut sauter jusqu'ici sans y passer, la boucle ne peut plus
       // se terminer prématurément (cf. try/catch par itération ci-dessus).
-      setResultatPose({ posesCount: idsPoses.length, decalesCount: idsDecales.length, echecs });
+      setResultatPose({ posesCount: idsPoses.length, decalesCount: idsAjustes.length, echecs });
 
-      if (idsPoses.length > 0 || idsDecales.length > 0) {
+      if (idsPoses.length > 0 || idsAjustes.length > 0) {
         // Ne retire de la sélection que ce qui a réussi : les échecs restent
         // cochés pour permettre un nouvel essai sans dupliquer les RDV déjà posés.
         if (idsPoses.length > 0) {
@@ -378,8 +379,8 @@ export function useJourneePose({
         }
       }
 
-      const mentionDecales = idsDecales.length > 0
-        ? ` · ${idsDecales.length} RDV déplacé${idsDecales.length > 1 ? 's' : ''}` : '';
+      const mentionDecales = idsAjustes.length > 0
+        ? ` · ${idsAjustes.length} RDV déplacé${idsAjustes.length > 1 ? 's' : ''}` : '';
       if (echecs.length === 0) {
         toast.success(`${idsPoses.length} rendez-vous posé${idsPoses.length > 1 ? 's' : ''}${mentionDecales}`);
         onClose();
@@ -403,7 +404,7 @@ export function useJourneePose({
     }
   }, [
     construireOrdonnees, journee, user, coreOrgId, queryClient, onClose,
-    appliquerDecalagesEnBase, retirerDecalages,
+    appliquerAjustementsEnBase, retirerAjustements,
   ]);
 
   const handlePoserClick = useCallback(async () => {
@@ -432,13 +433,13 @@ export function useJourneePose({
     // (Mapbox indisponible) et/ou le déplacement de RDV déjà annoncés à des
     // clients. Le second n'est pas un détail technique — on va réécrire une
     // heure que quelqu'un attend chez lui.
-    if (reel.estime || (decalages?.size ?? 0) > 0) {
+    if (reel.estime || (decalages?.size ?? 0) > 0 || (durees?.size ?? 0) > 0) {
       setPendingReel(reel);
       setConfirmOpen(true);
       return;
     }
     await executerPose(reel);
-  }, [coreOrgId, depot, selectionnees, calculerHorairesReels, executerPose, decalages]);
+  }, [coreOrgId, depot, selectionnees, calculerHorairesReels, executerPose, decalages, durees]);
 
   const handleConfirmApprox = useCallback(async () => {
     const reel = pendingReel;
