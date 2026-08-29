@@ -1,0 +1,204 @@
+// scripts/tournee/sequence.test.mjs
+// Run : node --test scripts/tournee/sequence.test.mjs
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { sequencerTournee, MAX_ARRETS_EXACT } from '../../src/lib/tournee/sequence.js';
+
+// Géographie de test, en minutes de trajet. D = dépôt.
+// A et B sont voisins (5 min) ; C est à l'opposé (40 min de D, 45 de A/B).
+const MATRICE = {
+  'D|A': 20, 'A|D': 20, 'D|B': 22, 'B|D': 22, 'D|C': 40, 'C|D': 40,
+  'A|B': 5,  'B|A': 5,  'A|C': 45, 'C|A': 45, 'B|C': 44, 'C|B': 44,
+};
+const trajet = (a, b) => (a === b ? 0 : MATRICE[`${a}|${b}`] ?? 999);
+
+const AMPLITUDE = { debut: 8 * 60, fin: 18 * 60 };
+const PAUSE = { minutes: 30, fenetre: [12 * 60, 14 * 60] };
+const ctx = { depotKey: 'D', trajet, amplitude: AMPLITUDE, budgetMinutes: 480, pause: PAUSE };
+
+const arret = (id, key, dureeMinutes, fenetre) => ({ id, key, dureeMinutes, fenetre });
+
+test('tournée vide — faisable, charge nulle', () => {
+  const r = sequencerTournee({ ...ctx, arrets: [] });
+  assert.equal(r.faisable, true);
+  assert.equal(r.chargeMinutes, 0);
+  assert.deepEqual(r.ordre, []);
+});
+
+test('un seul arrêt — aller-retour au dépôt compté', () => {
+  const r = sequencerTournee({ ...ctx, arrets: [arret('a', 'A', 90)] });
+  assert.equal(r.faisable, true);
+  assert.equal(r.chargeMinutes, 20 + 90 + 20, 'trajet aller + intervention + retour');
+  assert.equal(r.planning[0].rang, 1);
+  assert.equal(r.planning[0].arriveeMinutes, 8 * 60 + 20);
+});
+
+test('trouve le VRAI optimum, pas un ordre d arrivée', () => {
+  // Ordre fourni volontairement mauvais : A, C, B → 20+45+44+22 = 131 de trajet.
+  // Optimum : A, B, C (ou C, B, A) → 20+5+44+40 = 109.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('a', 'A', 60), arret('c', 'C', 60), arret('b', 'B', 60)],
+  });
+  assert.equal(r.faisable, true);
+  const trajets = r.chargeMinutes - 180;
+  assert.equal(trajets, 109, `attendu 109 min de trajet, obtenu ${trajets}`);
+  const ids = r.ordre.join(',');
+  assert.ok(ids === 'a,b,c' || ids === 'c,b,a', `ordre inattendu : ${ids}`);
+});
+
+test('pause méridienne insérée dans sa fenêtre', () => {
+  // 3 × 2h : la journée traverse forcément midi.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('a', 'A', 120), arret('b', 'B', 120), arret('c', 'C', 120)],
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, true);
+  assert.equal(r.pauseHorsFenetre, false);
+  // La pause décale les arrêts d'après : la fin dépasse la somme brute.
+  const brut = 8 * 60 + r.chargeMinutes;
+  assert.equal(r.finMinutes, brut + 30, 'la pause allonge la journee sans compter dans la charge');
+});
+
+test('budget dépassé — infaisable avec raison', () => {
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('a', 'A', 150), arret('b', 'B', 150), arret('c', 'C', 150)],
+    budgetMinutes: 480, // 450 d intervention + 109 de trajet = 559 > 480
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'budget');
+});
+
+test('amplitude dépassée — infaisable', () => {
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('a', 'A', 240), arret('c', 'C', 240)],
+    amplitude: { debut: 8 * 60, fin: 15 * 60 },
+    budgetMinutes: 900,
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'amplitude');
+});
+
+test('fenêtre promise respectée — l ordre s y plie', () => {
+  // C promis en début de matinée alors que l optimum géographique le mettrait
+  // en dernier : la promesse gagne.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [
+      arret('a', 'A', 60),
+      arret('b', 'B', 60),
+      arret('c', 'C', 60, { debut: 8 * 60, fin: 9 * 60 + 30 }),
+    ],
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, true);
+  assert.equal(r.ordre[0], 'c', 'la fenetre promise impose le premier passage');
+  const planC = r.planning.find((p) => p.id === 'c');
+  assert.ok(planC.arriveeMinutes <= 9 * 60 + 30);
+});
+
+test('fenêtre impossible à tenir — infaisable', () => {
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('c', 'C', 60, { debut: 8 * 60, fin: 8 * 60 + 10 })], // 40 min de trajet
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'fenetre');
+});
+
+test('attente si on arrive avant l ouverture de la fenêtre', () => {
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('a', 'A', 60, { debut: 10 * 60, fin: 11 * 60 })],
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, true);
+  assert.equal(r.planning[0].arriveeMinutes, 10 * 60, 'on patiente jusqu a l ouverture');
+});
+
+test('déterminisme — même entrée, même sortie', () => {
+  const arrets = [arret('a', 'A', 60), arret('b', 'B', 60), arret('c', 'C', 60)];
+  const r1 = sequencerTournee({ ...ctx, arrets, budgetMinutes: 600 });
+  const r2 = sequencerTournee({ ...ctx, arrets: [...arrets].reverse(), budgetMinutes: 600 });
+  assert.equal(r1.chargeMinutes, r2.chargeMinutes, 'l ordre d entree ne change pas l optimum');
+});
+
+test('au-delà de MAX_ARRETS_EXACT — repli heuristique, toujours faisable', () => {
+  const arrets = Array.from({ length: MAX_ARRETS_EXACT + 2 }, (_, i) =>
+    arret(`x${i}`, i % 2 === 0 ? 'A' : 'B', 20));
+  const r = sequencerTournee({ ...ctx, arrets, budgetMinutes: 900 });
+  assert.equal(r.ordre.length, arrets.length, 'tous les arrets sont places');
+  assert.equal(r.methode, 'heuristique');
+});
+
+// --- Fix round 1 (revue) ------------------------------------------------
+
+test('tie de charge — tie-break lexicographique BRUT, pas localeCompare, stable entre runtimes', () => {
+  // A et B sont symétriques dans la matrice de trajet : D→A→B→D et D→B→A→D
+  // traversent exactement les 3 mêmes arêtes, donc ont la MÊME charge (47 min
+  // de trajet + 120 d intervention = 167) — égalité stricte, pas un artefact
+  // d arrondi. Les deux ordres sont donc à égalité, et le choix ne doit RIEN
+  // devoir à l ordre dans lequel le générateur de permutations les explore.
+  //
+  // 'alpha' et 'Beta' sont volontairement choisis pour diverger entre
+  // localeCompare (classe 'alpha' avant 'Beta', casse quasi ignorée) et la
+  // comparaison brute qu utilise le moteur ('B' = U+0042 < 'a' = U+0061 en
+  // UTF-16) : sur l implémentation localeCompare, ce test échoue et renvoie
+  // ['alpha','Beta'] — vérifié empiriquement avant le fix.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('alpha', 'A', 60), arret('Beta', 'B', 60)],
+  });
+  assert.equal(r.faisable, true);
+  assert.equal(r.chargeMinutes, 167, 'égalité de charge entre les deux ordres possibles');
+  assert.deepEqual(r.ordre, ['Beta', 'alpha'],
+    'tie-break lexicographique brut : "B" (0x42) < "a" (0x61) en UTF-16, quel que soit l ordre d entrée');
+});
+
+// --- C2 (revue finale) — repli heuristique et fenêtres --------------------
+
+test('repli heuristique — respecte l ordre chronologique de deux arrêts contraints, même contre la géographie', () => {
+  // 7 arrêts de remplissage, tous en A (0 min de A à A) : au-delà de
+  // MAX_ARRETS_EXACT, ça force le repli plus-proche-voisin.
+  // 'proche' (position B, 5 min de A) porte une fenêtre TARDIVE (14h).
+  // 'loin' (position C, 45 min de A) porte une fenêtre PRÉCOCE (8h).
+  // Un plus-proche-voisin aveugle aux fenêtres visiterait 'proche' avant
+  // 'loin' (pure géographie) — exactement l ordre chronologique inverse de
+  // ce que leurs fenêtres imposent.
+  const remplissage = Array.from({ length: 7 }, (_, i) => arret(`x${i}`, 'A', 10));
+  const proche = arret('proche', 'B', 20, { debut: 14 * 60, fin: 16 * 60 });
+  const loin = arret('loin', 'C', 20, { debut: 8 * 60, fin: 9 * 60 + 30 });
+
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [...remplissage, proche, loin],
+    pause: { minutes: 0, fenetre: [0, 0] },
+    budgetMinutes: 900,
+  });
+
+  assert.equal(r.methode, 'heuristique', 'plus de MAX_ARRETS_EXACT arrêts');
+  assert.equal(r.ordre.length, 9, 'tous les arrets sont places');
+  assert.ok(
+    r.ordre.indexOf('loin') < r.ordre.indexOf('proche'),
+    `'loin' (fenêtre 8h) doit précéder 'proche' (fenêtre 14h) — ordre obtenu : ${r.ordre.join(',')}`,
+  );
+});
+
+test('repli heuristique — un seul arrêt contraint : la géographie décide pour le reste', () => {
+  const remplissage = Array.from({ length: 8 }, (_, i) => arret(`x${i}`, i % 2 === 0 ? 'A' : 'B', 10));
+  const promis = arret('promis', 'C', 20, { debut: 8 * 60, fin: 9 * 60 + 30 });
+
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [...remplissage, promis],
+    pause: { minutes: 0, fenetre: [0, 0] },
+    budgetMinutes: 900,
+  });
+
+  assert.equal(r.methode, 'heuristique');
+  assert.equal(r.ordre.length, 9, 'tous les arrets sont places, y compris le seul contraint');
+});
