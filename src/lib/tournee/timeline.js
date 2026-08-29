@@ -188,32 +188,35 @@ export function bornesDeplacement(segments, id, amplitude, trajet = trajetLocal)
   let minDebut = amplitude?.debut ?? s.debutMinutes;
   let maxDebut = (amplitude?.fin ?? s.finMinutes) - duree;
 
-  // Marge de route entre deux arrêts. Quand une position manque, on n'invente
-  // AUCUNE contrainte : mieux vaut une butée trop permissive (que le moteur
-  // rattrapera au calcul) qu'une butée de 60 min fabriquée sur du vide, qui
-  // empêcherait de bouger un RDV sans raison visible.
+  // Marge de route entre deux arrêts : le trajet ESTIMÉ. Quand une position
+  // manque, on n'invente AUCUNE contrainte — mieux vaut une butée trop
+  // permissive (que le moteur rattrapera au calcul) qu'une butée de 60 min
+  // fabriquée sur du vide, qui empêcherait de bouger un RDV sans raison visible.
   //
-  // ⚠️ Et jamais PLUS que l'écart déjà constaté : si deux RDV posés sont à
-  // 30 min l'un de l'autre là où l'estimation en réclame 42, c'est notre
-  // estimation qui est trop large — le trajet a lieu tous les jours. Sans ce
-  // plafond, le RDV se retrouvait immobile côté gauche, sans explication (vu le
-  // 31/08 sur TREVISIOL, coincé derrière LODDO). Même principe que le moteur :
-  // le planning posé est un fait, on ne lui oppose pas nos estimations.
-  const route = (a, b, ecartConstate) => {
+  // ⚠️ Une contrainte DÉJÀ violée par le planning en place ne s'applique pas.
+  // Sur le 31/08, LODDO finit à 9 h 30 et TREVISIOL commence à 10 h : 30 min
+  // d'écart là où l'estimation en réclame 46. TREVISIOL se retrouvait donc figé,
+  // incapable de reculer d'une seule minute — pour faire respecter un trajet qui
+  // n'était de toute façon pas respecté. Dans ce cas la butée redescend au
+  // contact et l'humain reprend la main : c'est lui qui sait si ce trajet passe
+  // (l'estimation est à vol d'oiseau, le technicien connaît sa route). L'écart
+  // insuffisant est signalé à l'écran plutôt qu'imposé — cf.
+  // `trajetDepuisPrecedent`, dont la carte de survol affiche les deux chiffres.
+  const marge = (a, b, ecartConstate) => {
     if (!a || !b) return 0;
     const estime = trajet(a, b);
-    return ecartConstate == null ? estime : Math.min(estime, Math.max(ecartConstate, 0));
+    return (ecartConstate != null && ecartConstate < estime) ? 0 : estime;
   };
 
   const precedent = segments[i - 1];
   const suivant = segments[i + 1];
   if (precedent) {
-    const marge = route(precedent.key, s.key, s.debutMinutes - precedent.finMinutes);
-    minDebut = Math.max(minDebut, precedent.finMinutes + marge);
+    const m = marge(precedent.key, s.key, s.debutMinutes - precedent.finMinutes);
+    minDebut = Math.max(minDebut, precedent.finMinutes + m);
   }
   if (suivant) {
-    const marge = route(s.key, suivant.key, suivant.debutMinutes - s.finMinutes);
-    maxDebut = Math.min(maxDebut, suivant.debutMinutes - marge - duree);
+    const m = marge(s.key, suivant.key, suivant.debutMinutes - s.finMinutes);
+    maxDebut = Math.min(maxDebut, suivant.debutMinutes - m - duree);
   }
 
   // La position ACTUELLE est toujours atteignable : sans ça, un RDV qui déborde
@@ -246,11 +249,13 @@ export function bornesDuree(segments, id, amplitude, trajet = trajetLocal, minim
   const dureeActuelle = s.finMinutes - s.debutMinutes;
 
   const suivant = segments[i + 1];
-  // Même plafond que `bornesDeplacement` : on ne réserve pas plus de route que
-  // l'écart que le planning montre déjà.
-  const marge = suivant && s.key && suivant.key
-    ? Math.min(trajet(s.key, suivant.key), Math.max(suivant.debutMinutes - s.finMinutes, 0))
-    : 0;
+  // Même règle que `bornesDeplacement` : trajet estimé, sauf si le planning en
+  // place ne le respecte déjà pas — auquel cas on ne l'impose pas.
+  let marge = 0;
+  if (suivant && s.key && suivant.key) {
+    const estime = trajet(s.key, suivant.key);
+    marge = (suivant.debutMinutes - s.finMinutes) < estime ? 0 : estime;
+  }
   const butoir = suivant
     ? suivant.debutMinutes - marge
     : (amplitude?.fin ?? s.finMinutes);
@@ -309,17 +314,23 @@ export function appliquerAjustements(rdvs, decalages, durees) {
 }
 
 /**
- * Temps de route entre un arrêt et le précédent, tel qu'on l'oppose aux bornes :
- * l'estimation, plafonnée par l'écart que le planning montre déjà.
+ * Temps de route entre un arrêt et le précédent : l'estimation, et le temps
+ * réellement disponible entre les deux rendez-vous.
  *
  * Existe pour être AFFICHÉ. Cette information manquait complètement à l'écran —
  * au point que la poignée de redimensionnement, une simple zone teintée au bord
  * du bloc, a été prise pour « le transport » (31/08). Une donnée qu'on cherche
  * et qui n'est nulle part finit toujours par être lue dans autre chose.
  *
- * @returns {{minutes: number, depuisId: string}|null} `null` s'il n'y a pas de
- *   précédent, ou si l'un des deux points n'a pas de position (aucun trajet
- *   n'est alors calculable, et en inventer un serait pire que se taire).
+ * Les DEUX chiffres sont rendus, jamais le seul minimum : quand le planning
+ * laisse moins de temps que le trajet estimé (30 min pour 46 estimées sur le
+ * 31/08), c'est précisément ce qu'il faut montrer — et c'est ce qui explique
+ * qu'on n'impose alors aucune butée (cf. `bornesDeplacement`).
+ *
+ * @returns {{minutes: number, disponibleMinutes: number, insuffisant: boolean,
+ *   depuisId: string}|null} `null` s'il n'y a pas de précédent, ou si l'un des
+ *   deux points n'a pas de position (aucun trajet n'est alors calculable, et en
+ *   inventer un serait pire que se taire).
  */
 export function trajetDepuisPrecedent(segments, id, trajet = trajetLocal) {
   const i = (segments || []).findIndex((s) => s.id === id);
@@ -327,6 +338,12 @@ export function trajetDepuisPrecedent(segments, id, trajet = trajetLocal) {
   const s = segments[i];
   const precedent = segments[i - 1];
   if (!s.key || !precedent.key) return null;
-  const ecart = Math.max(s.debutMinutes - precedent.finMinutes, 0);
-  return { minutes: Math.min(trajet(precedent.key, s.key), ecart), depuisId: precedent.id };
+  const estime = trajet(precedent.key, s.key);
+  const disponible = Math.max(s.debutMinutes - precedent.finMinutes, 0);
+  return {
+    minutes: estime,
+    disponibleMinutes: disponible,
+    insuffisant: disponible < estime,
+    depuisId: precedent.id,
+  };
 }

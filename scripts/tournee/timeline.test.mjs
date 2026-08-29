@@ -326,10 +326,11 @@ test('appliquerAjustements — une durée ramenée à sa valeur d origine ne men
     'aucun marqueur de modification si rien n a change');
 });
 
-test('bornesDeplacement — on ne réserve jamais plus de route que l écart constaté', () => {
+test('bornesDeplacement — une contrainte déjà violée ne fige pas le RDV', () => {
   // Cas 31/08 : LODDO finit a 9h30, TREVISIOL commence a 10h — 30 min d'ecart,
-  // la ou l'estimation a vol d'oiseau en reclame ~42. Sans plafond, TREVISIOL
-  // etait immobile cote gauche, sans explication.
+  // la ou l'estimation a vol d'oiseau en reclame ~46. TREVISIOL etait fige,
+  // incapable de reculer d'une minute, pour faire respecter un trajet qui
+  // n'etait de toute facon pas respecte. L'humain reprend la main.
   const A = { id: 'loddo', scheduled_start: '08:00', duration_minutes: 90, lat: 43.75, lng: 1.80 };
   const B = { id: 'trevisiol', scheduled_start: '10:00', duration_minutes: 120, lat: 43.57, lng: 2.01 };
   const { segments } = construireSegments([A, B], JOURNEE);
@@ -338,8 +339,8 @@ test('bornesDeplacement — on ne réserve jamais plus de route que l écart con
   assert.ok(estime > 30, `le pretest suppose une estimation > 30 min (obtenu ${estime})`);
 
   const bornes = bornesDeplacement(segments, 'trevisiol', JOURNEE);
-  assert.equal(bornes.minDebut, 570 + 30,
-    'la marge est plafonnee a l ecart reel (30 min), pas a l estimation');
+  assert.equal(bornes.minDebut, 570, 'butee au contact : TREVISIOL peut enfin reculer');
+  assert.ok(bornes.minDebut < 600, 'et pas coince a sa position actuelle');
 });
 
 test('bornesDeplacement — au-delà de l écart constaté, l estimation s applique normalement', () => {
@@ -351,7 +352,7 @@ test('bornesDeplacement — au-delà de l écart constaté, l estimation s appli
   assert.equal(bornesDeplacement(segments, 'b', JOURNEE).minDebut, 540 + estime);
 });
 
-test('trajetDepuisPrecedent — donne le temps de route à afficher, ou rien', () => {
+test('trajetDepuisPrecedent — donne les DEUX chiffres, ou rien', () => {
   const A = { id: 'a', scheduled_start: '08:00', duration_minutes: 90, lat: 43.75, lng: 1.80 };
   const B = { id: 'b', scheduled_start: '10:00', duration_minutes: 60, lat: 43.57, lng: 2.01 };
   const { segments } = construireSegments([A, B], JOURNEE);
@@ -359,7 +360,9 @@ test('trajetDepuisPrecedent — donne le temps de route à afficher, ou rien', (
   assert.equal(trajetDepuisPrecedent(segments, 'a'), null, 'aucun precedent : rien a dire');
   const t = trajetDepuisPrecedent(segments, 'b');
   assert.equal(t.depuisId, 'a');
-  assert.equal(t.minutes, 30, 'plafonne par l ecart reel, comme la butee');
+  assert.equal(t.minutes, trajetLocal(cleCoord(A), cleCoord(B)), 'le trajet estime, brut');
+  assert.equal(t.disponibleMinutes, 30, 'et le temps reellement disponible');
+  assert.equal(t.insuffisant, true, 'l ecart est plus court que le trajet : a signaler');
 
   // Sans position, aucun trajet n'est calculable : on se tait plutot que d'en
   // inventer un.

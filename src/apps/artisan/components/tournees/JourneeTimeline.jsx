@@ -203,7 +203,7 @@ export function JourneeTimeline({
   // du geste en cours) : c'est l'écart du planning tel qu'il est posé.
   const trajetBrut = survole ? trajetDepuisPrecedent(base.segments, survole.id) : null;
   const trajetSurvole = trajetBrut ? {
-    minutes: trajetBrut.minutes,
+    ...trajetBrut,
     depuis: base.segments.find((s) => s.id === trajetBrut.depuisId)?.rdv?.client_name
       || 'l\u2019arrêt précédent',
   } : null;

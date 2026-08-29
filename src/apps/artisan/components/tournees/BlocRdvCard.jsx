@@ -37,10 +37,13 @@ const COULEUR_TYPE = {
  * @param {object} props.rdv        RDV brut (`journee.rdvs`)
  * @param {number} props.debutMinutes  heure affichée — celle du bloc, décalage compris
  * @param {number} props.finMinutes
- * @param {{minutes: number, depuis: string}|null} [props.trajet]  temps de route
- *   depuis le RDV précédent. Cette information manquait à l'écran au point que
- *   la poignée de redimensionnement a été prise pour « le transport » (31/08) :
- *   une donnée qu'on cherche et qui n'est nulle part finit lue dans autre chose.
+ * @param {{minutes, disponibleMinutes, insuffisant, depuis}|null} [props.trajet]
+ *   temps de route depuis le RDV précédent. Cette information manquait à l'écran
+ *   au point que la poignée de redimensionnement a été prise pour « le
+ *   transport » (31/08) : une donnée qu'on cherche et qui n'est nulle part finit
+ *   lue dans autre chose. Les DEUX chiffres sont affichés quand ils divergent —
+ *   un planning qui laisse 30 min pour un trajet estimé à 46 doit le dire, c'est
+ *   la seule raison pour laquelle le rendez-vous se déplace librement.
  * @param {string} [props.className]
  */
 export function BlocRdvCard({
@@ -86,12 +89,25 @@ export function BlocRdvCard({
         </span>
       </div>
 
-      {/* Le trajet depuis le RDV précédent : c'est lui qui explique pourquoi ce
-          bloc ne peut pas reculer davantage. */}
+      {/* Le trajet depuis le RDV précédent : c'est lui qui borne le déplacement
+          de ce bloc — et son insuffisance explique qu'il n'en soit pas borné. */}
       {trajet && (
-        <p className="mt-1 flex items-center gap-1 text-[11px] text-gray-400">
-          <Car className="h-3 w-3 flex-shrink-0" />
-          {formatDuree(trajet.minutes)} de route depuis {trajet.depuis}
+        <p
+          className={`mt-1 flex items-start gap-1 text-[11px] ${
+            trajet.insuffisant ? 'text-amber-700' : 'text-gray-400'
+          }`}
+        >
+          <Car className="h-3 w-3 flex-shrink-0 mt-px" />
+          <span>
+            {formatDuree(trajet.minutes)} de route depuis {trajet.depuis}
+            {trajet.insuffisant && (
+              <>
+                {' '}— <strong className="font-semibold">
+                  {formatDuree(trajet.disponibleMinutes)} disponibles seulement
+                </strong>
+              </>
+            )}
+          </span>
         </p>
       )}
     </div>
