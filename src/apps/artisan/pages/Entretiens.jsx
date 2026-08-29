@@ -3,10 +3,12 @@
  * ============================================================================
  * Module unifié Entretien (visites annuelles) & SAV (réparations).
  *
- * 4 onglets :
+ * 5 onglets :
  *   - Kanban (défaut) : board unifié EntretienSAVKanban
  *   - Contrats : liste contrats existante
  *   - Programmation : vue secteurs avec CTA « Planifier »
+ *   - Tournées : optimisation tournées d'entretien (insertion la moins
+ *     coûteuse en trajet dans une journée technicien déjà planifiée)
  *   - Dashboard : KPIs contrats + SAV
  *
  * Header : 4 stat cards workflow (Entretiens à planifier, SAV en cours,
@@ -30,6 +32,7 @@ import {
   Calendar,
   CheckCircle2,
   Archive,
+  Route,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -39,6 +42,7 @@ import { useContracts, useContractStats, useContractSectors } from '@hooks/useCo
 import { useEntretienSAVStats, entretienSavKeys } from '@hooks/useEntretienSAV';
 import { smsKeys } from '@hooks/cacheKeys';
 import { savService } from '@services/sav.service';
+import { getPlannedContractIds } from '@services/entretiens.service';
 import { supabase } from '@/lib/supabaseClient';
 import { EntretienSAVKanban } from '@apps/artisan/components/entretiens/EntretienSAVKanban';
 import { EntretiensDashboard } from '@apps/artisan/components/entretiens/EntretiensDashboard';
@@ -46,6 +50,7 @@ import { ContractsList } from '@apps/artisan/components/entretiens/ContractsList
 import { SectorGroupView } from '@apps/artisan/components/entretiens/SectorGroupView';
 import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal';
 import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateContractModal';
+import { TourneesTab } from '@apps/artisan/components/tournees/TourneesTab';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -172,19 +177,14 @@ export default function Entretiens() {
   const { sectors, isLoading: sectorsLoading } = useContractSectors(orgId);
 
   // Contrats ayant déjà un entretien actif (pour désactiver le bouton Planifier)
+  // — logique factorisée dans entretiensService.getPlannedContractIds (réutilisée
+  // telle quelle par tournees.service.js::getContratsDus, cf. revue finale C3).
   const { data: plannedContractIds } = useQuery({
     queryKey: [...entretienSavKeys.all(orgId), 'planned-contracts'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('majordhome_entretien_sav')
-        .select('effective_contract_id')
-        .eq('org_id', orgId)
-        .eq('intervention_type', 'entretien')
-        .neq('workflow_status', 'realise');
-      // Contrat EFFECTIF : une carte créée avant la saisie du contrat a `contract_id`
-      // NULL et serait absente du Set → l'outil de Programmation reproposerait de la
-      // planifier, créant une 2ᵉ carte pour le même contrat (migration 20260728_1).
-      return new Set((data || []).map(r => r.effective_contract_id).filter(Boolean));
+      const { data, error } = await getPlannedContractIds({ orgId });
+      if (error) throw error;
+      return data;
     },
     enabled: !!orgId,
     staleTime: 30_000,
@@ -447,6 +447,10 @@ export default function Entretiens() {
             <Map className="h-4 w-4" />
             Programmation
           </TabsTrigger>
+          <TabsTrigger value="tournees" className="gap-2 data-[state=active]:bg-white">
+            <Route className="w-4 h-4" />
+            Tournées
+          </TabsTrigger>
           <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
             <BarChart3 className="h-4 w-4" />
             Dashboard
@@ -509,6 +513,11 @@ export default function Entretiens() {
             onSendReminder={handleSendReminder}
             canSendReminder={canCreateContract}
           />
+        </TabsContent>
+
+        {/* TAB TOURNEES */}
+        <TabsContent value="tournees" className="mt-6">
+          <TourneesTab />
         </TabsContent>
 
         {/* TAB DASHBOARD */}
