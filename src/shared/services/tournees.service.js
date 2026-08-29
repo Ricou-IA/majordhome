@@ -30,7 +30,7 @@ import {
   cleCoord, barycentre, filtreProximite, haversineKm,
 } from '@/lib/tournee/geo.js';
 import { construireMatrice } from '@/lib/tournee/matrice.js';
-import { classerCandidats } from '@/lib/tournee/insertion.js';
+import { classerParCreneaux } from '@/lib/tournee/creneaux.js';
 import { construireArretsExistants } from '@/lib/tournee/arrets.js';
 
 /**
@@ -361,21 +361,22 @@ export const tourneesService = {
    *   tête de fichier). `maxCandidats` — override explicite (tests) ; par
    *   défaut `reglages.max_candidats_tri` (I2, jamais figé en dur).
    * @returns {Promise<{
-   *   data: Array<{ candidat: { id: string, key: string|null, dureeMinutes: number, meta: (Candidat & { eligibilite: object }) }, coutMinutes: number, detourMinutes: number, scoreFinal: number, sequenceApres: object }>,
-   *   baseInfaisable: boolean,
-   *   raisonBase: ('budget'|'amplitude'|'fenetre'|null),
+   *   data: Array<{ candidat: { id: string, key: string|null, dureeMinutes: number, meta: (Candidat & { eligibilite: object }) }, coutMinutes: number, detourMinutes: number, scoreFinal: number, placement: object }>,
+   *   chargeMinutes: number,
+   *   raisonsRejet: Record<('creneau'|'budget'|'pause'|'position'), number>,
    *   estime: boolean,
    *   error: (Error|null),
    * }>}
-   *   Amendement 3 — trois états à distinguer, jamais confondus dans un simple
-   *   tableau vide :
+   *   Deux états à distinguer, jamais confondus dans un simple tableau vide :
    *     1. `error` non-null (dépôt non configuré via `siege_non_configure`, ou
    *        échec technique) → ne JAMAIS afficher comme « personne à visiter ».
-   *     2. `baseInfaisable: true` → la journée est DÉJÀ en dépassement avant
-   *        tout ajout (`data` toujours vide) ; `raisonBase` porte la cause
-   *        brute renvoyée par le séquenceur sur la tournée seule.
-   *     3. `baseInfaisable: false` + `data: []` → journée saine, aucun
-   *        candidat ne s'insère (budget/amplitude/fenêtre une fois ajouté).
+   *     2. `data: []` → aucun candidat ne s'insère ; `raisonsRejet` dit
+   *        POURQUOI (plus de trou assez grand, budget atteint, pause menacée,
+   *        client non géolocalisé) plutôt que de laisser l'écran deviner.
+   *
+   *   ⚠️ Plus de `baseInfaisable` : une journée déjà posée n'est pas
+   *   « infaisable », elle EST. Le moteur ne la juge plus, il cherche seulement
+   *   où un candidat se glisse (cf. bloc de tête de creneaux.js).
    */
   async proposerPourJournee({ journee, candidats, coreOrgId, settings, maxCandidats }) {
     try {
@@ -384,7 +385,7 @@ export const tourneesService = {
       const depot = getOrgHeadquarters(settings);
       if (!depot) {
         return {
-          data: [], baseInfaisable: false, raisonBase: null, estime: false,
+          data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false,
           error: new Error('siege_non_configure'),
         };
       }
@@ -444,7 +445,7 @@ export const tourneesService = {
       // trajetsService.chargerMatrice attend désormais { noyau, candidats } séparés
       // (plus jamais un seul tableau `points`) : le noyau = dépôt + arrêts déjà
       // posés (comparés entre eux ET à chaque candidat), les candidats ne sont
-      // jamais comparés les uns aux autres (coutInsertion n'en teste qu'un à la
+      // jamais comparés les uns aux autres (placerCandidat n'en teste qu'un à la
       // fois). Les deux paramètres doivent toujours être des tableaux (jamais
       // undefined) — dépot garantit noyau non vide, notes peut être [].
       // Les arrêts sans coordonnées (key null) bloquent bien leur créneau dans le
@@ -464,7 +465,7 @@ export const tourneesService = {
       // l'échec silencieux que ce projet proscrit : on la propage plutôt que de l'ignorer.
       if (matriceErr) {
         return {
-          data: [], baseInfaisable: false, raisonBase: null, estime: false, error: matriceErr,
+          data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, error: matriceErr,
         };
       }
       const trajet = construireMatrice(paires);
@@ -480,7 +481,7 @@ export const tourneesService = {
         },
       };
 
-      const { classement, baseInfaisable, raisonBase } = classerCandidats(
+      const { classement, chargeMinutes, raisonsRejet } = classerParCreneaux(
         arretsExistants,
         notes.map((c) => ({
           id: c.contractId, key: cleCoord(c), dureeMinutes: c.dureeMinutes, meta: c,
@@ -489,10 +490,12 @@ export const tourneesService = {
         { scoreParId: scores },
       );
 
-      return { data: classement, baseInfaisable, raisonBase, estime, error: null };
+      return {
+        data: classement, chargeMinutes, raisonsRejet, estime, error: null,
+      };
     } catch (error) {
       logger.error('[tournees] proposerPourJournee', error);
-      return { data: [], baseInfaisable: false, raisonBase: null, estime: false, error };
+      return { data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, error };
     }
   },
 };

@@ -75,7 +75,7 @@ export function minutesVersHeure(minutes) {
 
 /**
  * Arrêts déjà posés d'une journée, prêts pour `sequencerTournee` /
- * `classerCandidats` : `{ id, key, dureeMinutes, fenetre? }`.
+ * `classerParCreneaux` : `{ id, key, dureeMinutes, fenetre? }`.
  *
  * @param {Array<{id, lat, lng, duration_minutes, scheduled_start}>} rdvs
  *   `journee.rdvs` (cf. tournees.service.js).

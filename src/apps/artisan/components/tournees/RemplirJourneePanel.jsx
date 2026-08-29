@@ -4,11 +4,17 @@
  * Slide-over : propose les contrats dus qui coûtent le moins de trajet à
  * insérer dans la journée d'un technicien, et pose les RDV en un geste.
  *
- * Trois états à ne jamais confondre (cf. usePropositions) :
- *   - `baseInfaisable: true`  → la journée est DÉJÀ en dépassement (budget,
- *     amplitude ou fenêtre) avant tout ajout. Jamais "aucun entretien".
- *   - `baseInfaisable: false` + liste vide → aucun entretien à proximité.
+ * Deux états à ne jamais confondre (cf. usePropositions) :
+ *   - liste vide → aucun candidat ne trouve sa place ; `raisonsRejet` dit
+ *     POURQUOI (plus de trou, budget, pause, client non géolocalisé). Jamais
+ *     un « aucun entretien » sec qui laisse deviner.
  *   - liste non vide → le classement, à cocher.
+ *
+ * ⚠️ Il n'y a plus d'état « journée en dépassement » : une journée déjà posée
+ * n'est pas une hypothèse à valider, elle a lieu (cf. creneaux.js). L'ancien
+ * modèle la déclarait infaisable dès que ses RDV ne respectaient pas NOS
+ * estimations de trajet, et l'écran refusait alors tout en bloc — sur le 31/08
+ * réel, 2 h 30 annoncées libres et rien de possible.
  *
  * `estime: true` → au moins une durée de trajet de la MATRICE (utilisée pour
  * le classement initial) est approximative (Mapbox indisponible/hors quota) —
@@ -83,6 +89,15 @@ export function RemplirJourneePanel({
   const depot = useMemo(() => getOrgHeadquarters(settings), [settings]);
   const reglages = useMemo(() => construireReglages(settings), [settings]);
   const propositions = data?.propositions;
+
+  // Raison la plus fréquente parmi les candidats écartés : ce qu'il faut dire
+  // quand la liste est vide, plutôt que de laisser croire qu'il n'y a personne
+  // à visiter dans le secteur.
+  const motifDominant = useMemo(() => {
+    const entrees = Object.entries(data?.raisonsRejet || {});
+    if (entrees.length === 0) return null;
+    return entrees.sort((a, b) => b[1] - a[1])[0][0];
+  }, [data]);
 
   // Arrêts déjà posés ce jour — helper partagé avec tournees.service.js (C2,
   // revue finale) pour que les DEUX endroits qui construisent "les arrêts
@@ -195,12 +210,18 @@ export function RemplirJourneePanel({
                 Erreur de calcul : {error?.message || 'échec inconnu'}
               </div>
             )
-          ) : data?.baseInfaisable ? (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-4">
-              Cette journée est déjà en dépassement — {RAISON_LABELS[data.raisonBase] || data.raisonBase || 'raison inconnue'}.
-            </div>
           ) : !propositions || propositions.length === 0 ? (
-            <p className="text-sm text-gray-500 py-8 text-center">Aucun entretien à proposer à proximité.</p>
+            <div className="py-8 text-center text-sm text-gray-500">
+              <p>Aucun entretien à proposer sur cette journée.</p>
+              {/* Le motif dominant, pas un silence : « plus de trou » et
+                  « budget atteint » n'appellent pas la même réaction — et
+                  décaler un RDV peut débloquer le premier. */}
+              {motifDominant && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Motif principal : {RAISON_LABELS[motifDominant] || motifDominant}.
+                </p>
+              )}
+            </div>
           ) : (
             <ul className="space-y-2">
               {propositions.map((p) => (
@@ -230,23 +251,33 @@ export function RemplirJourneePanel({
           <div className="border-t border-gray-200 bg-gray-50 px-5 py-4 space-y-3">
             {selectedIds.size > 0 && recalcul && (
               <div className="text-sm text-gray-700 space-y-1">
-                {!recalcul.faisable ? (
-                  <p className="text-red-700 font-medium">
-                    Sélection impossible — {RAISON_LABELS[recalcul.raison] || recalcul.raison}.
+                {/* Un candidat coché que l'ensemble ne place plus n'est pas une
+                    erreur globale : les autres tiennent toujours. On nomme
+                    celui qui saute plutôt que d'annuler tout le panneau. */}
+                {recalcul.refuses.length > 0 && (
+                  <p className="text-amber-700">
+                    {recalcul.refuses.length === 1
+                      ? `${recalcul.refuses[0].candidat.meta?.clientName || 'Un client'} ne rentre plus`
+                      : `${recalcul.refuses.length} clients ne rentrent plus`}
+                    {' '}— {RAISON_LABELS[recalcul.refuses[0].raison] || recalcul.refuses[0].raison}.
                   </p>
-                ) : (
+                )}
+                {recalcul.places.length > 0 && (
                   <>
                     <div className="flex items-center justify-between">
                       <span>Fin de journée</span>
-                      <span className="font-medium">{minutesEnHHMM(recalcul.finMinutes)}</span>
+                      <span className="font-medium">
+                        {recalcul.finMinutes == null ? '—' : minutesEnHHMM(recalcul.finMinutes)}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Charge / budget</span>
-                      <span className="font-medium">{recalcul.chargeMinutes} / {journee.budgetMinutes} min</span>
+                      <span className="font-medium">
+                        {formatDuree(recalcul.chargeMinutes)} / {formatDuree(journee.budgetMinutes)}
+                      </span>
                     </div>
                     <p className="text-xs text-gray-400">
-                      Aperçu local, distances estimées à vol d&apos;oiseau
-                      {recalcul.methode === 'heuristique' ? ' · ordre approché (plus de 8 arrêts)' : ''}.
+                      Aperçu local, distances estimées à vol d&apos;oiseau.
                       Les horaires réels sont recalculés à la pose.
                     </p>
                   </>
@@ -275,7 +306,7 @@ export function RemplirJourneePanel({
               className="w-full"
               disabled={
                 selectedIds.size === 0 || posing || calculatingReel || !canCreer
-                || (recalcul && !recalcul.faisable)
+                || (recalcul && recalcul.places.length === 0)
               }
               onClick={handlePoserClick}
             >
@@ -290,7 +321,7 @@ export function RemplirJourneePanel({
                   Pose en cours…
                 </>
               ) : (
-                `Poser ${selectedIds.size} rendez-vous${decalages.size > 0 ? ` et décaler ${decalages.size} RDV` : ''}`
+                `Poser ${recalcul?.places.length ?? selectedIds.size} rendez-vous${decalages.size > 0 ? ` et décaler ${decalages.size} RDV` : ''}`
               )}
             </Button>
           </div>

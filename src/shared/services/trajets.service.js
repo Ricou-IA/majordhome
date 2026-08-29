@@ -7,7 +7,7 @@
 // quelques centaines de calculs.
 //
 // ⚠️ MATRICE PARTIELLE, VOLONTAIRE : cette fonction ne calcule JAMAIS les
-// paires candidat↔candidat. `coutInsertion` (src/lib/tournee/insertion.js)
+// paires candidat↔candidat. `placerCandidat` (src/lib/tournee/creneaux.js)
 // n'évalue jamais qu'un seul candidat ajouté à une tournée existante
 // (`[...tournée, UN candidat]`) — les distances entre deux candidats ne sont
 // donc jamais lues par le séquenceur. La matrice réellement utile n'est pas

@@ -43,7 +43,7 @@ import { appointmentsService } from '@services/appointments.service';
 import { trajetsService } from '@services/trajets.service';
 import { supabase } from '@lib/supabaseClient';
 import { logger } from '@lib/logger';
-import { sequencerTournee } from '@/lib/tournee/sequence.js';
+import { placerPlusieurs, finDeJournee, chargeExistante } from '@/lib/tournee/creneaux.js';
 import { cleCoord } from '@/lib/tournee/geo.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
 import { RAISON_LABELS, minutesEnHHMM, messageErreur } from './tourneesPanelUtils';
@@ -90,26 +90,44 @@ export function useJourneePose({
     [propositions, selectedIds],
   );
 
+  /** Contexte commun aux deux calculs (aperçu local et trajets réels). */
+  const contexte = useCallback((trajet) => ({
+    trajet,
+    depotKey: cleCoord(depot),
+    amplitude: journee.amplitude,
+    budgetMinutes: journee.budgetMinutes,
+    pause: {
+      minutes: reglages.pause_minutes,
+      fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],
+    },
+  }), [depot, journee, reglages]);
+
   // Aperçu LOCAL, pur, sans réseau — peut rester estimé pendant la sélection,
   // annoncé comme tel dans le footer par le composant appelant.
+  //
+  // Même modèle que le classement (creneaux.js) : les RDV posés sont fixes, on
+  // insère dans les trous. Utiliser un modèle différent ici ferait dire à
+  // l'aperçu le contraire de ce que la liste vient de proposer.
   const recalcul = useMemo(() => {
     if (!depot || !journee) return null;
-    const arrets = [...arretsExistants, ...selectionnees.map((p) => p.candidat)];
-    return sequencerTournee({
-      depotKey: cleCoord(depot),
-      arrets,
-      trajet: trajetLocal,
-      amplitude: journee.amplitude,
-      budgetMinutes: journee.budgetMinutes,
-      pause: {
-        minutes: reglages.pause_minutes,
-        fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],
-      },
-    });
-  }, [depot, journee, arretsExistants, selectionnees, reglages]);
+    const ctx = contexte(trajetLocal);
+    const { places, refuses, arretsFinaux } = placerPlusieurs(
+      arretsExistants, selectionnees.map((p) => p.candidat), ctx,
+    );
+    return {
+      places,
+      refuses,
+      planning: places.map((p) => ({
+        id: p.candidat.id,
+        arriveeMinutes: p.placement.arriveeMinutes,
+        departMinutes: p.placement.departMinutes,
+      })),
+      finMinutes: finDeJournee(arretsFinaux, ctx),
+      chargeMinutes: chargeExistante(arretsFinaux, ctx),
+    };
+  }, [depot, journee, arretsExistants, selectionnees, contexte]);
 
   const calculerHorairesReels = useCallback(async () => {
-    const arrets = [...arretsExistants, ...selectionnees.map((p) => p.candidat)];
     const noyau = [
       depot,
       // Un arrêt sans coordonnées (key null) bloque son créneau côté séquencement
@@ -128,30 +146,35 @@ export function useJourneePose({
         logger.error('[useJourneePose] chargerMatrice (pose)', matriceErr);
         return { ...recalcul, estime: true };
       }
-      const trajetReel = construireMatrice(paires);
-      const resultat = sequencerTournee({
-        depotKey: cleCoord(depot),
-        arrets,
-        trajet: trajetReel,
-        amplitude: journee.amplitude,
-        budgetMinutes: journee.budgetMinutes,
-        pause: {
-          minutes: reglages.pause_minutes,
-          fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],
-        },
-      });
-      return { ...resultat, estime: matriceEstimee };
+      const ctx = contexte(construireMatrice(paires));
+      const { places, refuses, arretsFinaux } = placerPlusieurs(
+        arretsExistants, selectionnees.map((p) => p.candidat), ctx,
+      );
+      return {
+        places,
+        refuses,
+        planning: places.map((p) => ({
+          id: p.candidat.id,
+          arriveeMinutes: p.placement.arriveeMinutes,
+          departMinutes: p.placement.departMinutes,
+        })),
+        finMinutes: finDeJournee(arretsFinaux, ctx),
+        chargeMinutes: chargeExistante(arretsFinaux, ctx),
+        estime: matriceEstimee,
+      };
     } catch (err) {
       // Repli explicite sur l'aperçu déjà affiché (vol d'oiseau), marqué estimé —
       // jamais un blocage total de la pose sur un souci réseau ponctuel.
       logger.error('[useJourneePose] calculerHorairesReels', err);
       return { ...recalcul, estime: true };
     }
-  }, [coreOrgId, depot, journee, arretsExistants, selectionnees, reglages, recalcul]);
+  }, [coreOrgId, depot, arretsExistants, selectionnees, contexte, recalcul]);
 
+  // Seuls les candidats RÉELLEMENT placés sont posés. Un candidat refusé au
+  // moment du calcul réel (le trou s'est refermé depuis la proposition) ne doit
+  // pas être écrit avec des horaires inventés — il ressort dans `refuses`.
   const construireOrdonnees = useCallback((resultat) => {
-    if (!resultat?.faisable) return [];
-    return resultat.planning
+    return (resultat?.planning || [])
       .filter((p) => selectedIds.has(p.id))
       .map((p) => ({ ...p, meta: selectionnees.find((s) => s.candidat.id === p.id)?.candidat.meta }))
       .filter((p) => p.meta);
@@ -348,8 +371,13 @@ export function useJourneePose({
       // toute la pose (calculatingReel et posing seraient vrais en même temps).
       setCalculatingReel(false);
     }
-    if (!reel?.faisable) {
-      toast.error(`Cette sélection ne tient plus — ${RAISON_LABELS[reel?.raison] || reel?.raison || 'raison inconnue'}.`);
+    // Plus de verdict global « faisable » : le modèle place chaque candidat
+    // dans un trou, indépendamment des autres. Ce qui bloque, c'est qu'AUCUN
+    // des candidats cochés n'ait trouvé sa place une fois les trajets réels
+    // connus.
+    if (!reel?.places?.length) {
+      const raison = reel?.refuses?.[0]?.raison;
+      toast.error(`Cette sélection ne tient plus — ${RAISON_LABELS[raison] || 'plus de créneau disponible'}.`);
       return;
     }
     // Deux motifs de confirmation, cumulables : des horaires approximatifs

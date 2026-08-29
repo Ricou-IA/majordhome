@@ -5,11 +5,17 @@
 // dans src/lib/tournee/) — uniquement de la mise en forme texte.
 // ============================================================================
 
-/** Traduction des 3 raisons brutes du moteur (`sequencerTournee`/`classerCandidats`). */
+/**
+ * Traduction des motifs de rejet du moteur (`creneaux.js::placerCandidat`).
+ * Ils portent tous sur le CANDIDAT qu'on essaie d'insérer, jamais sur la
+ * journée elle-même : depuis creneaux.js, une journée déjà posée n'est plus
+ * jugée « infaisable », elle est.
+ */
 export const RAISON_LABELS = {
-  budget: 'le temps de travail dépasse déjà le budget de la journée',
-  amplitude: 'le retour au dépôt dépasse déjà l’amplitude horaire',
-  fenetre: 'une fenêtre horaire promise n’est déjà plus respectée',
+  creneau: 'aucun créneau libre assez grand entre deux rendez-vous',
+  budget: 'le temps de travail de la journée serait dépassé',
+  pause: 'il ne resterait plus de quoi déjeuner',
+  position: 'ce client n’est pas géolocalisé',
 };
 
 /** Minutes depuis minuit -> "HH:MM". */

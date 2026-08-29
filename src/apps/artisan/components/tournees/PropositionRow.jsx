@@ -14,20 +14,19 @@ import { minutesEnHHMM } from './tourneesPanelUtils';
 export function PropositionRow({
   proposition, checked, disabled, onToggle, recalculEnsemble = null,
 }) {
-  const { candidat, detourMinutes, sequenceApres } = proposition;
+  const { candidat, detourMinutes, placement } = proposition;
   const meta = candidat.meta || {};
-  // I3 — `sequenceApres` suppose CE candidat seul ajouté à la tournée : dès
-  // que ≥2 candidats sont cochés (RemplirJourneePanel passe alors
-  // `recalculEnsemble`), cette hypothèse est fausse pour toutes les lignes en
-  // même temps, et les afficher produirait des heures mutuellement
-  // incompatibles sans le dire. On bascule sur le recalcul d'ENSEMBLE, en
-  // n'affichant l'heure que pour les lignes qu'il couvre réellement (les
-  // cochées) — une ligne non cochée n'affiche alors plus rien plutôt qu'une
-  // estimation solo devenue caduque, et une tournée d'ensemble infaisable
-  // n'affiche d'heure pour personne.
+  // I3 — `placement` suppose CE candidat seul ajouté à la tournée : dès que ≥2
+  // candidats sont cochés (RemplirJourneePanel passe alors `recalculEnsemble`),
+  // cette hypothèse est fausse pour toutes les lignes en même temps, et les
+  // afficher produirait des heures mutuellement incompatibles sans le dire. On
+  // bascule sur le recalcul d'ENSEMBLE, en n'affichant l'heure que pour les
+  // lignes qu'il couvre réellement (les cochées) — une ligne non cochée
+  // n'affiche alors plus rien plutôt qu'une estimation solo devenue caduque, et
+  // un candidat que l'ensemble ne place plus n'affiche pas d'heure du tout.
   const passage = recalculEnsemble
-    ? (recalculEnsemble.faisable ? recalculEnsemble.planning?.find((p) => p.id === candidat.id) : null)
-    : sequenceApres?.planning?.find((p) => p.id === candidat.id);
+    ? recalculEnsemble.planning?.find((p) => p.id === candidat.id)
+    : placement;
   const horsSaison = meta.eligibilite?.saisonDefavorable === true;
   // "Hors fenêtre anniversaire" ne veut dire quelque chose que pour un contrat
   // qui A une date anniversaire : sans elle, l'éligibilité par défaut porte
