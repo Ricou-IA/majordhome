@@ -51,6 +51,11 @@ import { RemplirJourneePanel } from './RemplirJourneePanel';
 // alors qu'elles font pourtant partie de l'horizon ferme promis).
 const MARGE_AMORCEE_JOURS = 30;
 
+// Plus court entretien du parc (poêle à bois / mono-split). En dessous de ce
+// reste, aucune intervention ne peut rentrer, trajet non compris : la journée
+// est masquée plutôt que de faire scroller sur des cartes inexploitables.
+const DUREE_MIN_ENTRETIEN_MINUTES = 60;
+
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
@@ -62,10 +67,21 @@ function StatValue({ isLoading, isError, value }) {
   return <span className="text-xl font-semibold text-gray-900">{value}</span>;
 }
 
+/**
+ * Minutes encore disponibles sur une journée. Négatif = la journée déborde déjà
+ * (typiquement une installation qui occupe 9 à 10 h).
+ */
+function minutesDisponibles(journee) {
+  return (journee.budgetMinutes || 0) - (journee.chargeMinutes || 0);
+}
+
 function JourneeCard({ journee, onClick }) {
   const pct = journee.budgetMinutes > 0
     ? Math.min(100, Math.round((journee.chargeMinutes / journee.budgetMinutes) * 100))
     : 0;
+  // On affiche le temps LIBRE, pas la charge : « 150 min libres » se lit d'un
+  // coup d'œil là où « 330 / 480 » demande une soustraction à chaque carte.
+  const libre = minutesDisponibles(journee);
 
   return (
     <button
@@ -89,9 +105,9 @@ function JourneeCard({ journee, onClick }) {
         <span className="font-semibold text-gray-900 truncate">{journee.technicienNom}</span>
       </div>
       <div>
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-          <span>{journee.chargeMinutes} / {journee.budgetMinutes} min</span>
-          <span>{journee.rdvs.length} RDV</span>
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span className="font-semibold text-gray-900">{libre} min libres</span>
+          <span className="text-gray-500">{journee.rdvs.length} RDV · {journee.chargeMinutes} min</span>
         </div>
         <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
           <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
@@ -157,22 +173,38 @@ export function TourneesTab() {
   // Filtrage impératif (spec §3.2) : au-delà de l'horizon ferme, seules les
   // journées déjà amorcées sont proposables — getJourneesHorizon ne filtre
   // pas lui-même, c'est à l'écran de le faire (cf. task-11-report.md).
-  const { joursFermes, joursAmorces, totalVisibles } = useMemo(() => {
-    if (!journees) return { joursFermes: [], joursAmorces: [], totalVisibles: 0 };
+  const { joursFermes, joursAmorces, totalVisibles, nbMasquees } = useMemo(() => {
+    if (!journees) {
+      return { joursFermes: [], joursAmorces: [], totalVisibles: 0, nbMasquees: 0 };
+    }
 
     const limiteFerme = new Date();
     limiteFerme.setDate(limiteFerme.getDate() + reglages.horizon_ferme_jours);
     const limite = limiteFerme.toISOString().slice(0, 10);
 
-    const journeesVisibles = (journees || []).filter(
+    const dansHorizon = (journees || []).filter(
       (j) => j.date <= limite || j.estAmorcee,
     );
-    const tri = (a, b) => a.date.localeCompare(b.date) || a.technicienNom.localeCompare(b.technicienNom);
+
+    // Une journée dont il reste moins que le plus court entretien du parc ne peut
+    // rien accueillir : l'afficher obligerait à la parcourir pour rien. Les
+    // journées en dépassement (disponible négatif, typiquement une installation
+    // qui occupe 9 à 10 h) tombent dans le même cas.
+    const exploitables = dansHorizon.filter(
+      (j) => minutesDisponibles(j) >= DUREE_MIN_ENTRETIEN_MINUTES,
+    );
+
+    // Le tri met en tête les journées où il reste le plus de place : c'est là
+    // qu'on a une chance de caser une vraie tournée, pas juste un arrêt.
+    const tri = (a, b) => minutesDisponibles(b) - minutesDisponibles(a)
+      || a.date.localeCompare(b.date)
+      || a.technicienNom.localeCompare(b.technicienNom);
 
     return {
-      joursFermes: journeesVisibles.filter((j) => j.date <= limite).sort(tri),
-      joursAmorces: journeesVisibles.filter((j) => j.date > limite).sort(tri),
-      totalVisibles: journeesVisibles.length,
+      joursFermes: exploitables.filter((j) => j.date <= limite).sort(tri),
+      joursAmorces: exploitables.filter((j) => j.date > limite).sort(tri),
+      totalVisibles: exploitables.length,
+      nbMasquees: dansHorizon.length - exploitables.length,
     };
   }, [journees, reglages.horizon_ferme_jours]);
 
@@ -201,7 +233,15 @@ export function TourneesTab() {
           <CalendarDays className="h-5 w-5 text-gray-400" />
           <div>
             <StatValue isLoading={journeesLoading} isError={journeesIsError} value={totalVisibles} />
-            <span className="text-sm text-gray-500 ml-2">journées ouvertes</span>
+            <span className="text-sm text-gray-500 ml-2">
+              {totalVisibles > 1 ? 'journées exploitables' : 'journée exploitable'}
+            </span>
+            {/* Une troncature qu'on ne montre pas se lit comme un planning vide. */}
+            {!journeesLoading && !journeesIsError && nbMasquees > 0 && (
+              <span className="block text-xs text-gray-400">
+                {nbMasquees} {nbMasquees > 1 ? 'journées complètes masquées' : 'journée complète masquée'}
+              </span>
+            )}
           </div>
         </div>
       </div>
