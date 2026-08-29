@@ -20,6 +20,9 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { appliquerDecalages } from '@/lib/tournee/timeline.js';
+import { appointmentsService } from '@services/appointments.service';
+import { logger } from '@lib/logger';
+import { messageErreur } from './tourneesPanelUtils';
 
 /**
  * @param {object|null} journee  Journee (cf. tournees.service.js)
@@ -79,3 +82,43 @@ export function useDecalagesJournee(journee) {
 }
 
 export default useDecalagesJournee;
+
+/**
+ * Écrit en base les décalages en attente. SEULE implémentation de cette
+ * écriture : elle sert au panneau de remplissage (avant la pose des nouveaux
+ * RDV) comme à la carte de la liste (déplacement seul). Deux copies finiraient
+ * par diverger sur exactement ce qui compte — quelle heure part en base.
+ *
+ * S'arrête au PREMIER échec et remonte ce qui a déjà été écrit : dans le
+ * contexte de la pose, les créneaux des nouveaux RDV supposent que les anciens
+ * ont bougé, poursuivre écrirait un chevauchement réel. L'état partiel n'est
+ * jamais tu.
+ *
+ * @param {Array<object>} rdvsAjustes  `journeeAjustee.rdvs` — `scheduled_start`
+ *   y porte DÉJÀ l'heure décalée, celle qui a été montrée à l'écran. On écrit
+ *   ce qui a été montré, on ne le recalcule pas ici.
+ * @param {Map<string, number>} decalages
+ * @returns {Promise<{ ids: string[], echec: {nom: string, message: string}|null }>}
+ */
+export async function ecrireDecalages(rdvsAjustes, decalages) {
+  if (!decalages || decalages.size === 0) return { ids: [], echec: null };
+  const ids = [];
+  for (const id of decalages.keys()) {
+    const rdv = (rdvsAjustes || []).find((r) => r.id === id);
+    if (!rdv) continue;
+    try {
+      const { error } = await appointmentsService.updateAppointment(id, {
+        scheduled_start: rdv.scheduled_start,
+        scheduled_end: rdv.scheduled_end,
+      });
+      if (error) {
+        return { ids, echec: { nom: rdv.client_name || 'RDV', message: messageErreur(error, 'déplacement refusé') } };
+      }
+      ids.push(id);
+    } catch (err) {
+      logger.error('[tournees] ecrireDecalages', err);
+      return { ids, echec: { nom: rdv.client_name || 'RDV', message: err?.message || 'exception inattendue' } };
+    }
+  }
+  return { ids, echec: null };
+}

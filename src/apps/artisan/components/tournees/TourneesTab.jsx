@@ -31,17 +31,22 @@
  */
 
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { AlertTriangle, Loader2, Users, CalendarDays } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
+import { tourneeKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useContratsDus, useJourneesHorizon } from '@hooks/useTournees';
 import { construireReglages } from '@services/tournees.service';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 import { formatDateFR } from '@/lib/utils';
+import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal';
 import { AlertesTournees } from './AlertesTournees';
 import { RemplirJourneePanel } from './RemplirJourneePanel';
 import { JourneeTimeline } from './JourneeTimeline';
+import { useDecalagesJournee, ecrireDecalages } from './useDecalagesJournee';
 import { formatDuree } from './tourneesPanelUtils';
 
 // Marge de recherche des journées déjà amorcées AU-DELÀ de l'horizon ferme
@@ -86,27 +91,67 @@ function minutesDisponibles(journee) {
   return (journee.budgetMinutes || 0) - (journee.chargeMinutes || 0);
 }
 
+/**
+ * Une journée dans la liste. La carte n'est PAS un `<button>` global : sa barre
+ * horaire est déplaçable sur place (un bouton dans un bouton serait invalide,
+ * et un glissement déclencherait l'ouverture du panneau). Seul l'en-tête ouvre
+ * le panneau de remplissage.
+ *
+ * Le décalage se fait ici comme dans le panneau — en attente à l'écran, écrit
+ * seulement sur un geste explicite : une heure de RDV est annoncée à un client,
+ * elle ne part pas en base parce qu'un doigt a glissé.
+ */
 function JourneeCard({ journee, onClick }) {
   // On affiche le temps LIBRE, pas la charge : « 2 h 30 libres » se lit d'un
   // coup d'œil là où « 330 / 480 » demande une soustraction à chaque carte.
   const libre = minutesDisponibles(journee);
+  const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const coreOrgId = organization?.id;
+
+  const {
+    decalages, journeeAjustee, decaler, reinitialiser,
+  } = useDecalagesJournee(journee);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [enregistrement, setEnregistrement] = useState(false);
+
+  const appliquer = async () => {
+    setEnregistrement(true);
+    try {
+      const { ids, echec } = await ecrireDecalages(journeeAjustee.rdvs, decalages);
+      if (ids.length > 0) {
+        await queryClient.invalidateQueries({ queryKey: tourneeKeys.all(coreOrgId) });
+        await queryClient.invalidateQueries({ queryKey: appointmentKeys.all(coreOrgId) });
+        // Les décalages écrits sortent de l'attente : les données rafraîchies
+        // portent désormais la nouvelle heure, les rejouer la doublerait.
+        reinitialiser();
+      }
+      if (echec) {
+        toast.error(
+          `Déplacement impossible (${echec.nom}) : ${echec.message}`
+          + (ids.length > 0 ? ` — ${ids.length} déjà déplacé${ids.length > 1 ? 's' : ''}.` : ''),
+        );
+      } else {
+        toast.success(`${ids.length} rendez-vous déplacé${ids.length > 1 ? 's' : ''}`);
+      }
+    } finally {
+      setEnregistrement(false);
+      setConfirmOpen(false);
+    }
+  };
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all"
-    >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-sm font-medium text-gray-500">{formatDateFR(journee.date)}</span>
-        {journee.estAmorcee && (
-          <span className="inline-flex items-center rounded-full font-medium px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 flex-shrink-0">
-            Amorcée
-          </span>
-        )}
-      </div>
-      {/* Le nom du technicien n'est pas répété ici : il titre la colonne. */}
-      <div>
+    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all">
+      <button type="button" onClick={onClick} className="w-full text-left">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-sm font-medium text-gray-500">{formatDateFR(journee.date)}</span>
+          {journee.estAmorcee && (
+            <span className="inline-flex items-center rounded-full font-medium px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 flex-shrink-0">
+              Amorcée
+            </span>
+          )}
+        </div>
+        {/* Le nom du technicien n'est pas répété ici : il titre la colonne. */}
         <div className="flex items-center justify-between text-xs mb-1.5">
           <span
             className="font-semibold text-gray-900"
@@ -118,12 +163,60 @@ function JourneeCard({ journee, onClick }) {
             {journee.rdvs.length} RDV · {formatDuree(journee.chargeMinutes)}
           </span>
         </div>
-        {/* La barre de charge (« 330 / 480 ») disait qu'il restait de la place
-            sans jamais dire OÙ : remplacée par la journée réelle, où le trou
-            se voit et se mesure à l'œil. */}
-        <JourneeTimeline amplitude={journee.amplitude} rdvs={journee.rdvs} />
-      </div>
-    </button>
+      </button>
+
+      {/* La barre de charge (« 330 / 480 ») disait qu'il restait de la place
+          sans jamais dire OÙ : remplacée par la journée réelle, où le trou se
+          voit, se mesure à l'œil — et où l'on peut pousser un RDV. */}
+      <JourneeTimeline
+        amplitude={journee.amplitude}
+        rdvs={journeeAjustee.rdvs}
+        onDecaler={enregistrement ? undefined : decaler}
+      />
+
+      {decalages.size > 0 && (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+          <span className="text-xs text-emerald-800 truncate">
+            {decalages.size} déplacement{decalages.size > 1 ? 's' : ''} en attente (
+            {[...decalages.values()].map((d) => (d > 0 ? `+${formatDuree(d)}` : formatDuree(d))).join(', ')}
+            )
+          </span>
+          <span className="flex items-center gap-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={reinitialiser}
+              disabled={enregistrement}
+              className="text-xs text-gray-500 hover:text-gray-900 disabled:opacity-50 px-1"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={enregistrement}
+              className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded px-2 py-1"
+            >
+              {enregistrement ? 'Enregistrement…' : 'Appliquer'}
+            </button>
+          </span>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => { if (!open) setConfirmOpen(false); }}
+        title="Déplacer des rendez-vous existants ?"
+        description={
+          `${decalages.size} rendez-vous déjà planifié${decalages.size > 1 ? 's seront déplacés' : ' sera déplacé'}. `
+          + 'Leur horaire a pu être annoncé aux clients concernés.'
+        }
+        confirmLabel="Déplacer"
+        cancelLabel="Annuler"
+        variant="default"
+        onConfirm={appliquer}
+        loading={enregistrement}
+      />
+    </div>
   );
 }
 

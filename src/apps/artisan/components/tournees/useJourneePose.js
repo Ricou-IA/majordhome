@@ -39,7 +39,6 @@ import { toast } from 'sonner';
 import { tourneeKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { ensureEntretienCard } from '@services/entretiens.service';
 import { savService } from '@services/sav.service';
-import { appointmentsService } from '@services/appointments.service';
 import { trajetsService } from '@services/trajets.service';
 import { supabase } from '@lib/supabaseClient';
 import { logger } from '@lib/logger';
@@ -47,6 +46,7 @@ import { placerPlusieurs, finDeJournee, chargeExistante } from '@/lib/tournee/cr
 import { cleCoord } from '@/lib/tournee/geo.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
 import { RAISON_LABELS, minutesEnHHMM, messageErreur } from './tourneesPanelUtils';
+import { ecrireDecalages } from './useDecalagesJournee';
 
 /**
  * @param {object} params
@@ -180,38 +180,13 @@ export function useJourneePose({
       .filter((p) => p.meta);
   }, [selectedIds, selectionnees]);
 
-  /**
-   * Écrit les décalages manuels des RDV DÉJÀ POSÉS, avant toute création.
-   *
-   * Bloquant par construction : les horaires calculés pour les nouveaux RDV
-   * supposent que les anciens ont bougé. Poser malgré un décalage en échec
-   * écrirait un chevauchement réel dans le planning d'un technicien — donc au
-   * premier échec on s'arrête et on ne pose rien. L'état partiel éventuel
-   * (2 décalés sur 3) est REMONTÉ tel quel, jamais tu.
-   */
-  const appliquerDecalagesEnBase = useCallback(async () => {
-    if (!decalages || decalages.size === 0) return { ids: [], echec: null };
-    const ids = [];
-    for (const id of decalages.keys()) {
-      // `journee` est la journée AJUSTÉE : `scheduled_start`/`scheduled_end`
-      // y portent déjà l'heure décalée, celle qu'on a montrée à l'écran. On
-      // écrit ce qui a été montré, on ne le recalcule pas ici.
-      const rdv = (journee?.rdvs || []).find((r) => r.id === id);
-      if (!rdv) continue;
-      try {
-        const { error } = await appointmentsService.updateAppointment(id, {
-          scheduled_start: rdv.scheduled_start,
-          scheduled_end: rdv.scheduled_end,
-        });
-        if (error) return { ids, echec: { nom: rdv.client_name || 'RDV', message: messageErreur(error, 'déplacement refusé') } };
-        ids.push(id);
-      } catch (err) {
-        logger.error('[useJourneePose] appliquerDecalagesEnBase', err);
-        return { ids, echec: { nom: rdv.client_name || 'RDV', message: err?.message || 'exception inattendue' } };
-      }
-    }
-    return { ids, echec: null };
-  }, [decalages, journee]);
+  // Écriture des décalages : implémentation PARTAGÉE avec la carte de la liste
+  // (useDecalagesJournee.js). Bloquante par construction dans ce contexte — les
+  // horaires calculés pour les nouveaux RDV supposent que les anciens ont bougé.
+  const appliquerDecalagesEnBase = useCallback(
+    () => ecrireDecalages(journee?.rdvs, decalages),
+    [decalages, journee],
+  );
 
   const executerPose = useCallback(async (resultat) => {
     setPosing(true);
