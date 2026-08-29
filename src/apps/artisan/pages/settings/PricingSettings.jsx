@@ -323,6 +323,22 @@ const EQUIPMENT_CATEGORIES = [
   { value: 'energie', label: 'Énergie' },
 ];
 
+// Mois déconseillés (tournées) — préférence de planification, jamais un blocage.
+const MONTHS_FR = [
+  { value: 1, label: 'Jan' },
+  { value: 2, label: 'Fév' },
+  { value: 3, label: 'Mar' },
+  { value: 4, label: 'Avr' },
+  { value: 5, label: 'Mai' },
+  { value: 6, label: 'Jun' },
+  { value: 7, label: 'Jul' },
+  { value: 8, label: 'Aoû' },
+  { value: 9, label: 'Sep' },
+  { value: 10, label: 'Oct' },
+  { value: 11, label: 'Nov' },
+  { value: 12, label: 'Déc' },
+];
+
 function EquipmentTypesPanel({ admin }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -360,6 +376,7 @@ function EquipmentTypesPanel({ admin }) {
                 <th className="py-2 pr-3 font-medium">Libellé</th>
                 <th className="py-2 pr-3 font-medium">Catégorie</th>
                 <th className="py-2 pr-3 font-medium text-center">Tarif unitaire</th>
+                <th className="py-2 pr-3 font-medium text-center">Durée</th>
                 <th className="py-2 pr-3 font-medium text-center">Actif</th>
                 <th className="py-2 w-20"></th>
               </tr>
@@ -374,6 +391,16 @@ function EquipmentTypesPanel({ admin }) {
                   </td>
                   <td className="py-2 pr-3 text-center">
                     {type.has_unit_pricing ? `${type.included_units} ${type.unit_label || 'inclus'}` : '—'}
+                  </td>
+                  <td className="py-2 pr-3 text-center">
+                    {type.duration_base_minutes == null ? (
+                      <span className="text-secondary-400">—</span>
+                    ) : (
+                      <>
+                        {type.duration_base_minutes} min
+                        {type.duration_per_extra_unit_minutes > 0 && ` +${type.duration_per_extra_unit_minutes}/${type.unit_label || 'unité'}`}
+                      </>
+                    )}
                   </td>
                   <td className="py-2 pr-3 text-center">{type.is_active ? '✓' : '—'}</td>
                   <td className="py-2 pr-3">
@@ -421,15 +448,36 @@ function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
     included_units: type?.included_units ?? 0,
     sort_order: type?.sort_order || 0,
     is_active: type?.is_active ?? true,
+    duration_base_minutes: type?.duration_base_minutes ?? '',
+    duration_per_extra_unit_minutes: type?.duration_per_extra_unit_minutes ?? 0,
+    unfavorable_months: type?.unfavorable_months ?? [],
   });
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const toggleMonth = (m) => {
+    setForm((p) => ({
+      ...p,
+      unfavorable_months: p.unfavorable_months.includes(m)
+        ? p.unfavorable_months.filter((x) => x !== m)
+        : [...p.unfavorable_months, m],
+    }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.code.trim() || !form.label.trim()) {
       toast.error('Code et libellé requis');
       return;
+    }
+    if (form.duration_base_minutes !== '') {
+      const parsedDuration = parseInt(form.duration_base_minutes, 10);
+      if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
+        toast.error(
+          "Durée d'entretien : laissez le champ vide si ce type n'est pas entretenu, ou saisissez une durée supérieure à 0 minute."
+        );
+        return;
+      }
     }
     onSave({
       code: form.code.trim().toUpperCase(),
@@ -440,6 +488,9 @@ function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
       included_units: form.has_unit_pricing ? (parseInt(form.included_units, 10) || 0) : 0,
       sort_order: parseInt(form.sort_order, 10) || 0,
       is_active: form.is_active,
+      duration_base_minutes: form.duration_base_minutes === '' ? null : parseInt(form.duration_base_minutes, 10),
+      duration_per_extra_unit_minutes: form.has_unit_pricing ? (parseInt(form.duration_per_extra_unit_minutes, 10) || 0) : 0,
+      unfavorable_months: form.unfavorable_months,
     });
   };
 
@@ -480,6 +531,53 @@ function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
             </FormField>
           </div>
         )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Durée d'entretien (min)">
+            <TextInput
+              value={form.duration_base_minutes}
+              onChange={(v) => set('duration_base_minutes', v)}
+              type="number"
+              min="1"
+              placeholder="Non entretenu"
+            />
+          </FormField>
+          {form.has_unit_pricing && (
+            <FormField label={`+ par ${form.unit_label || 'unité'} suppl. (min)`}>
+              <TextInput
+                value={form.duration_per_extra_unit_minutes}
+                onChange={(v) => set('duration_per_extra_unit_minutes', v)}
+                type="number"
+                min="0"
+              />
+            </FormField>
+          )}
+        </div>
+        <p className="text-xs text-secondary-400 -mt-2">
+          Laisser vide si ce type n&apos;est pas entretenu (travaux, prestations).
+        </p>
+
+        <div>
+          <p className="text-sm font-medium text-secondary-700 mb-1">Mois déconseillés</p>
+          <p className="text-xs text-secondary-500 mb-2">
+            Mois où l&apos;appareil doit être froid. <strong>Préférence, pas interdiction</strong> : ces mois
+            ne sont jamais proposés spontanément, mais restent réservables par le client et forçables en
+            interne.
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {MONTHS_FR.map((m) => (
+              <label key={m.value} className="flex items-center gap-1.5 text-sm text-secondary-700">
+                <input
+                  type="checkbox"
+                  checked={form.unfavorable_months.includes(m.value)}
+                  onChange={() => toggleMonth(m.value)}
+                />
+                {m.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Ordre">
             <TextInput value={form.sort_order} onChange={(v) => set('sort_order', v)} type="number" />

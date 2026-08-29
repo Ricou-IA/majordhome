@@ -15,7 +15,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
-import { useTeamMembers, useSetTeamMemberColor, useEnsureTeamMember } from '@hooks/useAppointments';
+import { useTeamMembers, useSetTeamMemberColor, useSetTeamMemberRouting, useEnsureTeamMember } from '@hooks/useAppointments';
 import { logger } from '@lib/logger';
 import {
   EFFECTIVE_ROLES,
@@ -68,6 +68,18 @@ const ROLE_OPTIONS = EFFECTIVE_ROLES.map((role) => ({
   label: ROLE_LABELS[role],
 }));
 
+// Erreurs RPC `team_member_set_routing_settings` traduites en français — jamais le
+// message Postgres brut à l'écran. 22023 = confirmé (p_daily_work_minutes hors
+// [60, 1440]) ; 42501 = garde org_admin, même convention que team_member_set_calendar_color
+// (filet défensif, pas explicitement confirmé pour cette RPC).
+const ROUTING_SETTINGS_ERROR_MESSAGES = {
+  '22023': 'Le budget journalier doit être compris entre 60 et 1440 minutes (1h à 24h).',
+  '42501': 'Seul un administrateur peut modifier ces réglages.',
+};
+
+const routingSettingsErrorMessage = (error, fallback) =>
+  ROUTING_SETTINGS_ERROR_MESSAGES[error?.code] || fallback;
+
 // Palette planning : couleurs distinctes et lisibles. Le violet #6D28D9 est
 // volontairement EXCLU (réservé aux RDV facturés sur le calendrier).
 const PLANNING_COLORS = [
@@ -111,6 +123,78 @@ function MemberColorPicker({ color, onPick, disabled }) {
         </>
       )}
     </div>
+  );
+}
+
+// =============================================================================
+// COMPOSANT — DailyBudgetInput (budget journalier, édition inline)
+// =============================================================================
+
+const DAILY_WORK_MINUTES_HELP =
+  "Trajets + interventions, pause exclue. Distinct des horaires ci-contre, qui bornent seulement les heures de placement.";
+
+function DailyBudgetInput({ value, onSave, disabled }) {
+  const [draft, setDraft] = useState(String(value ?? 480));
+
+  useEffect(() => {
+    setDraft(String(value ?? 480));
+  }, [value]);
+
+  const commit = () => {
+    const n = parseInt(draft, 10);
+    if (!Number.isFinite(n) || n <= 0) {
+      setDraft(String(value ?? 480)); // valeur invalide → revert silencieux (pas de champ requis ici)
+      return;
+    }
+    if (n !== value) onSave(n);
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="number"
+        min="60"
+        max="1440"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        disabled={disabled}
+        title={DAILY_WORK_MINUTES_HELP}
+        className="w-20 px-2 py-1 text-sm border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
+      />
+      <span className="text-xs text-secondary-400">min</span>
+    </div>
+  );
+}
+
+// =============================================================================
+// COMPOSANT — RoutingToggle (inclusion dans l'optimisation des tournées)
+// =============================================================================
+
+const INCLUDE_IN_ROUTING_HELP = 'Décocher pour un renfort ponctuel organisé hors outil.';
+
+function RoutingToggle({ checked, onChange, disabled }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      title={INCLUDE_IN_ROUTING_HELP}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+        checked ? 'bg-primary-600' : 'bg-secondary-300'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+          checked ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
   );
 }
 
@@ -262,7 +346,20 @@ function InviteModal({ open, onClose, onInvite, isInviting }) {
 // COMPOSANT — MemberRow
 // =============================================================================
 
-function MemberRow({ member, teamMember, canEditColor, isCurrentUser, isUpdating, isUpdatingRole, onRoleChangeRequest, onColorChange, isColorSaving }) {
+function MemberRow({
+  member,
+  teamMember,
+  canEditColor,
+  isCurrentUser,
+  isUpdating,
+  isUpdatingRole,
+  onRoleChangeRequest,
+  onColorChange,
+  isColorSaving,
+  onDailyBudgetChange,
+  onIncludeInRoutingChange,
+  isRoutingSaving,
+}) {
   const effectiveRole = computeEffectiveRole(member.profile, { role: member.role });
 
   return (
@@ -345,6 +442,40 @@ function MemberRow({ member, teamMember, canEditColor, isCurrentUser, isUpdating
           />
         )}
       </td>
+
+      {/* Budget journalier (tournées) */}
+      <td className="py-4 px-4">
+        {!teamMember ? (
+          <span className="text-xs text-secondary-400">—</span>
+        ) : canEditColor ? (
+          <DailyBudgetInput
+            value={teamMember.daily_work_minutes}
+            onSave={(minutes) => onDailyBudgetChange(teamMember.id, minutes)}
+            disabled={isRoutingSaving}
+          />
+        ) : (
+          <span className="text-sm text-secondary-700" title={DAILY_WORK_MINUTES_HELP}>
+            {teamMember.daily_work_minutes ?? 480} min
+          </span>
+        )}
+      </td>
+
+      {/* Inclusion dans l'optimisation des tournées */}
+      <td className="py-4 px-4">
+        {!teamMember ? (
+          <span className="text-xs text-secondary-400">—</span>
+        ) : canEditColor ? (
+          <RoutingToggle
+            checked={teamMember.include_in_routing ?? true}
+            onChange={(next) => onIncludeInRoutingChange(teamMember.id, next)}
+            disabled={isRoutingSaving}
+          />
+        ) : (
+          <span className="text-xs text-secondary-500" title={INCLUDE_IN_ROUTING_HELP}>
+            {(teamMember.include_in_routing ?? true) ? 'Incluse' : 'Exclue'}
+          </span>
+        )}
+      </td>
     </tr>
   );
 }
@@ -367,6 +498,7 @@ export default function TeamManagement() {
   // Couleurs planning : team_members reliés aux membres par user_id.
   const { members: teamMembers, isLoading: isLoadingTeam } = useTeamMembers(orgId);
   const { setColor } = useSetTeamMemberColor(orgId);
+  const { setRoutingSettings } = useSetTeamMemberRouting(orgId);
   const { ensureTeamMember } = useEnsureTeamMember(orgId);
   const tmByUser = useMemo(() => {
     const map = new Map();
@@ -374,6 +506,12 @@ export default function TeamManagement() {
     return map;
   }, [teamMembers]);
   const [savingColorId, setSavingColorId] = useState(null);
+  // Scopé par membre (même modèle que savingColorId ci-dessus) : un flag global
+  // aurait désactivé les champs de TOUS les techniciens pendant l'enregistrement
+  // d'une seule ligne, et `disabled` sur un input focalisé force un blur — un
+  // admin en train de saisir le budget d'un autre membre aurait vu son brouillon
+  // validé prématurément (fix round 1, 2026-08-29).
+  const [savingRoutingId, setSavingRoutingId] = useState(null);
 
   // ---------------------------------------------------------------------------
   // Ressource planning auto : un membre invité n'a pas de ligne team_members
@@ -504,6 +642,48 @@ export default function TeamManagement() {
     }
   };
 
+  /**
+   * Change le budget de travail journalier d'un membre (team_member.daily_work_minutes).
+   * RPC `team_member_set_routing_settings` — patch partiel, n'envoie que ce champ
+   * (l'autre reste inchangé côté DB via COALESCE). Hors [60, 1440] → erreur Postgres
+   * 22023, traduite en français par `routingSettingsErrorMessage` (jamais affichée brute).
+   */
+  const handleDailyBudgetChange = async (teamMemberId, minutes) => {
+    setSavingRoutingId(teamMemberId);
+    try {
+      const result = await setRoutingSettings({ teamMemberId, dailyWorkMinutes: minutes });
+      if (result?.error) {
+        toast.error(routingSettingsErrorMessage(result.error, "Erreur lors de l'enregistrement du budget journalier"));
+      } else {
+        toast.success('Budget journalier mis à jour');
+      }
+    } catch (err) {
+      toast.error(routingSettingsErrorMessage(err, 'Erreur inattendue'));
+    } finally {
+      setSavingRoutingId(null);
+    }
+  };
+
+  /**
+   * Inclut/exclut un membre de l'optimisation des tournées (team_member.include_in_routing).
+   * Même RPC combinée, patch partiel (seul ce champ est envoyé).
+   */
+  const handleIncludeInRoutingChange = async (teamMemberId, include) => {
+    setSavingRoutingId(teamMemberId);
+    try {
+      const result = await setRoutingSettings({ teamMemberId, includeInRouting: include });
+      if (result?.error) {
+        toast.error(routingSettingsErrorMessage(result.error, "Erreur lors de la mise à jour de l'inclusion dans les tournées"));
+      } else {
+        toast.success(include ? 'Membre inclus dans les tournées' : 'Membre exclu des tournées');
+      }
+    } catch (err) {
+      toast.error(routingSettingsErrorMessage(err, 'Erreur inattendue'));
+    } finally {
+      setSavingRoutingId(null);
+    }
+  };
+
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -573,6 +753,14 @@ export default function TeamManagement() {
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Couleur planning
                 </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
+                  Budget journalier
+                  <span className="block text-xs font-normal text-secondary-400">Tournées, trajets + interventions</span>
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
+                  Tournées
+                  <span className="block text-xs font-normal text-secondary-400">Inclusion dans l&apos;optimisation</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -590,6 +778,9 @@ export default function TeamManagement() {
                     onRoleChangeRequest={handleRoleChangeRequest}
                     onColorChange={handleColorChange}
                     isColorSaving={!!tm && savingColorId === tm.id}
+                    onDailyBudgetChange={handleDailyBudgetChange}
+                    onIncludeInRoutingChange={handleIncludeInRoutingChange}
+                    isRoutingSaving={!!tm && savingRoutingId === tm.id}
                   />
                 );
               })}
