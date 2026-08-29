@@ -41,6 +41,8 @@ import { formatDateFR } from '@/lib/utils';
 import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal';
 import { AlertesTournees } from './AlertesTournees';
 import { RemplirJourneePanel } from './RemplirJourneePanel';
+import { JourneeTimeline } from './JourneeTimeline';
+import { formatDuree } from './tourneesPanelUtils';
 
 // Marge de recherche des journées déjà amorcées AU-DELÀ de l'horizon ferme
 // (spec §3.2). La fenêtre chargée = horizon_ferme_jours + cette marge, JAMAIS
@@ -85,10 +87,7 @@ function minutesDisponibles(journee) {
 }
 
 function JourneeCard({ journee, onClick }) {
-  const pct = journee.budgetMinutes > 0
-    ? Math.min(100, Math.round((journee.chargeMinutes / journee.budgetMinutes) * 100))
-    : 0;
-  // On affiche le temps LIBRE, pas la charge : « 150 min libres » se lit d'un
+  // On affiche le temps LIBRE, pas la charge : « 2 h 30 libres » se lit d'un
   // coup d'œil là où « 330 / 480 » demande une soustraction à chaque carte.
   const libre = minutesDisponibles(journee);
 
@@ -108,18 +107,21 @@ function JourneeCard({ journee, onClick }) {
       </div>
       {/* Le nom du technicien n'est pas répété ici : il titre la colonne. */}
       <div>
-        <div className="flex items-center justify-between text-xs mb-1">
+        <div className="flex items-center justify-between text-xs mb-1.5">
           <span
             className="font-semibold text-gray-900"
             title="Temps restant hors trajets. Le moteur, lui, budgete aussi les deplacements : une journee peut donc refuser un entretien qui tiendrait sur ce seul chiffre."
           >
-            {libre} min libres
+            {formatDuree(libre)} libres
           </span>
-          <span className="text-gray-500">{journee.rdvs.length} RDV · {journee.chargeMinutes} min</span>
+          <span className="text-gray-500">
+            {journee.rdvs.length} RDV · {formatDuree(journee.chargeMinutes)}
+          </span>
         </div>
-        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-          <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
-        </div>
+        {/* La barre de charge (« 330 / 480 ») disait qu'il restait de la place
+            sans jamais dire OÙ : remplacée par la journée réelle, où le trou
+            se voit et se mesure à l'œil. */}
+        <JourneeTimeline amplitude={journee.amplitude} rdvs={journee.rdvs} />
       </div>
     </button>
   );

@@ -48,8 +48,13 @@ import { cleCoord } from './geo.js';
 /**
  * "HH:MM" ou "HH:MM:SS" -> minutes depuis minuit. `null` si non exploitable.
  * Parsing en chaîne, jamais via `Date` (règle du dossier).
+ *
+ * Exporté : `timeline.js` place les mêmes RDV sur une barre horaire et doit
+ * lire leur heure EXACTEMENT comme le séquenceur la lit — un RDV que le moteur
+ * traite comme contraint à 8 h 30 mais que l'écran dessine ailleurs (ou pas du
+ * tout) ferait mentir la seule vue qui sert à décider.
  */
-function minutesDepuisMinuit(hhmm) {
+export function minutesDepuisMinuit(hhmm) {
   if (!hhmm || typeof hhmm !== 'string') return null;
   const [h, m] = hhmm.split(':').map(Number);
   if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
