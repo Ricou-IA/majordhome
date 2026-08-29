@@ -9,6 +9,8 @@ import {
   construireSegments, graduations, creneauxLibres, bornesDeplacement, appliquerDecalages,
 } from '../../src/lib/tournee/timeline.js';
 import { construireArretsExistants } from '../../src/lib/tournee/arrets.js';
+import { cleCoord } from '../../src/lib/tournee/geo.js';
+import { trajetLocal } from '../../src/lib/tournee/matrice.js';
 
 const JOURNEE = { debut: 480, fin: 1080 }; // 08:00 -> 18:00, span 600
 const rdv = (id, start, duree, extra = {}) => ({
@@ -229,4 +231,33 @@ test('un décalage se propage jusqu au séquenceur : la fenêtre suit la nouvell
   const [apres] = construireArretsExistants(appliquerDecalages(rdvs, new Map([['a', 120]])));
   assert.deepEqual(apres.fenetre, { debut: 660, fin: 660 }, 'le moteur voit 11h, pas 9h');
   assert.equal(apres.dureeMinutes, 60);
+});
+
+test('bornesDeplacement — le TRAJET entre voisins est réservé, pas seulement leur durée', () => {
+  // Deux RDV geolocalises a ~14 km l'un de l'autre (~23 min de route estimee).
+  // Coller le second a la fin du premier dessinerait une journee impossible :
+  // finir chez A a 9h30 et etre chez B a 9h30. Vu a l'ecran le 2026-08-29.
+  const A = { id: 'a', scheduled_start: '08:00', duration_minutes: 90, lat: 43.90, lng: 1.90 };
+  const B = { id: 'b', scheduled_start: '10:00', duration_minutes: 150, lat: 43.95, lng: 2.05 };
+  const { segments } = construireSegments([A, B], JOURNEE);
+
+  const bornes = bornesDeplacement(segments, 'b', JOURNEE);
+  const finDeA = 480 + 90; // 9h30
+  assert.ok(bornes.minDebut > finDeA,
+    `B ne peut pas commencer a la seconde ou A finit (${bornes.minDebut} vs ${finDeA})`);
+
+  // La marge vaut exactement le trajet estime entre les deux points.
+  const route = trajetLocal(cleCoord(A), cleCoord(B));
+  assert.ok(route > 0, 'les deux points sont bien distants');
+  assert.equal(bornes.minDebut, finDeA + route);
+});
+
+test('bornesDeplacement — une position manquante n invente aucune contrainte', () => {
+  // Un RDV sans coordonnees (rattache a un lead non geocode) ne doit pas se
+  // retrouver fige par une marge de 60 min fabriquee sur du vide.
+  const A = { id: 'a', scheduled_start: '08:00', duration_minutes: 90, lat: null, lng: null };
+  const B = { id: 'b', scheduled_start: '10:00', duration_minutes: 60, lat: 43.95, lng: 2.05 };
+  const { segments } = construireSegments([A, B], JOURNEE);
+  const bornes = bornesDeplacement(segments, 'b', JOURNEE);
+  assert.equal(bornes.minDebut, 570, 'butee au contact, faute de savoir la distance');
 });

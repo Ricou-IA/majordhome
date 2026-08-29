@@ -80,12 +80,11 @@ export function useJourneesHorizon(coreOrgId, joursApres = 45) {
  * `data` (une fois la query résolue) expose l'INTÉGRALITÉ de ce que renvoie
  * `proposerPourJournee` — jamais réduit à la seule liste, sous peine de
  * confondre deux situations qui appellent des messages opposés à l'écran :
- *   - `baseInfaisable: true` → la journée est DÉJÀ en dépassement avant tout
- *     ajout ; `raisonBase` porte la cause (`'budget'|'amplitude'|'fenetre'`).
- *     `propositions` est alors toujours vide — ce n'est PAS "aucun candidat
- *     à proximité", et l'écran doit le dire explicitement.
- *   - `baseInfaisable: false` + `propositions: []` → journée saine, mais
- *     aucun candidat ne s'insère (budget/amplitude/fenêtre une fois ajouté).
+ *   - `propositions: []` → aucun candidat ne trouve sa place ; `raisonsRejet`
+ *     compte les motifs (`creneau`/`budget`/`pause`/`position`) et DOIT être
+ *     affiché : « aucun entretien » tout court laisse croire qu'il n'y a
+ *     personne à visiter dans le secteur, alors que la cause est souvent
+ *     ailleurs (journée pleine, clients non géolocalisés).
  *   - `propositions` non vide → le classement à afficher.
  * `estime: true` → au moins une durée de trajet de la matrice est
  * approximative (fallback haversine, pas un vrai calcul Mapbox) : à signaler.
@@ -105,8 +104,8 @@ export function useJourneesHorizon(coreOrgId, joursApres = 45) {
  *   (ex. attendre une sélection explicite de journée dans l'UI).
  * @returns {import('@tanstack/react-query').UseQueryResult<{
  *   propositions: Array<object>,
- *   baseInfaisable: boolean,
- *   raisonBase: ('budget'|'amplitude'|'fenetre'|null),
+ *   chargeMinutes: number,
+ *   raisonsRejet: Record<('creneau'|'budget'|'pause'|'position'), number>,
  *   estime: boolean,
  * }>}
  */
@@ -126,12 +125,20 @@ export function usePropositions({ journee, candidats, coreOrgId, settings, enabl
     ),
     queryFn: async () => {
       const {
-        data, baseInfaisable, raisonBase, estime, error,
+        data, chargeMinutes, raisonsRejet, estime, error,
       } = await tourneesService.proposerPourJournee({
         journee, candidats, coreOrgId, settings,
       });
       if (error) throw error;
-      return { propositions: data, baseInfaisable, raisonBase, estime };
+      // ⚠️ Tout ce que le service calcule doit ressortir ICI. Une clé oubliée
+      // dans ce retour n'est pas une erreur visible : elle vaut `undefined` à
+      // l'écran, qui affiche alors sa branche « rien à dire ». Vécu le
+      // 2026-08-29 en basculant sur le modèle « créneaux » — `raisonsRejet`
+      // était calculé, puis jeté ici, et l'écran annonçait « aucun entretien à
+      // proposer » sans jamais pouvoir dire pourquoi.
+      return {
+        propositions: data, chargeMinutes, raisonsRejet, estime,
+      };
     },
     // `settings` manquant (mineur, revue finale) : sans ce test, un panneau
     // ouvert avant la réponse de useOrgSettings() lançait le calcul avec

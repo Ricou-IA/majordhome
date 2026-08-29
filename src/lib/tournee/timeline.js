@@ -21,6 +21,8 @@
 // ============================================================================
 
 import { minutesDepuisMinuit, minutesVersHeure } from './arrets.js';
+import { cleCoord } from './geo.js';
+import { trajetLocal } from './matrice.js';
 
 /** Durée d'un RDV, avec le même défaut que partout ailleurs dans le module. */
 const dureeDe = (rdv) => rdv?.duration_minutes || 60;
@@ -69,6 +71,9 @@ export function construireSegments(rdvs, amplitude) {
     segments.push({
       id: rdv.id,
       rdv,
+      // Clé de position : sert aux BORNES de déplacement, pour qu'un RDV glissé
+      // ne vienne pas se coller à son voisin sans laisser le temps d'y aller.
+      key: cleCoord(rdv),
       debutMinutes: debut,
       finMinutes: fin,
       leftPct: ((debutVu - debutJour) / span) * 100,
@@ -155,20 +160,26 @@ export function creneauxLibres(segments, amplitude) {
 // la sienne (c'est une heure annoncée à un client), le moteur ne fait que
 // recalculer sur la nouvelle donne.
 //
-// Règle de butée : un RDV glissé s'arrête AU CONTACT de son voisin, il ne le
-// traverse jamais. Deux rendez-vous qui échangeraient leur ordre au passage
-// d'un pixel produiraient une tournée qu'on n'a pas voulue.
+// Règle de butée : un RDV glissé s'arrête à la distance de son voisin — pas au
+// contact. Le TRAJET entre les deux est réservé, sinon on dessine une journée
+// impossible : finir chez un client à 9 h 30 et être chez le suivant à 9 h 30.
+// Vu à l'écran le 2026-08-29, deux blocs accolés après un glissement.
+// Un RDV ne traverse jamais un autre : deux rendez-vous qui échangeraient leur
+// ordre au passage d'un pixel produiraient une tournée qu'on n'a pas voulue.
 
 /**
- * Jusqu'où un RDV peut être glissé sans traverser ses voisins ni sortir de la
- * journée.
+ * Jusqu'où un RDV peut être glissé sans empiéter sur ses voisins (trajet
+ * compris) ni sortir de la journée.
  *
  * @param {Array} segments   sortie de `construireSegments`, triée
  * @param {string} id
  * @param {{debut: number, fin: number}} amplitude
+ * @param {Function} [trajet=trajetLocal]  (fromKey, toKey) => minutes. Par
+ *   défaut l'estimation à vol d'oiseau : la barre n'a pas de matrice Mapbox
+ *   sous la main, et une butée approchée vaut mieux qu'une butée à zéro.
  * @returns {{minDebut: number, maxDebut: number, dureeMinutes: number}|null}
  */
-export function bornesDeplacement(segments, id, amplitude) {
+export function bornesDeplacement(segments, id, amplitude, trajet = trajetLocal) {
   const i = (segments || []).findIndex((s) => s.id === id);
   if (i === -1) return null;
   const s = segments[i];
@@ -177,10 +188,16 @@ export function bornesDeplacement(segments, id, amplitude) {
   let minDebut = amplitude?.debut ?? s.debutMinutes;
   let maxDebut = (amplitude?.fin ?? s.finMinutes) - duree;
 
+  // Marge de route entre deux arrêts. Quand une position manque, on n'invente
+  // AUCUNE contrainte : mieux vaut une butée trop permissive (que le moteur
+  // rattrapera au calcul) qu'une butée de 60 min fabriquée sur du vide, qui
+  // empêcherait de bouger un RDV sans raison visible.
+  const route = (a, b) => ((a && b) ? trajet(a, b) : 0);
+
   const precedent = segments[i - 1];
   const suivant = segments[i + 1];
-  if (precedent) minDebut = Math.max(minDebut, precedent.finMinutes);
-  if (suivant) maxDebut = Math.min(maxDebut, suivant.debutMinutes - duree);
+  if (precedent) minDebut = Math.max(minDebut, precedent.finMinutes + route(precedent.key, s.key));
+  if (suivant) maxDebut = Math.min(maxDebut, suivant.debutMinutes - route(s.key, suivant.key) - duree);
 
   // La position ACTUELLE est toujours atteignable : sans ça, un RDV qui déborde
   // déjà de l'amplitude (installation commencée à 7 h) ou qui chevauche un
