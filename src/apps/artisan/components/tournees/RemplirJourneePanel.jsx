@@ -68,8 +68,8 @@ export function RemplirJourneePanel({
   // existants" restent identiques par construction, fenêtre comprise, plutôt
   // que par discipline de copier-coller.
   const arretsExistants = useMemo(
-    () => construireArretsExistants(journee?.rdvs),
-    [journee],
+    () => construireArretsExistants(journee?.rdvs, depot),
+    [journee, depot],
   );
 
   const {

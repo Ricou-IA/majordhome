@@ -264,11 +264,30 @@ export const tourneesService = {
         : { data: [], error: null };
       if (ccErr) return { data: [], error: ccErr };
       const coordByClientId = new Map((clientsCoord || []).map((c) => [c.id, c]));
+
+      // Tous les RDV n'ont pas de client : une installation est rattachee a un
+      // LEAD (10 RDV sur 30 jours en prod, dont l'installation HACK du 04/09).
+      // On tente donc aussi le lead. Note : en pratique ces leads ne sont pas
+      // encore geocodes, d'ou le troisieme niveau (siege) applique plus loin,
+      // au moment ou le depot est connu.
+      const leadIds = [...new Set((rdvs || [])
+        .filter((r) => !r.client_id && r.lead_id).map((r) => r.lead_id))];
+      const { data: leadsCoord, error: lcErr } = leadIds.length
+        ? await supabase.from('majordhome_leads')
+            .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', leadIds)
+        : { data: [], error: null };
+      if (lcErr) return { data: [], error: lcErr };
+      const coordByLeadId = new Map((leadsCoord || []).map((l) => [l.id, l]));
+      // Un RDV sans coordonnee (ni client ni lead geocode) garde lat/lng null ici :
+      // le fallback siege est applique dans proposerPourJournee, seul endroit ou le
+      // depot est connu. Il n'est JAMAIS ecarte pour autant (il bloque son creneau).
+      // Ancien commentaire conserve pour memoire :
       // Un RDV sans coordonnée reste compté dans chargeMinutes (le technicien y
       // passe du temps) mais sera exclu de arretsExistants côté proposerPourJournee
       // (r.lat/r.lng null) : il ne peut pas participer au séquencement géographique.
       const rdvsAvecCoords = (rdvs || []).map((r) => {
-        const co = r.client_id ? coordByClientId.get(r.client_id) : null;
+        const co = (r.client_id ? coordByClientId.get(r.client_id) : null)
+          || (r.lead_id ? coordByLeadId.get(r.lead_id) : null);
         return { ...r, lat: co?.latitude ?? null, lng: co?.longitude ?? null };
       });
 
@@ -368,7 +387,7 @@ export const tourneesService = {
       // C2 — un rendez-vous déjà pris est un ENGAGEMENT, pas une préférence :
       // helper partagé avec RemplirJourneePanel.jsx (même dérivation, une
       // seule fois) qui verrouille sa fenêtre sur son heure réelle.
-      const arretsExistants = construireArretsExistants(journee.rdvs);
+      const arretsExistants = construireArretsExistants(journee.rdvs, depot);
 
       const centre = barycentre([
         ...(journee.rdvs || []).filter((r) => r.lat != null),
@@ -423,10 +442,14 @@ export const tourneesService = {
       // jamais comparés les uns aux autres (coutInsertion n'en teste qu'un à la
       // fois). Les deux paramètres doivent toujours être des tableaux (jamais
       // undefined) — dépot garantit noyau non vide, notes peut être [].
-      const noyau = [depot, ...arretsExistants.map((a) => {
-        const [lat, lng] = a.key.split(',').map(Number);
-        return { lat, lng };
-      })];
+      // Les arrêts sans coordonnées (key null) bloquent bien leur créneau dans le
+      // séquencement, mais n'ont rien à envoyer à Mapbox : on les écarte ici.
+      const noyau = [depot, ...arretsExistants
+        .filter((a) => a.key)
+        .map((a) => {
+          const [lat, lng] = a.key.split(',').map(Number);
+          return { lat, lng };
+        })];
       const { data: paires, estime, error: matriceErr } = await trajetsService.chargerMatrice({
         coreOrgId, noyau, candidats: notes,
       });

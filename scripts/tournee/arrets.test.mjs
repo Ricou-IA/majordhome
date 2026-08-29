@@ -24,13 +24,45 @@ test('un RDV sans heure exploitable reste sans fenêtre plutôt que d en invente
   assert.equal(heureVide[0].fenetre, undefined);
 });
 
-test('un RDV sans coordonnées est exclu du séquencement géographique', () => {
+test('un RDV sans coordonnées est CONSERVÉ : il bloque son créneau', () => {
+  // Il l'était auparavant écarté, ce qui laissait le moteur placer un entretien
+  // par-dessus (cas du 04/09 : installation 8h-13h sans coordonnée client,
+  // entretiens proposés à 8h05). Sans position on ne peut pas calculer son
+  // trajet, mais on sait que le technicien y est.
   const arrets = construireArretsExistants([
     rdv('avec', 43.9, 1.9, 60, '09:00'),
-    { id: 'sans', lat: null, lng: null, duration_minutes: 60, scheduled_start: '10:00' },
+    { id: 'sans', lat: null, lng: null, duration_minutes: 300, scheduled_start: '08:00' },
   ]);
-  assert.equal(arrets.length, 1);
-  assert.equal(arrets[0].id, 'avec');
+  assert.equal(arrets.length, 2, 'les deux arrets sont conserves');
+  const sans = arrets.find((a) => a.id === 'sans');
+  assert.equal(sans.key, null, 'pas de cle : aucun trajet calculable');
+  assert.deepEqual(sans.fenetre, { debut: 480, fin: 480 }, 'son creneau reste verrouille');
+  assert.equal(sans.dureeMinutes, 300, 'et il occupe bien toute sa duree');
+});
+
+test('04 septembre — une installation sans coordonnées bloque quand même la matinée', () => {
+  // 8h-13h chez HACK (300 min, sans coordonnée). Un entretien de 60 min ne peut
+  // pas etre place a 8h05 : il doit passer l apres-midi, ou pas du tout.
+  const trajet = (x, y) => (x === y ? 0 : 20);
+  const [hack] = construireArretsExistants([
+    { id: 'hack', lat: null, lng: null, duration_minutes: 300, scheduled_start: '08:00' },
+  ]);
+  const entretien = { id: 'entretien', key: 'E', dureeMinutes: 60 };
+
+  const r = sequencerTournee({
+    depotKey: 'D',
+    arrets: [hack, entretien],
+    trajet,
+    amplitude: { debut: 8 * 60, fin: 18 * 60 },
+    budgetMinutes: 480,
+    pause: { minutes: 30, fenetre: [12 * 60, 14 * 60] },
+  });
+
+  assert.equal(r.faisable, true);
+  assert.deepEqual(r.ordre, ['hack', 'entretien'], 'l entretien passe APRES l installation');
+  const planEntretien = r.planning.find((p) => p.id === 'entretien');
+  assert.ok(planEntretien.arriveeMinutes >= 13 * 60,
+    `arrivee attendue apres 13h, obtenue a ${planEntretien.arriveeMinutes} min`);
 });
 
 // --- Cas réel remonté en production, journée du 10 septembre ---

@@ -106,7 +106,9 @@ export function useJourneePose({
     const arrets = [...arretsExistants, ...selectionnees.map((p) => p.candidat)];
     const noyau = [
       depot,
-      ...arretsExistants.map((a) => {
+      // Un arrêt sans coordonnées (key null) bloque son créneau côté séquencement
+      // mais n'a rien à envoyer à Mapbox : écarté ici seulement.
+      ...arretsExistants.filter((a) => a.key).map((a) => {
         const [lat, lng] = a.key.split(',').map(Number);
         return { lat, lng };
       }),

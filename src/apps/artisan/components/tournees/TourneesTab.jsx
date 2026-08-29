@@ -51,10 +51,19 @@ import { RemplirJourneePanel } from './RemplirJourneePanel';
 // alors qu'elles font pourtant partie de l'horizon ferme promis).
 const MARGE_AMORCEE_JOURS = 30;
 
-// Plus court entretien du parc (poêle à bois / mono-split). En dessous de ce
-// reste, aucune intervention ne peut rentrer, trajet non compris : la journée
-// est masquée plutôt que de faire scroller sur des cartes inexploitables.
+// Seuil au-dessous duquel une journée ne peut rien accueillir, donc n'est pas
+// affichée. Deux termes :
+//   - 60 min : le plus court entretien du parc (poêle à bois, mono-split) ;
+//   - 30 min : l'aller-retour minimal pour s'y rendre depuis le reste de la
+//     tournée, en zone rurale.
+// Le second terme n'est pas cosmétique. `chargeMinutes` ne compte QUE les durées
+// d'intervention, alors que le moteur budgète aussi les trajets : sans cette
+// marge, une journée annoncée « 60 min libres » ouvrait un panneau répondant
+// « déjà en dépassement » — les deux chiffres ne mesuraient pas la même chose.
+// Observé le 11/09 (3 RDV, 420 min d'intervention, budget 480).
 const DUREE_MIN_ENTRETIEN_MINUTES = 60;
+const TRAJET_MIN_ALLER_RETOUR_MINUTES = 30;
+const SEUIL_JOURNEE_EXPLOITABLE_MINUTES = DUREE_MIN_ENTRETIEN_MINUTES + TRAJET_MIN_ALLER_RETOUR_MINUTES;
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -100,7 +109,12 @@ function JourneeCard({ journee, onClick }) {
       {/* Le nom du technicien n'est pas répété ici : il titre la colonne. */}
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
-          <span className="font-semibold text-gray-900">{libre} min libres</span>
+          <span
+            className="font-semibold text-gray-900"
+            title="Temps restant hors trajets. Le moteur, lui, budgete aussi les deplacements : une journee peut donc refuser un entretien qui tiendrait sur ce seul chiffre."
+          >
+            {libre} min libres
+          </span>
           <span className="text-gray-500">{journee.rdvs.length} RDV · {journee.chargeMinutes} min</span>
         </div>
         <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -230,7 +244,7 @@ export function TourneesTab() {
     // journées en dépassement (disponible négatif, typiquement une installation
     // qui occupe 9 à 10 h) tombent dans le même cas.
     const exploitables = dansHorizon.filter(
-      (j) => minutesDisponibles(j) >= DUREE_MIN_ENTRETIEN_MINUTES,
+      (j) => minutesDisponibles(j) >= SEUIL_JOURNEE_EXPLOITABLE_MINUTES,
     );
 
     // L'ordre à l'intérieur d'une colonne est chronologique, il est appliqué par

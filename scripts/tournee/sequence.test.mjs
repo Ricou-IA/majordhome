@@ -101,10 +101,42 @@ test('fenêtre promise respectée — l ordre s y plie', () => {
 });
 
 test('fenêtre impossible à tenir — infaisable', () => {
+  // Fenêtre à 8h30 : 40 min de trajet depuis le dépôt, départ à 8h00, arrivée
+  // 8h40 — après la fermeture. La tolérance de départ anticipé ne s'applique
+  // pas ici : elle ne couvre que les arrêts fixés À l'ouverture ou avant.
   const r = sequencerTournee({
     ...ctx,
-    arrets: [arret('c', 'C', 60, { debut: 8 * 60, fin: 8 * 60 + 10 })], // 40 min de trajet
+    arrets: [arret('c', 'C', 60, { debut: 8 * 60 + 30, fin: 8 * 60 + 35 })],
     budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'fenetre');
+});
+
+test('départ anticipé — un RDV fixé à l ouverture reste atteignable', () => {
+  // Un rendez-vous à 8h00 pile chez un client à 40 min : en partant à 8h00 on
+  // arriverait à 8h40, et TOUTE la journée serait declaree infaisable. Le
+  // technicien part evidemment plus tot pour etre a l heure. Sans cette
+  // tolerance, la plupart des journees de terrain seraient rejetees.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [arret('c', 'C', 60, { debut: 8 * 60, fin: 8 * 60 })],
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, true);
+  assert.equal(r.planning[0].arriveeMinutes, 8 * 60, 'il est chez le client a 8h00 pile');
+});
+
+test('départ anticipé — ne couvre PAS un arrêt de milieu de journée', () => {
+  // Deux arrets contraints dont le second est inatteignable apres le premier :
+  // la tolerance ne s applique qu au premier arret, ce conflit reste un echec.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [
+      arret('a', 'A', 240, { debut: 8 * 60, fin: 8 * 60 }),
+      arret('b', 'B', 60, { debut: 9 * 60, fin: 9 * 60 + 5 }),
+    ],
+    budgetMinutes: 900,
   });
   assert.equal(r.faisable, false);
   assert.equal(r.raison, 'fenetre');

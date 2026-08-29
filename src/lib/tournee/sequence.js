@@ -37,6 +37,20 @@ function* permutations(items) {
 function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause }) {
   let t = amplitude.debut;
   let charge = 0;
+
+  // Départ anticipé du dépôt. Un rendez-vous fixé à l'heure d'ouverture (8 h)
+  // serait sinon inatteignable dès que le trajet depuis le dépôt n'est pas nul :
+  // en partant à 8 h on arriverait à 8 h 20, après sa fenêtre ponctuelle, et
+  // TOUTE la journée serait déclarée infaisable. Or le technicien part
+  // évidemment plus tôt pour être chez le client à l'heure dite.
+  // La tolérance est volontairement étroite : elle ne s'applique qu'au PREMIER
+  // arrêt, et seulement si son heure tombe à l'ouverture ou avant. Un rendez-vous
+  // de milieu de journée qu'on ne peut plus atteindre reste un vrai conflit.
+  const premier = ordre[0];
+  if (premier?.fenetre && premier.fenetre.debut <= amplitude.debut) {
+    const trajetInitial = trajet(depotKey, premier.key);
+    if (t + trajetInitial > premier.fenetre.fin) t = premier.fenetre.debut - trajetInitial;
+  }
   let pausePrise = false;
   let pauseHorsFenetre = false;
   const planning = [];
