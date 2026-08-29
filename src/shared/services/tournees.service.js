@@ -246,7 +246,12 @@ export const tourneesService = {
           .select('id, display_name, calendar_color, default_availability, daily_work_minutes, include_in_routing')
           .eq('org_id', orgId).eq('role', 'technician').eq('include_in_routing', true).eq('is_active', true),
         supabase.from('majordhome_appointments')
-          .select('id, client_id, scheduled_date, scheduled_start, duration_minutes, appointment_type, client_name, address, city, postal_code')
+          // ⚠️ `lead_id` est INDISPENSABLE ici : la résolution de coordonnées ci-dessous
+          // en dépend (RDV rattaché à un lead, cf. bloc `leadIds`). Sans lui dans le
+          // SELECT, `r.lead_id` vaut `undefined`, `leadIds` reste vide et TOUT le repli
+          // lead est du code mort — silencieusement, puisque le repli suivant (siège)
+          // fournit quand même une position plausible. Vécu : livré ainsi, jamais vu.
+          .select('id, client_id, lead_id, scheduled_date, scheduled_start, duration_minutes, appointment_type, client_name, address, city, postal_code')
           .eq('org_id', orgId).gte('scheduled_date', iso(debut)).lte('scheduled_date', iso(fin))
           .not('status', 'in', '(cancelled,no_show)'),
       ]);
