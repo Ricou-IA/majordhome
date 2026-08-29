@@ -9,15 +9,24 @@
  * devant cet écran : ce trou de 10 h à 14 h, qu'est-ce qui y rentre ?
  *
  * Deux modes, une seule barre (deux composants divergeraient) :
- *   - lecture (carte de la liste) : blocs en `div`, aucun handler. La carte est
- *     elle-même un `<button>` — y imbriquer un bouton serait invalide.
- *   - interactif (`onDecaler` fourni, panneau de remplissage) : chaque RDV se
- *     glisse à la souris/au doigt ou aux flèches du clavier, par pas de 15 min.
+ *   - lecture : blocs en `div`, aucun handler.
+ *   - interactif (`onDecaler` fourni — carte de la liste comme panneau de
+ *     remplissage) : chaque RDV se glisse à la souris, au doigt ou aux flèches
+ *     du clavier, par pas de 15 min.
+ *
+ * En mode interactif, les blocs sont des `<button>` : l'élément qui contient
+ * cette barre ne doit donc jamais en être un lui-même (cf. `JourneeCard`, dont
+ * seul l'en-tête est cliquable).
+ *
+ * `apercus` dessine par-dessus les entretiens PAS ENCORE POSÉS, à la place que
+ * le moteur leur a trouvée. C'est la réponse à « où le caler ? » : on voit le
+ * client entrer dans le trou, entre quels rendez-vous et à quelle heure, au
+ * lieu de le déduire d'une ligne de liste.
  *
  * ⚠️ Le glissement ne déplace RIEN en base ici : il remonte une intention au
- * parent, qui l'applique en mémoire (`appliquerDecalages`) et ne l'écrit qu'au
- * moment de poser. Une heure de RDV est une heure annoncée à un client : elle
- * ne bouge pas parce qu'un doigt a glissé sur un écran.
+ * parent, qui l'applique en mémoire (`appliquerDecalages`) et ne l'écrit que
+ * sur un geste explicite. Une heure de RDV est une heure annoncée à un client :
+ * elle ne bouge pas parce qu'un doigt a glissé sur un écran.
  *
  * Tout le placement et toutes les bornes viennent de `src/lib/tournee/
  * timeline.js` (module pur testé) — y compris la règle « un RDV non plaçable
@@ -69,15 +78,22 @@ const arrondiAuPas = (m) => Math.round(m / PAS_DECALAGE_MINUTES) * PAS_DECALAGE_
  * @param {Function} [props.onDecaler]  (rdvId, deltaMinutes) => void — active le
  *   mode interactif. `deltaMinutes` est le déplacement DE CE GESTE, à cumuler
  *   par l'appelant : la barre ne connaît pas l'historique des décalages.
+ * @param {Array<{id, debutMinutes, finMinutes, label, pressenti?}>} [props.apercus]
+ *   Entretiens PAS ENCORE POSÉS, dessinés en surimpression à la place que le
+ *   moteur leur a trouvée. C'est ce qui permet de valider d'un coup d'œil : on
+ *   voit le client se caler dans le trou, entre quels rendez-vous, à quelle
+ *   heure — au lieu de le déduire d'une ligne de liste. `pressenti` = simple
+ *   survol (pas encore coché), rendu plus discret.
  */
 export function JourneeTimeline({
-  amplitude, rdvs, avecEchelle = true, onDecaler,
+  amplitude, rdvs, avecEchelle = true, onDecaler, apercus,
 }) {
   const interactif = typeof onDecaler === 'function';
   const barreRef = useRef(null);
   // Position provisoire pendant le geste. Le parent n'est prévenu qu'au
-  // relâchement : `sequencerTournee` énumère jusqu'à 40 320 ordres, le
-  // rejouer à chaque pixel figerait l'écran.
+  // relâchement : chaque décalage relance le classement des candidats (la clé
+  // de cache porte l'empreinte des créneaux), le rejouer à chaque pixel
+  // enverrait une rafale de calculs pour rien.
   const [drag, setDrag] = useState(null); // { id, debutMinutes, depuis, bornes }
 
   const base = useMemo(() => construireSegments(rdvs, amplitude), [rdvs, amplitude]);
@@ -235,6 +251,30 @@ export function JourneeTimeline({
                 </span>
               )}
             </button>
+          );
+        })}
+        {/* Entretiens en attente de pose : au-dessus des blocs existants, en
+            pointillés — jamais confondus avec un RDV réellement posé. */}
+        {(apercus || []).map((a) => {
+          const gauche = ((Math.max(a.debutMinutes, amplitude.debut) - amplitude.debut) / base.span) * 100;
+          const largeur = ((Math.min(a.finMinutes, amplitude.fin)
+            - Math.max(a.debutMinutes, amplitude.debut)) / base.span) * 100;
+          if (largeur <= 0) return null;
+          return (
+            <div
+              key={`apercu-${a.id}`}
+              className={`absolute inset-y-0 rounded-sm border-2 border-dashed border-emerald-600 ${
+                a.pressenti ? 'bg-emerald-200/50' : 'bg-emerald-300/80'
+              } flex items-center justify-center overflow-hidden`}
+              style={{ left: `${gauche}%`, width: `${Math.max(largeur, 1.5)}%` }}
+              title={`À poser · ${minutesEnHHMM(a.debutMinutes)}–${minutesEnHHMM(a.finMinutes)} · ${a.label}`}
+            >
+              {largeur >= 12 && (
+                <span className="text-[10px] font-semibold text-emerald-900 pointer-events-none">
+                  {minutesEnHHMM(a.debutMinutes)}
+                </span>
+              )}
+            </div>
           );
         })}
       </div>

@@ -12,7 +12,7 @@ import { Checkbox } from '@components/ui/checkbox';
 import { minutesEnHHMM } from './tourneesPanelUtils';
 
 export function PropositionRow({
-  proposition, checked, disabled, onToggle, recalculEnsemble = null,
+  proposition, checked, disabled, onToggle, recalculEnsemble = null, onSurvol,
 }) {
   const { candidat, detourMinutes, placement } = proposition;
   const meta = candidat.meta || {};
@@ -35,7 +35,11 @@ export function PropositionRow({
     && meta.eligibilite.dansTolerance === false;
 
   return (
-    <li className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 hover:border-blue-200 transition-colors">
+    <li
+      className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 hover:border-blue-200 transition-colors"
+      onMouseEnter={() => onSurvol?.(candidat.id)}
+      onMouseLeave={() => onSurvol?.(null)}
+    >
       <Checkbox checked={checked} onCheckedChange={onToggle} disabled={disabled} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">

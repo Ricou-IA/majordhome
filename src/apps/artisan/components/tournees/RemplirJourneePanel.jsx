@@ -39,7 +39,7 @@
  * ============================================================================
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { X, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -108,6 +108,9 @@ export function RemplirJourneePanel({
     [journeeAjustee, depot],
   );
 
+  // Candidat survolé : on montre où il SE CALERAIT avant même de le cocher.
+  const [survole, setSurvole] = useState(null);
+
   const {
     selectedIds, toggleSelection, recalcul, calculatingReel, posing, resultatPose,
     confirmOpen, handlePoserClick, handleConfirmApprox, handleCancelApprox,
@@ -116,6 +119,32 @@ export function RemplirJourneePanel({
     journee: journeeAjustee, depot, reglages, arretsExistants, propositions,
     coreOrgId, user, onClose, decalages, retirerDecalages,
   });
+
+  // Ce que la barre montre en surimpression : les entretiens cochés à leur
+  // place d'ensemble (recalculée dès qu'un second est coché), plus le candidat
+  // survolé à sa place solo. Un candidat coché prime sur le survol — sinon la
+  // même ligne serait dessinée deux fois à deux endroits.
+  const apercus = useMemo(() => {
+    const liste = (recalcul?.places || []).map((p) => ({
+      id: p.candidat.id,
+      debutMinutes: p.placement.arriveeMinutes,
+      finMinutes: p.placement.departMinutes,
+      label: p.candidat.meta?.clientName || 'Client',
+    }));
+    if (survole && !selectedIds.has(survole)) {
+      const p = (propositions || []).find((x) => x.candidat.id === survole);
+      if (p?.placement?.faisable) {
+        liste.push({
+          id: p.candidat.id,
+          debutMinutes: p.placement.arriveeMinutes,
+          finMinutes: p.placement.departMinutes,
+          label: p.candidat.meta?.clientName || 'Client',
+          pressenti: true,
+        });
+      }
+    }
+    return liste;
+  }, [recalcul, survole, selectedIds, propositions]);
 
   if (!journee) return null;
 
@@ -176,6 +205,7 @@ export function RemplirJourneePanel({
             amplitude={journee.amplitude}
             rdvs={journeeAjustee.rdvs}
             onDecaler={posing || calculatingReel ? undefined : decaler}
+            apercus={apercus}
           />
           {/* Un déplacement en attente n'est PAS encore en base : le dire, sinon
               on croit le planning déjà changé et on ferme le panneau. */}
@@ -231,6 +261,7 @@ export function RemplirJourneePanel({
                   checked={selectedIds.has(p.candidat.id)}
                   disabled={posing || calculatingReel}
                   onToggle={() => toggleSelection(p.candidat.id)}
+                  onSurvol={setSurvole}
                   // I3 — dès que ≥2 candidats sont cochés, l'heure de passage
                   // calculée pour CHAQUE ligne à la proposition initiale (en
                   // supposant CE candidat seul ajouté) devient mutuellement
