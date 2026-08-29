@@ -14,6 +14,7 @@
  * ============================================================================
  */
 
+import { Car } from 'lucide-react';
 import { EquipmentKindIcons } from '@apps/artisan/components/shared/EquipmentKindIcons';
 import { minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 
@@ -36,10 +37,14 @@ const COULEUR_TYPE = {
  * @param {object} props.rdv        RDV brut (`journee.rdvs`)
  * @param {number} props.debutMinutes  heure affichée — celle du bloc, décalage compris
  * @param {number} props.finMinutes
+ * @param {{minutes: number, depuis: string}|null} [props.trajet]  temps de route
+ *   depuis le RDV précédent. Cette information manquait à l'écran au point que
+ *   la poignée de redimensionnement a été prise pour « le transport » (31/08) :
+ *   une donnée qu'on cherche et qui n'est nulle part finit lue dans autre chose.
  * @param {string} [props.className]
  */
 export function BlocRdvCard({
-  rdv, debutMinutes, finMinutes, className = '',
+  rdv, debutMinutes, finMinutes, trajet = null, className = '',
 }) {
   const type = rdv.appointment_type;
   const duree = finMinutes - debutMinutes;
@@ -49,10 +54,10 @@ export function BlocRdvCard({
 
   return (
     <div
-      className={`rounded-lg border border-gray-200 bg-white shadow-lg p-2.5 text-left ${className}`}
+      className={`w-64 rounded-lg border border-gray-200 bg-white shadow-lg px-2.5 py-2 text-left ${className}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold text-gray-900 text-sm truncate">
+      <div className="flex items-center justify-between gap-1.5">
+        <p className="font-semibold text-gray-900 text-xs truncate">
           {rdv.client_name || rdv.subject || 'Sans client'}
         </p>
         {type === 'maintenance' && rdv.client_id && (
@@ -60,26 +65,35 @@ export function BlocRdvCard({
         )}
       </div>
 
-      <p className="text-xs text-gray-500 truncate">{rdv.city || 'Ville inconnue'}</p>
+      <p className="text-[11px] text-gray-500 truncate">{rdv.city || 'Ville inconnue'}</p>
 
-      <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+      <div className="mt-1 flex items-center gap-1.5 flex-wrap text-[11px]">
         <span
-          className={`inline-flex items-center rounded-full font-medium px-2 py-0.5 text-[11px] ${
+          className={`inline-flex items-center rounded-full font-medium px-1.5 py-px ${
             COULEUR_TYPE[type] || 'bg-gray-100 text-gray-600'
           }`}
         >
           {LIBELLE_TYPE[type] || type || 'RDV'}
         </span>
-        <span className="text-xs font-medium text-gray-900">
-          {minutesEnHHMM(debutMinutes)} – {minutesEnHHMM(finMinutes)}
+        <span className="font-medium text-gray-900">
+          {minutesEnHHMM(debutMinutes)}–{minutesEnHHMM(finMinutes)}
         </span>
-        <span className="text-xs text-gray-500">
+        <span className="text-gray-500">
           {formatDuree(duree)}
           {dureeInitiale != null && (
             <span className="text-emerald-700"> (au lieu de {formatDuree(dureeInitiale)})</span>
           )}
         </span>
       </div>
+
+      {/* Le trajet depuis le RDV précédent : c'est lui qui explique pourquoi ce
+          bloc ne peut pas reculer davantage. */}
+      {trajet && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] text-gray-400">
+          <Car className="h-3 w-3 flex-shrink-0" />
+          {formatDuree(trajet.minutes)} de route depuis {trajet.depuis}
+        </p>
+      )}
     </div>
   );
 }

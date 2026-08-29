@@ -192,12 +192,29 @@ export function bornesDeplacement(segments, id, amplitude, trajet = trajetLocal)
   // AUCUNE contrainte : mieux vaut une butée trop permissive (que le moteur
   // rattrapera au calcul) qu'une butée de 60 min fabriquée sur du vide, qui
   // empêcherait de bouger un RDV sans raison visible.
-  const route = (a, b) => ((a && b) ? trajet(a, b) : 0);
+  //
+  // ⚠️ Et jamais PLUS que l'écart déjà constaté : si deux RDV posés sont à
+  // 30 min l'un de l'autre là où l'estimation en réclame 42, c'est notre
+  // estimation qui est trop large — le trajet a lieu tous les jours. Sans ce
+  // plafond, le RDV se retrouvait immobile côté gauche, sans explication (vu le
+  // 31/08 sur TREVISIOL, coincé derrière LODDO). Même principe que le moteur :
+  // le planning posé est un fait, on ne lui oppose pas nos estimations.
+  const route = (a, b, ecartConstate) => {
+    if (!a || !b) return 0;
+    const estime = trajet(a, b);
+    return ecartConstate == null ? estime : Math.min(estime, Math.max(ecartConstate, 0));
+  };
 
   const precedent = segments[i - 1];
   const suivant = segments[i + 1];
-  if (precedent) minDebut = Math.max(minDebut, precedent.finMinutes + route(precedent.key, s.key));
-  if (suivant) maxDebut = Math.min(maxDebut, suivant.debutMinutes - route(s.key, suivant.key) - duree);
+  if (precedent) {
+    const marge = route(precedent.key, s.key, s.debutMinutes - precedent.finMinutes);
+    minDebut = Math.max(minDebut, precedent.finMinutes + marge);
+  }
+  if (suivant) {
+    const marge = route(s.key, suivant.key, suivant.debutMinutes - s.finMinutes);
+    maxDebut = Math.min(maxDebut, suivant.debutMinutes - marge - duree);
+  }
 
   // La position ACTUELLE est toujours atteignable : sans ça, un RDV qui déborde
   // déjà de l'amplitude (installation commencée à 7 h) ou qui chevauche un
@@ -229,9 +246,13 @@ export function bornesDuree(segments, id, amplitude, trajet = trajetLocal, minim
   const dureeActuelle = s.finMinutes - s.debutMinutes;
 
   const suivant = segments[i + 1];
-  const route = (a, b) => ((a && b) ? trajet(a, b) : 0);
+  // Même plafond que `bornesDeplacement` : on ne réserve pas plus de route que
+  // l'écart que le planning montre déjà.
+  const marge = suivant && s.key && suivant.key
+    ? Math.min(trajet(s.key, suivant.key), Math.max(suivant.debutMinutes - s.finMinutes, 0))
+    : 0;
   const butoir = suivant
-    ? suivant.debutMinutes - route(s.key, suivant.key)
+    ? suivant.debutMinutes - marge
     : (amplitude?.fin ?? s.finMinutes);
 
   return {
@@ -285,4 +306,27 @@ export function appliquerAjustements(rdvs, decalages, durees) {
         ? { dureeInitialeMinutes: dureeInitiale } : {}),
     };
   });
+}
+
+/**
+ * Temps de route entre un arrêt et le précédent, tel qu'on l'oppose aux bornes :
+ * l'estimation, plafonnée par l'écart que le planning montre déjà.
+ *
+ * Existe pour être AFFICHÉ. Cette information manquait complètement à l'écran —
+ * au point que la poignée de redimensionnement, une simple zone teintée au bord
+ * du bloc, a été prise pour « le transport » (31/08). Une donnée qu'on cherche
+ * et qui n'est nulle part finit toujours par être lue dans autre chose.
+ *
+ * @returns {{minutes: number, depuisId: string}|null} `null` s'il n'y a pas de
+ *   précédent, ou si l'un des deux points n'a pas de position (aucun trajet
+ *   n'est alors calculable, et en inventer un serait pire que se taire).
+ */
+export function trajetDepuisPrecedent(segments, id, trajet = trajetLocal) {
+  const i = (segments || []).findIndex((s) => s.id === id);
+  if (i <= 0) return null;
+  const s = segments[i];
+  const precedent = segments[i - 1];
+  if (!s.key || !precedent.key) return null;
+  const ecart = Math.max(s.debutMinutes - precedent.finMinutes, 0);
+  return { minutes: Math.min(trajet(precedent.key, s.key), ecart), depuisId: precedent.id };
 }

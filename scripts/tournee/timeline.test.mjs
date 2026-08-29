@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   construireSegments, graduations, creneauxLibres, bornesDeplacement, appliquerAjustements,
-  bornesDuree,
+  bornesDuree, trajetDepuisPrecedent,
 } from '../../src/lib/tournee/timeline.js';
 import { construireArretsExistants } from '../../src/lib/tournee/arrets.js';
 import { cleCoord } from '../../src/lib/tournee/geo.js';
@@ -324,4 +324,48 @@ test('appliquerAjustements — une durée ramenée à sa valeur d origine ne men
   const out = appliquerAjustements(rdvs, null, new Map([['a', 60]]));
   assert.equal(out[0].dureeInitialeMinutes, undefined,
     'aucun marqueur de modification si rien n a change');
+});
+
+test('bornesDeplacement — on ne réserve jamais plus de route que l écart constaté', () => {
+  // Cas 31/08 : LODDO finit a 9h30, TREVISIOL commence a 10h — 30 min d'ecart,
+  // la ou l'estimation a vol d'oiseau en reclame ~42. Sans plafond, TREVISIOL
+  // etait immobile cote gauche, sans explication.
+  const A = { id: 'loddo', scheduled_start: '08:00', duration_minutes: 90, lat: 43.75, lng: 1.80 };
+  const B = { id: 'trevisiol', scheduled_start: '10:00', duration_minutes: 120, lat: 43.57, lng: 2.01 };
+  const { segments } = construireSegments([A, B], JOURNEE);
+
+  const estime = trajetLocal(cleCoord(A), cleCoord(B));
+  assert.ok(estime > 30, `le pretest suppose une estimation > 30 min (obtenu ${estime})`);
+
+  const bornes = bornesDeplacement(segments, 'trevisiol', JOURNEE);
+  assert.equal(bornes.minDebut, 570 + 30,
+    'la marge est plafonnee a l ecart reel (30 min), pas a l estimation');
+});
+
+test('bornesDeplacement — au-delà de l écart constaté, l estimation s applique normalement', () => {
+  // Deux RDV tres espaces : rien ne plafonne, on reserve bien le trajet estime.
+  const A = { id: 'a', scheduled_start: '08:00', duration_minutes: 60, lat: 43.75, lng: 1.80 };
+  const B = { id: 'b', scheduled_start: '15:00', duration_minutes: 60, lat: 43.57, lng: 2.01 };
+  const { segments } = construireSegments([A, B], JOURNEE);
+  const estime = trajetLocal(cleCoord(A), cleCoord(B));
+  assert.equal(bornesDeplacement(segments, 'b', JOURNEE).minDebut, 540 + estime);
+});
+
+test('trajetDepuisPrecedent — donne le temps de route à afficher, ou rien', () => {
+  const A = { id: 'a', scheduled_start: '08:00', duration_minutes: 90, lat: 43.75, lng: 1.80 };
+  const B = { id: 'b', scheduled_start: '10:00', duration_minutes: 60, lat: 43.57, lng: 2.01 };
+  const { segments } = construireSegments([A, B], JOURNEE);
+
+  assert.equal(trajetDepuisPrecedent(segments, 'a'), null, 'aucun precedent : rien a dire');
+  const t = trajetDepuisPrecedent(segments, 'b');
+  assert.equal(t.depuisId, 'a');
+  assert.equal(t.minutes, 30, 'plafonne par l ecart reel, comme la butee');
+
+  // Sans position, aucun trajet n'est calculable : on se tait plutot que d'en
+  // inventer un.
+  const sansPos = construireSegments(
+    [{ id: 'x', scheduled_start: '08:00', duration_minutes: 60 },
+      { id: 'y', scheduled_start: '10:00', duration_minutes: 60 }], JOURNEE,
+  );
+  assert.equal(trajetDepuisPrecedent(sansPos.segments, 'y'), null);
 });

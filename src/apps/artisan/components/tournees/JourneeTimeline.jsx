@@ -39,6 +39,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   construireSegments, graduations, creneauxLibres, bornesDeplacement, bornesDuree,
+  trajetDepuisPrecedent,
 } from '@/lib/tournee/timeline.js';
 import { minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 import { BlocRdvCard } from './BlocRdvCard';
@@ -198,6 +199,14 @@ export function JourneeTimeline({
     ? trous.reduce((a, b) => (b.dureeMinutes > a.dureeMinutes ? b : a))
     : null;
   const survole = segments.find((s) => s.id === (geste?.id || survoleId));
+  // Trajet depuis le RDV précédent, calculé sur les segments RÉELS (pas ceux
+  // du geste en cours) : c'est l'écart du planning tel qu'il est posé.
+  const trajetBrut = survole ? trajetDepuisPrecedent(base.segments, survole.id) : null;
+  const trajetSurvole = trajetBrut ? {
+    minutes: trajetBrut.minutes,
+    depuis: base.segments.find((s) => s.id === trajetBrut.depuisId)?.rdv?.client_name
+      || 'l\u2019arrêt précédent',
+  } : null;
 
   return (
     <div className="relative">
@@ -231,7 +240,7 @@ export function JourneeTimeline({
             COULEUR_BLOC[s.rdv.appointment_type] || COULEUR_BLOC_DEFAUT,
             s.deborde ? 'ring-1 ring-inset ring-amber-400' : '',
             (decale || raccourci) ? 'ring-2 ring-inset ring-emerald-500' : '',
-            interactif ? 'cursor-grab active:cursor-grabbing touch-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-900' : '',
+            interactif ? 'group cursor-grab active:cursor-grabbing touch-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-900' : '',
             geste?.id === s.id ? 'opacity-90 shadow-lg' : '',
           ].filter(Boolean).join(' ');
           const etiquette = s.widthPct >= SEUIL_ETIQUETTE_PCT ? minutesEnHHMM(s.debutMinutes) : null;
@@ -278,15 +287,22 @@ export function JourneeTimeline({
               )}
               {/* Poignée de durée : raccourcir une intervention est l'autre
                   façon de faire de la place. Rendue en dernier pour passer
-                  au-dessus de l'étiquette. */}
+                  au-dessus de l'étiquette.
+                  ⚠️ Invisible tant que le bloc n'est pas survolé : en zone
+                  teintée permanente au bord du bloc, elle se lisait comme une
+                  DONNÉE (« l'espace plus foncé, c'est le transport ? », 31/08).
+                  Un élément d'interaction ne doit jamais pouvoir passer pour
+                  une part du planning. */}
               <span
                 role="presentation"
-                className="absolute inset-y-0 right-0 w-2 cursor-ew-resize bg-black/20 hover:bg-black/40"
+                className="absolute inset-y-0 right-0 w-2.5 flex items-center justify-center cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity"
                 onPointerDown={(e) => demarrerGeste(e, s, 'duree')}
                 onPointerMove={onPointerMove}
                 onPointerUp={terminerGeste}
                 onPointerCancel={terminerGeste}
-              />
+              >
+                <span className="w-0.5 h-3.5 rounded-full bg-white/90" />
+              </span>
             </button>
           );
         })}
@@ -336,13 +352,19 @@ export function JourneeTimeline({
 
       {/* Carte du RDV survolé (ou manipulé) : elle flotte sous la barre, hors du
           conteneur qui rogne, et ne capte pas le pointeur — sinon elle
-          couperait le geste en cours dès qu'elle apparaît sous le curseur. */}
+          couperait le geste en cours dès qu'elle apparaît sous le curseur.
+          Alignée sur son bloc plutôt qu'étalée sur toute la largeur, et bornée
+          à 70 % pour ne pas sortir du cadre côté droit. */}
       {survole && (
-        <div className="absolute left-0 right-0 top-full z-20 pointer-events-none">
+        <div
+          className="absolute top-full z-20 pointer-events-none"
+          style={{ left: `${Math.min(survole.leftPct, 70)}%` }}
+        >
           <BlocRdvCard
             rdv={survole.rdv}
             debutMinutes={survole.debutMinutes}
             finMinutes={survole.finMinutes}
+            trajet={trajetSurvole}
           />
         </div>
       )}
