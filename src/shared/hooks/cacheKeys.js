@@ -371,7 +371,16 @@ export const tourneeKeys = {
   // La proposition dépend de la journée ET de son contenu : la clé inclut la
   // charge, sinon poser un RDV n'invaliderait pas le classement des candidats
   // (amendement task-12 point 3).
-  propositions: (orgId, date, technicienId, chargeMinutes) => [
+  //
+  // ⚠️ `chargeMinutes` NE SUFFIT PAS : elle ne bouge pas quand un RDV change
+  // d'HEURE à durée constante — décalage manuel dans le panneau, ou RDV
+  // déplacé depuis le Planning. Le classement, lui, dépend entièrement des
+  // créneaux occupés (détour, faisabilité, heure de passage proposée). Sans
+  // `empreinteCreneaux`, React Query resservait le classement calculé sur le
+  // planning d'AVANT le déplacement — un cache périmé qui a l'air d'un
+  // résultat frais. D'où l'empreinte `id@heure` de tous les RDV du jour.
+  propositions: (orgId, date, technicienId, chargeMinutes, empreinteCreneaux) => [
     ...tourneeKeys.all(orgId), 'propositions', date, technicienId, chargeMinutes,
+    empreinteCreneaux,
   ],
 };

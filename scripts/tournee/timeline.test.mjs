@@ -5,7 +5,10 @@
 // Run : node --test scripts/tournee/timeline.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { construireSegments, graduations, creneauxLibres } from '../../src/lib/tournee/timeline.js';
+import {
+  construireSegments, graduations, creneauxLibres, bornesDeplacement, appliquerDecalages,
+} from '../../src/lib/tournee/timeline.js';
+import { construireArretsExistants } from '../../src/lib/tournee/arrets.js';
 
 const JOURNEE = { debut: 480, fin: 1080 }; // 08:00 -> 18:00, span 600
 const rdv = (id, start, duree, extra = {}) => ({
@@ -134,4 +137,96 @@ test('creneauxLibres — un RDV débordant ne crée pas de trou hors des bornes'
   const trous = creneauxLibres(segments, JOURNEE);
   assert.deepEqual(trous.map((t) => [t.debutMinutes, t.finMinutes]), [[540, 1080]]);
   assert.ok(trous.every((t) => t.debutMinutes >= JOURNEE.debut && t.finMinutes <= JOURNEE.fin));
+});
+
+// ============================================================================
+// DÉCALAGE MANUEL
+// ============================================================================
+
+test('bornesDeplacement — un RDV bute sur ses voisins, il ne les traverse pas', () => {
+  const { segments } = construireSegments(
+    [rdv('a', '08:00', 60), rdv('b', '11:00', 60), rdv('c', '15:00', 60)],
+    JOURNEE,
+  );
+  const b = bornesDeplacement(segments, 'b', JOURNEE);
+  assert.equal(b.minDebut, 540, 'pas avant la fin de A (9h)');
+  assert.equal(b.maxDebut, 840, 'pas au-dela du debut de C moins sa duree (14h)');
+  assert.equal(b.dureeMinutes, 60);
+});
+
+test('bornesDeplacement — sans voisin, les bornes sont celles de la journée', () => {
+  const { segments } = construireSegments([rdv('seul', '10:00', 120)], JOURNEE);
+  const b = bornesDeplacement(segments, 'seul', JOURNEE);
+  assert.equal(b.minDebut, 480);
+  assert.equal(b.maxDebut, 960, 'fin de journee moins la duree');
+});
+
+test('bornesDeplacement — la position actuelle reste toujours atteignable', () => {
+  // Un RDV qui deborde deja (installation commencee a 7h) ne doit pas sauter a
+  // 8h des qu'on le touche : personne n'a demande ce deplacement, et c'est une
+  // heure promise a un client.
+  const { segments } = construireSegments([rdv('tot', '07:00', 120)], JOURNEE);
+  const b = bornesDeplacement(segments, 'tot', JOURNEE);
+  assert.equal(b.minDebut, 420, 'sa propre position reste dans les bornes');
+  assert.ok(b.maxDebut >= b.minDebut);
+});
+
+test('bornesDeplacement — deux RDV déjà en chevauchement ne produisent pas de bornes inversées', () => {
+  const { segments } = construireSegments(
+    [rdv('long', '09:00', 240), rdv('dedans', '10:00', 60)],
+    JOURNEE,
+  );
+  for (const id of ['long', 'dedans']) {
+    const b = bornesDeplacement(segments, id, JOURNEE);
+    assert.ok(b.maxDebut >= b.minDebut, `${id} : bornes coherentes malgre le chevauchement`);
+  }
+});
+
+test('bornesDeplacement — id inconnu : null, jamais des bornes inventées', () => {
+  const { segments } = construireSegments([rdv('a', '09:00', 60)], JOURNEE);
+  assert.equal(bornesDeplacement(segments, 'fantome', JOURNEE), null);
+  assert.equal(bornesDeplacement([], 'a', JOURNEE), null);
+});
+
+test('appliquerDecalages — seule l heure bouge, la durée est intacte', () => {
+  const rdvs = [rdv('a', '09:00', 90), rdv('b', '14:00', 60)];
+  const out = appliquerDecalages(rdvs, new Map([['a', 45]]));
+  assert.equal(out[0].scheduled_start, '09:45');
+  assert.equal(out[0].scheduled_end, '11:15');
+  assert.equal(out[0].duration_minutes, 90, 'la duree ne bouge pas');
+  assert.equal(out[0].decalageMinutes, 45);
+  assert.equal(out[1].scheduled_start, '14:00', 'les autres RDV sont intacts');
+  assert.equal(out[1].decalageMinutes, undefined);
+});
+
+test('appliquerDecalages — décalage négatif, et aucune mutation de l entrée', () => {
+  const rdvs = [rdv('a', '10:00', 60)];
+  const out = appliquerDecalages(rdvs, new Map([['a', -90]]));
+  assert.equal(out[0].scheduled_start, '08:30');
+  assert.equal(rdvs[0].scheduled_start, '10:00', 'l entree n est jamais mutee');
+});
+
+test('appliquerDecalages — sans décalage, la liste passe telle quelle', () => {
+  const rdvs = [rdv('a', '09:00', 60)];
+  assert.equal(appliquerDecalages(rdvs, null), rdvs);
+  assert.equal(appliquerDecalages(rdvs, new Map()), rdvs);
+});
+
+test('appliquerDecalages — un RDV sans heure n est pas décalé, jamais inventé', () => {
+  const out = appliquerDecalages([rdv('flou', null, 60)], new Map([['flou', 60]]));
+  assert.equal(out[0].scheduled_start, null);
+  assert.equal(out[0].decalageMinutes, undefined);
+});
+
+test('un décalage se propage jusqu au séquenceur : la fenêtre suit la nouvelle heure', () => {
+  // C'est le point qui compte : le decalage n'est pas qu'un effet visuel, il
+  // doit changer ce que le moteur considere comme contraint. Un seul point
+  // d'injection (appliquerDecalages) alimente arrets.js comme la barre.
+  const rdvs = [rdv('a', '09:00', 60, { lat: 43.9, lng: 1.9 })];
+  const [avant] = construireArretsExistants(rdvs);
+  assert.deepEqual(avant.fenetre, { debut: 540, fin: 540 });
+
+  const [apres] = construireArretsExistants(appliquerDecalages(rdvs, new Map([['a', 120]])));
+  assert.deepEqual(apres.fenetre, { debut: 660, fin: 660 }, 'le moteur voit 11h, pas 9h');
+  assert.equal(apres.dureeMinutes, 60);
 });

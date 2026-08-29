@@ -18,11 +18,23 @@
  * de la pose (chaînage `ensureEntretienCard` -> `savService.scheduleEntretien`,
  * seule voie canonique de création carte<->RDV du projet) vivent dans le hook
  * `useJourneePose` — ce composant ne fait que l'orchestration d'affichage.
+ *
+ * ⚠️ DÉCALAGE MANUEL (useDecalagesJournee) : le moteur ne déplace jamais un RDV
+ * posé — sa fenêtre reste ponctuelle. Un HUMAIN, lui, peut en pousser un sur la
+ * barre pour faire de la place. Trois conséquences à ne pas perdre de vue :
+ *   1. c'est `journeeAjustee` (et elle seule) qui alimente `usePropositions`,
+ *      `construireArretsExistants` et `useJourneePose` — la journée d'origine
+ *      classerait les candidats pour un planning qui n'existe plus à l'écran ;
+ *   2. rien n'est écrit avant la pose, et le panneau doit le dire : fermer
+ *      annule tout ;
+ *   3. à la pose, les décalages partent en base AVANT les créations, et un
+ *      échec de déplacement ANNULE la pose (les créneaux des nouveaux RDV
+ *      supposent que les anciens ont bougé).
  * ============================================================================
  */
 
 import { useMemo } from 'react';
-import { X, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -34,8 +46,10 @@ import { formatDateFR } from '@/lib/utils';
 import { Button } from '@components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { PropositionRow } from './PropositionRow';
+import { JourneeTimeline } from './JourneeTimeline';
 import { useJourneePose } from './useJourneePose';
-import { RAISON_LABELS, minutesEnHHMM } from './tourneesPanelUtils';
+import { useDecalagesJournee } from './useDecalagesJournee';
+import { RAISON_LABELS, minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 
 /**
  * @param {object} props
@@ -55,8 +69,15 @@ export function RemplirJourneePanel({
 
   const candidatsIndisponibles = candidats === undefined;
 
+  // Décalages manuels des RDV déjà posés. `journeeAjustee` DOIT alimenter tout
+  // ce qui suit : proposer les candidats sur la journée d'origine les
+  // classerait pour un planning que l'utilisateur vient de changer sous ses yeux.
+  const {
+    decalages, journeeAjustee, decaler, reinitialiser, retirerDecalages,
+  } = useDecalagesJournee(journee);
+
   const { data, isLoading, isError, error } = usePropositions({
-    journee, candidats, coreOrgId, settings,
+    journee: journeeAjustee, candidats, coreOrgId, settings,
   });
 
   const depot = useMemo(() => getOrgHeadquarters(settings), [settings]);
@@ -68,15 +89,17 @@ export function RemplirJourneePanel({
   // existants" restent identiques par construction, fenêtre comprise, plutôt
   // que par discipline de copier-coller.
   const arretsExistants = useMemo(
-    () => construireArretsExistants(journee?.rdvs, depot),
-    [journee, depot],
+    () => construireArretsExistants(journeeAjustee?.rdvs, depot),
+    [journeeAjustee, depot],
   );
 
   const {
     selectedIds, toggleSelection, recalcul, calculatingReel, posing, resultatPose,
     confirmOpen, handlePoserClick, handleConfirmApprox, handleCancelApprox,
+    confirmEstime,
   } = useJourneePose({
-    journee, depot, reglages, arretsExistants, propositions, coreOrgId, user, onClose,
+    journee: journeeAjustee, depot, reglages, arretsExistants, propositions,
+    coreOrgId, user, onClose, decalages, retirerDecalages,
   });
 
   if (!journee) return null;
@@ -109,6 +132,46 @@ export function RemplirJourneePanel({
             <p>Temps de trajet estimés (Mapbox indisponible) — les horaires peuvent varier.</p>
           </div>
         )}
+
+        {/* La journée telle qu'elle est. C'est ici qu'on voit où il reste de la
+            place — et qu'on peut pousser un RDV pour en faire. */}
+        <div className="px-5 pt-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-medium text-gray-600">
+              Journée actuelle
+              {/* Rien à glisser sur une journée vide : la consigne ne s'affiche
+                  que quand elle a un objet. */}
+              {journeeAjustee.rdvs?.length > 0 && (
+                <span className="text-gray-400 font-normal"> · glisser un RDV pour le décaler</span>
+              )}
+            </p>
+            {decalages.size > 0 && (
+              <button
+                type="button"
+                onClick={reinitialiser}
+                disabled={posing || calculatingReel}
+                className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 disabled:opacity-50"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Annuler les déplacements
+              </button>
+            )}
+          </div>
+          <JourneeTimeline
+            amplitude={journee.amplitude}
+            rdvs={journeeAjustee.rdvs}
+            onDecaler={posing || calculatingReel ? undefined : decaler}
+          />
+          {/* Un déplacement en attente n'est PAS encore en base : le dire, sinon
+              on croit le planning déjà changé et on ferme le panneau. */}
+          {decalages.size > 0 && (
+            <p className="text-xs text-emerald-700 mt-1">
+              {decalages.size} RDV déplacé{decalages.size > 1 ? 's' : ''} (
+              {[...decalages.values()].map((d) => (d > 0 ? `+${formatDuree(d)}` : formatDuree(d))).join(', ')}
+              ) — appliqué{decalages.size > 1 ? 's' : ''} seulement à la pose.
+            </p>
+          )}
+        </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -194,8 +257,13 @@ export function RemplirJourneePanel({
             {resultatPose && resultatPose.echecs.length > 0 && (
               <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
                 {resultatPose.posesCount} posé{resultatPose.posesCount > 1 ? 's' : ''} sur{' '}
-                {resultatPose.posesCount + resultatPose.echecs.length}. Échec :{' '}
-                {resultatPose.echecs.map((e) => `${e.nom} (${e.message})`).join(' · ')}
+                {resultatPose.posesCount + resultatPose.echecs.length}.
+                {/* Un RDV déplacé l'est POUR DE BON, même si la pose a échoué
+                    ensuite : le taire laisserait croire le planning intact. */}
+                {resultatPose.decalesCount > 0 && (
+                  <> {resultatPose.decalesCount} RDV déjà déplacé{resultatPose.decalesCount > 1 ? 's' : ''} en base.</>
+                )}
+                {' '}Échec : {resultatPose.echecs.map((e) => `${e.nom} (${e.message})`).join(' · ')}
               </div>
             )}
 
@@ -222,7 +290,7 @@ export function RemplirJourneePanel({
                   Pose en cours…
                 </>
               ) : (
-                `Poser ${selectedIds.size} rendez-vous`
+                `Poser ${selectedIds.size} rendez-vous${decalages.size > 0 ? ` et décaler ${decalages.size} RDV` : ''}`
               )}
             </Button>
           </div>
@@ -232,9 +300,19 @@ export function RemplirJourneePanel({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={(open) => { if (!open) handleCancelApprox(); }}
-        title="Horaires approximatifs"
-        description="Les distances réelles entre ces rendez-vous n'ont pas pu être confirmées (Mapbox indisponible ou hors quota). Les rendez-vous seront posés avec des horaires estimés, qui peuvent varier une fois sur place."
-        confirmLabel="Poser quand même"
+        title={decalages.size > 0 ? 'Déplacer des rendez-vous existants ?' : 'Horaires approximatifs'}
+        description={[
+          // Le déplacement passe en premier : c'est la conséquence la plus
+          // lourde des deux — une heure déjà annoncée à un client change.
+          decalages.size > 0
+            ? `${decalages.size} rendez-vous déjà planifié${decalages.size > 1 ? 's seront déplacés' : ' sera déplacé'} pour libérer le créneau. `
+              + 'Leur horaire a pu être annoncé aux clients concernés.'
+            : null,
+          confirmEstime
+            ? "Les distances réelles entre ces rendez-vous n'ont pas pu être confirmées (Mapbox indisponible ou hors quota) : les horaires posés seront estimés et peuvent varier une fois sur place."
+            : null,
+        ].filter(Boolean).join(' ')}
+        confirmLabel={decalages.size > 0 ? 'Déplacer et poser' : 'Poser quand même'}
         cancelLabel="Annuler"
         variant="default"
         onConfirm={handleConfirmApprox}

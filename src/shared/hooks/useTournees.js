@@ -111,9 +111,18 @@ export function useJourneesHorizon(coreOrgId, joursApres = 45) {
  * }>}
  */
 export function usePropositions({ journee, candidats, coreOrgId, settings, enabled = true }) {
+  // Empreinte des créneaux occupés. Deux journées de même charge mais dont un
+  // RDV a changé d'heure n'ont RIEN à voir pour le classement : trié pour être
+  // stable quel que soit l'ordre de retour des RDV, sinon la clé changerait
+  // toute seule et relancerait le calcul sans raison.
+  const empreinteCreneaux = (journee?.rdvs || [])
+    .map((r) => `${r.id}@${r.scheduled_start ?? '?'}`)
+    .sort()
+    .join('|');
+
   return useQuery({
     queryKey: tourneeKeys.propositions(
-      coreOrgId, journee?.date, journee?.technicienId, journee?.chargeMinutes,
+      coreOrgId, journee?.date, journee?.technicienId, journee?.chargeMinutes, empreinteCreneaux,
     ),
     queryFn: async () => {
       const {

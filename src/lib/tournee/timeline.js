@@ -20,7 +20,7 @@
 // moteur contraint.
 // ============================================================================
 
-import { minutesDepuisMinuit } from './arrets.js';
+import { minutesDepuisMinuit, minutesVersHeure } from './arrets.js';
 
 /** Durée d'un RDV, avec le même défaut que partout ailleurs dans le module. */
 const dureeDe = (rdv) => rdv?.duration_minutes || 60;
@@ -143,4 +143,83 @@ export function creneauxLibres(segments, amplitude) {
   }
   pousser(curseur, finJour);
   return trous;
+}
+
+// ============================================================================
+// DÉCALAGE MANUEL D'UN RDV DÉJÀ POSÉ
+// ============================================================================
+// Le planning existant reste une contrainte ABSOLUE pour le moteur : il ne
+// déplace jamais rien de lui-même, et un RDV garde sa fenêtre ponctuelle.
+// Ce que ces deux fonctions ouvrent, c'est autre chose — un HUMAIN qui décide
+// de décaler un rendez-vous pour faire rentrer un entretien. La décision reste
+// la sienne (c'est une heure annoncée à un client), le moteur ne fait que
+// recalculer sur la nouvelle donne.
+//
+// Règle de butée : un RDV glissé s'arrête AU CONTACT de son voisin, il ne le
+// traverse jamais. Deux rendez-vous qui échangeraient leur ordre au passage
+// d'un pixel produiraient une tournée qu'on n'a pas voulue.
+
+/**
+ * Jusqu'où un RDV peut être glissé sans traverser ses voisins ni sortir de la
+ * journée.
+ *
+ * @param {Array} segments   sortie de `construireSegments`, triée
+ * @param {string} id
+ * @param {{debut: number, fin: number}} amplitude
+ * @returns {{minDebut: number, maxDebut: number, dureeMinutes: number}|null}
+ */
+export function bornesDeplacement(segments, id, amplitude) {
+  const i = (segments || []).findIndex((s) => s.id === id);
+  if (i === -1) return null;
+  const s = segments[i];
+  const duree = s.finMinutes - s.debutMinutes;
+
+  let minDebut = amplitude?.debut ?? s.debutMinutes;
+  let maxDebut = (amplitude?.fin ?? s.finMinutes) - duree;
+
+  const precedent = segments[i - 1];
+  const suivant = segments[i + 1];
+  if (precedent) minDebut = Math.max(minDebut, precedent.finMinutes);
+  if (suivant) maxDebut = Math.min(maxDebut, suivant.debutMinutes - duree);
+
+  // La position ACTUELLE est toujours atteignable : sans ça, un RDV qui déborde
+  // déjà de l'amplitude (installation commencée à 7 h) ou qui chevauche un
+  // voisin sauterait tout seul à la première prise en main — un déplacement que
+  // personne n'a demandé, sur une heure promise à un client.
+  minDebut = Math.min(minDebut, s.debutMinutes);
+  maxDebut = Math.max(maxDebut, s.debutMinutes);
+
+  return { minDebut, maxDebut, dureeMinutes: duree };
+}
+
+/**
+ * Applique des décalages (en minutes, signés) à des RDV bruts : seul
+ * `scheduled_start` bouge, la durée est inchangée.
+ *
+ * Point d'injection UNIQUE du décalage : tout ce qui suit (arrêts existants,
+ * séquencement, aperçu, trajets réels de la pose) consomme le résultat sans
+ * savoir qu'un décalage a eu lieu. Une seconde voie qui contournerait cette
+ * fonction ferait diverger ce qu'on montre de ce qu'on calcule.
+ *
+ * Un RDV sans heure exploitable n'est pas décalable : il est rendu tel quel
+ * plutôt que de lui inventer un horaire à partir de rien.
+ *
+ * @param {Array<object>} rdvs
+ * @param {Map<string, number>|null} decalages
+ * @returns {Array<object>}  `decalageMinutes` porté sur les RDV touchés
+ */
+export function appliquerDecalages(rdvs, decalages) {
+  if (!decalages || decalages.size === 0) return rdvs || [];
+  return (rdvs || []).map((r) => {
+    const delta = decalages.get(r.id);
+    if (!delta) return r;
+    const debut = minutesDepuisMinuit(r.scheduled_start);
+    if (debut == null) return r;
+    return {
+      ...r,
+      scheduled_start: minutesVersHeure(debut + delta),
+      scheduled_end: minutesVersHeure(debut + delta + (r.duration_minutes || 60)),
+      decalageMinutes: delta,
+    };
+  });
 }

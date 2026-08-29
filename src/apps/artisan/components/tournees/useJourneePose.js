@@ -39,6 +39,7 @@ import { toast } from 'sonner';
 import { tourneeKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { ensureEntretienCard } from '@services/entretiens.service';
 import { savService } from '@services/sav.service';
+import { appointmentsService } from '@services/appointments.service';
 import { trajetsService } from '@services/trajets.service';
 import { supabase } from '@lib/supabaseClient';
 import { logger } from '@lib/logger';
@@ -57,16 +58,21 @@ import { RAISON_LABELS, minutesEnHHMM, messageErreur } from './tourneesPanelUtil
  * @param {string} params.coreOrgId
  * @param {object} params.user              useAuth().user
  * @param {Function} params.onClose
+ * @param {Map<string, number>} [params.decalages]  décalages manuels en attente
+ *   (useDecalagesJournee) — `journee` est DÉJÀ ajustée, ceci ne sert qu'à savoir
+ *   quels RDV existants doivent être RÉÉCRITS en base au moment de poser.
+ * @param {Function} [params.retirerDecalages]  (ids[]) => void
  */
 export function useJourneePose({
   journee, depot, reglages, arretsExistants, propositions, coreOrgId, user, onClose,
+  decalages, retirerDecalages,
 }) {
   const queryClient = useQueryClient();
 
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [calculatingReel, setCalculatingReel] = useState(false);
   const [posing, setPosing] = useState(false);
-  const [resultatPose, setResultatPose] = useState(null); // { posesCount, echecs }
+  const [resultatPose, setResultatPose] = useState(null); // { posesCount, echecs, decalesCount }
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingReel, setPendingReel] = useState(null);
 
@@ -151,12 +157,58 @@ export function useJourneePose({
       .filter((p) => p.meta);
   }, [selectedIds, selectionnees]);
 
+  /**
+   * Écrit les décalages manuels des RDV DÉJÀ POSÉS, avant toute création.
+   *
+   * Bloquant par construction : les horaires calculés pour les nouveaux RDV
+   * supposent que les anciens ont bougé. Poser malgré un décalage en échec
+   * écrirait un chevauchement réel dans le planning d'un technicien — donc au
+   * premier échec on s'arrête et on ne pose rien. L'état partiel éventuel
+   * (2 décalés sur 3) est REMONTÉ tel quel, jamais tu.
+   */
+  const appliquerDecalagesEnBase = useCallback(async () => {
+    if (!decalages || decalages.size === 0) return { ids: [], echec: null };
+    const ids = [];
+    for (const id of decalages.keys()) {
+      // `journee` est la journée AJUSTÉE : `scheduled_start`/`scheduled_end`
+      // y portent déjà l'heure décalée, celle qu'on a montrée à l'écran. On
+      // écrit ce qui a été montré, on ne le recalcule pas ici.
+      const rdv = (journee?.rdvs || []).find((r) => r.id === id);
+      if (!rdv) continue;
+      try {
+        const { error } = await appointmentsService.updateAppointment(id, {
+          scheduled_start: rdv.scheduled_start,
+          scheduled_end: rdv.scheduled_end,
+        });
+        if (error) return { ids, echec: { nom: rdv.client_name || 'RDV', message: messageErreur(error, 'déplacement refusé') } };
+        ids.push(id);
+      } catch (err) {
+        logger.error('[useJourneePose] appliquerDecalagesEnBase', err);
+        return { ids, echec: { nom: rdv.client_name || 'RDV', message: err?.message || 'exception inattendue' } };
+      }
+    }
+    return { ids, echec: null };
+  }, [decalages, journee]);
+
   const executerPose = useCallback(async (resultat) => {
     setPosing(true);
     setResultatPose(null);
     try {
       const ordonnees = construireOrdonnees(resultat);
       if (ordonnees.length === 0) return;
+
+      // Les RDV existants d'abord : les créneaux des nouveaux en dépendent.
+      const { ids: idsDecales, echec: echecDecalage } = await appliquerDecalagesEnBase();
+      if (idsDecales.length > 0) retirerDecalages?.(idsDecales);
+      if (echecDecalage) {
+        setResultatPose({ posesCount: 0, decalesCount: idsDecales.length, echecs: [echecDecalage] });
+        await queryClient.invalidateQueries({ queryKey: tourneeKeys.all(coreOrgId) });
+        toast.error(
+          `Déplacement impossible (${echecDecalage.nom}) — aucun rendez-vous posé`
+          + (idsDecales.length > 0 ? `, ${idsDecales.length} RDV déjà déplacé${idsDecales.length > 1 ? 's' : ''}.` : '.'),
+        );
+        return;
+      }
 
       const idsPoses = [];
       const echecs = [];
@@ -225,16 +277,18 @@ export function useJourneePose({
       // qu'il soit arrivé pendant celle-ci — plus aucun `continue`/exception
       // interne ne peut sauter jusqu'ici sans y passer, la boucle ne peut plus
       // se terminer prématurément (cf. try/catch par itération ci-dessus).
-      setResultatPose({ posesCount: idsPoses.length, echecs });
+      setResultatPose({ posesCount: idsPoses.length, decalesCount: idsDecales.length, echecs });
 
-      if (idsPoses.length > 0) {
+      if (idsPoses.length > 0 || idsDecales.length > 0) {
         // Ne retire de la sélection que ce qui a réussi : les échecs restent
         // cochés pour permettre un nouvel essai sans dupliquer les RDV déjà posés.
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          idsPoses.forEach((id) => next.delete(id));
-          return next;
-        });
+        if (idsPoses.length > 0) {
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            idsPoses.forEach((id) => next.delete(id));
+            return next;
+          });
+        }
         try {
           // Attend la fin du refetch avant de rendre la main : un nouvel essai
           // doit voir la journée à jour (charge/RDV), pas l'ancienne capturée
@@ -253,8 +307,10 @@ export function useJourneePose({
         }
       }
 
+      const mentionDecales = idsDecales.length > 0
+        ? ` · ${idsDecales.length} RDV déplacé${idsDecales.length > 1 ? 's' : ''}` : '';
       if (echecs.length === 0) {
-        toast.success(`${idsPoses.length} rendez-vous posé${idsPoses.length > 1 ? 's' : ''}`);
+        toast.success(`${idsPoses.length} rendez-vous posé${idsPoses.length > 1 ? 's' : ''}${mentionDecales}`);
         onClose();
       } else if (idsPoses.length > 0) {
         toast.error(
@@ -274,7 +330,10 @@ export function useJourneePose({
     } finally {
       setPosing(false);
     }
-  }, [construireOrdonnees, journee, user, coreOrgId, queryClient, onClose]);
+  }, [
+    construireOrdonnees, journee, user, coreOrgId, queryClient, onClose,
+    appliquerDecalagesEnBase, retirerDecalages,
+  ]);
 
   const handlePoserClick = useCallback(async () => {
     if (!coreOrgId || !depot || selectionnees.length === 0) return;
@@ -293,13 +352,17 @@ export function useJourneePose({
       toast.error(`Cette sélection ne tient plus — ${RAISON_LABELS[reel?.raison] || reel?.raison || 'raison inconnue'}.`);
       return;
     }
-    if (reel.estime) {
+    // Deux motifs de confirmation, cumulables : des horaires approximatifs
+    // (Mapbox indisponible) et/ou le déplacement de RDV déjà annoncés à des
+    // clients. Le second n'est pas un détail technique — on va réécrire une
+    // heure que quelqu'un attend chez lui.
+    if (reel.estime || (decalages?.size ?? 0) > 0) {
       setPendingReel(reel);
       setConfirmOpen(true);
       return;
     }
     await executerPose(reel);
-  }, [coreOrgId, depot, selectionnees, calculerHorairesReels, executerPose]);
+  }, [coreOrgId, depot, selectionnees, calculerHorairesReels, executerPose, decalages]);
 
   const handleConfirmApprox = useCallback(async () => {
     const reel = pendingReel;
@@ -321,6 +384,9 @@ export function useJourneePose({
     posing,
     resultatPose,
     confirmOpen,
+    // Ce qui a déclenché la confirmation, pour que le dialogue dise exactement
+    // ce qu'on s'apprête à faire plutôt qu'un avertissement générique.
+    confirmEstime: pendingReel?.estime === true,
     handlePoserClick,
     handleConfirmApprox,
     handleCancelApprox,

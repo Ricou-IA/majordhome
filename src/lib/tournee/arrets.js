@@ -62,6 +62,18 @@ export function minutesDepuisMinuit(hhmm) {
 }
 
 /**
+ * Inverse de `minutesDepuisMinuit` : minutes depuis minuit -> "HH:MM".
+ * La paire vit ici, à un seul endroit — c'est elle qui garantit qu'un RDV
+ * décalé à l'écran s'écrit en base à l'heure exacte qu'on a montrée.
+ */
+export function minutesVersHeure(minutes) {
+  const arrondi = Math.round(minutes ?? 0);
+  const h = Math.floor(arrondi / 60) % 24;
+  const m = ((arrondi % 60) + 60) % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
  * Arrêts déjà posés d'une journée, prêts pour `sequencerTournee` /
  * `classerCandidats` : `{ id, key, dureeMinutes, fenetre? }`.
  *
