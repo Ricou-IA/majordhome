@@ -47,3 +47,22 @@ test('trajetLocal — symétrique (ordre des points sans effet)', () => {
   const bVersA = trajetLocal('43.9298,2.1480', '43.9027,1.8973');
   assert.equal(aVersB, bVersA);
 });
+
+test('construireMatrice — le repli comble une paire absente avant le forfait', () => {
+  // Le classement ne demande a Mapbox que depot/arrets <-> candidat : les paires
+  // candidat<->candidat n'y sont jamais. Sans repli, l'apercu d'une selection
+  // multiple leur appliquait 60 min forfaitaires ; en basculant TOUT en vol
+  // d'oiseau, il affichait une heure differente de la liste pour le meme client.
+  const paires = new Map([['A|B', 12]]);
+  const repli = (from, to) => (from === 'B' && to === 'C' ? 7 : 99);
+  const trajet = construireMatrice(paires, { repli });
+
+  assert.equal(trajet('A', 'B'), 12, 'la valeur reelle prime toujours sur le repli');
+  assert.equal(trajet('B', 'C'), 7, 'la paire absente passe par le repli');
+  assert.equal(trajet('A', 'A'), 0, 'meme point, toujours zero');
+});
+
+test('construireMatrice — un repli qui ne sait pas répondre retombe sur le forfait', () => {
+  const trajet = construireMatrice(new Map(), { repli: () => undefined, defautMinutes: 42 });
+  assert.equal(trajet('X', 'Y'), 42, 'jamais 0 : un trajet gratuit serait un echec silencieux');
+});

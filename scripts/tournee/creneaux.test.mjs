@@ -341,3 +341,23 @@ test('un créneau AVANT un RDV posé n est utilisé que si le retour laisse arri
   });
   assert.notEqual(p.apresId, 'joubert', 'jamais glisse dans le trou du matin');
 });
+
+test('attenteMinutes — dit quand le passage a été repoussé pour le déjeuner', () => {
+  // Un client tout proche peut atterrir l'apres-midi parce qu'y aller tout de
+  // suite supprimerait la pause. Sans ce chiffre, « +1 min de detour, passage a
+  // 13h34 » face a « +11 min, passage a 11h52 » se lit comme une incoherence.
+  const arrets = [arret('matin', 480, 240), arret('soir', 900, 120)]; // 8h-12h, 15h-17h
+  // 100 min : place a 12h pile, il ne resterait que 20 min avant 14h — pas de
+  // quoi manger. Il faut donc dejeuner d'abord.
+  const p = placerCandidat({
+    arrets, candidat: candidat('proche', 100, 'k'), ...ctx(uniforme(0), { budgetMinutes: 2000 }),
+  });
+  assert.equal(p.faisable, true);
+  assert.equal(p.arriveeMinutes, 750, 'repas pris (12h-12h30), puis on y va');
+  assert.equal(p.attenteMinutes, 30, 'et l ecran peut le dire');
+});
+
+test('attenteMinutes — vaut 0 quand rien n a repoussé le passage', () => {
+  const p = placerCandidat({ arrets: [], candidat: candidat('x', 60), ...ctx(uniforme(20)) });
+  assert.equal(p.attenteMinutes, 0);
+});

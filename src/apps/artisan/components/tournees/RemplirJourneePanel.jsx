@@ -117,7 +117,7 @@ export function RemplirJourneePanel({
     confirmEstime,
   } = useJourneePose({
     journee: journeeAjustee, depot, reglages, arretsExistants, propositions,
-    coreOrgId, user, onClose, decalages, retirerDecalages,
+    coreOrgId, user, onClose, decalages, retirerDecalages, paires: data?.paires,
   });
 
   // Ce que la barre montre en surimpression : les entretiens cochés à leur

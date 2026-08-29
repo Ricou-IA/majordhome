@@ -106,6 +106,9 @@ export function useJourneesHorizon(coreOrgId, joursApres = 45) {
  *   propositions: Array<object>,
  *   chargeMinutes: number,
  *   raisonsRejet: Record<('creneau'|'budget'|'pause'|'position'), number>,
+ *   paires: Map<string, number>|null,  matrice de trajets du classement — à
+ *     réutiliser pour tout aperçu, sous peine d'afficher deux heures
+ *     différentes pour le même client,
  *   estime: boolean,
  * }>}
  */
@@ -125,7 +128,7 @@ export function usePropositions({ journee, candidats, coreOrgId, settings, enabl
     ),
     queryFn: async () => {
       const {
-        data, chargeMinutes, raisonsRejet, estime, error,
+        data, chargeMinutes, raisonsRejet, estime, paires, error,
       } = await tourneesService.proposerPourJournee({
         journee, candidats, coreOrgId, settings,
       });
@@ -137,7 +140,7 @@ export function usePropositions({ journee, candidats, coreOrgId, settings, enabl
       // était calculé, puis jeté ici, et l'écran annonçait « aucun entretien à
       // proposer » sans jamais pouvoir dire pourquoi.
       return {
-        propositions: data, chargeMinutes, raisonsRejet, estime,
+        propositions: data, chargeMinutes, raisonsRejet, estime, paires,
       };
     },
     // `settings` manquant (mineur, revue finale) : sans ce test, un panneau

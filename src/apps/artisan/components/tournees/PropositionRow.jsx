@@ -54,6 +54,13 @@ export function PropositionRow({
             <span className="inline-flex items-center gap-1 text-xs text-gray-500">
               <Clock className="h-3 w-3" />
               passage prévu {minutesEnHHMM(passage.arriveeMinutes)}
+              {/* Le détour et l'heure de passage ne mesurent pas la même chose :
+                  un client tout proche peut être repoussé l'après-midi parce
+                  qu'y aller tout de suite supprimerait la pause déjeuner. Non
+                  dit, cela se lit comme une incohérence du classement. */}
+              {passage.attenteMinutes > 0 && (
+                <span className="text-gray-400">· après la pause</span>
+              )}
             </span>
           )}
           {horsSaison && (

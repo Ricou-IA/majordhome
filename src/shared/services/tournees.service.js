@@ -364,6 +364,7 @@ export const tourneesService = {
    *   data: Array<{ candidat: { id: string, key: string|null, dureeMinutes: number, meta: (Candidat & { eligibilite: object }) }, coutMinutes: number, detourMinutes: number, scoreFinal: number, placement: object }>,
    *   chargeMinutes: number,
    *   raisonsRejet: Record<('creneau'|'budget'|'pause'|'position'), number>,
+   *   paires: Map<string, number>|null,
    *   estime: boolean,
    *   error: (Error|null),
    * }>}
@@ -385,7 +386,7 @@ export const tourneesService = {
       const depot = getOrgHeadquarters(settings);
       if (!depot) {
         return {
-          data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false,
+          data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, paires: null,
           error: new Error('siege_non_configure'),
         };
       }
@@ -465,7 +466,7 @@ export const tourneesService = {
       // l'échec silencieux que ce projet proscrit : on la propage plutôt que de l'ignorer.
       if (matriceErr) {
         return {
-          data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, error: matriceErr,
+          data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, paires: null, error: matriceErr,
         };
       }
       const trajet = construireMatrice(paires);
@@ -490,12 +491,15 @@ export const tourneesService = {
         { scoreParId: scores },
       );
 
+      // `paires` remonte avec le classement : l'aperçu du panneau doit calculer
+      // sur EXACTEMENT la même matrice, sinon la barre place un client à une
+      // heure et la ligne juste en dessous en annonce une autre.
       return {
-        data: classement, chargeMinutes, raisonsRejet, estime, error: null,
+        data: classement, chargeMinutes, raisonsRejet, estime, paires, error: null,
       };
     } catch (error) {
       logger.error('[tournees] proposerPourJournee', error);
-      return { data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, error };
+      return { data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, paires: null, error };
     }
   },
 };

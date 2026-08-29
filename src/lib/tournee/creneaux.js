@@ -144,8 +144,14 @@ function pausePossible(places, pause) {
  *   faisable: boolean, raison: ('budget'|'creneau'|'pause'|'position'|null),
  *   arriveeMinutes: number|null, departMinutes: number|null,
  *   coutMinutes: number|null, detourMinutes: number|null,
- *   apresId: string|null, avantId: string|null,
+ *   apresId: string|null, avantId: string|null, attenteMinutes: number,
  * }}
+ *   `attenteMinutes` — écart entre l'heure retenue et la première où l'on
+ *   aurait pu arriver. Presque toujours 0 ; non nul quand le passage a dû être
+ *   repoussé pour laisser le technicien déjeuner. Sans ce chiffre, un client
+ *   « à +1 min de détour » placé à 13 h 34 alors qu'un autre « à +11 min » passe
+ *   à 11 h 52 est incompréhensible à l'écran — le détour et l'heure de passage
+ *   ne mesurent pas la même chose, et rien ne le disait.
  */
 export function placerCandidat({
   arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja,
@@ -159,6 +165,7 @@ export function placerCandidat({
     detourMinutes: null,
     apresId: null,
     avantId: null,
+    attenteMinutes: 0,
   });
 
   // Sans position, aucun trajet n'est calculable : le placer produirait des
@@ -240,6 +247,7 @@ export function placerCandidat({
           detourMinutes: cout - duree,
           apresId: iv.apresId,
           avantId: iv.avantId,
+          attenteMinutes: arrivee - auPlusTot,
         };
       }
     }

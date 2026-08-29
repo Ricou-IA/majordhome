@@ -58,6 +58,10 @@ import { ecrireDecalages } from './useDecalagesJournee';
  * @param {string} params.coreOrgId
  * @param {object} params.user              useAuth().user
  * @param {Function} params.onClose
+ * @param {Map<string, number>|null} [params.paires]  matrice de trajets du
+ *   classement (`usePropositions`). L'aperçu calcule DESSUS, complétée au vol
+ *   d'oiseau pour les seules paires qu'elle n'a pas — sans quoi la barre et la
+ *   liste affichent deux heures différentes pour le même client.
  * @param {Map<string, number>} [params.decalages]  décalages manuels en attente
  *   (useDecalagesJournee) — `journee` est DÉJÀ ajustée, ceci ne sert qu'à savoir
  *   quels RDV existants doivent être RÉÉCRITS en base au moment de poser.
@@ -65,7 +69,7 @@ import { ecrireDecalages } from './useDecalagesJournee';
  */
 export function useJourneePose({
   journee, depot, reglages, arretsExistants, propositions, coreOrgId, user, onClose,
-  decalages, retirerDecalages,
+  decalages, retirerDecalages, paires,
 }) {
   const queryClient = useQueryClient();
 
@@ -102,15 +106,30 @@ export function useJourneePose({
     },
   }), [depot, journee, reglages]);
 
-  // Aperçu LOCAL, pur, sans réseau — peut rester estimé pendant la sélection,
-  // annoncé comme tel dans le footer par le composant appelant.
+  // Trajets de l'aperçu : la matrice DU CLASSEMENT en priorité, complétée au vol
+  // d'oiseau pour les paires qu'elle ne contient pas (candidat↔candidat, que
+  // `proposerPourJournee` ne demande jamais à Mapbox — il n'évalue qu'un
+  // candidat à la fois).
+  //
+  // Le tout-vol-d'oiseau d'avant faisait diverger la barre de la liste : le
+  // 09/09, un client annoncé « passage prévu 11:56 » dans sa ligne était dessiné
+  // à 13:34 sur la barre juste au-dessus. Sur un écran où l'on décide d'une
+  // heure à annoncer au client, deux chiffres contradictoires ne se départagent
+  // pas à l'œil.
+  const trajetApercu = useMemo(
+    () => (paires ? construireMatrice(paires, { repli: trajetLocal }) : trajetLocal),
+    [paires],
+  );
+
+  // Aperçu sans réseau : aucun appel supplémentaire, on réutilise ce qui a déjà
+  // été chargé pour le classement.
   //
   // Même modèle que le classement (creneaux.js) : les RDV posés sont fixes, on
   // insère dans les trous. Utiliser un modèle différent ici ferait dire à
   // l'aperçu le contraire de ce que la liste vient de proposer.
   const recalcul = useMemo(() => {
     if (!depot || !journee) return null;
-    const ctx = contexte(trajetLocal);
+    const ctx = contexte(trajetApercu);
     const { places, refuses, arretsFinaux } = placerPlusieurs(
       arretsExistants, selectionnees.map((p) => p.candidat), ctx,
     );
@@ -121,11 +140,12 @@ export function useJourneePose({
         id: p.candidat.id,
         arriveeMinutes: p.placement.arriveeMinutes,
         departMinutes: p.placement.departMinutes,
+        attenteMinutes: p.placement.attenteMinutes,
       })),
       finMinutes: finDeJournee(arretsFinaux, ctx),
       chargeMinutes: chargeExistante(arretsFinaux, ctx),
     };
-  }, [depot, journee, arretsExistants, selectionnees, contexte]);
+  }, [depot, journee, arretsExistants, selectionnees, contexte, trajetApercu]);
 
   const calculerHorairesReels = useCallback(async () => {
     const noyau = [
@@ -139,14 +159,14 @@ export function useJourneePose({
       ...selectionnees.map((p) => ({ lat: p.candidat.meta.lat, lng: p.candidat.meta.lng })),
     ];
     try {
-      const { data: paires, estime: matriceEstimee, error: matriceErr } = await trajetsService.chargerMatrice({
+      const { data: pairesReelles, estime: matriceEstimee, error: matriceErr } = await trajetsService.chargerMatrice({
         coreOrgId, noyau, candidats: [],
       });
       if (matriceErr) {
         logger.error('[useJourneePose] chargerMatrice (pose)', matriceErr);
         return { ...recalcul, estime: true };
       }
-      const ctx = contexte(construireMatrice(paires));
+      const ctx = contexte(construireMatrice(pairesReelles, { repli: trajetLocal }));
       const { places, refuses, arretsFinaux } = placerPlusieurs(
         arretsExistants, selectionnees.map((p) => p.candidat), ctx,
       );
@@ -157,6 +177,7 @@ export function useJourneePose({
           id: p.candidat.id,
           arriveeMinutes: p.placement.arriveeMinutes,
           departMinutes: p.placement.departMinutes,
+          attenteMinutes: p.placement.attenteMinutes,
         })),
         finMinutes: finDeJournee(arretsFinaux, ctx),
         chargeMinutes: chargeExistante(arretsFinaux, ctx),

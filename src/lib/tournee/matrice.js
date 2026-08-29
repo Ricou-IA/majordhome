@@ -12,15 +12,29 @@ const DEFAUT_PAIRE_INCONNUE = 60;
 
 /**
  * @param {Map<string, number>} paires clés "from|to" → minutes
- * @param {number} defautMinutes coût d'une paire absente. Volontairement élevé :
- *   retourner 0 ferait croire au séquenceur que le trajet est gratuit et
+ * @param {object} [options]
+ * @param {number} [options.defautMinutes] coût d'une paire absente. Volontairement
+ *   élevé : retourner 0 ferait croire au moteur que le trajet est gratuit et
  *   produirait des tournées impossibles — un échec silencieux.
+ * @param {Function} [options.repli] `(fromKey, toKey) => minutes` consulté AVANT
+ *   de tomber sur `defautMinutes`. Sert à combler les paires que Mapbox n'a pas
+ *   été appelé à calculer — typiquement candidat↔candidat, que
+ *   `proposerPourJournee` ne demande jamais (il n'évalue qu'un candidat à la
+ *   fois). Sans lui, l'aperçu d'une sélection multiple retombait sur 60 min
+ *   forfaitaires, ou bien devait basculer TOUTE la journée en vol d'oiseau — et
+ *   affichait alors une heure différente de celle de la liste pour le MÊME
+ *   client. Deux chiffres contradictoires côte à côte sur un écran de décision.
  */
-export function construireMatrice(paires, { defautMinutes = DEFAUT_PAIRE_INCONNUE } = {}) {
+export function construireMatrice(paires, { defautMinutes = DEFAUT_PAIRE_INCONNUE, repli } = {}) {
   return (fromKey, toKey) => {
     if (fromKey === toKey) return 0;
     const v = paires.get(`${fromKey}|${toKey}`);
-    return v == null ? defautMinutes : v;
+    if (v != null) return v;
+    if (repli) {
+      const r = repli(fromKey, toKey);
+      if (Number.isFinite(r)) return r;
+    }
+    return defautMinutes;
   };
 }
 
