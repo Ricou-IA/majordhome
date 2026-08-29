@@ -11,14 +11,23 @@
 // C2 — un rendez-vous déjà pris est un ENGAGEMENT, pas une préférence :
 // `sequencerTournee` ne contraint que les arrêts porteurs d'une `fenetre`,
 // donc un arrêt existant SANS fenêtre flotte librement dans la journée (le
-// moteur peut le réordonner n'importe où). On lui dérive une fenêtre depuis
-// son heure réelle (`scheduled_start`), verrouillée en amont (arriver plus
-// tôt fait juste patienter, cf. sequence.js::simuler) et desserrée en aval de
-// `fenetrePromiseMinutes` (reglages.tournees.fenetre_promise_minutes — la
-// largeur de créneau déjà annoncée au client, jusqu'ici jamais consommée).
+// moteur peut le réordonner n'importe où). On lui dérive donc une fenêtre
+// depuis son heure réelle (`scheduled_start`).
+//
+// ⚠️ Cette fenêtre est PONCTUELLE : `fin === debut`. Un rendez-vous annoncé au
+// client à 8 h 30 est à 8 h 30, il ne se décale pas.
+// Ne pas confondre avec `fenetre_promise_minutes`, qui est la largeur du
+// créneau annoncé pour un NOUVEAU rendez-vous (« vers 10 h 30, entre 10 h et
+// 11 h 30 ») : l'appliquer à un rendez-vous déjà pris autorisait le moteur à
+// le faire glisser de 90 min, et donc à insérer un entretien qui mordait
+// dessus. Cas réel observé en production le 10/09 : un rendez-vous humain à
+// 8 h 30 (2 h), un entretien de 60 min proposé à 8 h 07 — retour au dépôt
+// impossible avant 9 h 15, soit 45 min de chevauchement.
+//
+// L'amont n'a pas besoin d'être desserré : arriver en avance fait simplement
+// patienter (`sequence.js::simuler` remonte `t` au début de la fenêtre).
 // Un RDV sans heure de début exploitable reste SANS fenêtre plutôt que de lui
-// en inventer une fausse : comportement antérieur, volontairement conservé
-// pour ce cas précis.
+// en inventer une fausse : comportement antérieur, volontairement conservé.
 // ============================================================================
 
 import { cleCoord } from './geo.js';
@@ -41,17 +50,16 @@ function minutesDepuisMinuit(hhmm) {
  * @param {Array<{id, lat, lng, duration_minutes, scheduled_start}>} rdvs
  *   `journee.rdvs` (cf. tournees.service.js). Un RDV sans coordonnées est
  *   exclu (aucun coût de trajet calculable), comme avant.
- * @param {number} fenetrePromiseMinutes  reglages.fenetre_promise_minutes —
- *   marge en aval de l'heure réelle avant qu'un retard soit jugé infaisable.
  * @returns {Array<{id: string, key: string|null, dureeMinutes: number, fenetre?: {debut: number, fin: number}}>}
  */
-export function construireArretsExistants(rdvs, fenetrePromiseMinutes) {
+export function construireArretsExistants(rdvs) {
   return (rdvs || [])
     .filter((r) => r.lat != null && r.lng != null)
     .map((r) => {
       const arret = { id: r.id, key: cleCoord(r), dureeMinutes: r.duration_minutes || 60 };
       const debut = minutesDepuisMinuit(r.scheduled_start);
-      if (debut != null) arret.fenetre = { debut, fin: debut + (fenetrePromiseMinutes || 0) };
+      // Fenêtre ponctuelle : l'heure du rendez-vous est celle annoncée au client.
+      if (debut != null) arret.fenetre = { debut, fin: debut };
       return arret;
     });
 }

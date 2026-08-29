@@ -368,7 +368,7 @@ export const tourneesService = {
       // C2 — un rendez-vous déjà pris est un ENGAGEMENT, pas une préférence :
       // helper partagé avec RemplirJourneePanel.jsx (même dérivation, une
       // seule fois) qui verrouille sa fenêtre sur son heure réelle.
-      const arretsExistants = construireArretsExistants(journee.rdvs, reglages.fenetre_promise_minutes);
+      const arretsExistants = construireArretsExistants(journee.rdvs);
 
       const centre = barycentre([
         ...(journee.rdvs || []).filter((r) => r.lat != null),
