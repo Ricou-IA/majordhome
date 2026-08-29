@@ -97,13 +97,7 @@ function JourneeCard({ journee, onClick }) {
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2 mb-3">
-        <span
-          className="w-3 h-3 rounded-full flex-shrink-0"
-          style={{ backgroundColor: journee.couleur || '#94A3B8' }}
-        />
-        <span className="font-semibold text-gray-900 truncate">{journee.technicienNom}</span>
-      </div>
+      {/* Le nom du technicien n'est pas répété ici : il titre la colonne. */}
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
           <span className="font-semibold text-gray-900">{libre} min libres</span>
@@ -117,7 +111,26 @@ function JourneeCard({ journee, onClick }) {
   );
 }
 
-function SectionJournees({ title, journees, onOpen, emptyLabel }) {
+/**
+ * Une colonne par technicien, journées en ordre chronologique à l'intérieur.
+ * On lit ainsi la charge d'une personne d'un seul coup d'œil, comme sur un
+ * planning — là où une grille triée par temps libre mélangeait les techniciens
+ * et obligeait à relire le nom sur chaque carte.
+ *
+ * `techniciens` vient de l'ensemble des journées de l'onglet, pas de celles de
+ * la section : une colonne reste affichée même vide, sinon les colonnes se
+ * décaleraient d'une section à l'autre.
+ */
+function SectionJournees({ title, journees, techniciens, onOpen, emptyLabel }) {
+  const parTechnicien = useMemo(() => {
+    const m = new Map(techniciens.map((t) => [t.id, []]));
+    for (const j of journees) {
+      if (m.has(j.technicienId)) m.get(j.technicienId).push(j);
+    }
+    for (const liste of m.values()) liste.sort((a, b) => a.date.localeCompare(b.date));
+    return m;
+  }, [journees, techniciens]);
+
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
@@ -126,10 +139,36 @@ function SectionJournees({ title, journees, onOpen, emptyLabel }) {
       {journees.length === 0 ? (
         <p className="text-sm text-gray-400 italic">{emptyLabel}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {journees.map((j) => (
-            <JourneeCard key={`${j.date}-${j.technicienId}`} journee={j} onClick={() => onOpen(j)} />
-          ))}
+        <div
+          className="grid gap-4"
+          style={{ gridTemplateColumns: `repeat(${Math.max(1, techniciens.length)}, minmax(0, 1fr))` }}
+        >
+          {techniciens.map((tech) => {
+            const siennes = parTechnicien.get(tech.id) || [];
+            return (
+              <div key={tech.id} className="min-w-0">
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-200">
+                  <span
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: tech.couleur || '#94A3B8' }}
+                  />
+                  <span className="font-semibold text-gray-900 truncate">{tech.nom}</span>
+                  <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
+                    {siennes.length}
+                  </span>
+                </div>
+                {siennes.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic py-2">Aucune journée exploitable</p>
+                ) : (
+                  <div className="space-y-3">
+                    {siennes.map((j) => (
+                      <JourneeCard key={`${j.date}-${j.technicienId}`} journee={j} onClick={() => onOpen(j)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -173,9 +212,9 @@ export function TourneesTab() {
   // Filtrage impératif (spec §3.2) : au-delà de l'horizon ferme, seules les
   // journées déjà amorcées sont proposables — getJourneesHorizon ne filtre
   // pas lui-même, c'est à l'écran de le faire (cf. task-11-report.md).
-  const { joursFermes, joursAmorces, totalVisibles, nbMasquees } = useMemo(() => {
+  const { joursFermes, joursAmorces, totalVisibles, nbMasquees, techniciens } = useMemo(() => {
     if (!journees) {
-      return { joursFermes: [], joursAmorces: [], totalVisibles: 0, nbMasquees: 0 };
+      return { joursFermes: [], joursAmorces: [], totalVisibles: 0, nbMasquees: 0, techniciens: [] };
     }
 
     const limiteFerme = new Date();
@@ -194,17 +233,26 @@ export function TourneesTab() {
       (j) => minutesDisponibles(j) >= DUREE_MIN_ENTRETIEN_MINUTES,
     );
 
-    // Le tri met en tête les journées où il reste le plus de place : c'est là
-    // qu'on a une chance de caser une vraie tournée, pas juste un arrêt.
-    const tri = (a, b) => minutesDisponibles(b) - minutesDisponibles(a)
-      || a.date.localeCompare(b.date)
-      || a.technicienNom.localeCompare(b.technicienNom);
+    // L'ordre à l'intérieur d'une colonne est chronologique, il est appliqué par
+    // SectionJournees. Ici on ne fait que répartir entre les deux sections.
+    // La liste des techniciens vient de TOUTES les journées de l'horizon (pas des
+    // seules exploitables) : une colonne dont tout est plein doit rester visible
+    // et le dire, sinon elle disparaîtrait sans explication.
+    const techs = new Map();
+    for (const j of dansHorizon) {
+      if (!techs.has(j.technicienId)) {
+        techs.set(j.technicienId, {
+          id: j.technicienId, nom: j.technicienNom, couleur: j.couleur,
+        });
+      }
+    }
 
     return {
-      joursFermes: exploitables.filter((j) => j.date <= limite).sort(tri),
-      joursAmorces: exploitables.filter((j) => j.date > limite).sort(tri),
+      joursFermes: exploitables.filter((j) => j.date <= limite),
+      joursAmorces: exploitables.filter((j) => j.date > limite),
       totalVisibles: exploitables.length,
       nbMasquees: dansHorizon.length - exploitables.length,
+      techniciens: [...techs.values()].sort((a, b) => a.nom.localeCompare(b.nom)),
     };
   }, [journees, reglages.horizon_ferme_jours]);
 
@@ -276,6 +324,7 @@ export function TourneesTab() {
           <SectionJournees
             title={`Horizon ferme (${reglages.horizon_ferme_jours} jours)`}
             journees={joursFermes}
+            techniciens={techniciens}
             onOpen={ouvrirJournee}
             emptyLabel="Aucune journée dans l'horizon ferme."
           />
@@ -283,6 +332,7 @@ export function TourneesTab() {
             <SectionJournees
               title="Au-delà — journées déjà amorcées"
               journees={joursAmorces}
+              techniciens={techniciens}
               onOpen={ouvrirJournee}
               emptyLabel=""
             />
