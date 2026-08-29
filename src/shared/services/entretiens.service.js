@@ -18,6 +18,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/logger';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
@@ -263,6 +264,47 @@ export async function ensureEntretienCard({
     return { interventionId: null, error };
   }
   return { interventionId: created.id, error: null };
+}
+
+// ============================================================================
+// HELPER EXPORTÉ — Contrats déjà rattachés à une carte d'entretien active
+// ============================================================================
+
+/**
+ * Contrats ayant déjà une carte d'entretien NON TERMINALE (`workflow_status
+ * != 'realise'`) — garde-fou anti-doublon partagé par tout écran qui propose
+ * de planifier un contrat : un contrat déjà présent ici ne doit PAS être
+ * reproposé comme "à planifier" ailleurs, sinon un second clic pose un
+ * second RDV sur la même carte.
+ *
+ * Historiquement inline dans `Entretiens.jsx` (onglet Programmation) ;
+ * factorisé ici pour que `tournees.service.js::getContratsDus` (Tournées,
+ * revue finale C3) applique EXACTEMENT la même règle plutôt que d'en
+ * réinventer une seconde qui aurait fini par diverger.
+ *
+ * `effective_contract_id` (pas `contract_id`) : une carte créée avant la
+ * saisie du contrat a `contract_id` NULL et serait absente du Set sans lui
+ * (migration 20260728_1).
+ *
+ * @param {{ orgId: string }} params  org CORE — `majordhome_entretien_sav.org_id`
+ *   dérive du client/contrat, tous deux côté CORE (cf. gotcha "Intervention
+ *   org = client OU contrat", CLAUDE.md).
+ * @returns {Promise<{ data: Set<string>, error: Error|null }>}
+ */
+export async function getPlannedContractIds({ orgId }) {
+  try {
+    const { data, error } = await supabase
+      .from('majordhome_entretien_sav')
+      .select('effective_contract_id')
+      .eq('org_id', orgId)
+      .eq('intervention_type', 'entretien')
+      .neq('workflow_status', 'realise');
+    if (error) return { data: new Set(), error };
+    return { data: new Set((data || []).map((r) => r.effective_contract_id).filter(Boolean)), error: null };
+  } catch (error) {
+    logger.error('[entretiensService] getPlannedContractIds', error);
+    return { data: new Set(), error };
+  }
 }
 
 // ============================================================================

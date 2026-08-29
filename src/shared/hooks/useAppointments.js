@@ -360,6 +360,54 @@ export function useSetTeamMemberColor(orgId) {
 }
 
 // ============================================================================
+// HOOK - useSetTeamMemberRouting (budget journalier + inclusion tournées)
+// ============================================================================
+
+/**
+ * Mutation unique : réglages de l'optimisation des tournées (daily_work_minutes,
+ * include_in_routing) d'un membre, via la RPC combinée `team_member_set_routing_settings`
+ * (patch partiel — n'envoyer que le champ qui change). Cf. JSDoc de
+ * `setTeamMemberRoutingSettings` dans appointments.service.js.
+ *
+ * La RPC retourne la ligne post-écriture : on l'utilise pour patcher directement
+ * le cache `teamMembers` (au lieu de juste invalider/refetch) — le succès n'est
+ * jamais supposé, seulement lu depuis `error`, et le cache reflète la valeur
+ * réellement écrite en base, pas une valeur optimiste.
+ */
+export function useSetTeamMemberRouting(orgId) {
+  const queryClient = useQueryClient();
+  const teamMembersKey = appointmentKeys.teamMembers(orgId);
+
+  const mutation = useMutation({
+    mutationFn: ({ teamMemberId, dailyWorkMinutes, includeInRouting }) =>
+      appointmentsService.setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting }),
+    onSuccess: (result, variables) => {
+      if (result?.error) return; // échec logique (ex. hors bornes) — rien à rafraîchir, le caller gère le toast
+
+      const row = result?.data;
+      if (!row) {
+        // Filet : pas de ligne retournée alors qu'il n'y a pas d'erreur (ne devrait pas arriver)
+        queryClient.invalidateQueries({ queryKey: teamMembersKey });
+        return;
+      }
+      queryClient.setQueryData(teamMembersKey, (old) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((tm) =>
+            tm.id === variables.teamMemberId
+              ? { ...tm, daily_work_minutes: row.daily_work_minutes, include_in_routing: row.include_in_routing }
+              : tm
+          ),
+        };
+      });
+    },
+  });
+
+  return { setRoutingSettings: mutation.mutateAsync, isSaving: mutation.isPending };
+}
+
+// ============================================================================
 // HOOK - useEnsureTeamMember (ressource planning d'un membre)
 // ============================================================================
 

@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
+import { logger } from '@lib/logger';
 
 // Buckets de type — source unique dans le module pur (re-export pour les callers
 // existants : EventModal, EventFormSections).
@@ -593,6 +594,43 @@ export const appointmentsService = {
       return { error: null };
     } catch (err) {
       console.error('[appointments] setTeamMemberColor error:', err);
+      return { error: err };
+    }
+  },
+
+  /**
+   * Définit le budget de travail journalier et/ou l'inclusion dans l'optimisation
+   * des tournées d'un membre (team_members.daily_work_minutes / .include_in_routing).
+   *
+   * Patch partiel : `dailyWorkMinutes`/`includeInRouting` omis ou `null` laisse le
+   * champ correspondant inchangé côté RPC (COALESCE) — un seul appel suffit même
+   * si les deux réglages changent en même temps.
+   *
+   * RPC combinée `team_member_set_routing_settings` (SECURITY DEFINER, org_admin
+   * only, anon révoqué — arbitrage tranché le 2026-08-29, remplace les 2 RPC à
+   * champ unique proposées puis abandonnées, cf. task-8-9-report.md). Retourne la
+   * ligne `{ daily_work_minutes, include_in_routing }` APRÈS écriture — utilisée
+   * par le hook pour rafraîchir le cache plutôt que de supposer le succès.
+   * `p_daily_work_minutes` hors [60, 1440] lève une erreur Postgres 22023, remontée
+   * telle quelle dans `error` (le caller UI la traduit en message compréhensible,
+   * jamais affichée brute).
+   */
+  async setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting } = {}) {
+    try {
+      const { data, error } = await supabase.rpc('team_member_set_routing_settings', {
+        p_team_member_id: teamMemberId,
+        p_daily_work_minutes: dailyWorkMinutes ?? null,
+        p_include_in_routing: includeInRouting ?? null,
+      });
+      if (error) {
+        logger.error('[appointments] setTeamMemberRoutingSettings error:', error);
+        return { error };
+      }
+      // Fonction RETURNS TABLE → data est un tableau d'1 ligne (valeurs post-écriture).
+      const row = Array.isArray(data) ? data[0] : data;
+      return { data: row ?? null, error: null };
+    } catch (err) {
+      logger.error('[appointments] setTeamMemberRoutingSettings error:', err);
       return { error: err };
     }
   },

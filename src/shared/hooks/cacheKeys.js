@@ -358,3 +358,20 @@ export const investigationKeys = {
     ...investigationKeys.all(orgId), 'address', addressKey, scope,
   ],
 };
+
+// --- Tournées d'entretien (optimisation de remplissage) ---
+// ⚠️ La valeur passée en 1ᵉʳ paramètre (`orgId`, convention P0.11) est en
+// pratique le `coreOrgId` — cf. src/shared/services/tournees.service.js
+// (asymétrie core/majordhome). La clé ne fait que scoper le cache par org,
+// peu importe l'espace réel de la donnée.
+export const tourneeKeys = {
+  all: (orgId) => ['tournees', orgId],
+  contratsDus: (orgId) => [...tourneeKeys.all(orgId), 'contratsDus'],
+  journees: (orgId, joursApres) => [...tourneeKeys.all(orgId), 'journees', joursApres],
+  // La proposition dépend de la journée ET de son contenu : la clé inclut la
+  // charge, sinon poser un RDV n'invaliderait pas le classement des candidats
+  // (amendement task-12 point 3).
+  propositions: (orgId, date, technicienId, chargeMinutes) => [
+    ...tourneeKeys.all(orgId), 'propositions', date, technicienId, chargeMinutes,
+  ],
+};

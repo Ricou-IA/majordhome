@@ -580,7 +580,18 @@ export const pricingService = {
     try {
       const { data, error } = await supabase
         .from('majordhome_pricing_equipment_types')
-        .insert({ ...payload, org_id: orgId })
+        .insert({
+          ...payload,
+          org_id: orgId,
+          // Tournées (2026-08-29) : durée d'entretien + mois déconseillés
+          // (duration_base_minutes / duration_per_extra_unit_minutes /
+          // unfavorable_months) voyagent via `...payload` seul, JAMAIS forcés
+          // ici (mineur, revue finale) — absents du payload, ils ne sont pas
+          // envoyés et la DB applique son propre défaut (NULL / 0 / '{}').
+          // Un forçage ici est inoffensif en création (rien à écraser) mais
+          // devenait une régression silencieuse dès qu'`updateEquipmentType`
+          // recopiait le même bloc pour un update PARTIEL (cf. plus bas).
+        })
         .select()
         .single();
       if (error) throw error;
@@ -594,7 +605,16 @@ export const pricingService = {
     try {
       const { data, error } = await supabase
         .from('majordhome_pricing_equipment_types')
-        .update(payload)
+        .update({
+          ...payload,
+          // Idem createEquipmentType ci-dessus : ne JAMAIS forcer
+          // duration_base_minutes / duration_per_extra_unit_minutes /
+          // unfavorable_months à une valeur par défaut ici. Un update
+          // PARTIEL qui omet ces champs (ex. l'écran ne touche que le prix)
+          // ne doit PAS écraser une durée ou des mois déconseillés déjà
+          // enregistrés — `...payload` seul : présent -> écrit tel quel
+          // (y compris `null` explicite) ; absent -> colonne intouchée.
+        })
         .eq('id', id)
         .select()
         .single();
