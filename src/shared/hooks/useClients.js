@@ -13,7 +13,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@services/clients.service';
 import { equipmentsService } from '@services/equipments.service';
-import { buildKindsByClient } from '@/lib/equipmentIcons';
+import { buildKindsByClient, buildEquipmentLabelsByClient } from '@/lib/equipmentIcons';
 import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
@@ -304,6 +304,30 @@ export function useClientEquipmentKinds() {
   });
 
   return { kindsByClientId, isLoading };
+}
+
+/**
+ * Libellés d'équipement par client (impression du planning) — même requête et
+ * même cache que `useClientEquipmentKinds`, projection différente : TOUS les
+ * équipements, pas seulement ceux qui ont une icône.
+ */
+export function useClientEquipmentLabels() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const { data: labelsByClientId } = useQuery({
+    queryKey: clientKeys.equipmentKinds(orgId),
+    queryFn: async () => {
+      const { data, error } = await equipmentsService.getEquipmentKindsByOrg(orgId);
+      if (error) throw error;
+      return data || [];
+    },
+    select: buildEquipmentLabelsByClient,
+    enabled: !!orgId,
+    staleTime: 5 * 60_000,
+  });
+
+  return { labelsByClientId };
 }
 
 // ============================================================================

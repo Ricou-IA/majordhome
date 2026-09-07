@@ -90,3 +90,23 @@ export function buildKindsByClient(rows) {
   }
   return map;
 }
+
+/**
+ * Libellés d'équipement par client, pour l'impression du planning : TOUS les
+ * équipements (y compris ceux sans icône, ex. poêle hydro), libellé précis du
+ * type tarifaire sinon la catégorie ENUM brute.
+ *
+ * @param {Array<{ client_id: string, category?: string|null, type_label?: string|null }>|null} rows
+ * @returns {Map<string, string[]>}
+ */
+export function buildEquipmentLabelsByClient(rows) {
+  const map = new Map();
+  if (!Array.isArray(rows)) return map;
+  for (const row of rows) {
+    const label = row?.type_label || row?.category;
+    if (!row?.client_id || !label) continue;
+    if (!map.has(row.client_id)) map.set(row.client_id, []);
+    map.get(row.client_id).push(label);
+  }
+  return map;
+}

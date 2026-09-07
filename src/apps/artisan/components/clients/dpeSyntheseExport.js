@@ -8,7 +8,7 @@
  */
 
 import { buildCompanyInfo } from '@lib/orgBranding';
-import { formatDateFR } from '@lib/utils';
+import { formatDateFR, downloadBlob } from '@lib/utils';
 import { buildDpeReportModel } from '@/lib/dpeReportModel';
 
 /**
@@ -25,25 +25,6 @@ export function buildSyntheseFilename(nom, date = new Date()) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'logement';
   return `bilan-energetique-${slug}-${date.toISOString().slice(0, 10)}.pdf`;
-}
-
-/**
- * Déclenche le téléchargement d'un blob.
- * NOTE : duplique volontairement `downloadBlob` de
- * `@apps/thermique/lib/rapportExport`. Importer ce module tirerait avec lui les
- * données climatiques et le chargeur de catalogue PAC dans le bundle artisan,
- * pour huit lignes d'idiome navigateur. À promouvoir dans `src/lib/utils.js`
- * lors d'un passage dédié (pas dans ce commit — cf. Posture #3).
- */
-export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 /**

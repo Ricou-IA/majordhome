@@ -133,3 +133,19 @@ export function computeDuration(startTime, endTime) {
   const diff = (eh * 60 + em) - (sh * 60 + sm);
   return diff > 0 ? diff : 60;
 }
+
+/**
+ * Déclenche le téléchargement d'un Blob dans le navigateur (ancre programmatique).
+ * Point unique pour les exports PDF artisan (planning, synthèse DPE). Les copies
+ * de `solaire/lib/etudeExport` et `thermique/lib/rapportExport` restent à rapatrier ici.
+ */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

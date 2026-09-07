@@ -26,10 +26,15 @@ import {
   ChevronDown,
   Wrench,
   Briefcase,
+  Printer,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
+import { useClientEquipmentLabels } from '@hooks/useClients';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { isoWeekNumber } from '@/lib/planningPrintModel';
+import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/planningPrintExport';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
@@ -60,18 +65,6 @@ function getDateRange(dateInfo) {
   };
 }
 
-/**
- * Numéro de semaine ISO 8601 (lundi = 1er jour ; semaine 1 = celle du 1er jeudi de l'année).
- * Ex : 2026-06-22 → 26.
- */
-function getISOWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7; // dimanche (0) → 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // jeudi de la semaine courante
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-}
-
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
@@ -87,7 +80,10 @@ function CalendarToolbar({
   weekNumber,
   onAddEvent,
   onRefresh,
-  isLoading
+  isLoading,
+  onPrint,
+  printHint,
+  isPrinting,
 }) {
   const goToday = () => calendarRef.current?.getApi().today();
   const goPrev = () => calendarRef.current?.getApi().prev();
@@ -162,6 +158,16 @@ function CalendarToolbar({
           title="Rafraîchir"
         >
           <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+
+        <button
+          onClick={onPrint}
+          disabled={!!printHint || isPrinting}
+          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={printHint || 'Imprimer le planning de la semaine (PDF)'}
+        >
+          {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+          Imprimer
         </button>
 
         {onAddEvent && (
@@ -371,6 +377,7 @@ export default function Planning() {
   const [modalState, setModalState] = useState({ open: false, mode: 'create', appointment: null, defaultDate: null, defaultTime: null });
   const [selectedChantier, setSelectedChantier] = useState(null);
   const [loadingChantier, setLoadingChantier] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Hooks données
   const {
@@ -395,6 +402,41 @@ export default function Planning() {
   });
 
   const { members } = useTeamMembers(orgId);
+  const { labelsByClientId } = useClientEquipmentLabels();
+  const { settings: orgSettings } = useOrgSettings();
+
+  // ==========================================================================
+  // IMPRESSION — planning hebdo d'UNE personne (vue Semaine + 1 chip équipe)
+  // ==========================================================================
+
+  const printPerson = filters.memberProfileKeys?.length === 1
+    ? teamList.find((h) => h.profileKey === filters.memberProfileKeys[0])
+    : null;
+  const printHint = currentView !== 'timeGridWeek'
+    ? 'Passez en vue Semaine pour imprimer'
+    : !printPerson
+      ? 'Sélectionnez une seule personne dans les filtres équipe'
+      : null;
+
+  const handlePrint = useCallback(async () => {
+    if (!printPerson || !dateRange.startDate) return;
+    setIsPrinting(true);
+    try {
+      // events = blocs calendrier déjà filtrés sur la personne ; le modèle
+      // déduplique par id (RDV multi-tech éclaté en plusieurs blocs).
+      await telechargerPlanningHebdo({
+        appointments: events.map((e) => e.extendedProps),
+        person: printPerson,
+        weekStart: dateRange.startDate,
+        equipmentLabelsByClient: labelsByClientId,
+        settings: orgSettings,
+      });
+    } catch (err) {
+      toast.error(`Impression impossible : ${err?.message || 'erreur inconnue'}`);
+    } finally {
+      setIsPrinting(false);
+    }
+  }, [printPerson, dateRange.startDate, events, labelsByClientId, orgSettings]);
 
   // ==========================================================================
   // HANDLERS FULLCALENDAR
@@ -409,7 +451,7 @@ export default function Planning() {
     const viewType = dateInfo.view.type;
     setCalendarWeek(
       viewType === 'timeGridWeek' || viewType === 'timeGridDay'
-        ? getISOWeekNumber(dateInfo.start)
+        ? isoWeekNumber(dateInfo.start)
         : null
     );
   }, []);
@@ -633,6 +675,9 @@ export default function Planning() {
           onAddEvent={canCreateAppointment ? () => setModalState({ open: true, mode: 'create', appointment: null, defaultDate: new Date().toISOString().split('T')[0], defaultTime: '09:00' }) : null}
           onRefresh={refresh}
           isLoading={isLoading}
+          onPrint={handlePrint}
+          printHint={printHint}
+          isPrinting={isPrinting}
         />
         <CalendarFilters
           filters={filters}
