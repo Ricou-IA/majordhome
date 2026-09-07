@@ -26,16 +26,9 @@ export function buildRapportFilename(nom, date = new Date()) {
   return `rapport-thermique-${slug}-${date.toISOString().slice(0, 10)}.pdf`;
 }
 
-export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+// Source unique : src/lib/utils.js (ré-exporté pour les callers du module).
+import { downloadBlob } from '@lib/utils';
+export { downloadBlob };
 
 /**
  * Machine du catalogue retenue par l'étude, pour le graphe de bivalence.

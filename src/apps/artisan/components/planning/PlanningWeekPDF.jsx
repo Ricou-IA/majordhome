@@ -8,13 +8,13 @@
  * client, secteur, adresse, téléphone, équipements, consignes.
  *
  * Le document n'effectue AUCUN calcul ni tri : tout vient de `buildWeeklyPlanningModel`.
- * Socle graphique emprunté au rapport thermique (`pdfShared`), comme la synthèse DPE.
+ * Socle graphique commun `@lib/pdfShared`, comme la synthèse DPE.
  *
  * ⚠️ Helvetica / WinAnsi : pas de flèches ni de glyphes hors cp1252 (« – · — » OK).
  * ============================================================================
  */
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
-import { C, accentOf, sharedStyles, CompanyHeader } from '@apps/thermique/components/etude/pdfShared';
+import { C, accentOf, sharedStyles, CompanyHeader } from '@lib/pdfShared';
 
 const s = StyleSheet.create({
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 },

@@ -7,11 +7,8 @@
  * DPE. Il n'imite pas la mise en page réglementaire et ne se présente jamais
  * comme un diagnostic : la mention figure en couverture ET en pied de page.
  *
- * Socle graphique mutualisé avec le rapport thermique (`@apps/thermique/.../
- * pdfShared`) : palette deutan, formatters PDF-safe, cartouche société. Le
- * `Footer` de ce socle n'est PAS réutilisé — son texte est propre à l'étude
- * thermique. Si un 3ᵉ document réutilise ce socle, il faudra le promouvoir
- * dans `src/lib/` plutôt que de multiplier les imports inter-apps.
+ * Socle graphique commun `@lib/pdfShared` : palette deutan, formatters PDF-safe,
+ * cartouche société. Le footer est propre à ce document.
  *
  * ⚠️ Helvetica / WinAnsi : pas de lettres grecques, de flèches, ni de
  * « ≈ ≥ ≤ − ». Autorisés : ° ² · × — – ’ « » € %. Tous les nombres passent par
@@ -24,7 +21,7 @@ import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer
 import {
   C, accentOf, sharedStyles, fmtInt, fmtDec, eur,
   CompanyHeader, SectionTitle, Kpi, Encart,
-} from '@apps/thermique/components/etude/pdfShared';
+} from '@lib/pdfShared';
 import { buildLegalFooter } from '@lib/orgBranding';
 
 const s = StyleSheet.create({
