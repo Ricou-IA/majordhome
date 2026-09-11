@@ -131,6 +131,43 @@ async function maybeCompleteParent(parentId) {
 }
 
 /**
+ * Org CORE d'une intervention racine (vue `majordhome_entretien_sav`,
+ * `org_id = project_org_id(project_id)`). Requis par `recordVisit`.
+ */
+async function getCoreOrgIdForRoot(rootId) {
+  const { data } = await supabase
+    .from('majordhome_entretien_sav')
+    .select('org_id')
+    .eq('id', rootId)
+    .maybeSingle();
+  return data?.org_id || null;
+}
+
+/**
+ * Enregistre la visite annuelle d'un entretien racine (chaînage `maintenance_visits`).
+ * Le trigger `sync_intervention_from_visit` pose ensuite `report_date` / `scheduled_date`
+ * sur la racine. Sans cette écriture la carte est « Réalisé » mais le contrat reste
+ * candidat Programmation / Tournées / SMS de rappel (`current_year_visit_status` NULL)
+ * et « Dernier entretien » ne bouge pas — vécu sur 28 cartes entre le 18/06 et le
+ * 11/09/2026 (wizard ouvert sur le parent depuis le RDV planning).
+ * @returns {Promise<{ error: any }>}
+ */
+async function recordRootVisit(root, orgId, { visitDate, notes } = {}) {
+  const { error } = await entretiensService.recordVisit({
+    contractId: root.contract_id,
+    orgId,
+    year: new Date().getFullYear(),
+    visitDate,
+    status: 'completed',
+    technicianId: root.technician_id,
+    technicianName: root.technician_name,
+    notes: notes || null,
+    userId: root.created_by,
+  });
+  return { error: error || null };
+}
+
+/**
  * Envoi d'un SMS/WhatsApp transactionnel via l'edge `sms-send`.
  *
  * Remplace les webhooks N8N `VITE_N8N_WEBHOOK_SMS_*` (2026-08-11). Un workflow
@@ -721,22 +758,37 @@ export const savService = {
   /**
    * Marquer une intervention comme réalisée (workflow_status + status)
    * Utilisé par le CertificatWizard après génération du PDF.
+   *
+   * Invariant : « Réalisé » ⇒ visite datée sur le contrat.
+   * - enfant (certificat par équipement) → la clôture du parent enregistre la visite ;
+   * - racine entretien marquée directement (wizard ouvert sur le parent) → personne
+   *   d'autre n'appelle `completeParentEntretien`, la visite est posée ici.
    * @param {string} interventionId - ID de l'intervention
+   * @param {{ visitDate?: string }} [opts] - date de la visite (ex. `date_intervention` du certificat)
    * @returns {Promise<{ data: Object|null, error: Error|null }>}
    */
-  async markRealise(interventionId) {
+  async markRealise(interventionId, { visitDate } = {}) {
     return withErrorHandling(async () => {
       const { data, error } = await supabase
         .from('majordhome_interventions')
         .update({ workflow_status: 'realise', status: 'completed' })
         .eq('id', interventionId)
-        .select('id, parent_id')
+        .select('id, parent_id, intervention_type, contract_id, scheduled_date, technician_id, technician_name, created_by')
         .single();
 
       if (error) throw error;
 
       if (data?.parent_id) {
         await maybeCompleteParent(data.parent_id);
+      } else if (data?.intervention_type === 'entretien' && data?.contract_id) {
+        const orgId = await getCoreOrgIdForRoot(data.id);
+        const today = new Date().toISOString().split('T')[0];
+        const { error: visitError } = await recordRootVisit(data, orgId, {
+          visitDate: visitDate || data.scheduled_date || today,
+        });
+        // La carte est déjà « Réalisé » : on remonte l'échec au lieu de l'avaler,
+        // c'est exactement l'état « réalisé sans date » qu'on veut voir.
+        if (visitError) throw new Error(`visite non enregistrée : ${visitError.message || visitError}`);
       }
 
       return data;
@@ -838,17 +890,7 @@ export const savService = {
 
       // 4) Insert maintenance_visit (chaînage annuel)
       if (parent?.contract_id) {
-        await entretiensService.recordVisit({
-          contractId: parent.contract_id,
-          orgId,
-          year: new Date().getFullYear(),
-          visitDate,
-          status: 'completed',
-          technicianId: parent.technician_id,
-          technicianName: parent.technician_name,
-          notes: reportNotes || null,
-          userId: parent.created_by,
-        });
+        await recordRootVisit(parent, orgId, { visitDate, notes: reportNotes });
       }
 
       return { allDone: true };

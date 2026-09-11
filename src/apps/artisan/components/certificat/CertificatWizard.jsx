@@ -310,7 +310,13 @@ export function CertificatWizard({
       // Générer le blob PDF
       const blob = await generatePdfBlob(pdfData, buildCompanyInfo(organization?.settings));
 
-      // Upload + DB uniquement si on a un certificatId
+      // Upload + DB uniquement si on a un certificatId.
+      // Un échec d'archivage du PDF ne doit PAS annuler la bascule « réalisé » :
+      // le certificat est déjà signé en base, et le PDF est régénérable depuis
+      // ses données. Interrompre ici laissait l'entretien « planifié » au kanban
+      // alors que le technicien l'avait fait signer (régression bucket Storage
+      // `certificats` absent après le cutover, 2026-08-11 → 2026-08-27).
+      let erreurArchivagePdf = null;
       if (currentCertId) {
         const uploadResult = await uploadPdf({
           orgId: organization?.id,
@@ -318,24 +324,46 @@ export function CertificatWizard({
           certificatId: currentCertId,
           pdfBlob: blob,
         });
-        if (uploadResult?.error) {
-          throw new Error(uploadResult.error.message || 'Erreur upload PDF');
-        }
 
-        const urlResult = await getSignedUrl(uploadResult.data.storagePath);
-        const signedUrl = urlResult?.data || '';
-        await updatePdfInfo(currentCertId, uploadResult.data.storagePath, signedUrl);
-        setPdfUrl(signedUrl);
+        if (uploadResult?.error) {
+          erreurArchivagePdf = uploadResult.error.message || 'archivage impossible';
+          console.error('[CertificatWizard] archivage PDF impossible:', uploadResult.error);
+          // Le technicien garde un PDF ouvrable pour le client, même non archivé.
+          setPdfUrl(URL.createObjectURL(blob));
+        } else {
+          const urlResult = await getSignedUrl(uploadResult.data.storagePath);
+          const signedUrl = urlResult?.data || '';
+          await updatePdfInfo(currentCertId, uploadResult.data.storagePath, signedUrl);
+          setPdfUrl(signedUrl);
+        }
       } else {
         // Pas de certificatId (table pas encore créée) — générer le PDF en local
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
       }
 
-      // Transition → réalisé (workflow + status)
-      await savService.markRealise(intervention.id);
+      // Transition → réalisé (workflow + status). Sur une racine, markRealise pose
+      // aussi la visite annuelle à la date saisie par le technicien — un échec ici
+      // laisserait la carte « Réalisé » sans date, il doit se voir.
+      const { error: realiseError } = await savService.markRealise(intervention.id, {
+        visitDate: formData.date_intervention || null,
+      });
+      if (erreurArchivagePdf) {
+        // On reste sur l'écran : StepSignature affiche l'erreur et le lien vers
+        // le PDF local, seul exemplaire disponible tant que l'archivage échoue.
+        setPdfError(`PDF non archivé : ${erreurArchivagePdf}`);
+        toast.warning(
+          "Entretien marqué réalisé, mais le PDF n'a pas pu être archivé — récupérez-le ci-dessous."
+        );
+        return;
+      }
 
-      toast.success('Certificat généré — entretien marqué réalisé');
+      if (realiseError) {
+        console.error('[CertificatWizard] markRealise error:', realiseError);
+        toast.error(`Certificat signé, mais la clôture de l'entretien a échoué : ${realiseError.message || 'erreur inconnue'}`);
+      } else {
+        toast.success('Certificat généré — entretien marqué réalisé');
+      }
 
       // Retour à la page précédente (modale entretien)
       navigate(-1);

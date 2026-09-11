@@ -35,7 +35,7 @@ export function CategoryBadge({ clientCategory }) {
 }
 
 function InterventionCard({ intervention }) {
-  const { intervention_type, scheduled_date, technician_name, report_notes, status, workflow_status, id, contract_number } = intervention;
+  const { intervention_type, scheduled_date, technician_name, report_notes, status, workflow_status, id, contract_number, parent_id } = intervention;
 
   const typeLabels = {
     maintenance: 'Entretien',
@@ -70,8 +70,12 @@ function InterventionCard({ intervention }) {
   const effectiveStatus = workflow_status || status;
   const statusInfo = statusConfig[effectiveStatus] || { label: effectiveStatus, className: 'bg-gray-100 text-gray-700' };
 
-  const isEntretienRealise = intervention_type === 'entretien' && workflow_status === 'realise';
-  const isEntretienPlanifie = intervention_type === 'entretien' && workflow_status === 'planifie';
+  // Certificat = enfant-équipement uniquement (même règle que TabInterventions).
+  // Ouvrir le wizard sur le parent produit un certificat orphelin (equipment_id NULL)
+  // et une carte « Réalisé » sans visite datée.
+  const isChild = !!parent_id;
+  const isEntretienRealise = isChild && intervention_type === 'entretien' && workflow_status === 'realise';
+  const isEntretienPlanifie = isChild && intervention_type === 'entretien' && workflow_status === 'planifie';
   const TypeIcon = typeIcons[intervention_type] || null;
 
   return (

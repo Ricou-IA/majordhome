@@ -14,8 +14,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save, Loader2, Trash2, Ban, CalendarDays, ClipboardCheck } from 'lucide-react';
-import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
+import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
+import { CertificatsSection } from '@/apps/artisan/components/entretiens/CertificatsSection';
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards, leadKeys } from '@hooks/useLeads';
@@ -202,11 +202,15 @@ export function EventModal({
   ]);
 
   // Recherche intervention entretien/SAV liée (pour CTA certificat)
-  const [entretienId, setEntretienId] = useState(null);
-  const [entretienStatus, setEntretienStatus] = useState(null);
+  // `entretien` porte l'intervention PARENT complete : CertificatsSection en a
+  // besoin (client_id + contrat) pour lister les equipements et resoudre leurs
+  // interventions enfants. Un certificat doit etre rattache a un equipement —
+  // ouvrir le formulaire sur le parent produit un certificat orphelin qui
+  // n'avance pas le compteur de la fiche entretien.
+  const [entretien, setEntretien] = useState(null);
+  const entretienStatus = entretien?.workflow_status || null;
   useEffect(() => {
-    setEntretienId(null);
-    setEntretienStatus(null);
+    setEntretien(null);
     if (!isOpen || !isEdit || !appointment?.client_id) return;
     if (!['maintenance', 'service'].includes(appointment?.appointment_type)) return;
 
@@ -214,7 +218,7 @@ export function EventModal({
       // Chercher d'abord un entretien pur, puis un SAV avec entretien inclus
       const { data } = await supabase
         .from('majordhome_entretien_sav')
-        .select('id, workflow_status, intervention_type, includes_entretien')
+        .select('id, workflow_status, intervention_type, includes_entretien, client_id, contract_id, effective_contract_id')
         .eq('client_id', appointment.client_id)
         .in('workflow_status', ['planifie', 'a_planifier', 'realise'])
         .order('created_at', { ascending: false })
@@ -223,10 +227,7 @@ export function EventModal({
       // Priorité : entretien pur > SAV avec entretien inclus
       const match = data?.find(d => d.intervention_type === 'entretien')
         || data?.find(d => d.intervention_type === 'sav' && d.includes_entretien);
-      if (match) {
-        setEntretienId(match.id);
-        setEntretienStatus(match.workflow_status);
-      }
+      if (match) setEntretien(match);
     }
     lookupEntretien();
   }, [isOpen, isEdit, appointment?.client_id, appointment?.appointment_type]);
@@ -1090,27 +1091,13 @@ export function EventModal({
                 />
               )}
 
-              {/* CTA Certificat d'entretien */}
-              {isEdit && !rescheduleMode && entretienId && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
+              {/* Certificats d'entretien — un par equipement.
+                  Meme section que la fiche entretien : le technicien saisit
+                  depuis son RDV, chaque certificat reste rattache a son
+                  equipement et le compteur avance. */}
+              {isEdit && !rescheduleMode && entretien && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
                 <div className={`${entretienStatus === 'realise' ? 'bg-green-50 border-green-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-4`}>
-                  <CertificatLink
-                    interventionId={entretienId}
-                    isRealise={entretienStatus === 'realise'}
-                    onClick={onClose}
-                    className="flex items-center gap-3 w-full text-left"
-                  >
-                    <div className={`w-10 h-10 rounded-full ${entretienStatus === 'realise' ? 'bg-green-600' : 'bg-[#1B4F72]'} flex items-center justify-center shrink-0`}>
-                      <ClipboardCheck className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {entretienStatus === 'realise' ? 'Voir le certificat d\'entretien' : 'Remplir le certificat d\'entretien'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {entretienStatus === 'realise' ? 'Certificat d\'entretien complété' : 'Formulaire réglementaire obligatoire'}
-                      </p>
-                    </div>
-                  </CertificatLink>
+                  <CertificatsSection item={entretien} onCloseModal={onClose} />
                 </div>
               )}
             </div>
