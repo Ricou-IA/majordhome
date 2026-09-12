@@ -1,6 +1,7 @@
 // ============================================================================
 // slots-propose — pour UN contrat d'entretien, les créneaux les moins coûteux
-// (technicien compétent, trajets réels, RDV déjà posés).
+// (technicien compétent — types cochés pour le rôle « entretien », trajets réels,
+// RDV déjà posés).
 //
 // Outil « machine-usable » : appelé par le CTA « Trouver le créneau optimisé »
 // de ContractModal aujourd'hui, par le serveur MCP (Hermes / Vapi) demain —
@@ -15,8 +16,8 @@
 // Body : { org_id, contract_id, constraints?: { technician_id?, date_from?,
 //   date_to?, periode?: 'matin'|'apres_midi', jours_semaine_exclus?: number[],
 //   dates_exclues?: string[] }, max_results? (défaut 4, max 10) }
-// 200 : { data: { contrat, creneaux[], nouvellesJournees[], raisonsRejet,
-//   techniciensEligibles, estime }, error: null }
+// 200 : { data: { contrat (dont categories: [{ id, code, label }]), creneaux[],
+//   nouvellesJournees[], raisonsRejet, techniciensEligibles, estime }, error: null }
 // 4xx : { error: 'siege_non_configure' | 'client_non_localise' |
 //   'contrat_introuvable' | 'aucun_technicien' | … }
 //
@@ -31,6 +32,10 @@ import { proposerPourContrat, journeesCandidates } from "../_shared/tournee/prop
 import { construireMatrice, trajetLocal } from "../_shared/tournee/matrice.js";
 import { construireArretsExistants } from "../_shared/tournee/arrets.js";
 import { construireReglages } from "../_shared/tournee/reglages.js";
+
+// Rôle de compétence appliqué par cet outil : une tournée d'entretien. La pose
+// (installations) aura son propre outil — jamais un défaut implicite du moteur.
+const ROLE_COMPETENCE = "entretien";
 
 const CONCURRENCE_MATRICE = 4; // Mapbox Matrix : 60 req/min sur le tier gratuit
 const FUSEAU = "Europe/Paris"; // les journées et « maintenant » sont ceux de l'artisan, pas d'UTC
@@ -119,7 +124,10 @@ Deno.serve(async (req) => {
     // horizon, contraintes) — pas de quota Mapbox brûlé pour une journée que le
     // moteur écartera d'office. Noyau = dépôt + arrêts de la journée, candidat =
     // le contrat ; paires fusionnées dans un seul trajet().
-    const candidates = journeesCandidates({ contrat, journees, techniciens, reglages, contraintes, aujourdhui });
+    const candidates = journeesCandidates({
+      contrat, journees, techniciens, reglages, contraintes, aujourdhui,
+      role: ROLE_COMPETENCE, typesParCategorie: contrat.typesParCategorie,
+    });
     const token = Deno.env.get("MDH_MAPBOX_TOKEN") || "";
     if (!token) console.error("[slots-propose] MDH_MAPBOX_TOKEN absent — trajets estimés à vol d'oiseau");
     const charger = creerChargeurMatrice({ client: admin, coreOrgId: orgId, token, logger: console });
@@ -148,6 +156,7 @@ Deno.serve(async (req) => {
     const resultat = proposerPourContrat({
       contrat, journees, techniciens, depot, reglages, trajet, estime, contraintes,
       aujourdhui, maintenantMinutes,
+      role: ROLE_COMPETENCE, typesParCategorie: contrat.typesParCategorie,
       maxResults: Math.min(Math.max(Number(body.max_results) || 4, 1), 10),
     });
 

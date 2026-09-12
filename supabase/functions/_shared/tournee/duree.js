@@ -31,15 +31,15 @@ export function dureeEquipement(equipement, type, fallbackMinutes) {
 /**
  * Durée totale d'un contrat = somme de ses équipements.
  *
- * @param {Array} equipements
+ * @param {Array<{ equipment_type_id?: string|null, category_id?: string|null, unit_count?: number }>} equipements
  * @param {Map} typesById
- * @param {{ parCategorie: Record<string, number>, defaut: number }} fallbacks
+ * @param {{ parCategorie: Record<string, number>, defaut: number }} fallbacks  clés = category_id (uuid du référentiel)
  * @returns {number} minutes
  */
 export function dureeContrat(equipements, typesById, fallbacks) {
   return (equipements || []).reduce((total, eq) => {
     const type = eq.equipment_type_id ? typesById.get(eq.equipment_type_id) : null;
-    const fallback = fallbacks?.parCategorie?.[eq.category] ?? fallbacks?.defaut ?? 0;
+    const fallback = fallbacks?.parCategorie?.[eq.category_id] ?? fallbacks?.defaut ?? 0;
     return total + dureeEquipement(eq, type, fallback);
   }, 0);
 }
@@ -49,6 +49,7 @@ export function dureeContrat(equipements, typesById, fallbacks) {
  * catégorie dans le parc réel. Un fallback uniforme sous-estimerait les
  * chaudières bois d'une heure et ferait déborder leur journée.
  * Les catégories sans aucun équipement typé restent absentes -> `defaut`.
+ * Clé = `category_id` (uuid de majordhome.equipment_categories), plus le code enum.
  *
  * @param {Array} parc  tous les équipements connus (typés ou non)
  * @param {Map} typesById
@@ -56,11 +57,11 @@ export function dureeContrat(equipements, typesById, fallbacks) {
  * @returns {{ parCategorie: Record<string, number>, defaut: number }}
  */
 export function construireFallbacks(parc, typesById, defautMinutes = 90) {
-  const comptes = new Map(); // category -> Map(typeId -> n)
+  const comptes = new Map(); // category_id -> Map(typeId -> n)
   for (const eq of parc || []) {
-    if (!eq.equipment_type_id || !eq.category) continue;
-    if (!comptes.has(eq.category)) comptes.set(eq.category, new Map());
-    const parType = comptes.get(eq.category);
+    if (!eq.equipment_type_id || !eq.category_id) continue;
+    if (!comptes.has(eq.category_id)) comptes.set(eq.category_id, new Map());
+    const parType = comptes.get(eq.category_id);
     parType.set(eq.equipment_type_id, (parType.get(eq.equipment_type_id) || 0) + 1);
   }
 
