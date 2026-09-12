@@ -24,8 +24,7 @@ import {
   listSmsCampaignsForEditor,
   normalizeSmsTemplates,
   findUnknownVariables,
-  estimateSmsSegments,
-  deburrSms,
+  coutSmsMessage,
   buildRappelRdvConfig,
   decrireRappelRdv,
   JOURS_SEMAINE,
@@ -199,23 +198,41 @@ function IdentitySection({ sms }) {
   );
 }
 
-function SegmentsHint({ text, deburr }) {
+/**
+ * « Coût de ce message : N SMS » — sur un exemple RENDU (prénom, date longue, lien
+ * court sur le domaine de l'org), accents retirés si l'option l'est. Pas de
+ * caractères ni de « segments » : ce que l'utilisateur veut savoir, c'est combien
+ * de SMS lui coûte chaque envoi, et ce que le client lira.
+ */
+function CoutSmsHint({ text, deburr, row, sms }) {
   if (!text) return null;
-  const { chars, segments, encoding } = estimateSmsSegments(deburr ? deburrSms(text) : text);
-  const gsm = encoding === 'gsm7';
-  const encodingLabel = gsm
-    ? 'alphabet SMS (160/segment)'
-    : 'hors alphabet SMS → 70/segment (ê â î ô û, apostrophe typographique « ’ », guillemets…)';
-  const advice = !gsm && !deburr ? ' — cocher « Retirer les accents » peut suffire' : '';
+  const { sms: nbSms, encoding, apercu } = coutSmsMessage(text, { campaign: row, sms, deburr });
+  const cher = nbSms > 1;
   return (
-    <p className={`${HINT_CLASS} ${gsm ? '' : 'text-amber-700'}`}>
-      ≈ {chars} caractères · {segments} segment{segments > 1 ? 's' : ''} · {encodingLabel}{advice}.
-      Estimation sur le gabarit, avant remplacement des variables.
-    </p>
+    <div className="mt-1.5 space-y-1">
+      <p className={`text-sm font-medium ${cher ? 'text-amber-700' : 'text-secondary-800'}`}>
+        Coût de ce message : {nbSms} SMS
+      </p>
+      {cher && encoding === 'ucs2' && (
+        <p className={`${HINT_CLASS} text-amber-700`}>
+          Un caractère hors alphabet SMS (ê â î ô û ë, apostrophe typographique « ’ », guillemets…)
+          fait passer à 70 caractères par SMS au lieu de 160.
+          {!deburr && ' Cocher « Retirer les accents à l’envoi » ramène souvent à 1 SMS.'}
+        </p>
+      )}
+      {cher && encoding === 'gsm7' && (
+        <p className={`${HINT_CLASS} text-amber-700`}>
+          Message long : au-delà de 160 caractères, chaque tranche de 153 caractères compte pour un SMS.
+        </p>
+      )}
+      <p className={HINT_CLASS}>
+        Aperçu (exemple) : <span className="italic text-secondary-700">« {apercu} »</span>
+      </p>
+    </div>
   );
 }
 
-function CampaignEditor({ row, value, error, whatsappActive, onChange }) {
+function CampaignEditor({ row, value, error, whatsappActive, sms, onChange }) {
   const isEmpty = !value.whatsapp && !value.sms;
   const ids = { whatsapp: `sms-${row.key}-whatsapp`, sms: `sms-${row.key}-sms`, deburr: `sms-${row.key}-deburr` };
 
@@ -288,7 +305,7 @@ function CampaignEditor({ row, value, error, whatsappActive, onChange }) {
           className={TEXTAREA_CLASS}
           placeholder="Envoyé si WhatsApp est absent ou échoue"
         />
-        <SegmentsHint text={value.sms} deburr={value.deburr} />
+        <CoutSmsHint text={value.sms} deburr={value.deburr} row={row} sms={sms} />
       </div>
 
       <label htmlFor={ids.deburr} className="flex items-start gap-2 text-sm text-secondary-700 cursor-pointer">
@@ -386,6 +403,7 @@ export default function SmsTab() {
               value={form.templates[row.key] || emptyTemplate()}
               error={errors[row.key]}
               whatsappActive={!!sms.whatsapp_from}
+              sms={sms}
               onChange={(patch) => patchCampaign(row.key, patch)}
             />
           ))}

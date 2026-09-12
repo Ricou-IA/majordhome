@@ -7,7 +7,7 @@
 // l'appelant a déjà résolu l'org (membership utilisateur pour sms-send, secret
 // partagé pour le cron) et lui passe `settings.sms`. Il fait, dans l'ordre :
 //   1. normalisation E.164 du numéro, choix du gabarit de la campagne ;
-//   2. rendu {{variable}} (+ lien court si le gabarit s'en sert, + deburr) ;
+//   2. rendu {{variable}} par le registre partage (+ lien court si le gabarit s'en sert, + deburr) ;
 //   3. pré-log `sms_log_create` AVANT l'appel fournisseur ;
 //   4. WhatsApp si l'org a un numéro, SMS en repli ;
 //   5. clôture `sms_log_mark_sent` (sent / failed, texte réellement parti).
@@ -27,6 +27,10 @@
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { sanitizeError } from "./auth.ts";
+// Rendu {{variable}} et retrait des accents : SOURCE UNIQUE = registre front
+// (copie Deno synchronisee de src/lib/smsCampaigns.js). L'apercu de l'onglet SMS
+// et le message envoye passent par le meme code.
+import { renderSmsTemplate, deburrSms } from "./smsCampaigns.js";
 
 export const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
 export const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
@@ -94,36 +98,6 @@ export function toE164FR(raw: string): string | null {
   if (cleaned.startsWith("0")) return "+33" + cleaned.slice(1);
   if (cleaned.startsWith("33")) return "+" + cleaned;
   return null;
-}
-
-/**
- * Substitution {{cle}} — les cles absentes sont remplacees par du vide, puis on
- * recolle la ponctuation restee orpheline.
- *
- * Le nettoyage n'est pas cosmetique : un gabarit « Bonjour {{full_name}}, ... »
- * rendu pour un client sans nom donnerait « Bonjour , ... ». Le workflow N8N
- * gerait ce cas par un `if` en dur ; ici, on rend le gabarit inconditionnel et
- * on repare le rendu. Un gabarit reste ainsi du texte, editable par le client,
- * sans logique conditionnelle a apprendre.
- */
-export function renderTemplate(tpl: string, vars: Record<string, string>): string {
-  return tpl
-    .replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_m, key: string) => vars[key] ?? "")
-    // ⚠ UNIQUEMENT la virgule et le point. En typographie francaise, « ! ? ; : »
-    // prennent une espace AVANT : les inclure ici mangeait « entretien ! » pour
-    // le transformer en « entretien! » — constate sur le 1er envoi de test.
-    .replace(/[ \t]+([,.])/g, "$1")      // « Bonjour , » -> « Bonjour, »
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
-/**
- * Retire les diacritiques : « éàç » -> « eac ». Voir SmsTemplate.deburr.
- * ⚠ Même règle que `deburrSms` du registre front (src/lib/smsCampaigns.js), qui
- * sert au compteur de segments de l'onglet SMS : toute évolution touche les deux.
- */
-export function deburr(s: string): string {
-  return s.normalize("NFD").replace(/\p{M}/gu, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -220,8 +194,8 @@ export async function sendCampaignSms(
 
   const renderVars = { ...(p.vars ?? {}), short_link: shortLink, short_code: shortCode ?? "" };
   const render = (tpl: string) => {
-    const out = renderTemplate(tpl, renderVars);
-    return template.deburr ? deburr(out) : out;
+    const out = renderSmsTemplate(tpl, renderVars);
+    return template.deburr ? deburrSms(out) : out;
   };
 
   const whatsappBody = template.whatsapp ? render(template.whatsapp) : null;

@@ -30,6 +30,7 @@ export const SMS_CAMPAIGNS = [
       { name: 'first_name', label: 'Prénom du client' },
       { name: 'short_link', label: 'Lien court vers la page d’avis (généré à l’envoi)' },
     ],
+    sample: { first_name: 'Véronique' },
     suggested: {
       whatsapp:
         'Bonjour {{first_name}},\n\nMerci de nous avoir fait confiance pour votre entretien ! '
@@ -49,6 +50,7 @@ export const SMS_CAMPAIGNS = [
       { name: 'name', label: 'Nom du client' },
       { name: 'full_name', label: 'Prénom + nom (en majuscules)' },
     ],
+    sample: { first_name: 'VÉRONIQUE', name: 'DUPONT', full_name: 'VÉRONIQUE DUPONT' },
     suggested: {
       sms:
         'Bonjour {{full_name}}, votre entretien annuel approche : vous recevrez un appel dans les '
@@ -67,6 +69,7 @@ export const SMS_CAMPAIGNS = [
       { name: 'heure', label: 'Heure d’arrivée prévue (ex. « 9h30 »)' },
       { name: 'technicien', label: 'Prénom du technicien' },
     ],
+    sample: { prenom: 'Véronique', date: 'mercredi 16 septembre', heure: '12h30', technicien: 'Antoine' },
     suggested: {
       whatsapp:
         'Bonjour {{prenom}},\n\nRappel : votre entretien est prévu le {{date}} à {{heure}}. '
@@ -270,6 +273,53 @@ export function listSmsCampaignsForEditor(templates) {
 
 // Injectées par l'edge pour toute campagne (lien court généré à l'envoi).
 const EDGE_PROVIDED_VARIABLES = ['short_link', 'short_code'];
+
+/**
+ * Rendu d'un gabarit : `{{cle}}` → valeur, clé absente → vide, puis ponctuation
+ * orpheline recollée. SOURCE UNIQUE du rendu : l'edge `_shared/sms.ts` importe
+ * cette fonction (copie Deno synchronisée) — ce que l'onglet SMS montre en aperçu
+ * est exactement ce que le client reçoit.
+ *
+ * Le nettoyage n'est pas cosmétique : « Bonjour {{prenom}}, … » rendu sans prénom
+ * donnerait « Bonjour , … ». ⚠ UNIQUEMENT la virgule et le point : en typographie
+ * française « ! ? ; : » prennent une espace AVANT (« entretien ! » doit rester).
+ */
+export function renderSmsTemplate(tpl, vars) {
+  const v = vars || {};
+  return String(tpl ?? '')
+    .replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_m, key) => v[key] ?? '')
+    .replace(/[ \t]+([,.])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+const SAMPLE_SHORT_CODE = 'Ab3Kx9';
+const SAMPLE_SHORT_LINK_BASE = 'votre-site.fr/a';
+
+/**
+ * Variables d'exemple d'une campagne (valeurs volontairement LONGUES : le coût en
+ * SMS est estimé dessus). Le lien court utilise le domaine de l'org s'il est connu.
+ */
+export function sampleVarsFor(campaign, sms) {
+  const base = String(sms?.short_link_base || SAMPLE_SHORT_LINK_BASE).replace(/\/+$/, '');
+  return {
+    ...(campaign?.sample || {}),
+    short_link: `${base}/${SAMPLE_SHORT_CODE}`,
+    short_code: SAMPLE_SHORT_CODE,
+  };
+}
+
+/**
+ * « Coût de ce message : N SMS » — sur l'exemple rendu (jamais sur le gabarit brut :
+ * les accolades comptent double et les variables changent la longueur), accents
+ * retirés si l'option l'est. `apercu` = le texte tel que le client le lira.
+ */
+export function coutSmsMessage(tpl, { campaign, sms, deburr } = {}) {
+  const rendu = renderSmsTemplate(tpl, sampleVarsFor(campaign, sms));
+  const apercu = deburr ? deburrSms(rendu) : rendu;
+  const { segments, encoding } = estimateSmsSegments(apercu);
+  return { sms: segments, encoding, apercu };
+}
 
 /**
  * Jetons `{{…}}` d'un gabarit qui ne correspondent à aucune variable de la campagne.

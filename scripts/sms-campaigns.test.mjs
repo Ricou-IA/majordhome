@@ -21,6 +21,9 @@ import {
   estimateSmsSegments,
   findUnknownVariables,
   deburrSms,
+  renderSmsTemplate,
+  sampleVarsFor,
+  coutSmsMessage,
 } from '../src/lib/smsCampaigns.js';
 
 const VAR_RE = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
@@ -190,4 +193,33 @@ test('buildRappelRdvVars — prénom stocké en MAJUSCULES rendu en capitale ini
   assert.equal(buildRappelRdvVars({ clientFirstName: 'VÉRONIQUE' }).prenom, 'Véronique');
   assert.equal(buildRappelRdvVars({ clientFirstName: "D'ANGELO" }).prenom, "D'Angelo");
   assert.equal(buildRappelRdvVars({ clientFirstName: '' }).prenom, '');
+});
+
+test('renderSmsTemplate — substitution {{…}}, variable absente effacée, ponctuation recollée (virgule/point seulement)', () => {
+  assert.equal(renderSmsTemplate('Bonjour {{prenom}}, RDV le {{ date }} !', { prenom: 'Jean', date: 'mardi' }), 'Bonjour Jean, RDV le mardi !');
+  assert.equal(renderSmsTemplate('Bonjour {{prenom}}, à bientôt.', {}), 'Bonjour, à bientôt.');
+  assert.equal(renderSmsTemplate('Merci {{prenom}} !', {}), 'Merci !'); // l espace avant « ! » reste (typographie FR)
+  assert.equal(renderSmsTemplate('A  {{x}}  B', { x: '' }), 'A B');
+});
+
+test('sampleVarsFor — exemple rendu réaliste par campagne, lien court sur le domaine de l’org', () => {
+  const rappel = sampleVarsFor(getSmsCampaign('rappel_rdv'), {});
+  assert.deepEqual(Object.keys(rappel).sort(), ['date', 'heure', 'prenom', 'short_code', 'short_link', 'technicien']);
+  assert.equal(rappel.date, 'mercredi 16 septembre');
+  const avis = sampleVarsFor(getSmsCampaign('avis_j1'), { short_link_base: 'www.mayer-energie.fr/a' });
+  assert.equal(avis.short_link, 'www.mayer-energie.fr/a/Ab3Kx9');
+  assert.equal(sampleVarsFor(getSmsCampaign('avis_j1'), {}).short_link, 'votre-site.fr/a/Ab3Kx9');
+  assert.deepEqual(sampleVarsFor({ key: 'x', variables: [], unknown: true }, {}), { short_link: 'votre-site.fr/a/Ab3Kx9', short_code: 'Ab3Kx9' });
+});
+
+test('coutSmsMessage — coût en SMS d’un gabarit sur son exemple rendu, accents retirés si demandé', () => {
+  const tpl = getSmsCampaign('rappel_rdv').suggested.sms;
+  const avecAccents = coutSmsMessage(tpl, { campaign: getSmsCampaign('rappel_rdv'), sms: {}, deburr: false });
+  const sansAccents = coutSmsMessage(tpl, { campaign: getSmsCampaign('rappel_rdv'), sms: {}, deburr: true });
+  assert.equal(avecAccents.sms, 3);
+  assert.equal(avecAccents.encoding, 'ucs2');
+  assert.equal(sansAccents.sms, 1);
+  assert.equal(sansAccents.encoding, 'gsm7');
+  assert.match(sansAccents.apercu, /^Bonjour Veronique, rappel : votre entretien est prevu le mercredi 16 septembre a 12h30 avec Antoine\./);
+  assert.deepEqual(coutSmsMessage('', { campaign: getSmsCampaign('rappel_rdv'), sms: {}, deburr: false }), { sms: 0, encoding: 'gsm7', apercu: '' });
 });
