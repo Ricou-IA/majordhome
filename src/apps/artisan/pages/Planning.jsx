@@ -337,7 +337,7 @@ function CalendarFilters({ filters, setFilters, teamList }) {
  */
 function PlanningEventContent({ eventInfo }) {
   const {
-    typeConfig, client_name, client_first_name, status, lead_id, grand_secteur, client_id, adaptable, hour_confirmed_at,
+    typeConfig, client_name, client_first_name, status, grand_secteur, client_id, adaptable, hour_confirmed_at,
     appointment_type,
   } = eventInfo.event.extendedProps;
   const typeSouple = estTypeAdaptable(appointment_type);
@@ -350,11 +350,6 @@ function PlanningEventContent({ eventInfo }) {
   return (
     <div className={`px-1 py-0.5 overflow-hidden ${isCancelled ? 'opacity-50 line-through' : ''}`}>
       <div className="font-medium text-xs truncate flex items-center gap-1">
-        {lead_id && (
-          <span className="inline-flex items-center justify-center w-3.5 h-3.5 bg-white/30 rounded-full text-[8px] font-bold shrink-0" title="Depuis pipeline">
-            P
-          </span>
-        )}
         {/* Souplesse : ↔ adaptable (heure provisoire), 🔒 heure communiquée au client */}
         {adaptable ? (
           <span className="mr-0.5 opacity-90" title="Adaptable : l’heure peut glisser dans sa tolérance">↔</span>
