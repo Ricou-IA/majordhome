@@ -1,6 +1,8 @@
 # Référentiel équipements, tarifs et compétences par organisation
 
-> Spec de design — 2026-09-12. Statut : **en attente de validation par Eric**.
+> Spec de design — 2026-09-12. Statut : **validée par Eric le 2026-09-12 ; implémentée** (plan
+> `docs/superpowers/plans/2026-09-12-referentiel-equipements-tarifs-competences.md`, M1 et M2 répétées
+> sur cluster local — voir `scripts/migration-rehearsal/`).
 > Remplace l'enum Postgres `majordhome.equipment_category` par un référentiel **par organisation**
 > (catégorie → type), y accroche la grille tarifaire, les durées d'entretien et les compétences des
 > techniciens (**par type × rôle**, cochées comme des droits). Chemin critique à ne jamais couper :
@@ -488,9 +490,10 @@ Purement additive : compatible avec le front et l'edge en production au moment o
 ### 7.4 M2 — contraction (`20260920_1_referentiel_equipements_contraction.sql`)
 
 1. `DROP VIEW IF EXISTS majordhome.v_planning, majordhome.v_equipments_maintenance`.
-2. `equipments` : DROP VIEW `majordhome_equipments`, `ALTER TABLE … DROP COLUMN category` (l'index
-   suit), **`DROP TYPE majordhome.equipment_category`**, recréation de la vue (miroir + `category_id`)
-   + re-GRANT ; trigger recréé sans branche legacy.
+2. `equipments` : DROP du trigger `tr_equipments_sync_category` (sa liste `UPDATE OF … category` dépend
+   de la colonne — trouvé à la répétition), DROP VIEW `majordhome_equipments`, `ALTER TABLE … DROP COLUMN
+   category` (l'index suit), **`DROP TYPE majordhome.equipment_category`**, recréation de la vue (miroir +
+   `category_id`) + re-GRANT ; trigger recréé sans branche legacy.
 3. `pricing_equipment_types` : DROP VIEW `majordhome_pricing_equipment_types` ; `DROP COLUMN
    equipment_category` ; recréation de la vue (`category` = code dénormalisé depuis M1,
    `category_id`) + re-GRANT. Les 4 vues dépendantes (`majordhome_leads`, `_chantiers`,

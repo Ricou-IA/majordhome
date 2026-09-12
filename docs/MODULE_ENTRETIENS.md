@@ -67,3 +67,11 @@ planifie → [Remplir certificats équipements] → realise → facture (hors Ka
 - RPCs (SECURITY DEFINER, REVOKE anon, role-checkées team_leader+ côté DB) : `certificat_set_piece_offert(p_intervention_id, p_piece_index, p_offert)`, `certificat_delete_piece(p_intervention_id, p_piece_index)`.
 - **⚠️ Gotcha `idx` parts_detail** : les `idx` sont recalculés par la vue (`WITH ORDINALITY`) → toute mutation qui retire/réordonne (`certificat_delete_piece`) invalide les `idx` mémorisés côté front. Pattern obligatoire : `refreshParts()` recharge `parts_detail` depuis la vue après CHAQUE mutation avant d'autoriser la suivante (sinon le 2ᵉ delete consécutif vise la mauvaise pièce).
 
+## Compétences techniciens — par type d'équipement × rôle (2026-09-12)
+
+Spec : `docs/superpowers/specs/2026-09-12-referentiel-equipements-tarifs-competences-design.md` §5–6.
+
+- **Table** `majordhome.team_member_skills(team_member_id, equipment_type_id, role)`, cochée **comme des droits** dans Settings → Équipe (bouton « Compétences » d'un technicien → `team/SkillsPanel.jsx` : types groupés par catégorie × Entretien / Pose, « tout cocher » par catégorie et par colonne). Écriture par la RPC `team_member_set_skills` (remplacement atomique membre × rôle, org_admin), jamais optimiste.
+- **Sémantique** : coché = compétent ; **rien coché pour un rôle = jamais proposé** (l'ancien « `specialties` vide = polyvalent » n'existe plus). À la reprise (M1) tout est coché pour les techniciens actifs, Entretien et Pose ; un nouveau technicien démarre à zéro (alerte « jamais proposé » sur sa ligne).
+- **Règle d'éligibilité** (`techniciensEligibles(contrat, techniciens, role)`, module pur `proposer-contrat.js`, rôle **obligatoire**) : chaque équipement du contrat impose son `typeId` s'il est typé, sinon sa `categoryId` (satisfaite par **au moins un** type coché de la catégorie) ; un équipement non catégorisé n'impose rien. Les exigences et `typesParCategorie` sont calculés par `chargerContrat` ; `chargerJournees` porte `competences { entretien, pose }` par technicien. L'edge `slots-propose` applique `role = 'entretien'` ; `pose` est stocké mais consommé par rien (planification des installations à venir).
+- Durées et replis (`dureeContrat` / `construireFallbacks`) sont clés sur `category_id` (uuid du référentiel), plus sur le code enum.

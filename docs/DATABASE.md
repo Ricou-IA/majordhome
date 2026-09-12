@@ -219,7 +219,9 @@ EXISTS (SELECT 1 FROM majordhome.contracts c WHERE c.client_id = clients.id AND 
 |-------------|------|-------|
 | `id` | uuid | PK |
 | `project_id` | uuid | FK → core.projects (⚠️ pas clients.id) |
-| `category` | ENUM equipment_category | pac_air_air, pac_air_eau, chaudiere_gaz/fioul/bois, vmc, climatisation, chauffe_eau_thermo, ballon_ecs, poele, autre |
+| `category_id` | uuid → equipment_categories | Catégorie du **référentiel de l'org** (2026-09). Dérivée du type par le trigger `equipments_sync_category` quand `equipment_type_id` est renseigné ; portée directement sinon ; NULL = non catégorisé. Invariant : typé ⇒ catégorie du type |
+| `equipment_type_id` | uuid → pricing_equipment_types | Type précis (prix, durée d'entretien, compétence requise). 353 équipements Mayer sans type au 2026-09-12 |
+| ~~`category`~~ | ~~ENUM equipment_category~~ | **Supprimé par M2 (20260920_1)** — enum figé remplacé par `equipment_categories` (M1 20260913_1 l'alimentait encore par trigger pendant la transition) |
 | `brand`, `model`, `serial_number` | text | Identité équipement |
 | `install_date` | date | |
 | `warranty_end_date` | date | |
@@ -296,9 +298,10 @@ Table pivot interventions ↔ team_members (Sprint 6 Chantiers).
 - RLS activé, 1 policy (`allow_authenticated`)
 
 ### majordhome.team_members
-3 rows (1 désactivé). Techniciens de l'organisation.
+7 rows (2026-09). Membres de l'organisation côté planning (⚠️ org **majordhome**, pas l'org core).
 - `org_id`, `first_name`, `last_name`, `display_name` (generated)
-- `role` (default 'technician'), `specialties` (text[])
+- `role` (default 'technician') ; ~~`specialties`~~ (text[]) **supprimée par M2 (20260920_1)** → compétences dans `team_member_skills`
+- `daily_work_minutes`, `include_in_routing` (tournées, 2026-08-29)
 - `calendar_color`, `google_calendar_id`, `google_calendar_email`
 - `default_availability` (jsonb) — horaires par jour
 - `slack_user_id`
@@ -416,3 +419,37 @@ Seed initial : 9 campagnes (mail_a à mail_i_newsletter) appliqué le 2026-04-19
 - `majordhome.service_requests`, `majordhome.conversations`, `majordhome.messages`
 - `majordhome.home_details`, `majordhome.dpe_data`, `majordhome.project_access`
 - `majordhome.appointment_technicians`, `majordhome.user_profiles`
+
+## Référentiel équipements par organisation (2026-09-12)
+
+Spec : `docs/superpowers/specs/2026-09-12-referentiel-equipements-tarifs-competences-design.md`. Deux niveaux : **catégorie → type**. Migrations `20260913_1` (expansion) puis `20260920_1` (contraction), répétées sur cluster local (`scripts/migration-rehearsal/`).
+
+### majordhome.equipment_categories
+Par org (org core). RLS : SELECT membre, écriture org_admin (vue updatable `majordhome_equipment_categories`).
+
+| Colonne | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK ; `UNIQUE (id, org_id)` cible de la FK composite des types |
+| `org_id` | uuid | FK → core.organizations CASCADE |
+| `code` | text | `^[a-z0-9_]+$`, UNIQUE (org_id, code), **immuable** (trigger) : `certificats.equipement_type` désigne par code |
+| `label`, `sort_order`, `is_active` | | libellé et ordre libres par org |
+| `certificate_profile` | text | liste fermée : combustion_bois · combustion_fossile · pac · ecs_thermo · ecs · aeraulique · generique — gabarit du wizard certificat (`SECTIONS_PAR_PROFIL`) |
+| `default_vat_rate` | numeric(4,2) | TVA par défaut du certificat |
+
+Semis Mayer (M1, dérivé des données) : poele · chaudiere_bois · pac_air_air · pac_air_eau · climatisation · chauffe_eau_thermo · energie (7).
+
+### majordhome.pricing_equipment_types (= référentiel des types, nom conservé)
+- `category_id uuid NOT NULL`, FK **composite** `(category_id, org_id) → equipment_categories(id, org_id)` (même org garanti).
+- `category` (text NOT NULL) = **code de catégorie dénormalisé** par trigger `pricing_equipment_types_sync_category_code`, jamais écrit par l'app (ex-famille tarifaire ; 4 vues l'exposent en `equipment_type_category`, zéro lecteur).
+- ~~`equipment_category`~~ supprimée par M2.
+
+### majordhome.team_member_skills
+Compétences cochées comme des droits : 1 ligne = ce membre couvre ce type pour ce rôle. **Aucune ligne pour un rôle = jamais proposé** (fin du « vide = polyvalent »).
+
+| Colonne | Type | Notes |
+|---|---|---|
+| `team_member_id` | uuid | FK → team_members CASCADE (org majordhome) |
+| `equipment_type_id` | uuid | FK → pricing_equipment_types CASCADE (org core) — cohérence d'org vérifiée par la RPC |
+| `role` | text | CHECK ∈ {entretien, pose} (`SKILL_ROLES`, `src/lib/tournee/competences.js`) |
+
+PK (team_member_id, equipment_type_id, role). RLS SELECT membre de l'org ; **aucune policy d'écriture** : RPC `public.team_member_set_skills(p_team_member_id, p_role, p_equipment_type_ids uuid[])` (SECURITY DEFINER, org_admin, remplacement atomique, type hors org → 23514). Vue `majordhome_team_member_skills`. Semis M1 : techniciens actifs × types actifs × 2 rôles (Mayer 84).
