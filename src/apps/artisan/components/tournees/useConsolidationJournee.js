@@ -97,7 +97,8 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
   const figer = useCallback(async () => {
     if (!apercu?.faisable) return;
     setEnCours(true);
-    const bilan = { figes: 0, echecs: [], sms: 0, smsEchecs: [], smsSansMobile: [], smsGabaritAbsent: false, perime: false };
+    const smsActifs = reglages?.figer_sms === true;
+    const bilan = { figes: 0, echecs: [], sms: 0, smsEchecs: [], smsSansMobile: [], smsGabaritAbsent: false, perime: false, smsDesactives: !smsActifs };
     try {
       const aChanger = apercu.lignes.filter((l) => !l.fige);
       // 1. L'aperçu est-il encore vrai ? Un RDV déplacé, figé ou clos entre
@@ -137,8 +138,9 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
         figes.push(l);
       }
       // 3. Les SMS, seulement si TOUT est écrit : une heure annoncée doit être
-      //    définitive, et une journée à moitié figée peut encore bouger.
-      if (bilan.echecs.length > 0) return;
+      //    définitive, et une journée à moitié figée peut encore bouger — et
+      //    seulement si le réglage `figer_sms` est actif (OFF pour l'instant).
+      if (bilan.echecs.length > 0 || !smsActifs) return;
       for (const l of figes) {
         const { error: smsErr } = await savService.sendHeureDePassage({
           orgId: coreOrgId, clientId: l.clientId, clientPhone: l.phone, clientFirstName: capitaliserPrenom(l.prenom),
@@ -160,12 +162,13 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(coreOrgId) });
       queryClient.invalidateQueries({ queryKey: tourneeKeys.all(coreOrgId) });
     }
-  }, [apercu, coreOrgId, journee, queryClient]);
+  }, [apercu, coreOrgId, journee, queryClient, reglages]);
 
   return {
     peutFiger: adaptables.length > 0 && !!depot,
     nbAdaptables: adaptables.length,
     ouvert, ouvrir: () => { setResultat(null); setOuvert(true); }, fermer: () => setOuvert(false),
     apercu, figer, enCours, resultat,
+    smsActifs: reglages?.figer_sms === true,
   };
 }

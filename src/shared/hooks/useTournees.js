@@ -19,6 +19,7 @@
  * ============================================================================
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { tourneesService } from '@services/tournees.service';
 import { contractsService } from '@services/contracts.service';
@@ -27,6 +28,9 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { supabase } from '@/lib/supabaseClient';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 import { chargerContrat } from '@/lib/tournee/loaders.js';
+import { verdictJournee } from '@/lib/tournee/plein.js';
+import { trajetLocal } from '@/lib/tournee/matrice.js';
+import { getOrgHeadquarters } from '@lib/territoire-config';
 
 // Re-export for backward compatibility
 export { tourneeKeys } from '@hooks/cacheKeys';
@@ -229,3 +233,28 @@ export function useDureeContratClient(coreOrgId, clientId, enabled = true) {
   });
   return useDureeContrat(coreOrgId, enabled ? (contrat.data ?? null) : null);
 }
+
+/**
+ * Journées PLEINES que l'ordonnanceur ne sait pas tenir (spec 2026-09-12, R3) —
+ * même `verdictJournee` que l'edge tournees-figer, trajets estimés à vol d'oiseau.
+ * Consommé par JourneesAArbitrer (tableau de bord de l'admin).
+ * @param {string} coreOrgId
+ * @returns {{ journees: Array<{ journee: object, sequence: object }>, isLoading: boolean, error: Error|null }}
+ */
+export function useJourneesAArbitrer(coreOrgId) {
+  const { settings } = useOrgSettings();
+  const { data: horizon, isLoading, error } = useJourneesHorizon(coreOrgId);
+  const journees = useMemo(() => {
+    if (!horizon || !settings) return [];
+    const reglages = construireReglages(settings);
+    const depot = getOrgHeadquarters(settings);
+    if (!depot) return [];
+    const aujourdhui = new Date().toLocaleDateString('fr-CA');
+    return horizon
+      .filter((j) => j.date > aujourdhui && (j.rdvs || []).length > 0)
+      .map((j) => ({ journee: j, ...verdictJournee({ journee: j, depot, reglages, trajet: trajetLocal }) }))
+      .filter((v) => v.verdict === 'a_arbitrer');
+  }, [horizon, settings]);
+  return { journees, isLoading, error: error || null };
+}
+

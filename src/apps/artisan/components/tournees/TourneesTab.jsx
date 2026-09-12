@@ -306,7 +306,14 @@ export function TourneesTab() {
   // Clé (date + technicienId), pas l'objet Journee lui-même : la journée
   // affichée est dérivée en direct de `journees` à chaque rendu (cf. bloc de
   // tête), pour ne jamais retenter sur une charge/RDV périmés après une pose.
-  const [selectedJourneeKey, setSelectedJourneeKey] = useState(null);
+  const [selectedJourneeKey, setSelectedJourneeKey] = useState(() => {
+    // Ouverture directe depuis le Dashboard (journées à arbitrer) :
+    // /entretiens?tab=tournees&journee=YYYY-MM-DD&tech=<team_member id>
+    const p = new URLSearchParams(window.location.search);
+    const date = p.get('journee');
+    const technicienId = p.get('tech');
+    return date && technicienId ? { date, technicienId } : null;
+  });
   const [selectedContractId, setSelectedContractId] = useState(null);
 
   const selectedJournee = useMemo(() => {
@@ -375,8 +382,6 @@ export function TourneesTab() {
         onOpenJournee={ouvrirJournee}
         onOpenContract={setSelectedContractId}
         toleranceAnniversaireMois={reglages.tolerance_anniversaire_mois}
-        reglages={reglages}
-        depot={depot}
       />
 
       {/* Bandeau de tête */}

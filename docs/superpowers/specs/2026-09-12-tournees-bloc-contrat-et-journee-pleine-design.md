@@ -44,15 +44,17 @@ telle qu'elle est.
 
 ### R3 — Pleine mais impossible
 Une journée pleine que l'ordonnanceur ne sait pas tenir (route, budget, amplitude) ne se
-fige pas : elle remonte en **« journée à arbitrer »** dans l'onglet Tournées avec le
-diagnostic chiffré (travail / trajets / budget / trajets qui ne tiennent pas). C'est le
-seul moment où l'humain intervient.
+fige pas : elle remonte en **« journée pleine à arbitrer »** sur le **tableau de bord de
+l'administrateur** (décision Eric : pas dans l'onglet Tournées) avec le diagnostic chiffré
+(travail / trajets / budget / trajets qui ne tiennent pas) ; un clic ouvre la journée dans
+l'onglet Tournées. C'est le seul moment où l'humain intervient.
 
-### R4 — Sans gabarit, pas de figeage automatique
-Figer sans prévenir personne serait pire que ne pas figer : si le gabarit
-`heure_de_passage` (Settings → Organisation → SMS) est absent ou si les SMS de l'org sont
-désactivés, le cron ne fige rien et le dit dans son rapport. Le bouton manuel, lui, fige
-et signale « SMS non envoyés ».
+### R4 — Le SMS d'heure de passage est un réglage, OFF pour l'instant
+Le figeage (automatique ou bouton) fige les heures ; le SMS `heure_de_passage` ne part que
+si `settings.tournees.figer_sms` est actif (Settings → Organisation → Tournées, **désactivé
+par défaut** — Eric, 2026-09-12 : « pour l'instant SMS : OFF »), que les SMS de l'org sont
+activés et que le gabarit existe (Settings → SMS). Le rapport du cron et le bilan du bouton
+disent explicitement quand personne n'a été prévenu.
 
 ## Implémentation
 
@@ -63,10 +65,10 @@ et signale « SMS non envoyés ».
 | `src/lib/tournee/plein.js` (pur) | `evaluerRemplissage({ arrets, trajet, depotKey, budgetMinutes, depassementMinutes, pauseMinutes, resteUtileMinMinutes })` → `{ pleine, resteUtileMinutes, … }` sur le diagnostic chronologique. |
 | Consolidation (`useConsolidationJournee`) | durée de ligne = celle de l'arrêt ; écrit `scheduled_end` **et** `duration_minutes`. |
 | Pose à la main | `DayResourceGrid` / `SchedulingAssistant` : prop `fixedDuration` (un clic pose le bloc, pas d'étirement). `SchedulingTransitionModal` charge la durée du contrat (`chargerContrat` + réglages) ; `EventModal` idem pour un Entretien sur un client à contrat. |
-| Edge `tournees-figer` | `verify_jwt:false` + `MDH_CRON_SECRET`, cron horaire 5-19 UTC. Par org : journées de l'horizon à ≥ 1 adaptable → matrice Mapbox → pleine ? → ordonnancer → RPC `tournees_figer_journee` (service_role only, garde « rien n'a bougé ») → SMS. Body `{ dry_run, org_id, date }`. |
+| Edge `tournees-figer` | `verify_jwt:false` + `MDH_CRON_SECRET`, cron horaire 5-19 UTC. Par org : journées de l'horizon à ≥ 1 adaptable → matrice Mapbox → pleine ? → ordonnancer → RPC `tournees_figer_journee` (service_role only, garde « rien n'a bougé ») → SMS seulement si `figer_sms`. Body `{ dry_run, org_id, date }`. |
 | Migration `20260912_5` | RPC `public.tournees_figer_journee(p_org_id, p_lignes jsonb)` SECURITY DEFINER, `REVOKE FROM PUBLIC, anon, authenticated` ; `cron.schedule('tournees-figer', '15 5-19 * * *')`. |
-| Onglet Tournées | `AlertesTournees` : « journée pleine, à arbitrer » (diagnostic, trajets estimés) ; bouton « Figer » inchangé. |
-| Settings → Organisation → Tournées | Nouvel onglet : souplesse par défaut, reste utile minimum, trajet max entre clients, gain multi-équipements, dépassement toléré, figeage automatique (on/off). Règle « pas de config sans UI ». |
+| Tableau de bord (org_admin) | `JourneesAArbitrer` : « journées pleines à arbitrer » (même `verdictJournee`, trajets estimés), clic → `/entretiens?tab=tournees&journee=&tech=`. Bouton « Figer » de l'onglet Tournées inchangé. |
+| Settings → Organisation → Tournées | Nouvel onglet : souplesse par défaut, reste utile minimum, trajet max entre clients, gain multi-équipements, dépassement toléré, pause, figeage automatique (on/off), SMS au figeage (on/off, OFF). Règle « pas de config sans UI ». |
 
 ## Hors périmètre
 - Le rappel J-1 « vers 8h » pour un RDV encore adaptable (le gabarit dit ce qu'il dit).

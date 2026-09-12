@@ -31,6 +31,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
+import { JourneesAArbitrer } from '@apps/artisan/components/tournees/JourneesAArbitrer';
 
 // =============================================================================
 // HOOK — Données dashboard (KPIs + planning du jour)
@@ -319,6 +320,9 @@ export default function Dashboard() {
           />
         )}
       </div>
+
+      {/* Journées pleines que le moteur ne sait pas figer : l'admin arbitre (spec 2026-09-12, R3) */}
+      {isOrgAdmin && <JourneesAArbitrer coreOrgId={orgId} />}
 
       {/* Contenu principal */}
       <div className="grid lg:grid-cols-3 gap-6">

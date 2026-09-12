@@ -16,7 +16,7 @@ const RAISONS = {
 };
 
 export function FigerJourneeDialog({ journee, consolidation }) {
-  const { ouvert, fermer, apercu, figer, enCours, resultat } = consolidation;
+  const { ouvert, fermer, apercu, figer, enCours, resultat, smsActifs } = consolidation;
   const aChanger = (apercu?.lignes || []).filter((l) => !l.fige);
   const changes = aChanger.filter((l) => l.change);
 
@@ -27,7 +27,9 @@ export function FigerJourneeDialog({ journee, consolidation }) {
       title={`Figer la journée du ${formatDateFR(journee.date)} — ${journee.technicienNom}`}
       description={resultat
         ? 'Bilan de la consolidation.'
-        : 'Les heures deviennent définitives et sont communiquées aux clients adaptables. Les rendez-vous figés ne bougent pas.'}
+        : smsActifs
+          ? 'Les heures deviennent définitives et sont communiquées aux clients adaptables. Les rendez-vous figés ne bougent pas.'
+          : 'Les heures deviennent définitives. Les rendez-vous figés ne bougent pas. SMS désactivés (Settings → Tournées) : personne n’est prévenu.'}
       confirmLabel={resultat ? 'OK' : `Figer ${aChanger.length} rendez-vous`}
       cancelLabel={resultat ? 'Fermer' : 'Annuler'}
       variant="default"
@@ -82,7 +84,8 @@ export function FigerJourneeDialog({ journee, consolidation }) {
               ))}
             </ul>
             <p className="text-xs text-gray-500">
-              {changes.length} heure(s) modifiée(s) · {aChanger.length} client(s) recevront un SMS d’heure de passage (mobile FR uniquement).
+              {changes.length} heure(s) modifiée(s)
+              {smsActifs ? ` · ${aChanger.length} client(s) recevront un SMS d’heure de passage (mobile FR uniquement).` : ' · aucun SMS (désactivés).'}
             </p>
           </>
         )}
@@ -93,7 +96,9 @@ export function FigerJourneeDialog({ journee, consolidation }) {
             ) : (
               <li>{resultat.figes} rendez-vous figé(s){resultat.echecs.length > 0 ? ' — arrêt au premier refus, aucun SMS envoyé' : ''}.</li>
             )}
-            {resultat.echecs.length === 0 && <li>{resultat.sms} SMS d’heure de passage envoyé(s).</li>}
+            {resultat.echecs.length === 0 && (resultat.smsDesactives
+              ? <li className="text-gray-500">SMS désactivés : aucun client prévenu.</li>
+              : <li>{resultat.sms} SMS d’heure de passage envoyé(s).</li>)}
             {resultat.smsGabaritAbsent && (
               <li className="text-amber-700">Heures figées, mais SMS non envoyés : gabarit « heure_de_passage » absent (Settings → SMS).</li>
             )}

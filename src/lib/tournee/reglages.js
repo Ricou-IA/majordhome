@@ -49,6 +49,11 @@ export const REGLAGES_DEFAUT = {
   // 2026-09-12 : « si c'est plein depuis 10 jours, pourquoi attendre ? ».
   // `false` pour s'en tenir au bouton « Figer la journée ».
   figer_journee_pleine: true,
+  // SMS « Heure de passage » au figeage (automatique ET bouton). OFF pour
+  // l'instant (Eric, 2026-09-12) : les heures se figent, personne n'est
+  // prévenu par SMS tant que ce réglage n'est pas activé — et il faut aussi le
+  // gabarit `heure_de_passage` (Settings → SMS).
+  figer_sms: false,
 };
 
 export function construireReglages(settings) {

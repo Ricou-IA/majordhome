@@ -47,10 +47,7 @@ import {
   AlertTriangle, Clock, Tag, Loader2, ChevronDown, MapPinOff,
 } from 'lucide-react';
 import { retardStatus } from '@/lib/tournee/eligibilite.js';
-import { verdictJournee } from '@/lib/tournee/plein.js';
-import { trajetLocal } from '@/lib/tournee/matrice.js';
 import { formatDateFR } from '@/lib/utils';
-import { formatDuree } from './tourneesPanelUtils';
 
 /** Nombre de jours calendaires entre deux dates "YYYY-MM-DD". */
 function joursEntre(dateA, dateB) {
@@ -111,12 +108,10 @@ function AlerteCard({
  * @param {Function} [props.onOpenContract]  (contractId) => void — ouvre ContractModal
  * @param {number} [props.toleranceAnniversaireMois]  reglages.tolerance_anniversaire_mois
  *   (I1, revue finale) — jamais une constante en dur ici.
- * @param {object} [props.reglages]  construireReglages(settings) — journées « à arbitrer »
- * @param {{lat:number,lng:number}|null} [props.depot]
  */
 export function AlertesTournees({
   journees, candidats, journeesError, candidatsError, onOpenJournee, onOpenContract,
-  toleranceAnniversaireMois, reglages = null, depot = null,
+  toleranceAnniversaireMois,
 }) {
   const chargement = journees === undefined || candidats === undefined;
   const erreurChargement = journeesError || candidatsError;
@@ -132,18 +127,6 @@ export function AlertesTournees({
       return dansSeptJours && j.estAmorcee && j.chargeMinutes < j.budgetMinutes * 0.5;
     });
   }, [journees, aujourdhui]);
-
-  // Journées PLEINES que l'ordonnanceur ne sait pas tenir (spec 2026-09-12,
-  // R3) : le figeage automatique les laisse de côté, il faut un humain. Même
-  // verdict que l'edge tournees-figer, avec des trajets estimés à vol d'oiseau
-  // (le navigateur n'a pas la matrice de chaque journée) — d'où « estimé ».
-  const aArbitrer = useMemo(() => {
-    if (!journees || !reglages || !depot) return [];
-    return journees
-      .filter((j) => j.date > aujourdhui && (j.rdvs || []).length > 0)
-      .map((j) => ({ journee: j, ...verdictJournee({ journee: j, depot, reglages, trajet: trajetLocal }) }))
-      .filter((v) => v.verdict === 'a_arbitrer');
-  }, [journees, reglages, depot, aujourdhui]);
 
   // Retardataires : contrats dont la fenêtre est en train de se refermer ou
   // déjà refermée, PLUS les contrats sans date anniversaire connue (ceux-là
@@ -211,7 +194,7 @@ export function AlertesTournees({
   // lui, un refetch en échec après une pose ferait disparaître silencieusement
   // toute alerte devenue entre-temps vraie.
   const rien = sousRemplies.length === 0 && retardataires.length === 0 && aTyper === 0
-    && sansPosition.length === 0 && aArbitrer.length === 0;
+    && sansPosition.length === 0;
   if (rien && !erreurChargement) return null;
 
   return (
@@ -225,35 +208,6 @@ export function AlertesTournees({
       )}
       {!rien && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {aArbitrer.length > 0 && (
-            <AlerteCard
-              icon={AlertTriangle}
-              color="bg-red-100 text-red-600"
-              title="journée(s) pleine(s) à arbitrer"
-              count={aArbitrer.length}
-            >
-              {aArbitrer.map(({ journee: j, sequence }) => {
-                const d = sequence?.diagnostic;
-                return (
-                  <button
-                    key={`${j.date}-${j.technicienId}`}
-                    type="button"
-                    onClick={() => onOpenJournee?.(j)}
-                    className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-50"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">{formatDateFR(j.date)} — {j.technicienNom}</span>
-                      {d && <span className="text-xs text-gray-400 flex-shrink-0">{formatDuree(d.chargeMinutes)} / {formatDuree(j.budgetMinutes)}</span>}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Pleine, mais impossible à ordonnancer{d?.conflits?.length ? ` : ${d.conflits.length} trajet(s) qui ne tiennent pas` : ''}{d?.depasseBudget ? ', budget dépassé' : ''} (estimé). Le figeage automatique l’a laissée de côté.
-                    </div>
-                  </button>
-                );
-              })}
-            </AlerteCard>
-          )}
-
           {sousRemplies.length > 0 && (
             <AlerteCard
               icon={AlertTriangle}

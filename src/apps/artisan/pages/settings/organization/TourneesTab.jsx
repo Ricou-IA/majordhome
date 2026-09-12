@@ -22,7 +22,7 @@ const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 /** Champs édités ici ; les autres clés de `settings.tournees` sont conservées telles quelles. */
 const CHAMPS = [
   'souplesse_defaut_minutes', 'reste_utile_min_minutes', 'trajet_max_entre_clients_minutes',
-  'gain_multi_equipements_pct', 'depassement_journee_minutes', 'figer_journee_pleine',
+  'gain_multi_equipements_pct', 'depassement_journee_minutes', 'figer_journee_pleine', 'figer_sms',
   'pause_minutes',
 ];
 
@@ -31,6 +31,7 @@ function depuisSettings(settings) {
   const out = {};
   CHAMPS.forEach((c) => { out[c] = t[c] ?? REGLAGES_DEFAUT[c] ?? null; });
   if (out.figer_journee_pleine == null) out.figer_journee_pleine = true; // absent = actif
+  out.figer_sms = out.figer_sms === true; // absent = OFF
   return out;
 }
 
@@ -148,9 +149,18 @@ export default function TourneesTab() {
             <span className="font-medium">Figer automatiquement une journée dès qu’elle est pleine.</span>
             <br />
             Toutes les heures : une journée où il ne rentre plus rien (reste utile sous le minimum) est ordonnancée dans les
-            tolérances, ses heures deviennent définitives et chaque client adaptable reçoit le SMS « Heure de passage »
-            (gabarit à créer dans l’onglet SMS — sans lui, rien n’est figé). Une journée pleine qui ne tient pas remonte
-            « à arbitrer » dans l’onglet Tournées. Figer à la main reste possible.
+            tolérances et ses heures deviennent définitives. Une journée pleine qui ne tient pas remonte « à arbitrer »
+            sur le tableau de bord de l’administrateur. Figer à la main reste possible.
+          </span>
+        </label>
+        <label className="flex items-start gap-3 text-sm text-secondary-700 mt-3">
+          <input type="checkbox" checked={!!form.figer_sms} onChange={(e) => set('figer_sms')(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="font-medium">Envoyer le SMS « Heure de passage » au figeage.</span>
+            <br />
+            Automatique ou par le bouton « Figer la journée » : chaque client dont l’heure vient d’être figée reçoit son
+            heure définitive (gabarit à créer dans l’onglet SMS, mobile FR uniquement). Désactivé : les heures se figent,
+            personne n’est prévenu par SMS.
           </span>
         </label>
       </section>

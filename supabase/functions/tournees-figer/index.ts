@@ -11,13 +11,13 @@
 //      travel_cache d'abord) ;
 //   2. pleine ? (`evaluerRemplissage` : reste utile < reste_utile_min_minutes) ;
 //   3. ordonnancement dans les tolérances (`sequencerTournee`, figés = faits) ;
-//   4. tenue → RPC `tournees_figer_journee` (tout ou rien) → SMS
-//      `heure_de_passage` à chaque client dont l'heure vient d'être figée ;
-//      pas tenue → rien d'écrit, la journée est « à arbitrer » (rapport +
-//      onglet Tournées).
+//   4. tenue → RPC `tournees_figer_journee` (tout ou rien) → si le réglage
+//      `settings.tournees.figer_sms` est actif (OFF pour l'instant, Eric
+//      2026-09-12) et que le gabarit existe : SMS `heure_de_passage` à chaque
+//      client dont l'heure vient d'être figée ; pas tenue → rien d'écrit, la
+//      journée est « à arbitrer » (rapport + tableau de bord de l'admin).
 // Décision Eric : dès que c'est plein — pas la veille (« si c'est plein depuis
-// 10 jours, pourquoi attendre ? »). Sans gabarit `heure_de_passage`, on ne fige
-// rien (figer sans prévenir personne serait pire que ne pas figer).
+// 10 jours, pourquoi attendre ? »).
 //
 // Body optionnel (appels manuels) :
 //   { dry_run: true }   calcule et rapporte, n'écrit ni n'envoie rien
@@ -88,8 +88,8 @@ interface OrgReport {
   org_id: string;
   name: string | null;
   skipped?: string;
-  /** dry_run seulement : le gabarit manque, rien ne se figerait en réel. */
-  template_missing?: boolean;
+  /** on | off | off_gabarit_ou_sms_inactifs — ce que le réglage `figer_sms` donne pour cette org. */
+  sms?: string;
   error?: string;
   journees?: JourneeReport[];
 }
@@ -136,7 +136,6 @@ Deno.serve(async (req: Request) => {
   const onlyOrgId = typeof body.org_id === "string" ? body.org_id : null;
   const onlyDate = typeof body.date === "string" && ISO_DATE.test(body.date) ? body.date : null;
 
-  if (!dryRun && !twilioConfigured()) return jsonResponse({ error: "twilio_not_configured" }, 500, req);
 
   try {
     const admin = getAdminClient();
@@ -156,28 +155,23 @@ Deno.serve(async (req: Request) => {
       const tournees = (settings.tournees ?? {}) as Record<string, unknown>;
       const report: OrgReport = { org_id: org.id, name: org.name };
 
-      if (sms?.enabled !== true) {
-        if (onlyOrgId) reports.push({ ...report, skipped: "sms_disabled" });
+      const { data: mdhOrg } = await admin.from("majordhome_organizations").select("id").eq("core_org_id", org.id).maybeSingle();
+      if (!mdhOrg) {
+        // core.organizations est partagé avec d'autres apps : une org sans
+        // majordhome_organizations n'a pas de tournées, on ne la liste pas.
+        if (onlyOrgId) reports.push({ ...report, skipped: "org_majordhome_introuvable" });
         continue;
       }
       if (tournees.figer_journee_pleine === false) {
         reports.push({ ...report, skipped: "figeage_auto_off" });
         continue;
       }
-      const template = sms.templates?.[CAMPAIGN];
-      if (!(template && (template.whatsapp || template.sms))) {
-        // R4 : sans gabarit, on ne fige rien — figer sans prévenir serait pire.
-        // Un dry-run montre quand même ce qui se figerait : c'est ainsi qu'on
-        // vérifie le périmètre avant de créer le gabarit.
-        if (!dryRun) {
-          reports.push({ ...report, skipped: "campaign_template_missing" });
-          continue;
-        }
-        report.template_missing = true;
-      }
-      const { data: mdhOrg } = await admin.from("majordhome_organizations").select("id").eq("core_org_id", org.id).maybeSingle();
-      if (!mdhOrg) {
-        if (onlyOrgId) reports.push({ ...report, skipped: "org_majordhome_introuvable" });
+      // SMS au figeage : réglage explicite (OFF par défaut) + SMS de l'org actifs + gabarit.
+      const template = sms?.templates?.[CAMPAIGN];
+      const smsPossibles = tournees.figer_sms === true && sms?.enabled === true && !!(template && (template.whatsapp || template.sms));
+      report.sms = tournees.figer_sms === true ? (smsPossibles ? "on" : "off_gabarit_ou_sms_inactifs") : "off";
+      if (!dryRun && smsPossibles && !twilioConfigured()) {
+        reports.push({ ...report, skipped: "twilio_not_configured" });
         continue;
       }
       const depot = siegeDepuis(settings);
@@ -283,6 +277,7 @@ Deno.serve(async (req: Request) => {
             continue;
           }
           jr.verdict = "figee";
+          if (!smsPossibles) continue; // figé, personne n'est prévenu par SMS (réglage OFF)
           jr.sms = 0;
           jr.sms_no_mobile = 0;
           jr.sms_failed = 0;
@@ -294,7 +289,7 @@ Deno.serve(async (req: Request) => {
               continue;
             }
             const res = await sendCampaignSms(admin, {
-              orgId: org.id, sms, campaign: CAMPAIGN, phone, clientId: r.client_id,
+              orgId: org.id, sms: sms!, campaign: CAMPAIGN, phone, clientId: r.client_id,
               vars: {
                 first_name: capitaliserPrenom(r.client_first_name),
                 name: r.client_name ?? "",
