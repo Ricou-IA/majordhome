@@ -78,6 +78,11 @@ verify_jwt = true
 [functions.pvgis-proxy]
 verify_jwt = true
 
+# Entretiens — créneaux optimisés pour un contrat (outil machine-usable : CTA
+# ContractModal aujourd'hui, serveur MCP Hermes/Vapi demain). requireOrgMembership.
+[functions.slots-propose]
+verify_jwt = true
+
 # Solaire — proxy IGN LiDAR HD MNS (élévation, open data, CORS)
 [functions.ign-mns-proxy]
 verify_jwt = true

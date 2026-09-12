@@ -79,7 +79,9 @@ export function minutesVersHeure(minutes) {
  * `classerParCreneaux` : `{ id, key, dureeMinutes, fenetre? }`.
  *
  * @param {Array<{id, lat, lng, duration_minutes, scheduled_start}>} rdvs
- *   `journee.rdvs` (cf. tournees.service.js).
+ *   `journee.rdvs` (cf. loaders.js::chargerJournees).
+ * @param {{ lat: number, lng: number }|null} [coordsFallback]  position de repli
+ *   (siège) pour un RDV sans coordonnées
  * @returns {Array<{id: string, key: string|null, dureeMinutes: number, fenetre?: {debut: number, fin: number}}>}
  */
 export function construireArretsExistants(rdvs, coordsFallback = null) {
