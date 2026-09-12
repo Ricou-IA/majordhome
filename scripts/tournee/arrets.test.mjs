@@ -4,7 +4,7 @@
 // Run : node --test scripts/tournee/arrets.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { construireArretsExistants } from '../../src/lib/tournee/arrets.js';
+import { construireArretsExistants, arrondirHeureFigee } from '../../src/lib/tournee/arrets.js';
 import { sequencerTournee } from '../../src/lib/tournee/sequence.js';
 
 const rdv = (id, lat, lng, duree, start) => ({
@@ -189,4 +189,10 @@ test('la tolérance est ancrée sur l heure ANNONCÉE : décalé à 14:20, la pl
   // et l'heure courante est toujours dans sa plage même si un décalage l'a poussée au bord
   const t2 = toleranceDe({ scheduled_start: '14:40', announced_start: '14:00', duration_minutes: 60, time_flex_minutes: 30, appointment_type: 'maintenance' }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
   assert.equal(t2.max, 880);
+});
+
+test('arrondirHeureFigee : une heure définitive s annonce au 5 min supérieur (12:31 → 12:35, 08:40 → 08:40)', () => {
+  assert.equal(arrondirHeureFigee(751), 755);
+  assert.equal(arrondirHeureFigee(520), 520);
+  assert.equal(arrondirHeureFigee(518), 520);
 });

@@ -74,6 +74,16 @@ export function minutesVersHeure(minutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+/**
+ * Heure DÉFINITIVE arrondie au pas supérieur (5 min) : l'ordonnanceur calcule à
+ * la minute (12:31), un client se voit annoncer 12:35. Toujours vers le haut —
+ * on n'arrive jamais avant ce que le calcul permet. Utilisé par les deux
+ * écrivains du figeage (edge tournees-figer, bouton « Figer la journée »).
+ */
+export function arrondirHeureFigee(minutes, pas = 5) {
+  return Math.ceil((minutes ?? 0) / pas) * pas;
+}
+
 const DEMI_JOURNEE = 240;
 const DEMI_JOURNEE_DEFAUT = { matin: [8, 12], apres_midi: [13, 18] };
 

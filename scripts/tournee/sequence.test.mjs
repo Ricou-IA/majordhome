@@ -127,6 +127,26 @@ test('départ anticipé — un RDV fixé à l ouverture reste atteignable', () =
   assert.equal(r.planning[0].arriveeMinutes, 8 * 60, 'il est chez le client a 8h00 pile');
 });
 
+test('la journée commence au dépôt à l ouverture : un premier arrêt ADAPTABLE à 8h00 ±30 à 40 min du dépôt n est pas atteignable (Eric, 15/09 : « ça ne prend pas en compte le trajet vers Bessières »)', () => {
+  // Adaptable 8h00 ±30 → fenêtre 8h00-8h30 ; départ 8h00 + 40 min = 8h40 > 8h30 → infaisable.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [{ ...arret('c', 'C', 60, { debut: 8 * 60, fin: 8 * 60 + 30 }), prevu: 8 * 60 }],
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'fenetre');
+  assert.deepEqual(r.diagnostic.conflits, [{ id: 'c', depuisId: null, trajetMinutes: 40, disponibleMinutes: 0 }], 'le diagnostic nomme le trajet depuis le dépôt');
+  // Même RDV annoncé 8h40 ±30 : arrivée 8h40, dans la plage → il est posé à 8h40, pas avant.
+  const ok = sequencerTournee({
+    ...ctx,
+    arrets: [{ ...arret('c', 'C', 60, { debut: 8 * 60 + 10, fin: 9 * 60 + 10 }), prevu: 8 * 60 + 40 }],
+    budgetMinutes: 600,
+  });
+  assert.equal(ok.faisable, true);
+  assert.equal(ok.planning[0].arriveeMinutes, 8 * 60 + 40);
+});
+
 test('départ anticipé — ne couvre PAS un arrêt de milieu de journée', () => {
   // Deux arrets contraints dont le second est inatteignable apres le premier :
   // la tolerance ne s applique qu au premier arret, ce conflit reste un echec.
@@ -294,7 +314,8 @@ test('journée infaisable : le diagnostic dit ce que la journée TELLE QUE POSÉ
   assert.equal(r.diagnostic.travailMinutes, 420);
   assert.equal(r.diagnostic.trajetsMinutes, 38 + 39 + 23);
   assert.equal(r.diagnostic.depasseBudget, true);
-  assert.deepEqual(r.diagnostic.conflits, [], 'au barème (3 h), 90 min séparent la fin d EKOUE de GOMES : la route tient, seul le budget déborde');
+  assert.deepEqual(r.diagnostic.conflits, [{ id: 'EKOUE', depuisId: null, trajetMinutes: 38, disponibleMinutes: 0 }],
+    'au barème (3 h), 90 min séparent la fin d EKOUE de GOMES : la route tient ; mais EKOUE à 8h00 est à 38 min du dépôt ouvert à 8h00');
   // Avec les durées posées à la main (4 h / 4 h 30) : 30 min d'écart pour 39 min de route.
   const arretsMain = construireArretsPourConsolidation(
     rdvs.map((x) => ({ ...x, duration_minutes: x.id === 'EKOUE' ? 240 : 270 })),
@@ -303,9 +324,17 @@ test('journée infaisable : le diagnostic dit ce que la journée TELLE QUE POSÉ
   const r2 = sequencerTournee({ depotKey: '43.912,1.890', arrets: arretsMain, trajet, amplitude: AMP, budgetMinutes: 480, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
   assert.equal(r2.faisable, false);
   assert.equal(r2.diagnostic.travailMinutes, 510);
-  assert.deepEqual(r2.diagnostic.conflits, [{ id: 'GOMES', depuisId: 'EKOUE', trajetMinutes: 39, disponibleMinutes: 30 }]);
-  // Journée faisable : pas de diagnostic (rien à expliquer).
-  const ok = sequencerTournee({ depotKey: '43.912,1.890', arrets, trajet, amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.deepEqual(r2.diagnostic.conflits, [
+    { id: 'EKOUE', depuisId: null, trajetMinutes: 38, disponibleMinutes: 0 },
+    { id: 'GOMES', depuisId: 'EKOUE', trajetMinutes: 39, disponibleMinutes: 30 },
+  ]);
+  // Journée faisable (EKOUE annoncé 8h40, budget large) : pas de diagnostic (rien à expliquer).
+  const arretsOk = construireArretsPourConsolidation(
+    rdvs.map((x) => (x.id === 'EKOUE' ? { ...x, scheduled_start: '08:40' } : x)),
+    { lat: 43.9119, lng: 1.8898 }, { souplesse: true, flexDefaut: 30, amplitude: AMP },
+  );
+  const ok = sequencerTournee({ depotKey: '43.912,1.890', arrets: arretsOk, trajet, amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
   assert.equal(ok.faisable, true);
+  assert.equal(ok.planning.find((p) => p.id === 'EKOUE').arriveeMinutes, 8 * 60 + 40, 'arrivée 8h38, RDV annoncé 8h40 : on garde 8h40');
   assert.equal(ok.diagnostic, undefined);
 });

@@ -21,7 +21,7 @@ import { appointmentKeys, entretienSavKeys, tourneeKeys } from '@hooks/cacheKeys
 import { logger } from '@lib/logger';
 import { formatSmsDate, formatSmsHour, capitaliserPrenom } from '@/lib/smsCampaigns';
 import { sequencerTournee } from '@/lib/tournee/sequence.js';
-import { construireArretsPourConsolidation, minutesVersHeure } from '@/lib/tournee/arrets.js';
+import { construireArretsPourConsolidation, minutesVersHeure, arrondirHeureFigee } from '@/lib/tournee/arrets.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
 import { cleCoord } from '@/lib/tournee/geo.js';
 import { souplesseEffective } from '@/lib/souplesse';
@@ -73,7 +73,7 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
           ...d,
           budgetMinutes: journee.budgetMinutes,
           depassementMinutes: reglages.depassement_journee_minutes ?? 0,
-          conflits: d.conflits.map((c) => ({ ...c, label: nom(c.id), depuisLabel: nom(c.depuisId) })),
+          conflits: d.conflits.map((c) => ({ ...c, label: nom(c.id), depuisLabel: c.depuisId ? nom(c.depuisId) : 'dépôt (ouverture)' })),
         } : null,
         estime: !(paires instanceof Map) || paires.size === 0,
       };
@@ -81,12 +81,13 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
     const lignes = seq.planning.map((p) => {
       const r = parId.get(p.id);
       const avant = r?.scheduled_start?.slice(0, 5) || '—';
-      const apres = minutesVersHeure(p.arriveeMinutes);
+      const arrivee = arrondirHeureFigee(p.arriveeMinutes); // heure annoncée : au 5 min supérieur
+      const apres = minutesVersHeure(arrivee);
       const fige = souplesseEffective(r, flexDefaut) === 0;
       return {
         id: p.id, label: nom(p.id), ville: r?.city || null,
         avant, apres, change: avant !== apres, fige,
-        arriveeMinutes: p.arriveeMinutes, dureeMinutes: r?.duration_minutes || 60,
+        arriveeMinutes: arrivee, dureeMinutes: r?.duration_minutes || 60,
         clientId: r?.client_id || null, phone: r?.client_phone || null, prenom: r?.client_first_name || null,
       };
     });

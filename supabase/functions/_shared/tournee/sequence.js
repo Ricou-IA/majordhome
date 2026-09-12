@@ -48,16 +48,15 @@ function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, fig
   let t = amplitude.debut;
   let charge = 0;
 
-  // Départ anticipé du dépôt. Un rendez-vous fixé à l'heure d'ouverture (8 h)
-  // serait sinon inatteignable dès que le trajet depuis le dépôt n'est pas nul :
-  // en partant à 8 h on arriverait à 8 h 20, après sa fenêtre ponctuelle, et
-  // TOUTE la journée serait déclarée infaisable. Or le technicien part
-  // évidemment plus tôt pour être chez le client à l'heure dite.
-  // La tolérance est volontairement étroite : elle ne s'applique qu'au PREMIER
-  // arrêt, et seulement si son heure tombe à l'ouverture ou avant. Un rendez-vous
-  // de milieu de journée qu'on ne peut plus atteindre reste un vrai conflit.
+  // La journée commence AU DÉPÔT à l'ouverture : le trajet vers le premier
+  // client en fait partie (Eric, 2026-09-12 : « ça ne prend pas en compte le
+  // trajet vers Bessières » — un entretien adaptable posé à 8 h à 38 min du
+  // dépôt ne peut pas commencer à 8 h). Seule exception, le départ anticipé
+  // pour un rendez-vous FIGÉ à l'ouverture ou avant : le client a exigé 8 h,
+  // le technicien part plus tôt pour y être. Un adaptable, lui, glisse dans sa
+  // tolérance — ou la journée est à arbitrer.
   const premier = ordre[0];
-  if (premier?.fenetre && premier.fenetre.debut <= amplitude.debut) {
+  if (premier?.fenetre && premier.fenetre.debut === premier.fenetre.fin && premier.fenetre.debut <= amplitude.debut) {
     const trajetInitial = trajet(depotKey, premier.key);
     if (t + trajetInitial > premier.fenetre.fin) t = premier.fenetre.debut - trajetInitial;
   }
@@ -190,7 +189,7 @@ function plusProcheVoisin(arrets, depotKey, trajet) {
  *   depasseBudget: boolean,
  *   conflits: Array<{ id, depuisId, trajetMinutes: number, disponibleMinutes: number }> }}
  */
-export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, pause }) {
+export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, pause, amplitude }) {
   const heure = (a) => a.prevu ?? a.fenetre?.debut ?? 0;
   const ordre = [...arrets].sort((a, b) => heure(a) - heure(b));
   let trajets = 0;
@@ -206,6 +205,13 @@ export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, 
       const disponible = heure(a) - (heure(precedent) + precedent.dureeMinutes);
       if (disponible < d) {
         conflits.push({ id: a.id, depuisId: precedent.id, trajetMinutes: d, disponibleMinutes: Math.max(0, disponible) });
+      }
+    } else if (amplitude && a.fenetre && a.fenetre.debut !== a.fenetre.fin) {
+      // Premier arrêt ADAPTABLE : le trajet depuis le dépôt à l'ouverture doit
+      // tenir avant son heure (un figé, lui, justifie un départ anticipé).
+      const disponible = heure(a) - amplitude.debut;
+      if (disponible < d) {
+        conflits.push({ id: a.id, depuisId: null, trajetMinutes: d, disponibleMinutes: Math.max(0, disponible) });
       }
     }
     position = a.key;

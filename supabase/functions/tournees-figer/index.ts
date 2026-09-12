@@ -40,7 +40,7 @@ import { isMobileFR } from "../_shared/phoneUtils.js";
 import { chargerJournees } from "../_shared/tournee/loaders.js";
 import { creerChargeurMatrice } from "../_shared/tournee/trajets-core.js";
 import { construireMatrice, trajetLocal } from "../_shared/tournee/matrice.js";
-import { construireArretsPourConsolidation, minutesVersHeure, TYPES_ADAPTABLES } from "../_shared/tournee/arrets.js";
+import { construireArretsPourConsolidation, minutesVersHeure, arrondirHeureFigee, TYPES_ADAPTABLES } from "../_shared/tournee/arrets.js";
 import { verdictJournee } from "../_shared/tournee/plein.js";
 import { construireReglages } from "../_shared/tournee/reglages.js";
 import { cleCoord } from "../_shared/tournee/geo.js";
@@ -248,11 +248,12 @@ Deno.serve(async (req: Request) => {
             .map((p: { id: string; arriveeMinutes: number }) => {
               const r = parId.get(p.id)!;
               const duree = arretParId.get(p.id)?.dureeMinutes ?? r.duration_minutes ?? 60;
+              const arrivee = arrondirHeureFigee(p.arriveeMinutes); // heure annoncée : au 5 min supérieur
               return {
                 id: p.id,
                 attendu: r.scheduled_start,
-                scheduled_start: minutesVersHeure(p.arriveeMinutes),
-                scheduled_end: minutesVersHeure(p.arriveeMinutes + duree),
+                scheduled_start: minutesVersHeure(arrivee),
+                scheduled_end: minutesVersHeure(arrivee + duree),
                 duration_minutes: duree,
               };
             });

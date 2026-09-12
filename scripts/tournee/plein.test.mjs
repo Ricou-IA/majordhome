@@ -49,15 +49,21 @@ test('verdictJournee : sans adaptable → rien ; pleine et tenable → figeable 
   const rdv = (id, lat, lng, duree, debut, extra = {}) => ({ id, lat, lng, duration_minutes: duree, scheduled_start: debut, appointment_type: 'maintenance', ...extra });
   const figes = { ...base, rdvs: [rdv('a', 43.79476, 1.604971, 162, '08:00', { hour_confirmed_at: 'x' }), rdv('b', 43.941915, 1.720688, 216, '12:30', { time_flex_minutes: 0 })] };
   assert.equal(verdictJournee({ journee: figes, depot: DEPOT, reglages, trajet }).verdict, 'sans_adaptable');
-  // 15/09 au barème : pleine (reste 32) et tenable (EKOUE 8:00 → 10:42, GOMES 12:30) → figeable
-  const ok = { ...base, rdvs: [rdv('EKOUE', 43.79476, 1.604971, 162, '08:00'), rdv('GOMES', 43.941915, 1.720688, 216, '12:30')] };
+  // 15/09 tel que posé (EKOUE 8h00 ±30 à 38 min du dépôt ouvert à 8h00) : pleine (reste 32)
+  // mais le trajet vers Bessières ne tient pas → à arbitrer (Eric, 2026-09-12).
+  const pose = { ...base, rdvs: [rdv('EKOUE', 43.79476, 1.604971, 162, '08:00'), rdv('GOMES', 43.941915, 1.720688, 216, '12:30')] };
+  const vp = verdictJournee({ journee: pose, depot: DEPOT, reglages, trajet });
+  assert.equal(vp.verdict, 'a_arbitrer');
+  assert.deepEqual(vp.sequence.diagnostic.conflits[0], { id: 'EKOUE', depuisId: null, trajetMinutes: 38, disponibleMinutes: 0 });
+  // EKOUE annoncé 8h40 : pleine et tenable (EKOUE 8:40 → 11:22, GOMES 12:30) → figeable
+  const ok = { ...base, rdvs: [rdv('EKOUE', 43.79476, 1.604971, 162, '08:40'), rdv('GOMES', 43.941915, 1.720688, 216, '12:30')] };
   const v = verdictJournee({ journee: ok, depot: DEPOT, reglages, trajet });
   assert.equal(v.verdict, 'figeable');
   assert.equal(v.remplissage.pleine, true);
   assert.equal(v.sequence.faisable, true);
-  // GOMES figé à 11:00 alors que 8:00 + 2h42 + 39 min de route = 11:21 : un figé est un FAIT
+  // GOMES figé à 11:00 alors que 8:40 + 2h42 + 39 min de route = 12:01 : un figé est un FAIT
   // (figesSontDesFaits), nos estimations ne le disqualifient pas → toujours figeable.
-  const serre = { ...base, rdvs: [rdv('EKOUE', 43.79476, 1.604971, 162, '08:00'), rdv('GOMES', 43.941915, 1.720688, 216, '11:00', { hour_confirmed_at: 'x' })] };
+  const serre = { ...base, rdvs: [rdv('EKOUE', 43.79476, 1.604971, 162, '08:40'), rdv('GOMES', 43.941915, 1.720688, 216, '11:00', { hour_confirmed_at: 'x' })] };
   assert.equal(verdictJournee({ journee: serre, depot: DEPOT, reglages, trajet }).verdict, 'figeable');
   // Un 3ᵉ entretien de 3h20 chez le voisin de GOMES : 9h38 de travail pour 8h30 → aucun ordre ne tient → à arbitrer
   const kaput = { ...base, rdvs: [...ok.rdvs, rdv('VOISIN', 43.941915, 1.720688, 200, '15:00')] };
