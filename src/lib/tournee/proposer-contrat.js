@@ -127,7 +127,8 @@ function fenetreDuJour(fenetre, j, { aujourdhui, maintenantMinutes, margeMinutes
  * @param {number} [p.margeAujourdhuiMinutes=60]
  * @returns {{
  *   creneaux: Array<{ date, technicianId, technicianNom, couleur, debutMinutes, finMinutes,
- *     coutMinutes, detourMinutes, attenteMinutes, avant: object|null, apres: object|null, estime: boolean }>,
+ *     coutMinutes, detourMinutes, attenteMinutes, trajetAllerMinutes, trajetRetourMinutes,
+ *     travailMinutes, resteUtileMinutes, avant: object|null, apres: object|null, estime: boolean }>,
  *   nouvellesJournees: Array<{ date, technicianId, technicianNom }>,
  *   raisonsRejet: Record<string, number>,
  *   techniciensEligibles: string[],
@@ -179,6 +180,7 @@ export function proposerPourContrat({
     }
 
     const parId = new Map((j.rdvs || []).map((r) => [r.id, r]));
+    const arretParId = new Map(arrets.map((a) => [a.id, a]));
     const voisin = (id, bord) => {
       if (!id) return null;
       const r = parId.get(id);
@@ -188,6 +190,18 @@ export function proposerPourContrat({
       else v.debutMinutes = debut;
       return v;
     };
+    const avant = voisin(place.avantId, 'avant');
+    const apres = voisin(place.apresId, 'apres');
+    // Les trois chiffres de l'opérateur (décision Eric 2026-09-12) : trajet pour y
+    // aller, trajet vers le suivant, et ce qu'il RESTE d'utile après la pose —
+    // jusqu'au RDV suivant (retour compris) ou jusqu'à la fin de journée (retour
+    // dépôt compris). Le détour net reste dans le score, pas à l'affichage.
+    const keyAvant = place.avantId ? (arretParId.get(place.avantId)?.key ?? depotKey) : depotKey;
+    const keyApres = place.apresId ? (arretParId.get(place.apresId)?.key ?? depotKey) : depotKey;
+    const trajetAllerMinutes = trajet(keyAvant, candidat.key);
+    const trajetRetourMinutes = trajet(candidat.key, keyApres);
+    const borneSuivante = apres?.debutMinutes ?? j.amplitude.fin;
+    const resteUtileMinutes = Math.max(0, borneSuivante - place.departMinutes - trajetRetourMinutes);
     creneaux.push({
       date: j.date,
       technicianId: j.technicienId,
@@ -198,8 +212,12 @@ export function proposerPourContrat({
       coutMinutes: place.coutMinutes,
       detourMinutes: place.detourMinutes,
       attenteMinutes: place.attenteMinutes,
-      avant: voisin(place.avantId, 'avant'),
-      apres: voisin(place.apresId, 'apres'),
+      trajetAllerMinutes,
+      trajetRetourMinutes,
+      travailMinutes: candidat.dureeMinutes,
+      resteUtileMinutes,
+      avant,
+      apres,
       estime,
     });
   }

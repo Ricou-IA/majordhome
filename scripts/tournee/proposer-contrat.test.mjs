@@ -210,3 +210,25 @@ test('journeesCandidates : seulement technicien éligible + horizon + contrainte
   const c = journeesCandidates({ contrat: CONTRAT, journees, techniciens: [ANTOINE, LUDOVIC], reglages: REGLAGES, aujourdhui: AUJOURDHUI });
   assert.deepEqual(c.map((j) => `${j.date}/${j.technicienId}`), ['2026-09-15/antoine', '2026-10-13/antoine']);
 });
+
+test('les trois chiffres de l opérateur : trajet aller, travail, reste utile avant le suivant', () => {
+  // Trajet 10 min partout ; RDV b à 14:00 (90 min). Candidat 60 min placé au plus tôt : 08:10-09:10.
+  const journees = [journee('2026-09-16', 'antoine', [rdv('b', '14:00', 43.9, 1.9)])];
+  const r = proposerPourContrat({
+    contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+  });
+  const k = r.creneaux[0];
+  assert.equal(k.trajetAllerMinutes, 10);
+  assert.equal(k.travailMinutes, 60);
+  assert.equal(k.trajetRetourMinutes, 10);
+  assert.equal(k.apres.id, 'b');
+  // reste utile = 14:00 − (09:10 + 10 min de trajet) = 4 h 40
+  assert.equal(k.resteUtileMinutes, 14 * 60 - (k.finMinutes + 10));
+  // journée vide : reste utile jusqu'à la fin de journée, retour dépôt compris
+  const vide = proposerPourContrat({
+    contrat: CONTRAT, journees: [journee('2026-09-16', 'antoine', [])], techniciens: [ANTOINE], depot: DEPOT,
+    reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+  }).creneaux[0];
+  assert.equal(vide.resteUtileMinutes, 1080 - (vide.finMinutes + 10));
+});
