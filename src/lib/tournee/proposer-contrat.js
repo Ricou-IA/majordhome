@@ -10,9 +10,12 @@
 // porte de quoi s'expliquer (voisins, trajets, heure) — l'écran et l'agent
 // l'affichent, personne ne refait le calcul.
 //
-// Règles (spec 2026-09-12 §4.3) :
-//   1. Éligibilité = compétence (catégories du contrat ⊆ specialties ; vide =
-//      polyvalent) ∧ contrainte technicianId.
+// Règles (spec 2026-09-12 §4.3, règle 1 révisée par la spec référentiel équipements §5) :
+//   1. Éligibilité = compétence PAR TYPE × RÔLE, cochée comme des droits : chaque
+//      exigence du contrat ({ typeId } si l'équipement est typé, sinon
+//      { categoryId }) doit être couverte par les types cochés du technicien pour
+//      le rôle ; rien coché = jamais proposé (fin du « vide = polyvalent »)
+//      ∧ contrainte technicianId.
 //   2. Dans l'horizon ferme, toute journée du technicien est candidate (vide ou
 //      amorcée). Au-delà, seules les journées DÉJÀ amorcées le sont — même règle
 //      que l'onglet : on ne crée pas de tournée d'un seul entretien loin devant.
@@ -24,27 +27,43 @@ import { placerCandidat, chargeExistante } from './creneaux.js';
 import { construireArretsExistants } from './arrets.js';
 import { cleCoord } from './geo.js';
 import { REGLAGES_DEFAUT } from './reglages.js';
+import { estRoleValide } from './competences.js';
 
 const MIDI = 12 * 60;
 const NOUVELLES_JOURNEES_MAX = 3;
 
+/** Types d'une catégorie, que la table soit une Map ou un objet (JSON). */
+const typesDeCategorie = (typesParCategorie, categoryId) => {
+  if (!typesParCategorie || !categoryId) return [];
+  if (typesParCategorie instanceof Map) return typesParCategorie.get(categoryId) || [];
+  return typesParCategorie[categoryId] || [];
+};
+
 /**
- * Techniciens éligibles pour un contrat : toutes les catégories d'équipement du
- * contrat doivent figurer dans `specialties`. Liste vide = polyvalent (choix
- * assumé : rien ne casse au déploiement, la restriction se pose dans Settings →
- * Équipe).
+ * Techniciens éligibles pour un contrat et un RÔLE (`entretien` | `pose`).
  *
- * @param {{ categories?: string[] }} contrat
- * @param {Array<{ id: string, specialties?: string[] }>} techniciens
+ * Coché = compétent, rien coché = jamais proposé : un technicien sans aucun type
+ * pour le rôle est écarté même d'un contrat sans exigence. Chaque exigence du
+ * contrat est couverte si son `typeId` est coché, ou — équipement non typé — si
+ * AU MOINS UN type de sa `categoryId` est coché. Un équipement non catégorisé
+ * n'apparaît pas dans `exigences` : il n'impose rien (l'ancienne règle « autre
+ * n'est pas une compétence », rendue explicite par le loader).
+ *
+ * @param {{ exigences?: Array<{ typeId?: string, categoryId?: string }>, typesParCategorie?: Map|object }} contrat
+ * @param {Array<{ id: string, competences?: { entretien?: string[], pose?: string[] } }>} techniciens
+ * @param {'entretien'|'pose'} role  OBLIGATOIRE — sans rôle c'est une erreur, pas « entretien » implicite
+ * @param {{ typesParCategorie?: Map<string, string[]>|Record<string, string[]> }} [options]  défaut : contrat.typesParCategorie
  */
-export function techniciensEligibles(contrat, techniciens) {
-  // `autre` n'est pas une compétence : un équipement non catégorisé n'impose
-  // rien (sinon un technicien spécialisé ne pourrait plus jamais y aller).
-  const categories = (contrat?.categories || []).filter((c) => c && c !== 'autre');
+export function techniciensEligibles(contrat, techniciens, role, { typesParCategorie } = {}) {
+  if (!estRoleValide(role)) throw new Error('role_competence_requis');
+  const exigences = (contrat?.exigences || []).filter((ex) => ex && (ex.typeId || ex.categoryId));
+  const parCategorie = typesParCategorie ?? contrat?.typesParCategorie;
   return (techniciens || []).filter((t) => {
-    const sp = t.specialties || [];
-    if (sp.length === 0) return true;
-    return categories.every((c) => sp.includes(c));
+    const types = new Set(t.competences?.[role] || []);
+    if (types.size === 0) return false;
+    return exigences.every((ex) => (ex.typeId
+      ? types.has(ex.typeId)
+      : typesDeCategorie(parCategorie, ex.categoryId).some((id) => types.has(id))));
   });
 }
 
@@ -81,8 +100,8 @@ function journeeRetenue(j, { aujourdhui, reglages, contraintes, raisons }) {
  * Exposé pour que l'appelant (edge) ne charge la matrice de trajets QUE pour
  * elles — pas pour un technicien non compétent ni une journée vide hors horizon.
  */
-export function journeesCandidates({ contrat, journees, techniciens, reglages, contraintes = {}, aujourdhui }) {
-  const eligibleIds = new Set(techniciensEligibles(contrat, techniciens)
+export function journeesCandidates({ contrat, journees, techniciens, reglages, contraintes = {}, aujourdhui, role, typesParCategorie }) {
+  const eligibleIds = new Set(techniciensEligibles(contrat, techniciens, role, { typesParCategorie })
     .filter((t) => !contraintes.technicianId || t.id === contraintes.technicianId)
     .map((t) => t.id));
   const raisons = { contrainte: 0, horizon: 0 };
@@ -109,10 +128,13 @@ function fenetreDuJour(fenetre, j, { aujourdhui, maintenantMinutes, margeMinutes
 
 /**
  * @param {object} p
- * @param {{ id: string, dureeMinutes: number, lat: number|null, lng: number|null, categories: string[] }} p.contrat
+ * @param {{ id: string, dureeMinutes: number, lat: number|null, lng: number|null,
+ *   exigences: Array<{ typeId?: string, categoryId?: string }>, typesParCategorie?: Map|object }} p.contrat
  * @param {Array} p.journees   cf. loaders.js::chargerJournees — une par technicien × date,
  *   `{ date, technicienId, technicienNom, couleur, amplitude, budgetMinutes, rdvs, estAmorcee }`
- * @param {Array<{ id: string, nom: string, specialties?: string[] }>} p.techniciens
+ * @param {Array<{ id: string, nom: string, competences: { entretien: string[], pose: string[] } }>} p.techniciens
+ * @param {'entretien'|'pose'} p.role  rôle de compétence appliqué (obligatoire)
+ * @param {Map<string, string[]>|Record<string, string[]>} [p.typesParCategorie]  types par catégorie (défaut : contrat.typesParCategorie)
  * @param {{ lat: number, lng: number }} p.depot
  * @param {object} p.reglages  construireReglages(settings) — horizon_ferme_jours,
  *   horizon_ouverture_jours, pause_minutes, pause_fenetre
@@ -136,9 +158,10 @@ function fenetreDuJour(fenetre, j, { aujourdhui, maintenantMinutes, margeMinutes
 export function proposerPourContrat({
   contrat, journees, techniciens, depot, reglages, contraintes = {}, trajet, aujourdhui,
   maxResults = 4, estime = false, maintenantMinutes = null, margeAujourdhuiMinutes = 60,
+  role, typesParCategorie,
 }) {
   const raisons = { competence: 0, horizon: 0, contrainte: 0, creneau: 0, budget: 0, pause: 0, position: 0 };
-  const competents = techniciensEligibles(contrat, techniciens);
+  const competents = techniciensEligibles(contrat, techniciens, role, { typesParCategorie });
   raisons.competence = (techniciens || []).length - competents.length;
   const eligibles = competents.filter((t) => !contraintes.technicianId || t.id === contraintes.technicianId);
   const eligibleIds = new Set(eligibles.map((t) => t.id));

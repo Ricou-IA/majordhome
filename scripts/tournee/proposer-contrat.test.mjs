@@ -11,9 +11,13 @@ const REGLAGES = {
   pause_minutes: 30, pause_fenetre: [12, 14],
 };
 const AUJOURDHUI = '2026-09-14'; // lundi
-const ANTOINE = { id: 'antoine', nom: 'Antoine', specialties: ['climatisation', 'poele'] };
-const LUDOVIC = { id: 'ludovic', nom: 'Ludovic', specialties: ['poele'] };
-const POLYVALENT = { id: 'poly', nom: 'Poly', specialties: [] };
+// Compétences par TYPE × rôle (coché = compétent). Types : clim ∈ cat_clim, poele_g ∈ cat_poele.
+const TYPES_PAR_CATEGORIE = new Map([['cat_clim', ['clim', 'gainable']], ['cat_poele', ['poele_g', 'poele_b']]]);
+const ANTOINE = { id: 'antoine', nom: 'Antoine', competences: { entretien: ['clim', 'poele_g'], pose: [] } };
+const LUDOVIC = { id: 'ludovic', nom: 'Ludovic', competences: { entretien: ['poele_g'], pose: [] } };
+// « Poly » : tout coché (l'ancien « vide = polyvalent » n'existe plus)
+const POLYVALENT = { id: 'poly', nom: 'Poly', competences: { entretien: ['clim', 'gainable', 'poele_g', 'poele_b'], pose: [] } };
+const ROLE = 'entretien';
 
 /** Journée d'un technicien : rdvs = [{id, lat, lng, duration_minutes, scheduled_start, client_name, city}] */
 const journee = (date, technicienId, rdvs = []) => ({
@@ -28,12 +32,12 @@ const rdv = (id, heure, lat, lng, duree = 90) => ({
 /** Trajet : 10 min entre points distincts, sauf paires listées. */
 const trajetAvec = (special = {}) => (a, b) => (a === b ? 0 : (special[`${a}|${b}`] ?? 10));
 
-const CONTRAT = { id: 'c1', dureeMinutes: 60, lat: 43.600, lng: 2.240, categories: ['climatisation'] }; // Castres
+const CONTRAT = { id: 'c1', dureeMinutes: 60, lat: 43.600, lng: 2.240, exigences: [{ typeId: 'clim' }], typesParCategorie: TYPES_PAR_CATEGORIE }; // Castres
 
-test('compétence : seul un technicien couvrant toutes les catégories est éligible ; vide = polyvalent', () => {
-  assert.deepEqual(techniciensEligibles(CONTRAT, [ANTOINE, LUDOVIC, POLYVALENT]).map((t) => t.id), ['antoine', 'poly']);
-  const multi = { ...CONTRAT, categories: ['climatisation', 'chaudiere_gaz'] };
-  assert.deepEqual(techniciensEligibles(multi, [ANTOINE, LUDOVIC, POLYVALENT]).map((t) => t.id), ['poly']);
+test('compétence : seul un technicien couvrant toutes les exigences (types cochés pour le rôle) est éligible', () => {
+  assert.deepEqual(techniciensEligibles(CONTRAT, [ANTOINE, LUDOVIC, POLYVALENT], ROLE).map((t) => t.id), ['antoine', 'poly']);
+  const multi = { ...CONTRAT, exigences: [{ typeId: 'clim' }, { typeId: 'poele_b' }] };
+  assert.deepEqual(techniciensEligibles(multi, [ANTOINE, LUDOVIC, POLYVALENT], ROLE).map((t) => t.id), ['poly']);
 });
 
 test('classement par coût : la journée où la tournée passe déjà à côté gagne, pas la plus proche dans le temps', () => {
@@ -43,7 +47,7 @@ test('classement par coût : la journée où la tournée passe déjà à côté 
   ];
   const { creneaux } = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   });
   assert.equal(creneaux.length, 2);
   assert.equal(creneaux[0].date, '2026-09-17');
@@ -65,7 +69,7 @@ test('au-delà de l horizon ferme, seules les journées amorcées sont proposée
   ];
   const r = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   });
   assert.equal(r.creneaux.length, 0);
   assert.deepEqual(r.nouvellesJournees, [{ date: '2026-10-12', technicianId: 'antoine', technicianNom: 'antoine' }]);
@@ -76,7 +80,7 @@ test('au-delà de l horizon ferme, seules les journées amorcées sont proposée
 test('une journée vide DANS l horizon ferme est un créneau (aller-retour dépôt), pas une nouvelle journée', () => {
   const r = proposerPourContrat({
     contrat: CONTRAT, journees: [journee('2026-09-18', 'antoine', [])], techniciens: [ANTOINE], depot: DEPOT,
-    reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   });
   assert.equal(r.creneaux.length, 1);
   assert.equal(r.creneaux[0].coutMinutes, 80);   // 10 + 60 + 10
@@ -89,13 +93,13 @@ test('contrainte periode=matin : arrivée avant 12 h ; apres_midi : arrivée à 
   const journees = [journee('2026-09-16', 'antoine', [rdv('m', '08:00', 43.600, 2.240, 230)])]; // libre à partir de 11:50
   const matin = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, contraintes: { periode: 'matin' },
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE, contraintes: { periode: 'matin' },
   });
   assert.equal(matin.creneaux.length, 1);
   assert.ok(matin.creneaux[0].debutMinutes < 720);
   const apresMidi = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, contraintes: { periode: 'apres_midi' },
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE, contraintes: { periode: 'apres_midi' },
   });
   assert.equal(apresMidi.creneaux.length, 1);
   assert.ok(apresMidi.creneaux[0].debutMinutes >= 720);
@@ -109,7 +113,7 @@ test('contraintes technicianId / joursSemaineExclus / datesExclues / dateFrom-da
   ];
   const base = {
     contrat: CONTRAT, journees, techniciens: [ANTOINE, POLYVALENT], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   };
   const sansMercredi = proposerPourContrat({ ...base, contraintes: { joursSemaineExclus: [3] } });
   assert.ok(sansMercredi.creneaux.length > 0);
@@ -128,7 +132,7 @@ test('maxResults borne la liste ; estime est propagé tel quel', () => {
   const journees = ['2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18', '2026-09-21'].map((d) => journee(d, 'antoine', []));
   const r = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, maxResults: 4, estime: true,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE, maxResults: 4, estime: true,
   });
   assert.equal(r.creneaux.length, 4);
   assert.ok(r.creneaux.every((c) => c.estime === true));
@@ -137,7 +141,7 @@ test('maxResults borne la liste ; estime est propagé tel quel', () => {
 test('un technicien non compétent est compté dans raisonsRejet.competence et jamais proposé', () => {
   const r = proposerPourContrat({
     contrat: CONTRAT, journees: [journee('2026-09-15', 'ludovic', []), journee('2026-09-15', 'antoine', [])],
-    techniciens: [ANTOINE, LUDOVIC], depot: DEPOT, reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    techniciens: [ANTOINE, LUDOVIC], depot: DEPOT, reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   });
   assert.equal(r.raisonsRejet.competence, 1);
   assert.deepEqual(r.techniciensEligibles, ['antoine']);
@@ -147,7 +151,7 @@ test('un technicien non compétent est compté dans raisonsRejet.competence et j
 test('contrat sans coordonnées → aucun créneau, motif position, jamais une exception', () => {
   const r = proposerPourContrat({
     contrat: { ...CONTRAT, lat: null, lng: null }, journees: [journee('2026-09-15', 'antoine', [])],
-    techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   });
   assert.equal(r.creneaux.length, 0);
   assert.equal(r.raisonsRejet.position, 1);
@@ -156,7 +160,7 @@ test('contrat sans coordonnées → aucun créneau, motif position, jamais une e
 test('les journées passées sont ignorées sans être comptées comme rejet', () => {
   const r = proposerPourContrat({
     contrat: CONTRAT, journees: [journee('2026-09-10', 'antoine', []), journee('2026-09-15', 'antoine', [])],
-    techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+    techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE,
   });
   assert.equal(r.creneaux.length, 1);
   assert.equal(r.creneaux[0].date, '2026-09-15');
@@ -166,9 +170,18 @@ test('les journées passées sont ignorées sans être comptées comme rejet', (
 // Revue 2026-09-12 — comportements ajoutés après relecture
 // ============================================================================
 
-test('« autre » n est pas une compétence : un technicien spécialisé reste éligible', () => {
-  const contrat = { ...CONTRAT, categories: ['climatisation', 'autre'] };
-  assert.deepEqual(techniciensEligibles(contrat, [ANTOINE, LUDOVIC]).map((t) => t.id), ['antoine']);
+test('équipement non typé : exigence par catégorie, satisfaite par n importe quel type coché de la catégorie', () => {
+  const contrat = { ...CONTRAT, exigences: [{ typeId: 'clim' }, { categoryId: 'cat_poele' }] };
+  assert.deepEqual(techniciensEligibles(contrat, [ANTOINE, LUDOVIC], ROLE).map((t) => t.id), ['antoine']);
+  const seulPoele = { ...CONTRAT, exigences: [{ categoryId: 'cat_poele' }] };
+  assert.deepEqual(techniciensEligibles(seulPoele, [ANTOINE, LUDOVIC], ROLE).map((t) => t.id), ['antoine', 'ludovic']);
+});
+
+test('rien coché pour le rôle = jamais proposé, même sans exigence', () => {
+  const vide = { id: 'vide', nom: 'Vide', competences: { entretien: [], pose: [] } };
+  const sansExigence = { ...CONTRAT, exigences: [] };
+  assert.deepEqual(techniciensEligibles(sansExigence, [ANTOINE, vide], ROLE).map((t) => t.id), ['antoine']);
+  assert.throws(() => techniciensEligibles(sansExigence, [ANTOINE]), /role_competence_requis/);
 });
 
 test('nouvellesJournees respecte les contraintes explicites (pas le mercredi → pas d ouverture un mercredi)', () => {
@@ -178,7 +191,7 @@ test('nouvellesJournees respecte les contraintes explicites (pas le mercredi →
   ];
   const r = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, contraintes: { joursSemaineExclus: [3] },
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE, contraintes: { joursSemaineExclus: [3] },
   });
   assert.equal(r.creneaux.length, 0);
   assert.deepEqual(r.nouvellesJournees.map((j) => j.date), ['2026-10-15']);
@@ -188,13 +201,13 @@ test('le jour même, aucune arrivée avant maintenant + marge', () => {
   const journees = [journee(AUJOURDHUI, 'antoine', [])];
   const r = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, maintenantMinutes: 16 * 60, margeAujourdhuiMinutes: 60,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE, maintenantMinutes: 16 * 60, margeAujourdhuiMinutes: 60,
   });
   // 17:00 + 60 min d'intervention + 10 min de retour = 18:10 > 18:00 → rien aujourd'hui
   assert.equal(r.creneaux.length, 0);
   const tot = proposerPourContrat({
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
-    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, maintenantMinutes: 9 * 60,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, role: ROLE, maintenantMinutes: 9 * 60,
   });
   assert.equal(tot.creneaux.length, 1);
   assert.ok(tot.creneaux[0].debutMinutes >= 10 * 60);
@@ -207,6 +220,6 @@ test('journeesCandidates : seulement technicien éligible + horizon + contrainte
     journee('2026-10-12', 'antoine', []),          // vide hors horizon
     journee('2026-10-13', 'antoine', [rdv('x', '08:00', 43.6, 2.24)]), // amorcée hors horizon → oui
   ];
-  const c = journeesCandidates({ contrat: CONTRAT, journees, techniciens: [ANTOINE, LUDOVIC], reglages: REGLAGES, aujourdhui: AUJOURDHUI });
+  const c = journeesCandidates({ contrat: CONTRAT, journees, techniciens: [ANTOINE, LUDOVIC], reglages: REGLAGES, aujourdhui: AUJOURDHUI, role: ROLE });
   assert.deepEqual(c.map((j) => `${j.date}/${j.technicienId}`), ['2026-09-15/antoine', '2026-10-13/antoine']);
 });
