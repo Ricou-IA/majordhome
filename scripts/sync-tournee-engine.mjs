@@ -17,7 +17,7 @@ const SRC = path.join(racine, 'src', 'lib', 'tournee');
 const DST = path.join(racine, 'supabase', 'functions', '_shared', 'tournee');
 const NOMS = [
   'arrets', 'creneaux', 'duree', 'eligibilite', 'geo', 'matrice', 'timeline', 'sequence',
-  'proposer-contrat', 'loaders', 'trajets-core',
+  'proposer-contrat', 'loaders', 'trajets-core', 'reglages',
 ];
 
 export const FICHIERS = [

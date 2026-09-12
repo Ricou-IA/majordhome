@@ -188,8 +188,12 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
             updateField('postalCode', next.postalCode);
             updateField('city', next.city);
             updateField('location', next.location ?? null);
+            // Le texte a changé : les coordonnées en base ne correspondent plus
+            // (le trigger DB les effacera au save) → la commune redevient proposable.
+            updateField('dejaLocalisee', false);
           }}
           disabled={isLocked}
+          dejaLocalisee={!!formData.dejaLocalisee}
         />
       </div>
 

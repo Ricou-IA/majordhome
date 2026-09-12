@@ -6,8 +6,10 @@
 // qu'aux techniciens qui ont « clim ».
 //
 // Les catégories proposées sont celles réellement présentes dans la grille
-// tarifaire de l'org (majordhome_pricing_equipment_types) — pas de liste en
-// dur, une org sans PAC ne voit pas de chip PAC.
+// tarifaire de l'org (majordhome_pricing_equipment_types.equipment_category —
+// ⚠️ PAS `category`, qui est la FAMILLE tarifaire « poeles/chaudieres/energie »
+// et ne matche jamais le vocabulaire de `equipments.category` que compare
+// techniciensEligibles). Une org sans PAC ne voit pas de chip PAC.
 // ============================================================================
 import { useMemo } from 'react';
 import { usePricingData } from '@hooks/usePricing';
@@ -19,7 +21,7 @@ import { specialtyLabel } from './specialtyLabels';
 export function SpecialtiesEditor({ value = [], onChange, disabled }) {
   const { equipmentTypes } = usePricingData();
   const categories = useMemo(
-    () => [...new Set((equipmentTypes || []).map((t) => t.category).filter(Boolean))].sort(),
+    () => [...new Set((equipmentTypes || []).map((t) => t.equipment_category).filter(Boolean))].sort(),
     [equipmentTypes],
   );
   const toggle = (cat) => onChange(value.includes(cat) ? value.filter((c) => c !== cat) : [...value, cat]);

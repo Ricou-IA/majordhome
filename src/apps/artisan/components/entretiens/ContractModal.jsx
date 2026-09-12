@@ -163,7 +163,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
       includesEntretien: false,
       coreOrgId: orgId,
     });
-    if (error) { toast.error('Erreur création du RDV'); return; }
+    if (error) { toast.error('Erreur création du RDV'); return { ok: false }; }
     toast.success('RDV planifié avec succès');
     setSchedulingOpen(false);
     setSchedulingItem(null);
@@ -173,6 +173,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', contractId] });
     // Le classement des créneaux dépend du planning : un RDV posé change tout.
     queryClient.invalidateQueries({ queryKey: tourneeKeys.all(orgId) });
+    return { ok: true };
   }, [organization, schedulingItem, contractId, queryClient]);
 
   /**
@@ -188,8 +189,10 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     }
     setPosing(true);
     try {
-      await handleConfirmScheduling([slot]);
-      setCreneauxOuverts(false);
+      // Sur échec, la liste reste affichée : l'utilisateur peut réessayer ou
+      // choisir un autre créneau (le toast d'erreur est déjà parti).
+      const result = await handleConfirmScheduling([slot]);
+      if (result?.ok) setCreneauxOuverts(false);
     } finally {
       setPosing(false);
     }

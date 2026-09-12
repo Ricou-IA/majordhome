@@ -76,6 +76,11 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
           Trajets estimés à vol d&apos;oiseau (Mapbox indisponible)
         </p>
       )}
+      {contrat?.sansEquipement && (
+        <p className="text-xs text-amber-700">
+          Aucun équipement rattaché à ce contrat : durée par défaut ({contrat.dureeMinutes} min).
+        </p>
+      )}
       {contrat?.typesNonRenseignes > 0 && (
         <p className="text-xs text-secondary-500">
           {contrat.typesNonRenseignes} équipement(s) sans type : durée par défaut appliquée ({contrat.dureeMinutes} min au total).
@@ -107,8 +112,11 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: k.couleur || '#94A3B8' }} />
             <span className="font-medium text-gray-900">{formatDateShortFR(k.date)} · {k.debut}</span>
             <span className="text-secondary-500 truncate">{k.technicianNom}</span>
-            <span className="ml-auto text-xs text-secondary-500 inline-flex items-center gap-1 shrink-0">
-              <Route className="h-3.5 w-3.5" />+{k.coutMinutes} min
+            <span
+              className="ml-auto text-xs text-secondary-500 inline-flex items-center gap-1 shrink-0"
+              title={`${k.coutMinutes} min ajoutées à la journée (trajets + intervention)`}
+            >
+              <Route className="h-3.5 w-3.5" />+{k.detourMinutes} min de trajet
             </span>
           </div>
           <div className="text-xs text-secondary-500 mt-0.5">

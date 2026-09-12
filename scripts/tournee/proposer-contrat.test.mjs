@@ -3,7 +3,7 @@
 // Run : node --test scripts/tournee/proposer-contrat.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { proposerPourContrat, techniciensEligibles } from '../../src/lib/tournee/proposer-contrat.js';
+import { proposerPourContrat, techniciensEligibles, journeesCandidates } from '../../src/lib/tournee/proposer-contrat.js';
 
 const DEPOT = { lat: 43.900, lng: 1.900 };            // clé "43.900,1.900"
 const REGLAGES = {
@@ -160,4 +160,53 @@ test('les journées passées sont ignorées sans être comptées comme rejet', (
   });
   assert.equal(r.creneaux.length, 1);
   assert.equal(r.creneaux[0].date, '2026-09-15');
+});
+
+// ============================================================================
+// Revue 2026-09-12 — comportements ajoutés après relecture
+// ============================================================================
+
+test('« autre » n est pas une compétence : un technicien spécialisé reste éligible', () => {
+  const contrat = { ...CONTRAT, categories: ['climatisation', 'autre'] };
+  assert.deepEqual(techniciensEligibles(contrat, [ANTOINE, LUDOVIC]).map((t) => t.id), ['antoine']);
+});
+
+test('nouvellesJournees respecte les contraintes explicites (pas le mercredi → pas d ouverture un mercredi)', () => {
+  const journees = [
+    journee('2026-10-14', 'antoine', []), // mercredi, vide, hors horizon
+    journee('2026-10-15', 'antoine', []), // jeudi
+  ];
+  const r = proposerPourContrat({
+    contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, contraintes: { joursSemaineExclus: [3] },
+  });
+  assert.equal(r.creneaux.length, 0);
+  assert.deepEqual(r.nouvellesJournees.map((j) => j.date), ['2026-10-15']);
+});
+
+test('le jour même, aucune arrivée avant maintenant + marge', () => {
+  const journees = [journee(AUJOURDHUI, 'antoine', [])];
+  const r = proposerPourContrat({
+    contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, maintenantMinutes: 16 * 60, margeAujourdhuiMinutes: 60,
+  });
+  // 17:00 + 60 min d'intervention + 10 min de retour = 18:10 > 18:00 → rien aujourd'hui
+  assert.equal(r.creneaux.length, 0);
+  const tot = proposerPourContrat({
+    contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
+    trajet: trajetAvec(), aujourdhui: AUJOURDHUI, maintenantMinutes: 9 * 60,
+  });
+  assert.equal(tot.creneaux.length, 1);
+  assert.ok(tot.creneaux[0].debutMinutes >= 10 * 60);
+});
+
+test('journeesCandidates : seulement technicien éligible + horizon + contraintes (pour borner la matrice)', () => {
+  const journees = [
+    journee('2026-09-15', 'antoine', []),
+    journee('2026-09-15', 'ludovic', []),          // pas la compétence
+    journee('2026-10-12', 'antoine', []),          // vide hors horizon
+    journee('2026-10-13', 'antoine', [rdv('x', '08:00', 43.6, 2.24)]), // amorcée hors horizon → oui
+  ];
+  const c = journeesCandidates({ contrat: CONTRAT, journees, techniciens: [ANTOINE, LUDOVIC], reglages: REGLAGES, aujourdhui: AUJOURDHUI });
+  assert.deepEqual(c.map((j) => `${j.date}/${j.technicienId}`), ['2026-09-15/antoine', '2026-10-13/antoine']);
 });
