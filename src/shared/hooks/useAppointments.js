@@ -379,8 +379,8 @@ export function useSetTeamMemberRouting(orgId) {
   const teamMembersKey = appointmentKeys.teamMembers(orgId);
 
   const mutation = useMutation({
-    mutationFn: ({ teamMemberId, dailyWorkMinutes, includeInRouting }) =>
-      appointmentsService.setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting }),
+    mutationFn: ({ teamMemberId, dailyWorkMinutes, includeInRouting, specialties }) =>
+      appointmentsService.setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting, specialties }),
     onSuccess: (result, variables) => {
       if (result?.error) return; // échec logique (ex. hors bornes) — rien à rafraîchir, le caller gère le toast
 
@@ -396,7 +396,12 @@ export function useSetTeamMemberRouting(orgId) {
           ...old,
           data: old.data.map((tm) =>
             tm.id === variables.teamMemberId
-              ? { ...tm, daily_work_minutes: row.daily_work_minutes, include_in_routing: row.include_in_routing }
+              ? {
+                ...tm,
+                daily_work_minutes: row.daily_work_minutes,
+                include_in_routing: row.include_in_routing,
+                specialties: row.specialties ?? tm.specialties ?? [],
+              }
               : tm
           ),
         };

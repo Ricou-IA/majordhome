@@ -38,6 +38,8 @@ import {
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
+import { SpecialtiesEditor } from './team/SpecialtiesEditor';
+import { specialtyLabel } from './team/specialtyLabels';
 
 // =============================================================================
 // HELPERS
@@ -358,6 +360,7 @@ function MemberRow({
   isColorSaving,
   onDailyBudgetChange,
   onIncludeInRoutingChange,
+  onSpecialtiesChange,
   isRoutingSaving,
 }) {
   const effectiveRole = computeEffectiveRole(member.profile, { role: member.role });
@@ -473,6 +476,25 @@ function MemberRow({
         ) : (
           <span className="text-xs text-secondary-500" title={INCLUDE_IN_ROUTING_HELP}>
             {(teamMember.include_in_routing ?? true) ? 'Incluse' : 'Exclue'}
+          </span>
+        )}
+      </td>
+
+      {/* Compétences (catégories d'équipement) — filtre dur du moteur de tournées */}
+      <td className="py-4 px-4">
+        {!teamMember ? (
+          <span className="text-xs text-secondary-400">—</span>
+        ) : canEditColor ? (
+          <SpecialtiesEditor
+            value={teamMember.specialties || []}
+            onChange={(next) => onSpecialtiesChange(teamMember.id, next)}
+            disabled={isRoutingSaving}
+          />
+        ) : (
+          <span className="text-xs text-secondary-500">
+            {(teamMember.specialties || []).length
+              ? teamMember.specialties.map(specialtyLabel).join(', ')
+              : 'polyvalent'}
           </span>
         )}
       </td>
@@ -684,6 +706,26 @@ export default function TeamManagement() {
     }
   };
 
+  /**
+   * Compétences d'un membre (team_member.specialties) — même RPC combinée, patch
+   * partiel. `[]` est envoyé tel quel (= polyvalent), jamais transformé en null.
+   */
+  const handleSpecialtiesChange = async (teamMemberId, specialties) => {
+    setSavingRoutingId(teamMemberId);
+    try {
+      const result = await setRoutingSettings({ teamMemberId, specialties });
+      if (result?.error) {
+        toast.error(routingSettingsErrorMessage(result.error, "Erreur lors de l'enregistrement des compétences"));
+      } else {
+        toast.success('Compétences mises à jour');
+      }
+    } catch (err) {
+      toast.error(routingSettingsErrorMessage(err, 'Erreur inattendue'));
+    } finally {
+      setSavingRoutingId(null);
+    }
+  };
+
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -761,6 +803,10 @@ export default function TeamManagement() {
                   Tournées
                   <span className="block text-xs font-normal text-secondary-400">Inclusion dans l&apos;optimisation</span>
                 </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
+                  Compétences
+                  <span className="block text-xs font-normal text-secondary-400">Catégories d&apos;équipement — vide = polyvalent</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -780,6 +826,7 @@ export default function TeamManagement() {
                     isColorSaving={!!tm && savingColorId === tm.id}
                     onDailyBudgetChange={handleDailyBudgetChange}
                     onIncludeInRoutingChange={handleIncludeInRoutingChange}
+                    onSpecialtiesChange={handleSpecialtiesChange}
                     isRoutingSaving={!!tm && savingRoutingId === tm.id}
                   />
                 );
