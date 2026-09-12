@@ -19,6 +19,14 @@ export const REGLAGES_DEFAUT = {
   // Nombre de candidats retenus après le pré-tri (score × proximité) et avant
   // le calcul de coût exact (Mapbox, trop cher sur ~300 candidats).
   max_candidats_tri: 20,
+  // Souplesse (spec 2026-09-12 « fenêtres d'abord, heures ensuite ») :
+  // tolérance par défaut d'un RDV sans souplesse renseignée (appointments.time_flex_minutes NULL).
+  souplesse_defaut_minutes: 30,
+  // En dessous, le temps restant après une insertion est du temps de technicien
+  // perdu (plus petite visite + un trajet) : pénalisé dans le classement.
+  reste_utile_min_minutes: 75,
+  // Fenêtres « demi-journée » (time_flex_minutes = 240), en heures.
+  demi_journee: { matin: [8, 12], apres_midi: [13, 18] },
 };
 
 export function construireReglages(settings) {
