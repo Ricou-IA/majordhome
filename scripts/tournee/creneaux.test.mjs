@@ -361,3 +361,35 @@ test('attenteMinutes — vaut 0 quand rien n a repoussé le passage', () => {
   const p = placerCandidat({ arrets: [], candidat: candidat('x', 60), ...ctx(uniforme(20)) });
   assert.equal(p.attenteMinutes, 0);
 });
+
+// ============================================================================
+// Fenêtre d'arrivée (contrainte « plutôt le matin / l'après-midi »,
+// proposerPourContrat). Sans fenêtre, rien ne change — les tests ci-dessus
+// en sont la preuve.
+// ============================================================================
+
+test('fenetreArrivee.max : le candidat n est placé que si son arrivée tient avant la borne', () => {
+  // Libre à partir de 11:50 : une arrivée avant midi est possible.
+  const ok = placerCandidat({
+    arrets: [arret('a', 480, 230)], candidat: candidat('c', 60), trajet: uniforme(0),
+    depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 480, fenetreArrivee: { max: 719 },
+  });
+  assert.equal(ok.faisable, true);
+  assert.ok(ok.arriveeMinutes <= 719);
+  // Libre seulement à partir de 13:00 : rien avant midi → refus « creneau ».
+  const ko = placerCandidat({
+    arrets: [arret('a', 480, 300)], candidat: candidat('c', 60), trajet: uniforme(0),
+    depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 480, fenetreArrivee: { max: 719 },
+  });
+  assert.equal(ko.faisable, false);
+  assert.equal(ko.raison, 'creneau');
+});
+
+test('fenetreArrivee.min : arrivée repoussée à la borne, même si le trou commence avant', () => {
+  const r = placerCandidat({
+    arrets: [arret('a', 480, 230)], candidat: candidat('c', 60), trajet: uniforme(0),
+    depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 480, fenetreArrivee: { min: 720 },
+  });
+  assert.equal(r.faisable, true);
+  assert.ok(r.arriveeMinutes >= 720);
+});

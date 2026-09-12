@@ -140,6 +140,9 @@ function pausePossible(places, pause) {
  * @param {{minutes: number, fenetre: [number, number]}} [params.pause]
  * @param {number} [params.chargeDeja]  charge existante déjà calculée (évite de
  *   la refaire pour chaque candidat : elle ne dépend pas du candidat)
+ * @param {{min?: number, max?: number}} [params.fenetreArrivee]  borne l'heure
+ *   d'ARRIVÉE (minutes depuis minuit) — « plutôt le matin » = { max: 719 },
+ *   « l'après-midi » = { min: 720 }. Absent : comportement inchangé.
  * @returns {{
  *   faisable: boolean, raison: ('budget'|'creneau'|'pause'|'position'|null),
  *   arriveeMinutes: number|null, departMinutes: number|null,
@@ -154,7 +157,7 @@ function pausePossible(places, pause) {
  *   ne mesurent pas la même chose, et rien ne le disait.
  */
 export function placerCandidat({
-  arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja,
+  arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, fenetreArrivee,
 }) {
   const echec = (raison) => ({
     faisable: false,
@@ -212,8 +215,15 @@ export function placerCandidat({
       arrivees.push(Math.max(iv.dispoDepuis, pauseDebut) + pause.minutes + allee);
       arrivees.push(pauseFin + allee);
     }
+    // Fenêtre d'arrivée (contrainte « plutôt le matin / l'après-midi ») : on
+    // essaie aussi le bord de la fenêtre, et on ne retient que les arrivées
+    // qui y tiennent. Sans fenêtre : strictement le comportement d'avant.
+    if (fenetreArrivee?.min != null) arrivees.push(Math.max(auPlusTot, fenetreArrivee.min));
+    const dansFenetre = (a) => (fenetreArrivee?.min == null || a >= fenetreArrivee.min)
+      && (fenetreArrivee?.max == null || a <= fenetreArrivee.max);
     // Jamais arriver avant d'être parti, et pas deux fois la même position.
-    const departsPossibles = [...new Set(arrivees.filter((a) => a >= auPlusTot))];
+    const departsPossibles = [...new Set(arrivees.filter((a) => a >= auPlusTot && dansFenetre(a)))];
+    if (departsPossibles.length === 0) noterRaison('creneau');
 
     for (const arrivee of departsPossibles) {
       const depart = arrivee + duree;
