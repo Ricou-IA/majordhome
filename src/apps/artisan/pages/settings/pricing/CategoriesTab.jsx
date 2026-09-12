@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { FormField, TextInput } from '@apps/artisan/components/FormFields';
 import { CERTIFICATE_PROFILES } from '@/lib/equipmentReferential';
 import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from './ui';
+import { prochainOrdre } from './ordre';
 
 const CODE_RE = /^[a-z0-9_]+$/;
 const TVA_SUGGESTIONS = [5.5, 10, 20];
@@ -75,7 +76,6 @@ export function CategoriesPanel({ admin }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-secondary-200 text-left text-secondary-500">
-                <th className="py-2 pr-3 font-medium">Ordre</th>
                 <th className="py-2 pr-3 font-medium">Code</th>
                 <th className="py-2 pr-3 font-medium">Libellé</th>
                 <th className="py-2 pr-3 font-medium">Certificat</th>
@@ -88,7 +88,6 @@ export function CategoriesPanel({ admin }) {
             <tbody>
               {admin.categories.map((cat) => (
                 <tr key={cat.id} className="border-b border-secondary-100">
-                  <td className="py-2 pr-3 text-secondary-500">{cat.sort_order}</td>
                   <td className="py-2 pr-3 font-mono text-xs">{cat.code}</td>
                   <td className="py-2 pr-3 font-medium text-secondary-900">{cat.label}</td>
                   <td className="py-2 pr-3 text-secondary-600 text-xs">{profilLabel(cat.certificate_profile)}</td>
@@ -111,6 +110,7 @@ export function CategoriesPanel({ admin }) {
       {showModal && (
         <CategoryModal
           category={editing}
+          nextSortOrder={prochainOrdre(admin.categories)}
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSave={async (payload) => {
             try {
@@ -131,12 +131,11 @@ export function CategoriesPanel({ admin }) {
   );
 }
 
-function CategoryModal({ category, onClose, onSave, isSaving }) {
+function CategoryModal({ category, nextSortOrder, onClose, onSave, isSaving }) {
   const isEdit = !!category;
   const [form, setForm] = useState({
     code: category?.code || '',
     label: category?.label || '',
-    sort_order: category?.sort_order ?? 0,
     is_active: category?.is_active ?? true,
     certificate_profile: category?.certificate_profile || 'generique',
     default_vat_rate: category?.default_vat_rate != null ? String(category.default_vat_rate) : '20',
@@ -155,7 +154,7 @@ function CategoryModal({ category, onClose, onSave, isSaving }) {
     if (!Number.isFinite(tva) || tva < 0 || tva >= 100) { toast.error('TVA : entre 0 et 100'); return; }
     const payload = {
       label: form.label.trim(),
-      sort_order: parseInt(form.sort_order, 10) || 0,
+      sort_order: isEdit ? (category.sort_order ?? 0) : nextSortOrder,
       is_active: form.is_active,
       certificate_profile: form.certificate_profile,
       default_vat_rate: tva,
@@ -214,9 +213,6 @@ function CategoryModal({ category, onClose, onSave, isSaving }) {
                 </button>
               ))}
             </div>
-          </FormField>
-          <FormField label="Ordre">
-            <TextInput value={form.sort_order} onChange={(v) => set('sort_order', v)} type="number" />
           </FormField>
         </div>
 

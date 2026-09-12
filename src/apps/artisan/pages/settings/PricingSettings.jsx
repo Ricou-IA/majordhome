@@ -17,6 +17,7 @@ import { formatEuro } from '@/lib/utils';
 import { Loader2, MapPin, Wrench, Grid3x3, Percent, Sparkles, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from './pricing/ui';
+import { prochainOrdre } from './pricing/ordre';
 import { CategoriesPanel } from './pricing/CategoriesTab';
 
 const TABS = [
@@ -168,6 +169,7 @@ function ZonesPanel({ admin }) {
       {showModal && (
         <ZoneModal
           zone={editing}
+          nextSortOrder={prochainOrdre(admin.zones)}
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSave={async (payload) => {
             try {
@@ -187,7 +189,7 @@ function ZonesPanel({ admin }) {
   );
 }
 
-function ZoneModal({ zone, onClose, onSave, isSaving }) {
+function ZoneModal({ zone, nextSortOrder, onClose, onSave, isSaving }) {
   const [form, setForm] = useState({
     code: zone?.code || '',
     label: zone?.label || '',
@@ -196,7 +198,6 @@ function ZoneModal({ zone, onClose, onSave, isSaving }) {
     supplement: zone?.supplement?.toString() || '0',
     is_default: zone?.is_default || false,
     is_active: zone?.is_active ?? true,
-    sort_order: zone?.sort_order || 0,
     min_driving_minutes: zone?.min_driving_minutes ?? '',
     max_driving_minutes: zone?.max_driving_minutes ?? '',
   });
@@ -221,7 +222,7 @@ function ZoneModal({ zone, onClose, onSave, isSaving }) {
       supplement: parseFloat(form.supplement) || 0,
       is_default: form.is_default,
       is_active: form.is_active,
-      sort_order: parseInt(form.sort_order, 10) || 0,
+      sort_order: zone ? (zone.sort_order ?? 0) : nextSortOrder,
       min_driving_minutes: form.min_driving_minutes === '' ? null : parseInt(form.min_driving_minutes, 10),
       max_driving_minutes: form.max_driving_minutes === '' ? null : parseInt(form.max_driving_minutes, 10),
     });
@@ -255,9 +256,6 @@ function ZoneModal({ zone, onClose, onSave, isSaving }) {
             <TextInput value={form.max_driving_minutes} onChange={(v) => set('max_driving_minutes', v)} type="number" min="0" />
           </FormField>
         </div>
-        <FormField label="Ordre">
-          <TextInput value={form.sort_order} onChange={(v) => set('sort_order', v)} type="number" />
-        </FormField>
         <div className="flex gap-4 pt-2">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.is_default} onChange={(e) => set('is_default', e.target.checked)} />
@@ -380,6 +378,7 @@ function EquipmentTypesPanel({ admin }) {
       {showModal && (
         <EquipmentTypeModal
           type={editing}
+          nextSortOrder={prochainOrdre(admin.equipmentTypes)}
           categories={admin.categories.filter((c) => c.is_active || c.id === editing?.category_id)}
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSave={async (payload) => {
@@ -400,7 +399,7 @@ function EquipmentTypesPanel({ admin }) {
   );
 }
 
-function EquipmentTypeModal({ type, categories = [], onClose, onSave, isSaving }) {
+function EquipmentTypeModal({ type, categories = [], nextSortOrder, onClose, onSave, isSaving }) {
   const isEdit = !!type;
   const [form, setForm] = useState({
     code: type?.code || '',
@@ -409,7 +408,6 @@ function EquipmentTypeModal({ type, categories = [], onClose, onSave, isSaving }
     has_unit_pricing: type?.has_unit_pricing || false,
     unit_label: type?.unit_label || '',
     included_units: type?.included_units ?? 0,
-    sort_order: type?.sort_order || 0,
     is_active: type?.is_active ?? true,
     duration_base_minutes: type?.duration_base_minutes ?? '',
     duration_per_extra_unit_minutes: type?.duration_per_extra_unit_minutes ?? 0,
@@ -456,7 +454,7 @@ function EquipmentTypeModal({ type, categories = [], onClose, onSave, isSaving }
       has_unit_pricing: form.has_unit_pricing,
       unit_label: form.has_unit_pricing ? (form.unit_label.trim() || null) : null,
       included_units: form.has_unit_pricing ? (parseInt(form.included_units, 10) || 0) : 0,
-      sort_order: parseInt(form.sort_order, 10) || 0,
+      sort_order: isEdit ? (type.sort_order ?? 0) : nextSortOrder,
       is_active: form.is_active,
       duration_base_minutes: form.duration_base_minutes === '' ? null : parseInt(form.duration_base_minutes, 10),
       duration_per_extra_unit_minutes: form.has_unit_pricing ? (parseInt(form.duration_per_extra_unit_minutes, 10) || 0) : 0,
@@ -554,17 +552,10 @@ function EquipmentTypeModal({ type, categories = [], onClose, onSave, isSaving }
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Ordre">
-            <TextInput value={form.sort_order} onChange={(v) => set('sort_order', v)} type="number" />
-          </FormField>
-          <FormField label="">
-            <label className="flex items-center gap-2 text-sm pt-2">
-              <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-              Actif
-            </label>
-          </FormField>
-        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
+          Actif
+        </label>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
           <button type="submit" disabled={isSaving} className="btn-primary">
@@ -941,6 +932,7 @@ function ExtrasPanel({ admin }) {
       {showModal && (
         <ExtraModal
           extra={editing}
+          nextSortOrder={prochainOrdre(admin.extras)}
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSave={async (payload) => {
             try {
@@ -960,13 +952,12 @@ function ExtrasPanel({ admin }) {
   );
 }
 
-function ExtraModal({ extra, onClose, onSave, isSaving }) {
+function ExtraModal({ extra, nextSortOrder, onClose, onSave, isSaving }) {
   const [form, setForm] = useState({
     code: extra?.code || '',
     label: extra?.label || '',
     price_per_unit: extra?.price_per_unit?.toString() || '0',
     unit_label: extra?.unit_label || '',
-    sort_order: extra?.sort_order || 0,
     is_active: extra?.is_active ?? true,
   });
 
@@ -987,7 +978,7 @@ function ExtraModal({ extra, onClose, onSave, isSaving }) {
       label: form.label.trim(),
       price_per_unit: parseFloat(form.price_per_unit) || 0,
       unit_label: form.unit_label.trim() || null,
-      sort_order: parseInt(form.sort_order, 10) || 0,
+      sort_order: extra ? (extra.sort_order ?? 0) : nextSortOrder,
       is_active: form.is_active,
     });
   };
@@ -1011,17 +1002,10 @@ function ExtraModal({ extra, onClose, onSave, isSaving }) {
             <TextInput value={form.unit_label} onChange={(v) => set('unit_label', v)} placeholder="mètre, pièce, ..." />
           </FormField>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Ordre">
-            <TextInput value={form.sort_order} onChange={(v) => set('sort_order', v)} type="number" />
-          </FormField>
-          <FormField label="">
-            <label className="flex items-center gap-2 text-sm pt-2">
-              <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-              Active
-            </label>
-          </FormField>
-        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
+          Active
+        </label>
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
           <button type="submit" disabled={isSaving} className="btn-primary">
