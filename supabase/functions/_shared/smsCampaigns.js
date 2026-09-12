@@ -279,12 +279,13 @@ export function findUnknownVariables(text, campaign) {
 
 /**
  * Retire les diacritiques : « éàç » → « eac ».
- * ⚠ COPIE de `deburr()` de l'edge `sms-send` (Deno ne partage pas ce code) : sert au
+ * ⚠ Même expression que `deburr()` de `supabase/functions/_shared/sms.ts` : sert au
  * compteur de segments quand l'option « sans accents » est cochée. Toute évolution
- * doit toucher LES DEUX.
+ * doit toucher LES DEUX. `\p{M}` (marques combinantes) plutôt qu'une plage
+ * `\uXXXX` : même résultat sur du NFD, sans échappement fragile à recopier.
  */
 export function deburrSms(text) {
-  return String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return String(text ?? '').normalize('NFD').replace(/\p{M}/gu, '');
 }
 
 // Alphabet GSM 03.38 (jeu de base) + caractères d'extension (comptent double).

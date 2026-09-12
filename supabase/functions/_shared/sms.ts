@@ -123,7 +123,7 @@ export function renderTemplate(tpl: string, vars: Record<string, string>): strin
  * sert au compteur de segments de l'onglet SMS : toute évolution touche les deux.
  */
 export function deburr(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return s.normalize("NFD").replace(/\p{M}/gu, "");
 }
 
 // ---------------------------------------------------------------------------
