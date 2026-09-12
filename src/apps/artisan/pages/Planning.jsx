@@ -327,7 +327,9 @@ function CalendarFilters({ filters, setFilters, teamList }) {
  * lit le cache useClientEquipmentKinds via hook.
  */
 function PlanningEventContent({ eventInfo }) {
-  const { typeConfig, client_name, client_first_name, status, lead_id, grand_secteur, client_id } = eventInfo.event.extendedProps;
+  const {
+    typeConfig, client_name, client_first_name, status, lead_id, grand_secteur, client_id, adaptable, hour_confirmed_at,
+  } = eventInfo.event.extendedProps;
   const isCancelled = status === 'cancelled';
   const fullName = [client_name, client_first_name].filter(Boolean).join(' ');
   // Ligne 1 = type (plus le nom), ligne 2 = nom · grand secteur → le nom n'apparaît
@@ -342,6 +344,12 @@ function PlanningEventContent({ eventInfo }) {
             P
           </span>
         )}
+        {/* Souplesse : ↔ adaptable (heure provisoire), 🔒 heure communiquée au client */}
+        {adaptable ? (
+          <span className="mr-0.5 opacity-90" title="Adaptable : l’heure peut glisser dans sa tolérance">↔</span>
+        ) : hour_confirmed_at ? (
+          <span className="mr-0.5 opacity-90" title="Heure communiquée au client">🔒</span>
+        ) : null}
         {eventInfo.timeText && (
           <span className="mr-1">{eventInfo.timeText}</span>
         )}

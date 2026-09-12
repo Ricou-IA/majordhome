@@ -826,7 +826,7 @@ export const appointmentsService = {
    * @param {string} [opts.idSuffix] rend l'event unique quand un RDV est découpé en
    *   plusieurs blocs (1 par technicien). L'id réel du RDV reste dans extendedProps.id.
    */
-  toCalendarEvent(appointment, { color, idSuffix } = {}) {
+  toCalendarEvent(appointment, { color, idSuffix, adaptable = false } = {}) {
     const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
 
     // Construire les datetimes ISO
@@ -846,9 +846,13 @@ export const appointmentsService = {
       backgroundColor: eventColor,
       borderColor: eventColor,
       textColor: '#FFFFFF',
+      // Souplesse : un RDV adaptable est dessiné en pointillé (heure provisoire),
+      // la bande de tolérance est un événement de fond séparé (useAppointments).
+      classNames: adaptable ? ['mdh-flex'] : [],
       extendedProps: {
         ...appointment,
         typeConfig,
+        adaptable,
       },
     };
   },

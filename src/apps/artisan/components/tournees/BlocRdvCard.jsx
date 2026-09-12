@@ -61,6 +61,9 @@ export function BlocRdvCard({
     >
       <div className="flex items-center justify-between gap-1.5">
         <p className="font-semibold text-gray-900 text-xs truncate">
+          {rdv.hour_confirmed_at
+            ? <span className="mr-1" title="Heure communiquée au client (figé)">🔒</span>
+            : (rdv.time_flex_minutes !== 0 && <span className="mr-1" title="Adaptable : peut glisser dans sa tolérance">↔</span>)}
           {rdv.client_name || rdv.subject || 'Sans client'}
         </p>
         {type === 'maintenance' && rdv.client_id && (

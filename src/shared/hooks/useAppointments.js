@@ -14,9 +14,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 import { useLeadCommercials } from '@hooks/useLeads';
 import {
-  buildPersonColorMaps, buildTeamList, expandAppointmentBlocks,
+  buildPersonColorMaps, buildTeamList, expandAppointmentBlocks, estAdaptable, fenetreDe,
   matchesKindFilter, matchesMemberFilter,
 } from '@/lib/planningEvents';
 
@@ -44,6 +46,9 @@ export { appointmentKeys } from '@hooks/cacheKeys';
  */
 export function useAppointments({ orgId, startDate, endDate } = {}) {
   const queryClient = useQueryClient();
+  // Souplesse par défaut de l'org (RDV sans time_flex_minutes) et demi-journées.
+  const { settings: orgSettings } = useOrgSettings();
+  const reglages = useMemo(() => construireReglages(orgSettings), [orgSettings]);
   const [filters, setFilters] = useState({
     kinds: { intervention: true, commercial: true }, // 2 toggles (les 2 ON = vue globale)
     memberProfileKeys: [],                            // chips équipe (humains, dédup par profile_key)
@@ -123,14 +128,32 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       technician_ids: techMap.get(a.id) || [],
     }));
 
+    const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
     return enriched
       .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
-      .flatMap((a) =>
-        expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
-          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix })
-        )
-      );
-  }, [appointments, techLinks, filters.kinds, selectedRecordIds, colorMaps]);
+      .flatMap((a) => {
+        const adaptable = estAdaptable(a, reglages.souplesse_defaut_minutes);
+        const blocs = expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
+          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable })
+        );
+        if (!adaptable || !a.scheduled_start) return blocs;
+        // Bande de tolérance : « on voit toujours des blocs » — le RDV reste à son
+        // heure provisoire, la bande montre jusqu'où il peut glisser. Événement de
+        // fond : ni cliquable ni déplaçable (FullCalendar), même couleur, translucide.
+        const f = fenetreDe(a, { flexDefaut: reglages.souplesse_defaut_minutes, demiJournee: reglages.demi_journee });
+        if (!f) return blocs;
+        blocs.push({
+          id: `${a.id}__band`,
+          start: `${a.scheduled_date}T${hhmm(f.debutMinutes)}`,
+          end: `${a.scheduled_date}T${hhmm(f.finMinutes)}`,
+          display: 'background',
+          backgroundColor: blocs[0]?.backgroundColor,
+          classNames: ['mdh-flex-band'],
+          extendedProps: { id: a.id, band: true },
+        });
+        return blocs;
+      });
+  }, [appointments, techLinks, filters.kinds, selectedRecordIds, colorMaps, reglages]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
