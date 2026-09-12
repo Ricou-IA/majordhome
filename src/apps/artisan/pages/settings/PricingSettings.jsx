@@ -1,8 +1,11 @@
 /**
  * PricingSettings.jsx — Gestion de la grille tarifaire (per-org)
  * ============================================================================
- * Onglets : Zones / Types d'équipement / Tarifs / Remises / Extras
- * Toutes les écritures passent par `pricingService` + RLS policies org_id.
+ * Onglets : Zones / Catégories / Types d'équipement / Tarifs / Remises / Extras
+ * Toutes les écritures passent par `pricingService` (+ equipmentCategoriesService
+ * pour les catégories, onglet dans pricing/CategoriesTab.jsx) + RLS policies org_id.
+ * Référentiel équipements (2026-09) : catégorie (niveau 1) → type (niveau 2),
+ * catégorie obligatoire sur chaque type, code de type jamais réécrit à l'édition.
  * ============================================================================
  */
 
@@ -11,11 +14,14 @@ import { Link } from 'react-router-dom';
 import { usePricingAdmin } from '@hooks/usePricing';
 import { FormField, TextInput, TextArea } from '../../components/FormFields';
 import { formatEuro } from '@/lib/utils';
-import { Plus, Pencil, Trash2, Loader2, MapPin, Wrench, Grid3x3, Percent, Sparkles, X } from 'lucide-react';
+import { Loader2, MapPin, Wrench, Grid3x3, Percent, Sparkles, Layers } from 'lucide-react';
 import { toast } from 'sonner';
+import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from './pricing/ui';
+import { CategoriesPanel } from './pricing/CategoriesTab';
 
 const TABS = [
   { key: 'zones', label: 'Zones', icon: MapPin },
+  { key: 'categories', label: 'Catégories', icon: Layers },
   { key: 'equipmentTypes', label: 'Types d\'équipement', icon: Wrench },
   { key: 'rates', label: 'Grille tarifaire', icon: Grid3x3 },
   { key: 'discounts', label: 'Remises volume', icon: Percent },
@@ -78,6 +84,7 @@ export default function PricingSettings() {
       ) : (
         <div className="card">
           {tab === 'zones' && <ZonesPanel admin={admin} />}
+          {tab === 'categories' && <CategoriesPanel admin={admin} />}
           {tab === 'equipmentTypes' && <EquipmentTypesPanel admin={admin} />}
           {tab === 'rates' && <RatesPanel admin={admin} />}
           {tab === 'discounts' && <DiscountsPanel admin={admin} />}
@@ -88,49 +95,7 @@ export default function PricingSettings() {
   );
 }
 
-// =============================================================================
-// Helpers UI
-// =============================================================================
-
-function ToolbarHeader({ title, count, onAdd, addLabel }) {
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <p className="text-sm text-secondary-500">{count} {title.toLowerCase()}</p>
-      <button onClick={onAdd} className="btn-primary btn-sm">
-        <Plus className="w-4 h-4 mr-1" /> {addLabel}
-      </button>
-    </div>
-  );
-}
-
-function ActionButtons({ onEdit, onDelete }) {
-  return (
-    <div className="flex gap-1 justify-end">
-      <button onClick={onEdit} className="p-1.5 hover:bg-primary-50 rounded" title="Modifier">
-        <Pencil className="w-3.5 h-3.5 text-primary-500" />
-      </button>
-      <button onClick={onDelete} className="p-1.5 hover:bg-red-50 rounded" title="Supprimer">
-        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-      </button>
-    </div>
-  );
-}
-
-function ModalShell({ title, onClose, children }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 pt-6 pb-2">
-          <h2 className="text-lg font-semibold text-secondary-900">{title}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded">
-            <X className="w-5 h-5 text-secondary-500" />
-          </button>
-        </div>
-        <div className="px-6 pb-6">{children}</div>
-      </div>
-    </div>
-  );
-}
+// Helpers UI (ToolbarHeader, ActionButtons, ModalShell) : ./pricing/ui.jsx
 
 // =============================================================================
 // ONGLET ZONES
@@ -244,6 +209,10 @@ function ZoneModal({ zone, onClose, onSave, isSaving }) {
       toast.error('Code et libellé requis');
       return;
     }
+    if (!form.category_id) {
+      toast.error('Catégorie requise — créez-la dans l\'onglet Catégories si elle n\'existe pas');
+      return;
+    }
     onSave({
       code: form.code.trim().toUpperCase(),
       label: form.label.trim(),
@@ -315,14 +284,6 @@ function ZoneModal({ zone, onClose, onSave, isSaving }) {
 // ONGLET TYPES D'ÉQUIPEMENT
 // =============================================================================
 
-const EQUIPMENT_CATEGORIES = [
-  { value: 'poeles', label: 'Poêles & Inserts' },
-  { value: 'chaudieres', label: 'Chaudières' },
-  { value: 'climatisation', label: 'Climatisation & PAC' },
-  { value: 'eau_chaude', label: 'Eau chaude & Solaire' },
-  { value: 'energie', label: 'Énergie' },
-];
-
 // Mois déconseillés (tournées) — préférence de planification, jamais un blocage.
 const MONTHS_FR = [
   { value: 1, label: 'Jan' },
@@ -387,7 +348,7 @@ function EquipmentTypesPanel({ admin }) {
                   <td className="py-2 pr-3 font-mono text-xs">{type.code}</td>
                   <td className="py-2 pr-3 font-medium text-secondary-900">{type.label}</td>
                   <td className="py-2 pr-3 text-secondary-500 text-xs">
-                    {EQUIPMENT_CATEGORIES.find((c) => c.value === type.category)?.label || type.category || '—'}
+                    {admin.categories.find((c) => c.id === type.category_id)?.label || '—'}
                   </td>
                   <td className="py-2 pr-3 text-center">
                     {type.has_unit_pricing ? `${type.included_units} ${type.unit_label || 'inclus'}` : '—'}
@@ -419,6 +380,7 @@ function EquipmentTypesPanel({ admin }) {
       {showModal && (
         <EquipmentTypeModal
           type={editing}
+          categories={admin.categories.filter((c) => c.is_active || c.id === editing?.category_id)}
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSave={async (payload) => {
             try {
@@ -438,11 +400,12 @@ function EquipmentTypesPanel({ admin }) {
   );
 }
 
-function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
+function EquipmentTypeModal({ type, categories = [], onClose, onSave, isSaving }) {
+  const isEdit = !!type;
   const [form, setForm] = useState({
     code: type?.code || '',
     label: type?.label || '',
-    category: type?.category || '',
+    category_id: type?.category_id || '',
     has_unit_pricing: type?.has_unit_pricing || false,
     unit_label: type?.unit_label || '',
     included_units: type?.included_units ?? 0,
@@ -470,6 +433,10 @@ function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
       toast.error('Code et libellé requis');
       return;
     }
+    if (!form.category_id) {
+      toast.error('Catégorie requise — créez-la dans l\'onglet Catégories si elle n\'existe pas');
+      return;
+    }
     if (form.duration_base_minutes !== '') {
       const parsedDuration = parseInt(form.duration_base_minutes, 10);
       if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
@@ -480,9 +447,12 @@ function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
       }
     }
     onSave({
-      code: form.code.trim().toUpperCase(),
+      // Le code n'est envoyé qu'à la création, tel que saisi : le site vitrine et les
+      // icônes désignent les types par code, un renommage (ou une mise en majuscules)
+      // à l'édition les casserait en silence.
+      ...(isEdit ? {} : { code: form.code.trim() }),
       label: form.label.trim(),
-      category: form.category || null,
+      category_id: form.category_id,
       has_unit_pricing: form.has_unit_pricing,
       unit_label: form.has_unit_pricing ? (form.unit_label.trim() || null) : null,
       included_units: form.has_unit_pricing ? (parseInt(form.included_units, 10) || 0) : 0,
@@ -499,23 +469,29 @@ function EquipmentTypeModal({ type, onClose, onSave, isSaving }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Code" required>
-            <TextInput value={form.code} onChange={(v) => set('code', v)} placeholder="POELE, PAC, ..." />
+            <TextInput value={form.code} onChange={(v) => set('code', v)} placeholder="poele_granules_elec" disabled={isEdit} />
+            {isEdit && <p className="text-xs text-secondary-400 mt-1">Immuable : site vitrine et icônes le référencent.</p>}
           </FormField>
           <FormField label="Libellé" required>
             <TextInput value={form.label} onChange={(v) => set('label', v)} />
           </FormField>
         </div>
-        <FormField label="Catégorie">
+        <FormField label="Catégorie" required>
           <select
-            value={form.category}
-            onChange={(e) => set('category', e.target.value)}
-            className="block w-full rounded-lg border border-secondary-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            value={form.category_id}
+            onChange={(e) => set('category_id', e.target.value)}
+            className={selectClass}
+            required
           >
-            <option value="">— Aucune —</option>
-            {EQUIPMENT_CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
+            <option value="">— Choisir —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}{c.is_active ? '' : ' (inactive)'}</option>
             ))}
           </select>
+          {categories.length === 0 && (
+            <p className="text-xs text-amber-700 mt-1">Aucune catégorie active : créez-en une dans l&apos;onglet Catégories.</p>
+          )}
+          <p className="text-xs text-secondary-400 mt-1">Porte la compétence requise (Équipe) et le gabarit du certificat.</p>
         </FormField>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.has_unit_pricing} onChange={(e) => set('has_unit_pricing', e.target.checked)} />
@@ -1000,6 +976,10 @@ function ExtraModal({ extra, onClose, onSave, isSaving }) {
     e.preventDefault();
     if (!form.code.trim() || !form.label.trim()) {
       toast.error('Code et libellé requis');
+      return;
+    }
+    if (!form.category_id) {
+      toast.error('Catégorie requise — créez-la dans l\'onglet Catégories si elle n\'existe pas');
       return;
     }
     onSave({

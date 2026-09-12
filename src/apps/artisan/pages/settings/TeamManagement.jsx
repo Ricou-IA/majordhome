@@ -34,12 +34,14 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
-import { SpecialtiesEditor } from './team/SpecialtiesEditor';
-import { specialtyLabel } from './team/specialtyLabels';
+import { SkillsPanel } from './team/SkillsPanel';
+import { useTeamSkills } from '@hooks/useTeamSkills';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 
 // =============================================================================
 // HELPERS
@@ -360,7 +362,8 @@ function MemberRow({
   isColorSaving,
   onDailyBudgetChange,
   onIncludeInRoutingChange,
-  onSpecialtiesChange,
+  onOpenSkills,
+  skillsSummary,
   isRoutingSaving,
 }) {
   const effectiveRole = computeEffectiveRole(member.profile, { role: member.role });
@@ -480,22 +483,33 @@ function MemberRow({
         )}
       </td>
 
-      {/* Compétences (catégories d'équipement) — filtre dur du moteur de tournées */}
+      {/* Compétences (types d'équipement × rôle, cochées comme des droits) — filtre dur des tournées */}
       <td className="py-4 px-4">
-        {!teamMember ? (
-          <span className="text-xs text-secondary-400">—</span>
-        ) : canEditColor ? (
-          <SpecialtiesEditor
-            value={teamMember.specialties || []}
-            onChange={(next) => onSpecialtiesChange(teamMember.id, next)}
-            disabled={isRoutingSaving}
-          />
+        {!teamMember || teamMember.role !== 'technician' ? (
+          <span className="text-xs text-secondary-400" title="Seuls les techniciens ont une grille de compétences">—</span>
         ) : (
-          <span className="text-xs text-secondary-500">
-            {(teamMember.specialties || []).length
-              ? teamMember.specialties.map(specialtyLabel).join(', ')
-              : 'polyvalent'}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenSkills(teamMember)}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-secondary-300 text-secondary-700 hover:border-primary-400 hover:text-primary-700"
+            >
+              Compétences
+            </button>
+            {skillsSummary && (
+              <span className="text-xs text-secondary-500 whitespace-nowrap">
+                Entretien {skillsSummary.entretien}/{skillsSummary.total} · Pose {skillsSummary.pose}/{skillsSummary.total}
+              </span>
+            )}
+            {skillsSummary && skillsSummary.entretien === 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-xs text-red-600"
+                title="Aucune compétence Entretien cochée : jamais proposé en tournée"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" /> jamais proposé
+              </span>
+            )}
+          </div>
         )}
       </td>
     </tr>
@@ -522,6 +536,14 @@ export default function TeamManagement() {
   const { setColor } = useSetTeamMemberColor(orgId);
   const { setRoutingSettings } = useSetTeamMemberRouting(orgId);
   const { ensureTeamMember } = useEnsureTeamMember(orgId);
+  // Compétences (type × rôle) des techniciens : compteurs sur la ligne, grille dans SkillsPanel.
+  const technicianIds = useMemo(
+    () => (teamMembers || []).filter((t) => t.role === 'technician').map((t) => t.id),
+    [teamMembers],
+  );
+  const { skillsByMember } = useTeamSkills(orgId, technicianIds);
+  const { equipmentTypes: activeTypes } = useEquipmentReferential();
+  const [skillsFor, setSkillsFor] = useState(null);
   const tmByUser = useMemo(() => {
     const map = new Map();
     (teamMembers || []).forEach((t) => { if (t.user_id) map.set(t.user_id, t); });
@@ -706,26 +728,6 @@ export default function TeamManagement() {
     }
   };
 
-  /**
-   * Compétences d'un membre (team_member.specialties) — même RPC combinée, patch
-   * partiel. `[]` est envoyé tel quel (= polyvalent), jamais transformé en null.
-   */
-  const handleSpecialtiesChange = async (teamMemberId, specialties) => {
-    setSavingRoutingId(teamMemberId);
-    try {
-      const result = await setRoutingSettings({ teamMemberId, specialties });
-      if (result?.error) {
-        toast.error(routingSettingsErrorMessage(result.error, "Erreur lors de l'enregistrement des compétences"));
-      } else {
-        toast.success('Compétences mises à jour');
-      }
-    } catch (err) {
-      toast.error(routingSettingsErrorMessage(err, 'Erreur inattendue'));
-    } finally {
-      setSavingRoutingId(null);
-    }
-  };
-
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -805,7 +807,7 @@ export default function TeamManagement() {
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Compétences
-                  <span className="block text-xs font-normal text-secondary-400">Catégories d&apos;équipement — vide = polyvalent</span>
+                  <span className="block text-xs font-normal text-secondary-400">Types d&apos;équipement, par rôle — coché = compétent</span>
                 </th>
               </tr>
             </thead>
@@ -826,7 +828,14 @@ export default function TeamManagement() {
                     isColorSaving={!!tm && savingColorId === tm.id}
                     onDailyBudgetChange={handleDailyBudgetChange}
                     onIncludeInRoutingChange={handleIncludeInRoutingChange}
-                    onSpecialtiesChange={handleSpecialtiesChange}
+                    onOpenSkills={setSkillsFor}
+                    skillsSummary={tm && tm.role === 'technician' && skillsByMember.has(tm.id)
+                      ? {
+                        entretien: skillsByMember.get(tm.id).entretien.size,
+                        pose: skillsByMember.get(tm.id).pose.size,
+                        total: activeTypes.length,
+                      }
+                      : null}
                     isRoutingSaving={!!tm && savingRoutingId === tm.id}
                   />
                 );
@@ -885,6 +894,15 @@ export default function TeamManagement() {
         onConfirm={handleRoleChangeConfirm}
         loading={updatingUserId === roleChangeConfirm?.member?.user_id}
       />
+
+      {/* Grille de compétences (types × rôles) d'un technicien */}
+      {skillsFor && (
+        <SkillsPanel
+          teamMember={skillsFor}
+          canEdit={isOrgAdmin}
+          onClose={() => setSkillsFor(null)}
+        />
+      )}
     </div>
   );
 }
