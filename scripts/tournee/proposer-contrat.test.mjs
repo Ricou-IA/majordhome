@@ -296,3 +296,20 @@ test('temps perdu pénalisé : à coût proche, la place qui laisse 50 min inuti
   assert.ok(j16.scoreMinutes > j16.coutMinutes);
   assert.ok(j17.scoreMinutes < j16.scoreMinutes, 'l enchaînement est mieux classé que le temps perdu');
 });
+
+test('trajet max entre clients : rien de raisonnable → nouvellesJournees, motif trajet compté', () => {
+  // Client isolé : 80 min de tout le monde, 60 min du dépôt. Journées amorcées seulement (hors horizon ferme : pas de vide proposable comme créneau).
+  const loin = (a, b) => (a === b ? 0 : (a === '43.900,1.900' || b === '43.900,1.900' ? 60 : 80));
+  const journees = [
+    journee('2026-10-13', 'antoine', [rdv('x', '08:00', 43.7, 2.1, 60)]),
+    journee('2026-10-14', 'antoine', []),
+  ];
+  const r = proposerPourContrat({
+    contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT,
+    reglages: { ...REGLAGES, trajet_max_entre_clients_minutes: 45, souplesse_defaut_minutes: 30 },
+    trajet: loin, aujourdhui: AUJOURDHUI,
+  });
+  assert.equal(r.creneaux.length, 0);
+  assert.equal(r.raisonsRejet.trajet, 1);
+  assert.deepEqual(r.nouvellesJournees.map((j) => j.date), ['2026-10-14']);
+});

@@ -19,6 +19,7 @@ const MOTIFS = {
   budget: 'journée(s) pleine(s)',
   pause: 'pause déjeuner impossible',
   position: 'client non localisé',
+  trajet: 'trajet trop long entre deux clients',
 };
 const ERREURS = {
   siege_non_configure: 'Siège non configuré (Settings → Organisation → Territoire)',
@@ -105,7 +106,8 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
 
       {creneaux.length === 0 && (
         <p className="text-sm text-secondary-600">
-          Aucun créneau dans une tournée existante{motifs.length ? ` — ${motifs.join(', ')}` : ''}.
+          Aucune insertion raisonnable dans une tournée existante{motifs.length ? ` — ${motifs.join(', ')}` : ''}.
+          {nouvellesJournees.length > 0 && ' Ouvrez une nouvelle journée, puis remplissez-la avec les clients du secteur (onglet Tournées).'}
         </p>
       )}
 

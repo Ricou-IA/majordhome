@@ -37,7 +37,7 @@
  * part ; ce n'est pas ça qu'il faut retenir si, ailleurs, il ne manquait que
  * la pause ou le budget.
  */
-const RANG_RAISON = { creneau: 0, pause: 1, budget: 2 };
+const RANG_RAISON = { creneau: 0, pause: 1, budget: 2, trajet: 3 };
 
 /** Ce que coûte un trajet manquant : jamais 0 (cf. matrice.js). */
 const trajetOu = (trajet, a, b) => {
@@ -199,6 +199,9 @@ function pausePossible(places, pause) {
  * @param {{min?: number, max?: number}} [params.fenetreArrivee]  borne l'heure
  *   d'ARRIVÉE (minutes depuis minuit) — « plutôt le matin » = { max: 719 },
  *   « l'après-midi » = { min: 720 }. Absent : comportement inchangé.
+ * @param {number} [params.trajetMaxMinutes]  trajet maximum entre le candidat et
+ *   un voisin CLIENT (les trajets dépôt↔candidat ne comptent pas). Au-delà,
+ *   l'intervalle est refusé pour « trajet ». Absent : pas de limite.
  * @returns {{
  *   faisable: boolean, raison: ('budget'|'creneau'|'pause'|'position'|null),
  *   arriveeMinutes: number|null, departMinutes: number|null,
@@ -216,7 +219,7 @@ function pausePossible(places, pause) {
  *   ne mesurent pas la même chose, et rien ne le disait.
  */
 export function placerCandidat({
-  arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, fenetreArrivee,
+  arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, fenetreArrivee, trajetMaxMinutes,
 }) {
   const echec = (raison) => ({
     faisable: false,
@@ -263,6 +266,15 @@ export function placerCandidat({
 
     const cout = allee + duree + retour - evite;
     const auPlusTot = dispoDepuis + allee;
+
+    // Trajet maximum entre deux clients : une insertion à 80 min de trajet
+    // « rentre » mais n'est pas raisonnable — mieux vaut ouvrir une journée.
+    if (trajetMaxMinutes != null) {
+      if ((iv.avantId && allee > trajetMaxMinutes) || (iv.apresId && retour > trajetMaxMinutes)) {
+        noterRaison('trajet');
+        return { placeIci: false, manque: 0 };
+      }
+    }
 
     // Trois arrivées essayées : au plus tôt, puis les deux qui laissent le
     // technicien déjeuner d'abord (dès l'ouverture de sa fenêtre de pause, ou

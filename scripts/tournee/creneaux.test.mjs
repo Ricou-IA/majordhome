@@ -466,3 +466,22 @@ test('souplesse : à coût et heure égaux, la place sans décalage gagne', () =
   });
   assert.deepEqual(r.decalages, []);
 });
+
+// ============================================================================
+// Trajet maximum entre deux clients (décision Eric 2026-09-12) : « ça rentre »
+// n'est pas « c'est raisonnable ». Les trajets dépôt↔candidat ne comptent pas.
+// ============================================================================
+test('trajetMaxMinutes : une insertion à 80 min d un client voisin est refusée pour « trajet », le dépôt est exempté', () => {
+  const arrets = [arret('a', 480, 60)];
+  const loin = (x, y) => (x === y ? 0 : (x === DEPOT || y === DEPOT ? 60 : 80));
+  // Sans limite : rentre après a (trajet 80).
+  const sans = placerCandidat({ arrets, candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] } });
+  assert.equal(sans.faisable, true);
+  // Avec limite 45 : après a = 80 > 45 → refusé ; avant a = arrivée depuis le dépôt (exempté) puis 80 vers a → refusé aussi.
+  const avec = placerCandidat({ arrets, candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] }, trajetMaxMinutes: 45 });
+  assert.equal(avec.faisable, false);
+  assert.equal(avec.raison, 'trajet');
+  // Journée vide : seuls des trajets dépôt↔candidat → la limite ne s'applique pas.
+  const vide = placerCandidat({ arrets: [], candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] }, trajetMaxMinutes: 45 });
+  assert.equal(vide.faisable, true);
+});

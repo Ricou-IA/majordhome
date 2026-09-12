@@ -139,7 +139,7 @@ export function proposerPourContrat({
   contrat, journees, techniciens, depot, reglages, contraintes = {}, trajet, aujourdhui,
   maxResults = 4, estime = false, maintenantMinutes = null, margeAujourdhuiMinutes = 60,
 }) {
-  const raisons = { competence: 0, horizon: 0, contrainte: 0, creneau: 0, budget: 0, pause: 0, position: 0 };
+  const raisons = { competence: 0, horizon: 0, contrainte: 0, creneau: 0, budget: 0, pause: 0, position: 0, trajet: 0 };
   const competents = techniciensEligibles(contrat, techniciens);
   raisons.competence = (techniciens || []).length - competents.length;
   const eligibles = competents.filter((t) => !contraintes.technicianId || t.id === contraintes.technicianId);
@@ -180,6 +180,7 @@ export function proposerPourContrat({
       arrets, candidat, trajet, depotKey, amplitude: j.amplitude,
       fenetreArrivee: fenetreDuJour(fenetreArrivee, j, { aujourdhui, maintenantMinutes, margeMinutes: margeAujourdhuiMinutes }),
       budgetMinutes: j.budgetMinutes, pause, chargeDeja,
+      trajetMaxMinutes: reglages.trajet_max_entre_clients_minutes ?? null,
     });
     if (!place.faisable) {
       raisons[place.raison] = (raisons[place.raison] || 0) + 1;

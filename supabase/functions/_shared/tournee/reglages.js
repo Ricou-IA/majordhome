@@ -28,6 +28,11 @@ export const REGLAGES_DEFAUT = {
   reste_utile_min_minutes: 75,
   // Fenêtres « demi-journée » (time_flex_minutes = 240), en heures.
   demi_journee: { matin: [8, 12], apres_midi: [13, 18] },
+  // Trajet maximum entre DEUX CLIENTS pour qu'une insertion soit raisonnable
+  // (décision Eric 2026-09-12 : « tout rentre » ≠ « c'est raisonnable »). Les
+  // trajets depuis/vers le dépôt en sont exclus : un client isolé impose un
+  // aller dédié — c'est précisément le cas « ouvrir une nouvelle journée ».
+  trajet_max_entre_clients_minutes: 45,
 };
 
 export function construireReglages(settings) {
