@@ -57,7 +57,7 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       arrets,
       trajet,
       amplitude: journee.amplitude,
-      budgetMinutes: journee.budgetMinutes,
+      budgetMinutes: journee.budgetMinutes + (reglages.depassement_journee_minutes ?? 0),
       pause: { minutes: reglages.pause_minutes, fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60] },
       // Un figé est un fait : arriver « en retard » selon nos estimations ne
       // bloque pas la journée (leçon du 31/08).
@@ -71,6 +71,8 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
         faisable: false, raison: seq.raison, lignes: [],
         diagnostic: d ? {
           ...d,
+          budgetMinutes: journee.budgetMinutes,
+          depassementMinutes: reglages.depassement_journee_minutes ?? 0,
           conflits: d.conflits.map((c) => ({ ...c, label: nom(c.id), depuisLabel: nom(c.depuisId) })),
         } : null,
         estime: !(paires instanceof Map) || paires.size === 0,

@@ -180,10 +180,10 @@ export async function chargerJournees({
  * terrain montre un décalage de durée), catégories d'équipement (compétence
  * requise) et coordonnées du client.
  *
- * @param {{ client: object, coreOrgId: string, contractId: string }} p
+ * @param {{ client: object, coreOrgId: string, contractId: string, reglages?: object|null }} p
  * @returns {Promise<{ data: { id, clientId, clientName, ville, lat, lng, dureeMinutes, categories: string[], typesNonRenseignes: number, sansEquipement: boolean }|null, error: Error|null }>}
  */
-export async function chargerContrat({ client, coreOrgId, contractId }) {
+export async function chargerContrat({ client, coreOrgId, contractId, reglages = null }) {
   const [{ data: contrat, error: cErr }, { data: types, error: tErr }] = await Promise.all([
     client.from('majordhome_contracts')
       .select('id, client_id, client_name, client_city, client_postal_code, start_date')
@@ -218,7 +218,9 @@ export async function chargerContrat({ client, coreOrgId, contractId }) {
   // Un contrat sans équipement rattaché n'a pas de durée calculable : on ne
   // pose JAMAIS un RDV de 0 minute, on prend la durée par défaut et on le dit.
   const sansEquipement = (equipements || []).length === 0;
-  const duree = sansEquipement ? DUREE_DEFAUT : dureeContrat(equipements, typesById, fallbacks);
+  const duree = sansEquipement
+    ? DUREE_DEFAUT
+    : dureeContrat(equipements, typesById, fallbacks, { gainMultiPct: reglages?.gain_multi_equipements_pct ?? 0 });
   return {
     data: {
       id: contrat.id,

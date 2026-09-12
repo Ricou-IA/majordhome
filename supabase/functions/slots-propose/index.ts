@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     const depot = siegeDepuis(settings);
     if (!depot) return jsonResponse({ error: "siege_non_configure" }, 422, req);
 
-    const { data: contrat, error: cErr } = await chargerContrat({ client: admin, coreOrgId: orgId, contractId });
+    const { data: contrat, error: cErr } = await chargerContrat({ client: admin, coreOrgId: orgId, contractId, reglages });
     if (cErr || !contrat) {
       // Un contrat absent et une erreur DB (42501, réseau…) ne sont pas la même
       // chose : masquer la seconde en « introuvable » serait un échec silencieux.

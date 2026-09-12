@@ -22,6 +22,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { tourneesService } from '@services/tournees.service';
 import { tourneeKeys } from '@hooks/cacheKeys';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 
 // Re-export for backward compatibility
 export { tourneeKeys } from '@hooks/cacheKeys';
@@ -36,10 +38,14 @@ export { tourneeKeys } from '@hooks/cacheKeys';
  *   `data` = tableau de `Candidat` (cf. JSDoc du service).
  */
 export function useContratsDus(coreOrgId) {
+  // Les durées des candidats dépendent des réglages d'org (gain multi-équipements) :
+  // la clé les porte pour qu'un changement de réglage recalcule la liste.
+  const { settings } = useOrgSettings();
+  const gainMultiPct = construireReglages(settings).gain_multi_equipements_pct ?? 0;
   return useQuery({
-    queryKey: tourneeKeys.contratsDus(coreOrgId),
+    queryKey: [...tourneeKeys.contratsDus(coreOrgId), { gainMultiPct }],
     queryFn: async () => {
-      const { data, error } = await tourneesService.getContratsDus({ coreOrgId });
+      const { data, error } = await tourneesService.getContratsDus({ coreOrgId, settings });
       if (error) throw error;
       return data;
     },

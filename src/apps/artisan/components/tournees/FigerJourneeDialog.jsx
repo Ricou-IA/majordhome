@@ -51,6 +51,7 @@ export function FigerJourneeDialog({ journee, consolidation }) {
                   {apercu.diagnostic.pauseMinutes ? ` (+ ${apercu.diagnostic.pauseMinutes} min de pause)` : ''}
                   {' = '}<span className="font-medium">{formatDuree(apercu.diagnostic.chargeMinutes)}</span>
                   {' pour un budget de '}{formatDuree(apercu.diagnostic.budgetMinutes)}
+                  {apercu.diagnostic.depassementMinutes ? ` (+ ${apercu.diagnostic.depassementMinutes} min tolérées)` : ''}
                   {apercu.diagnostic.depasseBudget ? ' — dépassé' : ''}.
                 </li>
                 {apercu.diagnostic.conflits.map((c) => (

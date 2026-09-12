@@ -33,6 +33,17 @@ export const REGLAGES_DEFAUT = {
   // trajets depuis/vers le dépôt en sont exclus : un client isolé impose un
   // aller dédié — c'est précisément le cas « ouvrir une nouvelle journée ».
   trajet_max_entre_clients_minutes: 45,
+  // Les durées du barème sont celles d'interventions ISOLÉES. Chez un client à
+  // plusieurs équipements, l'installation, les allers-retours au véhicule et la
+  // paperasse sont mutualisés : Eric estime le gain à 10 % (2026-09-12).
+  // Appliqué à la somme des barèmes dès 2 équipements ; 0 = somme brute.
+  gain_multi_equipements_pct: 10,
+  // Dépassement toléré de la journée de travail : finir 30 min plus tard
+  // certains jours est normal — d'autres sont « fini-parti » (le technicien
+  // rentre plus tôt, le budget est un plafond, pas une cible). Le budget
+  // affiché reste daily_work_minutes ; le moteur refuse au-delà de
+  // budget + dépassement.
+  depassement_journee_minutes: 30,
 };
 
 export function construireReglages(settings) {
