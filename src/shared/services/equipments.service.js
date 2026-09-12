@@ -84,7 +84,9 @@ export const equipmentsService = {
         .from('majordhome_equipments')
         .insert({
           project_id: client.project_id,
-          category: equipmentData.category,
+          // Pas de `category` : la catégorie est dérivée du type par le trigger
+          // equipments_sync_category (référentiel 2026-09). Un équipement sans type
+          // reste non catégorisé — on ne devine pas.
           equipment_type_id: equipmentData.equipmentTypeId || null,
           brand: equipmentData.brand,
           model: equipmentData.model,
@@ -115,7 +117,7 @@ export const equipmentsService = {
           org_id: client.org_id,
           activity_type: 'equipment_added',
           title: 'Équipement ajouté',
-          description: `${equipmentData.brand || ''} ${equipmentData.model || ''} (${equipmentData.category || ''})`.trim(),
+          description: `${equipmentData.brand || ''} ${equipmentData.model || ''}`.trim() || 'Équipement',
           reference_type: 'equipment',
           reference_id: data.id,
           is_system: true,
@@ -133,7 +135,7 @@ export const equipmentsService = {
       if (!equipmentId) throw new Error('[equipmentsService] equipmentId est requis');
 
       const updateData = {};
-      if (updates.category !== undefined) updateData.category = updates.category;
+      // `category` n'est plus écrite : elle suit le type (trigger equipments_sync_category).
       if (updates.equipmentTypeId !== undefined) updateData.equipment_type_id = updates.equipmentTypeId || null;
       if (updates.brand !== undefined) updateData.brand = updates.brand;
       if (updates.model !== undefined) updateData.model = updates.model;

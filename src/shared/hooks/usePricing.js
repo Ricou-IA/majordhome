@@ -22,7 +22,8 @@ import {
 } from '@services/pricing.service';
 import { useAuth } from '@contexts/AuthContext';
 import { getOrgHeadquarters } from '@/lib/territoire-config';
-import { contractKeys, pricingKeys } from '@hooks/cacheKeys';
+import { clientKeys, contractKeys, pricingKeys } from '@hooks/cacheKeys';
+import { equipmentCategoriesService } from '@services/equipmentCategories.service';
 
 // Re-export for backward compatibility
 export { pricingKeys } from '@hooks/cacheKeys';
@@ -35,7 +36,7 @@ export { pricingKeys } from '@hooks/cacheKeys';
  * Charge toutes les données de référence pricing en une requête, scopées sur
  * l'organisation courante (RLS + filtre explicite défense en profondeur).
  *
- * @returns {Object} { zones, equipmentTypes, rates, discounts, extras, isLoading, error }
+ * @returns {Object} { zones, equipmentTypes, categories, rates, discounts, extras, isLoading, error }
  */
 export function usePricingData() {
   const { organization } = useAuth();
@@ -55,6 +56,7 @@ export function usePricingData() {
   return {
     zones: data?.zones || [],
     equipmentTypes: data?.equipmentTypes || [],
+    categories: data?.categories || [],
     rates: data?.rates || [],
     discounts: data?.discounts || [],
     extras: data?.extras || [],
@@ -79,12 +81,26 @@ export function usePricingAdmin() {
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: pricingKeys.all(orgId) });
+    // Les sélecteurs (useEquipmentReferential, usePricingEquipmentTypes) lisent les
+    // types actifs sous clientKeys.pricingTypes : un type créé ou re-catégorisé ici
+    // doit s'y refléter sans attendre les 10 min de staleTime.
+    queryClient.invalidateQueries({ queryKey: clientKeys.pricingTypes(orgId) });
   }, [queryClient, orgId]);
 
   const zonesQuery = useQuery({
     queryKey: pricingKeys.zones(orgId),
     queryFn: async () => {
       const r = await pricingService.getZones(orgId, { activeOnly: false });
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!orgId,
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: pricingKeys.categories(orgId, false),
+    queryFn: async () => {
+      const r = await equipmentCategoriesService.getCategories(orgId, { activeOnly: false });
       if (r.error) throw r.error;
       return r.data;
     },
@@ -152,6 +168,19 @@ export function usePricingAdmin() {
     ...mutationOptions,
   });
 
+  const createCategory = useMutation({
+    mutationFn: (payload) => unwrap(equipmentCategoriesService.createCategory(orgId, payload)),
+    ...mutationOptions,
+  });
+  const updateCategory = useMutation({
+    mutationFn: ({ id, payload }) => unwrap(equipmentCategoriesService.updateCategory(id, payload)),
+    ...mutationOptions,
+  });
+  const deleteCategory = useMutation({
+    mutationFn: (id) => unwrap(equipmentCategoriesService.deleteCategory(id)),
+    ...mutationOptions,
+  });
+
   const createEquipmentType = useMutation({
     mutationFn: (payload) => unwrap(pricingService.createEquipmentType(orgId, payload)),
     ...mutationOptions,
@@ -203,23 +232,27 @@ export function usePricingAdmin() {
   return {
     orgId,
     zones: zonesQuery.data || [],
+    categories: categoriesQuery.data || [],
     equipmentTypes: equipmentTypesQuery.data || [],
     rates: ratesQuery.data || [],
     discounts: discountsQuery.data || [],
     extras: extrasQuery.data || [],
     isLoading:
       zonesQuery.isLoading ||
+      categoriesQuery.isLoading ||
       equipmentTypesQuery.isLoading ||
       ratesQuery.isLoading ||
       discountsQuery.isLoading ||
       extrasQuery.isLoading,
     error:
       zonesQuery.error ||
+      categoriesQuery.error ||
       equipmentTypesQuery.error ||
       ratesQuery.error ||
       discountsQuery.error ||
       extrasQuery.error,
     createZone, updateZone, deleteZone,
+    createCategory, updateCategory, deleteCategory,
     createEquipmentType, updateEquipmentType, deleteEquipmentType,
     upsertRate, deleteRate,
     createExtra, updateExtra, deleteExtra,

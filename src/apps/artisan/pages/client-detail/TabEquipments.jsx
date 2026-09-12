@@ -63,7 +63,6 @@ export const TabEquipments = ({ clientId }) => {
   const handleAdd = async (formData) => {
     try {
       const payload = {
-        category: formData.category,
         equipmentTypeId: formData.equipmentTypeId,
         brand: formData.brand,
         model: formData.model,
@@ -101,7 +100,6 @@ export const TabEquipments = ({ clientId }) => {
   const handleEdit = async (formData) => {
     try {
       await updateEquipment(editingEquipment.id, {
-        category: formData.category,
         equipmentTypeId: formData.equipmentTypeId,
         brand: formData.brand,
         model: formData.model,

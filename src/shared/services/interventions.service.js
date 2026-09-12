@@ -182,14 +182,14 @@ export const interventionsService = {
       if (equipmentIds.length > 0) {
         const { data: equipments } = await supabase
           .from('majordhome_equipments')
-          .select('id, category, brand, model')
+          .select('id, category_id, brand, model')
           .in('id', equipmentIds);
 
         if (equipments) {
           const eqMap = Object.fromEntries(equipments.map((e) => [e.id, e]));
           for (const item of withEquipment) {
             if (item.equipment_id && eqMap[item.equipment_id]) {
-              item.equipment_category = eqMap[item.equipment_id].category;
+              item.equipment_category_id = eqMap[item.equipment_id].category_id;
               item.equipment_brand = eqMap[item.equipment_id].brand;
               item.equipment_model = eqMap[item.equipment_id].model;
             }

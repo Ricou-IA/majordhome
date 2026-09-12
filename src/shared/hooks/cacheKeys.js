@@ -183,8 +183,17 @@ export const pricingKeys = {
   discounts: (orgId) => [...pricingKeys.all(orgId), 'discounts'],
   extras: (orgId) => [...pricingKeys.all(orgId), 'extras'],
   allData: (orgId) => [...pricingKeys.all(orgId), 'allData'],
+  // Catégories d'équipement (référentiel 2026-09). activeOnly dans la clé : la liste
+  // admin (toutes) et la liste des sélecteurs (actives) ne partagent pas une entrée.
+  categories: (orgId, activeOnly = true) => [...pricingKeys.all(orgId), 'categories', activeOnly],
   contractItems: (orgId, contractId) => [...pricingKeys.all(orgId), 'contractItems', contractId],
   contractOverrides: (orgId, contractId) => [...pricingKeys.all(orgId), 'contractOverrides', contractId],
+};
+
+// --- Compétences techniciens (team_member_skills, type × rôle) ---
+export const teamSkillKeys = {
+  all: (orgId) => ['teamSkills', orgId],
+  byMembers: (orgId, memberIds) => [...teamSkillKeys.all(orgId), 'members', [...(memberIds || [])].sort().join(',')],
 };
 
 // --- Permissions ---

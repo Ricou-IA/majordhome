@@ -34,7 +34,6 @@ const DEFAULT_FILTERS = {
   postalCode: null,
   city: null,
   hasContract: null,
-  equipmentCategory: null,
   showArchived: false,
   onlyArchived: false,
   orderBy: 'display_name',
@@ -371,7 +370,7 @@ export function usePricingEquipmentTypes() {
   } = useQuery({
     queryKey: clientKeys.pricingTypes(orgId),
     queryFn: async () => {
-      const { data, error } = await clientsService.getPricingEquipmentTypes();
+      const { data, error } = await clientsService.getPricingEquipmentTypes(orgId);
       if (error) throw error;
       return data;
     },

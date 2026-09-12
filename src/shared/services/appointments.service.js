@@ -609,21 +609,21 @@ export const appointmentsService = {
    * RPC combinée `team_member_set_routing_settings` (SECURITY DEFINER, org_admin
    * only, anon révoqué — arbitrage tranché le 2026-08-29, remplace les 2 RPC à
    * champ unique proposées puis abandonnées, cf. task-8-9-report.md). Retourne la
-   * ligne `{ daily_work_minutes, include_in_routing, specialties }` APRÈS écriture — utilisée
+   * ligne `{ daily_work_minutes, include_in_routing }` APRÈS écriture — utilisée
    * par le hook pour rafraîchir le cache plutôt que de supposer le succès.
    * `p_daily_work_minutes` hors [60, 1440] lève une erreur Postgres 22023, remontée
    * telle quelle dans `error` (le caller UI la traduit en message compréhensible,
    * jamais affichée brute).
    */
-  async setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting, specialties } = {}) {
+  async setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting } = {}) {
     try {
+      // Les compétences ne passent plus ici : team_member_skills (type × rôle),
+      // via teamSkills.service.js. `p_specialties` est omis (DEFAULT NULL = inchangé)
+      // jusqu'à la contraction M2 qui retire le paramètre.
       const { data, error } = await supabase.rpc('team_member_set_routing_settings', {
         p_team_member_id: teamMemberId,
         p_daily_work_minutes: dailyWorkMinutes ?? null,
         p_include_in_routing: includeInRouting ?? null,
-        // Compétences = catégories d'équipement (2026-09-12). `[]` est une valeur
-        // (polyvalent), `undefined`/`null` = inchangé (COALESCE côté RPC).
-        p_specialties: specialties ?? null,
       });
       if (error) {
         logger.error('[appointments] setTeamMemberRoutingSettings error:', error);

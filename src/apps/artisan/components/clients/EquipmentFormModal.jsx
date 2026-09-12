@@ -36,7 +36,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
-import { usePricingEquipmentTypes } from '@hooks/useClients';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useSuppliers, useAllProducts } from '@hooks/useSuppliers';
 
 // ============================================================================
@@ -56,17 +57,6 @@ const generateYears = () => {
 };
 
 const YEARS = generateYears();
-
-/**
- * Labels des catégories pour le groupement dans le <select>
- */
-const CATEGORY_LABELS = {
-  poeles: 'Poêles',
-  chaudieres: 'Chaudières',
-  climatisation: 'Climatisation / PAC',
-  eau_chaude: 'Eau chaude',
-  energie: 'Énergie',
-};
 
 /**
  * État initial du formulaire
@@ -97,7 +87,7 @@ export function EquipmentFormModal({
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const { suppliers, isLoading: suppliersLoading } = useSuppliers(orgId);
-  const { equipmentTypes, isLoading: typesLoading } = usePricingEquipmentTypes();
+  const { equipmentTypes, index: referentiel, isLoading: typesLoading } = useEquipmentReferential();
   const { products: allProducts } = useAllProducts(orgId);
 
   // Trouver le supplier correspondant à la saisie marque (match exact par nom)
@@ -115,16 +105,8 @@ export function EquipmentFormModal({
   // Mode édition ou ajout
   const isEditMode = !!equipment;
 
-  // Grouper les types par catégorie pour le <select> avec <optgroup>
-  const groupedTypes = useMemo(() => {
-    const groups = {};
-    for (const type of equipmentTypes) {
-      const cat = type.category || 'autre';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(type);
-    }
-    return groups;
-  }, [equipmentTypes]);
+  // Types groupés par catégorie de l'org (libellé de la catégorie en optgroup)
+  const groupedTypes = useMemo(() => grouperTypesParCategorie(referentiel, equipmentTypes), [referentiel, equipmentTypes]);
 
   // Reset ou pré-remplissage du formulaire à l'ouverture
   useEffect(() => {
@@ -183,22 +165,14 @@ export function EquipmentFormModal({
     }));
   };
 
-  // Soumission : on envoie l'equipmentTypeId + le category ENUM dérivé
+  // Soumission : le type suffit — la catégorie est dérivée du type par la base
+  // (trigger equipments_sync_category), une seule source de mapping.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.equipmentTypeId) return;
 
-    // Trouver le type sélectionné pour récupérer le equipment_category (ENUM)
-    // Fallback 'autre' : equipments.category est NOT NULL. Certains types
-    // (Panneau photovoltaïque, Prestations…) n'ont pas de equipment_category mappé
-    // → ne JAMAIS envoyer null (violation NOT NULL). Le type précis reste porté
-    // par equipment_type_id. Même convention que _pricingCodeToEquipmentCategory.
-    const selectedType = equipmentTypes.find(t => t.id === form.equipmentTypeId);
-    const category = selectedType?.equipment_category || 'autre';
-
     await onSubmit({
       equipmentTypeId: form.equipmentTypeId,
-      category,
       quantity: form.quantity || 1,
       brand: form.brand || null,
       model: form.model || null,
@@ -267,9 +241,9 @@ export function EquipmentFormModal({
               required
             >
               <option value="">Sélectionner un type...</option>
-              {Object.entries(groupedTypes).map(([category, types]) => (
-                <optgroup key={category} label={CATEGORY_LABELS[category] || category}>
-                  {types.map(type => (
+              {groupedTypes.map((groupe) => (
+                <optgroup key={groupe.category?.id ?? 'sans-categorie'} label={groupe.label}>
+                  {groupe.types.map(type => (
                     <option key={type.id} value={type.id}>{type.label}</option>
                   ))}
                 </optgroup>

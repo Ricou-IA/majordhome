@@ -43,24 +43,6 @@ export const EQUIPMENT_TYPES = [
 ];
 
 /**
- * Catégories d'équipements (ENUM majordhome.equipment_category — valeurs DB)
- * Utilisées dans le formulaire d'ajout et les contrats d'entretien
- */
-export const EQUIPMENT_CATEGORIES = [
-  { value: 'pac_air_air', label: 'PAC Air-Air' },
-  { value: 'pac_air_eau', label: 'PAC Air-Eau' },
-  { value: 'chaudiere_gaz', label: 'Chaudière Gaz' },
-  { value: 'chaudiere_fioul', label: 'Chaudière Fioul' },
-  { value: 'chaudiere_bois', label: 'Chaudière Bois' },
-  { value: 'vmc', label: 'VMC' },
-  { value: 'climatisation', label: 'Climatisation' },
-  { value: 'chauffe_eau_thermo', label: 'Chauffe-eau Thermodynamique' },
-  { value: 'ballon_ecs', label: 'Ballon ECS' },
-  { value: 'poele', label: 'Poêle' },
-  { value: 'autre', label: 'Autre' },
-];
-
-/**
  * Types de logement (ENUM majordhome.housing_type)
  */
 export const HOUSING_TYPES = [
@@ -114,7 +96,6 @@ export const clientsService = {
     postalCode = null,
     city = null,
     hasContract = null,
-    equipmentCategory = null,
     showArchived = false,
     onlyArchived = false,
     orderBy = 'display_name',
@@ -188,25 +169,7 @@ export const clientsService = {
       const { data, count, error } = await query;
       if (error) throw error;
 
-      // Si filtre équipement demandé, on filtre côté client (post-query)
-      // TODO: optimiser avec une sous-requête ou une vue quand nécessaire
-      let clients = data || [];
-
-      if (equipmentCategory && clients.length > 0) {
-        const projectIds = clients.map(c => c.project_id);
-        const { data: equipments } = await supabase
-          .from('majordhome_equipments')
-          .select('project_id')
-          .in('project_id', projectIds)
-          .eq('category', equipmentCategory);
-
-        if (equipments) {
-          const matchingProjectIds = new Set(equipments.map(e => e.project_id));
-          clients = clients.filter(c => matchingProjectIds.has(c.project_id));
-        }
-      }
-
-      return { data: clients, count };
+      return { data: data || [], count };
     }, 'clients.getClients');
   },
 
@@ -844,11 +807,13 @@ export const clientsService = {
    * Utilisé dans le formulaire d'ajout d'équipement pour le dropdown "Type"
    * @returns {Promise<{data: Array, error: Error|null}>}
    */
-  async getPricingEquipmentTypes() {
+  async getPricingEquipmentTypes(orgId) {
     return withErrorHandling(async () => {
+      if (!orgId) throw new Error('[clientsService] orgId est requis');
       const { data, error } = await supabase
         .from('majordhome_pricing_equipment_types')
         .select('*')
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .order('sort_order');
 

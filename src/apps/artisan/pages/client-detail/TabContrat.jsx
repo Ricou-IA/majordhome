@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -8,10 +8,11 @@ import {
   CheckCircle2, XCircle, Ban,
 } from 'lucide-react';
 import { useClientContract, useContractEquipments, useContractVisits, useContractMutations } from '@hooks/useContracts';
-import { usePricingEquipmentTypes, clientKeys } from '@hooks/useClients';
+import { clientKeys } from '@hooks/useClients';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { libelleEquipement } from '@/lib/equipmentReferential';
 import { CONTRACT_STATUSES, MAINTENANCE_MONTHS } from '@services/contracts.service';
 import { formatEuro } from '@/lib/utils';
-import { EQUIPMENT_TYPES } from '@services/clients.service';
 import { formatDateForInput, formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -48,21 +49,8 @@ const getEquipmentIcon = (type) => {
 
 const ContractEquipmentsSection = ({ contractId }) => {
   const { equipments, isLoading } = useContractEquipments(contractId);
-  const { equipmentTypes } = usePricingEquipmentTypes();
-
-  const pricingTypesMap = useMemo(() => {
-    const map = {};
-    for (const t of equipmentTypes) map[t.id] = t;
-    return map;
-  }, [equipmentTypes]);
-
-  const getLabel = (eq) => {
-    if (eq.equipment_type_id && pricingTypesMap[eq.equipment_type_id]) {
-      return pricingTypesMap[eq.equipment_type_id].label;
-    }
-    const type = eq.equipment_type || eq.category;
-    return EQUIPMENT_TYPES?.find((t) => t.value === type)?.label || type || 'Équipement';
-  };
+  const { index: referentiel } = useEquipmentReferential();
+  const getLabel = (eq) => libelleEquipement(eq, referentiel);
 
   return (
     <div className="pt-6 border-t border-secondary-200">
@@ -81,10 +69,10 @@ const ContractEquipmentsSection = ({ contractId }) => {
       ) : (
         <div className="space-y-2">
           {equipments.map((eq) => {
-            const Icon = getEquipmentIcon(eq.equipment_type || eq.category);
+            const Icon = getEquipmentIcon(referentiel.categoriesById.get(eq.category_id)?.code);
             const typeLabel = getLabel(eq);
             const unitCount = eq.unit_count || 1;
-            const pricingType = eq.equipment_type_id && pricingTypesMap[eq.equipment_type_id];
+            const pricingType = eq.equipment_type_id ? referentiel.typesById.get(eq.equipment_type_id) : null;
             const unitLabel = pricingType?.unit_label || 'unité';
             const details = [eq.brand, eq.model, eq.serial_number].filter(v => v && v !== 'À renseigner');
             return (

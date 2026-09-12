@@ -29,6 +29,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { equipmentCategoriesService } from './equipmentCategories.service';
 
 // Re-export zone detection par temps de trajet (Phase unification contrats)
 export { detectZoneForAddress, detectZoneByDuration } from '@/lib/zoneDetection';
@@ -316,17 +317,19 @@ export const pricingService = {
    */
   async getAllPricingData(orgId) {
     try {
-      const [zonesResult, typesResult, ratesResult, discountsResult, extrasResult] =
+      const [zonesResult, typesResult, ratesResult, discountsResult, extrasResult, categoriesResult] =
         await Promise.all([
           this.getZones(orgId),
           this.getEquipmentTypes(orgId),
           this.getRates(orgId),
           this.getDiscounts(orgId),
           this.getExtras(orgId),
+          // Catégories d'équipement (référentiel 2026-09) : niveau 1 des types.
+          equipmentCategoriesService.getCategories(orgId),
         ]);
 
       // Vérifier les erreurs
-      const errors = [zonesResult, typesResult, ratesResult, discountsResult, extrasResult]
+      const errors = [zonesResult, typesResult, ratesResult, discountsResult, extrasResult, categoriesResult]
         .filter((r) => r.error)
         .map((r) => r.error);
 
@@ -342,6 +345,7 @@ export const pricingService = {
           rates: ratesResult.data,
           discounts: discountsResult.data,
           extras: extrasResult.data,
+          categories: categoriesResult.data,
         },
         error: null,
       };

@@ -14,7 +14,7 @@
  * ============================================================================
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Wrench,
   Flame,
@@ -38,17 +38,21 @@ import {
   FileText,
   Download,
 } from 'lucide-react';
-import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES } from '@services/clients.service';
 import { storageService } from '@services/storage.service';
-import { usePricingEquipmentTypes } from '@hooks/useClients';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { indexReferentiel, libelleEquipement } from '@/lib/equipmentReferential';
 import { formatDateShortFR } from '@/lib/utils';
+
+const REFERENTIEL_VIDE = indexReferentiel();
 
 // ============================================================================
 // UTILITAIRES
 // ============================================================================
 
 /**
- * Icône selon le type d'équipement
+ * Icône selon le CODE de catégorie de l'équipement (référentiel de l'org).
+ * Les codes ci-dessous sont ceux repris de l'ancien enum : une org qui nomme
+ * ses catégories autrement voit l'icône générique — cosmétique, pas une règle.
  */
 const getEquipmentIcon = (type) => {
   const icons = {
@@ -87,16 +91,6 @@ const getEquipmentColor = (type) => {
     poele: 'bg-red-100 text-red-600',
   };
   return colors[type] || 'bg-gray-100 text-gray-600';
-};
-
-/**
- * Label du type d'équipement
- */
-const getEquipmentLabel = (type) => {
-  // Chercher dans les types legacy puis dans les catégories DB
-  const found = EQUIPMENT_TYPES.find(t => t.value === type)
-    || EQUIPMENT_CATEGORIES.find(t => t.value === type);
-  return found?.label || type || 'Équipement';
 };
 
 // formatDate alias → formatDateShortFR from utils
@@ -197,7 +191,7 @@ const EquipmentCard = ({
   onRemoveFromContract,
   expanded,
   onToggleExpand,
-  pricingTypesMap = {},
+  referentiel = REFERENTIEL_VIDE,
   hasContract = false,
   isLinkedToContract = false,
   productDocuments = [],
@@ -205,7 +199,6 @@ const EquipmentCard = ({
   const [showMenu, setShowMenu] = useState(false);
 
   const {
-    equipment_type,
     brand,
     model,
     serial_number,
@@ -216,14 +209,16 @@ const EquipmentCard = ({
     notes,
   } = equipment;
 
-  const Icon = getEquipmentIcon(equipment_type);
-  const iconColor = getEquipmentColor(equipment_type);
+  const categoryCode = referentiel.categoriesById.get(equipment.category_id)?.code;
+  const Icon = getEquipmentIcon(categoryCode);
+  const iconColor = getEquipmentColor(categoryCode);
   const maintenanceStatus = getMaintenanceStatus(next_maintenance_date);
   const MaintenanceIcon = maintenanceStatus.icon || Calendar;
   const hasWarranty = isWarrantyActive(warranty_end_date);
   const unitCount = equipment.unit_count || 1;
-  const pricingType = equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id];
+  const pricingType = equipment.equipment_type_id ? referentiel.typesById.get(equipment.equipment_type_id) : null;
   const unitLabel = pricingType?.unit_label || 'unité';
+  const categoryLabel = equipment.category_id ? referentiel.labelCategorie(equipment.category_id) : null;
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow relative">
@@ -238,8 +233,17 @@ const EquipmentCard = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h4 className="font-medium text-gray-900">
-                  {pricingType ? pricingType.label : getEquipmentLabel(equipment_type)}
+                  {libelleEquipement(equipment, referentiel)}
                 </h4>
+                {pricingType && categoryLabel && (
+                  <span className="text-xs text-gray-400">{categoryLabel}</span>
+                )}
+                {!equipment.equipment_type_id && (
+                  // Sans type : durée de repli dans les tournées, compétence par catégorie seulement.
+                  <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200" title="Choisissez un type précis (modifier) : durée d'entretien et compétence requise en dépendent">
+                    type à renseigner
+                  </span>
+                )}
                 {unitCount > 1 && (
                   <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700">
                     {unitCount} {unitLabel}{unitCount > 1 ? 's' : ''}
@@ -474,16 +478,7 @@ export function EquipmentList({
   readOnly = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
-  const { equipmentTypes } = usePricingEquipmentTypes();
-
-  // Map pricing types par id pour lookup rapide des labels
-  const pricingTypesMap = useMemo(() => {
-    const map = {};
-    for (const t of equipmentTypes) {
-      map[t.id] = t;
-    }
-    return map;
-  }, [equipmentTypes]);
+  const { index: referentiel } = useEquipmentReferential();
 
   const toggleExpand = (id) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -561,7 +556,7 @@ export function EquipmentList({
           isLinkedToContract={contractEquipmentIds.has(equipment.id)}
           expanded={expandedId === equipment.id}
           onToggleExpand={() => toggleExpand(equipment.id)}
-          pricingTypesMap={pricingTypesMap}
+          referentiel={referentiel}
           productDocuments={productDocumentsMap[equipment.supplier_product_id] || []}
         />
       ))}
@@ -577,16 +572,7 @@ export function EquipmentList({
  * Version compacte de la liste (pour affichage dans modale)
  */
 export function EquipmentListCompact({ equipments = [], onSelect }) {
-  const { equipmentTypes } = usePricingEquipmentTypes();
-
-  // Map pricing types par id pour lookup rapide des labels
-  const pricingTypesMap = useMemo(() => {
-    const map = {};
-    for (const t of equipmentTypes) {
-      map[t.id] = t;
-    }
-    return map;
-  }, [equipmentTypes]);
+  const { index: referentiel } = useEquipmentReferential();
 
   if (equipments.length === 0) {
     return (
@@ -599,8 +585,9 @@ export function EquipmentListCompact({ equipments = [], onSelect }) {
   return (
     <div className="space-y-2">
       {equipments.map(equipment => {
-        const Icon = getEquipmentIcon(equipment.equipment_type);
-        const iconColor = getEquipmentColor(equipment.equipment_type);
+        const categoryCode = referentiel.categoriesById.get(equipment.category_id)?.code;
+        const Icon = getEquipmentIcon(categoryCode);
+        const iconColor = getEquipmentColor(categoryCode);
 
         return (
           <div
@@ -617,13 +604,11 @@ export function EquipmentListCompact({ equipments = [], onSelect }) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {equipment.equipment_type_id && pricingTypesMap[equipment.equipment_type_id]
-                    ? pricingTypesMap[equipment.equipment_type_id].label
-                    : getEquipmentLabel(equipment.equipment_type)}
+                  {libelleEquipement(equipment, referentiel)}
                 </p>
                 {(equipment.unit_count || 1) > 1 && (
                   <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700 flex-shrink-0">
-                    {equipment.unit_count} {pricingTypesMap[equipment.equipment_type_id]?.unit_label || 'unité'}{equipment.unit_count > 1 ? 's' : ''}
+                    {equipment.unit_count} {referentiel.typesById.get(equipment.equipment_type_id)?.unit_label || 'unité'}{equipment.unit_count > 1 ? 's' : ''}
                   </span>
                 )}
               </div>
