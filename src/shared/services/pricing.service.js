@@ -38,17 +38,6 @@ export { detectZoneForAddress, detectZoneByDuration } from '@/lib/zoneDetection'
 // CONSTANTES
 // ============================================================================
 
-/**
- * Catégories visuelles pour regrouper les types d'équipements
- */
-export const EQUIPMENT_TYPE_CATEGORIES = [
-  { value: 'poeles', label: 'Poêles & Inserts' },
-  { value: 'chaudieres', label: 'Chaudières' },
-  { value: 'climatisation', label: 'Climatisation & PAC' },
-  { value: 'eau_chaude', label: 'Eau chaude & Solaire' },
-  { value: 'energie', label: 'Énergie' },
-];
-
 // ============================================================================
 // HELPERS
 // ============================================================================

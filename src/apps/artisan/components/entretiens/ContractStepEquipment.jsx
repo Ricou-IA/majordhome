@@ -18,7 +18,7 @@ import {
   Calculator,
   Tag,
 } from 'lucide-react';
-import { EQUIPMENT_TYPE_CATEGORIES } from '@services/pricing.service';
+import { indexReferentiel, grouperTypesParCategorie } from '@/lib/equipmentReferential';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -29,19 +29,14 @@ export function Step2Equipment({ pricingData, calculator, clientAddress }) {
   const { activeZone, items, pricing, addItem, removeItem, updateItemQuantity, isDetectingZone, durationMinutes, hqLabel } = calculator;
   const zoneSupplement = parseFloat(activeZone?.supplement || 0);
 
-  // Grouper les types d'équipements par catégorie
+  // Grouper les types d'équipements par catégorie de l'org (pricingData.categories)
   const groupedTypes = useMemo(() => {
     if (!equipmentTypes?.length) return [];
-    const groups = {};
-    for (const et of equipmentTypes) {
-      if (!groups[et.category]) {
-        const catInfo = EQUIPMENT_TYPE_CATEGORIES.find((c) => c.value === et.category);
-        groups[et.category] = { category: et.category, label: catInfo?.label || et.category, items: [] };
-      }
-      groups[et.category].items.push(et);
-    }
-    return Object.values(groups);
-  }, [equipmentTypes]);
+    const index = indexReferentiel({ categories: pricingData.categories || [], equipmentTypes });
+    return grouperTypesParCategorie(index, equipmentTypes).map((g) => ({
+      key: g.category?.id ?? 'sans-categorie', label: g.label, items: g.types,
+    }));
+  }, [equipmentTypes, pricingData.categories]);
 
   // Set des IDs sélectionnés pour lookup rapide
   const selectedIds = useMemo(
@@ -98,7 +93,7 @@ export function Step2Equipment({ pricingData, calculator, clientAddress }) {
       {/* Sélecteur d'équipements par catégorie */}
       <div className="space-y-4">
         {groupedTypes.map((group) => (
-          <div key={group.category}>
+          <div key={group.key}>
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
               {group.label}
             </h4>
