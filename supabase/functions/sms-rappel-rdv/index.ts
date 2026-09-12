@@ -75,6 +75,8 @@ interface OrgReport {
   no_mobile?: number;
   failed?: number;
   mark_failed?: number;
+  /** dry_run seulement : le gabarit manque, rien ne partirait en réel. */
+  template_missing?: boolean;
   preview?: Array<Record<string, unknown>>;
   failures?: Array<{ appointment_id: string; error: string }>;
 }
@@ -186,10 +188,16 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
+      // Sans gabarit rien ne part — mais un dry-run doit quand même montrer QUI
+      // serait rappelé : c'est ainsi qu'on vérifie le périmètre avant de configurer.
       const template = sms.templates?.[CAMPAIGN];
-      if (!template || (!template.whatsapp && !template.sms)) {
-        report.skipped = "campaign_template_missing";
-        continue;
+      const hasTemplate = !!(template && (template.whatsapp || template.sms));
+      if (!hasTemplate) {
+        if (!dryRun) {
+          report.skipped = "campaign_template_missing";
+          continue;
+        }
+        report.template_missing = true;
       }
 
       const { data: rows, error: candErr } = await admin.rpc("sms_rappel_rdv_candidates", {
