@@ -17,6 +17,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService } from './entretiens.service';
+import { logger } from '@lib/logger';
+import { minutesVersHeure as minutesVersHHMM } from '@/lib/tournee/arrets.js';
 
 // ============================================================================
 // CONSTANTES — STATUTS & TRANSITIONS
@@ -493,15 +495,21 @@ export const savService = {
    * Planifie une carte entretien/SAV : crée le(s) RDV (1 par créneau), pose la date
    * + workflow_status='planifie', confirme un éventuel brouillon Web.
    * Source unique appelée par le kanban ET le modal ContractModal.
+   *
+   * Souplesse (spec 2026-09-12) : `timeFlexMinutes` s'applique à chaque créneau
+   * (sauf s'il porte déjà le sien) ; `decalages` = les voisins adaptables que le
+   * moteur a dû glisser pour faire rentrer le RDV — écrits APRÈS le RDV, jamais
+   * en silence : un décalage refusé remonte en erreur (le RDV, lui, est posé).
    * @returns {{ error: any }}
    */
-  async scheduleEntretien({ card, slots, includesEntretien = false, coreOrgId }) {
+  async scheduleEntretien({ card, slots, includesEntretien = false, coreOrgId, timeFlexMinutes = null, decalages = [] }) {
     try {
       if (!card?.id || !slots?.length) return { error: { message: 'invalid_args' } };
       const isSav = card.intervention_type === 'sav';
 
       const { appointmentsService } = await import('@services/appointments.service');
-      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
+      const slotsAvecSouplesse = slots.map((s) => ({ ...s, timeFlexMinutes: s.timeFlexMinutes ?? timeFlexMinutes }));
+      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slotsAvecSouplesse, {
         coreOrgId,
         appointment_type: isSav ? 'service' : 'maintenance',
         intervention_id: card.id,
@@ -527,6 +535,21 @@ export const savService = {
       if (card.client_id && card.tags?.includes('Web')) {
         const { clientsService } = await import('@services/clients.service');
         await clientsService.confirmWebDraft(card.client_id);
+      }
+
+      // Décalages des voisins adaptables (un seul en V1, mais on itère).
+      for (const d of decalages || []) {
+        if (!d?.id || d.debutMinutesApres == null) continue;
+        const debut = minutesVersHHMM(d.debutMinutesApres);
+        const fin = d.dureeMinutes ? minutesVersHHMM(d.debutMinutesApres + d.dureeMinutes) : undefined;
+        const { error: decErr } = await appointmentsService.updateAppointment(d.id, {
+          scheduled_start: debut,
+          ...(fin ? { scheduled_end: fin } : {}),
+        });
+        if (decErr) {
+          logger.error('[sav] scheduleEntretien décalage refusé', decErr);
+          return { error: { message: 'decalage_refuse', detail: d.label || d.id } };
+        }
       }
       return { error: null };
     } catch (error) {

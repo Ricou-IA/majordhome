@@ -11,6 +11,7 @@
  * ============================================================================
  */
 
+import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
 import { useState, useMemo, useCallback } from 'react';
 import { X, ClipboardCheck, Check } from 'lucide-react';
 import { useTeamMembers } from '@hooks/useAppointments';
@@ -21,11 +22,13 @@ import { SchedulingAssistant } from '@apps/artisan/components/planning/schedulin
 // COMPOSANT
 // ============================================================================
 
-export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) {
+export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, souplesseDefaut = 30 }) {
   const { members: teamMembers } = useTeamMembers(orgId);
 
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
   const [loading, setLoading] = useState(false);
+  // Souplesse du RDV (spec 2026-09-12) : null = défaut d'org, 0 = figé.
+  const [timeFlexMinutes, setTimeFlexMinutes] = useState(null);
 
   // Objet "lead-like" pour le SchedulingAssistant — déclaré AVANT early return
   // (règle React Hooks : ordre stable des hooks à chaque render).
@@ -46,11 +49,11 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const handleConfirmScheduling = useCallback(async (slots) => {
     setLoading(true);
     try {
-      await onConfirm(slots, includesEntretien);
+      await onConfirm(slots, includesEntretien, { timeFlexMinutes: timeFlexMinutes ?? souplesseDefaut });
     } finally {
       setLoading(false);
     }
-  }, [onConfirm, includesEntretien]);
+  }, [onConfirm, includesEntretien, timeFlexMinutes, souplesseDefaut]);
 
   if (!item) return null;
 
@@ -100,6 +103,11 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Souplesse du RDV : jusqu'où son heure peut glisser pour la tournée. */}
+          <div className="rounded-lg border border-secondary-200 p-3 space-y-2">
+            <p className="text-xs font-medium text-secondary-600">Souplesse du rendez-vous</p>
+            <SouplesseSelect value={timeFlexMinutes} onChange={setTimeFlexMinutes} defaut={souplesseDefaut} compact />
+          </div>
           {/* Toggle Entretien (SAV uniquement) */}
           {isSAV && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">

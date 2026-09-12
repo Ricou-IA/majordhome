@@ -212,7 +212,11 @@ export function proposerPourContrat({
     // utile se mesure à sa NOUVELLE heure.
     const decalages = (place.decalages || []).map((d) => {
       const r = parId.get(d.id);
-      return { ...d, label: r?.client_name || d.id, ville: r?.city || null, tolerance: arretParId.get(d.id)?.tolerance ?? null };
+      const a = arretParId.get(d.id);
+      return {
+        ...d, label: r?.client_name || d.id, ville: r?.city || null,
+        dureeMinutes: a?.dureeMinutes ?? r?.duration_minutes ?? null, tolerance: a?.tolerance ?? null,
+      };
     });
     const apresDecale = decalages.find((d) => d.id === apres?.id);
     const debutSuivant = apresDecale ? apresDecale.debutMinutesApres : apres?.debutMinutes;

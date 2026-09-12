@@ -35,6 +35,9 @@ import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientC
 import { deriveVisitBadgeStatus } from '@/lib/entretienVisitStatus';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
 import { CreneauxProposesPanel } from './CreneauxProposesPanel';
+import { SouplesseDialog } from './SouplesseDialog';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -87,6 +90,10 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const [schedulingItem, setSchedulingItem] = useState(null);
   const [creneauxOuverts, setCreneauxOuverts] = useState(false);
   const [posing, setPosing] = useState(false);
+  // Créneau choisi en attente de sa souplesse (SouplesseDialog).
+  const [slotEnAttente, setSlotEnAttente] = useState(null);
+  const { settings: orgSettings } = useOrgSettings();
+  const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
 
   /**
    * Item de planification construit depuis le contrat — SANS écriture en base.
@@ -123,7 +130,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     setCreneauxOuverts(true);
   }, [contract, itemDepuisContrat]);
 
-  const handleConfirmScheduling = useCallback(async (slots) => {
+  const handleConfirmScheduling = useCallback(async (slots, { timeFlexMinutes = null, decalages = [] } = {}) => {
     const orgId = organization?.id;
     // La carte n'existe (ou n'est réutilisée) qu'ICI, juste avant le RDV —
     // même enchaînement que useJourneePose. Jamais avant un choix humain.
@@ -143,9 +150,18 @@ export function ContractModal({ contractId, isOpen, onClose }) {
       slots,
       includesEntretien: false,
       coreOrgId: orgId,
+      timeFlexMinutes,
+      decalages,
     });
-    if (error) { toast.error('Erreur création du RDV'); return { ok: false }; }
-    toast.success('RDV planifié avec succès');
+    if (error?.message === 'decalage_refuse') {
+      // Le RDV est posé, le voisin n'a pas bougé : on le dit, on ne masque rien.
+      toast.error(`RDV posé, mais ${error.detail || 'le RDV voisin'} n'a pas pu être décalé — vérifiez le planning`);
+    } else if (error) {
+      toast.error('Erreur création du RDV');
+      return { ok: false };
+    } else {
+      toast.success('RDV planifié avec succès');
+    }
     setSchedulingOpen(false);
     setSchedulingItem(null);
     queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
@@ -162,22 +178,29 @@ export function ContractModal({ contractId, isOpen, onClose }) {
    * (scheduleEntretien). Une « nouvelle journée » (journée vide hors horizon)
    * ouvre l'assistant classique : le choix de l'heure reste humain.
    */
-  const handleChoisirCreneau = useCallback(async (slot) => {
+  const handleChoisirCreneau = useCallback((slot) => {
     if (slot.nouvelleJournee) {
       setCreneauxOuverts(false);
       setSchedulingOpen(true);
       return;
     }
+    // Avant d'écrire : la souplesse du RDV (et l'annonce au client), dans SouplesseDialog.
+    setSlotEnAttente(slot);
+  }, []);
+
+  const handleConfirmerSouplesse = useCallback(async ({ timeFlexMinutes }) => {
+    const slot = slotEnAttente;
+    if (!slot) return;
     setPosing(true);
     try {
       // Sur échec, la liste reste affichée : l'utilisateur peut réessayer ou
       // choisir un autre créneau (le toast d'erreur est déjà parti).
-      const result = await handleConfirmScheduling([slot]);
-      if (result?.ok) setCreneauxOuverts(false);
+      const result = await handleConfirmScheduling([slot], { timeFlexMinutes, decalages: slot.decalages || [] });
+      if (result?.ok) { setCreneauxOuverts(false); setSlotEnAttente(null); }
     } finally {
       setPosing(false);
     }
-  }, [handleConfirmScheduling]);
+  }, [handleConfirmScheduling, slotEnAttente]);
 
   // Gestion ESC pour fermer
   useEffect(() => {
@@ -380,11 +403,20 @@ export function ContractModal({ contractId, isOpen, onClose }) {
           )}
         </div>
       </div>
+      <SouplesseDialog
+        open={!!slotEnAttente}
+        slot={slotEnAttente}
+        defaut={souplesseDefaut}
+        loading={posing}
+        onConfirm={handleConfirmerSouplesse}
+        onCancel={() => setSlotEnAttente(null)}
+      />
       {schedulingOpen && schedulingItem && (
         <SchedulingTransitionModal
           item={schedulingItem}
           orgId={organization?.id}
-          onConfirm={handleConfirmScheduling}
+          souplesseDefaut={souplesseDefaut}
+          onConfirm={(slots, _includesEntretien, options) => handleConfirmScheduling(slots, options)}
           onCancel={() => { setSchedulingOpen(false); setSchedulingItem(null); }}
         />
       )}

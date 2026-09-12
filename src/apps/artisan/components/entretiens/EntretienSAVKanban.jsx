@@ -191,7 +191,7 @@ export function EntretienSAVKanban() {
     }
   }, [pendingTransition, updateFields, updateWorkflowStatus, refresh]);
 
-  const handleConfirmSchedule = useCallback(async (slots, includesEntretien) => {
+  const handleConfirmSchedule = useCallback(async (slots, includesEntretien, options = {}) => {
     if (!pendingTransition) return;
     if (!slots || slots.length === 0) return;
     const item = pendingTransition.item;
@@ -201,6 +201,7 @@ export function EntretienSAVKanban() {
         slots,
         includesEntretien,
         coreOrgId: orgId,
+        timeFlexMinutes: options.timeFlexMinutes ?? null,
       });
       if (error) {
         toast.error('Erreur lors de la planification');

@@ -735,7 +735,9 @@ export const appointmentsService = {
   /**
    * Crée N appointments (1 par créneau) en réutilisant createAppointment
    * (donc même syncCardStateOnCreate + sync Google par appointment).
-   * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes? }]
+   * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes?, timeFlexMinutes? }]
+   *   timeFlexMinutes : souplesse (0 figé / 15 / 30 / 240 demi-journée) ; absent = défaut d'org (NULL en base).
+   *   0 ⇒ hour_confirmed_at = maintenant (l'heure est annoncée ferme au client).
    * shared = { coreOrgId, appointment_type, lead_id?, intervention_id?, client_id?,
    *            client_name?, client_first_name?, client_phone?, client_email?,
    *            address?, city?, postal_code?, assigned_commercial_id?, description?, subjectPrefix? }
@@ -768,6 +770,8 @@ export const appointmentsService = {
         status: 'scheduled',
         priority: 'normal',
         internal_notes: slot.notes || null,
+        time_flex_minutes: slot.timeFlexMinutes ?? null,
+        hour_confirmed_at: slot.timeFlexMinutes === 0 ? new Date().toISOString() : null,
       });
       if (error) return { data: created, error };
       created.push(data);

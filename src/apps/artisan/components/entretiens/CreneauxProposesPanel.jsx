@@ -32,6 +32,7 @@ const hhmmVersMinutes = (hhmm) => {
   return h * 60 + (m || 0);
 };
 
+const minutesVersHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 const dureeCourte = (min) => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}` : `${min} min`);
 
 /**
@@ -120,7 +121,11 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
             endTime: k.fin,
             duration: hhmmVersMinutes(k.fin) - hhmmVersMinutes(k.debut),
             technicianIds: [k.technicianId],
+            technicianNom: k.technicianNom,
             subject: sujet,
+            // Voisin adaptable à glisser pour que ce créneau tienne (0 ou 1) — écrit
+            // avec le RDV par scheduleEntretien, annoncé dans SouplesseDialog.
+            decalages: (k.decalages || []).map((d) => ({ ...d, dureeMinutes: d.dureeMinutes ?? null })),
           })}
         >
           <div className="flex items-center gap-2 text-sm">
@@ -142,6 +147,12 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
             {k.apres ? `${k.trajetRetourMinutes} min → ${k.apres.label}${k.apres.ville ? ` (${k.apres.ville})` : ''}` : `${k.trajetRetourMinutes} min → retour dépôt`}
           </div>
           {(() => { const l = lectureReste(k.resteUtileMinutes, k.apres); return <div className={`text-xs mt-0.5 ${l.ton}`}>{l.texte}</div>; })()}
+          {(k.decalages || []).map((d) => (
+            <div key={d.id} className="text-xs mt-0.5 text-amber-700">
+              rentre si {d.label} passe de {minutesVersHHMM(d.debutMinutesAvant)} à {minutesVersHHMM(d.debutMinutesApres)}
+              {d.tolerance?.flex ? ` (±${d.tolerance.flex} min)` : ''}
+            </div>
+          ))}
         </button>
       ))}
 
