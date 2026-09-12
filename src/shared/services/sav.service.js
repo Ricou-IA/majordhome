@@ -1024,6 +1024,32 @@ export const savService = {
     }
     return { data: { success: true }, error: null };
   },
+
+  /**
+   * SMS d'heure de passage (consolidation « Figer la journée », spec 2026-09-12) :
+   * « votre technicien passera vers 10h30 ». Campagne `heure_de_passage`, gabarit
+   * dans core.organizations.settings.sms.templates — absent ⇒ l'edge répond
+   * `campaign_template_missing`, remonté tel quel (l'appelant le dit à l'écran).
+   * Pas de mobile FR ⇒ `no_mobile` (pas une erreur d'envoi, juste rien à envoyer).
+   */
+  async sendHeureDePassage({ orgId, clientId, clientPhone, clientFirstName, clientName, date, heure, technicien }) {
+    if (!isMobileFR(clientPhone)) return { data: null, error: new Error('no_mobile') };
+    const { error } = await invokeSmsSend({
+      campaign: 'heure_de_passage',
+      phone: clientPhone,
+      org_id: orgId,
+      client_id: clientId || undefined,
+      vars: {
+        first_name: clientFirstName || '',
+        name: clientName || '',
+        date: date || '',
+        heure: heure || '',
+        technicien: technicien || '',
+      },
+    });
+    if (error) return { data: null, error };
+    return { data: { success: true }, error: null };
+  },
 };
 
 export default savService;

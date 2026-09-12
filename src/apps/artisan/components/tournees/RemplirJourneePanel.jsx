@@ -41,7 +41,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { X, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { X, Loader2, AlertTriangle, RotateCcw, Lock } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
@@ -56,6 +56,8 @@ import { PropositionRow } from './PropositionRow';
 import { JourneeTimeline } from './JourneeTimeline';
 import { useJourneePose } from './useJourneePose';
 import { useAjustementsJournee } from './useAjustementsJournee';
+import { useConsolidationJournee } from './useConsolidationJournee';
+import { FigerJourneeDialog } from './FigerJourneeDialog';
 import { RAISON_LABELS, minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 
 /**
@@ -123,6 +125,12 @@ export function RemplirJourneePanel({
     survoleId: survole,
   });
 
+  // Consolidation « Figer la journée » (spec 2026-09-12) : heures définitives
+  // dans les fenêtres de tolérance + SMS d'heure de passage.
+  const consolidation = useConsolidationJournee({
+    journee: journeeAjustee, depot, reglages, paires: data?.paires, coreOrgId,
+  });
+
   // Ce que la barre montre en surimpression. Une seule simulation la remplit :
   // celle qui inclut le candidat survolé s'il y en a un, sinon celle de la
   // sélection. Mélanger deux simulations replacerait les blocs déjà cochés à
@@ -184,6 +192,18 @@ export function RemplirJourneePanel({
                 </span>
               )}
             </p>
+            {nbAjustements === 0 && consolidation.peutFiger && canCreer && (
+              <button
+                type="button"
+                onClick={consolidation.ouvrir}
+                disabled={posing || calculatingReel}
+                title="Ordonnancer la journée dans les fenêtres de tolérance, figer les heures, prévenir les clients"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary-700 hover:text-primary-900 disabled:opacity-50"
+              >
+                <Lock className="h-3 w-3" />
+                Figer la journée ({consolidation.nbAdaptables} adaptable{consolidation.nbAdaptables > 1 ? 's' : ''})
+              </button>
+            )}
             {nbAjustements > 0 && (
               <button
                 type="button"
@@ -349,6 +369,8 @@ export function RemplirJourneePanel({
           </div>
         )}
       </div>
+
+      <FigerJourneeDialog journee={journeeAjustee} consolidation={consolidation} />
 
       <ConfirmDialog
         open={confirmOpen}
