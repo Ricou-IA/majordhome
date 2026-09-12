@@ -4,10 +4,7 @@ import { ROLE_LABELS } from '@lib/permissions';
 import {
   Building2,
   Users,
-  Bell,
-  Palette,
   Shield,
-  CreditCard,
   HelpCircle,
   Truck,
   Calculator,
@@ -45,20 +42,6 @@ export default function Settings() {
       adminOnly: true,
     },
     {
-      title: 'Notifications',
-      icon: Bell,
-      description: 'Configurer vos préférences de notification',
-      href: '/settings/notifications',
-      adminOnly: false,
-    },
-    {
-      title: 'Apparence',
-      icon: Palette,
-      description: 'Personnaliser l\'affichage de l\'application',
-      href: '/settings/appearance',
-      adminOnly: false,
-    },
-    {
       title: 'Fournisseurs',
       icon: Truck,
       description: 'Gérer les fournisseurs et catalogues produits',
@@ -84,13 +67,6 @@ export default function Settings() {
       icon: Thermometer,
       description: 'Paramètres de calcul des études de déperditions',
       href: '/settings/thermique',
-      adminOnly: true,
-    },
-    {
-      title: 'Facturation',
-      icon: CreditCard,
-      description: 'Gérer votre abonnement et vos factures',
-      href: '/settings/billing',
       adminOnly: true,
     },
   ];
