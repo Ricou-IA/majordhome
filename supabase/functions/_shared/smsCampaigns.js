@@ -1,3 +1,4 @@
+// ⚠️ COPIE GÉNÉRÉE par scripts/sync-tournee-engine.mjs depuis src/lib/smsCampaigns.js — ne pas éditer.
 // src/lib/smsCampaigns.js
 // ============================================================================
 // Campagnes SMS / WhatsApp — registre + helpers PURS (aucun import React/Supabase).

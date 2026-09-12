@@ -74,6 +74,12 @@ verify_jwt = true
 [functions.sms-send]
 verify_jwt = true
 
+# Rappel automatique des RDV d'entretien (cron pg_cron horaire, réglage par org
+# settings.sms.rappel_rdv : veille / hebdo / off) — protégée par MDH_CRON_SECRET.
+# Même cœur d'envoi que sms-send (_shared/sms.ts).
+[functions.sms-rappel-rdv]
+verify_jwt = false
+
 # Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
 [functions.pvgis-proxy]
 verify_jwt = true

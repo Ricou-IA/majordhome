@@ -8,7 +8,13 @@ import {
   getSmsCampaign,
   formatSmsDate,
   formatSmsHour,
-  buildConfirmationRdvVars,
+  buildRappelRdvVars,
+  buildRappelRdvConfig,
+  planifierRappelRdv,
+  decrireRappelRdv,
+  jourSemaineIso,
+  ajouterJours,
+  JOURS_SEMAINE,
   smsNameForMember,
   normalizeSmsTemplates,
   listSmsCampaignsForEditor,
@@ -19,12 +25,12 @@ import {
 
 const VAR_RE = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
 
-test('registre — les 3 campagnes appelées par le code, variables de confirmation_rdv', () => {
+test('registre — les 3 campagnes appelées par le code, variables de rappel_rdv', () => {
   assert.deepEqual(
     SMS_CAMPAIGNS.map((c) => c.key),
-    ['avis_j1', 'rappel_entretien', 'confirmation_rdv'],
+    ['avis_j1', 'rappel_entretien', 'rappel_rdv'],
   );
-  const conf = getSmsCampaign('confirmation_rdv');
+  const conf = getSmsCampaign('rappel_rdv');
   assert.deepEqual(conf.variables.map((v) => v.name), ['prenom', 'date', 'heure', 'technicien']);
   assert.equal(getSmsCampaign('inconnue'), null);
 });
@@ -40,7 +46,7 @@ test('registre — chaque texte suggéré n’utilise que les variables de sa ca
       }
     }
   }
-  const conf = getSmsCampaign('confirmation_rdv');
+  const conf = getSmsCampaign('rappel_rdv');
   const used = new Set([...conf.suggested.sms.matchAll(VAR_RE)].map((m) => m[1]));
   assert.deepEqual([...used].sort(), ['date', 'heure', 'prenom', 'technicien']);
 });
@@ -63,15 +69,15 @@ test('formatSmsHour — 9h30 / 14h, tolère les secondes', () => {
   assert.equal(formatSmsHour('abc'), '');
 });
 
-test('buildConfirmationRdvVars — exactement les 4 variables, toujours des chaînes', () => {
-  const vars = buildConfirmationRdvVars({
+test('buildRappelRdvVars — exactement les 4 variables, toujours des chaînes', () => {
+  const vars = buildRappelRdvVars({
     clientFirstName: ' Jean ',
     date: '2026-10-13',
     startTime: '09:30',
     technicianName: 'Philippe',
   });
   assert.deepEqual(vars, { prenom: 'Jean', date: 'mardi 13 octobre', heure: '9h30', technicien: 'Philippe' });
-  assert.deepEqual(buildConfirmationRdvVars({}), { prenom: '', date: '', heure: '', technicien: '' });
+  assert.deepEqual(buildRappelRdvVars({}), { prenom: '', date: '', heure: '', technicien: '' });
 });
 
 test('smsNameForMember — prénom du technicien, repli nom complet', () => {
@@ -84,18 +90,18 @@ test('normalizeSmsTemplates — retire les textes vides et les campagnes sans te
   const out = normalizeSmsTemplates({
     avis_j1: { whatsapp: '  Bonjour  ', sms: '', deburr: false },
     rappel_entretien: { whatsapp: '', sms: '   ', deburr: true },
-    confirmation_rdv: { sms: 'RDV {{date}}', deburr: true },
+    rappel_rdv: { sms: 'RDV {{date}}', deburr: true },
   });
   assert.deepEqual(out, {
     avis_j1: { whatsapp: 'Bonjour' },
-    confirmation_rdv: { sms: 'RDV {{date}}', deburr: true },
+    rappel_rdv: { sms: 'RDV {{date}}', deburr: true },
   });
   assert.deepEqual(normalizeSmsTemplates(undefined), {});
 });
 
 test('listSmsCampaignsForEditor — registre d’abord, clés inconnues en base préservées et signalées', () => {
-  const rows = listSmsCampaignsForEditor({ confirmation_rdv: { sms: 'x' }, legacy_promo: { sms: 'y' } });
-  assert.deepEqual(rows.map((r) => r.key), ['avis_j1', 'rappel_entretien', 'confirmation_rdv', 'legacy_promo']);
+  const rows = listSmsCampaignsForEditor({ rappel_rdv: { sms: 'x' }, legacy_promo: { sms: 'y' } });
+  assert.deepEqual(rows.map((r) => r.key), ['avis_j1', 'rappel_entretien', 'rappel_rdv', 'legacy_promo']);
   assert.equal(rows[2].unknown, false);
   assert.equal(rows[3].unknown, true);
   assert.deepEqual(rows[3].variables, []);
@@ -116,7 +122,7 @@ test('estimateSmsSegments — GSM-7 160/segment, UCS-2 70/segment dès un caract
 });
 
 test('findUnknownVariables — signale les {{…}} hors registre, accents et fautes de frappe compris', () => {
-  const conf = getSmsCampaign('confirmation_rdv');
+  const conf = getSmsCampaign('rappel_rdv');
   assert.deepEqual(findUnknownVariables('Bonjour {{prenom}}, le {{date}} à {{heure}}', conf), []);
   assert.deepEqual(findUnknownVariables('Bonjour {{prénom}}, le {{ date }} avec {{tech}}', conf), ['prénom', 'tech']);
   // short_link / short_code sont injectés par l'edge pour toute campagne
@@ -131,3 +137,48 @@ test('deburrSms — même règle que l’edge : accents retirés, apostrophes et
   assert.equal(deburrSms("l'entretien d’été"), "l'entretien d’ete");
   assert.equal(deburrSms(''), '');
 });
+
+test('jourSemaineIso / ajouterJours — lundi = 1, dimanche = 7, arithmétique de dates sans fuseau', () => {
+  assert.equal(jourSemaineIso('2026-09-14'), 1); // lundi
+  assert.equal(jourSemaineIso('2026-09-20'), 7); // dimanche
+  assert.equal(ajouterJours('2026-09-14', 6), '2026-09-20');
+  assert.equal(ajouterJours('2026-12-31', 1), '2027-01-01');
+  assert.equal(ajouterJours('2026-03-28', 2), '2026-03-30'); // passage à l'heure d'été sans glissement
+});
+
+test('buildRappelRdvConfig — défauts off / lundi / 8h, valeurs hors bornes ramenées aux défauts', () => {
+  assert.deepEqual(buildRappelRdvConfig(undefined), { mode: 'off', jour: 1, heure: 8 });
+  assert.deepEqual(buildRappelRdvConfig({ rappel_rdv: { mode: 'veille', heure: 18 } }), { mode: 'veille', jour: 1, heure: 18 });
+  assert.deepEqual(buildRappelRdvConfig({ rappel_rdv: { mode: 'hebdo', jour: 5, heure: 9 } }), { mode: 'hebdo', jour: 5, heure: 9 });
+  assert.deepEqual(buildRappelRdvConfig({ rappel_rdv: { mode: 'demain', jour: 9, heure: 3 } }), { mode: 'off', jour: 1, heure: 8 });
+});
+
+test('planifierRappelRdv — veille : chaque jour à H (tolérance H+1), fenêtre = lendemain', () => {
+  const cfg = { mode: 'veille', jour: 1, heure: 8 };
+  assert.deepEqual(planifierRappelRdv(cfg, { date: '2026-09-15', heure: 8 }), { debut: '2026-09-16', fin: '2026-09-16' });
+  assert.deepEqual(planifierRappelRdv(cfg, { date: '2026-09-15', heure: 9 }), { debut: '2026-09-16', fin: '2026-09-16' });
+  assert.equal(planifierRappelRdv(cfg, { date: '2026-09-15', heure: 7 }), null);
+  assert.equal(planifierRappelRdv(cfg, { date: '2026-09-15', heure: 10 }), null);
+});
+
+test('planifierRappelRdv — hebdo : le jour choisi à H, fenêtre = 7 jours à partir du jour même', () => {
+  const lundi = { mode: 'hebdo', jour: 1, heure: 8 };
+  assert.deepEqual(planifierRappelRdv(lundi, { date: '2026-09-14', heure: 8 }), { debut: '2026-09-14', fin: '2026-09-20' });
+  assert.equal(planifierRappelRdv(lundi, { date: '2026-09-15', heure: 8 }), null); // mardi
+  const vendredi = { mode: 'hebdo', jour: 5, heure: 17 };
+  assert.deepEqual(planifierRappelRdv(vendredi, { date: '2026-09-18', heure: 18 }), { debut: '2026-09-18', fin: '2026-09-24' });
+});
+
+test('planifierRappelRdv — off ou config invalide : jamais rien', () => {
+  assert.equal(planifierRappelRdv({ mode: 'off', jour: 1, heure: 8 }, { date: '2026-09-14', heure: 8 }), null);
+  assert.equal(planifierRappelRdv(undefined, { date: '2026-09-14', heure: 8 }), null);
+});
+
+test('decrireRappelRdv — phrase lisible pour l’onglet Settings', () => {
+  assert.equal(decrireRappelRdv({ mode: 'off', jour: 1, heure: 8 }), 'Désactivé : aucun rappel automatique.');
+  assert.equal(decrireRappelRdv({ mode: 'veille', jour: 1, heure: 18 }), 'Chaque jour à 18h, pour les rendez-vous du lendemain.');
+  assert.equal(decrireRappelRdv({ mode: 'hebdo', jour: 1, heure: 8 }), 'Chaque lundi à 8h, pour les rendez-vous des 7 jours suivants.');
+  assert.equal(JOURS_SEMAINE[0].label, 'lundi');
+  assert.equal(JOURS_SEMAINE.length, 7);
+});
+

@@ -6,7 +6,9 @@
 //   - identité d'expéditeur (enabled, sms_from, whatsapp_from, short_link_base) :
 //     LECTURE SEULE — posée par la plateforme à l'onboarding (le nom d'expéditeur
 //     SMS doit être déclaré auprès de l'opérateur), comme la clé Twilio elle-même ;
-//   - templates[campagne] = { whatsapp?, sms?, deburr? } : ÉDITABLES ici.
+//   - templates[campagne] = { whatsapp?, sms?, deburr? } : ÉDITABLES ici ;
+//   - rappel_rdv = { mode, jour, heure } : réglage du rappel automatique des RDV
+//     d'entretien (lu par l'edge `sms-rappel-rdv`, cron horaire). ÉDITABLE ici.
 // Les campagnes et leurs variables viennent du registre `src/lib/smsCampaigns.js`
 // (source unique partagée avec les émetteurs). Les clés présentes en base mais
 // inconnues du code sont affichées et préservées, jamais supprimées en silence.
@@ -24,6 +26,11 @@ import {
   findUnknownVariables,
   estimateSmsSegments,
   deburrSms,
+  buildRappelRdvConfig,
+  decrireRappelRdv,
+  JOURS_SEMAINE,
+  RAPPEL_RDV_HEURE_MIN,
+  RAPPEL_RDV_HEURE_MAX,
 } from '@/lib/smsCampaigns';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -46,6 +53,88 @@ function pickTemplates(templates, rows) {
     };
   });
   return out;
+}
+
+/** État complet du formulaire : gabarits + réglage du rappel automatique. */
+function pickForm(sms, rows) {
+  return { templates: pickTemplates(sms.templates, rows), rappel_rdv: buildRappelRdvConfig(sms) };
+}
+
+const HEURES = Array.from(
+  { length: RAPPEL_RDV_HEURE_MAX - RAPPEL_RDV_HEURE_MIN + 1 },
+  (_, i) => RAPPEL_RDV_HEURE_MIN + i,
+);
+const SELECT_CLASS = 'px-2 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+const MODES = [
+  { value: 'off', label: 'Désactivé', hint: 'Aucun rappel automatique.' },
+  { value: 'veille', label: 'La veille', hint: 'Chaque jour, pour les rendez-vous du lendemain.' },
+  { value: 'hebdo', label: 'En début de semaine', hint: 'Un jour fixe, pour les rendez-vous des 7 jours suivants.' },
+];
+
+function RappelRdvSection({ value, onChange, hasTemplate }) {
+  const actif = value.mode !== 'off';
+  return (
+    <section>
+      <h3 className={SECTION_TITLE}>Rappel des rendez-vous d&apos;entretien</h3>
+      <p className="text-xs text-secondary-500 mb-3">
+        Un SMS par rendez-vous d&apos;entretien planifié, envoyé automatiquement avec la date, l&apos;heure
+        et le technicien (gabarit « Rappel des rendez-vous d&apos;entretien » ci-dessous). Un rendez-vous
+        déplacé est rappelé de nouveau ; un rendez-vous déjà rappelé ne l&apos;est jamais deux fois.
+      </p>
+      <div className="space-y-2">
+        {MODES.map((m) => (
+          <label key={m.value} className="flex items-start gap-2 text-sm text-secondary-800 cursor-pointer">
+            <input
+              type="radio"
+              name="rappel-rdv-mode"
+              value={m.value}
+              checked={value.mode === m.value}
+              onChange={() => onChange({ mode: m.value })}
+              className="mt-1 border-secondary-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>
+              {m.label}
+              <span className="block text-xs text-secondary-500">{m.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {actif && (
+        <div className="flex flex-wrap items-center gap-3 mt-3 text-sm text-secondary-700">
+          {value.mode === 'hebdo' && (
+            <label className="flex items-center gap-2">
+              Le
+              <select
+                value={value.jour}
+                onChange={(e) => onChange({ jour: Number(e.target.value) })}
+                className={SELECT_CLASS}
+              >
+                {JOURS_SEMAINE.map((j) => <option key={j.value} value={j.value}>{j.label}</option>)}
+              </select>
+            </label>
+          )}
+          <label className="flex items-center gap-2">
+            à
+            <select
+              value={value.heure}
+              onChange={(e) => onChange({ heure: Number(e.target.value) })}
+              className={SELECT_CLASS}
+            >
+              {HEURES.map((h) => <option key={h} value={h}>{h}h</option>)}
+            </select>
+            <span className="text-xs text-secondary-500">heure de Paris</span>
+          </label>
+        </div>
+      )}
+      <p className="mt-3 text-sm font-medium text-secondary-900">{decrireRappelRdv(value)}</p>
+      {actif && !hasTemplate && (
+        <p className={ERROR_CLASS}>
+          Le gabarit « Rappel des rendez-vous d&apos;entretien » est vide : rien ne partira tant qu&apos;il
+          n&apos;est pas renseigné ci-dessous.
+        </p>
+      )}
+    </section>
+  );
 }
 
 /** Erreurs par campagne : variables {{…}} qui ne seraient pas substituées à l'envoi. */
@@ -225,37 +314,48 @@ function CampaignEditor({ row, value, error, whatsappActive, onChange }) {
 
 export default function SmsTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
-  const sms = settings?.sms || {};
+  // Référence stable (React Query) ou undefined : c'est elle qui pilote l'effet ci-dessous.
+  const smsSettings = settings?.sms;
+  const sms = smsSettings || {};
   const rows = useMemo(() => listSmsCampaignsForEditor(sms.templates), [sms.templates]);
-  const [form, setForm] = useState({});
-  const [initial, setInitial] = useState({});
+  const [form, setForm] = useState(() => ({ templates: {}, rappel_rdv: buildRappelRdvConfig({}) }));
+  const [initial, setInitial] = useState(form);
 
   useEffect(() => {
-    const picked = pickTemplates(sms.templates, rows);
+    const picked = pickForm(smsSettings || {}, rows);
     setForm(picked);
     setInitial(picked);
-  }, [sms.templates, rows]);
+  }, [smsSettings, rows]);
 
-  const errors = useMemo(() => validate(form, rows), [form, rows]);
+  const errors = useMemo(() => validate(form.templates, rows), [form.templates, rows]);
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
   const isValid = Object.keys(errors).length === 0;
 
   const patchCampaign = (key, patch) =>
-    setForm((f) => ({ ...f, [key]: { ...(f[key] || emptyTemplate()), ...patch } }));
+    setForm((f) => ({
+      ...f,
+      templates: { ...f.templates, [key]: { ...(f.templates[key] || emptyTemplate()), ...patch } },
+    }));
+  const patchRappel = (patch) => setForm((f) => ({ ...f, rappel_rdv: { ...f.rappel_rdv, ...patch } }));
+
+  const rappelTemplate = form.templates.rappel_rdv || emptyTemplate();
+  const hasRappelTemplate = !!(rappelTemplate.whatsapp.trim() || rappelTemplate.sms.trim());
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Corrige les variables inconnues avant d\'enregistrer.');
+      toast.error("Corrige les variables inconnues avant d'enregistrer.");
       return;
     }
     try {
       // Objet `sms` COMPLET : identité relue telle quelle, gabarits normalisés
-      // (textes vides retirés → l'edge répondra `campaign_template_missing`).
-      await save({ sms: { ...sms, templates: normalizeSmsTemplates(form) } });
-      toast.success('Gabarits SMS enregistrés');
+      // (textes vides retirés → `campaign_template_missing` à l'envoi), réglage du rappel.
+      await save({
+        sms: { ...sms, templates: normalizeSmsTemplates(form.templates), rappel_rdv: form.rappel_rdv },
+      });
+      toast.success('Réglages SMS enregistrés');
       setInitial(form);
     } catch (err) {
-      toast.error(err.message || 'Erreur lors de l\'enregistrement');
+      toast.error(err.message || "Erreur lors de l'enregistrement");
     }
   };
 
@@ -269,6 +369,8 @@ export default function SmsTab() {
     <div className="card space-y-8">
       <IdentitySection sms={sms} />
 
+      <RappelRdvSection value={form.rappel_rdv} onChange={patchRappel} hasTemplate={hasRappelTemplate} />
+
       <section>
         <h3 className={SECTION_TITLE}>Gabarits par campagne</h3>
         <p className="text-xs text-secondary-500 mb-4">
@@ -281,7 +383,7 @@ export default function SmsTab() {
             <CampaignEditor
               key={row.key}
               row={row}
-              value={form[row.key] || emptyTemplate()}
+              value={form.templates[row.key] || emptyTemplate()}
               error={errors[row.key]}
               whatsappActive={!!sms.whatsapp_from}
               onChange={(patch) => patchCampaign(row.key, patch)}

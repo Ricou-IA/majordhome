@@ -11,8 +11,10 @@ import { FICHIERS, transformer } from '../sync-tournee-engine.mjs';
 test('chaque copie _shared/tournee est à jour (sinon : npm run sync:tournee-engine)', () => {
   for (const { source, cible } of FICHIERS) {
     assert.ok(existsSync(cible), `copie manquante : ${cible} — lancer npm run sync:tournee-engine`);
+    // Comparaison insensible aux fins de ligne : la copie est écrite en LF, mais un
+    // checkout Windows (autocrlf) peut la relivrer en CRLF sans qu'elle ait divergé.
     assert.equal(
-      readFileSync(cible, 'utf8'),
+      readFileSync(cible, 'utf8').replace(/\r\n/g, '\n'),
       transformer(source, readFileSync(source, 'utf8')),
       `copie périmée : ${cible} — lancer npm run sync:tournee-engine`,
     );

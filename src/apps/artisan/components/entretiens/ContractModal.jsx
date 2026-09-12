@@ -23,8 +23,6 @@ import {
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useContract, useContractVisits, useEntretienByContract } from '@hooks/useContracts';
-import { useTeamMembers } from '@hooks/useAppointments';
-import { useOrgSettings } from '@hooks/useOrgSettings';
 import { entretienSavKeys, appointmentKeys, contractKeys, tourneeKeys } from '@hooks/cacheKeys';
 import { MAINTENANCE_MONTHS } from '@services/contracts.service';
 import { ensureEntretienCard } from '@services/entretiens.service';
@@ -33,7 +31,6 @@ import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
 import { Button } from '@components/ui/button';
 import { formatDateFR, formatEuro } from '@/lib/utils';
-import { smsNameForMember } from '@/lib/smsCampaigns';
 import { logger } from '@lib/logger';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { deriveVisitBadgeStatus } from '@/lib/entretienVisitStatus';
@@ -86,9 +83,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const { user, organization } = useAuth();
   const queryClient = useQueryClient();
   const { card: activeCard } = useEntretienByContract(organization?.id, contractId);
-  // SMS de confirmation : garde `settings.sms.enabled` + nom du technicien posé.
-  const { settings: orgSettings } = useOrgSettings();
-  const { members: teamMembers } = useTeamMembers(organization?.id);
 
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [schedulingItem, setSchedulingItem] = useState(null);
@@ -161,50 +155,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     }
   }, [contract, planning, preparerCarte]);
 
-  /**
-   * SMS/WhatsApp de confirmation après une pose RÉUSSIE (créneau optimisé comme
-   * planification manuelle). Jamais bloquant : le RDV est posé, chaque issue est un
-   * toast. Silencieux seulement si l'org n'a pas l'intégration SMS. Un seul créneau :
-   * avec plusieurs dates, c'est au commercial d'écrire au client.
-   */
-  const envoyerConfirmationSms = useCallback(async (slots, interventionId) => {
-    if (orgSettings?.sms?.enabled !== true) return;
-    if (slots.length !== 1) {
-      toast.info('Plusieurs créneaux posés : pas de SMS de confirmation automatique');
-      return;
-    }
-    const [slot] = slots;
-    const technicianName = (slot.technicianIds || [])
-      .map((id) => smsNameForMember(teamMembers.find((m) => m.id === id)))
-      .filter(Boolean)
-      .join(' et ');
-
-    const { data, error } = await savService.sendRdvConfirmation({
-      clientId: contract?.client_id,
-      clientFirstName: contract?.client_first_name,
-      clientPhone: contract?.client_phone,
-      orgId: organization?.id,
-      interventionId,
-      date: slot.date,
-      startTime: slot.startTime,
-      technicianName,
-    });
-
-    if (error) {
-      if (error.message === 'campaign_template_missing') {
-        toast.info('Pas de SMS de confirmation : gabarit « Confirmation de rendez-vous » à renseigner dans Paramètres → Organisation → SMS');
-      } else {
-        toast.warning(`RDV posé, mais le SMS de confirmation n'est pas parti (${error.message})`);
-      }
-      return;
-    }
-    if (data?.skipped === 'no_mobile') {
-      toast.info('Pas de SMS de confirmation : le client n\'a pas de numéro mobile');
-      return;
-    }
-    toast.success(data?.channel === 'whatsapp' ? 'Confirmation envoyée par WhatsApp' : 'SMS de confirmation envoyé');
-  }, [orgSettings, teamMembers, contract, organization]);
-
   const handleConfirmScheduling = useCallback(async (slots) => {
     const orgId = organization?.id;
     const { error } = await savService.scheduleEntretien({
@@ -215,7 +165,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     });
     if (error) { toast.error('Erreur création du RDV'); return; }
     toast.success('RDV planifié avec succès');
-    const interventionId = schedulingItem?.id;
     setSchedulingOpen(false);
     setSchedulingItem(null);
     queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
@@ -224,11 +173,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', contractId] });
     // Le classement des créneaux dépend du planning : un RDV posé change tout.
     queryClient.invalidateQueries({ queryKey: tourneeKeys.all(orgId) });
-    // Non attendu : la pose est acquise, le SMS ne doit ni la retarder ni la faire échouer.
-    envoyerConfirmationSms(slots, interventionId).catch((err) => {
-      logger.error('[ContractModal] envoyerConfirmationSms error:', err);
-    });
-  }, [organization, schedulingItem, contractId, queryClient, envoyerConfirmationSms]);
+  }, [organization, schedulingItem, contractId, queryClient]);
 
   /**
    * Clic sur un créneau proposé : pose directe par le chemin existant
