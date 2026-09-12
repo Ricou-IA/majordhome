@@ -32,6 +32,7 @@ import {
 import { construireMatrice } from '@/lib/tournee/matrice.js';
 import { classerParCreneaux } from '@/lib/tournee/creneaux.js';
 import { construireArretsExistants } from '@/lib/tournee/arrets.js';
+import { chargerJournees } from '@/lib/tournee/loaders.js';
 
 /**
  * @typedef {object} Candidat
@@ -81,11 +82,6 @@ export const REGLAGES_DEFAUT = {
 export function construireReglages(settings) {
   return { ...REGLAGES_DEFAUT, ...(settings?.tournees || {}) };
 }
-
-const hhmmEnMinutes = (s) => {
-  const [h, m] = String(s || '08:00').split(':').map(Number);
-  return h * 60 + (m || 0);
-};
 
 export const tourneesService = {
   /**
@@ -231,118 +227,12 @@ export const tourneesService = {
    * @returns {Promise<{ data: Journee[], error: Error|null }>}
    */
   async getJourneesHorizon({ coreOrgId, joursApres = 45 }) {
+    // Logique déplacée dans src/lib/tournee/loaders.js (injectable, partagée
+    // avec l'edge slots-propose). Ici : résolution de l'org majordhome + client de l'app.
     try {
-      const orgId = await getMajordhomeOrgId(coreOrgId);
-      const debut = new Date();
-      const fin = new Date();
-      fin.setDate(fin.getDate() + joursApres);
-      const iso = (d) => d.toISOString().slice(0, 10);
-
-      const [{ data: membres, error: mErr }, { data: rdvs, error: rErr }] = await Promise.all([
-        // I5 (revue finale) — `is_active` manquait ici alors que getTeamMembers
-        // (appointments.service.js) le filtre : sans lui, un technicien parti
-        // continue de recevoir des propositions de tournée.
-        supabase.from('majordhome_team_members')
-          .select('id, display_name, calendar_color, default_availability, daily_work_minutes, include_in_routing')
-          .eq('org_id', orgId).eq('role', 'technician').eq('include_in_routing', true).eq('is_active', true),
-        supabase.from('majordhome_appointments')
-          // ⚠️ `lead_id` est INDISPENSABLE ici : la résolution de coordonnées ci-dessous
-          // en dépend (RDV rattaché à un lead, cf. bloc `leadIds`). Sans lui dans le
-          // SELECT, `r.lead_id` vaut `undefined`, `leadIds` reste vide et TOUT le repli
-          // lead est du code mort — silencieusement, puisque le repli suivant (siège)
-          // fournit quand même une position plausible. Vécu : livré ainsi, jamais vu.
-          .select('id, client_id, lead_id, scheduled_date, scheduled_start, duration_minutes, appointment_type, client_name, address, city, postal_code')
-          .eq('org_id', orgId).gte('scheduled_date', iso(debut)).lte('scheduled_date', iso(fin))
-          .not('status', 'in', '(cancelled,no_show)'),
-      ]);
-      if (mErr) return { data: [], error: mErr };
-      if (rErr) return { data: [], error: rErr };
-
-      // Amendement 1 — les RDV existants DOIVENT porter leurs coordonnées :
-      // sans elles, `arretsExistants` (proposerPourJournee) est TOUJOURS vide
-      // et les candidats sont classés par distance au DÉPÔT au lieu de
-      // distance à la TOURNÉE — le défaut central que ce module corrige.
-      const clientIds = [...new Set((rdvs || []).map((r) => r.client_id).filter(Boolean))];
-      const { data: clientsCoord, error: ccErr } = clientIds.length
-        ? await supabase.from('majordhome_clients')
-            .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', clientIds)
-        : { data: [], error: null };
-      if (ccErr) return { data: [], error: ccErr };
-      const coordByClientId = new Map((clientsCoord || []).map((c) => [c.id, c]));
-
-      // Tous les RDV n'ont pas de client : une installation est rattachee a un
-      // LEAD (10 RDV sur 30 jours en prod, dont l'installation HACK du 04/09).
-      // On tente donc aussi le lead. Note : en pratique ces leads ne sont pas
-      // encore geocodes, d'ou le troisieme niveau (siege) applique plus loin,
-      // au moment ou le depot est connu.
-      const leadIds = [...new Set((rdvs || [])
-        .filter((r) => !r.client_id && r.lead_id).map((r) => r.lead_id))];
-      const { data: leadsCoord, error: lcErr } = leadIds.length
-        ? await supabase.from('majordhome_leads')
-            .select('id, latitude, longitude').eq('org_id', coreOrgId).in('id', leadIds)
-        : { data: [], error: null };
-      if (lcErr) return { data: [], error: lcErr };
-      const coordByLeadId = new Map((leadsCoord || []).map((l) => [l.id, l]));
-      // Un RDV sans coordonnee (ni client ni lead geocode) garde lat/lng null ici :
-      // le fallback siege est applique dans proposerPourJournee, seul endroit ou le
-      // depot est connu. Il n'est JAMAIS ecarte pour autant (il bloque son creneau).
-      // Ancien commentaire conserve pour memoire :
-      // Un RDV sans coordonnée reste compté dans chargeMinutes (le technicien y
-      // passe du temps) mais sera exclu de arretsExistants côté proposerPourJournee
-      // (r.lat/r.lng null) : il ne peut pas participer au séquencement géographique.
-      const rdvsAvecCoords = (rdvs || []).map((r) => {
-        const co = (r.client_id ? coordByClientId.get(r.client_id) : null)
-          || (r.lead_id ? coordByLeadId.get(r.lead_id) : null);
-        return { ...r, lat: co?.latitude ?? null, lng: co?.longitude ?? null };
-      });
-
-      const ids = rdvsAvecCoords.map((r) => r.id);
-      const { data: liens, error: liensErr } = ids.length
-        ? await supabase.from('majordhome_appointment_technicians')
-            .select('appointment_id, technician_id').in('appointment_id', ids)
-        : { data: [], error: null };
-      if (liensErr) return { data: [], error: liensErr };
-      const techsParRdv = new Map();
-      for (const l of liens || []) {
-        if (!techsParRdv.has(l.appointment_id)) techsParRdv.set(l.appointment_id, []);
-        techsParRdv.get(l.appointment_id).push(l.technician_id);
-      }
-
-      const JOURS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const journees = [];
-      for (let i = 0; i <= joursApres; i += 1) {
-        const d = new Date();
-        d.setDate(d.getDate() + i);
-        const date = iso(d);
-        const jour = JOURS[d.getDay()];
-        for (const m of membres || []) {
-          const dispo = m.default_availability?.[jour];
-          // I6 (revue finale) — deux lectures divergentes du même champ
-          // coexistaient : ici, un jour SANS `active` était OFF ; dans
-          // `scheduleConflicts.js::memberWorkingHoursForDate` (plus ancien),
-          // un jour SANS `active` est ON (seul `active === false` coupe).
-          // Alignement sur la lecture de référence (scheduleConflicts.js) —
-          // la plus ancienne et la plus permissive. Sans effet sur les
-          // données Mayer actuelles (`active` toujours renseigné en base),
-          // mais évite une divergence future entre les deux lectures.
-          if (!dispo || dispo.active === false) continue;
-          const duJour = rdvsAvecCoords.filter(
-            (r) => r.scheduled_date === date && (techsParRdv.get(r.id) || []).includes(m.id),
-          );
-          journees.push({
-            date,
-            technicienId: m.id,
-            technicienNom: m.display_name,
-            couleur: m.calendar_color,
-            amplitude: { debut: hhmmEnMinutes(dispo.start), fin: hhmmEnMinutes(dispo.end) },
-            budgetMinutes: m.daily_work_minutes || 480,
-            rdvs: duJour,
-            chargeMinutes: duJour.reduce((s, r) => s + (r.duration_minutes || 60), 0),
-            estAmorcee: duJour.some((r) => r.appointment_type === 'maintenance'),
-          });
-        }
-      }
-      return { data: journees, error: null };
+      const mdhOrgId = await getMajordhomeOrgId(coreOrgId);
+      const { data, error } = await chargerJournees({ client: supabase, coreOrgId, mdhOrgId, joursApres, logger });
+      return { data, error };
     } catch (error) {
       logger.error('[tournees] getJourneesHorizon', error);
       return { data: [], error };
