@@ -29,7 +29,6 @@
 - **Compétences techniciens = `team_members.specialties` (text[])**, catégories d'équipement, éditables Settings → Équipe ; **vide = polyvalent**. Filtre dur de `techniciensEligibles` (catégories du contrat ⊆ specialties). RPC `team_member_set_routing_settings` a 4 paramètres (l'ancienne signature à 3 a été DROP : PostgREST ne départage pas deux surcharges à défauts).
 - **Adresse BAN à la saisie** (`BanAddressInput`, ClientModal + LeadModal) : coordonnées écrites APRÈS l'adresse via RPC `client_set_location` (le trigger `reset_geocode_on_address_change` efface coordonnées ET `address_precision` quand l'adresse change) ; adresse introuvable → « Localiser à la commune » (précision `municipality`, suffisante pour les tournées). `geocode-sweep` retombe aussi sur la commune. Côté lead : texte seulement, le géocodage reste dans `geocodeAndAssignLead`.
 - **CTA « Trouver le créneau optimisé »** (ContractModal) : sans LLM ; la pose passe par `ensureEntretienCard` + `scheduleEntretien` (single writer inchangé) ; une « nouvelle journée » renvoie à l'assistant classique.
-- Gotcha : `npm run audit:dead-code` échoue depuis le 29/08 sur `src/lib/tournee/sequence.js` (orphelin conservé « hors chemin de prod ») — décider de le supprimer ou de l'allowlister.
 ---
 
 ## [2026-09-12 11:30] Tournées — souplesse des RDV : « fenêtres d'abord, heures ensuite »
