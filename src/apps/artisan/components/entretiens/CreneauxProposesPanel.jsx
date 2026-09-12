@@ -112,17 +112,22 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: k.couleur || '#94A3B8' }} />
             <span className="font-medium text-gray-900">{formatDateShortFR(k.date)} · {k.debut}</span>
             <span className="text-secondary-500 truncate">{k.technicianNom}</span>
+            {/* Temps homme total de cet entretien = minutes ajoutées à la journée
+                (intervention + détour net aller/retour) — décision Eric 2026-09-12. */}
             <span
-              className="ml-auto text-xs text-secondary-500 inline-flex items-center gap-1 shrink-0"
-              title={`${k.coutMinutes} min ajoutées à la journée (trajets + intervention)`}
+              className="ml-auto text-xs font-medium text-secondary-700 inline-flex items-center gap-1 shrink-0"
+              title="Temps homme ajouté à la journée du technicien"
             >
-              <Route className="h-3.5 w-3.5" />+{k.detourMinutes} min de trajet
+              <Route className="h-3.5 w-3.5" />+{k.coutMinutes} min
             </span>
           </div>
-          <div className="text-xs text-secondary-500 mt-0.5">
-            {k.avant ? `après ${k.avant.label}${k.avant.ville ? ` (${k.avant.ville})` : ''}` : 'depuis le dépôt'}
-            {' → '}
-            {k.apres ? `avant ${k.apres.label}${k.apres.ville ? ` (${k.apres.ville})` : ''}` : 'retour au dépôt'}
+          <div className="text-xs text-secondary-500 mt-0.5 flex justify-between gap-2">
+            <span className="truncate">
+              {k.avant ? `après ${k.avant.label}${k.avant.ville ? ` (${k.avant.ville})` : ''}` : 'depuis le dépôt'}
+              {' → '}
+              {k.apres ? `avant ${k.apres.label}${k.apres.ville ? ` (${k.apres.ville})` : ''}` : 'retour au dépôt'}
+            </span>
+            <span className="shrink-0">{k.coutMinutes - k.detourMinutes} min interv. + {k.detourMinutes} min trajet</span>
           </div>
         </button>
       ))}
