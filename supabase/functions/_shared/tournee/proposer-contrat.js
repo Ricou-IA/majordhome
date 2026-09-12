@@ -248,11 +248,16 @@ export function proposerPourContrat({
     });
   }
 
+  // Sélection par score (les N meilleures insertions), puis présentation en
+  // ordre CHRONOLOGIQUE (décision Eric 2026-09-12) : au téléphone on lit des
+  // dates, pas un classement. `scoreMinutes` reste dans chaque créneau pour qui
+  // veut le rang (agent, tri à l'écran).
   creneaux.sort((a, b) => a.scoreMinutes - b.scoreMinutes
     || a.coutMinutes - b.coutMinutes
     || a.date.localeCompare(b.date)
     || a.debutMinutes - b.debutMinutes);
-  const retenus = creneaux.slice(0, maxResults);
+  const retenus = creneaux.slice(0, maxResults)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.debutMinutes - b.debutMinutes);
   const nouvellesJournees = retenus.length === 0
     ? vides.sort((a, b) => a.date.localeCompare(b.date)).slice(0, NOUVELLES_JOURNEES_MAX)
     : [];

@@ -12,6 +12,7 @@
  * ============================================================================
  */
 
+import { estTypeAdaptable } from '@/lib/souplesse';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
@@ -1094,7 +1095,7 @@ export function EventModal({
 
               {/* Souplesse : édition uniquement (à la création par l'assistant, la
                   souplesse est demandée à la pose ; « Autre » prend le défaut d'org). */}
-              {isEdit && !isClosing && (
+              {isEdit && estTypeAdaptable(formData.appointment_type) && (
                 <SectionSouplesse
                   formData={formData}
                   updateField={updateField}

@@ -78,6 +78,14 @@ const DEMI_JOURNEE = 240;
 const DEMI_JOURNEE_DEFAUT = { matin: [8, 12], apres_midi: [13, 18] };
 
 /**
+ * Seuls les rendez-vous d'Entretien (`maintenance`) et de SAV (`service`) sont
+ * adaptables (décision Eric 2026-09-12) : une installation, une visite
+ * technique ou un RDV commercial ont une heure ferme, le moteur ne les
+ * déplace jamais. Source unique : souplesse.js et planningEvents.js l'importent.
+ */
+export const TYPES_ADAPTABLES = ['maintenance', 'service'];
+
+/**
  * Tolérance de déplacement d'un RDV (spec 2026-09-12 « fenêtres d'abord,
  * heures ensuite ») : la plage [min, max] dans laquelle son heure de DÉBUT peut
  * glisser. Figé (heure exigée par le client, ou heure déjà communiquée :
@@ -92,7 +100,7 @@ const DEMI_JOURNEE_DEFAUT = { matin: [8, 12], apres_midi: [13, 18] };
 export function toleranceDe(rdv, { flexDefaut = 0, amplitude, demiJournee = DEMI_JOURNEE_DEFAUT } = {}) {
   const debut = minutesDepuisMinuit(rdv?.scheduled_start);
   if (debut == null) return null;
-  const fige = !!rdv?.hour_confirmed_at;
+  const fige = !!rdv?.hour_confirmed_at || !TYPES_ADAPTABLES.includes(rdv?.appointment_type);
   const flex = fige ? 0 : (rdv?.time_flex_minutes ?? flexDefaut ?? 0);
   const duree = rdv?.duration_minutes || 60;
   let min = debut;

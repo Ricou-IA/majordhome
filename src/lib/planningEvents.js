@@ -148,9 +148,17 @@ export function matchesMemberFilter(appt, selectedRecordIds) {
 // ----------------------------------------------------------------------------
 // Souplesse (spec 2026-09-12 « fenêtres d'abord, heures ensuite »)
 // ----------------------------------------------------------------------------
-/** Un RDV est « adaptable » tant que son heure n'est pas communiquée au client et que sa souplesse est > 0. */
-export function estAdaptable(appt, flexDefaut = 30) {
-  if (!appt || appt.status === 'cancelled') return false;
+/**
+ * Un RDV est « adaptable » tant que son heure n'est pas communiquée au client,
+ * que sa souplesse est > 0 — et qu'il reste quelque chose à organiser : un RDV
+ * passé, facturé, réalisé ou annulé n'est plus adaptable (rien à afficher).
+ * @param {{ aujourdhui?: string }} [opts]  YYYY-MM-DD ; sans date, le passé n'est pas écarté
+ */
+export function estAdaptable(appt, flexDefaut = 30, { aujourdhui } = {}) {
+  if (!appt) return false;
+  if (['cancelled', 'completed', 'no_show'].includes(appt.status)) return false;
+  if (appt.target_invoiced === true) return false;
+  if (aujourdhui && appt.scheduled_date && appt.scheduled_date < aujourdhui) return false;
   return souplesseEffective(appt, flexDefaut) > 0;
 }
 

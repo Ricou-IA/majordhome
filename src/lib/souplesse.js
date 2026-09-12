@@ -23,8 +23,19 @@ export function libelleSouplesse(flex) {
   return `±${flex} min`;
 }
 
-/** Souplesse effective d'un RDV : heure confirmée ⇒ 0, sinon la sienne, sinon le défaut d'org. */
+import { TYPES_ADAPTABLES } from './tournee/arrets.js';
+
+export { TYPES_ADAPTABLES };
+
+/** Un type de RDV concerné par la souplesse (Entretien, SAV). */
+export const estTypeAdaptable = (appointmentType) => TYPES_ADAPTABLES.includes(appointmentType);
+
+/**
+ * Souplesse effective d'un RDV : type non concerné ou heure confirmée ⇒ 0,
+ * sinon la sienne, sinon le défaut d'org.
+ */
 export function souplesseEffective(appointment, defaut = 30) {
+  if (!estTypeAdaptable(appointment?.appointment_type)) return 0;
   if (appointment?.hour_confirmed_at) return 0;
   return appointment?.time_flex_minutes ?? defaut;
 }

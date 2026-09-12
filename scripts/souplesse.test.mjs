@@ -7,9 +7,12 @@ test('libellés et souplesse effective', () => {
   assert.equal(libelleSouplesse(0), 'figé');
   assert.equal(libelleSouplesse(30), '±30 min');
   assert.equal(libelleSouplesse(240), 'demi-journée');
-  assert.equal(souplesseEffective({ time_flex_minutes: 30, hour_confirmed_at: '2026-09-12' }), 0);
-  assert.equal(souplesseEffective({ time_flex_minutes: null }, 30), 30);
-  assert.equal(souplesseEffective({ time_flex_minutes: 15 }, 30), 15);
+  assert.equal(souplesseEffective({ appointment_type: 'maintenance', time_flex_minutes: 30, hour_confirmed_at: '2026-09-12' }), 0);
+  assert.equal(souplesseEffective({ appointment_type: 'maintenance', time_flex_minutes: null }, 30), 30);
+  assert.equal(souplesseEffective({ appointment_type: 'service', time_flex_minutes: 15 }, 30), 15);
+  // Seuls Entretien et SAV sont adaptables : installation / VT / commercial = 0
+  assert.equal(souplesseEffective({ appointment_type: 'installation', time_flex_minutes: 30 }, 30), 0);
+  assert.equal(souplesseEffective({ appointment_type: 'rdv_technical' }, 30), 0);
 });
 
 test('phrase d annonce au client', () => {

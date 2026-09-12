@@ -8,7 +8,7 @@ import { construireArretsExistants } from '../../src/lib/tournee/arrets.js';
 import { sequencerTournee } from '../../src/lib/tournee/sequence.js';
 
 const rdv = (id, lat, lng, duree, start) => ({
-  id, lat, lng, duration_minutes: duree, scheduled_start: start,
+  id, lat, lng, duration_minutes: duree, scheduled_start: start, appointment_type: 'maintenance',
 });
 
 test('un RDV existant reçoit une fenêtre PONCTUELLE, pas une plage', () => {
@@ -130,21 +130,28 @@ import { toleranceDe, construireArretsPourConsolidation } from '../../src/lib/to
 const AMP = { debut: 480, fin: 1080 };
 
 test('toleranceDe : figé (hour_confirmed_at) = ponctuel quel que soit time_flex_minutes', () => {
-  const t = toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, time_flex_minutes: 30, hour_confirmed_at: '2026-09-12T08:00:00Z' }, { flexDefaut: 30, amplitude: AMP });
+  const t = toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, time_flex_minutes: 30, hour_confirmed_at: '2026-09-12T08:00:00Z', appointment_type: 'maintenance' }, { flexDefaut: 30, amplitude: AMP });
   assert.deepEqual(t, { min: 840, max: 840, flex: 0 });
 });
 
+test('toleranceDe : seuls Entretien et SAV sont adaptables — une installation ou une VT est ponctuelle', () => {
+  assert.deepEqual(toleranceDe({ scheduled_start: '08:00', duration_minutes: 570, time_flex_minutes: 30, appointment_type: 'installation' }, { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 480, flex: 0 });
+  assert.deepEqual(toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, appointment_type: 'rdv_technical' }, { flexDefaut: 30, amplitude: AMP }), { min: 840, max: 840, flex: 0 });
+  assert.equal(toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, appointment_type: 'service' }, { flexDefaut: 30, amplitude: AMP }).flex, 30);
+});
+
 test('toleranceDe : NULL = défaut d org ; 0 = figé ; ±15/±30 = plage bornée par l amplitude', () => {
-  assert.deepEqual(toleranceDe({ scheduled_start: '14:00', duration_minutes: 60 }, { flexDefaut: 30, amplitude: AMP }), { min: 810, max: 870, flex: 30 });
-  assert.deepEqual(toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, time_flex_minutes: 0 }, { flexDefaut: 30, amplitude: AMP }), { min: 840, max: 840, flex: 0 });
-  assert.deepEqual(toleranceDe({ scheduled_start: '08:10', duration_minutes: 60, time_flex_minutes: 15 }, { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 505, flex: 15 });
+  const m = (o) => ({ appointment_type: 'maintenance', ...o });
+  assert.deepEqual(toleranceDe(m({ scheduled_start: '14:00', duration_minutes: 60 }), { flexDefaut: 30, amplitude: AMP }), { min: 810, max: 870, flex: 30 });
+  assert.deepEqual(toleranceDe(m({ scheduled_start: '14:00', duration_minutes: 60, time_flex_minutes: 0 }), { flexDefaut: 30, amplitude: AMP }), { min: 840, max: 840, flex: 0 });
+  assert.deepEqual(toleranceDe(m({ scheduled_start: '08:10', duration_minutes: 60, time_flex_minutes: 15 }), { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 505, flex: 15 });
   // fin d'amplitude : le RDV doit finir avant 18:00
-  assert.deepEqual(toleranceDe({ scheduled_start: '17:30', duration_minutes: 60, time_flex_minutes: 30 }, { flexDefaut: 30, amplitude: AMP }), { min: 1020, max: 1020, flex: 30 });
+  assert.deepEqual(toleranceDe(m({ scheduled_start: '17:30', duration_minutes: 60, time_flex_minutes: 30 }), { flexDefaut: 30, amplitude: AMP }), { min: 1020, max: 1020, flex: 30 });
 });
 
 test('toleranceDe : demi-journée = la demi-journée qui contient l heure provisoire', () => {
-  assert.deepEqual(toleranceDe({ scheduled_start: '09:30', duration_minutes: 90, time_flex_minutes: 240 }, { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 630, flex: 240 });
-  assert.deepEqual(toleranceDe({ scheduled_start: '15:00', duration_minutes: 60, time_flex_minutes: 240 }, { flexDefaut: 30, amplitude: AMP }), { min: 780, max: 1020, flex: 240 });
+  assert.deepEqual(toleranceDe({ scheduled_start: '09:30', duration_minutes: 90, time_flex_minutes: 240, appointment_type: 'maintenance' }, { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 630, flex: 240 });
+  assert.deepEqual(toleranceDe({ scheduled_start: '15:00', duration_minutes: 60, time_flex_minutes: 240, appointment_type: 'service' }, { flexDefaut: 30, amplitude: AMP }), { min: 780, max: 1020, flex: 240 });
   assert.equal(toleranceDe({ scheduled_start: null }, { flexDefaut: 30 }), null);
 });
 

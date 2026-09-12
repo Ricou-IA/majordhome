@@ -46,14 +46,17 @@ test('classement par coût : la journée où la tournée passe déjà à côté 
     trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
   });
   assert.equal(creneaux.length, 2);
-  assert.equal(creneaux[0].date, '2026-09-17');
-  assert.ok(creneaux[0].coutMinutes < creneaux[1].coutMinutes);
-  assert.equal(creneaux[0].technicianId, 'antoine');
-  assert.equal(creneaux[0].technicianNom, 'antoine');
-  assert.equal(creneaux[0].avant.id, 'b');            // inséré après B
-  assert.equal(creneaux[0].avant.label, 'B');
-  assert.equal(creneaux[0].avant.finMinutes, 570);    // 08:00 + 90
-  assert.equal(creneaux[0].apres, null);              // puis retour dépôt
+  // Présentation chronologique (15 puis 17), mais le 17 est le mieux classé.
+  assert.deepEqual(creneaux.map((k) => k.date), ['2026-09-15', '2026-09-17']);
+  const [j15, j17] = creneaux;
+  assert.ok(j17.scoreMinutes < j15.scoreMinutes);
+  assert.ok(j17.coutMinutes < j15.coutMinutes);
+  assert.equal(j17.technicianId, 'antoine');
+  assert.equal(j17.technicianNom, 'antoine');
+  assert.equal(j17.avant.id, 'b');            // inséré après B
+  assert.equal(j17.avant.label, 'B');
+  assert.equal(j17.avant.finMinutes, 570);    // 08:00 + 90
+  assert.equal(j17.apres, null);              // puis retour dépôt
 });
 
 test('au-delà de l horizon ferme, seules les journées amorcées sont proposées ; les vides deviennent des nouvellesJournees si rien ne rentre', () => {
@@ -132,6 +135,8 @@ test('maxResults borne la liste ; estime est propagé tel quel', () => {
   });
   assert.equal(r.creneaux.length, 4);
   assert.ok(r.creneaux.every((c) => c.estime === true));
+  const dates = r.creneaux.map((c) => c.date);
+  assert.deepEqual(dates, [...dates].sort(), 'présentés en ordre chronologique');
 });
 
 test('un technicien non compétent est compté dans raisonsRejet.competence et jamais proposé', () => {
@@ -284,8 +289,10 @@ test('temps perdu pénalisé : à coût proche, la place qui laisse 50 min inuti
     contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT,
     reglages: REGLAGES_SOUPLES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
   });
-  assert.equal(r.creneaux[0].date, '2026-09-17');
-  assert.equal(r.creneaux[0].resteUtileMinutes, 0);
-  assert.equal(r.creneaux[1].resteUtileMinutes, 40);
-  assert.ok(r.creneaux[1].scoreMinutes > r.creneaux[1].coutMinutes);
+  const j16 = r.creneaux.find((k) => k.date === '2026-09-16');
+  const j17 = r.creneaux.find((k) => k.date === '2026-09-17');
+  assert.equal(j17.resteUtileMinutes, 0);
+  assert.equal(j16.resteUtileMinutes, 40);
+  assert.ok(j16.scoreMinutes > j16.coutMinutes);
+  assert.ok(j17.scoreMinutes < j16.scoreMinutes, 'l enchaînement est mieux classé que le temps perdu');
 });

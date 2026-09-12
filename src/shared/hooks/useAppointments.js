@@ -54,6 +54,9 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     memberProfileKeys: [],                            // chips équipe (humains, dédup par profile_key)
     appointmentType: null,
     status: null,
+    // Bandes de tolérance (souplesse) : sur demande — sur une semaine chargée,
+    // une bande derrière chaque RDV noyait le planning (vécu 2026-09-12).
+    showTolerance: false,
   });
 
   // Query principale — récupère TOUS les RDV (filtrage membre côté client)
@@ -129,14 +132,15 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     }));
 
     const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
+    const aujourdhui = new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD, fuseau local
     return enriched
       .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
       .flatMap((a) => {
-        const adaptable = estAdaptable(a, reglages.souplesse_defaut_minutes);
+        const adaptable = estAdaptable(a, reglages.souplesse_defaut_minutes, { aujourdhui });
         const blocs = expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
           appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable })
         );
-        if (!adaptable || !a.scheduled_start) return blocs;
+        if (!filters.showTolerance || !adaptable || !a.scheduled_start) return blocs;
         // Bande de tolérance : « on voit toujours des blocs » — le RDV reste à son
         // heure provisoire, la bande montre jusqu'où il peut glisser. Événement de
         // fond : ni cliquable ni déplaçable (FullCalendar), même couleur, translucide.
@@ -153,7 +157,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         });
         return blocs;
       });
-  }, [appointments, techLinks, filters.kinds, selectedRecordIds, colorMaps, reglages]);
+  }, [appointments, techLinks, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
