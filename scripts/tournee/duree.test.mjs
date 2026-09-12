@@ -73,3 +73,20 @@ test('construireFallbacks — catégorie sans aucun équipement typé reste abse
   const fb = construireFallbacks([{ category: 'vmc' }], new Map(), 90);
   assert.equal(fb.parCategorie.vmc, undefined);
 });
+
+test('dureeContrat : gain multi-équipements dès 2 lignes (barème = interventions isolées, Eric 2026-09-12) ; une seule ligne à unit_count > 1 n est pas « multi »', () => {
+  const types = new Map([
+    ['clim', { duration_base_minutes: 60, duration_per_extra_unit_minutes: 30, included_units: 1 }],
+    ['bois', { duration_base_minutes: 60, duration_per_extra_unit_minutes: 0, included_units: 1 }],
+  ]);
+  const gomes = [
+    { equipment_type_id: 'clim', category: 'pac_air_air', unit_count: 1 },
+    { equipment_type_id: 'clim', category: 'pac_air_air', unit_count: 1 },
+    { equipment_type_id: 'clim', category: 'pac_air_air', unit_count: 1 },
+    { equipment_type_id: 'bois', category: 'poele', unit_count: 1 },
+  ];
+  assert.equal(dureeContrat(gomes, types, { parCategorie: {}, defaut: 90 }), 240, 'sans réglage : somme brute');
+  assert.equal(dureeContrat(gomes, types, { parCategorie: {}, defaut: 90 }, { gainMultiPct: 10 }), 216);
+  assert.equal(dureeContrat([{ equipment_type_id: 'clim', category: 'pac_air_air', unit_count: 3 }], types, { parCategorie: {}, defaut: 90 }, { gainMultiPct: 10 }), 120, 'une ligne à 3 unités : dégressif du barème, pas de gain multi');
+  assert.equal(dureeContrat([{ equipment_type_id: 'bois', category: 'poele', unit_count: 1 }], types, { parCategorie: {}, defaut: 90 }, { gainMultiPct: 10 }), 60);
+});

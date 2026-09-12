@@ -28,19 +28,27 @@ export function dureeEquipement(equipement, type, fallbackMinutes) {
 }
 
 /**
- * Durée totale d'un contrat = somme de ses équipements.
+ * Durée totale d'un contrat = somme de ses équipements, moins le gain
+ * « plusieurs équipements chez le même client » (`gainMultiPct`, réglage
+ * `gain_multi_equipements_pct`) dès 2 lignes d'équipement. Une seule ligne
+ * à `unit_count` > 1 n'est pas « multi » : son barème porte déjà le tarif
+ * dégressif par unité supplémentaire.
  *
  * @param {Array} equipements
  * @param {Map} typesById
  * @param {{ parCategorie: Record<string, number>, defaut: number }} fallbacks
+ * @param {{ gainMultiPct?: number }} [opts]
  * @returns {number} minutes
  */
-export function dureeContrat(equipements, typesById, fallbacks) {
-  return (equipements || []).reduce((total, eq) => {
+export function dureeContrat(equipements, typesById, fallbacks, { gainMultiPct = 0 } = {}) {
+  const lignes = equipements || [];
+  const brut = lignes.reduce((total, eq) => {
     const type = eq.equipment_type_id ? typesById.get(eq.equipment_type_id) : null;
     const fallback = fallbacks?.parCategorie?.[eq.category] ?? fallbacks?.defaut ?? 0;
     return total + dureeEquipement(eq, type, fallback);
   }, 0);
+  if (lignes.length >= 2 && gainMultiPct > 0) return Math.round(brut * (1 - gainMultiPct / 100));
+  return brut;
 }
 
 /**

@@ -105,7 +105,7 @@ export function useJourneePose({
     trajet,
     depotKey: cleCoord(depot),
     amplitude: journee.amplitude,
-    budgetMinutes: journee.budgetMinutes,
+    budgetMinutes: journee.budgetMinutes + (reglages?.depassement_journee_minutes ?? 0),
     pause: {
       minutes: reglages.pause_minutes,
       fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],

@@ -181,7 +181,9 @@ export function proposerPourContrat({
     const place = placerCandidat({
       arrets, candidat, trajet, depotKey, amplitude: j.amplitude,
       fenetreArrivee: fenetreDuJour(fenetreArrivee, j, { aujourdhui, maintenantMinutes, margeMinutes: margeAujourdhuiMinutes }),
-      budgetMinutes: j.budgetMinutes, pause, chargeDeja,
+      // Le budget affiché est daily_work_minutes ; le moteur tolère le
+      // dépassement réglé (finir 30 min plus tard certains jours est normal).
+      budgetMinutes: j.budgetMinutes + (reglages.depassement_journee_minutes ?? 0), pause, chargeDeja,
       trajetMaxMinutes: reglages.trajet_max_entre_clients_minutes ?? null,
     });
     if (!place.faisable) {
