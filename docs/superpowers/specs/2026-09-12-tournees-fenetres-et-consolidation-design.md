@@ -24,8 +24,8 @@ Ce que le client sait, et quand : un client **figé** connaît son heure dès la
 
 ## 3. Modèle de données
 
-- `majordhome.appointments.time_flex_minutes smallint NOT NULL DEFAULT 0` — tolérance autour de `scheduled_start` : `0` figé, `15`, `30`, `240` (demi-journée = la fenêtre devient [début de demi-journée, fin de demi-journée], cf. §5). **Défaut `0` pour l'existant** : tout RDV déjà posé a été annoncé au client, il est figé — aucune reprise de données.
-- `majordhome.appointments.hour_confirmed_at timestamptz NULL` — posé par la consolidation (ou par la prise si figé) ; `NOT NULL` ⇒ heure communiquée au client, plus aucune souplesse.
+- `majordhome.appointments.time_flex_minutes smallint NULL` — tolérance autour de `scheduled_start` : `0` figé, `15`, `30`, `240` (demi-journée = la fenêtre devient [début de demi-journée, fin de demi-journée], cf. §5). **`NULL` = souplesse par défaut de l'org** (`settings.tournees.souplesse_defaut_minutes`, ±30). **Décision d'Eric (2026-09-12) : par principe, tous les RDV existants sont adaptables** — pas de reprise de données, ils prennent le défaut d'org ; c'est en cliquant sur un RDV qu'on le fige quand le client l'exige (§4 bis). Conséquence assumée : une consolidation peut déplacer un RDV ancien dont l'heure avait été dite au client — l'aperçu avant confirmation le montre, et le SMS d'heure de passage l'informe.
+- `majordhome.appointments.hour_confirmed_at timestamptz NULL` — posé quand on fige (à la prise ou après coup) et par la consolidation ; `NOT NULL` ⇒ heure communiquée au client, plus aucune souplesse. Repasser un RDV en adaptable remet la colonne à NULL.
 - Vue `majordhome_appointments` : deux colonnes ajoutées **en fin de liste** (miroir simple auto-updatable, gotcha `CREATE OR REPLACE VIEW`). Google Calendar sync (one-way) continue de recevoir l'heure provisoire puis l'heure définitive : rien à changer.
 - `core.organizations.settings.tournees` : `souplesse_defaut_minutes` (proposé 30), `reste_utile_min_minutes` (proposé 75), `consolidation_heure` (proposé 17:00 la veille, pour l'automatisation ultérieure). Éditables dans l'onglet Settings → Tournées (tâche en cours `task_89bbe7fe`) — **règle « pas de config sans UI »**.
 
@@ -34,6 +34,12 @@ Ce que le client sait, et quand : un client **figé** connaît son heure dès la
 - Au clic sur un créneau proposé (CTA) **et** dans l'assistant classique, avant `scheduleEntretien` : une mini-modale « Souplesse du rendez-vous » avec quatre choix — **Figé** (heure exigée par le client), **±15 min**, **±30 min** (présélectionné = défaut d'org), **Demi-journée**. Une ligne rappelle ce que le client entend : « Vous lui annoncez : mardi 14 oct. vers 08:15 (entre 07:45 et 08:45) ».
 - Figé ⇒ `hour_confirmed_at = now()` (l'heure est annoncée) ; sinon `NULL`.
 - Le kanban / la fiche client affichent la souplesse (icône ↔ + « ±30 ») tant que `hour_confirmed_at` est NULL.
+
+### 4 bis. Modifier la souplesse après coup (décision Eric 2026-09-12)
+
+- **Un clic sur un RDV** (modale d'édition du Planning `EventModal`, et le panneau de la barre horaire Tournées) expose le **même sélecteur** de souplesse que la prise : Figé / ±15 / ±30 / Demi-journée. Un seul composant partagé (`SouplesseSelect`), une seule écriture (`appointmentsService.updateAppointment` sur `time_flex_minutes` + `hour_confirmed_at`), aucune logique dupliquée.
+- Passer en **Figé** = « le client exige cette heure » : `hour_confirmed_at = now()`, le moteur ne le déplacera plus jamais. Repasser en adaptable remet `hour_confirmed_at` à NULL.
+- Le geste est **par RDV**, jamais en masse (une exigence client se pose au cas par cas). Permission : celle qui autorise déjà l'édition du RDV.
 
 ## 5. Moteur (modules purs, testés)
 
@@ -67,7 +73,8 @@ Ce que le client sait, et quand : un client **figé** connaît son heure dès la
 2. Depuis le CTA, poser un RDV « ±30 » sur une journée où un voisin adaptable doit glisser : les deux RDV ont les bonnes heures en base, le planning montre bloc + bande, le kanban montre « ±30 ».
 3. « Figer la journée » sur une journée avec 2 adaptables : heures recalculées dans les fenêtres, `hour_confirmed_at` posé, 2 SMS partis (log `sms_logs`), blocs pleins.
 4. Un RDV figé n'est jamais modifié par une insertion ni par une consolidation (test + vérification SQL après scénario).
-5. Un RDV existant (avant migration) est figé : aucun changement de comportement sur le planning actuel.
+5. Un RDV existant (avant migration) est adaptable au défaut d'org : sans consolidation ni insertion voisine, aucun changement sur le planning actuel (heures inchangées, blocs habillés « adaptable »).
+6. Depuis `EventModal`, passer un RDV en « Figé » puis lancer une insertion ou une consolidation sur sa journée : il n'a pas bougé d'une minute.
 
 ## 10. Risques
 
@@ -76,4 +83,4 @@ Ce que le client sait, et quand : un client **figé** connaît son heure dès la
 - **Interaction avec Google Calendar** : une consolidation = N mises à jour d'événements ; la sync est fire-and-forget, vérifier qu'elle traite bien les updates en rafale.
 - **`sequencerTournee` > 8 arrêts** : heuristique plus-proche-voisin — acceptable (journées Mayer : 3-5 entretiens), à surveiller.
 
-**Hypothèse à confirmer par Eric** : souplesse par défaut d'un entretien pris par téléphone = **±30 min** (plutôt que demi-journée). Modifiable dans Settings → Tournées.
+**Souplesse par défaut** : **±30 min** (décision implicite d'Eric 2026-09-12 — « par principe tous les RDV ont une souplesse » ; il fige au cas par cas). Modifiable dans Settings → Tournées.
