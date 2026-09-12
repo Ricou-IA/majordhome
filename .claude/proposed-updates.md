@@ -31,3 +31,17 @@
 - **CTA « Trouver le créneau optimisé »** (ContractModal) : sans LLM ; la pose passe par `ensureEntretienCard` + `scheduleEntretien` (single writer inchangé) ; une « nouvelle journée » renvoie à l'assistant classique.
 - Gotcha : `npm run audit:dead-code` échoue depuis le 29/08 sur `src/lib/tournee/sequence.js` (orphelin conservé « hors chemin de prod ») — décider de le supprimer ou de l'allowlister.
 ---
+
+## [2026-09-12 11:30] Tournées — souplesse des RDV : « fenêtres d'abord, heures ensuite »
+**Statut** : PENDING
+**Commits** : eb37d4e · 0fe70c4 · df733e7 · 0526e1b · e44a5c7 · 55319ae
+**Contexte** : Spec `docs/superpowers/specs/2026-09-12-tournees-fenetres-et-consolidation-design.md`. Chaque RDV porte une souplesse ; le moteur peut glisser UN voisin adaptable ; « Figer la journée » ordonnance et communique les heures.
+**Proposition** (section « Module Planning / RDV ↔ Kanban » ou « Module Entretiens », règles qui mordent) :
+- **Souplesse d'un RDV** = `appointments.time_flex_minutes` (0 figé / 15 / 30 / 240 demi-journée, **NULL = défaut d'org** `settings.tournees.souplesse_defaut_minutes` = 30) + `appointments.hour_confirmed_at` (heure communiquée au client ⇒ figé, quel que soit `time_flex_minutes`). **Décision Eric 2026-09-12 : tous les RDV existants sont adaptables par principe** ; on fige au cas par cas (modale d'édition du Planning, `SectionSouplesse`). Source unique des libellés/annonce : `src/lib/souplesse.js` ; composant unique `SouplesseSelect`.
+- **Un RDV figé ne bouge jamais** : `arrets.js::toleranceDe` lui donne une tolérance ponctuelle ; `placerCandidat` ne décale qu'un voisin **adaptable** (au plus un par insertion, sans casser le voisin du voisin) ; `sequencerTournee` (de retour en prod pour la consolidation) le traite comme point fixe.
+- **`construireArretsExistants(rdvs, depot, opts)`** : sans `opts`, tolérance = fenêtre ponctuelle (comportement d'avant — c'est ce que fait encore l'onglet Tournées) ; avec `opts` (`flexDefaut`, `amplitude`, `demiJournee`), les voisins deviennent décalables — c'est ce que fait le CTA via `proposerPourContrat`. Ne pas passer `opts` par réflexe : l'appelant doit savoir écrire les décalages (`scheduleEntretien({ decalages })`).
+- **Classement du CTA** = `scoreMinutes` = coût + temps perdu (`resteUtileMinutes` sous `reste_utile_min_minutes` = 75) ; l'écran montre trajet / travail / reste utile, jamais le détour net.
+- **Pose** : `scheduleEntretien({ timeFlexMinutes, decalages })` écrit le RDV puis les décalages ; un décalage refusé remonte `decalage_refuse` (le RDV est posé, l'écran le dit).
+- **Consolidation** : bouton « Figer la journée » (panneau de journée, onglet Tournées) → `useConsolidationJournee` → heures définitives + `hour_confirmed_at` + SMS campagne `heure_de_passage` (gabarit `settings.sms.templates.heure_de_passage` à créer — absent ⇒ affiché, jamais avalé). Pas de consolidation automatique en V1.
+- **Affichage** : bloc pointillé à l'heure provisoire + événement de fond `__band` (ni cliquable ni déplaçable) sur la fenêtre ; ↔ adaptable / 🔒 figé. Les handlers Planning lisent `extendedProps.id` (inchangé).
+---
