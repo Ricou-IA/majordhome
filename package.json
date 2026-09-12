@@ -10,7 +10,8 @@
         "lint": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --max-warnings 0",
         "lint:errors": "eslint . --ext js,jsx,mjs --report-unused-disable-directives --quiet",
         "audit:dead-code": "node scripts/audit-dead-code.mjs",
-        "audit:quality": "npm run lint:errors && npm run audit:dead-code",
+        "audit:quality": "npm run lint:errors && node --test scripts/tournee/sync-engine.test.mjs && npm run audit:dead-code",
+        "sync:tournee-engine": "node scripts/sync-tournee-engine.mjs",
         "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
     },
     "dependencies": {
