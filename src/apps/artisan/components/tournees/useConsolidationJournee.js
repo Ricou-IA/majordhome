@@ -19,7 +19,7 @@ import { appointmentsService } from '@services/appointments.service';
 import { savService } from '@services/sav.service';
 import { appointmentKeys, entretienSavKeys, tourneeKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
-import { formatDateFR } from '@/lib/utils';
+import { formatSmsDate, formatSmsHour, capitaliserPrenom } from '@/lib/smsCampaigns';
 import { sequencerTournee } from '@/lib/tournee/sequence.js';
 import { construireArretsPourConsolidation, minutesVersHeure } from '@/lib/tournee/arrets.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
@@ -125,7 +125,9 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       for (const l of aChanger) {
         const { error } = await appointmentsService.updateAppointment(l.id, {
           scheduled_start: l.apres,
+          // R1 : le bloc suit le barème au figeage (durée = celle vue par le moteur).
           scheduled_end: minutesVersHeure(l.arriveeMinutes + l.dureeMinutes),
+          duration_minutes: l.dureeMinutes,
           time_flex_minutes: 0,
           hour_confirmed_at: maintenant,
           announced_start: l.apres,
@@ -139,8 +141,9 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       if (bilan.echecs.length > 0) return;
       for (const l of figes) {
         const { error: smsErr } = await savService.sendHeureDePassage({
-          orgId: coreOrgId, clientId: l.clientId, clientPhone: l.phone, clientFirstName: l.prenom,
-          clientName: l.label, date: formatDateFR(journee.date), heure: l.apres, technicien: journee.technicienNom,
+          orgId: coreOrgId, clientId: l.clientId, clientPhone: l.phone, clientFirstName: capitaliserPrenom(l.prenom),
+          clientName: l.label, date: formatSmsDate(journee.date), heure: formatSmsHour(l.apres),
+          technicien: String(journee.technicienNom || '').split(' ')[0],
         });
         if (!smsErr) bilan.sms += 1;
         else if (smsErr.message === 'campaign_template_missing') bilan.smsGabaritAbsent = true;

@@ -27,6 +27,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useDureeContratClient } from '@hooks/useTournees';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
@@ -167,6 +168,10 @@ export function EventModal({
   // y compris « Autre » (colonnes = tous les membres). En édition, l'assistant revient
   // via « Modifier le RDV » (rescheduleMode) ; sinon la planification est en lecture seule.
   const usesAssistant = !isEdit || rescheduleMode;
+  // Bloc contrat (R5) : un Entretien posé à la main prend la durée du contrat du client.
+  const { dureeMinutes: dureeContratClient } = useDureeContratClient(
+    orgId, selectedClient?.id || null, usesAssistant && formData.appointment_type === 'maintenance',
+  );
   // Ouverture depuis une fiche client (prefillClient) → client implicite :
   // on masque entièrement le bloc Client (inutile de rappeler la fiche, on y est déjà).
   const fromFiche = !!prefillClient;
@@ -1081,7 +1086,8 @@ export function EventModal({
                   members={assistantMembers}
                   appointmentTypeLabel={typeConfig.label}
                   appointmentTypeValue={formData.appointment_type}
-                  defaultDuration={Number(formData.duration_minutes) || 60}
+                  defaultDuration={dureeContratClient || Number(formData.duration_minutes) || 60}
+                  fixedDuration={formData.appointment_type === 'maintenance' ? dureeContratClient : null}
                   initialDate={rescheduleMode ? (formData.scheduled_date || null) : null}
                   multi={!rescheduleMode && formData.appointment_type === 'installation'}
                 />

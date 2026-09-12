@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
-import { Building2, Phone, MapPinned, MessageSquare, ChevronLeft } from 'lucide-react';
+import { Building2, Phone, MapPinned, MessageSquare, Route, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import IdentityTab from './organization/IdentityTab';
 import ContactTab from './organization/ContactTab';
 import TerritoryTab from './organization/TerritoryTab';
 import SmsTab from './organization/SmsTab';
+import TourneesTab from './organization/TourneesTab';
 
 const TABS = [
   { key: 'identity', label: 'Identité', icon: Building2, Component: IdentityTab },
   { key: 'contact', label: 'Coordonnées', icon: Phone, Component: ContactTab },
   { key: 'territory', label: 'Territoire', icon: MapPinned, Component: TerritoryTab },
   { key: 'sms', label: 'SMS', icon: MessageSquare, Component: SmsTab },
+  { key: 'tournees', label: 'Tournées', icon: Route, Component: TourneesTab },
 ];
 
 export default function OrganizationSettings() {

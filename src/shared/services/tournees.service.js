@@ -246,12 +246,13 @@ export const tourneesService = {
     return { data: data?.data ?? null, error: null };
   },
 
-  async getJourneesHorizon({ coreOrgId, joursApres = 45 }) {
+  async getJourneesHorizon({ coreOrgId, joursApres = 45, settings = null }) {
     // Logique déplacée dans src/lib/tournee/loaders.js (injectable, partagée
     // avec l'edge slots-propose). Ici : résolution de l'org majordhome + client de l'app.
     try {
       const mdhOrgId = await getMajordhomeOrgId(coreOrgId);
-      const { data, error } = await chargerJournees({ client: supabase, coreOrgId, mdhOrgId, joursApres, logger });
+      const reglages = construireReglages(settings);
+      const { data, error } = await chargerJournees({ client: supabase, coreOrgId, mdhOrgId, joursApres, reglages, logger });
       return { data, error };
     } catch (error) {
       logger.error('[tournees] getJourneesHorizon', error);

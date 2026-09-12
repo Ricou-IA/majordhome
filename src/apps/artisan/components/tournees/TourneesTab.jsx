@@ -375,6 +375,8 @@ export function TourneesTab() {
         onOpenJournee={ouvrirJournee}
         onOpenContract={setSelectedContractId}
         toleranceAnniversaireMois={reglages.tolerance_anniversaire_mois}
+        reglages={reglages}
+        depot={depot}
       />
 
       {/* Bandeau de tête */}

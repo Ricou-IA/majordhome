@@ -243,6 +243,24 @@ function estMeilleur(sim, ordre, meilleurActuel) {
   return false; // séquences strictement identiques : rien à remplacer
 }
 
+/**
+ * Ordonnance une journée : ordre des arrêts et heures d'arrivée qui minimisent
+ * le temps d'homme (trajets + travail), dans les fenêtres, le budget et
+ * l'amplitude. Exact jusqu'à MAX_ARRETS_EXACT arrêts, heuristique au-delà.
+ *
+ * @param {object} p
+ * @param {string} p.depotKey
+ * @param {Array<{ id: string, key: string|null, dureeMinutes: number, fenetre?: {debut:number, fin:number}, prevu?: number }>} [p.arrets]
+ * @param {(a: string|null, b: string|null) => number} p.trajet
+ * @param {{ debut: number, fin: number }} p.amplitude
+ * @param {number} p.budgetMinutes
+ * @param {{ minutes: number, fenetre: number[] }} [p.pause]
+ * @param {boolean} [p.figesSontDesFaits]  un figé atteint « en retard » selon nos estimations reste un fait
+ * @returns {{ faisable: boolean, raison: string|null, ordre: string[],
+ *   planning: Array<{ id: string, arriveeMinutes: number, departMinutes: number, rang: number }>,
+ *   chargeMinutes: number|null, finMinutes: number|null, pauseHorsFenetre: boolean,
+ *   methode: 'exact'|'heuristique', diagnostic?: object }}
+ */
 export function sequencerTournee({
   depotKey,
   arrets = [],

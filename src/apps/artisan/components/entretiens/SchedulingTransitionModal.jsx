@@ -15,6 +15,7 @@ import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelec
 import { useState, useMemo, useCallback } from 'react';
 import { X, ClipboardCheck, Check } from 'lucide-react';
 import { useTeamMembers } from '@hooks/useAppointments';
+import { useDureeContrat } from '@hooks/useTournees';
 import { formatEuro } from '@/lib/utils';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 
@@ -29,6 +30,10 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
   const [loading, setLoading] = useState(false);
   // Souplesse du RDV (spec 2026-09-12) : null = défaut d'org, 0 = figé.
   const [timeFlexMinutes, setTimeFlexMinutes] = useState(null);
+  // Bloc contrat (R5) : un entretien se pose à la durée du contrat, d'un clic.
+  const { dureeMinutes: dureeContratMinutes } = useDureeContrat(
+    orgId, item?.intervention_type === 'entretien' ? (item?.contract_id || null) : null,
+  );
 
   // Objet "lead-like" pour le SchedulingAssistant — déclaré AVANT early return
   // (règle React Hooks : ordre stable des hooks à chaque render).
@@ -73,9 +78,10 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
   const appointmentTypeValue = isSAV ? 'service' : 'maintenance';
   const defaultSubjectPrefix = appointmentTypeLabel;
 
-  const defaultDuration = item.estimated_time
+  const fixedDuration = !isSAV && dureeContratMinutes ? dureeContratMinutes : null;
+  const defaultDuration = fixedDuration || (item.estimated_time
     ? Math.round(Number(item.estimated_time) * 60)
-    : 60;
+    : 60);
 
   // Toggle entretien
   const handleToggleEntretien = () => {
@@ -151,6 +157,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
             assigneeType="technician"
             members={teamMembers || []}
             defaultDuration={defaultDuration}
+            fixedDuration={fixedDuration}
             defaultSubjectPrefix={defaultSubjectPrefix}
             multi
           />

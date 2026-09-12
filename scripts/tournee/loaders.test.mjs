@@ -131,3 +131,46 @@ test('chargerContrat : contrat introuvable → error contrat_introuvable, data n
   assert.equal(data, null);
   assert.equal(error.message, 'contrat_introuvable');
 });
+
+test('R1 (bloc contrat) : un Entretien à contrat porte la durée barème × gain, pas le bloc dessiné ; SAV et sans contrat gardent leur durée', async () => {
+  const client = fauxClient({
+    majordhome_team_members: [{
+      id: 't1', display_name: 'Antoine', calendar_color: '#f00', daily_work_minutes: 480, include_in_routing: true, specialties: [],
+      default_availability: { tuesday: { active: true, start: '08:00', end: '18:00' } },
+    }],
+    majordhome_appointments: [
+      { id: 'gomes', client_id: 'c1', lead_id: null, intervention_id: 'i1', scheduled_date: '2026-09-15', scheduled_start: '12:30', duration_minutes: 270, appointment_type: 'maintenance', status: 'scheduled' },
+      { id: 'sav', client_id: 'c2', lead_id: null, intervention_id: 'i2', scheduled_date: '2026-09-15', scheduled_start: '08:00', duration_minutes: 120, appointment_type: 'service', status: 'scheduled' },
+      { id: 'libre', client_id: 'c3', lead_id: null, intervention_id: null, scheduled_date: '2026-09-15', scheduled_start: '16:00', duration_minutes: 45, appointment_type: 'maintenance', status: 'scheduled' },
+    ],
+    majordhome_clients: [{ id: 'c1', latitude: 43.94, longitude: 1.72 }, { id: 'c2', latitude: 43.9, longitude: 1.9 }, { id: 'c3', latitude: 43.8, longitude: 1.6 }],
+    majordhome_leads: [],
+    majordhome_appointment_technicians: [{ appointment_id: 'gomes', technician_id: 't1' }, { appointment_id: 'sav', technician_id: 't1' }, { appointment_id: 'libre', technician_id: 't1' }],
+    majordhome_interventions: [{ id: 'i1', contract_id: 'ct1' }, { id: 'i2', contract_id: 'ct2' }],
+    majordhome_contract_equipments: [
+      { contract_id: 'ct1', equipment_id: 'e1' }, { contract_id: 'ct1', equipment_id: 'e2' }, { contract_id: 'ct1', equipment_id: 'e3' }, { contract_id: 'ct1', equipment_id: 'e4' },
+    ],
+    majordhome_pricing_equipment_types: [
+      { id: 'clim', code: 'CLIM', category: 'pac_air_air', duration_base_minutes: 60, duration_per_extra_unit_minutes: 30, included_units: 1 },
+      { id: 'bois', code: 'BOIS', category: 'poele', duration_base_minutes: 60, duration_per_extra_unit_minutes: 0, included_units: 1 },
+    ],
+    majordhome_equipments: [
+      { id: 'e1', category: 'pac_air_air', unit_count: 1, equipment_type_id: 'clim' },
+      { id: 'e2', category: 'pac_air_air', unit_count: 1, equipment_type_id: 'clim' },
+      { id: 'e3', category: 'pac_air_air', unit_count: 1, equipment_type_id: 'clim' },
+      { id: 'e4', category: 'poele', unit_count: 1, equipment_type_id: 'bois' },
+    ],
+  });
+  const { data, error } = await chargerJournees({
+    client, coreOrgId: 'core', mdhOrgId: 'mdh', joursApres: 1, maintenant: LUNDI, logger: silencieux,
+    reglages: { gain_multi_equipements_pct: 10 },
+  });
+  assert.equal(error, null);
+  const j = data.find((x) => x.date === '2026-09-15');
+  const par = Object.fromEntries(j.rdvs.map((r) => [r.id, r]));
+  assert.equal(par.gomes.duration_minutes, 216, '4 équipements : (60×3 + 60) × 0,9');
+  assert.equal(par.gomes.duration_minutes_saisie, 270, 'le bloc dessiné reste lisible');
+  assert.equal(par.sav.duration_minutes, 120, 'un SAV n a pas de barème');
+  assert.equal(par.libre.duration_minutes, 45, 'sans contrat : durée saisie');
+  assert.equal(j.chargeMinutes, 216 + 120 + 45);
+});

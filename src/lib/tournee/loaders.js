@@ -27,8 +27,12 @@ const hhmmEnMinutes = (s) => {
  * @property {{ debut: number, fin: number }} amplitude  minutes depuis minuit
  * @property {number} budgetMinutes
  * @property {Array<object>} rdvs  RDV du jour pour ce technicien (colonnes
- *   majordhome_appointments + `lat`/`lng` résolus client → lead → null)
- * @property {number} chargeMinutes  somme des `duration_minutes`, TOUS les RDV
+ *   majordhome_appointments + `lat`/`lng` résolus client → lead → null).
+ *   ⚠️ R1 (spec 2026-09-12 « bloc contrat ») : pour un Entretien rattaché à un
+ *   contrat, `duration_minutes` est REMPLACÉ par le barème × gain multi-
+ *   équipements — le bloc dessiné n'est qu'un dessin, le moteur voit le
+ *   barème. La valeur en base reste lisible dans `duration_minutes_saisie`.
+ * @property {number} chargeMinutes  somme des `duration_minutes` (barème pour les entretiens), TOUS les RDV
  * @property {boolean} estAmorcee  au moins un RDV de type 'maintenance' ce jour-là
  * @property {string[]} specialties  compétences du technicien (catégories d'équipement)
  */
@@ -44,11 +48,12 @@ const hhmmEnMinutes = (s) => {
  * @param {string} p.mdhOrgId    org majordhome (team_members/appointments)
  * @param {number} [p.joursApres=45]
  * @param {Date} [p.maintenant=new Date()]
+ * @param {object|null} [p.reglages]  construireReglages(settings) — gain multi-équipements (R1)
  * @param {{ error: Function }} [p.logger=console]
  * @returns {Promise<{ data: Journee[], techniciens: Array<{ id, nom, specialties: string[], couleur }>, error: Error|null }>}
  */
 export async function chargerJournees({
-  client, coreOrgId, mdhOrgId, joursApres = 45, maintenant = new Date(), logger: log = console,
+  client, coreOrgId, mdhOrgId, joursApres = 45, maintenant = new Date(), reglages = null, logger: log = console,
 }) {
   try {
   const orgId = mdhOrgId;
@@ -70,7 +75,7 @@ export async function chargerJournees({
       // SELECT, `r.lead_id` vaut `undefined`, `leadIds` reste vide et TOUT le repli
       // lead est du code mort — silencieusement, puisque le repli suivant (siège)
       // fournit quand même une position plausible. Vécu : livré ainsi, jamais vu.
-      .select('id, client_id, lead_id, scheduled_date, scheduled_start, scheduled_end, duration_minutes, appointment_type, status, subject, client_name, client_first_name, client_phone, address, city, postal_code, time_flex_minutes, hour_confirmed_at, announced_start')
+      .select('id, client_id, lead_id, intervention_id, scheduled_date, scheduled_start, scheduled_end, duration_minutes, appointment_type, status, subject, client_name, client_first_name, client_phone, address, city, postal_code, time_flex_minutes, hour_confirmed_at, announced_start')
       .eq('org_id', orgId).gte('scheduled_date', iso(debut)).lte('scheduled_date', iso(fin))
       .not('status', 'in', '(cancelled,no_show)'),
   ]);
@@ -109,10 +114,19 @@ export async function chargerJournees({
   // Un RDV sans coordonnée reste compté dans chargeMinutes (le technicien y
   // passe du temps) mais sera exclu de arretsExistants côté proposerPourJournee
   // (r.lat/r.lng null) : il ne peut pas participer au séquencement géographique.
+  // R1 — le temps de travail d'un Entretien est celui du barème, pas du bloc.
+  const { data: baremes, error: bErr } = await chargerDureesBareme({ client, coreOrgId, rdvs: rdvs || [], reglages });
+  if (bErr) return { data: [], techniciens: [], error: bErr };
   const rdvsAvecCoords = (rdvs || []).map((r) => {
     const co = (r.client_id ? coordByClientId.get(r.client_id) : null)
       || (r.lead_id ? coordByLeadId.get(r.lead_id) : null);
-    return { ...r, lat: co?.latitude ?? null, lng: co?.longitude ?? null };
+    const bareme = baremes.get(r.id);
+    return {
+      ...r,
+      lat: co?.latitude ?? null, lng: co?.longitude ?? null,
+      duration_minutes_saisie: r.duration_minutes,
+      duration_minutes: bareme ?? r.duration_minutes,
+    };
   });
 
   const ids = rdvsAvecCoords.map((r) => r.id);
@@ -170,6 +184,59 @@ export async function chargerJournees({
     log.error('[tournees] chargerJournees', error);
     return { data: [], techniciens: [], error };
   }
+}
+
+/**
+ * Durée barème × gain des RDV d'ENTRETIEN rattachés à un contrat (R1) :
+ * intervention → contrat → équipements → types. Un RDV sans contrat ou sans
+ * équipement n'est pas dans la Map (il garde sa durée saisie). Même mécanique
+ * que chargerContrat / getContratsDus — une seule définition de la durée.
+ *
+ * @param {{ client: object, coreOrgId: string, rdvs: Array<object>, reglages?: object|null }} p
+ * @returns {Promise<{ data: Map<string, number>, error: Error|null }>}  appointment id → minutes
+ */
+export async function chargerDureesBareme({ client, coreOrgId, rdvs, reglages = null }) {
+  const data = new Map();
+  const entretiens = (rdvs || []).filter((r) => r.appointment_type === 'maintenance' && r.intervention_id);
+  if (entretiens.length === 0) return { data, error: null };
+  const interventionIds = [...new Set(entretiens.map((r) => r.intervention_id))];
+  const { data: interventions, error: iErr } = await client
+    .from('majordhome_interventions').select('id, contract_id').in('id', interventionIds);
+  if (iErr) return { data, error: iErr };
+  const contratParIntervention = new Map((interventions || []).filter((i) => i.contract_id).map((i) => [i.id, i.contract_id]));
+  const contractIds = [...new Set([...contratParIntervention.values()])];
+  if (contractIds.length === 0) return { data, error: null };
+  const [{ data: liens, error: lErr }, { data: types, error: tErr }] = await Promise.all([
+    client.from('majordhome_contract_equipments').select('contract_id, equipment_id').in('contract_id', contractIds),
+    client.from('majordhome_pricing_equipment_types')
+      .select('id, code, category, duration_base_minutes, duration_per_extra_unit_minutes, included_units')
+      .eq('org_id', coreOrgId),
+  ]);
+  if (lErr) return { data, error: lErr };
+  if (tErr) return { data, error: tErr };
+  const equipIds = [...new Set((liens || []).map((l) => l.equipment_id))];
+  const { data: equipements, error: eErr } = equipIds.length
+    ? await client.from('majordhome_equipments').select('id, category, unit_count, equipment_type_id').in('id', equipIds)
+    : { data: [], error: null };
+  if (eErr) return { data, error: eErr };
+  const typesById = new Map((types || []).map((t) => [t.id, t]));
+  const fallbacks = construireFallbacks(equipements || [], typesById, 90);
+  const equipById = new Map((equipements || []).map((e) => [e.id, e]));
+  const eqsParContrat = new Map();
+  for (const l of liens || []) {
+    const eq = equipById.get(l.equipment_id);
+    if (!eq) continue;
+    if (!eqsParContrat.has(l.contract_id)) eqsParContrat.set(l.contract_id, []);
+    eqsParContrat.get(l.contract_id).push(eq);
+  }
+  const gainMultiPct = reglages?.gain_multi_equipements_pct ?? 0;
+  for (const r of entretiens) {
+    const contractId = contratParIntervention.get(r.intervention_id);
+    const eqs = contractId ? eqsParContrat.get(contractId) : null;
+    if (!eqs || eqs.length === 0) continue;
+    data.set(r.id, Math.max(15, dureeContrat(eqs, typesById, fallbacks, { gainMultiPct })));
+  }
+  return { data, error: null };
 }
 
 /**

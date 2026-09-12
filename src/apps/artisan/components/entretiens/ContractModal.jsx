@@ -116,6 +116,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const itemDepuisContrat = useCallback(() => ({
     id: null,
     intervention_type: 'entretien',
+    contract_id: contract.id, // bloc contrat : la durée du RDV est celle du contrat
     client_id: contract.client_id,
     client_name: contract.client_name,
     client_last_name: contract.client_name,

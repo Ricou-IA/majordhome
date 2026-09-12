@@ -184,6 +184,11 @@ export function construireArretsExistants(rdvs, coordsFallback = null, opts = {}
  * Même chose, mais la `fenetre` EST la tolérance : c'est l'entrée de
  * `sequencerTournee` pour la consolidation (« Figer la journée ») — l'ordonnanceur
  * peut poser chaque RDV n'importe où dans sa plage, les figés restant ponctuels.
+ *
+ * @param {Array<object>} rdvs
+ * @param {{ lat: number, lng: number }|null} [coordsFallback]
+ * @param {object} [opts]  ceux de construireArretsExistants (souplesse, flexDefaut, amplitude, demiJournee)
+ * @returns {Array<{ id: string, key: string|null, dureeMinutes: number, fenetre?: {debut:number, fin:number}, tolerance?: {min:number, max:number, flex:number}, prevu?: number }>}
  */
 export function construireArretsPourConsolidation(rdvs, coordsFallback = null, opts = {}) {
   return construireArretsExistants(rdvs, coordsFallback, opts).map((a) => {

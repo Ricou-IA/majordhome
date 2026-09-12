@@ -4,8 +4,8 @@
 // Réglages du moteur de tournées (core.organizations.settings.tournees) et
 // leurs défauts — SOURCE UNIQUE, module pur (Node, Vite, Deno). Consommé par
 // tournees.service.js (navigateur) et l'edge slots-propose (copie _shared).
-// ⚠️ `settings.tournees` n'est pas encore éditable dans /settings (dette
-// connue) : toute nouvelle clé naît ici avec un défaut documenté.
+// Éditable dans Settings → Organisation → Tournées (TourneesTab.jsx) : toute
+// nouvelle clé naît ici avec un défaut documenté, puis son champ dans l'onglet.
 // ============================================================================
 
 export const REGLAGES_DEFAUT = {
@@ -44,6 +44,12 @@ export const REGLAGES_DEFAUT = {
   // affiché reste daily_work_minutes ; le moteur refuse au-delà de
   // budget + dépassement.
   depassement_journee_minutes: 30,
+  // Figeage automatique d'une journée PLEINE (edge tournees-figer, cron
+  // horaire) : dès qu'il ne rentre plus rien, les heures deviennent
+  // définitives et les clients reçoivent l'heure de passage. Décision Eric
+  // 2026-09-12 : « si c'est plein depuis 10 jours, pourquoi attendre ? ».
+  // `false` pour s'en tenir au bouton « Figer la journée ».
+  figer_journee_pleine: true,
 };
 
 export function construireReglages(settings) {
