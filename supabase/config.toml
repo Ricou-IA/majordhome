@@ -74,6 +74,12 @@ verify_jwt = true
 [functions.sms-send]
 verify_jwt = true
 
+# Rappel automatique des RDV d'entretien (cron pg_cron horaire, réglage par org
+# settings.sms.rappel_rdv : veille / hebdo / off) — protégée par MDH_CRON_SECRET.
+# Même cœur d'envoi que sms-send (_shared/sms.ts).
+[functions.sms-rappel-rdv]
+verify_jwt = false
+
 # Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
 [functions.pvgis-proxy]
 verify_jwt = true
@@ -121,3 +127,8 @@ verify_jwt = true
 # deploiement du nouveau projet. Elle etait de surcroit declaree verify_jwt=true
 # alors que la prod la sert en false : un deploy global depuis ce repo vers
 # l'instance partagee aurait pu la basculer et casser une app voisine.
+
+# Tournées — figeage automatique des journées PLEINES (cron pg_cron horaire,
+# spec 2026-09-12 « bloc contrat et journée pleine ») — protégée par MDH_CRON_SECRET.
+[functions.tournees-figer]
+verify_jwt = false

@@ -229,6 +229,16 @@
   @apply text-secondary-700 font-medium;
 }
 
+/* Souplesse (2026-09-12) : RDV adaptable = heure provisoire en pointillé,
+   bande translucide = sa fenêtre de tolérance. Figé = bloc plein. */
+.fc .mdh-flex {
+  border-style: dashed !important;
+  border-width: 2px !important;
+}
+.fc .mdh-flex-band {
+  opacity: 0.18;
+}
+
 .fc .fc-daygrid-day.fc-day-today {
   @apply bg-primary-50;
 }

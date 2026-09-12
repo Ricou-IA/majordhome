@@ -105,7 +105,7 @@ export function useJourneePose({
     trajet,
     depotKey: cleCoord(depot),
     amplitude: journee.amplitude,
-    budgetMinutes: journee.budgetMinutes,
+    budgetMinutes: journee.budgetMinutes + (reglages?.depassement_journee_minutes ?? 0),
     pause: {
       minutes: reglages.pause_minutes,
       fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],
@@ -297,8 +297,17 @@ export function useJourneePose({
         // CARTE, pas le RDV). Une exception ici doit compter comme un échec pour
         // CE candidat et laisser les suivants s'exécuter, exactement comme une
         // erreur `{error}` renvoyée.
+        //
+        // Carte INSÉRÉE par ensureEntretienCard pour ce candidat : elle naît
+        // « Planifié » AVANT la pose du RDV. Si la pose échoue ensuite (erreur
+        // renvoyée par scheduleEntretien, carte illisible après création, ou
+        // exception), on la ramène en « À planifier » — une carte « Planifié »
+        // sans RDV est un fantôme (vécu 2026-09-12, même parade que
+        // ContractModal.handleConfirmScheduling). Une carte RÉUTILISÉE
+        // (created=false) n'est jamais touchée : son statut ne vient pas d'ici.
+        let carteCreeeId = null;
         try {
-          const { interventionId, error: ensureErr } = await ensureEntretienCard({
+          const { interventionId, created, error: ensureErr } = await ensureEntretienCard({
             clientId: p.meta.clientId,
             contractId: p.meta.contractId,
             visitDate: journee.date,
@@ -308,6 +317,7 @@ export function useJourneePose({
             echecs.push({ nom: p.meta.clientName, message: messageErreur(ensureErr, 'carte introuvable') });
             continue;
           }
+          if (created) carteCreeeId = interventionId;
 
           // Filtre org_id explicite même si RLS couvre déjà (charte du projet,
           // défense en profondeur multi-tenant — mineur, revue finale).
@@ -318,6 +328,7 @@ export function useJourneePose({
             .eq('org_id', coreOrgId)
             .maybeSingle();
           if (cardErr || !card) {
+            if (carteCreeeId) await savService.updateWorkflowStatus(carteCreeeId, 'a_planifier');
             echecs.push({ nom: p.meta.clientName, message: messageErreur(cardErr, 'carte introuvable après création') });
             continue;
           }
@@ -335,12 +346,17 @@ export function useJourneePose({
             }],
           });
           if (schedErr) {
+            // Rien n'est posé : scheduleEntretien remet le voisin en place et ne
+            // renvoie une erreur qu'AVANT la création du RDV (pour une carte neuve,
+            // jamais taguée Web, aucune étape faillible ne suit la pose).
+            if (carteCreeeId) await savService.updateWorkflowStatus(carteCreeeId, 'a_planifier');
             echecs.push({ nom: p.meta.clientName, message: messageErreur(schedErr, 'erreur inconnue') });
           } else {
             idsPoses.push(p.id);
           }
         } catch (err) {
           logger.error('[useJourneePose] executerPose — exception sur un candidat', p.meta?.clientName, err);
+          if (carteCreeeId) await savService.updateWorkflowStatus(carteCreeeId, 'a_planifier');
           echecs.push({ nom: p.meta?.clientName || 'client', message: err?.message || 'exception inattendue' });
         }
       }

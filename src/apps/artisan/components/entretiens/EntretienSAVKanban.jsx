@@ -24,6 +24,8 @@ import { ClientModal } from '../clients/ClientModal';
 import { SAVQuoteModal } from './SAVQuoteModal';
 import { AcceptQuoteModal } from './AcceptQuoteModal';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
@@ -36,6 +38,8 @@ export function EntretienSAVKanban() {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const { can, effectiveRole } = useCanAccess();
+  const { settings: orgSettings } = useOrgSettings();
+  const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
 
   const { items, isLoading, refresh } = useEntretienSAV(orgId);
   const { updateWorkflowStatus, updateFields } = useEntretienSAVMutations();
@@ -191,7 +195,7 @@ export function EntretienSAVKanban() {
     }
   }, [pendingTransition, updateFields, updateWorkflowStatus, refresh]);
 
-  const handleConfirmSchedule = useCallback(async (slots, includesEntretien) => {
+  const handleConfirmSchedule = useCallback(async (slots, includesEntretien, options = {}) => {
     if (!pendingTransition) return;
     if (!slots || slots.length === 0) return;
     const item = pendingTransition.item;
@@ -201,6 +205,7 @@ export function EntretienSAVKanban() {
         slots,
         includesEntretien,
         coreOrgId: orgId,
+        timeFlexMinutes: options.timeFlexMinutes ?? null,
       });
       if (error) {
         toast.error('Erreur lors de la planification');
@@ -318,6 +323,7 @@ export function EntretienSAVKanban() {
         <SchedulingTransitionModal
           item={pendingTransition.item}
           orgId={orgId}
+          souplesseDefaut={souplesseDefaut}
           onConfirm={handleConfirmSchedule}
           onCancel={handleCancelTransition}
         />

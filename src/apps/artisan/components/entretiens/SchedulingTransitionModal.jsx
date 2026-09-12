@@ -11,9 +11,11 @@
  * ============================================================================
  */
 
+import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
 import { useState, useMemo, useCallback } from 'react';
 import { X, ClipboardCheck, Check } from 'lucide-react';
 import { useTeamMembers } from '@hooks/useAppointments';
+import { useDureeContrat } from '@hooks/useTournees';
 import { formatEuro } from '@/lib/utils';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 
@@ -21,11 +23,17 @@ import { SchedulingAssistant } from '@apps/artisan/components/planning/schedulin
 // COMPOSANT
 // ============================================================================
 
-export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) {
+export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, souplesseDefaut = 30 }) {
   const { members: teamMembers } = useTeamMembers(orgId);
 
   const [includesEntretien, setIncludesEntretien] = useState(item?.includes_entretien || false);
   const [loading, setLoading] = useState(false);
+  // Souplesse du RDV (spec 2026-09-12) : null = défaut d'org, 0 = figé.
+  const [timeFlexMinutes, setTimeFlexMinutes] = useState(null);
+  // Bloc contrat (R5) : un entretien se pose à la durée du contrat, d'un clic.
+  const { dureeMinutes: dureeContratMinutes } = useDureeContrat(
+    orgId, item?.intervention_type === 'entretien' ? (item?.contract_id || null) : null,
+  );
 
   // Objet "lead-like" pour le SchedulingAssistant — déclaré AVANT early return
   // (règle React Hooks : ordre stable des hooks à chaque render).
@@ -46,11 +54,12 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const handleConfirmScheduling = useCallback(async (slots) => {
     setLoading(true);
     try {
-      await onConfirm(slots, includesEntretien);
+      // null = l'opérateur garde le défaut d'org : le RDV le suit (NULL en base).
+      await onConfirm(slots, includesEntretien, { timeFlexMinutes });
     } finally {
       setLoading(false);
     }
-  }, [onConfirm, includesEntretien]);
+  }, [onConfirm, includesEntretien, timeFlexMinutes]);
 
   if (!item) return null;
 
@@ -69,9 +78,10 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
   const appointmentTypeValue = isSAV ? 'service' : 'maintenance';
   const defaultSubjectPrefix = appointmentTypeLabel;
 
-  const defaultDuration = item.estimated_time
+  const fixedDuration = !isSAV && dureeContratMinutes ? dureeContratMinutes : null;
+  const defaultDuration = fixedDuration || (item.estimated_time
     ? Math.round(Number(item.estimated_time) * 60)
-    : 60;
+    : 60);
 
   // Toggle entretien
   const handleToggleEntretien = () => {
@@ -100,6 +110,11 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Souplesse du RDV : jusqu'où son heure peut glisser pour la tournée. */}
+          <div className="rounded-lg border border-secondary-200 p-3 space-y-2">
+            <p className="text-xs font-medium text-secondary-600">Souplesse du rendez-vous</p>
+            <SouplesseSelect value={timeFlexMinutes} onChange={setTimeFlexMinutes} defaut={souplesseDefaut} compact />
+          </div>
           {/* Toggle Entretien (SAV uniquement) */}
           {isSAV && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
@@ -142,6 +157,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel }) 
             assigneeType="technician"
             members={teamMembers || []}
             defaultDuration={defaultDuration}
+            fixedDuration={fixedDuration}
             defaultSubjectPrefix={defaultSubjectPrefix}
             multi
           />

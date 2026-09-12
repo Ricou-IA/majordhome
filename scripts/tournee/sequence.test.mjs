@@ -127,6 +127,26 @@ test('départ anticipé — un RDV fixé à l ouverture reste atteignable', () =
   assert.equal(r.planning[0].arriveeMinutes, 8 * 60, 'il est chez le client a 8h00 pile');
 });
 
+test('la journée commence au dépôt à l ouverture : un premier arrêt ADAPTABLE à 8h00 ±30 à 40 min du dépôt n est pas atteignable (Eric, 15/09 : « ça ne prend pas en compte le trajet vers Bessières »)', () => {
+  // Adaptable 8h00 ±30 → fenêtre 8h00-8h30 ; départ 8h00 + 40 min = 8h40 > 8h30 → infaisable.
+  const r = sequencerTournee({
+    ...ctx,
+    arrets: [{ ...arret('c', 'C', 60, { debut: 8 * 60, fin: 8 * 60 + 30 }), prevu: 8 * 60 }],
+    budgetMinutes: 600,
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'fenetre');
+  assert.deepEqual(r.diagnostic.conflits, [{ id: 'c', depuisId: null, trajetMinutes: 40, disponibleMinutes: 0 }], 'le diagnostic nomme le trajet depuis le dépôt');
+  // Même RDV annoncé 8h40 ±30 : arrivée 8h40, dans la plage → il est posé à 8h40, pas avant.
+  const ok = sequencerTournee({
+    ...ctx,
+    arrets: [{ ...arret('c', 'C', 60, { debut: 8 * 60 + 10, fin: 9 * 60 + 10 }), prevu: 8 * 60 + 40 }],
+    budgetMinutes: 600,
+  });
+  assert.equal(ok.faisable, true);
+  assert.equal(ok.planning[0].arriveeMinutes, 8 * 60 + 40);
+});
+
 test('départ anticipé — ne couvre PAS un arrêt de milieu de journée', () => {
   // Deux arrets contraints dont le second est inatteignable apres le premier :
   // la tolerance ne s applique qu au premier arret, ce conflit reste un echec.
@@ -233,4 +253,88 @@ test('repli heuristique — un seul arrêt contraint : la géographie décide po
 
   assert.equal(r.methode, 'heuristique');
   assert.equal(r.ordre.length, 9, 'tous les arrets sont places, y compris le seul contraint');
+});
+
+// ============================================================================
+// Consolidation (spec 2026-09-12) : les fenêtres de tolérance deviennent les
+// fenêtres du séquenceur ; les figés sont des points fixes.
+// ============================================================================
+import { construireArretsPourConsolidation } from '../../src/lib/tournee/arrets.js';
+
+test('consolidation : ordre + heures dans les fenêtres, le figé ne bouge pas, les adaptables se resserrent', () => {
+  const AMP = { debut: 480, fin: 1080 };
+  // a ±30 posé 08:30 ; b figé 14:00 ; c ±30 posé 10:50 — tous à des lieux distincts, trajets 10.
+  const rdvs = [
+    { id: 'a', lat: 43.7, lng: 2.1, duration_minutes: 60, scheduled_start: '08:30', time_flex_minutes: 30 },
+    { id: 'b', lat: 43.8, lng: 2.0, duration_minutes: 60, scheduled_start: '14:00', hour_confirmed_at: '2026-09-12T08:00:00Z' },
+    { id: 'c', lat: 43.75, lng: 2.05, duration_minutes: 60, scheduled_start: '10:50', time_flex_minutes: 30 },
+  ];
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9, lng: 1.9 }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
+  const r = sequencerTournee({
+    depotKey: '43.900,1.900', arrets, trajet: (x, y) => (x === y ? 0 : 10),
+    amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true,
+  });
+  assert.equal(r.faisable, true);
+  const par = Object.fromEntries(r.planning.map((p) => [p.id, p]));
+  assert.equal(par.b.arriveeMinutes, 840, 'le figé est un point fixe');
+  // Les heures provisoires tiennent : on ne resserre pas pour rien (revue I8).
+  assert.equal(par.a.arriveeMinutes, 510, 'a garde 08:30');
+  assert.equal(par.c.arriveeMinutes, 650, 'c garde 10:50');
+});
+
+test('consolidation : un figé atteint « en retard » selon nos estimations est un FAIT, pas un échec (leçon du 31/08)', () => {
+  const AMP = { debut: 480, fin: 1080 };
+  const rdvs = [
+    { id: 'a', lat: 43.7, lng: 2.1, duration_minutes: 60, scheduled_start: '08:10', hour_confirmed_at: 'x', appointment_type: 'maintenance' },
+    { id: 'b', lat: 43.75, lng: 2.05, duration_minutes: 60, scheduled_start: '10:00', time_flex_minutes: 30, appointment_type: 'maintenance' },
+  ];
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9, lng: 1.9 }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
+  const trajet = (x, y) => (x === y ? 0 : 20); // 20 min depuis le dépôt : « en retard » de 10 min à 08:10
+  const strict = sequencerTournee({ depotKey: '43.900,1.900', arrets, trajet, amplitude: AMP, budgetMinutes: 600 });
+  assert.equal(strict.faisable, false);
+  const faits = sequencerTournee({ depotKey: '43.900,1.900', arrets, trajet, amplitude: AMP, budgetMinutes: 600, figesSontDesFaits: true });
+  assert.equal(faits.faisable, true);
+  const par = Object.fromEntries(faits.planning.map((p) => [p.id, p]));
+  assert.equal(par.a.arriveeMinutes, 490);
+  assert.equal(par.b.arriveeMinutes, 600, 'b garde son heure provisoire');
+});
+
+test('journée infaisable : le diagnostic dit ce que la journée TELLE QUE POSÉE coûte (cas du 15/09 : 30 min entre deux clients pour 39 min de route, 8 h 40 d homme pour 8 h)', () => {
+  const AMP = { debut: 480, fin: 1080 };
+  const rdvs = [
+    { id: 'EKOUE', lat: 43.79476, lng: 1.604971, duration_minutes: 180, scheduled_start: '08:00', appointment_type: 'maintenance' },
+    { id: 'GOMES', lat: 43.941915, lng: 1.720688, duration_minutes: 240, scheduled_start: '12:30', appointment_type: 'maintenance' },
+  ];
+  const M = { '43.912,1.890|43.795,1.605': 38, '43.795,1.605|43.912,1.890': 40, '43.912,1.890|43.942,1.721': 21, '43.942,1.721|43.912,1.890': 23, '43.795,1.605|43.942,1.721': 39, '43.942,1.721|43.795,1.605': 38 };
+  const trajet = (a, b) => (a === b ? 0 : M[`${a}|${b}`]);
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9119, lng: 1.8898 }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
+  const r = sequencerTournee({ depotKey: '43.912,1.890', arrets, trajet, amplitude: AMP, budgetMinutes: 480, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.equal(r.faisable, false);
+  assert.deepEqual(r.diagnostic.ordre, ['EKOUE', 'GOMES']);
+  assert.equal(r.diagnostic.travailMinutes, 420);
+  assert.equal(r.diagnostic.trajetsMinutes, 38 + 39 + 23);
+  assert.equal(r.diagnostic.depasseBudget, true);
+  assert.deepEqual(r.diagnostic.conflits, [{ id: 'EKOUE', depuisId: null, trajetMinutes: 38, disponibleMinutes: 0 }],
+    'au barème (3 h), 90 min séparent la fin d EKOUE de GOMES : la route tient ; mais EKOUE à 8h00 est à 38 min du dépôt ouvert à 8h00');
+  // Avec les durées posées à la main (4 h / 4 h 30) : 30 min d'écart pour 39 min de route.
+  const arretsMain = construireArretsPourConsolidation(
+    rdvs.map((x) => ({ ...x, duration_minutes: x.id === 'EKOUE' ? 240 : 270 })),
+    { lat: 43.9119, lng: 1.8898 }, { souplesse: true, flexDefaut: 30, amplitude: AMP },
+  );
+  const r2 = sequencerTournee({ depotKey: '43.912,1.890', arrets: arretsMain, trajet, amplitude: AMP, budgetMinutes: 480, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.equal(r2.faisable, false);
+  assert.equal(r2.diagnostic.travailMinutes, 510);
+  assert.deepEqual(r2.diagnostic.conflits, [
+    { id: 'EKOUE', depuisId: null, trajetMinutes: 38, disponibleMinutes: 0 },
+    { id: 'GOMES', depuisId: 'EKOUE', trajetMinutes: 39, disponibleMinutes: 30 },
+  ]);
+  // Journée faisable (EKOUE annoncé 8h40, budget large) : pas de diagnostic (rien à expliquer).
+  const arretsOk = construireArretsPourConsolidation(
+    rdvs.map((x) => (x.id === 'EKOUE' ? { ...x, scheduled_start: '08:40' } : x)),
+    { lat: 43.9119, lng: 1.8898 }, { souplesse: true, flexDefaut: 30, amplitude: AMP },
+  );
+  const ok = sequencerTournee({ depotKey: '43.912,1.890', arrets: arretsOk, trajet, amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.equal(ok.faisable, true);
+  assert.equal(ok.planning.find((p) => p.id === 'EKOUE').arriveeMinutes, 8 * 60 + 40, 'arrivée 8h38, RDV annoncé 8h40 : on garde 8h40');
+  assert.equal(ok.diagnostic, undefined);
 });

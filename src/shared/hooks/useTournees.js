@@ -19,9 +19,18 @@
  * ============================================================================
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { tourneesService } from '@services/tournees.service';
+import { contractsService } from '@services/contracts.service';
 import { tourneeKeys } from '@hooks/cacheKeys';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { supabase } from '@/lib/supabaseClient';
+import { construireReglages } from '@/lib/tournee/reglages.js';
+import { chargerContrat } from '@/lib/tournee/loaders.js';
+import { verdictJournee } from '@/lib/tournee/plein.js';
+import { trajetLocal } from '@/lib/tournee/matrice.js';
+import { getOrgHeadquarters } from '@lib/territoire-config';
 
 // Re-export for backward compatibility
 export { tourneeKeys } from '@hooks/cacheKeys';
@@ -36,10 +45,14 @@ export { tourneeKeys } from '@hooks/cacheKeys';
  *   `data` = tableau de `Candidat` (cf. JSDoc du service).
  */
 export function useContratsDus(coreOrgId) {
+  // Les durées des candidats dépendent des réglages d'org (gain multi-équipements) :
+  // la clé les porte pour qu'un changement de réglage recalcule la liste.
+  const { settings } = useOrgSettings();
+  const gainMultiPct = construireReglages(settings).gain_multi_equipements_pct ?? 0;
   return useQuery({
-    queryKey: tourneeKeys.contratsDus(coreOrgId),
+    queryKey: [...tourneeKeys.contratsDus(coreOrgId), { gainMultiPct }],
     queryFn: async () => {
-      const { data, error } = await tourneesService.getContratsDus({ coreOrgId });
+      const { data, error } = await tourneesService.getContratsDus({ coreOrgId, settings });
       if (error) throw error;
       return data;
     },
@@ -61,10 +74,13 @@ export function useContratsDus(coreOrgId) {
  *   `data` = tableau de `Journee` (cf. JSDoc du service).
  */
 export function useJourneesHorizon(coreOrgId, joursApres = 45) {
+  // R1 : la durée des entretiens posés est le barème × gain (réglage d'org).
+  const { settings } = useOrgSettings();
+  const gainMultiPct = construireReglages(settings).gain_multi_equipements_pct ?? 0;
   return useQuery({
-    queryKey: tourneeKeys.journees(coreOrgId, joursApres),
+    queryKey: [...tourneeKeys.journees(coreOrgId, joursApres), { gainMultiPct }],
     queryFn: async () => {
-      const { data, error } = await tourneesService.getJourneesHorizon({ coreOrgId, joursApres });
+      const { data, error } = await tourneesService.getJourneesHorizon({ coreOrgId, joursApres, settings });
       if (error) throw error;
       return data;
     },
@@ -172,3 +188,73 @@ export function useCreneauxProposes({ orgId, contractId, constraints = {}, enabl
     retry: false,
   });
 }
+
+/**
+ * « Bloc contrat » (spec 2026-09-12, R5) : la durée d'un entretien à poser à la
+ * main est celle du contrat (barème × gain multi-équipements), la même que voit
+ * le moteur. `contractId` null (ou pas d'équipement) ⇒ `dureeMinutes` null : la
+ * grille redevient libre.
+ *
+ * @param {string} coreOrgId
+ * @param {string|null} contractId
+ * @returns {{ dureeMinutes: number|null, isLoading: boolean }}
+ */
+export function useDureeContrat(coreOrgId, contractId) {
+  const { settings } = useOrgSettings();
+  const reglages = construireReglages(settings);
+  const q = useQuery({
+    queryKey: [...tourneeKeys.all(coreOrgId), 'dureeContrat', contractId, { gain: reglages.gain_multi_equipements_pct ?? 0 }],
+    queryFn: async () => {
+      const { data, error } = await chargerContrat({ client: supabase, coreOrgId, contractId, reglages });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!coreOrgId && !!contractId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const dureeMinutes = q.data && !q.data.sansEquipement ? q.data.dureeMinutes : null;
+  return { dureeMinutes, isLoading: q.isLoading };
+}
+
+/**
+ * Même chose depuis un CLIENT (modale RDV du planning) : 1 client = au plus 1
+ * contrat ; sans contrat, pas de bloc.
+ */
+export function useDureeContratClient(coreOrgId, clientId, enabled = true) {
+  const contrat = useQuery({
+    queryKey: [...tourneeKeys.all(coreOrgId), 'contratClient', clientId],
+    queryFn: async () => {
+      const { data, error } = await contractsService.getContractByClientId(clientId);
+      if (error) throw error;
+      return data?.id ?? null;
+    },
+    enabled: !!coreOrgId && !!clientId && enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+  return useDureeContrat(coreOrgId, enabled ? (contrat.data ?? null) : null);
+}
+
+/**
+ * Journées PLEINES que l'ordonnanceur ne sait pas tenir (spec 2026-09-12, R3) —
+ * même `verdictJournee` que l'edge tournees-figer, trajets estimés à vol d'oiseau.
+ * Consommé par JourneesAArbitrer (tableau de bord de l'admin).
+ * @param {string} coreOrgId
+ * @returns {{ journees: Array<{ journee: object, sequence: object }>, isLoading: boolean, error: Error|null }}
+ */
+export function useJourneesAArbitrer(coreOrgId) {
+  const { settings } = useOrgSettings();
+  const { data: horizon, isLoading, error } = useJourneesHorizon(coreOrgId);
+  const journees = useMemo(() => {
+    if (!horizon || !settings) return [];
+    const reglages = construireReglages(settings);
+    const depot = getOrgHeadquarters(settings);
+    if (!depot) return [];
+    const aujourdhui = new Date().toLocaleDateString('fr-CA');
+    return horizon
+      .filter((j) => j.date > aujourdhui && (j.rdvs || []).length > 0)
+      .map((j) => ({ journee: j, ...verdictJournee({ journee: j, depot, reglages, trajet: trajetLocal }) }))
+      .filter((v) => v.verdict === 'a_arbitrer');
+  }, [horizon, settings]);
+  return { journees, isLoading, error: error || null };
+}
+

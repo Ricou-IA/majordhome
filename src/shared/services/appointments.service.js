@@ -461,7 +461,13 @@ export const appointmentsService = {
   },
 
   /**
-   * Déplacer un RDV (drag & drop FullCalendar)
+   * Déplacer un RDV (drag & drop FullCalendar).
+   * Un déplacement à la main RÉ-ANCRE la tolérance sur la nouvelle heure
+   * (`announced_start`) : l'humain vient de décider où le RDV se trouve, sa
+   * souplesse joue désormais autour de là — et non autour d'une heure annoncée
+   * qu'il vient précisément d'abandonner. La souplesse elle-même ne change pas :
+   * figer reste un geste explicite (EventModal), sinon organiser une tournée à
+   * la souris figerait tout et viderait « Figer la journée » de son sens.
    */
   async moveAppointment(appointmentId, { scheduled_date, scheduled_start, scheduled_end, duration_minutes }) {
     return this.updateAppointment(appointmentId, {
@@ -469,6 +475,7 @@ export const appointmentsService = {
       scheduled_start,
       scheduled_end,
       duration_minutes,
+      ...(scheduled_start ? { announced_start: scheduled_start } : {}),
     });
   },
 
@@ -735,7 +742,9 @@ export const appointmentsService = {
   /**
    * Crée N appointments (1 par créneau) en réutilisant createAppointment
    * (donc même syncCardStateOnCreate + sync Google par appointment).
-   * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes? }]
+   * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes?, timeFlexMinutes? }]
+   *   timeFlexMinutes : souplesse (0 figé / 15 / 30 / 240 demi-journée) ; absent = défaut d'org (NULL en base).
+   *   0 ⇒ hour_confirmed_at = maintenant (l'heure est annoncée ferme au client).
    * shared = { coreOrgId, appointment_type, lead_id?, intervention_id?, client_id?,
    *            client_name?, client_first_name?, client_phone?, client_email?,
    *            address?, city?, postal_code?, assigned_commercial_id?, description?, subjectPrefix? }
@@ -768,6 +777,11 @@ export const appointmentsService = {
         status: 'scheduled',
         priority: 'normal',
         internal_notes: slot.notes || null,
+        time_flex_minutes: slot.timeFlexMinutes ?? null,
+        hour_confirmed_at: slot.timeFlexMinutes === 0 ? new Date().toISOString() : null,
+        // Ancre de la tolérance : l'heure dite au client à la pose. Les décalages
+        // successifs restent dans « announced ± souplesse », pas dans « courante ± ».
+        announced_start: slot.startTime,
       });
       if (error) return { data: created, error };
       created.push(data);
@@ -822,7 +836,7 @@ export const appointmentsService = {
    * @param {string} [opts.idSuffix] rend l'event unique quand un RDV est découpé en
    *   plusieurs blocs (1 par technicien). L'id réel du RDV reste dans extendedProps.id.
    */
-  toCalendarEvent(appointment, { color, idSuffix } = {}) {
+  toCalendarEvent(appointment, { color, idSuffix, adaptable = false } = {}) {
     const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
 
     // Construire les datetimes ISO
@@ -842,9 +856,13 @@ export const appointmentsService = {
       backgroundColor: eventColor,
       borderColor: eventColor,
       textColor: '#FFFFFF',
+      // Souplesse : un RDV adaptable est dessiné en pointillé (heure provisoire),
+      // la bande de tolérance est un événement de fond séparé (useAppointments).
+      classNames: adaptable ? ['mdh-flex'] : [],
       extendedProps: {
         ...appointment,
         typeConfig,
+        adaptable,
       },
     };
   },

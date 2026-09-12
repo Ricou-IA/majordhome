@@ -3,14 +3,14 @@
 // Séquencement d'une journée de tournée. Module PUR.
 // Testé : node --test scripts/tournee/sequence.test.mjs
 //
-// ⚠️ HORS CHEMIN DE PRODUCTION depuis le passage au modèle « créneaux »
-// (creneaux.js) : plus aucun code applicatif ne l'appelle. Il réordonne une
-// journée entière, ce qui n'a plus de sens depuis que chaque RDV posé porte
-// une fenêtre ponctuelle — il n'y a plus d'ordre à chercher. Conservé parce
-// qu'il reste la seule implémentation d'optimisation d'ordre du projet (la
-// spec envisage de réordonner les entretiens que le module a lui-même posés),
-// et parce que le test-témoin de creneaux.test.mjs s'en sert pour démontrer la
-// régression corrigée. À supprimer si cette piste est abandonnée.
+// De retour dans le chemin de production depuis la souplesse des RDV (spec
+// 2026-09-12 « fenêtres d'abord, heures ensuite ») : la CONSOLIDATION « Figer
+// la journée » lui passe les arrêts avec leur tolérance comme `fenetre`
+// (arrets.js::construireArretsPourConsolidation) et il pose les heures
+// définitives — les RDV figés (fenêtre ponctuelle) restent des points fixes.
+// L'insertion au fil de l'eau, elle, reste sur creneaux.js (un candidat à la
+// fois, au plus un voisin décalé). Le test-témoin de creneaux.test.mjs s'en
+// sert aussi pour démontrer la régression corrigée du 31/08.
 //
 // Avec 4-5 entretiens par jour, l'espace des ordres possibles est minuscule
 // (5 arrêts = 120 ordres, 8 = 40 320) : on les énumère TOUS et on retourne le
@@ -44,20 +44,19 @@ function* permutations(items) {
  * Déroule une journée dans un ordre donné et retourne son coût, ou `null` si
  * une contrainte est violée (avec la raison).
  */
-function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause }) {
+function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits = false }) {
   let t = amplitude.debut;
   let charge = 0;
 
-  // Départ anticipé du dépôt. Un rendez-vous fixé à l'heure d'ouverture (8 h)
-  // serait sinon inatteignable dès que le trajet depuis le dépôt n'est pas nul :
-  // en partant à 8 h on arriverait à 8 h 20, après sa fenêtre ponctuelle, et
-  // TOUTE la journée serait déclarée infaisable. Or le technicien part
-  // évidemment plus tôt pour être chez le client à l'heure dite.
-  // La tolérance est volontairement étroite : elle ne s'applique qu'au PREMIER
-  // arrêt, et seulement si son heure tombe à l'ouverture ou avant. Un rendez-vous
-  // de milieu de journée qu'on ne peut plus atteindre reste un vrai conflit.
+  // La journée commence AU DÉPÔT à l'ouverture : le trajet vers le premier
+  // client en fait partie (Eric, 2026-09-12 : « ça ne prend pas en compte le
+  // trajet vers Bessières » — un entretien adaptable posé à 8 h à 38 min du
+  // dépôt ne peut pas commencer à 8 h). Seule exception, le départ anticipé
+  // pour un rendez-vous FIGÉ à l'ouverture ou avant : le client a exigé 8 h,
+  // le technicien part plus tôt pour y être. Un adaptable, lui, glisse dans sa
+  // tolérance — ou la journée est à arbitrer.
   const premier = ordre[0];
-  if (premier?.fenetre && premier.fenetre.debut <= amplitude.debut) {
+  if (premier?.fenetre && premier.fenetre.debut === premier.fenetre.fin && premier.fenetre.debut <= amplitude.debut) {
     const trajetInitial = trajet(depotKey, premier.key);
     if (t + trajetInitial > premier.fenetre.fin) t = premier.fenetre.debut - trajetInitial;
   }
@@ -85,8 +84,20 @@ function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause }) {
     }
 
     if (arret.fenetre) {
-      if (t < arret.fenetre.debut) t = arret.fenetre.debut; // on patiente
-      if (t > arret.fenetre.fin) return { echec: 'fenetre' };
+      const fige = arret.fenetre.debut === arret.fenetre.fin;
+      // Cible = l'heure provisoire quand elle tient dans la fenêtre : on ne
+      // resserre que si nécessaire, on n'avance pas un RDV pour rien.
+      const cible = arret.prevu != null
+        ? Math.min(Math.max(arret.prevu, arret.fenetre.debut), arret.fenetre.fin)
+        : arret.fenetre.debut;
+      if (t < cible) t = cible; // on patiente
+      if (t > arret.fenetre.fin) {
+        // Un RDV FIGÉ est un fait, pas une hypothèse : arriver « en retard »
+        // selon NOS estimations de trajet ne le disqualifie pas (leçon du
+        // 31/08, creneaux.js). On cale le temps sur son heure et on continue.
+        if (fige && figesSontDesFaits) t = arret.fenetre.debut;
+        else return { echec: 'fenetre' };
+      }
     }
 
     const arriveeMinutes = t;
@@ -164,6 +175,63 @@ function plusProcheVoisin(arrets, depotKey, trajet) {
 }
 
 /**
+ * Diagnostic de la journée TELLE QUE POSÉE — l'ordre chronologique des heures
+ * provisoires, c'est-à-dire ce que le technicien vivrait en suivant le planning
+ * tel quel. Quand aucune permutation ne tient, la raison de la dernière essayée
+ * est arbitraire : ce qui explique le refus à l'opérateur, ce sont les chiffres
+ * de SA journée — travail, trajets, budget, et chaque trajet qui ne tient pas
+ * dans l'écart entre deux rendez-vous (vécu sur une journée posée à la main :
+ * 30 min entre deux clients pour 39 min de route, et 8 h 40 d'homme pour un
+ * budget de 8 h — « Figer la journée » répondait « fenêtre », sans plus).
+ *
+ * @returns {{ ordre: string[], travailMinutes: number, trajetsMinutes: number,
+ *   pauseMinutes: number, chargeMinutes: number, budgetMinutes: number,
+ *   depasseBudget: boolean,
+ *   conflits: Array<{ id, depuisId, trajetMinutes: number, disponibleMinutes: number }> }}
+ */
+export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, pause, amplitude }) {
+  const heure = (a) => a.prevu ?? a.fenetre?.debut ?? 0;
+  const ordre = [...arrets].sort((a, b) => heure(a) - heure(b));
+  let trajets = 0;
+  let travail = 0;
+  const conflits = [];
+  let position = depotKey;
+  let precedent = null;
+  for (const a of ordre) {
+    const d = trajet(position, a.key);
+    trajets += d;
+    travail += a.dureeMinutes;
+    if (precedent) {
+      const disponible = heure(a) - (heure(precedent) + precedent.dureeMinutes);
+      if (disponible < d) {
+        conflits.push({ id: a.id, depuisId: precedent.id, trajetMinutes: d, disponibleMinutes: Math.max(0, disponible) });
+      }
+    } else if (amplitude && a.fenetre && a.fenetre.debut !== a.fenetre.fin) {
+      // Premier arrêt ADAPTABLE : le trajet depuis le dépôt à l'ouverture doit
+      // tenir avant son heure (un figé, lui, justifie un départ anticipé).
+      const disponible = heure(a) - amplitude.debut;
+      if (disponible < d) {
+        conflits.push({ id: a.id, depuisId: null, trajetMinutes: d, disponibleMinutes: Math.max(0, disponible) });
+      }
+    }
+    position = a.key;
+    precedent = a;
+  }
+  if (ordre.length > 0) trajets += trajet(position, depotKey);
+  const chargeMinutes = trajets + travail;
+  return {
+    ordre: ordre.map((a) => a.id),
+    travailMinutes: travail,
+    trajetsMinutes: trajets,
+    pauseMinutes: pause?.minutes ?? 0,
+    chargeMinutes,
+    budgetMinutes,
+    depasseBudget: chargeMinutes > budgetMinutes,
+    conflits,
+  };
+}
+
+/**
  * Départage deux séquences de même charge minimale par ordre lexicographique
  * BRUT (pas `localeCompare`, cf. commentaire sur le tri d'entrée) de leurs
  * ids. Sans ce tie-break explicite, la séquence retenue à égalité de charge
@@ -182,6 +250,24 @@ function estMeilleur(sim, ordre, meilleurActuel) {
   return false; // séquences strictement identiques : rien à remplacer
 }
 
+/**
+ * Ordonnance une journée : ordre des arrêts et heures d'arrivée qui minimisent
+ * le temps d'homme (trajets + travail), dans les fenêtres, le budget et
+ * l'amplitude. Exact jusqu'à MAX_ARRETS_EXACT arrêts, heuristique au-delà.
+ *
+ * @param {object} p
+ * @param {string} p.depotKey
+ * @param {Array<{ id: string, key: string|null, dureeMinutes: number, fenetre?: {debut:number, fin:number}, prevu?: number }>} [p.arrets]
+ * @param {(a: string|null, b: string|null) => number} p.trajet
+ * @param {{ debut: number, fin: number }} p.amplitude
+ * @param {number} p.budgetMinutes
+ * @param {{ minutes: number, fenetre: number[] }} [p.pause]
+ * @param {boolean} [p.figesSontDesFaits]  un figé atteint « en retard » selon nos estimations reste un fait
+ * @returns {{ faisable: boolean, raison: string|null, ordre: string[],
+ *   planning: Array<{ id: string, arriveeMinutes: number, departMinutes: number, rang: number }>,
+ *   chargeMinutes: number|null, finMinutes: number|null, pauseHorsFenetre: boolean,
+ *   methode: 'exact'|'heuristique', diagnostic?: object }}
+ */
 export function sequencerTournee({
   depotKey,
   arrets = [],
@@ -189,8 +275,9 @@ export function sequencerTournee({
   amplitude,
   budgetMinutes,
   pause = { minutes: 0, fenetre: [0, 0] },
+  figesSontDesFaits = false,
 }) {
-  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause };
+  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits };
 
   if (arrets.length === 0) {
     return {
@@ -208,6 +295,7 @@ export function sequencerTournee({
         faisable: false, raison: sim.echec, ordre: ordre.map((a) => a.id),
         planning: [], chargeMinutes: null, finMinutes: null,
         pauseHorsFenetre: false, methode: 'heuristique',
+        diagnostic: diagnostiquerJournee(arrets, ctx),
       };
     }
     return {
@@ -245,10 +333,13 @@ export function sequencerTournee({
   }
 
   if (!meilleur) {
+    // `raison` reste celle de la dernière permutation (compat) ; le diagnostic
+    // de la journée telle que posée est ce qu'il faut montrer à l'opérateur.
     return {
       faisable: false, raison: dernierEchec, ordre: [], planning: [],
       chargeMinutes: null, finMinutes: null, pauseHorsFenetre: false,
       methode: 'exact',
+      diagnostic: diagnostiquerJournee(arrets, ctx),
     };
   }
 

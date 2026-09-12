@@ -75,12 +75,14 @@ export const tourneesService = {
    * Contrats actifs sans visite enregistrée cette année, enrichis de leur durée
    * d'intervention et de leurs contraintes de saison.
    *
-   * @param {{ coreOrgId: string }} params  org CORE — contracts/clients/
+   * @param {{ coreOrgId: string, settings?: object }} params  org CORE — contracts/clients/
    *   pricing_equipment_types vivent tous côté core.organizations (cf. bloc
-   *   d'asymétrie en tête de fichier).
+   *   d'asymétrie en tête de fichier). `settings` = réglages d'org (gain
+   *   multi-équipements) ; absents, les défauts s'appliquent.
    * @returns {Promise<{ data: Candidat[], error: Error|null }>}
    */
-  async getContratsDus({ coreOrgId }) {
+  async getContratsDus({ coreOrgId, settings = null }) {
+    const gainMultiPct = construireReglages(settings).gain_multi_equipements_pct ?? 0;
     try {
       const [{ data: contrats, error: cErr }, { data: types, error: tErr }] = await Promise.all([
         supabase.from('majordhome_contracts')
@@ -184,7 +186,7 @@ export const tourneesService = {
           ville: c.client_city,
           lat: co?.latitude ?? null,
           lng: co?.longitude ?? null,
-          dureeMinutes: dureeContrat(eqs, typesById, fallbacks),
+          dureeMinutes: dureeContrat(eqs, typesById, fallbacks, { gainMultiPct }),
           moisAnniversaire: c.start_date ? new Date(c.start_date).getMonth() + 1 : null,
           moisDefavorables,
           estSaisonnier: moisDefavorables.length > 0,
@@ -244,12 +246,13 @@ export const tourneesService = {
     return { data: data?.data ?? null, error: null };
   },
 
-  async getJourneesHorizon({ coreOrgId, joursApres = 45 }) {
+  async getJourneesHorizon({ coreOrgId, joursApres = 45, settings = null }) {
     // Logique déplacée dans src/lib/tournee/loaders.js (injectable, partagée
     // avec l'edge slots-propose). Ici : résolution de l'org majordhome + client de l'app.
     try {
       const mdhOrgId = await getMajordhomeOrgId(coreOrgId);
-      const { data, error } = await chargerJournees({ client: supabase, coreOrgId, mdhOrgId, joursApres, logger });
+      const reglages = construireReglages(settings);
+      const { data, error } = await chargerJournees({ client: supabase, coreOrgId, mdhOrgId, joursApres, reglages, logger });
       return { data, error };
     } catch (error) {
       logger.error('[tournees] getJourneesHorizon', error);
@@ -383,7 +386,7 @@ export const tourneesService = {
         depotKey: cleCoord(depot),
         trajet,
         amplitude: journee.amplitude,
-        budgetMinutes: journee.budgetMinutes,
+        budgetMinutes: journee.budgetMinutes + (reglages.depassement_journee_minutes ?? 0),
         pause: {
           minutes: reglages.pause_minutes,
           fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],

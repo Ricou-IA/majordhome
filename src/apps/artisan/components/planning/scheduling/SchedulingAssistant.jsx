@@ -60,6 +60,7 @@ function newId() {
  * @param {string|null} [props.fixedAssigneeId] - (mode commercial) id du commercial figé (= owner de la carte) : la grille n'affiche QUE sa colonne. null → tous les commerciaux.
  * @param {string} [props.appointmentTypeLabel] - libellé affiché du type de RDV
  * @param {number} [props.defaultDuration]
+ * @param {number|null} [props.fixedDuration]  bloc contrat : un clic pose la durée entière (DayResourceGrid)
  * @param {string} [props.defaultSubjectPrefix]
  * @param {boolean} [props.multi] - false = 1 créneau (parité) ; true = multi-créneau
  * @param {Function} props.onConfirm - (slots[]) => void  (mode autonome, avec bouton)
@@ -83,6 +84,7 @@ export function SchedulingAssistant({
   // contexte partagé de createAppointmentBatch — pas par l'assistant. Les callers
   // peuvent passer `appointmentTypeValue` sans effet ici (forward-compat).
   defaultDuration = 30,
+  fixedDuration = null,
   defaultSubjectPrefix,
   multi = false,
   onConfirm,
@@ -304,7 +306,13 @@ export function SchedulingAssistant({
         dayAppointments={dayAppointments}
         draftSlots={draftSlots}
         onPlaceSlot={handlePlaceSlot}
+        fixedDuration={fixedDuration}
       />
+      {fixedDuration ? (
+        <p className="text-xs text-secondary-500 mt-1">
+          Bloc contrat : {Math.floor(fixedDuration / 60)} h{String(fixedDuration % 60).padStart(2, '0')} au barème — un clic pose le rendez-vous entier.
+        </p>
+      ) : null}
 
       {/* Liste des créneaux empilés (sélecteur par créneau masqué en mode commercial :
           l'assignation est celle de la carte, pas choisie ici). */}

@@ -92,6 +92,9 @@ function formatMonthLabel(dateStr) {
  * @param {Array} props.dayAppointments - RDV du jour (chacun avec technician_ids)
  * @param {Array} props.draftSlots - créneaux en cours [{ id, date, startTime, endTime, technicianIds }]
  * @param {Function} props.onPlaceSlot - ({ memberId, date, startTime, endTime, duration }) => void
+ * @param {number|null} [props.fixedDuration] - « bloc contrat » (spec 2026-09-12, R5) :
+ *   quand la durée est connue (temps contrat d'un entretien), un CLIC pose le bloc
+ *   entier à cette durée — plus d'étirement « à peu près ». null = étirement libre.
  */
 export function DayResourceGrid({
   date,
@@ -100,6 +103,7 @@ export function DayResourceGrid({
   dayAppointments = [],
   draftSlots = [],
   onPlaceSlot,
+  fixedDuration = null,
 }) {
   const todayStr = formatDate(new Date());
   // État du drag : { memberId, startIndex, currentIndex }
@@ -228,8 +232,22 @@ export function DayResourceGrid({
   const handleSlotMouseDown = useCallback((e, memberId, slotIndex) => {
     e.preventDefault();
     if (isOccupied(memberId, slotIndex)) return; // pas d'amorce sur un bloc occupé
+    if (fixedDuration) {
+      // Bloc contrat : la fin suit la durée, le clic ne pose que le début. Un
+      // bloc qui chevaucherait un RDV ou sortirait de la grille n'est pas posé.
+      const numSlots = Math.max(1, Math.ceil(fixedDuration / SLOT_MINUTES));
+      if (slotIndex + numSlots > TOTAL_SLOTS) return;
+      for (let i = slotIndex + 1; i < slotIndex + numSlots; i++) {
+        if (isOccupied(memberId, i)) return;
+      }
+      const startTime = slotIndexToTime(slotIndex);
+      const finMin = START_HOUR * 60 + slotIndex * SLOT_MINUTES + fixedDuration;
+      const endTime = `${String(Math.floor(finMin / 60)).padStart(2, '0')}:${String(finMin % 60).padStart(2, '0')}`;
+      onPlaceSlot?.({ memberId, date, startTime, endTime, duration: fixedDuration });
+      return;
+    }
     setDragState({ memberId, startIndex: slotIndex, currentIndex: slotIndex });
-  }, [isOccupied]);
+  }, [isOccupied, fixedDuration, date, onPlaceSlot]);
 
   const handleSlotMouseEnter = useCallback((memberId, slotIndex) => {
     if (!dragState) return;

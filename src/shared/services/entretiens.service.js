@@ -211,7 +211,9 @@ async function ensureKanbanAndAppointmentForVisit({ contractId, coreOrgId, visit
  * @param {string|null} [p.visitDate] - pré-remplit interventions.scheduled_date (compat legacy ; la date d'affichage est dérivée du RDV)
  * @param {string|null} [p.userId]
  * @param {'entretien'|'sav'} [p.interventionType]
- * @returns {Promise<{ interventionId: string|null, error: any }>}
+ * @returns {Promise<{ interventionId: string|null, created?: boolean, error: any }>}
+ *   `created` = la carte vient d'être insérée (l'appelant peut la ramener en
+ *   « À planifier » si la pose du RDV échoue juste après — elle naît « Planifié »).
  */
 export async function ensureEntretienCard({
   clientId,
@@ -241,7 +243,7 @@ export async function ensureEntretienCard({
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (existing?.id) return { interventionId: existing.id, error: null };
+  if (existing?.id) return { interventionId: existing.id, created: false, error: null };
 
   const { data: created, error } = await supabase
     .from('majordhome_interventions')
@@ -263,7 +265,7 @@ export async function ensureEntretienCard({
     console.error('[entretiensService] ensureEntretienCard insert error:', error);
     return { interventionId: null, error };
   }
-  return { interventionId: created.id, error: null };
+  return { interventionId: created.id, created: true, error: null };
 }
 
 // ============================================================================

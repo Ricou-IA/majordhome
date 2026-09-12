@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     const depot = siegeDepuis(settings);
     if (!depot) return jsonResponse({ error: "siege_non_configure" }, 422, req);
 
-    const { data: contrat, error: cErr } = await chargerContrat({ client: admin, coreOrgId: orgId, contractId });
+    const { data: contrat, error: cErr } = await chargerContrat({ client: admin, coreOrgId: orgId, contractId, reglages });
     if (cErr || !contrat) {
       // Un contrat absent et une erreur DB (42501, réseau…) ne sont pas la même
       // chose : masquer la seconde en « introuvable » serait un échec silencieux.
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     if (contrat.lat == null || contrat.lng == null) return jsonResponse({ error: "client_non_localise" }, 422, req);
 
     const horizon = Math.max(reglages.horizon_ferme_jours, reglages.horizon_ouverture_jours ?? 45);
-    const { data: journees, techniciens, error: jErr } = await chargerJournees({
+    const { data: journees, techniciens, error: jErr } = await chargerJournees({ reglages,
       client: admin, coreOrgId: orgId, mdhOrgId: mdhOrg.id, joursApres: horizon, logger: console,
     });
     if (jErr) return jsonResponse({ error: sanitizeError(jErr, "journées illisibles") }, 500, req);

@@ -10,6 +10,9 @@
  * - Prédicats de filtre (bucket + équipe).
  */
 
+import { souplesseEffective } from './souplesse.js';
+import { toleranceDe } from './tournee/arrets.js';
+
 export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical', 'rdv_closing'];
 export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
 
@@ -140,4 +143,33 @@ export function matchesMemberFilter(appt, selectedRecordIds) {
   if (!selectedRecordIds || selectedRecordIds.size === 0) return true;
   if (appt?.assigned_commercial_id && selectedRecordIds.has(appt.assigned_commercial_id)) return true;
   return (appt?.technician_ids || []).some((id) => selectedRecordIds.has(id));
+}
+
+// ----------------------------------------------------------------------------
+// Souplesse (spec 2026-09-12 « fenêtres d'abord, heures ensuite »)
+// ----------------------------------------------------------------------------
+/**
+ * Un RDV est « adaptable » tant que son heure n'est pas communiquée au client,
+ * que sa souplesse est > 0 — et qu'il reste quelque chose à organiser : un RDV
+ * passé, facturé, réalisé ou annulé n'est plus adaptable (rien à afficher).
+ * @param {{ aujourdhui?: string }} [opts]  YYYY-MM-DD ; sans date, le passé n'est pas écarté
+ */
+export function estAdaptable(appt, flexDefaut = 30, { aujourdhui } = {}) {
+  if (!appt) return false;
+  if (['cancelled', 'completed', 'no_show'].includes(appt.status)) return false;
+  if (appt.target_invoiced === true) return false;
+  if (aujourdhui && appt.scheduled_date && appt.scheduled_date < aujourdhui) return false;
+  return souplesseEffective(appt, flexDefaut) > 0;
+}
+
+/**
+ * Fenêtre de tolérance d'un RDV pour l'affichage (bande derrière le bloc) :
+ * du début au plus tôt à la fin au plus tard, en minutes depuis minuit.
+ * @returns {{ debutMinutes: number, finMinutes: number, flex: number }|null}
+ */
+export function fenetreDe(appt, { flexDefaut = 30, demiJournee } = {}) {
+  const t = toleranceDe(appt, { souplesse: true, flexDefaut, demiJournee });
+  if (!t || t.flex === 0) return null;
+  const borne = (m) => Math.max(0, Math.min(23 * 60 + 59, m));
+  return { debutMinutes: borne(t.min), finMinutes: borne(t.max + (appt.duration_minutes || 60)), flex: t.flex };
 }

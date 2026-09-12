@@ -19,6 +19,7 @@ const MOTIFS = {
   budget: 'journée(s) pleine(s)',
   pause: 'pause déjeuner impossible',
   position: 'client non localisé',
+  trajet: 'trajet trop long entre deux clients',
 };
 const ERREURS = {
   siege_non_configure: 'Siège non configuré (Settings → Organisation → Territoire)',
@@ -31,6 +32,22 @@ const hhmmVersMinutes = (hhmm) => {
   const [h, m] = String(hhmm).split(':').map(Number);
   return h * 60 + (m || 0);
 };
+
+const minutesVersHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+const dureeCourte = (min) => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${String(min % 60).padStart(2, '0')}` : ''}` : `${min} min`);
+
+/**
+ * Lecture du temps restant après la pose (jusqu'au RDV suivant ou à la fin de
+ * journée) : en dessous de la plus petite visite possible + un trajet, c'est du
+ * temps perdu — c'est ce que l'opérateur doit voir, pas le détour net.
+ */
+const RESTE_UTILE_MIN = 75;
+function lectureReste(reste, apres) {
+  const cible = apres ? `avant ${apres.label}` : 'en fin de journée';
+  if (reste <= 10) return { texte: `enchaîné ${cible}`, ton: 'text-secondary-600' };
+  if (reste < RESTE_UTILE_MIN) return { texte: `${dureeCourte(reste)} perdues ${cible}`, ton: 'text-amber-700' };
+  return { texte: `${dureeCourte(reste)} libres ${cible} — une autre visite y tient`, ton: 'text-green-700' };
+}
 
 /**
  * @param {object} props
@@ -89,7 +106,8 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
 
       {creneaux.length === 0 && (
         <p className="text-sm text-secondary-600">
-          Aucun créneau dans une tournée existante{motifs.length ? ` — ${motifs.join(', ')}` : ''}.
+          Aucune insertion raisonnable dans une tournée existante{motifs.length ? ` — ${motifs.join(', ')}` : ''}.
+          {nouvellesJournees.length > 0 && ' Ouvrez une nouvelle journée, puis remplissez-la avec les clients du secteur (onglet Tournées).'}
         </p>
       )}
 
@@ -105,30 +123,38 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
             endTime: k.fin,
             duration: hhmmVersMinutes(k.fin) - hhmmVersMinutes(k.debut),
             technicianIds: [k.technicianId],
+            technicianNom: k.technicianNom,
             subject: sujet,
+            // Voisin adaptable à glisser pour que ce créneau tienne (0 ou 1) — écrit
+            // avec le RDV par scheduleEntretien, annoncé dans SouplesseDialog.
+            decalages: (k.decalages || []).map((d) => ({ ...d, dureeMinutes: d.dureeMinutes ?? null })),
           })}
         >
           <div className="flex items-center gap-2 text-sm">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: k.couleur || '#94A3B8' }} />
             <span className="font-medium text-gray-900">{formatDateShortFR(k.date)} · {k.debut}</span>
             <span className="text-secondary-500 truncate">{k.technicianNom}</span>
-            {/* Temps homme total de cet entretien = minutes ajoutées à la journée
-                (intervention + détour net aller/retour) — décision Eric 2026-09-12. */}
+            {/* Les trois chiffres de l'opérateur : trajet pour y aller, travail,
+                reste utile (décision Eric 2026-09-12). Le coût total en info-bulle. */}
             <span
-              className="ml-auto text-xs font-medium text-secondary-700 inline-flex items-center gap-1 shrink-0"
-              title="Temps homme ajouté à la journée du technicien"
+              className="ml-auto text-xs text-secondary-700 inline-flex items-center gap-1 shrink-0"
+              title={`+${k.coutMinutes} min ajoutées à la journée (détour net ${k.detourMinutes} min)`}
             >
-              <Route className="h-3.5 w-3.5" />+{k.coutMinutes} min
+              <Route className="h-3.5 w-3.5" />{k.trajetAllerMinutes} min · {k.travailMinutes} min de travail
             </span>
           </div>
-          <div className="text-xs text-secondary-500 mt-0.5 flex justify-between gap-2">
-            <span className="truncate">
-              {k.avant ? `après ${k.avant.label}${k.avant.ville ? ` (${k.avant.ville})` : ''}` : 'depuis le dépôt'}
-              {' → '}
-              {k.apres ? `avant ${k.apres.label}${k.apres.ville ? ` (${k.apres.ville})` : ''}` : 'retour au dépôt'}
-            </span>
-            <span className="shrink-0">{k.coutMinutes - k.detourMinutes} min interv. + {k.detourMinutes} min trajet</span>
+          <div className="text-xs text-secondary-500 mt-0.5 truncate">
+            {k.avant ? `après ${k.avant.label}${k.avant.ville ? ` (${k.avant.ville})` : ''}` : 'depuis le dépôt'}
+            {' → '}
+            {k.apres ? `${k.trajetRetourMinutes} min → ${k.apres.label}${k.apres.ville ? ` (${k.apres.ville})` : ''}` : `${k.trajetRetourMinutes} min → retour dépôt`}
           </div>
+          {(() => { const l = lectureReste(k.resteUtileMinutes, k.apres); return <div className={`text-xs mt-0.5 ${l.ton}`}>{l.texte}</div>; })()}
+          {(k.decalages || []).map((d) => (
+            <div key={d.id} className="text-xs mt-0.5 text-amber-700">
+              rentre si {d.label} passe de {minutesVersHHMM(d.debutMinutesAvant)} à {minutesVersHHMM(d.debutMinutesApres)}
+              {d.tolerance?.flex ? ` (±${d.tolerance.flex} min)` : ''}
+            </div>
+          ))}
         </button>
       ))}
 
