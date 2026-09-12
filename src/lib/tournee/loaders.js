@@ -7,11 +7,12 @@
 // testée). Aucun import d'alias Vite. Testé : node --test scripts/tournee/loaders.test.mjs
 //
 // ⚠️ ASYMÉTRIE D'ORG : `coreOrgId` (core.organizations) porte contracts /
-// clients / pricing_equipment_types / leads ; `mdhOrgId` (majordhome.organizations)
+// clients / pricing_equipment_types / equipment_categories / leads ; `mdhOrgId` (majordhome.organizations)
 // porte team_members / appointments. L'appelant résout `mdhOrgId`
 // (getMajordhomeOrgId côté app, vue majordhome_organizations côté edge).
 // ============================================================================
 import { dureeContrat, construireFallbacks } from './duree.js';
+import { competencesVides, SKILL_ROLES } from './competences.js';
 
 const hhmmEnMinutes = (s) => {
   const [h, m] = String(s || '08:00').split(':').map(Number);
@@ -30,7 +31,7 @@ const hhmmEnMinutes = (s) => {
  *   majordhome_appointments + `lat`/`lng` résolus client → lead → null)
  * @property {number} chargeMinutes  somme des `duration_minutes`, TOUS les RDV
  * @property {boolean} estAmorcee  au moins un RDV de type 'maintenance' ce jour-là
- * @property {string[]} specialties  compétences du technicien (catégories d'équipement)
+ * @property {{ entretien: string[], pose: string[] }} competences  types cochés par rôle (majordhome_team_member_skills)
  */
 
 /**
@@ -45,7 +46,7 @@ const hhmmEnMinutes = (s) => {
  * @param {number} [p.joursApres=45]
  * @param {Date} [p.maintenant=new Date()]
  * @param {{ error: Function }} [p.logger=console]
- * @returns {Promise<{ data: Journee[], techniciens: Array<{ id, nom, specialties: string[], couleur }>, error: Error|null }>}
+ * @returns {Promise<{ data: Journee[], techniciens: Array<{ id, nom, competences: { entretien: string[], pose: string[] }, couleur }>, error: Error|null }>}
  */
 export async function chargerJournees({
   client, coreOrgId, mdhOrgId, joursApres = 45, maintenant = new Date(), logger: log = console,
@@ -62,7 +63,7 @@ export async function chargerJournees({
     // (appointments.service.js) le filtre : sans lui, un technicien parti
     // continue de recevoir des propositions de tournée.
     client.from('majordhome_team_members')
-      .select('id, display_name, calendar_color, default_availability, daily_work_minutes, include_in_routing, specialties')
+      .select('id, display_name, calendar_color, default_availability, daily_work_minutes, include_in_routing')
       .eq('org_id', orgId).eq('role', 'technician').eq('include_in_routing', true).eq('is_active', true),
     client.from('majordhome_appointments')
       // ⚠️ `lead_id` est INDISPENSABLE ici : la résolution de coordonnées ci-dessous
@@ -76,6 +77,20 @@ export async function chargerJournees({
   ]);
   if (mErr) return { data: [], techniciens: [], error: mErr };
   if (rErr) return { data: [], techniciens: [], error: rErr };
+
+  // Compétences cochées (type × rôle). Un membre sans ligne = rien coché =
+  // jamais proposé : on ne devine pas, la grille Settings → Équipe fait foi.
+  const membreIds = (membres || []).map((m) => m.id);
+  const { data: skills, error: sErr } = membreIds.length
+    ? await client.from('majordhome_team_member_skills')
+        .select('team_member_id, equipment_type_id, role').in('team_member_id', membreIds)
+    : { data: [], error: null };
+  if (sErr) return { data: [], techniciens: [], error: sErr };
+  const competencesPar = new Map(membreIds.map((id) => [id, competencesVides()]));
+  for (const s of skills || []) {
+    if (!SKILL_ROLES.includes(s.role)) continue;
+    competencesPar.get(s.team_member_id)?.[s.role].push(s.equipment_type_id);
+  }
 
   // Amendement 1 — les RDV existants DOIVENT porter leurs coordonnées :
   // sans elles, `arretsExistants` (proposerPourJournee) est TOUJOURS vide
@@ -158,12 +173,12 @@ export async function chargerJournees({
         rdvs: duJour,
         chargeMinutes: duJour.reduce((s, r) => s + (r.duration_minutes || 60), 0),
         estAmorcee: duJour.some((r) => r.appointment_type === 'maintenance'),
-        specialties: m.specialties || [],
+        competences: competencesPar.get(m.id),
       });
     }
   }
   const techniciens = (membres || []).map((m) => ({
-    id: m.id, nom: m.display_name, specialties: m.specialties || [], couleur: m.calendar_color ?? null,
+    id: m.id, nom: m.display_name, competences: competencesPar.get(m.id), couleur: m.calendar_color ?? null,
   }));
   return { data: journees, techniciens, error: null };
   } catch (error) {
@@ -180,19 +195,27 @@ export async function chargerJournees({
  * requise) et coordonnées du client.
  *
  * @param {{ client: object, coreOrgId: string, contractId: string }} p
- * @returns {Promise<{ data: { id, clientId, clientName, ville, lat, lng, dureeMinutes, categories: string[], typesNonRenseignes: number, sansEquipement: boolean }|null, error: Error|null }>}
+ * @returns {Promise<{ data: { id, clientId, clientName, ville, lat, lng, dureeMinutes,
+ *   exigences: Array<{ typeId?: string, categoryId?: string }>,
+ *   categories: Array<{ id: string, code: string, label: string }>,
+ *   typesParCategorie: Map<string, string[]>,
+ *   typesNonRenseignes: number, sansEquipement: boolean }|null, error: Error|null }>}
  */
 export async function chargerContrat({ client, coreOrgId, contractId }) {
-  const [{ data: contrat, error: cErr }, { data: types, error: tErr }] = await Promise.all([
+  const [{ data: contrat, error: cErr }, { data: types, error: tErr }, { data: categories, error: catErr }] = await Promise.all([
     client.from('majordhome_contracts')
       .select('id, client_id, client_name, client_city, client_postal_code, start_date')
       .eq('org_id', coreOrgId).eq('id', contractId).maybeSingle(),
     client.from('majordhome_pricing_equipment_types')
-      .select('id, code, category, duration_base_minutes, duration_per_extra_unit_minutes, included_units, unfavorable_months')
+      .select('id, code, category_id, duration_base_minutes, duration_per_extra_unit_minutes, included_units, unfavorable_months')
+      .eq('org_id', coreOrgId),
+    client.from('majordhome_equipment_categories')
+      .select('id, code, label')
       .eq('org_id', coreOrgId),
   ]);
   if (cErr) return { data: null, error: cErr };
   if (tErr) return { data: null, error: tErr };
+  if (catErr) return { data: null, error: catErr };
   if (!contrat) return { data: null, error: new Error('contrat_introuvable') };
 
   const [{ data: clients, error: clErr }, { data: liens, error: lErr }] = await Promise.all([
@@ -206,11 +229,28 @@ export async function chargerContrat({ client, coreOrgId, contractId }) {
 
   const equipIds = [...new Set((liens || []).map((l) => l.equipment_id))];
   const { data: equipements, error: eqErr } = equipIds.length
-    ? await client.from('majordhome_equipments').select('id, category, unit_count, equipment_type_id').in('id', equipIds)
+    ? await client.from('majordhome_equipments').select('id, category_id, unit_count, equipment_type_id').in('id', equipIds)
     : { data: [], error: null };
   if (eqErr) return { data: null, error: eqErr };
 
   const typesById = new Map((types || []).map((t) => [t.id, t]));
+  const categoriesById = new Map((categories || []).map((c) => [c.id, c]));
+  // Types par catégorie : ce qui permet à une exigence « catégorie » (équipement
+  // non typé) d'être satisfaite par n'importe quel type coché de la catégorie.
+  const typesParCategorie = new Map();
+  for (const t of types || []) {
+    if (!t.category_id) continue;
+    if (!typesParCategorie.has(t.category_id)) typesParCategorie.set(t.category_id, []);
+    typesParCategorie.get(t.category_id).push(t.id);
+  }
+  // Exigences de compétence : le type si l'équipement est typé, sinon sa
+  // catégorie ; un équipement non catégorisé n'impose rien (mais reste compté
+  // dans typesNonRenseignes s'il n'a pas de type).
+  const exigences = (equipements || []).flatMap((e) => {
+    if (e.equipment_type_id) return [{ typeId: e.equipment_type_id }];
+    if (e.category_id) return [{ categoryId: e.category_id }];
+    return [];
+  });
   const DUREE_DEFAUT = 90;
   const fallbacks = construireFallbacks(equipements || [], typesById, DUREE_DEFAUT);
   const co = (clients || [])[0];
@@ -227,7 +267,10 @@ export async function chargerContrat({ client, coreOrgId, contractId }) {
       lat: co?.latitude ?? null,
       lng: co?.longitude ?? null,
       dureeMinutes: Math.max(duree, 15),
-      categories: [...new Set((equipements || []).map((e) => e.category).filter(Boolean))],
+      exigences,
+      categories: [...new Set((equipements || []).map((e) => e.category_id).filter(Boolean))]
+        .map((id) => categoriesById.get(id) || { id, code: null, label: null }),
+      typesParCategorie,
       typesNonRenseignes: (equipements || []).filter((e) => !e.equipment_type_id).length,
       sansEquipement,
     },

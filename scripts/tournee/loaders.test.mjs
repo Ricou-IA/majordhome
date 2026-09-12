@@ -35,13 +35,18 @@ function fauxClient(tables) {
 const LUNDI = new Date('2026-09-14T08:00:00Z');
 const silencieux = { error() {}, warn() {} };
 
-test('chargerJournees : une journée par technicien × jour ouvré, RDV coordonnés via le client, specialties portées', async () => {
+test('chargerJournees : une journée par technicien × jour ouvré, RDV coordonnés via le client, compétences par rôle portées', async () => {
   const client = fauxClient({
     majordhome_team_members: [{
       id: 't1', display_name: 'Antoine', calendar_color: '#f00', daily_work_minutes: 480, include_in_routing: true,
-      specialties: ['climatisation'],
       default_availability: { monday: { active: true, start: '08:00', end: '18:00' }, tuesday: { active: false } },
     }],
+    majordhome_team_member_skills: [
+      { team_member_id: 't1', equipment_type_id: 'clim', role: 'entretien' },
+      { team_member_id: 't1', equipment_type_id: 'poele_g', role: 'entretien' },
+      { team_member_id: 't1', equipment_type_id: 'clim', role: 'pose' },
+      { team_member_id: 't1', equipment_type_id: 'x', role: 'inconnu' }, // rôle hors liste : ignoré
+    ],
     majordhome_appointments: [{
       id: 'r1', client_id: 'c1', lead_id: null, scheduled_date: '2026-09-14', scheduled_start: '08:00',
       duration_minutes: 90, appointment_type: 'maintenance', client_name: 'DUPONT', address: null, city: 'GAILLAC',
@@ -65,14 +70,15 @@ test('chargerJournees : une journée par technicien × jour ouvré, RDV coordonn
   assert.equal(data[0].rdvs[0].lat, 43.9);
   assert.equal(data[0].chargeMinutes, 90);
   assert.equal(data[0].estAmorcee, true);
-  assert.deepEqual(data[0].specialties, ['climatisation']);
-  assert.deepEqual(techniciens, [{ id: 't1', nom: 'Antoine', specialties: ['climatisation'], couleur: '#f00' }]);
+  assert.deepEqual(data[0].competences, { entretien: ['clim', 'poele_g'], pose: ['clim'] });
+  assert.deepEqual(techniciens, [{ id: 't1', nom: 'Antoine', competences: { entretien: ['clim', 'poele_g'], pose: ['clim'] }, couleur: '#f00' }]);
+  assert.ok(client.lues.includes('majordhome_team_member_skills'));
 });
 
 test('chargerJournees : un RDV rattaché à un lead prend les coordonnées du lead ; sans rien, lat/lng null (jamais écarté)', async () => {
   const client = fauxClient({
     majordhome_team_members: [{
-      id: 't1', display_name: 'A', calendar_color: null, daily_work_minutes: 480, include_in_routing: true, specialties: null,
+      id: 't1', display_name: 'A', calendar_color: null, daily_work_minutes: 480, include_in_routing: true,
       default_availability: { monday: { active: true, start: '08:00', end: '17:00' } },
     }],
     majordhome_appointments: [
@@ -89,16 +95,21 @@ test('chargerJournees : un RDV rattaché à un lead prend les coordonnées du le
   assert.equal(parId.r1.lat, 43.5);
   assert.equal(parId.r2.lat, null);
   assert.equal(data[0].chargeMinutes, 120);
-  assert.deepEqual(data[0].specialties, []);
+  // aucune ligne de compétence : rien coché pour chaque rôle (jamais proposé), pas « polyvalent »
+  assert.deepEqual(data[0].competences, { entretien: [], pose: [] });
 });
 
-test('chargerContrat : durée barémée + catégories + coordonnées du client', async () => {
+test('chargerContrat : durée barémée + exigences (type) + catégories libellées + coordonnées du client', async () => {
   const client = fauxClient({
     majordhome_contracts: [{ id: 'k1', client_id: 'c1', client_name: 'DUPONT', client_city: 'CASTRES', client_postal_code: '81100', start_date: '2025-06-01' }],
-    majordhome_pricing_equipment_types: [{ id: 'ty1', code: 'CLIM', category: 'climatisation', duration_base_minutes: 60, duration_per_extra_unit_minutes: 20, included_units: 1, unfavorable_months: [] }],
+    majordhome_pricing_equipment_types: [
+      { id: 'ty1', code: 'CLIM', category_id: 'cat_clim', duration_base_minutes: 60, duration_per_extra_unit_minutes: 20, included_units: 1, unfavorable_months: [] },
+      { id: 'ty2', code: 'GAINABLE', category_id: 'cat_clim', duration_base_minutes: 90, duration_per_extra_unit_minutes: 0, included_units: 1, unfavorable_months: [] },
+    ],
+    majordhome_equipment_categories: [{ id: 'cat_clim', code: 'climatisation', label: 'Climatisation' }],
     majordhome_clients: [{ id: 'c1', latitude: 43.6, longitude: 2.24 }],
     majordhome_contract_equipments: [{ contract_id: 'k1', equipment_id: 'e1' }],
-    majordhome_equipments: [{ id: 'e1', category: 'climatisation', unit_count: 2, equipment_type_id: 'ty1' }],
+    majordhome_equipments: [{ id: 'e1', category_id: 'cat_clim', unit_count: 2, equipment_type_id: 'ty1' }],
   });
   const { data, error } = await chargerContrat({ client, coreOrgId: 'core', contractId: 'k1' });
   assert.equal(error, null);
@@ -106,22 +117,30 @@ test('chargerContrat : durée barémée + catégories + coordonnées du client',
   assert.equal(data.clientName, 'DUPONT');
   assert.equal(data.ville, 'CASTRES');
   assert.equal(data.dureeMinutes, 80);                 // 60 + (2 − 1) × 20
-  assert.deepEqual(data.categories, ['climatisation']);
+  assert.deepEqual(data.exigences, [{ typeId: 'ty1' }]);
+  assert.deepEqual(data.categories, [{ id: 'cat_clim', code: 'climatisation', label: 'Climatisation' }]);
+  assert.deepEqual([...data.typesParCategorie.entries()], [['cat_clim', ['ty1', 'ty2']]]);
   assert.equal(data.lat, 43.6);
   assert.equal(data.typesNonRenseignes, 0);
 });
 
-test('chargerContrat : équipement sans type → durée par défaut (90) et compté dans typesNonRenseignes', async () => {
+test('chargerContrat : équipement sans type → durée par défaut (90), exigence par catégorie, compté dans typesNonRenseignes', async () => {
   const client = fauxClient({
     majordhome_contracts: [{ id: 'k1', client_id: 'c1', client_name: 'X', client_city: null, client_postal_code: null, start_date: null }],
     majordhome_pricing_equipment_types: [],
+    majordhome_equipment_categories: [{ id: 'cat_poele', code: 'poele', label: 'Poêle' }],
     majordhome_clients: [{ id: 'c1', latitude: null, longitude: null }],
-    majordhome_contract_equipments: [{ contract_id: 'k1', equipment_id: 'e1' }],
-    majordhome_equipments: [{ id: 'e1', category: 'poele', unit_count: 1, equipment_type_id: null }],
+    majordhome_contract_equipments: [{ contract_id: 'k1', equipment_id: 'e1' }, { contract_id: 'k1', equipment_id: 'e2' }],
+    majordhome_equipments: [
+      { id: 'e1', category_id: 'cat_poele', unit_count: 1, equipment_type_id: null },
+      { id: 'e2', category_id: null, unit_count: 1, equipment_type_id: null },      // non catégorisé : aucune exigence
+    ],
   });
   const { data } = await chargerContrat({ client, coreOrgId: 'core', contractId: 'k1' });
-  assert.equal(data.dureeMinutes, 90);
-  assert.equal(data.typesNonRenseignes, 1);
+  assert.equal(data.dureeMinutes, 180);                // 2 × 90 par défaut
+  assert.equal(data.typesNonRenseignes, 2);
+  assert.deepEqual(data.exigences, [{ categoryId: 'cat_poele' }]);
+  assert.deepEqual(data.categories, [{ id: 'cat_poele', code: 'poele', label: 'Poêle' }]);
   assert.equal(data.lat, null);
 });
 

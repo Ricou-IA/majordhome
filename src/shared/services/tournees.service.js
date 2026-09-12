@@ -90,7 +90,7 @@ export const tourneesService = {
         // un client garde sa durée d'entretien réelle même si son type n'est plus
         // commercialisé — le filtrer basculerait ces contrats sur le fallback à tort.
         supabase.from('majordhome_pricing_equipment_types')
-          .select('id, code, category, duration_base_minutes, duration_per_extra_unit_minutes, included_units, unfavorable_months')
+          .select('id, code, category_id, duration_base_minutes, duration_per_extra_unit_minutes, included_units, unfavorable_months')
           .eq('org_id', coreOrgId),
       ]);
       if (cErr) return { data: [], error: cErr };
@@ -153,7 +153,7 @@ export const tourneesService = {
       const equipIds = [...new Set((liens || []).map((l) => l.equipment_id))];
       const { data: equipements, error: eqErr } = equipIds.length
         ? await supabase.from('majordhome_equipments')
-            .select('id, category, unit_count, equipment_type_id').in('id', equipIds)
+            .select('id, category_id, unit_count, equipment_type_id').in('id', equipIds)
         : { data: [], error: null };
       if (eqErr) return { data: [], error: eqErr };
 

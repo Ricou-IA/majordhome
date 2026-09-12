@@ -33,8 +33,8 @@ test('dureeEquipement — type absent ou sans durée renseignée retombe sur le 
 test('dureeContrat — somme des équipements', () => {
   const types = new Map([['a', T_POELE_GRAN], ['b', T_PAC_AIR_AIR]]);
   const equipements = [
-    { equipment_type_id: 'a', category: 'poele', unit_count: 1 },
-    { equipment_type_id: 'b', category: 'pac_air_air', unit_count: 2 },
+    { equipment_type_id: 'a', category_id: 'poele', unit_count: 1 },
+    { equipment_type_id: 'b', category_id: 'pac_air_air', unit_count: 2 },
   ];
   assert.equal(dureeContrat(equipements, types, { parCategorie: {}, defaut: 90 }), 180);
 });
@@ -42,9 +42,9 @@ test('dureeContrat — somme des équipements', () => {
 test('dureeContrat — équipement non typé prend le fallback de SA catégorie', () => {
   const types = new Map();
   const fallbacks = { parCategorie: { poele: 90, chaudiere_bois: 150 }, defaut: 90 };
-  assert.equal(dureeContrat([{ category: 'chaudiere_bois' }], types, fallbacks), 150);
-  assert.equal(dureeContrat([{ category: 'poele' }], types, fallbacks), 90);
-  assert.equal(dureeContrat([{ category: 'inconnue' }], types, fallbacks), 90);
+  assert.equal(dureeContrat([{ category_id: 'chaudiere_bois' }], types, fallbacks), 150);
+  assert.equal(dureeContrat([{ category_id: 'poele' }], types, fallbacks), 90);
+  assert.equal(dureeContrat([{ category_id: 'inconnue' }], types, fallbacks), 90);
 });
 
 test('dureeContrat — contrat vide = 0', () => {
@@ -56,12 +56,12 @@ test('construireFallbacks — durée du type DOMINANT de chaque catégorie', () 
   //        2 chaudières bois (150) -> dominant chaudiere_bois = 150.
   const typesById = new Map([['g', T_POELE_GRAN], ['b', T_POELE_BOIS], ['c', T_CHAUD_BOIS]]);
   const parc = [
-    { equipment_type_id: 'g', category: 'poele' },
-    { equipment_type_id: 'g', category: 'poele' },
-    { equipment_type_id: 'g', category: 'poele' },
-    { equipment_type_id: 'b', category: 'poele' },
-    { equipment_type_id: 'c', category: 'chaudiere_bois' },
-    { equipment_type_id: 'c', category: 'chaudiere_bois' },
+    { equipment_type_id: 'g', category_id: 'poele' },
+    { equipment_type_id: 'g', category_id: 'poele' },
+    { equipment_type_id: 'g', category_id: 'poele' },
+    { equipment_type_id: 'b', category_id: 'poele' },
+    { equipment_type_id: 'c', category_id: 'chaudiere_bois' },
+    { equipment_type_id: 'c', category_id: 'chaudiere_bois' },
   ];
   const fb = construireFallbacks(parc, typesById, 90);
   assert.equal(fb.parCategorie.poele, 90);
@@ -70,6 +70,6 @@ test('construireFallbacks — durée du type DOMINANT de chaque catégorie', () 
 });
 
 test('construireFallbacks — catégorie sans aucun équipement typé reste absente', () => {
-  const fb = construireFallbacks([{ category: 'vmc' }], new Map(), 90);
+  const fb = construireFallbacks([{ category_id: 'vmc' }], new Map(), 90);
   assert.equal(fb.parCategorie.vmc, undefined);
 });
