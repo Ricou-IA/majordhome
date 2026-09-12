@@ -7,10 +7,10 @@
 
 import { FormField, TextInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
-import { MESURES_PAR_TYPE, SECTIONS_PAR_EQUIPEMENT } from '../constants';
+import { MESURES_PAR_TYPE, sectionsPourProfil } from '../constants';
 
-export function StepMesures({ formData, onChange }) {
-  const config = SECTIONS_PAR_EQUIPEMENT[formData.equipement_type] || SECTIONS_PAR_EQUIPEMENT.autre;
+export function StepMesures({ formData, onChange, profil }) {
+  const config = sectionsPourProfil(profil);
   const mesuresItems = MESURES_PAR_TYPE[config.mesuresLabel] || MESURES_PAR_TYPE.combustion;
   const mesures = formData.mesures || {};
 

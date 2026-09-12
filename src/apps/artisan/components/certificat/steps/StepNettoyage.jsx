@@ -9,9 +9,9 @@ import { SectionTitle } from '@apps/artisan/components/FormFields';
 import { ConformiteRow } from '../ConformiteRow';
 import { getNettoyageItems } from '../constants';
 
-export function StepNettoyage({ formData, onChange }) {
+export function StepNettoyage({ formData, onChange, profil }) {
   const nettoyage = formData.donnees_entretien?.nettoyage || {};
-  const items = getNettoyageItems(formData.equipement_type);
+  const items = getNettoyageItems(profil);
 
   const handleChange = (key, value) => {
     const updated = {

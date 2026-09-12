@@ -8,17 +8,16 @@
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
 import {
-  EQUIPMENT_CATEGORY_LABELS,
   COMBUSTIBLES,
   FLUIDES_FRIGORIGENES,
-  SECTIONS_PAR_EQUIPEMENT,
+  sectionsPourProfil,
 } from '../constants';
 
 // Certifications propres à Mayer Énergie (en dur)
 const CERTIFICATIONS_ENTREPRISE = ['QualiPAC', 'QualiBois'];
 
-export function StepInfosGenerales({ formData, onChange, client, technicians = [], canSelectTechnician = false }) {
-  const config = SECTIONS_PAR_EQUIPEMENT[formData.equipement_type] || {};
+export function StepInfosGenerales({ formData, onChange, client, technicians = [], canSelectTechnician = false, profil, referentiel }) {
+  const config = sectionsPourProfil(profil);
   const showFluide = config.showFGaz;
   const showCombustible = config.showRamonage;
 
@@ -79,7 +78,7 @@ export function StepInfosGenerales({ formData, onChange, client, technicians = [
       <SectionTitle>Équipement</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField label="Type">
-          <TextInput value={EQUIPMENT_CATEGORY_LABELS[formData.equipement_type] || formData.equipement_type} disabled />
+          <TextInput value={referentiel?.categoriesByCode.get(formData.equipement_type)?.label || formData.equipement_type} disabled />
         </FormField>
         <FormField label="Marque">
           <TextInput

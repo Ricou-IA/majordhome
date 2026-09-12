@@ -11,10 +11,10 @@ import { Loader2, FileText, Download, CheckCircle, RotateCcw } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
 import { CertificatSignaturePad } from '../CertificatSignaturePad';
-import { EQUIPMENT_CATEGORY_LABELS } from '../constants';
 
 export function StepSignature({
   formData,
+  referentiel,
   client,
   onSign,
   onGeneratePdf,
@@ -63,7 +63,7 @@ export function StepSignature({
         <div className="flex justify-between">
           <span className="text-gray-500">Équipement</span>
           <span className="font-medium text-gray-800">
-            {EQUIPMENT_CATEGORY_LABELS[formData.equipement_type] || '—'}
+            {referentiel?.categoriesByCode.get(formData.equipement_type)?.label || formData.equipement_type || '—'}
             {formData.equipement_marque && ` — ${formData.equipement_marque}`}
             {formData.equipement_modele && ` ${formData.equipement_modele}`}
           </span>

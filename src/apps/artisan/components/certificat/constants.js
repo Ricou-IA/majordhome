@@ -7,40 +7,32 @@
  */
 
 // ============================================================================
-// SECTIONS PAR TYPE D'ÉQUIPEMENT
+// SECTIONS PAR PROFIL DE CERTIFICAT
 // ============================================================================
+// Liste FERMÉE niveau app (= ce que le wizard sait produire), reflétée par le
+// CHECK de majordhome.equipment_categories.certificate_profile. Le gabarit d'un
+// certificat vient de la CATÉGORIE de l'équipement (référentiel de l'org,
+// Settings → Tarification → Catégories), plus d'un enum : `profilParCode()`
+// de src/lib/equipmentReferential.js résout code de catégorie → profil, et un
+// code inconnu tombe sur `generique` (affiché dans le wizard, jamais silencieux).
+// La TVA par défaut vient elle aussi de la catégorie (default_vat_rate).
 
-export const SECTIONS_PAR_EQUIPEMENT = {
-  pac_air_eau:        { showRamonage: false, showFGaz: true,  showBruleur: false, showCendres: false, mesuresLabel: 'pac',        tvaDefaut: 5.5 },
-  pac_air_air:        { showRamonage: false, showFGaz: true,  showBruleur: false, showCendres: false, mesuresLabel: 'pac',        tvaDefaut: 5.5 },
-  climatisation:      { showRamonage: false, showFGaz: true,  showBruleur: false, showCendres: false, mesuresLabel: 'pac',        tvaDefaut: 20  },
-  poele:              { showRamonage: true,  showFGaz: false, showBruleur: true,  showCendres: true,  mesuresLabel: 'combustion', tvaDefaut: 5.5 },
-  chaudiere_bois:     { showRamonage: true,  showFGaz: false, showBruleur: true,  showCendres: true,  mesuresLabel: 'combustion', tvaDefaut: 5.5 },
-  chaudiere_fioul:    { showRamonage: true,  showFGaz: false, showBruleur: true,  showCendres: false, mesuresLabel: 'combustion', tvaDefaut: 10  },
-  chaudiere_gaz:      { showRamonage: true,  showFGaz: false, showBruleur: true,  showCendres: false, mesuresLabel: 'combustion', tvaDefaut: 10  },
-  chauffe_eau_thermo: { showRamonage: false, showFGaz: true,  showBruleur: false, showCendres: false, mesuresLabel: 'ecs',        tvaDefaut: 10  },
-  ballon_ecs:         { showRamonage: false, showFGaz: false, showBruleur: false, showCendres: false, mesuresLabel: 'ecs',        tvaDefaut: 10  },
-  vmc:                { showRamonage: false, showFGaz: false, showBruleur: false, showCendres: false, mesuresLabel: 'aeraulique', tvaDefaut: 10  },
-  autre:              { showRamonage: false, showFGaz: false, showBruleur: false, showCendres: false, mesuresLabel: 'combustion', tvaDefaut: 20  },
+export const PROFIL_GENERIQUE = 'generique';
+
+export const SECTIONS_PAR_PROFIL = {
+  combustion_bois:    { showRamonage: true,  showFGaz: false, showBruleur: true,  showCendres: true,  mesuresLabel: 'combustion' },
+  combustion_fossile: { showRamonage: true,  showFGaz: false, showBruleur: true,  showCendres: false, mesuresLabel: 'combustion' },
+  pac:                { showRamonage: false, showFGaz: true,  showBruleur: false, showCendres: false, mesuresLabel: 'pac'        },
+  ecs_thermo:         { showRamonage: false, showFGaz: true,  showBruleur: false, showCendres: false, mesuresLabel: 'ecs'        },
+  ecs:                { showRamonage: false, showFGaz: false, showBruleur: false, showCendres: false, mesuresLabel: 'ecs'        },
+  aeraulique:         { showRamonage: false, showFGaz: false, showBruleur: false, showCendres: false, mesuresLabel: 'aeraulique' },
+  generique:          { showRamonage: false, showFGaz: false, showBruleur: false, showCendres: false, mesuresLabel: 'combustion' },
 };
 
-// ============================================================================
-// LABELS TYPE ÉQUIPEMENT
-// ============================================================================
-
-export const EQUIPMENT_CATEGORY_LABELS = {
-  pac_air_eau:        'PAC Air-Eau',
-  pac_air_air:        'PAC Air-Air',
-  climatisation:      'Climatisation',
-  poele:              'Poêle',
-  chaudiere_bois:     'Chaudière bois',
-  chaudiere_fioul:    'Chaudière fioul',
-  chaudiere_gaz:      'Chaudière gaz',
-  chauffe_eau_thermo: 'Chauffe-eau thermodynamique',
-  ballon_ecs:         'Ballon ECS',
-  vmc:                'VMC',
-  autre:              'Autre',
-};
+/** Sections d'un profil ; profil inconnu ou absent → générique. */
+export function sectionsPourProfil(profil) {
+  return SECTIONS_PAR_PROFIL[profil] || SECTIONS_PAR_PROFIL[PROFIL_GENERIQUE];
+}
 
 // ============================================================================
 // CONTRÔLES SÉCURITÉ
@@ -77,10 +69,10 @@ export const NETTOYAGE_ITEMS = [
 ];
 
 /**
- * Retourne les items de nettoyage filtrés selon le type d'équipement
+ * Retourne les items de nettoyage filtrés selon le profil de certificat
  */
-export function getNettoyageItems(equipmentCategory) {
-  const config = SECTIONS_PAR_EQUIPEMENT[equipmentCategory] || SECTIONS_PAR_EQUIPEMENT.autre;
+export function getNettoyageItems(profil) {
+  const config = sectionsPourProfil(profil);
   return NETTOYAGE_ITEMS.filter(item => {
     if (item.requiresBruleur && !config.showBruleur) return false;
     if (item.requiresCendres && !config.showCendres) return false;
@@ -196,10 +188,10 @@ export const TAUX_DEPOTS = [
 // ============================================================================
 
 /**
- * Calcule les étapes à afficher selon le type d'équipement
+ * Calcule les étapes à afficher selon le profil de certificat
  */
-export function getSteps(equipmentCategory) {
-  const config = SECTIONS_PAR_EQUIPEMENT[equipmentCategory] || SECTIONS_PAR_EQUIPEMENT.autre;
+export function getSteps(profil) {
+  const config = sectionsPourProfil(profil);
 
   const steps = [
     { id: 'equipement',  label: 'Équipement' },
@@ -222,10 +214,10 @@ export function getSteps(equipmentCategory) {
 }
 
 /**
- * Type de document déduit du type d'équipement
+ * Type de document déduit du profil de certificat
  */
-export function getTypeDocument(equipmentCategory) {
-  const config = SECTIONS_PAR_EQUIPEMENT[equipmentCategory] || SECTIONS_PAR_EQUIPEMENT.autre;
+export function getTypeDocument(profil) {
+  const config = sectionsPourProfil(profil);
   if (config.showRamonage && config.showFGaz) return 'entretien_ramonage';
   if (config.showRamonage) return 'entretien_ramonage';
   return 'entretien';

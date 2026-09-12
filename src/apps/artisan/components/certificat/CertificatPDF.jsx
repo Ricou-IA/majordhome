@@ -17,10 +17,9 @@ import {
   pdf,
 } from '@react-pdf/renderer';
 import {
-  EQUIPMENT_CATEGORY_LABELS,
   CONTROLES_SECURITE_ITEMS,
   MESURES_PAR_TYPE,
-  SECTIONS_PAR_EQUIPEMENT,
+  sectionsPourProfil,
   getNettoyageItems,
 } from './constants';
 import logoMayer from '@/assets/logo-mayer.png';
@@ -120,7 +119,9 @@ function CertificatDocument({ data, company }) {
   const companyFooter = company
     ? `${company.name} - ${company.legalForm || 'SASU'} SIRET ${company.siret} - ${company.city} (${company.postalCode}) - RGE ${(company.rgeCertifications || []).join(', ')}`
     : DEFAULT_COMPANY_FOOTER;
-  const config = SECTIONS_PAR_EQUIPEMENT[data.equipement_type] || {};
+  // `profil` et `equipement_type_label` sont posés par l'appelant (wizard) depuis
+  // le référentiel de l'org : le PDF ne connaît ni l'enum ni les catégories.
+  const config = sectionsPourProfil(data.profil);
   const controles = data.donnees_entretien?.controles_securite || {};
   const nettoyage = data.donnees_entretien?.nettoyage || {};
   const fgaz = data.donnees_entretien?.fgaz || {};
@@ -128,7 +129,7 @@ function CertificatDocument({ data, company }) {
   const mesures = data.mesures || {};
   const mesuresItems = MESURES_PAR_TYPE[config.mesuresLabel] || [];
   const pieces = data.pieces_remplacees || [];
-  const nettoyageItems = getNettoyageItems(data.equipement_type);
+  const nettoyageItems = getNettoyageItems(data.profil);
 
   const bilanColor = data.bilan_conformite === 'conforme' ? C.vert :
     data.bilan_conformite === 'anomalie' ? C.orange : C.rouge;
@@ -183,7 +184,7 @@ function CertificatDocument({ data, company }) {
         <Text style={s.sectionTitle}>EQUIPEMENT</Text>
         <View style={s.row2}>
           <View style={s.col}>
-            <Field label="Type" value={EQUIPMENT_CATEGORY_LABELS[data.equipement_type] || data.equipement_type} />
+            <Field label="Type" value={data.equipement_type_label || data.equipement_type} />
             <Field label="Marque / Modele" value={[data.equipement_marque, data.equipement_modele].filter(Boolean).join(' ')} />
             <Field label="N. serie" value={data.equipement_numero_serie} />
           </View>

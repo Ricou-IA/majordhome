@@ -25,12 +25,22 @@ import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
 import { generatePdfBlob } from './CertificatPDF';
 import { buildCompanyInfo } from '@/lib/orgBranding';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import {
   getSteps,
   getTypeDocument,
   getEmptyFormData,
-  SECTIONS_PAR_EQUIPEMENT,
+  sectionsPourProfil,
 } from './constants';
+
+/** Données de ramonage initiales (profils à ramonage). */
+const RAMONAGE_INITIAL = () => ({
+  conduits: [{ label: 'Conduit principal', diametre_mm: null, longueur_ml: null, resultat: 'ramone', observations: '' }],
+  methode: 'mecanique',
+  methode_autre: '',
+  taux_depots: 'faible',
+  observations_conduit: '',
+});
 
 // Steps
 import { StepEquipementType } from './steps/StepEquipementType';
@@ -82,6 +92,9 @@ export function CertificatWizard({
   const { members: teamMembers = [] } = useTeamMembers(canSelectTechnician ? organization?.id : null);
   const { saveDraft, signCertificat, uploadPdf, updatePdfInfo, getSignedUrl, isSaving, isSigning } = useCertificatMutations();
   const saveTimeoutRef = useRef(null);
+  // Référentiel de l'org : la valeur enregistrée (equipement_type) est le CODE de
+  // catégorie ; le gabarit (profil) et la TVA par défaut viennent de la catégorie.
+  const { index: referentiel, isLoading: referentielLoading } = useEquipmentReferential();
 
   // ── State formData ──
   const [formData, setFormData] = useState(() => {
@@ -100,7 +113,8 @@ export function CertificatWizard({
       : new Date().toISOString().split('T')[0];
 
     if (equipment) {
-      initial.equipement_type = equipment.category || '';
+      // Le code de catégorie est posé par l'effet ci-dessous, une fois le
+      // référentiel chargé (equipment ne porte que category_id).
       initial.equipement_marque = equipment.brand || '';
       initial.equipement_modele = equipment.model || '';
       initial.equipement_numero_serie = equipment.serial_number || '';
@@ -112,27 +126,29 @@ export function CertificatWizard({
       }
     }
 
-    // TVA par défaut
-    const config = SECTIONS_PAR_EQUIPEMENT[initial.equipement_type];
-    if (config) {
-      initial.tva_taux = config.tvaDefaut;
-      // Initialiser donnees_ramonage si nécessaire
-      if (config.showRamonage) {
-        initial.donnees_ramonage = {
-          conduits: [{ label: 'Conduit principal', diametre_mm: null, longueur_ml: null, resultat: 'ramone', observations: '' }],
-          methode: 'mecanique',
-          methode_autre: '',
-          taux_depots: 'faible',
-          observations_conduit: '',
-        };
-      }
-    }
-
     // Nom du technicien : assignedTechnician (planning) > user connecté
     initial.technicien_nom = assignedTechnician || profile?.full_name || '';
 
     return initial;
   });
+
+  // ── Catégorie de l'équipement lié → code + TVA + ramonage (nouveau certificat) ──
+  useEffect(() => {
+    if (existingCertificat || !equipment?.category_id || referentielLoading) return;
+    const cat = referentiel.categoriesById.get(equipment.category_id);
+    if (!cat) return;
+    setFormData((prev) => {
+      if (prev.equipement_type) return prev;
+      const config = sectionsPourProfil(cat.certificate_profile);
+      const tva = referentiel.tvaParCode(cat.code);
+      return {
+        ...prev,
+        equipement_type: cat.code,
+        tva_taux: prev.tva_taux || (tva ?? prev.tva_taux),
+        donnees_ramonage: prev.donnees_ramonage || (config.showRamonage ? RAMONAGE_INITIAL() : prev.donnees_ramonage),
+      };
+    });
+  }, [equipment, existingCertificat, referentiel, referentielLoading]);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [certificatId, setCertificatId] = useState(existingCertificat?.id || null);
@@ -147,22 +163,26 @@ export function CertificatWizard({
     }
   }, [assignedTechnician]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Steps dynamiques ──
-  const steps = getSteps(formData.equipement_type);
+  // ── Profil de certificat (gabarit) depuis la catégorie ; code inconnu → générique, affiché ──
+  const profil = referentiel.profilParCode(formData.equipement_type);
+  const codeInconnu = !!formData.equipement_type && !referentielLoading && !referentiel.codeConnu(formData.equipement_type);
 
-  // ── Quand le step 0 choisit un type, recalculer TVA + type_document ──
+  // ── Steps dynamiques ──
+  const steps = getSteps(profil);
+
+  // ── Quand le step 0 choisit une catégorie, recalculer TVA + type_document + ramonage ──
   useEffect(() => {
-    if (formData.equipement_type) {
-      const config = SECTIONS_PAR_EQUIPEMENT[formData.equipement_type];
-      if (config && !existingCertificat) {
-        setFormData(prev => ({
-          ...prev,
-          tva_taux: prev.tva_taux || config.tvaDefaut,
-          type_document: getTypeDocument(prev.equipement_type),
-        }));
-      }
+    if (formData.equipement_type && !existingCertificat) {
+      const config = sectionsPourProfil(profil);
+      const tva = referentiel.tvaParCode(formData.equipement_type);
+      setFormData(prev => ({
+        ...prev,
+        tva_taux: prev.tva_taux || (tva ?? prev.tva_taux),
+        type_document: getTypeDocument(profil),
+        donnees_ramonage: prev.donnees_ramonage || (config.showRamonage ? RAMONAGE_INITIAL() : prev.donnees_ramonage),
+      }));
     }
-  }, [formData.equipement_type, existingCertificat]);
+  }, [formData.equipement_type, existingCertificat, profil, referentiel]);
 
   // ── onChange générique ──
   const handleChange = useCallback((field, value) => {
@@ -183,7 +203,7 @@ export function CertificatWizard({
       contract_id: contract?.id || intervention.contract_id || null,
       org_id: orgId,
       created_by: userId,
-      type_document: getTypeDocument(formData.equipement_type),
+      type_document: getTypeDocument(profil),
     };
 
     const result = await saveDraft(payload);
@@ -195,7 +215,7 @@ export function CertificatWizard({
       setCertificatId(result.data.id);
     }
     return result?.data?.id || certificatId;
-  }, [formData, intervention, client, equipment, contract, orgId, userId, saveDraft, certificatId, pdfUrl]);
+  }, [formData, intervention, client, equipment, contract, orgId, userId, saveDraft, certificatId, pdfUrl, profil]);
 
   // Auto-save quand on change d'étape (debounce 500ms)
   useEffect(() => {
@@ -301,6 +321,9 @@ export function CertificatWizard({
       // Préparer les données pour le PDF (merge formData + infos client)
       const pdfData = {
         ...formData,
+        // Gabarit et libellé résolus ici, depuis le référentiel : le PDF n'en connaît rien.
+        profil,
+        equipement_type_label: referentiel.categoriesByCode.get(formData.equipement_type)?.label || formData.equipement_type,
         reference: contract?.contract_number || existingCertificat?.reference || '',
         client_name: client?.display_name || client?.last_name || '',
         client_address: [client?.address, client?.postal_code, client?.city].filter(Boolean).join(', '),
@@ -393,9 +416,17 @@ export function CertificatWizard({
 
       {/* Contenu step */}
       <div className="min-h-[400px]">
+        {codeInconnu && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Catégorie « {formData.equipement_type} » inconnue de votre organisation : gabarit générique appliqué
+            (contrôles et nettoyage seulement). Pour un gabarit complet, recréez la catégorie sous ce code dans
+            Paramètres → Tarification → Catégories.
+          </div>
+        )}
         {StepComponent && currentStepConfig.id === 'signature' ? (
           <StepSignature
             formData={formData}
+            referentiel={referentiel}
             client={client}
             certificatId={certificatId}
             onSign={handleSign}
@@ -409,6 +440,8 @@ export function CertificatWizard({
           <StepComponent
             formData={formData}
             onChange={handleChange}
+            profil={profil}
+            referentiel={referentiel}
             client={client}
             equipment={equipment}
             clientEquipments={clientEquipments}

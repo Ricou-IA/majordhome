@@ -8,7 +8,7 @@ import { INTERVENTION_TYPES } from '@services/interventions.service';
 import { getStatusConfig } from '@services/sav.service';
 import { chantiersService, getChantierStatusConfig } from '@services/chantiers.service';
 import { formatDateFR } from '@/lib/utils';
-import { EQUIPMENT_CATEGORY_LABELS } from '@/apps/artisan/components/certificat/constants';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 
 const InterventionCard = ({ intervention, hasChildren = false }) => {
@@ -37,9 +37,10 @@ const InterventionCard = ({ intervention, hasChildren = false }) => {
     && ['planifie', 'realise'].includes(intervention.workflow_status);
   const isRealise = intervention.workflow_status === 'realise';
 
-  // Equipment label for child interventions
-  const equipmentLabel = isChild && intervention.equipment_category
-    ? (EQUIPMENT_CATEGORY_LABELS[intervention.equipment_category] || intervention.equipment_category)
+  // Libellé de catégorie de l'équipement (interventions enfants), depuis le référentiel de l'org
+  const { index: referentiel } = useEquipmentReferential();
+  const equipmentLabel = isChild && intervention.equipment_category_id
+    ? referentiel.labelCategorie(intervention.equipment_category_id)
     : null;
   const equipmentDetail = isChild
     ? [intervention.equipment_brand, intervention.equipment_model].filter(Boolean).join(' ')

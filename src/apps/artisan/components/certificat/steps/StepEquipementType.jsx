@@ -1,24 +1,22 @@
 /**
  * StepEquipementType.jsx - Étape 0 du wizard certificat
  * ============================================================================
- * Sélection ou auto-détection du type d'équipement.
- * Si l'intervention a déjà un equipment_id → on passe automatiquement.
- * Sinon → sélecteur dropdown ou recherche dans le parc client.
+ * Sélection ou auto-détection de la CATÉGORIE d'équipement (référentiel de
+ * l'org : la valeur enregistrée est son code, le gabarit du certificat vient
+ * de son profil). Si l'intervention a déjà un equipment_id → résumé read-only.
+ * Sinon → sélecteur ou recherche dans le parc client.
  * ============================================================================
  */
 
-import { EQUIPMENT_CATEGORY_LABELS } from '../constants';
 import { FormField, SelectInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 
-const categoryOptions = Object.entries(EQUIPMENT_CATEGORY_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
-
-export function StepEquipementType({ formData, onChange, equipment, clientEquipments }) {
+export function StepEquipementType({ formData, onChange, equipment, clientEquipments, referentiel }) {
   const hasEquipment = !!equipment;
+  const categoryOptions = (referentiel?.categories || []).map((c) => ({ value: c.code, label: c.label }));
+  const labelDe = (eq) => referentiel?.labelCategorie(eq?.category_id) || 'Équipement';
+  const codeDe = (eq) => referentiel?.categoriesById.get(eq?.category_id)?.code || '';
 
   // Si équipement déjà lié → afficher un résumé read-only
   if (hasEquipment) {
@@ -29,7 +27,7 @@ export function StepEquipementType({ formData, onChange, equipment, clientEquipm
           <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-medium text-green-800">
-              {EQUIPMENT_CATEGORY_LABELS[equipment.category] || equipment.category}
+              {labelDe(equipment)}
             </p>
             <p className="text-sm text-green-700">
               {[equipment.brand, equipment.model].filter(Boolean).join(' ') || 'Marque/modèle non renseignés'}
@@ -74,7 +72,7 @@ export function StepEquipementType({ formData, onChange, equipment, clientEquipm
                 key={eq.id}
                 type="button"
                 onClick={() => {
-                  onChange('equipement_type', eq.category);
+                  onChange('equipement_type', codeDe(eq));
                   onChange('equipment_id', eq.id);
                   onChange('equipement_marque', eq.brand || '');
                   onChange('equipement_modele', eq.model || '');
@@ -89,7 +87,7 @@ export function StepEquipementType({ formData, onChange, equipment, clientEquipm
                 className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <p className="text-sm font-medium text-gray-800">
-                  {EQUIPMENT_CATEGORY_LABELS[eq.category] || eq.category}
+                  {labelDe(eq)}
                 </p>
                 <p className="text-xs text-gray-500">
                   {[eq.brand, eq.model].filter(Boolean).join(' ') || 'Non renseigné'}

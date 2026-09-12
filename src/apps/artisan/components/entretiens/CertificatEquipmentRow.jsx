@@ -11,7 +11,8 @@
 
 import { Loader2, Ban, Undo2 } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
-import { EQUIPMENT_CATEGORY_LABELS } from '@/apps/artisan/components/certificat/constants';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { libelleEquipement } from '@/lib/equipmentReferential';
 
 // ============================================================================
 // HELPERS
@@ -45,9 +46,8 @@ export function CertificatEquipmentRow({
   const status = getChildStatus(childIntervention);
   const badge = STATUS_BADGES[status];
 
-  const categoryLabel = equipment?.category
-    ? (EQUIPMENT_CATEGORY_LABELS[equipment.category] || equipment.category)
-    : 'Équipement';
+  const { index: referentiel } = useEquipmentReferential();
+  const categoryLabel = libelleEquipement(equipment, referentiel);
 
   const detail = [equipment?.brand, equipment?.model].filter(Boolean).join(' ');
 
