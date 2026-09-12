@@ -121,3 +121,48 @@ test('10 septembre — l ordre inverse est bien rejeté, ce n est pas un hasard 
   assert.equal(r.faisable, false);
   assert.equal(r.raison, 'fenetre');
 });
+
+// ============================================================================
+// Souplesse (spec 2026-09-12) : tolérance de déplacement par RDV
+// ============================================================================
+import { toleranceDe, construireArretsPourConsolidation } from '../../src/lib/tournee/arrets.js';
+
+const AMP = { debut: 480, fin: 1080 };
+
+test('toleranceDe : figé (hour_confirmed_at) = ponctuel quel que soit time_flex_minutes', () => {
+  const t = toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, time_flex_minutes: 30, hour_confirmed_at: '2026-09-12T08:00:00Z' }, { flexDefaut: 30, amplitude: AMP });
+  assert.deepEqual(t, { min: 840, max: 840, flex: 0 });
+});
+
+test('toleranceDe : NULL = défaut d org ; 0 = figé ; ±15/±30 = plage bornée par l amplitude', () => {
+  assert.deepEqual(toleranceDe({ scheduled_start: '14:00', duration_minutes: 60 }, { flexDefaut: 30, amplitude: AMP }), { min: 810, max: 870, flex: 30 });
+  assert.deepEqual(toleranceDe({ scheduled_start: '14:00', duration_minutes: 60, time_flex_minutes: 0 }, { flexDefaut: 30, amplitude: AMP }), { min: 840, max: 840, flex: 0 });
+  assert.deepEqual(toleranceDe({ scheduled_start: '08:10', duration_minutes: 60, time_flex_minutes: 15 }, { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 505, flex: 15 });
+  // fin d'amplitude : le RDV doit finir avant 18:00
+  assert.deepEqual(toleranceDe({ scheduled_start: '17:30', duration_minutes: 60, time_flex_minutes: 30 }, { flexDefaut: 30, amplitude: AMP }), { min: 1020, max: 1020, flex: 30 });
+});
+
+test('toleranceDe : demi-journée = la demi-journée qui contient l heure provisoire', () => {
+  assert.deepEqual(toleranceDe({ scheduled_start: '09:30', duration_minutes: 90, time_flex_minutes: 240 }, { flexDefaut: 30, amplitude: AMP }), { min: 480, max: 630, flex: 240 });
+  assert.deepEqual(toleranceDe({ scheduled_start: '15:00', duration_minutes: 60, time_flex_minutes: 240 }, { flexDefaut: 30, amplitude: AMP }), { min: 780, max: 1020, flex: 240 });
+  assert.equal(toleranceDe({ scheduled_start: null }, { flexDefaut: 30 }), null);
+});
+
+test('construireArretsExistants sans opts = comportement antérieur (tolérance ponctuelle) ; avec opts, tolérance portée, fenêtre inchangée', () => {
+  const [sans] = construireArretsExistants([rdv('j', 43.9, 1.9, 60, '08:30:00')]);
+  assert.deepEqual(sans.fenetre, { debut: 510, fin: 510 });
+  assert.deepEqual(sans.tolerance, { min: 510, max: 510, flex: 0 });
+  const [avec] = construireArretsExistants([rdv('j', 43.9, 1.9, 60, '08:30:00')], null, { flexDefaut: 30, amplitude: AMP });
+  assert.deepEqual(avec.fenetre, { debut: 510, fin: 510 });
+  assert.deepEqual(avec.tolerance, { min: 480, max: 540, flex: 30 });
+});
+
+test('construireArretsPourConsolidation : la fenêtre devient la tolérance (entrée de sequencerTournee)', () => {
+  const rdvs = [
+    { ...rdv('a', 43.9, 1.9, 60, '08:30:00'), time_flex_minutes: 30 },
+    { ...rdv('b', 43.95, 2.0, 60, '14:00:00'), hour_confirmed_at: '2026-09-12T08:00:00Z' },
+  ];
+  const [a, b] = construireArretsPourConsolidation(rdvs, null, { flexDefaut: 30, amplitude: AMP });
+  assert.deepEqual(a.fenetre, { debut: 480, fin: 540 });
+  assert.deepEqual(b.fenetre, { debut: 840, fin: 840 });
+});

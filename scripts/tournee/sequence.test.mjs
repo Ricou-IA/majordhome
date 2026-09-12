@@ -234,3 +234,29 @@ test('repli heuristique — un seul arrêt contraint : la géographie décide po
   assert.equal(r.methode, 'heuristique');
   assert.equal(r.ordre.length, 9, 'tous les arrets sont places, y compris le seul contraint');
 });
+
+// ============================================================================
+// Consolidation (spec 2026-09-12) : les fenêtres de tolérance deviennent les
+// fenêtres du séquenceur ; les figés sont des points fixes.
+// ============================================================================
+import { construireArretsPourConsolidation } from '../../src/lib/tournee/arrets.js';
+
+test('consolidation : ordre + heures dans les fenêtres, le figé ne bouge pas, les adaptables se resserrent', () => {
+  const AMP = { debut: 480, fin: 1080 };
+  // a ±30 posé 08:30 ; b figé 14:00 ; c ±30 posé 10:50 — tous à des lieux distincts, trajets 10.
+  const rdvs = [
+    { id: 'a', lat: 43.7, lng: 2.1, duration_minutes: 60, scheduled_start: '08:30', time_flex_minutes: 30 },
+    { id: 'b', lat: 43.8, lng: 2.0, duration_minutes: 60, scheduled_start: '14:00', hour_confirmed_at: '2026-09-12T08:00:00Z' },
+    { id: 'c', lat: 43.75, lng: 2.05, duration_minutes: 60, scheduled_start: '10:50', time_flex_minutes: 30 },
+  ];
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9, lng: 1.9 }, { flexDefaut: 30, amplitude: AMP });
+  const r = sequencerTournee({
+    depotKey: '43.900,1.900', arrets, trajet: (x, y) => (x === y ? 0 : 10),
+    amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] },
+  });
+  assert.equal(r.faisable, true);
+  const par = Object.fromEntries(r.planning.map((p) => [p.id, p]));
+  assert.equal(par.b.arriveeMinutes, 840, 'le figé est un point fixe');
+  assert.ok(par.a.arriveeMinutes >= 480 && par.a.arriveeMinutes <= 540, 'a reste dans ±30 de 08:30');
+  assert.ok(par.c.arriveeMinutes >= 620 && par.c.arriveeMinutes <= 680, 'c reste dans ±30 de 10:50');
+});

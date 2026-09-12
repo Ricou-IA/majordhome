@@ -3,14 +3,14 @@
 // Séquencement d'une journée de tournée. Module PUR.
 // Testé : node --test scripts/tournee/sequence.test.mjs
 //
-// ⚠️ HORS CHEMIN DE PRODUCTION depuis le passage au modèle « créneaux »
-// (creneaux.js) : plus aucun code applicatif ne l'appelle. Il réordonne une
-// journée entière, ce qui n'a plus de sens depuis que chaque RDV posé porte
-// une fenêtre ponctuelle — il n'y a plus d'ordre à chercher. Conservé parce
-// qu'il reste la seule implémentation d'optimisation d'ordre du projet (la
-// spec envisage de réordonner les entretiens que le module a lui-même posés),
-// et parce que le test-témoin de creneaux.test.mjs s'en sert pour démontrer la
-// régression corrigée. À supprimer si cette piste est abandonnée.
+// De retour dans le chemin de production depuis la souplesse des RDV (spec
+// 2026-09-12 « fenêtres d'abord, heures ensuite ») : la CONSOLIDATION « Figer
+// la journée » lui passe les arrêts avec leur tolérance comme `fenetre`
+// (arrets.js::construireArretsPourConsolidation) et il pose les heures
+// définitives — les RDV figés (fenêtre ponctuelle) restent des points fixes.
+// L'insertion au fil de l'eau, elle, reste sur creneaux.js (un candidat à la
+// fois, au plus un voisin décalé). Le test-témoin de creneaux.test.mjs s'en
+// sert aussi pour démontrer la régression corrigée du 31/08.
 //
 // Avec 4-5 entretiens par jour, l'espace des ordres possibles est minuscule
 // (5 arrêts = 120 ordres, 8 = 40 320) : on les énumère TOUS et on retourne le

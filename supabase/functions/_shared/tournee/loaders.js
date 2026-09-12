@@ -71,7 +71,7 @@ export async function chargerJournees({
       // SELECT, `r.lead_id` vaut `undefined`, `leadIds` reste vide et TOUT le repli
       // lead est du code mort — silencieusement, puisque le repli suivant (siège)
       // fournit quand même une position plausible. Vécu : livré ainsi, jamais vu.
-      .select('id, client_id, lead_id, scheduled_date, scheduled_start, duration_minutes, appointment_type, client_name, address, city, postal_code')
+      .select('id, client_id, lead_id, scheduled_date, scheduled_start, duration_minutes, appointment_type, client_name, address, city, postal_code, time_flex_minutes, hour_confirmed_at')
       .eq('org_id', orgId).gte('scheduled_date', iso(debut)).lte('scheduled_date', iso(fin))
       .not('status', 'in', '(cancelled,no_show)'),
   ]);

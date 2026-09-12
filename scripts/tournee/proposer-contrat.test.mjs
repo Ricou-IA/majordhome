@@ -232,3 +232,60 @@ test('les trois chiffres de l opérateur : trajet aller, travail, reste utile av
   }).creneaux[0];
   assert.equal(vide.resteUtileMinutes, 1080 - (vide.finMinutes + 10));
 });
+
+// ============================================================================
+// Souplesse (spec 2026-09-12) : décalage d'un voisin remonté, temps perdu pénalisé
+// ============================================================================
+const REGLAGES_SOUPLES = { ...REGLAGES, souplesse_defaut_minutes: 30, reste_utile_min_minutes: 75 };
+const rdvSouple = (id, heure, lat, lng, duree, flex) => ({ ...rdv(id, heure, lat, lng, duree), time_flex_minutes: flex });
+
+test('un voisin adaptable glisse pour faire rentrer le contrat, et le créneau porte le décalage (label, heures)', () => {
+  // a 08:00-09:00 figé (heure confirmée), b 10:50 ±30, trois lieux distincts (trajets 10).
+  // Contrat 100 min : trou utile = 110 − 20 = 90 → manque 10. Coût 110 = même coût qu'après b,
+  // mais plus tôt → la place entre a et b (avec décalage de b) gagne.
+  const journees = [journee('2026-09-16', 'antoine', [
+    { ...rdv('a', '08:00', 43.7, 2.1, 60), hour_confirmed_at: '2026-09-12T08:00:00Z' },
+    rdvSouple('b', '10:50', 43.8, 2.0, 60, 30),
+  ])];
+  const r = proposerPourContrat({
+    contrat: { ...CONTRAT, dureeMinutes: 100 }, journees, techniciens: [ANTOINE], depot: DEPOT,
+    reglages: REGLAGES_SOUPLES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+  });
+  const entre = r.creneaux.find((k) => k.avant?.id === 'a');
+  assert.ok(entre, 'le créneau entre a et b existe grâce au décalage');
+  assert.equal(entre.decalages.length, 1);
+  assert.equal(entre.decalages[0].id, 'b');
+  assert.equal(entre.decalages[0].label, 'B');
+  assert.equal(entre.decalages[0].debutMinutesApres, 660);
+  assert.equal(entre.resteUtileMinutes, 0);      // enchaîné sur b décalé
+});
+
+test('un RDV figé ne bouge jamais : sans souplesse chez le voisin, pas de décalage possible', () => {
+  const journees = [journee('2026-09-16', 'antoine', [
+    { ...rdv('a', '08:00', 43.7, 2.1, 60), hour_confirmed_at: '2026-09-12T08:00:00Z' },
+    { ...rdv('b', '10:50', 43.8, 2.0, 60), time_flex_minutes: 0 },
+  ])];
+  const r = proposerPourContrat({
+    contrat: { ...CONTRAT, dureeMinutes: 100 }, journees, techniciens: [ANTOINE], depot: DEPOT,
+    reglages: REGLAGES_SOUPLES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+  });
+  assert.ok(r.creneaux.every((k) => k.decalages.length === 0));
+  assert.ok(!r.creneaux.some((k) => k.avant?.id === 'a' && k.apres?.id === 'b'));
+});
+
+test('temps perdu pénalisé : à coût proche, la place qui laisse 50 min inutilisables passe derrière celle qui enchaîne', () => {
+  // Trajets 10 partout. Jour 1 : b à 10:00 (figé) → candidat 08:10-09:10, reste 10:00 − 09:20 = 40 min perdues.
+  // Jour 2 : b à 09:20 (figé) → candidat 08:10-09:10 + 10 de trajet → enchaîné (reste 0).
+  const journees = [
+    journee('2026-09-16', 'antoine', [{ ...rdv('b1', '10:00', 43.7, 2.1, 60), time_flex_minutes: 0 }]),
+    journee('2026-09-17', 'antoine', [{ ...rdv('b2', '09:20', 43.7, 2.1, 60), time_flex_minutes: 0 }]),
+  ];
+  const r = proposerPourContrat({
+    contrat: CONTRAT, journees, techniciens: [ANTOINE], depot: DEPOT,
+    reglages: REGLAGES_SOUPLES, trajet: trajetAvec(), aujourdhui: AUJOURDHUI,
+  });
+  assert.equal(r.creneaux[0].date, '2026-09-17');
+  assert.equal(r.creneaux[0].resteUtileMinutes, 0);
+  assert.equal(r.creneaux[1].resteUtileMinutes, 40);
+  assert.ok(r.creneaux[1].scoreMinutes > r.creneaux[1].coutMinutes);
+});

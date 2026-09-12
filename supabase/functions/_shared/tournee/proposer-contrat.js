@@ -129,7 +129,8 @@ function fenetreDuJour(fenetre, j, { aujourdhui, maintenantMinutes, margeMinutes
  * @returns {{
  *   creneaux: Array<{ date, technicianId, technicianNom, couleur, debutMinutes, finMinutes,
  *     coutMinutes, detourMinutes, attenteMinutes, trajetAllerMinutes, trajetRetourMinutes,
- *     travailMinutes, resteUtileMinutes, avant: object|null, apres: object|null, estime: boolean }>,
+ *     travailMinutes, resteUtileMinutes, scoreMinutes, decalages: Array<object>,
+ *     avant: object|null, apres: object|null, estime: boolean }>,
  *   nouvellesJournees: Array<{ date, technicianId, technicianNom }>,
  *   raisonsRejet: Record<string, number>,
  *   techniciensEligibles: string[],
@@ -168,7 +169,13 @@ export function proposerPourContrat({
     }
     if (!journeeRetenue(j, { aujourdhui, reglages, contraintes, raisons })) continue;
 
-    const arrets = construireArretsExistants(j.rdvs, depot);
+    // Souplesse : chaque arrêt porte sa tolérance (figé / ±15 / ±30 / demi-journée,
+    // défaut d'org) — c'est ce qui autorise placerCandidat à glisser UN voisin.
+    const arrets = construireArretsExistants(j.rdvs, depot, {
+      flexDefaut: reglages.souplesse_defaut_minutes ?? 0,
+      amplitude: j.amplitude,
+      demiJournee: reglages.demi_journee,
+    });
     const chargeDeja = chargeExistante(arrets, { trajet, depotKey });
     const place = placerCandidat({
       arrets, candidat, trajet, depotKey, amplitude: j.amplitude,
@@ -201,8 +208,20 @@ export function proposerPourContrat({
     const keyApres = place.apresId ? (arretParId.get(place.apresId)?.key ?? depotKey) : depotKey;
     const trajetAllerMinutes = trajet(keyAvant, candidat.key);
     const trajetRetourMinutes = trajet(candidat.key, keyApres);
-    const borneSuivante = apres?.debutMinutes ?? j.amplitude.fin;
+    // Le suivant a pu être décalé pour faire rentrer le candidat : le reste
+    // utile se mesure à sa NOUVELLE heure.
+    const decalages = (place.decalages || []).map((d) => {
+      const r = parId.get(d.id);
+      return { ...d, label: r?.client_name || d.id, ville: r?.city || null, tolerance: arretParId.get(d.id)?.tolerance ?? null };
+    });
+    const apresDecale = decalages.find((d) => d.id === apres?.id);
+    const debutSuivant = apresDecale ? apresDecale.debutMinutesApres : apres?.debutMinutes;
+    const borneSuivante = debutSuivant ?? j.amplitude.fin;
     const resteUtileMinutes = Math.max(0, borneSuivante - place.departMinutes - trajetRetourMinutes);
+    // Pénalité de temps perdu : un reste trop court pour une autre visite est du
+    // temps de technicien perdu — il compte dans le classement, pas dans le coût affiché.
+    const seuilReste = reglages.reste_utile_min_minutes ?? 75;
+    const tempsPerdu = resteUtileMinutes > 10 && resteUtileMinutes < seuilReste ? resteUtileMinutes : 0;
     creneaux.push({
       date: j.date,
       technicianId: j.technicienId,
@@ -217,13 +236,16 @@ export function proposerPourContrat({
       trajetRetourMinutes,
       travailMinutes: candidat.dureeMinutes,
       resteUtileMinutes,
+      scoreMinutes: place.coutMinutes + tempsPerdu,
+      decalages,
       avant,
       apres,
       estime,
     });
   }
 
-  creneaux.sort((a, b) => a.coutMinutes - b.coutMinutes
+  creneaux.sort((a, b) => a.scoreMinutes - b.scoreMinutes
+    || a.coutMinutes - b.coutMinutes
     || a.date.localeCompare(b.date)
     || a.debutMinutes - b.debutMinutes);
   const retenus = creneaux.slice(0, maxResults);

@@ -61,8 +61,64 @@ export function arretsPlaces(arrets) {
       debutMinutes: a.fenetre.debut,
       finMinutes: a.fenetre.debut + (a.dureeMinutes || 0),
       dureeMinutes: a.dureeMinutes || 0,
+      // Souplesse (arrets.js::toleranceDe) : jusqu'où le début peut glisser.
+      // Absente ou ponctuelle = RDV figé, jamais déplacé.
+      tolerance: a.tolerance ?? null,
     }))
     .sort((a, b) => a.debutMinutes - b.debutMinutes);
+}
+
+/**
+ * Souplesse (spec 2026-09-12) : quand un candidat manque de `manque` minutes
+ * dans un intervalle, on tente de décaler UN voisin adaptable dans sa
+ * tolérance — le suivant plus tard, sinon le précédent plus tôt — sans jamais
+ * casser la contrainte du voisin du voisin (trajet compris). Un seul RDV
+ * déplacé par insertion : le cas simple, lisible, annonçable au client.
+ * @returns {{ dispoDepuis: number, dispoJusqua: number, places: Array, decalage: object }|null}
+ */
+function tenterDecalage({ places, iv, manque, trajet, depotKey, amplitude }) {
+  const i = iv.indexApres;
+  const apres = places[i];
+  const avant = places[i - 1];
+
+  const marge = (p) => (p?.tolerance ? p.tolerance.max - p.debutMinutes : 0);
+  if (apres && marge(apres) >= manque) {
+    const nouveauDebut = apres.debutMinutes + manque;
+    const suivant = places[i + 1];
+    const butee = suivant
+      ? suivant.debutMinutes - trajetOu(trajet, apres.key, suivant.key)
+      : amplitude.fin - trajetOu(trajet, apres.key, depotKey);
+    if (nouveauDebut + apres.dureeMinutes <= butee) {
+      const deplace = { ...apres, debutMinutes: nouveauDebut, finMinutes: nouveauDebut + apres.dureeMinutes };
+      const nouvellesPlaces = places.map((p) => (p.id === apres.id ? deplace : p));
+      return {
+        dispoDepuis: iv.dispoDepuis,
+        dispoJusqua: nouveauDebut,
+        places: nouvellesPlaces,
+        decalage: { id: apres.id, debutMinutesAvant: apres.debutMinutes, debutMinutesApres: nouveauDebut },
+      };
+    }
+  }
+
+  const margeAvant = (p) => (p?.tolerance ? p.debutMinutes - p.tolerance.min : 0);
+  if (avant && margeAvant(avant) >= manque) {
+    const nouveauDebut = avant.debutMinutes - manque;
+    const precedent = places[i - 2];
+    const auPlusTot = precedent
+      ? precedent.finMinutes + trajetOu(trajet, precedent.key, avant.key)
+      : amplitude.debut + trajetOu(trajet, depotKey, avant.key);
+    if (nouveauDebut >= auPlusTot) {
+      const deplace = { ...avant, debutMinutes: nouveauDebut, finMinutes: nouveauDebut + avant.dureeMinutes };
+      const nouvellesPlaces = places.map((p) => (p.id === avant.id ? deplace : p));
+      return {
+        dispoDepuis: deplace.finMinutes,
+        dispoJusqua: iv.dispoJusqua,
+        places: nouvellesPlaces,
+        decalage: { id: avant.id, debutMinutesAvant: avant.debutMinutes, debutMinutesApres: nouveauDebut },
+      };
+    }
+  }
+  return null;
 }
 
 /**
@@ -149,7 +205,10 @@ function pausePossible(places, pause) {
  *   arriveeMinutes: number|null, departMinutes: number|null,
  *   coutMinutes: number|null, detourMinutes: number|null,
  *   apresId: string|null, avantId: string|null, attenteMinutes: number,
+ *   decalages: Array<{ id: string, debutMinutesAvant: number, debutMinutesApres: number }>,
  * }}
+ *   `decalages` — le voisin adaptable qu'il faut glisser (dans sa tolérance) pour
+ *   que le candidat rentre ; vide quand il rentre tel quel. Jamais plus d'un.
  *   `attenteMinutes` — écart entre l'heure retenue et la première où l'on
  *   aurait pu arriver. Presque toujours 0 ; non nul quand le passage a dû être
  *   repoussé pour laisser le technicien déjeuner. Sans ce chiffre, un client
@@ -170,6 +229,7 @@ export function placerCandidat({
     apresId: null,
     avantId: null,
     attenteMinutes: 0,
+    decalages: [],
   });
 
   // Sans position, aucun trajet n'est calculable : le placer produirait des
@@ -190,16 +250,20 @@ export function placerCandidat({
     if (RANG_RAISON[r] > (RANG_RAISON[raisonVue] ?? -1)) raisonVue = r;
   };
 
-  for (const iv of intervalles(places, { depotKey, amplitude })) {
+  /**
+   * Évalue un intervalle (bornes `dispoDepuis`/`dispoJusqua`, arrêts `placesCourantes`
+   * qui peuvent inclure un voisin décalé) et retient le meilleur placement.
+   */
+  const evaluerIntervalle = (iv, { dispoDepuis, dispoJusqua, placesCourantes, decalages }) => {
     const allee = trajetOu(trajet, iv.keyAvant, candidat.key);
     const retour = trajetOu(trajet, candidat.key, iv.keyApres);
-    const evite = places.length === 0 && iv.indexApres === 0
+    const evite = placesCourantes.length === 0 && iv.indexApres === 0
       // Journée vide : il n'y a pas d'arc dépôt→dépôt à économiser.
       ? 0
       : trajetOu(trajet, iv.keyAvant, iv.keyApres);
 
     const cout = allee + duree + retour - evite;
-    const auPlusTot = iv.dispoDepuis + allee;
+    const auPlusTot = dispoDepuis + allee;
 
     // Trois arrivées essayées : au plus tôt, puis les deux qui laissent le
     // technicien déjeuner d'abord (dès l'ouverture de sa fenêtre de pause, ou
@@ -213,7 +277,7 @@ export function placerCandidat({
       // « Je mange dès que je peux, puis j'y vais » — la position la plus
       // proche du comportement réel, donc essayée avant le repli sur la fin
       // de fenêtre.
-      arrivees.push(Math.max(iv.dispoDepuis, pauseDebut) + pause.minutes + allee);
+      arrivees.push(Math.max(dispoDepuis, pauseDebut) + pause.minutes + allee);
       arrivees.push(pauseFin + allee);
     }
     // Fenêtre d'arrivée (contrainte « plutôt le matin / l'après-midi ») : on
@@ -226,9 +290,10 @@ export function placerCandidat({
     const departsPossibles = [...new Set(arrivees.filter((a) => a >= auPlusTot && dansFenetre(a)))];
     if (departsPossibles.length === 0) noterRaison('creneau');
 
+    let placeIci = false;
     for (const arrivee of departsPossibles) {
       const depart = arrivee + duree;
-      if (depart + retour > iv.dispoJusqua) { noterRaison('creneau'); continue; }
+      if (depart + retour > dispoJusqua) { noterRaison('creneau'); continue; }
       if (charge + cout > budgetMinutes) { noterRaison('budget'); continue; }
 
       // Pause : test DIFFÉRENTIEL. Si le technicien ne pouvait déjà pas
@@ -238,17 +303,23 @@ export function placerCandidat({
       // corrige sur les fenêtres. On ne bloque que si NOTRE insertion est ce
       // qui supprime la pause.
       if (pauseAvant) {
-        const apresInsertion = [...places, {
+        const apresInsertion = [...placesCourantes, {
           id: candidat.id, key: candidat.key, debutMinutes: arrivee, finMinutes: depart, dureeMinutes: duree,
         }].sort((a, b) => a.debutMinutes - b.debutMinutes);
         if (!pausePossible(apresInsertion, pause)) { noterRaison('pause'); continue; }
       }
 
+      placeIci = true;
       // À coût égal, la place la plus tôt : un technicien préfère enchaîner
       // plutôt que d'attendre, et c'est reproductible (pas d'ordre d'itération
-      // qui déciderait à notre place).
-      if (!meilleur || cout < meilleur.coutMinutes
-        || (cout === meilleur.coutMinutes && arrivee < meilleur.arriveeMinutes)) {
+      // qui déciderait à notre place). À coût ET heure égaux, sans décalage
+      // plutôt qu'avec (ne pas déranger un voisin pour rien).
+      const mieux = !meilleur
+        || cout < meilleur.coutMinutes
+        || (cout === meilleur.coutMinutes && arrivee < meilleur.arriveeMinutes)
+        || (cout === meilleur.coutMinutes && arrivee === meilleur.arriveeMinutes
+          && decalages.length < meilleur.decalages.length);
+      if (mieux) {
         meilleur = {
           faisable: true,
           raison: null,
@@ -259,9 +330,26 @@ export function placerCandidat({
           apresId: iv.apresId,
           avantId: iv.avantId,
           attenteMinutes: arrivee - auPlusTot,
+          decalages,
         };
       }
     }
+    // Rien ne rentre tel quel : de combien manque-t-il, au plus tôt ?
+    return { placeIci, manque: (auPlusTot + duree + retour) - dispoJusqua };
+  };
+
+  for (const iv of intervalles(places, { depotKey, amplitude })) {
+    const { placeIci, manque } = evaluerIntervalle(iv, {
+      dispoDepuis: iv.dispoDepuis, dispoJusqua: iv.dispoJusqua, placesCourantes: places, decalages: [],
+    });
+    if (placeIci || manque <= 0) continue;
+    // Souplesse : un voisin adaptable peut-il glisser de `manque` minutes ?
+    const ajuste = tenterDecalage({ places, iv, manque, trajet, depotKey, amplitude });
+    if (!ajuste) continue;
+    evaluerIntervalle(iv, {
+      dispoDepuis: ajuste.dispoDepuis, dispoJusqua: ajuste.dispoJusqua,
+      placesCourantes: ajuste.places, decalages: [ajuste.decalage],
+    });
   }
 
   return meilleur || echec(raisonVue || 'creneau');

@@ -74,17 +74,64 @@ export function minutesVersHeure(minutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+const DEMI_JOURNEE = 240;
+const DEMI_JOURNEE_DEFAUT = { matin: [8, 12], apres_midi: [13, 18] };
+
+/**
+ * Tolérance de déplacement d'un RDV (spec 2026-09-12 « fenêtres d'abord,
+ * heures ensuite ») : la plage [min, max] dans laquelle son heure de DÉBUT peut
+ * glisser. Figé (heure exigée par le client, ou heure déjà communiquée :
+ * `hour_confirmed_at`) ⇒ min = max = début. Sans souplesse renseignée
+ * (`time_flex_minutes` NULL) ⇒ défaut d'org `flexDefaut`. 240 = demi-journée :
+ * la plage devient la demi-journée qui contient l'heure provisoire.
+ *
+ * @param {{ scheduled_start, time_flex_minutes?, hour_confirmed_at? }} rdv
+ * @param {{ flexDefaut?: number, amplitude?: {debut:number, fin:number}, demiJournee?: object }} [opts]
+ * @returns {{ min: number, max: number, flex: number }|null}  null si le RDV n'a pas d'heure
+ */
+export function toleranceDe(rdv, { flexDefaut = 0, amplitude, demiJournee = DEMI_JOURNEE_DEFAUT } = {}) {
+  const debut = minutesDepuisMinuit(rdv?.scheduled_start);
+  if (debut == null) return null;
+  const fige = !!rdv?.hour_confirmed_at;
+  const flex = fige ? 0 : (rdv?.time_flex_minutes ?? flexDefaut ?? 0);
+  const duree = rdv?.duration_minutes || 60;
+  let min = debut;
+  let max = debut;
+  if (flex >= DEMI_JOURNEE) {
+    const [mDebut, mFin] = (demiJournee?.matin || DEMI_JOURNEE_DEFAUT.matin).map((h) => h * 60);
+    const [aDebut, aFin] = (demiJournee?.apres_midi || DEMI_JOURNEE_DEFAUT.apres_midi).map((h) => h * 60);
+    const [d, f] = debut < mFin ? [mDebut, mFin] : [aDebut, aFin];
+    min = d;
+    max = Math.max(d, f - duree); // doit finir dans la demi-journée
+  } else if (flex > 0) {
+    min = debut - flex;
+    max = debut + flex;
+  }
+  if (amplitude) {
+    min = Math.max(min, amplitude.debut);
+    max = Math.min(max, Math.max(amplitude.debut, amplitude.fin - duree));
+  }
+  if (max < min) max = min;
+  return { min, max, flex };
+}
+
 /**
  * Arrêts déjà posés d'une journée, prêts pour `sequencerTournee` /
- * `classerParCreneaux` : `{ id, key, dureeMinutes, fenetre? }`.
+ * `classerParCreneaux` : `{ id, key, dureeMinutes, fenetre?, tolerance? }`.
  *
- * @param {Array<{id, lat, lng, duration_minutes, scheduled_start}>} rdvs
+ * La `fenetre` reste PONCTUELLE (l'heure provisoire, celle que l'écran montre) ;
+ * la `tolerance` dit jusqu'où cette heure peut glisser — c'est elle que
+ * `placerCandidat` lit pour décaler un voisin adaptable. Sans `opts`, la
+ * tolérance vaut la fenêtre : strictement le comportement antérieur.
+ *
+ * @param {Array<{id, lat, lng, duration_minutes, scheduled_start, time_flex_minutes?, hour_confirmed_at?}>} rdvs
  *   `journee.rdvs` (cf. loaders.js::chargerJournees).
  * @param {{ lat: number, lng: number }|null} [coordsFallback]  position de repli
  *   (siège) pour un RDV sans coordonnées
- * @returns {Array<{id: string, key: string|null, dureeMinutes: number, fenetre?: {debut: number, fin: number}}>}
+ * @param {{ flexDefaut?: number, amplitude?: object, demiJournee?: object }} [opts]  cf. `toleranceDe`
+ * @returns {Array<{id: string, key: string|null, dureeMinutes: number, fenetre?: {debut: number, fin: number}, tolerance?: {min: number, max: number, flex: number}}>}
  */
-export function construireArretsExistants(rdvs, coordsFallback = null) {
+export function construireArretsExistants(rdvs, coordsFallback = null, opts = {}) {
   const cleFallback = cleCoord(coordsFallback);
   return (rdvs || []).map((r) => {
     // Cascade : position du RDV (client ou lead géocodé, résolue en amont), puis
@@ -97,8 +144,23 @@ export function construireArretsExistants(rdvs, coordsFallback = null) {
       dureeMinutes: r.duration_minutes || 60,
     };
     const debut = minutesDepuisMinuit(r.scheduled_start);
-    // Fenêtre ponctuelle : l'heure du rendez-vous est celle annoncée au client.
-    if (debut != null) arret.fenetre = { debut, fin: debut };
+    // Fenêtre ponctuelle : l'heure provisoire du rendez-vous, celle de l'écran.
+    if (debut != null) {
+      arret.fenetre = { debut, fin: debut };
+      arret.tolerance = toleranceDe(r, opts);
+    }
     return arret;
+  });
+}
+
+/**
+ * Même chose, mais la `fenetre` EST la tolérance : c'est l'entrée de
+ * `sequencerTournee` pour la consolidation (« Figer la journée ») — l'ordonnanceur
+ * peut poser chaque RDV n'importe où dans sa plage, les figés restant ponctuels.
+ */
+export function construireArretsPourConsolidation(rdvs, coordsFallback = null, opts = {}) {
+  return construireArretsExistants(rdvs, coordsFallback, opts).map((a) => {
+    if (!a.tolerance) return a;
+    return { ...a, fenetre: { debut: a.tolerance.min, fin: a.tolerance.max } };
   });
 }
