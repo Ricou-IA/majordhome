@@ -24,6 +24,8 @@ import { ClientModal } from '../clients/ClientModal';
 import { SAVQuoteModal } from './SAVQuoteModal';
 import { AcceptQuoteModal } from './AcceptQuoteModal';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 // CertificatsEntretienModal retiré — section certificats intégrée dans EntretienSAVModal
 
 // ============================================================================
@@ -36,6 +38,8 @@ export function EntretienSAVKanban() {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const { can, effectiveRole } = useCanAccess();
+  const { settings: orgSettings } = useOrgSettings();
+  const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
 
   const { items, isLoading, refresh } = useEntretienSAV(orgId);
   const { updateWorkflowStatus, updateFields } = useEntretienSAVMutations();
@@ -319,6 +323,7 @@ export function EntretienSAVKanban() {
         <SchedulingTransitionModal
           item={pendingTransition.item}
           orgId={orgId}
+          souplesseDefaut={souplesseDefaut}
           onConfirm={handleConfirmSchedule}
           onCancel={handleCancelTransition}
         />

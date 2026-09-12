@@ -249,14 +249,32 @@ test('consolidation : ordre + heures dans les fenêtres, le figé ne bouge pas, 
     { id: 'b', lat: 43.8, lng: 2.0, duration_minutes: 60, scheduled_start: '14:00', hour_confirmed_at: '2026-09-12T08:00:00Z' },
     { id: 'c', lat: 43.75, lng: 2.05, duration_minutes: 60, scheduled_start: '10:50', time_flex_minutes: 30 },
   ];
-  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9, lng: 1.9 }, { flexDefaut: 30, amplitude: AMP });
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9, lng: 1.9 }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
   const r = sequencerTournee({
     depotKey: '43.900,1.900', arrets, trajet: (x, y) => (x === y ? 0 : 10),
-    amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] },
+    amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true,
   });
   assert.equal(r.faisable, true);
   const par = Object.fromEntries(r.planning.map((p) => [p.id, p]));
   assert.equal(par.b.arriveeMinutes, 840, 'le figé est un point fixe');
-  assert.ok(par.a.arriveeMinutes >= 480 && par.a.arriveeMinutes <= 540, 'a reste dans ±30 de 08:30');
-  assert.ok(par.c.arriveeMinutes >= 620 && par.c.arriveeMinutes <= 680, 'c reste dans ±30 de 10:50');
+  // Les heures provisoires tiennent : on ne resserre pas pour rien (revue I8).
+  assert.equal(par.a.arriveeMinutes, 510, 'a garde 08:30');
+  assert.equal(par.c.arriveeMinutes, 650, 'c garde 10:50');
+});
+
+test('consolidation : un figé atteint « en retard » selon nos estimations est un FAIT, pas un échec (leçon du 31/08)', () => {
+  const AMP = { debut: 480, fin: 1080 };
+  const rdvs = [
+    { id: 'a', lat: 43.7, lng: 2.1, duration_minutes: 60, scheduled_start: '08:10', hour_confirmed_at: 'x', appointment_type: 'maintenance' },
+    { id: 'b', lat: 43.75, lng: 2.05, duration_minutes: 60, scheduled_start: '10:00', time_flex_minutes: 30, appointment_type: 'maintenance' },
+  ];
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9, lng: 1.9 }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
+  const trajet = (x, y) => (x === y ? 0 : 20); // 20 min depuis le dépôt : « en retard » de 10 min à 08:10
+  const strict = sequencerTournee({ depotKey: '43.900,1.900', arrets, trajet, amplitude: AMP, budgetMinutes: 600 });
+  assert.equal(strict.faisable, false);
+  const faits = sequencerTournee({ depotKey: '43.900,1.900', arrets, trajet, amplitude: AMP, budgetMinutes: 600, figesSontDesFaits: true });
+  assert.equal(faits.faisable, true);
+  const par = Object.fromEntries(faits.planning.map((p) => [p.id, p]));
+  assert.equal(par.a.arriveeMinutes, 490);
+  assert.equal(par.b.arriveeMinutes, 600, 'b garde son heure provisoire');
 });

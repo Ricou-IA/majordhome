@@ -44,7 +44,7 @@ function* permutations(items) {
  * Déroule une journée dans un ordre donné et retourne son coût, ou `null` si
  * une contrainte est violée (avec la raison).
  */
-function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause }) {
+function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits = false }) {
   let t = amplitude.debut;
   let charge = 0;
 
@@ -85,8 +85,20 @@ function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause }) {
     }
 
     if (arret.fenetre) {
-      if (t < arret.fenetre.debut) t = arret.fenetre.debut; // on patiente
-      if (t > arret.fenetre.fin) return { echec: 'fenetre' };
+      const fige = arret.fenetre.debut === arret.fenetre.fin;
+      // Cible = l'heure provisoire quand elle tient dans la fenêtre : on ne
+      // resserre que si nécessaire, on n'avance pas un RDV pour rien.
+      const cible = arret.prevu != null
+        ? Math.min(Math.max(arret.prevu, arret.fenetre.debut), arret.fenetre.fin)
+        : arret.fenetre.debut;
+      if (t < cible) t = cible; // on patiente
+      if (t > arret.fenetre.fin) {
+        // Un RDV FIGÉ est un fait, pas une hypothèse : arriver « en retard »
+        // selon NOS estimations de trajet ne le disqualifie pas (leçon du
+        // 31/08, creneaux.js). On cale le temps sur son heure et on continue.
+        if (fige && figesSontDesFaits) t = arret.fenetre.debut;
+        else return { echec: 'fenetre' };
+      }
     }
 
     const arriveeMinutes = t;
@@ -189,8 +201,9 @@ export function sequencerTournee({
   amplitude,
   budgetMinutes,
   pause = { minutes: 0, fenetre: [0, 0] },
+  figesSontDesFaits = false,
 }) {
-  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause };
+  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits };
 
   if (arrets.length === 0) {
     return {

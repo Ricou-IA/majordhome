@@ -401,6 +401,13 @@ export function classerParCreneaux(arrets, candidats, ctx, { scoreParId = {} } =
       raisonsRejet[place.raison] = (raisonsRejet[place.raison] || 0) + 1;
       continue;
     }
+    // Un placement qui exige de décaler un voisin n'est pas gérable ici (le
+    // classement d'une journée ne sait pas écrire les décalages) : on le refuse
+    // plutôt que de poser par-dessus le voisin (revue 2026-09-12, C2).
+    if (place.decalages?.length) {
+      raisonsRejet.creneau = (raisonsRejet.creneau || 0) + 1;
+      continue;
+    }
 
     const eligibilite = scoreParId[candidat.id] ?? 1;
     // Le détour est ramené en [0,1] : 60 min de détour divise l'attrait par deux.
@@ -448,8 +455,9 @@ export function placerPlusieurs(arrets, candidats, ctx) {
     const placement = placerCandidat({
       arrets: courants, candidat, trajet, depotKey, amplitude, budgetMinutes, pause,
     });
-    if (!placement.faisable) {
-      refuses.push({ candidat, raison: placement.raison });
+    if (!placement.faisable || placement.decalages?.length) {
+      // idem classerParCreneaux : un décalage de voisin n'est pas propagé ici.
+      refuses.push({ candidat, raison: placement.faisable ? 'creneau' : placement.raison });
       continue;
     }
     places.push({ candidat, placement });

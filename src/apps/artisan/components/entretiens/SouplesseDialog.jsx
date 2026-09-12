@@ -18,11 +18,17 @@ const minutesVersHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, '0'
  * @param {boolean} props.open
  * @param {{ date, startTime, endTime, technicianNom?, decalages?: Array }} props.slot
  * @param {number} [props.defaut=30]  souplesse par défaut de l'org
- * @param {(choix: { timeFlexMinutes: number }) => void} props.onConfirm
+ * @param {object} [props.demiJournee]  bornes matin/après-midi de l'org (phrase d'annonce)
+ * @param {(choix: { timeFlexMinutes: number|null }) => void} props.onConfirm
+ *   `timeFlexMinutes` = null quand l'opérateur garde le défaut : le RDV suit
+ *   alors le réglage d'org (NULL en base), il ne le fige pas en valeur.
  * @param {() => void} props.onCancel
  * @param {boolean} [props.loading]
+ *
+ * Le parent le monte avec une `key` dérivée du créneau : un autre créneau
+ * choisi = un nouveau dialogue, souplesse remise au défaut.
  */
-export function SouplesseDialog({ open, slot, defaut = 30, onConfirm, onCancel, loading = false }) {
+export function SouplesseDialog({ open, slot, defaut = 30, demiJournee, onConfirm, onCancel, loading = false }) {
   const [flex, setFlex] = useState(null);
   const effectif = flex ?? defaut;
   if (!slot) return null;
@@ -38,12 +44,12 @@ export function SouplesseDialog({ open, slot, defaut = 30, onConfirm, onCancel, 
       cancelLabel="Annuler"
       variant="default"
       loading={loading}
-      onConfirm={() => onConfirm({ timeFlexMinutes: effectif })}
+      onConfirm={() => onConfirm({ timeFlexMinutes: flex })}
     >
       <div className="mt-4 space-y-3">
         <SouplesseSelect value={flex} onChange={setFlex} defaut={defaut} />
         <p className="text-sm text-gray-700">
-          Vous lui annoncez : <span className="font-medium">{phraseAnnonce(slot, effectif, formatDateShortFR(slot.date))}</span>
+          Vous lui annoncez : <span className="font-medium">{phraseAnnonce(slot, effectif, formatDateShortFR(slot.date), { demiJournee })}</span>
           {slot.technicianNom ? ` — ${slot.technicianNom}` : ''}
         </p>
         {decalages.length > 0 && (

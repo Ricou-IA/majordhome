@@ -485,3 +485,14 @@ test('trajetMaxMinutes : une insertion à 80 min d un client voisin est refusée
   const vide = placerCandidat({ arrets: [], candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] }, trajetMaxMinutes: 45 });
   assert.equal(vide.faisable, true);
 });
+
+test('classerParCreneaux / placerPlusieurs refusent un placement qui exigerait de décaler un voisin (ils ne savent pas l écrire)', () => {
+  const arrets = [arret('a', 480, 60), arretSouple('b', 650, 60, 30)];
+  const ctxSans = { trajet: uniforme(5), depotKey: DEPOT, amplitude: { debut: 480, fin: 800 }, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] } };
+  const { classement, raisonsRejet } = classerParCreneaux(arrets, [candidat('c', 110)], ctxSans);
+  assert.equal(classement.length, 0);
+  assert.equal(raisonsRejet.creneau, 1);
+  const { places, refuses } = placerPlusieurs(arrets, [candidat('c', 110)], ctxSans);
+  assert.equal(places.length, 0);
+  assert.equal(refuses.length, 1);
+});

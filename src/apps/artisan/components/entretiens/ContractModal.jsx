@@ -78,6 +78,15 @@ function InfoRow({ label, value, isLink = false, href = null }) {
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
+/** Pourquoi un voisin n'a pas pu être glissé (sav.service::decalerVoisins). */
+const RAISONS_DECALAGE = {
+  introuvable: 'disparu',
+  fige: 'été figé ou clos',
+  deplace: 'été déplacé',
+  souplesse_modifiee: 'changé de souplesse',
+  ecriture: 'refusé l’écriture',
+};
+
 export function ContractModal({ contractId, isOpen, onClose }) {
   const navigate = useNavigate();
   const { contract, isLoading: loadingContract } = useContract(contractId);
@@ -93,7 +102,8 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   // Créneau choisi en attente de sa souplesse (SouplesseDialog).
   const [slotEnAttente, setSlotEnAttente] = useState(null);
   const { settings: orgSettings } = useOrgSettings();
-  const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
+  const reglagesTournees = construireReglages(orgSettings);
+  const souplesseDefaut = reglagesTournees.souplesse_defaut_minutes;
 
   /**
    * Item de planification construit depuis le contrat — SANS écriture en base.
@@ -134,7 +144,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     const orgId = organization?.id;
     // La carte n'existe (ou n'est réutilisée) qu'ICI, juste avant le RDV —
     // même enchaînement que useJourneePose. Jamais avant un choix humain.
-    const { interventionId, error: ensureErr } = await ensureEntretienCard({
+    const { interventionId, created, error: ensureErr } = await ensureEntretienCard({
       clientId: contract.client_id,
       contractId: contract.id,
       userId: user?.id,
@@ -153,15 +163,20 @@ export function ContractModal({ contractId, isOpen, onClose }) {
       timeFlexMinutes,
       decalages,
     });
-    if (error?.message === 'decalage_refuse') {
-      // Le RDV est posé, le voisin n'a pas bougé : on le dit, on ne masque rien.
-      toast.error(`RDV posé, mais ${error.detail || 'le RDV voisin'} n'a pas pu être décalé — vérifiez le planning`);
-    } else if (error) {
-      toast.error('Erreur création du RDV');
+    if (error) {
+      // Rien n'est posé (le voisin est glissé AVANT la pose, et remis en place
+      // si elle échoue) : une carte créée pour l'occasion ne doit pas rester
+      // « Planifié » sans RDV (vécu 2026-09-12).
+      if (created) await savService.updateWorkflowStatus(interventionId, 'a_planifier');
+      if (error.message === 'decalage_refuse') {
+        toast.error(`Créneau plus valable : ${error.detail || 'le RDV voisin'} a ${RAISONS_DECALAGE[error.raison] || 'changé'} depuis la proposition — relancez la recherche`);
+        queryClient.invalidateQueries({ queryKey: tourneeKeys.all(orgId) });
+      } else {
+        toast.error('Erreur création du RDV');
+      }
       return { ok: false };
-    } else {
-      toast.success('RDV planifié avec succès');
     }
+    toast.success('RDV planifié avec succès');
     setSchedulingOpen(false);
     setSchedulingItem(null);
     queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
@@ -404,9 +419,11 @@ export function ContractModal({ contractId, isOpen, onClose }) {
         </div>
       </div>
       <SouplesseDialog
+        key={slotEnAttente ? `${slotEnAttente.date}|${slotEnAttente.startTime}|${slotEnAttente.technicianIds?.[0] || ''}` : 'aucun'}
         open={!!slotEnAttente}
         slot={slotEnAttente}
         defaut={souplesseDefaut}
+        demiJournee={reglagesTournees.demi_journee}
         loading={posing}
         onConfirm={handleConfirmerSouplesse}
         onCancel={() => setSlotEnAttente(null)}

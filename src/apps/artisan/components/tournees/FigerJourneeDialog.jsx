@@ -63,13 +63,22 @@ export function FigerJourneeDialog({ journee, consolidation }) {
         )}
         {resultat && (
           <ul className="space-y-1">
-            <li>{resultat.figes} rendez-vous figé(s).</li>
-            <li>{resultat.sms} SMS d’heure de passage envoyé(s).</li>
+            {resultat.perime ? (
+              <li className="text-amber-800">Rien n’a été écrit : la journée a changé depuis l’aperçu.</li>
+            ) : (
+              <li>{resultat.figes} rendez-vous figé(s){resultat.echecs.length > 0 ? ' — arrêt au premier refus, aucun SMS envoyé' : ''}.</li>
+            )}
+            {resultat.echecs.length === 0 && <li>{resultat.sms} SMS d’heure de passage envoyé(s).</li>}
             {resultat.smsGabaritAbsent && (
               <li className="text-amber-700">Heures figées, mais SMS non envoyés : gabarit « heure_de_passage » absent (Settings → SMS).</li>
             )}
             {resultat.echecs.map((e) => <li key={e.label} className="text-red-600">Non figé : {e.label} — {e.message}</li>)}
             {resultat.smsEchecs.map((e) => <li key={e.label} className="text-amber-700">SMS non envoyé : {e.label} — {e.message}</li>)}
+            {(resultat.smsSansMobile || []).length > 0 && (
+              <li className="text-amber-700">
+                À prévenir par téléphone (pas de mobile) : {resultat.smsSansMobile.map((s) => `${s.label}${s.phone ? ` (${s.phone})` : ''}`).join(', ')}.
+              </li>
+            )}
           </ul>
         )}
       </div>

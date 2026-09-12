@@ -51,10 +51,14 @@ const minutesVersHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, '0'
  * @param {{ startTime: string }} slot   'HH:MM'
  * @param {number} flex
  * @param {string} jour   date déjà formatée (ex. « mar. 14 oct. »)
+ * @param {{ demiJournee?: { matin: number[], apres_midi: number[] } }} [opts]
+ *   bornes de l'org (heures) — la « matinée » s'arrête où l'org l'a décidé,
+ *   comme dans toleranceDe (même réglage `demi_journee`), pas à midi en dur.
  */
-export function phraseAnnonce(slot, flex, jour) {
+export function phraseAnnonce(slot, flex, jour, { demiJournee } = {}) {
   const debut = hhmmVersMinutes(slot.startTime);
+  const finMatin = (demiJournee?.matin?.[1] ?? 12) * 60;
   if (flex === 0) return `${jour} à ${slot.startTime} — heure ferme`;
-  if (flex >= 240) return `${jour}, ${debut < 12 * 60 ? 'dans la matinée' : 'dans l’après-midi'} (heure précisée la veille)`;
+  if (flex >= 240) return `${jour}, ${debut < finMatin ? 'dans la matinée' : 'dans l’après-midi'} (heure précisée la veille)`;
   return `${jour} vers ${slot.startTime} (entre ${minutesVersHHMM(Math.max(0, debut - flex))} et ${minutesVersHHMM(debut + flex)})`;
 }

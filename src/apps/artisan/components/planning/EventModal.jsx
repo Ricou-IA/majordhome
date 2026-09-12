@@ -26,6 +26,8 @@ import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, ch
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
@@ -135,6 +137,8 @@ export function EventModal({
 
   const queryClient = useQueryClient();
   const { isOrgAdmin } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
+  const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
 
   // Tous les team_members actifs (techniciens + commerciaux + admin)
   // `members` prop = team_members from Planning.jsx, mais ne contient que les techniciens
@@ -1100,6 +1104,7 @@ export function EventModal({
                   formData={formData}
                   updateField={updateField}
                   isCancelled={isCancelled}
+                  souplesseDefaut={souplesseDefaut}
                 />
               )}
 

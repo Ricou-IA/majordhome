@@ -92,28 +92,47 @@ export const TYPES_ADAPTABLES = ['maintenance', 'service'];
  * (`time_flex_minutes` NULL) ⇒ défaut d'org `flexDefaut`. 240 = demi-journée :
  * la plage devient la demi-journée qui contient l'heure provisoire.
  *
- * @param {{ scheduled_start, time_flex_minutes?, hour_confirmed_at? }} rdv
- * @param {{ flexDefaut?: number, amplitude?: {debut:number, fin:number}, demiJournee?: object }} [opts]
+ * ⚠️ La souplesse est OPT-IN (`opts.souplesse === true`) : sans elle, la tolérance
+ * est ponctuelle quel que soit `time_flex_minutes`. Un appelant qui ne sait pas
+ * ÉCRIRE les décalages (onglet Tournées aujourd'hui) ne doit jamais recevoir
+ * de tolérance — sinon il classe un candidat à une heure qui suppose un voisin
+ * déplacé et pose par-dessus (revue 2026-09-12, C2).
+ * L'ancre de la plage est l'heure ANNONCÉE au client (`announced_start`) quand
+ * elle existe, pas l'heure courante : des décalages successifs restent dans ce
+ * qui a été dit au client (revue, I2). Un figé n'est jamais borné par
+ * l'amplitude : il est là où il est (revue, I3).
+ *
+ * @param {{ scheduled_start, announced_start?, time_flex_minutes?, hour_confirmed_at?, appointment_type?, duration_minutes? }} rdv
+ * @param {{ souplesse?: boolean, flexDefaut?: number, amplitude?: {debut:number, fin:number}, demiJournee?: object }} [opts]
  * @returns {{ min: number, max: number, flex: number }|null}  null si le RDV n'a pas d'heure
  */
-export function toleranceDe(rdv, { flexDefaut = 0, amplitude, demiJournee = DEMI_JOURNEE_DEFAUT } = {}) {
+export function toleranceDe(rdv, { souplesse = false, flexDefaut = 0, amplitude, demiJournee = DEMI_JOURNEE_DEFAUT } = {}) {
   const debut = minutesDepuisMinuit(rdv?.scheduled_start);
   if (debut == null) return null;
-  const fige = !!rdv?.hour_confirmed_at || !TYPES_ADAPTABLES.includes(rdv?.appointment_type);
+  const fige = !souplesse || !!rdv?.hour_confirmed_at || !TYPES_ADAPTABLES.includes(rdv?.appointment_type);
   const flex = fige ? 0 : (rdv?.time_flex_minutes ?? flexDefaut ?? 0);
+  if (flex === 0) return { min: debut, max: debut, flex: 0 };
   const duree = rdv?.duration_minutes || 60;
-  let min = debut;
-  let max = debut;
+  const ancre = minutesDepuisMinuit(rdv?.announced_start) ?? debut;
+  let min = ancre;
+  let max = ancre;
   if (flex >= DEMI_JOURNEE) {
     const [mDebut, mFin] = (demiJournee?.matin || DEMI_JOURNEE_DEFAUT.matin).map((h) => h * 60);
     const [aDebut, aFin] = (demiJournee?.apres_midi || DEMI_JOURNEE_DEFAUT.apres_midi).map((h) => h * 60);
-    const [d, f] = debut < mFin ? [mDebut, mFin] : [aDebut, aFin];
+    const [d, f] = ancre < mFin ? [mDebut, mFin] : [aDebut, aFin];
     min = d;
     max = Math.max(d, f - duree); // doit finir dans la demi-journée
-  } else if (flex > 0) {
-    min = debut - flex;
-    max = debut + flex;
+  } else {
+    min = ancre - flex;
+    max = ancre + flex;
   }
+  // L'heure courante est dans sa propre plage (un décalage antérieur, ou une
+  // souplesse réduite après coup, a pu l'y placer au bord)…
+  min = Math.min(min, debut);
+  max = Math.max(max, debut);
+  // …mais l'amplitude prime : un RDV adaptable qui déborde de la journée n'a
+  // pour plage que ce qui y tient — c'est ce qui autorise la consolidation à
+  // le ramener dedans.
   if (amplitude) {
     min = Math.max(min, amplitude.debut);
     max = Math.min(max, Math.max(amplitude.debut, amplitude.fin - duree));
@@ -168,6 +187,8 @@ export function construireArretsExistants(rdvs, coordsFallback = null, opts = {}
 export function construireArretsPourConsolidation(rdvs, coordsFallback = null, opts = {}) {
   return construireArretsExistants(rdvs, coordsFallback, opts).map((a) => {
     if (!a.tolerance) return a;
-    return { ...a, fenetre: { debut: a.tolerance.min, fin: a.tolerance.max } };
+    // `prevu` = l'heure provisoire : l'ordonnanceur la garde quand elle tient,
+    // et ne resserre que si nécessaire (revue 2026-09-12, I8).
+    return { ...a, prevu: a.fenetre.debut, fenetre: { debut: a.tolerance.min, fin: a.tolerance.max } };
   });
 }

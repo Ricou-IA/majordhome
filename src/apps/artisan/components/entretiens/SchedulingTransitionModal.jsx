@@ -49,11 +49,12 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
   const handleConfirmScheduling = useCallback(async (slots) => {
     setLoading(true);
     try {
-      await onConfirm(slots, includesEntretien, { timeFlexMinutes: timeFlexMinutes ?? souplesseDefaut });
+      // null = l'opérateur garde le défaut d'org : le RDV le suit (NULL en base).
+      await onConfirm(slots, includesEntretien, { timeFlexMinutes });
     } finally {
       setLoading(false);
     }
-  }, [onConfirm, includesEntretien, timeFlexMinutes, souplesseDefaut]);
+  }, [onConfirm, includesEntretien, timeFlexMinutes]);
 
   if (!item) return null;
 

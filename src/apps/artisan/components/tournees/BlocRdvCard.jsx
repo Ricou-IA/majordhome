@@ -64,7 +64,7 @@ export function BlocRdvCard({
         <p className="font-semibold text-gray-900 text-xs truncate">
           {estTypeAdaptable(type) && (rdv.hour_confirmed_at || rdv.time_flex_minutes === 0
             ? <span className="mr-1" title="Heure communiquée au client (figé)">🔒</span>
-            : <span className="mr-1" title="Adaptable : peut glisser dans sa tolérance">↔</span>)}
+            : <span className="mr-1" title="Adaptable : le CTA « Trouver le créneau » et « Figer la journée » peuvent le glisser dans sa tolérance. Le remplissage de journée, lui, ne déplace jamais un RDV posé.">↔</span>)}
           {rdv.client_name || rdv.subject || 'Sans client'}
         </p>
         {type === 'maintenance' && rdv.client_id && (

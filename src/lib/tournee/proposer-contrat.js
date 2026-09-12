@@ -171,6 +171,7 @@ export function proposerPourContrat({
     // Souplesse : chaque arrêt porte sa tolérance (figé / ±15 / ±30 / demi-journée,
     // défaut d'org) — c'est ce qui autorise placerCandidat à glisser UN voisin.
     const arrets = construireArretsExistants(j.rdvs, depot, {
+      souplesse: true, // l'appelant (scheduleEntretien) sait écrire les décalages
       flexDefaut: reglages.souplesse_defaut_minutes ?? 0,
       amplitude: j.amplitude,
       demiJournee: reglages.demi_journee,

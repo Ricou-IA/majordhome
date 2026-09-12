@@ -6,16 +6,20 @@
 //
 // Calcul = sequencerTournee (module pur) sur construireArretsPourConsolidation.
 // Les RDV figés (heure communiquée au client) sont des points fixes : ils ne
-// bougent pas d'une minute. Écriture = un UPDATE par RDV (heures + figé), puis
-// un SMS d'heure de passage par client adaptable — jamais en silence : chaque
-// échec est compté et rendu.
+// bougent pas d'une minute. Écriture = relecture de l'état (rien n'a bougé
+// depuis l'aperçu), un UPDATE par RDV (heures + figé) — arrêt au premier
+// refus —, puis, seulement si TOUT est écrit, un SMS d'heure de passage par
+// client adaptable. Jamais en silence : chaque échec est compté et rendu, y
+// compris les clients sans mobile (à prévenir par téléphone).
 // ============================================================================
 import { useMemo, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@services/appointments.service';
 import { savService } from '@services/sav.service';
 import { appointmentKeys, entretienSavKeys, tourneeKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
+import { formatDateFR } from '@/lib/utils';
 import { sequencerTournee } from '@/lib/tournee/sequence.js';
 import { construireArretsPourConsolidation, minutesVersHeure } from '@/lib/tournee/arrets.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
@@ -44,6 +48,7 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
   const apercu = useMemo(() => {
     if (!ouvert || !depot || rdvs.length === 0) return null;
     const arrets = construireArretsPourConsolidation(rdvs, depot, {
+      souplesse: true, // cette consolidation ÉCRIT les heures : elle a droit aux tolérances
       flexDefaut, amplitude: journee.amplitude, demiJournee: reglages?.demi_journee,
     });
     const trajet = construireMatrice(paires instanceof Map ? paires : new Map(), { repli: trajetLocal });
@@ -54,6 +59,9 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       amplitude: journee.amplitude,
       budgetMinutes: journee.budgetMinutes,
       pause: { minutes: reglages.pause_minutes, fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60] },
+      // Un figé est un fait : arriver « en retard » selon nos estimations ne
+      // bloque pas la journée (leçon du 31/08).
+      figesSontDesFaits: true,
     });
     if (!seq.faisable) return { faisable: false, raison: seq.raison, lignes: [] };
     const parId = new Map(rdvs.map((r) => [r.id, r]));
@@ -76,27 +84,55 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
   const figer = useCallback(async () => {
     if (!apercu?.faisable) return;
     setEnCours(true);
-    const bilan = { figes: 0, echecs: [], sms: 0, smsEchecs: [], smsGabaritAbsent: false };
+    const bilan = { figes: 0, echecs: [], sms: 0, smsEchecs: [], smsSansMobile: [], smsGabaritAbsent: false, perime: false };
     try {
+      const aChanger = apercu.lignes.filter((l) => !l.fige);
+      // 1. L'aperçu est-il encore vrai ? Un RDV déplacé, figé ou clos entre
+      //    l'ouverture et le clic invalide l'ordonnancement entier : on n'écrit rien.
+      const { data: etats, error: lireErr } = await supabase
+        .from('majordhome_appointments')
+        .select('id, scheduled_start, hour_confirmed_at, time_flex_minutes, status')
+        .in('id', aChanger.map((l) => l.id));
+      if (lireErr) throw lireErr;
+      const parIdEtat = new Map((etats || []).map((e) => [e.id, e]));
+      const perimes = aChanger.filter((l) => {
+        const e = parIdEtat.get(l.id);
+        return !e || e.status === 'cancelled' || !!e.hour_confirmed_at || e.time_flex_minutes === 0
+          || (e.scheduled_start || '').slice(0, 5) !== l.avant;
+      });
+      if (perimes.length > 0) {
+        bilan.perime = true;
+        bilan.echecs.push(...perimes.map((l) => ({ label: l.label, message: 'modifié depuis l’aperçu — rouvrez « Figer la journée »' })));
+        return;
+      }
+      // 2. Les heures, une par une ; au premier refus on s'arrête : la suite
+      //    reposait sur un ordre qui n'est plus entièrement écrit.
       const maintenant = new Date().toISOString();
-      for (const l of apercu.lignes) {
-        if (l.fige) continue; // point fixe : rien à écrire
+      const figes = [];
+      for (const l of aChanger) {
         const { error } = await appointmentsService.updateAppointment(l.id, {
           scheduled_start: l.apres,
           scheduled_end: minutesVersHeure(l.arriveeMinutes + l.dureeMinutes),
           time_flex_minutes: 0,
           hour_confirmed_at: maintenant,
+          announced_start: l.apres,
         });
-        if (error) { bilan.echecs.push({ label: l.label, message: error.message || 'refusé' }); continue; }
+        if (error) { bilan.echecs.push({ label: l.label, message: error.message || 'refusé' }); break; }
         bilan.figes += 1;
-        // SMS d'heure de passage : seulement pour ceux qui viennent d'être figés.
+        figes.push(l);
+      }
+      // 3. Les SMS, seulement si TOUT est écrit : une heure annoncée doit être
+      //    définitive, et une journée à moitié figée peut encore bouger.
+      if (bilan.echecs.length > 0) return;
+      for (const l of figes) {
         const { error: smsErr } = await savService.sendHeureDePassage({
           orgId: coreOrgId, clientId: l.clientId, clientPhone: l.phone, clientFirstName: l.prenom,
-          clientName: l.label, date: journee.date, heure: l.apres, technicien: journee.technicienNom,
+          clientName: l.label, date: formatDateFR(journee.date), heure: l.apres, technicien: journee.technicienNom,
         });
         if (!smsErr) bilan.sms += 1;
         else if (smsErr.message === 'campaign_template_missing') bilan.smsGabaritAbsent = true;
-        else if (smsErr.message !== 'no_mobile') bilan.smsEchecs.push({ label: l.label, message: smsErr.message });
+        else if (smsErr.message === 'no_mobile') bilan.smsSansMobile.push({ label: l.label, phone: l.phone || null });
+        else bilan.smsEchecs.push({ label: l.label, message: smsErr.message });
       }
     } catch (err) {
       logger.error('[tournees] figer la journée', err);

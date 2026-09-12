@@ -20,3 +20,9 @@ test('phrase d annonce au client', () => {
   assert.equal(phraseAnnonce({ startTime: '14:00' }, 0, 'mar. 14 oct.'), 'mar. 14 oct. à 14:00 — heure ferme');
   assert.equal(phraseAnnonce({ startTime: '09:30' }, 240, 'mar. 14 oct.'), 'mar. 14 oct., dans la matinée (heure précisée la veille)');
 });
+
+test('phraseAnnonce demi-journée : la frontière matin/après-midi est celle de l org, pas midi en dur', () => {
+  const demiJournee = { matin: [8, 13], apres_midi: [14, 18] };
+  assert.equal(phraseAnnonce({ startTime: '12:30' }, 240, 'mar. 14 oct.', { demiJournee }), 'mar. 14 oct., dans la matinée (heure précisée la veille)');
+  assert.equal(phraseAnnonce({ startTime: '12:30' }, 240, 'mar. 14 oct.'), 'mar. 14 oct., dans l’après-midi (heure précisée la veille)');
+});

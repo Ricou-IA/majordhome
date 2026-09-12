@@ -168,7 +168,8 @@ export function estAdaptable(appt, flexDefaut = 30, { aujourdhui } = {}) {
  * @returns {{ debutMinutes: number, finMinutes: number, flex: number }|null}
  */
 export function fenetreDe(appt, { flexDefaut = 30, demiJournee } = {}) {
-  const t = toleranceDe(appt, { flexDefaut, demiJournee });
+  const t = toleranceDe(appt, { souplesse: true, flexDefaut, demiJournee });
   if (!t || t.flex === 0) return null;
-  return { debutMinutes: t.min, finMinutes: t.max + (appt.duration_minutes || 60), flex: t.flex };
+  const borne = (m) => Math.max(0, Math.min(23 * 60 + 59, m));
+  return { debutMinutes: borne(t.min), finMinutes: borne(t.max + (appt.duration_minutes || 60)), flex: t.flex };
 }

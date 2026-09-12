@@ -461,7 +461,13 @@ export const appointmentsService = {
   },
 
   /**
-   * Déplacer un RDV (drag & drop FullCalendar)
+   * Déplacer un RDV (drag & drop FullCalendar).
+   * Un déplacement à la main RÉ-ANCRE la tolérance sur la nouvelle heure
+   * (`announced_start`) : l'humain vient de décider où le RDV se trouve, sa
+   * souplesse joue désormais autour de là — et non autour d'une heure annoncée
+   * qu'il vient précisément d'abandonner. La souplesse elle-même ne change pas :
+   * figer reste un geste explicite (EventModal), sinon organiser une tournée à
+   * la souris figerait tout et viderait « Figer la journée » de son sens.
    */
   async moveAppointment(appointmentId, { scheduled_date, scheduled_start, scheduled_end, duration_minutes }) {
     return this.updateAppointment(appointmentId, {
@@ -469,6 +475,7 @@ export const appointmentsService = {
       scheduled_start,
       scheduled_end,
       duration_minutes,
+      ...(scheduled_start ? { announced_start: scheduled_start } : {}),
     });
   },
 
@@ -772,6 +779,9 @@ export const appointmentsService = {
         internal_notes: slot.notes || null,
         time_flex_minutes: slot.timeFlexMinutes ?? null,
         hour_confirmed_at: slot.timeFlexMinutes === 0 ? new Date().toISOString() : null,
+        // Ancre de la tolérance : l'heure dite au client à la pose. Les décalages
+        // successifs restent dans « announced ± souplesse », pas dans « courante ± ».
+        announced_start: slot.startTime,
       });
       if (error) return { data: created, error };
       created.push(data);
