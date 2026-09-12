@@ -17,6 +17,58 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService } from './entretiens.service';
+import { logger } from '@lib/logger';
+import { minutesVersHeure as minutesVersHHMM, minutesDepuisMinuit } from '@/lib/tournee/arrets.js';
+
+const STATUTS_CLOS = ['cancelled', 'completed', 'no_show'];
+
+/**
+ * Glisse les voisins adaptables d'une proposition de créneau, chacun relu en
+ * base juste avant l'écriture. Refuse (`decalage_refuse`) dès que le voisin ne
+ * correspond plus à ce que le moteur a vu : heure différente, figé entre-temps,
+ * souplesse modifiée, RDV clos. La durée vient de la proposition, sinon de la
+ * base (jamais d'heure de fin devinée).
+ * @returns {Promise<{ faits: Array<{id, scheduled_start, scheduled_end}>, error: object|null }>}
+ *   `faits` = décalages déjà écrits (pour les annuler si la suite échoue)
+ */
+async function decalerVoisins(appointmentsService, decalages) {
+  const faits = [];
+  for (const d of decalages || []) {
+    if (!d?.id || d.debutMinutesApres == null) continue;
+    const refus = (raison) => ({ faits, error: { message: 'decalage_refuse', detail: d.label || d.id, raison } });
+    const { data: voisin, error: lireErr } = await supabase
+      .from('majordhome_appointments')
+      .select('id, scheduled_start, scheduled_end, duration_minutes, time_flex_minutes, hour_confirmed_at, status')
+      .eq('id', d.id)
+      .maybeSingle();
+    if (lireErr || !voisin) return refus('introuvable');
+    if (STATUTS_CLOS.includes(voisin.status) || voisin.hour_confirmed_at || voisin.time_flex_minutes === 0) return refus('fige');
+    if (minutesDepuisMinuit(voisin.scheduled_start) !== d.debutMinutesAvant) return refus('deplace');
+    // NULL = défaut d'org = celui que le moteur a appliqué ; une souplesse posée
+    // explicitement depuis la proposition doit lui correspondre.
+    const flexAttendu = d.tolerance?.flex;
+    if (flexAttendu != null && (voisin.time_flex_minutes ?? flexAttendu) !== flexAttendu) return refus('souplesse_modifiee');
+    const duree = d.dureeMinutes ?? voisin.duration_minutes ?? null;
+    const { error: decErr } = await appointmentsService.updateAppointment(d.id, {
+      scheduled_start: minutesVersHHMM(d.debutMinutesApres),
+      ...(duree ? { scheduled_end: minutesVersHHMM(d.debutMinutesApres + duree) } : {}),
+    });
+    if (decErr) {
+      logger.error('[sav] scheduleEntretien décalage refusé', decErr);
+      return refus('ecriture');
+    }
+    faits.push({ id: voisin.id, scheduled_start: voisin.scheduled_start, scheduled_end: voisin.scheduled_end });
+  }
+  return { faits, error: null };
+}
+
+/** Remet les voisins glissés à leur heure d'origine (au mieux : une erreur ici se logue, elle ne masque pas la cause). */
+async function annulerDecalages(appointmentsService, faits) {
+  for (const f of faits || []) {
+    const { error } = await appointmentsService.updateAppointment(f.id, { scheduled_start: f.scheduled_start, scheduled_end: f.scheduled_end });
+    if (error) logger.error('[sav] scheduleEntretien : retour du voisin impossible', { id: f.id, error });
+  }
+}
 
 // ============================================================================
 // CONSTANTES — STATUTS & TRANSITIONS
@@ -493,15 +545,33 @@ export const savService = {
    * Planifie une carte entretien/SAV : crée le(s) RDV (1 par créneau), pose la date
    * + workflow_status='planifie', confirme un éventuel brouillon Web.
    * Source unique appelée par le kanban ET le modal ContractModal.
+   *
+   * Souplesse (spec 2026-09-12) : `timeFlexMinutes` s'applique à chaque créneau
+   * (sauf s'il porte déjà le sien) ; `decalages` = les voisins adaptables que le
+   * moteur a dû glisser pour faire rentrer le RDV — écrits APRÈS le RDV, jamais
+   * en silence : un décalage refusé remonte en erreur (le RDV, lui, est posé).
    * @returns {{ error: any }}
    */
-  async scheduleEntretien({ card, slots, includesEntretien = false, coreOrgId }) {
+  async scheduleEntretien({ card, slots, includesEntretien = false, coreOrgId, timeFlexMinutes = null, decalages = [] }) {
     try {
       if (!card?.id || !slots?.length) return { error: { message: 'invalid_args' } };
       const isSav = card.intervention_type === 'sav';
 
       const { appointmentsService } = await import('@services/appointments.service');
-      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slots, {
+
+      // Décalage du voisin adaptable (un seul en V1, mais on itère) — AVANT la
+      // pose : un voisin glissé dans sa tolérance sans RDV posé est anodin ;
+      // l'inverse (RDV posé, voisin pas glissé) est un chevauchement. Chaque
+      // voisin est relu et le décalage refusé si son état a changé depuis la
+      // proposition (déplacé, figé, souplesse modifiée, clos) — revue 2026-09-12.
+      const { faits: decalagesFaits, error: decalageError } = await decalerVoisins(appointmentsService, decalages);
+      if (decalageError) {
+        await annulerDecalages(appointmentsService, decalagesFaits);
+        return { error: decalageError };
+      }
+
+      const slotsAvecSouplesse = slots.map((s) => ({ ...s, timeFlexMinutes: s.timeFlexMinutes ?? timeFlexMinutes }));
+      const { error: appointmentError } = await appointmentsService.createAppointmentBatch(slotsAvecSouplesse, {
         coreOrgId,
         appointment_type: isSav ? 'service' : 'maintenance',
         intervention_id: card.id,
@@ -515,7 +585,11 @@ export const savService = {
         postal_code: card.client_postal_code || null,
         subjectPrefix: isSav ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien',
       });
-      if (appointmentError) return { error: appointmentError };
+      if (appointmentError) {
+        // Le RDV n'est pas posé : on remet le voisin à son heure (au mieux).
+        await annulerDecalages(appointmentsService, decalagesFaits);
+        return { error: appointmentError };
+      }
 
       const fields = { scheduled_date: slots[0].date };
       if (isSav && includesEntretien !== (card.includes_entretien || false)) {
@@ -999,6 +1073,38 @@ export const savService = {
       console.error('[sav] sendEntretienReminder error:', error);
       return { data: null, error };
     }
+    return { data: { success: true }, error: null };
+  },
+
+  /**
+   * SMS d'heure de passage (consolidation « Figer la journée », spec 2026-09-12) :
+   * « votre technicien passera vers 10h30 ». Campagne `heure_de_passage`, gabarit
+   * dans core.organizations.settings.sms.templates — absent ⇒ l'edge répond
+   * `campaign_template_missing`, remonté tel quel (l'appelant le dit à l'écran).
+   * Pas de mobile FR ⇒ `no_mobile` (pas une erreur d'envoi, juste rien à envoyer).
+   */
+  /**
+   * SMS d'heure de passage (campagne `heure_de_passage`, vars first_name / name /
+   * date / heure / technicien). `date` et `heure` sont envoyées telles quelles :
+   * l'appelant passe une date déjà lisible (« 14 octobre 2026 »), jamais l'ISO.
+   * Erreur `no_mobile` si le numéro n'est pas un mobile FR (à prévenir par téléphone).
+   */
+  async sendHeureDePassage({ orgId, clientId, clientPhone, clientFirstName, clientName, date, heure, technicien }) {
+    if (!isMobileFR(clientPhone)) return { data: null, error: new Error('no_mobile') };
+    const { error } = await invokeSmsSend({
+      campaign: 'heure_de_passage',
+      phone: clientPhone,
+      org_id: orgId,
+      client_id: clientId || undefined,
+      vars: {
+        first_name: clientFirstName || '',
+        name: clientName || '',
+        date: date || '',
+        heure: heure || '',
+        technicien: technicien || '',
+      },
+    });
+    if (error) return { data: null, error };
     return { data: { success: true }, error: null };
   },
 };

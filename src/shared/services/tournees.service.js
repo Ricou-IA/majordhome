@@ -33,6 +33,7 @@ import { construireMatrice } from '@/lib/tournee/matrice.js';
 import { classerParCreneaux } from '@/lib/tournee/creneaux.js';
 import { construireArretsExistants } from '@/lib/tournee/arrets.js';
 import { chargerJournees } from '@/lib/tournee/loaders.js';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 
 /**
  * @typedef {object} Candidat
@@ -65,23 +66,9 @@ import { chargerJournees } from '@/lib/tournee/loaders.js';
  * @property {boolean} estAmorcee  au moins un RDV de type 'maintenance' ce jour-là
  */
 
-export const REGLAGES_DEFAUT = {
-  horizon_ferme_jours: 15,
-  tolerance_anniversaire_mois: 2,
-  pause_minutes: 30,
-  pause_fenetre: [12, 14],
-  rayon_filtre_km: 25,
-  fenetre_promise_minutes: 90,
-  mois_creux: [11, 12, 1, 2, 3],
-  // I2 (revue finale) — nombre de candidats retenus après le pré-tri
-  // (score × proximité) et avant le calcul de coût exact (Mapbox, trop cher
-  // sur ~300 candidats). Sorti du code en dur pour rester éditable par org.
-  max_candidats_tri: 20,
-};
-
-export function construireReglages(settings) {
-  return { ...REGLAGES_DEFAUT, ...(settings?.tournees || {}) };
-}
+// Défauts et fusion des réglages : src/lib/tournee/reglages.js (source unique,
+// partagée avec l'edge slots-propose). Ré-exportés ici pour les appelants existants.
+export { REGLAGES_DEFAUT, construireReglages } from '@/lib/tournee/reglages.js';
 
 export const tourneesService = {
   /**

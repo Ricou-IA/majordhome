@@ -12,6 +12,7 @@
  * ============================================================================
  */
 
+import { estTypeAdaptable } from '@/lib/souplesse';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
@@ -25,6 +26,8 @@ import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, ch
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { construireReglages } from '@/lib/tournee/reglages.js';
 import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
@@ -36,6 +39,7 @@ import {
   SectionClient,
   SectionAssignee,
   SectionNotes,
+  SectionSouplesse,
 } from './EventFormSections';
 
 // ============================================================================
@@ -133,6 +137,8 @@ export function EventModal({
 
   const queryClient = useQueryClient();
   const { isOrgAdmin } = useAuth();
+  const { settings: orgSettings } = useOrgSettings();
+  const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
 
   // Tous les team_members actifs (techniciens + commerciaux + admin)
   // `members` prop = team_members from Planning.jsx, mais ne contient que les techniciens
@@ -266,6 +272,8 @@ export function EventModal({
         internal_notes: appointment.internal_notes || '',
         technicianIds: appointment.technician_ids || [],
         assigned_commercial_id: appointment.assigned_commercial_id || '',
+        time_flex_minutes: appointment.time_flex_minutes ?? null,
+        hour_confirmed_at: appointment.hour_confirmed_at || null,
       });
 
       // Restaurer le client lié
@@ -319,6 +327,8 @@ export function EventModal({
         internal_notes: '',
         technicianIds: [],
         assigned_commercial_id: '',
+        time_flex_minutes: null,
+        hour_confirmed_at: null,
       });
       if (prefillClient?.id) {
         setSelectedClient({
@@ -678,6 +688,12 @@ export function EventModal({
       internal_notes: formData.internal_notes || null,
       technicianIds: formData.technicianIds,
       assigned_commercial_id: formData.assigned_commercial_id || null,
+      // Souplesse : figé (0) ⇒ heure communiquée au client (conservée si déjà
+      // posée) ; adaptable ⇒ on efface la confirmation.
+      time_flex_minutes: formData.time_flex_minutes ?? null,
+      hour_confirmed_at: formData.time_flex_minutes === 0
+        ? (formData.hour_confirmed_at || new Date().toISOString())
+        : null,
     };
 
     await onSave(data);
@@ -1078,6 +1094,17 @@ export function EventModal({
                   updateField={updateField}
                   allTeamMembers={allTeamMembers}
                   isCancelled={isCancelled}
+                />
+              )}
+
+              {/* Souplesse : édition uniquement (à la création par l'assistant, la
+                  souplesse est demandée à la pose ; « Autre » prend le défaut d'org). */}
+              {isEdit && estTypeAdaptable(formData.appointment_type) && (
+                <SectionSouplesse
+                  formData={formData}
+                  updateField={updateField}
+                  isCancelled={isCancelled}
+                  souplesseDefaut={souplesseDefaut}
                 />
               )}
 

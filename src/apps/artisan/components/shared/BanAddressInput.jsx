@@ -31,8 +31,10 @@ const PRECISION_LABEL = {
  * @param {(next: { address: string, postalCode: string, city: string, location: object|null }) => void} props.onChange
  * @param {boolean} [props.disabled]
  * @param {boolean} [props.showLocation=true]  masquer l'état « localisée » (leads : le géocodage reste en aval)
+ * @param {boolean} [props.dejaLocalisee=false]  le client a déjà des coordonnées en base : on l'affiche et on
+ *   ne propose PAS de le dégrader à la commune tant que le texte n'a pas changé (spec §4.1)
  */
-export function BanAddressInput({ value, onChange, disabled, showLocation = true }) {
+export function BanAddressInput({ value, onChange, disabled, showLocation = true, dejaLocalisee = false }) {
   const address = value?.address || '';
   const postalCode = value?.postalCode || '';
   const city = value?.city || '';
@@ -41,6 +43,7 @@ export function BanAddressInput({ value, onChange, disabled, showLocation = true
   const [suggestions, setSuggestions] = useState([]);
   const [ouvert, setOuvert] = useState(false);
   const [localisation, setLocalisation] = useState(false);
+  const [communeIntrouvable, setCommuneIntrouvable] = useState(false);
   const debounced = useDebounce(address, 300);
   const boite = useRef(null);
 
@@ -73,9 +76,10 @@ export function BanAddressInput({ value, onChange, disabled, showLocation = true
 
   const localiserCommune = async () => {
     setLocalisation(true);
+    setCommuneIntrouvable(false);
     try {
       const c = await geocodeCommune(postalCode, city);
-      if (!c) return;
+      if (!c) { setCommuneIntrouvable(true); return; }
       setOuvert(false);
       emettre({
         postalCode: c.postcode || postalCode,
@@ -142,10 +146,17 @@ export function BanAddressInput({ value, onChange, disabled, showLocation = true
               <Check className="w-3.5 h-3.5" />
               Localisée ({PRECISION_LABEL[location.precision] || location.precision})
             </span>
+          ) : dejaLocalisee ? (
+            <span className="inline-flex items-center gap-1 text-green-700">
+              <Check className="w-3.5 h-3.5" />
+              Localisée (en base)
+            </span>
           ) : (
-            <span className="text-amber-700">Adresse non localisée</span>
+            <span className="text-amber-700">
+              {communeIntrouvable ? 'Commune introuvable pour ce code postal / cette ville' : 'Adresse non localisée'}
+            </span>
           )}
-          {!location && (postalCode || city) && (
+          {!location && !dejaLocalisee && (postalCode || city) && (
             <button
               type="button"
               disabled={disabled || localisation}

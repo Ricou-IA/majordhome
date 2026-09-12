@@ -47,25 +47,31 @@ interface ApplyRow {
   precision?: string;
 }
 
-// Un appel BAN unitaire, borné à 8 s. Retourne la 1re feature si son score passe
-// le seuil, sinon null (échec réseau compris).
-async function banSearch(params: URLSearchParams): Promise<{ lat: number; lng: number; type: string } | null> {
+const PRECISIONS = new Set(["housenumber", "street", "locality", "municipality"]);
+
+// Un appel BAN unitaire, borné à 8 s. `trouve` = feature acceptée ; `indisponible`
+// = échec TECHNIQUE (réseau, timeout, HTTP non-2xx) — distinct d'une adresse
+// inconnue, car on ne doit pas retomber sur la commune à cause d'un timeout.
+async function banSearch(params: URLSearchParams): Promise<
+  { trouve: { lat: number; lng: number; type?: string } | null; indisponible: boolean }
+> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(`${GOUV_SEARCH}?${params}`, { signal: controller.signal });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) return { trouve: null, indisponible: true };
     const data = await res.json();
     const f = data?.features?.[0];
     const score = f?.properties?.score ?? 0;
-    if (!f || score < SCORE_MIN) return null;
+    if (!f || score < SCORE_MIN) return { trouve: null, indisponible: false };
     const [lng, lat] = f.geometry.coordinates;
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng, type: String(f.properties?.type ?? "") };
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { trouve: null, indisponible: false };
+    const type = String(f.properties?.type ?? "");
+    return { trouve: { lat, lng, type: PRECISIONS.has(type) ? type : undefined }, indisponible: false };
   } catch {
     clearTimeout(timeout);
-    return null;
+    return { trouve: null, indisponible: true };
   }
 }
 
@@ -81,14 +87,17 @@ async function geocodeOne(c: PendingClient): Promise<ApplyRow> {
   if (q.length >= 5) {
     const params = new URLSearchParams({ q, limit: "1" });
     if (c.postal_code) params.set("postcode", c.postal_code);
-    const exact = await banSearch(params);
-    if (exact) return { id: c.id, lat: exact.lat, lng: exact.lng, precision: exact.type || undefined };
+    const { trouve, indisponible } = await banSearch(params);
+    if (trouve) return { id: c.id, lat: trouve.lat, lng: trouve.lng, precision: trouve.type };
+    // BAN injoignable : on ne fige pas le client à la commune sur un incident réseau,
+    // la tentative est comptée et le prochain passage réessaiera l'adresse exacte.
+    if (indisponible) return echec;
   }
 
   if (c.postal_code && /^\d{5}$/.test(c.postal_code)) {
     const params = new URLSearchParams({ q: c.city || c.postal_code, type: "municipality", postcode: c.postal_code, limit: "1" });
-    const commune = await banSearch(params);
-    if (commune) return { id: c.id, lat: commune.lat, lng: commune.lng, precision: "municipality" };
+    const { trouve } = await banSearch(params);
+    if (trouve) return { id: c.id, lat: trouve.lat, lng: trouve.lng, precision: "municipality" };
   }
   return echec;
 }

@@ -17,7 +17,9 @@ import {
   AlertCircle, CheckCircle, Lock, Unlock, Plus, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { clientKeys } from '@hooks/cacheKeys';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useClient } from '@hooks/useClients';
 import { usePennylaneSyncClient } from '@hooks/usePennylane';
@@ -39,7 +41,7 @@ const TABS = [
 
 const EMPTY_FORM = {
   firstName: '', lastName: '', clientCategory: 'particulier',
-  companyName: '', address: '', postalCode: '', city: '', location: null,
+  companyName: '', address: '', postalCode: '', city: '', location: null, dejaLocalisee: false,
   phone: '', phoneSecondary: '', email: '', mailOptin: true, smsOptin: true,
   housingType: '', surface: '', dpeNumber: '',
   leadSource: '', notes: '', createdAt: null,
@@ -69,6 +71,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   const { organization, user } = useAuth();
   const { can } = useCanAccess();
   const orgId = organization?.id;
+  const queryClient = useQueryClient();
   const canEditClient = can('clients', 'edit');
 
   // State
@@ -102,8 +105,10 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
       clientCategory: c.client_category || 'particulier',
       address: c.address || '', postalCode: c.postal_code || '', city: c.city || '',
       // Coordonnées choisies via la saisie BAN pendant cette session d'édition
-      // seulement (null au chargement : celles en base restent gérées en aval).
+      // seulement (null au chargement) ; `dejaLocalisee` dit si la base en a déjà,
+      // pour ne jamais proposer de dégrader une adresse exacte à la commune.
       location: null,
+      dejaLocalisee: c.latitude != null && c.longitude != null,
       phone: c.phone || '', email: c.email || '', mailOptin: c.mail_optin !== false, smsOptin: c.sms_optin !== false,
       housingType: c.housing_type || '', surface: c.surface || '',
       dpeNumber: c.dpe_number || '', leadSource: c.lead_source || '',
@@ -225,7 +230,13 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           // Écrit APRÈS l'adresse : le trigger DB efface les coordonnées quand
           // l'adresse change, on les repose ensuite avec leur précision.
           const { error: locErr } = await setClientLocation({ clientId: client.id, ...formData.location });
-          if (locErr) toast.error("Adresse enregistrée, mais sa localisation n'a pas pu être sauvegardée");
+          if (locErr) {
+            toast.error("Adresse enregistrée, mais sa localisation n'a pas pu être sauvegardée");
+          } else {
+            // Le cache détail porte la ligne renvoyée par l'UPDATE (coordonnées
+            // effacées par le trigger) : on le rafraîchit pour refléter la RPC.
+            queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, client.id) });
+          }
         } else if (addressChanged && formData.postalCode && formData.city && client?.project_id) {
           geocodeAndUpdateByProjectId(client.project_id, formData.address, formData.postalCode, formData.city)
             .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));

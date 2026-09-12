@@ -70,7 +70,7 @@ export async function chargerJournees({
       // SELECT, `r.lead_id` vaut `undefined`, `leadIds` reste vide et TOUT le repli
       // lead est du code mort — silencieusement, puisque le repli suivant (siège)
       // fournit quand même une position plausible. Vécu : livré ainsi, jamais vu.
-      .select('id, client_id, lead_id, scheduled_date, scheduled_start, duration_minutes, appointment_type, client_name, address, city, postal_code')
+      .select('id, client_id, lead_id, scheduled_date, scheduled_start, scheduled_end, duration_minutes, appointment_type, status, subject, client_name, client_first_name, client_phone, address, city, postal_code, time_flex_minutes, hour_confirmed_at, announced_start')
       .eq('org_id', orgId).gte('scheduled_date', iso(debut)).lte('scheduled_date', iso(fin))
       .not('status', 'in', '(cancelled,no_show)'),
   ]);
@@ -180,7 +180,7 @@ export async function chargerJournees({
  * requise) et coordonnées du client.
  *
  * @param {{ client: object, coreOrgId: string, contractId: string }} p
- * @returns {Promise<{ data: { id, clientId, clientName, ville, lat, lng, dureeMinutes, categories: string[], typesNonRenseignes: number }|null, error: Error|null }>}
+ * @returns {Promise<{ data: { id, clientId, clientName, ville, lat, lng, dureeMinutes, categories: string[], typesNonRenseignes: number, sansEquipement: boolean }|null, error: Error|null }>}
  */
 export async function chargerContrat({ client, coreOrgId, contractId }) {
   const [{ data: contrat, error: cErr }, { data: types, error: tErr }] = await Promise.all([
@@ -211,8 +211,13 @@ export async function chargerContrat({ client, coreOrgId, contractId }) {
   if (eqErr) return { data: null, error: eqErr };
 
   const typesById = new Map((types || []).map((t) => [t.id, t]));
-  const fallbacks = construireFallbacks(equipements || [], typesById, 90);
+  const DUREE_DEFAUT = 90;
+  const fallbacks = construireFallbacks(equipements || [], typesById, DUREE_DEFAUT);
   const co = (clients || [])[0];
+  // Un contrat sans équipement rattaché n'a pas de durée calculable : on ne
+  // pose JAMAIS un RDV de 0 minute, on prend la durée par défaut et on le dit.
+  const sansEquipement = (equipements || []).length === 0;
+  const duree = sansEquipement ? DUREE_DEFAUT : dureeContrat(equipements, typesById, fallbacks);
   return {
     data: {
       id: contrat.id,
@@ -221,9 +226,10 @@ export async function chargerContrat({ client, coreOrgId, contractId }) {
       ville: contrat.client_city,
       lat: co?.latitude ?? null,
       lng: co?.longitude ?? null,
-      dureeMinutes: dureeContrat(equipements || [], typesById, fallbacks),
+      dureeMinutes: Math.max(duree, 15),
       categories: [...new Set((equipements || []).map((e) => e.category).filter(Boolean))],
       typesNonRenseignes: (equipements || []).filter((e) => !e.equipment_type_id).length,
+      sansEquipement,
     },
     error: null,
   };

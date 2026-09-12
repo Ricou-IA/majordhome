@@ -393,3 +393,106 @@ test('fenetreArrivee.min : arrivée repoussée à la borne, même si le trou com
   assert.equal(r.faisable, true);
   assert.ok(r.arriveeMinutes >= 720);
 });
+
+// ============================================================================
+// Souplesse (spec 2026-09-12) : décaler UN voisin adaptable dans sa tolérance
+// ============================================================================
+const arretSouple = (id, debut, duree, flex, key = id) => ({
+  id, key, dureeMinutes: duree, fenetre: { debut, fin: debut },
+  tolerance: { min: debut - flex, max: debut + flex, flex },
+});
+
+test('souplesse : 110 min dans un trou de 100 → le suivant adaptable glisse de 10, et la proposition le dit', () => {
+  // a 08:00-09:00 figé, b 10:50 (±30) — trou de 110 min moins 2 trajets de 5 = 100 utiles.
+  const arrets = [arret('a', 480, 60), arretSouple('b', 650, 60, 30)];
+  const r = placerCandidat({
+    arrets, candidat: candidat('c', 110), trajet: uniforme(5), depotKey: DEPOT,
+    amplitude: AMPLITUDE, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] },
+  });
+  assert.equal(r.faisable, true);
+  assert.equal(r.arriveeMinutes, 545);            // 09:00 + 5
+  assert.deepEqual(r.decalages, [{ id: 'b', debutMinutesAvant: 650, debutMinutesApres: 660 }]);
+  assert.equal(r.avantId, 'a');
+  assert.equal(r.apresId, 'b');
+});
+
+test('souplesse : jamais un voisin figé, jamais deux voisins', () => {
+  const figes = [arret('a', 480, 60), arret('b', 650, 60)];
+  const r = placerCandidat({
+    arrets: figes, candidat: candidat('c', 110), trajet: uniforme(5), depotKey: DEPOT,
+    amplitude: { debut: 480, fin: 800 }, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] },
+  });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'creneau');
+  // Deux voisins ±5 : il faudrait les décaler tous les deux (manque 10) → refus.
+  const deuxPetits = [arretSouple('a', 480, 60, 5), arretSouple('b', 650, 60, 5)];
+  const r2 = placerCandidat({
+    arrets: deuxPetits, candidat: candidat('c', 110), trajet: uniforme(5), depotKey: DEPOT,
+    amplitude: { debut: 480, fin: 800 }, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] },
+  });
+  assert.equal(r2.faisable, false);
+});
+
+test('souplesse : le décalage du suivant ne peut pas casser le voisin du suivant (trajet compris)', () => {
+  // b ±30 mais collé à c figé : b ne peut pas reculer.
+  const arrets = [arret('a', 480, 60), arretSouple('b', 650, 60, 30), arret('c', 715, 60)];
+  const r = placerCandidat({
+    arrets, candidat: candidat('x', 110), trajet: uniforme(5), depotKey: DEPOT,
+    amplitude: { debut: 480, fin: 1080 }, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] },
+  });
+  // Le seul trou possible sans casser c est après c (13:00-18:00) : pas de décalage.
+  assert.equal(r.faisable, true);
+  assert.deepEqual(r.decalages, []);
+  assert.equal(r.avantId, 'c');
+});
+
+test('souplesse : sinon on avance le précédent adaptable (voisin d avant)', () => {
+  // a 08:30 (±30) 60 min, b 10:20 figé. Trou a→b : 10:20 − 09:30 − 2×5 = 40 utiles ; candidat 60 → manque 20 ; a peut avancer de 30.
+  const arrets = [arretSouple('a', 510, 60, 30), arret('b', 620, 60)];
+  const r = placerCandidat({
+    arrets, candidat: candidat('c', 60), trajet: uniforme(5), depotKey: DEPOT,
+    amplitude: { debut: 480, fin: 700 }, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] },
+  });
+  assert.equal(r.faisable, true);
+  assert.deepEqual(r.decalages, [{ id: 'a', debutMinutesAvant: 510, debutMinutesApres: 490 }]);
+  assert.equal(r.arriveeMinutes, 555);            // a fini 09:10 + 5
+});
+
+test('souplesse : à coût et heure égaux, la place sans décalage gagne', () => {
+  const arrets = [arretSouple('a', 480, 60, 30)];
+  const r = placerCandidat({
+    arrets, candidat: candidat('c', 60), trajet: uniforme(5), depotKey: DEPOT,
+    amplitude: AMPLITUDE, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] },
+  });
+  assert.deepEqual(r.decalages, []);
+});
+
+// ============================================================================
+// Trajet maximum entre deux clients (décision Eric 2026-09-12) : « ça rentre »
+// n'est pas « c'est raisonnable ». Les trajets dépôt↔candidat ne comptent pas.
+// ============================================================================
+test('trajetMaxMinutes : une insertion à 80 min d un client voisin est refusée pour « trajet », le dépôt est exempté', () => {
+  const arrets = [arret('a', 480, 60)];
+  const loin = (x, y) => (x === y ? 0 : (x === DEPOT || y === DEPOT ? 60 : 80));
+  // Sans limite : rentre après a (trajet 80).
+  const sans = placerCandidat({ arrets, candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] } });
+  assert.equal(sans.faisable, true);
+  // Avec limite 45 : après a = 80 > 45 → refusé ; avant a = arrivée depuis le dépôt (exempté) puis 80 vers a → refusé aussi.
+  const avec = placerCandidat({ arrets, candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] }, trajetMaxMinutes: 45 });
+  assert.equal(avec.faisable, false);
+  assert.equal(avec.raison, 'trajet');
+  // Journée vide : seuls des trajets dépôt↔candidat → la limite ne s'applique pas.
+  const vide = placerCandidat({ arrets: [], candidat: candidat('c', 60), trajet: loin, depotKey: DEPOT, amplitude: AMPLITUDE, budgetMinutes: 900, pause: { minutes: 0, fenetre: [0, 0] }, trajetMaxMinutes: 45 });
+  assert.equal(vide.faisable, true);
+});
+
+test('classerParCreneaux / placerPlusieurs refusent un placement qui exigerait de décaler un voisin (ils ne savent pas l écrire)', () => {
+  const arrets = [arret('a', 480, 60), arretSouple('b', 650, 60, 30)];
+  const ctxSans = { trajet: uniforme(5), depotKey: DEPOT, amplitude: { debut: 480, fin: 800 }, budgetMinutes: 600, pause: { minutes: 0, fenetre: [0, 0] } };
+  const { classement, raisonsRejet } = classerParCreneaux(arrets, [candidat('c', 110)], ctxSans);
+  assert.equal(classement.length, 0);
+  assert.equal(raisonsRejet.creneau, 1);
+  const { places, refuses } = placerPlusieurs(arrets, [candidat('c', 110)], ctxSans);
+  assert.equal(places.length, 0);
+  assert.equal(refuses.length, 1);
+});

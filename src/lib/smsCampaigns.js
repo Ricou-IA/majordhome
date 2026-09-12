@@ -80,6 +80,30 @@ export const SMS_CAMPAIGNS = [
       deburr: true,
     },
   },
+  {
+    // Émetteur : savService.sendHeureDePassage (« Figer la journée », onglet Tournées).
+    // `date` et `heure` arrivent déjà lisibles (« 14 octobre 2026 », « 10h30 »).
+    key: 'heure_de_passage',
+    label: 'Heure de passage (journée figée)',
+    trigger: 'Bouton « Figer la journée » de l’onglet Tournées : l’heure définitive est envoyée à chaque client dont le rendez-vous était adaptable.',
+    variables: [
+      { name: 'first_name', label: 'Prénom du client' },
+      { name: 'name', label: 'Nom du client' },
+      { name: 'date', label: 'Date du rendez-vous (ex. « 14 octobre 2026 »)' },
+      { name: 'heure', label: 'Heure de passage définitive (ex. « 10h30 »)' },
+      { name: 'technicien', label: 'Prénom du technicien' },
+    ],
+    sample: { first_name: 'Véronique', name: 'DUPONT', date: '14 octobre 2026', heure: '10h30', technicien: 'Antoine' },
+    suggested: {
+      whatsapp:
+        'Bonjour {{first_name}},\n\nVotre technicien {{technicien}} passera le {{date}} vers {{heure}} '
+        + 'pour votre entretien.\n\nEn cas d’empêchement, merci de nous prévenir. À bientôt !',
+      sms:
+        'Bonjour {{first_name}}, votre technicien {{technicien}} passera le {{date}} vers {{heure}} '
+        + 'pour votre entretien. En cas d\'empêchement, merci de nous prévenir. À bientôt !',
+      deburr: true,
+    },
+  },
 ];
 
 export function getSmsCampaign(key) {
