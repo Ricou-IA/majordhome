@@ -36,6 +36,7 @@ import {
   SectionClient,
   SectionAssignee,
   SectionNotes,
+  SectionSouplesse,
 } from './EventFormSections';
 
 // ============================================================================
@@ -266,6 +267,8 @@ export function EventModal({
         internal_notes: appointment.internal_notes || '',
         technicianIds: appointment.technician_ids || [],
         assigned_commercial_id: appointment.assigned_commercial_id || '',
+        time_flex_minutes: appointment.time_flex_minutes ?? null,
+        hour_confirmed_at: appointment.hour_confirmed_at || null,
       });
 
       // Restaurer le client lié
@@ -319,6 +322,8 @@ export function EventModal({
         internal_notes: '',
         technicianIds: [],
         assigned_commercial_id: '',
+        time_flex_minutes: null,
+        hour_confirmed_at: null,
       });
       if (prefillClient?.id) {
         setSelectedClient({
@@ -678,6 +683,12 @@ export function EventModal({
       internal_notes: formData.internal_notes || null,
       technicianIds: formData.technicianIds,
       assigned_commercial_id: formData.assigned_commercial_id || null,
+      // Souplesse : figé (0) ⇒ heure communiquée au client (conservée si déjà
+      // posée) ; adaptable ⇒ on efface la confirmation.
+      time_flex_minutes: formData.time_flex_minutes ?? null,
+      hour_confirmed_at: formData.time_flex_minutes === 0
+        ? (formData.hour_confirmed_at || new Date().toISOString())
+        : null,
     };
 
     await onSave(data);
@@ -1077,6 +1088,16 @@ export function EventModal({
                   formData={formData}
                   updateField={updateField}
                   allTeamMembers={allTeamMembers}
+                  isCancelled={isCancelled}
+                />
+              )}
+
+              {/* Souplesse : édition uniquement (à la création par l'assistant, la
+                  souplesse est demandée à la pose ; « Autre » prend le défaut d'org). */}
+              {isEdit && !isClosing && (
+                <SectionSouplesse
+                  formData={formData}
+                  updateField={updateField}
                   isCancelled={isCancelled}
                 />
               )}

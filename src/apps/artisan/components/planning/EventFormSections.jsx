@@ -13,7 +13,7 @@
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2,
-  Phone, MapPin, CalendarClock,
+  Phone, MapPin, CalendarClock, MoveHorizontal,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
@@ -23,6 +23,7 @@ import {
   TECHNICIAN_TYPES,
 } from '@services/appointments.service';
 import { TechnicianSelect } from './TechnicianSelect';
+import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
 
 const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
@@ -555,6 +556,32 @@ export const SectionAssignee = ({ formData, updateField, allTeamMembers }) => {
 // ============================================================================
 // SECTION NOTES
 // ============================================================================
+
+/**
+ * Souplesse du RDV (spec 2026-09-12) : jusqu'où son heure peut glisser pour la
+ * tournée. « Figé » = le client exige cette heure (hour_confirmed_at posé au
+ * save). Même sélecteur que la prise de RDV — un seul composant.
+ */
+export const SectionSouplesse = ({ formData, updateField, isCancelled, souplesseDefaut = 30 }) => (
+  <div>
+    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+      <MoveHorizontal className="w-4 h-4 text-gray-500" />
+      Souplesse du rendez-vous
+    </h3>
+    <SouplesseSelect
+      value={formData.time_flex_minutes ?? null}
+      onChange={(v) => updateField('time_flex_minutes', v)}
+      defaut={souplesseDefaut}
+      disabled={isCancelled}
+      compact
+    />
+    <p className="text-xs text-gray-500 mt-2">
+      {formData.hour_confirmed_at
+        ? 'Heure communiquée au client : le moteur de tournées ne la déplacera pas.'
+        : 'Adaptable : le moteur peut le glisser dans cette tolérance pour faire rentrer un autre entretien.'}
+    </p>
+  </div>
+);
 
 export const SectionNotes = ({ formData, updateField, isCancelled }) => (
   <div>
