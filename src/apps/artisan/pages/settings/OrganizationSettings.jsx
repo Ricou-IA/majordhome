@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
-import { Building2, Phone, MapPinned, ChevronLeft } from 'lucide-react';
+import { Building2, Phone, MapPinned, MessageSquare, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import IdentityTab from './organization/IdentityTab';
 import ContactTab from './organization/ContactTab';
 import TerritoryTab from './organization/TerritoryTab';
+import SmsTab from './organization/SmsTab';
 
 const TABS = [
   { key: 'identity', label: 'Identité', icon: Building2, Component: IdentityTab },
   { key: 'contact', label: 'Coordonnées', icon: Phone, Component: ContactTab },
   { key: 'territory', label: 'Territoire', icon: MapPinned, Component: TerritoryTab },
+  { key: 'sms', label: 'SMS', icon: MessageSquare, Component: SmsTab },
 ];
 
 export default function OrganizationSettings() {
@@ -44,7 +46,7 @@ export default function OrganizationSettings() {
         </button>
         <h1 className="text-2xl font-bold text-secondary-900">Organisation</h1>
         <p className="text-secondary-600">
-          Configure l&apos;identité, les coordonnées et le territoire de ton entreprise.
+          Configure l&apos;identité, les coordonnées, le territoire et les SMS de ton entreprise.
         </p>
       </div>
 

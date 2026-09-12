@@ -1,0 +1,313 @@
+// src/apps/artisan/pages/settings/organization/SmsTab.jsx
+// ============================================================================
+// Settings → Organisation → SMS : gabarits SMS / WhatsApp par campagne.
+//
+// Source de vérité : core.organizations.settings.sms via useOrgSettings().
+//   - identité d'expéditeur (enabled, sms_from, whatsapp_from, short_link_base) :
+//     LECTURE SEULE — posée par la plateforme à l'onboarding (le nom d'expéditeur
+//     SMS doit être déclaré auprès de l'opérateur), comme la clé Twilio elle-même ;
+//   - templates[campagne] = { whatsapp?, sms?, deburr? } : ÉDITABLES ici.
+// Les campagnes et leurs variables viennent du registre `src/lib/smsCampaigns.js`
+// (source unique partagée avec les émetteurs). Les clés présentes en base mais
+// inconnues du code sont affichées et préservées, jamais supprimées en silence.
+//
+// ⚠ `org_update_settings` merge le JSONB au niveau 1 : on sauve TOUJOURS l'objet
+// `sms` COMPLET (identité inchangée + templates), jamais un sous-objet partiel.
+// ============================================================================
+import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
+import { Wand2 } from 'lucide-react';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import {
+  listSmsCampaignsForEditor,
+  normalizeSmsTemplates,
+  findUnknownVariables,
+  estimateSmsSegments,
+  deburrSms,
+} from '@/lib/smsCampaigns';
+
+const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
+const LABEL_CLASS = 'block text-xs font-medium text-secondary-600 mb-1';
+const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
+const ERROR_CLASS = 'mt-1 text-xs text-red-600';
+const TEXTAREA_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+const emptyTemplate = () => ({ whatsapp: '', sms: '', deburr: false });
+
+/** État de formulaire : une entrée par ligne de l'éditeur, toujours les 3 champs. */
+function pickTemplates(templates, rows) {
+  const out = {};
+  rows.forEach((row) => {
+    const tpl = templates?.[row.key] || {};
+    out[row.key] = {
+      whatsapp: tpl.whatsapp ?? '',
+      sms: tpl.sms ?? '',
+      deburr: tpl.deburr === true,
+    };
+  });
+  return out;
+}
+
+/** Erreurs par campagne : variables {{…}} qui ne seraient pas substituées à l'envoi. */
+function validate(form, rows) {
+  const errors = {};
+  rows.forEach((row) => {
+    const value = form[row.key] || emptyTemplate();
+    const unknown = [
+      ...findUnknownVariables(value.whatsapp, row),
+      ...findUnknownVariables(value.sms, row),
+    ];
+    if (unknown.length > 0) {
+      const list = [...new Set(unknown)].map((v) => `{{${v}}}`).join(', ');
+      const available = row.variables.map((v) => `{{${v.name}}}`).join(', ');
+      errors[row.key] = `Variable inconnue : ${list} — elle partirait telle quelle chez le client. Disponibles : ${available}.`;
+    }
+  });
+  return errors;
+}
+
+function ReadOnlyField({ label, value, missingHint }) {
+  return (
+    <div>
+      <span className={LABEL_CLASS}>{label}</span>
+      {value ? (
+        <p className="text-sm text-secondary-900 font-mono">{value}</p>
+      ) : (
+        <p className="text-sm text-secondary-400 italic">{missingHint || 'Non configuré'}</p>
+      )}
+    </div>
+  );
+}
+
+function IdentitySection({ sms }) {
+  const enabled = sms.enabled === true;
+  return (
+    <section>
+      <h3 className={SECTION_TITLE}>Identité d&apos;expéditeur</h3>
+      <div className="flex items-center gap-2 mb-4">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            enabled ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {enabled ? 'Envoi activé' : 'Envoi désactivé'}
+        </span>
+        <span className="text-xs text-secondary-500">
+          Activation et identité sont posées par la plateforme à l&apos;onboarding — le nom
+          d&apos;expéditeur SMS doit être déclaré auprès de l&apos;opérateur.
+        </span>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-4">
+        <ReadOnlyField label="Nom d'expéditeur SMS" value={sms.sms_from} />
+        <ReadOnlyField
+          label="Numéro WhatsApp"
+          value={sms.whatsapp_from}
+          missingHint="Non configuré — les gabarits WhatsApp sont ignorés, seul le SMS part"
+        />
+        <ReadOnlyField label="Domaine des liens courts" value={sms.short_link_base} />
+      </div>
+    </section>
+  );
+}
+
+function SegmentsHint({ text, deburr }) {
+  if (!text) return null;
+  const { chars, segments, encoding } = estimateSmsSegments(deburr ? deburrSms(text) : text);
+  const gsm = encoding === 'gsm7';
+  const encodingLabel = gsm
+    ? 'alphabet SMS (160/segment)'
+    : 'hors alphabet SMS → 70/segment (ê â î ô û, apostrophe typographique « ’ », guillemets…)';
+  const advice = !gsm && !deburr ? ' — cocher « Retirer les accents » peut suffire' : '';
+  return (
+    <p className={`${HINT_CLASS} ${gsm ? '' : 'text-amber-700'}`}>
+      ≈ {chars} caractères · {segments} segment{segments > 1 ? 's' : ''} · {encodingLabel}{advice}.
+      Estimation sur le gabarit, avant remplacement des variables.
+    </p>
+  );
+}
+
+function CampaignEditor({ row, value, error, whatsappActive, onChange }) {
+  const isEmpty = !value.whatsapp && !value.sms;
+  const ids = { whatsapp: `sms-${row.key}-whatsapp`, sms: `sms-${row.key}-sms`, deburr: `sms-${row.key}-deburr` };
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-4 ${row.unknown ? 'border-dashed border-secondary-300' : 'border-secondary-200'}`}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h4 className="text-sm font-semibold text-secondary-900">
+            {row.label}
+            {row.unknown && <span className="ml-2 text-xs font-normal text-secondary-500">(clé inconnue du code)</span>}
+          </h4>
+          <p className="text-xs text-secondary-500 mt-0.5">{row.trigger}</p>
+          {isEmpty && !row.unknown && (
+            <p className="text-xs text-amber-700 mt-1">
+              Aucun gabarit : cette campagne ne part pas tant qu&apos;un texte n&apos;est pas enregistré.
+            </p>
+          )}
+        </div>
+        {row.suggested && isEmpty && (
+          <button
+            type="button"
+            onClick={() => onChange({
+              whatsapp: row.suggested.whatsapp ?? '',
+              sms: row.suggested.sms ?? '',
+              deburr: row.suggested.deburr === true,
+            })}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 border border-primary-300 rounded-md hover:bg-primary-50"
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            Utiliser le texte suggéré
+          </button>
+        )}
+      </div>
+
+      {row.variables.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {row.variables.map((v) => (
+            <span key={v.name} className="text-xs text-secondary-600">
+              <code className="px-1.5 py-0.5 rounded bg-secondary-100 text-secondary-800">{`{{${v.name}}}`}</code>
+              {' '}{v.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <label htmlFor={ids.whatsapp} className={LABEL_CLASS}>Message WhatsApp</label>
+        <textarea
+          id={ids.whatsapp}
+          value={value.whatsapp}
+          onChange={(e) => onChange({ whatsapp: e.target.value })}
+          rows={4}
+          className={TEXTAREA_CLASS}
+          placeholder="Envoyé en priorité si l'organisation a un numéro WhatsApp"
+        />
+        {!whatsappActive && value.whatsapp && (
+          <p className={HINT_CLASS}>
+            Aucun numéro WhatsApp configuré : ce texte est conservé mais seul le SMS est envoyé.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor={ids.sms} className={LABEL_CLASS}>Message SMS</label>
+        <textarea
+          id={ids.sms}
+          value={value.sms}
+          onChange={(e) => onChange({ sms: e.target.value })}
+          rows={3}
+          className={TEXTAREA_CLASS}
+          placeholder="Envoyé si WhatsApp est absent ou échoue"
+        />
+        <SegmentsHint text={value.sms} deburr={value.deburr} />
+      </div>
+
+      <label htmlFor={ids.deburr} className="flex items-start gap-2 text-sm text-secondary-700 cursor-pointer">
+        <input
+          id={ids.deburr}
+          type="checkbox"
+          checked={value.deburr}
+          onChange={(e) => onChange({ deburr: e.target.checked })}
+          className="mt-0.5 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
+        />
+        <span>
+          Retirer les accents à l&apos;envoi
+          <span className="block text-xs text-secondary-500">
+            Un message accentué peut basculer en UCS-2 (70 caractères par segment au lieu de 160). S&apos;applique au SMS comme au WhatsApp.
+          </span>
+        </span>
+      </label>
+
+      {error && <p className={ERROR_CLASS}>{error}</p>}
+    </div>
+  );
+}
+
+export default function SmsTab() {
+  const { settings, save, isSaving, isLoading } = useOrgSettings();
+  const sms = settings?.sms || {};
+  const rows = useMemo(() => listSmsCampaignsForEditor(sms.templates), [sms.templates]);
+  const [form, setForm] = useState({});
+  const [initial, setInitial] = useState({});
+
+  useEffect(() => {
+    const picked = pickTemplates(sms.templates, rows);
+    setForm(picked);
+    setInitial(picked);
+  }, [sms.templates, rows]);
+
+  const errors = useMemo(() => validate(form, rows), [form, rows]);
+  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
+  const isValid = Object.keys(errors).length === 0;
+
+  const patchCampaign = (key, patch) =>
+    setForm((f) => ({ ...f, [key]: { ...(f[key] || emptyTemplate()), ...patch } }));
+
+  const handleSave = async () => {
+    if (!isValid) {
+      toast.error('Corrige les variables inconnues avant d\'enregistrer.');
+      return;
+    }
+    try {
+      // Objet `sms` COMPLET : identité relue telle quelle, gabarits normalisés
+      // (textes vides retirés → l'edge répondra `campaign_template_missing`).
+      await save({ sms: { ...sms, templates: normalizeSmsTemplates(form) } });
+      toast.success('Gabarits SMS enregistrés');
+      setInitial(form);
+    } catch (err) {
+      toast.error(err.message || 'Erreur lors de l\'enregistrement');
+    }
+  };
+
+  const handleReset = () => setForm(initial);
+
+  if (isLoading) {
+    return <div className="card text-sm text-secondary-500">Chargement…</div>;
+  }
+
+  return (
+    <div className="card space-y-8">
+      <IdentitySection sms={sms} />
+
+      <section>
+        <h3 className={SECTION_TITLE}>Gabarits par campagne</h3>
+        <p className="text-xs text-secondary-500 mb-4">
+          Les variables entre doubles accolades sont remplacées à l&apos;envoi ; une variable absente
+          est retirée et la ponctuation recollée. WhatsApp part en premier quand l&apos;organisation a un
+          numéro, le SMS sert de repli.
+        </p>
+        <div className="space-y-4">
+          {rows.map((row) => (
+            <CampaignEditor
+              key={row.key}
+              row={row}
+              value={form[row.key] || emptyTemplate()}
+              error={errors[row.key]}
+              whatsappActive={!!sms.whatsapp_from}
+              onChange={(patch) => patchCampaign(row.key, patch)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={!isDirty || isSaving}
+          className="px-4 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md disabled:opacity-50"
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty || !isValid || isSaving}
+          className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+        >
+          {isSaving ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
+      </div>
+    </div>
+  );
+}

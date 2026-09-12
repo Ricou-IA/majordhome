@@ -16,6 +16,8 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
+import { buildConfirmationRdvVars } from '@/lib/smsCampaigns';
+import { logger } from '@/lib/logger';
 import { entretiensService } from './entretiens.service';
 
 // ============================================================================
@@ -1000,6 +1002,46 @@ export const savService = {
       return { data: null, error };
     }
     return { data: { success: true }, error: null };
+  },
+
+  /**
+   * SMS/WhatsApp de confirmation après la pose d'un RDV d'entretien.
+   * Campagne 'confirmation_rdv' — gabarit édité dans Settings → Organisation → SMS,
+   * variables construites par `buildConfirmationRdvVars` (registre `smsCampaigns`).
+   * Mono-destinataire (mobile principal du client).
+   *
+   * Retours (jamais de throw : le RDV est déjà posé quand on arrive ici) :
+   *   { data: { skipped: 'no_mobile' } }      — pas de mobile FR : rien envoyé, pas une erreur
+   *   { data: { success: true, channel } }    — parti (trace dans sms_logs)
+   *   { data: null, error }                   — échec ; `error.message` = code de l'edge.
+   *     `campaign_template_missing` = gabarit non renseigné → l'appelant INFORME, ne bloque pas.
+   */
+  async sendRdvConfirmation({
+    clientId, clientFirstName, clientPhone, orgId, interventionId, date, startTime, technicianName,
+  }) {
+    if (!isMobileFR(clientPhone)) return { data: { skipped: 'no_mobile' }, error: null };
+
+    try {
+      const { data, error } = await invokeSmsSend({
+        campaign: 'confirmation_rdv',
+        phone: clientPhone,
+        org_id: orgId,
+        client_id: clientId || null,
+        intervention_id: interventionId || null,
+        vars: buildConfirmationRdvVars({ clientFirstName, date, startTime, technicianName }),
+      });
+      if (error) {
+        // Gabarit absent = configuration, pas incident : pas de bruit dans les logs.
+        if (error.message !== 'campaign_template_missing') {
+          logger.error('[sav] sendRdvConfirmation error:', error);
+        }
+        return { data: null, error };
+      }
+      return { data: { success: true, channel: data?.channel || null }, error: null };
+    } catch (err) {
+      logger.error('[sav] sendRdvConfirmation error:', err);
+      return { data: null, error: err };
+    }
   },
 };
 

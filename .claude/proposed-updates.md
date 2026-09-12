@@ -31,3 +31,14 @@
 - **CTA « Trouver le créneau optimisé »** (ContractModal) : sans LLM ; la pose passe par `ensureEntretienCard` + `scheduleEntretien` (single writer inchangé) ; une « nouvelle journée » renvoie à l'assistant classique.
 - Gotcha : `npm run audit:dead-code` échoue depuis le 29/08 sur `src/lib/tournee/sequence.js` (orphelin conservé « hors chemin de prod ») — décider de le supprimer ou de l'allowlister.
 ---
+
+## [2026-09-12 11:30] SMS — registre de campagnes, onglet Settings → Organisation → SMS, confirmation de RDV
+**Statut** : PENDING
+**Commit** : (tâche de suite de la tranche 1 Tournées — voir `git log --grep="confirmation_rdv"`)
+**Contexte** : Les gabarits SMS (`settings.sms.templates`) étaient posés en SQL sans UI, ce qui bloquait toute nouvelle campagne (règle « pas de config sans UI »). Un onglet SMS édite désormais les gabarits, un registre pur fixe les campagnes et leurs variables, et la pose d'un RDV d'entretien depuis ContractModal envoie une confirmation. Détails : `docs/MODULE_MAILING.md` (sections « Gabarits SMS / WhatsApp » et « SMS confirmation de RDV »).
+**Proposition** (section « Module Mailing », règles qui mordent — ou nouvelle sous-section « SMS ») :
+- **Campagnes SMS = registre `src/lib/smsCampaigns.js`** (pur, testé) : une entrée par campagne appelée par le code (`avis_j1`, `rappel_entretien`, `confirmation_rdv`) avec ses variables. Les gabarits vivent dans `settings.sms.templates`, **éditables dans Settings → Organisation → SMS** (`SmsTab`) ; l'identité d'expéditeur (`enabled`, `sms_from`, `whatsapp_from`, `short_link_base`) y est en lecture seule (plateforme). **Ajouter une campagne = registre + gabarit saisi dans l'onglet**, jamais un texte en dur ni un `UPDATE` SQL.
+- **`campaign_template_missing` est une information, pas une erreur** : tout émetteur l'affiche en `toast.info` pointant vers l'onglet et n'échoue jamais l'action métier qui l'a déclenché (le RDV est posé avant le SMS, non attendu). `settings.sms.enabled !== true` → silencieux (l'edge répond 403 sinon).
+- Gotchas SMS : l'edge ne substitue que `{{[a-z0-9_]+}}` → `{{prénom}}` partirait tel quel (l'onglet bloque l'enregistrement) ; `deburr` s'applique au SMS **et** au WhatsApp ; sans `whatsapp_from` le gabarit WhatsApp est ignoré ; `’ ê â î ô û « »` font basculer un SMS en UCS-2 (70 car./segment). `deburrSms` du registre est une **copie** du `deburr()` de l'edge (Deno) : toute évolution touche les deux.
+- Confirmation de RDV : envoyée par `ContractModal.handleConfirmScheduling` (CTA créneau optimisé ET planification manuelle), 1 seul créneau, mobile FR. **Non couvert** : kanban entretien et Tournées (`useJourneePose`).
+---
