@@ -109,12 +109,25 @@ export function formatSmsHour(hhmm) {
 }
 
 /**
+ * « LUCILLE » → « Lucille », « JEAN-PIERRE » → « Jean-Pierre », « D'ANGELO » → « D'Angelo ».
+ * Les prénoms clients sont stockés en majuscules (import Excel) ; un SMS qui crie
+ * « Bonjour LUCILLE » n'est pas un rappel aimable. Capitale après début, espace,
+ * tiret et apostrophe (droite ou typographique).
+ */
+export function capitaliserPrenom(s) {
+  return String(s ?? '')
+    .trim()
+    .toLocaleLowerCase('fr-FR')
+    .replace(/(^|[\s'’-])(\p{L})/gu, (_m, sep, ch) => sep + ch.toLocaleUpperCase('fr-FR'));
+}
+
+/**
  * Variables du gabarit `rappel_rdv`. Toujours 4 clés, toujours des chaînes
  * (l'edge remplace une clé absente par du vide puis recolle la ponctuation).
  */
 export function buildRappelRdvVars({ clientFirstName, date, startTime, technicianName } = {}) {
   return {
-    prenom: String(clientFirstName ?? '').trim(),
+    prenom: capitaliserPrenom(clientFirstName),
     date: formatSmsDate(date),
     heure: formatSmsHour(startTime),
     technicien: String(technicianName ?? '').trim(),

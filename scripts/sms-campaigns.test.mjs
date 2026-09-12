@@ -182,3 +182,12 @@ test('decrireRappelRdv — phrase lisible pour l’onglet Settings', () => {
   assert.equal(JOURS_SEMAINE.length, 7);
 });
 
+
+test('buildRappelRdvVars — prénom stocké en MAJUSCULES rendu en capitale initiale (composés, accents, apostrophe)', () => {
+  assert.equal(buildRappelRdvVars({ clientFirstName: 'LUCILLE' }).prenom, 'Lucille');
+  assert.equal(buildRappelRdvVars({ clientFirstName: 'JEAN-PIERRE' }).prenom, 'Jean-Pierre');
+  assert.equal(buildRappelRdvVars({ clientFirstName: 'marie claire' }).prenom, 'Marie Claire');
+  assert.equal(buildRappelRdvVars({ clientFirstName: 'VÉRONIQUE' }).prenom, 'Véronique');
+  assert.equal(buildRappelRdvVars({ clientFirstName: "D'ANGELO" }).prenom, "D'Angelo");
+  assert.equal(buildRappelRdvVars({ clientFirstName: '' }).prenom, '');
+});
