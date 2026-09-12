@@ -226,6 +226,37 @@ export const tourneesService = {
    *   majordhome, cf. bloc d'asymétrie en tête de fichier).
    * @returns {Promise<{ data: Journee[], error: Error|null }>}
    */
+  /**
+   * Créneaux optimisés pour UN contrat — calcul côté serveur (edge slots-propose,
+   * même moteur que l'onglet). Outil « machine-usable » : même entrée/sortie
+   * pour le CTA de ContractModal et, demain, le serveur MCP (Hermes/Vapi).
+   *
+   * @param {{ coreOrgId: string, contractId: string, constraints?: {
+   *   technician_id?: string, date_from?: string, date_to?: string,
+   *   periode?: 'matin'|'apres_midi', jours_semaine_exclus?: number[], dates_exclues?: string[]
+   * }, maxResults?: number }} params
+   * @returns {Promise<{ data: object|null, error: Error|null }>}  `error.message` porte le
+   *   code de l'edge (`siege_non_configure`, `client_non_localise`, `aucun_technicien`, …)
+   */
+  async proposerPourContrat({ coreOrgId, contractId, constraints = {}, maxResults = 4 }) {
+    const { data, error } = await supabase.functions.invoke('slots-propose', {
+      body: { org_id: coreOrgId, contract_id: contractId, constraints, max_results: maxResults },
+    });
+    if (error) {
+      // supabase-js enveloppe les réponses non-2xx : le code métier est dans le corps.
+      let detail = error.message;
+      try {
+        const payload = await error.context?.json?.();
+        if (payload?.error) detail = payload.error;
+      } catch {
+        // Corps non-JSON : on garde le message brut plutôt que de le masquer.
+      }
+      logger.error('[tournees] proposerPourContrat', detail);
+      return { data: null, error: new Error(detail) };
+    }
+    return { data: data?.data ?? null, error: null };
+  },
+
   async getJourneesHorizon({ coreOrgId, joursApres = 45 }) {
     // Logique déplacée dans src/lib/tournee/loaders.js (injectable, partagée
     // avec l'edge slots-propose). Ici : résolution de l'org majordhome + client de l'app.

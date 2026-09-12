@@ -383,4 +383,9 @@ export const tourneeKeys = {
     ...tourneeKeys.all(orgId), 'propositions', date, technicienId, chargeMinutes,
     empreinteCreneaux,
   ],
+  // Créneaux optimisés pour UN contrat (edge slots-propose). Sous tourneeKeys.all :
+  // poser un RDV invalide tout (le classement dépend du planning).
+  creneauxContrat: (orgId, contractId, constraints) => [
+    ...tourneeKeys.all(orgId), 'creneauxContrat', contractId, JSON.stringify(constraints || {}),
+  ],
 };

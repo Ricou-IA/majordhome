@@ -153,3 +153,22 @@ export function usePropositions({ journee, candidats, coreOrgId, settings, enabl
     staleTime: 5 * 60 * 1000,
   });
 }
+
+/**
+ * Créneaux optimisés pour un contrat (edge slots-propose). `staleTime: 0` : un
+ * RDV posé entre-temps change la réponse. Pas de retry : les erreurs sont
+ * métier (siège non configuré, client non localisé…) et l'écran les affiche.
+ */
+export function useCreneauxProposes({ orgId, contractId, constraints = {}, enabled = true }) {
+  return useQuery({
+    queryKey: tourneeKeys.creneauxContrat(orgId, contractId, constraints),
+    queryFn: async () => {
+      const { data, error } = await tourneesService.proposerPourContrat({ coreOrgId: orgId, contractId, constraints });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!contractId && enabled,
+    staleTime: 0,
+    retry: false,
+  });
+}

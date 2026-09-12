@@ -18,12 +18,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, User, Calendar,
   FileText, History, ExternalLink, Loader2, AlertCircle,
-  CalendarPlus,
+  CalendarPlus, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useContract, useContractVisits, useEntretienByContract } from '@hooks/useContracts';
-import { entretienSavKeys, appointmentKeys, contractKeys } from '@hooks/cacheKeys';
+import { entretienSavKeys, appointmentKeys, contractKeys, tourneeKeys } from '@hooks/cacheKeys';
 import { MAINTENANCE_MONTHS } from '@services/contracts.service';
 import { ensureEntretienCard } from '@services/entretiens.service';
 import { savService } from '@services/sav.service';
@@ -35,6 +35,7 @@ import { logger } from '@lib/logger';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { deriveVisitBadgeStatus } from '@/lib/entretienVisitStatus';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
+import { CreneauxProposesPanel } from './CreneauxProposesPanel';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -86,44 +87,73 @@ export function ContractModal({ contractId, isOpen, onClose }) {
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [schedulingItem, setSchedulingItem] = useState(null);
   const [planning, setPlanning] = useState(false);
+  const [creneauxOuverts, setCreneauxOuverts] = useState(false);
+  const [posing, setPosing] = useState(false);
+
+  /**
+   * Carte d'entretien à planifier (créée si absente) + item de planification.
+   * Partagé par « Planifier manuellement » (assistant classique) et « Trouver le
+   * créneau optimisé » (edge slots-propose). Retourne null si la préparation
+   * échoue (le toast est déjà affiché).
+   */
+  const preparerCarte = useCallback(async () => {
+    if (!contract) return null;
+    const { interventionId, error } = await ensureEntretienCard({
+      clientId: contract.client_id,
+      contractId: contract.id,
+      userId: user?.id,
+    });
+    if (error || !interventionId) {
+      toast.error(error === 'client_sans_projet'
+        ? 'Projet client introuvable — impossible de planifier'
+        : 'Erreur lors de la préparation de la planification');
+      return null;
+    }
+    const item = {
+      id: interventionId,
+      intervention_type: 'entretien',
+      client_id: contract.client_id,
+      client_name: contract.client_name,
+      client_last_name: contract.client_name,
+      client_first_name: null,
+      client_phone: contract.client_phone || '',
+      client_email: contract.client_email || null,
+      client_address: contract.client_address || null,
+      client_city: contract.client_city || null,
+      client_postal_code: contract.client_postal_code || null,
+      includes_entretien: false,
+    };
+    setSchedulingItem(item);
+    return item;
+  }, [contract, user]);
 
   const handlePlanifier = useCallback(async () => {
     if (!contract || planning) return;
     setPlanning(true);
     try {
-      const { interventionId, error } = await ensureEntretienCard({
-        clientId: contract.client_id,
-        contractId: contract.id,
-        userId: user?.id,
-      });
-      if (error || !interventionId) {
-        toast.error(error === 'client_sans_projet'
-          ? 'Projet client introuvable — impossible de planifier'
-          : 'Erreur lors de la préparation de la planification');
-        return;
-      }
-      setSchedulingItem({
-        id: interventionId,
-        intervention_type: 'entretien',
-        client_id: contract.client_id,
-        client_name: contract.client_name,
-        client_last_name: contract.client_name,
-        client_first_name: null,
-        client_phone: contract.client_phone || '',
-        client_email: contract.client_email || null,
-        client_address: contract.client_address || null,
-        client_city: contract.client_city || null,
-        client_postal_code: contract.client_postal_code || null,
-        includes_entretien: false,
-      });
-      setSchedulingOpen(true);
+      const item = await preparerCarte();
+      if (item) setSchedulingOpen(true);
     } catch (err) {
       logger.error('[ContractModal] handlePlanifier error:', err);
       toast.error('Erreur lors de la planification');
     } finally {
       setPlanning(false);
     }
-  }, [contract, planning, user]);
+  }, [contract, planning, preparerCarte]);
+
+  const handleCreneauOptimise = useCallback(async () => {
+    if (!contract || planning) return;
+    setPlanning(true);
+    try {
+      const item = await preparerCarte();
+      if (item) setCreneauxOuverts(true);
+    } catch (err) {
+      logger.error('[ContractModal] handleCreneauOptimise error:', err);
+      toast.error('Erreur lors de la préparation des créneaux');
+    } finally {
+      setPlanning(false);
+    }
+  }, [contract, planning, preparerCarte]);
 
   const handleConfirmScheduling = useCallback(async (slots) => {
     const orgId = organization?.id;
@@ -141,7 +171,29 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
     queryClient.invalidateQueries({ queryKey: contractKeys.detail(orgId, contractId) });
     queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', contractId] });
+    // Le classement des créneaux dépend du planning : un RDV posé change tout.
+    queryClient.invalidateQueries({ queryKey: tourneeKeys.all(orgId) });
   }, [organization, schedulingItem, contractId, queryClient]);
+
+  /**
+   * Clic sur un créneau proposé : pose directe par le chemin existant
+   * (scheduleEntretien). Une « nouvelle journée » (journée vide hors horizon)
+   * ouvre l'assistant classique : le choix de l'heure reste humain.
+   */
+  const handleChoisirCreneau = useCallback(async (slot) => {
+    if (slot.nouvelleJournee) {
+      setCreneauxOuverts(false);
+      setSchedulingOpen(true);
+      return;
+    }
+    setPosing(true);
+    try {
+      await handleConfirmScheduling([slot]);
+      setCreneauxOuverts(false);
+    } finally {
+      setPosing(false);
+    }
+  }, [handleConfirmScheduling]);
 
   // Gestion ESC pour fermer
   useEffect(() => {
@@ -272,7 +324,29 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                   <InfoRow label="Prochaine visite" value={formatDateFR(nextVisitDate)} />
                 )}
                 {badgeStatus === 'a_planifier' && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={handleCreneauOptimise}
+                      disabled={planning || creneauxOuverts}
+                    >
+                      {planning ? (
+                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Préparation…</>
+                      ) : (
+                        <><Sparkles className="h-4 w-4 mr-1.5" />Trouver le créneau optimisé</>
+                      )}
+                    </Button>
+                    {creneauxOuverts && schedulingItem && (
+                      <CreneauxProposesPanel
+                        orgId={organization?.id}
+                        contractId={contractId}
+                        clientName={contract.client_name}
+                        onChoisir={handleChoisirCreneau}
+                        onFermer={() => setCreneauxOuverts(false)}
+                        busy={posing}
+                      />
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -280,11 +354,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                       onClick={handlePlanifier}
                       disabled={planning}
                     >
-                      {planning ? (
-                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Préparation…</>
-                      ) : (
-                        <><CalendarPlus className="h-4 w-4 mr-1.5" />Planifier</>
-                      )}
+                      <CalendarPlus className="h-4 w-4 mr-1.5" />Planifier manuellement
                     </Button>
                   </div>
                 )}
