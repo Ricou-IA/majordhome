@@ -31,7 +31,6 @@ import { useAuth } from '@contexts/AuthContext';
 import { VisitBadge } from './VisitBadge';
 import { Button } from '@components/ui/button';
 import { formatDateFR, formatEuro } from '@/lib/utils';
-import { logger } from '@lib/logger';
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
 import { deriveVisitBadgeStatus } from '@/lib/entretienVisitStatus';
 import { SchedulingTransitionModal } from './SchedulingTransitionModal';
@@ -86,79 +85,61 @@ export function ContractModal({ contractId, isOpen, onClose }) {
 
   const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [schedulingItem, setSchedulingItem] = useState(null);
-  const [planning, setPlanning] = useState(false);
   const [creneauxOuverts, setCreneauxOuverts] = useState(false);
   const [posing, setPosing] = useState(false);
 
   /**
-   * Carte d'entretien à planifier (créée si absente) + item de planification.
-   * Partagé par « Planifier manuellement » (assistant classique) et « Trouver le
-   * créneau optimisé » (edge slots-propose). Retourne null si la préparation
-   * échoue (le toast est déjà affiché).
+   * Item de planification construit depuis le contrat — SANS écriture en base.
+   * La carte d'entretien n'est créée qu'au moment où un RDV est réellement posé
+   * (handleConfirmScheduling) : `ensureEntretienCard` insère directement en
+   * `planifie`, et une carte « planifiée » sans RDV est un fantôme qui sort le
+   * contrat des contrats dus (bug vécu 2026-09-12 : ouvrir le CTA puis fermer
+   * taguait le client « Planifié »).
    */
-  const preparerCarte = useCallback(async () => {
-    if (!contract) return null;
-    const { interventionId, error } = await ensureEntretienCard({
+  const itemDepuisContrat = useCallback(() => ({
+    id: null,
+    intervention_type: 'entretien',
+    client_id: contract.client_id,
+    client_name: contract.client_name,
+    client_last_name: contract.client_name,
+    client_first_name: null,
+    client_phone: contract.client_phone || '',
+    client_email: contract.client_email || null,
+    client_address: contract.client_address || null,
+    client_city: contract.client_city || null,
+    client_postal_code: contract.client_postal_code || null,
+    includes_entretien: false,
+  }), [contract]);
+
+  const handlePlanifier = useCallback(() => {
+    if (!contract) return;
+    setSchedulingItem(itemDepuisContrat());
+    setSchedulingOpen(true);
+  }, [contract, itemDepuisContrat]);
+
+  const handleCreneauOptimise = useCallback(() => {
+    if (!contract) return;
+    setSchedulingItem(itemDepuisContrat());
+    setCreneauxOuverts(true);
+  }, [contract, itemDepuisContrat]);
+
+  const handleConfirmScheduling = useCallback(async (slots) => {
+    const orgId = organization?.id;
+    // La carte n'existe (ou n'est réutilisée) qu'ICI, juste avant le RDV —
+    // même enchaînement que useJourneePose. Jamais avant un choix humain.
+    const { interventionId, error: ensureErr } = await ensureEntretienCard({
       clientId: contract.client_id,
       contractId: contract.id,
       userId: user?.id,
     });
-    if (error || !interventionId) {
-      toast.error(error === 'client_sans_projet'
+    if (ensureErr || !interventionId) {
+      toast.error(ensureErr === 'client_sans_projet'
         ? 'Projet client introuvable — impossible de planifier'
         : 'Erreur lors de la préparation de la planification');
-      return null;
+      return { ok: false };
     }
-    const item = {
-      id: interventionId,
-      intervention_type: 'entretien',
-      client_id: contract.client_id,
-      client_name: contract.client_name,
-      client_last_name: contract.client_name,
-      client_first_name: null,
-      client_phone: contract.client_phone || '',
-      client_email: contract.client_email || null,
-      client_address: contract.client_address || null,
-      client_city: contract.client_city || null,
-      client_postal_code: contract.client_postal_code || null,
-      includes_entretien: false,
-    };
-    setSchedulingItem(item);
-    return item;
-  }, [contract, user]);
-
-  const handlePlanifier = useCallback(async () => {
-    if (!contract || planning) return;
-    setPlanning(true);
-    try {
-      const item = await preparerCarte();
-      if (item) setSchedulingOpen(true);
-    } catch (err) {
-      logger.error('[ContractModal] handlePlanifier error:', err);
-      toast.error('Erreur lors de la planification');
-    } finally {
-      setPlanning(false);
-    }
-  }, [contract, planning, preparerCarte]);
-
-  const handleCreneauOptimise = useCallback(async () => {
-    if (!contract || planning) return;
-    setPlanning(true);
-    try {
-      const item = await preparerCarte();
-      if (item) setCreneauxOuverts(true);
-    } catch (err) {
-      logger.error('[ContractModal] handleCreneauOptimise error:', err);
-      toast.error('Erreur lors de la préparation des créneaux');
-    } finally {
-      setPlanning(false);
-    }
-  }, [contract, planning, preparerCarte]);
-
-  const handleConfirmScheduling = useCallback(async (slots) => {
-    const orgId = organization?.id;
     const { error } = await savService.scheduleEntretien({
-      card: schedulingItem,
+      card: { ...schedulingItem, id: interventionId },
       slots,
       includesEntretien: false,
       coreOrgId: orgId,
@@ -174,7 +155,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
     // Le classement des créneaux dépend du planning : un RDV posé change tout.
     queryClient.invalidateQueries({ queryKey: tourneeKeys.all(orgId) });
     return { ok: true };
-  }, [organization, schedulingItem, contractId, queryClient]);
+  }, [organization, schedulingItem, contract, contractId, queryClient, user]);
 
   /**
    * Clic sur un créneau proposé : pose directe par le chemin existant
@@ -332,13 +313,9 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                       size="sm"
                       className="w-full"
                       onClick={handleCreneauOptimise}
-                      disabled={planning || creneauxOuverts}
+                      disabled={creneauxOuverts}
                     >
-                      {planning ? (
-                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Préparation…</>
-                      ) : (
-                        <><Sparkles className="h-4 w-4 mr-1.5" />Trouver le créneau optimisé</>
-                      )}
+                      <Sparkles className="h-4 w-4 mr-1.5" />Trouver le créneau optimisé
                     </Button>
                     {creneauxOuverts && schedulingItem && (
                       <CreneauxProposesPanel
@@ -355,7 +332,6 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                       size="sm"
                       className="w-full border-primary-300 text-primary-700 hover:bg-primary-50"
                       onClick={handlePlanifier}
-                      disabled={planning}
                     >
                       <CalendarPlus className="h-4 w-4 mr-1.5" />Planifier manuellement
                     </Button>
