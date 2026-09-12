@@ -12,9 +12,10 @@
  */
 
 import { LinkedClientCard } from '@/apps/artisan/components/shared/LinkedClientCard';
+import { BanAddressInput } from '@/apps/artisan/components/shared/BanAddressInput';
 import {
   Search, PenLine, Unlink, Link2, X,
-  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, MapPin, Euro, ChevronDown, CalendarDays,
+  Phone, PhoneOutgoing, PhoneForwarded, Mail, MailCheck, Euro, ChevronDown, CalendarDays,
   ArrowRightLeft, Target, Loader2, Wrench, Undo2,
   FileText, ChevronRight, Plus, Info,
 } from 'lucide-react';
@@ -333,20 +334,21 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
       </div>
     </FormField>
 
-    <FormField label="Adresse" className="mt-3">
-      <div className="relative">
-        <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          value={form.address}
-          onChange={(e) => setField('address', e.target.value)}
-          className={`${inputClass} pl-9`}
-          placeholder="Adresse"
-          disabled={contactFieldsDisabled}
-          autoComplete="off"
-        />
-      </div>
-    </FormField>
+    {/* Saisie assistée BAN (2026-09-12) : suggestions d'adresses, texte validé.
+        Pas de `location` côté lead : le géocodage (+ zone + commercial) reste
+        dans geocodeAndAssignLead, en aval du save. */}
+    <div className="mt-3">
+      <BanAddressInput
+        value={{ address: form.address, postalCode: form.postal_code, city: form.city }}
+        onChange={(next) => {
+          setField('address', next.address);
+          setField('postal_code', next.postalCode);
+          setField('city', next.city);
+        }}
+        disabled={contactFieldsDisabled}
+        showLocation={false}
+      />
+    </div>
 
     <input
       type="text"
@@ -357,32 +359,6 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
       disabled={contactFieldsDisabled}
       autoComplete="off"
     />
-
-    <div className="grid grid-cols-3 gap-3 mt-2">
-      <FormField label="CP">
-        <input
-          type="text"
-          value={form.postal_code}
-          onChange={(e) => setField('postal_code', e.target.value.replace(/\D/g, '').slice(0, 5))}
-          className={inputClass}
-          placeholder="81600"
-          maxLength={5}
-          disabled={contactFieldsDisabled}
-          autoComplete="off"
-        />
-      </FormField>
-      <FormField label="Ville" className="col-span-2">
-        <input
-          type="text"
-          value={form.city}
-          onChange={(e) => setField('city', e.target.value)}
-          className={inputClass}
-          placeholder="Gaillac"
-          disabled={contactFieldsDisabled}
-          autoComplete="off"
-        />
-      </FormField>
-    </div>
   </>
   );
 };

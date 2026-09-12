@@ -12,6 +12,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import * as turf from '@turf/turf';
+import { logger } from '@lib/logger';
 
 const API_BASE = 'https://api-adresse.data.gouv.fr';
 
@@ -73,6 +74,82 @@ export async function geocodeAddress(address, postalCode, city) {
     console.error('[geocoding] Erreur:', error);
     return null;
   }
+}
+
+// ============================================================================
+// SAISIE ASSISTÉE (BAN) — 2026-09-12
+// L'adresse est validée AU MOMENT de la saisie (BanAddressInput) : une
+// suggestion choisie remonte lat/lng + précision ; si l'adresse exacte n'existe
+// pas, l'utilisateur localise au moins la COMMUNE (centroïde, précision
+// « municipality » — suffisant pour les tournées, décision produit).
+// ============================================================================
+
+/**
+ * Suggestions BAN pour l'autocomplétion.
+ * @param {string} q
+ * @param {{ postcode?: string, limit?: number }} [options]
+ * @returns {Promise<Array<{ label, name, postcode, city, citycode, lat, lng,
+ *   type: 'housenumber'|'street'|'locality'|'municipality', score }>>}  [] si trop court / erreur
+ */
+export async function suggestAddresses(q, { postcode, limit = 5 } = {}) {
+  const query = String(q || '').trim();
+  if (query.length < 3) return [];
+  const params = new URLSearchParams({ q: query, limit: String(limit), autocomplete: '1' });
+  if (postcode && /^\d{5}$/.test(postcode)) params.set('postcode', postcode);
+  try {
+    const res = await fetch(`${API_BASE}/search/?${params}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.features || []).map((f) => {
+      const p = f.properties;
+      const [lng, lat] = f.geometry.coordinates;
+      return {
+        label: p.label, name: p.name, postcode: p.postcode, city: p.city, citycode: p.citycode,
+        lat, lng, type: p.type, score: p.score,
+      };
+    });
+  } catch (err) {
+    logger.warn('[geocoding] suggestAddresses', err);
+    return [];
+  }
+}
+
+/**
+ * Centroïde d'une commune (précision « municipality ») — le filet quand
+ * l'adresse exacte n'existe pas dans la BAN.
+ * @returns {Promise<{ lat, lng, label, postcode, city } | null>}
+ */
+export async function geocodeCommune(postalCode, city) {
+  const q = String(city || postalCode || '').trim();
+  if (!q) return null;
+  const params = new URLSearchParams({ q, type: 'municipality', limit: '1' });
+  if (postalCode && /^\d{5}$/.test(postalCode)) params.set('postcode', postalCode);
+  try {
+    const res = await fetch(`${API_BASE}/search/?${params}`);
+    if (!res.ok) return null;
+    const f = (await res.json()).features?.[0];
+    if (!f || (f.properties.score ?? 0) < 0.3) return null;
+    const [lng, lat] = f.geometry.coordinates;
+    return { lat, lng, label: f.properties.label, postcode: f.properties.postcode, city: f.properties.city };
+  } catch (err) {
+    logger.warn('[geocoding] geocodeCommune', err);
+    return null;
+  }
+}
+
+/**
+ * Coordonnées choisies à la saisie (BAN) — RPC `client_set_location`
+ * (membership-checked), jamais un UPDATE direct : la vue majordhome_clients
+ * n'expose pas address_precision. Écrit APRÈS l'adresse (le trigger
+ * reset_geocode_on_address_change efface les coordonnées quand l'adresse change).
+ * @returns {Promise<{ error: Error|null }>}
+ */
+export async function setClientLocation({ clientId, lat, lng, precision }) {
+  const { error } = await supabase.rpc('client_set_location', {
+    p_client_id: clientId, p_lat: lat, p_lng: lng, p_precision: precision ?? null,
+  });
+  if (error) logger.error('[geocoding] setClientLocation', error);
+  return { error: error || null };
 }
 
 // ============================================================================

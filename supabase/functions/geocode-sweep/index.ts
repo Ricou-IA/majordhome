@@ -42,36 +42,55 @@ interface ApplyRow {
   id: string;
   lat: number | null;
   lng: number | null;
+  // Précision BAN (housenumber | street | locality | municipality) — posée par la
+  // RPC geocode_apply_client_coordinates dans clients.address_precision (2026-09-12).
+  precision?: string;
 }
 
-// Géocode une adresse via l'endpoint unitaire gouv. Retourne lat/lng null si échec
-// ou score < seuil.
-async function geocodeOne(c: PendingClient): Promise<ApplyRow> {
-  const q = [c.address, c.postal_code, c.city].filter(Boolean).join(" ").trim();
-  if (q.length < 5) return { id: c.id, lat: null, lng: null };
-
-  const params = new URLSearchParams({ q, limit: "1" });
-  if (c.postal_code) params.set("postcode", c.postal_code);
-
+// Un appel BAN unitaire, borné à 8 s. Retourne la 1re feature si son score passe
+// le seuil, sinon null (échec réseau compris).
+async function banSearch(params: URLSearchParams): Promise<{ lat: number; lng: number; type: string } | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(`${GOUV_SEARCH}?${params}`, { signal: controller.signal });
     clearTimeout(timeout);
-    if (!res.ok) return { id: c.id, lat: null, lng: null };
-
+    if (!res.ok) return null;
     const data = await res.json();
     const f = data?.features?.[0];
     const score = f?.properties?.score ?? 0;
-    if (!f || score < SCORE_MIN) return { id: c.id, lat: null, lng: null };
-
+    if (!f || score < SCORE_MIN) return null;
     const [lng, lat] = f.geometry.coordinates;
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { id: c.id, lat: null, lng: null };
-    return { id: c.id, lat, lng };
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng, type: String(f.properties?.type ?? "") };
   } catch {
     clearTimeout(timeout);
-    return { id: c.id, lat: null, lng: null };
+    return null;
   }
+}
+
+// Géocode une adresse en deux étages : l'adresse exacte, puis — si elle n'est
+// pas reconnue mais qu'un code postal existe — la COMMUNE (centroïde, précision
+// « municipality »). Une adresse mal saisie ne bloque plus le calcul des
+// tournées : « le code postal suffit dans 99 % des cas » (décision 2026-09-12).
+// Retourne lat/lng null seulement si même la commune est inconnue.
+async function geocodeOne(c: PendingClient): Promise<ApplyRow> {
+  const echec: ApplyRow = { id: c.id, lat: null, lng: null };
+  const q = [c.address, c.postal_code, c.city].filter(Boolean).join(" ").trim();
+
+  if (q.length >= 5) {
+    const params = new URLSearchParams({ q, limit: "1" });
+    if (c.postal_code) params.set("postcode", c.postal_code);
+    const exact = await banSearch(params);
+    if (exact) return { id: c.id, lat: exact.lat, lng: exact.lng, precision: exact.type || undefined };
+  }
+
+  if (c.postal_code && /^\d{5}$/.test(c.postal_code)) {
+    const params = new URLSearchParams({ q: c.city || c.postal_code, type: "municipality", postcode: c.postal_code, limit: "1" });
+    const commune = await banSearch(params);
+    if (commune) return { id: c.id, lat: commune.lat, lng: commune.lng, precision: "municipality" };
+  }
+  return echec;
 }
 
 // Géocode le lot en petits paquets concurrents.

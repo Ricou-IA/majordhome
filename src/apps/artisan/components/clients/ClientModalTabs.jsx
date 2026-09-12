@@ -19,6 +19,7 @@ import { useClientEquipments } from '@hooks/useClients';
 import { formatDateFR } from '@/lib/utils';
 import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '../FormFields';
 import { EquipmentList } from './EquipmentList';
+import { BanAddressInput } from '../shared/BanAddressInput';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -174,34 +175,22 @@ export function TabInfo({ formData, setFormData, errors, isLocked }) {
           <MapPin className="w-4 h-4 text-gray-500" />
           Adresse
         </h3>
-        <div className="space-y-4">
-          <FormField label="Adresse">
-            <TextInput
-              value={formData.address}
-              onChange={(v) => updateField('address', v)}
-              placeholder="12 rue des Lilas"
-              disabled={isLocked}
-            />
-          </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Code postal">
-              <TextInput
-                value={formData.postalCode}
-                onChange={(v) => updateField('postalCode', v)}
-                placeholder="40100"
-                disabled={isLocked}
-              />
-            </FormField>
-            <FormField label="Ville">
-              <TextInput
-                value={formData.city}
-                onChange={(v) => updateField('city', v)}
-                placeholder="Dax"
-                disabled={isLocked}
-              />
-            </FormField>
-          </div>
-        </div>
+        {/* Saisie assistée BAN : une adresse choisie est localisée à l'enregistrement
+            (location → RPC client_set_location), une adresse introuvable se localise
+            au moins à la commune. */}
+        <BanAddressInput
+          value={{
+            address: formData.address, postalCode: formData.postalCode, city: formData.city,
+            location: formData.location,
+          }}
+          onChange={(next) => {
+            updateField('address', next.address);
+            updateField('postalCode', next.postalCode);
+            updateField('city', next.city);
+            updateField('location', next.location ?? null);
+          }}
+          disabled={isLocked}
+        />
       </div>
 
       {/* Section Contact */}

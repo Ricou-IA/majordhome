@@ -22,7 +22,7 @@ import { useCanAccess } from '@hooks/usePermissions';
 import { useClient } from '@hooks/useClients';
 import { usePennylaneSyncClient } from '@hooks/usePennylane';
 import { clientsService } from '@services/clients.service';
-import { geocodeAndUpdateByProjectId } from '@services/geocoding.service';
+import { geocodeAndUpdateByProjectId, setClientLocation } from '@services/geocoding.service';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
 import { TabContrat } from '../../pages/client-detail/TabContrat';
 
@@ -39,7 +39,7 @@ const TABS = [
 
 const EMPTY_FORM = {
   firstName: '', lastName: '', clientCategory: 'particulier',
-  companyName: '', address: '', postalCode: '', city: '',
+  companyName: '', address: '', postalCode: '', city: '', location: null,
   phone: '', phoneSecondary: '', email: '', mailOptin: true, smsOptin: true,
   housingType: '', surface: '', dpeNumber: '',
   leadSource: '', notes: '', createdAt: null,
@@ -101,6 +101,9 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
       firstName, lastName,
       clientCategory: c.client_category || 'particulier',
       address: c.address || '', postalCode: c.postal_code || '', city: c.city || '',
+      // Coordonnées choisies via la saisie BAN pendant cette session d'édition
+      // seulement (null au chargement : celles en base restent gérées en aval).
+      location: null,
       phone: c.phone || '', email: c.email || '', mailOptin: c.mail_optin !== false, smsOptin: c.sms_optin !== false,
       housingType: c.housing_type || '', surface: c.surface || '',
       dpeNumber: c.dpe_number || '', leadSource: c.lead_source || '',
@@ -136,6 +139,9 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   // Détection modifications
   const hasUnsavedChanges = useCallback(() => {
     const orig = originalDataRef.current;
+    // Une localisation choisie (BAN) sans changement de texte est une modification
+    // à enregistrer (ex. « Localiser à la commune » sur une adresse existante).
+    if (formData.location) return true;
     return FIELDS_TO_COMPARE.some(f => String(orig[f] ?? '') !== String(formData[f] ?? ''));
   }, [formData]);
 
@@ -180,7 +186,13 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
         });
         if (error) throw error;
 
-        if (formData.postalCode && formData.city && newClient?.project_id) {
+        // Localisation : coordonnées choisies à la saisie (BAN) en priorité, sinon
+        // géocodage après coup comme avant. Jamais les deux (le second écraserait
+        // une précision meilleure par une moins bonne).
+        if (formData.location && newClient?.id) {
+          const { error: locErr } = await setClientLocation({ clientId: newClient.id, ...formData.location });
+          if (locErr) toast.error("Client créé, mais sa localisation n'a pas pu être enregistrée");
+        } else if (formData.postalCode && formData.city && newClient?.project_id) {
           geocodeAndUpdateByProjectId(newClient.project_id, formData.address, formData.postalCode, formData.city)
             .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
         }
@@ -209,11 +221,16 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           formData.address !== originalDataRef.current?.address ||
           formData.postalCode !== originalDataRef.current?.postalCode ||
           formData.city !== originalDataRef.current?.city;
-        if (addressChanged && formData.postalCode && formData.city && client?.project_id) {
+        if (formData.location && client?.id) {
+          // Écrit APRÈS l'adresse : le trigger DB efface les coordonnées quand
+          // l'adresse change, on les repose ensuite avec leur précision.
+          const { error: locErr } = await setClientLocation({ clientId: client.id, ...formData.location });
+          if (locErr) toast.error("Adresse enregistrée, mais sa localisation n'a pas pu être sauvegardée");
+        } else if (addressChanged && formData.postalCode && formData.city && client?.project_id) {
           geocodeAndUpdateByProjectId(client.project_id, formData.address, formData.postalCode, formData.city)
             .catch(err => console.warn('[ClientModal] Auto-geocode failed:', err));
         }
-        originalDataRef.current = { ...formData };
+        originalDataRef.current = { ...formData, location: null };
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
       }
