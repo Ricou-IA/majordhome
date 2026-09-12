@@ -6,15 +6,6 @@
  * ============================================================================
  */
 
-// Labels catégories équipements (même que EquipmentFormModal)
-export const EQUIPMENT_CATEGORY_LABELS = {
-  poeles: 'Poêles',
-  chaudieres: 'Chaudières',
-  climatisation: 'Climatisation / PAC',
-  eau_chaude: 'Eau chaude',
-  energie: 'Énergie',
-};
-
 // Causes de perte prédéfinies
 export const LOST_REASONS = [
   { value: 'Prix', label: 'Prix' },

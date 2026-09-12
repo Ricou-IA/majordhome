@@ -53,20 +53,5 @@ export const FREQUENCY_LABELS = {
 // ÉQUIPEMENTS
 // ===========================================================================
 
-export const EQUIPMENT_CATEGORY_LABELS = {
-  pac_air_air: 'PAC Air/Air',
-  pac_air_eau: 'PAC Air/Eau',
-  pac_eau_eau: 'PAC Eau/Eau',
-  pac_hybride: 'PAC Hybride',
-  chaudiere_gaz: 'Chaudière Gaz',
-  chaudiere_fioul: 'Chaudière Fioul',
-  chaudiere_granule: 'Chaudière Granulé',
-  poele_granule: 'Poêle Granulé',
-  poele_bois: 'Poêle Bois',
-  insert: 'Insert',
-  climatisation: 'Climatisation',
-  chauffe_eau: 'Chauffe-eau',
-  ballon_thermo: 'Ballon Thermodynamique',
-  vmc: 'VMC',
-  autre: 'Autre',
-};
+// Libellés d'équipement : viennent du référentiel de l'org (Settings → Tarification),
+// pas d'une constante — à exposer au portail par une vue dédiée (Sprint 8).

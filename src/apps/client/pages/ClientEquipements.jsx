@@ -9,7 +9,6 @@ import { useAuth } from '@contexts/AuthContext';
 import { useClientEquipments } from '@hooks/useClients';
 import { Wrench, Calendar, Tag, Loader2 } from 'lucide-react';
 import { formatDateFR } from '@/lib/utils';
-import { EQUIPMENT_CATEGORY_LABELS as CATEGORY_LABELS } from '../constants';
 
 export default function ClientEquipements() {
   const { clientId } = useAuth();
@@ -48,7 +47,9 @@ export default function ClientEquipements() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-semibold text-gray-900">
-                    {eq.equipment_type_name || CATEGORY_LABELS[eq.equipment_category] || 'Equipement'}
+                    {/* Libellé de type/catégorie : à exposer par une vue lisible côté portail (Sprint 8) —
+                        les référentiels de l'org ne sont pas accessibles à un compte client. */}
+                    {eq.equipment_type_name || 'Equipement'}
                   </h3>
                   <p className="text-sm text-gray-500 mt-0.5">
                     {[eq.brand, eq.model].filter(Boolean).join(' - ') || 'Marque/modèle non renseigné'}

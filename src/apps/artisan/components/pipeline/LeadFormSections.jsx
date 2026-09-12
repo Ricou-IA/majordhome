@@ -25,7 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FormField, SectionTitle, inputClass, selectClass } from '@/apps/artisan/components/FormFields';
 import { formatPhoneNumber } from '@/lib/utils';
-import { EQUIPMENT_CATEGORY_LABELS, LOST_REASONS } from './LeadStatusConfig';
+import { LOST_REASONS } from './LeadStatusConfig';
 import { FICHE_STATUS_CONFIG, computeVisitStatus } from './FicheTechniqueConfig';
 import { useTechnicalVisit } from '@hooks/useTechnicalVisit';
 // SchedulingPanel déplacé dans LeadModal (overlay mode)
@@ -451,9 +451,9 @@ export const SectionPipeline = ({
           className={selectClass}
         >
           <option value="">—</option>
-          {Object.entries(groupedEquipmentTypes).map(([category, types]) => (
-            <optgroup key={category} label={EQUIPMENT_CATEGORY_LABELS[category] || category}>
-              {types.map((type) => (
+          {groupedEquipmentTypes.map((groupe) => (
+            <optgroup key={groupe.category?.id ?? 'sans-categorie'} label={groupe.label}>
+              {groupe.types.map((type) => (
                 <option key={type.id} value={type.id}>{type.label}</option>
               ))}
             </optgroup>

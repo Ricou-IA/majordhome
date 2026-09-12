@@ -6,7 +6,8 @@ import { useAuth } from '@contexts/AuthContext';
 import { useMailSegments, useSegmentCount, useSegmentPreview } from '@hooks/useMailSegments';
 import { useMailCampaigns } from '@hooks/useMailCampaigns';
 import { useLeadStatuses, useLeadSources, useLeadCommercials } from '@hooks/useLeads';
-import { usePricingEquipmentTypes } from '@hooks/useClients';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useDebounce } from '@hooks/useDebounce';
 import {
   AUDIENCES,
@@ -21,7 +22,6 @@ import {
   arrayToCsv,
   updateFilters,
 } from './segmentBuilder.constants';
-import { EQUIPMENT_CATEGORY_LABELS } from '../pipeline/LeadStatusConfig';
 
 /**
  * SegmentBuilderDrawer — builder à facettes (4 blocs) pour composer un segment
@@ -57,18 +57,13 @@ export default function SegmentBuilderDrawer({ initial = null, onClose, onSaved 
   const { sources: leadSources } = useLeadSources();
   const { commercials: leadCommercials } = useLeadCommercials(orgId);
   const { campaigns } = useMailCampaigns(orgId);
-  const { equipmentTypes } = usePricingEquipmentTypes();
+  const { equipmentTypes, index: referentiel } = useEquipmentReferential();
 
   // Types d'équipement groupés par catégorie (même source/grouping que la fiche lead)
-  const groupedEquipmentTypes = useMemo(() => {
-    const groups = {};
-    for (const type of equipmentTypes) {
-      const cat = type.category || 'autre';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(type);
-    }
-    return groups;
-  }, [equipmentTypes]);
+  const groupedEquipmentTypes = useMemo(
+    () => grouperTypesParCategorie(referentiel, equipmentTypes),
+    [referentiel, equipmentTypes],
+  );
 
   // ------------------------------------------------------------------
   // Compteur + preview (debounced)
@@ -315,7 +310,7 @@ function CheckboxList({ label, options, values, onChange }) {
 }
 
 function EquipmentTypePicker({ groupedTypes, values, onChange, audience }) {
-  const entries = Object.entries(groupedTypes || {});
+  const entries = groupedTypes || [];
   if (entries.length === 0) return null;
   const toggle = (id) => {
     const next = new Set(values || []);
@@ -331,13 +326,13 @@ function EquipmentTypePicker({ groupedTypes, values, onChange, audience }) {
           : 'Leads dont la demande porte sur cet équipement.'}
       </p>
       <div className="space-y-2">
-        {entries.map(([category, types]) => (
-          <div key={category}>
+        {entries.map((groupe) => (
+          <div key={groupe.category?.id ?? 'sans-categorie'}>
             <p className="text-xs font-medium text-secondary-500 mb-1">
-              {EQUIPMENT_CATEGORY_LABELS[category] || category}
+              {groupe.label}
             </p>
             <div className="flex flex-wrap gap-2">
-              {types.map((t) => {
+              {groupe.types.map((t) => {
                 const checked = (values || []).includes(t.id);
                 return (
                   <button

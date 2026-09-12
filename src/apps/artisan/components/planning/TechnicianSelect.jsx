@@ -15,7 +15,7 @@ import { CheckCircle2, ChevronDown } from 'lucide-react';
  * @param {Object} props
  * @param {string[]} props.selectedIds - IDs des techniciens sélectionnés
  * @param {Function} props.onChange - Callback (newIds: string[]) => void
- * @param {Array} props.members - Liste des team_members {id, display_name, calendar_color, specialties}
+ * @param {Array} props.members - Liste des team_members {id, display_name, calendar_color}
  * @param {string} [props.placeholder] - Placeholder quand aucun technicien sélectionné
  */
 export function TechnicianSelect({ selectedIds, onChange, members, placeholder = 'Sélectionner des techniciens...' }) {
@@ -78,9 +78,6 @@ export function TechnicianSelect({ selectedIds, onChange, members, placeholder =
                     style={{ backgroundColor: member.calendar_color || '#6B7280' }}
                   />
                   <span className="text-gray-900">{member.display_name}</span>
-                  {member.specialties && (
-                    <span className="text-gray-400 text-xs ml-auto">{member.specialties}</span>
-                  )}
                 </button>
               ))
             )}

@@ -130,7 +130,7 @@ export default function ClientContrat() {
               <div key={eq.id} className="py-3 flex items-center justify-between">
                 <div>
                   <p className="font-medium text-gray-900">
-                    {eq.equipment_type_name || eq.equipment_category || 'Equipement'}
+                    {eq.equipment_type_name || 'Equipement'}
                   </p>
                   <p className="text-sm text-gray-500">
                     {[eq.brand, eq.model].filter(Boolean).join(' - ') || 'Marque/modèle non renseigné'}

@@ -37,7 +37,7 @@ function formatSlotDate(dateStr) {
 /**
  * @param {Object} props
  * @param {Array} props.slots - [{ id, date, startTime, endTime, duration, technicianIds }]
- * @param {Array} props.members - [{ id, display_name, calendar_color, specialties }]
+ * @param {Array} props.members - [{ id, display_name, calendar_color }]
  * @param {Object} props.conflictsBySlot - { [slotId]: number } compteur de conflits
  * @param {Function} props.onRemoveSlot - (slotId) => void
  * @param {Function} props.onToggleTech - (slotId, techId) => void

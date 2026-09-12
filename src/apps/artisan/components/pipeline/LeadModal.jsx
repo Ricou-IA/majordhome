@@ -27,7 +27,9 @@ import {
   useLeadCommercials,
   useLeadMutations,
 } from '@hooks/useLeads';
-import { usePricingEquipmentTypes, useClientSearch } from '@hooks/useClients';
+import { useClientSearch } from '@hooks/useClients';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@services/appointments.service';
@@ -94,7 +96,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const { statuses } = useLeadStatuses();
   const { sources } = useLeadSources();
   const { commercials } = useLeadCommercials(orgId);
-  const { equipmentTypes } = usePricingEquipmentTypes();
+  const { equipmentTypes, index: referentiel } = useEquipmentReferential();
   const pennylaneActive = usePennylaneEnabled();
   const { query: clientSearchQuery, results: clientResults, searching: clientSearching, search: searchClientMdh, clear: clearClientMdhSearch } = useClientSearch(orgId);
   // Bug #5 ROGERO : search customer Pennylane (cache D.5 + fallback live)
@@ -854,15 +856,11 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
 
   // ========== COMPUTED ==========
 
-  const groupedEquipmentTypes = useMemo(() => {
-    const groups = {};
-    for (const type of equipmentTypes) {
-      const cat = type.category || 'autre';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(type);
-    }
-    return groups;
-  }, [equipmentTypes]);
+  // [{ category, label, types }] : libellés de catégorie du référentiel de l'org
+  const groupedEquipmentTypes = useMemo(
+    () => grouperTypesParCategorie(referentiel, equipmentTypes),
+    [referentiel, equipmentTypes],
+  );
 
   // Requalifier lead → Entretien : crée client + contrat pending + carte Kanban
   // Entretien « À planifier », puis soft-delete du lead

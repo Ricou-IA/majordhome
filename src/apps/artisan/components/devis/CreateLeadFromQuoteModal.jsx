@@ -15,11 +15,11 @@ import { toast } from 'sonner';
 import { X, Plus, ChevronDown } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useLeadCommercials, useLeadSources } from '@hooks/useLeads';
-import { usePricingEquipmentTypes } from '@hooks/useClients';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useAttachQuotesAndSend } from '@hooks/usePennylane';
 import { leadsService } from '@services/leads.service';
 import { pennylaneService } from '@services/pennylane.service';
-import { EQUIPMENT_CATEGORY_LABELS } from '@apps/artisan/components/pipeline/LeadStatusConfig';
 import { formatEuro } from '@/lib/utils';
 
 const selectClass =
@@ -81,7 +81,7 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
 
   const { commercials } = useLeadCommercials(orgId);
   const { sources } = useLeadSources();
-  const { equipmentTypes } = usePricingEquipmentTypes();
+  const { equipmentTypes, index: referentiel } = useEquipmentReferential();
 
   const [commercialId, setCommercialId] = useState('');
   const [sourceId, setSourceId] = useState('');
@@ -89,16 +89,11 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
   const [isCreating, setIsCreating] = useState(false);
   const [createdLeadId, setCreatedLeadId] = useState(null);
 
-  // Même regroupement par catégorie que LeadModal.
-  const groupedEquipmentTypes = useMemo(() => {
-    const groups = {};
-    for (const type of equipmentTypes || []) {
-      const cat = type.category || 'autre';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(type);
-    }
-    return groups;
-  }, [equipmentTypes]);
+  // Même regroupement par catégorie (référentiel de l'org) que LeadModal.
+  const groupedEquipmentTypes = useMemo(
+    () => grouperTypesParCategorie(referentiel, equipmentTypes),
+    [referentiel, equipmentTypes],
+  );
 
   // Intitulé du devis : c'est ce qui permet de choisir le bon équipement sans
   // aller ouvrir le PDF. L'information est déjà dans la ligne, autant la montrer.
@@ -218,9 +213,9 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
                   className={selectClass}
                 >
                   <option value="">—</option>
-                  {Object.entries(groupedEquipmentTypes).map(([category, types]) => (
-                    <optgroup key={category} label={EQUIPMENT_CATEGORY_LABELS[category] || category}>
-                      {types.map((type) => (
+                  {groupedEquipmentTypes.map((groupe) => (
+                    <optgroup key={groupe.category?.id ?? 'sans-categorie'} label={groupe.label}>
+                      {groupe.types.map((type) => (
                         <option key={type.id} value={type.id}>{type.label}</option>
                       ))}
                     </optgroup>
