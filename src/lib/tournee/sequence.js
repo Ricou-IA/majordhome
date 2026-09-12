@@ -175,6 +175,56 @@ function plusProcheVoisin(arrets, depotKey, trajet) {
 }
 
 /**
+ * Diagnostic de la journée TELLE QUE POSÉE — l'ordre chronologique des heures
+ * provisoires, c'est-à-dire ce que le technicien vivrait en suivant le planning
+ * tel quel. Quand aucune permutation ne tient, la raison de la dernière essayée
+ * est arbitraire : ce qui explique le refus à l'opérateur, ce sont les chiffres
+ * de SA journée — travail, trajets, budget, et chaque trajet qui ne tient pas
+ * dans l'écart entre deux rendez-vous (vécu sur une journée posée à la main :
+ * 30 min entre deux clients pour 39 min de route, et 8 h 40 d'homme pour un
+ * budget de 8 h — « Figer la journée » répondait « fenêtre », sans plus).
+ *
+ * @returns {{ ordre: string[], travailMinutes: number, trajetsMinutes: number,
+ *   pauseMinutes: number, chargeMinutes: number, budgetMinutes: number,
+ *   depasseBudget: boolean,
+ *   conflits: Array<{ id, depuisId, trajetMinutes: number, disponibleMinutes: number }> }}
+ */
+export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, pause }) {
+  const heure = (a) => a.prevu ?? a.fenetre?.debut ?? 0;
+  const ordre = [...arrets].sort((a, b) => heure(a) - heure(b));
+  let trajets = 0;
+  let travail = 0;
+  const conflits = [];
+  let position = depotKey;
+  let precedent = null;
+  for (const a of ordre) {
+    const d = trajet(position, a.key);
+    trajets += d;
+    travail += a.dureeMinutes;
+    if (precedent) {
+      const disponible = heure(a) - (heure(precedent) + precedent.dureeMinutes);
+      if (disponible < d) {
+        conflits.push({ id: a.id, depuisId: precedent.id, trajetMinutes: d, disponibleMinutes: Math.max(0, disponible) });
+      }
+    }
+    position = a.key;
+    precedent = a;
+  }
+  if (ordre.length > 0) trajets += trajet(position, depotKey);
+  const chargeMinutes = trajets + travail;
+  return {
+    ordre: ordre.map((a) => a.id),
+    travailMinutes: travail,
+    trajetsMinutes: trajets,
+    pauseMinutes: pause?.minutes ?? 0,
+    chargeMinutes,
+    budgetMinutes,
+    depasseBudget: chargeMinutes > budgetMinutes,
+    conflits,
+  };
+}
+
+/**
  * Départage deux séquences de même charge minimale par ordre lexicographique
  * BRUT (pas `localeCompare`, cf. commentaire sur le tri d'entrée) de leurs
  * ids. Sans ce tie-break explicite, la séquence retenue à égalité de charge
@@ -220,6 +270,7 @@ export function sequencerTournee({
         faisable: false, raison: sim.echec, ordre: ordre.map((a) => a.id),
         planning: [], chargeMinutes: null, finMinutes: null,
         pauseHorsFenetre: false, methode: 'heuristique',
+        diagnostic: diagnostiquerJournee(arrets, ctx),
       };
     }
     return {
@@ -257,10 +308,13 @@ export function sequencerTournee({
   }
 
   if (!meilleur) {
+    // `raison` reste celle de la dernière permutation (compat) ; le diagnostic
+    // de la journée telle que posée est ce qu'il faut montrer à l'opérateur.
     return {
       faisable: false, raison: dernierEchec, ordre: [], planning: [],
       chargeMinutes: null, finMinutes: null, pauseHorsFenetre: false,
       methode: 'exact',
+      diagnostic: diagnostiquerJournee(arrets, ctx),
     };
   }
 

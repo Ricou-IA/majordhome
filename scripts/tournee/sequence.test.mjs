@@ -278,3 +278,34 @@ test('consolidation : un figé atteint « en retard » selon nos estimations est
   assert.equal(par.a.arriveeMinutes, 490);
   assert.equal(par.b.arriveeMinutes, 600, 'b garde son heure provisoire');
 });
+
+test('journée infaisable : le diagnostic dit ce que la journée TELLE QUE POSÉE coûte (cas du 15/09 : 30 min entre deux clients pour 39 min de route, 8 h 40 d homme pour 8 h)', () => {
+  const AMP = { debut: 480, fin: 1080 };
+  const rdvs = [
+    { id: 'EKOUE', lat: 43.79476, lng: 1.604971, duration_minutes: 180, scheduled_start: '08:00', appointment_type: 'maintenance' },
+    { id: 'GOMES', lat: 43.941915, lng: 1.720688, duration_minutes: 240, scheduled_start: '12:30', appointment_type: 'maintenance' },
+  ];
+  const M = { '43.912,1.890|43.795,1.605': 38, '43.795,1.605|43.912,1.890': 40, '43.912,1.890|43.942,1.721': 21, '43.942,1.721|43.912,1.890': 23, '43.795,1.605|43.942,1.721': 39, '43.942,1.721|43.795,1.605': 38 };
+  const trajet = (a, b) => (a === b ? 0 : M[`${a}|${b}`]);
+  const arrets = construireArretsPourConsolidation(rdvs, { lat: 43.9119, lng: 1.8898 }, { souplesse: true, flexDefaut: 30, amplitude: AMP });
+  const r = sequencerTournee({ depotKey: '43.912,1.890', arrets, trajet, amplitude: AMP, budgetMinutes: 480, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.equal(r.faisable, false);
+  assert.deepEqual(r.diagnostic.ordre, ['EKOUE', 'GOMES']);
+  assert.equal(r.diagnostic.travailMinutes, 420);
+  assert.equal(r.diagnostic.trajetsMinutes, 38 + 39 + 23);
+  assert.equal(r.diagnostic.depasseBudget, true);
+  assert.deepEqual(r.diagnostic.conflits, [], 'au barème (3 h), 90 min séparent la fin d EKOUE de GOMES : la route tient, seul le budget déborde');
+  // Avec les durées posées à la main (4 h / 4 h 30) : 30 min d'écart pour 39 min de route.
+  const arretsMain = construireArretsPourConsolidation(
+    rdvs.map((x) => ({ ...x, duration_minutes: x.id === 'EKOUE' ? 240 : 270 })),
+    { lat: 43.9119, lng: 1.8898 }, { souplesse: true, flexDefaut: 30, amplitude: AMP },
+  );
+  const r2 = sequencerTournee({ depotKey: '43.912,1.890', arrets: arretsMain, trajet, amplitude: AMP, budgetMinutes: 480, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.equal(r2.faisable, false);
+  assert.equal(r2.diagnostic.travailMinutes, 510);
+  assert.deepEqual(r2.diagnostic.conflits, [{ id: 'GOMES', depuisId: 'EKOUE', trajetMinutes: 39, disponibleMinutes: 30 }]);
+  // Journée faisable : pas de diagnostic (rien à expliquer).
+  const ok = sequencerTournee({ depotKey: '43.912,1.890', arrets, trajet, amplitude: AMP, budgetMinutes: 600, pause: { minutes: 30, fenetre: [720, 840] }, figesSontDesFaits: true });
+  assert.equal(ok.faisable, true);
+  assert.equal(ok.diagnostic, undefined);
+});

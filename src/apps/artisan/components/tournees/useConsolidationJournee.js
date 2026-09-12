@@ -63,15 +63,26 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       // bloque pas la journée (leçon du 31/08).
       figesSontDesFaits: true,
     });
-    if (!seq.faisable) return { faisable: false, raison: seq.raison, lignes: [] };
     const parId = new Map(rdvs.map((r) => [r.id, r]));
+    const nom = (id) => parId.get(id)?.client_name || parId.get(id)?.subject || 'RDV';
+    if (!seq.faisable) {
+      const d = seq.diagnostic;
+      return {
+        faisable: false, raison: seq.raison, lignes: [],
+        diagnostic: d ? {
+          ...d,
+          conflits: d.conflits.map((c) => ({ ...c, label: nom(c.id), depuisLabel: nom(c.depuisId) })),
+        } : null,
+        estime: !(paires instanceof Map) || paires.size === 0,
+      };
+    }
     const lignes = seq.planning.map((p) => {
       const r = parId.get(p.id);
       const avant = r?.scheduled_start?.slice(0, 5) || '—';
       const apres = minutesVersHeure(p.arriveeMinutes);
       const fige = souplesseEffective(r, flexDefaut) === 0;
       return {
-        id: p.id, label: r?.client_name || r?.subject || 'RDV', ville: r?.city || null,
+        id: p.id, label: nom(p.id), ville: r?.city || null,
         avant, apres, change: avant !== apres, fige,
         arriveeMinutes: p.arriveeMinutes, dureeMinutes: r?.duration_minutes || 60,
         clientId: r?.client_id || null, phone: r?.client_phone || null, prenom: r?.client_first_name || null,

@@ -7,6 +7,7 @@
 import { Lock, MoveHorizontal, ArrowRight, AlertTriangle } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { formatDateFR } from '@/lib/utils';
+import { formatDuree } from './tourneesPanelUtils';
 
 const RAISONS = {
   fenetre: 'un RDV ne tient pas dans sa fenêtre de tolérance',
@@ -35,10 +36,33 @@ export function FigerJourneeDialog({ journee, consolidation }) {
     >
       <div className="mt-4 space-y-3 text-sm">
         {!resultat && apercu && !apercu.faisable && (
-          <p className="flex items-start gap-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-            Impossible d’ordonnancer : {RAISONS[apercu.raison] || apercu.raison}. Décalez un rendez-vous à la main, puis réessayez.
-          </p>
+          <div className="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 space-y-1.5">
+            <p className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>Impossible d’ordonnancer : {RAISONS[apercu.raison] || apercu.raison}.</span>
+            </p>
+            {/* La journée telle qu'elle est posée, en chiffres : c'est ce qui
+                explique le refus (pas la raison d'une permutation quelconque). */}
+            {apercu.diagnostic && (
+              <ul className="text-xs space-y-0.5 pl-6">
+                <li>
+                  Telle que posée : {formatDuree(apercu.diagnostic.travailMinutes)} de travail
+                  {' + '}{formatDuree(apercu.diagnostic.trajetsMinutes)} de trajets
+                  {apercu.diagnostic.pauseMinutes ? ` (+ ${apercu.diagnostic.pauseMinutes} min de pause)` : ''}
+                  {' = '}<span className="font-medium">{formatDuree(apercu.diagnostic.chargeMinutes)}</span>
+                  {' pour un budget de '}{formatDuree(apercu.diagnostic.budgetMinutes)}
+                  {apercu.diagnostic.depasseBudget ? ' — dépassé' : ''}.
+                </li>
+                {apercu.diagnostic.conflits.map((c) => (
+                  <li key={c.id}>
+                    {c.trajetMinutes} min de trajet {c.depuisLabel} → {c.label}, {c.disponibleMinutes} min disponibles.
+                  </li>
+                ))}
+                {apercu.estime && <li className="text-amber-700">Trajets estimés à vol d’oiseau (matrice indisponible).</li>}
+              </ul>
+            )}
+            <p className="text-xs pl-6">Décalez ou déplacez un rendez-vous à la main, puis réessayez.</p>
+          </div>
         )}
         {!resultat && apercu?.faisable && (
           <>
