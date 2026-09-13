@@ -210,10 +210,6 @@ function ZoneModal({ zone, nextSortOrder, onClose, onSave, isSaving }) {
       toast.error('Code et libellé requis');
       return;
     }
-    if (!form.category_id) {
-      toast.error('Catégorie requise — créez-la dans l\'onglet Catégories si elle n\'existe pas');
-      return;
-    }
     onSave({
       code: form.code.trim().toUpperCase(),
       label: form.label.trim(),
@@ -967,10 +963,6 @@ function ExtraModal({ extra, nextSortOrder, onClose, onSave, isSaving }) {
     e.preventDefault();
     if (!form.code.trim() || !form.label.trim()) {
       toast.error('Code et libellé requis');
-      return;
-    }
-    if (!form.category_id) {
-      toast.error('Catégorie requise — créez-la dans l\'onglet Catégories si elle n\'existe pas');
       return;
     }
     onSave({
