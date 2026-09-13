@@ -3,7 +3,7 @@
 // Réglages du moteur de tournées (core.organizations.settings.tournees) et
 // leurs défauts — SOURCE UNIQUE, module pur (Node, Vite, Deno). Consommé par
 // tournees.service.js (navigateur) et l'edge slots-propose (copie _shared).
-// Éditable dans Settings → Organisation → Tournées (TourneesTab.jsx) : toute
+// Éditable dans Settings → Entretiens → Tournées (TourneesTab.jsx) : toute
 // nouvelle clé naît ici avec un défaut documenté, puis son champ dans l'onglet.
 // ============================================================================
 

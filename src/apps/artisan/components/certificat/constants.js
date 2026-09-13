@@ -12,7 +12,7 @@
 // Liste FERMÉE niveau app (= ce que le wizard sait produire), reflétée par le
 // CHECK de majordhome.equipment_categories.certificate_profile. Le gabarit d'un
 // certificat vient de la CATÉGORIE de l'équipement (référentiel de l'org,
-// Settings → Tarification → Catégories), plus d'un enum : `profilParCode()`
+// Settings → Équipements → Catégories), plus d'un enum : `profilParCode()`
 // de src/lib/equipmentReferential.js résout code de catégorie → profil, et un
 // code inconnu tombe sur `generique` (affiché dans le wizard, jamais silencieux).
 // La TVA par défaut vient elle aussi de la catégorie (default_vat_rate).

@@ -1,6 +1,6 @@
-// src/apps/artisan/pages/settings/organization/SmsTab.jsx
+// src/apps/artisan/pages/settings/communication/SmsTab.jsx
 // ============================================================================
-// Settings → Organisation → SMS : gabarits SMS / WhatsApp par campagne.
+// Settings → Communication → SMS & WhatsApp (/settings/sms) : gabarits SMS / WhatsApp par campagne.
 //
 // Source de vérité : core.organizations.settings.sms via useOrgSettings().
 //   - identité d'expéditeur (enabled, sms_from, whatsapp_from, short_link_base) :

@@ -53,5 +53,5 @@ export const FREQUENCY_LABELS = {
 // ÉQUIPEMENTS
 // ===========================================================================
 
-// Libellés d'équipement : viennent du référentiel de l'org (Settings → Tarification),
+// Libellés d'équipement : viennent du référentiel de l'org (Settings → Équipements),
 // pas d'une constante — à exposer au portail par une vue dédiée (Sprint 8).

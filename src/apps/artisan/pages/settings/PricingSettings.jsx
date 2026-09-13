@@ -1,11 +1,13 @@
 /**
  * PricingSettings.jsx — Gestion de la grille tarifaire (per-org)
  * ============================================================================
- * Onglets : Zones / Catégories / Types d'équipement / Tarifs / Remises / Extras
- * Toutes les écritures passent par `pricingService` (+ equipmentCategoriesService
- * pour les catégories, onglet dans pricing/CategoriesTab.jsx) + RLS policies org_id.
- * Référentiel équipements (2026-09) : catégorie (niveau 1) → type (niveau 2),
- * catégorie obligatoire sur chaque type, code de type jamais réécrit à l'édition.
+ * Module Entretiens & Contrats. Onglets : Zones / Grille tarifaire / Remises /
+ * Options / Durées d'entretien. Toutes les écritures passent par `pricingService`
+ * + RLS policies org_id.
+ * Le référentiel des types (catégories, types : code, libellé) est un réglage du
+ * SOCLE, dans Settings → Équipements (EquipementsSettings.jsx) — regroupement par
+ * module du 2026-09-13. Ici on ne fait que VALORISER ces types : prix par zone,
+ * remises, options, et durées/saisonnalité d'entretien (pricing/DureesTab.jsx).
  * ============================================================================
  */
 
@@ -14,19 +16,18 @@ import { Link } from 'react-router-dom';
 import { usePricingAdmin } from '@hooks/usePricing';
 import { FormField, TextInput, TextArea } from '../../components/FormFields';
 import { formatEuro } from '@/lib/utils';
-import { Loader2, MapPin, Wrench, Grid3x3, Percent, Sparkles, Layers } from 'lucide-react';
+import { Loader2, MapPin, Grid3x3, Percent, Sparkles, Timer } from 'lucide-react';
 import { toast } from 'sonner';
-import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from './pricing/ui';
+import { ToolbarHeader, ActionButtons, ModalShell } from './pricing/ui';
 import { prochainOrdre } from './pricing/ordre';
-import { CategoriesPanel } from './pricing/CategoriesTab';
+import { DureesPanel } from './pricing/DureesTab';
 
 const TABS = [
   { key: 'zones', label: 'Zones', icon: MapPin },
-  { key: 'categories', label: 'Catégories', icon: Layers },
-  { key: 'equipmentTypes', label: 'Types d\'équipement', icon: Wrench },
   { key: 'rates', label: 'Grille tarifaire', icon: Grid3x3 },
   { key: 'discounts', label: 'Remises volume', icon: Percent },
   { key: 'extras', label: 'Options', icon: Sparkles },
+  { key: 'durees', label: 'Durées d\'entretien', icon: Timer },
 ];
 
 // =============================================================================
@@ -56,7 +57,7 @@ export default function PricingSettings() {
 
       <div>
         <h1 className="text-2xl font-bold text-secondary-900">Tarification</h1>
-        <p className="text-secondary-600">Gérez la grille tarifaire de votre organisation : zones, types d&apos;équipement, tarifs, remises et options.</p>
+        <p className="text-secondary-600">Ce que vaut l&apos;entretien de chaque type d&apos;équipement : zones, grille de prix, remises, options, durées. Les types eux-mêmes se gèrent dans Paramètres → Équipements.</p>
       </div>
 
       {/* Tabs */}
@@ -85,11 +86,10 @@ export default function PricingSettings() {
       ) : (
         <div className="card">
           {tab === 'zones' && <ZonesPanel admin={admin} />}
-          {tab === 'categories' && <CategoriesPanel admin={admin} />}
-          {tab === 'equipmentTypes' && <EquipmentTypesPanel admin={admin} />}
           {tab === 'rates' && <RatesPanel admin={admin} />}
           {tab === 'discounts' && <DiscountsPanel admin={admin} />}
           {tab === 'extras' && <ExtrasPanel admin={admin} />}
+          {tab === 'durees' && <DureesPanel admin={admin} />}
         </div>
       )}
     </div>
@@ -267,296 +267,6 @@ function ZoneModal({ zone, nextSortOrder, onClose, onSave, isSaving }) {
           <button type="submit" disabled={isSaving} className="btn-primary">
             {isSaving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
             {zone ? 'Enregistrer' : 'Créer'}
-          </button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-}
-
-// =============================================================================
-// ONGLET TYPES D'ÉQUIPEMENT
-// =============================================================================
-
-// Mois déconseillés (tournées) — préférence de planification, jamais un blocage.
-const MONTHS_FR = [
-  { value: 1, label: 'Jan' },
-  { value: 2, label: 'Fév' },
-  { value: 3, label: 'Mar' },
-  { value: 4, label: 'Avr' },
-  { value: 5, label: 'Mai' },
-  { value: 6, label: 'Jun' },
-  { value: 7, label: 'Jul' },
-  { value: 8, label: 'Aoû' },
-  { value: 9, label: 'Sep' },
-  { value: 10, label: 'Oct' },
-  { value: 11, label: 'Nov' },
-  { value: 12, label: 'Déc' },
-];
-
-function EquipmentTypesPanel({ admin }) {
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-
-  const handleDelete = async (type) => {
-    if (!window.confirm(`Supprimer le type "${type.label}" ?`)) return;
-    try {
-      await admin.deleteEquipmentType.mutateAsync(type.id);
-      toast.success('Type supprimé');
-    } catch (err) {
-      toast.error(err?.message || 'Erreur');
-    }
-  };
-
-  return (
-    <div>
-      <ToolbarHeader
-        title="Types"
-        count={admin.equipmentTypes.length}
-        addLabel="Type"
-        onAdd={() => { setEditing(null); setShowModal(true); }}
-      />
-
-      {admin.equipmentTypes.length === 0 ? (
-        <div className="text-center py-12 text-secondary-500">
-          <Wrench className="w-10 h-10 mx-auto mb-2 opacity-40" />
-          <p>Aucun type d&apos;équipement</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-secondary-200 text-left text-secondary-500">
-                <th className="py-2 pr-3 font-medium">Code</th>
-                <th className="py-2 pr-3 font-medium">Libellé</th>
-                <th className="py-2 pr-3 font-medium">Catégorie</th>
-                <th className="py-2 pr-3 font-medium text-center">Tarif unitaire</th>
-                <th className="py-2 pr-3 font-medium text-center">Durée</th>
-                <th className="py-2 pr-3 font-medium text-center">Actif</th>
-                <th className="py-2 w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {admin.equipmentTypes.map((type) => (
-                <tr key={type.id} className="border-b border-secondary-100">
-                  <td className="py-2 pr-3 font-mono text-xs">{type.code}</td>
-                  <td className="py-2 pr-3 font-medium text-secondary-900">{type.label}</td>
-                  <td className="py-2 pr-3 text-secondary-500 text-xs">
-                    {admin.categories.find((c) => c.id === type.category_id)?.label || '—'}
-                  </td>
-                  <td className="py-2 pr-3 text-center">
-                    {type.has_unit_pricing ? `${type.included_units} ${type.unit_label || 'inclus'}` : '—'}
-                  </td>
-                  <td className="py-2 pr-3 text-center">
-                    {type.duration_base_minutes == null ? (
-                      <span className="text-secondary-400">—</span>
-                    ) : (
-                      <>
-                        {type.duration_base_minutes} min
-                        {type.duration_per_extra_unit_minutes > 0 && ` +${type.duration_per_extra_unit_minutes}/${type.unit_label || 'unité'}`}
-                      </>
-                    )}
-                  </td>
-                  <td className="py-2 pr-3 text-center">{type.is_active ? '✓' : '—'}</td>
-                  <td className="py-2 pr-3">
-                    <ActionButtons
-                      onEdit={() => { setEditing(type); setShowModal(true); }}
-                      onDelete={() => handleDelete(type)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {showModal && (
-        <EquipmentTypeModal
-          type={editing}
-          nextSortOrder={prochainOrdre(admin.equipmentTypes)}
-          categories={admin.categories.filter((c) => c.is_active || c.id === editing?.category_id)}
-          onClose={() => { setShowModal(false); setEditing(null); }}
-          onSave={async (payload) => {
-            try {
-              if (editing) await admin.updateEquipmentType.mutateAsync({ id: editing.id, payload });
-              else await admin.createEquipmentType.mutateAsync(payload);
-              toast.success('Type enregistré');
-              setShowModal(false);
-              setEditing(null);
-            } catch (err) {
-              toast.error(err?.message || 'Erreur');
-            }
-          }}
-          isSaving={admin.createEquipmentType.isPending || admin.updateEquipmentType.isPending}
-        />
-      )}
-    </div>
-  );
-}
-
-function EquipmentTypeModal({ type, categories = [], nextSortOrder, onClose, onSave, isSaving }) {
-  const isEdit = !!type;
-  const [form, setForm] = useState({
-    code: type?.code || '',
-    label: type?.label || '',
-    category_id: type?.category_id || '',
-    has_unit_pricing: type?.has_unit_pricing || false,
-    unit_label: type?.unit_label || '',
-    included_units: type?.included_units ?? 0,
-    is_active: type?.is_active ?? true,
-    duration_base_minutes: type?.duration_base_minutes ?? '',
-    duration_per_extra_unit_minutes: type?.duration_per_extra_unit_minutes ?? 0,
-    unfavorable_months: type?.unfavorable_months ?? [],
-  });
-
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
-  const toggleMonth = (m) => {
-    setForm((p) => ({
-      ...p,
-      unfavorable_months: p.unfavorable_months.includes(m)
-        ? p.unfavorable_months.filter((x) => x !== m)
-        : [...p.unfavorable_months, m],
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.code.trim() || !form.label.trim()) {
-      toast.error('Code et libellé requis');
-      return;
-    }
-    if (!form.category_id) {
-      toast.error('Catégorie requise — créez-la dans l\'onglet Catégories si elle n\'existe pas');
-      return;
-    }
-    if (form.duration_base_minutes !== '') {
-      const parsedDuration = parseInt(form.duration_base_minutes, 10);
-      if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
-        toast.error(
-          "Durée d'entretien : laissez le champ vide si ce type n'est pas entretenu, ou saisissez une durée supérieure à 0 minute."
-        );
-        return;
-      }
-    }
-    onSave({
-      // Le code n'est envoyé qu'à la création, tel que saisi : le site vitrine et les
-      // icônes désignent les types par code, un renommage (ou une mise en majuscules)
-      // à l'édition les casserait en silence.
-      ...(isEdit ? {} : { code: form.code.trim() }),
-      label: form.label.trim(),
-      category_id: form.category_id,
-      has_unit_pricing: form.has_unit_pricing,
-      unit_label: form.has_unit_pricing ? (form.unit_label.trim() || null) : null,
-      included_units: form.has_unit_pricing ? (parseInt(form.included_units, 10) || 0) : 0,
-      sort_order: isEdit ? (type.sort_order ?? 0) : nextSortOrder,
-      is_active: form.is_active,
-      duration_base_minutes: form.duration_base_minutes === '' ? null : parseInt(form.duration_base_minutes, 10),
-      duration_per_extra_unit_minutes: form.has_unit_pricing ? (parseInt(form.duration_per_extra_unit_minutes, 10) || 0) : 0,
-      unfavorable_months: form.unfavorable_months,
-    });
-  };
-
-  return (
-    <ModalShell title={type ? 'Modifier le type' : 'Nouveau type'} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Code" required>
-            <TextInput value={form.code} onChange={(v) => set('code', v)} placeholder="poele_granules_elec" disabled={isEdit} />
-            {isEdit && <p className="text-xs text-secondary-400 mt-1">Immuable : site vitrine et icônes le référencent.</p>}
-          </FormField>
-          <FormField label="Libellé" required>
-            <TextInput value={form.label} onChange={(v) => set('label', v)} />
-          </FormField>
-        </div>
-        <FormField label="Catégorie" required>
-          <select
-            value={form.category_id}
-            onChange={(e) => set('category_id', e.target.value)}
-            className={selectClass}
-            required
-          >
-            <option value="">— Choisir —</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}{c.is_active ? '' : ' (inactive)'}</option>
-            ))}
-          </select>
-          {categories.length === 0 && (
-            <p className="text-xs text-amber-700 mt-1">Aucune catégorie active : créez-en une dans l&apos;onglet Catégories.</p>
-          )}
-          <p className="text-xs text-secondary-400 mt-1">Porte la compétence requise (Équipe) et le gabarit du certificat.</p>
-        </FormField>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.has_unit_pricing} onChange={(e) => set('has_unit_pricing', e.target.checked)} />
-          Tarif unitaire (ex: par radiateur)
-        </label>
-        {form.has_unit_pricing && (
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Libellé unité">
-              <TextInput value={form.unit_label} onChange={(v) => set('unit_label', v)} placeholder="radiateur(s)" />
-            </FormField>
-            <FormField label="Inclus dans tarif de base">
-              <TextInput value={form.included_units} onChange={(v) => set('included_units', v)} type="number" min="0" />
-            </FormField>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Durée d'entretien (min)">
-            <TextInput
-              value={form.duration_base_minutes}
-              onChange={(v) => set('duration_base_minutes', v)}
-              type="number"
-              min="1"
-              placeholder="Non entretenu"
-            />
-          </FormField>
-          {form.has_unit_pricing && (
-            <FormField label={`+ par ${form.unit_label || 'unité'} suppl. (min)`}>
-              <TextInput
-                value={form.duration_per_extra_unit_minutes}
-                onChange={(v) => set('duration_per_extra_unit_minutes', v)}
-                type="number"
-                min="0"
-              />
-            </FormField>
-          )}
-        </div>
-        <p className="text-xs text-secondary-400 -mt-2">
-          Laisser vide si ce type n&apos;est pas entretenu (travaux, prestations).
-        </p>
-
-        <div>
-          <p className="text-sm font-medium text-secondary-700 mb-1">Mois déconseillés</p>
-          <p className="text-xs text-secondary-500 mb-2">
-            Mois où l&apos;appareil doit être froid. <strong>Préférence, pas interdiction</strong> : ces mois
-            ne sont jamais proposés spontanément, mais restent réservables par le client et forçables en
-            interne.
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            {MONTHS_FR.map((m) => (
-              <label key={m.value} className="flex items-center gap-1.5 text-sm text-secondary-700">
-                <input
-                  type="checkbox"
-                  checked={form.unfavorable_months.includes(m.value)}
-                  onChange={() => toggleMonth(m.value)}
-                />
-                {m.label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-          Actif
-        </label>
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
-          <button type="submit" disabled={isSaving} className="btn-primary">
-            {isSaving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-            {type ? 'Enregistrer' : 'Créer'}
           </button>
         </div>
       </form>

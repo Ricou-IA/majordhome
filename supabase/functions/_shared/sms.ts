@@ -17,7 +17,7 @@
 // propre a chaque client n'est pas la CLE mais l'IDENTITE D'EXPEDITEUR :
 // numero WhatsApp, nom d'expediteur SMS, domaine du lien court, gabarits.
 // Tout cela vit dans core.organizations.settings.sms — donc editable
-// (Settings → Organisation → SMS), donc onboardable sans redeploiement.
+// (Settings → Communication → SMS & WhatsApp), donc onboardable sans redeploiement.
 //
 // ⚠ Le nom d'expediteur alphanumerique (ex. « Mayer-SAV ») doit etre declare
 // par marque aupres de l'operateur en France. Mutualiser le compte n'y change

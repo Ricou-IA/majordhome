@@ -291,7 +291,7 @@ export function AlertesTournees({
                 </div>
               ))}
               <Link
-                to="/settings/pricing"
+                to="/settings/equipements"
                 className="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline"
               >
                 Configurer les types d&apos;équipement →

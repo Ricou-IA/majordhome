@@ -5,7 +5,7 @@
 //
 // Source unique de « quelles campagnes le code envoie, avec quelles variables ».
 // Consommé par :
-//   - Settings → Organisation → SMS (`SmsTab`) : liste des gabarits à éditer,
+//   - Settings → Communication → SMS & WhatsApp (`SmsTab`) : liste des gabarits à éditer,
 //     variables disponibles, texte suggéré, réglage du rappel automatique ;
 //   - les émetteurs : le front (`savService`) et l'edge `sms-rappel-rdv` via la
 //     COPIE Deno `supabase/functions/_shared/smsCampaigns.js` générée par

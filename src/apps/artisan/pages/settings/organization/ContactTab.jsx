@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import ResendDomainSection from './components/ResendDomainSection';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -9,7 +8,8 @@ const LABEL_CLASS = 'block text-xs font-medium text-secondary-600 mb-1';
 const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
 
-const FIELDS = ['address', 'postal_code', 'city', 'phone', 'from_email', 'reply_to', 'website_url'];
+// Emails (from_email, reply_to, domaine d'envoi) : Settings → Communication → Emails (communication/EmailsTab.jsx).
+const FIELDS = ['address', 'postal_code', 'city', 'phone', 'website_url'];
 
 function formatPhoneFR(raw) {
   const digits = (raw || '').replace(/\D/g, '').slice(0, 10);
@@ -26,7 +26,6 @@ function autoPrefixHttps(url) {
   return `https://${url}`;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const URL_RE = /^https?:\/\/[^\s]+$/i;
 
 function validate(form) {
@@ -39,9 +38,6 @@ function validate(form) {
   if (form.city && form.city.length > 80) errors.city = 'Maximum 80 caractères';
   if (!form.phone?.trim()) errors.phone = 'Obligatoire';
   if (form.phone && form.phone.replace(/\D/g, '').length !== 10) errors.phone = 'Téléphone FR à 10 chiffres';
-  if (!form.from_email?.trim()) errors.from_email = 'Obligatoire';
-  if (form.from_email && !EMAIL_RE.test(form.from_email)) errors.from_email = 'Email invalide';
-  if (form.reply_to && !EMAIL_RE.test(form.reply_to)) errors.reply_to = 'Email invalide';
   if (form.website_url && !URL_RE.test(autoPrefixHttps(form.website_url))) {
     errors.website_url = 'URL invalide (ex: https://cimaj.fr ou cimaj.fr)';
   }
@@ -94,7 +90,6 @@ export default function ContactTab() {
   }
 
   return (
-    <>
     <div className="card space-y-8">
       {/* Section Siège social */}
       <section>
@@ -153,31 +148,8 @@ export default function ContactTab() {
             />
             {errors.phone && <p className={ERROR_CLASS}>{errors.phone}</p>}
           </div>
-          <div>
-            <label className={LABEL_CLASS}>Email expéditeur *</label>
-            <input
-              type="email"
-              value={form.from_email}
-              onChange={(e) => setForm({ ...form, from_email: e.target.value })}
-              placeholder="contact@cimaj.fr"
-              className={INPUT_CLASS}
-            />
-            {errors.from_email && <p className={ERROR_CLASS}>{errors.from_email}</p>}
-            <p className={HINT_CLASS}>Son domaine doit être vérifié sur Resend (voir « Domaine d&apos;envoi » ci-dessous).</p>
-          </div>
         </div>
-        <div className="mt-4">
-          <label className={LABEL_CLASS}>Email de réponse (si différent)</label>
-          <input
-            type="email"
-            value={form.reply_to}
-            onChange={(e) => setForm({ ...form, reply_to: e.target.value })}
-            placeholder="reply@cimaj.fr"
-            className={INPUT_CLASS}
-          />
-          {errors.reply_to && <p className={ERROR_CLASS}>{errors.reply_to}</p>}
-          <p className={HINT_CLASS}>Laisse vide pour utiliser l&apos;email expéditeur.</p>
-        </div>
+        <p className={HINT_CLASS}>Les emails (expéditeur, réponse, domaine d&apos;envoi) se règlent dans Paramètres → Communication → Emails.</p>
       </section>
 
       {/* Section Présence web */}
@@ -216,7 +188,5 @@ export default function ContactTab() {
         </button>
       </div>
     </div>
-    <ResendDomainSection />
-    </>
   );
 }

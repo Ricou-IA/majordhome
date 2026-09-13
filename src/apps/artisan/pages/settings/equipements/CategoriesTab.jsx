@@ -1,5 +1,5 @@
 /**
- * pricing/CategoriesTab.jsx — Settings → Tarification → onglet « Catégories »
+ * equipements/CategoriesTab.jsx — Settings → Équipements → onglet « Catégories »
  * ============================================================================
  * Niveau 1 du référentiel équipements de l'org (catégorie → type). Chaque
  * catégorie porte : un code IMMUABLE (certificats et site vitrine désignent par
@@ -17,8 +17,8 @@ import { Layers, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, TextInput } from '@apps/artisan/components/FormFields';
 import { CERTIFICATE_PROFILES } from '@/lib/equipmentReferential';
-import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from './ui';
-import { prochainOrdre } from './ordre';
+import { ToolbarHeader, ActionButtons, ModalShell, selectClass } from '../pricing/ui';
+import { prochainOrdre } from '../pricing/ordre';
 
 const CODE_RE = /^[a-z0-9_]+$/;
 const TVA_SUGGESTIONS = [5.5, 10, 20];

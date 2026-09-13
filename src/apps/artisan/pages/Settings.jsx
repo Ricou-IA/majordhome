@@ -1,79 +1,37 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { ROLE_LABELS } from '@lib/permissions';
+import { MODULES } from '@/lib/modules';
 import {
   Building2,
   Users,
   Shield,
-  HelpCircle,
+  Wrench,
   Truck,
   Calculator,
+  Route,
+  Mail,
+  MessageSquare,
   Sun,
   Thermometer,
+  HelpCircle,
 } from 'lucide-react';
 
 // =============================================================================
-// PAGE SETTINGS
+// PAGE SETTINGS — un groupe par module de l'offre (registre src/lib/modules.js)
 // =============================================================================
+
+// Le registre est un module pur : il nomme ses icônes, la page les résout.
+const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail, MessageSquare, Sun, Thermometer };
 
 export default function Settings() {
   const { organization, effectiveRole, isOrgAdmin } = useAuth();
 
-  const settingsSections = [
-    {
-      title: 'Organisation',
-      icon: Building2,
-      description: 'Gérer les informations de votre entreprise',
-      href: '/settings/organization',
-      adminOnly: true,
-    },
-    {
-      title: 'Équipe',
-      icon: Users,
-      description: 'Gérer les membres et leurs rôles',
-      href: '/settings/team',
-      adminOnly: true,
-    },
-    {
-      title: 'Droits d\'accès',
-      icon: Shield,
-      description: 'Configurer les permissions par rôle',
-      href: '/settings/permissions',
-      adminOnly: true,
-    },
-    {
-      title: 'Fournisseurs',
-      icon: Truck,
-      description: 'Gérer les fournisseurs et catalogues produits',
-      href: '/settings/suppliers',
-      adminOnly: true,
-    },
-    {
-      title: 'Tarification',
-      icon: Calculator,
-      description: 'Zones, types d\'équipement, grille de prix, remises et options',
-      href: '/settings/pricing',
-      adminOnly: true,
-    },
-    {
-      title: 'Solaire',
-      icon: Sun,
-      description: 'Paramètres du calculateur photovoltaïque et grille de coûts',
-      href: '/settings/solaire',
-      adminOnly: true,
-    },
-    {
-      title: 'Thermique',
-      icon: Thermometer,
-      description: 'Paramètres de calcul des études de déperditions',
-      href: '/settings/thermique',
-      adminOnly: true,
-    },
-  ];
-
-  const filteredSections = settingsSections.filter(
-    (section) => !section.adminOnly || isOrgAdmin
-  );
+  // Socle en tête, puis les modules ; un module sans tuile visible pour ce rôle
+  // n'affiche pas son en-tête.
+  const groupes = MODULES
+    .map((m) => ({ ...m, tiles: m.tiles.filter((t) => !t.adminOnly || isOrgAdmin) }))
+    .filter((m) => m.tiles.length > 0);
 
   return (
     <div className="space-y-6">
@@ -104,28 +62,31 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Settings sections */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        {filteredSections.map((section) => (
-          <NavLink
-            key={section.title}
-            to={section.href}
-            className="card-hover flex items-start gap-4"
-          >
-            <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center flex-shrink-0">
-              <section.icon className="w-5 h-5 text-secondary-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-secondary-900">
-                {section.title}
-              </h3>
-              <p className="text-sm text-secondary-600">
-                {section.description}
-              </p>
-            </div>
-          </NavLink>
-        ))}
-      </div>
+      {/* Un groupe par module */}
+      {groupes.map((m) => (
+        <section key={m.key} className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-secondary-900">{m.label}</h2>
+            {m.description && <p className="text-sm text-secondary-500">{m.description}</p>}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {m.tiles.map((t) => {
+              const Icon = ICONS[t.icon] || HelpCircle;
+              return (
+                <NavLink key={t.key} to={t.href} className="card-hover flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-5 h-5 text-secondary-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-secondary-900">{t.title}</h3>
+                    <p className="text-sm text-secondary-600">{t.description}</p>
+                  </div>
+                </NavLink>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       {/* Aide */}
       <div className="card bg-secondary-50">

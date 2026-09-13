@@ -27,6 +27,10 @@ const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'));
 const SolaireSettings = lazy(() => import('./pages/settings/SolaireSettings'));
 const ThermiqueSettings = lazy(() => import('./pages/settings/ThermiqueSettings'));
+const EquipementsSettings = lazy(() => import('./pages/settings/EquipementsSettings'));
+const TourneesSettings = lazy(() => import('./pages/settings/TourneesSettings'));
+const EmailsSettings = lazy(() => import('./pages/settings/EmailsSettings'));
+const SmsSettings = lazy(() => import('./pages/settings/SmsSettings'));
 
 // Certificat
 const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
@@ -314,6 +318,46 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <ThermiqueSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/equipements',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <EquipementsSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/tournees',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <TourneesSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/emails',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <EmailsSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/sms',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <SmsSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

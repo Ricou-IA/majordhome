@@ -1,6 +1,6 @@
-// src/apps/artisan/pages/settings/organization/TourneesTab.jsx
+// src/apps/artisan/pages/settings/entretiens/TourneesTab.jsx
 // ============================================================================
-// Settings → Organisation → Tournées : les réglages du moteur de tournées
+// Settings → Entretiens → Tournées (/settings/tournees) : les réglages du moteur de tournées
 // (`core.organizations.settings.tournees`). Défauts et sémantique : source
 // unique `src/lib/tournee/reglages.js` (REGLAGES_DEFAUT) — l'onglet n'en
 // recopie aucun. Règle du projet : « pas de config sans UI ».

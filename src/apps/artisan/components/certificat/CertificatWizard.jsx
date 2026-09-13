@@ -420,7 +420,7 @@ export function CertificatWizard({
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             Catégorie « {formData.equipement_type} » inconnue de votre organisation : gabarit générique appliqué
             (contrôles et nettoyage seulement). Pour un gabarit complet, recréez la catégorie sous ce code dans
-            Paramètres → Tarification → Catégories.
+            Paramètres → Équipements → Catégories.
           </div>
         )}
         {StepComponent && currentStepConfig.id === 'signature' ? (
