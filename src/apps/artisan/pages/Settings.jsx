@@ -88,7 +88,9 @@ export default function Settings() {
         </section>
       ))}
 
-      {/* Aide */}
+      {/* Aide — emplacement RÉSERVÉ à l'agent d'onboarding (décision Eric,
+          2026-09-13) : chantier à part, non commencé. Les deux boutons sont
+          volontairement inactifs en attendant ; ne pas retirer le bloc. */}
       <div className="card bg-secondary-50">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
