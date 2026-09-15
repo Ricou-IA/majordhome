@@ -13,7 +13,7 @@
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2,
-  Phone, MapPin, CalendarClock, MoveHorizontal,
+  Phone, MapPin, CalendarClock, CalendarPlus, MoveHorizontal,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
@@ -88,9 +88,11 @@ export const SectionType = ({
 // SECTION DATE & HEURE
 // ============================================================================
 
-export const SectionDateTime = ({ formData, updateField, errors, isCancelled, readOnly = false, onRequestReschedule }) => {
+export const SectionDateTime = ({ formData, updateField, errors, isCancelled, readOnly = false, onRequestReschedule, onRequestContinuation }) => {
   // Lecture seule (édition) : la planification se modifie via l'assistant
   // (« Modifier le RDV ») ou par glisser-déposer sur le calendrier.
+  // « Programmer une suite » : le RDV courant reste tel quel, on ajoute un
+  // ou plusieurs RDV sur la même carte (chantier pas fini le jour prévu).
   if (readOnly) {
     const timeRange = [formData.scheduled_start, formData.scheduled_end].filter(Boolean).join(' – ');
     const durationLabel = DURATION_OPTIONS.find((o) => o.value === Number(formData.duration_minutes))?.label
@@ -109,15 +111,30 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled, re
             {timeRange && <span className="text-gray-600"> · {timeRange}</span>}
             {durationLabel && <span className="text-gray-500"> ({durationLabel})</span>}
           </div>
-          {!isCancelled && onRequestReschedule && (
-            <button
-              type="button"
-              onClick={onRequestReschedule}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors shrink-0"
-            >
-              <CalendarClock className="w-4 h-4" />
-              Modifier le RDV
-            </button>
+          {!isCancelled && (onRequestReschedule || onRequestContinuation) && (
+            <div className="flex items-center gap-2 shrink-0">
+              {onRequestReschedule && (
+                <button
+                  type="button"
+                  onClick={onRequestReschedule}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  Modifier le RDV
+                </button>
+              )}
+              {onRequestContinuation && (
+                <button
+                  type="button"
+                  onClick={onRequestContinuation}
+                  title="Ajouter un ou plusieurs RDV sur la même carte, sans toucher à celui-ci"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <CalendarPlus className="w-4 h-4" />
+                  Programmer une suite
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

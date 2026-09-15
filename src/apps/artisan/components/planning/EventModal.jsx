@@ -103,6 +103,10 @@ export function EventModal({
   // Re-planification (édition) : ré-ouvre l'assistant créneaux pour déplacer le RDV
   // (date/heure/personne), changement de type inclus. Date/heure figées sinon.
   const [rescheduleMode, setRescheduleMode] = useState(false);
+  // Programmer une suite (édition) : ré-ouvre l'assistant pour AJOUTER un ou
+  // plusieurs RDV sur la même carte (chantier pas fini le jour prévu, 2ᵉ visite
+  // d'entretien). Le RDV courant n'est pas touché.
+  const [continuationMode, setContinuationMode] = useState(false);
 
   // État recherche / liaison client & lead
   const [selectedClient, setSelectedClient] = useState(null);
@@ -166,8 +170,11 @@ export function EventModal({
   const isClosing = formData.appointment_type === 'rdv_closing';
   // Tous les types en CRÉATION utilisent l'assistant (grille jour × colonnes par personne),
   // y compris « Autre » (colonnes = tous les membres). En édition, l'assistant revient
-  // via « Modifier le RDV » (rescheduleMode) ; sinon la planification est en lecture seule.
-  const usesAssistant = !isEdit || rescheduleMode;
+  // via « Modifier le RDV » (rescheduleMode) ou « Programmer une suite » (continuationMode) ;
+  // sinon la planification est en lecture seule.
+  const usesAssistant = !isEdit || rescheduleMode || continuationMode;
+  // Vue édition « au repos » (ni re-planification ni suite) : sections annexes + actions danger.
+  const editIdle = isEdit && !rescheduleMode && !continuationMode;
   // Bloc contrat (R5) : un Entretien posé à la main prend la durée du contrat du client.
   const { dureeMinutes: dureeContratClient } = useDureeContratClient(
     orgId, selectedClient?.id || null, usesAssistant && formData.appointment_type === 'maintenance',
@@ -254,6 +261,7 @@ export function EventModal({
     setAssistantSlots([]);
     setBatchSaving(false);
     setRescheduleMode(false);
+    setContinuationMode(false);
 
     if (isEdit && appointment) {
       // Mode édition : pré-remplir avec les données existantes
@@ -895,6 +903,73 @@ export function EventModal({
     isCommercialType, onSave, orgId, queryClient,
   ]);
 
+  // --------------------------------------------------------------------------
+  // Programmer une suite (édition) : AJOUTE N RDV sur la même carte que le RDV
+  // courant (lead_id / intervention_id / client copiés tels quels), sans le
+  // modifier. Pas de resolveActivation : la carte est déjà connue, aucun filet
+  // doublon à rejouer. createAppointmentBatch refait le sync carte forward-only
+  // (une carte déjà « planifiée » / « en cours » ne bouge pas).
+  // --------------------------------------------------------------------------
+  const handleContinuationSave = useCallback(async () => {
+    if (assistantSlots.length === 0) {
+      toast.error('Choisissez au moins un créneau');
+      return;
+    }
+    setBatchSaving(true);
+    try {
+      const baseSubject = (appointment?.subject || '').trim()
+        || getAppointmentTypeConfig(appointment?.appointment_type).label;
+      const subject = /\(suite\)$/i.test(baseSubject) ? baseSubject : `${baseSubject} (suite)`;
+      const slots = assistantSlots.map((s) => ({ ...s, subject, notes: null }));
+
+      const { error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
+        coreOrgId: orgId,
+        appointment_type: appointment?.appointment_type,
+        lead_id: appointment?.lead_id || null,
+        intervention_id: appointment?.intervention_id || null,
+        client_id: appointment?.client_id || null,
+        client_name: appointment?.client_name || null,
+        client_first_name: appointment?.client_first_name || null,
+        client_phone: appointment?.client_phone || null,
+        client_email: appointment?.client_email || null,
+        address: appointment?.address || null,
+        city: appointment?.city || null,
+        postal_code: appointment?.postal_code || null,
+        assigned_commercial_id: isCommercialType
+          ? (assistantSlots[0]?.assignedCommercialId || appointment?.assigned_commercial_id || null)
+          : null,
+        description: appointment?.description || null,
+        subjectPrefix: subject,
+      });
+      if (batchErr) {
+        console.error('[EventModal] continuation batch error:', batchErr);
+        toast.error('Erreur lors de la création de la suite');
+        setBatchSaving(false);
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      if (appointment?.lead_id) {
+        queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+        queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+        if (appointment?.appointment_type === 'installation') {
+          queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+        }
+      }
+      if (appointment?.intervention_id) {
+        queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+        queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      }
+
+      toast.success(slots.length > 1 ? `${slots.length} RDV ajoutés` : 'Suite programmée');
+      onClose();
+    } catch (err) {
+      console.error('[EventModal] handleContinuationSave error:', err);
+      toast.error('Une erreur est survenue');
+      setBatchSaving(false);
+    }
+  }, [assistantSlots, appointment, isCommercialType, orgId, queryClient, onClose]);
+
   // Reprise après décision du dialogue doublon : relance le chemin d'origine
   // avec la décision ({ action: 'link', leadId } ou { action: 'create' }).
   const resumeDuplicate = useCallback((decision) => {
@@ -954,7 +1029,7 @@ export function EventModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-gray-900 truncate">
-                {isEdit ? 'Modifier le RDV' : 'Nouveau RDV'}
+                {continuationMode ? 'Programmer une suite' : (isEdit ? 'Modifier le RDV' : 'Nouveau RDV')}
               </h2>
               {isEdit && appointment?.client_name && (
                 <p className="text-sm text-gray-500 truncate">{appointment.client_name}</p>
@@ -1016,8 +1091,8 @@ export function EventModal({
                 availableTypes={availableTypes}
                 typeLocked={typeLocked}
                 hideSubject={usesAssistant}
-                allowTypeChange={rescheduleMode || canRetypeInline}
-                retypeHint={canRetypeInline && !rescheduleMode
+                allowTypeChange={rescheduleMode || (canRetypeInline && !continuationMode)}
+                retypeHint={canRetypeInline && !rescheduleMode && !continuationMode
                   ? 'Admin : corriger le type recrée la carte liée (entretien, visite…) et conserve la date.'
                   : null}
               />
@@ -1035,6 +1110,15 @@ export function EventModal({
                     setAssistantSlots([]);
                     setRescheduleMode(true);
                   }}
+                  // « Suite » sans carte liée (RDV « Autre » libre) = simple nouveau RDV : pas proposé.
+                  onRequestContinuation={
+                    (appointment?.lead_id || appointment?.intervention_id || formData.appointment_type !== 'other')
+                      ? () => {
+                        setAssistantSlots([]);
+                        setContinuationMode(true);
+                      }
+                      : null
+                  }
                 />
               )}
 
@@ -1088,7 +1172,7 @@ export function EventModal({
                   appointmentTypeValue={formData.appointment_type}
                   defaultDuration={dureeContratClient || Number(formData.duration_minutes) || 60}
                   fixedDuration={formData.appointment_type === 'maintenance' ? dureeContratClient : null}
-                  initialDate={rescheduleMode ? (formData.scheduled_date || null) : null}
+                  initialDate={(rescheduleMode || continuationMode) ? (formData.scheduled_date || null) : null}
                   multi={!rescheduleMode && formData.appointment_type === 'installation'}
                 />
               )}
@@ -1105,7 +1189,7 @@ export function EventModal({
 
               {/* Souplesse : édition uniquement (à la création par l'assistant, la
                   souplesse est demandée à la pose ; « Autre » prend le défaut d'org). */}
-              {isEdit && estTypeAdaptable(formData.appointment_type) && (
+              {isEdit && !continuationMode && estTypeAdaptable(formData.appointment_type) && (
                 <SectionSouplesse
                   formData={formData}
                   updateField={updateField}
@@ -1128,7 +1212,7 @@ export function EventModal({
                   Meme section que la fiche entretien : le technicien saisit
                   depuis son RDV, chaque certificat reste rattache a son
                   equipement et le compteur avance. */}
-              {isEdit && !rescheduleMode && entretien && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
+              {editIdle && entretien && ['maintenance', 'service'].includes(formData.appointment_type) && !isCancelled && (
                 <div className={`${entretienStatus === 'realise' ? 'bg-green-50 border-green-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-4`}>
                   <CertificatsSection item={entretien} onCloseModal={onClose} />
                 </div>
@@ -1142,7 +1226,7 @@ export function EventModal({
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
             {/* Actions danger (mode edit seulement, hors re-planification) */}
             <div className="flex items-center gap-2">
-              {isEdit && !isCancelled && !rescheduleMode && (
+              {editIdle && !isCancelled && (
                 <>
                   <button
                     onClick={() => setConfirmAction('cancel')}
@@ -1166,11 +1250,12 @@ export function EventModal({
 
             {/* Actions principales */}
             <div className="flex items-center gap-3">
-              {rescheduleMode ? (
+              {(rescheduleMode || continuationMode) ? (
                 <button
                   onClick={() => {
                     setAssistantSlots([]);
                     setRescheduleMode(false);
+                    setContinuationMode(false);
                   }}
                   className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
                 >
@@ -1187,19 +1272,23 @@ export function EventModal({
               {!isCancelled && (
                 usesAssistant ? (
                   <button
-                    onClick={rescheduleMode ? handleRescheduleSave : handleCreateFromAssistant}
-                    disabled={batchSaving || assistantSlots.length === 0 || (isClosing && !rescheduleMode && !selectedLead)}
+                    onClick={continuationMode ? handleContinuationSave : (rescheduleMode ? handleRescheduleSave : handleCreateFromAssistant)}
+                    disabled={batchSaving || assistantSlots.length === 0 || (isClosing && !rescheduleMode && !continuationMode && !selectedLead)}
                     className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {batchSaving ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        {rescheduleMode ? 'Enregistrement...' : 'Création...'}
+                        {rescheduleMode ? 'Enregistrement...' : (continuationMode ? 'Ajout...' : 'Création...')}
                       </>
                     ) : (
                       <>
                         <Save className="w-4 h-4" />
-                        {rescheduleMode ? 'Enregistrer le créneau' : 'Créer le RDV'}
+                        {rescheduleMode
+                          ? 'Enregistrer le créneau'
+                          : (continuationMode
+                            ? (assistantSlots.length > 1 ? `Ajouter ${assistantSlots.length} RDV` : 'Ajouter la suite')
+                            : 'Créer le RDV')}
                       </>
                     )}
                   </button>
