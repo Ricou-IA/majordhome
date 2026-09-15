@@ -79,6 +79,26 @@ export function getAppointmentTypeConfig(type) {
 // ORG ID MAPPING — imported from @/lib/serviceHelpers
 // ============================================================================
 
+/**
+ * Auteur d'un RDV (`appointments.created_by`) = utilisateur courant, résolu ICI
+ * et non par les appelants : 9 points d'entrée (EventModal, LeadModal, ChantierModal,
+ * EntretienSAVModal, PhoningScreenPop, ClientDetail, Planning, savService…) — en
+ * laisser un oublier le champ redonnerait des RDV anonymes (GUITTARD CTR-00129,
+ * 2026-09-15 : impossible de dire qui avait posé le 2ᵉ RDV d'entretien).
+ * Non bloquant : sans session (cas anormal côté front) on insère avec NULL.
+ * @returns {Promise<string|null>}
+ */
+async function resolveCurrentUserId() {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    return user?.id ?? null;
+  } catch (e) {
+    logger.warn('[appointments] created_by non résolu (pas de session ?):', e?.message);
+    return null;
+  }
+}
+
 // ============================================================================
 // CYCLE DE VIE CARTE <-> RDV (Bloc A)
 // ============================================================================
@@ -296,10 +316,13 @@ export const appointmentsService = {
    * @param {Object} appointmentData - Données du RDV
    * @param {string} appointmentData.coreOrgId - ID core.organizations
    * @param {string[]} [appointmentData.technicianIds] - IDs techniciens à assigner
+   * @param {string|null} [appointmentData.created_by] - Auteur ; absent = utilisateur courant
+   *   (résolu ici, pas par l'appelant — un seul pattern pour les 9 points d'entrée).
    */
   async createAppointment({ coreOrgId, technicianIds = [], ...appointmentData }) {
     try {
       const orgId = await getMajordhomeOrgId(coreOrgId);
+      const createdBy = appointmentData.created_by ?? (await resolveCurrentUserId());
 
       // Photo du grand secteur, figée à la création (même découpage que la
       // Programmation). Non bloquant : un échec laisse la valeur fournie (souvent null).
@@ -324,6 +347,7 @@ export const appointmentsService = {
         .insert({
           org_id: orgId,
           ...appointmentData,
+          created_by: createdBy,
           grand_secteur: grandSecteur,
         })
         .select()
@@ -761,10 +785,13 @@ export const appointmentsService = {
    */
   async createAppointmentBatch(slots, shared) {
     const created = [];
+    // Auteur résolu UNE fois pour tous les slots (évite N appels auth.getUser()).
+    const createdBy = await resolveCurrentUserId();
     for (const slot of slots) {
       const { data, error } = await this.createAppointment({
         coreOrgId: shared.coreOrgId,
         technicianIds: slot.technicianIds || [],
+        created_by: createdBy,
         appointment_type: shared.appointment_type,
         subject: slot.subject || shared.subjectPrefix || null,
         scheduled_date: slot.date,
