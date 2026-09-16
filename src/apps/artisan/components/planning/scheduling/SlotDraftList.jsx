@@ -14,7 +14,7 @@
  * ============================================================================
  */
 
-import { CalendarDays, Trash2, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Trash2, AlertTriangle, UserX } from 'lucide-react';
 import { TechnicianSelect } from '@apps/artisan/components/planning/TechnicianSelect';
 
 // ============================================================================
@@ -62,7 +62,7 @@ export function SlotDraftList({
 
       {slots.length === 0 ? (
         <p className="text-xs text-gray-400 italic px-1 py-2">
-          Cliquez-glissez dans une colonne ci-dessus pour ajouter un créneau.
+          Cliquez-glissez dans la colonne d&apos;une personne ci-dessus, ou dans « À assigner » pour choisir plus tard.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -91,6 +91,12 @@ export function SlotDraftList({
                       {slot.startTime}
                       {slot.endTime ? `–${slot.endTime}` : ''}
                     </span>
+                    {selectedIds.length === 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                        <UserX className="w-3 h-3" />
+                        Non assigné
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"

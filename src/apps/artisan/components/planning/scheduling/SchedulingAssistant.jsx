@@ -24,6 +24,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { CalendarCheck, Loader2, X, FileText, User } from 'lucide-react';
 import { DayResourceGrid } from './DayResourceGrid';
 import { SlotDraftList } from './SlotDraftList';
+import { AssignSlotModal } from './AssignSlotModal';
 import { useTeamDayAvailability } from '@hooks/useAppointments';
 import { findMemberConflicts } from '@/lib/scheduleConflicts';
 import { formatDateForInput } from '@/lib/utils';
@@ -93,6 +94,10 @@ export function SchedulingAssistant({
   embedded = false,
   onSlotsChange,
   initialDate = null,
+  // Colonne « À assigner » (2026-09-16) : poser un RDV sans personne, la liste
+  // est proposée aussitôt et « Laisser non assigné » reste possible. Inutile
+  // quand la colonne est figée sur l'owner de la carte (fixedAssigneeId).
+  allowUnassigned = true,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -151,6 +156,8 @@ export function SchedulingAssistant({
     return name ? `${subjectPrefix} - ${name}` : subjectPrefix;
   });
   const [notes, setNotes] = useState('');
+  // Créneau posé dans « À assigner » en attente de réponse (« Qui prend ce RDV ? »)
+  const [assignPromptSlot, setAssignPromptSlot] = useState(null);
 
   // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
   const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
@@ -168,7 +175,17 @@ export function SchedulingAssistant({
         : [...defaultTechIds],
     };
     setDraftSlots((prev) => (multi ? [...prev, slot] : [slot]));
+    // Posé sans personne → proposer la liste tout de suite (skip possible)
+    if (!slot.technicianIds.length) setAssignPromptSlot(slot);
   }, [multi, defaultDuration, defaultTechIds]);
+
+  const handleAssignPrompt = useCallback((ids) => {
+    const slotId = assignPromptSlot?.id;
+    if (slotId && ids?.length) {
+      setDraftSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, technicianIds: ids } : s)));
+    }
+    setAssignPromptSlot(null);
+  }, [assignPromptSlot]);
 
   // --- Ajouter / retirer un tech sur un créneau ---
   const handleToggleTech = useCallback((slotId, techId) => {
@@ -307,6 +324,18 @@ export function SchedulingAssistant({
         draftSlots={draftSlots}
         onPlaceSlot={handlePlaceSlot}
         fixedDuration={fixedDuration}
+        allowUnassigned={allowUnassigned && !fixedAssigneeId}
+      />
+
+      {/* « Qui prend ce RDV ? » — après une pose dans « À assigner » */}
+      <AssignSlotModal
+        open={!!assignPromptSlot}
+        slot={assignPromptSlot}
+        members={columnMembers}
+        single={commercialMode}
+        assigneeLabel={assigneeLabel}
+        onAssign={handleAssignPrompt}
+        onSkip={() => setAssignPromptSlot(null)}
       />
       {fixedDuration ? (
         <p className="text-xs text-secondary-500 mt-1">
