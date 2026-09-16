@@ -222,15 +222,23 @@ Deno.serve(async (req: Request) => {
   const log: string[] = [];
 
   try {
-    // 1. Récupérer tous les pl_id déjà mappés
-    const { data: existingSyncs } = await supabase
+    // 1. Récupérer tous les pl_id déjà mappés (+ le client MDH de chacun)
+    const { data: existingSyncs, error: syncsError } = await supabase
       .from("majordhome_pennylane_sync")
-      .select("pennylane_id")
+      .select("pennylane_id, local_id")
       .eq("entity_type", "client")
       .eq("org_id", ORG_ID);
+    if (syncsError) {
+      // Sans la liste des mappings, TOUT client PL passerait pour « nouveau ».
+      throw new Error(`[sync-error] lecture pennylane_sync: ${syncsError.message}`);
+    }
 
     const mappedPlIds = new Set(
       (existingSyncs || []).map((s: any) => s.pennylane_id)
+    );
+    // client MDH → customer PL déjà mappé (unicité DB = org × entity × local_id)
+    const mappedPlIdByClient = new Map<string, number>(
+      (existingSyncs || []).map((s: any) => [s.local_id, s.pennylane_id])
     );
     log.push(`Existing mappings: ${mappedPlIds.size}`);
 
@@ -257,6 +265,8 @@ Deno.serve(async (req: Request) => {
     let clientsCreated = 0;
     let leadsCreated = 0;
     let leadsUpdated = 0;
+    let plDuplicatesSkipped = 0;
+    let syncErrors = 0;
 
     for (const plCustomer of newCustomers) {
       try {
@@ -314,20 +324,49 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        // Garde doublon Pennylane (2026-09-16) : le client MDH matché porte
+        // DÉJÀ un mapping vers un AUTRE customer PL. L'unicité de
+        // pennylane_sync est (org, entity, local_id) : l'upsert remplacerait
+        // pennylane_id, l'ancien customer redeviendrait « nouveau » à l'heure
+        // suivante et le client serait retraité sans fin (vécu : 10 customers
+        // rejoués à chaque passage, leads/clients retouchés toutes les heures).
+        // On conserve le mapping en place et on signale le doublon — la
+        // résolution (fusion côté Pennylane ou mapping N:N) est un arbitrage.
+        const alreadyMappedPlId = mappedPlIdByClient.get(clientId);
+        if (alreadyMappedPlId !== undefined && alreadyMappedPlId !== plCustomer.id) {
+          plDuplicatesSkipped++;
+          log.push(
+            `[dup-pl-customer] ${displayName} pl=${plCustomer.id} → client ${clientId} déjà mappé sur pl=${alreadyMappedPlId} (mapping conservé, doublon Pennylane à fusionner)`
+          );
+          continue;
+        }
+
         // Créer le mapping sync
-        await supabase.from("majordhome_pennylane_sync").upsert(
-          {
-            org_id: ORG_ID,
-            entity_type: "client",
-            local_id: clientId,
-            pennylane_id: plCustomer.id,
-            pennylane_number: pl411,
-            external_reference: clientId,
-            sync_status: "synced",
-            metadata: { source: "sync_cron" },
-          },
-          { onConflict: "org_id,entity_type,local_id" }
-        );
+        const { error: syncError } = await supabase
+          .from("majordhome_pennylane_sync")
+          .upsert(
+            {
+              org_id: ORG_ID,
+              entity_type: "client",
+              local_id: clientId,
+              pennylane_id: plCustomer.id,
+              pennylane_number: pl411,
+              external_reference: clientId,
+              sync_status: "synced",
+              metadata: { source: "sync_cron" },
+            },
+            { onConflict: "org_id,entity_type,local_id" }
+          );
+        if (syncError) {
+          // Sans mapping, le customer sera rejoué à l'heure suivante : ne pas
+          // empiler le rapprochement lead/devis sur un état non synchronisé.
+          syncErrors++;
+          log.push(
+            `[sync-error] ${displayName} pl=${plCustomer.id} → client ${clientId}: ${syncError.message}`
+          );
+          continue;
+        }
+        mappedPlIdByClient.set(clientId, plCustomer.id);
 
         // Vérifier si un lead est nécessaire (devis principal > 1000€) — lookup local (sans appel API)
         const customerQuotes = quotesByCustomer.get(plCustomer.id) || [];
@@ -408,10 +447,10 @@ Deno.serve(async (req: Request) => {
         log.push(
           `[error] ${plCustomer.name}: ${err instanceof Error ? err.message : String(err)}`
         );
+      } finally {
+        // Pause entre chaque client pour rate limit (y compris après un continue)
+        await new Promise((r) => setTimeout(r, 300));
       }
-
-      // Pause entre chaque client pour rate limit
-      await new Promise((r) => setTimeout(r, 300));
     }
 
     return jsonResponse({
@@ -420,6 +459,8 @@ Deno.serve(async (req: Request) => {
       clients_created: clientsCreated,
       leads_created: leadsCreated,
       leads_updated: leadsUpdated,
+      pl_duplicates_skipped: plDuplicatesSkipped,
+      sync_errors: syncErrors,
       log,
     });
   } catch (err) {
