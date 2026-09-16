@@ -1,11 +1,15 @@
 /**
- * pennylaneCustomerDuplicates.service.js — fiches customer Pennylane en double
+ * pennylaneCustomerDuplicates.service.js — anomalies de rattachement Pennylane
  * ============================================================================
- * Projection écrite par l'edge `pennylane-sync-cron` (RPC service_role only,
- * remplacement d'un bloc à chaque passage horaire) : une fiche Pennylane qui
- * matche un client MDH DÉJÀ lié à une autre fiche. Lecture seule ici — la
- * résolution se fait dans Pennylane (fusion), la ligne disparaît au passage
- * suivant.
+ * 1. Fiches customer PL en double : projection écrite par l'edge
+ *    `pennylane-sync-cron` (RPC service_role only, remplacement d'un bloc à
+ *    chaque passage horaire) : une fiche Pennylane qui matche un client MDH
+ *    DÉJÀ lié à une autre fiche. Lecture seule ici — la résolution se fait
+ *    dans Pennylane (fusion), la ligne disparaît au passage suivant.
+ * 2. Leads multi-payeurs : vue LIVE `majordhome_lead_multi_customers` — un lead
+ *    dont les devis actifs couvrent ≥ 2 customers PL. Le cron cesse d'y écraser
+ *    l'identité (migration 20260916_5) ; l'admin écarte les devis du mauvais
+ *    customer depuis le tableau de bord, le lead sort de la vue de lui-même.
  *
  * ⚠️ orgId = org CORE (useAuth().organization.id).
  * ============================================================================
@@ -80,5 +84,44 @@ export const pennylaneCustomerDuplicatesService = {
         };
       });
     });
+  },
+
+  /**
+   * Leads dont les devis actifs couvrent ≥ 2 customers Pennylane (vue live).
+   * @param {string} orgId
+   * @returns {Promise<{ data: Array<{
+   *   leadId: string, lastName: string|null, firstName: string|null, leadCity: string|null, clientId: string|null,
+   *   customerCount: number,
+   *   customers: Array<{ pennylaneId: number, name: string|null, city: string|null, quoteCount: number,
+   *     quoteIds: number[], quoteStatuses: string[], lastAssignedAt: string|null }>
+   * }>, error: Error|null }>}
+   */
+  async getLeadMultiCustomers(orgId) {
+    return withErrorHandling(async () => {
+      if (!orgId) return [];
+      const { data, error } = await supabase
+        .from('majordhome_lead_multi_customers')
+        .select('lead_id, last_name, first_name, lead_city, client_id, customer_count, customers')
+        .eq('org_id', orgId)
+        .order('last_name', { ascending: true });
+      if (error) throw error;
+      return (data || []).map((r) => ({
+        leadId: r.lead_id,
+        lastName: r.last_name,
+        firstName: r.first_name,
+        leadCity: r.lead_city,
+        clientId: r.client_id,
+        customerCount: r.customer_count,
+        customers: (r.customers || []).map((c) => ({
+          pennylaneId: c.pennylane_id,
+          name: c.name ?? null,
+          city: c.city ?? null,
+          quoteCount: c.quote_count,
+          quoteIds: c.quote_ids || [],
+          quoteStatuses: c.quote_statuses || [],
+          lastAssignedAt: c.last_assigned_at ?? null,
+        })),
+      }));
+    }, 'pennylaneCustomerDuplicates.getLeadMultiCustomers');
   },
 };

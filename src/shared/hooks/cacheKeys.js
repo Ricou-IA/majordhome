@@ -298,6 +298,8 @@ export const pennylaneKeys = {
   quoteDismissals: (orgId) => [...pennylaneKeys.all(orgId), 'quote-dismissals'],
   // Fiches customer PL en double (écrites par le cron pennylane-sync-cron, lues par le tableau de bord admin)
   customerDuplicates: (orgId) => [...pennylaneKeys.all(orgId), 'customer-duplicates'],
+  // Leads dont les devis actifs couvrent ≥ 2 customers PL (vue live, tableau de bord admin)
+  leadMultiCustomers: (orgId) => [...pennylaneKeys.all(orgId), 'lead-multi-customers'],
   // Bug #5 ROGERO : recherche customer PL (cache D.5 + live)
   customerSearch: (orgId, query) => [...pennylaneKeys.all(orgId), 'customer-search', query],
 };

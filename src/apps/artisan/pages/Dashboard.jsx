@@ -33,6 +33,7 @@ import {
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { JourneesAArbitrer } from '@apps/artisan/components/tournees/JourneesAArbitrer';
 import { PennylaneDoublonsClients } from '@apps/artisan/components/devis/PennylaneDoublonsClients';
+import { PennylaneLeadsMultiPayeurs } from '@apps/artisan/components/devis/PennylaneLeadsMultiPayeurs';
 
 // =============================================================================
 // HOOK — Données dashboard (KPIs + planning du jour)
@@ -327,6 +328,9 @@ export default function Dashboard() {
 
       {/* Fiches client Pennylane en double : à fusionner dans Pennylane (décision 2026-09-16) */}
       {showQuotesKpi && <PennylaneDoublonsClients />}
+
+      {/* Leads rattachés à plusieurs clients Pennylane : synchro d'identité suspendue, l'admin tranche (mouchard 2026-09-16) */}
+      {showQuotesKpi && <PennylaneLeadsMultiPayeurs />}
 
       {/* Contenu principal */}
       <div className="grid lg:grid-cols-3 gap-6">

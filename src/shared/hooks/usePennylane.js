@@ -536,6 +536,68 @@ export function usePennylaneCustomerDuplicates({ enabled = true } = {}) {
 }
 
 /**
+ * Leads multi-payeurs Pennylane (vue live) — tableau de bord org_admin.
+ */
+export function useLeadMultiCustomers({ enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const query = useQuery({
+    queryKey: pennylaneKeys.leadMultiCustomers(orgId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneCustomerDuplicatesService.getLeadMultiCustomers(orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 60_000,
+  });
+
+  return {
+    leads: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
+  };
+}
+
+/**
+ * Retire d'un lead tous les devis d'UN customer Pennylane (cas multi-payeurs) :
+ * les devis redeviennent « Non rattachés » dans l'explorateur, le lead sort de
+ * la vue multi-payeurs et la synchro d'identité PL reprend au passage suivant.
+ * Tout ou rien côté UX : au premier échec on s'arrête et on remonte l'erreur
+ * (les devis déjà retirés le restent — l'explorateur permet de les rattacher).
+ */
+export function useEjectLeadCustomerQuotes() {
+  const queryClient = useQueryClient();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const mutation = useMutation({
+    mutationFn: async ({ quoteIds }) => {
+      let ejected = 0;
+      for (const quoteId of quoteIds) {
+        const { error } = await pennylaneService.ejectQuoteFromLead(orgId, quoteId, 'multi_customer_split');
+        if (error) throw error;
+        ejected++;
+      }
+      return { ejected };
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.leadMultiCustomers(orgId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.quotesExplorer(orgId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+    },
+  });
+
+  return {
+    ejectCustomerQuotes: useCallback((quoteIds) => mutation.mutateAsync({ quoteIds }), [mutation]),
+    isEjecting: mutation.isPending,
+  };
+}
+
+/**
  * Écarter (unitaire ou en lot) et réintégrer un devis.
  * Invalide l'explorateur pour que la carte disparaisse/réapparaisse.
  */
