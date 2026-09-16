@@ -12,6 +12,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pennylaneService } from '@services/pennylane.service';
 import { pennylaneQuotesService } from '@services/pennylaneQuotes.service';
+import { pennylaneCustomerDuplicatesService } from '@services/pennylaneCustomerDuplicates.service';
 import { leadsService } from '@services/leads.service';
 import { quoteDismissalsService } from '@services/quoteDismissals.service';
 import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
@@ -500,6 +501,37 @@ export function useQuotesExplorer({ enabled = true } = {}) {
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
+  };
+}
+
+/**
+ * Fiches customer Pennylane en double (projection du cron pennylane-sync-cron,
+ * remplacée d'un bloc chaque heure). Consommé par la carte du tableau de bord
+ * de l'org_admin ; une ligne disparaît d'elle-même une fois la fusion faite
+ * dans Pennylane.
+ *
+ * @param {object} [opts]
+ * @param {boolean} [opts.enabled=true]
+ */
+export function usePennylaneCustomerDuplicates({ enabled = true } = {}) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+
+  const query = useQuery({
+    queryKey: pennylaneKeys.customerDuplicates(orgId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneCustomerDuplicatesService.getAll(orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && enabled,
+    staleTime: 5 * 60_000,
+  });
+
+  return {
+    duplicates: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
   };
 }
 

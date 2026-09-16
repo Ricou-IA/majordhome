@@ -205,6 +205,43 @@ async function findLeadMatch(
 }
 
 // ---------------------------------------------------------------------------
+// Doublons de fiches Pennylane → tableau de bord de l'org_admin
+// ---------------------------------------------------------------------------
+
+interface DuplicateRow {
+  pennylane_id: number;
+  client_id: string;
+  mapped_pennylane_id: number;
+  pl_name: string | null;
+  pl_email: string | null;
+  pl_phone: string | null;
+}
+
+/**
+ * Remplace la liste des doublons de l'org par celle du passage courant
+ * (RPC service_role only). Un échec est loggé, jamais avalé : sinon le
+ * tableau de bord afficherait une liste figée sans que personne le sache.
+ */
+async function publishDuplicates(
+  supabase: ReturnType<typeof getAdminClient>,
+  rows: DuplicateRow[],
+  log: string[],
+) {
+  const { data, error } = await supabase.rpc("pennylane_customer_duplicates_replace", {
+    p_org_id: ORG_ID,
+    p_rows: rows,
+  });
+  if (error) {
+    log.push(`[dup-publish-error] ${error.message}`);
+    return;
+  }
+  const r = (data ?? {}) as { inserted?: number; updated?: number; removed?: number };
+  log.push(
+    `[dup-publish] ${rows.length} doublon(s) publiés (nouveaux ${r.inserted ?? 0}, revus ${r.updated ?? 0}, résolus ${r.removed ?? 0})`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main sync logic
 // ---------------------------------------------------------------------------
 
@@ -253,6 +290,8 @@ Deno.serve(async (req: Request) => {
     log.push(`New customers to process: ${newCustomers.length}`);
 
     if (newCustomers.length === 0) {
+      // Plus aucun customer non mappé ⇒ plus aucun doublon à afficher.
+      await publishDuplicates(supabase, [], log);
       return jsonResponse({ success: true, new_customers: 0, log });
     }
 
@@ -267,6 +306,7 @@ Deno.serve(async (req: Request) => {
     let leadsUpdated = 0;
     let plDuplicatesSkipped = 0;
     let syncErrors = 0;
+    const duplicates: DuplicateRow[] = [];
 
     for (const plCustomer of newCustomers) {
       try {
@@ -335,6 +375,14 @@ Deno.serve(async (req: Request) => {
         const alreadyMappedPlId = mappedPlIdByClient.get(clientId);
         if (alreadyMappedPlId !== undefined && alreadyMappedPlId !== plCustomer.id) {
           plDuplicatesSkipped++;
+          duplicates.push({
+            pennylane_id: plCustomer.id,
+            client_id: clientId,
+            mapped_pennylane_id: alreadyMappedPlId,
+            pl_name: plCustomer.name || null,
+            pl_email: email,
+            pl_phone: phone,
+          });
           log.push(
             `[dup-pl-customer] ${displayName} pl=${plCustomer.id} → client ${clientId} déjà mappé sur pl=${alreadyMappedPlId} (mapping conservé, doublon Pennylane à fusionner)`
           );
@@ -452,6 +500,10 @@ Deno.serve(async (req: Request) => {
         await new Promise((r) => setTimeout(r, 300));
       }
     }
+
+    // Tableau de bord de l'admin : la liste de l'org est remplacée d'un bloc,
+    // une fiche fusionnée dans Pennylane disparaît au passage suivant.
+    await publishDuplicates(supabase, duplicates, log);
 
     return jsonResponse({
       success: true,

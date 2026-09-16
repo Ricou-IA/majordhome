@@ -294,6 +294,8 @@ export const pennylaneKeys = {
   // deux sources divergeraient sur les filtres.
   quotesExplorer: (orgId) => [...pennylaneKeys.all(orgId), 'quotes-explorer'],
   quoteDismissals: (orgId) => [...pennylaneKeys.all(orgId), 'quote-dismissals'],
+  // Fiches customer PL en double (écrites par le cron pennylane-sync-cron, lues par le tableau de bord admin)
+  customerDuplicates: (orgId) => [...pennylaneKeys.all(orgId), 'customer-duplicates'],
   // Bug #5 ROGERO : recherche customer PL (cache D.5 + live)
   customerSearch: (orgId, query) => [...pennylaneKeys.all(orgId), 'customer-search', query],
 };
