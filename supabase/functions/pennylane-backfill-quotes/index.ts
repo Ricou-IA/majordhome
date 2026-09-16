@@ -4,7 +4,9 @@
 //
 // Pour TOUS les customers Pennylane déjà mappés en MDH :
 //   1. Récupère tous leurs devis Pennylane
-//   2. Trouve un lead existant pour le client MDH (ou en crée un via RPC)
+//   2. Trouve un lead ACTIF existant pour le client MDH (RPC upsert_pennylane_lead,
+//      qui ne crée JAMAIS de lead depuis le 2026-09-16 — sans lead, les devis
+//      restent « Non rattaché » dans l'explorateur /devis)
 //   3. Attache toutes les quotes au lead via RPC assign_pennylane_quote_to_lead
 //
 // Idempotent : déjà attachée à un lead → no-op (RPC retourne already_assigned).
@@ -238,6 +240,11 @@ Deno.serve(async (req: Request) => {
         const action = (leadResult as any)?.action;
         if (action === "lead_created") leadsCreated++;
         else if (action === "lead_updated") leadsUpdated++;
+        else if (action === "no_lead") {
+          // Décision 2026-09-16 : pas de lead actif → on n'invente rien, les
+          // devis restent « Non rattaché » dans /devis (leadId null ⇒ pas d'attache).
+          log.push(`[no-lead] ${plCustomer.name}: aucune carte active, ${customerQuotes.length} devis laisse(s) non rattache(s)`);
+        }
       }
 
       // Attacher toutes les quotes

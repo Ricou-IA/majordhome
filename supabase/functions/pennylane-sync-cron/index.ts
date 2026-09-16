@@ -5,7 +5,11 @@
 // Détecte les nouveaux clients Pennylane (sans mapping pennylane_sync)
 // et crée automatiquement :
 //   1. Le client dans majordhome.clients (+ code 411)
-//   2. Un lead en "Devis envoyé" SI le client a un devis > 500€ HT
+//   2. SI le client a un devis >= 500€ HT ET qu'un lead ACTIF correspond
+//      (email / téléphone / client_id) : passe ce lead en "Devis envoyé" et y
+//      attache les devis. Sinon (action `no_lead`) : ne crée RIEN — le devis
+//      reste « Non rattaché » dans l'explorateur /devis (décision 2026-09-16,
+//      après les doublons DURAND / GOTTARDI créés par la machine).
 //
 // Appelé toutes les heures via N8N ou pg_cron.
 //
@@ -30,7 +34,8 @@ const PENNYLANE_BASE_URL =
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
-// ⚠️ Cette constante ne FILTRE pas, elle decide de CREER un lead (cf ligne ~328).
+// Seuil au-dessus duquel on tente le rapprochement avec un lead ACTIF via
+// upsert_pennylane_lead (qui ne crée plus rien depuis le 2026-09-16).
 // 2026-08-05 : descendue de 1000 a 500 (demande equipe — le SAV est sous 500).
 // Alignee sur PIPELINE_MIN_AMOUNT_HT (src/lib/constants.js + copies Deno).
 const LEAD_THRESHOLD_HT = 500;
@@ -361,6 +366,10 @@ Deno.serve(async (req: Request) => {
               log.push(`[lead-updated] ${displayName} -> Devis envoye (max ${maxQuoteHT} EUR HT)`);
             } else if (leadAction === "lead_skipped_priority_status") {
               log.push(`[lead-skipped] ${displayName} -> statut prioritaire conserve`);
+            } else if (leadAction === "no_lead") {
+              // Décision 2026-09-16 : le cron n'invente pas de carte. Sans lead
+              // actif, les devis restent « Non rattaché » dans /devis (humain).
+              log.push(`[no-lead] ${displayName} -> aucune carte active, ${customerQuotes.length} devis laisse(s) non rattache(s)`);
             }
 
             // 2) Attacher TOUTES les quotes du customer à ce lead (variantes + autres projets,
