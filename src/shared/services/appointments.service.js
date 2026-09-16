@@ -143,9 +143,16 @@ async function syncCardStateOnCreate(appt) {
       .from('majordhome_leads').select('chantier_status').eq('id', appt.lead_id).maybeSingle();
     const order = CHANTIER_ORDER[lead?.chantier_status] ?? 0;
     if (lead?.chantier_status && order < CHANTIER_ORDER.planification) {
+      // planification_date = date de passage en planification (même sémantique que
+      // chantiersService.updateChantierStatus ; affichée « Planif. » sur la carte chantier)
+      const now = new Date();
       const { error } = await supabase.rpc('update_majordhome_lead', {
         p_lead_id: appt.lead_id,
-        p_updates: { chantier_status: 'planification', updated_at: new Date().toISOString() },
+        p_updates: {
+          chantier_status: 'planification',
+          planification_date: now.toISOString().split('T')[0],
+          updated_at: now.toISOString(),
+        },
       });
       if (error) console.error('[appointments] syncCreate install lead error:', error);
     }
