@@ -7,21 +7,21 @@
  *  - Bandeau identité (nom, montant, source, ville, contact)
  *  - Notes contextuelles (éditable, save sur blur)
  *  - Timeline d'interactions + bouton ajouter
- *  - Footer actions : Gagné / Perdu / Réactiver
+ *  - Footer : Réactiver uniquement. Gagné / Perdu ne se décident JAMAIS ici :
+ *    Pennylane est canonique (devis accepté → Gagné, tous refusés → Perdu), et
+ *    le MT-LT n'est qu'une vue des projets long terme, pas un statut (2026-09-16).
  *
  * @version 1.0.0
  * ============================================================================
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   Phone,
   Mail,
   MapPin,
   Hourglass,
-  Trophy,
-  XCircle,
   RotateCcw,
   Plus,
   Loader2,
@@ -36,14 +36,11 @@ import {
   useLeadInteractionMutations,
   useLongTermMutations,
 } from '@hooks/useLeadInteractions';
-import { useLeadStatuses, useLeadMutations } from '@hooks/useLeads';
 import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { leadsService } from '@services/leads.service';
-import { LOST_REASONS } from '../LeadStatusConfig';
 import { LinkedQuotesPanel } from '../LinkedQuotesPanel';
 import { QuoteCandidatesModal } from '../QuoteCandidatesModal';
-import { MarkWonQuoteModal } from '../MarkWonQuoteModal';
 import { AddInteractionModal } from './AddInteractionModal';
 import { InteractionTimeline } from './InteractionTimeline';
 import { computeFreshness, formatShortDate } from './longTermUtils';
@@ -100,28 +97,19 @@ export function LongTermLeadDrawer({
   onClose,
   onLeadUpdated,
 }) {
-  const { user, organization } = useAuth();
-  const userId = user?.id;
+  const { organization } = useAuth();
   const orgId = organization?.id;
   const leadId = lead?.id;
 
   const { interactions, isLoading: loadingInteractions, refresh: refreshInteractions } = useLeadInteractions(leadId);
   const { createInteraction, deleteInteraction, isCreating } = useLeadInteractionMutations();
   const { reactivateFromLongTerm, isReactivating } = useLongTermMutations();
-  const { updateLeadStatus, isChangingStatus } = useLeadMutations();
-  const { statuses } = useLeadStatuses();
 
   const [addOpen, setAddOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  // Modale Perdu (motif requis)
-  const [pendingLost, setPendingLost] = useState(false);
-  const [lostReasonSelect, setLostReasonSelect] = useState('');
-  const [lostReasonCustom, setLostReasonCustom] = useState('');
-
   // Pennylane bridge — rattachement de devis pour régularisation
   const [showQuoteCandidates, setShowQuoteCandidates] = useState(false);
-  const [showMarkWon, setShowMarkWon] = useState(false);
   const pennylaneActive = usePennylaneEnabled();
   const { linkedQuotes } = useLinkedPennylaneQuotes(pennylaneActive && leadId ? leadId : null);
 
@@ -129,21 +117,8 @@ export function LongTermLeadDrawer({
   useEffect(() => {
     if (!isOpen) {
       setAddOpen(false);
-      setPendingLost(false);
-      setLostReasonSelect('');
-      setLostReasonCustom('');
-      setShowMarkWon(false);
     }
   }, [isOpen, leadId]);
-
-  const wonStatusId = useMemo(
-    () => statuses?.find((s) => s.label === 'Gagné')?.id,
-    [statuses],
-  );
-  const lostStatusId = useMemo(
-    () => statuses?.find((s) => s.label === 'Perdu')?.id,
-    [statuses],
-  );
 
   if (!isOpen || !lead) return null;
 
@@ -185,61 +160,7 @@ export function LongTermLeadDrawer({
     }
   };
 
-  const handleWon = async () => {
-    // Org Pennylane : le gain est piloté par Pennylane, exactement comme « Devis envoyé »
-    // (le Long Terme n'est qu'un autre affichage de Devis envoyé, jamais plus permissif).
-    // Pas de bascule « à la main » : on sélectionne le devis signé via MarkWonQuoteModal
-    // (→ lead_mark_won_with_quote). Sans devis attaché, rattachement obligatoire d'abord.
-    if (pennylaneActive) {
-      if ((linkedQuotes?.length || 0) === 0) {
-        toast.error('Aucun devis Pennylane attaché. Rattachez d’abord un devis avant de marquer « Gagné ».');
-        return;
-      }
-      setShowMarkWon(true);
-      return;
-    }
-    // Org sans Pennylane : autonomie MDH — bascule manuelle conservée.
-    if (!wonStatusId) {
-      toast.error('Statut "Gagné" introuvable');
-      return;
-    }
-    try {
-      // 1) Clear flag MT-LT
-      await reactivateFromLongTerm({ leadId });
-      // 2) Transition vers Gagné (gère aussi chantier_status, lock visit, etc.)
-      await updateLeadStatus(leadId, wonStatusId, userId, {});
-      toast.success('Lead passé en Gagné');
-      onLeadUpdated?.();
-      onClose();
-    } catch (err) {
-      console.error('[Drawer] won error:', err);
-      toast.error('Erreur lors du passage en Gagné');
-    }
-  };
-
-  const handleConfirmLost = async () => {
-    const reason = lostReasonSelect === 'Autre' ? lostReasonCustom.trim() : lostReasonSelect;
-    if (!reason) {
-      toast.error('Veuillez sélectionner un motif');
-      return;
-    }
-    if (!lostStatusId) {
-      toast.error('Statut "Perdu" introuvable');
-      return;
-    }
-    try {
-      await reactivateFromLongTerm({ leadId });
-      await updateLeadStatus(leadId, lostStatusId, userId, { lostReason: reason });
-      toast.success('Lead marqué comme perdu');
-      onLeadUpdated?.();
-      onClose();
-    } catch (err) {
-      console.error('[Drawer] lost error:', err);
-      toast.error('Erreur lors du passage en Perdu');
-    }
-  };
-
-  const isBusy = isReactivating || isChangingStatus;
+  const isBusy = isReactivating;
 
   return (
     <div className="fixed inset-0 z-40">
@@ -370,48 +291,23 @@ export function LongTermLeadDrawer({
           </div>
         </div>
 
-        {/* Footer actions */}
+        {/* Footer : Réactiver seulement. Gagné / Perdu = Pennylane (devis accepté /
+            tous refusés), la carte quitte le suivi MT-LT toute seule (LongTermTab). */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-3">
-          <div className="flex flex-wrap gap-2 justify-between">
+          <div className="flex flex-wrap gap-2 justify-between items-center">
+            <p className="text-xs text-gray-500">
+              Gagné / Perdu se décident dans Pennylane (devis accepté ou refusé).
+            </p>
             <button
               type="button"
-              onClick={() => {
-                // Parité fiche/board : sur org Pennylane avec devis attaché(s), la perte
-                // est pilotée par Pennylane (marquer les devis refusés → la carte bascule
-                // en Perdu quand 100% sont refusés). Perte directe (sans devis) autorisée.
-                if (pennylaneActive && (linkedQuotes?.length || 0) > 0) {
-                  toast.error('Marquez le(s) devis comme refusé(s) dans Pennylane — la carte basculera automatiquement.');
-                  return;
-                }
-                setPendingLost(true);
-              }}
+              onClick={handleReactivate}
               disabled={isBusy}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              title="Remettre en Devis envoyé dans le pipeline"
             >
-              <XCircle className="h-4 w-4" />
-              Perdu
+              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              Réactiver
             </button>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleReactivate}
-                disabled={isBusy}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
-                title="Remettre en Devis envoyé dans le pipeline"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Réactiver
-              </button>
-              <button
-                type="button"
-                onClick={handleWon}
-                disabled={isBusy}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />}
-                Gagné
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -437,84 +333,6 @@ export function LongTermLeadDrawer({
         />
       )}
 
-      {/* Bridge Pennylane — bascule « Gagné » par choix du devis signé (parité fiche lead).
-          onBeforeMark : on sort d'abord le lead du parking MT-LT, puis la RPC
-          lead_mark_won_with_quote fait la bascule statut + chantier + is_winning_quote. */}
-      {pennylaneActive && leadId && (
-        <MarkWonQuoteModal
-          isOpen={showMarkWon}
-          onClose={() => setShowMarkWon(false)}
-          leadId={leadId}
-          orgId={orgId}
-          userId={userId}
-          onBeforeMark={async () => {
-            await reactivateFromLongTerm({ leadId });
-          }}
-          onMarked={() => {
-            onLeadUpdated?.();
-            onClose();
-          }}
-        />
-      )}
-
-      {/* Modale motif Perdu */}
-      {pendingLost && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Motif de perte</h3>
-              <button
-                onClick={() => setPendingLost(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <select
-                value={lostReasonSelect}
-                onChange={(e) => setLostReasonSelect(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                autoFocus
-              >
-                <option value="">Sélectionner un motif…</option>
-                {LOST_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-                <option value="Autre">Autre (préciser)</option>
-              </select>
-
-              {lostReasonSelect === 'Autre' && (
-                <input
-                  type="text"
-                  value={lostReasonCustom}
-                  onChange={(e) => setLostReasonCustom(e.target.value)}
-                  placeholder="Précisez le motif…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
-                  autoFocus
-                />
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <button
-                onClick={() => setPendingLost(false)}
-                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleConfirmLost}
-                disabled={isBusy || !lostReasonSelect || (lostReasonSelect === 'Autre' && !lostReasonCustom.trim())}
-                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirmer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

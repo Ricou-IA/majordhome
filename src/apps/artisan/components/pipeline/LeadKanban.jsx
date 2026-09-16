@@ -37,6 +37,12 @@ const STATUS_LABEL_TO_COLUMN_KEY = {
   'Perdu': 'perdu',
 };
 
+// Colonnes terminales : seules colonnes où un lead MT-LT apparaît sur le board.
+// Le suivi MT-LT est une VUE des projets long terme, pas un statut : quand
+// Pennylane classe la carte (devis accepté → Gagné, tous refusés → Perdu),
+// elle sort du suivi (LongTermTab) et se montre ici (2026-09-16).
+const TERMINAL_COLUMN_KEYS = new Set(['gagne', 'perdu']);
+
 // Inverse mapping: column_key → status label (for DnD droppable ID lookup)
 const COLUMN_KEY_TO_STATUS_LABEL = Object.fromEntries(
   Object.entries(STATUS_LABEL_TO_COLUMN_KEY).map(([label, key]) => [key, label]),
@@ -333,8 +339,9 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       if (selectedSourceId) {
         dateFilters.sourceId = selectedSourceId;
       }
-      // Exclure les leads MT-LT (Suivi long terme) du Kanban
-      dateFilters.excludeLongTerm = true;
+      // Les leads MT-LT restent dans la liste : ils sont masqués des colonnes
+      // amont à la fusion cartes/leads (kanbanItems), mais s'affichent en
+      // Gagné / Perdu dès que Pennylane les y place (2026-09-16).
       const { data, error } = await leadsService.getLeads({
         orgId,
         filters: dateFilters,
@@ -371,7 +378,6 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         if (selectedSourceId) {
           dateFilters.sourceId = selectedSourceId;
         }
-        dateFilters.excludeLongTerm = true;
         const { data, error } = await leadsService.getLeads({
           orgId,
           filters: dateFilters,
@@ -432,6 +438,8 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       .map((card) => {
         const lead = leadsById.get(card.lead_id);
         if (!lead) return null; // carte pour un lead hors du filtre courant
+        // Lead MT-LT : visible seulement une fois classé par Pennylane (Gagné / Perdu)
+        if (lead.is_long_term_project && !TERMINAL_COLUMN_KEYS.has(card.column_key)) return null;
         leadsWithCard.add(lead.id);
         return {
           id: card.card_key,          // clé React unique (card_key est unique par carte)
@@ -448,6 +456,7 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
       if (leadsWithCard.has(lead.id)) return;
       const colKey = statusIdToColumnKey.get(lead.status_id);
       if (!colKey) return;
+      if (lead.is_long_term_project && !TERMINAL_COLUMN_KEYS.has(colKey)) return;
       items.push({
         id: `classic:${lead.id}`,
         column_key: colKey,

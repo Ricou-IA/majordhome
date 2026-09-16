@@ -30,6 +30,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLongTermLeads, useLeadInteractionMutations } from '@hooks/useLeadInteractions';
 import { useLeadCommercials } from '@hooks/useLeads';
+import { useKanbanCards } from '@hooks/useKanbanCards';
 import { formatEuroCeil } from '@/lib/utils';
 import { computeFreshness, formatShortDate } from './longTermUtils';
 import { LongTermLeadDrawer } from './LongTermLeadDrawer';
@@ -152,13 +153,29 @@ export function LongTermTab() {
   const [drawerLeadId, setDrawerLeadId] = useState(null);
   const [addInteractionLead, setAddInteractionLead] = useState(null);
 
+  // Le suivi MT-LT est une VUE, pas un statut : un projet que Pennylane a classé
+  // (devis accepté → Gagné, tous refusés → Perdu) sort de la liste tout seul et
+  // apparaît dans la colonne correspondante du board. Source unique = la vue des
+  // cartes (même placement que le Kanban). Sans devis PL : statut classique final.
+  // Rien n'est écrit : un devis renvoyé (à nouveau en attente) ramène le projet.
+  const { cards } = useKanbanCards();
+  const classifiedLeadIds = useMemo(() => {
+    const ids = new Set();
+    cards.forEach((c) => {
+      if (c.column_key === 'gagne' || c.column_key === 'perdu') ids.add(c.lead_id);
+    });
+    return ids;
+  }, [cards]);
+
   // Filtres et enrichissement (calcul fraîcheur)
   const enrichedLeads = useMemo(() => {
-    return leads.map((l) => ({
-      ...l,
-      freshness: computeFreshness(l.last_interaction_at, l.long_term_started_at),
-    }));
-  }, [leads]);
+    return leads
+      .filter((l) => !classifiedLeadIds.has(l.id) && !['Gagné', 'Perdu'].includes(l.status_label))
+      .map((l) => ({
+        ...l,
+        freshness: computeFreshness(l.last_interaction_at, l.long_term_started_at),
+      }));
+  }, [leads, classifiedLeadIds]);
 
   const filteredLeads = useMemo(() => {
     let out = enrichedLeads;
