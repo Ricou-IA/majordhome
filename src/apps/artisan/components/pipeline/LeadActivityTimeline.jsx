@@ -3,7 +3,12 @@
  * ============================================================================
  * Timeline des activités d'un lead + formulaire d'ajout de note.
  *
- * @version 1.0.0 - Sprint 4 Pipeline Commercial
+ * Deux natures d'entrées (fusionnées par `mergeTimeline`, src/lib/auditTrail.js) :
+ *  - `activity` : activités déclaratives de `lead_activities` (statut, note, appel…)
+ *  - `audit`    : mouchard — écritures réelles sur le lead et ses RDV, tracées par
+ *                 trigger DB (qui / quoi / par où), rendues via <AuditEntry />
+ *
+ * @version 1.1.0 - Mouchard (2026-09-16)
  * ============================================================================
  */
 
@@ -18,12 +23,14 @@ import {
   Mail,
   MailOpen,
   FileText,
+  History,
   Loader2,
   Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ACTIVITY_CONFIG } from '@services/leads.service';
+import { AuditEntry } from '../shared/AuditEntry';
 
 // Map des icônes (Lucide)
 const ICON_MAP = {
@@ -40,14 +47,14 @@ const ICON_MAP = {
 
 /**
  * @param {Object} props
- * @param {Array} props.activities - Liste des activités
+ * @param {Array} props.entries - Timeline fusionnée (activités + audit), la plus récente en tête
  * @param {boolean} props.isLoading - Chargement
  * @param {Function} props.onAddNote - (description: string) => Promise
  * @param {boolean} props.isAddingNote - Loading ajout note
  * @param {boolean} props.disabled - Désactiver le formulaire
  */
 export function LeadActivityTimeline({
-  activities = [],
+  entries = [],
   isLoading = false,
   onAddNote,
   isAddingNote = false,
@@ -129,7 +136,7 @@ export function LeadActivityTimeline({
       )}
 
       {/* Liste des activités */}
-      {activities.length === 0 ? (
+      {entries.length === 0 ? (
         <p className="text-sm text-gray-400 italic py-4 text-center">
           Aucune activité enregistrée
         </p>
@@ -139,7 +146,20 @@ export function LeadActivityTimeline({
           <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
 
           <div className="space-y-4">
-            {activities.map((activity) => {
+            {entries.map((activity) => {
+              if (activity.kind === 'audit') {
+                return (
+                  <div key={activity.id} className="relative flex gap-3 pl-1">
+                    <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                      <History className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <AuditEntry entry={activity} showSubject={activity.table !== 'leads'} />
+                    </div>
+                  </div>
+                );
+              }
+
               const config = ACTIVITY_CONFIG[activity.activity_type] || ACTIVITY_CONFIG.note;
               const IconComponent = ICON_MAP[config.icon] || MessageSquare;
 

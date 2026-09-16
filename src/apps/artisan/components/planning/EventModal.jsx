@@ -7,6 +7,7 @@
  * Orchestrateur : logique métier + state. Le JSX formulaire est dans :
  *   - EventFormSections.jsx (SectionType, SectionDateTime, SectionClient, SectionCommercial, SectionNotes)
  *   - EventConfirmations.jsx (CancelConfirmation, DeleteConfirmation)
+ *   - AppointmentHistorySection.jsx (mouchard : historique des écritures du RDV)
  *
  * @version 3.0.0 - Refactoring extraction sous-composants
  * ============================================================================
@@ -34,6 +35,7 @@ import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
 import { SchedulingAssistant } from './scheduling/SchedulingAssistant';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
+import { AppointmentHistorySection } from './AppointmentHistorySection';
 import {
   SectionType,
   SectionDateTime,
@@ -1206,6 +1208,11 @@ export function EventModal({
                   updateField={updateField}
                   isCancelled={isCancelled}
                 />
+              )}
+
+              {/* Mouchard : qui a créé / déplacé / annulé ce RDV, et par où (édition seule). */}
+              {editIdle && appointment?.id && (
+                <AppointmentHistorySection appointmentId={appointment.id} />
               )}
 
               {/* Certificats d'entretien — un par equipement.

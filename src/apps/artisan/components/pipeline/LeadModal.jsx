@@ -23,11 +23,14 @@ import { useCanAccess } from '@hooks/usePermissions';
 import {
   useLead,
   useLeadActivities,
+  useLeadAuditTrail,
   useLeadStatuses,
   useLeadSources,
   useLeadCommercials,
   useLeadMutations,
 } from '@hooks/useLeads';
+import { useAuditResolvers } from '@hooks/useAuditResolvers';
+import { buildAuditEntry, mergeTimeline } from '@/lib/auditTrail';
 import { useClientSearch } from '@hooks/useClients';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
@@ -94,6 +97,14 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   // Données
   const { lead, isLoading: loadingLead } = useLead(isEditing ? leadId : null);
   const { activities, isLoading: loadingActivities } = useLeadActivities(isEditing ? leadId : null);
+  // Mouchard : écritures réelles sur le lead et ses RDV (trigger DB), fusionnées
+  // avec les activités déclaratives dans l'Historique.
+  const { rows: auditRows } = useLeadAuditTrail(isEditing ? leadId : null);
+  const auditResolvers = useAuditResolvers();
+  const timelineEntries = useMemo(
+    () => mergeTimeline(activities, auditRows.map((row) => buildAuditEntry(row, { resolvers: auditResolvers }))),
+    [activities, auditRows, auditResolvers],
+  );
   const { statuses } = useLeadStatuses();
   const { sources } = useLeadSources();
   const { commercials } = useLeadCommercials(orgId);
@@ -1141,7 +1152,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 form={form}
                 setField={setField}
                 isEditing={isEditing}
-                activities={activities}
+                timelineEntries={timelineEntries}
                 loadingActivities={loadingActivities}
                 handleAddNote={handleAddNote}
                 isAddingNote={isAddingNote}

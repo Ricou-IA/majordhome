@@ -70,6 +70,7 @@ export const leadKeys = {
   list: (orgId, filters) => [...leadKeys.lists(orgId), filters],
   detail: (orgId, id) => [...leadKeys.all(orgId), 'detail', id],
   activities: (orgId, leadId) => [...leadKeys.all(orgId), 'activities', leadId],
+  audit: (orgId, leadId) => [...leadKeys.all(orgId), 'audit', leadId],
   sources: (orgId) => [...leadKeys.all(orgId), 'sources'],
   statuses: (orgId) => [...leadKeys.all(orgId), 'statuses'],
   commercials: (orgId) => [...leadKeys.all(orgId), 'commercials'],
@@ -99,6 +100,7 @@ export const appointmentKeys = {
   technicians: (orgId, appointmentIds) => [...appointmentKeys.all(orgId), 'technicians', appointmentIds],
   dayAvailability: (orgId, date) => [...appointmentKeys.all(orgId), 'day-availability', date],
   chantier: (orgId, leadId) => [...appointmentKeys.all(orgId), 'chantier', leadId],
+  audit: (orgId, id) => [...appointmentKeys.all(orgId), 'audit', id],
 };
 
 // --- Interventions ---

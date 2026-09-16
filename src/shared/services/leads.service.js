@@ -520,16 +520,21 @@ export const leadsService = {
       }
       const newLabel = newStatusLabel || '?';
 
-      // Creer l'activite
-      await this._createActivity({
-        leadId,
-        orgId: updatedLead?.org_id || currentLead?.org_id,
-        userId,
-        type: LEAD_ACTIVITY_TYPES.STATUS_CHANGED,
-        description: `Statut : ${oldLabel} \u2192 ${newLabel}${extra.lostReason ? ` (${extra.lostReason})` : ''}`,
-        oldStatusId,
-        newStatusId,
-      });
+      // Creer l'activite \u2014 seulement si le statut change vraiment. Re-poser le
+      // meme statut (ex. nouvelle date de RDV) ecrivait \u00ab RDV planifie \u2192 RDV
+      // planifie \u00bb : un mensonge dans l'Historique. Le changement reel (date,
+      // RDV lie\u2026) est trace par le mouchard DB (majordhome.audit_log).
+      if (oldStatusId !== newStatusId || extra.lostReason) {
+        await this._createActivity({
+          leadId,
+          orgId: updatedLead?.org_id || currentLead?.org_id,
+          userId,
+          type: LEAD_ACTIVITY_TYPES.STATUS_CHANGED,
+          description: `Statut : ${oldLabel} \u2192 ${newLabel}${extra.lostReason ? ` (${extra.lostReason})` : ''}`,
+          oldStatusId,
+          newStatusId,
+        });
+      }
 
       // Auto-conversion lead \u2192 client lors du passage en "Gagn\u00e9"
       // (couvre tous les chemins : drag-and-drop Kanban, modal, LongTermDrawer)

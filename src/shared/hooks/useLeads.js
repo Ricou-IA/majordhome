@@ -10,6 +10,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@services/leads.service';
+import { auditService } from '@services/audit.service';
 import { leadKeys, clientKeys, appointmentKeys, kanbanCardKeys, chantierKeys, interventionKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -198,6 +199,30 @@ export function useLeadActivities(leadId) {
     error,
     refresh: refetch,
   };
+}
+
+// ============================================================================
+// HOOK - useLeadAuditTrail (mouchard : écritures sur le lead ET ses RDV)
+// ============================================================================
+
+/**
+ * Lignes brutes du journal d'audit rattachées à un lead (fiche + RDV liés).
+ * Mise en forme côté appelant via `buildAuditEntry` (src/lib/auditTrail.js).
+ * staleTime 0 : chaque ouverture de fiche relit le journal — une modification
+ * faite depuis le planning n'invalide pas la famille `leads`.
+ */
+export function useLeadAuditTrail(leadId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: leadKeys.audit(orgId, leadId),
+    queryFn: () => auditService.getForLead(orgId, leadId),
+    enabled: !!orgId && !!leadId,
+    staleTime: 0,
+    select: (result) => result?.data || [],
+  });
+
+  return { rows: data || [], isLoading, error, refresh: refetch };
 }
 
 // ============================================================================

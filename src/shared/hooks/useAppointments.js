@@ -10,6 +10,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
+import { auditService } from '@services/audit.service';
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
@@ -335,6 +336,28 @@ export function useAppointment(appointmentId) {
     error,
     refresh: refetch,
   };
+}
+
+// ============================================================================
+// HOOK - useAppointmentAuditTrail (mouchard : écritures sur un RDV)
+// ============================================================================
+
+/**
+ * Lignes brutes du journal d'audit d'un RDV (vue `majordhome_audit_log`).
+ * Mise en forme côté appelant via `buildAuditEntry` (src/lib/auditTrail.js).
+ */
+export function useAppointmentAuditTrail(appointmentId) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: appointmentKeys.audit(orgId, appointmentId),
+    queryFn: () => auditService.getForRecord(orgId, 'appointments', appointmentId),
+    enabled: !!orgId && !!appointmentId,
+    staleTime: 0,
+    select: (result) => result?.data || [],
+  });
+
+  return { rows: data || [], isLoading, error, refresh: refetch };
 }
 
 // ============================================================================

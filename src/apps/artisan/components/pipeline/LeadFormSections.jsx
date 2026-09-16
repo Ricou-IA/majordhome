@@ -786,7 +786,7 @@ export const SectionNotes = ({
   form,
   setField,
   isEditing,
-  activities,
+  timelineEntries,
   loadingActivities,
   leadId,
   onOpenFicheTechnique,
@@ -844,7 +844,7 @@ export const SectionNotes = ({
         <>
           <SectionTitle>Historique</SectionTitle>
           <LeadActivityTimeline
-            activities={activities}
+            entries={timelineEntries}
             isLoading={loadingActivities}
             disabled
           />

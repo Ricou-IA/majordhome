@@ -334,7 +334,10 @@ id, name, description, color, is_active
 id, label (unique), display_order, color, is_final, is_won
 
 ### majordhome.lead_activities
-Historique activités leads (status_change, note, etc.)
+Historique activités leads (status_change, note, etc.) — **déclaratif** : écrit par le front, `user_id` fourni dans le payload. Pour prouver un auteur, voir `audit_log`.
+
+### majordhome.audit_log ⭐ (2026-09-16, mouchard)
+Journal **append-only** des écritures sur `leads` et `appointments`, alimenté par le trigger générique `majordhome.audit_row_change()` (SECURITY DEFINER, seul écrivain). Colonnes : `org_id` (org CORE normalisée), `table_name`, `record_id`, `lead_id`, `action` (INSERT/UPDATE/DELETE), `changed_fields[]`, `old_values` / `new_values` (champs modifiés seulement), `changed_by` (= `auth.uid()` serveur, NULL = automatisation), `changed_by_role`, `source` (RPC / vue racine extraite de `current_query()`), `changed_at`. Pas de FK vers l'entité (survit au hard delete). RLS SELECT membres org ; aucun droit d'écriture. Vue : `public.majordhome_audit_log` (security_invoker, + `changed_by_name`). Spec : `docs/superpowers/specs/2026-09-16-mouchard-audit-log-design.md`.
 
 ### majordhome.monthly_source_costs
 Coûts pub mensuels par source (ROI)
