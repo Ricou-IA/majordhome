@@ -19,7 +19,11 @@
 --
 -- L'organisation figée est celle que portent les leads de Mayer dans
 -- majordhome.leads : le core_org_id (3c68…), pas l'id de
--- majordhome.organizations (7825…). Vérifié en base le 17/09/2026.
+-- majordhome.organizations (7825…). Vérifié le 17/09/2026 sur le projet de
+-- production ejqqqwudmizqisdkxohw (org confer-saas), le seul qui compte
+-- depuis la bascule du 10/08 : le projet odspcxgafcqxjzrarsqf n'est plus
+-- qu'une copie de secours, et supabase/.temp/project-ref pointe encore
+-- dessus.
 -- ============================================================================
 
 INSERT INTO majordhome.sources (id, name, description, is_active, color)
