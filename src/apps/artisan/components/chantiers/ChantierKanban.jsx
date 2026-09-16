@@ -47,6 +47,14 @@ export function ChantierKanban() {
   }, [commercials]);
 
   const [selectedChantier, setSelectedChantier] = useState(null);
+  // La modale lit le chantier dans la liste FRAÎCHE, pas dans l'instantané du clic :
+  // une planification d'installation avance le statut en base (syncCardStateOnCreate)
+  // sans fermer la modale, et le CTA « À planifier » restait affiché sur un chantier
+  // déjà passé en Planification. Repli sur l'instantané si la carte sort de la liste.
+  const modalChantier = useMemo(() => {
+    if (!selectedChantier) return null;
+    return chantiers.find((c) => c.id === selectedChantier.id) || selectedChantier;
+  }, [chantiers, selectedChantier]);
   const canEdit = can('chantiers', 'edit');
 
   // Colonnes visibles selon le rôle
@@ -121,9 +129,9 @@ export function ChantierKanban() {
         </button>
       }
     >
-      {selectedChantier && (
+      {modalChantier && (
         <ChantierModal
-          chantier={selectedChantier}
+          chantier={modalChantier}
           onClose={() => setSelectedChantier(null)}
           onUpdated={refresh}
           effectiveRole={effectiveRole}
