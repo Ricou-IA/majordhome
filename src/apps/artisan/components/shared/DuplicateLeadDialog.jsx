@@ -17,6 +17,7 @@ import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { formatDateShortFR } from '@/lib/utils';
 
 const REASON_LABELS = {
+  client: 'même client',
   phone: 'même téléphone',
   email: 'même email',
   name: 'même nom',

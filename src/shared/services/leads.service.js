@@ -887,15 +887,20 @@ export const leadsService = {
   // puis CONFIRMATION par le module pur leadDuplicateMatch (élimine les faux
   // positifs du ILIKE, annote matchReasons pour le dialogue).
   // ==========================================================================
-  async findPotentialDuplicates({ orgId, phone, email, firstName, lastName }) {
+  async findPotentialDuplicates({ orgId, phone, email, firstName, lastName, clientId }) {
     if (!orgId) return { data: [], error: null };
 
-    const probe = buildDuplicateProbe({ phone, email, firstName, lastName });
+    const probe = buildDuplicateProbe({ phone, email, firstName, lastName, clientId });
     if (!probe) return { data: [], error: null };
 
     return withErrorHandling(async () => {
       // P0.26 : chaque terme interpolé dans .or() passe par escapePostgrestSearchTerm.
       const orClauses = [];
+      if (probe.clientKey) {
+        // Axe client (2026-09-16) : leads déjà rattachés au même client Majord'home.
+        const term = escapePostgrestSearchTerm(probe.clientKey);
+        if (term) orClauses.push(`client_id.eq.${term}`);
+      }
       if (probe.phoneKey) {
         // La base stocke majoritairement « 06 10 36 56 72 » ; on couvre aussi le brut.
         const spaced = escapePostgrestSearchTerm(formatPhoneForSearch(probe.phoneKey) || '');
@@ -916,7 +921,7 @@ export const leadsService = {
 
       const { data, error } = await supabase
         .from('majordhome_leads')
-        .select('id, first_name, last_name, email, phone, city, status_label, status_color, source_name, created_at')
+        .select('id, first_name, last_name, email, phone, city, client_id, status_label, status_color, source_name, created_at')
         .eq('org_id', orgId)
         .eq('is_deleted', false)
         .or(orClauses.join(','))

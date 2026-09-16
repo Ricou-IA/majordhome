@@ -99,3 +99,20 @@ export function filterExplorerRows(rows, view) {
       return rows.filter(r => !r.is_dismissed && r.is_orphan);
   }
 }
+
+/**
+ * Payload RPC `lead_attach_quotes_and_send` d'une ligne de l'explorateur.
+ * Forme unique partagée par le rattachement (AttachQuoteToLeadModal) et la
+ * création de lead (CreateLeadFromQuoteModal).
+ */
+export function toAttachPayload(quote) {
+  return {
+    quote_pl_id: quote.id,
+    customer_id: quote.customer_id ?? null,
+    amount_ht: quote.amount_ht ?? null,
+    label: quote.quote_number || quote.label || null,
+    date: quote.date || null,
+    status: quote.status || null,
+    pdf_url: quote.pdf_url || null,
+  };
+}

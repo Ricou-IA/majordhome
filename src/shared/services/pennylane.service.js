@@ -134,6 +134,26 @@ async function getSyncRecord(orgId, entityType, localId) {
   return data;
 }
 
+/**
+ * Client Majord'home déjà ponté à un customer Pennylane (mapping posé par le
+ * cron pennylane-sync-cron ou la sync client MDH→PL). null si aucun pont.
+ * Sert au filet anti-doublon de l'explorateur : un devis PL dont le customer est
+ * déjà ponté a très probablement une carte active sur ce client.
+ */
+async function getClientIdForCustomer(orgId, customerId) {
+  if (!orgId || !customerId) return null;
+  const { data, error } = await supabase
+    .from('majordhome_pennylane_sync')
+    .select('local_id')
+    .eq('org_id', orgId)
+    .eq('entity_type', 'client')
+    .eq('pennylane_id', customerId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.local_id || null;
+}
+
 async function upsertSyncRecord(record) {
   const { data, error } = await supabase
     .from('majordhome_pennylane_sync')
@@ -1706,6 +1726,7 @@ export const pennylaneService = {
 
   // Sync table
   getSyncRecord: (orgId, entityType, localId) => withErrorHandling(() => getSyncRecord(orgId, entityType, localId), 'pennylane.getSyncRecord'),
+  getClientIdForCustomer: (orgId, customerId) => withErrorHandling(() => getClientIdForCustomer(orgId, customerId), 'pennylane.getClientIdForCustomer'),
 
   // Bug #5 ROGERO — search PL (cache + live) + import client
   searchPennylaneCustomers: (query, orgId, opts) => withErrorHandling(() => searchPennylaneCustomers(query, orgId, opts), 'pennylane.searchPennylaneCustomers'),

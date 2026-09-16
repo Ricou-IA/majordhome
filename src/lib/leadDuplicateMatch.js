@@ -56,25 +56,30 @@ export function normalizeNameKey(firstName, lastName) {
  * @returns {{phoneKey: string|null, emailKey: string|null, nameKey: Object|null}|null}
  *          null si aucun axe exploitable (le check est alors sauté)
  */
-export function buildDuplicateProbe({ phone, email, firstName, lastName } = {}) {
+export function buildDuplicateProbe({ phone, email, firstName, lastName, clientId } = {}) {
   const phoneKey = normalizePhoneKey(phone);
   const emailKey = normalizeEmailKey(email);
   const nameKey = normalizeNameKey(firstName, lastName);
-  if (!phoneKey && !emailKey && !nameKey) return null;
-  return { phoneKey, emailKey, nameKey };
+  // 4ᵉ axe (2026-09-16) : le client Majord'home déjà connu (ex. client Pennylane
+  // ponté par pennylane_sync). Couvre le cas où le contact de la fiche diffère
+  // de celui du lead — DURAND : 3 leads sur le même client_id.
+  const clientKey = clientId ? String(clientId) : null;
+  if (!phoneKey && !emailKey && !nameKey && !clientKey) return null;
+  return { phoneKey, emailKey, nameKey, clientKey };
 }
 
 /**
  * Confirme et annote les candidats ramenés par la requête large.
  * @param {Array} candidates - leads {id, first_name, last_name, phone, email, …}
  * @param {Object} probe - résultat de buildDuplicateProbe
- * @returns {Array} candidats confirmés, annotés de matchReasons ('phone'|'email'|'name')
+ * @returns {Array} candidats confirmés, annotés de matchReasons ('client'|'phone'|'email'|'name')
  */
 export function matchLeadDuplicates(candidates, probe) {
   if (!probe || !Array.isArray(candidates)) return [];
   return candidates
     .map((c) => {
       const reasons = [];
+      if (probe.clientKey && c.client_id && String(c.client_id) === probe.clientKey) reasons.push('client');
       if (probe.phoneKey && normalizePhoneKey(c.phone) === probe.phoneKey) reasons.push('phone');
       if (probe.emailKey && normalizeEmailKey(c.email) === probe.emailKey) reasons.push('email');
       if (probe.nameKey) {

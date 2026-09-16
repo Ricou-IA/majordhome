@@ -111,3 +111,28 @@ test('matchLeadDuplicates — probe null ou candidats invalides → []', () => {
   assert.deepEqual(matchLeadDuplicates(CANDIDATES, null), []);
   assert.deepEqual(matchLeadDuplicates(null, buildDuplicateProbe({ phone: '0610365672' })), []);
 });
+
+// ============================================================================
+// Axe client (2026-09-16) — client Majord'home déjà ponté (Pennylane)
+// ============================================================================
+
+test('buildDuplicateProbe — clientId seul suffit à sonder', () => {
+  const probe = buildDuplicateProbe({ clientId: 'c-1' });
+  assert.deepEqual(probe, { phoneKey: null, emailKey: null, nameKey: null, clientKey: 'c-1' });
+});
+
+test('matchLeadDuplicates — même client_id confirme le candidat, même sans contact commun', () => {
+  const probe = buildDuplicateProbe({ clientId: 'c-1', phone: '06 10 36 56 72' });
+  const out = matchLeadDuplicates([
+    { id: 'a', client_id: 'c-1', phone: null, email: null },
+    { id: 'b', client_id: 'c-2', phone: '06 10 36 56 72' },
+    { id: 'c', client_id: 'c-3', phone: null },
+  ], probe);
+  assert.deepEqual(out.map((o) => [o.id, o.matchReasons]), [['a', ['client']], ['b', ['phone']]]);
+});
+
+test('matchLeadDuplicates — sans clientKey, client_id du candidat ignoré', () => {
+  const probe = buildDuplicateProbe({ phone: '0610365672' });
+  const out = matchLeadDuplicates([{ id: 'a', client_id: 'c-1', phone: null }], probe);
+  assert.deepEqual(out, []);
+});

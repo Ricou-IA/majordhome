@@ -10,7 +10,7 @@
 import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, EyeOff } from 'lucide-react';
+import { AlertTriangle, EyeOff, Link2, Plus } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useQuotesExplorer, useQuoteDismissals } from '@hooks/usePennylane';
@@ -44,8 +44,9 @@ export default function DevisExplorer() {
 
   const [view, setView] = useState(EXPLORER_VIEWS.ORPHANS);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [attachRow, setAttachRow] = useState(null);
-  const [createRow, setCreateRow] = useState(null);
+  // Cibles des modales : liste de devis (sélection groupée) ou [carte cliquée].
+  const [attachRows, setAttachRows] = useState(null);
+  const [createRows, setCreateRows] = useState(null);
 
   const { rows, syncedAt, isLoading, error, refetch } = useQuotesExplorer({
     enabled: isOrgAdmin && pennylaneActive,
@@ -54,7 +55,21 @@ export default function DevisExplorer() {
 
   const visibleRows = useMemo(() => filterExplorerRows(rows, view), [rows, view]);
 
+  // Sélection groupée (2026-09-16) : « Rattacher N devis » et « Créer le lead
+  // avec N devis » agissent sur les cases cochées — avant, seule « Écarter »
+  // lisait la sélection et chaque « Créer le lead » fabriquait son propre lead
+  // (vécu DURAND : 2 devis, 2 clics, 2 leads).
+  const selectedRows = useMemo(
+    () => visibleRows.filter((r) => selectedIds.has(r.id)),
+    [visibleRows, selectedIds],
+  );
+  // Un lead = un client : la création groupée exige un client Pennylane unique.
+  const sameCustomer = selectedRows.length > 0
+    && selectedRows.every((r) => r.customer_id && r.customer_id === selectedRows[0].customer_id);
+
   if (!isOrgAdmin || !pennylaneActive) return <Navigate to="/" replace />;
+
+  const clearSelection = () => setSelectedIds(new Set());
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -172,15 +187,35 @@ export default function DevisExplorer() {
           columnAmount={(items) => items.reduce((sum, r) => sum + (Number(r.amount_ht) || 0), 0)}
           headerLeft={
             selectedIds.size > 0 ? (
-              <button
-                type="button"
-                disabled={isDismissing}
-                onClick={() => handleDismiss([...selectedIds])}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-sm font-medium text-secondary-700 disabled:opacity-50"
-              >
-                <EyeOff className="w-4 h-4" />
-                Écarter {selectedIds.size} devis
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setAttachRows(selectedRows)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-sm font-medium text-white"
+                >
+                  <Link2 className="w-4 h-4" />
+                  Rattacher {selectedIds.size} devis
+                </button>
+                <button
+                  type="button"
+                  disabled={!sameCustomer}
+                  title={sameCustomer ? undefined : 'Les devis cochés doivent appartenir au même client Pennylane'}
+                  onClick={() => setCreateRows(selectedRows)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-sm font-medium text-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4" />
+                  Créer le lead ({selectedIds.size} devis)
+                </button>
+                <button
+                  type="button"
+                  disabled={isDismissing}
+                  onClick={() => handleDismiss([...selectedIds])}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-sm font-medium text-secondary-700 disabled:opacity-50"
+                >
+                  <EyeOff className="w-4 h-4" />
+                  Écarter {selectedIds.size} devis
+                </button>
+              </div>
             ) : (
               <p className="text-sm text-gray-500">
                 {visibleRows.length} devis · {formatEuro(visibleRows.reduce((s, r) => s + (Number(r.amount_ht) || 0), 0))}
@@ -192,8 +227,8 @@ export default function DevisExplorer() {
               row={row}
               selected={selectedIds.has(row.id)}
               onToggleSelect={toggleSelect}
-              onAttach={setAttachRow}
-              onCreateLead={setCreateRow}
+              onAttach={(row) => setAttachRows([row])}
+              onCreateLead={(row) => setCreateRows([row])}
               onDismiss={handleDismiss}
               onRestore={handleRestore}
             />
@@ -201,19 +236,19 @@ export default function DevisExplorer() {
         />
       )}
 
-      {attachRow && (
+      {attachRows && (
         <AttachQuoteToLeadModal
-          quote={attachRow}
-          onClose={() => setAttachRow(null)}
-          onAttached={() => { setAttachRow(null); refetch(); }}
+          quotes={attachRows}
+          onClose={() => setAttachRows(null)}
+          onAttached={() => { setAttachRows(null); clearSelection(); refetch(); }}
         />
       )}
 
-      {createRow && (
+      {createRows && (
         <CreateLeadFromQuoteModal
-          quote={createRow}
-          onClose={() => setCreateRow(null)}
-          onCreated={() => { setCreateRow(null); refetch(); }}
+          quotes={createRows}
+          onClose={() => setCreateRows(null)}
+          onCreated={() => { setCreateRows(null); clearSelection(); refetch(); }}
         />
       )}
     </div>

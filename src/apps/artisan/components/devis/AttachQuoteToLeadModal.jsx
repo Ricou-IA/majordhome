@@ -1,6 +1,11 @@
 /**
- * AttachQuoteToLeadModal.jsx — rattache un devis PL orphelin à un lead existant.
- * Réutilise useAttachQuotesAndSend (RPC lead_attach_quotes_and_send, forward-only).
+ * AttachQuoteToLeadModal.jsx — rattache un ou plusieurs devis PL orphelins à un
+ * lead existant. Réutilise useAttachQuotesAndSend (RPC lead_attach_quotes_and_send,
+ * forward-only), qui accepte nativement une liste.
+ *
+ * Multi-devis (2026-09-16) : la sélection de l'explorateur arrive en `quotes[]`
+ * (variantes d'un même client, à rattacher d'un coup). `quote` (singulier) reste
+ * accepté pour l'usage unitaire depuis une carte.
  */
 
 import { useState } from 'react';
@@ -12,6 +17,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useAttachQuotesAndSend } from '@hooks/usePennylane';
 import { useDebounce } from '@hooks/useDebounce';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { toAttachPayload } from '@/lib/quotesExplorer';
 import { formatEuro } from '@/lib/utils';
 
 /**
@@ -40,21 +46,14 @@ function buildSearchTokens(raw) {
 }
 
 /** Bouton monté une fois le lead choisi → leadId stable pour le hook. */
-function AttachButton({ orgId, leadId, quote, onDone }) {
+function AttachButton({ orgId, leadId, quotes, onDone }) {
   const { attachQuotes, isAttaching } = useAttachQuotesAndSend(orgId, leadId);
+  const n = quotes.length;
 
   const handleAttach = async () => {
     try {
-      await attachQuotes([{
-        quote_pl_id: quote.id,
-        customer_id: quote.customer_id ?? null,
-        amount_ht: quote.amount_ht ?? null,
-        label: quote.quote_number || quote.label || null,
-        date: quote.date || null,
-        status: quote.status || null,
-        pdf_url: quote.pdf_url || null,
-      }]);
-      toast.success('Devis rattaché au lead');
+      await attachQuotes(quotes.map(toAttachPayload));
+      toast.success(n > 1 ? `${n} devis rattachés au lead` : 'Devis rattaché au lead');
       onDone();
     } catch (e) {
       toast.error(`Rattachement impossible : ${e?.message || e}`);
@@ -69,16 +68,21 @@ function AttachButton({ orgId, leadId, quote, onDone }) {
       className="btn-primary inline-flex items-center gap-2 disabled:opacity-50"
     >
       <Link2 className="w-4 h-4" />
-      {isAttaching ? 'Rattachement...' : 'Rattacher'}
+      {isAttaching ? 'Rattachement...' : (n > 1 ? `Rattacher ${n} devis` : 'Rattacher')}
     </button>
   );
 }
 
-export function AttachQuoteToLeadModal({ quote, onClose, onAttached }) {
+export function AttachQuoteToLeadModal({ quote = null, quotes = null, onClose, onAttached }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
-  const [query, setQuery] = useState(quote.customer_name || '');
+  const list = quotes?.length ? quotes : (quote ? [quote] : []);
+  const first = list[0] || {};
+  const n = list.length;
+  const totalHt = list.reduce((s, q) => s + (Number(q.amount_ht) || 0), 0);
+
+  const [query, setQuery] = useState(first.customer_name || '');
   const [selected, setSelected] = useState(null);
   const debounced = useDebounce(query, 300);
   const tokens = buildSearchTokens(debounced);
@@ -103,15 +107,26 @@ export function AttachQuoteToLeadModal({ quote, onClose, onAttached }) {
     enabled: !!orgId && debounced.trim().length >= 2 && tokens.length > 0,
   });
 
+  if (n === 0) return null;
+
+  const subtitle = n > 1
+    ? `${first.customer_name || 'Client inconnu'} · ${n} devis · ${formatEuro(totalHt)}`
+    : `${first.quote_number || `#${first.id}`} · ${first.customer_name || 'Client inconnu'} · ${formatEuro(first.amount_ht)}`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-secondary-200">
           <div>
-            <h2 className="font-semibold text-secondary-900">Rattacher le devis</h2>
-            <p className="text-sm text-secondary-500">
-              {quote.quote_number || `#${quote.id}`} · {quote.customer_name || 'Client inconnu'} · {formatEuro(quote.amount_ht)}
-            </p>
+            <h2 className="font-semibold text-secondary-900">
+              {n > 1 ? `Rattacher ${n} devis` : 'Rattacher le devis'}
+            </h2>
+            <p className="text-sm text-secondary-500">{subtitle}</p>
+            {n > 1 && (
+              <p className="text-xs text-secondary-400 mt-0.5 truncate">
+                {list.map((q) => q.quote_number || `#${q.id}`).join(' · ')}
+              </p>
+            )}
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded hover:bg-secondary-100">
             <X className="w-5 h-5 text-secondary-500" />
@@ -167,7 +182,7 @@ export function AttachQuoteToLeadModal({ quote, onClose, onAttached }) {
             <AttachButton
               orgId={orgId}
               leadId={selected.id}
-              quote={quote}
+              quotes={list}
               onDone={onAttached}
             />
           )}

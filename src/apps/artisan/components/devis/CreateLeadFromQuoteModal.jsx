@@ -1,8 +1,16 @@
 /**
- * CreateLeadFromQuoteModal.jsx — crée un lead depuis un devis PL orphelin.
- * Le contact vient de Pennylane (canonical post-attache) ; l'admin renseigne
- * ce que Pennylane ne sait pas : commercial, source et équipement. Puis on
- * enchaîne sur l'attache : le lead naît en « Devis envoyé » avec son devis.
+ * CreateLeadFromQuoteModal.jsx — crée un lead depuis un ou plusieurs devis PL
+ * orphelins (même client Pennylane). Le contact vient de Pennylane (canonical
+ * post-attache) ; l'admin renseigne ce que Pennylane ne sait pas : commercial,
+ * source et équipement. Puis on enchaîne sur l'attache : le lead naît en
+ * « Nouveau » et la RPC d'attache le pousse en « Devis envoyé » avec ses devis.
+ *
+ * Filet anti-doublon (2026-09-16) : AVANT de créer, on cherche un lead actif
+ * partageant client Majord'home ponté, téléphone, email ou nom+prénom — même
+ * filet que la fiche lead et le planning. S'il en existe, l'humain choisit :
+ * « Rattacher à cette carte » (aucune création) ou « Créer quand même ».
+ * Vécu : DURAND JULIEN — deux clics « Créer le lead » sur deux devis du même
+ * client ont fabriqué deux leads à côté de la carte du commercial.
  *
  * Source et équipement portent ici les MÊMES libellés que dans LeadModal
  * (« Source », « Équipement concerné ») et alimentent les mêmes colonnes
@@ -14,13 +22,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { X, Plus, ChevronDown } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
-import { useLeadCommercials, useLeadSources } from '@hooks/useLeads';
+import { useLeadCommercials, useLeadSources, useLeadStatuses } from '@hooks/useLeads';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { useAttachQuotesAndSend } from '@hooks/usePennylane';
 import { leadsService } from '@services/leads.service';
 import { pennylaneService } from '@services/pennylane.service';
 import { formatEuro } from '@/lib/utils';
+import { toAttachPayload } from '@/lib/quotesExplorer';
+import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
 
 const selectClass =
   'w-full px-3 py-2 pr-9 border border-secondary-200 rounded-lg text-sm appearance-none bg-white';
@@ -39,31 +49,28 @@ function Field({ id, label, children }) {
   );
 }
 
-/** Monté une fois le lead créé → leadId stable pour le hook d'attache. */
-function AttachAfterCreate({ orgId, leadId, quote, onDone }) {
+/**
+ * Monté une fois la cible connue (lead créé OU carte existante choisie dans le
+ * dialogue de doublon) → leadId stable pour le hook d'attache.
+ */
+function AttachToLead({ orgId, leadId, quotes, created, onDone }) {
   const { attachQuotes } = useAttachQuotesAndSend(orgId, leadId);
+  const n = quotes.length;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        await attachQuotes([{
-          quote_pl_id: quote.id,
-          customer_id: quote.customer_id ?? null,
-          amount_ht: quote.amount_ht ?? null,
-          label: quote.quote_number || quote.label || null,
-          date: quote.date || null,
-          status: quote.status || null,
-          pdf_url: quote.pdf_url || null,
-        }]);
+        await attachQuotes(quotes.map(toAttachPayload));
         if (!cancelled) {
-          toast.success('Lead créé et devis rattaché');
+          const devis = n > 1 ? `${n} devis rattachés` : 'devis rattaché';
+          toast.success(created ? `Lead créé et ${devis}` : `${devis[0].toUpperCase()}${devis.slice(1)} à la carte existante`);
           onDone();
         }
       } catch (e) {
         if (!cancelled) {
-          // Le lead EXISTE déjà à ce stade : ne pas laisser croire à un échec total.
-          toast.error(`Lead créé, mais rattachement échoué : ${e?.message || e}`);
+          // La cible EXISTE déjà à ce stade : ne pas laisser croire à un échec total.
+          toast.error(`${created ? 'Lead créé, mais r' : 'R'}attachement échoué : ${e?.message || e}`);
           onDone();
         }
       }
@@ -72,22 +79,33 @@ function AttachAfterCreate({ orgId, leadId, quote, onDone }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <p className="text-sm text-secondary-500 p-4">Rattachement du devis...</p>;
+  return <p className="text-sm text-secondary-500 p-4">Rattachement {n > 1 ? 'des devis' : 'du devis'}...</p>;
 }
 
-export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
+export function CreateLeadFromQuoteModal({ quote = null, quotes = null, onClose, onCreated }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
 
+  const list = useMemo(() => (quotes?.length ? quotes : (quote ? [quote] : [])), [quote, quotes]);
+  const first = list[0] || {};
+  const n = list.length;
+  const totalHt = list.reduce((s, q) => s + (Number(q.amount_ht) || 0), 0);
+
   const { commercials } = useLeadCommercials(orgId);
   const { sources } = useLeadSources();
+  const { statuses } = useLeadStatuses();
   const { equipmentTypes, index: referentiel } = useEquipmentReferential();
 
   const [commercialId, setCommercialId] = useState('');
   const [sourceId, setSourceId] = useState('');
   const [equipmentTypeId, setEquipmentTypeId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [createdLeadId, setCreatedLeadId] = useState(null);
+  // Contact Pennylane résolu une fois (réutilisé après « Créer quand même »).
+  const [contact, setContact] = useState(null);
+  // Filet anti-doublon : candidats trouvés au moment de créer.
+  const [duplicateCandidates, setDuplicateCandidates] = useState(null);
+  // Cible de l'attache : { leadId, created } — lead créé ou carte existante choisie.
+  const [attachTarget, setAttachTarget] = useState(null);
 
   // Même regroupement par catégorie (référentiel de l'org) que LeadModal.
   const groupedEquipmentTypes = useMemo(
@@ -95,51 +113,101 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
     [referentiel, equipmentTypes],
   );
 
-  // Intitulé du devis : c'est ce qui permet de choisir le bon équipement sans
+  // Intitulé des devis : c'est ce qui permet de choisir le bon équipement sans
   // aller ouvrir le PDF. L'information est déjà dans la ligne, autant la montrer.
-  const quoteHint = [quote.quote_number, quote.subject || quote.label]
+  const quoteHint = list
+    .map((q) => [q.quote_number, q.subject || q.label].filter(Boolean).join(' · '))
     .filter(Boolean)
-    .join(' · ');
+    .join('\n');
 
-  const handleCreate = async () => {
+  if (n === 0) return null;
+
+  /** Contact canonique = Pennylane (cf. règle « PL fait foi post-attache »). */
+  const resolveContact = async () => {
+    if (contact) return contact;
+    const { data: customer } = first.customer_id
+      ? await pennylaneService.fetchCustomerById(first.customer_id, orgId)
+      : { data: null };
+
+    // API RÉELLE du service : extractCustomerName renvoie un OBJET
+    // { firstName, lastName, fullName }, extractCustomerAddress renvoie
+    // { address, postalCode, city }. Ce ne sont pas des extracteurs par champ.
+    const { firstName, lastName, fullName } = customer
+      ? pennylaneService.extractCustomerName(customer)
+      : { firstName: '', lastName: '', fullName: '' };
+    const { address, postalCode, city } = customer
+      ? pennylaneService.extractCustomerAddress(customer)
+      : { address: null, postalCode: null, city: null };
+
+    // Client Majord'home déjà ponté à ce customer (axe le plus fiable du filet).
+    const { data: clientId } = first.customer_id
+      ? await pennylaneService.getClientIdForCustomer(orgId, first.customer_id)
+      : { data: null };
+
+    const resolved = {
+      first_name: firstName || '',
+      last_name: lastName || fullName || first.customer_name || 'CLIENT PENNYLANE',
+      email: customer ? pennylaneService.extractCustomerEmail(customer) : null,
+      phone: customer ? pennylaneService.extractCustomerPhone(customer) : null,
+      address: address || null,
+      postal_code: postalCode || null,
+      city: city || null,
+      client_id: clientId || null,
+    };
+    setContact(resolved);
+    return resolved;
+  };
+
+  const handleCreate = async ({ force = false } = {}) => {
     setIsCreating(true);
     try {
-      // Contact canonique = Pennylane (cf. règle « PL fait foi post-attache »).
-      const { data: customer } = quote.customer_id
-        ? await pennylaneService.fetchCustomerById(quote.customer_id, orgId)
-        : { data: null };
+      const c = await resolveContact();
 
-      // API RÉELLE du service : extractCustomerName renvoie un OBJET
-      // { firstName, lastName, fullName }, extractCustomerAddress renvoie
-      // { address, postalCode, city }. Ce ne sont pas des extracteurs par champ.
-      const { firstName, lastName, fullName } = customer
-        ? pennylaneService.extractCustomerName(customer)
-        : { firstName: '', lastName: '', fullName: '' };
-      const { address, postalCode, city } = customer
-        ? pennylaneService.extractCustomerAddress(customer)
-        : { address: null, postalCode: null, city: null };
+      // Filet anti-doublon : jamais de création silencieuse si une carte active
+      // partage client / téléphone / email / nom+prénom. Best-effort : une erreur
+      // de la recherche ne bloque pas la création.
+      if (!force) {
+        const dup = await leadsService.findPotentialDuplicates({
+          orgId,
+          phone: c.phone,
+          email: c.email,
+          firstName: c.first_name,
+          lastName: c.last_name,
+          clientId: c.client_id,
+        });
+        if (dup.data?.length) {
+          setDuplicateCandidates(dup.data);
+          setIsCreating(false);
+          return;
+        }
+      }
 
-      const leadData = {
+      // Statut « Nouveau » (display_order 1) : la RPC d'attache ne promeut en
+      // « Devis envoyé » qu'un lead qui A un statut — sans statut, la carte
+      // restait sans colonne classique (vécu DURAND).
+      const defaultStatus = statuses.find((s) => s.display_order === 1);
+
+      const { data: lead, error } = await leadsService.createLead({
         orgId,
         userId: user?.id,
-        first_name: firstName || '',
-        last_name: lastName || fullName || quote.customer_name || 'CLIENT PENNYLANE',
-        email: customer ? pennylaneService.extractCustomerEmail(customer) : null,
-        phone: customer ? pennylaneService.extractCustomerPhone(customer) : null,
-        address: address || null,
-        postal_code: postalCode || null,
-        city: city || null,
+        first_name: c.first_name,
+        last_name: c.last_name,
+        email: c.email,
+        phone: c.phone,
+        address: c.address,
+        postal_code: c.postal_code,
+        city: c.city,
+        client_id: c.client_id,
+        status_id: defaultStatus?.id || null,
         // assigned_user_id porte l'ID de la table commercials (dual-ID bridge,
         // cf. Dashboard.jsx) — donc bien `commercial.id`, pas `profile_id`.
         assigned_user_id: commercialId || null,
         source_id: sourceId || null,
         equipment_type_id: equipmentTypeId || null,
-      };
-
-      const { data: lead, error } = await leadsService.createLead(leadData);
+      });
       if (error) throw error;
 
-      setCreatedLeadId(lead?.id);
+      setAttachTarget({ leadId: lead?.id, created: true });
     } catch (e) {
       toast.error(`Création impossible : ${e?.message || e}`);
       setIsCreating(false);
@@ -151,9 +219,11 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-4 border-b border-secondary-200">
           <div>
-            <h2 className="font-semibold text-secondary-900">Créer le lead</h2>
+            <h2 className="font-semibold text-secondary-900">
+              {n > 1 ? `Créer le lead avec ${n} devis` : 'Créer le lead'}
+            </h2>
             <p className="text-sm text-secondary-500">
-              {quote.customer_name || 'Client inconnu'} · {formatEuro(quote.amount_ht)}
+              {first.customer_name || 'Client inconnu'} · {formatEuro(totalHt)}
             </p>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded hover:bg-secondary-100">
@@ -161,8 +231,14 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
           </button>
         </div>
 
-        {createdLeadId ? (
-          <AttachAfterCreate orgId={orgId} leadId={createdLeadId} quote={quote} onDone={onCreated} />
+        {attachTarget ? (
+          <AttachToLead
+            orgId={orgId}
+            leadId={attachTarget.leadId}
+            quotes={list}
+            created={attachTarget.created}
+            onDone={onCreated}
+          />
         ) : (
           <>
             <div className="p-4 space-y-3">
@@ -172,7 +248,7 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
               </p>
 
               {quoteHint && (
-                <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2">
+                <p className="text-xs text-secondary-500 bg-secondary-50 rounded-lg px-3 py-2 whitespace-pre-line">
                   {quoteHint}
                 </p>
               )}
@@ -228,7 +304,7 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
               <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
               <button
                 type="button"
-                onClick={handleCreate}
+                onClick={() => handleCreate()}
                 disabled={isCreating}
                 className="btn-primary inline-flex items-center gap-2 disabled:opacity-50"
               >
@@ -239,6 +315,22 @@ export function CreateLeadFromQuoteModal({ quote, onClose, onCreated }) {
           </>
         )}
       </div>
+
+      {/* Filet anti-doublon : rattacher à la carte existante (aucune création) ou créer quand même */}
+      <DuplicateLeadDialog
+        open={!!duplicateCandidates}
+        candidates={duplicateCandidates || []}
+        primaryActionLabel={n > 1 ? `Rattacher les ${n} devis à cette carte` : 'Rattacher le devis à cette carte'}
+        onPrimaryAction={(c) => {
+          setDuplicateCandidates(null);
+          setAttachTarget({ leadId: c.id, created: false });
+        }}
+        onCreateAnyway={() => {
+          setDuplicateCandidates(null);
+          handleCreate({ force: true });
+        }}
+        onCancel={() => setDuplicateCandidates(null)}
+      />
     </div>
   );
 }
