@@ -12,8 +12,31 @@
  * ============================================================================
  */
 
+import { useMemo } from 'react';
 import { CalendarDays, Plus, Trash2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+
+const INACTIVE_STATUSES = new Set(['cancelled', 'no_show']);
+
+/**
+ * Journées d'installation actives, dans l'ordre chronologique.
+ * Source unique = `appointments` (aucun champ dénormalisé) : le badge « J i/N »
+ * suit donc les ajouts après coup (« Programmer une suite », EventModal).
+ * Le hook `useChantierAppointments` filtre/trie déjà — on le refait ici pour ne
+ * pas dépendre d'un contrat implicite du caller.
+ */
+function orderInstallationDays(appointments) {
+  return appointments
+    .filter(
+      (apt) =>
+        apt.appointment_type === 'installation' && !INACTIVE_STATUSES.has(apt.status)
+    )
+    .sort(
+      (a, b) =>
+        (a.scheduled_date || '').localeCompare(b.scheduled_date || '') ||
+        (a.scheduled_start || '').localeCompare(b.scheduled_start || '')
+    );
+}
 
 /**
  * @param {Object} props
@@ -28,6 +51,9 @@ export function ChantierInterventionSection({
   onDeleteAppointment,
   disabled = false,
 }) {
+  const installationDays = useMemo(() => orderInstallationDays(appointments), [appointments]);
+  const totalDays = installationDays.length;
+
   const handleDelete = async (appointmentId) => {
     try {
       await onDeleteAppointment(appointmentId);
@@ -48,14 +74,20 @@ export function ChantierInterventionSection({
         <p className="text-sm text-gray-400 italic py-1">Aucun jour d&apos;installation planifié</p>
       ) : (
         <div className="space-y-2">
-          {appointments.map((apt) => (
-            <AppointmentRow
-              key={apt.id}
-              apt={apt}
-              onDelete={() => handleDelete(apt.id)}
-              disabled={disabled}
-            />
-          ))}
+          {appointments.map((apt) => {
+            const dayIndex = installationDays.indexOf(apt);
+            return (
+              <AppointmentRow
+                key={apt.id}
+                apt={apt}
+                dayLabel={
+                  totalDays > 1 && dayIndex !== -1 ? `J${dayIndex + 1}/${totalDays}` : null
+                }
+                onDelete={() => handleDelete(apt.id)}
+                disabled={disabled}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -76,7 +108,7 @@ export function ChantierInterventionSection({
 /**
  * Ligne d'un jour d'installation (appointment)
  */
-function AppointmentRow({ apt, onDelete, disabled }) {
+function AppointmentRow({ apt, dayLabel, onDelete, disabled }) {
   const dateStr = apt.scheduled_date
     ? new Date(apt.scheduled_date + 'T00:00:00').toLocaleDateString('fr-FR', {
         weekday: 'short',
@@ -94,11 +126,6 @@ function AppointmentRow({ apt, onDelete, disabled }) {
 
   const techNames =
     apt.technician_names?.length > 0 ? apt.technician_names.join(', ') : null;
-
-  const dayLabel =
-    apt.chantier_total_days > 1
-      ? `J${apt.chantier_day_index}/${apt.chantier_total_days}`
-      : null;
 
   return (
     <div className="flex items-center gap-3 p-2.5 bg-white border border-gray-200 rounded-lg group">
