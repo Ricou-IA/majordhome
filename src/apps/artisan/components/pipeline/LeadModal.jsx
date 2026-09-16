@@ -12,11 +12,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save, Loader2, ArrowLeft, Trash2, Link2 } from 'lucide-react';
+import { X, Save, Loader2, ArrowLeft, Trash2, Link2, GitMerge } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { MergeLeadDialog } from './MergeLeadDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import {
@@ -173,6 +174,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [mailingCampaigns, setMailingCampaigns] = useState([]);
   const [showHardDelete, setShowHardDelete] = useState(false);
   const [hardDeleteCounts, setHardDeleteCounts] = useState(null);
+  // God mode — fusion d'un doublon dans cette carte (org_admin, RPC lead_merge)
+  const [showMerge, setShowMerge] = useState(false);
 
   // Charger les mailings envoyés au lead
   useEffect(() => {
@@ -1183,17 +1186,29 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 Annuler
               </Button>
               {isEditing && isAdmin && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleOpenHardDelete}
-                  disabled={isHardDeleting}
-                  className="min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
-                  title="God mode — supprimer définitivement (org_admin)"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Supprimer
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setShowMerge(true)}
+                    className="min-h-[44px] text-gray-600 hover:bg-gray-100 hover:text-gray-800 gap-1.5"
+                    title="God mode — absorber un doublon dans cette carte (org_admin)"
+                  >
+                    <GitMerge className="h-4 w-4" />
+                    Fusionner
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleOpenHardDelete}
+                    disabled={isHardDeleting}
+                    className="min-h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                    title="God mode — supprimer définitivement (org_admin)"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer
+                  </Button>
+                </>
               )}
             </div>
             <Button
@@ -1315,6 +1330,17 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       )}
 
       {/* Hard delete — org_admin god mode */}
+      {/* God mode — fusion additive d'un doublon dans cette carte (org_admin) */}
+      {isEditing && isAdmin && (
+        <MergeLeadDialog
+          open={showMerge}
+          onOpenChange={setShowMerge}
+          lead={lead}
+          orgId={organization?.id}
+          onMerged={() => onSaved?.()}
+        />
+      )}
+
       <ConfirmDialog
         open={showHardDelete}
         onOpenChange={(open) => {

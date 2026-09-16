@@ -400,6 +400,27 @@ export const leadsService = {
     }, 'leads.hardDeleteLead');
   },
 
+  /**
+   * Fusion ADDITIVE de deux leads (org_admin only, RPC lead_merge — 2026-09-16).
+   * Le survivant garde ses valeurs et hérite des champs vides de l'absorbé ;
+   * RDV / devis PL / activités / interactions… sont re-parentés ; l'absorbé
+   * passe en soft delete avec instantané complet (activité `lead_merged`).
+   * Retourne { survivor_id, absorbed_id, status_id, counts }.
+   */
+  async mergeLeads(survivorId, absorbedId) {
+    if (!survivorId || !absorbedId) throw new Error('[leads] survivorId et absorbedId requis');
+
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('lead_merge', {
+        p_survivor_id: survivorId,
+        p_absorbed_id: absorbedId,
+      });
+
+      if (error) throw error;
+      return data;
+    }, 'leads.mergeLeads');
+  },
+
   // ==========================================================================
   // GESTION STATUTS
   // ==========================================================================

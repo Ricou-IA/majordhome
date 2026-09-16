@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@services/leads.service';
-import { leadKeys, clientKeys, appointmentKeys } from '@hooks/cacheKeys';
+import { leadKeys, clientKeys, appointmentKeys, kanbanCardKeys, chantierKeys, interventionKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -308,6 +308,20 @@ export function useLeadMutations() {
     },
   });
 
+  // Fusion additive de deux leads (org_admin only) — RDV / devis PL / chantier /
+  // interventions re-parentés côté DB → invalider tout ce qui les affiche.
+  const mergeMutation = useMutation({
+    mutationFn: ({ survivorId, absorbedId }) => leadsService.mergeLeads(survivorId, absorbedId),
+    onSuccess: () => {
+      invalidateLeads();
+      queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: ['pennylane', orgId] });
+    },
+  });
+
   // Changer le statut
   const statusMutation = useMutation({
     mutationFn: ({ leadId, statusId, userId, extra }) =>
@@ -354,6 +368,7 @@ export function useLeadMutations() {
   const updateLead = useCallback(async (leadId, updates) => updateMutation.mutateAsync({ leadId, updates }), [updateMutation]);
   const deleteLead = useCallback(async (leadId) => deleteMutation.mutateAsync(leadId), [deleteMutation]);
   const hardDeleteLead = useCallback(async (leadId) => hardDeleteMutation.mutateAsync(leadId), [hardDeleteMutation]);
+  const mergeLeads = useCallback(async (survivorId, absorbedId) => mergeMutation.mutateAsync({ survivorId, absorbedId }), [mergeMutation]);
   const updateLeadStatus = useCallback(async (leadId, statusId, userId, extra) => statusMutation.mutateAsync({ leadId, statusId, userId, extra }), [statusMutation]);
   const assignLead = useCallback(async (leadId, assignedUserId, currentUserId) => assignMutation.mutateAsync({ leadId, assignedUserId, currentUserId }), [assignMutation]);
   const convertLead = useCallback(async (leadId, orgId, userId) => convertMutation.mutateAsync({ leadId, orgId, userId }), [convertMutation]);
@@ -365,6 +380,7 @@ export function useLeadMutations() {
     updateLead,
     deleteLead,
     hardDeleteLead,
+    mergeLeads,
     updateLeadStatus,
     assignLead,
     convertLead,
@@ -376,6 +392,7 @@ export function useLeadMutations() {
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
     isHardDeleting: hardDeleteMutation.isPending,
+    isMerging: mergeMutation.isPending,
     isChangingStatus: statusMutation.isPending,
     isAssigning: assignMutation.isPending,
     isConverting: convertMutation.isPending,
