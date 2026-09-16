@@ -1,0 +1,27 @@
+-- ============================================================================
+-- 20260916_3 — DROP public.process_pennylane_quote(uuid, jsonb, jsonb)
+-- ============================================================================
+--
+-- Décision Eric (2026-09-16, cf. 20260916_1_upsert_pennylane_lead_no_create) :
+-- un flux serveur ne crée JAMAIS de lead depuis Pennylane. Cette RPC
+-- (orchestrateur quote-driven de la 1ʳᵉ itération : find_or_create_client →
+-- lookup/INSERT lead → assign quote → reevaluate_lead_status_from_quotes)
+-- portait encore une branche « 2c. INSERT direct » dans majordhome.leads.
+--
+-- Appelants vérifiés à zéro le 2026-09-16, sur les cinq sources :
+--   - prod pg_proc (prosrc), pg_trigger, cron.job, vues : aucun
+--   - supabase/functions/* : aucun
+--   - src/ : aucun
+--   - site vitrine (C:\Dev\Landing Page - Mayer\app) : aucun
+--   - N8N (60 workflows, base SQLite du KVM2) : aucun
+--
+-- Le chemin vivant reste pennylane-sync-cron / pennylane-backfill-quotes →
+-- upsert_pennylane_lead (renvoie `no_lead`, le devis reste « Non rattaché »
+-- dans l'explorateur /devis) → lead_attach_quotes_and_send.
+--
+-- Non touchées ici (décision à prendre pour le chantier « statut lead piloté
+-- par PL ») : reevaluate_lead_status_from_quotes, promote_lead_to_gagne,
+-- demote_lead_to_perdu — cette RPC était leur dernier appelant.
+-- ============================================================================
+
+DROP FUNCTION IF EXISTS public.process_pennylane_quote(uuid, jsonb, jsonb);
