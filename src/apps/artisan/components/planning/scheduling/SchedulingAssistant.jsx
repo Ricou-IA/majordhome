@@ -94,9 +94,10 @@ export function SchedulingAssistant({
   embedded = false,
   onSlotsChange,
   initialDate = null,
-  // Colonne « À assigner » (2026-09-16) : poser un RDV sans personne, la liste
-  // est proposée aussitôt et « Laisser non assigné » reste possible. Inutile
-  // quand la colonne est figée sur l'owner de la carte (fixedAssigneeId).
+  // Colonne « À assigner » (2026-09-16) : poser un RDV sans savoir qui le fera,
+  // la liste est proposée aussitôt. FILET OBLIGATOIRE (« pas de planning non
+  // assigné ») : annuler retire le créneau, un créneau sans personne n'est
+  // jamais remonté au host. Inutile quand la colonne est figée (fixedAssigneeId).
   allowUnassigned = true,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
@@ -175,7 +176,7 @@ export function SchedulingAssistant({
         : [...defaultTechIds],
     };
     setDraftSlots((prev) => (multi ? [...prev, slot] : [slot]));
-    // Posé sans personne → proposer la liste tout de suite (skip possible)
+    // Posé sans personne → la liste s'impose (annuler = le créneau disparaît)
     if (!slot.technicianIds.length) setAssignPromptSlot(slot);
   }, [multi, defaultDuration, defaultTechIds]);
 
@@ -187,10 +188,18 @@ export function SchedulingAssistant({
     setAssignPromptSlot(null);
   }, [assignPromptSlot]);
 
+  // Annuler la modale = retirer le créneau : pas de RDV sans personne.
+  const handleAssignCancel = useCallback(() => {
+    const slotId = assignPromptSlot?.id;
+    if (slotId) setDraftSlots((prev) => prev.filter((s) => s.id !== slotId));
+    setAssignPromptSlot(null);
+  }, [assignPromptSlot]);
+
   // --- Ajouter / retirer un tech sur un créneau ---
+  // Vider le sélecteur inline rouvre le filet sur ce créneau (jamais vide).
   const handleToggleTech = useCallback((slotId, techId) => {
-    setDraftSlots((prev) =>
-      prev.map((s) => {
+    setDraftSlots((prev) => {
+      const next = prev.map((s) => {
         if (s.id !== slotId) return s;
         const has = (s.technicianIds || []).includes(techId);
         return {
@@ -199,8 +208,11 @@ export function SchedulingAssistant({
             ? s.technicianIds.filter((id) => id !== techId)
             : [...(s.technicianIds || []), techId],
         };
-      }),
-    );
+      });
+      const emptied = next.find((s) => s.id === slotId && !(s.technicianIds || []).length);
+      if (emptied) setAssignPromptSlot(emptied);
+      return next;
+    });
   }, []);
 
   const handleRemoveSlot = useCallback((slotId) => {
@@ -229,10 +241,17 @@ export function SchedulingAssistant({
     [conflictsBySlot],
   );
 
+  // Créneaux ASSIGNÉS seulement : un créneau en attente dans le filet n'est ni
+  // remonté au host ni soumis — invariant « pas de RDV sans personne ».
+  const assignedSlots = useMemo(
+    () => draftSlots.filter((s) => (s.technicianIds || []).length > 0),
+    [draftSlots],
+  );
+
   // --- Mode intégré (embedded) : remonte en continu les créneaux au host (EventModal),
   // sans bouton de confirmation interne. Objet/notes/subject sont gérés par le host. ---
   const emittedSlots = useMemo(
-    () => draftSlots.map((s) => ({
+    () => assignedSlots.map((s) => ({
       date: s.date,
       startTime: s.startTime,
       endTime: s.endTime || null,
@@ -240,7 +259,7 @@ export function SchedulingAssistant({
       technicianIds: commercialMode ? [] : (s.technicianIds || []),
       assignedCommercialId: commercialMode ? (s.technicianIds?.[0] || null) : null,
     })),
-    [draftSlots, defaultDuration, commercialMode],
+    [assignedSlots, defaultDuration, commercialMode],
   );
   useEffect(() => {
     if (embedded) onSlotsChange?.(emittedSlots);
@@ -255,8 +274,8 @@ export function SchedulingAssistant({
   //   - sélectionnable (fixedAssigneeId=null, ex. VT depuis EventModal) : la colonne
   //     choisie est portée par `assignedCommercialId` → le caller la recopie sur le RDV.
   const handleSubmit = useCallback(() => {
-    if (draftSlots.length === 0) return;
-    const slots = draftSlots.map((s) => ({
+    if (assignedSlots.length === 0) return;
+    const slots = assignedSlots.map((s) => ({
       date: s.date,
       startTime: s.startTime,
       endTime: s.endTime || null,
@@ -267,7 +286,7 @@ export function SchedulingAssistant({
       notes: notes.trim() || null,
     }));
     onConfirm?.(slots);
-  }, [draftSlots, defaultDuration, commercialMode, subject, subjectPrefix, notes, onConfirm]);
+  }, [assignedSlots, defaultDuration, commercialMode, subject, subjectPrefix, notes, onConfirm]);
 
   const assigneeLabel = commercialMode
     ? 'Commercial(aux)'
@@ -335,7 +354,7 @@ export function SchedulingAssistant({
         single={commercialMode}
         assigneeLabel={assigneeLabel}
         onAssign={handleAssignPrompt}
-        onSkip={() => setAssignPromptSlot(null)}
+        onCancel={handleAssignCancel}
       />
       {fixedDuration ? (
         <p className="text-xs text-secondary-500 mt-1">
@@ -399,7 +418,7 @@ export function SchedulingAssistant({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isLoading || draftSlots.length === 0}
+            disabled={isLoading || assignedSlots.length === 0}
             className="flex-1 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg
                        hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
                        flex items-center justify-center gap-2 min-h-[44px]"
@@ -412,7 +431,7 @@ export function SchedulingAssistant({
             ) : (
               <>
                 <CalendarCheck className="w-4 h-4" />
-                Planifier {draftSlots.length || ''} créneau{draftSlots.length > 1 ? 'x' : ''}
+                Planifier {assignedSlots.length || ''} créneau{assignedSlots.length > 1 ? 'x' : ''}
               </>
             )}
           </button>

@@ -107,8 +107,9 @@ function formatMonthLabel(dateStr) {
  *   quand la durée est connue (temps contrat d'un entretien), un CLIC pose le bloc
  *   entier à cette durée — plus d'étirement « à peu près ». null = étirement libre.
  * @param {boolean} [props.allowUnassigned] - ajoute une 1ʳᵉ colonne « À assigner » :
- *   poser dedans remonte `memberId: null` (RDV sans personne — demande Eric
- *   2026-09-16, « on pose souvent sans savoir qui »). Pas d'occupation ni d'horaires.
+ *   poser dedans remonte `memberId: null` et l'assistant impose aussitôt le choix
+ *   de la personne (demande Eric 2026-09-16 : « on pose souvent sans savoir qui »,
+ *   mais « pas de planning non assigné »). Pas d'occupation ni d'horaires.
  */
 export function DayResourceGrid({
   date,
@@ -406,7 +407,7 @@ export function DayResourceGrid({
               <div
                 key={m.id}
                 className={`border-b border-r px-1 py-1.5 text-center ${m.isUnassigned ? 'bg-slate-100' : 'bg-gray-50'}`}
-                title={m.isUnassigned ? 'Poser ici un RDV sans personne : la liste sera proposée' : m.display_name}
+                title={m.isUnassigned ? 'Poser ici, puis choisir qui prend le RDV' : m.display_name}
               >
                 <div className="flex items-center justify-center gap-1">
                   <span

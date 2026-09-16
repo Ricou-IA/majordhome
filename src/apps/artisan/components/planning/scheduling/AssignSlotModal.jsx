@@ -1,17 +1,17 @@
 /**
  * AssignSlotModal.jsx — « Qui prend ce RDV ? »
  * ============================================================================
- * Ouverte quand un créneau est posé dans la colonne « À assigner » de la grille
- * (demande Eric 2026-09-16 : on pose souvent un RDV sans savoir qui le fera ;
- * la modale propose la liste, et « Laisser non assigné » reste possible).
+ * Filet OBLIGATOIRE (Eric, 2026-09-16 : « je ne veux pas de planning non
+ * assigné ») : un créneau posé dans la colonne « À assigner » de la grille
+ * n'existe que si on lui donne quelqu'un. Annuler = le créneau est retiré.
  *
- * Présentationnelle : la décision remonte via onAssign(ids[]) / onSkip().
+ * Présentationnelle : la décision remonte via onAssign(ids[]) / onCancel().
  * Mode `single` (commercial) : un seul choix ; sinon plusieurs techniciens.
  * ============================================================================
  */
 
 import { useEffect, useState } from 'react';
-import { X, UserCheck, UserX } from 'lucide-react';
+import { X, UserCheck } from 'lucide-react';
 
 /** "2026-06-09" → "mardi 9 juin". */
 function formatSlotDate(dateStr) {
@@ -23,12 +23,12 @@ function formatSlotDate(dateStr) {
 /**
  * @param {Object} props
  * @param {boolean} props.open
- * @param {Object|null} props.slot - { date, startTime, endTime }
+ * @param {Object|null} props.slot - { id, date, startTime, endTime }
  * @param {Array} props.members - [{ id, display_name, calendar_color }]
  * @param {boolean} [props.single] - un seul assigné (mode commercial)
  * @param {string} [props.assigneeLabel]
- * @param {Function} props.onAssign - (ids[]) => void
- * @param {Function} props.onSkip - () => void  (laisser non assigné)
+ * @param {Function} props.onAssign - (ids[]) => void  (ids non vide)
+ * @param {Function} props.onCancel - () => void  (le créneau est retiré)
  */
 export function AssignSlotModal({
   open,
@@ -37,7 +37,7 @@ export function AssignSlotModal({
   single = false,
   assigneeLabel = 'Technicien(s)',
   onAssign,
-  onSkip,
+  onCancel,
 }) {
   const [selected, setSelected] = useState([]);
 
@@ -66,9 +66,10 @@ export function AssignSlotModal({
           </div>
           <button
             type="button"
-            onClick={onSkip}
+            onClick={onCancel}
             className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-            aria-label="Fermer"
+            aria-label="Annuler ce créneau"
+            title="Annuler ce créneau"
           >
             <X className="w-5 h-5" />
           </button>
@@ -104,20 +105,22 @@ export function AssignSlotModal({
               })}
             </ul>
           )}
+          <p className="mt-3 text-xs text-gray-500 italic">
+            Un RDV a toujours une personne. Annuler retire le créneau.
+          </p>
         </div>
 
-        <div className="flex items-center justify-between gap-2 p-4 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
           <button
             type="button"
-            onClick={onSkip}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            onClick={onCancel}
+            className="px-3 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
-            <UserX className="w-4 h-4" />
-            Laisser non assigné
+            Annuler
           </button>
           <button
             type="button"
-            onClick={() => onAssign?.(selected)}
+            onClick={() => selected.length && onAssign?.(selected)}
             disabled={selected.length === 0}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

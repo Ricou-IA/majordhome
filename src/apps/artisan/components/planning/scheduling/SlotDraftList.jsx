@@ -62,7 +62,7 @@ export function SlotDraftList({
 
       {slots.length === 0 ? (
         <p className="text-xs text-gray-400 italic px-1 py-2">
-          Cliquez-glissez dans la colonne d&apos;une personne ci-dessus, ou dans « À assigner » pour choisir plus tard.
+          Cliquez-glissez dans la colonne d&apos;une personne ci-dessus, ou dans « À assigner » pour choisir ensuite.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -94,7 +94,7 @@ export function SlotDraftList({
                     {selectedIds.length === 0 && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                         <UserX className="w-3 h-3" />
-                        Non assigné
+                        En attente d&apos;une personne
                       </span>
                     )}
                   </div>
