@@ -353,26 +353,27 @@ async function initialSyncForUser(
     .select("appointment_id")
     .eq("technician_id", teamMember.id);
 
-  // Appointments via assigned_commercial_id (check commercials table for this user)
+  // Appointments via assigned_commercial_id — deux référentiels (cf.
+  // google-calendar-sync::resolveProfileIds) : `commercials.id` (VT posées
+  // depuis le pipeline) ou `team_members.id` (VT posées depuis le planning).
   const { data: commercial } = await admin
     .from("majordhome_commercials")
     .select("id")
     .eq("profile_id", userId)
     .maybeSingle();
+  const commercialIds = commercial ? [teamMember.id, commercial.id] : [teamMember.id];
 
   // Collect all appointment IDs
   const appointmentIds = new Set<string>();
   techAppointments?.forEach((t: { appointment_id: string }) => appointmentIds.add(t.appointment_id));
 
-  if (commercial) {
-    const { data: comAppts } = await admin
-      .from("majordhome_appointments")
-      .select("id")
-      .eq("assigned_commercial_id", commercial.id)
-      .eq("org_id", majordhomeOrgId)
-      .gte("scheduled_date", today);
-    comAppts?.forEach((a: { id: string }) => appointmentIds.add(a.id));
-  }
+  const { data: comAppts } = await admin
+    .from("majordhome_appointments")
+    .select("id")
+    .in("assigned_commercial_id", commercialIds)
+    .eq("org_id", majordhomeOrgId)
+    .gte("scheduled_date", today);
+  comAppts?.forEach((a: { id: string }) => appointmentIds.add(a.id));
 
   if (appointmentIds.size === 0) {
     console.log("[gcal-auth] No future appointments to sync");

@@ -40,11 +40,18 @@ async function resolveCoreOrgId(admin: ReturnType<typeof getAdminClient>, orgId:
   return resolved || orgId;
 }
 
+// `assigned_commercial_id` (sans FK) porte deux référentiels : un `commercials.id`
+// (VT posées depuis le pipeline) ou un `team_members.id` (VT posées depuis le
+// planning). Mesuré en prod le 2026-09-17 : 203 / 25 sur 228. Les deux tables se
+// rejoignent sur le profil (`commercials.profile_id` = `team_members.user_id`), on
+// résout donc l'id contre les deux — comme `resolveAppointmentColor` côté front.
+// Ne chercher que `commercials` laissait le commercial sans sync, en silence.
 async function resolveProfileIds(admin: ReturnType<typeof getAdminClient>, techIds: string[], commercialId: string | null, currentUserId: string | null): Promise<string[]> {
   const ids: Set<string> = new Set();
   if (currentUserId) ids.add(currentUserId);
-  if (techIds?.length) {
-    const { data } = await admin.from("majordhome_team_members").select("user_id").in("id", techIds);
+  const memberIds = commercialId ? [...(techIds || []), commercialId] : (techIds || []);
+  if (memberIds.length) {
+    const { data } = await admin.from("majordhome_team_members").select("user_id").in("id", memberIds);
     data?.forEach((m: { user_id: string }) => { if (m.user_id) ids.add(m.user_id); });
   }
   if (commercialId) {
