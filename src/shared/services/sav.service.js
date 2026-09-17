@@ -763,39 +763,21 @@ export const savService = {
   // ==========================================================================
 
   /**
-   * Récupérer les interventions enfants d'un parent + données équipement
+   * Récupérer les interventions enfants d'un parent (1 par équipement).
+   * Pas de données équipement : l'appelant étiquette depuis `getClientEquipments`.
    * @param {string} parentId - ID de l'intervention parent
    * @returns {Promise<{ data: Array|null, error: Error|null }>}
    */
   async getChildInterventions(parentId) {
     return withErrorHandling(async () => {
-      const { data: children, error } = await supabase
+      const { data, error } = await supabase
         .from('majordhome_interventions')
         .select('id, parent_id, equipment_id, workflow_status, status, created_at')
         .eq('parent_id', parentId)
         .order('created_at');
 
       if (error) throw error;
-      if (!children || children.length === 0) return [];
-
-      const equipmentIds = children.map((c) => c.equipment_id).filter(Boolean);
-      let equipmentMap = {};
-
-      if (equipmentIds.length > 0) {
-        const { data: equipments } = await supabase
-          .from('majordhome_equipments')
-          .select('id, category_id, brand, model, serial_number, equipment_type_id')
-          .in('id', equipmentIds);
-
-        if (equipments) {
-          equipmentMap = Object.fromEntries(equipments.map((e) => [e.id, e]));
-        }
-      }
-
-      return children.map((child) => ({
-        ...child,
-        equipment: equipmentMap[child.equipment_id] || null,
-      }));
+      return data || [];
     }, 'sav.getChildInterventions');
   },
 

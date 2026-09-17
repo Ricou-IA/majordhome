@@ -54,7 +54,7 @@ planifie → [Remplir certificats équipements] → realise → facture (hors Ka
 - Combobox marque/modèle : saisie libre + suggestions fournisseurs (`<input>` + `<datalist>`)
 
 ### Service methods (`sav.service.js`)
-- `getChildInterventions(parentId)` — enfants + JOIN équipements
+- `getChildInterventions(parentId)` — enfants seuls (colonnes intervention ; l'équipement est étiqueté par l'appelant via `getClientEquipments`)
 - `createChildInterventions(parentId, equipments, ctx)` — batch insert
 - `markChildNeant(childId)` / `unmarkChildNeant(childId)` — NÉANT toggle
 - `completeParentEntretien(parentId, orgId, reportNotes)` — clôture + maintenance_visit
