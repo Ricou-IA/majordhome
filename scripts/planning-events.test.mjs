@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   appointmentKind, buildPersonColorMaps, resolveAppointmentColor,
   buildTeamList, matchesKindFilter, matchesMemberFilter, expandAppointmentBlocks,
-  INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR,
+  resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR,
 } from '../src/lib/planningEvents.js';
 
 // Fixtures inspirées des vraies données Mayer (Philippe = tech + commercial).
@@ -111,4 +111,42 @@ test('expandAppointmentBlocks: RDV commercial ne se découpe pas', () => {
   const blocks = expandAppointmentBlocks(appt, maps, null);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].idSuffix, null);
+});
+
+test('resolveAppointmentColor: VT prise depuis le planning (team_members.id) -> couleur du commercial', () => {
+  // Le planning écrit un team_members.id dans assigned_commercial_id (pas un commercials.id).
+  const appt = { appointment_type: 'rdv_technical', technician_ids: [], assigned_commercial_id: 'tm-phil', target_invoiced: false };
+  assert.equal(resolveAppointmentColor(appt, maps), '#3B82F6');
+});
+
+// Membres assignables à un RDV commercial (rôle commercial/admin) — Mathis n'a pas de
+// ligne `commercials`, comme en prod.
+const commercialMembers = [
+  { id: 'tm-phil', user_id: 'p-phil', display_name: 'Philippe Mazel', role: 'commercial' },
+  { id: 'tm-mathis', user_id: 'p-mathis', display_name: 'Mathis Daguts', role: 'commercial' },
+];
+
+test('resolveCommercialMemberId: team_members.id stocké -> lui-même', () => {
+  assert.equal(resolveCommercialMemberId({ assignedCommercialId: 'tm-mathis', members: commercialMembers, commercials }), 'tm-mathis');
+});
+
+test('resolveCommercialMemberId: commercials.id (VT pipeline) -> membre via le profil', () => {
+  assert.equal(resolveCommercialMemberId({ assignedCommercialId: 'co-phil', members: commercialMembers, commercials }), 'tm-phil');
+});
+
+test('resolveCommercialMemberId: id stocké inconnu -> null, sans repli sur technicianIds', () => {
+  const r = resolveCommercialMemberId({ assignedCommercialId: 'co-parti', technicianIds: ['tm-phil'], members: commercialMembers, commercials });
+  assert.equal(r, null);
+});
+
+test('resolveCommercialMemberId: legacy — commercial rangé en technicien -> repris', () => {
+  assert.equal(resolveCommercialMemberId({ assignedCommercialId: null, technicianIds: ['tm-phil'], members: commercialMembers, commercials }), 'tm-phil');
+});
+
+test('resolveCommercialMemberId: legacy — vrai technicien en technicianIds -> null (pas assignable)', () => {
+  assert.equal(resolveCommercialMemberId({ assignedCommercialId: '', technicianIds: ['tm-ludo'], members: commercialMembers, commercials }), null);
+});
+
+test('resolveCommercialMemberId: rien -> null', () => {
+  assert.equal(resolveCommercialMemberId({ assignedCommercialId: null, technicianIds: [], members: commercialMembers }), null);
 });

@@ -60,7 +60,10 @@ export function resolveAppointmentColor(appt, maps) {
   const { colorByProfile, techProfileById, comProfileById } = maps;
   const techId = appt?.technician_ids?.[0];
   const techProfile = techId ? techProfileById.get(techId) : null;
-  const comProfile = appt?.assigned_commercial_id ? comProfileById.get(appt.assigned_commercial_id) : null;
+  // assigned_commercial_id porte un commercials.id (VT prise depuis le pipeline) OU un
+  // team_members.id (VT prise depuis le planning) : on résout dans les deux référentiels.
+  const comId = appt?.assigned_commercial_id;
+  const comProfile = comId ? (comProfileById.get(comId) || techProfileById.get(comId) || null) : null;
   // VT/agence : on préfère le commercial ; sinon (intervention/autre) le technicien.
   const preferCom = COMMERCIAL_TYPES.includes(appt?.appointment_type);
   const profile = preferCom ? (comProfile || techProfile) : (techProfile || comProfile);
@@ -94,6 +97,32 @@ export function expandAppointmentBlocks(appt, maps, selectedRecordIds) {
     }));
   }
   return [{ color: resolveAppointmentColor(appt, maps), idSuffix: null }];
+}
+
+/**
+ * Membre (team_members.id) qui porte un RDV commercial, quel que soit le référentiel
+ * de l'id stocké : `assigned_commercial_id` vaut un commercials.id (VT prise depuis le
+ * pipeline) ou un team_members.id (VT prise depuis le planning) — les deux tables sont
+ * reliées par le profil (`commercials.profile_id` = `team_members.user_id`).
+ * Un id stocké mais introuvable (membre désactivé) → null, sans repli : on n'affiche
+ * jamais une autre personne que celle enregistrée.
+ * Filet legacy : l'ancien sélecteur d'édition rangeait le commercial dans
+ * `technician_ids` — repris s'il fait partie des membres assignables, seulement quand
+ * rien n'est stocké.
+ * @param {Object} p
+ * @param {string|null} p.assignedCommercialId
+ * @param {string[]}    [p.technicianIds]
+ * @param {Array}       p.members       team_members assignables [{ id, user_id }]
+ * @param {Array}       [p.commercials] [{ id, profile_id }]
+ * @returns {string|null} team_members.id
+ */
+export function resolveCommercialMemberId({ assignedCommercialId, technicianIds = [], members = [], commercials = [] }) {
+  if (assignedCommercialId) {
+    if (members.some((m) => m.id === assignedCommercialId)) return assignedCommercialId;
+    const profileId = commercials.find((c) => c.id === assignedCommercialId)?.profile_id;
+    return (profileId && members.find((m) => m.user_id === profileId)?.id) || null;
+  }
+  return technicianIds.find((id) => members.some((m) => m.id === id)) || null;
 }
 
 /**

@@ -518,20 +518,17 @@ export const SectionClient = ({
 // ============================================================================
 
 /**
- * SectionAssignee — Assignation dynamique selon le type de RDV
- * - COMMERCIAL_TYPES → commerciaux (Responsable + Commercial) via multi-select
- * - TECHNICIAN_TYPES → techniciens via multi-select
- * - other → tous les membres via multi-select
- */
-/**
- * SectionAssignee — Assignation dynamique selon le type de RDV
+ * SectionAssignee — Assignation dynamique selon le type de RDV (édition classique).
  * Tous les IDs sont des team_members.id (table pivot planning).
- * - COMMERCIAL_TYPES → team_members avec role commercial/admin (Responsable + Commercial)
- * - TECHNICIAN_TYPES → team_members avec role technician
- * - other → tous les team_members actifs
- * `error` : message de validation (« Une personne est requise » — un RDV a toujours une personne).
+ * - COMMERCIAL_TYPES → 1 commercial (role commercial/admin), porté par
+ *   `assigned_commercial_id` — jamais par `technicianIds` (vidé à la sélection :
+ *   l'ancien sélecteur y rangeait le commercial en « technicien », lien fantôme).
+ *   `commercialMemberId` = la personne enregistrée résolue par EventModal
+ *   (l'id stocké peut venir du pipeline, cf. resolveCommercialMemberId).
+ * - TECHNICIAN_TYPES → techniciens (multi) via `technicianIds`
+ * - other → tous les team_members actifs (multi) via `technicianIds`
  */
-export const SectionAssignee = ({ formData, updateField, allTeamMembers, error = null }) => {
+export const SectionAssignee = ({ formData, updateField, allTeamMembers, commercialMemberId = null, errors = {} }) => {
   const type = formData.appointment_type;
   const isCommercialType = COMMERCIAL_TYPES.includes(type);
   const isTechnicianType = TECHNICIAN_TYPES.includes(type);
@@ -555,18 +552,32 @@ export const SectionAssignee = ({ formData, updateField, allTeamMembers, error =
     placeholder = 'Sélectionner des personnes...';
   }
 
+  const error = isCommercialType ? errors.assigned_commercial_id : errors.technicianIds;
+
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
         {icon}
         {label}
       </h3>
-      <TechnicianSelect
-        selectedIds={formData.technicianIds || []}
-        onChange={(ids) => updateField('technicianIds', ids)}
-        members={selectMembers}
-        placeholder={placeholder}
-      />
+      {isCommercialType ? (
+        <SelectInput
+          value={commercialMemberId || ''}
+          onChange={(id) => {
+            updateField('assigned_commercial_id', id || '');
+            updateField('technicianIds', []);
+          }}
+          options={selectMembers.map((m) => ({ value: m.id, label: m.display_name }))}
+          placeholder={placeholder}
+        />
+      ) : (
+        <TechnicianSelect
+          selectedIds={formData.technicianIds || []}
+          onChange={(ids) => updateField('technicianIds', ids)}
+          members={selectMembers}
+          placeholder={placeholder}
+        />
+      )}
       {error && (
         <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
           <AlertTriangle className="w-3.5 h-3.5" />

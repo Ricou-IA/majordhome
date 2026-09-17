@@ -20,7 +20,8 @@ import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
 import { CertificatsSection } from '@/apps/artisan/components/entretiens/CertificatsSection';
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
-import { useLeadSearch, useRecentPipelineCards, leadKeys } from '@hooks/useLeads';
+import { useLeadSearch, useRecentPipelineCards, useLeadCommercials, leadKeys } from '@hooks/useLeads';
+import { resolveCommercialMemberId } from '@/lib/planningEvents';
 import { leadsService, BOUCLABLE_STATUS_IDS } from '@services/leads.service';
 import { resolveCardForAppointment } from '@services/appointmentActivation.service';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
@@ -188,6 +189,22 @@ export function EventModal({
     () => (allTeamMembers || []).filter((m) => ['commercial', 'admin'].includes(m.role)),
     [allTeamMembers],
   );
+  // Édition classique d'un RDV commercial : la personne est `assigned_commercial_id`.
+  // L'id stocké vient du pipeline (commercials.id) ou du planning (team_members.id) →
+  // résolu en team_members.id à chaque rendu (jamais figé : `commercials` arrive en
+  // async). Null si non commercial. Sert à l'affichage (SectionAssignee), à la garde
+  // « une personne » (validate) et au save (report du legacy « commercial en technicien »).
+  const { commercials } = useLeadCommercials(orgId);
+  const commercialMemberId = useMemo(() => (
+    isCommercialType
+      ? resolveCommercialMemberId({
+        assignedCommercialId: formData.assigned_commercial_id || null,
+        technicianIds: formData.technicianIds || [],
+        members: commercialMembers,
+        commercials,
+      })
+      : null
+  ), [isCommercialType, formData.assigned_commercial_id, formData.technicianIds, commercialMembers, commercials]);
   // team_member de l'utilisateur connecté → pré-affectation « Autre » à soi par défaut.
   const currentMemberId = useMemo(
     () => (allTeamMembers || []).find((m) => m.user_id === userId)?.id || null,
@@ -404,15 +421,17 @@ export function EventModal({
     if (!formData.scheduled_start) newErrors.scheduled_start = 'Heure de début requise';
     if (formData.appointment_type !== 'other' && !formData.client_name?.trim()) newErrors.client_name = 'Nom requis';
     if (!formData.appointment_type) newErrors.appointment_type = 'Type requis';
-    // Un RDV a toujours une personne (Eric, 2026-09-17) : le chemin classique (édition)
-    // ne doit pas pouvoir vider l'assignation — technicien(s) ou commercial assigné.
-    if (!(formData.technicianIds || []).length && !formData.assigned_commercial_id) {
-      newErrors.technicianIds = 'Une personne est requise';
-    }
+    // Un RDV a toujours une personne (l'assistant tient l'invariant en création ; ici
+    // c'est l'édition classique). Commercial → assigned_commercial_id (id stocké, même
+    // pas encore résolu, ou legacy résolu) ; sinon → technicien(s) ou commercial.
+    const hasPerson = isCommercialType
+      ? !!(formData.assigned_commercial_id || commercialMemberId)
+      : ((formData.technicianIds || []).length > 0 || !!formData.assigned_commercial_id);
+    if (!hasPerson) newErrors[isCommercialType ? 'assigned_commercial_id' : 'technicianIds'] = 'Une personne est requise';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData]);
+  }, [formData, isCommercialType, commercialMemberId]);
 
   // --------------------------------------------------------------------------
   // Sélection / déliaison client
@@ -706,8 +725,12 @@ export function EventModal({
       duration_minutes: Number(formData.duration_minutes) || 60,
       description: formData.description || null,
       internal_notes: formData.internal_notes || null,
-      technicianIds: formData.technicianIds,
-      assigned_commercial_id: formData.assigned_commercial_id || null,
+      // RDV commercial : la personne est assigned_commercial_id — l'id stocké est
+      // conservé tel quel s'il n'a pas été modifié (pas de réécriture d'un id pipeline),
+      // le legacy « commercial rangé en technicien » est reporté ; technicianIds vidé
+      // (même règle que l'assistant en mode commercial : purge du lien fantôme).
+      technicianIds: isCommercialType ? [] : formData.technicianIds,
+      assigned_commercial_id: formData.assigned_commercial_id || commercialMemberId || null,
       // Souplesse : figé (0) ⇒ heure communiquée au client (conservée si déjà
       // posée) ; adaptable ⇒ on efface la confirmation.
       time_flex_minutes: formData.time_flex_minutes ?? null,
@@ -730,7 +753,7 @@ export function EventModal({
         queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
       }
     }
-  }, [validate, selectedLead, attachContext, isEdit, appointment, resolveActivation, reportActivationError, formData, onSave, selectedClient, orgId, queryClient]);
+  }, [validate, selectedLead, attachContext, isEdit, appointment, resolveActivation, reportActivationError, formData, isCommercialType, commercialMemberId, onSave, selectedClient, orgId, queryClient]);
 
   // --------------------------------------------------------------------------
   // Créer depuis l'assistant INTÉGRÉ (chemin CRÉATION VT/entretien/SAV/install).
@@ -1190,8 +1213,9 @@ export function EventModal({
                   formData={formData}
                   updateField={updateField}
                   allTeamMembers={allTeamMembers}
+                  commercialMemberId={commercialMemberId}
+                  errors={errors}
                   isCancelled={isCancelled}
-                  error={errors.technicianIds}
                 />
               )}
 
