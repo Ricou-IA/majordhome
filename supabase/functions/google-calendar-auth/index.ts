@@ -1,11 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { buildCorsHeaders, getAdminClient, jsonResponse, requireOrgMembership } from "../_shared/auth.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const RESEND_WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET") || "";
 const FRONTEND_ORIGINS = (Deno.env.get("FRONTEND_ORIGINS") || "")
@@ -142,38 +140,6 @@ function isAllowedReturnTo(returnTo: string): boolean {
   }
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-};
-
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
-async function getUser(req: Request) {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) return null;
-  const token = authHeader.replace("Bearer ", "");
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data: { user } } = await supabase.auth.getUser(token);
-  return user;
-}
-
-async function requireUser(req: Request) {
-  const user = await getUser(req);
-  if (!user) return { user: null, errorResponse: jsonResponse({ error: "Unauthorized" }, 401) };
-  return { user, errorResponse: null };
-}
-
 function normalizeTime(t: string): string {
   if (!t) return "00:00:00";
   const parts = t.split(":");
@@ -182,26 +148,31 @@ function normalizeTime(t: string): string {
 }
 
 // --- Generate OAuth URL ---
+// Les trois actions a JWT (auth-url / status / disconnect) recoivent l'org
+// CORE en query/body : requireOrgMembership valide le jeton ET que l'appelant
+// est membre de cette org (P0.25). Le callback OAuth, lui, n'a pas de JWT :
+// il repose sur le state signe HMAC.
 async function handleAuthUrl(req: Request) {
-  const { user, errorResponse } = await requireUser(req);
-  if (!user) return errorResponse!;
   const url = new URL(req.url);
   const orgId = url.searchParams.get("org_id");
   const returnUrl = url.searchParams.get("return_url") || "";
-  if (!orgId) return jsonResponse({ error: "org_id required" }, 400);
+  if (!orgId) return jsonResponse({ error: "org_id required" }, 400, req);
+  const auth = await requireOrgMembership(req, { orgId });
+  if (!auth.ok) return auth.response;
   if (!RESEND_WEBHOOK_SECRET) {
     return jsonResponse(
       { error: "RESEND_WEBHOOK_SECRET not configured (required for state signing)" },
       500,
+      req,
     );
   }
   if (returnUrl && !isAllowedReturnTo(returnUrl)) {
-    return jsonResponse({ error: "return_url not allowed" }, 400);
+    return jsonResponse({ error: "return_url not allowed" }, 400, req);
   }
 
   const state = await signState({
     orgId,
-    userId: user.id,
+    userId: auth.userId,
     returnTo: returnUrl,
     nonce: crypto.randomUUID(),
     exp: Math.floor(Date.now() / 1000) + STATE_TTL_SECONDS,
@@ -214,7 +185,7 @@ async function handleAuthUrl(req: Request) {
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
   authUrl.searchParams.set("state", state);
-  return jsonResponse({ url: authUrl.toString() });
+  return jsonResponse({ url: authUrl.toString() }, 200, req);
 }
 
 // --- OAuth callback ---
@@ -228,15 +199,15 @@ async function handleCallback(req: Request) {
   // construire une redirection : un state invalide n'a pas de returnTo
   // exploitable, on repond en JSON plutot que de rediriger n'importe ou.
   if (!RESEND_WEBHOOK_SECRET) {
-    return jsonResponse({ error: "RESEND_WEBHOOK_SECRET not configured" }, 500);
+    return jsonResponse({ error: "RESEND_WEBHOOK_SECRET not configured" }, 500, req);
   }
-  if (error && !stateParam) return jsonResponse({ error: `google:${error}` }, 400);
-  if (!stateParam) return jsonResponse({ error: "missing_state" }, 400);
+  if (error && !stateParam) return jsonResponse({ error: `google:${error}` }, 400, req);
+  if (!stateParam) return jsonResponse({ error: "missing_state" }, 400, req);
 
   const stateVerif = await verifySignedState(stateParam);
   if (!stateVerif.ok) {
     console.error(`[gcal-auth] State OAuth rejete : ${stateVerif.error}`);
-    return jsonResponse({ error: `invalid_state:${stateVerif.error}` }, 400);
+    return jsonResponse({ error: `invalid_state:${stateVerif.error}` }, 400, req);
   }
   const state = {
     user_id: stateVerif.payload.userId,
@@ -244,17 +215,17 @@ async function handleCallback(req: Request) {
     return_url: stateVerif.payload.returnTo,
   };
   if (state.return_url && !isAllowedReturnTo(state.return_url)) {
-    return jsonResponse({ error: "return_url not allowed" }, 400);
+    return jsonResponse({ error: "return_url not allowed" }, 400, req);
   }
   const returnUrl = state.return_url || "";
 
   function redirectError(msg: string) {
     if (returnUrl) return Response.redirect(`${returnUrl}?gcal=error&gcal_error=${encodeURIComponent(msg)}`, 302);
-    return jsonResponse({ error: msg }, 400);
+    return jsonResponse({ error: msg }, 400, req);
   }
   function redirectSuccess(email: string) {
     if (returnUrl) return Response.redirect(`${returnUrl}?gcal=success&gcal_email=${encodeURIComponent(email)}`, 302);
-    return jsonResponse({ success: true, email });
+    return jsonResponse({ success: true, email }, 200, req);
   }
 
   // A ce stade le state est verifie, donc returnUrl est sur : on peut rediriger.
@@ -502,19 +473,19 @@ async function refreshTokenWorks(refreshToken: string): Promise<boolean> {
 
 // --- Check connection status ---
 async function handleStatus(req: Request) {
-  const { user, errorResponse } = await requireUser(req);
-  if (!user) return errorResponse!;
   const url = new URL(req.url);
   const orgId = url.searchParams.get("org_id");
-  if (!orgId) return jsonResponse({ error: "org_id required" }, 400);
+  if (!orgId) return jsonResponse({ error: "org_id required" }, 400, req);
+  const auth = await requireOrgMembership(req, { orgId });
+  if (!auth.ok) return auth.response;
 
-  const admin = getAdminClient();
+  const admin = auth.supabase;
   const { data, error: dbError } = await admin
     .from("majordhome_google_calendar_tokens")
     .select("google_email, calendar_id, connected_at, refresh_token")
-    .eq("user_id", user.id).eq("org_id", orgId).maybeSingle();
+    .eq("user_id", auth.userId).eq("org_id", orgId).maybeSingle();
 
-  if (dbError) return jsonResponse({ error: "Database error" }, 500);
+  if (dbError) return jsonResponse({ error: "Database error" }, 500, req);
 
   // « Connecte » ne veut rien dire si le refresh token est mort : c'est
   // exactement ce qui a fait passer 98 RDV a la trappe entre avril et aout
@@ -530,32 +501,32 @@ async function handleStatus(req: Request) {
     calendar_id: data?.calendar_id || null,
     connected_at: data?.connected_at || null,
     needs_reconnect: needsReconnect,
-  });
+  }, 200, req);
 }
 
 // --- Disconnect ---
 async function handleDisconnect(req: Request) {
-  const { user, errorResponse } = await requireUser(req);
-  if (!user) return errorResponse!;
   const body = await req.json();
   const orgId = body.org_id;
-  if (!orgId) return jsonResponse({ error: "org_id required" }, 400);
+  if (!orgId) return jsonResponse({ error: "org_id required" }, 400, req);
+  const auth = await requireOrgMembership(req, { orgId });
+  if (!auth.ok) return auth.response;
 
-  const admin = getAdminClient();
+  const admin = auth.supabase;
   const { data: tokenData } = await admin
     .from("majordhome_google_calendar_tokens")
-    .select("access_token").eq("user_id", user.id).eq("org_id", orgId).maybeSingle();
+    .select("access_token").eq("user_id", auth.userId).eq("org_id", orgId).maybeSingle();
 
   if (tokenData?.access_token) {
     await fetch(`https://oauth2.googleapis.com/revoke?token=${tokenData.access_token}`, { method: "POST" }).catch(() => {});
   }
-  await admin.rpc('gcal_disconnect', { p_user_id: user.id, p_org_id: orgId });
-  return jsonResponse({ success: true });
+  await admin.rpc('gcal_disconnect', { p_user_id: auth.userId, p_org_id: orgId });
+  return jsonResponse({ success: true }, 200, req);
 }
 
 // --- ROUTER ---
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: buildCorsHeaders(req) });
   const url = new URL(req.url);
   const action = url.searchParams.get("action");
   try {
@@ -564,10 +535,10 @@ Deno.serve(async (req: Request) => {
       case "callback": return await handleCallback(req);
       case "status": return await handleStatus(req);
       case "disconnect": return await handleDisconnect(req);
-      default: return jsonResponse({ error: `Unknown action: ${action}` }, 400);
+      default: return jsonResponse({ error: `Unknown action: ${action}` }, 400, req);
     }
   } catch (err) {
     console.error("[gcal-auth] Unhandled:", err);
-    return jsonResponse({ error: "Internal server error" }, 500);
+    return jsonResponse({ error: "Internal server error" }, 500, req);
   }
 });

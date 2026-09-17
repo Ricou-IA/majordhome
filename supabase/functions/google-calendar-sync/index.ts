@@ -1,30 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { buildCorsHeaders, getAdminClient, jsonResponse, requireOrgMembership } from "../_shared/auth.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const GCAL_API = "https://www.googleapis.com/calendar/v3";
 const TIMEZONE = "Europe/Paris";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
 
 function normalizeTime(t: string): string {
   if (!t) return "00:00:00";
@@ -235,8 +216,8 @@ async function deleteForUser(
 
 // --- MAIN ---
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "POST required" }, 405);
+  if (req.method === "OPTIONS") return new Response(null, { headers: buildCorsHeaders(req) });
+  if (req.method !== "POST") return jsonResponse({ error: "POST required" }, 405, req);
 
   let body: {
     action: string;
@@ -247,22 +228,32 @@ Deno.serve(async (req: Request) => {
     org_id: string;
     existing_sync_records?: Array<{ user_id: string; google_event_id: string; google_calendar_id: string }>;
   };
-  try { body = await req.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400); }
+  try { body = await req.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400, req); }
 
   const { action, appointment, technician_ids, assigned_commercial_id, current_user_id, org_id, existing_sync_records } = body;
-  if (!action || !appointment?.id || !org_id) return jsonResponse({ error: "Missing required fields" }, 400);
+  if (!action || !appointment?.id || !org_id) return jsonResponse({ error: "Missing required fields" }, 400, req);
 
   const admin = getAdminClient();
 
+  // Le front envoie tantot l'org CORE (createAppointment), tantot l'org
+  // majordhome (update/delete passent appointment.org_id) : on la ramene a
+  // l'org core, seule reference de core.organization_members, AVANT de
+  // verifier que l'appelant en est membre. Tout le reste tourne en
+  // service_role sur un payload fourni par l'appelant : sans cette garde,
+  // n'importe quel utilisateur authentifie pouvait forger org_id + appointment
+  // et ecrire dans les agendas Google d'une autre org (P0.25).
+  const coreOrgId = await resolveCoreOrgId(admin, org_id);
+  const auth = await requireOrgMembership(req, { orgId: coreOrgId, supabase: admin });
+  if (!auth.ok) return auth.response;
+
   // For deletes with pre-loaded sync records, use them directly
   if (action === "delete" && existing_sync_records?.length) {
-    const coreOrgId = await resolveCoreOrgId(admin, org_id);
     const userIds = existing_sync_records.map(r => r.user_id);
 
     const { data: tokens } = await admin.from("majordhome_google_calendar_tokens")
       .select("*").eq("org_id", coreOrgId).in("user_id", userIds);
 
-    if (!tokens?.length) return jsonResponse({ results: [], message: "No tokens" });
+    if (!tokens?.length) return jsonResponse({ results: [], message: "No tokens" }, 200, req);
 
     const results = await Promise.allSettled(
       existing_sync_records
@@ -280,17 +271,16 @@ Deno.serve(async (req: Request) => {
     }));
 
     console.log(`[gcal-sync] delete ${appointment.id}: ${summary.filter((s:{success:boolean}) => s.success).length}/${summary.length} deleted`);
-    return jsonResponse({ results: summary });
+    return jsonResponse({ results: summary }, 200, req);
   }
 
   // Standard flow for create/update/cancel
-  const coreOrgId = await resolveCoreOrgId(admin, org_id);
   const profileIds = await resolveProfileIds(admin, technician_ids || [], assigned_commercial_id || null, current_user_id || null);
-  if (!profileIds.length) return jsonResponse({ results: [], message: "No users to sync" });
+  if (!profileIds.length) return jsonResponse({ results: [], message: "No users to sync" }, 200, req);
 
   const { data: tokens } = await admin.from("majordhome_google_calendar_tokens")
     .select("*").eq("org_id", coreOrgId).in("user_id", profileIds);
-  if (!tokens?.length) return jsonResponse({ results: [], message: "No Google Calendar connected" });
+  if (!tokens?.length) return jsonResponse({ results: [], message: "No Google Calendar connected" }, 200, req);
 
   const results = await Promise.allSettled(tokens.map((t: TokenRecord) => syncForUser(admin, t, action, appointment)));
   const summary = results.map((r, i) => ({
@@ -299,5 +289,5 @@ Deno.serve(async (req: Request) => {
   }));
 
   console.log(`[gcal-sync] ${action} ${appointment.id}: ${summary.filter((s:{success:boolean}) => s.success).length}/${summary.length} synced`);
-  return jsonResponse({ results: summary });
+  return jsonResponse({ results: summary }, 200, req);
 });
