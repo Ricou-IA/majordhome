@@ -784,7 +784,7 @@ export const savService = {
       if (equipmentIds.length > 0) {
         const { data: equipments } = await supabase
           .from('majordhome_equipments')
-          .select('id, category, brand, model, serial_number, equipment_type_id')
+          .select('id, category_id, brand, model, serial_number, equipment_type_id')
           .in('id', equipmentIds);
 
         if (equipments) {
