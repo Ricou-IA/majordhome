@@ -6,6 +6,7 @@
  *
  * @version 6.0.0 - Refonte : cacheKeys centralisées, usePaginatedList, useDebounce
  * @version 6.1.0 - P0.11 : propagation orgId dans toutes les cache keys
+ * @version 6.2.0 - Contrat unique des mutations : mutateAsync REJETTE sur refus (cf. unwrap)
  * ============================================================================
  */
 
@@ -27,6 +28,22 @@ export { clientKeys } from '@hooks/cacheKeys';
 // ============================================================================
 
 const DEFAULT_LIMIT = 25;
+
+/**
+ * Contrat UNIQUE des mutations de ce fichier : `mutateAsync` résout avec la
+ * donnée et REJETTE sur refus (convention TanStack, même modèle qu'usePricing).
+ *
+ * Les services renvoient { data, error } sans jamais throw (withErrorHandling) :
+ * sans ce déballage, mutateAsync résout même quand la base a refusé et un
+ * appelant écrit en try/catch affiche un toast de succès mensonger (vécu :
+ * DELETE 409 sur un équipement porteur d'un certificat → « Équipement supprimé »).
+ * Corollaire côté appelant : try/catch + toast, jamais de lecture de `{ error }`.
+ */
+const unwrap = async (promise) => {
+  const r = await promise;
+  if (r?.error) throw r.error;
+  return r?.data ?? null;
+};
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -115,12 +132,12 @@ export function useClient(clientId) {
 
   // Mutation de mise à jour
   const updateMutation = useMutation({
-    mutationFn: (updates) => clientsService.updateClient(clientId, updates),
-    onSuccess: (result) => {
-      if (result?.data) {
+    mutationFn: (updates) => unwrap(clientsService.updateClient(clientId, updates)),
+    onSuccess: (updated) => {
+      if (updated) {
         queryClient.setQueryData(clientKeys.detail(orgId, clientId), (old) => ({
           ...old,
-          data: { ...(old?.data || {}), ...result.data },
+          data: { ...(old?.data || {}), ...updated },
         }));
         queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
       }
@@ -129,7 +146,7 @@ export function useClient(clientId) {
 
   // Mutation d'archivage
   const archiveMutation = useMutation({
-    mutationFn: () => clientsService.archiveClient(clientId),
+    mutationFn: () => unwrap(clientsService.archiveClient(clientId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
@@ -139,7 +156,7 @@ export function useClient(clientId) {
 
   // Mutation de désarchivage
   const unarchiveMutation = useMutation({
-    mutationFn: () => clientsService.unarchiveClient(clientId),
+    mutationFn: () => unwrap(clientsService.unarchiveClient(clientId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
@@ -150,7 +167,7 @@ export function useClient(clientId) {
   // Mutation hard delete (org_admin only) — god mode, nettoyage de base.
   // Supprime contrats/interventions/certificats + détache leads/RDV → invalidation croisée large.
   const hardDeleteMutation = useMutation({
-    mutationFn: () => clientsService.hardDeleteClient(clientId),
+    mutationFn: () => unwrap(clientsService.hardDeleteClient(clientId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
@@ -159,52 +176,17 @@ export function useClient(clientId) {
     },
   });
 
-  const updateClient = useCallback(
-    async (updates) => {
-      try {
-        const result = await updateMutation.mutateAsync(updates);
-        return result;
-      } catch (err) {
-        return { data: null, error: err };
-      }
-    },
-    [updateMutation]
-  );
-
-  const archiveClient = useCallback(async () => {
-    try {
-      const result = await archiveMutation.mutateAsync();
-      return result;
-    } catch (err) {
-      return { success: false, error: err };
-    }
-  }, [archiveMutation]);
-
-  const unarchiveClient = useCallback(async () => {
-    try {
-      const result = await unarchiveMutation.mutateAsync();
-      return result;
-    } catch (err) {
-      return { success: false, error: err };
-    }
-  }, [unarchiveMutation]);
-
-  const hardDeleteClient = useCallback(
-    async () => hardDeleteMutation.mutateAsync(),
-    [hardDeleteMutation]
-  );
-
   return {
     client: queryData,
     isLoading,
     error: error || queryData?.error,
-    updateClient,
+    updateClient: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
-    archiveClient,
+    archiveClient: archiveMutation.mutateAsync,
     isArchiving: archiveMutation.isPending,
-    unarchiveClient,
+    unarchiveClient: unarchiveMutation.mutateAsync,
     isUnarchiving: unarchiveMutation.isPending,
-    hardDeleteClient,
+    hardDeleteClient: hardDeleteMutation.mutateAsync,
     isHardDeleting: hardDeleteMutation.isPending,
     refresh: refetch,
   };
@@ -234,15 +216,6 @@ export function useClientEquipments(clientId) {
     enabled: !!orgId && !!clientId,
     staleTime: 60_000,
   });
-
-  // Les services renvoient { data, error } sans jamais throw (withErrorHandling) :
-  // sans unwrap, mutateAsync résout même quand la base a refusé (vécu : DELETE
-  // 409 sur un équipement porteur d'un certificat → toast « Équipement supprimé »).
-  const unwrap = async (promise) => {
-    const r = await promise;
-    if (r?.error) throw r.error;
-    return r?.data ?? null;
-  };
 
   const addMutation = useMutation({
     mutationFn: (equipmentData) => unwrap(clientsService.addEquipment(clientId, equipmentData)),
@@ -416,7 +389,7 @@ export function useClientActivities(clientId) {
   });
 
   const addNoteMutation = useMutation({
-    mutationFn: (noteData) => clientsService.addClientNote({ clientId, ...noteData }),
+    mutationFn: (noteData) => unwrap(clientsService.addClientNote({ clientId, ...noteData })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.activities(orgId, clientId) });
     },
@@ -542,12 +515,12 @@ export function useLinkedClients(clientId, orgId) {
   }, [queryClient, orgId]);
 
   const linkMutation = useMutation({
-    mutationFn: ({ tenantId, ownerId }) => clientsService.linkClientAsOwner(tenantId, ownerId),
+    mutationFn: ({ tenantId, ownerId }) => unwrap(clientsService.linkClientAsOwner(tenantId, ownerId)),
     onSuccess: (_, { tenantId, ownerId }) => invalidateLinked([tenantId, ownerId]),
   });
 
   const unlinkMutation = useMutation({
-    mutationFn: (targetClientId) => clientsService.unlinkClient(targetClientId),
+    mutationFn: (targetClientId) => unwrap(clientsService.unlinkClient(targetClientId)),
     onSuccess: () => invalidateLinked([clientId, data?.owner?.id]),
   });
 

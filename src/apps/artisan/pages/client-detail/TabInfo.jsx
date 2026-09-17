@@ -211,8 +211,7 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
   const handleUnlink = async (targetId) => {
     if (!window.confirm('Voulez-vous vraiment délier ce client ?')) return;
     try {
-      const { error } = await unlinkClient(targetId);
-      if (error) throw error;
+      await unlinkClient(targetId);
       toast.success('Client délié');
     } catch (err) {
       toast.error('Erreur : ' + (err?.message || 'Erreur inconnue'));

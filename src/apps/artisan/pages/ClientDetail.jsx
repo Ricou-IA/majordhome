@@ -151,30 +151,31 @@ export default function ClientDetail() {
       return;
     }
 
-    const { error: err } = await updateClient({
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      clientCategory: formData.clientCategory,
-      companyName: formData.companyName,
-      phone: formData.phone,
-      phoneSecondary: formData.phoneSecondary,
-      email: formData.email,
-      mailOptin: formData.mailOptin,
-      smsOptin: formData.smsOptin,
-      address: formData.address,
-      addressComplement: formData.addressComplement,
-      postalCode: formData.postalCode,
-      city: formData.city,
-      accessInstructions: formData.accessInstructions,
-      housingType: formData.housingType,
-      surface: formData.surface,
-      dpeNumber: formData.dpeNumber,
-      leadSource: formData.leadSource,
-      notes: formData.notes,
-      internalNotes: formData.internalNotes,
-    });
-
-    if (err) {
+    try {
+      await updateClient({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        clientCategory: formData.clientCategory,
+        companyName: formData.companyName,
+        phone: formData.phone,
+        phoneSecondary: formData.phoneSecondary,
+        email: formData.email,
+        mailOptin: formData.mailOptin,
+        smsOptin: formData.smsOptin,
+        address: formData.address,
+        addressComplement: formData.addressComplement,
+        postalCode: formData.postalCode,
+        city: formData.city,
+        accessInstructions: formData.accessInstructions,
+        housingType: formData.housingType,
+        surface: formData.surface,
+        dpeNumber: formData.dpeNumber,
+        leadSource: formData.leadSource,
+        notes: formData.notes,
+        internalNotes: formData.internalNotes,
+      });
+    } catch (err) {
+      console.error('[ClientDetail] Erreur sauvegarde:', err);
       toast.error('Erreur lors de la sauvegarde');
       return;
     }
@@ -185,12 +186,13 @@ export default function ClientDetail() {
   };
 
   const handleArchive = async () => {
-    const result = await archiveClient();
-    if (result?.data && !result?.error) {
+    try {
+      await archiveClient();
       toast.success('Client archivé');
       setShowArchiveConfirm(false);
       navigate('/clients');
-    } else {
+    } catch (err) {
+      console.error('[ClientDetail] Erreur archivage:', err);
       toast.error("Erreur lors de l'archivage");
     }
   };
@@ -219,12 +221,13 @@ export default function ClientDetail() {
   };
 
   const handleUnarchive = async () => {
-    const result = await unarchiveClient();
-    if (result?.data && !result?.error) {
+    try {
+      await unarchiveClient();
       toast.success('Client désarchivé');
       refresh();
-    } else {
-      toast.error('Erreur lors de la désarchivage');
+    } catch (err) {
+      console.error('[ClientDetail] Erreur désarchivage:', err);
+      toast.error('Erreur lors du désarchivage');
     }
   };
 

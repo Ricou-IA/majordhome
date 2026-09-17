@@ -219,8 +219,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           dpeNumber: formData.dpeNumber, leadSource: formData.leadSource,
           notes: formData.notes,
         };
-        const { error } = await updateClient(updates);
-        if (error) throw error;
+        await updateClient(updates);
 
         const addressChanged =
           formData.address !== originalDataRef.current?.address ||
