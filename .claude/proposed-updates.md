@@ -19,8 +19,8 @@
 ---
 
 ## [2026-09-16 16:00] Module Mouchard — journal d'audit des écritures (leads, RDV)
-**Statut** : PENDING
-**Commit** : (commit de cette livraison)
+**Statut** : RESOLU (intégré dans CLAUDE.md § Module Mouchard, après Module Planning, le 2026-09-17)
+**Commit** : 836a5ca
 **Contexte** : L'Historique d'un lead était déclaratif (le front loggait quand il y pensait, avec un `user_id` auto-déclaré) ; une modif de date de RDV à 15:05 sur PERRON n'avait laissé aucune trace. Un trigger AFTER générique trace maintenant toute écriture sur `leads` / `appointments` dans `majordhome.audit_log`, affiché dans l'Historique de la fiche lead et dans la modale RDV.
 **Proposition** (section « ## Module Mouchard (journal d'audit) → `docs/superpowers/specs/2026-09-16-mouchard-audit-log-design.md` », à placer après Module Planning) :
 ```

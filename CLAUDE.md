@@ -328,6 +328,14 @@ Règles qui mordent :
 - **Un RDV a toujours une personne** (Eric, 2026-09-16 : « pas de planning non assigné »). La grille de l'assistant propose une colonne « À assigner » (`allowUnassigned`, masquée si `fixedAssigneeId`) pour poser sans savoir qui ; poser dedans ouvre `AssignSlotModal` (« Qui prend ce RDV ? »), **filet obligatoire** : annuler retire le créneau, vider le sélecteur inline le rouvre, et `SchedulingAssistant` ne remonte au host que les créneaux ASSIGNÉS (`assignedSlots`). Ne jamais réintroduire de « Laisser non assigné » : service et calendrier acceptent un RDV sans personne (couleur neutre), c'est l'assistant qui tient l'invariant.
 - **« Programmer une suite »** (édition d'un RDV, 2026-09-15) : `continuationMode` d'`EventModal`, symétrique de `rescheduleMode` — rouvre l'assistant et **ajoute** N RDV sur la même carte (`createAppointmentBatch` avec `lead_id`/`intervention_id`/client copiés, objet suffixé « (suite) »), sans toucher au RDV d'origine. Cas typique : chantier pas fini le jour prévu.
 
+## Module Mouchard (journal d'audit) → `docs/superpowers/specs/2026-09-16-mouchard-audit-log-design.md`
+Règles qui mordent :
+- **Toute écriture sur `leads` / `appointments` est tracée par trigger DB** (`majordhome.audit_row_change()` → `majordhome.audit_log`, append-only, `changed_by = auth.uid()` serveur, `source` = RPC/vue racine). Ne JAMAIS y écrire depuis le front ni y poser de GRANT INSERT : le trigger est le seul écrivain. Ajouter une table auditée = 1 `CREATE TRIGGER` avec la liste CSV des colonnes bruit en argument.
+- **`lead_activities` reste déclaratif** (`user_id` fourni par le front) : pour prouver QUI a fait QUOI, c'est `audit_log` qui fait foi, pas l'activité.
+- **Fail-safe assumé** : une erreur du trigger part en WARNING et ne bloque pas l'écriture métier → après toute modif de la fonction, vérifier qu'une écriture depuis l'app produit bien une ligne (`SELECT * FROM majordhome.audit_log ORDER BY id DESC LIMIT 1`).
+- **`org_id` du journal = org CORE** (normalisé dans le trigger via `majordhome.organizations.core_org_id`, car `appointments.org_id` porte l'org majordhome) → filtrer avec `organization.id`, comme les leads.
+- UPDATE sans champ utile → aucune ligne ; `updateLeadStatus` n'écrit plus « Statut : X → X ». Mise en forme = module pur `src/lib/auditTrail.js` (libellés FR, `resolvers` ids→noms via `useAuditResolvers`), rendu partagé `AuditEntry` (fiche lead + modale RDV).
+
 ## Module Entretiens (Programmation · grands secteurs · certificats · géocodage) → `docs/MODULE_ENTRETIENS.md`
 Règles qui mordent :
 - Programmation regroupée en **grands secteurs** (clustering CP par proximité, `src/lib/sectorClustering.js` pur + testé ; nommage par la ville la + peuplée). Gotcha : l'icône `Map` de lucide **shadow** `new Map()` → aliaser `MapIcon`.
