@@ -95,6 +95,17 @@ export function formatPhoneNumber(value) {
   return parts.join(' ');
 }
 
+// Affichage d'un numéro stocké : "0682347660" → "06 82 34 76 60".
+// Ne reformate qu'un numéro national à 10 chiffres (séparateurs espace/point/tiret
+// tolérés). Tout autre contenu (+33…, deux numéros, poste) est rendu tel quel :
+// formatPhoneNumber tronque à 10 chiffres et afficherait un numéro faux.
+export function formatPhoneDisplay(value) {
+  if (!value) return '';
+  const str = String(value);
+  const compact = str.replace(/[\s.-]/g, '');
+  return /^0\d{9}$/.test(compact) ? formatPhoneNumber(compact) : str;
+}
+
 // 1234.5 → "1 235 €"
 export function formatEuro(amount) {
   if (!amount && amount !== 0) return '-';

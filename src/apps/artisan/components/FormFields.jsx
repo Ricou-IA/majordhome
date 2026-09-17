@@ -7,7 +7,7 @@
  */
 
 import { AlertTriangle } from 'lucide-react';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, formatPhoneDisplay } from '@/lib/utils';
 
 // Classes de base réutilisables
 const baseClass =
@@ -69,7 +69,7 @@ export function PhoneInput({ value, onChange, placeholder = '06 12 34 56 78', di
   return (
     <input
       type="tel"
-      value={value || ''}
+      value={formatPhoneDisplay(value)}
       onChange={(e) => onChange(formatPhoneNumber(e.target.value))}
       placeholder={placeholder}
       disabled={disabled}

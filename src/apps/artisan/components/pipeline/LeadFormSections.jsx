@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FormField, SectionTitle, inputClass, selectClass } from '@/apps/artisan/components/FormFields';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, formatPhoneDisplay } from '@/lib/utils';
 import { LOST_REASONS } from './LeadStatusConfig';
 import { FICHE_STATUS_CONFIG, computeVisitStatus } from './FicheTechniqueConfig';
 import { useTechnicalVisit } from '@hooks/useTechnicalVisit';
@@ -297,7 +297,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="tel"
-            value={form.phone}
+            value={formatPhoneDisplay(form.phone)}
             onChange={(e) => setField('phone', formatPhoneNumber(e.target.value))}
             className={`${inputClass} pl-9`}
             placeholder="06 00 00 00 00"
@@ -309,7 +309,7 @@ export const SectionContact = ({ form, setField, contactFieldsDisabled, pennylan
       <FormField label="Tél. secondaire">
         <input
           type="tel"
-          value={form.phone_secondary}
+          value={formatPhoneDisplay(form.phone_secondary)}
           onChange={(e) => setField('phone_secondary', formatPhoneNumber(e.target.value))}
           className={inputClass}
           placeholder="Optionnel"
