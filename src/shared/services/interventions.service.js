@@ -139,11 +139,13 @@ export const interventionsService = {
           .eq('project_id', intervention.project_id)
           .single(),
 
-        // Équipement (optionnel)
+        // Équipement (optionnel) — category_id (référentiel de l'org, lu par le
+        // wizard certificat), pas l'enum legacy `category` ; metadata /
+        // installation_year pré-remplissent le certificat.
         intervention.equipment_id
           ? supabase
               .from('majordhome_equipments')
-              .select('id, category, brand, model, serial_number, install_date, notes')
+              .select('id, category_id, brand, model, serial_number, install_date, installation_year, metadata, notes')
               .eq('id', intervention.equipment_id)
               .single()
           : Promise.resolve({ data: null, error: null }),
