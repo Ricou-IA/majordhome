@@ -235,8 +235,17 @@ export function useClientEquipments(clientId) {
     staleTime: 60_000,
   });
 
+  // Les services renvoient { data, error } sans jamais throw (withErrorHandling) :
+  // sans unwrap, mutateAsync résout même quand la base a refusé (vécu : DELETE
+  // 409 sur un équipement porteur d'un certificat → toast « Équipement supprimé »).
+  const unwrap = async (promise) => {
+    const r = await promise;
+    if (r?.error) throw r.error;
+    return r?.data ?? null;
+  };
+
   const addMutation = useMutation({
-    mutationFn: (equipmentData) => clientsService.addEquipment(clientId, equipmentData),
+    mutationFn: (equipmentData) => unwrap(clientsService.addEquipment(clientId, equipmentData)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
@@ -246,14 +255,14 @@ export function useClientEquipments(clientId) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ equipmentId, updates }) => clientsService.updateEquipment(equipmentId, updates),
+    mutationFn: ({ equipmentId, updates }) => unwrap(clientsService.updateEquipment(equipmentId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (equipmentId) => clientsService.deleteEquipment(equipmentId),
+    mutationFn: (equipmentId) => unwrap(clientsService.deleteEquipment(equipmentId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });

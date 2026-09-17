@@ -13,6 +13,7 @@ import {
   User, MapPin, Phone, Home, Building2, FileText,
   History, ExternalLink, ClipboardCheck, Wrench,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/clients.service';
 import { useClientEquipments } from '@hooks/useClients';
@@ -342,8 +343,17 @@ export function TabEquipments({ clientId }) {
   const { equipments, loading, deleteEquipment } = useClientEquipments(clientId);
 
   const handleDelete = async (equipment) => {
-    if (window.confirm(`Supprimer l'équipement ${equipment.brand} ${equipment.model} ?`)) {
+    if (!window.confirm(`Supprimer l'équipement ${equipment.brand} ${equipment.model} ?`)) return;
+    try {
       await deleteEquipment(equipment.id);
+      toast.success('Équipement supprimé');
+    } catch (error) {
+      console.error('[ClientModalTabs] Erreur suppression équipement:', error);
+      toast.error(
+        error?.code === '23503'
+          ? 'Suppression refusée : cet équipement est encore référencé par un autre enregistrement.'
+          : 'Erreur lors de la suppression'
+      );
     }
   };
 

@@ -159,7 +159,12 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
       setDeletingEquipment(null);
     } catch (error) {
       console.error('[TabEquipments] Erreur suppression:', error);
-      toast.error('Erreur lors de la suppression');
+      // 23503 = la base refuse : une autre ligne pointe encore vers cet équipement
+      toast.error(
+        error?.code === '23503'
+          ? 'Suppression refusée : cet équipement est encore référencé par un autre enregistrement.'
+          : 'Erreur lors de la suppression'
+      );
     } finally {
       setIsDeleting(false);
     }
