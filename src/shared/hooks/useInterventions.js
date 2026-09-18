@@ -6,12 +6,16 @@
  * Inclut un système de brouillon localStorage pour auto-save du formulaire.
  *
  * @version 1.0.0 - Sprint 3 Outil Terrain Tablette
+ * @version 1.1.0 - Contrat unique des mutations : mutateAsync résout avec la
+ *   donnée et REJETTE sur refus (unwrapResult) — l'appelant fait try/catch +
+ *   toast, jamais de lecture de { error }.
  * ============================================================================
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { interventionsService } from '@services/interventions.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { interventionKeys, clientKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -70,8 +74,8 @@ export function useCreateIntervention() {
   const orgId = organization?.id;
 
   const mutation = useMutation({
-    mutationFn: (params) => interventionsService.createIntervention(params),
-    onSuccess: (result, variables) => {
+    mutationFn: (params) => unwrapResult(interventionsService.createIntervention(params)),
+    onSuccess: (_created, variables) => {
       // Invalider la liste interventions du projet
       queryClient.invalidateQueries({
         queryKey: interventionKeys.byProject(orgId, variables.projectId),
@@ -81,16 +85,8 @@ export function useCreateIntervention() {
     },
   });
 
-  const createIntervention = useCallback(
-    async (params) => {
-      const result = await mutation.mutateAsync(params);
-      return result;
-    },
-    [mutation]
-  );
-
   return {
-    createIntervention,
+    createIntervention: mutation.mutateAsync,
     isCreating: mutation.isPending,
   };
 }
@@ -194,99 +190,55 @@ export function useInterventionMutations(interventionId) {
 
   // Mutation : mettre à jour l'intervention
   const updateMutation = useMutation({
-    mutationFn: (updates) => interventionsService.updateIntervention(interventionId, updates),
+    mutationFn: (updates) => unwrapResult(interventionsService.updateIntervention(interventionId, updates)),
     onSuccess: invalidateIntervention,
   });
 
   // Mutation : changer le statut
   const statusMutation = useMutation({
-    mutationFn: (status) => interventionsService.updateInterventionStatus(interventionId, status),
+    mutationFn: (status) => unwrapResult(interventionsService.updateInterventionStatus(interventionId, status)),
     onSuccess: invalidateIntervention,
   });
 
-  // Mutation : upload fichier
+  // Mutation : upload fichier — résout avec { path, url }
   const uploadMutation = useMutation({
     mutationFn: ({ projectId, file, fileType }) =>
-      interventionsService.uploadFile(projectId, interventionId, file, fileType),
+      unwrapResult(interventionsService.uploadFile(projectId, interventionId, file, fileType)),
     onSuccess: invalidateIntervention,
   });
 
   // Mutation : supprimer fichier
   const deleteFileMutation = useMutation({
-    mutationFn: (path) => interventionsService.deleteFile(path),
+    mutationFn: (path) => unwrapResult(interventionsService.deleteFile(path)),
     onSuccess: invalidateIntervention,
   });
 
-  // Mutation : générer PDF via N8N
+  // Mutation : générer PDF via N8N — résout avec { success, pdfPath }
   const pdfMutation = useMutation({
-    mutationFn: () => interventionsService.triggerPdfGeneration(interventionId),
+    mutationFn: () => unwrapResult(interventionsService.triggerPdfGeneration(interventionId)),
     onSuccess: () => {
       // Le PDF est uploadé par N8N, on rafraîchit après un délai
       setTimeout(invalidateIntervention, 3000);
     },
   });
 
-  // Mutation : envoyer rapport signé via N8N
+  // Mutation : envoyer rapport signé via N8N — résout avec { success }
   const signedReportMutation = useMutation({
-    mutationFn: () => interventionsService.triggerSignedReport(interventionId),
+    mutationFn: () => unwrapResult(interventionsService.triggerSignedReport(interventionId)),
   });
 
-  // Helpers wrappés
-  const updateIntervention = useCallback(
-    async (updates) => {
-      const result = await updateMutation.mutateAsync(updates);
-      return result;
-    },
-    [updateMutation]
-  );
-
-  const updateStatus = useCallback(
-    async (status) => {
-      const result = await statusMutation.mutateAsync(status);
-      return result;
-    },
-    [statusMutation]
-  );
-
   const uploadFile = useCallback(
-    async (projectId, file, fileType) => {
-      const result = await uploadMutation.mutateAsync({ projectId, file, fileType });
-      return result;
-    },
+    (projectId, file, fileType) => uploadMutation.mutateAsync({ projectId, file, fileType }),
     [uploadMutation]
   );
 
-  const deleteFile = useCallback(
-    async (path) => {
-      const result = await deleteFileMutation.mutateAsync(path);
-      return result;
-    },
-    [deleteFileMutation]
-  );
-
-  const triggerPdf = useCallback(
-    async () => {
-      const result = await pdfMutation.mutateAsync();
-      return result;
-    },
-    [pdfMutation]
-  );
-
-  const triggerSignedReport = useCallback(
-    async () => {
-      const result = await signedReportMutation.mutateAsync();
-      return result;
-    },
-    [signedReportMutation]
-  );
-
   return {
-    updateIntervention,
-    updateStatus,
+    updateIntervention: updateMutation.mutateAsync,
+    updateStatus: statusMutation.mutateAsync,
     uploadFile,
-    deleteFile,
-    triggerPdf,
-    triggerSignedReport,
+    deleteFile: deleteFileMutation.mutateAsync,
+    triggerPdf: pdfMutation.mutateAsync,
+    triggerSignedReport: signedReportMutation.mutateAsync,
 
     // États
     isUpdating: updateMutation.isPending,

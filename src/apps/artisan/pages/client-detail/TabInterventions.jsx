@@ -258,24 +258,19 @@ export const TabInterventions = ({ projectId, clientId }) => {
       return;
     }
     try {
-      const result = await createIntervention({
+      await createIntervention({
         projectId,
         interventionType: formData.interventionType,
         scheduledDate: formData.scheduledDate,
         reportNotes: formData.reportNotes || null,
         createdBy: user?.id || null,
       });
-      if (result?.error) {
-        console.error('[TabInterventions] create error:', result.error);
-        toast.error(result.error.message || "Erreur lors de la création");
-        return;
-      }
       toast.success('Intervention créée');
       setShowForm(false);
       setFormData({ interventionType: 'maintenance', scheduledDate: new Date().toISOString().split('T')[0], reportNotes: '' });
     } catch (err) {
-      console.error('[TabInterventions] create exception:', err);
-      toast.error("Erreur lors de la création");
+      console.error('[TabInterventions] create error:', err);
+      toast.error(err?.message || "Erreur lors de la création");
     }
   };
 

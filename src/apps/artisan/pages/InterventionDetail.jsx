@@ -131,8 +131,7 @@ export default function InterventionDetail() {
   // Démarrer l'intervention (scheduled → in_progress)
   const handleStart = async () => {
     try {
-      const result = await mutations.updateStatus('in_progress');
-      if (result?.error) throw result.error;
+      await mutations.updateStatus('in_progress');
       toast.success('Intervention démarrée');
       refresh();
     } catch (err) {
@@ -146,8 +145,7 @@ export default function InterventionDetail() {
     try {
       // Sauvegarder le rapport d'abord
       await handleSaveReport();
-      const result = await mutations.updateStatus('completed');
-      if (result?.error) throw result.error;
+      await mutations.updateStatus('completed');
       draft.clearDraft();
       toast.success('Intervention terminée');
       refresh();
@@ -160,14 +158,13 @@ export default function InterventionDetail() {
   // Sauvegarder le rapport
   const handleSaveReport = async () => {
     try {
-      const result = await mutations.updateIntervention({
+      await mutations.updateIntervention({
         work_performed: formData.work_performed,
         report_notes: formData.report_notes,
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
         is_billable: formData.is_billable,
         parts_replaced: formData.parts_replaced,
       });
-      if (result?.error) throw result.error;
       draft.saveDraft(formData);
       toast.success('Rapport sauvegardé');
     } catch (err) {
@@ -180,18 +177,18 @@ export default function InterventionDetail() {
   const handlePhotoUpload = async (file, fileType, dbField) => {
     if (!intervention?.project_id) return;
     try {
-      const result = await mutations.uploadFile(intervention.project_id, file, fileType);
-      if (result?.error) throw result.error;
+      // uploadFile résout avec { path, url } (rejette si Storage refuse)
+      const { path } = await mutations.uploadFile(intervention.project_id, file, fileType);
 
       // Mettre à jour le chemin en DB
       if (fileType === FILE_TYPES.PHOTO_EXTRA) {
         // Photos supplémentaires : ajouter au tableau
         const currentExtra = intervention.photos_extra || [];
         await mutations.updateIntervention({
-          photos_extra: [...currentExtra, result.path],
+          photos_extra: [...currentExtra, path],
         });
       } else {
-        await mutations.updateIntervention({ [dbField]: result.path });
+        await mutations.updateIntervention({ [dbField]: path });
       }
 
       toast.success('Photo uploadée');
@@ -231,11 +228,10 @@ export default function InterventionDetail() {
     if (!intervention?.project_id) return;
     try {
       const file = new File([blob], 'signature.png', { type: 'image/png' });
-      const result = await mutations.uploadFile(intervention.project_id, file, FILE_TYPES.SIGNATURE);
-      if (result?.error) throw result.error;
+      const { path } = await mutations.uploadFile(intervention.project_id, file, FILE_TYPES.SIGNATURE);
 
       await mutations.updateIntervention({
-        signature_url: result.path,
+        signature_url: path,
         signed_at: new Date().toISOString(),
         signed_by_name: name,
       });
@@ -256,11 +252,8 @@ export default function InterventionDetail() {
       await handleSaveReport();
 
       setPdfError(null);
-      const result = await mutations.triggerPdf();
-
-      if (!result?.success) {
-        throw result?.error || new Error('Erreur de génération');
-      }
+      // triggerPdf rejette si le webhook N8N échoue ; résout avec { success, pdfPath }
+      await mutations.triggerPdf();
 
       // Le PDF sera disponible après que N8N l'ait uploadé
       toast.success('Génération du PV lancée', {
@@ -282,10 +275,7 @@ export default function InterventionDetail() {
   // Envoyer le rapport signé au client via N8N
   const handleSendReport = async () => {
     try {
-      const result = await mutations.triggerSignedReport();
-      if (!result?.success) {
-        throw result?.error || new Error("Erreur d'envoi");
-      }
+      await mutations.triggerSignedReport();
       toast.success('Rapport envoyé au client', {
         description: `Email envoyé à ${client?.email || 'l\'adresse du client'}`,
       });
