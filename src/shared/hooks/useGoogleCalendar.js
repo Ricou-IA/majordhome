@@ -38,6 +38,12 @@ export function useGoogleCalendarStatus(orgId) {
 
 /**
  * Hook to connect/disconnect Google Calendar
+ *
+ * Pas d'`unwrapResult` ici, volontairement : googleCalendar.service est en
+ * `fetch` et THROW nativement (`Failed to disconnect`…), il ne renvoie pas de
+ * { data, error }. `mutateAsync` rejette donc déjà sur refus — même contrat
+ * que les autres hooks, sans déballage. Y appliquer unwrapResult renverrait
+ * `null` à la place de la réponse JSON.
  */
 export function useGoogleCalendarConnection(orgId) {
   const queryClient = useQueryClient();
