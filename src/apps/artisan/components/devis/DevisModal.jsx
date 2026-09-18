@@ -57,8 +57,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
   const handleAccept = async () => {
     try {
-      const result = await acceptQuote(quoteId);
-      if (result?.error) throw result.error;
+      await acceptQuote(quoteId);
 
       // Auto-conversion lead → client si pas déjà lié
       if (quote?.lead_id && !quote?.client_id) {
@@ -85,8 +84,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
   const handleRefuse = async () => {
     try {
-      const result = await refuseQuote(quoteId);
-      if (result?.error) throw result.error;
+      await refuseQuote(quoteId);
       toast.success('Devis refusé');
       onStatusChange?.();
     } catch (err) {
@@ -96,8 +94,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
   const handleDuplicate = async () => {
     try {
-      const result = await duplicateQuote(quoteId, orgId);
-      if (result?.error) throw result.error;
+      await duplicateQuote(quoteId, orgId);
       toast.success('Devis dupliqué');
       onClose();
     } catch (err) {
@@ -107,8 +104,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
   const handleDelete = async () => {
     try {
-      const result = await deleteQuote(quoteId);
-      if (result?.error) throw result.error;
+      await deleteQuote(quoteId);
       toast.success('Devis supprimé');
       setShowDeleteConfirm(false);
       onClose();

@@ -2,12 +2,17 @@
  * useDevis.js - Majord'home Artisan
  * ============================================================================
  * Hooks React Query pour la gestion des devis (quotes).
+ *
+ * Contrat unique des mutations : `mutateAsync` résout avec la donnée et REJETTE
+ * sur refus (unwrapResult) — l'appelant fait try/catch + toast, jamais de
+ * lecture de { error }.
  * ============================================================================
  */
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devisService } from '@services/devis.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { devisKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -140,13 +145,13 @@ export function useDevisMutations(leadId) {
 
   // Créer un devis
   const createMutation = useMutation({
-    mutationFn: (data) => devisService.createQuote(data),
+    mutationFn: (data) => unwrapResult(devisService.createQuote(data)),
     onSuccess: invalidateAll,
   });
 
   // Mettre à jour un devis
   const updateMutation = useMutation({
-    mutationFn: ({ quoteId, updates }) => devisService.updateQuote(quoteId, updates),
+    mutationFn: ({ quoteId, updates }) => unwrapResult(devisService.updateQuote(quoteId, updates)),
     onSuccess: (_, { quoteId }) => {
       queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
@@ -156,7 +161,7 @@ export function useDevisMutations(leadId) {
   // Mettre à jour les lignes
   const upsertLinesMutation = useMutation({
     mutationFn: ({ quoteId, lines, globalDiscountPercent }) =>
-      devisService.upsertQuoteLines(quoteId, lines, globalDiscountPercent),
+      unwrapResult(devisService.upsertQuoteLines(quoteId, lines, globalDiscountPercent)),
     onSuccess: (_, { quoteId }) => {
       queryClient.invalidateQueries({ queryKey: devisKeys.lines(orgId, quoteId) });
       queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
@@ -166,13 +171,13 @@ export function useDevisMutations(leadId) {
 
   // Supprimer un devis
   const deleteMutation = useMutation({
-    mutationFn: (quoteId) => devisService.deleteQuote(quoteId),
+    mutationFn: (quoteId) => unwrapResult(devisService.deleteQuote(quoteId)),
     onSuccess: invalidateAll,
   });
 
   // Envoyer
   const sendMutation = useMutation({
-    mutationFn: (quoteId) => devisService.sendQuote(quoteId),
+    mutationFn: (quoteId) => unwrapResult(devisService.sendQuote(quoteId)),
     onSuccess: (_, quoteId) => {
       queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
@@ -181,7 +186,7 @@ export function useDevisMutations(leadId) {
 
   // Accepter
   const acceptMutation = useMutation({
-    mutationFn: (quoteId) => devisService.acceptQuote(quoteId),
+    mutationFn: (quoteId) => unwrapResult(devisService.acceptQuote(quoteId)),
     onSuccess: (_, quoteId) => {
       queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
@@ -190,7 +195,7 @@ export function useDevisMutations(leadId) {
 
   // Refuser
   const refuseMutation = useMutation({
-    mutationFn: (quoteId) => devisService.refuseQuote(quoteId),
+    mutationFn: (quoteId) => unwrapResult(devisService.refuseQuote(quoteId)),
     onSuccess: (_, quoteId) => {
       queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quoteId) });
       invalidateAll();
@@ -199,19 +204,19 @@ export function useDevisMutations(leadId) {
 
   // Dupliquer
   const duplicateMutation = useMutation({
-    mutationFn: ({ quoteId, orgId }) => devisService.duplicateQuote(quoteId, orgId),
+    mutationFn: ({ quoteId, orgId }) => unwrapResult(devisService.duplicateQuote(quoteId, orgId)),
     onSuccess: invalidateAll,
   });
 
   return {
-    createQuote: useCallback(async (data) => createMutation.mutateAsync(data), [createMutation]),
-    updateQuote: useCallback(async (quoteId, updates) => updateMutation.mutateAsync({ quoteId, updates }), [updateMutation]),
-    upsertLines: useCallback(async (quoteId, lines, globalDiscountPercent) => upsertLinesMutation.mutateAsync({ quoteId, lines, globalDiscountPercent }), [upsertLinesMutation]),
-    deleteQuote: useCallback(async (quoteId) => deleteMutation.mutateAsync(quoteId), [deleteMutation]),
-    sendQuote: useCallback(async (quoteId) => sendMutation.mutateAsync(quoteId), [sendMutation]),
-    acceptQuote: useCallback(async (quoteId) => acceptMutation.mutateAsync(quoteId), [acceptMutation]),
-    refuseQuote: useCallback(async (quoteId) => refuseMutation.mutateAsync(quoteId), [refuseMutation]),
-    duplicateQuote: useCallback(async (quoteId, orgId) => duplicateMutation.mutateAsync({ quoteId, orgId }), [duplicateMutation]),
+    createQuote: createMutation.mutateAsync,
+    updateQuote: useCallback((quoteId, updates) => updateMutation.mutateAsync({ quoteId, updates }), [updateMutation]),
+    upsertLines: useCallback((quoteId, lines, globalDiscountPercent) => upsertLinesMutation.mutateAsync({ quoteId, lines, globalDiscountPercent }), [upsertLinesMutation]),
+    deleteQuote: deleteMutation.mutateAsync,
+    sendQuote: sendMutation.mutateAsync,
+    acceptQuote: acceptMutation.mutateAsync,
+    refuseQuote: refuseMutation.mutateAsync,
+    duplicateQuote: useCallback((quoteId, orgId) => duplicateMutation.mutateAsync({ quoteId, orgId }), [duplicateMutation]),
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isSending: sendMutation.isPending,

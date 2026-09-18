@@ -94,7 +94,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
 
   const handleCreate = async () => {
     try {
-      const result = await createQuote({
+      const created = await createQuote({
         orgId,
         leadId: lead?.id || null,
         clientId: lead?.client_id || null,
@@ -107,10 +107,8 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
         createdBy: user?.id,
       });
 
-      if (result?.error) throw result.error;
-
       toast.success('Devis créé');
-      onCreated?.(result?.data);
+      onCreated?.(created);
       onClose();
     } catch (err) {
       console.error('[CreateDevisModal]', err);
