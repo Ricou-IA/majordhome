@@ -206,15 +206,19 @@ export function CertificatWizard({
       type_document: getTypeDocument(profil),
     };
 
-    const result = await saveDraft(payload);
-    if (result?.error) {
-      console.error('[CertificatWizard] doSave ERROR:', result.error);
-      toast.error('Erreur sauvegarde certificat: ' + (result.error?.message || JSON.stringify(result.error)));
+    // Best effort : un refus se signale (toast) mais ne bloque pas le wizard —
+    // on retombe sur l'id déjà connu (null tant que rien n'est enregistré).
+    let saved = null;
+    try {
+      saved = await saveDraft(payload);
+    } catch (err) {
+      console.error('[CertificatWizard] doSave ERROR:', err);
+      toast.error('Erreur sauvegarde certificat: ' + (err?.message || JSON.stringify(err)));
     }
-    if (result?.data?.id && !certificatId) {
-      setCertificatId(result.data.id);
+    if (saved?.id && !certificatId) {
+      setCertificatId(saved.id);
     }
-    return result?.data?.id || certificatId;
+    return saved?.id || certificatId;
   }, [formData, intervention, client, equipment, contract, orgId, userId, saveDraft, certificatId, pdfUrl, profil]);
 
   // Auto-save quand on change d'étape (debounce 500ms)
@@ -341,23 +345,24 @@ export function CertificatWizard({
       // `certificats` absent après le cutover, 2026-08-11 → 2026-08-27).
       let erreurArchivagePdf = null;
       if (currentCertId) {
-        const uploadResult = await uploadPdf({
-          orgId: organization?.id,
-          clientId: client.id,
-          certificatId: currentCertId,
-          pdfBlob: blob,
-        });
-
-        if (uploadResult?.error) {
-          erreurArchivagePdf = uploadResult.error.message || 'archivage impossible';
-          console.error('[CertificatWizard] archivage PDF impossible:', uploadResult.error);
+        try {
+          // uploadPdf résout avec { path, storagePath } et rejette si Storage refuse ;
+          // updatePdfInfo rejette si la ligne certificat ne prend pas le chemin.
+          const { storagePath } = await uploadPdf({
+            orgId: organization?.id,
+            clientId: client.id,
+            certificatId: currentCertId,
+            pdfBlob: blob,
+          });
+          const urlResult = await getSignedUrl(storagePath);
+          const signedUrl = urlResult?.data || '';
+          await updatePdfInfo(currentCertId, storagePath, signedUrl);
+          setPdfUrl(signedUrl);
+        } catch (archiveErr) {
+          erreurArchivagePdf = archiveErr?.message || 'archivage impossible';
+          console.error('[CertificatWizard] archivage PDF impossible:', archiveErr);
           // Le technicien garde un PDF ouvrable pour le client, même non archivé.
           setPdfUrl(URL.createObjectURL(blob));
-        } else {
-          const urlResult = await getSignedUrl(uploadResult.data.storagePath);
-          const signedUrl = urlResult?.data || '';
-          await updatePdfInfo(currentCertId, uploadResult.data.storagePath, signedUrl);
-          setPdfUrl(signedUrl);
         }
       } else {
         // Pas de certificatId (table pas encore créée) — générer le PDF en local

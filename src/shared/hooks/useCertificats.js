@@ -4,12 +4,16 @@
  * Hooks TanStack React Query v5 pour les certificats d'entretien.
  *
  * @version 1.0.0 - Module Certificat d'Entretien & Ramonage
+ * @version 1.1.0 - Contrat unique des mutations : mutateAsync résout avec la
+ *   donnée et REJETTE sur refus (unwrapResult) — l'appelant fait try/catch +
+ *   toast, jamais de lecture de { error }.
  * ============================================================================
  */
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { certificatsService } from '@services/certificats.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { certificatKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -53,12 +57,12 @@ export function useCertificatMutations() {
     queryClient.invalidateQueries({ queryKey: certificatKeys.all(orgId) });
   }, [queryClient, orgId]);
 
-  // Sauvegarder brouillon
+  // Sauvegarder brouillon — résout avec le certificat
   const draftMutation = useMutation({
-    mutationFn: (formData) => certificatsService.saveDraft(formData),
-    onSuccess: (result) => {
-      if (result.data?.intervention_id) {
-        invalidate(result.data.intervention_id);
+    mutationFn: (formData) => unwrapResult(certificatsService.saveDraft(formData)),
+    onSuccess: (certificat) => {
+      if (certificat?.intervention_id) {
+        invalidate(certificat.intervention_id);
       }
     },
   });
@@ -66,61 +70,46 @@ export function useCertificatMutations() {
   // Signer le certificat
   const signMutation = useMutation({
     mutationFn: ({ certificatId, signatureBase64, signataireNom }) =>
-      certificatsService.signCertificat(certificatId, signatureBase64, signataireNom),
-    onSuccess: (result) => {
-      if (result.data?.intervention_id) {
-        invalidate(result.data.intervention_id);
+      unwrapResult(certificatsService.signCertificat(certificatId, signatureBase64, signataireNom)),
+    onSuccess: (certificat) => {
+      if (certificat?.intervention_id) {
+        invalidate(certificat.intervention_id);
       }
     },
   });
 
-  // Upload PDF — orgId requis depuis P0.0.7 (storage RLS scopée org_id)
+  // Upload PDF — orgId requis depuis P0.0.7 (storage RLS scopée org_id).
+  // Résout avec { path, storagePath }.
   const uploadPdfMutation = useMutation({
     mutationFn: ({ orgId, clientId, certificatId, pdfBlob }) =>
-      certificatsService.uploadPdf(orgId, clientId, certificatId, pdfBlob),
+      unwrapResult(certificatsService.uploadPdf(orgId, clientId, certificatId, pdfBlob)),
   });
 
   // Mettre à jour infos PDF
   const updatePdfMutation = useMutation({
     mutationFn: ({ certificatId, storagePath, pdfUrl }) =>
-      certificatsService.updatePdfInfo(certificatId, storagePath, pdfUrl),
-    onSuccess: (result) => {
-      if (result.data?.intervention_id) {
-        invalidate(result.data.intervention_id);
+      unwrapResult(certificatsService.updatePdfInfo(certificatId, storagePath, pdfUrl)),
+    onSuccess: (certificat) => {
+      if (certificat?.intervention_id) {
+        invalidate(certificat.intervention_id);
       }
     },
   });
 
   return {
-    saveDraft: useCallback(
-      async (formData) => {
-        const result = await draftMutation.mutateAsync(formData);
-        return result;
-      },
-      [draftMutation]
-    ),
+    saveDraft: draftMutation.mutateAsync,
 
     signCertificat: useCallback(
-      async (certificatId, signatureBase64, signataireNom) => {
-        const result = await signMutation.mutateAsync({ certificatId, signatureBase64, signataireNom });
-        return result;
-      },
+      (certificatId, signatureBase64, signataireNom) =>
+        signMutation.mutateAsync({ certificatId, signatureBase64, signataireNom }),
       [signMutation]
     ),
 
-    uploadPdf: useCallback(
-      async ({ orgId, clientId, certificatId, pdfBlob }) => {
-        const result = await uploadPdfMutation.mutateAsync({ orgId, clientId, certificatId, pdfBlob });
-        return result;
-      },
-      [uploadPdfMutation]
-    ),
+    uploadPdf: uploadPdfMutation.mutateAsync,
 
     updatePdfInfo: useCallback(
-      async (certificatId, storagePath, pdfUrl) => {
-        const result = await updatePdfMutation.mutateAsync({ certificatId, storagePath, pdfUrl });
-        return result;
-      },
+      (certificatId, storagePath, pdfUrl) =>
+        updatePdfMutation.mutateAsync({ certificatId, storagePath, pdfUrl }),
       [updatePdfMutation]
     ),
 
