@@ -72,10 +72,14 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
 
   const {
     updateWorkflowStatus,
+    unscheduleEntretien,
     updateFields,
-    isUpdatingStatus,
+    isUpdatingStatus: isUpdatingWorkflow,
+    isUnscheduling,
     isSavingFields,
   } = useEntretienSAVMutations();
+  // Les boutons de transition se figent pendant une transition OU une déplanification
+  const isUpdatingStatus = isUpdatingWorkflow || isUnscheduling;
 
   // Techniciens pour le SchedulingAssistant (mode SAV-Entretien)
   const { members: teamMembers } = useTeamMembers(orgId);
@@ -183,6 +187,24 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
     // Intercepter "planifie" → ouvrir le panneau de planification
     if (newStatus === 'planifie') {
       setShowScheduling(true);
+      return;
+    }
+
+    // Retour Planifié → À planifier = déplanifier : les RDV liés sont supprimés
+    // du planning avec la carte (sinon créneaux fantômes — vécu 2026-09-18).
+    if (newStatus === 'a_planifier' && item.workflow_status === 'planifie') {
+      try {
+        const { deleted } = await unscheduleEntretien(item);
+        toast.success(
+          deleted > 0
+            ? `Carte remise à planifier · ${deleted} RDV supprimé${deleted > 1 ? 's' : ''} du planning`
+            : 'Carte remise à planifier',
+        );
+        onUpdated?.();
+        onClose();
+      } catch {
+        // Toast d'erreur déjà émis par la mutation (useEntretienSAVMutations)
+      }
       return;
     }
 

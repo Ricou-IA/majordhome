@@ -17,7 +17,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
 import { callCampaignsService } from '@services/callCampaigns.service';
-import { entretienSavKeys, callAttemptKeys } from '@hooks/cacheKeys';
+import { entretienSavKeys, callAttemptKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -160,6 +160,27 @@ export function useEntretienSAVMutations() {
     },
   });
 
+  // --- Déplanification (Planifié → À planifier : les RDV liés partent avec la carte) ---
+  // Le service renvoie { deleted, error } sans throw : on lève ici pour que
+  // onError ET le catch de l'appelant voient l'échec (contrairement à statusMutation).
+  // Invalidation même en erreur : une partie des RDV peut déjà être supprimée,
+  // le kanban et le planning doivent montrer l'état réel, pas celui d'avant.
+  const unscheduleMutation = useMutation({
+    mutationFn: async ({ card }) => {
+      const result = await savService.unscheduleEntretien({ card, coreOrgId: orgId });
+      if (result.error) throw result.error;
+      return result;
+    },
+    onSettled: () => {
+      invalidateAll();
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    },
+    onError: (err) => {
+      console.error('[useEntretienSAV] unscheduleEntretien error:', err);
+      toast.error('Erreur lors de la déplanification');
+    },
+  });
+
   // --- Commande pièces ---
   const partsOrderMutation = useMutation({
     mutationFn: ({ interventionId, status }) =>
@@ -233,6 +254,8 @@ export function useEntretienSAVMutations() {
     // Transitions
     updateWorkflowStatus: (interventionId, newStatus) =>
       statusMutation.mutateAsync({ interventionId, newStatus }),
+    /** @returns {Promise<{ deleted: number }>} nombre de RDV supprimés du planning */
+    unscheduleEntretien: (card) => unscheduleMutation.mutateAsync({ card }),
 
     // SAV fields
     updatePartsOrder: (interventionId, status) =>
@@ -254,6 +277,7 @@ export function useEntretienSAVMutations() {
     isCreatingEntretien: createEntretienMutation.isPending,
     isCreatingSAV: createSAVMutation.isPending,
     isUpdatingStatus: statusMutation.isPending,
+    isUnscheduling: unscheduleMutation.isPending,
     isUpdatingPartsOrder: partsOrderMutation.isPending,
     isUpdatingDevis: devisMutation.isPending,
     isSavingNotes: notesMutation.isPending,

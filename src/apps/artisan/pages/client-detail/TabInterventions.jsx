@@ -30,6 +30,16 @@ const InterventionCard = ({ intervention, hasChildren = false }) => {
     ? { label: 'Néant', className: 'bg-gray-100 text-gray-500' }
     : (statusConfig[intervention.status] || statusConfig.scheduled);
 
+  // Carte kanban (entretien / SAV) sans enfants : le badge workflow fait foi.
+  // `status` reste 'scheduled' de la création à la clôture ('completed') → afficher
+  // « Planifié » sur une carte « À planifier » était faux ; on ne garde le badge
+  // technique que s'il porte une information propre (annulé, absent, en attente…).
+  const hasWorkflowBadge = !isChild && !hasChildren
+    && ['entretien', 'sav'].includes(intervention.intervention_type)
+    && !!intervention.workflow_status;
+  const showTechnicalStatus = !hasWorkflowBadge
+    || !['scheduled', 'completed'].includes(intervention.status);
+
   // Le certificat s'affiche uniquement sur les enfants (pas le parent qui a des enfants)
   const hasEntretien = intervention.intervention_type === 'entretien'
     || (intervention.intervention_type === 'sav' && intervention.includes_entretien);
@@ -90,11 +100,12 @@ const InterventionCard = ({ intervention, hasChildren = false }) => {
             ) : (
               <span className={`text-xs px-2 py-0.5 rounded-full ${typeConfig.bgClass}`}>{typeConfig.label}</span>
             )}
-            <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
+            {showTechnicalStatus && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.className}`}>{statusInfo.label}</span>
+            )}
             {isNeant && <Ban className="w-3 h-3 text-gray-400" />}
             {/* Badge workflow pour interventions sans enfants */}
-            {!isChild && !hasChildren && (intervention.intervention_type === 'entretien' || intervention.intervention_type === 'sav') &&
-              intervention.workflow_status && (() => {
+            {hasWorkflowBadge && (() => {
                 const wfConfig = getStatusConfig(intervention.intervention_type, intervention.workflow_status);
                 return wfConfig ? (
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: wfConfig.color }}>

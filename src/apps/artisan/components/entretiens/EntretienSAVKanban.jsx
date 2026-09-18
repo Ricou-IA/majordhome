@@ -42,7 +42,7 @@ export function EntretienSAVKanban() {
   const souplesseDefaut = construireReglages(orgSettings).souplesse_defaut_minutes;
 
   const { items, isLoading, refresh } = useEntretienSAV(orgId);
-  const { updateWorkflowStatus, updateFields } = useEntretienSAVMutations();
+  const { updateWorkflowStatus, unscheduleEntretien, updateFields } = useEntretienSAVMutations();
 
   // --- State ---
   const [selectedItem, setSelectedItem] = useState(null);
@@ -119,6 +119,23 @@ export function EntretienSAVKanban() {
     }
   }, [updateWorkflowStatus, refresh]);
 
+  // Planifié → À planifier = déplanifier : les RDV liés sont supprimés du planning
+  // avec la carte (sinon créneaux fantômes — vécu 2026-09-18). Même geste que le
+  // bouton « ← À planifier » de la modale (source unique savService.unscheduleEntretien).
+  const handleUnschedule = useCallback(async (item) => {
+    try {
+      const { deleted } = await unscheduleEntretien(item);
+      toast.success(
+        deleted > 0
+          ? `Carte remise à planifier · ${deleted} RDV supprimé${deleted > 1 ? 's' : ''} du planning`
+          : 'Carte remise à planifier',
+      );
+      refresh();
+    } catch {
+      // Toast d'erreur déjà émis par la mutation (useEntretienSAVMutations)
+    }
+  }, [unscheduleEntretien, refresh]);
+
   const handleDragEnd = useCallback((result) => {
     const { draggableId, source, destination } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
@@ -148,10 +165,12 @@ export function EntretienSAVKanban() {
       setPendingTransition({ item, oldStatus, newStatus, type: 'accept' });
     } else if (newStatus === 'planifie') {
       setPendingTransition({ item, oldStatus, newStatus, type: 'schedule' });
+    } else if (newStatus === 'a_planifier' && oldStatus === 'planifie') {
+      handleUnschedule(item);
     } else {
       handleDirectTransition(item, newStatus);
     }
-  }, [roleFilteredItems, handleDirectTransition]);
+  }, [roleFilteredItems, handleDirectTransition, handleUnschedule]);
 
   const handleCancelTransition = useCallback(() => {
     setPendingTransition(null);

@@ -14,7 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { withErrorHandling } from '@/lib/serviceHelpers';
+import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService } from './entretiens.service';
 import { logger } from '@lib/logger';
@@ -606,6 +606,64 @@ export const savService = {
     } catch (error) {
       console.error('[sav] scheduleEntretien error:', error);
       return { error };
+    }
+  },
+
+  /**
+   * Déplanifie une carte entretien/SAV (miroir de scheduleEntretien) : supprime
+   * chaque RDV actif qui lui est lié via `appointmentsService.deleteAppointment`
+   * (techniciens, Google Calendar, reflux de carte) puis remet
+   * `workflow_status='a_planifier'`. Source unique appelée par le kanban
+   * (drag Planifié → À planifier) ET la modale.
+   *
+   * Le reste de la trace est effacé en base par le trigger
+   * `trg_intervention_unschedule` (migration 20260918_1) sur la transition
+   * Planifié → À planifier : `scheduled_date` → NULL et suppression des enfants
+   * « certificat par équipement » vierges — côté DB parce que la policy DELETE
+   * d'interventions exige `clients.delete` (org_admin seul : un DELETE depuis le
+   * front serait un no-op silencieux pour un team_leader).
+   *
+   * Sans ça, la carte revenait en « À planifier » avec ses créneaux toujours
+   * inscrits au planning (tournée déplanifiée le 2026-09-18 : 3 RDV fantômes,
+   * et toute retouche de l'un d'eux aurait renvoyé la carte en « Planifié »).
+   *
+   * Un échec de suppression arrête net : les RDV déjà supprimés ont chacun
+   * recalculé la carte (elle reste « Planifié » tant qu'il en reste un), on ne
+   * laisse jamais un état à moitié déplanifié.
+   * @returns {{ deleted: number, error: any }}
+   */
+  async unscheduleEntretien({ card, coreOrgId }) {
+    try {
+      if (!card?.id || !coreOrgId) return { deleted: 0, error: { message: 'invalid_args' } };
+
+      const { appointmentsService } = await import('@services/appointments.service');
+      const orgId = await getMajordhomeOrgId(coreOrgId);
+
+      // Même périmètre que recomputeEntretienWorkflow (appointments.service) : tout
+      // RDV non annulé / non no_show maintient la carte en « Planifié ». En laisser
+      // un (même `completed`) ferait remonter la carte à la prochaine retouche.
+      const { data: rdvs, error: readError } = await supabase
+        .from('majordhome_appointments')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('intervention_id', card.id)
+        .not('status', 'in', '(cancelled,no_show)');
+      if (readError) return { deleted: 0, error: readError };
+
+      let deleted = 0;
+      for (const rdv of rdvs || []) {
+        const { error } = await appointmentsService.deleteAppointment(rdv.id);
+        if (error) return { deleted, error };
+        deleted += 1;
+      }
+
+      // Explicite même si le dernier deleteAppointment a déjà fait refluer la carte :
+      // couvre la carte « Planifié » sans RDV (legacy) — le trigger fait le reste.
+      const { error: statusError } = await savService.updateWorkflowStatus(card.id, 'a_planifier');
+      return { deleted, error: statusError || null };
+    } catch (error) {
+      logger.error('[sav] unscheduleEntretien error:', error);
+      return { deleted: 0, error };
     }
   },
 

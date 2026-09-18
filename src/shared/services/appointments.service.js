@@ -171,6 +171,8 @@ async function recomputeEntretienWorkflow(interventionId) {
     .eq('intervention_id', interventionId)
     .not('status', 'in', '(cancelled,no_show)');
   const nextStatus = count && count > 0 ? 'planifie' : 'a_planifier';
+  // Retour en « À planifier » : scheduled_date et enfants certificat vierges sont
+  // effacés en base par le trigger trg_intervention_unschedule (migration 20260918_1).
   const { error } = await supabase
     .from('majordhome_interventions')
     .update({ workflow_status: nextStatus, updated_at: new Date().toISOString() })
