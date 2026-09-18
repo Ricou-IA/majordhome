@@ -132,7 +132,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
       return;
     }
     try {
-      const result = await recordVisit({
+      await recordVisit({
         contractId: contract.id,
         orgId,
         year,
@@ -141,11 +141,6 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
         notes: visitForm.notes || null,
         userId,
       });
-      if (result?.error) {
-        console.error('[ContractVisits] recordVisit error:', result.error);
-        toast.error(result.error.message || "Erreur lors de l'enregistrement");
-        return;
-      }
       toast.success(`Visite ${year} enregistrée`);
       setEditingYear(null);
       setVisitForm({ date: '', notes: '', status: 'completed' });
@@ -154,8 +149,8 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
         queryClient.invalidateQueries({ queryKey: clientKeys.detail(contract.client_id) });
       }
     } catch (err) {
-      console.error('[ContractVisits] recordVisit exception:', err);
-      toast.error("Erreur lors de l'enregistrement");
+      console.error('[ContractVisits] recordVisit error:', err);
+      toast.error(err?.message || "Erreur lors de l'enregistrement");
     }
   };
 
@@ -412,29 +407,31 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
   }
 
   const handleSaveContract = async () => {
-    const result = await updateContract(contract.id, {
-      status: contractForm.status,
-      startDate: contractForm.startDate || null,
-      endDate: contractForm.endDate || null,
-      maintenanceMonth: contractForm.maintenanceMonth || null,
-      amount: contractForm.amount || null,
-      estimatedTime: contractForm.estimatedTime || null,
-      notes: contractForm.notes || null,
-    });
-    if (result?.error) {
-      toast.error('Erreur lors de la mise à jour');
-    } else {
+    try {
+      await updateContract(contract.id, {
+        status: contractForm.status,
+        startDate: contractForm.startDate || null,
+        endDate: contractForm.endDate || null,
+        maintenanceMonth: contractForm.maintenanceMonth || null,
+        amount: contractForm.amount || null,
+        estimatedTime: contractForm.estimatedTime || null,
+        notes: contractForm.notes || null,
+      });
       toast.success('Contrat mis à jour');
       setIsEditing(false);
+    } catch (err) {
+      console.error('[TabContrat] updateContract error:', err);
+      toast.error('Erreur lors de la mise à jour');
     }
   };
 
   const handleDeleteContract = async () => {
-    const result = await deleteContract(contract.id);
-    if (result?.error) {
-      toast.error('Erreur lors de la suppression');
-    } else {
+    try {
+      await deleteContract(contract.id);
       toast.success('Contrat supprimé');
+    } catch (err) {
+      console.error('[TabContrat] deleteContract error:', err);
+      toast.error('Erreur lors de la suppression');
     }
     setShowDeleteConfirm(false);
   };
@@ -660,12 +657,13 @@ export const TabContrat = ({ clientId, orgId, userId, client }) => {
             toast.error('Veuillez sélectionner une raison de clôture');
             return;
           }
-          const result = await closeContract(contract.id, reason);
-          if (result?.error) {
-            toast.error('Erreur lors de la clôture');
-          } else {
+          try {
+            await closeContract(contract.id, reason);
             toast.success('Contrat clos');
             setShowCloseModal(false);
+          } catch (err) {
+            console.error('[TabContrat] closeContract error:', err);
+            toast.error('Erreur lors de la clôture');
           }
         }}
         loading={isClosing}

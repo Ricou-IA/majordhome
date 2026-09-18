@@ -3,6 +3,7 @@
  * ============================================================================
  * Hooks React pour la gestion des contrats d'entretien.
  *
+ * v2.2.0 - Contrat unique des mutations : mutateAsync REJETTE sur refus (unwrapResult)
  * v2.1.0 - P0.11 : propagation orgId dans toutes les cache keys
  * v2.0.0 - Refonte : table majordhome.contracts (remplace pending_contracts)
  * ============================================================================
@@ -15,6 +16,7 @@ import { contractsService } from '@services/contracts.service';
 import { savService } from '@services/sav.service';
 import { entretiensService } from '@services/entretiens.service';
 import { clientsService } from '@services/clients.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { contractKeys, clientKeys, interventionKeys, entretienSavKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -46,8 +48,10 @@ export function useClientContract(clientId) {
     staleTime: 30_000,
   });
 
+  // Contrat unique : `mutateAsync` résout avec la donnée et REJETTE sur refus
+  // (unwrapResult) — l'appelant fait try/catch + toast, jamais de lecture de { error }.
   const createMutation = useMutation({
-    mutationFn: (contractData) => contractsService.createContract({ ...contractData, clientId }),
+    mutationFn: (contractData) => unwrapResult(contractsService.createContract({ ...contractData, clientId })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
@@ -56,7 +60,7 @@ export function useClientContract(clientId) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ contractId: cId, updates }) => contractsService.updateContract(cId, updates),
+    mutationFn: ({ contractId: cId, updates }) => unwrapResult(contractsService.updateContract(cId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
@@ -65,7 +69,7 @@ export function useClientContract(clientId) {
   });
 
   const closeMutation = useMutation({
-    mutationFn: ({ contractId: cId, reason }) => contractsService.closeContract(cId, reason),
+    mutationFn: ({ contractId: cId, reason }) => unwrapResult(contractsService.closeContract(cId, reason)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
@@ -75,7 +79,7 @@ export function useClientContract(clientId) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (contractId) => contractsService.deleteContract(contractId),
+    mutationFn: (contractId) => unwrapResult(contractsService.deleteContract(contractId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.byClient(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
@@ -83,51 +87,13 @@ export function useClientContract(clientId) {
     },
   });
 
-  const createContract = useCallback(
-    async (data) => {
-      try {
-        const result = await createMutation.mutateAsync(data);
-        return result;
-      } catch (err) {
-        return { data: null, error: err };
-      }
-    },
-    [createMutation]
-  );
-
   const updateContract = useCallback(
-    async (contractId, updates) => {
-      try {
-        const result = await updateMutation.mutateAsync({ contractId, updates });
-        return result;
-      } catch (err) {
-        return { data: null, error: err };
-      }
-    },
+    (contractId, updates) => updateMutation.mutateAsync({ contractId, updates }),
     [updateMutation]
   );
 
-  const deleteContract = useCallback(
-    async (contractId) => {
-      try {
-        const result = await deleteMutation.mutateAsync(contractId);
-        return result;
-      } catch (err) {
-        return { success: false, error: err };
-      }
-    },
-    [deleteMutation]
-  );
-
   const closeContract = useCallback(
-    async (contractId, reason) => {
-      try {
-        const result = await closeMutation.mutateAsync({ contractId, reason });
-        return result;
-      } catch (err) {
-        return { data: null, error: err };
-      }
-    },
+    (contractId, reason) => closeMutation.mutateAsync({ contractId, reason }),
     [closeMutation]
   );
 
@@ -135,13 +101,13 @@ export function useClientContract(clientId) {
     contract,
     isLoading,
     error,
-    createContract,
+    createContract: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     updateContract,
     isUpdating: updateMutation.isPending,
     closeContract,
     isClosing: closeMutation.isPending,
-    deleteContract,
+    deleteContract: deleteMutation.mutateAsync,
     isDeleting: deleteMutation.isPending,
     refresh: refetch,
   };
@@ -173,14 +139,14 @@ export function useContractEquipments(contractId) {
   });
 
   const addMutation = useMutation({
-    mutationFn: (equipmentId) => contractsService.addEquipmentToContract(contractId, equipmentId),
+    mutationFn: (equipmentId) => unwrapResult(contractsService.addEquipmentToContract(contractId, equipmentId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.equipments(orgId, contractId) });
     },
   });
 
   const removeMutation = useMutation({
-    mutationFn: (equipmentId) => contractsService.removeEquipmentFromContract(contractId, equipmentId),
+    mutationFn: (equipmentId) => unwrapResult(contractsService.removeEquipmentFromContract(contractId, equipmentId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.equipments(orgId, contractId) });
     },
@@ -403,7 +369,7 @@ export function useContractMutations() {
   const orgId = organization?.id;
 
   const updateMutation = useMutation({
-    mutationFn: ({ contractId, updates }) => entretiensService.updateContract(contractId, updates),
+    mutationFn: ({ contractId, updates }) => unwrapResult(entretiensService.updateContract(contractId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
@@ -411,7 +377,7 @@ export function useContractMutations() {
   });
 
   const recordVisitMutation = useMutation({
-    mutationFn: (params) => entretiensService.recordVisit(params),
+    mutationFn: (params) => unwrapResult(entretiensService.recordVisit(params)),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', variables.contractId] });
       queryClient.invalidateQueries({ queryKey: contractKeys.detail(orgId, variables.contractId) });
@@ -425,7 +391,7 @@ export function useContractMutations() {
   });
 
   const updateVisitMutation = useMutation({
-    mutationFn: ({ visitId, status, notes }) => entretiensService.updateVisitStatus(visitId, status, notes),
+    mutationFn: ({ visitId, status, notes }) => unwrapResult(entretiensService.updateVisitStatus(visitId, status, notes)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     },
@@ -433,15 +399,12 @@ export function useContractMutations() {
 
   return {
     updateContract: useCallback(
-      async (contractId, updates) => updateMutation.mutateAsync({ contractId, updates }),
+      (contractId, updates) => updateMutation.mutateAsync({ contractId, updates }),
       [updateMutation]
     ),
-    recordVisit: useCallback(
-      async (params) => recordVisitMutation.mutateAsync(params),
-      [recordVisitMutation]
-    ),
+    recordVisit: recordVisitMutation.mutateAsync,
     updateVisitStatus: useCallback(
-      async (visitId, status, notes) => updateVisitMutation.mutateAsync({ visitId, status, notes }),
+      (visitId, status, notes) => updateVisitMutation.mutateAsync({ visitId, status, notes }),
       [updateVisitMutation]
     ),
     isUpdating: updateMutation.isPending,
@@ -548,21 +511,10 @@ export function useCreateContractWithClient() {
     },
   });
 
-  const createContractWithClient = useCallback(
-    async (params) => {
-      try {
-        const result = await mutation.mutateAsync(params);
-        return { data: result, error: null };
-      } catch (err) {
-        console.error('[useCreateContractWithClient] error:', err);
-        return { data: null, error: err };
-      }
-    },
-    [mutation]
-  );
-
+  // La mutationFn throw déjà à chaque étape : on expose mutateAsync tel quel
+  // (résout avec { client, contract }, rejette sinon) — même contrat que le reste du fichier.
   return {
-    createContractWithClient,
+    createContractWithClient: mutation.mutateAsync,
     isCreating: mutation.isPending,
     error: mutation.error,
   };

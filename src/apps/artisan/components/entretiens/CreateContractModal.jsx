@@ -257,10 +257,13 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       params.newClientData = { ...newClientData };
     }
 
-    const result = await createContractWithClient(params);
-
-    if (result.error) {
-      const msg = result.error.message || 'Erreur lors de la création';
+    // Rejette si le client ou le contrat n'a pas pu être créé (contrat unique des hooks)
+    let result;
+    try {
+      result = await createContractWithClient(params);
+    } catch (err) {
+      console.error('[CreateContractModal] createContractWithClient error:', err);
+      const msg = err?.message || 'Erreur lors de la création';
       if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('23505')) {
         toast.error('Ce client possède déjà un contrat actif');
       } else {
@@ -270,8 +273,8 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
     }
 
     // Sauvegarder les lignes tarifaires
-    const contractId = result.data?.contract?.id;
-    const resolvedClientId = result.data?.client || result.data?.contract?.client_id;
+    const contractId = result?.contract?.id;
+    const resolvedClientId = result?.client || result?.contract?.client_id;
 
     if (contractId && calculator.hasItems) {
       const itemsToSave = calculator.getItemsForSave();
