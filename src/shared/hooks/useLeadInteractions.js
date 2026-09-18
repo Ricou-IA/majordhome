@@ -5,12 +5,16 @@
  * des projets long-terme.
  *
  * @version 1.0.0
+ * @version 1.1.0 - Contrat unique des mutations : mutateAsync résout avec la
+ *   donnée et REJETTE sur refus (unwrapResult) — l'appelant fait try/catch +
+ *   toast, jamais de lecture de { error }.
  * ============================================================================
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadInteractionsService } from '@services/leadInteractions.service';
 import { leadsService } from '@services/leads.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { leadInteractionKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -60,23 +64,24 @@ export function useLeadInteractionMutations() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (input) => leadInteractionsService.create(input),
+    mutationFn: (input) => unwrapResult(leadInteractionsService.create(input)),
     onSuccess: (_, variables) => invalidateForLead(variables.leadId),
   });
 
+  // `leadId` voyage dans les variables (2ᵉ argument d'onSuccess) — plus besoin
+  // de le recoller sur le résultat du service.
   const updateMutation = useMutation({
-    mutationFn: ({ interactionId, updates, leadId }) =>
-      leadInteractionsService.update(interactionId, updates).then((res) => ({ ...res, leadId })),
-    onSuccess: (result) => {
-      if (result?.leadId) invalidateForLead(result.leadId);
+    mutationFn: ({ interactionId, updates }) =>
+      unwrapResult(leadInteractionsService.update(interactionId, updates)),
+    onSuccess: (_, { leadId }) => {
+      if (leadId) invalidateForLead(leadId);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: ({ interactionId, leadId }) =>
-      leadInteractionsService.delete(interactionId).then((res) => ({ ...res, leadId })),
-    onSuccess: (result) => {
-      if (result?.leadId) invalidateForLead(result.leadId);
+    mutationFn: ({ interactionId }) => unwrapResult(leadInteractionsService.delete(interactionId)),
+    onSuccess: (_, { leadId }) => {
+      if (leadId) invalidateForLead(leadId);
     },
   });
 
@@ -147,12 +152,12 @@ export function useLongTermMutations() {
   };
 
   const moveMutation = useMutation({
-    mutationFn: ({ leadId, notes }) => leadsService.moveToLongTerm(leadId, notes),
+    mutationFn: ({ leadId, notes }) => unwrapResult(leadsService.moveToLongTerm(leadId, notes)),
     onSuccess: invalidate,
   });
 
   const reactivateMutation = useMutation({
-    mutationFn: ({ leadId }) => leadsService.reactivateFromLongTerm(leadId),
+    mutationFn: ({ leadId }) => unwrapResult(leadsService.reactivateFromLongTerm(leadId)),
     onSuccess: invalidate,
   });
 
