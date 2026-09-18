@@ -537,20 +537,15 @@ export default function Planning() {
       const end = event.end || new Date(start.getTime() + 60 * 60000);
       const pad = (n) => String(n).padStart(2, '0');
 
-      const result = await moveAppointment(appointmentId, {
+      await moveAppointment(appointmentId, {
         scheduled_date: start.toISOString().split('T')[0],
         scheduled_start: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
         scheduled_end: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
         duration_minutes: Math.round((end - start) / 60000),
       });
-
-      if (result?.error) {
-        dropInfo.revert();
-        toast.error('Erreur lors du déplacement');
-      } else {
-        toast.success('RDV déplacé');
-      }
-    } catch {
+      toast.success('RDV déplacé');
+    } catch (err) {
+      console.error('[Planning] moveAppointment error:', err);
       dropInfo.revert();
       toast.error('Erreur lors du déplacement');
     }
@@ -566,18 +561,14 @@ export default function Planning() {
       const end = event.end;
       const pad = (n) => String(n).padStart(2, '0');
 
-      const result = await moveAppointment(appointmentId, {
+      await moveAppointment(appointmentId, {
         scheduled_date: start.toISOString().split('T')[0],
         scheduled_start: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
         scheduled_end: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
         duration_minutes: Math.round((end - start) / 60000),
       });
-
-      if (result?.error) {
-        resizeInfo.revert();
-        toast.error('Erreur lors du redimensionnement');
-      }
-    } catch {
+    } catch (err) {
+      console.error('[Planning] resize error:', err);
       resizeInfo.revert();
       toast.error('Erreur lors du redimensionnement');
     }
@@ -592,26 +583,20 @@ export default function Planning() {
   }, []);
 
   const handleModalSave = useCallback(async (formData) => {
+    const isCreate = modalState.mode === 'create';
     try {
-      if (modalState.mode === 'create') {
-        const result = await createAppointment(formData);
-        if (result?.error) {
-          toast.error('Erreur lors de la création du RDV');
-          return false;
-        }
+      if (isCreate) {
+        await createAppointment(formData);
         toast.success('RDV créé avec succès');
       } else {
-        const result = await updateAppointment(modalState.appointment.id, formData);
-        if (result?.error) {
-          toast.error('Erreur lors de la modification du RDV');
-          return false;
-        }
+        await updateAppointment(modalState.appointment.id, formData);
         toast.success('RDV modifié avec succès');
       }
       handleModalClose();
       return true;
-    } catch {
-      toast.error('Une erreur est survenue');
+    } catch (err) {
+      console.error('[Planning] save appointment error:', err);
+      toast.error(isCreate ? 'Erreur lors de la création du RDV' : 'Erreur lors de la modification du RDV');
       return false;
     }
   }, [modalState, createAppointment, updateAppointment, handleModalClose]);
@@ -619,14 +604,11 @@ export default function Planning() {
   const handleModalDelete = useCallback(async () => {
     if (!modalState.appointment?.id) return;
     try {
-      const result = await deleteAppointment(modalState.appointment.id);
-      if (result?.error) {
-        toast.error('Erreur lors de la suppression');
-        return;
-      }
+      await deleteAppointment(modalState.appointment.id);
       toast.success('RDV supprimé');
       handleModalClose();
-    } catch {
+    } catch (err) {
+      console.error('[Planning] deleteAppointment error:', err);
       toast.error('Erreur lors de la suppression');
     }
   }, [modalState, deleteAppointment, handleModalClose]);
@@ -634,14 +616,11 @@ export default function Planning() {
   const handleModalCancel = useCallback(async (reason) => {
     if (!modalState.appointment?.id) return;
     try {
-      const result = await cancelAppointment(modalState.appointment.id, reason);
-      if (result?.error) {
-        toast.error('Erreur lors de l\'annulation');
-        return;
-      }
+      await cancelAppointment(modalState.appointment.id, reason);
       toast.success('RDV annulé');
       handleModalClose();
-    } catch {
+    } catch (err) {
+      console.error('[Planning] cancelAppointment error:', err);
       toast.error('Erreur lors de l\'annulation');
     }
   }, [modalState, cancelAppointment, handleModalClose]);

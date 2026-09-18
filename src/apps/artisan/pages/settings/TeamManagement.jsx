@@ -584,8 +584,9 @@ export default function TeamManagement() {
           PLANNING_COLORS[used.size % PLANNING_COLORS.length];
         used.add(color);
 
-        const { error } = await ensureTeamMember({ userId: m.user_id, color });
-        if (error) {
+        try {
+          await ensureTeamMember({ userId: m.user_id, color });
+        } catch (error) {
           logger.error('[TeamManagement] ensureTeamMember failed', m.user_id, error);
           toast.error(
             `Ressource planning non créée pour ${m.profile?.full_name || 'ce membre'}`
@@ -673,14 +674,11 @@ export default function TeamManagement() {
   const handleColorChange = async (teamMemberId, color) => {
     setSavingColorId(teamMemberId);
     try {
-      const result = await setColor({ teamMemberId, color });
-      if (result?.error) {
-        toast.error('Erreur lors du changement de couleur');
-      } else {
-        toast.success('Couleur mise à jour');
-      }
-    } catch {
-      toast.error('Erreur inattendue');
+      await setColor({ teamMemberId, color });
+      toast.success('Couleur mise à jour');
+    } catch (err) {
+      logger.error('[TeamManagement] setColor failed', err);
+      toast.error('Erreur lors du changement de couleur');
     } finally {
       setSavingColorId(null);
     }
@@ -695,14 +693,10 @@ export default function TeamManagement() {
   const handleDailyBudgetChange = async (teamMemberId, minutes) => {
     setSavingRoutingId(teamMemberId);
     try {
-      const result = await setRoutingSettings({ teamMemberId, dailyWorkMinutes: minutes });
-      if (result?.error) {
-        toast.error(routingSettingsErrorMessage(result.error, "Erreur lors de l'enregistrement du budget journalier"));
-      } else {
-        toast.success('Budget journalier mis à jour');
-      }
+      await setRoutingSettings({ teamMemberId, dailyWorkMinutes: minutes });
+      toast.success('Budget journalier mis à jour');
     } catch (err) {
-      toast.error(routingSettingsErrorMessage(err, 'Erreur inattendue'));
+      toast.error(routingSettingsErrorMessage(err, "Erreur lors de l'enregistrement du budget journalier"));
     } finally {
       setSavingRoutingId(null);
     }
@@ -715,14 +709,10 @@ export default function TeamManagement() {
   const handleIncludeInRoutingChange = async (teamMemberId, include) => {
     setSavingRoutingId(teamMemberId);
     try {
-      const result = await setRoutingSettings({ teamMemberId, includeInRouting: include });
-      if (result?.error) {
-        toast.error(routingSettingsErrorMessage(result.error, "Erreur lors de la mise à jour de l'inclusion dans les tournées"));
-      } else {
-        toast.success(include ? 'Membre inclus dans les tournées' : 'Membre exclu des tournées');
-      }
+      await setRoutingSettings({ teamMemberId, includeInRouting: include });
+      toast.success(include ? 'Membre inclus dans les tournées' : 'Membre exclu des tournées');
     } catch (err) {
-      toast.error(routingSettingsErrorMessage(err, 'Erreur inattendue'));
+      toast.error(routingSettingsErrorMessage(err, "Erreur lors de la mise à jour de l'inclusion dans les tournées"));
     } finally {
       setSavingRoutingId(null);
     }

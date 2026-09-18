@@ -4,6 +4,9 @@
  * Hooks React Query pour la gestion du planning et des rendez-vous.
  *
  * @version 1.0.0 - Sprint 2 Planning
+ * @version 1.1.0 - Contrat unique des mutations : mutateAsync résout avec la
+ *   donnée et REJETTE sur refus (unwrapResult) — l'appelant fait try/catch +
+ *   toast, jamais de lecture de { error }.
  * ============================================================================
  */
 
@@ -12,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { appointmentsService } from '@services/appointments.service';
 import { auditService } from '@services/audit.service';
 import { supabase } from '@/lib/supabaseClient';
-import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
+import { getMajordhomeOrgId, unwrapResult } from '@/lib/serviceHelpers';
 import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -162,7 +165,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
-    mutationFn: (data) => appointmentsService.createAppointment({ coreOrgId: orgId, ...data }),
+    mutationFn: (data) => unwrapResult(appointmentsService.createAppointment({ coreOrgId: orgId, ...data })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
     },
@@ -171,17 +174,18 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   // Mutation : mettre à jour un RDV
   const updateMutation = useMutation({
     mutationFn: ({ appointmentId, updates }) =>
-      appointmentsService.updateAppointment(appointmentId, updates),
+      unwrapResult(appointmentsService.updateAppointment(appointmentId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
 
-  // Mutation : déplacer un RDV (drag & drop)
+  // Mutation : déplacer un RDV (drag & drop) — le rejet sur refus déclenche le
+  // rollback optimiste d'onError (mort tant que la mutation résolvait sur { error })
   const moveMutation = useMutation({
     mutationFn: ({ appointmentId, ...moveData }) =>
-      appointmentsService.moveAppointment(appointmentId, moveData),
+      unwrapResult(appointmentsService.moveAppointment(appointmentId, moveData)),
     // Optimistic update pour le drag & drop
     onMutate: async ({ appointmentId, scheduled_date, scheduled_start, scheduled_end }) => {
       await queryClient.cancelQueries({ queryKey: appointmentKeys.lists(orgId) });
@@ -220,7 +224,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   // Mutation : annuler un RDV
   const cancelMutation = useMutation({
     mutationFn: ({ appointmentId, reason }) =>
-      appointmentsService.cancelAppointment(appointmentId, reason),
+      unwrapResult(appointmentsService.cancelAppointment(appointmentId, reason)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
     },
@@ -228,52 +232,27 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
 
   // Mutation : supprimer un RDV
   const deleteMutation = useMutation({
-    mutationFn: (appointmentId) => appointmentsService.deleteAppointment(appointmentId),
+    mutationFn: (appointmentId) => unwrapResult(appointmentsService.deleteAppointment(appointmentId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
 
-  // Helpers
-  const createAppointment = useCallback(
-    async (data) => {
-      const result = await createMutation.mutateAsync(data);
-      return result;
-    },
-    [createMutation]
-  );
-
+  // Mappage d'arguments (aucun try/catch : le rejet remonte à l'appelant)
   const updateAppointment = useCallback(
-    async (appointmentId, updates) => {
-      const result = await updateMutation.mutateAsync({ appointmentId, updates });
-      return result;
-    },
+    (appointmentId, updates) => updateMutation.mutateAsync({ appointmentId, updates }),
     [updateMutation]
   );
 
   const moveAppointment = useCallback(
-    async (appointmentId, moveData) => {
-      const result = await moveMutation.mutateAsync({ appointmentId, ...moveData });
-      return result;
-    },
+    (appointmentId, moveData) => moveMutation.mutateAsync({ appointmentId, ...moveData }),
     [moveMutation]
   );
 
   const cancelAppointment = useCallback(
-    async (appointmentId, reason) => {
-      const result = await cancelMutation.mutateAsync({ appointmentId, reason });
-      return result;
-    },
+    (appointmentId, reason) => cancelMutation.mutateAsync({ appointmentId, reason }),
     [cancelMutation]
-  );
-
-  const deleteAppointment = useCallback(
-    async (appointmentId) => {
-      const result = await deleteMutation.mutateAsync(appointmentId);
-      return result;
-    },
-    [deleteMutation]
   );
 
   return {
@@ -289,11 +268,11 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     teamList,
 
     // Mutations
-    createAppointment,
+    createAppointment: createMutation.mutateAsync,
     updateAppointment,
     moveAppointment,
     cancelAppointment,
-    deleteAppointment,
+    deleteAppointment: deleteMutation.mutateAsync,
 
     // États mutations
     isCreating: createMutation.isPending,
@@ -401,7 +380,7 @@ export function useSetTeamMemberColor(orgId) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: ({ teamMemberId, color }) =>
-      appointmentsService.setTeamMemberColor(teamMemberId, color),
+      unwrapResult(appointmentsService.setTeamMemberColor(teamMemberId, color)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.teamMembers(orgId) });
     },
@@ -421,8 +400,9 @@ export function useSetTeamMemberColor(orgId) {
  *
  * La RPC retourne la ligne post-écriture : on l'utilise pour patcher directement
  * le cache `teamMembers` (au lieu de juste invalider/refetch) — le succès n'est
- * jamais supposé, seulement lu depuis `error`, et le cache reflète la valeur
- * réellement écrite en base, pas une valeur optimiste.
+ * jamais supposé (`onSuccess` ne tourne que si le service n'a pas renvoyé
+ * d'erreur), et le cache reflète la valeur réellement écrite en base, pas une
+ * valeur optimiste.
  */
 export function useSetTeamMemberRouting(orgId) {
   const queryClient = useQueryClient();
@@ -430,11 +410,8 @@ export function useSetTeamMemberRouting(orgId) {
 
   const mutation = useMutation({
     mutationFn: ({ teamMemberId, dailyWorkMinutes, includeInRouting }) =>
-      appointmentsService.setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting }),
-    onSuccess: (result, variables) => {
-      if (result?.error) return; // échec logique (ex. hors bornes) — rien à rafraîchir, le caller gère le toast
-
-      const row = result?.data;
+      unwrapResult(appointmentsService.setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting })),
+    onSuccess: (row, variables) => {
       if (!row) {
         // Filet : pas de ligne retournée alors qu'il n'y a pas d'erreur (ne devrait pas arriver)
         queryClient.invalidateQueries({ queryKey: teamMembersKey });
@@ -474,7 +451,7 @@ export function useEnsureTeamMember(orgId) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: ({ userId, color }) =>
-      appointmentsService.ensureTeamMemberForUser({ coreOrgId: orgId, userId, color }),
+      unwrapResult(appointmentsService.ensureTeamMemberForUser({ coreOrgId: orgId, userId, color })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.teamMembers(orgId) });
     },
