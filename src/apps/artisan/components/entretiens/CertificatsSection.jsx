@@ -92,18 +92,21 @@ export function CertificatsSection({ item, onCloseModal }) {
           .catch((err) => console.warn('[CertificatsSection] backfill contract_id:', err));
       }
       refetch();
+    }).catch(() => {
+      // Toast d'erreur déjà émis par le hook (onError) ; pas de nouvelle tentative
+      // automatique — l'utilisateur rouvre la modale pour relancer.
     });
   }, [childrenLoading, equipmentsLoading, children.length, equipments, item, contractId, createChildren, refetch]);
 
-  // --- Handlers ---
+  // --- Handlers (toasts d'erreur émis par le hook) ---
   const handleMarkNeant = useCallback(async (childId) => {
     setMutatingId(childId);
-    try { await markNeant(childId, item.id); } finally { setMutatingId(null); }
+    try { await markNeant(childId, item.id); } catch { /* toast émis par le hook */ } finally { setMutatingId(null); }
   }, [markNeant, item?.id]);
 
   const handleUnmarkNeant = useCallback(async (childId) => {
     setMutatingId(childId);
-    try { await unmarkNeant(childId, item.id); } finally { setMutatingId(null); }
+    try { await unmarkNeant(childId, item.id); } catch { /* toast émis par le hook */ } finally { setMutatingId(null); }
   }, [unmarkNeant, item?.id]);
 
   // --- Derived ---
