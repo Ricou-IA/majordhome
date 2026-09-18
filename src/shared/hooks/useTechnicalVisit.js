@@ -3,12 +3,17 @@
  * ============================================================================
  * Hook React Query pour la Fiche Technique Terrain.
  * Pattern identique à useLeads.js / useChantiers.js
+ *
+ * Contrat unique des mutations : `mutateAsync` résout avec la donnée et REJETTE
+ * sur refus (unwrapResult, dans la mutationFn — pas dans un wrapper, sinon
+ * onSuccess / isError de la mutation ne reflètent pas le refus).
  * ============================================================================
  */
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { technicalVisitService } from '@services/technicalVisit.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { technicalVisitKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -94,70 +99,57 @@ export function useTechnicalVisitMutations() {
 
   // CREATE
   const createMutation = useMutation({
-    mutationFn: (payload) => technicalVisitService.create(payload),
+    mutationFn: (payload) => unwrapResult(technicalVisitService.create(payload)),
     onSuccess: () => invalidateAll(),
   });
 
-  const createVisit = useCallback(async (payload) => {
-    const result = await createMutation.mutateAsync(payload);
-    if (result.error) throw result.error;
-    return result.data;
-  }, [createMutation]);
-
   // UPDATE
   const updateMutation = useMutation({
-    mutationFn: ({ visitId, updates }) => technicalVisitService.update(visitId, updates),
+    mutationFn: ({ visitId, updates }) => unwrapResult(technicalVisitService.update(visitId, updates)),
+    onSuccess: (_visit, { leadId }) => {
+      if (leadId) invalidateDetail(leadId);
+    },
   });
 
-  const updateVisit = useCallback(async (visitId, updates, leadId) => {
-    const result = await updateMutation.mutateAsync({ visitId, updates });
-    if (result.error) throw result.error;
-    if (leadId) invalidateDetail(leadId);
-    return result.data;
-  }, [updateMutation, invalidateDetail]);
+  const updateVisit = useCallback(
+    (visitId, updates, leadId) => updateMutation.mutateAsync({ visitId, updates, leadId }),
+    [updateMutation]
+  );
 
   // AUTO-SAVE (pas d'invalidation automatique — on update le cache manuellement)
   const autoSaveMutation = useMutation({
     mutationFn: ({ visitId, field, value }) =>
-      technicalVisitService.autoSaveField(visitId, field, value),
-  });
-
-  const autoSave = useCallback(async (visitId, field, value, leadId) => {
-    const result = await autoSaveMutation.mutateAsync({ visitId, field, value });
-    if (result.error) throw result.error;
-    // Mettre à jour le cache optimistiquement
-    if (leadId) {
+      unwrapResult(technicalVisitService.autoSaveField(visitId, field, value)),
+    onSuccess: (_visit, { field, value, leadId }) => {
+      if (!leadId) return;
       queryClient.setQueryData(technicalVisitKeys.byLead(orgId, leadId), (old) => {
         if (!old?.data) return old;
         return { ...old, data: { ...old.data, [field]: value } };
       });
-    }
-    return result.data;
-  }, [autoSaveMutation, queryClient, orgId]);
+    },
+  });
+
+  const autoSave = useCallback(
+    (visitId, field, value, leadId) => autoSaveMutation.mutateAsync({ visitId, field, value, leadId }),
+    [autoSaveMutation]
+  );
 
   // LOCK
   const lockMutation = useMutation({
-    mutationFn: ({ visitId, userId }) => technicalVisitService.lock(visitId, userId),
+    mutationFn: ({ visitId, userId }) => unwrapResult(technicalVisitService.lock(visitId, userId)),
     onSuccess: () => invalidateAll(),
   });
 
-  const lockVisit = useCallback(async (visitId, userId) => {
-    const result = await lockMutation.mutateAsync({ visitId, userId });
-    if (result.error) throw result.error;
-    return result.data;
-  }, [lockMutation]);
+  const lockVisit = useCallback(
+    (visitId, userId) => lockMutation.mutateAsync({ visitId, userId }),
+    [lockMutation]
+  );
 
   // UNLOCK
   const unlockMutation = useMutation({
-    mutationFn: (visitId) => technicalVisitService.unlock(visitId),
+    mutationFn: (visitId) => unwrapResult(technicalVisitService.unlock(visitId)),
     onSuccess: () => invalidateAll(),
   });
-
-  const unlockVisit = useCallback(async (visitId) => {
-    const result = await unlockMutation.mutateAsync(visitId);
-    if (result.error) throw result.error;
-    return result.data;
-  }, [unlockMutation]);
 
   // UPLOAD PHOTO
   const uploadPhotoMutation = useMutation({
@@ -189,21 +181,21 @@ export function useTechnicalVisitMutations() {
   // DELETE PHOTO
   const deletePhotoMutation = useMutation({
     mutationFn: ({ photoId, storagePath }) =>
-      technicalVisitService.deletePhoto(photoId, storagePath),
+      unwrapResult(technicalVisitService.deletePhoto(photoId, storagePath)),
+    onSuccess: (_r, { visitId }) => invalidatePhotos(visitId),
   });
 
-  const deletePhoto = useCallback(async (photoId, storagePath, visitId) => {
-    const result = await deletePhotoMutation.mutateAsync({ photoId, storagePath });
-    if (result.error) throw result.error;
-    invalidatePhotos(visitId);
-  }, [deletePhotoMutation, invalidatePhotos]);
+  const deletePhoto = useCallback(
+    (photoId, storagePath, visitId) => deletePhotoMutation.mutateAsync({ photoId, storagePath, visitId }),
+    [deletePhotoMutation]
+  );
 
   return {
-    createVisit,
+    createVisit: createMutation.mutateAsync,
     updateVisit,
     autoSave,
     lockVisit,
-    unlockVisit,
+    unlockVisit: unlockMutation.mutateAsync,
     uploadPhoto,
     deletePhoto,
     isCreating: createMutation.isPending,
