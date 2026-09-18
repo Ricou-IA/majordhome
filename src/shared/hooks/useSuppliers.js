@@ -2,12 +2,17 @@
  * useSuppliers.js - Majord'home Artisan
  * ============================================================================
  * Hooks React Query pour la gestion des fournisseurs et catalogue produits.
+ *
+ * Contrat unique des mutations : `mutateAsync` résout avec la donnée et REJETTE
+ * sur refus (unwrapResult) — l'appelant fait try/catch + toast, jamais de
+ * lecture de { error }.
  * ============================================================================
  */
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { suppliersService } from '@services/suppliers.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { supplierKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -66,14 +71,14 @@ export function useSupplierMutations(orgId) {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: (data) => suppliersService.createSupplier({ orgId, ...data }),
+    mutationFn: (data) => unwrapResult(suppliersService.createSupplier({ orgId, ...data })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: supplierKeys.list(orgId) });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ supplierId, updates }) => suppliersService.updateSupplier(supplierId, updates),
+    mutationFn: ({ supplierId, updates }) => unwrapResult(suppliersService.updateSupplier(supplierId, updates)),
     onSuccess: (_, { supplierId }) => {
       queryClient.invalidateQueries({ queryKey: supplierKeys.list(orgId) });
       queryClient.invalidateQueries({ queryKey: supplierKeys.detail(orgId, supplierId) });
@@ -81,20 +86,18 @@ export function useSupplierMutations(orgId) {
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (supplierId) => suppliersService.deactivateSupplier(supplierId),
+    mutationFn: (supplierId) => unwrapResult(suppliersService.deactivateSupplier(supplierId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: supplierKeys.list(orgId) });
     },
   });
 
-  const createSupplier = useCallback(async (data) => createMutation.mutateAsync(data), [createMutation]);
-  const updateSupplier = useCallback(async (supplierId, updates) => updateMutation.mutateAsync({ supplierId, updates }), [updateMutation]);
-  const deactivateSupplier = useCallback(async (supplierId) => deactivateMutation.mutateAsync(supplierId), [deactivateMutation]);
+  const updateSupplier = useCallback((supplierId, updates) => updateMutation.mutateAsync({ supplierId, updates }), [updateMutation]);
 
   return {
-    createSupplier,
+    createSupplier: createMutation.mutateAsync,
     updateSupplier,
-    deactivateSupplier,
+    deactivateSupplier: deactivateMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeactivating: deactivateMutation.isPending,
@@ -214,28 +217,26 @@ export function useProductMutations(orgId, supplierId) {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data) => suppliersService.createProduct({ supplierId, orgId, ...data }),
+    mutationFn: (data) => unwrapResult(suppliersService.createProduct({ supplierId, orgId, ...data })),
     onSuccess: invalidateAll,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ productId, updates }) => suppliersService.updateProduct(productId, updates),
+    mutationFn: ({ productId, updates }) => unwrapResult(suppliersService.updateProduct(productId, updates)),
     onSuccess: invalidateAll,
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (productId) => suppliersService.deactivateProduct(productId),
+    mutationFn: (productId) => unwrapResult(suppliersService.deactivateProduct(productId)),
     onSuccess: invalidateAll,
   });
 
-  const createProduct = useCallback(async (data) => createMutation.mutateAsync(data), [createMutation]);
-  const updateProduct = useCallback(async (productId, updates) => updateMutation.mutateAsync({ productId, updates }), [updateMutation]);
-  const deactivateProduct = useCallback(async (productId) => deactivateMutation.mutateAsync(productId), [deactivateMutation]);
+  const updateProduct = useCallback((productId, updates) => updateMutation.mutateAsync({ productId, updates }), [updateMutation]);
 
   return {
-    createProduct,
+    createProduct: createMutation.mutateAsync,
     updateProduct,
-    deactivateProduct,
+    deactivateProduct: deactivateMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
   };
@@ -298,18 +299,18 @@ export function useProductImageMutations(orgId, productId, supplierId) {
   };
 
   const uploadMutation = useMutation({
-    mutationFn: ({ file }) => suppliersService.uploadProductImage({ orgId, productId, file }),
+    mutationFn: ({ file }) => unwrapResult(suppliersService.uploadProductImage({ orgId, productId, file })),
     onSuccess: invalidate,
   });
 
   const setFromUrlMutation = useMutation({
     mutationFn: ({ imageUrl, sourceUrl }) =>
-      suppliersService.setProductImageFromUrl(productId, imageUrl, sourceUrl),
+      unwrapResult(suppliersService.setProductImageFromUrl(productId, imageUrl, sourceUrl)),
     onSuccess: invalidate,
   });
 
   const clearMutation = useMutation({
-    mutationFn: () => suppliersService.clearProductImage(productId),
+    mutationFn: () => unwrapResult(suppliersService.clearProductImage(productId)),
     onSuccess: invalidate,
   });
 
@@ -372,13 +373,13 @@ export function useProductDocumentMutations(orgId, productId) {
 
   const uploadMutation = useMutation({
     mutationFn: ({ file, documentType, userId }) =>
-      suppliersService.uploadProductDocument({ orgId, productId, file, documentType, userId }),
+      unwrapResult(suppliersService.uploadProductDocument({ orgId, productId, file, documentType, userId })),
     onSuccess: invalidate,
   });
 
   const deleteMutation = useMutation({
     mutationFn: ({ documentId, storagePath }) =>
-      suppliersService.deleteProductDocument(documentId, storagePath),
+      unwrapResult(suppliersService.deleteProductDocument(documentId, storagePath)),
     onSuccess: invalidate,
   });
 

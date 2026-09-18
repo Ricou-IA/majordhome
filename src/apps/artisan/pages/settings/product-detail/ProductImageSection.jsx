@@ -35,8 +35,7 @@ export default function ProductImageSection({ product, orgId, supplierId }) {
       return;
     }
     try {
-      const result = await uploadImage(file);
-      if (result?.error) throw result.error;
+      await uploadImage(file);
       toast.success('Photo mise à jour');
     } catch (err) {
       toast.error(err?.message || 'Erreur upload photo');
@@ -59,8 +58,7 @@ export default function ProductImageSection({ product, orgId, supplierId }) {
   const handleClear = async () => {
     if (!window.confirm('Supprimer la photo du produit ?')) return;
     try {
-      const result = await clearImage();
-      if (result?.error) throw result.error;
+      await clearImage();
       toast.success('Photo supprimée');
     } catch (err) {
       toast.error(err?.message || 'Erreur suppression');

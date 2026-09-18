@@ -43,8 +43,7 @@ export function ProductDocumentsInline({ productId, orgId }) {
   const handleUpload = async () => {
     if (!file) return;
     try {
-      const { error } = await uploadDocument({ file, documentType: documentType || 'Manuel', userId: user?.id });
-      if (error) throw error;
+      await uploadDocument({ file, documentType: documentType || 'Manuel', userId: user?.id });
       toast.success('Document ajouté');
       setFile(null);
       setDocumentType('Manuel');
@@ -57,8 +56,7 @@ export function ProductDocumentsInline({ productId, orgId }) {
   const handleDelete = async (doc) => {
     setDeletingId(doc.id);
     try {
-      const { error } = await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
-      if (error) throw error;
+      await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
       toast.success('Document supprimé');
     } catch (err) {
       console.error('[ProductDocumentsInline] delete error:', err);
@@ -165,12 +163,11 @@ export function ProductDocumentsPanel({ isOpen, onClose, productId, productName,
   const handleUpload = async () => {
     if (!file) return;
     try {
-      const { error } = await uploadDocument({
+      await uploadDocument({
         file,
         documentType: documentType || 'Manuel',
         userId: user?.id,
       });
-      if (error) throw error;
       toast.success('Document ajouté');
       setFile(null);
       setDocumentType('Manuel');
@@ -183,8 +180,7 @@ export function ProductDocumentsPanel({ isOpen, onClose, productId, productName,
   const handleDelete = async (doc) => {
     setDeletingId(doc.id);
     try {
-      const { error } = await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
-      if (error) throw error;
+      await deleteDocument({ documentId: doc.id, storagePath: doc.storage_path });
       toast.success('Document supprimé');
     } catch (err) {
       console.error('[ProductDocumentsPanel] delete error:', err);

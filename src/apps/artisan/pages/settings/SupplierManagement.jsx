@@ -495,13 +495,11 @@ function ProductCatalog({ supplier, orgId, onBack }) {
   const handleSave = async (form) => {
     try {
       if (editProduct) {
-        const result = await updateProduct(editProduct.id, form);
-        if (result?.error) throw result.error;
+        await updateProduct(editProduct.id, form);
         toast.success('Produit mis à jour');
       } else {
         // À la création, kind = onglet actif (Équipement/Accessoires/Consommables)
-        const result = await createProduct({ ...form, productKind: kindFilter });
-        if (result?.error) throw result.error;
+        await createProduct({ ...form, productKind: kindFilter });
         toast.success(kindFilter === 'accessory' ? 'Accessoire créé' : 'Produit créé');
       }
       setShowModal(false);
@@ -514,8 +512,7 @@ function ProductCatalog({ supplier, orgId, onBack }) {
   const handleDelete = async (product) => {
     if (!window.confirm(`Supprimer "${product.name}" ?`)) return;
     try {
-      const result = await deactivateProduct(product.id);
-      if (result?.error) throw result.error;
+      await deactivateProduct(product.id);
       toast.success('Produit supprimé');
     } catch (err) {
       toast.error(err?.message || 'Erreur lors de la suppression');
@@ -816,12 +813,10 @@ export default function SupplierManagement() {
   const handleSave = async (form) => {
     try {
       if (editSupplier) {
-        const result = await updateSupplier(editSupplier.id, form);
-        if (result?.error) throw result.error;
+        await updateSupplier(editSupplier.id, form);
         toast.success('Fournisseur mis à jour');
       } else {
-        const result = await createSupplier(form);
-        if (result?.error) throw result.error;
+        await createSupplier(form);
         toast.success('Fournisseur créé');
       }
       setShowModal(false);
@@ -834,8 +829,7 @@ export default function SupplierManagement() {
   const handleDelete = async (supplier) => {
     if (!window.confirm(`Supprimer "${supplier.name}" et tout son catalogue ?`)) return;
     try {
-      const result = await deactivateSupplier(supplier.id);
-      if (result?.error) throw result.error;
+      await deactivateSupplier(supplier.id);
       toast.success('Fournisseur supprimé');
     } catch (err) {
       toast.error(err?.message || 'Erreur lors de la suppression');
