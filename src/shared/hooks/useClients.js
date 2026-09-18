@@ -6,7 +6,7 @@
  *
  * @version 6.0.0 - Refonte : cacheKeys centralisées, usePaginatedList, useDebounce
  * @version 6.1.0 - P0.11 : propagation orgId dans toutes les cache keys
- * @version 6.2.0 - Contrat unique des mutations : mutateAsync REJETTE sur refus (cf. unwrap)
+ * @version 6.2.0 - Contrat unique des mutations : mutateAsync REJETTE sur refus (cf. unwrapResult)
  * ============================================================================
  */
 
@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@services/clients.service';
 import { equipmentsService } from '@services/equipments.service';
 import { buildKindsByClient, buildEquipmentLabelsByClient } from '@/lib/equipmentIcons';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
@@ -29,21 +30,9 @@ export { clientKeys } from '@hooks/cacheKeys';
 
 const DEFAULT_LIMIT = 25;
 
-/**
- * Contrat UNIQUE des mutations de ce fichier : `mutateAsync` résout avec la
- * donnée et REJETTE sur refus (convention TanStack, même modèle qu'usePricing).
- *
- * Les services renvoient { data, error } sans jamais throw (withErrorHandling) :
- * sans ce déballage, mutateAsync résout même quand la base a refusé et un
- * appelant écrit en try/catch affiche un toast de succès mensonger (vécu :
- * DELETE 409 sur un équipement porteur d'un certificat → « Équipement supprimé »).
- * Corollaire côté appelant : try/catch + toast, jamais de lecture de `{ error }`.
- */
-const unwrap = async (promise) => {
-  const r = await promise;
-  if (r?.error) throw r.error;
-  return r?.data ?? null;
-};
+// Contrat UNIQUE des mutations de ce fichier : `mutateAsync` résout avec la donnée
+// et REJETTE sur refus (`unwrapResult`, cf. serviceHelpers). Corollaire côté
+// appelant : try/catch + toast, jamais de lecture de `{ error }`.
 
 const DEFAULT_FILTERS = {
   search: '',
@@ -132,7 +121,7 @@ export function useClient(clientId) {
 
   // Mutation de mise à jour
   const updateMutation = useMutation({
-    mutationFn: (updates) => unwrap(clientsService.updateClient(clientId, updates)),
+    mutationFn: (updates) => unwrapResult(clientsService.updateClient(clientId, updates)),
     onSuccess: (updated) => {
       if (updated) {
         queryClient.setQueryData(clientKeys.detail(orgId, clientId), (old) => ({
@@ -146,7 +135,7 @@ export function useClient(clientId) {
 
   // Mutation d'archivage
   const archiveMutation = useMutation({
-    mutationFn: () => unwrap(clientsService.archiveClient(clientId)),
+    mutationFn: () => unwrapResult(clientsService.archiveClient(clientId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
@@ -156,7 +145,7 @@ export function useClient(clientId) {
 
   // Mutation de désarchivage
   const unarchiveMutation = useMutation({
-    mutationFn: () => unwrap(clientsService.unarchiveClient(clientId)),
+    mutationFn: () => unwrapResult(clientsService.unarchiveClient(clientId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
@@ -167,7 +156,7 @@ export function useClient(clientId) {
   // Mutation hard delete (org_admin only) — god mode, nettoyage de base.
   // Supprime contrats/interventions/certificats + détache leads/RDV → invalidation croisée large.
   const hardDeleteMutation = useMutation({
-    mutationFn: () => unwrap(clientsService.hardDeleteClient(clientId)),
+    mutationFn: () => unwrapResult(clientsService.hardDeleteClient(clientId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
@@ -218,7 +207,7 @@ export function useClientEquipments(clientId) {
   });
 
   const addMutation = useMutation({
-    mutationFn: (equipmentData) => unwrap(clientsService.addEquipment(clientId, equipmentData)),
+    mutationFn: (equipmentData) => unwrapResult(clientsService.addEquipment(clientId, equipmentData)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
@@ -228,14 +217,14 @@ export function useClientEquipments(clientId) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ equipmentId, updates }) => unwrap(clientsService.updateEquipment(equipmentId, updates)),
+    mutationFn: ({ equipmentId, updates }) => unwrapResult(clientsService.updateEquipment(equipmentId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (equipmentId) => unwrap(clientsService.deleteEquipment(equipmentId)),
+    mutationFn: (equipmentId) => unwrapResult(clientsService.deleteEquipment(equipmentId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.equipments(orgId, clientId) });
       queryClient.invalidateQueries({ queryKey: clientKeys.detail(orgId, clientId) });
@@ -389,7 +378,7 @@ export function useClientActivities(clientId) {
   });
 
   const addNoteMutation = useMutation({
-    mutationFn: (noteData) => unwrap(clientsService.addClientNote({ clientId, ...noteData })),
+    mutationFn: (noteData) => unwrapResult(clientsService.addClientNote({ clientId, ...noteData })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: clientKeys.activities(orgId, clientId) });
     },
@@ -515,12 +504,12 @@ export function useLinkedClients(clientId, orgId) {
   }, [queryClient, orgId]);
 
   const linkMutation = useMutation({
-    mutationFn: ({ tenantId, ownerId }) => unwrap(clientsService.linkClientAsOwner(tenantId, ownerId)),
+    mutationFn: ({ tenantId, ownerId }) => unwrapResult(clientsService.linkClientAsOwner(tenantId, ownerId)),
     onSuccess: (_, { tenantId, ownerId }) => invalidateLinked([tenantId, ownerId]),
   });
 
   const unlinkMutation = useMutation({
-    mutationFn: (targetClientId) => unwrap(clientsService.unlinkClient(targetClientId)),
+    mutationFn: (targetClientId) => unwrapResult(clientsService.unlinkClient(targetClientId)),
     onSuccess: () => invalidateLinked([clientId, data?.owner?.id]),
   });
 

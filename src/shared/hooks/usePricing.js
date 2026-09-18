@@ -22,6 +22,7 @@ import {
 } from '@services/pricing.service';
 import { useAuth } from '@contexts/AuthContext';
 import { getOrgHeadquarters } from '@/lib/territoire-config';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { clientKeys, contractKeys, pricingKeys } from '@hooks/cacheKeys';
 import { equipmentCategoriesService } from '@services/equipmentCategories.service';
 
@@ -147,85 +148,80 @@ export function usePricingAdmin() {
     enabled: !!orgId,
   });
 
-  // Helper qui transforme une réponse { data, error } du service en valeur résolvable
-  const unwrap = async (promise) => {
-    const r = await promise;
-    if (r.error) throw r.error;
-    return r.data ?? null;
-  };
+  // Contrat unique des mutations : mutateAsync REJETTE sur refus (unwrapResult).
   const mutationOptions = { onSuccess: invalidateAll };
 
   const createZone = useMutation({
-    mutationFn: (payload) => unwrap(pricingService.createZone(orgId, payload)),
+    mutationFn: (payload) => unwrapResult(pricingService.createZone(orgId, payload)),
     ...mutationOptions,
   });
   const updateZone = useMutation({
-    mutationFn: ({ id, payload }) => unwrap(pricingService.updateZone(id, payload)),
+    mutationFn: ({ id, payload }) => unwrapResult(pricingService.updateZone(id, payload)),
     ...mutationOptions,
   });
   const deleteZone = useMutation({
-    mutationFn: (id) => unwrap(pricingService.deleteZone(id)),
+    mutationFn: (id) => unwrapResult(pricingService.deleteZone(id)),
     ...mutationOptions,
   });
 
   const createCategory = useMutation({
-    mutationFn: (payload) => unwrap(equipmentCategoriesService.createCategory(orgId, payload)),
+    mutationFn: (payload) => unwrapResult(equipmentCategoriesService.createCategory(orgId, payload)),
     ...mutationOptions,
   });
   const updateCategory = useMutation({
-    mutationFn: ({ id, payload }) => unwrap(equipmentCategoriesService.updateCategory(id, payload)),
+    mutationFn: ({ id, payload }) => unwrapResult(equipmentCategoriesService.updateCategory(id, payload)),
     ...mutationOptions,
   });
   const deleteCategory = useMutation({
-    mutationFn: (id) => unwrap(equipmentCategoriesService.deleteCategory(id)),
+    mutationFn: (id) => unwrapResult(equipmentCategoriesService.deleteCategory(id)),
     ...mutationOptions,
   });
 
   const createEquipmentType = useMutation({
-    mutationFn: (payload) => unwrap(pricingService.createEquipmentType(orgId, payload)),
+    mutationFn: (payload) => unwrapResult(pricingService.createEquipmentType(orgId, payload)),
     ...mutationOptions,
   });
   const updateEquipmentType = useMutation({
-    mutationFn: ({ id, payload }) => unwrap(pricingService.updateEquipmentType(id, payload)),
+    mutationFn: ({ id, payload }) => unwrapResult(pricingService.updateEquipmentType(id, payload)),
     ...mutationOptions,
   });
   const deleteEquipmentType = useMutation({
-    mutationFn: (id) => unwrap(pricingService.deleteEquipmentType(id)),
+    mutationFn: (id) => unwrapResult(pricingService.deleteEquipmentType(id)),
     ...mutationOptions,
   });
 
   const upsertRate = useMutation({
-    mutationFn: (payload) => unwrap(pricingService.upsertRate(orgId, payload)),
+    mutationFn: (payload) => unwrapResult(pricingService.upsertRate(orgId, payload)),
     ...mutationOptions,
   });
   const deleteRate = useMutation({
-    mutationFn: (id) => unwrap(pricingService.deleteRate(id)),
+    mutationFn: (id) => unwrapResult(pricingService.deleteRate(id)),
     ...mutationOptions,
   });
 
   const createExtra = useMutation({
-    mutationFn: (payload) => unwrap(pricingService.createExtra(orgId, payload)),
+    mutationFn: (payload) => unwrapResult(pricingService.createExtra(orgId, payload)),
     ...mutationOptions,
   });
   const updateExtra = useMutation({
-    mutationFn: ({ id, payload }) => unwrap(pricingService.updateExtra(id, payload)),
+    mutationFn: ({ id, payload }) => unwrapResult(pricingService.updateExtra(id, payload)),
     ...mutationOptions,
   });
   const deleteExtra = useMutation({
-    mutationFn: (id) => unwrap(pricingService.deleteExtra(id)),
+    mutationFn: (id) => unwrapResult(pricingService.deleteExtra(id)),
     ...mutationOptions,
   });
 
   const createDiscount = useMutation({
-    mutationFn: (payload) => unwrap(pricingService.createDiscount(orgId, payload)),
+    mutationFn: (payload) => unwrapResult(pricingService.createDiscount(orgId, payload)),
     ...mutationOptions,
   });
   const updateDiscount = useMutation({
-    mutationFn: ({ id, payload }) => unwrap(pricingService.updateDiscount(id, payload)),
+    mutationFn: ({ id, payload }) => unwrapResult(pricingService.updateDiscount(id, payload)),
     ...mutationOptions,
   });
   const deleteDiscount = useMutation({
-    mutationFn: (id) => unwrap(pricingService.deleteDiscount(id)),
+    mutationFn: (id) => unwrapResult(pricingService.deleteDiscount(id)),
     ...mutationOptions,
   });
 

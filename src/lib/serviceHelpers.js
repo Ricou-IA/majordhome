@@ -57,6 +57,31 @@ export async function withErrorHandlingCount(fn, context = '') {
 }
 
 /**
+ * Déballe une réponse de service `{ data, error }` pour une `mutationFn` React Query :
+ * résout avec `data` (ou null) et REJETTE avec `error` — contrat unique des hooks
+ * de mutation (`mutateAsync` rejette sur refus, l'appelant fait try/catch + toast).
+ *
+ * Les services ne throw jamais (withErrorHandling) : sans ce déballage, `mutateAsync`
+ * résout même quand la base a refusé (RLS, 23503, RPC qui RAISE…) et un appelant en
+ * try/catch affiche un toast de succès mensonger (vécu 2026-09-17 : DELETE 409 sur un
+ * équipement → « Équipement supprimé » ; `org_admin_required` → « Client supprimé »).
+ * Accepte aussi `{ error }` seul (deletes) → résout avec null.
+ *
+ * @param {Promise<{ data?: any, error?: any }>|{ data?: any, error?: any }} promise
+ * @returns {Promise<any>} `data` de la réponse, ou null
+ *
+ * @example
+ * const deleteMutation = useMutation({
+ *   mutationFn: (id) => unwrapResult(clientsService.deleteEquipment(id)),
+ * });
+ */
+export async function unwrapResult(promise) {
+  const r = await promise;
+  if (r?.error) throw r.error;
+  return r?.data ?? null;
+}
+
+/**
  * Extraire le premier résultat d'un appel RPC retournant SETOF.
  * Les RPC Supabase avec SETOF retournent un array, pas un objet.
  *
