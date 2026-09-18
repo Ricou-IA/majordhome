@@ -470,8 +470,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         }
         await updateLead(leadId, payload);
       } else {
-        const result = await createLead({ orgId, userId, ...payload });
-        savedLeadId = result?.data?.id || null;
+        const created = await createLead({ orgId, userId, ...payload });
+        savedLeadId = created?.id || null;
       }
       const synced = await syncClientFields();
       if (synced) {
@@ -794,10 +794,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       await updateLead(leadId, payload);
       await syncClientFields();
       const result = await convertLead(leadId, orgId, userId);
-      if (result?.data?.skipped) {
+      if (result?.skipped) {
         toast.info('Ce lead est déjà lié à un client');
-      } else if (result?.data?.client) {
-        const clientName = result.data.client.display_name || result.data.client.client_number;
+      } else if (result?.client) {
+        const clientName = result.client.display_name || result.client.client_number;
         toast.success(`Fiche client créée : ${clientName}`, { duration: 5000 });
       } else {
         toast.success('Lead converti en client !');

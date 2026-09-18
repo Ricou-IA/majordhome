@@ -4,6 +4,9 @@
  * Hooks React Query pour la gestion des leads du pipeline commercial.
  *
  * @version 1.0.0 - Sprint 4 Pipeline Commercial
+ * @version 1.1.0 - Contrat unique des mutations : mutateAsync résout avec la
+ *   donnée et REJETTE sur refus (unwrapResult) — l'appelant fait try/catch +
+ *   toast, jamais de lecture de { error }.
  * ============================================================================
  */
 
@@ -11,6 +14,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@services/leads.service';
 import { auditService } from '@services/audit.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { leadKeys, clientKeys, appointmentKeys, kanbanCardKeys, chantierKeys, interventionKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -307,25 +311,25 @@ export function useLeadMutations() {
 
   // Créer un lead
   const createMutation = useMutation({
-    mutationFn: (data) => leadsService.createLead(data),
+    mutationFn: (data) => unwrapResult(leadsService.createLead(data)),
     onSuccess: invalidateLeads,
   });
 
   // Mettre à jour un lead
   const updateMutation = useMutation({
-    mutationFn: ({ leadId, updates }) => leadsService.updateLead(leadId, updates),
+    mutationFn: ({ leadId, updates }) => unwrapResult(leadsService.updateLead(leadId, updates)),
     onSuccess: invalidateLeads,
   });
 
   // Soft delete un lead
   const deleteMutation = useMutation({
-    mutationFn: (leadId) => leadsService.softDeleteLead(leadId),
+    mutationFn: (leadId) => unwrapResult(leadsService.softDeleteLead(leadId)),
     onSuccess: invalidateLeads,
   });
 
   // Hard delete un lead (org_admin only) — supprime aussi RDV + cascade FK
   const hardDeleteMutation = useMutation({
-    mutationFn: (leadId) => leadsService.hardDeleteLead(leadId),
+    mutationFn: (leadId) => unwrapResult(leadsService.hardDeleteLead(leadId)),
     onSuccess: () => {
       invalidateLeads();
       // Le RDV lié est supprimé côté DB → invalider le cache planning
@@ -336,7 +340,7 @@ export function useLeadMutations() {
   // Fusion additive de deux leads (org_admin only) — RDV / devis PL / chantier /
   // interventions re-parentés côté DB → invalider tout ce qui les affiche.
   const mergeMutation = useMutation({
-    mutationFn: ({ survivorId, absorbedId }) => leadsService.mergeLeads(survivorId, absorbedId),
+    mutationFn: ({ survivorId, absorbedId }) => unwrapResult(leadsService.mergeLeads(survivorId, absorbedId)),
     onSuccess: () => {
       invalidateLeads();
       queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
@@ -347,24 +351,28 @@ export function useLeadMutations() {
     },
   });
 
-  // Changer le statut
+  // Changer le statut — le service porte `clientCreated` (fiche client créée par
+  // la transition) HORS de `data` : on le remonte à côté du lead.
   const statusMutation = useMutation({
-    mutationFn: ({ leadId, statusId, userId, extra }) =>
-      leadsService.updateLeadStatus(leadId, statusId, userId, extra),
+    mutationFn: async ({ leadId, statusId, userId, extra }) => {
+      const r = await leadsService.updateLeadStatus(leadId, statusId, userId, extra);
+      if (r?.error) throw r.error;
+      return { lead: r?.data ?? null, clientCreated: r?.clientCreated ?? null };
+    },
     onSuccess: invalidateLeads,
   });
 
   // Assigner un lead
   const assignMutation = useMutation({
     mutationFn: ({ leadId, assignedUserId, currentUserId }) =>
-      leadsService.assignLead(leadId, assignedUserId, currentUserId),
+      unwrapResult(leadsService.assignLead(leadId, assignedUserId, currentUserId)),
     onSuccess: invalidateLeads,
   });
 
   // Convertir en client
   const convertMutation = useMutation({
     mutationFn: ({ leadId, orgId, userId }) =>
-      leadsService.convertLeadToClient(leadId, orgId, userId),
+      unwrapResult(leadsService.convertLeadToClient(leadId, orgId, userId)),
     onSuccess: () => {
       invalidateLeads();
       // Invalider aussi le cache clients
@@ -375,7 +383,7 @@ export function useLeadMutations() {
   // Ajouter une note
   const addNoteMutation = useMutation({
     mutationFn: ({ leadId, orgId, userId, description }) =>
-      leadsService.addLeadNote(leadId, { orgId, userId, description }),
+      unwrapResult(leadsService.addLeadNote(leadId, { orgId, userId, description })),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: leadKeys.activities(orgId, variables.leadId) });
     },
@@ -384,27 +392,24 @@ export function useLeadMutations() {
   // Enregistrer un appel
   const logCallMutation = useMutation({
     mutationFn: ({ leadId, orgId, userId, description }) =>
-      leadsService.logCall(leadId, { orgId, userId, description }),
+      unwrapResult(leadsService.logCall(leadId, { orgId, userId, description })),
     onSuccess: invalidateLeads,
   });
 
-  // Helpers wrappés
-  const createLead = useCallback(async (data) => createMutation.mutateAsync(data), [createMutation]);
-  const updateLead = useCallback(async (leadId, updates) => updateMutation.mutateAsync({ leadId, updates }), [updateMutation]);
-  const deleteLead = useCallback(async (leadId) => deleteMutation.mutateAsync(leadId), [deleteMutation]);
-  const hardDeleteLead = useCallback(async (leadId) => hardDeleteMutation.mutateAsync(leadId), [hardDeleteMutation]);
-  const mergeLeads = useCallback(async (survivorId, absorbedId) => mergeMutation.mutateAsync({ survivorId, absorbedId }), [mergeMutation]);
-  const updateLeadStatus = useCallback(async (leadId, statusId, userId, extra) => statusMutation.mutateAsync({ leadId, statusId, userId, extra }), [statusMutation]);
-  const assignLead = useCallback(async (leadId, assignedUserId, currentUserId) => assignMutation.mutateAsync({ leadId, assignedUserId, currentUserId }), [assignMutation]);
-  const convertLead = useCallback(async (leadId, orgId, userId) => convertMutation.mutateAsync({ leadId, orgId, userId }), [convertMutation]);
-  const addNote = useCallback(async (leadId, orgId, userId, description) => addNoteMutation.mutateAsync({ leadId, orgId, userId, description }), [addNoteMutation]);
-  const logCall = useCallback(async (leadId, orgId, userId, description) => logCallMutation.mutateAsync({ leadId, orgId, userId, description }), [logCallMutation]);
+  // Mappage d'arguments (aucun try/catch : le rejet remonte à l'appelant)
+  const updateLead = useCallback((leadId, updates) => updateMutation.mutateAsync({ leadId, updates }), [updateMutation]);
+  const mergeLeads = useCallback((survivorId, absorbedId) => mergeMutation.mutateAsync({ survivorId, absorbedId }), [mergeMutation]);
+  const updateLeadStatus = useCallback((leadId, statusId, userId, extra) => statusMutation.mutateAsync({ leadId, statusId, userId, extra }), [statusMutation]);
+  const assignLead = useCallback((leadId, assignedUserId, currentUserId) => assignMutation.mutateAsync({ leadId, assignedUserId, currentUserId }), [assignMutation]);
+  const convertLead = useCallback((leadId, orgId, userId) => convertMutation.mutateAsync({ leadId, orgId, userId }), [convertMutation]);
+  const addNote = useCallback((leadId, orgId, userId, description) => addNoteMutation.mutateAsync({ leadId, orgId, userId, description }), [addNoteMutation]);
+  const logCall = useCallback((leadId, orgId, userId, description) => logCallMutation.mutateAsync({ leadId, orgId, userId, description }), [logCallMutation]);
 
   return {
-    createLead,
+    createLead: createMutation.mutateAsync,
     updateLead,
-    deleteLead,
-    hardDeleteLead,
+    deleteLead: deleteMutation.mutateAsync,
+    hardDeleteLead: hardDeleteMutation.mutateAsync,
     mergeLeads,
     updateLeadStatus,
     assignLead,

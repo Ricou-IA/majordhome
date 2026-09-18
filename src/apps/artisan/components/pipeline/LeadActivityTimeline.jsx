@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   Plus,
   ArrowRight,
@@ -71,6 +72,7 @@ export function LeadActivityTimeline({
       setShowNoteForm(false);
     } catch (err) {
       console.error('[LeadActivityTimeline] Erreur ajout note:', err);
+      toast.error("Erreur lors de l'ajout de la note");
     }
   };
 
