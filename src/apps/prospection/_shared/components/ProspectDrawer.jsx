@@ -111,44 +111,48 @@ export default function ProspectDrawer({
       return;
     }
 
-    const { error } = await updateProspect(updates);
-    if (error) {
-      toast.error('Erreur lors de la sauvegarde');
-    } else {
+    try {
+      await updateProspect(updates);
       toast.success('Prospect mis à jour');
+    } catch (err) {
+      console.error('[ProspectDrawer] updateProspect error:', err);
+      toast.error('Erreur lors de la sauvegarde');
     }
   };
 
   const handleStatusChange = async (newStatus) => {
     if (!prospect || newStatus === prospect.statut) return;
-    const { error } = await updateStatus(prospect.id, newStatus, user?.id);
-    if (error) {
-      toast.error('Erreur lors du changement de statut');
-    } else {
+    try {
+      await updateStatus(prospect.id, newStatus, user?.id);
       toast.success('Statut mis à jour');
+    } catch (err) {
+      console.error('[ProspectDrawer] updateStatus error:', err);
+      toast.error('Erreur lors du changement de statut');
     }
   };
 
   const handleDelete = async () => {
     if (!confirm('Supprimer ce prospect ?')) return;
-    const { error } = await deleteProspect(prospect.id);
-    if (error) {
-      toast.error('Erreur lors de la suppression');
-    } else {
+    try {
+      await deleteProspect(prospect.id);
       toast.success('Prospect supprimé');
       onDeleted?.();
       onClose();
+    } catch (err) {
+      console.error('[ProspectDrawer] deleteProspect error:', err);
+      toast.error('Erreur lors de la suppression');
     }
   };
 
   const handleConvert = async () => {
     if (!confirm('Convertir ce prospect en client ?')) return;
-    const result = await convertToClient(prospect.id, orgId, user?.id);
-    if (result?.error) {
-      toast.error(result.error.message || 'Erreur lors de la conversion');
-    } else {
+    try {
+      const result = await convertToClient(prospect.id, orgId, user?.id);
       toast.success('Prospect converti en client !');
-      onConverted?.(result?.data?.client);
+      onConverted?.(result?.client);
+    } catch (err) {
+      console.error('[ProspectDrawer] convertToClient error:', err);
+      toast.error(err?.message || 'Erreur lors de la conversion');
     }
   };
 

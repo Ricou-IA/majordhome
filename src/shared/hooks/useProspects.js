@@ -3,12 +3,17 @@
  * ============================================================================
  * Hooks TanStack React Query v5 pour prospects (Cédants + Commercial).
  * Pattern identique à useClients.js.
+ *
+ * Contrat unique des mutations : `mutateAsync` résout avec la donnée et REJETTE
+ * sur refus (unwrapResult) — l'appelant fait try/catch + toast, jamais de
+ * lecture de { error }.
  * ============================================================================
  */
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { prospectsService } from '@services/prospects.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { prospectKeys, clientKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useAuth } from '@contexts/AuthContext';
@@ -103,31 +108,20 @@ export function useProspect(prospectId) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (updates) => prospectsService.updateProspect(prospectId, updates),
-    onSuccess: (result) => {
-      if (result?.data) {
-        queryClient.setQueryData(prospectKeys.detail(orgId, prospectId), result.data);
+    mutationFn: (updates) => unwrapResult(prospectsService.updateProspect(prospectId, updates)),
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(prospectKeys.detail(orgId, prospectId), updated);
         queryClient.invalidateQueries({ queryKey: prospectKeys.lists(orgId) });
       }
     },
   });
 
-  const updateProspect = useCallback(
-    async (updates) => {
-      try {
-        return await updateMutation.mutateAsync(updates);
-      } catch (err) {
-        return { data: null, error: err };
-      }
-    },
-    [updateMutation]
-  );
-
   return {
     prospect,
     isLoading,
     error,
-    updateProspect,
+    updateProspect: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
     refresh: refetch,
   };
@@ -160,7 +154,7 @@ export function useProspectInteractions(prospectId) {
 
   const addMutation = useMutation({
     mutationFn: (interactionData) =>
-      prospectsService.addInteraction(prospectId, interactionData),
+      unwrapResult(prospectsService.addInteraction(prospectId, interactionData)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: prospectKeys.interactions(orgId, prospectId) });
     },
@@ -213,19 +207,26 @@ export function useProspectMutations() {
     queryClient.invalidateQueries({ queryKey: prospectKeys.all(orgId) });
   }, [queryClient, orgId]);
 
+  // createProspect = upsert ignoré sur doublon (org, module, siren) : le service
+  // renvoie { data: null, duplicate: true } HORS de `data`. Un doublon n'est pas un
+  // refus — on le remonte à côté de la donnée : résout avec { prospect, duplicate }.
   const createMutation = useMutation({
-    mutationFn: (data) => prospectsService.createProspect(data),
+    mutationFn: async (data) => {
+      const r = await prospectsService.createProspect(data);
+      if (r?.error) throw r.error;
+      return { prospect: r?.data ?? null, duplicate: r?.duplicate === true };
+    },
     onSuccess: invalidateAll,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (prospectId) => prospectsService.deleteProspect(prospectId),
+    mutationFn: (prospectId) => unwrapResult(prospectsService.deleteProspect(prospectId)),
     onSuccess: invalidateAll,
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ prospectId, newStatus, userId, contenu }) =>
-      prospectsService.updateStatus(prospectId, newStatus, userId, { contenu }),
+      unwrapResult(prospectsService.updateStatus(prospectId, newStatus, userId, { contenu })),
     onSuccess: (_, { prospectId }) => {
       invalidateAll();
       queryClient.invalidateQueries({ queryKey: prospectKeys.interactions(orgId, prospectId) });
@@ -234,7 +235,7 @@ export function useProspectMutations() {
 
   const convertMutation = useMutation({
     mutationFn: ({ prospectId, orgId: convertOrgId, userId }) =>
-      prospectsService.convertToClient(prospectId, convertOrgId, userId),
+      unwrapResult(prospectsService.convertToClient(prospectId, convertOrgId, userId)),
     onSuccess: () => {
       invalidateAll();
       // Invalider aussi la liste clients
@@ -243,16 +244,10 @@ export function useProspectMutations() {
   });
 
   return {
-    createProspect: useCallback(
-      (data) => createMutation.mutateAsync(data),
-      [createMutation]
-    ),
+    createProspect: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
 
-    deleteProspect: useCallback(
-      (prospectId) => deleteMutation.mutateAsync(prospectId),
-      [deleteMutation]
-    ),
+    deleteProspect: deleteMutation.mutateAsync,
     isDeleting: deleteMutation.isPending,
 
     updateStatus: useCallback(

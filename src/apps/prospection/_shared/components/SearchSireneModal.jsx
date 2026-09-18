@@ -153,21 +153,22 @@ export default function SearchSireneModal({
 
     const score = scoringFn ? scoringFn(prospect) : 0;
 
-    const result = await createProspect({
-      ...prospect,
-      score,
-      org_id: orgId,
-      created_by: user.id,
-    });
-
-    if (result?.duplicate) {
-      toast.info('Déjà dans votre pipeline');
-    } else if (result?.error) {
-      toast.error('Erreur lors de l\'ajout');
-      console.error('[SearchSirene] createProspect error:', result.error);
-    } else {
+    try {
+      const { duplicate } = await createProspect({
+        ...prospect,
+        score,
+        org_id: orgId,
+        created_by: user.id,
+      });
+      if (duplicate) {
+        toast.info('Déjà dans votre pipeline');
+        return;
+      }
       toast.success(`${prospect.raison_sociale} ajouté au pipeline`);
       setAddedSirens((prev) => new Set([...prev, prospect.siren]));
+    } catch (err) {
+      console.error('[SearchSirene] createProspect error:', err);
+      toast.error('Erreur lors de l\'ajout');
     }
   };
 
