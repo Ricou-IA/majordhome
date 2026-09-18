@@ -9,6 +9,9 @@
  * - useEntretienSAVStats(orgId) → stats dashboard
  *
  * @version 1.0.0 - Sprint 8 Entretien & SAV
+ * @version 1.1.0 - Contrat unique des mutations : mutateAsync résout avec la
+ *   donnée et REJETTE sur refus (unwrapResult). Les toasts d'erreur vivent dans
+ *   `onError` (qui ne se déclenchait jamais tant que le service ne throwait pas).
  * ============================================================================
  */
 
@@ -17,6 +20,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { savService } from '@services/sav.service';
 import { callCampaignsService } from '@services/callCampaigns.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { entretienSavKeys, callAttemptKeys, appointmentKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -123,7 +127,7 @@ export function useEntretienSAVMutations() {
 
   // --- Création entretien ---
   const createEntretienMutation = useMutation({
-    mutationFn: (params) => savService.createEntretien(params),
+    mutationFn: (params) => unwrapResult(savService.createEntretien(params)),
     onSuccess: () => {
       invalidateAll();
       toast.success('Entretien programmé');
@@ -136,7 +140,7 @@ export function useEntretienSAVMutations() {
 
   // --- Création SAV ---
   const createSAVMutation = useMutation({
-    mutationFn: (params) => savService.createSAV(params),
+    mutationFn: (params) => unwrapResult(savService.createSAV(params)),
     onSuccess: () => {
       invalidateAll();
       toast.success('Demande SAV créée');
@@ -150,7 +154,7 @@ export function useEntretienSAVMutations() {
   // --- Transition workflow ---
   const statusMutation = useMutation({
     mutationFn: ({ interventionId, newStatus }) =>
-      savService.updateWorkflowStatus(interventionId, newStatus),
+      unwrapResult(savService.updateWorkflowStatus(interventionId, newStatus)),
     onSuccess: () => {
       invalidateAll();
     },
@@ -184,7 +188,7 @@ export function useEntretienSAVMutations() {
   // --- Commande pièces ---
   const partsOrderMutation = useMutation({
     mutationFn: ({ interventionId, status }) =>
-      savService.updatePartsOrderStatus(interventionId, status),
+      unwrapResult(savService.updatePartsOrderStatus(interventionId, status)),
     onSuccess: () => {
       invalidateAll();
     },
@@ -197,7 +201,7 @@ export function useEntretienSAVMutations() {
   // --- Devis ---
   const devisMutation = useMutation({
     mutationFn: ({ interventionId, amount, status }) =>
-      savService.updateDevis(interventionId, { amount, status }),
+      unwrapResult(savService.updateDevis(interventionId, { amount, status })),
     onSuccess: () => {
       invalidateAll();
     },
@@ -210,7 +214,7 @@ export function useEntretienSAVMutations() {
   // --- Notes ---
   const notesMutation = useMutation({
     mutationFn: ({ interventionId, notes }) =>
-      savService.updateNotes(interventionId, notes),
+      unwrapResult(savService.updateNotes(interventionId, notes)),
     onSuccess: () => {
       invalidateAll();
     },
@@ -223,7 +227,7 @@ export function useEntretienSAVMutations() {
   // --- Description SAV ---
   const descriptionMutation = useMutation({
     mutationFn: ({ interventionId, description }) =>
-      savService.updateSavDescription(interventionId, description),
+      unwrapResult(savService.updateSavDescription(interventionId, description)),
     onSuccess: () => {
       invalidateAll();
     },
@@ -236,7 +240,7 @@ export function useEntretienSAVMutations() {
   // --- Sauvegarde groupée (bouton Enregistrer) ---
   const updateFieldsMutation = useMutation({
     mutationFn: ({ interventionId, fields }) =>
-      savService.updateFields(interventionId, fields),
+      unwrapResult(savService.updateFields(interventionId, fields)),
     onSuccess: () => {
       invalidateAll();
     },

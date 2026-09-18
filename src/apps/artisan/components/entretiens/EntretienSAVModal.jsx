@@ -292,12 +292,8 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
         }
       }
 
-      // Sauvegarder les champs
-      const result = await updateFields(item.id, fields);
-      if (result?.error) {
-        toast.error('Erreur lors de la sauvegarde');
-        return;
-      }
+      // Sauvegarder les champs (rejette sur refus → catch ci-dessous)
+      await updateFields(item.id, fields);
 
       // Auto-transitions basées sur le devis/pièces
       let workflowChanged = false;
