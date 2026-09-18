@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
-import { useClientEquipments, clientKeys } from '@hooks/useClients';
+import { useClientEquipments, usePricingEquipmentTypes, clientKeys } from '@hooks/useClients';
 import { useClientContract, useContractEquipments, contractKeys } from '@hooks/useContracts';
 import { useProductDocumentsByProductIds } from '@hooks/useSuppliers';
 import { contractsService } from '@services/contracts.service';
@@ -10,11 +10,12 @@ import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
-export const TabEquipments = ({ clientId }) => {
+export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed }) => {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const [showModal, setShowModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
+  const [prefillEquipment, setPrefillEquipment] = useState(null);
   const [deletingEquipment, setDeletingEquipment] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const {
@@ -23,6 +24,7 @@ export const TabEquipments = ({ clientId }) => {
     updateEquipment, isUpdating,
     deleteEquipment,
   } = useClientEquipments(clientId);
+  const { equipmentTypes } = usePricingEquipmentTypes();
   const { contract } = useClientContract(clientId);
   const { equipments: contractEquipments } = useContractEquipments(contract?.id);
   const queryClient = useQueryClient();
@@ -58,7 +60,29 @@ export const TabEquipments = ({ clientId }) => {
 
   const handleOpenAdd = () => { setEditingEquipment(null); setShowModal(true); };
   const handleOpenEdit = (equipment) => { setEditingEquipment(equipment); setShowModal(true); };
-  const handleCloseModal = () => { setShowModal(false); setEditingEquipment(null); };
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingEquipment(null);
+    setPrefillEquipment(null);
+  };
+
+  // Pré-remplissage venu de l'investigation bâtiment (panneau DPE de la fiche).
+  // La catégorie deduite du DPE est resolue vers un type de LA grille de l'org :
+  // `equipment_type_id` lui est propre, on ne peut pas le deviner en dur.
+  // Aucun type correspondant → on ouvre quand même la modale, l'utilisateur
+  // choisit ; mieux vaut un formulaire à compléter qu'un bouton sans effet.
+  useEffect(() => {
+    if (!prefillDraft) return;
+    const match = equipmentTypes.find((t) => t.equipment_category === prefillDraft.category);
+    setPrefillEquipment({
+      equipment_type_id: match?.id || '',
+      installation_year: prefillDraft.installationYear || '',
+      notes: prefillDraft.notes || '',
+    });
+    setEditingEquipment(null); // reste en mode AJOUT → onSubmit = handleAdd
+    setShowModal(true);
+    onPrefillConsumed?.();
+  }, [prefillDraft, equipmentTypes, onPrefillConsumed]);
 
   const handleAdd = async (formData) => {
     try {
@@ -195,7 +219,7 @@ export const TabEquipments = ({ clientId }) => {
         onSubmit={editingEquipment ? handleEdit : handleAdd}
         isSubmitting={editingEquipment ? isUpdating : isAdding}
         orgId={orgId}
-        equipment={editingEquipment}
+        equipment={editingEquipment || prefillEquipment}
       />
       <ConfirmDialog
         open={!!deletingEquipment}

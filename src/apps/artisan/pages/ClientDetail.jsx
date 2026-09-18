@@ -71,6 +71,7 @@ export default function ClientDetail() {
   const [showHardDelete, setShowHardDelete] = useState(false);
   const [hardDeleteCounts, setHardDeleteCounts] = useState(null);
   const [showInvestigation, setShowInvestigation] = useState(false);
+  const [equipmentDraft, setEquipmentDraft] = useState(null);
 
   const { can } = useCanAccess();
   const canCreateAppointment = can('planning', 'create');
@@ -132,6 +133,16 @@ export default function ClientDetail() {
     setIsLocked(false);
     setShowInvestigation(false);
     toast.success('Champs pré-remplis depuis le DPE — vérifiez puis Enregistrer');
+  }, []);
+
+  // Équipement repéré dans le DPE : on bascule sur l'onglet Équipements, qui
+  // ouvre sa modale d'ajout pré-remplie. Atterrir sur la liste plutôt que dans
+  // un panneau permet de voir tout de suite ce qui est déjà recensé — et évite
+  // de dupliquer ici la création d'équipement.
+  const handleCreateEquipmentFromDpe = useCallback((draft) => {
+    setShowInvestigation(false);
+    setActiveTab('equipments');
+    setEquipmentDraft(draft);
   }, []);
 
   const handleSave = async () => {
@@ -472,7 +483,13 @@ export default function ClientDetail() {
             <p className="text-xs text-secondary-400 mt-1">Ce client n&apos;a pas encore de code comptable Pennylane</p>
           </div>
         )}
-        {activeTab === 'equipments' && <TabEquipments clientId={id} />}
+        {activeTab === 'equipments' && (
+          <TabEquipments
+            clientId={id}
+            prefillDraft={equipmentDraft}
+            onPrefillConsumed={() => setEquipmentDraft(null)}
+          />
+        )}
         {activeTab === 'interventions' && <TabInterventions projectId={client.project_id} clientId={id} />}
         {activeTab === 'timeline' && <TabTimeline clientId={id} orgId={organization?.id} userId={user?.id} />}
         {activeTab === 'mailings' && <TabMailings clientId={id} />}
@@ -487,6 +504,7 @@ export default function ClientDetail() {
         isOpen={showInvestigation}
         onClose={() => setShowInvestigation(false)}
         onApply={handleApplyInvestigation}
+        onCreateEquipment={handleCreateEquipmentFromDpe}
       />
 
       {/* Modale création RDV (pré-remplie avec les infos du client) */}
