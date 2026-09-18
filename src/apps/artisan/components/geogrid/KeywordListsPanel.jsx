@@ -26,31 +26,33 @@ export default function KeywordListsPanel({ orgId }) {
     setEditingList(null);
   };
 
-  const handleSave = async () => {
+  // Les toasts (succès / erreur) sont émis par les hooks ; le formulaire ne se
+  // ferme que si l'écriture a réussi.
+  const handleSave = () => {
     if (!editingList.name.trim() || !editingList.keywords.length) return;
 
+    const closeForm = () => setEditingList(null);
     if (editingList.id) {
-      await updateList.mutateAsync({
+      updateList.mutate({
         listId: editingList.id,
         orgId,
         name: editingList.name.trim(),
         description: editingList.description?.trim() || null,
         keywords: editingList.keywords,
-      });
+      }, { onSuccess: closeForm });
     } else {
-      await createList.mutateAsync({
+      createList.mutate({
         orgId,
         name: editingList.name.trim(),
         description: editingList.description?.trim() || null,
         keywords: editingList.keywords,
-      });
+      }, { onSuccess: closeForm });
     }
-    setEditingList(null);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!confirm('Supprimer cette liste ? Les benchmarks associés seront aussi supprimés.')) return;
-    await deleteList.mutateAsync(id);
+    deleteList.mutate(id);
   };
 
   const handleKeywordsChange = (text) => {

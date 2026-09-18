@@ -22,9 +22,9 @@ export default function ScanTab({ orgId }) {
     launchScan.mutate(
       { ...config, orgId },
       {
-        onSuccess: (result) => {
-          if (result.data?.scanId) {
-            setSelectedScanId(result.data.scanId);
+        onSuccess: (scan) => {
+          if (scan?.scanId) {
+            setSelectedScanId(scan.scanId);
           }
         },
       }

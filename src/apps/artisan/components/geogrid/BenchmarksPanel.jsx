@@ -52,10 +52,10 @@ export default function BenchmarksPanel({ orgId }) {
 
   const selectedBenchmark = benchmarks?.find((b) => b.id === selectedBenchmarkId);
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!confirm('Supprimer ce benchmark et tous ses scans ?')) return;
     if (id === selectedBenchmarkId) setSelectedBenchmarkId(null);
-    await deleteBenchmark.mutateAsync(id);
+    deleteBenchmark.mutate(id); // toasts succès / erreur émis par le hook
   };
 
   const hasAnyList = (lists?.length || 0) > 0;
