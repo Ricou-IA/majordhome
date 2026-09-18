@@ -84,8 +84,7 @@ export default function AppLayout() {
 
   const handleCreateTask = useCallback(
     async (data) => {
-      const result = await createTask({ orgId, ...data });
-      if (result?.error) throw result.error;
+      await createTask({ orgId, ...data });
     },
     [createTask, orgId]
   );

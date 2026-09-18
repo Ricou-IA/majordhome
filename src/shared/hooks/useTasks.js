@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { tasksService } from '@services/tasks.service';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { taskKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -46,6 +47,10 @@ export function useArchivedTasks(orgId, enabled = false) {
   };
 }
 
+// Contrat unique des mutations : `mutateAsync` résout avec la donnée et REJETTE
+// sur refus (unwrapResult) — l'appelant fait try/catch + toast, jamais de
+// lecture de { error }.
+
 export function useTaskMutations() {
   const queryClient = useQueryClient();
   const { organization } = useAuth();
@@ -56,36 +61,36 @@ export function useTaskMutations() {
   }, [queryClient, orgId]);
 
   const createMutation = useMutation({
-    mutationFn: (data) => tasksService.createTask(data),
+    mutationFn: (data) => unwrapResult(tasksService.createTask(data)),
     onSuccess: invalidateTasks,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ taskId, updates }) => tasksService.updateTask(taskId, updates),
+    mutationFn: ({ taskId, updates }) => unwrapResult(tasksService.updateTask(taskId, updates)),
     onSuccess: invalidateTasks,
   });
 
   const doneMutation = useMutation({
-    mutationFn: (taskId) => tasksService.markAsDone(taskId),
+    mutationFn: (taskId) => unwrapResult(tasksService.markAsDone(taskId)),
     onSuccess: invalidateTasks,
   });
 
   const archiveMutation = useMutation({
-    mutationFn: (taskId) => tasksService.archiveTask(taskId),
+    mutationFn: (taskId) => unwrapResult(tasksService.archiveTask(taskId)),
     onSuccess: invalidateTasks,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (taskId) => tasksService.deleteTask(taskId),
+    mutationFn: (taskId) => unwrapResult(tasksService.deleteTask(taskId)),
     onSuccess: invalidateTasks,
   });
 
   return {
-    createTask: useCallback((data) => createMutation.mutateAsync(data), [createMutation]),
+    createTask: createMutation.mutateAsync,
     updateTask: useCallback((taskId, updates) => updateMutation.mutateAsync({ taskId, updates }), [updateMutation]),
-    markAsDone: useCallback((taskId) => doneMutation.mutateAsync(taskId), [doneMutation]),
-    archiveTask: useCallback((taskId) => archiveMutation.mutateAsync(taskId), [archiveMutation]),
-    deleteTask: useCallback((taskId) => deleteMutation.mutateAsync(taskId), [deleteMutation]),
+    markAsDone: doneMutation.mutateAsync,
+    archiveTask: archiveMutation.mutateAsync,
+    deleteTask: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
@@ -114,12 +119,12 @@ export function useTaskNotes(taskId) {
   }, [queryClient, taskId, orgId]);
 
   const addMutation = useMutation({
-    mutationFn: (content) => tasksService.addNote(taskId, content),
+    mutationFn: (content) => unwrapResult(tasksService.addNote(taskId, content)),
     onSuccess: invalidateNotes,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (noteId) => tasksService.deleteNote(noteId),
+    mutationFn: (noteId) => unwrapResult(tasksService.deleteNote(noteId)),
     onSuccess: invalidateNotes,
   });
 
@@ -127,8 +132,8 @@ export function useTaskNotes(taskId) {
     notes: data || [],
     isLoading,
     refresh: refetch,
-    addNote: useCallback((content) => addMutation.mutateAsync(content), [addMutation]),
-    deleteNote: useCallback((noteId) => deleteMutation.mutateAsync(noteId), [deleteMutation]),
+    addNote: addMutation.mutateAsync,
+    deleteNote: deleteMutation.mutateAsync,
     isAdding: addMutation.isPending,
   };
 }

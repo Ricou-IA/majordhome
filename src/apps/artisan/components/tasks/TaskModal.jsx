@@ -31,8 +31,7 @@ function TaskNotesSection({ taskId, userId }) {
     e.preventDefault();
     if (!draft.trim()) return;
     try {
-      const result = await addNote(draft.trim());
-      if (result?.error) throw result.error;
+      await addNote(draft.trim());
       setDraft('');
     } catch {
       toast.error('Erreur');

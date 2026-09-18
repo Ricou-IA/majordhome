@@ -42,18 +42,14 @@ export default function Tasks() {
   }, []);
 
   const handleCreate = useCallback(
-    async (data) => {
-      const result = await createTask({ orgId, ...data });
-      if (result?.error) throw result.error;
-    },
+    (data) => createTask({ orgId, ...data }),
     [createTask, orgId]
   );
 
   const handleMarkDone = useCallback(
     async (taskId) => {
       try {
-        const result = await markAsDone(taskId);
-        if (result?.error) throw result.error;
+        await markAsDone(taskId);
         toast.success('Tâche marquée comme réalisée');
       } catch {
         toast.error('Erreur');
@@ -65,8 +61,7 @@ export default function Tasks() {
   const handleArchive = useCallback(
     async (taskId) => {
       try {
-        const result = await archiveTask(taskId);
-        if (result?.error) throw result.error;
+        await archiveTask(taskId);
         toast.success('Tâche archivée');
       } catch {
         toast.error('Erreur');
@@ -80,8 +75,7 @@ export default function Tasks() {
       try {
         const updates = { is_important, is_urgent };
         if (status) updates.status = status;
-        const result = await updateTask(taskId, updates);
-        if (result?.error) throw result.error;
+        await updateTask(taskId, updates);
       } catch {
         toast.error('Erreur de déplacement');
       }
