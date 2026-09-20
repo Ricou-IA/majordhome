@@ -26,7 +26,13 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
   } = useClientEquipments(clientId);
   const { equipmentTypes } = usePricingEquipmentTypes();
   const { contract } = useClientContract(clientId);
-  const { equipments: contractEquipments } = useContractEquipments(contract?.id);
+  // Mutations du hook (mutateAsync rejette sur refus) : un appel direct au service
+  // renverrait `{ error }` sans throw et le catch ne verrait jamais le refus.
+  const {
+    equipments: contractEquipments,
+    addEquipment: addEquipmentToContract,
+    removeEquipment: removeEquipmentFromContract,
+  } = useContractEquipments(contract?.id);
   const queryClient = useQueryClient();
 
   const hasContract = !!contract?.id;
@@ -103,13 +109,14 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
 
       if (hasContract && eqId) {
         try {
-          await contractsService.addEquipmentToContract(contract.id, eqId);
+          await addEquipmentToContract(eqId);
           await resetSignatureIfNeeded();
           invalidateAll();
           toast.success('Équipement ajouté et lié au contrat');
         } catch (linkError) {
+          // L'équipement existe, seule la liaison a été refusée : le dire tel quel
           console.error('[TabEquipments] Erreur liaison contrat:', linkError);
-          toast.success('Équipement ajouté (liaison contrat échouée)');
+          toast.warning('Équipement ajouté, mais la liaison au contrat a échoué');
         }
       } else {
         toast.success('Équipement ajouté');
@@ -149,9 +156,12 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
     if (!deletingEquipment) return;
     setIsDeleting(true);
     try {
-      // Si l’équipement supprimé était lié au contrat, invalider la signature
+      // Si l’équipement supprimé était lié au contrat, invalider la signature.
+      // Refus de la base → on ne supprime pas : un contrat signé ne doit pas
+      // perdre un équipement en restant « signé ».
       if (hasContract && contractEquipmentIds.has(deletingEquipment.id)) {
-        await resetSignatureIfNeeded();
+        const ok = await resetSignatureIfNeeded();
+        if (!ok) return;
       }
       await deleteEquipment(deletingEquipment.id);
       invalidateAll();
@@ -170,18 +180,25 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
     }
   };
 
-  // Si le contrat est signé et qu’on modifie les équipements, invalider la signature
+  // Si le contrat est signé et qu’on modifie les équipements, invalider la signature.
+  // Le service ne throw jamais (`{ data, error }`) : on lit `error` et on le dit,
+  // sinon le contrat resterait signé en silence. Retourne false sur refus.
   const resetSignatureIfNeeded = async () => {
-    if (contract?.signed_at) {
-      await contractsService.resetContractSignature(contract.id);
-      toast.info('Le contrat doit être re-signé car les équipements ont changé.');
+    if (!contract?.signed_at) return true;
+    const { error } = await contractsService.resetContractSignature(contract.id);
+    if (error) {
+      console.error('[TabEquipments] Erreur invalidation signature:', error);
+      toast.error('Le contrat signé n’a pas pu être remis en attente de signature.');
+      return false;
     }
+    toast.info('Le contrat doit être re-signé car les équipements ont changé.');
+    return true;
   };
 
   const handleAddToContract = async (equipment) => {
     if (!hasContract) return;
     try {
-      await contractsService.addEquipmentToContract(contract.id, equipment.id);
+      await addEquipmentToContract(equipment.id);
       await resetSignatureIfNeeded();
       invalidateAll();
       toast.success('Équipement ajouté au contrat');
@@ -194,7 +211,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
   const handleRemoveFromContract = async (equipment) => {
     if (!hasContract) return;
     try {
-      await contractsService.removeEquipmentFromContract(contract.id, equipment.id);
+      await removeEquipmentFromContract(equipment.id);
       await resetSignatureIfNeeded();
       invalidateAll();
       toast.success('Équipement retiré du contrat');
