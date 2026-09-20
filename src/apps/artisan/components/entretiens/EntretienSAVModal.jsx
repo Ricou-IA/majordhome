@@ -250,12 +250,23 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       await updateWorkflowStatus(item.id, 'planifie');
       await updateFields(item.id, { scheduled_date: slots[0].date });
 
-      // Confirmer le client draft si c'est un contact web
+      // Confirmer le client draft si c'est un contact web. Le service ne throw
+      // pas (`{ data, error }`) : un refus laisserait la fiche masquée en silence.
+      let webDraftConfirmed = true;
       if (item.client_id && item.tags?.includes('Web')) {
-        await clientsService.confirmWebDraft(item.client_id);
+        const { error: draftError } = await clientsService.confirmWebDraft(item.client_id);
+        if (draftError) {
+          console.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
+          webDraftConfirmed = false;
+        }
       }
 
-      toast.success('RDV planifié avec succès');
+      if (webDraftConfirmed) {
+        toast.success('RDV planifié avec succès');
+      } else {
+        // Le RDV est bien posé : ne pas le nier, mais dire ce qui manque
+        toast.warning('RDV planifié, mais la fiche client web n’a pas pu être confirmée — elle reste masquée dans la liste clients');
+      }
       onUpdated?.();
       onClose();
     } catch {
@@ -348,9 +359,15 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   // Ouvrir fiche client — confirme le draft si besoin puis navigue
   const handleOpenClient = async () => {
     if (item.client_id) {
-      // Confirmer le client draft (le rend visible dans la liste clients)
+      // Confirmer le client draft (le rend visible dans la liste clients). La fiche
+      // se lit via majordhome_clients_all (drafts inclus) : on y va quand même,
+      // mais un refus se dit — sinon la fiche reste masquée en silence.
       if (item.tags?.includes('Web')) {
-        await clientsService.confirmWebDraft(item.client_id);
+        const { error: draftError } = await clientsService.confirmWebDraft(item.client_id);
+        if (draftError) {
+          console.error('[EntretienSAVModal] confirmWebDraft refusé:', draftError);
+          toast.warning('La fiche client web n’a pas pu être confirmée — elle reste masquée dans la liste clients');
+        }
       }
       onClose();
       navigate(`/clients/${item.client_id}`);
