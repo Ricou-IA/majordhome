@@ -274,7 +274,12 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
               <button
                 onClick={async (e) => {
                   e.stopPropagation();
-                  await savService.updateWorkflowStatus(item.id, 'facture');
+                  // Même contrat que les autres boutons de la carte : `{ error }` sans throw
+                  const { error } = await savService.updateWorkflowStatus(item.id, 'facture');
+                  if (error) {
+                    toast.error('Erreur mise à jour encaissement — la carte reste ouverte');
+                    return;
+                  }
                   onRefresh?.();
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition-colors"
