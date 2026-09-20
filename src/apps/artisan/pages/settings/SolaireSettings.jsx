@@ -291,7 +291,14 @@ function BibliothequeTab({ form, patch, orgId }) {
   };
 
   const handleDelete = async (doc) => {
-    await storageService.deleteFile(TECH_DOCS_BUCKET, doc.path);
+    // Le service renvoie `{ error }` sans throw : un refus du Storage laisserait
+    // le PDF orphelin dans le bucket pendant que la fiche disparaît de la liste.
+    const { error } = await storageService.deleteFile(TECH_DOCS_BUCKET, doc.path);
+    if (error) {
+      console.error('[SolaireSettings] deleteFile refusé:', error);
+      toast.error('Impossible de supprimer le fichier du Storage — la fiche est conservée');
+      return;
+    }
     patch({ tech_docs: docs.filter((d) => d.id !== doc.id) });
     toast.success('Fiche supprimée — ne pas oublier d\'Enregistrer');
   };
