@@ -31,6 +31,28 @@ export const CLIENT_CATEGORIES = [
 ];
 
 /**
+ * Catégories pour lesquelles la raison sociale prime sur le nom du contact.
+ * Les particuliers gardent NOM PRÉNOM : sur ces fiches le champ société est
+ * souvent un nom de personne recopié, pas une entreprise.
+ */
+const COMPANY_FIRST_CATEGORIES = ['entreprise', 'public'];
+
+/**
+ * Construit le nom affiché d'un client.
+ *
+ * Source unique de la règle : une fiche entreprise/public dont la société est
+ * renseignée s'affiche et se cherche sous sa raison sociale, pas sous le nom
+ * de son contact (sinon la fiche est introuvable par le nom de la société).
+ */
+export function buildClientDisplayName({ firstName, lastName, companyName, clientCategory } = {}) {
+  const company = (companyName || '').trim();
+  if (company && COMPANY_FIRST_CATEGORIES.includes(clientCategory)) {
+    return company.toUpperCase();
+  }
+  return `${(lastName || '').trim()} ${(firstName || '').trim()}`.trim().toUpperCase();
+}
+
+/**
  * Types d'équipements — legacy (catégories simplifiées, utilisées par import Excel)
  */
 export const EQUIPMENT_TYPES = [
@@ -302,7 +324,9 @@ export const clientsService = {
       // Construire le nom affiché (forcer majuscules)
       const upperFirst = firstName ? firstName.toUpperCase() : '';
       const upperLast = lastName ? lastName.toUpperCase() : '';
-      const name = displayName ? displayName.toUpperCase() : `${upperLast} ${upperFirst}`.trim();
+      const name = displayName
+        ? displayName.toUpperCase()
+        : buildClientDisplayName({ firstName, lastName, companyName, clientCategory });
       if (!name) throw new Error('[clientsService] displayName ou lastName est requis');
 
       // 1. Créer le project dans core.projects (pour les FK existantes)
@@ -424,26 +448,27 @@ export const clientsService = {
       if (updates.displayName !== undefined) updateData.display_name = updates.displayName ? updates.displayName.toUpperCase() : null;
       if (updates.companyName !== undefined) updateData.company_name = updates.companyName || null;
 
-      // Reconstruire display_name si nom/prénom changé
-      if ((updates.firstName !== undefined || updates.lastName !== undefined) && !updates.displayName) {
-        const currentFirst = updates.firstName !== undefined ? updates.firstName : null;
-        const currentLast = updates.lastName !== undefined ? updates.lastName : null;
-
-        if (currentFirst !== null || currentLast !== null) {
-          if (currentFirst === null || currentLast === null) {
-            const { data: current } = await supabase
-              .from('majordhome_clients_all')
-              .select('first_name, last_name')
-              .eq('id', clientId)
-              .single();
-
-            const first = updates.firstName !== undefined ? updates.firstName : current?.first_name || '';
-            const last = updates.lastName !== undefined ? updates.lastName : current?.last_name || '';
-            updateData.display_name = `${last} ${first}`.trim().toUpperCase();
-          } else {
-            updateData.display_name = `${currentLast} ${currentFirst}`.trim().toUpperCase();
-          }
+      // Reconstruire display_name si un de ses ingrédients change.
+      // La société et la catégorie en font partie : sans elles, renseigner la
+      // raison sociale d'une entreprise laissait le nom du contact affiché.
+      const nameInputs = ['firstName', 'lastName', 'companyName', 'clientCategory'];
+      if (nameInputs.some((k) => updates[k] !== undefined) && !updates.displayName) {
+        let current = null;
+        if (nameInputs.some((k) => updates[k] === undefined)) {
+          const { data } = await supabase
+            .from('majordhome_clients_all')
+            .select('first_name, last_name, company_name, client_category')
+            .eq('id', clientId)
+            .single();
+          current = data;
         }
+
+        updateData.display_name = buildClientDisplayName({
+          firstName: updates.firstName !== undefined ? updates.firstName : current?.first_name || '',
+          lastName: updates.lastName !== undefined ? updates.lastName : current?.last_name || '',
+          companyName: updates.companyName !== undefined ? updates.companyName : current?.company_name || '',
+          clientCategory: updates.clientCategory !== undefined ? updates.clientCategory : current?.client_category,
+        });
       }
 
       // Contact
