@@ -28,7 +28,14 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+// ⚠️ Cette liste doit rester alignee sur les buckets reellement utilises par le
+// code (grep `storage.from(` dans src/ et supabase/functions/). `certificats`
+// manquait ici ET dans 20260809_2_storage_buckets_et_policies.sql : ses 45 PDF
+// sont restes sur l'ancien projet et tout nouvel upload a echoue du 2026-08-11
+// au 2026-08-27, sans que le controle de la migration puisse le voir — il
+// comptait sa propre liste. Ajouter un bucket au code = l'ajouter ici aussi.
 const BUCKETS = [
+  'certificats',
   'contracts',
   'interventions',
   'product-documents',
