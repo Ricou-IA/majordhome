@@ -38,7 +38,7 @@ import {
 } from '@hooks/useLeadInteractions';
 import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
-import { leadsService } from '@services/leads.service';
+import { useLeadMutations } from '@hooks/useLeads';
 import { LinkedQuotesPanel } from '../LinkedQuotesPanel';
 import { QuoteCandidatesModal } from '../QuoteCandidatesModal';
 import { AddInteractionModal } from './AddInteractionModal';
@@ -49,6 +49,10 @@ function NotesEditor({ leadId, initialNotes, onSaved }) {
   const [value, setValue] = useState(initialNotes || '');
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  // Mutation du hook : rejette sur refus (un appel direct au service renvoie
+  // `{ error }` sans throw → « sauvegardé » affiché sur une note perdue) et
+  // invalide le cache leads.
+  const { updateLead } = useLeadMutations();
 
   useEffect(() => {
     setValue(initialNotes || '');
@@ -58,7 +62,7 @@ function NotesEditor({ leadId, initialNotes, onSaved }) {
     if ((value || '') === (initialNotes || '')) return;
     setSaving(true);
     try {
-      await leadsService.updateLead(leadId, { long_term_notes: value });
+      await updateLead(leadId, { long_term_notes: value });
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
       onSaved?.();
