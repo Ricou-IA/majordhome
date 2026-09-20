@@ -81,3 +81,4 @@ supabase/.branches/
 
 # Cluster PostgreSQL local de répétition des migrations (données prod, jamais versionnées)
 scripts/migration-rehearsal/scratch/
+deno.lock
