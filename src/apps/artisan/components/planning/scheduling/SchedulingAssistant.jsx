@@ -94,11 +94,6 @@ export function SchedulingAssistant({
   embedded = false,
   onSlotsChange,
   initialDate = null,
-  // Colonne « À assigner » (2026-09-16) : poser un RDV sans savoir qui le fera,
-  // la liste est proposée aussitôt. FILET OBLIGATOIRE (« pas de planning non
-  // assigné ») : annuler retire le créneau, un créneau sans personne n'est
-  // jamais remonté au host. Inutile quand la colonne est figée (fixedAssigneeId).
-  allowUnassigned = true,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -157,13 +152,16 @@ export function SchedulingAssistant({
     return name ? `${subjectPrefix} - ${name}` : subjectPrefix;
   });
   const [notes, setNotes] = useState('');
-  // Créneau posé dans « À assigner » en attente de réponse (« Qui prend ce RDV ? »)
+  // Créneau dont on a vidé le sélecteur, en attente de réponse (« Qui prend ce RDV ? »).
+  // Un RDV a toujours une personne (Eric, 2026-09-16/17 : « on décide sur l'instant ») :
+  // poser = poser dans la colonne de quelqu'un, la modale n'est que le filet du
+  // sélecteur inline vidé. Annuler retire le créneau.
   const [assignPromptSlot, setAssignPromptSlot] = useState(null);
 
   // RDV du jour sélectionné (avec technician_ids) pour les colonnes.
   const { dayAppointments } = useTeamDayAvailability(orgId, selectedDate);
 
-  // --- Poser un créneau depuis la grille ---
+  // --- Poser un créneau depuis la grille (toujours dans la colonne d'une personne) ---
   const handlePlaceSlot = useCallback(({ memberId, date, startTime, endTime, duration }) => {
     const slot = {
       id: newId(),
@@ -171,13 +169,9 @@ export function SchedulingAssistant({
       startTime,
       endTime,
       duration: duration || defaultDuration,
-      technicianIds: memberId
-        ? Array.from(new Set([memberId, ...defaultTechIds]))
-        : [...defaultTechIds],
+      technicianIds: Array.from(new Set([memberId, ...defaultTechIds])),
     };
     setDraftSlots((prev) => (multi ? [...prev, slot] : [slot]));
-    // Posé sans personne → la liste s'impose (annuler = le créneau disparaît)
-    if (!slot.technicianIds.length) setAssignPromptSlot(slot);
   }, [multi, defaultDuration, defaultTechIds]);
 
   const handleAssignPrompt = useCallback((ids) => {
@@ -343,10 +337,9 @@ export function SchedulingAssistant({
         draftSlots={draftSlots}
         onPlaceSlot={handlePlaceSlot}
         fixedDuration={fixedDuration}
-        allowUnassigned={allowUnassigned && !fixedAssigneeId}
       />
 
-      {/* « Qui prend ce RDV ? » — après une pose dans « À assigner » */}
+      {/* « Qui prend ce RDV ? » — filet quand le sélecteur d'un créneau a été vidé */}
       <AssignSlotModal
         open={!!assignPromptSlot}
         slot={assignPromptSlot}

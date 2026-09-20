@@ -25,17 +25,6 @@ import { findMemberConflicts, memberWorkingHoursForDate, timeToMinutes } from '@
 // ============================================================================
 
 /** Heures affichées : 07h-19h (même range que Planning.jsx / MiniWeekCalendar) */
-/** Id de la colonne virtuelle « À assigner » (jamais un vrai team_member). */
-export const UNASSIGNED_COLUMN_ID = '__unassigned__';
-const UNASSIGNED_COLUMN = {
-  id: UNASSIGNED_COLUMN_ID,
-  display_name: 'À assigner',
-  calendar_color: '#94A3B8',
-  isUnassigned: true,
-};
-
-const toMemberId = (columnId) => (columnId === UNASSIGNED_COLUMN_ID ? null : columnId);
-
 const START_HOUR = 7;
 const END_HOUR = 19;
 const SLOT_MINUTES = 30;
@@ -106,10 +95,10 @@ function formatMonthLabel(dateStr) {
  * @param {number|null} [props.fixedDuration] - « bloc contrat » (spec 2026-09-12, R5) :
  *   quand la durée est connue (temps contrat d'un entretien), un CLIC pose le bloc
  *   entier à cette durée — plus d'étirement « à peu près ». null = étirement libre.
- * @param {boolean} [props.allowUnassigned] - ajoute une 1ʳᵉ colonne « À assigner » :
- *   poser dedans remonte `memberId: null` et l'assistant impose aussitôt le choix
- *   de la personne (demande Eric 2026-09-16 : « on pose souvent sans savoir qui »,
- *   mais « pas de planning non assigné »). Pas d'occupation ni d'horaires.
+ *
+ * Pas de colonne « À assigner » : poser un créneau, c'est le poser dans la colonne
+ * de quelqu'un (Eric, 2026-09-17 : « on décide sur l'instant », pas de planning
+ * sans personne). La colonne virtuelle du 16/09 a été retirée.
  */
 export function DayResourceGrid({
   date,
@@ -119,18 +108,10 @@ export function DayResourceGrid({
   draftSlots = [],
   onPlaceSlot,
   fixedDuration = null,
-  allowUnassigned = false,
 }) {
   const todayStr = formatDate(new Date());
   // État du drag : { memberId, startIndex, currentIndex }
   const [dragState, setDragState] = useState(null);
-
-  // Colonnes affichées = membres, précédés de la colonne virtuelle « À assigner ».
-  // Vers l'extérieur, la colonne virtuelle remonte `memberId: null`.
-  const columns = useMemo(
-    () => (allowUnassigned && members.length > 0 ? [UNASSIGNED_COLUMN, ...members] : members),
-    [allowUnassigned, members],
-  );
 
   // --- Bande semaine (Lun-Ven) ---
   const monday = useMemo(() => getMonday(date ? new Date(date + 'T00:00:00') : new Date()), [date]);
@@ -189,7 +170,7 @@ export function DayResourceGrid({
   // Map<memberId, Array<{ startIdx, slotCount, conflict }>>
   const draftsByMember = useMemo(() => {
     const map = new Map();
-    columns.forEach((m) => map.set(m.id, []));
+    members.forEach((m) => map.set(m.id, []));
     (draftSlots || []).forEach((slot) => {
       if (slot.date !== date) return;
       const startIdx = timeToSlotIndex(slot.startTime);
@@ -198,13 +179,6 @@ export function DayResourceGrid({
       const eMin = timeToMinutes(slot.endTime) ?? (sMin + (slot.duration || SLOT_MINUTES));
       const slotCount = Math.max(1, Math.ceil((eMin - sMin) / SLOT_MINUTES));
       const endTime = slot.endTime || slotIndexToTime(startIdx + slotCount);
-      // Créneau sans personne → dessiné dans la colonne « À assigner » (si présente)
-      if (!(slot.technicianIds || []).length) {
-        if (map.has(UNASSIGNED_COLUMN_ID)) {
-          map.get(UNASSIGNED_COLUMN_ID).push({ startIdx, slotCount, conflict: false });
-        }
-        return;
-      }
       (slot.technicianIds || []).forEach((tid) => {
         if (!map.has(tid)) return;
         const conflict = findMemberConflicts(
@@ -216,7 +190,7 @@ export function DayResourceGrid({
       });
     });
     return map;
-  }, [columns, draftSlots, date, dayAppointments]);
+  }, [members, draftSlots, date, dayAppointments]);
 
   // --- Plage de travail (off-hours) par membre ---
   const hoursByMember = useMemo(() => {
@@ -226,7 +200,6 @@ export function DayResourceGrid({
   }, [members, date]);
 
   const isOffHour = useCallback((memberId, slotIndex) => {
-    if (memberId === UNASSIGNED_COLUMN_ID) return false; // colonne libre, pas d'horaires
     const hours = hoursByMember.get(memberId);
     if (!hours) return true; // jour off complet
     const slotStartMin = START_HOUR * 60 + slotIndex * SLOT_MINUTES;
@@ -274,7 +247,7 @@ export function DayResourceGrid({
       const startTime = slotIndexToTime(slotIndex);
       const finMin = START_HOUR * 60 + slotIndex * SLOT_MINUTES + fixedDuration;
       const endTime = `${String(Math.floor(finMin / 60)).padStart(2, '0')}:${String(finMin % 60).padStart(2, '0')}`;
-      onPlaceSlot?.({ memberId: toMemberId(memberId), date, startTime, endTime, duration: fixedDuration });
+      onPlaceSlot?.({ memberId, date, startTime, endTime, duration: fixedDuration });
       return;
     }
     setDragState({ memberId, startIndex: slotIndex, currentIndex: slotIndex });
@@ -297,7 +270,7 @@ export function DayResourceGrid({
     const duration = numSlots * SLOT_MINUTES;
     const startTime = slotIndexToTime(dragState.startIndex);
     const endTime = slotIndexToTime(dragState.currentIndex + 1);
-    onPlaceSlot?.({ memberId: toMemberId(dragState.memberId), date, startTime, endTime, duration });
+    onPlaceSlot?.({ memberId: dragState.memberId, date, startTime, endTime, duration });
     setDragState(null);
   }, [dragState, date, onPlaceSlot]);
 
@@ -309,7 +282,11 @@ export function DayResourceGrid({
     return () => window.removeEventListener('mouseup', onGlobalMouseUp);
   }, [dragState, handleDragEnd]);
 
-  const gridTemplateColumns = `40px repeat(${Math.max(columns.length, 1)}, minmax(96px, 1fr))`;
+  // Plancher bas (56 px) : toutes les colonnes doivent TENIR dans le panneau EventModal
+  // (max-w-2xl → 622 px utiles, soit 10 colonnes). Avec 96 px, « Autre » (tous les
+  // membres) débordait à droite et la barre de défilement, 24 lignes plus bas, était
+  // invisible : Philippe et Mohammed n'étaient pas atteignables (2026-09-16).
+  const gridTemplateColumns = `40px repeat(${Math.max(members.length, 1)}, minmax(56px, 1fr))`;
 
   // Sélecteur de date : navigation directe vers une période lointaine.
   // Week-end choisi → snap au lundi suivant (grille Lun-Ven).
@@ -403,19 +380,16 @@ export function DayResourceGrid({
           <div className={`grid ${dragState ? 'select-none' : ''}`} style={{ gridTemplateColumns }}>
             {/* Header colonnes membres */}
             <div className="border-b border-r bg-gray-50" />
-            {columns.map((m) => (
-              <div
-                key={m.id}
-                className={`border-b border-r px-1 py-1.5 text-center ${m.isUnassigned ? 'bg-slate-100' : 'bg-gray-50'}`}
-                title={m.isUnassigned ? 'Poser ici, puis choisir qui prend le RDV' : m.display_name}
-              >
+            {members.map((m) => (
+              <div key={m.id} className="border-b border-r bg-gray-50 px-1 py-1.5 text-center" title={m.display_name}>
                 <div className="flex items-center justify-center gap-1">
                   <span
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.isUnassigned ? 'border border-dashed border-slate-500 bg-transparent' : ''}`}
-                    style={m.isUnassigned ? undefined : { backgroundColor: m.calendar_color || '#6B7280' }}
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: m.calendar_color || '#6B7280' }}
                   />
-                  <span className={`text-xs truncate ${m.isUnassigned ? 'italic text-slate-600' : 'font-medium text-gray-700'}`}>
-                    {m.display_name}
+                  {/* Prénom seul (colonnes étroites) — même convention que les chips du planning ; nom complet en `title` */}
+                  <span className="text-xs font-medium text-gray-700 truncate">
+                    {(m.display_name || '').trim().split(' ')[0] || m.display_name}
                   </span>
                 </div>
               </div>
@@ -432,8 +406,8 @@ export function DayResourceGrid({
                   <span className="text-[10px] text-gray-400 -mt-1.5 select-none">{slot.label}</span>
                 </div>
 
-                {/* Cellules par colonne (membres + « À assigner ») */}
-                {columns.map((m) => {
+                {/* Cellules par membre */}
+                {members.map((m) => {
                   const off = isOffHour(m.id, slot.index);
                   const occupied = isOccupied(m.id, slot.index);
                   const inDrag = dragState

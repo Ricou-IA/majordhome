@@ -404,6 +404,11 @@ export function EventModal({
     if (!formData.scheduled_start) newErrors.scheduled_start = 'Heure de début requise';
     if (formData.appointment_type !== 'other' && !formData.client_name?.trim()) newErrors.client_name = 'Nom requis';
     if (!formData.appointment_type) newErrors.appointment_type = 'Type requis';
+    // Un RDV a toujours une personne (Eric, 2026-09-17) : le chemin classique (édition)
+    // ne doit pas pouvoir vider l'assignation — technicien(s) ou commercial assigné.
+    if (!(formData.technicianIds || []).length && !formData.assigned_commercial_id) {
+      newErrors.technicianIds = 'Une personne est requise';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1186,6 +1191,7 @@ export function EventModal({
                   updateField={updateField}
                   allTeamMembers={allTeamMembers}
                   isCancelled={isCancelled}
+                  error={errors.technicianIds}
                 />
               )}
 

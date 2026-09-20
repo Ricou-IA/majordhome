@@ -62,7 +62,7 @@ export function SlotDraftList({
 
       {slots.length === 0 ? (
         <p className="text-xs text-gray-400 italic px-1 py-2">
-          Cliquez-glissez dans la colonne d&apos;une personne ci-dessus, ou dans « À assigner » pour choisir ensuite.
+          Cliquez-glissez dans la colonne d&apos;une personne ci-dessus.
         </p>
       ) : (
         <ul className="space-y-2">

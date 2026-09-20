@@ -13,7 +13,7 @@
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2,
-  Phone, MapPin, CalendarClock, CalendarPlus, MoveHorizontal,
+  Phone, MapPin, CalendarClock, CalendarPlus, MoveHorizontal, AlertTriangle,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
@@ -529,8 +529,9 @@ export const SectionClient = ({
  * - COMMERCIAL_TYPES → team_members avec role commercial/admin (Responsable + Commercial)
  * - TECHNICIAN_TYPES → team_members avec role technician
  * - other → tous les team_members actifs
+ * `error` : message de validation (« Une personne est requise » — un RDV a toujours une personne).
  */
-export const SectionAssignee = ({ formData, updateField, allTeamMembers }) => {
+export const SectionAssignee = ({ formData, updateField, allTeamMembers, error = null }) => {
   const type = formData.appointment_type;
   const isCommercialType = COMMERCIAL_TYPES.includes(type);
   const isTechnicianType = TECHNICIAN_TYPES.includes(type);
@@ -566,6 +567,12 @@ export const SectionAssignee = ({ formData, updateField, allTeamMembers }) => {
         members={selectMembers}
         placeholder={placeholder}
       />
+      {error && (
+        <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          {error}
+        </p>
+      )}
     </div>
   );
 };

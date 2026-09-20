@@ -2,8 +2,10 @@
  * AssignSlotModal.jsx — « Qui prend ce RDV ? »
  * ============================================================================
  * Filet OBLIGATOIRE (Eric, 2026-09-16 : « je ne veux pas de planning non
- * assigné ») : un créneau posé dans la colonne « À assigner » de la grille
- * n'existe que si on lui donne quelqu'un. Annuler = le créneau est retiré.
+ * assigné ») : s'ouvre quand le sélecteur inline d'un créneau a été vidé.
+ * Le créneau n'existe que si on lui donne quelqu'un : Annuler = il est retiré.
+ * (La colonne « À assigner » de la grille a été retirée le 2026-09-17 : on
+ * décide sur l'instant, poser = poser dans la colonne de quelqu'un.)
  *
  * Présentationnelle : la décision remonte via onAssign(ids[]) / onCancel().
  * Mode `single` (commercial) : un seul choix ; sinon plusieurs techniciens.
