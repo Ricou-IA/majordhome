@@ -11,6 +11,7 @@ import {
   mapDpeRecord,
   buildHeatLossBreakdown,
   buildCostBreakdown,
+  buildEquipmentDrafts,
   assessMatch,
   toClientPatch,
   isDpeExpired,
@@ -216,6 +217,125 @@ test('buildCostBreakdown — pas de ligne « Autres » quand ça tombe juste', (
     mapDpeRecord({ cout_total_5_usages: 511, cout_chauffage: 400, cout_ecs: 111 })
   );
   assert.deepEqual(b.map((x) => x.key), ['heating', 'ecs']);
+});
+
+// --- buildEquipmentDrafts --------------------------------------------------
+
+const draftsOf = (raw) => buildEquipmentDrafts(mapDpeRecord(raw));
+
+test('buildEquipmentDrafts — poêle à granulés : catégorie poele, année = borne haute', () => {
+  const d = draftsOf({
+    numero_dpe: 'X1',
+    date_etablissement_dpe: '2026-07-09',
+    type_generateur_chauffage_principal: 'Poêle à granulés flamme verte installé à partir de 2020',
+  });
+  assert.equal(d.length, 1);
+  assert.equal(d[0].category, 'poele');
+  assert.equal(d[0].source, 'Poêle à granulés flamme verte installé à partir de 2020');
+  // « à partir de 2020 » n'a pas de borne haute → pas d'année inventée
+  assert.equal(d[0].installationYear, null);
+  assert.match(d[0].notes, /DPE X1 du 2026-07-09/);
+  assert.match(d[0].notes, /À confirmer sur place/);
+});
+
+test('buildEquipmentDrafts — « Chaudière bois granulés » ne tombe PAS dans poele', () => {
+  assert.equal(
+    draftsOf({ type_generateur_chauffage_principal: 'Chaudière bois granulés après 2019' })[0].category,
+    'chaudiere_bois'
+  );
+});
+
+test('buildEquipmentDrafts — chaudières fioul et gaz, année = borne haute', () => {
+  const fioul = draftsOf({ type_generateur_chauffage_principal: 'Chaudière fioul standard 1991-2015' })[0];
+  assert.equal(fioul.category, 'chaudiere_fioul');
+  assert.equal(fioul.installationYear, 2015);
+
+  const gaz = draftsOf({ type_generateur_chauffage_principal: 'Chaudière gaz classique avant 1981' })[0];
+  assert.equal(gaz.category, 'chaudiere_gaz');
+  assert.equal(gaz.installationYear, 1981);
+});
+
+test('buildEquipmentDrafts — PAC air/air et air/eau distinguées', () => {
+  assert.equal(
+    draftsOf({ type_generateur_chauffage_principal: 'PAC air/air installée entre 2008 et 2014' })[0].category,
+    'pac_air_air'
+  );
+  assert.equal(
+    draftsOf({ type_generateur_chauffage_principal: 'PAC air/eau installée après 2017' })[0].category,
+    'pac_air_eau'
+  );
+});
+
+test('buildEquipmentDrafts — rien pour un chauffage qui n’est pas un équipement recensable', () => {
+  // Convecteurs, effet joule, PAC géothermique : aucune catégorie sûre.
+  // Mieux vaut ne rien proposer que faire créer une ligne fausse.
+  for (const label of [
+    'Convecteur électrique NFC, NF** et NF***',
+    'Autres émetteurs à effet joule',
+    'Chaudière électrique',
+    'PAC eau/eau installée après 2015',
+  ]) {
+    assert.deepEqual(draftsOf({ type_generateur_chauffage_principal: label }), [], label);
+  }
+});
+
+test('buildEquipmentDrafts — ECS : seulement les appareils dédiés', () => {
+  assert.equal(
+    draftsOf({ type_generateur_chauffage_principal_ecs: 'Chauffe-eau thermodynamique' })[0].category,
+    'chauffe_eau_thermo'
+  );
+  assert.equal(
+    draftsOf({ type_generateur_chauffage_principal_ecs: 'Ballon électrique à accumulation' })[0].category,
+    'ballon_ecs'
+  );
+  // ECS produite par la chaudière : pas un équipement distinct
+  assert.deepEqual(
+    draftsOf({ type_generateur_chauffage_principal_ecs: 'Chaudière gaz à condensation' }),
+    []
+  );
+});
+
+test('buildEquipmentDrafts — clim et VMC, mais pas l’ouverture des fenêtres', () => {
+  const clim = draftsOf({ periode_installation_generateur_froid: 'Avant 2008' })[0];
+  assert.equal(clim.category, 'climatisation');
+
+  const vmc = draftsOf({ type_ventilation: 'VMC SF Hygro B de 2001 à 2012' })[0];
+  assert.equal(vmc.category, 'vmc');
+  assert.equal(vmc.installationYear, 2012);
+
+  assert.deepEqual(draftsOf({ type_ventilation: 'Ventilation par ouverture des fenêtres' }), []);
+});
+
+test('buildEquipmentDrafts — plusieurs équipements sur un même DPE', () => {
+  const d = draftsOf({
+    type_generateur_chauffage_principal: 'Chaudière fioul standard 1991-2015',
+    type_generateur_chauffage_principal_ecs: 'Chauffe-eau thermodynamique',
+    periode_installation_generateur_froid: 'Avant 2008',
+    type_ventilation: 'VMC SF Hygro B de 2001 à 2012',
+  });
+  assert.deepEqual(d.map((x) => x.key), ['heating', 'ecs', 'cooling', 'ventilation']);
+});
+
+test('buildEquipmentDrafts — n’émet que des catégories de l’ENUM majordhome', () => {
+  // Garde-fou : `equipments.category` est un ENUM NOT NULL, une valeur hors
+  // liste fait échouer l'insert (23514) au moment du clic, pas avant.
+  const VALID = new Set([
+    'pac_air_air', 'pac_air_eau', 'chaudiere_gaz', 'chaudiere_fioul', 'chaudiere_bois',
+    'vmc', 'climatisation', 'chauffe_eau_thermo', 'ballon_ecs', 'poele', 'autre',
+  ]);
+  const d = draftsOf({
+    type_generateur_chauffage_principal: 'Poêle à granulés flamme verte installé à partir de 2020',
+    type_generateur_chauffage_principal_ecs: 'Ballon électrique',
+    periode_installation_generateur_froid: 'Avant 2008',
+    type_ventilation: 'VMC autoréglable de 1982 à 2000',
+  });
+  assert.ok(d.length > 0);
+  for (const x of d) assert.ok(VALID.has(x.category), `catégorie inconnue : ${x.category}`);
+});
+
+test('buildEquipmentDrafts — tolère un record vide', () => {
+  assert.deepEqual(buildEquipmentDrafts(null), []);
+  assert.deepEqual(draftsOf({}), []);
 });
 
 // --- assessMatch -----------------------------------------------------------

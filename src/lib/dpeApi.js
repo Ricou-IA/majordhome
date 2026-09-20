@@ -392,6 +392,178 @@ export function assessMatch(record, { matchMode } = {}) {
   return { level: 'exact', reason: null };
 }
 
+// ============================================================================
+// LECTURE DES LIBELLÉS DE GÉNÉRATEUR
+// ============================================================================
+
+/** Un générateur au-delà de cet âge est considéré comme à remplacer. */
+export const AGING_GENERATOR_YEARS = 15;
+
+/**
+ * Extrait la période d'installation portée par le libellé ADEME.
+ * Formes rencontrées : « avant 1981 », « 1991-2000 », « 2001-2015 »,
+ * « après 2015 », « à partir de 2015 », « entre 2008 et 2014 », et pour la
+ * ventilation « VMC SF Hygro B **de 2001 à 2012** » — séparateur « à », qui
+ * faisait retomber la lecture sur l'année isolée 2001.
+ *
+ * @returns {{from: number|null, to: number|null}|null}
+ */
+export function extractGeneratorPeriod(label) {
+  if (!label) return null;
+  const s = String(label);
+
+  // `à` sans `\b` : en JS les limites de mot se basent sur [A-Za-z0-9_], donc
+  // `\bà\b` ne matche JAMAIS (le caractère accentué n'est pas un mot).
+  const range = s.match(/(?:entre\s+|de\s+)?(\d{4})\s*(?:-|–|—|\bet\b|à|\ba\b)\s*(\d{4})/i);
+  if (range) return { from: Number(range[1]), to: Number(range[2]) };
+
+  const before = s.match(/avant\s+(\d{4})/i);
+  if (before) return { from: null, to: Number(before[1]) };
+
+  const after = s.match(/(?:après|apres|à partir de|a partir de)\s+(\d{4})/i);
+  if (after) return { from: Number(after[1]), to: null };
+
+  const lone = s.match(/\b(19|20)\d{2}\b/);
+  if (lone) return { from: Number(lone[0]), to: Number(lone[0]) };
+
+  return null;
+}
+
+/**
+ * Le générateur est-il vieillissant ?
+ * On raisonne sur la BORNE HAUTE de la période : « 2001-2015 » veut dire « au
+ * plus tard 2015 ». Sans borne haute (« après 2015 »), on ne conclut pas — on
+ * préfère taire une recommandation que d'annoncer au client que sa chaudière
+ * neuve est à changer.
+ *
+ * @returns {boolean|null} null si l'âge est indéterminable
+ */
+export function isAgingGenerator(label, refYear) {
+  const period = extractGeneratorPeriod(label);
+  if (!period) return null;
+  if (period.to === null) return false;
+  return refYear - period.to >= AGING_GENERATOR_YEARS;
+}
+
+// ============================================================================
+// ÉQUIPEMENTS
+// ============================================================================
+
+/**
+ * Libellé de générateur DPE → `majordhome.equipment_category`.
+ * L'ordre compte : « Chaudière bois granulés » doit tomber sur
+ * `chaudiere_bois` et non sur `poele`, d'où le test « poêle/insert » d'abord
+ * mais restreint aux libellés qui ne contiennent pas « chaudière ».
+ *
+ * `null` = aucune catégorie sûre, on n'invente pas d'équipement.
+ */
+export function equipmentCategoryFromGenerator(label) {
+  const s = String(label || '');
+  if (!s) return null;
+  const has = (re) => re.test(s);
+
+  if (has(/chaudi[èe]re/i)) {
+    if (has(/bois|granul|pellet|b[ûu]che|plaquette/i)) return 'chaudiere_bois';
+    if (has(/fioul|fuel/i)) return 'chaudiere_fioul';
+    if (has(/gaz|gpl|propane|butane/i)) return 'chaudiere_gaz';
+    return null; // chaudière électrique, hybride… on ne devine pas
+  }
+  if (has(/po[êe]le|insert/i)) return 'poele';
+  if (has(/\bPAC\b|pompe.{0,8}chaleur/i)) {
+    if (has(/air\s*\/?\s*air/i)) return 'pac_air_air';
+    if (has(/air\s*\/?\s*eau/i)) return 'pac_air_eau';
+    return null; // PAC eau/eau, géothermique : hors des catégories disponibles
+  }
+  return null;
+}
+
+/**
+ * Équipements que le DPE permet de pré-remplir, prêts pour la modale
+ * d'ajout d'équipement.
+ *
+ * **On n'émet une entrée que si la catégorie est certaine.** Un chauffage
+ * « Convecteur électrique » ou une ECS produite par la chaudière ne
+ * correspondent à aucun équipement à recenser : mieux vaut ne rien proposer
+ * que de faire créer une ligne fausse dans la fiche.
+ *
+ * L'année retenue est la BORNE HAUTE de la période (« 1991-2015 » → 2015) :
+ * c'est la seule date dont on soit sûr que l'appareil existait.
+ *
+ * @returns {{key, label, category, installationYear, source, notes}[]}
+ */
+export function buildEquipmentDrafts(record) {
+  if (!record) return [];
+
+  const drafts = [];
+  const trace = (what) => {
+    const ref = [
+      record.dpeNumber ? `DPE ${record.dpeNumber}` : 'DPE',
+      record.dpeDate ? `du ${record.dpeDate}` : null,
+    ].filter(Boolean).join(' ');
+    return `Pré-rempli depuis le ${ref} — « ${what} ». À confirmer sur place.`;
+  };
+  const yearOf = (label) => extractGeneratorPeriod(label)?.to ?? null;
+
+  const heating = record.heatingGenerator;
+  const heatingCategory = equipmentCategoryFromGenerator(heating);
+  if (heatingCategory) {
+    drafts.push({
+      key: 'heating',
+      label: 'Chauffage',
+      category: heatingCategory,
+      installationYear: yearOf(heating),
+      source: heating,
+      notes: trace(heating),
+    });
+  }
+
+  const ecs = record.ecsGenerator;
+  if (ecs) {
+    // Uniquement les appareils dédiés : une ECS assurée par la chaudière ne
+    // constitue pas un équipement distinct à recenser.
+    const ecsCategory = /thermodynamique/i.test(ecs)
+      ? 'chauffe_eau_thermo'
+      : /ballon|cumulus|accumulation|chauffe-eau/i.test(ecs)
+        ? 'ballon_ecs'
+        : null;
+    if (ecsCategory) {
+      drafts.push({
+        key: 'ecs',
+        label: 'Eau chaude',
+        category: ecsCategory,
+        installationYear: yearOf(ecs),
+        source: ecs,
+        notes: trace(ecs),
+      });
+    }
+  }
+
+  if (record.coolingPeriod) {
+    drafts.push({
+      key: 'cooling',
+      label: 'Climatisation',
+      category: 'climatisation',
+      installationYear: yearOf(record.coolingPeriod),
+      source: record.coolingPeriod,
+      notes: trace(record.coolingPeriod),
+    });
+  }
+
+  // « Ventilation par ouverture des fenêtres » n'est pas un équipement
+  if (record.ventilation && /vmc/i.test(record.ventilation)) {
+    drafts.push({
+      key: 'ventilation',
+      label: 'Ventilation',
+      category: 'vmc',
+      installationYear: yearOf(record.ventilation),
+      source: record.ventilation,
+      notes: trace(record.ventilation),
+    });
+  }
+
+  return drafts;
+}
+
 /**
  * `type_batiment` du DPE → `HOUSING_TYPES` de `clients.service.js`.
  * Le DPE ne connaît que ces trois valeurs (vérifié sur le Tarn) ; les autres

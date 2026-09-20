@@ -23,62 +23,21 @@
 
 // Extension explicite : le runner `node --test` ne résout pas les imports sans
 // extension, contrairement à Vite.
-import { buildHeatLossBreakdown, buildCostBreakdown } from './dpeApi.js';
+// La lecture des libellés de générateur (période, vieillissement) vit dans
+// `dpeApi.js` : c'est de l'interprétation de champs DPE, pas de la mise en
+// forme de document — et l'écran Équipements en a besoin sans passer par ici.
+import {
+  buildHeatLossBreakdown,
+  buildCostBreakdown,
+  isAgingGenerator,
+  AGING_GENERATOR_YEARS,
+} from './dpeApi.js';
 
 /** Postes de déperdition sur lesquels Mayer n'a rien à proposer. */
 export const OUT_OF_SCOPE_POSTS = ['walls', 'windows', 'doors'];
 
 /** Au-delà de cette part des pertes, le renouvellement d'air justifie une VMC. */
 export const AIR_RENEWAL_VMC_THRESHOLD = 15;
-
-/** Un générateur au-delà de cet âge est considéré comme à remplacer. */
-export const AGING_GENERATOR_YEARS = 15;
-
-// ============================================================================
-// LECTURE DU LIBELLÉ DE GÉNÉRATEUR
-// ============================================================================
-
-/**
- * Extrait la période d'installation portée par le libellé ADEME.
- * Formes rencontrées : « avant 1981 », « 1991-2000 », « 2001-2015 »,
- * « après 2015 », « à partir de 2015 », « entre 2008 et 2014 ».
- *
- * @returns {{from: number|null, to: number|null}|null}
- */
-export function extractGeneratorPeriod(label) {
-  if (!label) return null;
-  const s = String(label);
-
-  const range = s.match(/(?:entre\s+)?(\d{4})\s*(?:-|–|et)\s*(\d{4})/i);
-  if (range) return { from: Number(range[1]), to: Number(range[2]) };
-
-  const before = s.match(/avant\s+(\d{4})/i);
-  if (before) return { from: null, to: Number(before[1]) };
-
-  const after = s.match(/(?:après|apres|à partir de|a partir de)\s+(\d{4})/i);
-  if (after) return { from: Number(after[1]), to: null };
-
-  const lone = s.match(/\b(19|20)\d{2}\b/);
-  if (lone) return { from: Number(lone[0]), to: Number(lone[0]) };
-
-  return null;
-}
-
-/**
- * Le générateur est-il vieillissant ?
- * On raisonne sur la BORNE HAUTE de la période : « 2001-2015 » veut dire « au
- * plus tard 2015 ». Sans borne haute (« après 2015 »), on ne conclut pas — on
- * préfère taire une recommandation que d'annoncer au client que sa chaudière
- * neuve est à changer.
- *
- * @returns {boolean|null} null si l'âge est indéterminable
- */
-export function isAgingGenerator(label, refYear) {
-  const period = extractGeneratorPeriod(label);
-  if (!period) return null;
-  if (period.to === null) return false;
-  return refYear - period.to >= AGING_GENERATOR_YEARS;
-}
 
 const has = (value, re) => re.test(String(value || ''));
 

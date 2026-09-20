@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import {
   X, Loader2, Flame, Droplets, Snowflake, Wind, Home, AlertCircle,
   RefreshCw, MapPin, Ruler, CalendarClock, ClipboardCheck, FileDown, Radius,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plus,
 } from 'lucide-react';
 import { useClientInvestigation } from '@hooks/useClientInvestigation';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -24,7 +24,7 @@ import { telechargerSyntheseDpe } from './dpeSyntheseExport';
 import { DpeNeighbourhoodMap } from './DpeNeighbourhoodMap';
 import {
   isDpeExpired, toClientPatch, buildHeatLossBreakdown, buildCostBreakdown, assessMatch,
-  NEARBY_RADII_M,
+  buildEquipmentDrafts, NEARBY_RADII_M,
 } from '@/lib/dpeApi';
 import { formatDateShortFR, formatEuro } from '@/lib/utils';
 
@@ -150,10 +150,42 @@ function CostBreakdown({ record }) {
   );
 }
 
+/**
+ * Équipements que le DPE permet de recenser. Le clic ouvre la modale d'ajout
+ * pré-remplie dans l'onglet Équipements — **rien n'est créé sans validation**,
+ * la donnée peut dater de plusieurs années.
+ */
+function EquipmentDrafts({ record, onCreate }) {
+  const drafts = buildEquipmentDrafts(record);
+  if (drafts.length === 0 || !onCreate) return null;
+
+  return (
+    <div className="pt-2.5 border-t border-secondary-100">
+      <p className="text-xs font-medium text-secondary-500 mb-1.5">
+        Équipements identifiés — à recenser dans la fiche
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {drafts.map((d) => (
+          <button
+            key={d.key}
+            onClick={() => onCreate(d)}
+            className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+            title={`${d.source} — ouvre la modale d’ajout pré-remplie`}
+          >
+            <Plus className="w-3 h-3" />
+            {d.label}
+            {d.installationYear ? ` · ${d.installationYear}` : ''}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Libellés des champs de la fiche que ce DPE peut renseigner. */
 const PATCH_LABELS = { dpeNumber: 'n° DPE', surface: 'surface', housingType: 'type' };
 
-function RecordCard({ record, onApply, onExport, exportingId, matchMode }) {
+function RecordCard({ record, onApply, onExport, exportingId, matchMode, onCreateEquipment }) {
   const expired = isDpeExpired(record);
   const patch = toClientPatch(record);
   const fillable = Object.keys(patch);
@@ -217,6 +249,7 @@ function RecordCard({ record, onApply, onExport, exportingId, matchMode }) {
         />
       </div>
 
+      <EquipmentDrafts record={record} onCreate={onCreateEquipment} />
       <InsulationRow record={record} />
       <HeatLossBars record={record} />
       <CostBreakdown record={record} />
@@ -279,7 +312,7 @@ function EmptyState({ icon: Icon, title, children }) {
 function Body({
   result, isLoading, hasAddress, onRetry, onApply, onExport, exportingId,
   onSearchNearby, nearbySearched, selectedId, onSelect, onStep,
-  nearbyRadius, onRadiusChange,
+  nearbyRadius, onRadiusChange, onCreateEquipment,
 }) {
   if (!hasAddress) {
     return (
@@ -437,6 +470,7 @@ function Body({
                 onExport={onExport}
                 exportingId={exportingId}
                 matchMode={result.matchMode}
+                onCreateEquipment={onCreateEquipment}
               />
             ))}
         </>
@@ -456,6 +490,7 @@ function Body({
               onExport={onExport}
               exportingId={exportingId}
               matchMode={result.matchMode}
+              onCreateEquipment={onCreateEquipment}
             />
           ))}
         </>
@@ -473,7 +508,7 @@ function Body({
   );
 }
 
-export function ClientInvestigationPanel({ client, isOpen, onClose, onApply }) {
+export function ClientInvestigationPanel({ client, isOpen, onClose, onApply, onCreateEquipment }) {
   const {
     result, isLoading, hasAddress, refetch, tally,
     includeNearby, searchNearby, nearbyRadius, setNearbyRadius,
@@ -562,6 +597,7 @@ export function ClientInvestigationPanel({ client, isOpen, onClose, onApply }) {
             onStep={step}
             nearbyRadius={nearbyRadius}
             onRadiusChange={setNearbyRadius}
+            onCreateEquipment={onCreateEquipment}
           />
         </div>
 

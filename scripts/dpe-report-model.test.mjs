@@ -5,16 +5,18 @@
 // (relevés sur le Tarn le 2026-08-12).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapDpeRecord } from '../src/lib/dpeApi.js';
 import {
+  mapDpeRecord,
   extractGeneratorPeriod,
   isAgingGenerator,
+  AGING_GENERATOR_YEARS,
+} from '../src/lib/dpeApi.js';
+import {
   buildRecommendations,
   buildOutOfScopeNote,
   plainQuality,
   formatDateFrLong,
   buildDpeReportModel,
-  AGING_GENERATOR_YEARS,
 } from '../src/lib/dpeReportModel.js';
 
 const REF_YEAR = 2026;
