@@ -70,6 +70,7 @@ import { useLinkedPennylaneQuotes, usePennylaneClientSearch, useImportPennylaneC
 import CreateDevisModal from '../devis/CreateDevisModal';
 import DevisModal from '../devis/DevisModal';
 import { devisService } from '@services/devis.service';
+import { useDevisMutations } from '@hooks/useDevis';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -124,9 +125,12 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     clearPennylaneSearch();
   }, [clearClientMdhSearch, clearPennylaneSearch]);
   const {
-    createLead, updateLead, updateLeadStatus, convertLead, addNote, hardDeleteLead,
+    createLead, updateLead, updateLeadStatus, convertLead, addNote, deleteLead, hardDeleteLead,
     isCreating, isUpdating, isChangingStatus, isConverting, isAddingNote, isHardDeleting,
   } = useLeadMutations();
+  // Envoi des devis MDH (flux hors Pennylane) : mutation qui rejette sur refus et
+  // invalide le cache devis — un appel direct au service masquerait le refus.
+  const { sendQuote } = useDevisMutations(isEditing ? leadId : null);
   const isAdmin = effectiveRole === 'org_admin';
 
   // État formulaire
@@ -700,11 +704,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       return;
     }
     try {
-      // 1. Marquer tous les devis brouillon comme envoyés
-      const { data: quotes } = await devisService.getQuotesByLead(leadId);
+      // 1. Marquer tous les devis brouillon comme envoyés. Une lecture refusée
+      // renverrait `[]` : on ne passe pas le lead en « Devis envoyé » sans savoir.
+      const { data: quotes, error: quotesError } = await devisService.getQuotesByLead(leadId);
+      if (quotesError) throw quotesError;
       const brouillons = (quotes || []).filter((q) => q.status === 'brouillon');
       for (const q of brouillons) {
-        await devisService.sendQuote(q.id);
+        await sendQuote(q.id); // rejette sur refus → catch, pas de transition
       }
 
       // 2. Calculer le montant total des devis envoyés
@@ -943,7 +949,15 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       });
       if (entretienError) throw entretienError;
 
-      await leadsService.softDeleteLead(lead.id);
+      // Mutation du hook (rejette sur refus). Le contrat et la carte Entretien
+      // existent déjà : un refus ici laisse le lead dans le pipeline — le dire,
+      // pour que personne ne relance la requalification (2ᵉ contrat, 2ᵉ carte).
+      try {
+        await deleteLead(lead.id);
+      } catch (deleteError) {
+        console.error('[LeadModal] softDeleteLead refusé:', deleteError);
+        throw new Error('Demande de contrat créée, mais le lead n’a pas pu être retiré du pipeline');
+      }
 
       queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
       toast.success('Lead requalifié → demande de contrat créée (Kanban Entretien)');
@@ -955,7 +969,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     } finally {
       setIsRequalifying(false);
     }
-  }, [orgId, lead, form, isRequalifying, navigate, onClose, userId, queryClient]);
+  }, [orgId, lead, form, isRequalifying, navigate, onClose, userId, queryClient, deleteLead]);
 
   const currentStatus = statuses.find((s) => s.id === form.status_id);
   const isWon = currentStatus?.is_won === true;
