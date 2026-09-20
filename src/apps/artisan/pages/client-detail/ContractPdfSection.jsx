@@ -297,13 +297,26 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         throw new Error(sendData?.error || 'Envoi proposition échoué');
       }
 
-      // 7. Marquer workflow_status = proposal_sent (le statut contractuel reste inchangé)
+      // 7. Marquer workflow_status = proposal_sent (le statut contractuel reste inchangé).
+      // L'email est parti : un refus ici ne doit PAS passer par le catch (« Erreur lors
+      // de l'envoi » inciterait à renvoyer la proposition au client). Le service
+      // renvoie `{ data, error }` sans throw → on lit `error` et on le dit tel quel.
+      let statusMarked = true;
       if (!contract.workflow_status || contract.workflow_status === 'nouveau') {
-        await contractsService.updateContract(contract.id, { workflow_status: 'proposal_sent' });
-        queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+        const { error: statusError } = await contractsService.updateContract(contract.id, { workflow_status: 'proposal_sent' });
+        if (statusError) {
+          console.error('[ContractPdfSection] workflow_status proposal_sent refusé:', statusError);
+          statusMarked = false;
+        } else {
+          queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+        }
       }
 
-      toast.success(`Proposition envoyée à ${client.email}`);
+      if (statusMarked) {
+        toast.success(`Proposition envoyée à ${client.email}`);
+      } else {
+        toast.warning(`Proposition envoyée à ${client.email}, mais le contrat n’a pas pu être marqué « proposition envoyée »`);
+      }
     } catch (err) {
       console.error('[ContractPdfSection] send proposal error:', err);
       toast.error(`Erreur lors de l'envoi : ${err.message || 'Erreur inconnue'}`);
