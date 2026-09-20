@@ -299,11 +299,12 @@ export function CertificatWizard({
 
     if (Object.keys(updates).length === 0) return; // Rien à mettre à jour
 
-    try {
-      await clientsService.updateEquipment(eqId, updates);
-    } catch (err) {
-      // Non-bloquant : la sync est best-effort
-      console.error('[CertificatWizard] syncEquipmentBack error:', err);
+    // Non-bloquant : la sync est best-effort (les valeurs restent dans le certificat).
+    // Le service ne throw jamais (`{ data, error }`) : on lit `error` pour que le refus
+    // soit au moins tracé — un catch ne le verrait jamais.
+    const { error } = await clientsService.updateEquipment(eqId, updates);
+    if (error) {
+      console.error('[CertificatWizard] syncEquipmentBack refusé (équipement non mis à jour):', error);
     }
   }, [formData, equipment]);
 
