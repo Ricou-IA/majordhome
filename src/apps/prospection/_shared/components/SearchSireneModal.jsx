@@ -152,10 +152,13 @@ export default function SearchSireneModal({
     if (!orgId || !user?.id) return;
 
     const score = scoringFn ? scoringFn(prospect) : 0;
+    // `_raw` (réponse SIRENE brute, gardée pour l'affichage) n'est pas une
+    // colonne de majordhome_prospects : PostgREST refuserait toute la ligne (PGRST204).
+    const { _raw, ...row } = prospect;
 
     try {
       const { duplicate } = await createProspect({
-        ...prospect,
+        ...row,
         score,
         org_id: orgId,
         created_by: user.id,

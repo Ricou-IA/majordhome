@@ -25,10 +25,11 @@ const SCRATCH = path.join(HERE, 'scratch');
 // columns: null = toutes ; sinon liste explicite (le DDL est restreint à ces colonnes).
 const TABLES = [
   { schema: 'core', table: 'organizations', columns: ['id', 'name', 'settings', 'created_at', 'updated_at'] },
-  { schema: 'core', table: 'profiles', columns: ['id', 'app_role', 'email', 'full_name'] },
+  { schema: 'core', table: 'profiles', columns: null }, // toutes : public.profiles (vue regénérée) les référence toutes
   { schema: 'core', table: 'organization_members', columns: null },
   { schema: 'core', table: 'projects', columns: ['id', 'org_id', 'name', 'status', 'identity'] },
   { schema: 'majordhome', table: 'organizations', columns: null },
+  { schema: 'majordhome', table: 'equipment_categories', columns: null }, // M1 (20260913_1) en prod : cible des FK pricing_equipment_types / equipments et de la vue client_equipment_kinds
   { schema: 'majordhome', table: 'pricing_zones', columns: null },
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
@@ -46,6 +47,7 @@ const FUNCTIONS = [
   'majordhome.handle_updated_at()',
   'majordhome.calculate_next_maintenance()',
   'majordhome.update_client_on_equipment_change()',
+  'majordhome.equipments_sync_category()', // trigger equipments posé par M1 (20260913_1), en prod depuis le 2026-09-12
   'majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.team_member_set_routing_settings(uuid, integer, boolean, text[])',
@@ -55,6 +57,7 @@ const FUNCTIONS = [
 const TRIGGER_TABLES = ['majordhome.equipments'];
 
 const VIEWS = [
+  'public.profiles', // cible des sous-requêtes « nom de l'auteur » des vues majordhome_* (interactions prospects…)
   'majordhome.v_planning',
   'majordhome.v_equipments_maintenance',
   'public.majordhome_equipments',

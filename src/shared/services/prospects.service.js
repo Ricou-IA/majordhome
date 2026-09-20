@@ -2,8 +2,10 @@
  * prospects.service.js — Majord'home Prospection
  * ============================================================================
  * Service CRUD pour les prospects (Cédants + Commercial).
- * Lecture via vue publique majordhome_prospects.
- * Écriture via schema majordhome.
+ * Lecture ET écriture via les vues publiques majordhome_prospects /
+ * majordhome_prospect_interactions (miroirs auto-updatable, security_invoker,
+ * RLS membre org — migration 20260920_2). Le schéma majordhome n'est pas exposé
+ * à PostgREST : `.schema('majordhome')` répond PGRST106.
  * ============================================================================
  */
 
@@ -116,17 +118,19 @@ export const prospectsService = {
 
   async createProspect(prospectData) {
     try {
+      // Upsert à travers la vue (miroir auto-updatable) : ON CONFLICT (org, module,
+      // siren) DO NOTHING. Sur doublon PostgREST renvoie 0 ligne → maybeSingle()
+      // (single() transformerait ce cas légitime en erreur PGRST116).
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('prospects')
+        .from('majordhome_prospects')
         .upsert(prospectData, {
           onConflict: 'org_id,module,siren',
           ignoreDuplicates: true,
         })
         .select()
-        .single();
+        .maybeSingle();
 
-      // Si ignoreDuplicates=true et doublon, data peut être null
+      // Si ignoreDuplicates=true et doublon, data est null
       if (!data && !error) {
         return { data: null, duplicate: true, error: null };
       }
@@ -211,8 +215,7 @@ export const prospectsService = {
 
       // 3. Créer l'interaction
       await supabase
-        .schema('majordhome')
-        .from('prospect_interactions')
+        .from('majordhome_prospect_interactions')
         .insert({
           prospect_id: prospectId,
           type: 'status_changed',
@@ -251,8 +254,7 @@ export const prospectsService = {
   async addInteraction(prospectId, { type, contenu, metadata, userId }) {
     try {
       const { data, error } = await supabase
-        .schema('majordhome')
-        .from('prospect_interactions')
+        .from('majordhome_prospect_interactions')
         .insert({
           prospect_id: prospectId,
           type,
@@ -385,8 +387,7 @@ export const prospectsService = {
 
       // 4. Ajouter l'interaction
       await supabase
-        .schema('majordhome')
-        .from('prospect_interactions')
+        .from('majordhome_prospect_interactions')
         .insert({
           prospect_id: prospectId,
           type: 'converted',
