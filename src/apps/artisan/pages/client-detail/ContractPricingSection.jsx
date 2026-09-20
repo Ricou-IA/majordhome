@@ -121,19 +121,27 @@ export function ContractPricingSection({ contractId, contract, client }) {
   useEffect(() => {
     if (!computedPricing || !amountMismatch) return;
     if (isForced && !hasOverrides) return; // legacy global force préservé
-    // Fire-and-forget : pas de toast, juste l'alignement silencieux
+    // Fire-and-forget : pas de toast de succès, juste l'alignement silencieux.
+    // Le service renvoie `{ data, error }` sans throw : un refus se lit ici, et se
+    // dit — `contract.amount` est ce que le client signe (source de vérité figée),
+    // le laisser diverger du calcul en silence est le pire cas. `id` stable :
+    // l'effet peut rejouer, sonner met à jour le même toast au lieu d'empiler.
     (async () => {
-      try {
-        await pricingService.updateContractAmount(
-          contractId,
-          computedPricing,
-          activeZone?.id,
-          false
+      const { error } = await pricingService.updateContractAmount(
+        contractId,
+        computedPricing,
+        activeZone?.id,
+        false
+      );
+      if (error) {
+        console.warn('[ContractPricingSection] auto-sync refusé:', error);
+        toast.error(
+          `Le montant du contrat n’a pas pu être réaligné sur le calcul — le montant enregistré reste ${formatEuro(currentAmount)}`,
+          { id: 'contract-amount-sync' }
         );
-        queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
-      } catch (err) {
-        console.warn('[ContractPricingSection] auto-sync silent fail:', err);
+        return;
       }
+      queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amountMismatch, isForced, hasOverrides, contractId, activeZone?.id, computedPricing?.total]);
