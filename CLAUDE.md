@@ -330,7 +330,8 @@ Règles qui mordent :
 - **Le rôle planning suit le rôle du membre** : tout changement de rôle dans Gestion de l'équipe appelle `team_member_sync_role_for_user(p_core_org_id, p_user_id)` (depuis `permissions.service.updateMemberRole`). Dérivation centralisée dans `majordhome.planning_role_for(app_role, business_role, membership_role)` — `org_admin`→`admin`, `team_leader`/`Commercial`→`commercial`, sinon `technician` (c'est ce que filtre `SectionAssignee` : types commerciaux → `['commercial','admin']`, types techniques → `technician`). **Seule source, utilisée par ensure ET par sync** : ne pas recopier le CASE ailleurs. Sans resync, un technicien passé commercial restait proposé comme technicien et disparaissait des RDV commerciaux.
 - Gotcha : `team_members.display_name` est une colonne **GENERATED** (`first_name || ' ' || last_name`) → ne jamais l'inclure dans un INSERT (erreur `428C9`).
 - **Impression PDF du planning hebdo** (1 personne, vue Semaine + 1 chip équipe) : point d'entrée unique `planningPrintExport.js`, modèle pur `src/lib/planningPrintModel.js` testé. Tout nouvel écran qui imprime un planning passe par là. Socle graphique commun des PDF artisan = `src/lib/pdfShared.jsx` (Solaire garde le sien), téléchargement = `downloadBlob` de `src/lib/utils.js`.
-- **Un RDV a toujours une personne** (Eric, 2026-09-16 : « pas de planning non assigné »). La grille de l'assistant propose une colonne « À assigner » (`allowUnassigned`, masquée si `fixedAssigneeId`) pour poser sans savoir qui ; poser dedans ouvre `AssignSlotModal` (« Qui prend ce RDV ? »), **filet obligatoire** : annuler retire le créneau, vider le sélecteur inline le rouvre, et `SchedulingAssistant` ne remonte au host que les créneaux ASSIGNÉS (`assignedSlots`). Ne jamais réintroduire de « Laisser non assigné » : service et calendrier acceptent un RDV sans personne (couleur neutre), c'est l'assistant qui tient l'invariant.
+- **Un RDV a toujours une personne** (Eric, 2026-09-16 : « pas de planning non assigné » ; 2026-09-17 : « on décide sur l'instant »). Dans la grille de l'assistant, poser = poser dans la colonne de quelqu'un — la colonne virtuelle « À assigner » du 16/09 a été retirée le 17/09. `AssignSlotModal` (« Qui prend ce RDV ? ») reste le **filet obligatoire** quand le sélecteur inline d'un créneau est vidé : annuler retire le créneau, et `SchedulingAssistant` ne remonte au host que les créneaux ASSIGNÉS (`assignedSlots`). En édition classique, `EventModal` refuse d'enregistrer sans technicien ni commercial (« Une personne est requise »). Ne jamais réintroduire de « Laisser non assigné » : service et calendrier acceptent un RDV sans personne (couleur neutre), c'est l'UI qui tient l'invariant.
+- **Édition d'un RDV commercial** : la personne est portée par `assigned_commercial_id`, **jamais** par `technicianIds` (l'ancien sélecteur y rangeait le commercial en « technicien » → lien fantôme). `resolveCommercialMemberId` (`planningEvents.js`) résout l'id stocké quel que soit son référentiel (`commercials.id` ou `team_members.id`). `appointments.created_by` est renseigné par `appointmentsService.createAppointment` (utilisateur courant résolu dans le service, pas par les 9 appelants).
 - **« Programmer une suite »** (édition d'un RDV, 2026-09-15) : `continuationMode` d'`EventModal`, symétrique de `rescheduleMode` — rouvre l'assistant et **ajoute** N RDV sur la même carte (`createAppointmentBatch` avec `lead_id`/`intervention_id`/client copiés, objet suffixé « (suite) »), sans toucher au RDV d'origine. Cas typique : chantier pas fini le jour prévu.
 
 ## Module Mouchard (journal d'audit) → `docs/superpowers/specs/2026-09-16-mouchard-audit-log-design.md`
@@ -598,6 +599,12 @@ Règles qui mordent :
   test vérifie qu'aucune recommandation ne mentionne isolation/menuiserie/fenêtre. Quand les murs
   dominent les pertes, le document l'énonce en « En toute transparence » au lieu de renvoyer vers
   une prestation non assurée.
+- **DPE → équipements** (2026-09-17) : `buildEquipmentDrafts` (`dpeApi.js`, testé) propose les
+  équipements à recenser (boutons « Chauffage · 2015 » dans la carte DPE → modale d'ajout
+  pré-remplie via `onCreateEquipment`, **rien n'est créé sans validation**). N'émet une entrée que si
+  la catégorie est certaine ; année = borne haute de la période. ⚠️ Écrit encore
+  `equipments.category` (ENUM) : à basculer sur `category_id` du référentiel **avant** la
+  migration M2 (drop de l'enum), sinon le bouton cassera en silence.
 
 ## Module Meta Ads (dashboard ROI)
 
