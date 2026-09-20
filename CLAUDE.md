@@ -91,6 +91,8 @@ Règles pour maintenir le niveau atteint après le hardening Sem 0 + audit quali
 - Toutes les keys prennent `orgId` en 1ᵉʳ paramètre (convention P0.11, voir en-tête `cacheKeys.js`)
 - `enabled: !!orgId && ...` obligatoire sur les `useQuery` qui dépendent d'orgId
 - Pas de console.* en prod : utiliser `import { logger } from '@lib/logger'` (no-op en prod, sauf `logger.error`)
+- **Contrat unique des mutations** : toute `mutationFn` déballe la réponse du service via `unwrapResult()` (`src/lib/serviceHelpers.js`, pendant hook de `withErrorHandling`) → `mutateAsync` résout avec `data` et **REJETTE** sur `{ error }`. Côté appelant : try/catch + toast, **jamais** de lecture de `{ error }` ni de `result.data` sur le retour d'un hook. Sans ce déballage, un appelant en try/catch annonce un succès sur un refus (vécu ×3, 2026-09-17/18) — et le contrat porté par l'appelant (« hybride » `if (result?.error) throw`) ne protège que lui.
+- Exceptions et mesure : un service qui porte une clé hors `data` (`clientCreated` d'`updateLeadStatus`, `duplicate` de `createProspect`) se déballe à la main dans la mutationFn et résout avec un objet nommé (`{ lead, clientCreated }`). Les services qui `throw` nativement (`googleCalendar.service`, fetch) n'ont rien à déballer. Mesure de régression : `grep -rnE "mutationFn: .*=> *[a-zA-Z]+Service\.[a-zA-Z]+\(" src/shared/hooks | grep -v "unwrap("` doit ne remonter que `useGoogleCalendar`.
 
 ### Cache keys
 - Convention pricingKeys-style : `all: (orgId) => [domain, orgId]` + sous-keys avec orgId en 1ᵉʳ
@@ -240,7 +242,7 @@ Pour les entités où un soft-delete + restauration ne suffisent pas (planning f
 - Pattern : `export const xxxService = { async method() {...} }`
 - Retour : `{ data, error }` ou `{ data, count, error }`
 - **`storage.service.js`** : Opérations Storage Supabase centralisées (`getSignedUrl`, `uploadFile`, `deleteFile`)
-- **`serviceHelpers.js`** (`src/lib/`) : `withErrorHandling()`, `extractRpcResult()`, `getMajordhomeOrgId()`
+- **`serviceHelpers.js`** (`src/lib/`) : `withErrorHandling()`, `unwrapResult()` (pendant hook, cf. Conventions qualité → Hooks), `extractRpcResult()`, `getMajordhomeOrgId()`
 - **`phoneUtils.js`** (`src/lib/`) : `cleanPhone()`, `formatPhoneForSearch()` (pour la recherche en base), `isMobileFR()` (détecte mobile FR 06/07 national/international, partagé avec `sav.service.js::sendAvisRequest` et `::sendEntretienReminder` — SMS rappel entretien mono-destinataire via webhook `VITE_N8N_WEBHOOK_SMS_RAPPEL`, campagne `rappel_entretien` distincte de l'avis `avis_j1`, N8N envoie + log dans `sms_logs` ; timeout 15s traité comme succès car N8N traite en background ; testé via `node --test scripts/phone-utils.test.mjs`)
 
 ### Hooks (`src/shared/hooks/`)
