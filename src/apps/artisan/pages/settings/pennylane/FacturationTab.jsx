@@ -39,13 +39,13 @@ function pickForm(settings) {
   };
 }
 
-/** `{ catId: '7061' }` → `{ catId: 7061 }` sans les vides (la forme stockée). */
+/** Forme stockée : NUMÉROS de compte (chaînes), sans les vides. */
 function ledgerAccountsForSave(form) {
   const by_category = {};
-  for (const [catId, id] of Object.entries(form.ledger_by_category || {})) {
-    if (id) by_category[catId] = Number(id);
+  for (const [catId, num] of Object.entries(form.ledger_by_category || {})) {
+    if (num) by_category[catId] = String(num);
   }
-  return { by_category, parts: form.ledger_parts ? Number(form.ledger_parts) : null };
+  return { by_category, parts: form.ledger_parts ? String(form.ledger_parts) : null };
 }
 
 function validate(form) {
@@ -61,10 +61,31 @@ export default function FacturationTab() {
   const [initial, setInitial] = useState(() => pickForm({}));
   const { categories } = useEquipmentReferential();
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
-  const accountOptions = useMemo(
-    () => [...(accounts || [])].sort((a, b) => String(a.number).localeCompare(String(b.number))),
-    [accounts],
-  );
+  // Pennylane décline chaque compte par taux de TVA (70601 × any / 10 % / 5,5 % / 20 %) :
+  // on paramètre le NUMÉRO, une fois ; la facture choisit la déclinaison du taux de la ligne.
+  const accountOptions = useMemo(() => {
+    const byNumber = new Map();
+    for (const a of accounts || []) {
+      if (!byNumber.has(a.number)) byNumber.set(a.number, { number: a.number, label: a.label });
+    }
+    return [...byNumber.values()].sort((a, b) => a.number.localeCompare(b.number));
+  }, [accounts]);
+  // Anciens réglages stockés par id → convertis en numéro dès que le catalogue est là
+  useEffect(() => {
+    if (!accounts?.length) return;
+    const toNumber = (v) => {
+      if (!v) return v;
+      if (accounts.some((a) => a.number === String(v))) return String(v);
+      const hit = accounts.find((a) => String(a.id) === String(v));
+      return hit ? hit.number : v;
+    };
+    setForm((f) => {
+      const by = Object.fromEntries(Object.entries(f.ledger_by_category || {}).map(([k, v]) => [k, toNumber(v)]));
+      const parts = toNumber(f.ledger_parts);
+      const same = parts === f.ledger_parts && JSON.stringify(by) === JSON.stringify(f.ledger_by_category);
+      return same ? f : { ...f, ledger_by_category: by, ledger_parts: parts };
+    });
+  }, [accounts]);
   const setLedgerForCategory = (catId, value) =>
     setForm((f) => ({ ...f, ledger_by_category: { ...f.ledger_by_category, [catId]: value } }));
 
@@ -178,7 +199,7 @@ export default function FacturationTab() {
               >
                 <option value="">— Compte par défaut Pennylane —</option>
                 {accountOptions.map((a) => (
-                  <option key={a.id} value={String(a.id)}>{a.number} · {a.label}</option>
+                  <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
                 ))}
               </select>
             </div>

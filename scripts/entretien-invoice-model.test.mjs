@@ -10,7 +10,7 @@
 // F-2026-09372 saisie à la main le 2026-09-21 (90 € TTC, 81,82 HT, TVA 10 %).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildEntretienInvoice, toPennylaneInvoicePayload } from '../src/lib/entretienInvoiceModel.js';
+import { buildEntretienInvoice, toPennylaneInvoicePayload, resolveLedgerAccountId } from '../src/lib/entretienInvoiceModel.js';
 import { computeContractLines, calculateContractTotal } from '../src/lib/contractPricing.js';
 
 const ZONE = { id: 'z1', name: 'Zone 1', supplement: 0 };
@@ -81,32 +81,56 @@ test('computeContractLines : prix forcé par ligne, splits supplémentaires, sup
 // buildEntretienInvoice
 // ---------------------------------------------------------------------------
 
-const LEDGERS = { byCategory: { 'cat-poele': 7061, 'cat-pac': 7062 }, parts: 7070 };
+// Pennylane : un compte par (numéro, taux) — cf. plan Mayer (70601 × any/FR_100/FR_55/FR_200)
+const CATALOG = [
+  { id: 1, number: '70601', label: "Contrat d'entretien", vatRate: 'any' },
+  { id: 2, number: '70601', label: "Contrat d'entretien", vatRate: 'FR_100' },
+  { id: 3, number: '70601', label: "Contrat d'entretien", vatRate: 'FR_55' },
+  { id: 4, number: '70601', label: "Contrat d'entretien", vatRate: 'FR_200' },
+  { id: 5, number: '7070', label: 'Pièces', vatRate: 'any' },
+];
+const LEDGERS = { byCategory: { 'cat-poele': '70601', 'cat-pac': '70601' }, parts: '7070', catalog: CATALOG };
 
-test('comptes comptables : par catégorie d’équipement + pièces, transmis à Pennylane ; absent → avertissement une fois par catégorie', () => {
+test('resolveLedgerAccountId : déclinaison du taux de la ligne, sinon générique « any », id legacy toléré, introuvable = null', () => {
+  assert.equal(resolveLedgerAccountId(CATALOG, '70601', 'FR_100'), 2);
+  assert.equal(resolveLedgerAccountId(CATALOG, '70601', 'FR_200'), 4);
+  assert.equal(resolveLedgerAccountId(CATALOG, '70601', 'exempt'), 1);
+  assert.equal(resolveLedgerAccountId(CATALOG, '7070', 'FR_100'), 5);
+  assert.equal(resolveLedgerAccountId(CATALOG, 3, 'FR_200'), 3);
+  assert.equal(resolveLedgerAccountId(CATALOG, '70699', 'FR_100'), null);
+  assert.equal(resolveLedgerAccountId([], '70601', 'FR_100'), '70601');
+  assert.equal(resolveLedgerAccountId(CATALOG, null, 'FR_100'), null);
+});
+
+test('comptes comptables : par catégorie d’équipement + pièces, déclinés par TVA, transmis à Pennylane ; absent → avertissement une fois par catégorie', () => {
   const avec = buildEntretienInvoice(dalous({
     contract: { contract_number: 'CTR-1', amount: 225 },
     pricing: pricingFor([EQ_POELE, EQ_PAC]),
     parts: [{ designation: 'Joint', quantite: 1, prix_ht: 11 }],
     ledgerAccounts: LEDGERS,
   }));
-  assert.deepEqual(avec.lines.map((l) => l.ledgerAccountId), [7061, 7062, 7070]);
+  // poêle TVA 10 % → 70601/FR_100 ; PAC TVA 20 % → 70601/FR_200 ; pièces TVA 10 % → 7070/any
+  assert.deepEqual(avec.lines.map((l) => l.ledgerAccountId), [2, 4, 5]);
   assert.equal(avec.warnings.filter((w) => w.code === 'compte_manquant').length, 0);
   const payload = toPennylaneInvoicePayload(avec, { customerId: 1, draft: true, externalReference: 'iv-1' });
-  assert.deepEqual(payload.invoice_lines.map((l) => l.ledger_account_id), [7061, 7062, 7070]);
+  assert.deepEqual(payload.invoice_lines.map((l) => l.ledger_account_id), [2, 4, 5]);
 
   const sans = buildEntretienInvoice(dalous({
     contract: { contract_number: 'CTR-1', amount: 225 },
     pricing: pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-1b' }, EQ_PAC]),
     parts: [{ designation: 'Joint', quantite: 1, prix_ht: 11 }],
-    ledgerAccounts: { byCategory: { 'cat-pac': 7062 } },
+    ledgerAccounts: { byCategory: { 'cat-pac': '70601' }, catalog: CATALOG },
   }));
-  assert.deepEqual(sans.lines.map((l) => l.ledgerAccountId), [null, null, 7062, null]);
+  assert.deepEqual(sans.lines.map((l) => l.ledgerAccountId), [null, null, 4, null]);
   // poêle (1 fois pour 2 lignes) + pièces = 2 avertissements
   assert.equal(sans.warnings.filter((w) => w.code === 'compte_manquant').length, 2);
   assert.deepEqual(sans.errors, []);
   const p2 = toPennylaneInvoicePayload(sans, { customerId: 1, draft: true, externalReference: 'iv-1' });
   assert.equal('ledger_account_id' in p2.invoice_lines[0], false);
+
+  const disparu = buildEntretienInvoice(dalous({ ledgerAccounts: { byCategory: { 'cat-poele': '70699' }, catalog: CATALOG } }));
+  assert.equal(disparu.lines[0].ledgerAccountId, null);
+  assert.ok(disparu.warnings.some((w) => w.code === 'compte_manquant' && /n’existe plus/.test(w.message)));
 });
 
 test('DALOUS : une ligne au prix grille = montant contractuel, TVA 10 %, HT dérivé du TTC, échéance à 30 jours', () => {

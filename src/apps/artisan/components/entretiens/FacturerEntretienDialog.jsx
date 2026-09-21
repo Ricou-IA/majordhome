@@ -21,7 +21,7 @@ import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
 import { useContract, useContractEquipments } from '@hooks/useContracts';
 import { useContractZone } from '@hooks/useContractZone';
 import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
-import { useCreateEntretienInvoice } from '@hooks/usePennylane';
+import { useCreateEntretienInvoice, useLedgerAccounts } from '@hooks/usePennylane';
 import { computeContractLines } from '@/lib/contractPricing';
 import { buildEntretienInvoice, toPennylaneInvoicePayload } from '@/lib/entretienInvoiceModel';
 import { formatEuro, formatDateForInput, formatDateShortFR } from '@/lib/utils';
@@ -41,6 +41,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   const { zones, rates, discounts, equipmentTypes, categories, isLoading: loadingPricing } = usePricingData();
   const { overrides, isLoading: loadingOverrides } = useContractLineOverrides(contractId);
   const { settings, isLoading: loadingSettings } = useOrgSettings();
+  // Catalogue des comptes (déclinés par TVA) pour résoudre l'id du compte paramétré par numéro.
+  // Indisponible (PL injoignable) → lignes sans compte + avertissement, jamais bloquant.
+  const { accounts: ledgerCatalog, isLoading: loadingLedger } = useLedgerAccounts();
   const createInvoice = useCreateEntretienInvoice(orgId);
 
   // Zone : celle ENREGISTRÉE sur le contrat (figée à la configuration, cf. Module
@@ -68,7 +71,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
 
   const invoiceSettings = pennylaneInvoiceSettings(settings);
   const isDraft = invoiceSettings.mode === 'draft';
-  const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings;
+  const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings || loadingLedger;
 
   const model = useMemo(() => {
     if (isLoading || !contract) return null;
@@ -87,12 +90,12 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       pricing,
       parts: Array.isArray(item.parts_detail) ? item.parts_detail : [],
       referentiel,
-      ledgerAccounts: invoiceSettings.ledgerAccounts,
+      ledgerAccounts: { ...invoiceSettings.ledgerAccounts, catalog: ledgerCatalog || [] },
       deadlineDays: invoiceSettings.deadlineDays,
       today: formatDateForInput(new Date()),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- invoiceSettings est dérivé de `settings` (objet stable de React Query)
-  }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings]);
+  }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings, ledgerCatalog]);
 
   const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id;
 

@@ -1139,9 +1139,16 @@ async function getLedgerAccounts() {
   if (pageCount === MAX_PAGES && hasMore) {
     logger.warn(`[pennylane.getLedgerAccounts] MAX_PAGES=${MAX_PAGES} atteint, liste des comptes possiblement incomplète`);
   }
+  // Pennylane tient UN compte par (numéro, taux de TVA) : 706/any, 706/FR_100, 706/FR_55…
+  // (vu le 2026-09-21 : « 706 · Prestations de services » ×6 dans la liste). Le paramétrage
+  // choisit un NUMÉRO ; à la facture, `resolveLedgerAccountId` (entretienInvoiceModel) prend
+  // la déclinaison du taux de la ligne, sinon la générique `any` (doc PL « Handle VAT rates
+  // by ledger accounts » : toujours préférer la déclinaison exacte). On renvoie donc TOUTES
+  // les déclinaisons, triées par numéro.
   return [...byId.values()]
     .filter((a) => String(a.number || '').startsWith('7') && a.enabled !== false)
-    .map((a) => ({ id: a.id, number: String(a.number), label: a.label || '' }));
+    .map((a) => ({ id: a.id, number: String(a.number), label: a.label || '', vatRate: a.vat_rate || 'any' }))
+    .sort((a, b) => a.number.localeCompare(b.number) || a.vatRate.localeCompare(b.vatRate));
 }
 
 // ============================================================================

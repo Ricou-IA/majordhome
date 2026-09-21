@@ -41,6 +41,32 @@ function addDaysIso(iso, days) {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Résout l'identifiant du compte comptable Pennylane à envoyer sur une ligne.
+ * Pennylane tient un compte par (numéro, taux de TVA) ; le paramétrage stocke un NUMÉRO
+ * (ex. « 70601 »). On prend la déclinaison du taux de la ligne, sinon la générique `any`
+ * (doc PL : préférer la déclinaison exacte). Tolère un id stocké (anciens réglages).
+ *
+ * @param {Array<{ id: number|string, number: string, vatRate?: string }>} catalog  `getLedgerAccounts()`
+ * @param {string|number|null|undefined} ref  numéro (ou id) paramétré
+ * @param {string|null} vatCode  code PL de la ligne (`FR_100`…)
+ * @returns {number|string|null}
+ */
+export function resolveLedgerAccountId(catalog, ref, vatCode) {
+  if (ref == null || ref === '') return null;
+  const list = Array.isArray(catalog) ? catalog : [];
+  const refStr = String(ref);
+  const byNumber = list.filter((a) => String(a.number) === refStr);
+  if (byNumber.length > 0) {
+    const exact = vatCode ? byNumber.find((a) => (a.vatRate || 'any') === vatCode) : null;
+    const generic = byNumber.find((a) => !a.vatRate || a.vatRate === 'any');
+    return (exact || generic || byNumber[0]).id;
+  }
+  const byId = list.find((a) => String(a.id) === refStr);
+  if (byId) return byId.id;
+  return list.length === 0 ? ref : null; // catalogue absent : on fait confiance à la valeur ; présent : introuvable
+}
+
 /** « Marque · Modèle · N° série » d'un équipement, ou null si rien de renseigné. */
 export function referenceEquipement(eq) {
   if (!eq) return null;
@@ -77,9 +103,10 @@ function categoryLabelForEquipment(eq, referentiel) {
  * @param {Array<{ designation?: string, reference?: string, quantite?: number|string, prix_ht?: number|string, offert?: boolean }>} p.parts
  *   pièces du certificat (`prix_ht` contient du TTC, convention Phase 1)
  * @param {{ typesById: Map, categoriesById: Map }} p.referentiel  index types / catégories (TVA)
- * @param {{ byCategory?: Object<string, number|string>, parts?: number|string|null }} [p.ledgerAccounts]
+ * @param {{ byCategory?: Object<string, number|string>, parts?: number|string|null, catalog?: Array }} [p.ledgerAccounts]
  *   comptes de vente Pennylane (706xxx) par catégorie d'équipement + pièces — la « famille »
- *   comptable d'une ligne (Settings → Facturation Pennylane). Absent → compte par défaut de PL + avertissement.
+ *   comptable d'une ligne (Settings → Facturation Pennylane), stockés par NUMÉRO ; `catalog` =
+ *   déclinaisons par TVA (`getLedgerAccounts()`) pour résoudre l'id. Absent → défaut PL + avertissement.
  * @param {number} [p.deadlineDays]
  * @param {string} p.today  YYYY-MM-DD
  * @returns {{ date: string, deadline: string, subject: string, lines: Array, discount: object|null, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
@@ -134,22 +161,28 @@ export function buildEntretienInvoice({
     return v;
   };
 
-  // Compte de vente PL d'une catégorie (famille comptable). Avertissement UNE fois par catégorie.
-  const missingAccountCats = new Set();
-  const ledgerForCategory = (catId, catLabel) => {
-    const id = catId ? ledgerAccounts?.byCategory?.[catId] : null;
-    if (id) return id;
-    const key = catId || '__none__';
-    if (!missingAccountCats.has(key)) {
-      missingAccountCats.add(key);
-      warnings.push({
-        code: 'compte_manquant',
-        message: catId
-          ? `Pas de compte comptable paramétré pour « ${catLabel || 'cette catégorie'} » : Pennylane appliquera son compte de vente par défaut (Paramètres → Facturation Pennylane).`
-          : 'Équipement sans catégorie : Pennylane appliquera son compte de vente par défaut.',
-      });
+  // Compte de vente PL d'une catégorie (famille comptable), déclinaison du taux de la ligne.
+  // Avertissement UNE fois par catégorie (absent ou introuvable dans le catalogue PL).
+  const catalog = ledgerAccounts?.catalog || [];
+  const warnedCats = new Set();
+  const warnOnce = (key, message) => {
+    if (warnedCats.has(key)) return;
+    warnedCats.add(key);
+    warnings.push({ code: 'compte_manquant', message });
+  };
+  const ledgerForCategory = (catId, catLabel, vatCode) => {
+    const ref = catId ? ledgerAccounts?.byCategory?.[catId] : null;
+    if (!ref) {
+      warnOnce(catId || '__none__', catId
+        ? `Pas de compte comptable paramétré pour « ${catLabel || 'cette catégorie'} » : Pennylane appliquera son compte de vente par défaut (Paramètres → Facturation Pennylane).`
+        : 'Équipement sans catégorie : Pennylane appliquera son compte de vente par défaut.');
+      return null;
     }
-    return null;
+    const id = resolveLedgerAccountId(catalog, ref, vatCode);
+    if (id == null) {
+      warnOnce(`${catId}:introuvable`, `Le compte ${ref} paramétré pour « ${catLabel || 'cette catégorie'} » n’existe plus dans Pennylane : compte par défaut appliqué.`);
+    }
+    return id;
   };
 
   const pushLine = (line) => {
@@ -209,13 +242,14 @@ export function buildEntretienInvoice({
     const catLabel = categoryLabelForEquipment(eq, referentiel);
     if (ref) subjectRefs.push({ ref, category: catLabel });
     const label = it.labelWithUnits || it.label || 'Entretien';
+    const vatPercent = resolveVat(typeId, label);
     pushLine({
       kind: 'contrat',
       label,
       description: ref,
       quantity: 1,
-      vatPercent: resolveVat(typeId, label),
-      ledgerAccountId: ledgerForCategory(catId, catLabel),
+      vatPercent,
+      ledgerAccountId: ledgerForCategory(catId, catLabel, VAT_CODES[vatPercent] || null),
       grossTtc,
       netTtc,
       discountPercent: discount ? discount.percent : 0,
@@ -225,8 +259,16 @@ export function buildEntretienInvoice({
   // --- Pièces non offertes, TVA de la première ligne d'équipement, sans remise ---
   const partsVat = lines[0]?.vatPercent ?? DEFAULT_VAT_PERCENT;
   const billableParts = (parts || []).filter((p) => p && !p.offert && (Number(p.prix_ht) || 0) > 0);
-  if (billableParts.length > 0 && !ledgerAccounts?.parts) {
-    warnings.push({ code: 'compte_manquant', message: 'Pas de compte comptable paramétré pour les pièces de rechange : Pennylane appliquera son compte de vente par défaut.' });
+  let partsLedgerId = null;
+  if (billableParts.length > 0) {
+    if (!ledgerAccounts?.parts) {
+      warnOnce('__parts__', 'Pas de compte comptable paramétré pour les pièces de rechange : Pennylane appliquera son compte de vente par défaut.');
+    } else {
+      partsLedgerId = resolveLedgerAccountId(catalog, ledgerAccounts.parts, VAT_CODES[partsVat] || null);
+      if (partsLedgerId == null) {
+        warnOnce('__parts__:introuvable', `Le compte ${ledgerAccounts.parts} paramétré pour les pièces n’existe plus dans Pennylane : compte par défaut appliqué.`);
+      }
+    }
   }
   for (const part of billableParts) {
     const qty = Number(part.quantite) || 1;
@@ -237,7 +279,7 @@ export function buildEntretienInvoice({
       description: part.reference || null,
       quantity: qty,
       vatPercent: partsVat,
-      ledgerAccountId: ledgerAccounts?.parts || null,
+      ledgerAccountId: partsLedgerId,
       grossTtc: unitTtc * qty,
     });
   }
