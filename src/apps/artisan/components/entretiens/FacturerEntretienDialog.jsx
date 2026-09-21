@@ -197,7 +197,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             <div className="text-xs text-gray-600 space-y-0.5">
               <div><span className="text-gray-500">Objet :</span> {model.subject}</div>
               <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(model.deadline)} ({invoiceSettings.deadlineDays} j)</div>
-              {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.name}</div>}
+              {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
           </>
         )}
