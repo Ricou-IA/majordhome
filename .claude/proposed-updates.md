@@ -20,3 +20,12 @@
 
 *Confirmé PENDING le 2026-08-09 : rien à graver tant que les phases ne sont pas livrées. Reconfirmé le 2026-09-16.*
 ---
+
+## [2026-09-21 23:15] Plan comptable de gestion + affectation par métier + icônes des tuiles
+**Statut** : PENDING
+**Commit** : (session du 2026-09-21, feat(settings): plan comptable de gestion)
+**Contexte** : Les sélecteurs de compte proposaient toute la classe 7 de Pennylane (une trentaine de numéros, chacun décliné par TVA). Eric : « la liste mérite d'être un paramètre plan comptable de gestion » et « l'affectation doit être affectée au métier » (entretien d'un poêle ≠ sa pose). Livré : tuile Socle → Plan comptable, section « Contrats d'entretien » renommée, icônes `Receipt`/`BookOpen` ajoutées à la page Paramètres (la tuile Facturation Pennylane affichait un « ? »).
+**Proposition** (§ Module Pennylane + § Paramétrage par module) :
+- **Plan comptable de gestion = source unique des sélecteurs de compte** : `settings.pennylane.chart = [{ number, alias }]` (Settings → Plan comptable, `pennylaneChart(settings)` dans `useOrgSettings.js`), vide → toute la classe 7 avec un rappel. Affectation PAR MÉTIER : « Contrat » = catégorie d'équipement → compte (livré) ; « Devis » = un compte par article du catalogue (colonnes `supplier_products.ledger_account_pl_id` / `quote_lines.ledger_account_pl_id` posées, aucun écran ne les renseigne, à câbler avec les devis natifs) ; travaux / installation = autre module. Ne jamais mélanger les contextes.
+- **Toute icône citée dans `src/lib/modules.js` doit figurer dans `ICONS` de `pages/Settings.jsx`**, sinon la tuile affiche un « ? » (HelpCircle) sans erreur — vécu sur Facturation Pennylane le 2026-09-21. À ajouter au test `modules.test.mjs` si ça se reproduit.
+---

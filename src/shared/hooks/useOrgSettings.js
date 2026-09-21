@@ -84,6 +84,22 @@ export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode
  * compte part en ligne libre sur le compte par défaut de PL, avec avertissement.
  * Fonction pure (pas de hook) pour être appelable depuis un modèle ou un test.
  */
+/**
+ * Plan comptable de GESTION (Eric, 2026-09-21) : le sous-ensemble des comptes de vente
+ * Pennylane que Majord'home a le droit d'utiliser, avec un alias facultatif. Source
+ * unique de tous les sélecteurs de compte (contrats d'entretien, pièces, catalogue
+ * article à venir). `settings.pennylane.chart = [{ number: '70601', alias: 'Entretien' }]`.
+ * Vide → les sélecteurs retombent sur toute la classe 7 de Pennylane.
+ * @returns {Array<{ number: string, alias: string }>}
+ */
+export function pennylaneChart(settings) {
+  const chart = settings?.pennylane?.chart;
+  if (!Array.isArray(chart)) return [];
+  return chart
+    .filter((c) => c && c.number)
+    .map((c) => ({ number: String(c.number), alias: typeof c.alias === 'string' ? c.alias : '' }));
+}
+
 export function pennylaneInvoiceSettings(settings) {
   const inv = settings?.pennylane?.invoice || {};
   const days = Number(inv.deadline_days);

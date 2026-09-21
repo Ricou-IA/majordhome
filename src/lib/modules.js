@@ -27,7 +27,8 @@ export const MODULES = [
       { key: 'permissions', title: 'Droits d\'accès', description: 'Permissions par rôle', icon: 'Shield', href: '/settings/permissions', adminOnly: true },
       { key: 'equipements', title: 'Équipements', description: 'Catégories et types d\'équipement du parc client', icon: 'Wrench', href: '/settings/equipements', adminOnly: true },
       { key: 'suppliers', title: 'Fournisseurs & catalogue', description: 'Fournisseurs et catalogues produits', icon: 'Truck', href: '/settings/suppliers', adminOnly: true },
-      { key: 'pennylane', title: 'Facturation Pennylane', description: 'Activation, échéance et mode des factures créées depuis les cartes', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
+      { key: 'pennylane', title: 'Facturation Pennylane', description: 'Activation, échéance, mode des factures et comptes des contrats d\'entretien', icon: 'Receipt', href: '/settings/pennylane', adminOnly: true },
+      { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home, avec alias', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true },
     ],
   },
   {

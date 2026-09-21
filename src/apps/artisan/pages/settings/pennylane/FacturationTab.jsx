@@ -14,7 +14,7 @@
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
+import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks/useOrgSettings';
 import { useLedgerAccounts } from '@hooks/usePennylane';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 
@@ -63,13 +63,19 @@ export default function FacturationTab() {
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
   // Pennylane décline chaque compte par taux de TVA (70601 × any / 10 % / 5,5 % / 20 %) :
   // on paramètre le NUMÉRO, une fois ; la facture choisit la déclinaison du taux de la ligne.
+  // Options = plan comptable de GESTION (Settings → Plan comptable, alias affiché) ; s'il est
+  // vide, toute la classe 7 de Pennylane, un numéro une fois.
+  const chart = useMemo(() => pennylaneChart(settings), [settings]);
   const accountOptions = useMemo(() => {
     const byNumber = new Map();
     for (const a of accounts || []) {
       if (!byNumber.has(a.number)) byNumber.set(a.number, { number: a.number, label: a.label });
     }
+    if (chart.length > 0) {
+      return chart.map((c) => ({ number: c.number, label: c.alias || byNumber.get(c.number)?.label || '' }));
+    }
     return [...byNumber.values()].sort((a, b) => a.number.localeCompare(b.number));
-  }, [accounts]);
+  }, [accounts, chart]);
   // Anciens réglages stockés par id → convertis en numéro dès que le catalogue est là
   useEffect(() => {
     if (!accounts?.length) return;
@@ -179,10 +185,14 @@ export default function FacturationTab() {
       </section>
 
       <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
-        <h3 className={SECTION_TITLE}>Comptes comptables (famille des lignes)</h3>
+        <h3 className={SECTION_TITLE}>Contrats d&apos;entretien — compte de vente par catégorie d&apos;équipement</h3>
         <p className="text-xs text-secondary-500 mb-3">
-          Chaque ligne de facture est comptabilisée sur le compte de vente de sa catégorie d&apos;équipement : c&apos;est la famille
-          que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane applique son compte par défaut.
+          Contexte « contrat » : chaque ligne d&apos;une facture d&apos;entretien est comptabilisée sur le compte de sa catégorie
+          d&apos;équipement, la famille que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane
+          applique son compte par défaut. Les devis (articles du catalogue) et les travaux auront leur propre affectation.
+          {chart.length === 0 && (
+            <> Aucun plan comptable de gestion défini : toute la classe 7 est proposée (Paramètres → Plan comptable pour la réduire).</>
+          )}
         </p>
         {accountsError && (
           <p className={`${ERROR_CLASS} mb-3`}>Comptes Pennylane indisponibles : {accountsError.message || 'erreur'}</p>
