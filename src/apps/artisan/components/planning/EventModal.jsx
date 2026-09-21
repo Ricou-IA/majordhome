@@ -255,7 +255,10 @@ export function EventModal({
       // Chercher d'abord un entretien pur, puis un SAV avec entretien inclus
       const { data } = await supabase
         .from('majordhome_entretien_sav')
-        .select('id, workflow_status, intervention_type, includes_entretien, client_id, contract_id, effective_contract_id')
+        // project_id / client_project_id : CertificatsSection en a besoin pour créer les
+        // enfants (interventions.project_id NOT NULL). Sans eux, la création échouait en
+        // 23502 à chaque ouverture d'un RDV entretien (avalé jusqu'au 2026-09-20).
+        .select('id, workflow_status, intervention_type, includes_entretien, client_id, contract_id, effective_contract_id, project_id, client_project_id')
         .eq('client_id', appointment.client_id)
         .in('workflow_status', ['planifie', 'a_planifier', 'realise'])
         .order('created_at', { ascending: false })

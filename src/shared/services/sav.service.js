@@ -788,6 +788,8 @@ export const savService = {
       if (fields.parts_order_status !== undefined) updates.parts_order_status = fields.parts_order_status || null;
       if (fields.includes_entretien !== undefined) updates.includes_entretien = !!fields.includes_entretien;
       if (fields.invoiced_at !== undefined) updates.invoiced_at = fields.invoiced_at;
+      // Id de la facture Pennylane créée depuis la carte (push MDH → PL, spec 2026-09-21)
+      if (fields.invoice_id !== undefined) updates.invoice_id = fields.invoice_id || null;
       if (fields.scheduled_date !== undefined) updates.scheduled_date = fields.scheduled_date || null;
       // Rattrapage du rattachement contrat (carte créée avant la saisie du contrat).
       // Volontairement NON destructif : on ne pose que du renseigné, jamais de NULL —
@@ -848,6 +850,11 @@ export const savService = {
    */
   async createChildInterventions(parentId, equipments, { projectId, clientId, contractId }) {
     return withErrorHandling(async () => {
+      // interventions.project_id est NOT NULL sans défaut : un appelant qui a chargé le
+      // parent sans sa colonne project_id ferait échouer l'insert en 23502, message
+      // illisible côté UI. On le dit en clair (vécu : EventModal, 2026-09-11 → 09-21).
+      if (!projectId) throw new Error('[sav] projectId requis pour créer les certificats (parent chargé sans project_id ?)');
+
       const rows = equipments.map((eq) => ({
         parent_id: parentId,
         equipment_id: eq.id,
