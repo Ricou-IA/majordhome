@@ -149,7 +149,7 @@ test('DALOUS : une ligne au prix grille = montant contractuel, TVA 10 %, HT dér
   assert.equal(l.grossTtc, 90);
   assert.equal(l.netTtc, 90);
   assert.equal(l.discountPercent, 0);
-  assert.equal(l.unitPriceHt, '81.8181818182');
+  assert.equal(l.unitPriceHt, '81.818182');
   assert.equal(m.discount, null);
   assert.equal(m.totalTtc, 90);
   assert.equal(m.subject, 'Entretien de votre poêle à bois : Jollymec · Quadro+s/80 · N° 0160067');
@@ -227,7 +227,7 @@ test('pièces : les non offertes s’ajoutent sur la même facture, TVA de l’�
   assert.equal(piece.quantity, 2);
   assert.equal(piece.vatCode, 'FR_100');
   assert.equal(piece.discountPercent, 0);
-  assert.equal(piece.unitPriceHt, '27.2727272727');
+  assert.equal(piece.unitPriceHt, '27.272727');
   assert.equal(piece.netTtc, 60);
   assert.equal(m.totalTtc, 285);
 });
@@ -246,7 +246,7 @@ test('catégorie sans TVA configurée : 20 % par défaut ET avertissement', () =
   const eqX = { id: 'eq-x', equipment_type_id: 'type-x', brand: 'Marque' };
   const m = buildEntretienInvoice(dalous({ contract: { amount: 100 }, pricing: pricingFor([eqX]) }));
   assert.equal(m.lines[0].vatCode, 'FR_200');
-  assert.equal(m.lines[0].unitPriceHt, '83.3333333333');
+  assert.equal(m.lines[0].unitPriceHt, '83.333333');
   assert.ok(m.warnings.some((w) => w.code === 'tva_par_defaut'));
 });
 
@@ -281,9 +281,9 @@ test('charge utile Pennylane : chaînes pour les montants, remise relative par l
   assert.deepEqual(brouillon.invoice_lines[0], {
     label: 'Entretien et ramonage de conduit poêle à bois',
     description: 'Jollymec · Quadro+s/80 · N° 0160067',
-    quantity: '1',
+    quantity: 1,
     unit: 'piece',
-    raw_currency_unit_price: '81.8181818182',
+    raw_currency_unit_price: '81.818182',
     vat_rate: 'FR_100',
     discount: { type: 'relative', value: '10' },
   });

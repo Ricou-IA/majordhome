@@ -29,10 +29,14 @@ export const DEFAULT_DEADLINE_DAYS = 30;
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const round4 = (n) => Math.round((Number(n) || 0) * 10000) / 10000;
 
-/** HT unitaire à partir d'un TTC total, 10 décimales sans zéros de queue (chaîne, exigée par PL). */
+/**
+ * HT unitaire à partir d'un TTC total — chaîne, **6 décimales max** (limite du schéma
+ * PL `raw_currency_unit_price` : 10 décimales ⇒ 400 « schema of invoice_lines isn't
+ * one of Product-based / Standard Invoice Line », vécu 2026-09-22), sans zéros de queue.
+ */
 function unitHt(totalTtc, quantity, vatPercent) {
   const ht = totalTtc / (quantity || 1) / (1 + vatPercent / 100);
-  return ht.toFixed(10).replace(/\.?0+$/, '');
+  return ht.toFixed(6).replace(/\.?0+$/, '');
 }
 
 function addDaysIso(iso, days) {
@@ -322,7 +326,9 @@ export function toPennylaneInvoicePayload(model, { customerId, draft, externalRe
     invoice_lines: model.lines.map((l) => {
       const line = { label: l.label };
       if (l.description) line.description = l.description;
-      line.quantity = String(l.quantity);
+      // Schéma PL : `quantity` est un NOMBRE, les montants sont des chaînes (une
+      // quantité en chaîne ⇒ 400 « schema of invoice_lines isn't one of… », 2026-09-22)
+      line.quantity = Number(l.quantity);
       line.unit = 'piece';
       line.raw_currency_unit_price = l.unitPriceHt;
       line.vat_rate = l.vatCode;
