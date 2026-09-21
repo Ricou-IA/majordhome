@@ -86,9 +86,10 @@ export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode
  */
 /**
  * Plan comptable de GESTION (Eric, 2026-09-21) : le sous-ensemble des comptes de vente
- * Pennylane que Majord'home a le droit d'utiliser, avec un alias facultatif. Source
- * unique de tous les sélecteurs de compte (contrats d'entretien, pièces, catalogue
- * article à venir). `settings.pennylane.chart = [{ number: '70601', alias: 'Entretien' }]`.
+ * Pennylane que Majord'home a le droit d'utiliser. Pennylane est canonique (numéro ET
+ * libellé) : on coche, on ne renomme pas (`alias` toléré en lecture pour d'anciens
+ * réglages, plus saisi). Source unique de tous les sélecteurs de compte (contrats
+ * d'entretien, pièces, catalogue article à venir). `settings.pennylane.chart = [{ number }]`.
  * Vide → les sélecteurs retombent sur toute la classe 7 de Pennylane.
  * @returns {Array<{ number: string, alias: string }>}
  */

@@ -9,7 +9,7 @@ export default function PlanComptableSettings() {
   return (
     <SettingsPage
       title="Plan comptable"
-      description="Les comptes de vente Pennylane que Majord'home a le droit d'utiliser, et le nom que vous leur donnez."
+      description="Les comptes de vente Pennylane que Majord'home a le droit d'utiliser. Pennylane reste la référence : numéros et libellés viennent de là."
     >
       <PlanComptableTab />
     </SettingsPage>
