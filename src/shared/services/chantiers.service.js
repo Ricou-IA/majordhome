@@ -194,6 +194,19 @@ export const chantiersService = {
     });
   },
 
+  /**
+   * Commande « personnes × jours » de l'installation (spec 2026-09-21).
+   * null = non renseigné (la RPC pose NULL quand la clé est présente et vide).
+   */
+  async updatePlannedOrder(leadId, { teamSize, days }) {
+    if (!leadId) throw new Error('[chantiers] leadId requis');
+
+    return leadsService.updateLead(leadId, {
+      planned_team_size: teamSize ?? null,
+      planned_days: days ?? null,
+    });
+  },
+
   // ==========================================================================
   // PV DE RÉCEPTION
   // ==========================================================================

@@ -504,7 +504,23 @@ export function useChantierAppointments(orgId, leadId) {
         .order('scheduled_date', { ascending: true })
         .order('scheduled_start', { ascending: true });
       if (error) throw error;
-      return data || [];
+      const rows = data || [];
+      if (rows.length === 0) return rows;
+      // Techniciens par RDV (vue miroir simple = pas d'agrégat : 2ᵉ requête + merge,
+      // même pattern que getTeamDayAvailability). Sert au badge « 1/2 pers. » de la
+      // commande d'installation.
+      const { data: techLinks, error: techError } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('appointment_id, technician_id')
+        .in('appointment_id', rows.map((r) => r.id));
+      if (techError) throw techError;
+      const byAppt = new Map();
+      (techLinks || []).forEach((t) => {
+        const arr = byAppt.get(t.appointment_id) || [];
+        arr.push(t.technician_id);
+        byAppt.set(t.appointment_id, arr);
+      });
+      return rows.map((r) => ({ ...r, technician_ids: byAppt.get(r.id) || [] }));
     },
     enabled: !!orgId && !!leadId,
     staleTime: 15_000,

@@ -34,6 +34,7 @@ import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
+import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
   const { organization, user } = useAuth();
@@ -44,6 +45,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     updateChantierStatus,
     updateEstimatedDate,
     updateChantierNotes,
+    updatePlannedOrder,
     isUpdatingStatus,
   } = useChantierMutations();
 
@@ -69,6 +71,22 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   // Planification installation (assistant créneaux)
   const [showScheduler, setShowScheduler] = useState(false);
   const [isSchedulingInstall, setIsSchedulingInstall] = useState(false);
+
+  // Commande « personnes × jours » (spec 2026-09-21) : persistée sur le chantier,
+  // l'assistant et le badge J i/N en dérivent. Sauvegarde au blur, sans bloquer.
+  const plannedOrder = useMemo(
+    () => ({ teamSize: chantier?.planned_team_size ?? null, days: chantier?.planned_days ?? null }),
+    [chantier?.planned_team_size, chantier?.planned_days],
+  );
+  const handlePlannedOrderChange = async ({ teamSize, days }) => {
+    try {
+      await updatePlannedOrder(chantier.id, { teamSize, days });
+      onUpdated?.();
+    } catch (err) {
+      console.error('[ChantierModal] updatePlannedOrder error:', err);
+      toast.error('Impossible d\'enregistrer la commande');
+    }
+  };
 
 
   // Trajet depuis le siège de l'org (P0.19 — paramétré via settings, fallback Mayer/Gaillac
@@ -218,6 +236,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         client_id: chantier.client_id || null,
         client_name: chantier.last_name || 'Sans nom',
         client_first_name: chantier.first_name || null,
+        // Photo de contact complète sur le RDV (le téléphone manquait sur les installations).
+        client_phone: chantier.phone || null,
+        client_email: chantier.email || null,
         address: chantier.address || null,
         city: chantier.city || null,
         postal_code: chantier.postal_code || null,
@@ -384,7 +405,16 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
           {/* Section installation (Bloc B stage 4 : jours = appointments `installation`) */}
           {showScheduler ? (
-            <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3">
+            <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 space-y-3">
+              {/* Commande « personnes × jours » : saisie ici, persistée sur le chantier */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs font-semibold text-secondary-500 uppercase tracking-wider">Commande</span>
+                <PlannedOrderFields
+                  teamSize={plannedOrder.teamSize}
+                  days={plannedOrder.days}
+                  onChange={handlePlannedOrderChange}
+                />
+              </div>
               <SchedulingAssistant
                 lead={schedulingLead}
                 orgId={orgId}
@@ -394,6 +424,9 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                 appointmentTypeValue="installation"
                 defaultDuration={480}
                 multi
+                mergeOverlapping
+                expectedTeamSize={plannedOrder.teamSize}
+                expectedDays={plannedOrder.days}
                 onConfirm={handleConfirmInstallation}
                 onCancel={() => setShowScheduler(false)}
                 isLoading={isSchedulingInstall}
@@ -402,6 +435,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           ) : (
             <ChantierInterventionSection
               appointments={installAppointments}
+              plannedOrder={plannedOrder}
               onSchedule={() => setShowScheduler(true)}
               onDeleteAppointment={handleDeleteInstallAppointment}
               disabled={chantier.chantier_status === 'gagne'}

@@ -11,6 +11,7 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@services/chantiers.service';
 import { chantierKeys } from '@hooks/cacheKeys';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -81,6 +82,13 @@ export function useChantierMutations() {
     onSuccess: invalidateChantiers,
   });
 
+  // Mutation : commande « personnes × jours » (spec 2026-09-21)
+  const plannedOrderMutation = useMutation({
+    mutationFn: ({ leadId, teamSize, days }) =>
+      unwrapResult(chantiersService.updatePlannedOrder(leadId, { teamSize, days })),
+    onSuccess: invalidateChantiers,
+  });
+
   // Mutation : upload PV de réception
   const pvMutation = useMutation({
     mutationFn: ({ leadId, file }) =>
@@ -108,6 +116,10 @@ export function useChantierMutations() {
     uploadPvReception: useCallback(
       (leadId, file) => pvMutation.mutateAsync({ leadId, file }),
       [pvMutation]
+    ),
+    updatePlannedOrder: useCallback(
+      (leadId, { teamSize, days }) => plannedOrderMutation.mutateAsync({ leadId, teamSize, days }),
+      [plannedOrderMutation]
     ),
 
     // États
