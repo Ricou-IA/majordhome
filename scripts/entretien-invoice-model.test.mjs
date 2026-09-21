@@ -250,6 +250,15 @@ test('catégorie sans TVA configurée : 20 % par défaut ET avertissement', () =
   assert.ok(m.warnings.some((w) => w.code === 'tva_par_defaut'));
 });
 
+test('équipement « À renseigner » : le texte de remplissage n’apparaît ni en description ni dans l’objet (FERNANDEZ, 2026-09-22)', () => {
+  const eq = { id: 'eq-p', brand: 'À renseigner', model: 'à renseigner', serial_number: '', equipment_type_id: 'type-poele' };
+  const m = buildEntretienInvoice(dalous({ pricing: pricingFor([eq]) }));
+  assert.equal(m.lines[0].description, null);
+  assert.equal(m.subject, 'Entretien — contrat CTR-00593');
+  const payload = toPennylaneInvoicePayload(m, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.equal('description' in payload.invoice_lines[0], false);
+});
+
 test('montant contractuel nul : erreur bloquante, aucune ligne', () => {
   const m = buildEntretienInvoice(dalous({ contract: { contract_number: 'CTR-1', amount: 0 } }));
   assert.ok(m.errors.some((e) => e.code === 'montant_contrat_nul'));

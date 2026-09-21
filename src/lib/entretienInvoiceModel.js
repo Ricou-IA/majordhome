@@ -76,10 +76,22 @@ export function resolveLedgerAccountId(catalog, ref, vatCode) {
   return list.length === 0 ? ref : null; // catalogue absent : on fait confiance à la valeur ; présent : introuvable
 }
 
-/** « Marque · Modèle · N° série » d'un équipement, ou null si rien de renseigné. */
+/** Texte de remplissage saisi dans le parc à la place d'une vraie valeur : jamais sur une facture. */
+const PLACEHOLDER_RE = /^\s*(à|a)\s+renseigner\s*$|^\s*(n\/?a|inconnu|\?+|-+)\s*$/i;
+const clean = (v) => {
+  const s = v == null ? '' : String(v).trim();
+  return s && !PLACEHOLDER_RE.test(s) ? s : null;
+};
+
+/**
+ * « Marque · Modèle · N° série » d'un équipement, ou null si rien de renseigné.
+ * Les textes de remplissage (« À renseigner »…) sont ignorés — vu sur le brouillon
+ * FERNANDEZ du 2026-09-22 : « Entretien de votre poêle : À renseigner · À renseigner ».
+ */
 export function referenceEquipement(eq) {
   if (!eq) return null;
-  const parts = [eq.brand, eq.model, eq.serial_number ? `N° ${eq.serial_number}` : null].filter(Boolean);
+  const serial = clean(eq.serial_number);
+  const parts = [clean(eq.brand), clean(eq.model), serial ? `N° ${serial}` : null].filter(Boolean);
   return parts.length ? parts.join(' · ') : null;
 }
 
