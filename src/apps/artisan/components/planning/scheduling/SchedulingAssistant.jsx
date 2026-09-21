@@ -27,6 +27,7 @@ import { SlotDraftList } from './SlotDraftList';
 import { AssignSlotModal } from './AssignSlotModal';
 import { useTeamDayAvailability } from '@hooks/useAppointments';
 import { findMemberConflicts } from '@/lib/scheduleConflicts';
+import { fusionnerCreneau, etatCommande } from '@/lib/installOrder';
 import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================
@@ -72,6 +73,11 @@ function newId() {
  * @param {Function} [props.onSlotsChange] - (slots[]) => void  (mode embedded, doit être stable)
  * @param {string|null} [props.initialDate] - YYYY-MM-DD : jour affiché à l'ouverture
  *   (re-planification → date actuelle du RDV). null → prochain jour ouvré.
+ * @param {boolean} [props.mergeOverlapping] - commande « personnes × jours » (installation,
+ *   SAV) : un clic sur une journée qui porte déjà un créneau au même horaire AJOUTE la
+ *   personne à ce créneau au lieu d'en créer un second (un jour = un RDV à N techniciens).
+ * @param {number|null} [props.expectedTeamSize] - personnes attendues par jour (commande de la carte)
+ * @param {number|null} [props.expectedDays] - jours attendus (commande de la carte)
  */
 export function SchedulingAssistant({
   lead,
@@ -94,6 +100,9 @@ export function SchedulingAssistant({
   embedded = false,
   onSlotsChange,
   initialDate = null,
+  mergeOverlapping = false,
+  expectedTeamSize = null,
+  expectedDays = null,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -171,8 +180,13 @@ export function SchedulingAssistant({
       duration: duration || defaultDuration,
       technicianIds: Array.from(new Set([memberId, ...defaultTechIds])),
     };
-    setDraftSlots((prev) => (multi ? [...prev, slot] : [slot]));
-  }, [multi, defaultDuration, defaultTechIds]);
+    setDraftSlots((prev) => {
+      if (!multi) return [slot];
+      // Commande « personnes × jours » : même journée, même horaire ⇒ on ajoute la
+      // personne au créneau existant (un jour = un RDV à N techniciens).
+      return mergeOverlapping ? fusionnerCreneau(prev, slot) : [...prev, slot];
+    });
+  }, [multi, defaultDuration, defaultTechIds, mergeOverlapping]);
 
   const handleAssignPrompt = useCallback((ids) => {
     const slotId = assignPromptSlot?.id;
@@ -240,6 +254,13 @@ export function SchedulingAssistant({
   const assignedSlots = useMemo(
     () => draftSlots.filter((s) => (s.technicianIds || []).length > 0),
     [draftSlots],
+  );
+
+  // État de la commande (personnes × jours) sur les créneaux en brouillon :
+  // on prévient, on ne bloque pas (« on décide sur l'instant »).
+  const commande = useMemo(
+    () => etatCommande({ teamSize: expectedTeamSize, days: expectedDays }, draftSlots),
+    [expectedTeamSize, expectedDays, draftSlots],
   );
 
   // --- Mode intégré (embedded) : remonte en continu les créneaux au host (EventModal),
@@ -365,7 +386,16 @@ export function SchedulingAssistant({
         onToggleTech={handleToggleTech}
         assigneeLabel={assigneeLabel}
         showTechSelect={!commercialMode}
+        expectedTeamSize={expectedTeamSize}
+        expectedDays={expectedDays}
       />
+
+      {/* Commande incomplète (personnes × jours) : avertissement, pas de blocage */}
+      {!commande.complete && draftSlots.length > 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {commande.message} — vous pouvez planifier quand même et compléter plus tard.
+        </p>
+      )}
 
       {!embedded && (
         <>

@@ -43,6 +43,8 @@ function formatSlotDate(dateStr) {
  * @param {Function} props.onToggleTech - (slotId, techId) => void
  * @param {string} [props.assigneeLabel] - libellé du type de membre (défaut "Technicien(s)")
  * @param {boolean} [props.showTechSelect] - afficher le sélecteur par ligne (défaut true)
+ * @param {number|null} [props.expectedTeamSize] - commande : personnes attendues par créneau
+ * @param {number|null} [props.expectedDays] - commande : jours attendus
  */
 export function SlotDraftList({
   slots = [],
@@ -52,12 +54,20 @@ export function SlotDraftList({
   onToggleTech,
   assigneeLabel = 'Technicien(s)',
   showTechSelect = true,
+  expectedTeamSize = null,
+  expectedDays = null,
 }) {
+  const joursPoses = new Set(slots.map((s) => s.date).filter(Boolean)).size;
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
         <CalendarDays className="w-4 h-4 text-blue-600" />
         Créneaux à planifier ({slots.length})
+        {expectedDays ? (
+          <span className={`text-xs font-medium ${joursPoses < expectedDays ? 'text-amber-700' : 'text-gray-500'}`}>
+            · {joursPoses}/{expectedDays} jour{expectedDays > 1 ? 's' : ''}
+          </span>
+        ) : null}
       </h4>
 
       {slots.length === 0 ? (
@@ -95,6 +105,19 @@ export function SlotDraftList({
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                         <UserX className="w-3 h-3" />
                         En attente d&apos;une personne
+                      </span>
+                    )}
+                    {/* Commande : personnes posées / attendues sur ce créneau */}
+                    {expectedTeamSize && selectedIds.length > 0 && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[11px] border shrink-0 ${
+                          selectedIds.length < expectedTeamSize
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}
+                        title={`${selectedIds.length} personne(s) sur ${expectedTeamSize} attendue(s)`}
+                      >
+                        {selectedIds.length}/{expectedTeamSize} pers.
                       </span>
                     )}
                   </div>
