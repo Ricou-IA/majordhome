@@ -132,3 +132,6 @@ verify_jwt = true
 # spec 2026-09-12 « bloc contrat et journée pleine ») — protégée par MDH_CRON_SECRET.
 [functions.tournees-figer]
 verify_jwt = false
+
+[functions.pennylane-ledger-push]
+verify_jwt = true

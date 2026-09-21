@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks/useOrgSettings';
 import { useLedgerAccounts, useJournals } from '@hooks/usePennylane';
+import { pennylaneService } from '@services/pennylane.service';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -96,6 +97,42 @@ export default function FacturationTab() {
   }, [accounts]);
   const setLedgerForCategory = (catId, value) =>
     setForm((f) => ({ ...f, ledger_by_category: { ...f.ledger_by_category, [catId]: value } }));
+
+  // --- Spike écriture dans le journal (admin) ---
+  const [testAccount411, setTestAccount411] = useState('');
+  const [testAccount706, setTestAccount706] = useState('706');
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState('');
+  const handleTestLedgerEntry = async () => {
+    if (!form.journal_id || !testAccount411) return;
+    if (!window.confirm('Pousser une écriture de test de 1,20 € dans ce journal Pennylane ? Elle devra être contrepassée.')) return;
+    setTestRunning(true);
+    setTestResult('');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const journal = journals.find((j) => String(j.id) === form.journal_id);
+    const piece = `MDH-TEST-${stamp}`;
+    const { data, error } = await pennylaneService.pushLedgerEntry({
+      journal_id: Number(form.journal_id),
+      date: new Date().toISOString().slice(0, 10),
+      due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      label: `TEST Majordhome ${piece} — écriture d’essai à contrepasser`,
+      piece_number: piece,
+      lines: [
+        { account_number: testAccount411, debit: 1.2, credit: 0, label: `Client test ${piece}` },
+        { account_number: testAccount706, vat_rate: 'FR_200', debit: 0, credit: 1.0, label: 'Prestation test' },
+        { account_number: '44571', vat_rate: 'FR_200', debit: 0, credit: 0.2, label: 'TVA collectée 20 %' },
+      ],
+      test_pdf_text: `TEST Majordhome ${piece} - journal ${journal?.code || form.journal_id} - a contrepasser`,
+    });
+    setTestRunning(false);
+    if (error) {
+      setTestResult(JSON.stringify({ error: error.message, steps: error.steps || null }, null, 2));
+      toast.error(error.message || 'Écriture de test refusée');
+      return;
+    }
+    setTestResult(JSON.stringify(data, null, 2));
+    toast.success(`Écriture ${piece} poussée — vérifiez dans Pennylane (journal ${journal?.code || ''})`);
+  };
 
   useEffect(() => {
     const picked = pickForm(settings);
@@ -258,6 +295,57 @@ export default function FacturationTab() {
           <p className={HINT_CLASS}>Aucune catégorie d&apos;équipement active (Paramètres → Équipements).</p>
         )}
       </section>
+
+      {/* Spike 2026-09-22 (admin) : une écriture de vente poussée dans le journal choisi,
+          avec un PDF, est-elle convertie en facture par Pennylane (voie « logiciel de
+          facturation tiers », article 301073) ? Montant symbolique, à contrepasser. */}
+      {form.enabled && form.journal_id && (
+        <section>
+          <h3 className={SECTION_TITLE}>Test d&apos;écriture dans le journal (administrateur)</h3>
+          <p className="text-xs text-secondary-500 mb-3">
+            Pousse une écriture de vente de 1,20 € TTC (1,00 € HT + 0,20 € de TVA à 20 %) dans le journal sélectionné, avec un PDF
+            d&apos;essai, pour vérifier si Pennylane la convertit en facture. À contrepasser ensuite dans Pennylane.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className={LABEL_CLASS}>Compte 411 du client de test</label>
+              <input
+                type="text"
+                value={testAccount411}
+                onChange={(e) => setTestAccount411(e.target.value.trim())}
+                placeholder="411000197"
+                className={INPUT_CLASS}
+              />
+              <p className={HINT_CLASS}>Numéro de compte auxiliaire du client (fiche client, « n° Pennylane »).</p>
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>Compte de vente</label>
+              <input
+                type="text"
+                value={testAccount706}
+                onChange={(e) => setTestAccount706(e.target.value.trim())}
+                placeholder="706"
+                className={INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={handleTestLedgerEntry}
+                disabled={testRunning || !testAccount411 || !testAccount706}
+                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 w-full"
+              >
+                {testRunning ? 'Envoi…' : 'Pousser l’écriture de test'}
+              </button>
+            </div>
+          </div>
+          {testResult && (
+            <pre className="mt-3 max-h-80 overflow-auto text-[11px] bg-secondary-50 border border-secondary-200 rounded-md p-3 whitespace-pre-wrap break-all">
+              {testResult}
+            </pre>
+          )}
+        </section>
+      )}
 
       <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
         <button
