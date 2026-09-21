@@ -34,13 +34,19 @@ const TABLES = [
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
   { schema: 'majordhome', table: 'team_members', columns: null },
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at'] },
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at'] },
   { schema: 'majordhome', table: 'equipments', columns: null },
-  { schema: 'majordhome', table: 'contracts', columns: ['id', 'org_id', 'client_id', 'status', 'start_date', 'zone_id', 'amount', 'subtotal', 'discount_percent', 'source', 'notes', 'contract_number', 'created_at', 'updated_at'], data: false },
+  // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
+  // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
+  { schema: 'majordhome', table: 'contracts', columns: null, data: false },
   { schema: 'majordhome', table: 'contract_equipments', columns: null, data: false },
   { schema: 'majordhome', table: 'contract_pricing_items', columns: ['id', 'contract_id', 'equipment_type_id', 'zone_id', 'equipment_id', 'quantity', 'base_price', 'unit_price', 'line_total', 'created_at'], data: false },
-  { schema: 'majordhome', table: 'interventions', columns: ['id', 'project_id', 'client_id', 'contract_id', 'equipment_id', 'intervention_type', 'status', 'workflow_status', 'includes_entretien', 'tags', 'metadata', 'scheduled_date', 'scheduled_time_start', 'scheduled_time_end', 'technician_id', 'technician_name', 'created_at'], data: false },
-  { schema: 'majordhome', table: 'certificats', columns: ['id', 'org_id', 'equipment_id', 'equipement_type', 'type_document', 'tva_taux', 'created_at'] },
+  { schema: 'majordhome', table: 'interventions', columns: null, data: false },
+  { schema: 'majordhome', table: 'certificats', columns: ['id', 'org_id', 'equipment_id', 'intervention_id', 'equipement_type', 'type_document', 'tva_taux', 'pieces_remplacees', 'created_at'] },
+  { schema: 'majordhome', table: 'leads', columns: null, data: false },
+  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: ['id', 'lead_id', 'org_id', 'quote_status', 'quote_amount_ht', 'ejected_at'], data: false },
+  { schema: 'majordhome', table: 'appointments', columns: ['id', 'org_id', 'lead_id', 'intervention_id', 'client_id', 'appointment_type', 'status', 'scheduled_date', 'scheduled_start', 'created_at'], data: false },
+  { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
 ];
 
 const FUNCTIONS = [
@@ -51,6 +57,10 @@ const FUNCTIONS = [
   'majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.team_member_set_routing_settings(uuid, integer, boolean, text[])',
+  // 20260922_1 (commande personnes × jours) : vues chantiers / entretien_sav + RPC de patch lead
+  'majordhome.project_org_id(uuid)',
+  'majordhome.quote_status_bucket(text)',
+  'public.update_majordhome_lead(uuid, jsonb)',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
@@ -66,6 +76,11 @@ const VIEWS = [
   'public.majordhome_client_equipment_kinds',
   'public.majordhome_pricing_zones',
   'public.majordhome_organizations',
+  // 20260922_1 : cibles du CREATE OR REPLACE (l'ordre compte : lead_quote_stats avant chantiers)
+  'majordhome.lead_quote_stats',
+  'public.majordhome_interventions',
+  'public.majordhome_chantiers',
+  'public.majordhome_entretien_sav',
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
