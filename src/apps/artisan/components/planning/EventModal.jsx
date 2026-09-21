@@ -385,6 +385,38 @@ export function EventModal({
   }, [isOpen, mode, appointment, defaultDate, defaultTime, prefillClient, isEdit, clearClientSearch, clearLeadSearch, attachContext]);
 
   // --------------------------------------------------------------------------
+  // Édition : compléter le client lié depuis sa fiche. La photo du RDV n'a ni
+  // numéro client ni forcément le téléphone/adresse (selon le chemin de création).
+  // Lecture seule : rien n'est réécrit sur le RDV, la carte contact affiche
+  // formData.* en priorité et selectedClient.* en repli.
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isOpen || !isEdit || !appointment?.client_id || !orgId) return;
+    let cancelled = false;
+    supabase
+      .from('majordhome_clients')
+      .select('id, display_name, client_number, phone, address, postal_code, city')
+      .eq('id', appointment.client_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.warn('[EventModal] fetch linked client error:', error); return; }
+        if (!data) return;
+        setSelectedClient(prev => (prev && prev.id === data.id ? {
+          ...prev,
+          display_name: prev.display_name || data.display_name,
+          client_number: data.client_number,
+          phone: prev.phone || data.phone,
+          address: data.address,
+          postal_code: data.postal_code,
+          city: prev.city || data.city,
+        } : prev));
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, isEdit, appointment?.client_id, orgId]);
+
+  // --------------------------------------------------------------------------
   // Mettre à jour un champ (avec auto-calcul heures)
   // --------------------------------------------------------------------------
   const updateField = useCallback((field, value) => {

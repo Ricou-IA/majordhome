@@ -191,6 +191,32 @@ export const SectionDateTime = ({ formData, updateField, errors, isCancelled, re
 // SECTION CLIENT
 // ============================================================================
 
+/** Chip « lien » de la carte contact : ouvre la cible, `×` pour délier (null = pas de délier). */
+const LinkChip = ({ icon: Icon, label, title, tone, onOpen, onUnlink, unlinkTitle }) => (
+  <span className={`inline-flex items-center rounded-md border text-xs shrink-0 ${tone}`}>
+    <button
+      type="button"
+      onClick={onOpen}
+      title={title}
+      className="flex items-center gap-1 px-2 py-1 hover:bg-white/60 rounded-l-md transition-colors"
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+      <ExternalLink className="w-3 h-3" />
+    </button>
+    {onUnlink && (
+      <button
+        type="button"
+        onClick={onUnlink}
+        title={unlinkTitle}
+        className="px-1.5 py-1 border-l border-black/10 text-gray-400 hover:text-red-500 rounded-r-md transition-colors"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    )}
+  </span>
+);
+
 export const SectionClient = ({
   formData,
   updateField,
@@ -226,6 +252,24 @@ export const SectionClient = ({
   const displayLeads = leadOnly
     ? (clientSearchQuery.length >= 2 ? leadSearchResults : browseLeads)
     : leadSearchResults;
+
+  // Carte contact : photo du RDV d'abord, fiche client liée en repli.
+  const showClientChip = !!selectedClient && !leadOnly;
+  const contactName = [formData.client_name, formData.client_first_name].filter(Boolean).join(' ')
+    || (showClientChip ? selectedClient.display_name : '')
+    || selectedLead?.display_name
+    || 'Sans nom';
+  const contactPhone = formData.client_phone || (showClientChip ? selectedClient.phone : '') || '';
+  const contactAddress = [
+    formData.client_address || (showClientChip ? selectedClient.address : ''),
+    [
+      formData.client_postal_code || (showClientChip ? selectedClient.postal_code : ''),
+      formData.client_city || (showClientChip ? selectedClient.city : ''),
+    ].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ');
+  const showContactCard = showClientChip || !!selectedLead
+    || (showContactDetails && (contactName !== 'Sans nom' || contactPhone || contactAddress));
+
   return (
   <div>
     <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -233,102 +277,58 @@ export const SectionClient = ({
       Client
     </h3>
 
-    {/* Coordonnées du RDV (édition) : lecture directe pour le technicien —
-        nom, téléphone cliquable, adresse. Source = champs dénormalisés du RDV. */}
-    {showContactDetails && (formData.client_name || formData.client_first_name
-      || formData.client_phone || formData.client_address) && (
+    {/* Carte contact UNIQUE : nom + téléphone + adresse, avec les liens (fiche client /
+        carte pipeline) en chips. Une seule source affichée : la photo du RDV (formData),
+        complétée par la fiche client liée quand la photo est incomplète (téléphone,
+        adresse — selon le chemin de création, le RDV ne les porte pas toujours).
+        Avant : trois blocs (coordonnées + bannière client + bannière lead) répétaient
+        le même nom. Client masqué en leadOnly (R2 raisonne par carte, pas par client). */}
+    {showContactCard && (
       <div className="mb-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg space-y-1.5">
-        <div className="text-sm font-semibold text-gray-900">
-          {[formData.client_name, formData.client_first_name].filter(Boolean).join(' ') || 'Sans nom'}
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-gray-900 truncate">{contactName}</div>
+            {showClientChip && selectedClient.client_number && (
+              <div className="text-xs text-gray-500">N° client {selectedClient.client_number}</div>
+            )}
+          </div>
+          {showClientChip && (
+            <LinkChip
+              icon={UserCircle}
+              label="Fiche"
+              title="Voir la fiche client"
+              tone="border-blue-200 bg-blue-50 text-blue-700"
+              onOpen={() => navigate(`/clients/${selectedClient.id}`)}
+              onUnlink={isCancelled ? null : handleUnlinkClient}
+              unlinkTitle="Délier le client"
+            />
+          )}
+          {selectedLead && (
+            <LinkChip
+              icon={Link2}
+              label={selectedLead.status_label ? `Lead · ${selectedLead.status_label}` : 'Lead'}
+              title="Voir dans le pipeline"
+              tone="border-violet-200 bg-violet-50 text-violet-700"
+              onOpen={() => navigate('/pipeline')}
+              onUnlink={isCancelled ? null : handleUnlinkLead}
+              unlinkTitle="Délier le lead"
+            />
+          )}
         </div>
-        {formData.client_phone && (
+        {contactPhone && (
           <a
-            href={`tel:${formData.client_phone}`}
+            href={`tel:${contactPhone}`}
             className="flex items-center gap-1.5 text-sm text-blue-700 hover:underline w-fit"
           >
             <Phone className="w-3.5 h-3.5 shrink-0" />
-            {formatPhoneNumber(formData.client_phone)}
+            {formatPhoneNumber(contactPhone)}
           </a>
         )}
-        {(formData.client_address || formData.client_city) && (
+        {contactAddress && (
           <div className="flex items-start gap-1.5 text-sm text-gray-600">
             <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            <span>
-              {[
-                formData.client_address,
-                [formData.client_postal_code, formData.client_city].filter(Boolean).join(' '),
-              ].filter(Boolean).join(', ')}
-            </span>
+            <span>{contactAddress}</span>
           </div>
-        )}
-      </div>
-    )}
-
-    {/* Bannière client lié (masquée en mode leadOnly : R2 raisonne par carte, pas par client) */}
-    {selectedClient && !leadOnly && (
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-3">
-        <UserCircle className="w-5 h-5 text-blue-500 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-blue-800 truncate block">
-            {selectedClient.display_name}
-          </span>
-          <span className="text-xs text-blue-600">
-            {selectedClient.client_number && `${selectedClient.client_number}`}
-            {selectedClient.city ? `${selectedClient.client_number ? ' — ' : ''}${selectedClient.city}` : ''}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate(`/clients/${selectedClient.id}`)}
-          className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md transition-colors shrink-0"
-          title="Voir la fiche client"
-        >
-          <ExternalLink className="w-3 h-3" />
-          Fiche
-        </button>
-        {!isCancelled && (
-          <button
-            type="button"
-            onClick={handleUnlinkClient}
-            className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-            title="Délier le client"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-    )}
-
-    {/* Bannière lead lié */}
-    {selectedLead && (
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg mb-3">
-        <Link2 className="w-5 h-5 text-violet-500 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-violet-800 truncate block">
-            {selectedLead.display_name}
-          </span>
-          <span className="text-xs text-violet-600">
-            {selectedLead.status_label || 'Lead'}{selectedLead.source_name ? ` · ${selectedLead.source_name}` : ''}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate('/pipeline')}
-          className="flex items-center gap-1 text-xs px-2 py-1 bg-violet-100 text-violet-700 hover:bg-violet-200 rounded-md transition-colors shrink-0"
-          title="Voir dans le pipeline"
-        >
-          <ExternalLink className="w-3 h-3" />
-          Lead
-        </button>
-        {!isCancelled && (
-          <button
-            type="button"
-            onClick={handleUnlinkLead}
-            className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-            title="Délier le lead"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
         )}
       </div>
     )}
