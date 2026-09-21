@@ -86,10 +86,12 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       pricing,
       parts: Array.isArray(item.parts_detail) ? item.parts_detail : [],
       referentiel,
+      ledgerAccounts: invoiceSettings.ledgerAccounts,
       deadlineDays: invoiceSettings.deadlineDays,
       today: formatDateForInput(new Date()),
     });
-  }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, invoiceSettings.deadlineDays]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- invoiceSettings est dérivé de `settings` (objet stable de React Query)
+  }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings]);
 
   const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id;
 

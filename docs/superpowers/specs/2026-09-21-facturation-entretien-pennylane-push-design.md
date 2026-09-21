@@ -39,6 +39,11 @@ directement dans Pennylane, org sans intégration).
   recalcule et arrondit ; c'est ce qu'a produit la saisie manuelle : `81.81818181818181`).
 - **Objet PDF** : « Entretien de votre poêle à bois : Marque · Modèle · N° série », reconstruit depuis
   les équipements du contrat (format de la saisie manuelle).
+- **Comptes comptables = famille des lignes** (Eric, 2026-09-21 soir : « les articles doivent avoir
+  une famille pour les stats, je gère ça avec les comptes comptables, il faut qu'ils soient
+  paramétrables ») : `settings.pennylane.invoice.ledger_accounts = { by_category, parts }`, comptes
+  706* lus dans Pennylane, transmis en `ledger_account_id` par ligne. Lignes libres, **aucun article
+  créé côté Pennylane**. Sans compte → défaut PL + avertissement. Extensible aux travaux.
 - **Échéance** : `settings.pennylane.invoice.deadline_days` (défaut 30).
 - **Mode** : `settings.pennylane.invoice.mode` = `draft` (défaut) | `final`. On démarre en brouillon :
   la facture apparaît dans Pennylane, la carte est marquée, Eric finalise et envoie depuis PL. Bascule

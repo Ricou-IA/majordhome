@@ -1,14 +1,22 @@
 // src/apps/artisan/pages/settings/pennylane/FacturationTab.jsx
 // ============================================================================
-// Réglages `settings.pennylane` : { enabled, invoice: { deadline_days, mode } }.
+// Réglages `settings.pennylane` : { enabled, invoice: { deadline_days, mode,
+// ledger_accounts: { by_category: { [categoryId]: ledgerAccountId }, parts } } }.
 // `org_update_settings` merge le JSONB au niveau 1 → on renvoie TOUJOURS l'objet
 // `pennylane` complet (jamais un sous-objet partiel), cf. Module Solaire.
 // Lecture côté métier : `usePennylaneEnabled()` et `pennylaneInvoiceSettings()`
 // (src/shared/hooks/useOrgSettings.js).
+//
+// Comptes comptables (Eric, 2026-09-21) : la « famille » d'une ligne de facture
+// pour les stats = son compte de vente Pennylane (706xxx), choisi PAR CATÉGORIE
+// d'équipement + un compte pour les pièces. Les comptes viennent de Pennylane
+// (`useLedgerAccounts`, GET /ledger_accounts 706*) : rien n'est créé côté PL.
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
+import { useLedgerAccounts } from '@hooks/usePennylane';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -18,11 +26,26 @@ const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 
 function pickForm(settings) {
   const inv = pennylaneInvoiceSettings(settings);
+  const byCategory = {};
+  for (const [catId, id] of Object.entries(inv.ledgerAccounts.byCategory)) {
+    if (id) byCategory[catId] = String(id);
+  }
   return {
     enabled: Boolean(settings?.pennylane?.enabled),
     deadline_days: String(inv.deadlineDays),
     mode: inv.mode,
+    ledger_by_category: byCategory,
+    ledger_parts: inv.ledgerAccounts.parts ? String(inv.ledgerAccounts.parts) : '',
   };
+}
+
+/** `{ catId: '7061' }` → `{ catId: 7061 }` sans les vides (la forme stockée). */
+function ledgerAccountsForSave(form) {
+  const by_category = {};
+  for (const [catId, id] of Object.entries(form.ledger_by_category || {})) {
+    if (id) by_category[catId] = Number(id);
+  }
+  return { by_category, parts: form.ledger_parts ? Number(form.ledger_parts) : null };
 }
 
 function validate(form) {
@@ -36,6 +59,14 @@ export default function FacturationTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const [form, setForm] = useState(() => pickForm({}));
   const [initial, setInitial] = useState(() => pickForm({}));
+  const { categories } = useEquipmentReferential();
+  const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
+  const accountOptions = useMemo(
+    () => [...(accounts || [])].sort((a, b) => String(a.number).localeCompare(String(b.number))),
+    [accounts],
+  );
+  const setLedgerForCategory = (catId, value) =>
+    setForm((f) => ({ ...f, ledger_by_category: { ...f.ledger_by_category, [catId]: value } }));
 
   useEffect(() => {
     const picked = pickForm(settings);
@@ -58,6 +89,7 @@ export default function FacturationTab() {
           ...(settings?.pennylane?.invoice || {}),
           deadline_days: Number(form.deadline_days),
           mode: form.mode,
+          ledger_accounts: ledgerAccountsForSave(form),
         },
       };
       await save({ pennylane });
@@ -123,6 +155,53 @@ export default function FacturationTab() {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
+        <h3 className={SECTION_TITLE}>Comptes comptables (famille des lignes)</h3>
+        <p className="text-xs text-secondary-500 mb-3">
+          Chaque ligne de facture est comptabilisée sur le compte de vente de sa catégorie d&apos;équipement : c&apos;est la famille
+          que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane applique son compte par défaut.
+        </p>
+        {accountsError && (
+          <p className={`${ERROR_CLASS} mb-3`}>Comptes Pennylane indisponibles : {accountsError.message || 'erreur'}</p>
+        )}
+        <div className="grid sm:grid-cols-2 gap-4">
+          {categories.map((cat) => (
+            <div key={cat.id}>
+              <label className={LABEL_CLASS}>{cat.label}</label>
+              <select
+                value={form.ledger_by_category?.[cat.id] || ''}
+                onChange={(e) => setLedgerForCategory(cat.id, e.target.value)}
+                disabled={loadingAccounts}
+                className={INPUT_CLASS}
+              >
+                <option value="">— Compte par défaut Pennylane —</option>
+                {accountOptions.map((a) => (
+                  <option key={a.id} value={String(a.id)}>{a.number} · {a.label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+          <div>
+            <label className={LABEL_CLASS}>Pièces de rechange</label>
+            <select
+              value={form.ledger_parts || ''}
+              onChange={(e) => setForm({ ...form, ledger_parts: e.target.value })}
+              disabled={loadingAccounts}
+              className={INPUT_CLASS}
+            >
+              <option value="">— Compte par défaut Pennylane —</option>
+              {accountOptions.map((a) => (
+                <option key={a.id} value={String(a.id)}>{a.number} · {a.label}</option>
+              ))}
+            </select>
+            <p className={HINT_CLASS}>Pièces facturées avec l&apos;entretien (certificat).</p>
+          </div>
+        </div>
+        {categories.length === 0 && (
+          <p className={HINT_CLASS}>Aucune catégorie d&apos;équipement active (Paramètres → Équipements).</p>
+        )}
       </section>
 
       <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">

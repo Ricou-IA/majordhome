@@ -81,8 +81,36 @@ test('computeContractLines : prix forcé par ligne, splits supplémentaires, sup
 // buildEntretienInvoice
 // ---------------------------------------------------------------------------
 
+const LEDGERS = { byCategory: { 'cat-poele': 7061, 'cat-pac': 7062 }, parts: 7070 };
+
+test('comptes comptables : par catégorie d’équipement + pièces, transmis à Pennylane ; absent → avertissement une fois par catégorie', () => {
+  const avec = buildEntretienInvoice(dalous({
+    contract: { contract_number: 'CTR-1', amount: 225 },
+    pricing: pricingFor([EQ_POELE, EQ_PAC]),
+    parts: [{ designation: 'Joint', quantite: 1, prix_ht: 11 }],
+    ledgerAccounts: LEDGERS,
+  }));
+  assert.deepEqual(avec.lines.map((l) => l.ledgerAccountId), [7061, 7062, 7070]);
+  assert.equal(avec.warnings.filter((w) => w.code === 'compte_manquant').length, 0);
+  const payload = toPennylaneInvoicePayload(avec, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.deepEqual(payload.invoice_lines.map((l) => l.ledger_account_id), [7061, 7062, 7070]);
+
+  const sans = buildEntretienInvoice(dalous({
+    contract: { contract_number: 'CTR-1', amount: 225 },
+    pricing: pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-1b' }, EQ_PAC]),
+    parts: [{ designation: 'Joint', quantite: 1, prix_ht: 11 }],
+    ledgerAccounts: { byCategory: { 'cat-pac': 7062 } },
+  }));
+  assert.deepEqual(sans.lines.map((l) => l.ledgerAccountId), [null, null, 7062, null]);
+  // poêle (1 fois pour 2 lignes) + pièces = 2 avertissements
+  assert.equal(sans.warnings.filter((w) => w.code === 'compte_manquant').length, 2);
+  assert.deepEqual(sans.errors, []);
+  const p2 = toPennylaneInvoicePayload(sans, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.equal('ledger_account_id' in p2.invoice_lines[0], false);
+});
+
 test('DALOUS : une ligne au prix grille = montant contractuel, TVA 10 %, HT dérivé du TTC, échéance à 30 jours', () => {
-  const m = buildEntretienInvoice(dalous());
+  const m = buildEntretienInvoice(dalous({ ledgerAccounts: LEDGERS }));
   assert.deepEqual(m.errors, []);
   assert.deepEqual(m.warnings, []);
   assert.equal(m.date, '2026-09-21');

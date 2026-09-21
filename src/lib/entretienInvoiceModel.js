@@ -77,6 +77,9 @@ function categoryLabelForEquipment(eq, referentiel) {
  * @param {Array<{ designation?: string, reference?: string, quantite?: number|string, prix_ht?: number|string, offert?: boolean }>} p.parts
  *   pièces du certificat (`prix_ht` contient du TTC, convention Phase 1)
  * @param {{ typesById: Map, categoriesById: Map }} p.referentiel  index types / catégories (TVA)
+ * @param {{ byCategory?: Object<string, number|string>, parts?: number|string|null }} [p.ledgerAccounts]
+ *   comptes de vente Pennylane (706xxx) par catégorie d'équipement + pièces — la « famille »
+ *   comptable d'une ligne (Settings → Facturation Pennylane). Absent → compte par défaut de PL + avertissement.
  * @param {number} [p.deadlineDays]
  * @param {string} p.today  YYYY-MM-DD
  * @returns {{ date: string, deadline: string, subject: string, lines: Array, discount: object|null, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
@@ -87,6 +90,7 @@ export function buildEntretienInvoice({
   pricing,
   parts = [],
   referentiel,
+  ledgerAccounts = {},
   deadlineDays = DEFAULT_DEADLINE_DAYS,
   today,
 }) {
@@ -130,6 +134,24 @@ export function buildEntretienInvoice({
     return v;
   };
 
+  // Compte de vente PL d'une catégorie (famille comptable). Avertissement UNE fois par catégorie.
+  const missingAccountCats = new Set();
+  const ledgerForCategory = (catId, catLabel) => {
+    const id = catId ? ledgerAccounts?.byCategory?.[catId] : null;
+    if (id) return id;
+    const key = catId || '__none__';
+    if (!missingAccountCats.has(key)) {
+      missingAccountCats.add(key);
+      warnings.push({
+        code: 'compte_manquant',
+        message: catId
+          ? `Pas de compte comptable paramétré pour « ${catLabel || 'cette catégorie'} » : Pennylane appliquera son compte de vente par défaut (Paramètres → Facturation Pennylane).`
+          : 'Équipement sans catégorie : Pennylane appliquera son compte de vente par défaut.',
+      });
+    }
+    return null;
+  };
+
   const pushLine = (line) => {
     const vatCode = VAT_CODES[line.vatPercent];
     if (!vatCode) {
@@ -142,6 +164,7 @@ export function buildEntretienInvoice({
       netTtc: round2(line.netTtc ?? grossTtc),
       discountPercent: line.discountPercent || 0,
       vatCode: vatCode || null,
+      ledgerAccountId: line.ledgerAccountId ?? null,
       unitPriceHt: unitHt(grossTtc, line.quantity, line.vatPercent),
     });
   };
@@ -173,13 +196,17 @@ export function buildEntretienInvoice({
       : grossTtc;
     allocatedNet += netTtc;
     const ref = referenceEquipement(eq);
-    if (ref) subjectRefs.push({ ref, category: categoryLabelForEquipment(eq, referentiel) });
+    const typeId = it.equipmentTypeId || eq?.equipment_type_id || null;
+    const catId = referentiel?.typesById?.get(typeId)?.category_id ?? eq?.category_id ?? null;
+    const catLabel = categoryLabelForEquipment(eq, referentiel);
+    if (ref) subjectRefs.push({ ref, category: catLabel });
     pushLine({
       kind: 'contrat',
       label: it.label || 'Entretien',
       description: ref,
       quantity: 1,
-      vatPercent: resolveVat(it.equipmentTypeId || eq?.equipment_type_id, it.label || 'Entretien'),
+      vatPercent: resolveVat(typeId, it.label || 'Entretien'),
+      ledgerAccountId: ledgerForCategory(catId, catLabel),
       grossTtc,
       netTtc,
       discountPercent: discount ? discount.percent : 0,
@@ -188,17 +215,20 @@ export function buildEntretienInvoice({
 
   // --- Pièces non offertes, TVA de la première ligne d'équipement, sans remise ---
   const partsVat = lines[0]?.vatPercent ?? DEFAULT_VAT_PERCENT;
-  for (const part of parts || []) {
-    if (part?.offert) continue;
+  const billableParts = (parts || []).filter((p) => p && !p.offert && (Number(p.prix_ht) || 0) > 0);
+  if (billableParts.length > 0 && !ledgerAccounts?.parts) {
+    warnings.push({ code: 'compte_manquant', message: 'Pas de compte comptable paramétré pour les pièces de rechange : Pennylane appliquera son compte de vente par défaut.' });
+  }
+  for (const part of billableParts) {
     const qty = Number(part.quantite) || 1;
     const unitTtc = Number(part.prix_ht) || 0;
-    if (unitTtc <= 0) continue;
     pushLine({
       kind: 'piece',
       label: part.designation || 'Pièce de rechange',
       description: part.reference || null,
       quantity: qty,
       vatPercent: partsVat,
+      ledgerAccountId: ledgerAccounts?.parts || null,
       grossTtc: unitTtc * qty,
     });
   }
@@ -245,6 +275,7 @@ export function toPennylaneInvoicePayload(model, { customerId, draft, externalRe
       line.unit = 'piece';
       line.raw_currency_unit_price = l.unitPriceHt;
       line.vat_rate = l.vatCode;
+      if (l.ledgerAccountId) line.ledger_account_id = Number(l.ledgerAccountId);
       if (l.discountPercent > 0) {
         line.discount = { type: 'relative', value: l.discountPercent.toFixed(4).replace(/\.?0+$/, '') };
       }

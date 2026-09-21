@@ -74,15 +74,26 @@ export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode
 
 /**
  * Réglages des factures créées depuis les cartes entretien (push MDH → PL,
- * spec 2026-09-21). Source `settings.pennylane.invoice = { deadline_days, mode }`,
+ * spec 2026-09-21). Source `settings.pennylane.invoice = { deadline_days, mode,
+ * ledger_accounts: { by_category: { [categoryId]: ledgerAccountId }, parts } }`,
  * `mode` ∈ `draft` (brouillon à finaliser dans PL) | `final`. Défauts si absent.
+ *
+ * Comptes comptables (Eric, 2026-09-21) : la famille d'une ligne pour les stats
+ * = son compte de vente Pennylane (706xxx), paramétré PAR CATÉGORIE d'équipement
+ * (Settings → Facturation Pennylane) + un compte pour les pièces. Une ligne sans
+ * compte part en ligne libre sur le compte par défaut de PL, avec avertissement.
  * Fonction pure (pas de hook) pour être appelable depuis un modèle ou un test.
  */
 export function pennylaneInvoiceSettings(settings) {
   const inv = settings?.pennylane?.invoice || {};
   const days = Number(inv.deadline_days);
+  const la = inv.ledger_accounts || {};
   return {
     deadlineDays: Number.isInteger(days) && days >= 0 ? days : PENNYLANE_INVOICE_DEFAULTS.deadlineDays,
     mode: inv.mode === 'final' ? 'final' : PENNYLANE_INVOICE_DEFAULTS.mode,
+    ledgerAccounts: {
+      byCategory: la.by_category && typeof la.by_category === 'object' ? la.by_category : {},
+      parts: la.parts ?? null,
+    },
   };
 }
