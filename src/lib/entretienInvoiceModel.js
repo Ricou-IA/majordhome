@@ -20,8 +20,13 @@
 //    recalcule et arrondit, comme la saisie manuelle `81.81818181818181`).
 // ============================================================================
 
-/** Taux de TVA (en %) → code Pennylane. Un taux absent = erreur bloquante. */
-export const VAT_CODES = { 20: 'FR_200', 10: 'FR_100', 5.5: 'FR_055', 0: 'exempt' };
+/**
+ * Taux de TVA (en %) → code Pennylane. Un taux absent = erreur bloquante.
+ * ⚠️ 5,5 % = `FR_55` (relevé sur les articles et comptes réels de Mayer), PAS `FR_055`
+ * comme le suggère un exemple de doc : `FR_055` ⇒ 400 « schema of invoice_lines
+ * isn't one of Product-based / Standard Invoice Line » (vécu 2026-09-22).
+ */
+export const VAT_CODES = { 20: 'FR_200', 10: 'FR_100', 5.5: 'FR_55', 0: 'exempt' };
 
 export const DEFAULT_VAT_PERCENT = 20;
 export const DEFAULT_DEADLINE_DAYS = 30;

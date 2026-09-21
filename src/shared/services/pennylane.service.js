@@ -59,16 +59,20 @@ function pLimit(concurrency) {
 // CONSTANTES & MAPPINGS
 // ============================================================================
 
+// ⚠️ 5,5 % = `FR_55` chez Pennylane (relevé sur les articles et comptes réels de Mayer) —
+// `FR_055` (exemple de doc) est refusé en 400 « schema of invoice_lines ». Corrigé le
+// 2026-09-22 ; `FR_055` reste accepté en LECTURE au cas où un ancien devis l'aurait porté.
 const TVA_MAPPING = {
   20: 'FR_200',
   10: 'FR_100',
-  5.5: 'FR_055',
+  5.5: 'FR_55',
   0: 'exempt',
 };
 
 const VAT_RATE_REVERSE = {
   FR_200: 20,
   FR_100: 10,
+  FR_55: 5.5,
   FR_055: 5.5,
   exempt: 0,
 };
