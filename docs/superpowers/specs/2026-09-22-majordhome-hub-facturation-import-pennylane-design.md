@@ -12,12 +12,16 @@ Ce que l'API Pennylane permet et refuse, vérifié sur le schéma OpenAPI brut l
 | Chemin | Journal choisi ? | Document PDF | Relances / lettrage / e-invoicing PL | Constat |
 |---|---|---|---|---|
 | Créer la facture (`POST /customer_invoices`) | Non (aucun champ journal) | Pennylane | Oui | Écriture générée par PL, **non modifiable par l'API** (422 « not created via the API », vécu sur FERNANDEZ) |
-| Importer la facture (`POST /customer_invoices/import`) | Non à l'import, **mais l'écriture est « créée via l'API »** → `PUT /ledger_entries/{id}` avec `journal_id` (à valider) | Majord'home | Oui | Chemin retenu |
-| Écriture brute (`POST /ledger_entries`) | Oui | Aucun | Non | Pennylane n'a plus de facture : écarté |
+| Importer la facture (`POST /customer_invoices/import`) | Non : l'écriture est générée par le module facture, `PUT /ledger_entries/{id}` répond aussi 422 (testé le 2026-09-22, test 2) | Majord'home | Oui | **Chemin retenu** — écriture dans le journal de ventes principal (VT) |
+| Écriture brute (`POST /ledger_entries`) | Oui | Aucun | Non | Pennylane n'a plus de facture (test 1 : OD sans facture, pas de conversion pour l'API) : écarté |
 
-Le journal dédié (« VA · Ventes automatiques », créé par Eric dans PL) est l'exigence d'audit :
-tout ce que Majord'home écrit s'y lit, rien d'autre n'y est. Le rapprochement se fait sans
-retraitement : journal d'intégration Majord'home ↔ écritures du journal VA.
+**Journal dédié : reporté (décision Eric, 2026-09-22 soir).** Le journal est une propriété du module
+Pennylane (facture client → journal de ventes par défaut, identifié en interne, sans réglage exposé
+ni par l'API, ni par un gabarit, ni dans l'écran Journaux). Relecture à neuf le 2026-09-22 : aucune
+voie API. On livre vers VT ; le passage vers un journal dédié se fera dans Pennylane, à la main ou
+en masse, plus tard. Le marqueur d'origine est `external_reference` (id facture Majord'home) +
+`invoice_number` à notre numérotation. Le réglage `settings.pennylane.invoice.journal_id` et le
+déplacement d'écriture de l'edge de test restent en place mais ne sont plus une exigence.
 
 ## Ce que Majord'home porte désormais (obligations d'un émetteur de factures)
 
@@ -45,7 +49,7 @@ retraitement : journal d'intégration Majord'home ↔ écritures du journal VA.
   `contract_id`, `intervention_id`, `issued_at`, `due_at`, `currency`, `total_ht`, `total_tva`,
   `total_ttc`, `vat_breakdown` jsonb, `subject`, `pdf_path`, `pennylane_invoice_id`,
   `pennylane_ledger_entry_id`, `pennylane_journal_id`, `import_status` ∈
-  `pending | imported | journal_moved | error`, `import_error`, `created_by`, timestamps.
+  `pending | imported | error`, `import_error`, `created_by`, timestamps (`pennylane_journal_id` conservé, informatif).
 - `invoice_lines` : `invoice_id`, `position`, `label`, `description`, `quantity`, `unit_price_ht`,
   `vat_rate`, `discount_percent`, `ht`, `tva`, `ttc`, `ledger_account_number`,
   `ledger_account_pl_id`, **axes analytiques sans dilution** : `metier_key` (type d'équipement /
@@ -67,24 +71,24 @@ retraitement : journal d'intégration Majord'home ↔ écritures du journal VA.
    `orgSettingsFilter` pennylane) : dépôt du PDF chez PL (file attachments, multipart — le proxy
    JSON actuel ne suffit pas, l'edge parle à PL directement avec `PENNYLANE_API_TOKEN`), puis
    `POST /customer_invoices/import` (`invoice_number` = le nôtre, `external_reference` = id
-   facture, lignes avec `ledger_account_id` déclinaison TVA, montants exacts), puis
-   `PUT /ledger_entries/{ledger_entry.id}` `{ journal_id }` (réglage `settings.pennylane.invoice.journal_id`).
+   facture, lignes avec `ledger_account_id` déclinaison TVA, montants exacts). L'écriture tombe
+   dans le journal de ventes principal (VT) ; pas de déplacement d'écriture (refusé par l'API).
    Idempotent par `external_reference`. Chaque étape trace son statut ; un échec est visible et
    rejouable, jamais silencieux.
 4. **Envoyer** : Pennylane (`send_by_email`, PDF importé) ou Majord'home (Resend) — décision plus tard,
    envoi manuel conservé pour l'instant.
-5. **Rapprocher** : balayage des `customer_invoices` PL par `external_reference` + écritures du
-   journal VA → vue anomalies : chez nous pas chez eux, chez eux (journal VA) pas chez nous,
-   montants divergents, écriture hors journal VA.
+5. **Rapprocher** : balayage des `customer_invoices` PL par `external_reference` → vue anomalies :
+   chez nous pas chez eux, chez eux sans `external_reference` Majord'home (facture saisie à la main
+   dans PL), montants divergents. Le filtre par journal reviendra si un journal dédié est posé.
 
 ## Phases
 
-0. **Spike de validation (bloquant)** : un import avec un PDF minimal + déplacement de l'écriture
-   dans VA, sur une société bac à sable Pennylane ou un cas réel de petit montant. Si le
-   déplacement est refusé, le journal dédié est inatteignable par un chemin de facturation → on
-   s'arrête et on revient au réglage côté Pennylane.
+0. ~~Spike de validation~~ **Fait le 2026-09-22** (edge `pennylane-ledger-push`, 2 tests réels sur
+   FERNANDEZ ANNA, écritures supprimées ensuite) : l'import donne une vraie facture PL avec notre
+   PDF et notre numéro ; le déplacement d'écriture est refusé (422). Décision : journal VT, journal
+   dédié reporté (voir « Pourquoi changer de chemin »).
 1. Numérotation + tables + RPC d'émission + PDF + archivage (sans Pennylane).
-2. Import + journal + statuts + rejeu.
+2. Import + statuts + rejeu (`import_status` ∈ `pending | imported | error`, plus de `journal_moved`).
 3. Avoir.
 4. Facturation électronique, envoi, rapprochement automatisé.
 
