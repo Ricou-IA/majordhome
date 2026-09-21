@@ -154,11 +154,13 @@ test('montant forcé à la baisse : la remise relative couvre dégressivité + r
 
 test('bi-split : le nombre d’unités se lit dans le libellé de la ligne, comme sur la Tarification (MATHIEU, 2026-09-21)', () => {
   const m = buildEntretienInvoice(dalous({
-    contract: { contract_number: 'CTR-00233', amount: 468 },
+    contract: { contract_number: 'CTR-00233', amount: 270 }, // (210 + 90) − dégressivité 10 %
     pricing: pricingFor([{ ...EQ_PAC, unit_count: 2 }, EQ_POELE]),
   }));
   assert.equal(m.lines[0].label, 'Entretien PAC Air/Air (2 splits)');
   assert.equal(m.lines[0].grossTtc, 210); // 160 + 1 split supplémentaire à 50
+  assert.equal(m.lines[0].netTtc, 189);
+  assert.equal(m.totalTtc, 270);
   assert.equal(m.lines[1].label, 'Entretien et ramonage de conduit poêle à bois');
   assert.equal(m.lines[0].description, 'Toshiba · Ras-16e2avg-e · N° 32301304');
 });
