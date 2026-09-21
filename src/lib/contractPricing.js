@@ -106,11 +106,17 @@ export function computeContractLines({ equipments = [], rates = [], equipmentTyp
       eq.installation_type === 'ventouse' ? 'Pose ventouse' : eq.installation_type === 'verticale' ? 'Pose verticale' : null,
       unitCount > 1 && equipType?.unit_label ? `${unitCount} ${equipType.unit_label}s` : null,
     ].filter(Boolean);
+    const label = equipType?.label || 'Équipement';
+    // « PAC Air/Air (2 splits) » — le nombre d'unités fait partie de la prestation
+    // (barème par split), il doit se lire sur la facture comme sur la Tarification.
+    const unitsSuffix = unitCount > 1 && equipType?.unit_label ? ` (${unitCount} ${equipType.unit_label}s)` : '';
     return {
       equipmentId: eq.id,
       equipmentTypeId: etId,
       equipment: eq,
-      label: equipType?.label || 'Équipement',
+      label,
+      labelWithUnits: label + unitsSuffix,
+      unitCount,
       reference: refParts.length > 0 ? refParts.join(' · ') : null,
       quantity: unitCount,
       basePrice: rate ? parseFloat(rate.price) : 0,

@@ -200,12 +200,13 @@ export function buildEntretienInvoice({
     const catId = referentiel?.typesById?.get(typeId)?.category_id ?? eq?.category_id ?? null;
     const catLabel = categoryLabelForEquipment(eq, referentiel);
     if (ref) subjectRefs.push({ ref, category: catLabel });
+    const label = it.labelWithUnits || it.label || 'Entretien';
     pushLine({
       kind: 'contrat',
-      label: it.label || 'Entretien',
+      label,
       description: ref,
       quantity: 1,
-      vatPercent: resolveVat(typeId, it.label || 'Entretien'),
+      vatPercent: resolveVat(typeId, label),
       ledgerAccountId: ledgerForCategory(catId, catLabel),
       grossTtc,
       netTtc,
