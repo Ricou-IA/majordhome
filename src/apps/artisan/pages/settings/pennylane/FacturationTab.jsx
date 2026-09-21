@@ -134,6 +134,50 @@ export default function FacturationTab() {
     toast.success(`Écriture ${piece} poussée — vérifiez dans Pennylane (journal ${journal?.code || ''})`);
   };
 
+  // Test 2 : facture IMPORTÉE (PDF + montants exacts) puis déplacement de son écriture dans le journal.
+  // Une facture importée est « créée via l'API » : c'est ce qui manquait à la voie « Facturer ».
+  const [testCustomerId, setTestCustomerId] = useState('');
+  const handleTestImportInvoice = async () => {
+    if (!form.journal_id || !testCustomerId) return;
+    if (!window.confirm('Importer une facture de test de 1,20 € (avec PDF) puis déplacer son écriture dans ce journal ? À annuler ensuite dans Pennylane.')) return;
+    setTestRunning(true);
+    setTestResult('');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const journal = journals.find((j) => String(j.id) === form.journal_id);
+    const number = `MDH-TEST-${stamp}`;
+    const { data, error } = await pennylaneService.pushLedgerEntry({
+      mode: 'import_invoice',
+      journal_id: Number(form.journal_id),
+      date: new Date().toISOString().slice(0, 10),
+      due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      label: `TEST Majordhome ${number} — facture importée d’essai`,
+      invoice_number: number,
+      external_reference: number,
+      customer_id: Number(testCustomerId),
+      currency_amount_before_tax: '1.00',
+      currency_tax: '0.20',
+      currency_amount: '1.20',
+      invoice_lines: [
+        { label: 'Prestation test', quantity: 1, unit: 'piece', raw_currency_unit_price: '1.00', vat_rate: 'FR_200', currency_amount: '1.20', currency_tax: '0.20', account_number: testAccount706 || '706' },
+      ],
+      test_pdf_text: `TEST Majordhome ${number} - facture importee d essai - journal ${journal?.code || form.journal_id}`,
+      lines: [],
+    });
+    setTestRunning(false);
+    if (error) {
+      setTestResult(JSON.stringify({ error: error.message, steps: error.steps || null }, null, 2));
+      toast.error(error.message || 'Import de test refusé');
+      return;
+    }
+    setTestResult(JSON.stringify(data, null, 2));
+    toast[data?.journal_moved ? 'success' : 'warning'](
+      data?.journal_moved
+        ? `Facture ${number} importée et écriture déplacée dans ${journal?.code || 'le journal'}`
+        : `Facture ${number} importée, mais l’écriture n’a pas pu être déplacée — voir le détail`,
+      { duration: 12000 },
+    );
+  };
+
   useEffect(() => {
     const picked = pickForm(settings);
     setForm(picked);
@@ -336,6 +380,29 @@ export default function FacturationTab() {
                 className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 w-full"
               >
                 {testRunning ? 'Envoi…' : 'Pousser l’écriture de test'}
+              </button>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4 items-end mt-4">
+            <div>
+              <label className={LABEL_CLASS}>Client Pennylane (identifiant) — test 2 : facture importée</label>
+              <input
+                type="text"
+                value={testCustomerId}
+                onChange={(e) => setTestCustomerId(e.target.value.trim())}
+                placeholder="244601347"
+                className={INPUT_CLASS}
+              />
+              <p className={HINT_CLASS}>Importe une facture de 1,20 € avec PDF, puis tente de déplacer son écriture dans le journal.</p>
+            </div>
+            <div className="sm:col-span-2">
+              <button
+                type="button"
+                onClick={handleTestImportInvoice}
+                disabled={testRunning || !testCustomerId}
+                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 w-full"
+              >
+                {testRunning ? 'Envoi…' : 'Importer une facture de test puis déplacer l’écriture'}
               </button>
             </div>
           </div>

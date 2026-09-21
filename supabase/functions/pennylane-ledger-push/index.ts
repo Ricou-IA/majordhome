@@ -21,6 +21,9 @@ const PENNYLANE_BASE_URL = Deno.env.get("PENNYLANE_BASE_URL") || "https://app.pe
 
 interface LineIn { account_number: string; vat_rate?: string | null; debit?: string | number; credit?: string | number; label?: string }
 interface Body {
+  /** `ledger_entry` (défaut) : écriture brute dans le journal. `import_invoice` : facture importée
+   *  (PDF + montants exacts) puis déplacement de son écriture dans le journal (test 2, 2026-09-22). */
+  mode?: "ledger_entry" | "import_invoice";
   journal_id: number;
   date: string;
   label: string;
@@ -30,6 +33,14 @@ interface Body {
   pdf_base64?: string;
   filename?: string;
   test_pdf_text?: string;
+  /** import_invoice : client Pennylane + lignes de facture (montants en chaînes, cohérents au centime) */
+  customer_id?: number;
+  invoice_number?: string;
+  external_reference?: string;
+  invoice_lines?: Array<{ label: string; quantity: number; unit?: string; raw_currency_unit_price: string; vat_rate: string; currency_amount: string; currency_tax: string; account_number?: string }>;
+  currency_amount_before_tax?: string;
+  currency_amount?: string;
+  currency_tax?: string;
 }
 
 async function pl(method: string, path: string, body?: unknown, form?: FormData) {
@@ -96,11 +107,79 @@ Deno.serve(async (req: Request) => {
   let body: Body;
   try { body = await req.json(); } catch { return jsonResponse({ error: "Corps JSON invalide" }, 400); }
   const { journal_id, date, label, piece_number, due_date, lines } = body;
-  if (!journal_id || !date || !label || !Array.isArray(lines) || lines.length === 0) {
-    return jsonResponse({ error: "journal_id, date, label et lines sont requis" }, 400);
+  const mode = body.mode || "ledger_entry";
+  if (!journal_id || !date || !label) return jsonResponse({ error: "journal_id, date et label sont requis" }, 400);
+  if (mode === "ledger_entry" && (!Array.isArray(lines) || lines.length === 0)) {
+    return jsonResponse({ error: "lines est requis en mode ledger_entry" }, 400);
   }
 
   const steps: Record<string, unknown> = {};
+
+  // ---- Mode 2 : facture IMPORTÉE (PDF + montants) puis déplacement de l'écriture dans le journal ----
+  if (mode === "import_invoice") {
+    try {
+      if (!body.customer_id || !Array.isArray(body.invoice_lines) || body.invoice_lines.length === 0) {
+        return jsonResponse({ error: "customer_id et invoice_lines sont requis en mode import_invoice" }, 400);
+      }
+      const pdfBytes = body.pdf_base64
+        ? Uint8Array.from(atob(body.pdf_base64), (c) => c.charCodeAt(0))
+        : minimalPdf(body.test_pdf_text || label);
+      const form = new FormData();
+      const filename = body.filename || `${body.invoice_number || piece_number || "facture"}.pdf`;
+      form.append("file", new Blob([pdfBytes], { type: "application/pdf" }), filename);
+      form.append("filename", filename);
+      const up = await pl("POST", "/file_attachments", undefined, form);
+      steps.file_attachment = { status: up.status, data: up.data };
+      if (up.status >= 300) return jsonResponse({ error: "Envoi du fichier refusé par Pennylane", step: "file_attachment", steps }, 502);
+      const fileAttachmentId = (up.data as { id?: number })?.id;
+
+      const invoiceLines = [];
+      for (const l of body.invoice_lines) {
+        const line: Record<string, unknown> = {
+          label: l.label, quantity: l.quantity, unit: l.unit || "piece",
+          raw_currency_unit_price: l.raw_currency_unit_price, vat_rate: l.vat_rate,
+          currency_amount: l.currency_amount, currency_tax: l.currency_tax,
+        };
+        if (l.account_number) line.ledger_account_id = (await resolveAccount(l.account_number, l.vat_rate)).id;
+        invoiceLines.push(line);
+      }
+      const payload: Record<string, unknown> = {
+        file_attachment_id: fileAttachmentId,
+        date, deadline: due_date || date, customer_id: Number(body.customer_id), currency: "EUR",
+        currency_amount_before_tax: body.currency_amount_before_tax, currency_amount: body.currency_amount, currency_tax: body.currency_tax,
+        label, external_reference: body.external_reference || piece_number, invoice_lines: invoiceLines,
+      };
+      if (body.invoice_number) payload.invoice_number = body.invoice_number;
+      const imported = await pl("POST", "/customer_invoices/import", payload);
+      steps.import = { status: imported.status, data: imported.data, payload };
+      console.log(`[pennylane-ledger-push] import ${imported.status} by ${auth.userId} → ${JSON.stringify(imported.data).slice(0, 2000)}`);
+      if (imported.status >= 300) return jsonResponse({ error: "Import de facture refusé par Pennylane", step: "import", steps }, 502);
+
+      const invoiceId = (imported.data as { id?: number })?.id;
+      let ledgerEntryId = (imported.data as { ledger_entry?: { id?: number } })?.ledger_entry?.id ?? null;
+      if (!ledgerEntryId && invoiceId) {
+        const back = await pl("GET", `/customer_invoices/${invoiceId}`);
+        steps.invoice_readback = { status: back.status, data: back.data };
+        ledgerEntryId = (back.data as { ledger_entry?: { id?: number } })?.ledger_entry?.id ?? null;
+      }
+      let moved = false;
+      if (ledgerEntryId) {
+        const mv = await pl("PUT", `/ledger_entries/${ledgerEntryId}`, { journal_id: Number(journal_id) });
+        steps.journal_move = { status: mv.status, data: mv.data };
+        moved = mv.status < 300;
+        const entry = await pl("GET", `/ledger_entries/${ledgerEntryId}`);
+        steps.ledger_entry_readback = { status: entry.status, data: entry.data };
+      } else {
+        steps.journal_move = { skipped: "ledger_entry.id absent de la facture importée" };
+      }
+      console.log(`[pennylane-ledger-push] import invoice=${invoiceId} ledger_entry=${ledgerEntryId} moved=${moved} → ${JSON.stringify(steps.journal_move).slice(0, 1500)}`);
+      return jsonResponse({ ok: true, mode, invoice_id: invoiceId ?? null, ledger_entry_id: ledgerEntryId, journal_moved: moved, steps }, 201);
+    } catch (err) {
+      console.error("[pennylane-ledger-push] import Error:", err);
+      return jsonResponse({ error: err instanceof Error ? err.message : "Internal error", steps }, 500);
+    }
+  }
+
   try {
     // 1. Comptes par numéro → id (déclinaison TVA)
     const resolved: Array<{ id: number; number: string; vat_rate: string }> = [];
