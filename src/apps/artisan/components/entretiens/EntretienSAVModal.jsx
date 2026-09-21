@@ -33,6 +33,7 @@ import { useCanAccess } from '@hooks/usePermissions';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
 import { entretienSavKeys } from '@hooks/cacheKeys';
+import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
 import {
   savService,
   getStatusConfig,
@@ -215,6 +216,21 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       onClose();
     } catch {
       toast.error('Erreur de transition');
+    }
+  };
+
+  // Commande « personnes × jours » du SAV (spec 2026-09-21) : l'entretien est
+  // dimensionné par le barème, le SAV « peut être 3 jours ou 1 h ». Persistée sur
+  // l'intervention (allowlist savService.updateFields), l'assistant en dérive.
+  const isSav = type === 'sav';
+  const plannedTeamSize = isSav ? (item?.planned_team_size ?? null) : null;
+  const plannedDays = isSav ? (item?.planned_days ?? null) : null;
+  const handlePlannedOrderChange = async ({ teamSize, days }) => {
+    try {
+      await updateFields(item.id, { planned_team_size: teamSize, planned_days: days });
+      onUpdated?.();
+    } catch {
+      toast.error('Impossible d\'enregistrer la commande');
     }
   };
 
@@ -471,29 +487,46 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
           {/* VUE PLANIFICATION (SchedulingAssistant — Bloc B) */}
           {/* ============================================================ */}
           {showScheduling ? (
-            <SchedulingAssistant
-              lead={schedulingLead}
-              orgId={orgId}
-              commercials={[]}
-              onConfirm={handleConfirmScheduling}
-              onCancel={() => setShowScheduling(false)}
-              isLoading={schedulingLoading}
-              appointmentTypeLabel={type === 'sav' ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien'}
-              appointmentTypeValue={type === 'sav' ? 'service' : 'maintenance'}
-              assigneeType="technician"
-              members={teamMembers || []}
-              defaultDuration={
-                item.estimated_time
-                  ? Math.round(Number(item.estimated_time) * 60)
-                  : 60
-              }
-              defaultSubjectPrefix={
-                type === 'sav'
-                  ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
-                  : 'Entretien'
-              }
-              multi
-            />
+            <div className="space-y-3">
+              {/* SAV : commande « personnes × jours » (l'entretien est dimensionné par le barème) */}
+              {isSav && (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <span className="text-xs font-semibold text-secondary-500 uppercase tracking-wider">Commande</span>
+                  <PlannedOrderFields
+                    teamSize={plannedTeamSize}
+                    days={plannedDays}
+                    onChange={handlePlannedOrderChange}
+                    disabled={isSavingFields}
+                  />
+                </div>
+              )}
+              <SchedulingAssistant
+                lead={schedulingLead}
+                orgId={orgId}
+                commercials={[]}
+                onConfirm={handleConfirmScheduling}
+                onCancel={() => setShowScheduling(false)}
+                isLoading={schedulingLoading}
+                appointmentTypeLabel={type === 'sav' ? (includesEntretien ? 'SAV + Entretien' : 'SAV') : 'Entretien'}
+                appointmentTypeValue={type === 'sav' ? 'service' : 'maintenance'}
+                assigneeType="technician"
+                members={teamMembers || []}
+                defaultDuration={
+                  item.estimated_time
+                    ? Math.round(Number(item.estimated_time) * 60)
+                    : 60
+                }
+                defaultSubjectPrefix={
+                  type === 'sav'
+                    ? (includesEntretien ? 'SAV + Entretien' : 'SAV')
+                    : 'Entretien'
+                }
+                multi
+                mergeOverlapping={isSav}
+                expectedTeamSize={plannedTeamSize}
+                expectedDays={plannedDays}
+              />
+            </div>
           ) : (
             <>
               {/* Infos client */}

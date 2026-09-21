@@ -791,6 +791,9 @@ export const savService = {
       // Id de la facture Pennylane créée depuis la carte (push MDH → PL, spec 2026-09-21)
       if (fields.invoice_id !== undefined) updates.invoice_id = fields.invoice_id || null;
       if (fields.scheduled_date !== undefined) updates.scheduled_date = fields.scheduled_date || null;
+      // Commande « personnes × jours » du SAV (spec 2026-09-21) : null = non renseigné.
+      if (fields.planned_team_size !== undefined) updates.planned_team_size = fields.planned_team_size ?? null;
+      if (fields.planned_days !== undefined) updates.planned_days = fields.planned_days ?? null;
       // Rattrapage du rattachement contrat (carte créée avant la saisie du contrat).
       // Volontairement NON destructif : on ne pose que du renseigné, jamais de NULL —
       // un détachement doit rester un geste explicite, pas un effet de bord.
