@@ -1108,16 +1108,19 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
  * @returns {Promise<Array<{ id: number, number: string, label: string }>>}
  */
 async function getLedgerAccounts() {
-  // Dédoublonnage par id : sur cette ressource, Pennylane a renvoyé la MÊME page à
-  // chaque curseur (vécu 2026-09-21 : chaque compte affiché 4 à 6 fois). On s'arrête
-  // dès qu'une page n'apporte aucun compte nouveau, quoi que dise `has_more`.
+  // Filtre côté Pennylane (syntaxe V2 = tableau JSON, cf. sweep des devis) : sans lui, le
+  // plan comptable de Mayer fait des milliers de comptes (un 411 par client), triés du
+  // plus récent au plus ancien — les 706 n'arrivaient jamais dans les 30 premières pages
+  // (vécu 2026-09-21 : listes vides). Dédoublonnage par id et arrêt dès qu'une page
+  // n'apporte rien : filet contre une pagination qui rejouerait la même page.
+  const filter = encodeURIComponent(JSON.stringify([{ field: 'number', operator: 'start_with', value: '7' }]));
   const byId = new Map();
   let cursor = null;
   let hasMore = true;
   let pageCount = 0;
   const MAX_PAGES = 30;
   while (hasMore && pageCount < MAX_PAGES) {
-    let path = '/ledger_accounts?limit=100';
+    let path = `/ledger_accounts?limit=100&filter=${filter}`;
     if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
     const result = await apiCall('GET', path);
     const items = result?.items || result?.data || (Array.isArray(result) ? result : []);
