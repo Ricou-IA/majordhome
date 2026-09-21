@@ -36,9 +36,12 @@ export function calculateLineTotal(rate, equipType, quantity = 1, zoneSupplement
 /**
  * Calcule le montant total d'un contrat à partir des lignes tarifaires.
  * Accepte les deux formats : camelCase (frontend) et snake_case (DB).
+ * total = sous-total − dégressivité − remise exceptionnelle (`contracts.exceptional_discount`,
+ * saisie Tarification, 2026-09-21 : ajuste le montant global à l'euro près sans forcer chaque ligne).
  */
-export function calculateContractTotal(items, discounts = []) {
-  if (!items?.length) return { subtotal: 0, discountPercent: 0, discountAmount: 0, total: 0 };
+export function calculateContractTotal(items, discounts = [], exceptionalDiscount = 0) {
+  const exceptional = round2(Math.max(0, parseFloat(exceptionalDiscount) || 0));
+  if (!items?.length) return { subtotal: 0, discountPercent: 0, discountAmount: 0, exceptionalDiscount: exceptional, total: 0 };
 
   // Supporter camelCase (lineTotal) et snake_case (line_total)
   const subtotal = items.reduce((sum, item) => {
@@ -60,9 +63,9 @@ export function calculateContractTotal(items, discounts = []) {
 
   const discountPercent = applicableDiscount?.discount_percent || 0;
   const discountAmount = Math.round(subtotal * (discountPercent / 100) * 100) / 100;
-  const total = Math.round((subtotal - discountAmount) * 100) / 100;
+  const total = Math.max(0, Math.round((subtotal - discountAmount - exceptional) * 100) / 100);
 
-  return { subtotal, discountPercent, discountAmount, total };
+  return { subtotal, discountPercent, discountAmount, exceptionalDiscount: exceptional, total };
 }
 
 /**
@@ -77,9 +80,10 @@ export function calculateContractTotal(items, discounts = []) {
  * @param {object|null} p.zone      zone tarifaire active (`supplement` = déplacement)
  * @param {Object<string, number>} [p.overrides]  prix forcé par `equipment.id`
  * @param {Array} [p.discounts]     `majordhome_pricing_discounts`
- * @returns {{ items: Array, subtotal: number, discountPercent: number, discountAmount: number, total: number }}
+ * @param {number} [p.exceptionalDiscount]  `contracts.exceptional_discount` (€ TTC, après dégressivité)
+ * @returns {{ items: Array, subtotal: number, discountPercent: number, discountAmount: number, exceptionalDiscount: number, total: number }}
  */
-export function computeContractLines({ equipments = [], rates = [], equipmentTypes = [], zone = null, overrides = {}, discounts = [] }) {
+export function computeContractLines({ equipments = [], rates = [], equipmentTypes = [], zone = null, overrides = {}, discounts = [], exceptionalDiscount = 0 }) {
   const rateIndex = {};
   for (const r of rates || []) {
     const zId = r.zone_id || r.zone?.id;
@@ -124,7 +128,7 @@ export function computeContractLines({ equipments = [], rates = [], equipmentTyp
     };
   });
 
-  return { items, ...calculateContractTotal(items, discounts) };
+  return { items, ...calculateContractTotal(items, discounts, exceptionalDiscount) };
 }
 
 /**
@@ -175,18 +179,22 @@ export function buildContractPresentation(computedPricing, billableTotal) {
       subtotal: billable,
       discountPercent: 0,
       discountAmount: 0,
+      exceptionalDiscountAmount: 0,
       extraDiscountAmount: 0,
       total: billable,
     };
   }
 
   // --- Calcul standard / forçage à la baisse : remise commerciale absorbe l'écart ---
+  // La remise exceptionnelle (saisie sur le contrat) est déjà dans computedTotal : elle
+  // s'affiche à part, la « remise commerciale » ne porte que l'écart legacy (amount_forced).
   const extraDiscountAmount = billable < computedTotal - 0.01 ? round2(computedTotal - billable) : 0;
   return {
     equipmentLines: items,
     subtotal: computedPricing?.subtotal || 0,
     discountPercent: computedPricing?.discountPercent || 0,
     discountAmount: computedPricing?.discountAmount || 0,
+    exceptionalDiscountAmount: computedPricing?.exceptionalDiscount || 0,
     extraDiscountAmount,
     total: billable,
   };

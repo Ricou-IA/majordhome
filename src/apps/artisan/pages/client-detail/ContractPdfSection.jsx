@@ -89,9 +89,9 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
         lineTotal,
       };
     });
-    const totals = calculateContractTotal(items, discounts);
+    const totals = calculateContractTotal(items, discounts, contract?.exceptional_discount);
     return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides, contract?.exceptional_discount]);
 
   // Montant facturable : priorité au montant forcé (admin), sinon calculé, sinon DB
   const billableTotal = useMemo(() => {
@@ -129,6 +129,7 @@ export function ContractPdfSection({ contract, clientId, client, orgId }) {
       discountPercent: presentation.discountPercent,
       discountAmount: presentation.discountAmount,
       extraDiscountAmount: presentation.extraDiscountAmount,
+      exceptionalDiscountAmount: presentation.exceptionalDiscountAmount,
       total: presentation.total,
       zoneName: activeZone?.label || '-',
       notes: contract.notes || null,

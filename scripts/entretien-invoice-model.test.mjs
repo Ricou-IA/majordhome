@@ -138,7 +138,7 @@ test('2 équipements : 1 ligne chacun au prix grille, dégressivité 10 % porté
     [90, 10, 81, 'FR_100'],
     [160, 10, 144, 'FR_200'],
   ]);
-  assert.deepEqual(m.discount, { percent: 10, amount: 25, degressivitePercent: 10, commercialAmount: 0 });
+  assert.deepEqual(m.discount, { percent: 10, amount: 25, degressivitePercent: 10, exceptionalAmount: 0, commercialAmount: 0 });
   assert.equal(m.totalTtc, 225);
   assert.equal(m.subject, 'Entretien de vos équipements : Jollymec · Quadro+s/80 · N° 0160067 / Toshiba · Ras-16e2avg-e · N° 32301304');
 });
@@ -163,6 +163,21 @@ test('bi-split : le nombre d’unités se lit dans le libellé de la ligne, comm
   assert.equal(m.totalTtc, 270);
   assert.equal(m.lines[1].label, 'Entretien et ramonage de conduit poêle à bois');
   assert.equal(m.lines[0].description, 'Toshiba · Ras-16e2avg-e · N° 32301304');
+});
+
+test('remise exceptionnelle (contrat) : après la dégressivité, distinguée de la remise commerciale legacy, total = montant du contrat', () => {
+  const pricing = computeContractLines({ equipments: [EQ_POELE, EQ_PAC], rates: RATES, equipmentTypes: TYPES, zone: ZONE, discounts: DISCOUNTS, exceptionalDiscount: 25 });
+  assert.equal(pricing.discountAmount, 25);
+  assert.equal(pricing.exceptionalDiscount, 25);
+  assert.equal(pricing.total, 200); // 250 − 25 (dégressivité) − 25 (exceptionnelle)
+  const m = buildEntretienInvoice(dalous({ contract: { contract_number: 'CTR-1', amount: 200 }, pricing }));
+  assert.equal(m.discount.percent, 20);
+  assert.equal(m.discount.degressivitePercent, 10);
+  assert.equal(m.discount.exceptionalAmount, 25);
+  assert.equal(m.discount.commercialAmount, 0);
+  assert.equal(m.totalTtc, 200);
+  // Une remise exceptionnelle supérieure au total ne produit jamais un total négatif
+  assert.equal(calculateContractTotal([{ lineTotal: 90 }], [], 500).total, 0);
 });
 
 test('montant forcé à la hausse : lignes majorées au prorata, pas de remise', () => {

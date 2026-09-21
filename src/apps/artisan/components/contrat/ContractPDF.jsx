@@ -351,6 +351,7 @@ function ContractDocument({ data, company }) {
     discountPercent,
     discountAmount,
     extraDiscountAmount = 0,
+    exceptionalDiscountAmount = 0,
     total,
     notes,
     signatureBase64,
@@ -360,7 +361,8 @@ function ContractDocument({ data, company }) {
 
   const hasDiscount = discountPercent > 0 && discountAmount > 0;
   const hasExtraDiscount = extraDiscountAmount > 0;
-  const showSubtotal = hasDiscount || hasExtraDiscount;
+  const hasExceptionalDiscount = exceptionalDiscountAmount > 0;
+  const showSubtotal = hasDiscount || hasExtraDiscount || hasExceptionalDiscount;
 
   return (
     <Document>
@@ -463,6 +465,16 @@ function ContractDocument({ data, company }) {
             </Text>
             <Text style={[s.discountCell, { flex: 1, textAlign: 'right' }]}>
               -{fmtEuro(discountAmount)}
+            </Text>
+          </View>
+        )}
+        {hasExceptionalDiscount && (
+          <View style={s.rowDiscount}>
+            <Text style={[s.discountCell, { flex: 3 }]}>
+              Remise exceptionnelle
+            </Text>
+            <Text style={[s.discountCell, { flex: 1, textAlign: 'right' }]}>
+              -{fmtEuro(exceptionalDiscountAmount)}
             </Text>
           </View>
         )}

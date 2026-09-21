@@ -176,8 +176,16 @@ export function buildEntretienInvoice({
   if (amount < subtotal - 0.01) {
     const percent = round4(((subtotal - amount) / subtotal) * 100);
     const degressivite = Number(pricing?.discountPercent) || 0;
-    const commercial = round2(subtotal - amount - (Number(pricing?.discountAmount) || 0));
-    discount = { percent, amount: round2(subtotal - amount), degressivitePercent: degressivite, commercialAmount: commercial > 0.01 ? commercial : 0 };
+    const exceptional = round2(Number(pricing?.exceptionalDiscount) || 0);
+    // Écart résiduel = forçage legacy du montant (amount_forced), hors dégressivité et remise exceptionnelle
+    const commercial = round2(subtotal - amount - (Number(pricing?.discountAmount) || 0) - exceptional);
+    discount = {
+      percent,
+      amount: round2(subtotal - amount),
+      degressivitePercent: degressivite,
+      exceptionalAmount: exceptional > 0.01 ? exceptional : 0,
+      commercialAmount: commercial > 0.01 ? commercial : 0,
+    };
   } else if (amount > subtotal + 0.01) {
     scaleUp = amount / subtotal;
   }

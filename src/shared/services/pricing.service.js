@@ -644,6 +644,29 @@ export const pricingService = {
    * @param {string} zoneId
    * @param {boolean} forced - true = saisie manuelle admin (ne sera pas re-sync automatiquement)
    */
+  /**
+   * Remise exceptionnelle d'un contrat (€ TTC, après dégressivité — 2026-09-21).
+   * Le montant se réaligne ensuite via l'auto-sync de ContractPricingSection
+   * (amount = sous-total − dégressivité − remise exceptionnelle).
+   */
+  async updateContractExceptionalDiscount(contractId, value) {
+    try {
+      if (!contractId) throw new Error('[pricingService] contractId requis');
+      const amount = Math.max(0, Math.round((parseFloat(value) || 0) * 100) / 100);
+      const { data, error } = await supabase
+        .from('majordhome_contracts_write')
+        .update({ exceptional_discount: amount, updated_at: new Date().toISOString() })
+        .eq('id', contractId)
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('[pricingService] updateContractExceptionalDiscount ERREUR:', error);
+      return { data: null, error };
+    }
+  },
+
   async updateContractAmount(contractId, pricing, zoneId, forced = false) {
     try {
       if (!contractId) throw new Error('[pricingService] contractId requis');

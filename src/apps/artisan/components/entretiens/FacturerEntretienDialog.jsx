@@ -79,6 +79,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       zone: activeZone,
       overrides: overrides || {},
       discounts: discounts || [],
+      exceptionalDiscount: contract.exceptional_discount || 0,
     });
     return buildEntretienInvoice({
       intervention: { id: item.id },
@@ -182,6 +183,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
                       <span className="text-gray-500">
                         {' '}({[
                           model.discount.degressivitePercent > 0 ? `dégressivité ${model.discount.degressivitePercent} %` : null,
+                          model.discount.exceptionalAmount > 0 ? `remise exceptionnelle ${formatEuro(model.discount.exceptionalAmount)}` : null,
                           model.discount.commercialAmount > 0 ? `remise commerciale ${formatEuro(model.discount.commercialAmount)}` : null,
                         ].filter(Boolean).join(' + ') || 'montant du contrat'})
                       </span>

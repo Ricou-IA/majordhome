@@ -104,9 +104,26 @@ export function ContractPricingSection({ contractId, contract, client }) {
       });
     }
 
-    const totals = calculateContractTotal(items, discounts);
+    const totals = calculateContractTotal(items, discounts, contract?.exceptional_discount);
     return { items, unmapped, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides, contract?.exceptional_discount]);
+
+  // Remise exceptionnelle (org_admin) : montant TTC après dégressivité, enregistré sur le
+  // contrat (`contracts.exceptional_discount`). Le total se réaligne ensuite via l'auto-sync.
+  // Permet d'ajuster le montant global à l'euro près sans forcer chaque ligne (Eric, 2026-09-21).
+  const handleExceptionalDiscountCommit = useCallback(async (rawValue) => {
+    const parsed = parseFloat(String(rawValue).replace(',', '.'));
+    const value = isNaN(parsed) || parsed < 0 ? 0 : Math.round(parsed * 100) / 100;
+    const current = Math.round((parseFloat(contract?.exceptional_discount) || 0) * 100) / 100;
+    if (Math.abs(value - current) < 0.005) return;
+    const { error } = await pricingService.updateContractExceptionalDiscount(contractId, value);
+    if (error) {
+      toast.error('La remise exceptionnelle n’a pas pu être enregistrée');
+      return;
+    }
+    toast.success(value > 0 ? `Remise exceptionnelle : -${formatEuro(value)}` : 'Remise exceptionnelle retirée');
+    queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+  }, [contract?.exceptional_discount, contractId, orgId, queryClient]);
 
   // Vérifier si le montant du contrat correspond au calcul
   const currentAmount = contract?.amount ? parseFloat(contract.amount) : 0;
@@ -356,6 +373,40 @@ export function ContractPricingSection({ contractId, contract, client }) {
               <span className="text-green-700 tabular-nums">
                 -{formatEuro(computedPricing.discountAmount)}
               </span>
+            </div>
+          )}
+          {/* Remise exceptionnelle — après dégressivité, ajuste le total à l'euro près */}
+          {(isOrgAdmin || computedPricing.exceptionalDiscount > 0) && (
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-green-700 flex items-center gap-1">
+                <Tag className="w-3.5 h-3.5" />
+                Remise exceptionnelle
+              </span>
+              {isOrgAdmin ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-green-700">-</span>
+                  <input
+                    key={`exceptional-${computedPricing.exceptionalDiscount}`}
+                    type="number"
+                    step="1"
+                    min="0"
+                    defaultValue={computedPricing.exceptionalDiscount || ''}
+                    placeholder="0"
+                    onBlur={(e) => handleExceptionalDiscountCommit(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    title="Montant TTC retiré après la dégressivité"
+                    className={`w-20 px-1.5 py-0.5 border rounded text-right tabular-nums text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                      computedPricing.exceptionalDiscount > 0
+                        ? 'border-green-300 text-green-700 font-medium bg-green-50'
+                        : 'border-secondary-200 text-secondary-900 bg-white'
+                    }`}
+                  />
+                  <span className="text-secondary-400 text-xs">€</span>
+                  <span className="w-[18px]" aria-hidden />
+                </div>
+              ) : (
+                <span className="text-green-700 tabular-nums">-{formatEuro(computedPricing.exceptionalDiscount)}</span>
+              )}
             </div>
           )}
           <div className="flex justify-between text-sm font-semibold">

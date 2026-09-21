@@ -106,7 +106,25 @@ async function apiCall(method, path, body) {
     body: { method, path, body },
   });
 
-  if (error) throw error;
+  if (error) {
+    // Le proxy relaie le statut HTTP de Pennylane (400, 422…) : supabase-js le
+    // transforme en FunctionsHttpError générique (« non-2xx status code ») et cache
+    // le message PL, pourtant présent dans le corps. On le fait remonter : c'est lui
+    // que l'utilisateur doit lire (champ manquant, TVA invalide, client inconnu…).
+    let message = error.message;
+    try {
+      const payload = await error.context?.json?.();
+      const plError = payload?.data?.error ?? payload?.data?.message ?? payload?.data?.errors ?? payload?.error;
+      if (plError) {
+        message = `Pennylane (${payload?.pennylane_status ?? error.context?.status ?? '?'}) : ${
+          typeof plError === 'string' ? plError : JSON.stringify(plError)
+        }`;
+      }
+    } catch {
+      // corps illisible : on garde le message générique
+    }
+    throw new Error(message);
+  }
 
   // Le proxy retourne { data, pennylane_status }
   if (data?.pennylane_status && data.pennylane_status >= 400) {
@@ -1082,12 +1100,35 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
 // ============================================================================
 
 /**
- * Récupère la liste des comptes comptables de vente (706xxx) depuis Pennylane.
- * API V2 : param `limit` (pas `page_size`)
+ * Récupère les comptes comptables de VENTE (classe 7, actifs) depuis Pennylane.
+ * API V2 : liste paginée par curseur (`limit` + `cursor`), filtre appliqué en local —
+ * l'ancienne syntaxe `filter[number][start_with]=706` renvoyait 400 (vécu 2026-09-21,
+ * premier vrai appel depuis Settings → Facturation Pennylane). Résultat mis en cache
+ * 24 h par `useLedgerAccounts`.
+ * @returns {Promise<Array<{ id: number, number: string, label: string }>>}
  */
 async function getLedgerAccounts() {
-  const result = await apiCall('GET', '/ledger_accounts?filter[number][start_with]=706&filter[enabled][eq]=true&limit=100');
-  return result?.items || result?.data || result || [];
+  const all = [];
+  let cursor = null;
+  let hasMore = true;
+  let pageCount = 0;
+  const MAX_PAGES = 30;
+  while (hasMore && pageCount < MAX_PAGES) {
+    let path = '/ledger_accounts?limit=100';
+    if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+    const result = await apiCall('GET', path);
+    const items = result?.items || result?.data || (Array.isArray(result) ? result : []);
+    all.push(...items);
+    hasMore = Boolean(result?.has_more && result?.next_cursor);
+    cursor = result?.next_cursor || null;
+    pageCount++;
+  }
+  if (pageCount === MAX_PAGES && hasMore) {
+    logger.warn(`[pennylane.getLedgerAccounts] MAX_PAGES=${MAX_PAGES} atteint, liste des comptes possiblement incomplète`);
+  }
+  return all
+    .filter((a) => a && String(a.number || '').startsWith('7') && a.enabled !== false)
+    .map((a) => ({ id: a.id, number: String(a.number), label: a.label || '' }));
 }
 
 // ============================================================================

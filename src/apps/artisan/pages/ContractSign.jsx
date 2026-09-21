@@ -212,9 +212,9 @@ export default function ContractSign() {
       };
     });
 
-    const totals = calculateContractTotal(items, discounts);
+    const totals = calculateContractTotal(items, discounts, contract?.exceptional_discount);
     return { items, ...totals };
-  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides]);
+  }, [equipments, activeZone, rateIndex, equipTypeMap, discounts, zoneSupplement, overrides, contract?.exceptional_discount]);
 
   // -- Montant à signer = montant ENREGISTRÉ sur le contrat (ce qui a été proposé/convenu).
   //    On ne signe jamais un total recalculé en live qui divergerait. Secours : total
@@ -264,6 +264,7 @@ export default function ContractSign() {
         discountPercent: presentation.discountPercent,
         discountAmount: presentation.discountAmount,
         extraDiscountAmount: presentation.extraDiscountAmount,
+        exceptionalDiscountAmount: presentation.exceptionalDiscountAmount,
         total: presentation.total,
         zoneName: activeZone?.label || '-',
         notes: contract.notes || null,
@@ -447,7 +448,7 @@ export default function ContractSign() {
               {/* Totaux — le total signé = montant ENREGISTRÉ sur le contrat (billableTotal),
                   pas un recalcul. Sous-total/remises mirrorisent le PDF généré. */}
               <div className="mt-3 space-y-1">
-                {(presentation.discountPercent > 0 || presentation.extraDiscountAmount > 0) && (
+                {(presentation.discountPercent > 0 || presentation.extraDiscountAmount > 0 || presentation.exceptionalDiscountAmount > 0) && (
                   <div className="flex justify-between text-sm px-4">
                     <span className="text-gray-500">Sous-total</span>
                     <span className="tabular-nums">{formatEuro(presentation.subtotal)}</span>
@@ -457,6 +458,12 @@ export default function ContractSign() {
                   <div className="flex justify-between text-sm px-4 text-green-700">
                     <span>Dégressivité -{presentation.discountPercent}%</span>
                     <span className="tabular-nums">-{formatEuro(presentation.discountAmount)}</span>
+                  </div>
+                )}
+                {presentation.exceptionalDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm px-4 text-green-700">
+                    <span>Remise exceptionnelle</span>
+                    <span className="tabular-nums">-{formatEuro(presentation.exceptionalDiscountAmount)}</span>
                   </div>
                 )}
                 {presentation.extraDiscountAmount > 0 && (
