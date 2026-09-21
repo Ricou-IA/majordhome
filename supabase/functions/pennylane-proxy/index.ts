@@ -191,6 +191,15 @@ Deno.serve(async (req: Request) => {
 
     const result = await callPennylane(upperMethod, path, body);
 
+    // Diagnostic (2026-09-22) : sur un refus Pennylane d'une ÉCRITURE, journaliser la
+    // charge utile exacte et la réponse complète — la doc PL et l'API réelle divergent
+    // (codes TVA, types des champs) et le message d'erreur seul ne dit pas quel champ.
+    // Pas de secret dans le corps (le token est dans l'en-tête) ; tronqué à 6 Ko.
+    if (result.status >= 400 && upperMethod !== "GET") {
+      const dump = JSON.stringify({ path, body, pennylane_status: result.status, response: result.data });
+      console.error(`[pennylane-proxy] PL ${result.status} on ${upperMethod} ${path}: ${dump.slice(0, 6000)}`);
+    }
+
     return jsonResponse(
       { data: result.data, pennylane_status: result.status },
       result.status >= 200 && result.status < 300 ? 200 : result.status,
