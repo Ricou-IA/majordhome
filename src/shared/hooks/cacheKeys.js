@@ -284,6 +284,7 @@ export const pennylaneKeys = {
   sync: (orgId, entityType, localId) => [...pennylaneKeys.all(orgId), 'sync', entityType, localId],
   syncByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'sync', 'client', clientId],
   ledgerAccounts: (orgId) => [...pennylaneKeys.all(orgId), 'ledger-accounts'],
+  journals: (orgId) => [...pennylaneKeys.all(orgId), 'journals'],
   invoicesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'invoices', clientId],
   quotesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'quotes', clientId],
   quoteLines: (orgId, pennylaneQuoteId) => [...pennylaneKeys.all(orgId), 'quote-lines', pennylaneQuoteId],

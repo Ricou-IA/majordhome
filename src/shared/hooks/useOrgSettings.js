@@ -125,6 +125,7 @@ export function pennylaneInvoiceSettings(settings) {
   const inv = settings?.pennylane?.invoice || {};
   const days = Number(inv.deadline_days);
   const la = inv.ledger_accounts || {};
+  const journalId = Number(inv.journal_id);
   return {
     deadlineDays: Number.isInteger(days) && days >= 0 ? days : PENNYLANE_INVOICE_DEFAULTS.deadlineDays,
     mode: inv.mode === 'final' ? 'final' : PENNYLANE_INVOICE_DEFAULTS.mode,
@@ -132,5 +133,10 @@ export function pennylaneInvoiceSettings(settings) {
       byCategory: la.by_category && typeof la.by_category === 'object' ? la.by_category : {},
       parts: la.parts ?? null,
     },
+    // Journal des factures Majordhome (Eric, 2026-09-22 : journal « VA » créé dans PL) :
+    // l'écriture de chaque facture créée est DÉPLACÉE dans ce journal juste après la
+    // création (PUT /ledger_entries/{id}). null = journal de ventes par défaut de PL.
+    journalId: Number.isFinite(journalId) && journalId > 0 ? journalId : null,
+    journalCode: typeof inv.journal_code === 'string' ? inv.journal_code : '',
   };
 }

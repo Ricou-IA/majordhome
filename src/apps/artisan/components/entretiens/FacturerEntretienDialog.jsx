@@ -108,7 +108,11 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         invoicedAt: item.invoiced_at || null,
         buildPayload: (customerId) =>
           toPennylaneInvoicePayload(model, { customerId, draft: isDraft, externalReference: item.id }),
+        journalId: invoiceSettings.journalId,
       });
+      if (created.journalWarning) {
+        toast.warning(created.journalWarning, { duration: 12000 });
+      }
       const ref = created.invoiceNumber || (created.draft ? 'brouillon' : `#${created.invoiceId}`);
       toast.success(
         created.alreadyExisted
@@ -204,6 +208,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             <div className="text-xs text-gray-600 space-y-0.5">
               <div><span className="text-gray-500">Objet :</span> {model.subject}</div>
               <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(model.deadline)} ({invoiceSettings.deadlineDays} j)</div>
+              {invoiceSettings.journalId && (
+                <div><span className="text-gray-500">Journal :</span> {invoiceSettings.journalCode || `#${invoiceSettings.journalId}`} (écriture déplacée après création)</div>
+              )}
               {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
           </>

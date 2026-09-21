@@ -160,12 +160,31 @@ export function usePennylaneInvoices(clientId, orgId) {
  *
  * @param {string} orgId — org core
  */
+/**
+ * Journaux comptables Pennylane (réglage « Journal des factures Majordhome »).
+ */
+export function useJournals() {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const { data, isLoading, error } = useQuery({
+    queryKey: pennylaneKeys.journals(orgId),
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getJournals();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId,
+    staleTime: 24 * 60 * 60_000,
+  });
+  return { journals: data || [], isLoading, error };
+}
+
 export function useCreateEntretienInvoice(orgId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ interventionId, clientId, invoicedAt, buildPayload }) => {
+    mutationFn: async ({ interventionId, clientId, invoicedAt, buildPayload, journalId = null }) => {
       const created = await unwrapResult(
-        pennylaneService.createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload }),
+        pennylaneService.createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload, journalId }),
       );
       const { error } = await savService.updateFields(interventionId, {
         invoice_id: String(created.invoiceId),

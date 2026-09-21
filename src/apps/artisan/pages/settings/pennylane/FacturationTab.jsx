@@ -15,7 +15,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks/useOrgSettings';
-import { useLedgerAccounts } from '@hooks/usePennylane';
+import { useLedgerAccounts, useJournals } from '@hooks/usePennylane';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -34,6 +34,7 @@ function pickForm(settings) {
     enabled: Boolean(settings?.pennylane?.enabled),
     deadline_days: String(inv.deadlineDays),
     mode: inv.mode,
+    journal_id: inv.journalId ? String(inv.journalId) : '',
     ledger_by_category: byCategory,
     ledger_parts: inv.ledgerAccounts.parts ? String(inv.ledgerAccounts.parts) : '',
   };
@@ -61,6 +62,7 @@ export default function FacturationTab() {
   const [initial, setInitial] = useState(() => pickForm({}));
   const { categories } = useEquipmentReferential();
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
+  const { journals, isLoading: loadingJournals, error: journalsError } = useJournals();
   // Pennylane décline chaque compte par taux de TVA (70601 × any / 10 % / 5,5 % / 20 %) :
   // on paramètre le NUMÉRO, une fois ; la facture choisit la déclinaison du taux de la ligne.
   // Options = plan comptable de GESTION, contexte « contrat » (Settings → Plan comptable) ;
@@ -117,6 +119,8 @@ export default function FacturationTab() {
           deadline_days: Number(form.deadline_days),
           mode: form.mode,
           ledger_accounts: ledgerAccountsForSave(form),
+          journal_id: form.journal_id ? Number(form.journal_id) : null,
+          journal_code: form.journal_id ? (journals.find((j) => String(j.id) === form.journal_id)?.code || '') : '',
         },
       };
       await save({ pennylane });
@@ -179,6 +183,26 @@ export default function FacturationTab() {
             </select>
             <p className={HINT_CLASS}>
               Commencez en brouillon : vous relisez et envoyez depuis Pennylane. Une facture finalisée est un document légal, irréversible (avoir).
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLASS}>Journal des factures Majordhome</label>
+            <select
+              value={form.journal_id || ''}
+              onChange={(e) => setForm({ ...form, journal_id: e.target.value })}
+              disabled={loadingJournals}
+              className={INPUT_CLASS}
+            >
+              <option value="">— Journal de ventes par défaut de Pennylane —</option>
+              {journals.map((j) => (
+                <option key={j.id} value={String(j.id)}>{j.code} · {j.label}{j.type ? ` (${j.type})` : ''}</option>
+              ))}
+            </select>
+            {journalsError && <p className={ERROR_CLASS}>Journaux Pennylane indisponibles : {journalsError.message || 'erreur'}</p>}
+            <p className={HINT_CLASS}>
+              Le journal se crée dans Pennylane (Paramètres → Comptabilité → Journaux, type Ventes). Juste après la création d&apos;une facture,
+              son écriture comptable y est déplacée : tout ce que Majord&apos;home écrit se lit dans ce journal, le reste non. Si Pennylane
+              refuse le déplacement, la facture est quand même créée et l&apos;aperçu vous le dit.
             </p>
           </div>
         </div>

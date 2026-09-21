@@ -1018,6 +1018,31 @@ async function getInvoicesByClient(clientId, orgId) {
 // ============================================================================
 
 /**
+ * Journaux comptables de la société Pennylane (`GET /journals`, lecture seule ici —
+ * le journal « VA · Ventes automatiques » a été créé dans PL par Eric le 2026-09-22).
+ * @returns {Promise<Array<{ id: number, code: string, label: string, type: string|null }>>}
+ */
+async function getJournals() {
+  const result = await apiCall('GET', '/journals?limit=100');
+  const items = result?.items || result?.data || (Array.isArray(result) ? result : []);
+  return items
+    .map((j) => ({ id: j.id, code: j.code || '', label: j.label || '', type: j.type || null }))
+    .sort((a, b) => a.code.localeCompare(b.code));
+}
+
+/**
+ * Déplace l'écriture comptable d'une facture dans un journal (`PUT /ledger_entries/{id}`).
+ * L'API de création de facture n'a pas de champ journal : c'est le seul chemin pour
+ * qu'une facture du module de facturation tombe dans le journal Majordhome, tout en
+ * gardant numérotation, PDF, relances et facturation électronique côté Pennylane.
+ * Throw si PL refuse (l'appelant transforme en avertissement, jamais en blocage).
+ */
+async function moveLedgerEntryToJournal(ledgerEntryId, journalId) {
+  if (!ledgerEntryId || !journalId) throw new Error('ledgerEntryId et journalId requis');
+  return apiCall('PUT', `/ledger_entries/${ledgerEntryId}`, { journal_id: Number(journalId) });
+}
+
+/**
  * Crée la facture Pennylane d'un entretien réalisé.
  *
  * Idempotent : si un mapping `pennylane_sync` de type `invoice` existe déjà pour
@@ -1026,15 +1051,20 @@ async function getInvoicesByClient(clientId, orgId) {
  * l'écriture MDH avait échoué après la création PL). Le client est ponté via
  * `pennylane_sync` type `client`, sinon créé (même chemin que le push devis).
  *
+ * Journal (2026-09-22) : si `journalId` est fourni, l'écriture de la facture créée
+ * est déplacée dans ce journal ; un refus PL ou une écriture absente (brouillon)
+ * remonte en `journalWarning`, la facture reste créée.
+ *
  * @param {object} p
  * @param {string} p.orgId
  * @param {string} p.interventionId
  * @param {string} p.clientId
  * @param {(customerId: number) => object} p.buildPayload — corps `POST /customer_invoices`
  *   (cf. `toPennylaneInvoicePayload` de `src/lib/entretienInvoiceModel.js`)
- * @returns {Promise<{ invoiceId: number, invoiceNumber: string|null, publicFileUrl: string|null, draft: boolean|null, alreadyExisted: boolean }>}
+ * @param {number|null} [p.journalId] — journal des factures Majordhome (réglage org)
+ * @returns {Promise<{ invoiceId: number, invoiceNumber: string|null, publicFileUrl: string|null, draft: boolean|null, alreadyExisted: boolean, ledgerEntryId: number|null, journalMoved: boolean, journalWarning: string|null }>}
  */
-async function createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload }) {
+async function createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload, journalId = null }) {
   if (!orgId || !interventionId || !clientId) throw new Error('orgId, interventionId et clientId sont requis');
 
   const existing = await getSyncRecord(orgId, 'invoice', interventionId);
@@ -1045,6 +1075,9 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
       publicFileUrl: existing.metadata?.public_file_url || null,
       draft: existing.metadata?.draft ?? null,
       alreadyExisted: true,
+      ledgerEntryId: existing.metadata?.ledger_entry_id ?? null,
+      journalMoved: existing.metadata?.journal_moved === true,
+      journalWarning: null,
     };
   }
 
@@ -1067,6 +1100,25 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
   if (!created?.id) throw new Error('Pennylane n’a pas renvoyé de facture');
 
   const draft = created.draft ?? Boolean(payload.draft);
+
+  // Journal Majordhome : déplacer l'écriture de la facture. Jamais bloquant.
+  const ledgerEntryId = created.ledger_entry?.id ?? null;
+  let journalMoved = false;
+  let journalWarning = null;
+  if (journalId) {
+    if (!ledgerEntryId) {
+      journalWarning = 'Pennylane n’a pas encore créé l’écriture comptable de ce brouillon : le journal sera à poser après finalisation.';
+    } else {
+      try {
+        await moveLedgerEntryToJournal(ledgerEntryId, journalId);
+        journalMoved = true;
+      } catch (err) {
+        journalWarning = `Écriture laissée dans le journal de ventes par défaut — Pennylane a refusé le déplacement : ${err?.message || err}`;
+        logger.warn('[pennylane.createInvoiceFromEntretien] journal move refused', { ledgerEntryId, journalId, err });
+      }
+    }
+  }
+
   await upsertSyncRecord({
     org_id: orgId,
     entity_type: 'invoice',
@@ -1083,6 +1135,10 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
       amount: created.amount ?? null,
       date: payload.date,
       deadline: payload.deadline,
+      ledger_entry_id: ledgerEntryId,
+      journal_id: journalId || null,
+      journal_moved: journalMoved,
+      journal_warning: journalWarning,
     },
   });
 
@@ -1092,6 +1148,9 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
     publicFileUrl: created.public_file_url || null,
     draft,
     alreadyExisted: false,
+    ledgerEntryId,
+    journalMoved,
+    journalWarning,
   };
 }
 
@@ -1864,6 +1923,8 @@ export const pennylaneService = {
   pullInvoices: (orgId, since) => withErrorHandling(() => pullInvoices(orgId, since), 'pennylane.pullInvoices'),
   getInvoicesByClient: (clientId, orgId) => withErrorHandling(() => getInvoicesByClient(clientId, orgId), 'pennylane.getInvoicesByClient'),
   createInvoiceFromEntretien: (params) => withErrorHandling(() => createInvoiceFromEntretien(params), 'pennylane.createInvoiceFromEntretien'),
+  getJournals: () => withErrorHandling(() => getJournals(), 'pennylane.getJournals'),
+  moveLedgerEntryToJournal: (ledgerEntryId, journalId) => withErrorHandling(() => moveLedgerEntryToJournal(ledgerEntryId, journalId), 'pennylane.moveLedgerEntryToJournal'),
 
   // Config
   getLedgerAccounts: () => withErrorHandling(() => getLedgerAccounts(), 'pennylane.getLedgerAccounts'),
