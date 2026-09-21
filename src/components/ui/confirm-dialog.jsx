@@ -31,6 +31,7 @@ export function ConfirmDialog({
   variant = 'destructive', // 'destructive' | 'default'
   onConfirm,
   loading = false,
+  confirmDisabled = false, // bloque la confirmation (ex. aperçu en erreur) sans masquer le bouton
   children,
 }) {
   const confirmButtonClass = variant === 'destructive'
@@ -78,7 +79,7 @@ export function ConfirmDialog({
                 'px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2',
                 confirmButtonClass,
               )}
-              disabled={loading}
+              disabled={loading || confirmDisabled}
               onClick={(e) => {
                 // Empêcher la fermeture auto pour gérer le loading
                 e.preventDefault();

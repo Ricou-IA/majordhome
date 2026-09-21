@@ -996,6 +996,88 @@ async function getInvoicesByClient(clientId, orgId) {
 }
 
 // ============================================================================
+// FACTURES — push d'un entretien vers Pennylane (spec 2026-09-21)
+// ============================================================================
+
+/**
+ * Crée la facture Pennylane d'un entretien réalisé.
+ *
+ * Idempotent : si un mapping `pennylane_sync` de type `invoice` existe déjà pour
+ * l'intervention, rien n'est recréé — on renvoie le mapping et l'appelant se
+ * contente de ré-appliquer `invoice_id` / `invoiced_at` sur la carte (filet si
+ * l'écriture MDH avait échoué après la création PL). Le client est ponté via
+ * `pennylane_sync` type `client`, sinon créé (même chemin que le push devis).
+ *
+ * @param {object} p
+ * @param {string} p.orgId
+ * @param {string} p.interventionId
+ * @param {string} p.clientId
+ * @param {(customerId: number) => object} p.buildPayload — corps `POST /customer_invoices`
+ *   (cf. `toPennylaneInvoicePayload` de `src/lib/entretienInvoiceModel.js`)
+ * @returns {Promise<{ invoiceId: number, invoiceNumber: string|null, publicFileUrl: string|null, draft: boolean|null, alreadyExisted: boolean }>}
+ */
+async function createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload }) {
+  if (!orgId || !interventionId || !clientId) throw new Error('orgId, interventionId et clientId sont requis');
+
+  const existing = await getSyncRecord(orgId, 'invoice', interventionId);
+  if (existing?.pennylane_id) {
+    return {
+      invoiceId: existing.pennylane_id,
+      invoiceNumber: existing.pennylane_number || null,
+      publicFileUrl: existing.metadata?.public_file_url || null,
+      draft: existing.metadata?.draft ?? null,
+      alreadyExisted: true,
+    };
+  }
+
+  const clientSync = await getSyncRecord(orgId, 'client', clientId);
+  let customerId = clientSync?.pennylane_id || null;
+  if (!customerId) {
+    const { data: client, error } = await supabase
+      .from('majordhome_clients')
+      .select('*')
+      .eq('id', clientId)
+      .eq('org_id', orgId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!client) throw new Error('Client introuvable');
+    customerId = await getOrCreateCustomer(client, orgId);
+  }
+
+  const payload = buildPayload(customerId);
+  const created = await apiCall('POST', '/customer_invoices', payload);
+  if (!created?.id) throw new Error('Pennylane n’a pas renvoyé de facture');
+
+  const draft = created.draft ?? Boolean(payload.draft);
+  await upsertSyncRecord({
+    org_id: orgId,
+    entity_type: 'invoice',
+    local_id: interventionId,
+    pennylane_id: created.id,
+    pennylane_number: created.invoice_number || null,
+    external_reference: interventionId,
+    sync_status: 'synced',
+    last_synced_at: new Date().toISOString(),
+    metadata: {
+      public_file_url: created.public_file_url || null,
+      file_url: created.file_url || null,
+      draft,
+      amount: created.amount ?? null,
+      date: payload.date,
+      deadline: payload.deadline,
+    },
+  });
+
+  return {
+    invoiceId: created.id,
+    invoiceNumber: created.invoice_number || null,
+    publicFileUrl: created.public_file_url || null,
+    draft,
+    alreadyExisted: false,
+  };
+}
+
+// ============================================================================
 // CONFIG — comptes comptables (ledger_accounts)
 // ============================================================================
 
@@ -1720,6 +1802,7 @@ export const pennylaneService = {
   // Factures
   pullInvoices: (orgId, since) => withErrorHandling(() => pullInvoices(orgId, since), 'pennylane.pullInvoices'),
   getInvoicesByClient: (clientId, orgId) => withErrorHandling(() => getInvoicesByClient(clientId, orgId), 'pennylane.getInvoicesByClient'),
+  createInvoiceFromEntretien: (params) => withErrorHandling(() => createInvoiceFromEntretien(params), 'pennylane.createInvoiceFromEntretien'),
 
   // Config
   getLedgerAccounts: () => withErrorHandling(() => getLedgerAccounts(), 'pennylane.getLedgerAccounts'),

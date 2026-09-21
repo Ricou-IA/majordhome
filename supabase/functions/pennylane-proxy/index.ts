@@ -37,14 +37,17 @@ const MAX_RETRIES = 3;
 // ---------------------------------------------------------------------------
 // Allowlist paths × méthodes
 // ---------------------------------------------------------------------------
-// Chaque entrée : { prefix, methods }. Un path est autorisé si :
+// Chaque entrée : { prefix, methods, exactMethods? }. Un path est autorisé si :
 //   - son chemin (avant le `?`) commence par `prefix`
 //   - la méthode est dans `methods`
+//   - OU le chemin est EXACTEMENT `prefix` et la méthode est dans `exactMethods`
+//     (création d'une facture : `POST /customer_invoices` — les sous-routes
+//     `/{id}/finalize`, `/{id}/send_by_email`… restent bloquées, spec 2026-09-21)
 // DELETE et PATCH ne sont autorisés nulle part.
 // ---------------------------------------------------------------------------
-const ALLOWED_ROUTES: { prefix: string; methods: string[] }[] = [
+const ALLOWED_ROUTES: { prefix: string; methods: string[]; exactMethods?: string[] }[] = [
   { prefix: "/customers", methods: ["GET", "POST"] },
-  { prefix: "/customer_invoices", methods: ["GET"] },
+  { prefix: "/customer_invoices", methods: ["GET"], exactMethods: ["POST"] },
   { prefix: "/quotes", methods: ["GET", "POST", "PUT"] },
   { prefix: "/ledger_accounts", methods: ["GET"] },
 ];
@@ -53,7 +56,8 @@ function isRouteAllowed(method: string, path: string): boolean {
   const cleanPath = path.split("?")[0];
   for (const route of ALLOWED_ROUTES) {
     if (cleanPath === route.prefix || cleanPath.startsWith(route.prefix + "/")) {
-      return route.methods.includes(method);
+      if (route.methods.includes(method)) return true;
+      return cleanPath === route.prefix && (route.exactMethods ?? []).includes(method);
     }
   }
   return false;

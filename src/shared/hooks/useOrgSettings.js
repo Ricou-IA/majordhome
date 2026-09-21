@@ -58,8 +58,8 @@ export function useOrgSettings() {
 /**
  * Sélecteur : l'org courante a-t-elle l'intégration Pennylane activée ?
  *
- * Source : `core.organizations.settings.pennylane.enabled` (toggle posé via
- * la spec bridge Pennylane PR 2 — UI future via /settings/integrations).
+ * Source : `core.organizations.settings.pennylane.enabled`, éditable dans
+ * Settings → Socle → Facturation Pennylane (/settings/pennylane, 2026-09-21).
  *
  * Consommé par QuoteCandidatesModal (PR 4) et MarkWonQuoteModal (PR 5) pour
  * brancher conditionnellement les nouvelles modales du bridge Pipeline ↔ PL.
@@ -68,4 +68,21 @@ export function useOrgSettings() {
 export function usePennylaneEnabled() {
   const { settings } = useOrgSettings();
   return Boolean(settings?.pennylane?.enabled);
+}
+
+export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode: 'draft' });
+
+/**
+ * Réglages des factures créées depuis les cartes entretien (push MDH → PL,
+ * spec 2026-09-21). Source `settings.pennylane.invoice = { deadline_days, mode }`,
+ * `mode` ∈ `draft` (brouillon à finaliser dans PL) | `final`. Défauts si absent.
+ * Fonction pure (pas de hook) pour être appelable depuis un modèle ou un test.
+ */
+export function pennylaneInvoiceSettings(settings) {
+  const inv = settings?.pennylane?.invoice || {};
+  const days = Number(inv.deadline_days);
+  return {
+    deadlineDays: Number.isInteger(days) && days >= 0 ? days : PENNYLANE_INVOICE_DEFAULTS.deadlineDays,
+    mode: inv.mode === 'final' ? 'final' : PENNYLANE_INVOICE_DEFAULTS.mode,
+  };
 }

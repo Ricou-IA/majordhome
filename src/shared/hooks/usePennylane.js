@@ -15,7 +15,9 @@ import { pennylaneQuotesService } from '@services/pennylaneQuotes.service';
 import { pennylaneCustomerDuplicatesService } from '@services/pennylaneCustomerDuplicates.service';
 import { leadsService } from '@services/leads.service';
 import { quoteDismissalsService } from '@services/quoteDismissals.service';
-import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys } from '@hooks/cacheKeys';
+import { savService } from '@services/sav.service';
+import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys, entretienSavKeys } from '@hooks/cacheKeys';
+import { unwrapResult } from '@/lib/serviceHelpers';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -144,6 +146,42 @@ export function usePennylaneInvoices(clientId, orgId) {
   });
 
   return { invoices: invoices || [], isLoading, error, refetch };
+}
+
+/**
+ * Crée la facture Pennylane d'un entretien réalisé depuis sa carte, puis marque
+ * l'intervention (`invoice_id` + `invoiced_at`) — spec 2026-09-21.
+ *
+ * Contrat unique des mutations : `mutateAsync` résout avec la facture créée
+ * (`{ invoiceId, invoiceNumber, publicFileUrl, draft, alreadyExisted }`) et REJETTE
+ * sur refus. Si Pennylane a créé la facture mais que le marquage MDH échoue, l'erreur
+ * le dit explicitement (le mapping `pennylane_sync` est posé : un nouveau clic ne
+ * recrée rien et ré-applique juste le marquage).
+ *
+ * @param {string} orgId — org core
+ */
+export function useCreateEntretienInvoice(orgId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ interventionId, clientId, invoicedAt, buildPayload }) => {
+      const created = await unwrapResult(
+        pennylaneService.createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload }),
+      );
+      const { error } = await savService.updateFields(interventionId, {
+        invoice_id: String(created.invoiceId),
+        invoiced_at: invoicedAt || new Date().toISOString(),
+      });
+      if (error) {
+        const ref = created.invoiceNumber || `#${created.invoiceId}`;
+        throw new Error(`Facture ${ref} créée sur Pennylane, mais la carte n’a pas pu être marquée facturée : ${error.message || error}`);
+      }
+      return created;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.all(orgId) });
+    },
+  });
 }
 
 // ============================================================================

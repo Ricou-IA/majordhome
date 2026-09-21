@@ -19,3 +19,14 @@
 
 *Confirmé PENDING le 2026-08-09 : rien à graver tant que les phases ne sont pas livrées. Reconfirmé le 2026-09-16.*
 ---
+
+## [2026-09-21 16:30] Facturation d'un entretien : push Majord'home → Pennylane
+**Statut** : PENDING
+**Commit** : (session du 2026-09-21, feat(entretiens): bouton « Facturer » → facture Pennylane)
+**Contexte** : Il n'a jamais existé de chaînage facture Pennylane → carte entretien (seul le bouton manuel posait `invoiced_at` ; 41/50 cartes Réalisé marquées à la main, 0 mapping facture). Livré : bouton « Facturer » sur la carte entretien Réalisé qui crée la facture via `POST /customer_invoices` (proxy, path exact) et marque la carte (`invoice_id` + `invoiced_at`), modèle pur `src/lib/entretienInvoiceModel.js` (testé), réglages `settings.pennylane.invoice` (Settings → Socle → Facturation Pennylane, qui porte enfin le toggle `enabled`).
+**Proposition** (§ Module Pennylane, « Règles qui mordent ») :
+- **Facturer un entretien = bouton « Facturer » de la carte** (`FacturerEntretienDialog` → `useCreateEntretienInvoice` → `pennylaneService.createInvoiceFromEntretien`), spec `docs/superpowers/specs/2026-09-21-facturation-entretien-pennylane-push-design.md`. Lignes = lignes tarifaires ENREGISTRÉES du contrat mises à l'échelle de `contract.amount` (jamais le prix catalogue ni une ligne de remise), TVA = `equipment_categories.default_vat_rate` (absente → 20 % + avertissement affiché), pièces non offertes sur la même facture, HT = TTC / (1 + taux) à 10 décimales. Calcul dans le module PUR `src/lib/entretienInvoiceModel.js` (`node --test scripts/entretien-invoice-model.test.mjs`, dans `audit:quality`) — jamais dans le composant.
+- **Idempotence = mapping `pennylane_sync` type `invoice`** (`local_id` = intervention, `external_reference` = intervention) relu AVANT tout POST : un second clic ne recrée rien et ré-applique `invoice_id`/`invoiced_at`. `interventions.invoice_id` posé ⇒ bouton inerte « Facturée », marquage manuel masqué.
+- **Mode `settings.pennylane.invoice.mode` = `draft` par défaut** (brouillon à finaliser/envoyer depuis PL), `final` quand le mapping est jugé fiable ; échéance `deadline_days` (30). Toujours sauver l'objet `pennylane` COMPLET (merge JSONB niveau 1). Le proxy n'autorise `POST` que sur `/customer_invoices` exact : `finalize` / `send_by_email` restent bloqués tant que l'envoi reste manuel (décision Eric 2026-09-21).
+- Périmètre V1 : entretiens uniquement (SAV = devis PL). Hors périmètre : lien vers la facture sur la carte, rattrapage des factures saisies à la main dans PL.
+---

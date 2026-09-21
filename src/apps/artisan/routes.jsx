@@ -31,6 +31,7 @@ const EquipementsSettings = lazy(() => import('./pages/settings/EquipementsSetti
 const TourneesSettings = lazy(() => import('./pages/settings/TourneesSettings'));
 const EmailsSettings = lazy(() => import('./pages/settings/EmailsSettings'));
 const SmsSettings = lazy(() => import('./pages/settings/SmsSettings'));
+const PennylaneSettings = lazy(() => import('./pages/settings/PennylaneSettings'));
 
 // Certificat
 const CertificatEntretien = lazy(() => import('./pages/CertificatEntretien'));
@@ -358,6 +359,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <SmsSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/pennylane',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <PennylaneSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

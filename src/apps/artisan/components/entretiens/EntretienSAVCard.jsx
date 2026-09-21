@@ -18,6 +18,8 @@ import { savService } from '@services/sav.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { entretienSavKeys } from '@hooks/cacheKeys';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import FacturerEntretienDialog from './FacturerEntretienDialog';
 
 // ============================================================================
 // CONSTANTES VISUELLES
@@ -64,10 +66,15 @@ function PartsOrderBadge({ status }) {
 export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [smsLoading, setSmsLoading] = useState(false);
   const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const { isTeamLeaderOrAbove } = useAuth();
+  const pennylaneEnabled = usePennylaneEnabled();
   const queryClient = useQueryClient();
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
+  // Push MDH → Pennylane (spec 2026-09-21) : entretiens seulement, org avec PL activé.
+  // Les SAV restent hors périmètre (montant issu d'un devis PL).
+  const canPushInvoice = pennylaneEnabled && type === 'entretien';
 
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
   // Montant : SAV = devis + contrat si entretien inclus, Entretien = contrat
@@ -241,12 +248,47 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
           {/* Boutons d'action (Facturé + Encaissé + SMS avis) — tout item réalisé, entretien ou SAV */}
           {item.workflow_status === 'realise' && (
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {/* Facturé (team_leader / org_admin) : suivi de facturation (toggle) —
-                  la carte reste en Réalisé, fallback de suivi quand le client n'a pas
-                  de RDV visible sur le planning (sinon le RDV lié passe en violet).
-                  Évolution prévue (hors scope) : ce bouton générera la facture côté
-                  Pennylane + envoi au client par mail. */}
-              {isTeamLeaderOrAbove && (
+              {/* Facturer (team_leader / org_admin, org Pennylane, entretien) : crée la
+                  facture sur Pennylane ET marque la carte (`invoice_id` + `invoiced_at`).
+                  Une fois `invoice_id` posé, le bouton devient « Facturée » (inerte) et le
+                  marquage manuel disparaît : la facture existe, on ne la « dé-marque » pas ici. */}
+              {isTeamLeaderOrAbove && canPushInvoice && (
+                <>
+                  <button
+                    type="button"
+                    disabled={!!item.invoice_id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!item.invoice_id) setInvoiceOpen(true);
+                    }}
+                    title={item.invoice_id ? 'Facture créée sur Pennylane' : 'Créer la facture sur Pennylane'}
+                    className={`inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border transition-colors ${
+                      item.invoice_id
+                        ? 'border-violet-300 text-violet-700 bg-violet-50 cursor-default'
+                        : 'border-violet-400 text-white bg-violet-600 hover:bg-violet-700'
+                    }`}
+                  >
+                    {item.invoice_id ? <Check className="w-3 h-3" /> : <Receipt className="w-3 h-3" />}
+                    {item.invoice_id ? 'Facturée' : 'Facturer'}
+                  </button>
+                  {invoiceOpen && (
+                    // Le portail Radix remonte les clics React jusqu'à la carte : on les arrête ici.
+                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <FacturerEntretienDialog
+                        item={item}
+                        orgId={orgId}
+                        open={invoiceOpen}
+                        onOpenChange={setInvoiceOpen}
+                        onCreated={() => onRefresh?.()}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              {/* Marquage manuel « Facturé » (toggle) : facture faite directement dans
+                  Pennylane, ou org sans intégration. La carte reste en Réalisé ; le RDV
+                  lié passe en violet sur le planning. Masqué dès qu'une facture PL existe. */}
+              {isTeamLeaderOrAbove && !item.invoice_id && (
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
