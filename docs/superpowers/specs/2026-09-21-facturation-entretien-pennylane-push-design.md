@@ -19,12 +19,20 @@ directement dans Pennylane, org sans intégration).
 
 - **Périmètre V1** : cartes `intervention_type = 'entretien'` en `realise`, org avec
   `settings.pennylane.enabled`. Les SAV restent hors périmètre (leur montant vient d'un devis PL).
-- **Lignes** = lignes tarifaires enregistrées du contrat effectif (`majordhome_contract_pricing_items`,
-  1 par équipement, libellé du type) **mises à l'échelle du montant contractuel** `contract.amount`
-  (source figée à la signature, cf. Module Contrats) — la facture porte le prix facturé, pas le prix
-  catalogue ni une ligne de remise (c'est ce que fait la saisie manuelle : DALOUS 90 € sur un produit
-  catalogue à 99 €). Sans ligne tarifaire : une ligne « Contrat d'entretien CTR-xxx » au montant.
-  Plus les **pièces non offertes** de `parts_detail`, sur la même facture.
+- **Lignes = celles du contrat signé, 1 par équipement** (révision Eric, 2026-09-21 soir : la 1ʳᵉ
+  version lisait `contract_pricing_items`, vides sur la plupart des contrats → 1 ligne « Contrat »
+  globale, refusée). Mêmes entrées que l'écran de signature : équipements du contrat, grille × zone
+  ENREGISTRÉE sur le contrat, prix forcés par ligne, dégressivité — calcul pur `computeContractLines`
+  (`src/lib/contractPricing.js`, sorti de `pricing.service.js` et ré-exporté pour ContractSign /
+  ContractPdfSection / ContractPricingSection). Lignes au prix grille TTC.
+- **La remise s'applique** : écart entre Σ lignes grille et `contract.amount` (source figée à la
+  signature) = **remise relative portée par chaque ligne d'équipement** (`discount: { type:
+  'relative', value }` dans PL), qui couvre la dégressivité et, si le montant a été forcé à la
+  baisse, la remise commerciale ; jamais sur les pièces. Montant forcé à la hausse → lignes majorées
+  au prorata. Le total retombe sur `contract.amount` (dernière ligne absorbe l'arrondi côté aperçu ;
+  PL recalcule ligne par ligne, ±0,01 € possible). Équipement sans tarif → ignoré + avertissement ;
+  aucun équipement tarifé → erreur bloquante. Plus les **pièces non offertes** de `parts_detail`,
+  sur la même facture.
 - **TVA par ligne** = `equipment_categories.default_vat_rate` de la catégorie du type. Catégorie sans
   TVA → 20 % **et avertissement visible** dans l'aperçu. Les pièces prennent la TVA de la première
   ligne d'équipement. Montants MDH en TTC → HT = TTC / (1 + taux), transmis avec 10 décimales (PL

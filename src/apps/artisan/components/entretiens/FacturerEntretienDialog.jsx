@@ -4,11 +4,12 @@
  * Aperçu puis création de la facture Pennylane d'un entretien réalisé, depuis
  * sa carte (spec 2026-09-21-facturation-entretien-pennylane-push-design.md).
  *
- * Le calcul (lignes, TVA, objet, total) vit dans le module PUR
- * `src/lib/entretienInvoiceModel.js` ; ce composant ne fait que charger les
- * entrées (lignes tarifaires du contrat effectif, équipements du client,
- * référentiel, réglages) et afficher le modèle. Un avertissement s'affiche, une
- * erreur bloque : on ne crée jamais une facture qu'on n'a pas su calculer.
+ * Les lignes sont celles du CONTRAT SIGNÉ : mêmes entrées que l'écran de
+ * signature (équipements du contrat, grille × zone enregistrée, prix forcés par
+ * ligne, dégressivité) passées au calcul pur `computeContractLines`, puis au
+ * modèle pur `buildEntretienInvoice` (remise, TVA, pièces, objet). Ce composant
+ * ne calcule rien : il charge et affiche. Un avertissement s'affiche, une erreur
+ * bloque : on ne crée jamais une facture qu'on n'a pas su calculer.
  * ============================================================================
  */
 
@@ -16,11 +17,12 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { useContractPricing } from '@hooks/usePricing';
-import { useClientEquipments } from '@hooks/useClients';
-import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
+import { useContract, useContractEquipments } from '@hooks/useContracts';
+import { useContractZone } from '@hooks/useContractZone';
 import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
 import { useCreateEntretienInvoice } from '@hooks/usePennylane';
+import { computeContractLines } from '@/lib/contractPricing';
 import { buildEntretienInvoice, toPennylaneInvoicePayload } from '@/lib/entretienInvoiceModel';
 import { formatEuro, formatDateForInput, formatDateShortFR } from '@/lib/utils';
 
@@ -34,29 +36,60 @@ import { formatEuro, formatDateForInput, formatDateShortFR } from '@/lib/utils';
  */
 export default function FacturerEntretienDialog({ item, orgId, open, onOpenChange, onCreated }) {
   const contractId = item.effective_contract_id || item.contract_id || null;
-  const { items: pricingItems, isLoading: loadingItems } = useContractPricing(contractId);
-  const { equipments, isLoading: loadingEquipments } = useClientEquipments(item.client_id);
-  const { index: referentiel, isLoading: loadingReferentiel } = useEquipmentReferential();
+  const { contract, isLoading: loadingContract } = useContract(contractId);
+  const { equipments, isLoading: loadingEquipments } = useContractEquipments(contractId);
+  const { zones, rates, discounts, equipmentTypes, categories, isLoading: loadingPricing } = usePricingData();
+  const { overrides, isLoading: loadingOverrides } = useContractLineOverrides(contractId);
   const { settings, isLoading: loadingSettings } = useOrgSettings();
   const createInvoice = useCreateEntretienInvoice(orgId);
 
+  // Zone : celle ENREGISTRÉE sur le contrat (figée à la configuration, cf. Module
+  // Contrats) ; détection de secours partagée seulement si le contrat n'en a jamais reçu.
+  const clientLite = useMemo(
+    () => ({ address: item.client_address, postal_code: item.client_postal_code, city: item.client_city }),
+    [item.client_address, item.client_postal_code, item.client_city],
+  );
+  const { activeZone: detectedZone } = useContractZone(clientLite, contract, zones);
+  const activeZone = useMemo(() => {
+    if (contract?.zone_id && zones?.length) {
+      const stored = zones.find((z) => z.id === contract.zone_id);
+      if (stored) return stored;
+    }
+    return detectedZone;
+  }, [contract?.zone_id, zones, detectedZone]);
+
+  const referentiel = useMemo(
+    () => ({
+      typesById: new Map((equipmentTypes || []).map((t) => [t.id, t])),
+      categoriesById: new Map((categories || []).map((c) => [c.id, c])),
+    }),
+    [equipmentTypes, categories],
+  );
+
   const invoiceSettings = pennylaneInvoiceSettings(settings);
   const isDraft = invoiceSettings.mode === 'draft';
-  const isLoading = loadingItems || loadingEquipments || loadingReferentiel || loadingSettings;
+  const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings;
 
   const model = useMemo(() => {
-    if (isLoading) return null;
+    if (isLoading || !contract) return null;
+    const pricing = computeContractLines({
+      equipments: equipments || [],
+      rates: rates || [],
+      equipmentTypes: equipmentTypes || [],
+      zone: activeZone,
+      overrides: overrides || {},
+      discounts: discounts || [],
+    });
     return buildEntretienInvoice({
       intervention: { id: item.id },
-      contract: { id: contractId, contract_number: item.contract_number, amount: item.contract_amount },
-      pricingItems: pricingItems || [],
-      equipments: equipments || [],
+      contract: { id: contract.id, contract_number: contract.contract_number, amount: contract.amount },
+      pricing,
       parts: Array.isArray(item.parts_detail) ? item.parts_detail : [],
       referentiel,
       deadlineDays: invoiceSettings.deadlineDays,
       today: formatDateForInput(new Date()),
     });
-  }, [isLoading, item, contractId, pricingItems, equipments, referentiel, invoiceSettings.deadlineDays]);
+  }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, invoiceSettings.deadlineDays]);
 
   const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id;
 
@@ -87,13 +120,14 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   };
 
   const clientLabel = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim();
+  const contractNumber = contract?.contract_number || item.contract_number;
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
       title={isDraft ? 'Créer le brouillon de facture' : 'Créer la facture'}
-      description={`${clientLabel}${item.contract_number ? ` · ${item.contract_number}` : ''} — la facture sera créée sur Pennylane${isDraft ? ' en brouillon, à finaliser et envoyer depuis Pennylane' : ' et numérotée immédiatement'}.`}
+      description={`${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — la facture sera créée sur Pennylane${isDraft ? ' en brouillon, à finaliser et envoyer depuis Pennylane' : ' et numérotée immédiatement'}.`}
       confirmLabel={isDraft ? 'Créer le brouillon' : 'Créer la facture'}
       variant="default"
       onConfirm={handleConfirm}
@@ -103,6 +137,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       <div className="mt-4 space-y-3 text-sm">
         {isLoading && <p className="text-gray-500">Préparation de la facture…</p>}
 
+        {!isLoading && !contract && (
+          <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Cette carte n’a pas de contrat rattaché : rien à facturer.</p>
+        )}
         {!isLoading && !item.client_id && (
           <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Cette carte n’a pas de client rattaché.</p>
         )}
@@ -131,11 +168,25 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
                     </td>
                     <td className="py-1.5 text-right text-gray-700">{l.quantity}</td>
                     <td className="py-1.5 text-right text-gray-700">{l.vatPercent} %</td>
-                    <td className="py-1.5 text-right text-gray-900 font-medium">{formatEuro(l.totalTtc)}</td>
+                    <td className="py-1.5 text-right text-gray-900 font-medium">{formatEuro(l.grossTtc)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
+                {model.discount && (
+                  <tr className="text-gray-700">
+                    <td colSpan={3} className="pt-2 text-right">
+                      Remise {model.discount.percent} % sur les équipements
+                      <span className="text-gray-500">
+                        {' '}({[
+                          model.discount.degressivitePercent > 0 ? `dégressivité ${model.discount.degressivitePercent} %` : null,
+                          model.discount.commercialAmount > 0 ? `remise commerciale ${formatEuro(model.discount.commercialAmount)}` : null,
+                        ].filter(Boolean).join(' + ') || 'montant du contrat'})
+                      </span>
+                    </td>
+                    <td className="pt-2 text-right">−{formatEuro(model.discount.amount)}</td>
+                  </tr>
+                )}
                 <tr>
                   <td colSpan={3} className="pt-2 text-right font-semibold text-gray-900">Total TTC</td>
                   <td className="pt-2 text-right font-semibold text-gray-900">{formatEuro(model.totalTtc)}</td>
@@ -146,6 +197,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             <div className="text-xs text-gray-600 space-y-0.5">
               <div><span className="text-gray-500">Objet :</span> {model.subject}</div>
               <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(model.deadline)} ({invoiceSettings.deadlineDays} j)</div>
+              {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.name}</div>}
             </div>
           </>
         )}

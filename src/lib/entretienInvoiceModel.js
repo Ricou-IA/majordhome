@@ -4,14 +4,18 @@
 // Module PUR : aucun import React / Supabase. Testé par
 // scripts/entretien-invoice-model.test.mjs (inclus dans audit:quality).
 //
-// Règles (spec 2026-09-21-facturation-entretien-pennylane-push-design.md) :
-//  - les lignes sont les lignes tarifaires ENREGISTRÉES du contrat, mises à
-//    l'échelle du montant contractuel figé (`contract.amount`) — la facture porte
-//    le prix facturé, jamais le prix catalogue ni une ligne de remise ;
+// Règles (spec 2026-09-21-facturation-entretien-pennylane-push-design.md,
+// révisées avec Eric le 2026-09-21 soir) :
+//  - 1 LIGNE PAR ÉQUIPEMENT au prix grille de la zone (ou prix forcé par ligne),
+//    calcul strictement identique au contrat signé (`computeContractLines`) ;
+//  - la REMISE s'applique : dégressivité (+ remise commerciale si le montant du
+//    contrat a été forcé à la baisse) = remise relative par ligne d'équipement,
+//    jamais sur les pièces ; le total retombe sur `contract.amount`, source figée
+//    à la signature. Montant forcé à la HAUSSE → lignes majorées au prorata ;
 //  - TVA par ligne = TVA par défaut de la catégorie du type d'équipement ;
 //    catégorie sans TVA → 20 % + avertissement (jamais silencieux) ;
 //  - les pièces non offertes du certificat s'ajoutent sur la même facture, à
-//    la TVA de la première ligne d'équipement ;
+//    la TVA de la première ligne d'équipement, sans remise ;
 //  - montants MDH en TTC → HT = TTC / (1 + taux), 10 décimales (Pennylane
 //    recalcule et arrondit, comme la saisie manuelle `81.81818181818181`).
 // ============================================================================
@@ -23,6 +27,7 @@ export const DEFAULT_VAT_PERCENT = 20;
 export const DEFAULT_DEADLINE_DAYS = 30;
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const round4 = (n) => Math.round((Number(n) || 0) * 10000) / 10000;
 
 /** HT unitaire à partir d'un TTC total, 10 décimales sans zéros de queue (chaîne, exigée par PL). */
 function unitHt(totalTtc, quantity, vatPercent) {
@@ -67,19 +72,19 @@ function categoryLabelForEquipment(eq, referentiel) {
  * @param {object} p
  * @param {{ id: string }} p.intervention
  * @param {{ id?: string, contract_number?: string, amount: number|string }} p.contract
- * @param {Array<{ equipment_id?: string, equipment_type_id?: string, equipment_type_label?: string, quantity?: number, line_total: number|string }>} p.pricingItems
- * @param {Array<{ id: string, brand?: string, model?: string, serial_number?: string, equipment_type_id?: string, category_id?: string }>} p.equipments
- * @param {Array<{ designation?: string, quantite?: number|string, prix_ht?: number|string, offert?: boolean }>} p.parts  pièces du certificat (`prix_ht` contient du TTC, convention Phase 1)
- * @param {{ typesById: Map, categoriesById: Map }} p.referentiel  index `indexReferentiel()`
+ * @param {{ items: Array, subtotal: number, discountPercent: number, discountAmount: number, total: number }} p.pricing
+ *   résultat de `computeContractLines` (src/lib/contractPricing.js) — le même calcul que le contrat signé
+ * @param {Array<{ designation?: string, reference?: string, quantite?: number|string, prix_ht?: number|string, offert?: boolean }>} p.parts
+ *   pièces du certificat (`prix_ht` contient du TTC, convention Phase 1)
+ * @param {{ typesById: Map, categoriesById: Map }} p.referentiel  index types / catégories (TVA)
  * @param {number} [p.deadlineDays]
  * @param {string} p.today  YYYY-MM-DD
- * @returns {{ date: string, deadline: string, subject: string, lines: Array, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
+ * @returns {{ date: string, deadline: string, subject: string, lines: Array, discount: object|null, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
  */
 export function buildEntretienInvoice({
   intervention,
   contract,
-  pricingItems = [],
-  equipments = [],
+  pricing,
   parts = [],
   referentiel,
   deadlineDays = DEFAULT_DEADLINE_DAYS,
@@ -91,14 +96,27 @@ export function buildEntretienInvoice({
   const contractNumber = contract?.contract_number || (contract?.id ? `CTR-${String(contract.id).slice(0, 8).toUpperCase()}` : '');
   const date = today;
   const deadline = addDaysIso(today, Number(deadlineDays) || DEFAULT_DEADLINE_DAYS);
+  const base = { date, deadline, subject: '', lines, discount: null, totalTtc: 0, warnings, errors, interventionId: intervention?.id };
 
   const amount = round2(contract?.amount);
   if (!(amount > 0)) {
     errors.push({ code: 'montant_contrat_nul', message: 'Le contrat n’a pas de montant : rien à facturer.' });
-    return { date, deadline, subject: '', lines, totalTtc: 0, warnings, errors, interventionId: intervention?.id };
+    return base;
   }
 
-  const equipmentsById = new Map((equipments || []).map((e) => [e.id, e]));
+  const items = pricing?.items || [];
+  const priced = items.filter((it) => (Number(it.lineTotal) || 0) > 0);
+  for (const it of items) {
+    if ((Number(it.lineTotal) || 0) > 0) continue;
+    warnings.push({
+      code: 'ligne_sans_tarif',
+      message: `« ${it.label || 'Équipement'} » n’a pas de prix (grille de la zone ou type manquant) : il n’est pas facturé.`,
+    });
+  }
+  if (priced.length === 0) {
+    errors.push({ code: 'aucune_ligne', message: 'Aucun équipement tarifé sur ce contrat : impossible de construire la facture.' });
+    return base;
+  }
 
   const resolveVat = (typeId, label) => {
     const v = vatForType(typeId, referentiel);
@@ -117,53 +135,58 @@ export function buildEntretienInvoice({
     if (!vatCode) {
       errors.push({ code: 'tva_inconnue', message: `Taux de TVA ${line.vatPercent} % sans équivalent Pennylane sur « ${line.label} ».` });
     }
+    const grossTtc = round2(line.grossTtc);
     lines.push({
       ...line,
-      totalTtc: round2(line.totalTtc),
+      grossTtc,
+      netTtc: round2(line.netTtc ?? grossTtc),
+      discountPercent: line.discountPercent || 0,
       vatCode: vatCode || null,
-      unitPriceHt: unitHt(round2(line.totalTtc), line.quantity, line.vatPercent),
+      unitPriceHt: unitHt(grossTtc, line.quantity, line.vatPercent),
     });
   };
 
-  // --- Lignes d'équipement : lignes enregistrées, mises à l'échelle du montant contractuel ---
-  const priced = (pricingItems || []).filter((it) => (Number(it.line_total) || 0) > 0);
-  const subjectRefs = [];
-  if (priced.length > 0) {
-    const base = priced.reduce((s, it) => s + Number(it.line_total), 0);
-    let allocated = 0;
-    priced.forEach((it, i) => {
-      const last = i === priced.length - 1;
-      const ttc = last ? round2(amount - allocated) : round2(amount * (Number(it.line_total) / base));
-      allocated += ttc;
-      const eq = it.equipment_id ? equipmentsById.get(it.equipment_id) : null;
-      const label = it.equipment_type_label || referentiel?.typesById?.get(it.equipment_type_id)?.label || 'Entretien';
-      const ref = referenceEquipement(eq);
-      if (ref) subjectRefs.push({ ref, category: categoryLabelForEquipment(eq, referentiel) });
-      pushLine({
-        kind: 'contrat',
-        label,
-        description: ref,
-        quantity: 1,
-        vatPercent: resolveVat(it.equipment_type_id || eq?.equipment_type_id, label),
-        totalTtc: ttc,
-      });
-    });
-  } else {
-    const firstEq = equipments?.[0] || null;
-    const label = `Contrat d’entretien ${contractNumber}`.trim();
-    const ref = referenceEquipement(firstEq);
-    if (ref) subjectRefs.push({ ref, category: categoryLabelForEquipment(firstEq, referentiel) });
-    pushLine({
-      kind: 'contrat',
-      label,
-      description: ref,
-      quantity: 1,
-      vatPercent: resolveVat(firstEq?.equipment_type_id, label),
-      totalTtc: amount,
-    });
+  // --- Écart entre la grille (Σ lignes) et le montant contractuel figé ---
+  const subtotal = round2(priced.reduce((s, it) => s + Number(it.lineTotal), 0));
+  let discount = null;
+  let scaleUp = null;
+  if (amount < subtotal - 0.01) {
+    const percent = round4(((subtotal - amount) / subtotal) * 100);
+    const degressivite = Number(pricing?.discountPercent) || 0;
+    const commercial = round2(subtotal - amount - (Number(pricing?.discountAmount) || 0));
+    discount = { percent, amount: round2(subtotal - amount), degressivitePercent: degressivite, commercialAmount: commercial > 0.01 ? commercial : 0 };
+  } else if (amount > subtotal + 0.01) {
+    scaleUp = amount / subtotal;
   }
 
-  // --- Pièces non offertes, TVA de la première ligne d'équipement ---
+  // --- 1 ligne par équipement ---
+  const subjectRefs = [];
+  let allocatedNet = 0;
+  priced.forEach((it, i) => {
+    const last = i === priced.length - 1;
+    const eq = it.equipment || null;
+    const grossTtc = scaleUp
+      ? (last ? round2(amount - allocatedNet) : round2(Number(it.lineTotal) * scaleUp))
+      : round2(Number(it.lineTotal));
+    const netTtc = discount
+      ? (last ? round2(amount - allocatedNet) : round2(grossTtc * (1 - discount.percent / 100)))
+      : grossTtc;
+    allocatedNet += netTtc;
+    const ref = referenceEquipement(eq);
+    if (ref) subjectRefs.push({ ref, category: categoryLabelForEquipment(eq, referentiel) });
+    pushLine({
+      kind: 'contrat',
+      label: it.label || 'Entretien',
+      description: ref,
+      quantity: 1,
+      vatPercent: resolveVat(it.equipmentTypeId || eq?.equipment_type_id, it.label || 'Entretien'),
+      grossTtc,
+      netTtc,
+      discountPercent: discount ? discount.percent : 0,
+    });
+  });
+
+  // --- Pièces non offertes, TVA de la première ligne d'équipement, sans remise ---
   const partsVat = lines[0]?.vatPercent ?? DEFAULT_VAT_PERCENT;
   for (const part of parts || []) {
     if (part?.offert) continue;
@@ -176,7 +199,7 @@ export function buildEntretienInvoice({
       description: part.reference || null,
       quantity: qty,
       vatPercent: partsVat,
-      totalTtc: unitTtc * qty,
+      grossTtc: unitTtc * qty,
     });
   }
 
@@ -192,14 +215,16 @@ export function buildEntretienInvoice({
     subject = `Entretien — contrat ${contractNumber}`.trim();
   }
 
-  const totalTtc = round2(lines.reduce((s, l) => s + l.totalTtc, 0));
-  return { date, deadline, subject, lines, totalTtc, warnings, errors, interventionId: intervention?.id };
+  const totalTtc = round2(lines.reduce((s, l) => s + l.netTtc, 0));
+  return { ...base, subject, discount, totalTtc };
 }
 
 /**
  * Corps du `POST /customer_invoices` (API Pennylane v2) à partir du modèle.
  * `draft: true` crée un brouillon ; omis = facture finalisée immédiatement.
- * Les montants sont des CHAÎNES (exigence PL).
+ * Les montants sont des CHAÎNES (exigence PL). La remise est portée PAR LIGNE
+ * d'équipement (`discount: { type: 'relative', value }`), jamais globale : les
+ * pièces ne sont pas remisées.
  *
  * @param {ReturnType<typeof buildEntretienInvoice>} model
  * @param {{ customerId: number, draft: boolean, externalReference: string }} opts
@@ -214,18 +239,16 @@ export function toPennylaneInvoicePayload(model, { customerId, draft, externalRe
     external_reference: externalReference,
     pdf_invoice_subject: model.subject,
     invoice_lines: model.lines.map((l) => {
-      const line = {
-        label: l.label,
-        quantity: String(l.quantity),
-        unit: 'piece',
-        raw_currency_unit_price: l.unitPriceHt,
-        vat_rate: l.vatCode,
-      };
+      const line = { label: l.label };
       if (l.description) line.description = l.description;
-      // Ordre des clés stable pour la lisibilité des tests/logs
-      return l.description
-        ? { label: line.label, description: line.description, quantity: line.quantity, unit: line.unit, raw_currency_unit_price: line.raw_currency_unit_price, vat_rate: line.vat_rate }
-        : line;
+      line.quantity = String(l.quantity);
+      line.unit = 'piece';
+      line.raw_currency_unit_price = l.unitPriceHt;
+      line.vat_rate = l.vatCode;
+      if (l.discountPercent > 0) {
+        line.discount = { type: 'relative', value: l.discountPercent.toFixed(4).replace(/\.?0+$/, '') };
+      }
+      return line;
     }),
   };
   if (draft) payload.draft = true;
