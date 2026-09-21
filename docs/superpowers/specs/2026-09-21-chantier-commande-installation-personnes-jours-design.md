@@ -15,7 +15,7 @@ Rappel : le modèle « intervention parent + créneaux » a été abandonné au 
 
 ## 2. Décisions
 
-1. **La commande est une donnée de la carte** : du chantier (`leads`) pour l'installation, de l'intervention (`interventions`) pour le SAV. Saisie dans la modale de prise de RDV (section Installation de `ChantierModal`, planification d'`EntretienSAVModal`), persistée, éditable. Pour le SAV la durée d'une journée = `interventions.estimated_time` déjà existante (1 h ou 8 h), la commande n'ajoute que personnes et jours.
+1. **La commande est une donnée de la carte** : du chantier (`leads`) pour l'installation, de l'intervention (`interventions`) pour le SAV. Saisie dans la modale de prise de RDV (section Installation de `ChantierModal`, planification d'`EntretienSAVModal`), persistée, éditable. Pour le SAV la durée d'un passage n'est pas stockée sur l'intervention (le `estimated_time` de la vue vient du **contrat**) : elle est choisie à la pose (drag ou durée par défaut), la commande n'ajoute que personnes et jours.
 2. **Un jour = un RDV, N techniciens.** Dans l'assistant, un second clic sur une journée qui porte déjà un créneau brouillon **qui chevauche l'horaire** ajoute la personne à ce créneau au lieu d'en créer un second. Une installation étant une journée entière (`fixedDuration`), c'est toujours le cas ; pour un SAV d'1 h, deux passages à des heures différentes le même jour restent deux créneaux.
 3. **On prévient, on ne bloque pas** (« on décide sur l'instant », Eric 2026-09-17) : commande incomplète → avertissement explicite au moment de planifier, pas d'interdiction.
 4. **Rattrapage des 12 paires** existantes par les gestes de l'app (le service `deleteAppointment` porte la suppression Google Calendar), pas par SQL.
@@ -54,7 +54,7 @@ Aucun import React/Supabase. Deux fonctions :
 - `SchedulingAssistant` reçoit `mergeOverlapping`, `expectedTeamSize`, `expectedDays`, et `defaultDuration` inchangé (480).
 
 ### EntretienSAVModal — planification d'un SAV (`type === 'sav'`)
-- Mêmes deux champs **Personnes** et **Jours** au-dessus de l'assistant, sauvegardés via `savService.updateFields(card.id, { planned_team_size, planned_days })`, invalidation `entretienSavKeys`. La durée d'un passage reste `estimated_time` (champ existant, déjà `defaultDuration` de l'assistant).
+- Mêmes deux champs **Personnes** et **Jours** au-dessus de l'assistant, sauvegardés via `savService.updateFields(card.id, { planned_team_size, planned_days })`, invalidation `entretienSavKeys`. La durée par défaut d'un passage reste celle du contrat (`estimated_time` de la vue, déjà `defaultDuration` de l'assistant), ajustable par drag.
 - Composant de saisie partagé `PlannedOrderFields` (`components/planning/scheduling/PlannedOrderFields.jsx`) consommé par les deux modales dans le même commit.
 - `SchedulingAssistant` reçoit `mergeOverlapping` pour un SAV uniquement (un entretien garde le comportement actuel).
 
