@@ -57,6 +57,8 @@ directement dans Pennylane, org sans intégration).
 - Hook `useCreateEntretienInvoice(orgId)` (`usePennylane.js`), contrat `unwrapResult`.
 - UI : `FacturerEntretienDialog` (aperçu lignes / TVA / total / objet / mode, avertissements, erreurs
   bloquantes) ouvert depuis `EntretienSAVCard` ; bouton grisé « Facturée » quand `invoice_id` est posé.
+  **One shot** (Eric, 2026-09-21) : « Facturer » disparaît dès que la carte est facturée, y compris
+  par le marquage manuel (`invoiced_at`) — avoir / facture différente = geste Pennylane.
 - Settings : `PennylaneSettings.jsx` + `pennylane/FacturationTab.jsx`, route `settings/pennylane`,
   tuile dans `src/lib/modules.js`.
 

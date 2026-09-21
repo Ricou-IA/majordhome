@@ -250,9 +250,12 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {/* Facturer (team_leader / org_admin, org Pennylane, entretien) : crée la
                   facture sur Pennylane ET marque la carte (`invoice_id` + `invoiced_at`).
-                  Une fois `invoice_id` posé, le bouton devient « Facturée » (inerte) et le
-                  marquage manuel disparaît : la facture existe, on ne la « dé-marque » pas ici. */}
-              {isTeamLeaderOrAbove && canPushInvoice && (
+                  Bouton ONE SHOT (Eric, 2026-09-21) : il disparaît dès que la carte est
+                  facturée, que ce soit par ce bouton (`invoice_id`) ou par le marquage
+                  manuel (`invoiced_at`) — un avoir ou une facture différente se gère dans
+                  Pennylane, jamais en re-générant depuis la carte. `invoice_id` posé ⇒
+                  « Facturée » inerte et marquage manuel masqué. */}
+              {isTeamLeaderOrAbove && canPushInvoice && (item.invoice_id || !item.invoiced_at) && (
                 <>
                   <button
                     type="button"
