@@ -7,6 +7,7 @@
 > Revue du 2026-09-16 : 6 entrées intégrées (SMS, référentiel équipements, paramétrage par module, Pennylane sans création de lead, MT-LT = vue, RDV toujours assigné) — commit `docs(claude): revue des propositions`.
 > Revue du 2026-09-20 : 1 entrée intégrée (contrat unique des mutations React Query — `unwrapResult`, § Conventions qualité → Hooks).
 > Revue du 2026-09-20 (soir) : 1 entrée intégrée (gotcha « un fichier `sql/*.sql` n'est pas une migration appliquée », § Gotchas DB + correction des vues `majordhome_prospects` / `_prospect_interactions`, § Vues publiques principales).
+> Revue du 2026-09-21 : 2 entrées intégrées (facturation d'entretien → Pennylane, condensée en 4 puces § Module Pennylane + remise exceptionnelle § Module Contrats ; `create-user` : écritures `core` + lecture de `{ error }`, § Edge functions).
 
 ---
 
@@ -18,27 +19,4 @@
 **À faire** : graver la doc complète dans CLAUDE.md § Rôles & Permissions quand Phases 4-6 atterrissent. Spec : `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`.
 
 *Confirmé PENDING le 2026-08-09 : rien à graver tant que les phases ne sont pas livrées. Reconfirmé le 2026-09-16.*
----
-
-## [2026-09-21 16:30] Facturation d'un entretien : push Majord'home → Pennylane
-**Statut** : PENDING
-**Commit** : (session du 2026-09-21, feat(entretiens): bouton « Facturer » → facture Pennylane)
-**Contexte** : Il n'a jamais existé de chaînage facture Pennylane → carte entretien (seul le bouton manuel posait `invoiced_at` ; 41/50 cartes Réalisé marquées à la main, 0 mapping facture). Livré : bouton « Facturer » sur la carte entretien Réalisé qui crée la facture via `POST /customer_invoices` (proxy, path exact) et marque la carte (`invoice_id` + `invoiced_at`), modèle pur `src/lib/entretienInvoiceModel.js` (testé), réglages `settings.pennylane.invoice` (Settings → Socle → Facturation Pennylane, qui porte enfin le toggle `enabled`).
-**Proposition** (§ Module Pennylane, « Règles qui mordent ») :
-- **Facturer un entretien = bouton « Facturer » de la carte** (`FacturerEntretienDialog` → `useCreateEntretienInvoice` → `pennylaneService.createInvoiceFromEntretien`), spec `docs/superpowers/specs/2026-09-21-facturation-entretien-pennylane-push-design.md`. **1 ligne par équipement au prix grille, calcul IDENTIQUE au contrat signé** (`computeContractLines` de `src/lib/contractPricing.js`, module PUR sorti de `pricing.service.js` et ré-exporté pour ContractSign / ContractPdfSection / ContractPricingSection — toute nouvelle surface qui chiffre un contrat passe par là, jamais par `contract_pricing_items`, vides sur la plupart des contrats). **La remise s'applique** : écart Σ grille − `contract.amount` = remise relative par ligne d'équipement (dégressivité + remise commerciale), jamais sur les pièces ; forçage à la hausse = lignes majorées au prorata. TVA = `equipment_categories.default_vat_rate` (absente → 20 % + avertissement affiché), pièces non offertes sur la même facture, HT = TTC / (1 + taux) à 10 décimales. Modèle PUR `src/lib/entretienInvoiceModel.js` (`node --test scripts/entretien-invoice-model.test.mjs`, dans `audit:quality`) — jamais dans le composant.
-- **Idempotence = mapping `pennylane_sync` type `invoice`** (`local_id` = intervention, `external_reference` = intervention) relu AVANT tout POST : un second clic ne recrée rien et ré-applique `invoice_id`/`invoiced_at`. `interventions.invoice_id` posé ⇒ bouton inerte « Facturée », marquage manuel masqué. **Bouton one shot** : « Facturer » disparaît dès que la carte est facturée, y compris par le marquage manuel (`invoiced_at`) — avoir / facture différente = geste Pennylane, jamais une re-génération depuis la carte.
-- **Lignes libres, jamais d'articles PL ; la famille comptable = compte de vente paramétré PAR NUMÉRO** : `settings.pennylane.invoice.ledger_accounts = { by_category: { [categoryId]: '70601' }, parts: '7070' }`. Pennylane tient un compte par (numéro, taux de TVA) : `resolveLedgerAccountId(catalog, numéro, vatCode)` choisit la déclinaison du taux de la ligne, sinon `any` (doc PL). Absent ou disparu → défaut PL + avertissement `compte_manquant`. Les 411 (un par client) ne se paramètrent jamais. Même mécanisme à réutiliser pour les travaux.
-- **Remise exceptionnelle du contrat** (`contracts.exceptional_discount`, migration `20260921_1`) : après la dégressivité, `calculateContractTotal(items, discounts, exceptionalDiscount)` (module PUR `src/lib/contractPricing.js`), reprise PDF / signature / facture. § Module Contrats : total = sous-total − dégressivité − remise exceptionnelle ; l'ancien forçage global `amount_forced` reste le filet legacy (« Remise commerciale »).
-- **`apiCall` Pennylane remonte le message PL** (`error.context.json()`) ; `getLedgerAccounts` = pagination + filtre local (la syntaxe `filter[number][start_with]` renvoie 400).
-- **Mode `settings.pennylane.invoice.mode` = `draft` par défaut** (brouillon à finaliser/envoyer depuis PL), `final` quand le mapping est jugé fiable ; échéance `deadline_days` (30). Toujours sauver l'objet `pennylane` COMPLET (merge JSONB niveau 1). Le proxy n'autorise `POST` que sur `/customer_invoices` exact : `finalize` / `send_by_email` restent bloqués tant que l'envoi reste manuel (décision Eric 2026-09-21).
-- Périmètre V1 : entretiens uniquement (SAV = devis PL). Hors périmètre : lien vers la facture sur la carte, rattrapage des factures saisies à la main dans PL.
----
-
-## [2026-09-21 22:30] create-user : écritures core + idempotence (échec silencieux vécu)
-**Statut** : PENDING
-**Commit** : 127a553
-**Contexte** : L'invitation d'un membre renvoyait « succès » sans rien créer : `create-user` faisait UPDATE sur la vue `profiles` (aucun trigger auth.users → profil, 0 ligne) et INSERT sur la vue `organization_members` (JOIN, non insérable) sans lire `{ error }`. Deux comptes auth orphelins (Sylvain 11/09, Lucas 21/09). Réécrite : `.schema('core')`, erreurs contrôlées, email déjà inscrit ⇒ compte réutilisé et complété.
-**Proposition** (§ Edge functions) :
-- **Aucun trigger `auth.users` ne crée `core.profiles`** : toute voie de création d'utilisateur (create-user, SSO, import) doit INSÉRER le profil elle-même via `.schema('core')` (service_role) ; le trigger `core.sync_profile_org_membership` pose alors l'adhésion (rôle = `app_role` recopié tel quel → réaligner sur `org_admin` / `team_leader` / `member` derrière). Les vues publiques `profiles` / `organization_members` ne sont pas des cibles d'écriture serveur (`organization_members` est un JOIN non insérable).
-- **Une edge function qui écrit doit lire `{ error }` de CHAQUE écriture** et répondre 5xx explicite — une réponse 201 après un INSERT ignoré est l'échec silencieux type (create-user, 2026-09-21).
 ---
