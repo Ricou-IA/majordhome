@@ -85,20 +85,40 @@ export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode
  * Fonction pure (pas de hook) pour être appelable depuis un modèle ou un test.
  */
 /**
- * Plan comptable de GESTION (Eric, 2026-09-21) : le sous-ensemble des comptes de vente
- * Pennylane que Majord'home a le droit d'utiliser. Pennylane est canonique (numéro ET
- * libellé) : on coche, on ne renomme pas (`alias` toléré en lecture pour d'anciens
- * réglages, plus saisi). Source unique de tous les sélecteurs de compte (contrats
- * d'entretien, pièces, catalogue article à venir). `settings.pennylane.chart = [{ number }]`.
- * Vide → les sélecteurs retombent sur toute la classe 7 de Pennylane.
- * @returns {Array<{ number: string, alias: string }>}
+ * Contextes d'usage d'un compte du plan comptable de gestion (Eric, 2026-09-21 :
+ * « en colonnes Contrat / Devis, ça permet d'utiliser le même plan pour X types »).
+ * Ajouter un contexte = une entrée ici + un consommateur qui appelle
+ * `pennylaneChart(settings, key)`. `contrat` = contrats d'entretien (livré) ;
+ * `devis` = articles du catalogue (à câbler avec les devis natifs).
  */
-export function pennylaneChart(settings) {
+export const PENNYLANE_CHART_CONTEXTS = Object.freeze([
+  Object.freeze({ key: 'contrat', label: 'Contrat', hint: 'Contrats d’entretien : compte par catégorie d’équipement, pièces' }),
+  Object.freeze({ key: 'devis', label: 'Devis', hint: 'Articles du catalogue (devis natifs, à venir)' }),
+]);
+
+/**
+ * Plan comptable de GESTION : le sous-ensemble des comptes de vente Pennylane que
+ * Majord'home a le droit d'utiliser, PAR CONTEXTE. Pennylane est canonique (numéro ET
+ * libellé) : on coche, on ne renomme pas. Source unique de tous les sélecteurs de
+ * compte. `settings.pennylane.chart = [{ number: '70601', contexts: ['contrat'] }]`
+ * (entrée sans `contexts` = anciens réglages → tous les contextes).
+ * Vide → les sélecteurs retombent sur toute la classe 7 de Pennylane.
+ *
+ * @param {object} settings
+ * @param {string} [context]  clé de `PENNYLANE_CHART_CONTEXTS` ; absent = toutes entrées
+ * @returns {Array<{ number: string, contexts: string[] }>}
+ */
+export function pennylaneChart(settings, context) {
   const chart = settings?.pennylane?.chart;
   if (!Array.isArray(chart)) return [];
+  const all = PENNYLANE_CHART_CONTEXTS.map((c) => c.key);
   return chart
     .filter((c) => c && c.number)
-    .map((c) => ({ number: String(c.number), alias: typeof c.alias === 'string' ? c.alias : '' }));
+    .map((c) => ({
+      number: String(c.number),
+      contexts: Array.isArray(c.contexts) ? c.contexts.filter((k) => all.includes(k)) : all,
+    }))
+    .filter((c) => c.contexts.length > 0 && (!context || c.contexts.includes(context)));
 }
 
 export function pennylaneInvoiceSettings(settings) {

@@ -1,37 +1,43 @@
 // src/apps/artisan/pages/settings/pennylane/PlanComptableTab.jsx
 // ============================================================================
 // Plan comptable de GESTION (Eric, 2026-09-21) : parmi les comptes de vente
-// (classe 7) lus dans Pennylane, ceux que Majord'home a le droit d'utiliser.
+// (classe 7) lus dans Pennylane, ceux que Majord'home a le droit d'utiliser,
+// PAR CONTEXTE (une colonne par contexte : Contrat, Devis… — registre
+// `PENNYLANE_CHART_CONTEXTS`, le même plan sert à tous les types).
 // **Pennylane est canonique** : numéro et libellé viennent de Pennylane, on ne
-// fait que COCHER ici (pas d'alias — retiré le soir même à la demande d'Eric).
-// Source unique de tous les sélecteurs de compte : contrats d'entretien et
-// pièces aujourd'hui, catalogue article (devis) demain.
+// fait que COCHER ici (pas d'alias).
 //
-// Stockage : `settings.pennylane.chart = [{ number }]` — des NUMÉROS (Pennylane
-// décline chaque numéro par taux de TVA, la déclinaison est résolue à la facture).
-// `org_update_settings` merge au niveau 1 → on renvoie l'objet `pennylane` complet.
+// Stockage : `settings.pennylane.chart = [{ number, contexts: ['contrat', …] }]`
+// (Pennylane décline chaque numéro par taux de TVA, la déclinaison est résolue à
+// la facture). `org_update_settings` merge au niveau 1 → objet `pennylane` complet.
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { useOrgSettings, pennylaneChart } from '@hooks/useOrgSettings';
+import { useOrgSettings, pennylaneChart, PENNYLANE_CHART_CONTEXTS } from '@hooks/useOrgSettings';
 import { useLedgerAccounts } from '@hooks/usePennylane';
 
 const ERROR_CLASS = 'mt-1 text-xs text-red-600';
+const CHECKBOX_CLASS = 'h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500';
 
-/** Forme du formulaire : liste triée des numéros cochés, comparable en JSON. */
+/** Forme du formulaire : `{ [number]: string[] }` (contextes cochés), normalisée pour la comparaison. */
 function pickForm(settings) {
-  return pennylaneChart(settings).map((c) => c.number).sort();
+  const out = {};
+  for (const c of pennylaneChart(settings)) out[c.number] = [...c.contexts].sort();
+  return out;
 }
 
-function chartForSave(numbers) {
-  return [...numbers].sort().map((number) => ({ number }));
+function chartForSave(form) {
+  return Object.entries(form)
+    .filter(([, ctx]) => ctx?.length)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([number, ctx]) => ({ number, contexts: [...ctx].sort() }));
 }
 
 export default function PlanComptableTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
-  const [form, setForm] = useState([]);
-  const [initial, setInitial] = useState([]);
+  const [form, setForm] = useState({});
+  const [initial, setInitial] = useState({});
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -55,11 +61,16 @@ export default function PlanComptableTab() {
     return numbers.filter((n) => n.number.includes(q) || (n.label || '').toLowerCase().includes(q));
   }, [numbers, query]);
 
-  const selectedCount = form.length;
-  const isDirty = useMemo(() => JSON.stringify([...form].sort()) !== JSON.stringify([...initial].sort()), [form, initial]);
+  const selectedCount = Object.values(form).filter((ctx) => ctx?.length).length;
+  const isDirty = useMemo(() => JSON.stringify(chartForSave(form)) !== JSON.stringify(chartForSave(initial)), [form, initial]);
 
-  const toggle = (number, checked) =>
-    setForm((f) => (checked ? (f.includes(number) ? f : [...f, number]) : f.filter((n) => n !== number)));
+  const isChecked = (number, key) => (form[number] || []).includes(key);
+  const toggle = (number, key, checked) =>
+    setForm((f) => {
+      const current = f[number] || [];
+      const next = checked ? (current.includes(key) ? current : [...current, key]) : current.filter((k) => k !== key);
+      return { ...f, [number]: next };
+    });
 
   const handleSave = async () => {
     try {
@@ -77,9 +88,8 @@ export default function PlanComptableTab() {
   return (
     <div className="card space-y-4">
       <p className="text-sm text-secondary-600">
-        Cochez les comptes de vente que Majord&apos;home peut utiliser. Numéros et libellés sont ceux de Pennylane,
-        qui reste la référence : on ne les modifie pas ici. Seuls les comptes cochés sont proposés dans les
-        paramétrages (contrats d&apos;entretien, pièces, et demain les articles du catalogue).
+        Cochez, pour chaque contexte, les comptes de vente que Majord&apos;home peut utiliser. Numéros et libellés sont
+        ceux de Pennylane, qui reste la référence : on ne les modifie pas ici.
       </p>
 
       <div className="flex items-center justify-between gap-3">
@@ -97,24 +107,43 @@ export default function PlanComptableTab() {
       {loadingAccounts && <p className="text-sm text-secondary-500">Lecture du plan comptable Pennylane…</p>}
 
       {!loadingAccounts && numbers.length > 0 && (
-        <div className="border border-secondary-200 rounded-md divide-y divide-secondary-100 max-h-[32rem] overflow-y-auto">
-          {visible.map((n) => {
-            const checked = form.includes(n.number);
-            return (
-              <label key={n.number} className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${checked ? 'bg-primary-50/40' : 'hover:bg-secondary-50'}`}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(e) => toggle(n.number, e.target.checked)}
-                  className="h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500"
-                  aria-label={`Retenir le compte ${n.number}`}
-                />
-                <span className="w-16 font-mono text-sm text-secondary-900">{n.number}</span>
-                <span className="flex-1 min-w-0 truncate text-sm text-secondary-700" title={n.label}>{n.label || '—'}</span>
-              </label>
-            );
-          })}
-          {visible.length === 0 && <p className="px-3 py-3 text-sm text-secondary-500">Aucun compte ne correspond.</p>}
+        <div className="border border-secondary-200 rounded-md max-h-[32rem] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-secondary-50 text-xs text-secondary-500">
+              <tr>
+                <th className="text-left font-medium px-3 py-2 w-20">Compte</th>
+                <th className="text-left font-medium px-3 py-2">Libellé Pennylane</th>
+                {PENNYLANE_CHART_CONTEXTS.map((c) => (
+                  <th key={c.key} className="text-center font-medium px-3 py-2 w-24" title={c.hint}>{c.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-secondary-100">
+              {visible.map((n) => {
+                const any = (form[n.number] || []).length > 0;
+                return (
+                  <tr key={n.number} className={any ? 'bg-primary-50/40' : 'hover:bg-secondary-50'}>
+                    <td className="px-3 py-2 font-mono text-secondary-900">{n.number}</td>
+                    <td className="px-3 py-2 text-secondary-700 truncate max-w-0" title={n.label}>{n.label || '—'}</td>
+                    {PENNYLANE_CHART_CONTEXTS.map((c) => (
+                      <td key={c.key} className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked(n.number, c.key)}
+                          onChange={(e) => toggle(n.number, c.key, e.target.checked)}
+                          className={CHECKBOX_CLASS}
+                          aria-label={`${c.label} : compte ${n.number}`}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+              {visible.length === 0 && (
+                <tr><td colSpan={2 + PENNYLANE_CHART_CONTEXTS.length} className="px-3 py-3 text-secondary-500">Aucun compte ne correspond.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 

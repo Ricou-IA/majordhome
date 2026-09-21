@@ -63,16 +63,16 @@ export default function FacturationTab() {
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
   // Pennylane décline chaque compte par taux de TVA (70601 × any / 10 % / 5,5 % / 20 %) :
   // on paramètre le NUMÉRO, une fois ; la facture choisit la déclinaison du taux de la ligne.
-  // Options = plan comptable de GESTION (Settings → Plan comptable, alias affiché) ; s'il est
-  // vide, toute la classe 7 de Pennylane, un numéro une fois.
-  const chart = useMemo(() => pennylaneChart(settings), [settings]);
+  // Options = plan comptable de GESTION, contexte « contrat » (Settings → Plan comptable) ;
+  // s'il est vide, toute la classe 7 de Pennylane, un numéro une fois. Libellés = Pennylane.
+  const chart = useMemo(() => pennylaneChart(settings, 'contrat'), [settings]);
   const accountOptions = useMemo(() => {
     const byNumber = new Map();
     for (const a of accounts || []) {
       if (!byNumber.has(a.number)) byNumber.set(a.number, { number: a.number, label: a.label });
     }
     if (chart.length > 0) {
-      return chart.map((c) => ({ number: c.number, label: c.alias || byNumber.get(c.number)?.label || '' }));
+      return chart.map((c) => ({ number: c.number, label: byNumber.get(c.number)?.label || '' }));
     }
     return [...byNumber.values()].sort((a, b) => a.number.localeCompare(b.number));
   }, [accounts, chart]);
@@ -191,7 +191,7 @@ export default function FacturationTab() {
           d&apos;équipement, la famille que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane
           applique son compte par défaut. Les devis (articles du catalogue) et les travaux auront leur propre affectation.
           {chart.length === 0 && (
-            <> Aucun plan comptable de gestion défini : toute la classe 7 est proposée (Paramètres → Plan comptable pour la réduire).</>
+            <> Aucun compte coché en colonne « Contrat » du plan comptable : toute la classe 7 est proposée (Paramètres → Plan comptable pour la réduire).</>
           )}
         </p>
         {accountsError && (
