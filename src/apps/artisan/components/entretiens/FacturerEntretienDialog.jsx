@@ -106,8 +106,12 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         interventionId: item.id,
         clientId: item.client_id,
         invoicedAt: item.invoiced_at || null,
+        // `external_reference` devient la référence de paiement PL et doit être UNIQUE, même
+        // face à un brouillon supprimé (422 « Custom payment reference has already been
+        // taken », 2026-09-22) : intervention + suffixe d'essai. L'idempotence, elle, est
+        // portée par le mapping pennylane_sync relu avant tout POST, pas par ce champ.
         buildPayload: (customerId) =>
-          toPennylaneInvoicePayload(model, { customerId, draft: isDraft, externalReference: item.id }),
+          toPennylaneInvoicePayload(model, { customerId, draft: isDraft, externalReference: `${item.id}-${Date.now().toString(36)}` }),
         journalId: invoiceSettings.journalId,
       });
       if (created.journalWarning) {
