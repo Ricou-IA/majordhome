@@ -1108,7 +1108,10 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
  * @returns {Promise<Array<{ id: number, number: string, label: string }>>}
  */
 async function getLedgerAccounts() {
-  const all = [];
+  // Dédoublonnage par id : sur cette ressource, Pennylane a renvoyé la MÊME page à
+  // chaque curseur (vécu 2026-09-21 : chaque compte affiché 4 à 6 fois). On s'arrête
+  // dès qu'une page n'apporte aucun compte nouveau, quoi que dise `has_more`.
+  const byId = new Map();
   let cursor = null;
   let hasMore = true;
   let pageCount = 0;
@@ -1118,16 +1121,23 @@ async function getLedgerAccounts() {
     if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
     const result = await apiCall('GET', path);
     const items = result?.items || result?.data || (Array.isArray(result) ? result : []);
-    all.push(...items);
+    let added = 0;
+    for (const a of items) {
+      if (a?.id != null && !byId.has(a.id)) {
+        byId.set(a.id, a);
+        added++;
+      }
+    }
+    pageCount++;
+    if (added === 0) break;
     hasMore = Boolean(result?.has_more && result?.next_cursor);
     cursor = result?.next_cursor || null;
-    pageCount++;
   }
   if (pageCount === MAX_PAGES && hasMore) {
     logger.warn(`[pennylane.getLedgerAccounts] MAX_PAGES=${MAX_PAGES} atteint, liste des comptes possiblement incomplète`);
   }
-  return all
-    .filter((a) => a && String(a.number || '').startsWith('7') && a.enabled !== false)
+  return [...byId.values()]
+    .filter((a) => String(a.number || '').startsWith('7') && a.enabled !== false)
     .map((a) => ({ id: a.id, number: String(a.number), label: a.label || '' }));
 }
 
