@@ -22,9 +22,13 @@ import { useContract, useContractEquipments } from '@hooks/useContracts';
 import { useContractZone } from '@hooks/useContractZone';
 import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
 import { useCreateEntretienInvoice, useLedgerAccounts } from '@hooks/usePennylane';
+import { useIssueEntretienInvoice } from '@hooks/useInvoices';
+import { buildInvoiceDraft, invoicingSettings } from '@/lib/invoiceDocumentModel';
+import { buildCompanyInfo } from '@/lib/orgBranding';
+import { generateInvoicePdfBlob } from '@/apps/artisan/components/facturation/InvoicePDF';
 import { computeContractLines } from '@/lib/contractPricing';
 import { buildEntretienInvoice, toPennylaneInvoicePayload } from '@/lib/entretienInvoiceModel';
-import { formatEuro, formatDateForInput, formatDateShortFR } from '@/lib/utils';
+import { formatEuro, formatDateForInput, formatDateShortFR, downloadBlob } from '@/lib/utils';
 
 /**
  * @param {object} p
@@ -45,6 +49,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   // Indisponible (PL injoignable) → lignes sans compte + avertissement, jamais bloquant.
   const { accounts: ledgerCatalog, isLoading: loadingLedger } = useLedgerAccounts();
   const createInvoice = useCreateEntretienInvoice(orgId);
+  const issueInvoice = useIssueEntretienInvoice(orgId);
 
   // Zone : celle ENREGISTRÉE sur le contrat (figée à la configuration, cf. Module
   // Contrats) ; détection de secours partagée seulement si le contrat n'en a jamais reçu.
@@ -70,8 +75,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   );
 
   const invoiceSettings = pennylaneInvoiceSettings(settings);
-  // 'hub' (émission locale, câblée en phase 1 Task 6) retombe en brouillon Pennylane tant que la branche locale n'existe pas : jamais une facture finalisée par surprise.
-  const isDraft = invoiceSettings.mode !== 'final';
+  const isDraft = invoiceSettings.mode === 'draft';
+  const isHub = invoiceSettings.mode === 'hub';
+  const invoicing = invoicingSettings(settings);
   const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings || loadingLedger;
 
   const model = useMemo(() => {
@@ -98,10 +104,53 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     // eslint-disable-next-line react-hooks/exhaustive-deps -- invoiceSettings est dérivé de `settings` (objet stable de React Query)
   }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings, ledgerCatalog]);
 
-  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id;
+  const missingAddress = isHub && !(item.client_address && item.client_city);
+  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id || missingAddress;
 
   const handleConfirm = async () => {
-    if (blocked || createInvoice.isPending) return;
+    if (blocked || createInvoice.isPending || issueInvoice.isPending) return;
+    if (isHub) {
+      try {
+        const draft = buildInvoiceDraft({
+          model,
+          orgId,
+          context: 'contrat',
+          client: {
+            id: item.client_id,
+            display_name: item.client_name,
+            first_name: item.client_first_name,
+            last_name: item.client_last_name,
+            address: item.client_address,
+            postal_code: item.client_postal_code,
+            city: item.client_city,
+            email: item.client_email,
+            phone: item.client_phone,
+            client_number: item.client_number ?? null,
+          },
+          contractId: contract?.id || null,
+          interventionId: item.id,
+          dueDays: invoiceSettings.deadlineDays,
+        });
+        const issued = await issueInvoice.mutateAsync({
+          draft,
+          numberPrefix: invoicing.numberPrefix,
+          company: buildCompanyInfo(settings),
+          invoicing,
+          renderPdf: generateInvoicePdfBlob,
+          interventionId: item.id,
+          invoicedAt: item.invoiced_at || null,
+        });
+        if (issued.blob) downloadBlob(issued.blob, `${issued.number}.pdf`);
+        toast.success(`Facture ${issued.number} émise et archivée`, {
+          action: issued.blob ? { label: 'Télécharger', onClick: () => downloadBlob(issued.blob, `${issued.number}.pdf`) } : undefined,
+        });
+        onOpenChange(false);
+        onCreated?.();
+      } catch (err) {
+        toast.error(err?.message || 'La facture n’a pas pu être émise', { duration: 15000 });
+      }
+      return;
+    }
     try {
       const created = await createInvoice.mutateAsync({
         interventionId: item.id,
@@ -141,12 +190,16 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={isDraft ? 'Créer le brouillon de facture' : 'Créer la facture'}
-      description={`${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — la facture sera créée sur Pennylane${isDraft ? ' en brouillon, à finaliser et envoyer depuis Pennylane' : ' et numérotée immédiatement'}.`}
-      confirmLabel={isDraft ? 'Créer le brouillon' : 'Créer la facture'}
+      title={isHub ? 'Émettre la facture' : isDraft ? 'Créer le brouillon de facture' : 'Créer la facture'}
+      description={
+        isHub
+          ? `${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — Majord'home attribue le numéro (${invoicing.numberPrefix}-${new Date().getFullYear()}-…), génère le PDF et l'archive. Rien n'est envoyé à Pennylane (phase 2).`
+          : `${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — la facture sera créée sur Pennylane${isDraft ? ' en brouillon, à finaliser et envoyer depuis Pennylane' : ' et numérotée immédiatement'}.`
+      }
+      confirmLabel={isHub ? 'Émettre la facture' : isDraft ? 'Créer le brouillon' : 'Créer la facture'}
       variant="default"
       onConfirm={handleConfirm}
-      loading={createInvoice.isPending}
+      loading={createInvoice.isPending || issueInvoice.isPending}
       confirmDisabled={isLoading || blocked}
     >
       <div className="mt-4 space-y-3 text-sm">
@@ -157,6 +210,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         )}
         {!isLoading && !item.client_id && (
           <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Cette carte n’a pas de client rattaché.</p>
+        )}
+        {!isLoading && missingAddress && (
+          <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Adresse du client incomplète : une facture doit porter l’adresse de facturation (fiche client).</p>
         )}
 
         {model && model.errors.map((e) => (
@@ -213,8 +269,8 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             <div className="text-xs text-gray-600 space-y-0.5">
               <div><span className="text-gray-500">Objet :</span> {model.subject}</div>
               <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(model.deadline)} ({invoiceSettings.deadlineDays} j)</div>
-              {invoiceSettings.journalId && (
-                <div><span className="text-gray-500">Journal :</span> {invoiceSettings.journalCode || `#${invoiceSettings.journalId}`} (écriture déplacée après création)</div>
+              {!isHub && invoiceSettings.journalId && (
+                <div><span className="text-gray-500">Journal :</span> {invoiceSettings.journalCode || `#${invoiceSettings.journalId}`} (Pennylane refuse le déplacement, la facture tombe dans le journal de ventes principal)</div>
               )}
               {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
@@ -230,7 +286,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         {!isLoading && (
           <p className="text-xs text-gray-500 flex items-center gap-1">
             <ExternalLink className="w-3 h-3" />
-            Mode et échéance : Paramètres → Facturation Pennylane.
+            Mode, échéance et mentions : Paramètres → Facturation.
           </p>
         )}
       </div>

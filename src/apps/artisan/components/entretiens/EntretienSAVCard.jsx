@@ -18,7 +18,7 @@ import { savService } from '@services/sav.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { entretienSavKeys } from '@hooks/cacheKeys';
-import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { usePennylaneEnabled, useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
 
 // ============================================================================
@@ -69,12 +69,15 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const { isTeamLeaderOrAbove } = useAuth();
   const pennylaneEnabled = usePennylaneEnabled();
+  const { settings } = useOrgSettings();
+  const isHubMode = pennylaneInvoiceSettings(settings).mode === 'hub';
   const queryClient = useQueryClient();
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
   // Push MDH → Pennylane (spec 2026-09-21) : entretiens seulement, org avec PL activé.
   // Les SAV restent hors périmètre (montant issu d'un devis PL).
-  const canPushInvoice = pennylaneEnabled && type === 'entretien';
+  // Mode hub : Majord'home émet lui-même, l'intégration Pennylane n'est pas requise.
+  const canPushInvoice = (pennylaneEnabled || isHubMode) && type === 'entretien';
 
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
   // Montant : SAV = devis + contrat si entretien inclus, Entretien = contrat
@@ -264,7 +267,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                       e.stopPropagation();
                       if (!item.invoice_id) setInvoiceOpen(true);
                     }}
-                    title={item.invoice_id ? 'Facture créée sur Pennylane' : 'Créer la facture sur Pennylane'}
+                    title={item.invoice_id ? (isHubMode ? 'Facture émise' : 'Facture créée sur Pennylane') : (isHubMode ? 'Émettre la facture' : 'Créer la facture sur Pennylane')}
                     className={`inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border transition-colors ${
                       item.invoice_id
                         ? 'border-violet-300 text-violet-700 bg-violet-50 cursor-default'

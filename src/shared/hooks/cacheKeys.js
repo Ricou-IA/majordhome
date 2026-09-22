@@ -305,6 +305,12 @@ export const pennylaneKeys = {
   customerSearch: (orgId, query) => [...pennylaneKeys.all(orgId), 'customer-search', query],
 };
 
+// Factures émises par Majord'home (hub de facturation, phase 1)
+export const invoiceKeys = {
+  all: (orgId) => ['invoices', orgId],
+  detail: (orgId, invoiceId) => [...invoiceKeys.all(orgId), 'detail', invoiceId],
+};
+
 // --- Meta Ads ---
 export const metaAdsKeys = {
   all: (orgId) => ['meta-ads', orgId],
