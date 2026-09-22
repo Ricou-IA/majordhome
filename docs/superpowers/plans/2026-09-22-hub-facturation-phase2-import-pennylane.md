@@ -399,7 +399,7 @@ git commit -m "feat(facturation): suivi d'import Pennylane — vat_code, import_
 
 **Interfaces:**
 - Consumes: lignes de `buildEntretienInvoice` (`vatCode` = `'FR_200' | 'FR_100' | 'FR_55' | 'exempt' | null`).
-- Produces: chaque ligne de `buildInvoiceDraft().lines` porte `vat_code: string|null` ; `INVOICE_RPC_MESSAGES` gagne `customer_not_synced`, `pdf_missing`, `invoice_not_issued`, `pennylane_import_failed`, `pennylane_disabled`, `already_imported`.
+- Produces: chaque ligne de `buildInvoiceDraft().lines` porte `vat_code: string|null` ; `INVOICE_RPC_MESSAGES` gagne `customer_not_synced`, `pdf_missing`, `invoice_not_issued`, `pennylane_import_failed`, `vat_code_unmapped`, `pennylane_reference_taken`, `invoice_without_client`.
 
 - [ ] **Step 1: Tests qui échouent**
 
