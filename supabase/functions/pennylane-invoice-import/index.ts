@@ -13,7 +13,7 @@
 // = error + message) puis répondu 502 : visible et rejouable, jamais silencieux.
 // Auth : verify_jwt + requireOrgMembership(team_leader+, org Pennylane activée).
 // ============================================================================
-import { requireOrgMembership, jsonResponse, corsHeaders, sanitizeError } from "../_shared/auth.ts";
+import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
 
 const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
 const PENNYLANE_BASE_URL = Deno.env.get("PENNYLANE_BASE_URL") || "https://app.pennylane.com/api/external/v2";
@@ -40,8 +40,8 @@ const unitPrice = (n: unknown) => Number(n ?? 0).toFixed(6).replace(/\.?0+$/, ""
 const plError = (data: unknown) => (typeof data === "string" ? data : JSON.stringify(data ?? {})).slice(0, 1500);
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: buildCorsHeaders(req) });
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, req);
 
   let body: Body;
   try { body = await req.json(); } catch { return jsonResponse({ error: "Corps JSON invalide" }, 400, req); }
@@ -209,11 +209,13 @@ Deno.serve(async (req: Request) => {
     }, 201, req);
   } catch (err) {
     console.error("[pennylane-invoice-import] Error:", err);
+    let recordError: string | null = null;
     try {
-      await recordResult("error", null, null, `exception: ${sanitizeError(err, "Internal error")}`);
+      recordError = await recordResult("error", null, null, `exception: ${sanitizeError(err, "Internal error")}`);
+      if (recordError) console.error(`[pennylane-invoice-import] record failed in catch: ${recordError}`);
     } catch (recordErr) {
       console.error("[pennylane-invoice-import] recordResult threw in catch:", recordErr);
     }
-    return jsonResponse({ error: sanitizeError(err, "Internal error") }, 500, req);
+    return jsonResponse({ error: sanitizeError(err, "Internal error"), ...(recordError ? { record_error: recordError } : {}) }, 500, req);
   }
 });
