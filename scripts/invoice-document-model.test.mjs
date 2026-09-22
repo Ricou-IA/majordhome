@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INVOICING_DEFAULTS, invoicingSettings, validateIban, validateBic, validateNumberPrefix, splitTtc, fmtEur,
-  buildInvoiceDraft, buildInvoicePdfModel,
+  buildInvoiceDraft, buildInvoicePdfModel, invoiceErrorMessage,
 } from '../src/lib/invoiceDocumentModel.js';
 import { buildCompanyInfo } from '../src/lib/orgBranding.js';
 
@@ -115,6 +115,11 @@ test('buildInvoiceDraft : nom client = display_name, sinon "Prénom NOM"', () =>
   assert.equal(invoice.customer.name, 'Anna FERNANDEZ');
 });
 
+test('buildInvoiceDraft : dueDays 0 reste 0 (paiement comptant), pas un fallback à 30', () => {
+  const { invoice } = buildInvoiceDraft({ model: MODEL, orgId: 'org-1', client: CLIENT, dueDays: 0 });
+  assert.equal(invoice.due_days, 0);
+});
+
 test('buildInvoiceDraft : sans catalogue Pennylane, resolveLedgerAccountId renvoie le numéro → pas un id PL, ledger_account_pl_id null', () => {
   const model = { ...MODEL, lines: [{ ...MODEL.lines[0], ledgerAccountId: '70601', ledgerAccountNumber: '70601' }] };
   const { lines } = buildInvoiceDraft({ model, orgId: 'org-1', client: CLIENT, dueDays: 30 });
@@ -183,8 +188,35 @@ test('buildInvoicePdfModel : sans IBAN → pas de ligne IBAN ; sans RGE → null
   assert.equal(pdf.rge, null);
 });
 
+test('buildInvoicePdfModel : IBAN invalide en settings → pas de ligne IBAN (iban.ok requis, pas seulement iban.value)', () => {
+  const pdf = buildInvoicePdfModel({
+    invoice: ISSUED, lines: LINES, company: COMPANY,
+    invoicing: invoicingSettings({ invoicing: { iban: 'PAS UN IBAN' } }),
+  });
+  assert.equal(pdf.payment.length, 1);
+  assert.ok(!pdf.payment.some((p) => p.includes('IBAN')));
+});
+
 test('buildInvoicePdfModel : aucun glyphe hors cp1252 dans les chaînes rendues', () => {
   const pdf = buildInvoicePdfModel({ invoice: ISSUED, lines: LINES, company: COMPANY, invoicing: INVOICING });
   const all = JSON.stringify(pdf);
   assert.ok(!/[\u202f\u2212\u2192\u2265\u2264\u0394\u03b8\u03a6]/.test(all), 'glyphe interdit trouvé');
+});
+
+test('invoiceErrorMessage : code RPC connu (nu ou dans un message PostgREST) → français', () => {
+  assert.equal(invoiceErrorMessage(new Error('intervention_already_invoiced')), 'Cette intervention a déjà une facture émise.');
+  assert.equal(
+    invoiceErrorMessage(new Error('duplicate key value violates unique constraint "invoices_one_issued_per_intervention" DETAIL: intervention_already_invoiced')),
+    'Cette intervention a déjà une facture émise.',
+  );
+  assert.equal(invoiceErrorMessage(new Error('team_leader_required')), 'Réservé aux chefs d’équipe et administrateurs.');
+});
+
+test('invoiceErrorMessage : code inconnu → message brut renvoyé tel quel (jamais masqué)', () => {
+  assert.equal(invoiceErrorMessage(new Error('some_unmapped_pg_error')), 'some_unmapped_pg_error');
+});
+
+test('invoiceErrorMessage : erreur vide/absente → fallback', () => {
+  assert.equal(invoiceErrorMessage(null), 'La facture n’a pas pu être émise');
+  assert.equal(invoiceErrorMessage('', 'Repli custom'), 'Repli custom');
 });

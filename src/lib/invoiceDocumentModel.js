@@ -196,7 +196,7 @@ export function buildInvoiceDraft({ model, orgId, context = 'contrat', client, c
     customer: customerSnapshot(client),
     subject: model?.subject || null,
     currency: 'EUR',
-    due_days: Number(dueDays) || 30,
+    due_days: Number.isFinite(Number(dueDays)) ? Number(dueDays) : 30,
     total_ht: totalHt,
     total_tva: totalTva,
     total_ttc: totalTtc,
@@ -244,7 +244,7 @@ export function buildInvoicePdfModel({ invoice, lines, company, invoicing }) {
   const payment = [invoicing.paymentTerms];
   const iban = validateIban(invoicing.iban);
   const bic = validateBic(invoicing.bic);
-  if (iban.value) payment.push(`IBAN : ${iban.value}${bic.value ? ` — BIC : ${bic.value}` : ''}`);
+  if (iban.ok && iban.value) payment.push(`IBAN : ${iban.value}${bic.value ? ` — BIC : ${bic.value}` : ''}`);
   const footerParts = [buildLegalFooter(company)];
   if (company.siret) footerParts.push(`SIRET ${company.siret}`);
   if (company.tvaIntra) footerParts.push(`TVA ${company.tvaIntra}`);
@@ -265,4 +265,38 @@ export function buildInvoicePdfModel({ invoice, lines, company, invoicing }) {
     companyAddress: formatFullAddress(company),
     footer: footerParts.filter(Boolean).join(' — '),
   };
+}
+
+/**
+ * Messages utilisateur des codes d'erreur de la chaîne d'émission (`invoice_create_draft` /
+ * `invoice_issue`, cf. supabase/migrations/20260923_1_invoices_hub.sql et
+ * 20260923_2_invoices_unique_issued_per_intervention.sql). Finding F3 de la revue finale
+ * (2026-09-22) : un `RAISE EXCEPTION 'code'` PostgREST remonte tel quel dans `err.message`
+ * (ex. `intervention_already_invoiced`, ou le message brut PostgREST qui l'englobe) — sans ce
+ * mappage, l'utilisateur voit un code technique anglais au lieu d'une explication actionnable.
+ */
+export const INVOICE_RPC_MESSAGES = Object.freeze({
+  unauthenticated: 'Session expirée : reconnectez-vous.',
+  team_leader_required: 'Réservé aux chefs d’équipe et administrateurs.',
+  lines_required: 'La facture n’a aucune ligne.',
+  totals_mismatch: 'Les totaux ne correspondent pas à la somme des lignes : rechargez la page et réessayez.',
+  invalid_prefix: 'Préfixe de numérotation invalide (Paramètres → Facturation → Émission).',
+  prefix_mismatch: 'La série de l’année est déjà amorcée avec un autre préfixe : le préfixe ne peut plus changer avant l’année prochaine (Paramètres → Facturation → Émission).',
+  invoice_already_issued: 'Cette facture est déjà émise.',
+  intervention_already_invoiced: 'Cette intervention a déjà une facture émise.',
+  invoice_not_found: 'Facture introuvable.',
+  invoice_immutable: 'Facture émise : elle ne peut plus être modifiée (correction par avoir).',
+});
+
+/**
+ * Message utilisateur d'une erreur de la chaîne d'émission (code RPC → français, sinon message
+ * brut renvoyé tel quel, jamais masqué — cf. posture « échouer fort »).
+ * @param {unknown} err
+ * @param {string} [fallback]
+ * @returns {string}
+ */
+export function invoiceErrorMessage(err, fallback = 'La facture n’a pas pu être émise') {
+  const raw = String(err?.message || err || '');
+  const code = Object.keys(INVOICE_RPC_MESSAGES).find((k) => raw.includes(k));
+  return code ? INVOICE_RPC_MESSAGES[code] : (raw || fallback);
 }
