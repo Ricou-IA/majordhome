@@ -113,6 +113,18 @@ async function ensurePennylaneCustomer(orgId, clientId) {
   return customerId;
 }
 
+/**
+ * Annulation d'une facture émise par un avoir (phase 3, hub). `orgId` est reçu pour
+ * homogénéité et journalisation ; la RPC dérive l'org de la facture elle-même.
+ */
+async function cancelWithCreditNote(orgId, invoiceId, numberPrefix, reason) {
+  const { data, error } = await supabase.rpc('invoice_cancel_with_credit_note', {
+    p_invoice_id: invoiceId, p_number_prefix: numberPrefix, p_reason: reason || null,
+  });
+  if (error) throw error;
+  return extractRpcResult(data);
+}
+
 /** Appelle l'edge d'import ; l'erreur remonte le code de l'edge (`customer_not_synced`…) et l'étape. */
 async function importToPennylane(orgId, invoiceId) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -139,4 +151,5 @@ export const invoicesService = {
   attachPdf: (orgId, invoiceId, pdfPath) => withErrorHandling(() => attachPdf(orgId, invoiceId, pdfPath), 'invoices.attachPdf'),
   ensurePennylaneCustomer: (orgId, clientId) => withErrorHandling(() => ensurePennylaneCustomer(orgId, clientId), 'invoices.ensurePennylaneCustomer'),
   importToPennylane: (orgId, invoiceId) => withErrorHandling(() => importToPennylane(orgId, invoiceId), 'invoices.importToPennylane'),
+  cancelWithCreditNote: (orgId, invoiceId, numberPrefix, reason) => withErrorHandling(() => cancelWithCreditNote(orgId, invoiceId, numberPrefix, reason), 'invoices.cancelWithCreditNote'),
 };

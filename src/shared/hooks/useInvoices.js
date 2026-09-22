@@ -98,6 +98,70 @@ export function useIssueEntretienInvoice(orgId) {
 }
 
 /**
+ * Annulation d'une facture émise par un avoir (phase 3). L'avoir est émis par la base
+ * (même série), la carte redevient facturable, le PDF est archivé, l'import Pennylane
+ * enchaîné sans jamais faire échouer l'annulation. Erreurs post-RPC : `err.issued`.
+ * @param {string} orgId  org CORE
+ */
+export function useCancelInvoiceWithCreditNote(orgId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    /**
+     * @param {object} p
+     * @param {string} p.invoiceId
+     * @param {string|null} p.interventionId
+     * @param {string} p.numberPrefix
+     * @param {string} [p.reason]
+     * @param {object} p.company  `buildCompanyInfo(settings)`
+     * @param {object} p.invoicing  `invoicingSettings(settings)`
+     * @param {(pdfModel: object, company: object) => Promise<Blob>} p.renderPdf
+     * @param {boolean} p.pennylaneEnabled
+     */
+    mutationFn: async ({ invoiceId, interventionId, numberPrefix, reason, company, invoicing, renderPdf, pennylaneEnabled }) => {
+      const res = await unwrapResult(invoicesService.cancelWithCreditNote(orgId, invoiceId, numberPrefix, reason));
+      const creditNoteId = res.credit_note_id;
+      const number = res.number;
+      const fail = (message) => { const e = new Error(message); e.issued = { creditNoteId, number }; return e; };
+      if (interventionId) {
+        const { error: cardError } = await savService.updateFields(interventionId, { invoice_id: null, invoiced_at: null });
+        if (cardError) throw fail(`Avoir ${number} émis, mais la carte n’a pas pu être remise à facturer : ${invoiceErrorMessage(cardError, cardError.message || String(cardError))}`);
+      }
+      let invoiceRow = null;
+      let pdfPath = null;
+      let blob = null;
+      try {
+        const { invoice, lines } = await unwrapResult(invoicesService.getById(orgId, creditNoteId));
+        invoiceRow = invoice;
+        blob = await renderPdf(buildInvoicePdfModel({ invoice, lines, company, invoicing }), company);
+        pdfPath = await unwrapResult(invoicesService.uploadPdf(orgId, invoice, blob));
+        await unwrapResult(invoicesService.attachPdf(orgId, creditNoteId, pdfPath));
+      } catch (err) {
+        throw fail(`Avoir ${number} émis et carte remise à facturer, mais le PDF n’a pas pu être archivé : ${invoiceErrorMessage(err, err?.message || String(err))}`);
+      }
+      let importWarning = null;
+      if (pennylaneEnabled) {
+        try {
+          if (!invoiceRow.client_id) throw new Error('invoice_without_client');
+          await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, invoiceRow.client_id));
+          const imported = await unwrapResult(invoicesService.importToPennylane(orgId, creditNoteId));
+          if (Array.isArray(imported?.warnings) && imported.warnings.includes('credited_invoice_not_imported')) {
+            importWarning = invoiceErrorMessage(new Error('credited_invoice_not_imported'));
+          }
+        } catch (err) {
+          importWarning = `Avoir ${number} émis et archivé, mais pas encore importé dans Pennylane : ${invoiceErrorMessage(err, err?.message || String(err))}`;
+        }
+      }
+      return { creditNoteId, number, creditedNumber: res.credited_number, blob, pdfPath, importWarning };
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: invoiceKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.all(orgId) });
+    },
+  });
+}
+
+/**
  * Rejeu de l'export d'une facture ÉMISE : régénère et archive le PDF s'il manque, puis
  * importe dans Pennylane si l'org l'a activé et que l'import n'est pas complet — soit parce que
  * la facture n'y est pas encore, soit parce qu'un `pennylane_invoice_id` existe mais que

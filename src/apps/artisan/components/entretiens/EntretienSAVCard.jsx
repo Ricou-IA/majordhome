@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -24,6 +24,7 @@ import { useRetryInvoiceExport } from '@hooks/useInvoices';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { invoicingSettings, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
 import { generateInvoicePdfBlob } from '../facturation/InvoicePDF';
+import CancelInvoiceDialog from '../facturation/CancelInvoiceDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
 
 // ============================================================================
@@ -72,6 +73,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [smsLoading, setSmsLoading] = useState(false);
   const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const { isTeamLeaderOrAbove } = useAuth();
   const pennylaneEnabled = usePennylaneEnabled();
   const { settings } = useOrgSettings();
@@ -301,6 +303,24 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                         onOpenChange={setInvoiceOpen}
                         onCreated={() => onRefresh?.()}
                       />
+                    </div>
+                  )}
+                </>
+              )}
+              {isTeamLeaderOrAbove && isHubMode && item.invoice_id && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setCancelOpen(true); }}
+                    title="Annuler cette facture par un avoir"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-red-200 text-red-700 bg-white hover:bg-red-50"
+                  >
+                    <Undo2 className="w-3 h-3" />
+                    Avoir
+                  </button>
+                  {cancelOpen && (
+                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <CancelInvoiceDialog item={item} orgId={orgId} open={cancelOpen} onOpenChange={setCancelOpen} onDone={() => onRefresh?.()} />
                     </div>
                   )}
                 </>
