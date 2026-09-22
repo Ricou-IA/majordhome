@@ -129,12 +129,19 @@ test('buildInvoicePdfModel : en-tête, lignes, TVA, totaux, remise', () => {
   assert.deepEqual(pdf.dates, { invoice: '23/09/2026', due: '23/10/2026' });
   assert.deepEqual(pdf.customer, ['Anna FERNANDEZ', '3 impasse des Lilas', '81600 Gaillac', 'Client n° 286']);
   assert.equal(pdf.rows.length, 2);
-  assert.deepEqual(pdf.rows[0], { label: 'Entretien poêle', description: 'Jollymec · Quadro', qty: '1', unitHt: '81,82 €', vat: '10 %', ht: '81,82 €' });
+  assert.deepEqual(pdf.rows[0], { label: 'Entretien poêle', description: 'Jollymec · Quadro', qty: '1', unitHt: '81,8182 €', vat: '10 %', ht: '81,82 €' });
   assert.equal(pdf.rows[1].qty, '2');
-  assert.equal(pdf.rows[1].unitHt, '5,45 €');
+  assert.equal(pdf.rows[1].unitHt, '5,4545 €');
   assert.deepEqual(pdf.vatRows, [{ rate: '10 %', base: '92,73 €', amount: '9,27 €' }]);
   assert.deepEqual(pdf.totals, { ht: '92,73 €', tva: '9,27 €', ttc: '102,00 €' });
   assert.equal(pdf.discountLine, 'Remise 10 % appliquée sur les équipements (dégressivité 10 %) : -10,00 € TTC');
+});
+
+test('buildInvoicePdfModel : prix unitaire HT exact au centime → 2 décimales, pas 4', () => {
+  const pdf = buildInvoicePdfModel({
+    invoice: ISSUED, lines: [{ ...LINES[0], unit_price_ht: 100 }], company: COMPANY, invoicing: INVOICING,
+  });
+  assert.equal(pdf.rows[0].unitHt, '100,00 €');
 });
 
 test('buildInvoicePdfModel : mentions obligatoires, paiement, RGE, pied de page', () => {

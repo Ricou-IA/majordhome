@@ -78,6 +78,20 @@ export function fmtEur(n) {
   return `${sign}${int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${dec} €`;
 }
 
+/**
+ * Prix unitaire HT affiché sur le PDF (review round 1, 2026-09-22) : 2 décimales quand le
+ * prix est exact au centime, sinon 4 décimales — sinon quantité × unitaire affiché ≠ HT de la
+ * ligne affiché (`5,45 € × 2 = 10,90 €` alors que la ligne porte `10,91 €`). Usage : UNIQUEMENT
+ * `rows[].unitHt` dans `buildInvoicePdfModel` — les autres montants du PDF sont déjà au centime.
+ */
+function fmtEurUnit(n) {
+  const v = Number(n) || 0;
+  if (round2(v) === round4(v)) return fmtEur(v);
+  const sign = v < 0 ? '-' : '';
+  const [int, dec] = Math.abs(v).toFixed(4).split('.');
+  return `${sign}${int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${dec} €`;
+}
+
 const fmtDateFr = (iso) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
@@ -110,6 +124,13 @@ function customerSnapshot(client) {
  * @param {string|null} [p.interventionId]
  * @param {number} p.dueDays
  * @returns {{ invoice: object, lines: object[] }}
+ *
+ * `lines[].metier_key` = `equipmentTypeId` du modèle (pas un libellé métier — nom conservé pour
+ * matcher le vocabulaire du journal d'intégration).
+ *
+ * ⚠️ Ne vérifie PAS `model.errors` (montant contractuel nul, taux de TVA sans code Pennylane…) —
+ * c'est un blocage à faire porter par l'appelant (garde UI) AVANT d'appeler `buildInvoiceDraft`,
+ * cf. `buildEntretienInvoice`. Cette fonction assemble un brouillon, elle ne valide pas le modèle.
  */
 export function buildInvoiceDraft({ model, orgId, context = 'contrat', client, contractId = null, interventionId = null, dueDays }) {
   const byRate = new Map();
@@ -132,9 +153,18 @@ export function buildInvoiceDraft({ model, orgId, context = 'contrat', client, c
       label: l.label,
       description: l.description || null,
       quantity: Number(l.quantity) || 1,
-      // Prix unitaire HT EXACT (pas depuis le ht arrondi de la ligne) — ruling contrôleur 2026-09-22 :
-      // round4(ht_ligne / qty) donne 5.455 sur la fixture 12€/qty2/10%, alors que la valeur attendue
-      // (round4 du prix unitaire TTC exact / (1+taux)) est 5.4545 / 81.8182.
+      // Prix unitaire HT NET (après remise) — PAS une redite de `l.unitPriceHt` (review round 1,
+      // 2026-09-22). `entretienInvoiceModel` porte deux prix unitaires distincts et volontairement
+      // divergents : `l.unitPriceHt` est le prix unitaire HT BRUT (avant remise), c'est la base sur
+      // laquelle la remise par ligne d'équipement est appliquée (cf. Module Contrats — forçage par
+      // ligne). `invoice_lines.unit_price_ht` (ici) doit être le prix NET, pour que
+      // quantité × unitaire = ht de la ligne tienne à l'affichage PDF (`buildInvoicePdfModel`,
+      // cf. `fmtEurUnit`). Les deux valeurs ne sont égales que sur une ligne sans remise (`piece`) ;
+      // ne jamais fusionner ce calcul avec `l.unitPriceHt`.
+      // Calculé depuis `netTtc` (pas depuis `ht` déjà arrondi à la ligne) — ruling contrôleur
+      // 2026-09-22 : round4(ht_ligne / qty) donne 5.455 sur la fixture 12€/qty2/10% (arrondi
+      // intermédiaire), alors que round4(netTtc/qty/(1+taux)), calculé depuis le TTC exact, donne
+      // la valeur attendue 5.4545 / 81.8182.
       unit_price_ht: round4(Number(l.netTtc) / (Number(l.quantity) || 1) / (1 + rate / 100)),
       vat_rate: rate,
       discount_percent: Number(l.discountPercent) || 0,
@@ -198,7 +228,7 @@ export function buildInvoicePdfModel({ invoice, lines, company, invoicing }) {
     label: l.label,
     description: l.description || null,
     qty: fmtQty(l.quantity),
-    unitHt: fmtEur(l.unit_price_ht),
+    unitHt: fmtEurUnit(l.unit_price_ht),
     vat: fmtPct(l.vat_rate),
     ht: fmtEur(l.ht),
   }));
