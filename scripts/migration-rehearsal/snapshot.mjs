@@ -54,6 +54,7 @@ const FUNCTIONS = [
   'majordhome.calculate_next_maintenance()',
   'majordhome.update_client_on_equipment_change()',
   'majordhome.equipments_sync_category()', // trigger equipments posé par M1 (20260913_1), en prod depuis le 2026-09-12
+  'majordhome.equipment_unlinked_purge_children()', // trigger equipments posé par 20260922_2, en prod depuis le 2026-09-22
   'majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.team_member_set_routing_settings(uuid, integer, boolean, text[])',
@@ -61,6 +62,9 @@ const FUNCTIONS = [
   'majordhome.project_org_id(uuid)',
   'majordhome.quote_status_bucket(text)',
   'public.update_majordhome_lead(uuid, jsonb)',
+  // 20260922_3 : REVOKE PUBLIC/anon/authenticated — l'ACL de départ (anon/authenticated/service_role
+  // = EXECUTE) est reproduite par les privilèges par défaut de bootstrap-pre.sql, comme en prod.
+  'public.exec_sql(text)',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
