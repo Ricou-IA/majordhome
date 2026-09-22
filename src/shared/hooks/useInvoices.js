@@ -99,7 +99,11 @@ export function useIssueEntretienInvoice(orgId) {
 
 /**
  * Rejeu de l'export d'une facture ÉMISE : régénère et archive le PDF s'il manque, puis
- * importe dans Pennylane si l'org l'a activé et que la facture n'y est pas encore.
+ * importe dans Pennylane si l'org l'a activé et que l'import n'est pas complet — soit parce que
+ * la facture n'y est pas encore, soit parce qu'un `pennylane_invoice_id` existe mais que
+ * `import_status` n'est pas `imported` (fix round 2, 2026-09-23 : c'est exactement l'état que la
+ * branche `repaired` de l'edge cible — sans ce 2ᵉ cas, le bouton de rejeu reste amber pour
+ * toujours puisque `pennylane_invoice_id` seul suffisait à couper l'appel).
  * Idempotent : rien n'est recréé pour ce qui existe déjà.
  * @param {string} orgId  org CORE
  */
@@ -126,8 +130,12 @@ export function useRetryInvoiceExport(orgId) {
         pdfRegenerated = true;
       }
       let imported = false;
-      let alreadyImported = Boolean(invoice.pennylane_invoice_id);
-      if (pennylaneEnabled && !alreadyImported) {
+      let alreadyImported = Boolean(invoice.pennylane_invoice_id) && invoice.import_status === 'imported';
+      // Fix round 2 (2026-09-23) : `pennylane_invoice_id` seul ne suffit pas à couper l'appel —
+      // un id posé avec `import_status` pending/error (crash entre le POST PL et l'écriture RPC,
+      // cf. finding I4 de l'edge) doit rappeler l'edge pour que sa branche `repaired` s'exécute.
+      const needsImport = pennylaneEnabled && (!invoice.pennylane_invoice_id || invoice.import_status !== 'imported');
+      if (needsImport) {
         // Le client importé est TOUJOURS celui de la facture, jamais un client fourni par
         // l'appelant (review round 1, 2026-09-23). Absence de client ≠ client pas encore
         // synchronisé Pennylane : deux causes distinctes, deux messages distincts (finding
@@ -136,8 +144,9 @@ export function useRetryInvoiceExport(orgId) {
         await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, invoice.client_id));
         const res = await unwrapResult(invoicesService.importToPennylane(orgId, invoiceId));
         // `recovered` = la facture existait déjà côté PL (probe anti-doublon) et cet appel vient
-        // de la réconcilier : c'est un travail fait maintenant, pas un no-op.
-        alreadyImported = Boolean(res?.already) && !res?.recovered;
+        // de la réconcilier ; `repaired` = l'id PL existait déjà mais import_status a été corrigé
+        // maintenant (fix round 2) — les deux sont un travail fait maintenant, pas un no-op.
+        alreadyImported = Boolean(res?.already) && !res?.recovered && !res?.repaired;
         imported = !alreadyImported;
       }
       return { number: invoice.number, pdfRegenerated, imported, alreadyImported };

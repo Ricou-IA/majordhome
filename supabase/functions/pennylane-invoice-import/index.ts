@@ -77,6 +77,24 @@ Deno.serve(async (req: Request) => {
     return rpcError ? sanitizeError(rpcError, "invoice_set_import_result failed") : null;
   };
 
+  // Fix round 2 (2026-09-23) : factorisé — le mapping pennylane_sync doit être posé sur les
+  // TROIS chemins qui rendent la facture "importée" (nominal, `recovered` via probe, `repaired`
+  // via I4), pas seulement le nominal. Avant ce fix, `recovered`/`repaired` renvoyaient
+  // `pennylane_invoice_id` au front sans jamais alimenter `majordhome_pennylane_sync` — un miroir
+  // qui restait vide pour ces deux chemins.
+  const upsertInvoiceSync = async (
+    invoiceRow: Record<string, unknown>, plId: number, ledgerEntryId: number | null,
+    extraMetadata: Record<string, unknown> = {},
+  ): Promise<string | null> => {
+    const { error: upsertErr } = await supabase.from("majordhome_pennylane_sync").upsert({
+      org_id: orgId, entity_type: "invoice", local_id: invoiceRow.id,
+      pennylane_id: plId, pennylane_number: invoiceRow.number, external_reference: invoiceRow.id,
+      sync_status: "synced", last_synced_at: new Date().toISOString(),
+      metadata: { source: "hub", intervention_id: invoiceRow.intervention_id, ledger_entry_id: ledgerEntryId, ...extraMetadata },
+    }, { onConflict: "org_id,entity_type,local_id" });
+    return upsertErr ? sanitizeError(upsertErr, "pennylane_sync upsert") : null;
+  };
+
   try {
     // 1. Facture + lignes
     const { data: invoice, error: invErr } = await supabase
@@ -90,9 +108,13 @@ Deno.serve(async (req: Request) => {
       // (ex. le crash entre le POST PL et l'écriture RPC, cf. exception ci-dessous) — on répare
       // avant de répondre plutôt que de laisser une facture importée signalée « à rejouer ».
       if (invoice.import_status !== "imported") {
-        const recordError = await recordResult("imported", Number(invoice.pennylane_invoice_id), invoice.pennylane_ledger_entry_id ?? null, null);
+        const plId = Number(invoice.pennylane_invoice_id);
+        const ledgerId = invoice.pennylane_ledger_entry_id ?? null;
+        const recordError = await recordResult("imported", plId, ledgerId, null);
         if (recordError) console.error(`[pennylane-invoice-import] record failed (repair) for ${invoice.number}: ${recordError}`);
-        return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id, repaired: true, ...(recordError ? { record_error: recordError } : {}) }, 200, req);
+        const syncWarning = await upsertInvoiceSync(invoice, plId, ledgerId);
+        if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed (repair) for ${invoice.number}: ${syncWarning}`);
+        return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id, repaired: true, ...(recordError ? { record_error: recordError } : {}), ...(syncWarning ? { sync_warning: syncWarning } : {}) }, 200, req);
       }
       return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id }, 200, req);
     }
@@ -145,9 +167,12 @@ Deno.serve(async (req: Request) => {
         const items = (probe.data as { items?: Array<{ id?: number; external_reference?: string; ledger_entry?: { id?: number } }> })?.items || [];
         const existing = items[0];
         if (existing?.id && existing.external_reference === invoice.id) {
-          const recordError = await recordResult("imported", existing.id, existing.ledger_entry?.id ?? null, null);
+          const ledgerId = existing.ledger_entry?.id ?? null;
+          const recordError = await recordResult("imported", existing.id, ledgerId, null);
           if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
-          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, ...(recordError ? { record_error: recordError } : {}) }, 200, req);
+          const syncWarning = await upsertInvoiceSync(invoice, existing.id, ledgerId);
+          if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed (recovered) for ${invoice.number}: ${syncWarning}`);
+          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, ...(recordError ? { record_error: recordError } : {}), ...(syncWarning ? { sync_warning: syncWarning } : {}) }, 200, req);
         }
         if (existing && existing.external_reference !== invoice.id) {
           // Le filtre `external_reference eq` a été ignoré par Pennylane (ou l'API l'a mal
@@ -249,13 +274,9 @@ Deno.serve(async (req: Request) => {
       console.error(`[pennylane-invoice-import] invoice_set_import_result failed for ${invoice.number} (PL ${plInvoice.id}): ${rpcFail}`);
       return jsonResponse({ error: "import_recorded_failed", pennylane_invoice_id: plInvoice.id, detail: rpcFail }, 500, req);
     }
-    const { error: upsertErr } = await supabase.from("majordhome_pennylane_sync").upsert({
-      org_id: orgId, entity_type: "invoice", local_id: invoice.id,
-      pennylane_id: plInvoice.id, pennylane_number: invoice.number, external_reference: invoice.id,
-      sync_status: "synced", last_synced_at: new Date().toISOString(),
-      metadata: { source: "hub", intervention_id: invoice.intervention_id, public_file_url: plInvoice.public_file_url ?? null, file_url: plInvoice.file_url ?? null, ledger_entry_id: ledgerEntryId },
-    }, { onConflict: "org_id,entity_type,local_id" });
-    const syncWarning = upsertErr ? sanitizeError(upsertErr, "pennylane_sync upsert") : null;
+    const syncWarning = await upsertInvoiceSync(invoice, plInvoice.id, ledgerEntryId, {
+      public_file_url: plInvoice.public_file_url ?? null, file_url: plInvoice.file_url ?? null,
+    });
     if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed for ${invoice.number}: ${syncWarning}`);
 
     const warnings: string[] = [];
