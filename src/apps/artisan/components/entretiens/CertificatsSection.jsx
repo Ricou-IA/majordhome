@@ -66,19 +66,27 @@ export function CertificatsSection({ item, onCloseModal }) {
     });
   }, [contractId, item?.client_id]);
 
-  // --- Lazy create children si absents ---
+  // --- Derived ---
+  const childByEquipId = Object.fromEntries(children.map((c) => [c.equipment_id, c]));
+  const equipmentIds = new Set(equipments.map((eq) => eq.id));
+  // Enfants dont l'équipement n'est plus dans le contrat (retiré / supprimé) et qui
+  // ont été conservés par la base parce qu'ils ne sont pas vierges (néant, certificat).
+  // Les vierges sont purgés par trigger (20260922_2) ; s'il en reste un, on le montre
+  // quand même : invisible, il bloquait la clôture (GOMES CTR-00821, 2026-09-22).
+  const orphanChildren = children.filter((c) => !c.equipment_id || !equipmentIds.has(c.equipment_id));
+  const doneCount = children.filter((c) => c.workflow_status === 'realise').length;
+  const totalCount = children.length;
+
+  // --- Réconciliation : un enfant par équipement du contrat. Crée les manquants
+  // (première ouverture, ou équipement ajouté au contrat après coup). ---
   useEffect(() => {
-    if (
-      creatingRef.current ||
-      childrenLoading ||
-      equipmentsLoading ||
-      children.length > 0 ||
-      equipments.length === 0 ||
-      !item
-    ) return;
+    if (creatingRef.current || childrenLoading || equipmentsLoading || !item) return;
+    const covered = new Set(children.map((c) => c.equipment_id));
+    const missing = equipments.filter((eq) => !covered.has(eq.id));
+    if (missing.length === 0) return;
 
     creatingRef.current = true;
-    createChildren(item.id, equipments, {
+    createChildren(item.id, missing, {
       projectId: item.project_id || item.client_project_id,
       clientId: item.client_id,
       contractId,
@@ -96,7 +104,7 @@ export function CertificatsSection({ item, onCloseModal }) {
       // Toast d'erreur déjà émis par le hook (onError) ; pas de nouvelle tentative
       // automatique — l'utilisateur rouvre la modale pour relancer.
     });
-  }, [childrenLoading, equipmentsLoading, children.length, equipments, item, contractId, createChildren, refetch]);
+  }, [childrenLoading, equipmentsLoading, children, equipments, item, contractId, createChildren, refetch]);
 
   // --- Handlers (toasts d'erreur émis par le hook) ---
   const handleMarkNeant = useCallback(async (childId) => {
@@ -108,11 +116,6 @@ export function CertificatsSection({ item, onCloseModal }) {
     setMutatingId(childId);
     try { await unmarkNeant(childId, item.id); } catch { /* toast émis par le hook */ } finally { setMutatingId(null); }
   }, [unmarkNeant, item?.id]);
-
-  // --- Derived ---
-  const childByEquipId = Object.fromEntries(children.map((c) => [c.equipment_id, c]));
-  const doneCount = children.filter((c) => c.workflow_status === 'realise').length;
-  const totalCount = children.length;
 
   // --- Self-healing : si tous les enfants sont done mais le parent est encore planifie,
   // déclencher la clôture automatique. Couvre les cas legacy où la transition manquait. ---
@@ -170,6 +173,20 @@ export function CertificatsSection({ item, onCloseModal }) {
           onMarkNeant={handleMarkNeant}
           onUnmarkNeant={handleUnmarkNeant}
           isLoading={mutatingId === childByEquipId[eq.id]?.id}
+          onCloseModal={onCloseModal}
+        />
+      ))}
+
+      {/* Enfants conservés dont l'équipement a quitté le contrat */}
+      {orphanChildren.map((child) => (
+        <CertificatEquipmentRow
+          key={child.id}
+          equipment={null}
+          orphan
+          childIntervention={child}
+          onMarkNeant={handleMarkNeant}
+          onUnmarkNeant={handleUnmarkNeant}
+          isLoading={mutatingId === child.id}
           onCloseModal={onCloseModal}
         />
       ))}

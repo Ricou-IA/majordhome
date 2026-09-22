@@ -42,12 +42,13 @@ export function CertificatEquipmentRow({
   onUnmarkNeant,
   isLoading = false,
   onCloseModal,
+  orphan = false, // enfant conservé dont l'équipement a été retiré du contrat / supprimé
 }) {
   const status = getChildStatus(childIntervention);
   const badge = STATUS_BADGES[status];
 
   const { index: referentiel } = useEquipmentReferential();
-  const categoryLabel = libelleEquipement(equipment, referentiel);
+  const categoryLabel = orphan ? 'Équipement retiré du contrat' : libelleEquipement(equipment, referentiel);
 
   const detail = [equipment?.brand, equipment?.model].filter(Boolean).join(' ');
 
