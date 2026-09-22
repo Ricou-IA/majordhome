@@ -19,10 +19,10 @@ const MODEL = {
   lines: [
     { kind: 'contrat', label: 'Entretien poêle', description: 'Jollymec · Quadro', quantity: 1, vatPercent: 10,
       grossTtc: 100, netTtc: 90, discountPercent: 10, ledgerAccountId: 123, ledgerAccountNumber: '70601',
-      equipmentId: 'eq-1', equipmentTypeId: 'type-poele', categoryId: 'cat-poele' },
+      equipmentId: 'eq-1', equipmentTypeId: 'type-poele', categoryId: 'cat-poele', vatCode: 'FR_100' },
     { kind: 'piece', label: 'Joint', description: 'REF-1', quantity: 2, vatPercent: 10,
       grossTtc: 12, netTtc: 12, discountPercent: 0, ledgerAccountId: null, ledgerAccountNumber: '7070',
-      equipmentId: null, equipmentTypeId: null, categoryId: null },
+      equipmentId: null, equipmentTypeId: null, categoryId: null, vatCode: 'FR_100' },
   ],
   warnings: [], errors: [],
 };
@@ -89,7 +89,7 @@ test('buildInvoiceDraft : en-tête + lignes persistables, totaux = sommes des li
   assert.deepEqual(lines[0], {
     position: 1, kind: 'contrat', label: 'Entretien poêle', description: 'Jollymec · Quadro', quantity: 1,
     unit_price_ht: 81.8182, vat_rate: 10, discount_percent: 10, ht: 81.82, tva: 8.18, ttc: 90,
-    ledger_account_number: '70601', ledger_account_pl_id: 123, metier_key: 'type-poele', equipment_id: 'eq-1', category_id: 'cat-poele',
+    ledger_account_number: '70601', ledger_account_pl_id: 123, metier_key: 'type-poele', equipment_id: 'eq-1', category_id: 'cat-poele', vat_code: 'FR_100',
   });
   assert.equal(lines[1].quantity, 2);
   assert.equal(lines[1].unit_price_ht, 5.4545);
@@ -219,4 +219,17 @@ test('invoiceErrorMessage : code inconnu → message brut renvoyé tel quel (jam
 test('invoiceErrorMessage : erreur vide/absente → fallback', () => {
   assert.equal(invoiceErrorMessage(null), 'La facture n’a pas pu être émise');
   assert.equal(invoiceErrorMessage('', 'Repli custom'), 'Repli custom');
+});
+
+test('buildInvoiceDraft : vat_code figé depuis le modèle, null si absent', () => {
+  const { lines } = buildInvoiceDraft({ model: MODEL, orgId: 'o', client: CLIENT, dueDays: 30 });
+  assert.equal(lines[0].vat_code, 'FR_100');
+  const sans = { ...MODEL, lines: [{ ...MODEL.lines[0], vatCode: undefined }] };
+  assert.equal(buildInvoiceDraft({ model: sans, orgId: 'o', client: CLIENT, dueDays: 30 }).lines[0].vat_code, null);
+});
+
+test('invoiceErrorMessage : codes de l\'import Pennylane', () => {
+  assert.match(invoiceErrorMessage(new Error('customer_not_synced')), /client.*Pennylane/i);
+  assert.match(invoiceErrorMessage(new Error('pdf_missing')), /PDF/);
+  assert.match(invoiceErrorMessage(new Error('pennylane_import_failed (étape import)')), /Pennylane/);
 });

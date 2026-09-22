@@ -184,6 +184,9 @@ export function buildInvoiceDraft({ model, orgId, context = 'contrat', client, c
       metier_key: l.equipmentTypeId ?? null,
       equipment_id: l.equipmentId ?? null,
       category_id: l.categoryId ?? null,
+      // Code TVA Pennylane figé (VAT_CODES du modèle d'entretien) : l'edge d'import le
+      // relit tel quel, sans recopier la table de correspondance côté Deno.
+      vat_code: l.vatCode ?? null,
     };
   });
   const invoice = {
@@ -286,6 +289,12 @@ export const INVOICE_RPC_MESSAGES = Object.freeze({
   intervention_already_invoiced: 'Cette intervention a déjà une facture émise.',
   invoice_not_found: 'Facture introuvable.',
   invoice_immutable: 'Facture émise : elle ne peut plus être modifiée (correction par avoir).',
+  customer_not_synced: "Le client n'a pas encore de fiche Pennylane : rejouez l'import depuis la carte (elle sera créée).",
+  pdf_missing: "Le PDF de la facture n'est pas archivé : rejouez l'export depuis la carte.",
+  invoice_not_issued: "Cette facture n'est pas émise : rien à importer.",
+  pennylane_import_failed: "Pennylane a refusé l'import de la facture : voir le détail et rejouer depuis la carte.",
+  pennylane_disabled: "Pennylane n'est pas activé pour cette organisation.",
+  already_imported: "Cette facture est déjà importée dans Pennylane.",
 });
 
 /**
