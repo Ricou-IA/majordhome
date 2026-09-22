@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INVOICING_DEFAULTS, invoicingSettings, validateIban, validateBic, validateNumberPrefix, splitTtc, fmtEur,
-  buildInvoiceDraft, buildInvoicePdfModel, invoiceErrorMessage,
+  buildInvoiceDraft, buildInvoicePdfModel, invoiceErrorMessage, INVOICE_RPC_MESSAGES,
 } from '../src/lib/invoiceDocumentModel.js';
 import { buildCompanyInfo } from '../src/lib/orgBranding.js';
 
@@ -232,4 +232,14 @@ test('invoiceErrorMessage : codes de l\'import Pennylane', () => {
   assert.match(invoiceErrorMessage(new Error('customer_not_synced')), /client.*Pennylane/i);
   assert.match(invoiceErrorMessage(new Error('pdf_missing')), /PDF/);
   assert.match(invoiceErrorMessage(new Error('pennylane_import_failed (étape import)')), /Pennylane/);
+});
+
+test('invoiceErrorMessage : detail de l\'edge ajouté entre parenthèses, borné à 300 caractères', () => {
+  const err = Object.assign(new Error('pennylane_import_failed'), { detail: '422 Unprocessable Entity' });
+  assert.equal(invoiceErrorMessage(err), `${INVOICE_RPC_MESSAGES.pennylane_import_failed} (422 Unprocessable Entity)`);
+  const long = Object.assign(new Error('pennylane_import_failed'), { detail: 'x'.repeat(400) });
+  assert.equal(invoiceErrorMessage(long), `${INVOICE_RPC_MESSAGES.pennylane_import_failed} (${'x'.repeat(300)})`);
+  // Sans detail (ou detail vide/non-string) : message mappé nu, comportement inchangé.
+  assert.equal(invoiceErrorMessage(new Error('pennylane_import_failed')), INVOICE_RPC_MESSAGES.pennylane_import_failed);
+  assert.equal(invoiceErrorMessage(Object.assign(new Error('pennylane_import_failed'), { detail: '   ' })), INVOICE_RPC_MESSAGES.pennylane_import_failed);
 });

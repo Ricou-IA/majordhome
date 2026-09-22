@@ -33,7 +33,9 @@ export function useIssueEntretienInvoice(orgId) {
      * @param {(pdfModel: object, company: object) => Promise<Blob>} p.renderPdf
      * @param {string} p.interventionId
      * @param {string|null} p.invoicedAt
-     * @param {{ enabled: boolean, clientId: string } | null} [p.pennylane]
+     * @param {{ enabled: boolean } | null} [p.pennylane]  déclenche l'import si activé ; le
+     *   client importé est TOUJOURS celui de la facture (`draft.invoice.client_id`), jamais un
+     *   client fourni par l'appelant (review round 1, 2026-09-23).
      */
     mutationFn: async ({ draft, numberPrefix, company, invoicing, renderPdf, interventionId, invoicedAt, pennylane = null }) => {
       const invoiceId = await unwrapResult(invoicesService.createDraft(draft));
@@ -67,16 +69,21 @@ export function useIssueEntretienInvoice(orgId) {
       }
 
       // Import Pennylane (phase 2) : jamais bloquant — la facture est émise et archivée,
-      // un import raté se rejoue depuis la carte (import_status = error + message).
+      // un import raté se rejoue depuis la carte (import_status pending ou error).
       let pennylaneInvoiceId = null;
       let importWarning = null;
-      if (pennylane?.enabled && pennylane.clientId) {
-        try {
-          await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, pennylane.clientId));
-          const imported = await unwrapResult(invoicesService.importToPennylane(orgId, invoiceId));
-          pennylaneInvoiceId = imported?.pennylane_invoice_id ?? null;
-        } catch (err) {
-          importWarning = `Facture ${number} émise et archivée, mais pas encore importée dans Pennylane (à rejouer depuis la carte) : ${invoiceErrorMessage(err, err?.message || String(err))}`;
+      if (pennylane?.enabled) {
+        const pennylaneClientId = draft?.invoice?.client_id || null;
+        if (!pennylaneClientId) {
+          importWarning = `Facture ${number} émise et archivée, mais sans client rattaché : import Pennylane impossible.`;
+        } else {
+          try {
+            await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, pennylaneClientId));
+            const imported = await unwrapResult(invoicesService.importToPennylane(orgId, invoiceId));
+            pennylaneInvoiceId = imported?.pennylane_invoice_id ?? null;
+          } catch (err) {
+            importWarning = `Facture ${number} émise et archivée, mais pas encore importée dans Pennylane (à rejouer depuis la carte) : ${invoiceErrorMessage(err, err?.message || String(err))}`;
+          }
         }
       }
       return { invoiceId, number, pdfPath, blob, pennylaneInvoiceId, importWarning };
@@ -102,13 +109,12 @@ export function useRetryInvoiceExport(orgId) {
     /**
      * @param {object} p
      * @param {string} p.invoiceId
-     * @param {string|null} p.clientId
      * @param {object} p.company  `buildCompanyInfo(settings)`
      * @param {object} p.invoicing  `invoicingSettings(settings)`
      * @param {(pdfModel: object, company: object) => Promise<Blob>} p.renderPdf
      * @param {boolean} p.pennylaneEnabled
      */
-    mutationFn: async ({ invoiceId, clientId, company, invoicing, renderPdf, pennylaneEnabled }) => {
+    mutationFn: async ({ invoiceId, company, invoicing, renderPdf, pennylaneEnabled }) => {
       const { invoice, lines } = await unwrapResult(invoicesService.getById(orgId, invoiceId));
       if (invoice.status !== 'issued') throw new Error('invoice_not_issued');
       let pdfRegenerated = false;
@@ -122,10 +128,14 @@ export function useRetryInvoiceExport(orgId) {
       let imported = false;
       let alreadyImported = Boolean(invoice.pennylane_invoice_id);
       if (pennylaneEnabled && !alreadyImported) {
-        if (!clientId) throw new Error('customer_not_synced');
-        await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, clientId));
+        // Le client importé est TOUJOURS celui de la facture, jamais un client fourni par
+        // l'appelant (review round 1, 2026-09-23).
+        if (!invoice.client_id) throw new Error('customer_not_synced');
+        await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, invoice.client_id));
         const res = await unwrapResult(invoicesService.importToPennylane(orgId, invoiceId));
-        alreadyImported = Boolean(res?.already);
+        // `recovered` = la facture existait déjà côté PL (probe anti-doublon) et cet appel vient
+        // de la réconcilier : c'est un travail fait maintenant, pas un no-op.
+        alreadyImported = Boolean(res?.already) && !res?.recovered;
         imported = !alreadyImported;
       }
       return { number: invoice.number, pdfRegenerated, imported, alreadyImported };

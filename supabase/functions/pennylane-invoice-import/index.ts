@@ -83,14 +83,22 @@ Deno.serve(async (req: Request) => {
     const { data: lines, error: linesErr } = await supabase
       .from("majordhome_invoice_lines").select("*").eq("invoice_id", invoice.id).eq("org_id", orgId).order("position");
     if (linesErr) return jsonResponse({ error: sanitizeError(linesErr, "lecture lignes") }, 500, req);
-    if (!lines || lines.length === 0) return jsonResponse({ error: "lines_required" }, 409, req);
+    if (!lines || lines.length === 0) {
+      const recordError = await recordResult("error", null, null, "lines_required");
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "lines_required", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
+    }
 
     // 2. Client Pennylane (mapping posé par le front via getOrCreateCustomer)
     const { data: sync, error: syncErr } = await supabase
       .from("majordhome_pennylane_sync").select("pennylane_id")
       .eq("org_id", orgId).eq("entity_type", "client").eq("local_id", invoice.client_id).maybeSingle();
     if (syncErr) return jsonResponse({ error: sanitizeError(syncErr, "lecture mapping client") }, 500, req);
-    if (!sync?.pennylane_id) return jsonResponse({ error: "customer_not_synced" }, 409, req);
+    if (!sync?.pennylane_id) {
+      const recordError = await recordResult("error", null, null, "customer_not_synced");
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "customer_not_synced", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
+    }
 
     // 3. PDF archivé → Pennylane
     const { data: file, error: dlErr } = await supabase.storage.from(INVOICES_BUCKET).download(invoice.pdf_path);

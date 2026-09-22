@@ -307,5 +307,10 @@ export const INVOICE_RPC_MESSAGES = Object.freeze({
 export function invoiceErrorMessage(err, fallback = 'La facture n’a pas pu être émise') {
   const raw = String(err?.message || err || '');
   const code = Object.keys(INVOICE_RPC_MESSAGES).find((k) => raw.includes(k));
-  return code ? INVOICE_RPC_MESSAGES[code] : (raw || fallback);
+  if (!code) return raw || fallback;
+  const mapped = INVOICE_RPC_MESSAGES[code];
+  // Détail brut de l'edge (ex. réponse Pennylane 422) : utile au diagnostic, jamais masqué,
+  // borné à 300 caractères pour ne pas noyer le message français (review round 1, 2026-09-23).
+  const detail = typeof err?.detail === 'string' && err.detail.trim() ? err.detail.trim().slice(0, 300) : null;
+  return detail ? `${mapped} (${detail})` : mapped;
 }

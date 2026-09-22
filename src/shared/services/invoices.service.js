@@ -13,7 +13,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, extractRpcResult } from '@/lib/serviceHelpers';
 import { storageService } from './storage.service';
 import { pennylaneService } from './pennylane.service';
-import { clientsService } from './clients.service';
 
 export const INVOICES_BUCKET = 'invoices';
 
@@ -101,7 +100,12 @@ async function ensurePennylaneCustomer(orgId, clientId) {
   const { data: existing, error: syncError } = await pennylaneService.getSyncRecord(orgId, 'client', clientId);
   if (syncError) throw syncError;
   if (existing?.pennylane_id) return existing.pennylane_id;
-  const { data: client, error: clientError } = await clientsService.getClientById(clientId);
+  const { data: client, error: clientError } = await supabase
+    .from('majordhome_clients')
+    .select('*')
+    .eq('id', clientId)
+    .eq('org_id', orgId)
+    .maybeSingle();
   if (clientError) throw clientError;
   if (!client) throw new Error('Client introuvable');
   const { data: customerId, error } = await pennylaneService.getOrCreateCustomer(client, orgId);
@@ -120,6 +124,7 @@ async function importToPennylane(orgId, invoiceId) {
     const err = new Error(detail?.error ? `${detail.error}${detail.step ? ` (étape ${detail.step})` : ''}${detail.detail ? ` — ${detail.detail}` : ''}` : error.message);
     err.code = detail?.error || null;
     err.step = detail?.step || null;
+    err.detail = detail?.detail || null;
     throw err;
   }
   return data;
