@@ -26,3 +26,25 @@ node scripts/migration-rehearsal/run.mjs --assert scripts/migration-rehearsal/as
   c'est ce qui rend testables les `REVOKE … FROM anon` et `GRANT … TO service_role` d'une migration.
 - Les assertions sont des blocs `DO $$ … RAISE EXCEPTION … $$` : un écart fait échouer le run.
 - `scratch/` (données, cluster, logs) est ignoré par git.
+
+## `assert-baseline.sql` — quand le ré-aligner
+
+Le contrôle « sans migration » ne code **aucun compte d'activité** (équipements, certificats,
+clients…) : ces chiffres bougent chaque jour en prod et ne prouvent rien, `run.mjs` ayant déjà
+chargé `data.json` ligne à ligne. Il vérifie la structure (fonctions, triggers, vues +
+`security_invoker`, RLS/policies, enum, colonne GENERATED, ACL), les invariants tenus par les
+triggers de prod (typé ⇒ catégorie du type, code de catégorie dénormalisé) et les seuls comptes
+stables : 14 types d'équipement, 7 membres d'équipe, 11 valeurs d'enum. Le `NOTICE` final
+affiche les volumes du snapshot à titre indicatif.
+
+Il faut l'éditer quand, et seulement quand :
+- un objet entre ou sort des listes `FUNCTIONS` / `TRIGGER_TABLES` / `VIEWS` / `POLICY_TABLES`
+  de `snapshot.mjs` → même changement dans le §1 ;
+- un type d'équipement ou un membre d'équipe est créé/supprimé en prod → §3 (le message d'erreur
+  le dit) ;
+- M2 (`20260920_1`, drop de l'enum `equipment_category`) est passée en prod → retirer le contrôle
+  d'enum du §1 et du bilan.
+
+Un simple snapshot plus récent ne doit **jamais** exiger de le toucher : si c'est le cas, c'est
+un compte volumétrique qui s'est glissé dedans, à retirer. Les `assert-m*.sql` / `assert-<sujet>.sql`
+restent, eux, figés sur la prod du jour où la migration a été répétée (chiffres de reprise).
