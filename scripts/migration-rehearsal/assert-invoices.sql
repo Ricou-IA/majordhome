@@ -2,7 +2,8 @@
 -- Un écart lève une exception → run.mjs sort en ECHEC.
 -- Couvre : structure, RLS, privilèges, puis parcours fonctionnel en rôle authenticated :
 -- brouillon → émission (numéro 00001 puis 00002), immuabilité, brouillon vide refusé,
--- anon refusé, isolation cross-org.
+-- anon refusé, isolation cross-org, émission manuelle refusée (10), écart total/lignes
+-- refusé (11), une seule série de numérotation par org/année (12).
 
 -- ── A. Structure ───────────────────────────────────────────────────────────
 DO $$
@@ -52,7 +53,7 @@ DO $$
 DECLARE
   v_mayer uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
   v_membre uuid; v_etranger uuid; v_role text;
-  v_id uuid; v_id2 uuid; v_id3 uuid;
+  v_id uuid; v_id2 uuid; v_id3 uuid; v_id4 uuid; v_id5 uuid; v_id6 uuid;
   v_res jsonb; v_res2 jsonb;
   v_year text := extract(year FROM (now() AT TIME ZONE 'Europe/Paris'))::text;
   v_inv record;
@@ -67,6 +68,7 @@ BEGIN
     JOIN core.profiles p ON p.id = om.user_id
    WHERE om.org_id <> v_mayer AND om.user_id IS NOT NULL
      AND om.user_id NOT IN (SELECT user_id FROM core.organization_members WHERE org_id = v_mayer AND user_id IS NOT NULL) LIMIT 1;
+  IF v_etranger IS NULL THEN RAISE EXCEPTION 'fixture : aucun membre d''une autre org hors Mayer'; END IF;
 
   PERFORM set_config('request.jwt.claim.sub', v_membre::text, false);
   SET LOCAL ROLE authenticated;
@@ -154,21 +156,17 @@ BEGIN
   RESET ROLE;
 
   -- (8) Isolation cross-org : un membre d'une autre org ne voit rien, ne peut pas émettre
-  IF v_etranger IS NOT NULL THEN
-    PERFORM set_config('request.jwt.claim.sub', v_etranger::text, false);
-    SET LOCAL ROLE authenticated;
-    SELECT count(*) INTO n FROM public.majordhome_invoices WHERE org_id = v_mayer;
-    IF n <> 0 THEN RAISE EXCEPTION '(8) % facture(s) Mayer visibles par une autre org', n; END IF;
-    ok := false;
-    BEGIN
-      PERFORM public.invoice_create_draft(jsonb_build_object('org_id', v_mayer), jsonb_build_array(jsonb_build_object('label', 'x')));
-    EXCEPTION WHEN SQLSTATE '42501' THEN ok := true;
-    END;
-    IF NOT ok THEN RAISE EXCEPTION '(8) brouillon Mayer créé par une autre org'; END IF;
-    RESET ROLE;
-  ELSE
-    RAISE NOTICE '(8) aucun membre d''une autre org : test cross-org sauté';
-  END IF;
+  PERFORM set_config('request.jwt.claim.sub', v_etranger::text, false);
+  SET LOCAL ROLE authenticated;
+  SELECT count(*) INTO n FROM public.majordhome_invoices WHERE org_id = v_mayer;
+  IF n <> 0 THEN RAISE EXCEPTION '(8) % facture(s) Mayer visibles par une autre org', n; END IF;
+  ok := false;
+  BEGIN
+    PERFORM public.invoice_create_draft(jsonb_build_object('org_id', v_mayer), jsonb_build_array(jsonb_build_object('label', 'x')));
+  EXCEPTION WHEN SQLSTATE '42501' THEN ok := true;
+  END;
+  IF NOT ok THEN RAISE EXCEPTION '(8) brouillon Mayer créé par une autre org'; END IF;
+  RESET ROLE;
 
   -- (9) Anonyme : refusé
   PERFORM set_config('request.jwt.claim.sub', '', false);
@@ -179,6 +177,52 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '42501' THEN ok := true;
   END;
   IF NOT ok THEN RAISE EXCEPTION '(9) brouillon créé sans auth.uid()'; END IF;
+  RESET ROLE;
+
+  PERFORM set_config('request.jwt.claim.sub', v_membre::text, false);
+  SET LOCAL ROLE authenticated;
+
+  -- (10) Émission manuelle par UPDATE direct : refusée sur un brouillon frais ; un champ
+  -- ordinaire (subject) reste éditable en dehors d'invoice_issue.
+  v_id4 := public.invoice_create_draft(
+    jsonb_build_object('org_id', v_mayer), jsonb_build_array(jsonb_build_object('label', 'x')));
+  ok := false;
+  BEGIN
+    UPDATE public.majordhome_invoices
+       SET status = 'issued', number = 'F-' || v_year || '-99999', issued_at = now(), invoice_date = current_date
+     WHERE id = v_id4;
+  EXCEPTION WHEN SQLSTATE '42501' THEN ok := true;
+  END;
+  IF NOT ok THEN RAISE EXCEPTION '(10) émission manuelle par UPDATE acceptée'; END IF;
+  UPDATE public.majordhome_invoices SET subject = 'Modifié via UPDATE' WHERE id = v_id4;
+  SELECT subject INTO v_inv FROM public.majordhome_invoices WHERE id = v_id4;
+  IF v_inv.subject <> 'Modifié via UPDATE' THEN RAISE EXCEPTION '(10) UPDATE de subject sur un brouillon refusé à tort'; END IF;
+
+  -- (11) Écart en-tête / somme des lignes à la création : refusé
+  ok := false;
+  BEGIN
+    PERFORM public.invoice_create_draft(
+      jsonb_build_object('org_id', v_mayer, 'total_ht', 1000, 'total_tva', 0, 'total_ttc', 1000),
+      jsonb_build_array(jsonb_build_object('label', 'Ligne', 'ht', 10, 'tva', 2, 'ttc', 12)));
+  EXCEPTION WHEN SQLSTATE '22023' THEN ok := true;
+  END;
+  IF NOT ok THEN RAISE EXCEPTION '(11) écart en-tête/lignes accepté à la création'; END IF;
+
+  -- (12) Une seule série de numérotation par (org, année) : un 2ᵉ préfixe la même année est
+  -- refusé, le 1ᵉʳ préfixe continue sans trou (00003 après les 00001/00002 des tests 2-3).
+  v_id5 := public.invoice_create_draft(
+    jsonb_build_object('org_id', v_mayer), jsonb_build_array(jsonb_build_object('label', 'x')));
+  ok := false;
+  BEGIN
+    PERFORM public.invoice_issue(v_id5, 'AV');
+  EXCEPTION WHEN SQLSTATE '22023' THEN ok := true;
+  END;
+  IF NOT ok THEN RAISE EXCEPTION '(12) préfixe concurrent AV accepté sur la série F'; END IF;
+
+  v_id6 := public.invoice_create_draft(
+    jsonb_build_object('org_id', v_mayer), jsonb_build_array(jsonb_build_object('label', 'x')));
+  v_res := public.invoice_issue(v_id6, 'F');
+  IF v_res->>'number' <> 'F-' || v_year || '-00003' THEN RAISE EXCEPTION '(12) numéro % inattendu (attendu 00003)', v_res->>'number'; END IF;
   RESET ROLE;
 
   RAISE NOTICE 'assert-invoices B (fonctionnel) : OK';

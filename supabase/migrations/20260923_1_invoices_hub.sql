@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS majordhome.invoice_sequences (
   org_id      uuid NOT NULL REFERENCES core.organizations(id) ON DELETE CASCADE,
   year        integer NOT NULL,
   last_number integer NOT NULL DEFAULT 0 CHECK (last_number >= 0),
+  prefix      text,
   PRIMARY KEY (org_id, year)
 );
 COMMENT ON TABLE majordhome.invoice_sequences IS
@@ -121,8 +122,26 @@ CREATE OR REPLACE FUNCTION majordhome.invoices_guard_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_issuing boolean;
 BEGIN
   IF OLD.status = 'draft' THEN
+    -- Numéro et émission réservés à invoice_issue, qui pose le repère de transaction
+    -- majordhome.invoice_issue_id = OLD.id juste avant son propre UPDATE. Toute autre
+    -- UPDATE sur un brouillon reste libre (subject, customer, totaux…) — seules les
+    -- colonnes qui matérialisent l'émission sont gelées hors de ce chemin.
+    v_issuing := (current_setting('majordhome.invoice_issue_id', true) = OLD.id::text);
+    IF (v_issuing IS NOT TRUE) AND (
+         NEW.status IS DISTINCT FROM OLD.status
+      OR NEW.number IS DISTINCT FROM OLD.number
+      OR NEW.year IS DISTINCT FROM OLD.year
+      OR NEW.issued_at IS DISTINCT FROM OLD.issued_at
+      OR NEW.invoice_date IS DISTINCT FROM OLD.invoice_date
+      OR NEW.due_at IS DISTINCT FROM OLD.due_at
+    ) THEN
+      RAISE EXCEPTION 'invoice_immutable' USING ERRCODE = '42501',
+        DETAIL = 'numéro et émission réservés à invoice_issue';
+    END IF;
     RETURN NEW;
   END IF;
   -- Émise ou annulée : seules les colonnes de suivi bougent ; status ne peut aller que vers cancelled.
@@ -251,6 +270,12 @@ DECLARE
   v_id uuid;
   v_line jsonb;
   v_count int := 0;
+  v_header_ht numeric(12,2);
+  v_header_tva numeric(12,2);
+  v_header_ttc numeric(12,2);
+  v_sum_ht numeric(12,2);
+  v_sum_tva numeric(12,2);
+  v_sum_ttc numeric(12,2);
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501';
@@ -289,7 +314,7 @@ BEGIN
     COALESCE(p_invoice->'vat_breakdown', '[]'::jsonb),
     p_invoice->'discount',
     v_user
-  ) RETURNING id INTO v_id;
+  ) RETURNING id, total_ht, total_tva, total_ttc INTO v_id, v_header_ht, v_header_tva, v_header_ttc;
 
   FOR v_line IN SELECT * FROM jsonb_array_elements(p_lines) LOOP
     v_count := v_count + 1;
@@ -318,6 +343,19 @@ BEGIN
     );
   END LOOP;
 
+  -- En-tête et lignes doivent porter le même montant : évite qu'une facture parte avec un
+  -- total affiché qui ne correspond pas à la somme réelle des lignes comptables.
+  SELECT sum(ht), sum(tva), sum(ttc) INTO v_sum_ht, v_sum_tva, v_sum_ttc
+    FROM majordhome.invoice_lines WHERE invoice_id = v_id;
+  IF v_sum_ht IS DISTINCT FROM v_header_ht
+     OR v_sum_tva IS DISTINCT FROM v_header_tva
+     OR v_sum_ttc IS DISTINCT FROM v_header_ttc
+  THEN
+    RAISE EXCEPTION 'totals_mismatch' USING ERRCODE = '22023',
+      DETAIL = format('en-tête (ht=%s, tva=%s, ttc=%s) ≠ somme des lignes (ht=%s, tva=%s, ttc=%s)',
+        v_header_ht, v_header_tva, v_header_ttc, v_sum_ht, v_sum_tva, v_sum_ttc);
+  END IF;
+
   RETURN v_id;
 END;
 $function$;
@@ -344,6 +382,10 @@ DECLARE
   v_n int;
   v_number text;
   v_lines int;
+  v_sum_ht numeric(12,2);
+  v_sum_tva numeric(12,2);
+  v_sum_ttc numeric(12,2);
+  v_existing_prefix text;
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501';
@@ -368,18 +410,54 @@ BEGIN
     RAISE EXCEPTION 'lines_required' USING ERRCODE = '22023';
   END IF;
 
+  -- Re-vérifié ici : rien n'empêche un UPDATE direct des totaux d'en-tête entre la création
+  -- du brouillon et son émission (seules status/number/year/issued_at/invoice_date/due_at
+  -- sont gelées sur un brouillon) — on n'émet jamais sur un écart en-tête/lignes.
+  SELECT sum(ht), sum(tva), sum(ttc) INTO v_sum_ht, v_sum_tva, v_sum_ttc
+    FROM majordhome.invoice_lines WHERE invoice_id = p_invoice_id;
+  IF v_sum_ht IS DISTINCT FROM v_inv.total_ht
+     OR v_sum_tva IS DISTINCT FROM v_inv.total_tva
+     OR v_sum_ttc IS DISTINCT FROM v_inv.total_ttc
+  THEN
+    RAISE EXCEPTION 'totals_mismatch' USING ERRCODE = '22023',
+      DETAIL = format('en-tête (ht=%s, tva=%s, ttc=%s) ≠ somme des lignes (ht=%s, tva=%s, ttc=%s)',
+        v_inv.total_ht, v_inv.total_tva, v_inv.total_ttc, v_sum_ht, v_sum_tva, v_sum_ttc);
+  END IF;
+
   v_year := extract(year FROM v_date)::int;
-  -- Compteur (org, année) sous verrou ligne : continu, sans trou, chronologique.
-  INSERT INTO majordhome.invoice_sequences (org_id, year, last_number)
-  VALUES (v_inv.org_id, v_year, 1)
-  ON CONFLICT (org_id, year) DO UPDATE SET last_number = majordhome.invoice_sequences.last_number + 1
-  RETURNING last_number INTO v_n;
+  -- Une seule série par (org, année) : le préfixe se fixe au premier numéro émis, puis se
+  -- vérifie — sinon une 2ᵉ série percerait des trous dans la 1ʳᵉ (même compteur, préfixes
+  -- différents). La ligne (org, année) est verrouillée avant le préfixe pour sérialiser deux
+  -- émissions concurrentes de la même année.
+  INSERT INTO majordhome.invoice_sequences (org_id, year, last_number, prefix)
+  VALUES (v_inv.org_id, v_year, 0, NULL)
+  ON CONFLICT (org_id, year) DO NOTHING;
+
+  SELECT prefix INTO v_existing_prefix
+    FROM majordhome.invoice_sequences
+   WHERE org_id = v_inv.org_id AND year = v_year
+   FOR UPDATE;
+
+  IF v_existing_prefix IS NOT NULL AND v_existing_prefix <> v_prefix THEN
+    RAISE EXCEPTION 'prefix_mismatch' USING ERRCODE = '22023',
+      DETAIL = format('série %s déjà amorcée avec le préfixe %s, reçu %s', v_year, v_existing_prefix, v_prefix);
+  END IF;
+
+  UPDATE majordhome.invoice_sequences
+     SET last_number = last_number + 1,
+         prefix = COALESCE(prefix, v_prefix)
+   WHERE org_id = v_inv.org_id AND year = v_year
+   RETURNING last_number INTO v_n;
   v_number := format('%s-%s-%s', v_prefix, v_year, lpad(v_n::text, 5, '0'));
 
+  -- Repère de transaction lu par invoices_guard_immutable : seule cette UPDATE peut poser
+  -- status/number/year/issued_at/invoice_date/due_at sur un brouillon.
+  PERFORM set_config('majordhome.invoice_issue_id', p_invoice_id::text, true);
   UPDATE majordhome.invoices
      SET status = 'issued', number = v_number, year = v_year, invoice_date = v_date,
          due_at = v_date + (due_days || ' days')::interval, issued_at = now()
    WHERE id = p_invoice_id;
+  PERFORM set_config('majordhome.invoice_issue_id', '', true);
 
   RETURN jsonb_build_object(
     'id', p_invoice_id, 'number', v_number, 'year', v_year,
@@ -409,7 +487,7 @@ GRANT SELECT ON public.majordhome_invoice_lines TO authenticated;
 GRANT SELECT ON public.majordhome_invoices, public.majordhome_invoice_lines TO service_role;
 
 COMMENT ON VIEW public.majordhome_invoices IS
-  'Miroir auto-updatable de majordhome.invoices (security_invoker, RLS org). Lecture front ; UPDATE limité par trigger aux colonnes de suivi (pdf_path, pennylane_*, import_*) ; INSERT via invoice_create_draft.';
+  'Miroir auto-updatable de majordhome.invoices (security_invoker, RLS org). Lecture front ; sur un brouillon, UPDATE libre sauf status/number/year/issued_at/invoice_date/due_at réservés à la RPC invoice_issue ; sur une facture émise, UPDATE limité aux colonnes de suivi (pdf_path, pennylane_*, import_*) ; INSERT via invoice_create_draft.';
 COMMENT ON VIEW public.majordhome_invoice_lines IS
   'Miroir de majordhome.invoice_lines (security_invoker, RLS org). Lecture front ; écriture via invoice_create_draft.';
 
