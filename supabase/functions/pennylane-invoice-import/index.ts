@@ -7,7 +7,8 @@
 //   2. client Pennylane = mapping pennylane_sync type client (jamais du payload)
 //   3. PDF archivé (bucket invoices) → POST /file_attachments (multipart)
 //   4. POST /customer_invoices/import : notre numéro, external_reference = id
-//      facture (unique), lignes et montants au centime tels qu'enregistrés
+//      facture (unique), lignes et montants au centime tels qu'enregistrés —
+//      facture ou avoir (montants négatifs + credited_invoice_id)
 //   5. résultat → RPC invoice_set_import_result (service_role) + pennylane_sync
 // Toute écriture lit { error } ; un échec Pennylane est ENREGISTRÉ (import_status
 // = error + message) puis répondu 502 : visible et rejouable, jamais silencieux.
@@ -155,6 +156,17 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "customer_not_synced", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
     }
 
+    // Avoir (phase 3) : lié à sa facture d'origine côté Pennylane quand elle y est importée.
+    let creditedPlId: number | null = null;
+    const extraWarnings: string[] = [];
+    if (invoice.kind === "credit_note" && invoice.credited_invoice_id) {
+      const { data: src, error: srcErr } = await supabase
+        .from("majordhome_invoices").select("pennylane_invoice_id").eq("id", invoice.credited_invoice_id).eq("org_id", orgId).maybeSingle();
+      if (srcErr) return jsonResponse({ error: sanitizeError(srcErr, "lecture facture créditée") }, 500, req);
+      if (src?.pennylane_invoice_id) creditedPlId = Number(src.pennylane_invoice_id);
+      else extraWarnings.push("credited_invoice_not_imported");
+    }
+
     // Garde anti-doublon : un échec réseau après un précédent POST (réponse jamais lue) ne doit
     // pas relancer un import — la facture peut déjà exister côté PL. Le probe est un GARDE-FOU,
     // pas un GATE : son échec ne bloque pas l'import. Placé ICI, avant le téléchargement/upload
@@ -227,6 +239,7 @@ Deno.serve(async (req: Request) => {
       label: invoice.subject || invoice.number,
       invoice_number: invoice.number,
       external_reference: invoice.id,
+      ...(creditedPlId ? { credited_invoice_id: creditedPlId } : {}),
       invoice_lines: lines.map((l: Record<string, unknown>) => ({
         label: l.description ? `${l.label} — ${l.description}` : l.label,
         quantity: Number(l.quantity),
@@ -279,7 +292,7 @@ Deno.serve(async (req: Request) => {
     });
     if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed for ${invoice.number}: ${syncWarning}`);
 
-    const warnings: string[] = [];
+    const warnings: string[] = [...extraWarnings];
     if (lines.some((l: Record<string, unknown>) => !l.ledger_account_pl_id)) warnings.push("compte_manquant");
 
     return jsonResponse({
