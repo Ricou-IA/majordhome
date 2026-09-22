@@ -44,8 +44,8 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   let body: Body;
-  try { body = await req.json(); } catch { return jsonResponse({ error: "Corps JSON invalide" }, 400); }
-  if (!body.invoice_id || !body.org_id) return jsonResponse({ error: "invoice_id et org_id sont requis" }, 400);
+  try { body = await req.json(); } catch { return jsonResponse({ error: "Corps JSON invalide" }, 400, req); }
+  if (!body.invoice_id || !body.org_id) return jsonResponse({ error: "invoice_id et org_id sont requis" }, 400, req);
 
   const auth = await requireOrgMembership(req, {
     orgId: body.org_id,
@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
     orgSettingsFilter: (s) => (s.pennylane as { enabled?: boolean } | undefined)?.enabled === true,
   });
   if (!auth.ok) return auth.response;
-  if (!PENNYLANE_API_TOKEN) return jsonResponse({ error: "PENNYLANE_API_TOKEN manquant" }, 500);
+  if (!PENNYLANE_API_TOKEN) return jsonResponse({ error: "PENNYLANE_API_TOKEN manquant" }, 500, req);
   const { supabase, orgId, userId } = auth;
 
   const recordResult = async (status: "imported" | "error", plId: number | null, ledgerId: number | null, error: string | null) => {
@@ -68,44 +68,56 @@ Deno.serve(async (req: Request) => {
     // 1. Facture + lignes
     const { data: invoice, error: invErr } = await supabase
       .from("majordhome_invoices").select("*").eq("id", body.invoice_id).eq("org_id", orgId).maybeSingle();
-    if (invErr) return jsonResponse({ error: sanitizeError(invErr, "lecture facture") }, 500);
-    if (!invoice) return jsonResponse({ error: "invoice_not_found" }, 404);
-    if (invoice.status !== "issued") return jsonResponse({ error: "invoice_not_issued", status: invoice.status }, 409);
+    if (invErr) return jsonResponse({ error: sanitizeError(invErr, "lecture facture") }, 500, req);
+    if (!invoice) return jsonResponse({ error: "invoice_not_found" }, 404, req);
+    if (invoice.status !== "issued") return jsonResponse({ error: "invoice_not_issued", status: invoice.status }, 409, req);
     if (invoice.pennylane_invoice_id) {
-      return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id }, 200);
+      return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id }, 200, req);
     }
-    if (!invoice.pdf_path) return jsonResponse({ error: "pdf_missing" }, 409);
+    if (!invoice.pdf_path) {
+      const recordError = await recordResult("error", null, null, "pdf_missing");
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "pdf_missing", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
+    }
 
     const { data: lines, error: linesErr } = await supabase
       .from("majordhome_invoice_lines").select("*").eq("invoice_id", invoice.id).eq("org_id", orgId).order("position");
-    if (linesErr) return jsonResponse({ error: sanitizeError(linesErr, "lecture lignes") }, 500);
-    if (!lines || lines.length === 0) return jsonResponse({ error: "lines_required" }, 409);
+    if (linesErr) return jsonResponse({ error: sanitizeError(linesErr, "lecture lignes") }, 500, req);
+    if (!lines || lines.length === 0) return jsonResponse({ error: "lines_required" }, 409, req);
 
     // 2. Client Pennylane (mapping posé par le front via getOrCreateCustomer)
     const { data: sync, error: syncErr } = await supabase
       .from("majordhome_pennylane_sync").select("pennylane_id")
       .eq("org_id", orgId).eq("entity_type", "client").eq("local_id", invoice.client_id).maybeSingle();
-    if (syncErr) return jsonResponse({ error: sanitizeError(syncErr, "lecture mapping client") }, 500);
-    if (!sync?.pennylane_id) return jsonResponse({ error: "customer_not_synced" }, 409);
+    if (syncErr) return jsonResponse({ error: sanitizeError(syncErr, "lecture mapping client") }, 500, req);
+    if (!sync?.pennylane_id) return jsonResponse({ error: "customer_not_synced" }, 409, req);
 
     // 3. PDF archivé → Pennylane
     const { data: file, error: dlErr } = await supabase.storage.from(INVOICES_BUCKET).download(invoice.pdf_path);
     if (dlErr || !file) {
       const msg = `pdf_download_failed: ${sanitizeError(dlErr, "download")}`;
-      await recordResult("error", null, null, msg);
-      return jsonResponse({ error: "pdf_missing", detail: msg }, 409);
+      const recordError = await recordResult("error", null, null, msg);
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "pdf_missing", detail: msg, ...(recordError ? { record_error: recordError } : {}) }, 409, req);
     }
     const form = new FormData();
     const filename = `${invoice.number}.pdf`;
-    form.append("file", new Blob([await file.arrayBuffer()], { type: "application/pdf" }), filename);
+    form.append("file", file, filename);
     form.append("filename", filename);
     const up = await pl("POST", "/file_attachments", undefined, form);
     if (up.status >= 300) {
       const detail = plError(up.data);
-      await recordResult("error", null, null, `file_attachment ${up.status}: ${detail}`);
-      return jsonResponse({ error: "pennylane_import_failed", step: "file_attachment", status: up.status, detail }, 502);
+      const recordError = await recordResult("error", null, null, `file_attachment ${up.status}: ${detail}`);
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "pennylane_import_failed", step: "file_attachment", status: up.status, detail, ...(recordError ? { record_error: recordError } : {}) }, 502, req);
     }
     const fileAttachmentId = (up.data as { id?: number })?.id;
+    if (!fileAttachmentId) {
+      const msg = "file_attachment: réponse Pennylane sans id";
+      const recordError = await recordResult("error", null, null, msg);
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "pennylane_import_failed", step: "file_attachment", detail: msg, ...(recordError ? { record_error: recordError } : {}) }, 502, req);
+    }
 
     // 4. Import : montants ENREGISTRÉS, jamais recalculés
     const payload = {
@@ -123,6 +135,7 @@ Deno.serve(async (req: Request) => {
       invoice_lines: lines.map((l: Record<string, unknown>) => ({
         label: l.description ? `${l.label} — ${l.description}` : l.label,
         quantity: Number(l.quantity),
+        // invoice_lines n'a pas d'unité (V1 entretien) : 'piece' pour toutes les lignes.
         unit: "piece",
         raw_currency_unit_price: unitPrice(l.unit_price_ht),
         vat_rate: (l.vat_code as string) || "FR_200",
@@ -131,25 +144,52 @@ Deno.serve(async (req: Request) => {
         ...(l.ledger_account_pl_id ? { ledger_account_id: Number(l.ledger_account_pl_id) } : {}),
       })),
     };
+
+    // Garde anti-doublon : un échec réseau après le POST (réponse jamais lue)
+    // ne doit pas relancer un import — la facture peut déjà exister côté PL.
+    // Le probe est un GARDE-FOU, pas un GATE : son échec ne bloque pas l'import.
+    try {
+      const probeFilter = encodeURIComponent(JSON.stringify([{ field: "external_reference", operator: "eq", value: invoice.id }]));
+      const probe = await pl("GET", `/customer_invoices?limit=1&filter=${probeFilter}`);
+      if (probe.status < 300) {
+        const existing = ((probe.data as { items?: Array<{ id?: number; ledger_entry?: { id?: number } }> })?.items || [])[0];
+        if (existing?.id) {
+          const recordError = await recordResult("imported", existing.id, existing.ledger_entry?.id ?? null, null);
+          if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, ...(recordError ? { record_error: recordError } : {}) }, 200, req);
+        }
+      } else {
+        console.error(`[pennylane-invoice-import] probe failed for ${invoice.number}: HTTP ${probe.status}`);
+      }
+    } catch (probeErr) {
+      console.error(`[pennylane-invoice-import] probe threw for ${invoice.number}:`, probeErr);
+    }
+
     const imported = await pl("POST", "/customer_invoices/import", payload);
     console.log(`[pennylane-invoice-import] ${imported.status} invoice=${invoice.number} by ${userId} (org ${orgId}) → ${JSON.stringify(imported.data).slice(0, 1500)}`);
     if (imported.status >= 300) {
       const detail = plError(imported.data);
-      await recordResult("error", null, null, `import ${imported.status}: ${detail}`);
-      return jsonResponse({ error: "pennylane_import_failed", step: "import", status: imported.status, detail }, 502);
+      const recordError = await recordResult("error", null, null, `import ${imported.status}: ${detail}`);
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "pennylane_import_failed", step: "import", status: imported.status, detail, ...(recordError ? { record_error: recordError } : {}) }, 502, req);
     }
     const plInvoice = imported.data as { id?: number; ledger_entry?: { id?: number }; public_file_url?: string; file_url?: string };
     if (!plInvoice?.id) {
-      await recordResult("error", null, null, "import: réponse Pennylane sans id");
-      return jsonResponse({ error: "pennylane_import_failed", step: "import", detail: "réponse sans id" }, 502);
+      const recordError = await recordResult("error", null, null, "import: réponse Pennylane sans id");
+      if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+      return jsonResponse({ error: "pennylane_import_failed", step: "import", detail: "réponse sans id", ...(recordError ? { record_error: recordError } : {}) }, 502, req);
     }
-    const ledgerEntryId = plInvoice.ledger_entry?.id ?? null;
+    let ledgerEntryId = plInvoice.ledger_entry?.id ?? null;
+    if (!ledgerEntryId) {
+      const back = await pl("GET", `/customer_invoices/${plInvoice.id}`);
+      ledgerEntryId = (back.data as { ledger_entry?: { id?: number } })?.ledger_entry?.id ?? null;
+    }
 
     // 5. Résultat (la facture Pennylane EXISTE désormais : tout échec ici est répondu avec son id)
     const rpcFail = await recordResult("imported", plInvoice.id, ledgerEntryId, null);
     if (rpcFail) {
       console.error(`[pennylane-invoice-import] invoice_set_import_result failed for ${invoice.number} (PL ${plInvoice.id}): ${rpcFail}`);
-      return jsonResponse({ error: "import_recorded_failed", pennylane_invoice_id: plInvoice.id, detail: rpcFail }, 500);
+      return jsonResponse({ error: "import_recorded_failed", pennylane_invoice_id: plInvoice.id, detail: rpcFail }, 500, req);
     }
     const { error: upsertErr } = await supabase.from("majordhome_pennylane_sync").upsert({
       org_id: orgId, entity_type: "invoice", local_id: invoice.id,
@@ -160,12 +200,20 @@ Deno.serve(async (req: Request) => {
     const syncWarning = upsertErr ? sanitizeError(upsertErr, "pennylane_sync upsert") : null;
     if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed for ${invoice.number}: ${syncWarning}`);
 
+    const warnings: string[] = [];
+    if (lines.some((l: Record<string, unknown>) => !l.ledger_account_pl_id)) warnings.push("compte_manquant");
+
     return jsonResponse({
       ok: true, pennylane_invoice_id: plInvoice.id, ledger_entry_id: ledgerEntryId,
-      public_file_url: plInvoice.public_file_url ?? null, ...(syncWarning ? { sync_warning: syncWarning } : {}),
-    }, 201);
+      public_file_url: plInvoice.public_file_url ?? null, warnings, ...(syncWarning ? { sync_warning: syncWarning } : {}),
+    }, 201, req);
   } catch (err) {
     console.error("[pennylane-invoice-import] Error:", err);
-    return jsonResponse({ error: sanitizeError(err, "Internal error") }, 500);
+    try {
+      await recordResult("error", null, null, `exception: ${sanitizeError(err, "Internal error")}`);
+    } catch (recordErr) {
+      console.error("[pennylane-invoice-import] recordResult threw in catch:", recordErr);
+    }
+    return jsonResponse({ error: sanitizeError(err, "Internal error") }, 500, req);
   }
 });
