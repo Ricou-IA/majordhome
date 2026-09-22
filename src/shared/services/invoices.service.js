@@ -12,6 +12,8 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, extractRpcResult } from '@/lib/serviceHelpers';
 import { storageService } from './storage.service';
+import { pennylaneService } from './pennylane.service';
+import { clientsService } from './clients.service';
 
 export const INVOICES_BUCKET = 'invoices';
 
@@ -91,6 +93,38 @@ async function attachPdf(orgId, invoiceId, pdfPath) {
   return data;
 }
 
+/**
+ * Garantit la fiche Pennylane du client (mapping `pennylane_sync` type client) AVANT
+ * l'import : l'edge ne prend jamais un customer_id du payload, elle relit le mapping.
+ */
+async function ensurePennylaneCustomer(orgId, clientId) {
+  const { data: existing, error: syncError } = await pennylaneService.getSyncRecord(orgId, 'client', clientId);
+  if (syncError) throw syncError;
+  if (existing?.pennylane_id) return existing.pennylane_id;
+  const { data: client, error: clientError } = await clientsService.getClientById(clientId);
+  if (clientError) throw clientError;
+  if (!client) throw new Error('Client introuvable');
+  const { data: customerId, error } = await pennylaneService.getOrCreateCustomer(client, orgId);
+  if (error) throw error;
+  return customerId;
+}
+
+/** Appelle l'edge d'import ; l'erreur remonte le code de l'edge (`customer_not_synced`…) et l'étape. */
+async function importToPennylane(orgId, invoiceId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Non authentifié');
+  const { data, error } = await supabase.functions.invoke('pennylane-invoice-import', { body: { invoice_id: invoiceId, org_id: orgId } });
+  if (error) {
+    let detail = null;
+    try { detail = await error.context?.json?.(); } catch { /* corps illisible */ }
+    const err = new Error(detail?.error ? `${detail.error}${detail.step ? ` (étape ${detail.step})` : ''}${detail.detail ? ` — ${detail.detail}` : ''}` : error.message);
+    err.code = detail?.error || null;
+    err.step = detail?.step || null;
+    throw err;
+  }
+  return data;
+}
+
 export const invoicesService = {
   createDraft: (params) => withErrorHandling(() => createDraft(params), 'invoices.createDraft'),
   issue: (invoiceId, numberPrefix) => withErrorHandling(() => issue(invoiceId, numberPrefix), 'invoices.issue'),
@@ -98,4 +132,6 @@ export const invoicesService = {
   getPdfUrl: (orgId, invoiceId) => withErrorHandling(() => getPdfUrl(orgId, invoiceId), 'invoices.getPdfUrl'),
   uploadPdf: (orgId, invoice, blob) => withErrorHandling(() => uploadPdf(orgId, invoice, blob), 'invoices.uploadPdf'),
   attachPdf: (orgId, invoiceId, pdfPath) => withErrorHandling(() => attachPdf(orgId, invoiceId, pdfPath), 'invoices.attachPdf'),
+  ensurePennylaneCustomer: (orgId, clientId) => withErrorHandling(() => ensurePennylaneCustomer(orgId, clientId), 'invoices.ensurePennylaneCustomer'),
+  importToPennylane: (orgId, invoiceId) => withErrorHandling(() => importToPennylane(orgId, invoiceId), 'invoices.importToPennylane'),
 };
