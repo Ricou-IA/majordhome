@@ -24,6 +24,16 @@ COMMENT ON INDEX majordhome.invoices_one_issued_per_intervention IS
   'Un entretien = une FACTURE émise (kind=invoice). Un avoir (kind=credit_note) et une facture annulée (status=cancelled) ne comptent pas : après un avoir, l''entretien est refacturable.';
 
 -- ----------------------------------------------------------------------------
+-- 1bis. Index unique : au plus un AVOIR émis par facture créditée (l'annulation
+--       reste unique — RPC déjà gardée par `already_credited`, filet DB en plus)
+-- ----------------------------------------------------------------------------
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_one_credit_note_per_invoice
+  ON majordhome.invoices (credited_invoice_id)
+  WHERE kind = 'credit_note' AND status = 'issued' AND credited_invoice_id IS NOT NULL;
+COMMENT ON INDEX majordhome.invoices_one_credit_note_per_invoice IS
+  'Une facture émise n''est créditée qu''une fois : au plus un avoir (kind=credit_note, status=issued) par credited_invoice_id.';
+
+-- ----------------------------------------------------------------------------
 -- 2. invoice_issue — corps identique à 20260923_2 ; la garde explicite ne vise
 --    que les FACTURES (l'émission d'un avoir ne doit ni être bloquée, ni bloquer)
 -- ----------------------------------------------------------------------------
@@ -188,6 +198,10 @@ BEGIN
 
   v_subject := format('Avoir sur la facture %s', v_src.number)
     || CASE WHEN nullif(trim(p_reason), '') IS NOT NULL THEN ' — ' || left(trim(p_reason), 200) ELSE '' END;
+
+  IF jsonb_typeof(COALESCE(v_src.vat_breakdown, '[]'::jsonb)) <> 'array' THEN
+    RAISE EXCEPTION 'credit_note_source_invalid' USING ERRCODE = '22023', DETAIL = 'vat_breakdown non tabulaire';
+  END IF;
 
   -- Ventilation TVA négative (base et montant × -1, taux inchangé)
   SELECT COALESCE(jsonb_agg(jsonb_build_object(

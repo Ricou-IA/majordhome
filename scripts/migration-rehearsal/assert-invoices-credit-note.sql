@@ -4,6 +4,12 @@ DECLARE v_def text;
 BEGIN
   SELECT indexdef INTO v_def FROM pg_indexes WHERE schemaname='majordhome' AND indexname='invoices_one_issued_per_intervention';
   IF v_def IS NULL OR v_def NOT LIKE '%kind = ''invoice''%' THEN RAISE EXCEPTION 'index invoices_one_issued_per_intervention sans kind=invoice : %', v_def; END IF;
+  SELECT indexdef INTO v_def FROM pg_indexes WHERE schemaname='majordhome' AND indexname='invoices_one_credit_note_per_invoice';
+  IF v_def IS NULL THEN RAISE EXCEPTION 'index invoices_one_credit_note_per_invoice absent'; END IF;
+  IF v_def NOT LIKE '%(credited_invoice_id)%' THEN RAISE EXCEPTION 'index % ne porte pas (credited_invoice_id)', v_def; END IF;
+  IF v_def NOT LIKE '%kind = ''credit_note''%' THEN RAISE EXCEPTION 'index % sans prédicat kind=credit_note', v_def; END IF;
+  IF v_def NOT LIKE '%status = ''issued''%' THEN RAISE EXCEPTION 'index % sans prédicat status=issued', v_def; END IF;
+  IF v_def NOT LIKE '%credited_invoice_id IS NOT NULL%' THEN RAISE EXCEPTION 'index % sans prédicat credited_invoice_id IS NOT NULL', v_def; END IF;
   IF pg_get_functiondef('public.invoice_issue(uuid, text)'::regprocedure) NOT LIKE '%kind = ''invoice''%' THEN RAISE EXCEPTION 'invoice_issue : garde non restreinte aux factures'; END IF;
   IF has_function_privilege('anon', 'public.invoice_cancel_with_credit_note(uuid, text, text)', 'EXECUTE') THEN RAISE EXCEPTION 'invoice_cancel_with_credit_note exécutable par anon'; END IF;
   IF NOT has_function_privilege('authenticated', 'public.invoice_cancel_with_credit_note(uuid, text, text)', 'EXECUTE') THEN RAISE EXCEPTION 'invoice_cancel_with_credit_note non exécutable par authenticated'; END IF;
@@ -19,7 +25,7 @@ DECLARE
   v_mayer uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
   v_membre uuid; v_etranger uuid; v_client uuid; v_project uuid; v_interv uuid;
   v_inv uuid; v_draft uuid; v_res jsonb; v_row record; v_year text := extract(year FROM (now() AT TIME ZONE 'Europe/Paris'))::text;
-  n int; ok boolean;
+  ok boolean;
 BEGIN
   SELECT om.user_id INTO v_membre FROM core.organization_members om JOIN core.profiles p ON p.id = om.user_id
    WHERE om.org_id = v_mayer AND om.user_id IS NOT NULL AND om.role IN ('org_admin','team_leader') LIMIT 1;
@@ -63,8 +69,16 @@ BEGIN
   IF v_row.total_ttc <> -102.00 OR v_row.total_ht <> -92.73 OR v_row.total_tva <> -9.27 OR v_row.due_days <> 0 THEN RAISE EXCEPTION '(2) totaux avoir : %', to_jsonb(v_row); END IF;
   IF v_row.subject NOT LIKE 'Avoir sur la facture F-%00001 — Erreur de tarif' THEN RAISE EXCEPTION '(2) objet % inattendu', v_row.subject; END IF;
   IF (v_row.vat_breakdown->0->>'amount')::numeric <> -9.27 THEN RAISE EXCEPTION '(2) ventilation TVA non négative : %', v_row.vat_breakdown; END IF;
-  SELECT count(*), sum(ttc), min(quantity) INTO v_row FROM public.majordhome_invoice_lines WHERE invoice_id = (v_res->>'credit_note_id')::uuid;
-  IF v_row.count <> 2 OR v_row.sum <> -102.00 OR v_row.min <= 0 THEN RAISE EXCEPTION '(2) lignes avoir : %', to_jsonb(v_row); END IF;
+  SELECT count(*), sum(ttc), array_agg(quantity ORDER BY position) INTO v_row FROM public.majordhome_invoice_lines WHERE invoice_id = (v_res->>'credit_note_id')::uuid;
+  IF v_row.count <> 2 OR v_row.sum <> -102.00 OR v_row.array_agg <> ARRAY[1,2]::numeric[] THEN RAISE EXCEPTION '(2) lignes avoir : %', to_jsonb(v_row); END IF;
+  -- Négation ligne à ligne (une requête par colonne : un record avec 3 max() porterait
+  -- 3 champs nommés "max", ambigus au premier accès par nom).
+  SELECT max(unit_price_ht) INTO v_row FROM public.majordhome_invoice_lines WHERE invoice_id = (v_res->>'credit_note_id')::uuid;
+  IF v_row.max >= 0 THEN RAISE EXCEPTION '(2) unit_price_ht non négatif sur au moins une ligne : %', v_row.max; END IF;
+  SELECT max(ht) INTO v_row FROM public.majordhome_invoice_lines WHERE invoice_id = (v_res->>'credit_note_id')::uuid;
+  IF v_row.max >= 0 THEN RAISE EXCEPTION '(2) ht non négatif sur au moins une ligne : %', v_row.max; END IF;
+  SELECT max(tva) INTO v_row FROM public.majordhome_invoice_lines WHERE invoice_id = (v_res->>'credit_note_id')::uuid;
+  IF v_row.max >= 0 THEN RAISE EXCEPTION '(2) tva non négatif sur au moins une ligne : %', v_row.max; END IF;
 
   -- (3) Deuxième annulation : refusée ; annuler l'avoir lui-même : refusé ; annuler un brouillon : refusé
   ok := false; BEGIN PERFORM public.invoice_cancel_with_credit_note(v_inv, 'F', NULL); EXCEPTION WHEN SQLSTATE '22023' THEN ok := true; END;
@@ -86,7 +100,7 @@ BEGIN
   -- (5) Cross-org : refusé
   PERFORM set_config('request.jwt.claim.sub', v_etranger::text, false);
   SET LOCAL ROLE authenticated;
-  ok := false; BEGIN PERFORM public.invoice_cancel_with_credit_note(v_draft, 'F', NULL); EXCEPTION WHEN SQLSTATE '42501' THEN ok := true; WHEN SQLSTATE 'P0002' THEN ok := true; END;
+  ok := false; BEGIN PERFORM public.invoice_cancel_with_credit_note(v_draft, 'F', NULL); EXCEPTION WHEN SQLSTATE '42501' THEN ok := true; END;
   IF NOT ok THEN RAISE EXCEPTION '(5) annulation cross-org acceptée'; END IF;
   RESET ROLE;
 
