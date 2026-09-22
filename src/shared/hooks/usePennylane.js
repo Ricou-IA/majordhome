@@ -95,8 +95,11 @@ export function usePennylaneSync(quoteId, orgId) {
 /**
  * Hook pour charger les comptes comptables Pennylane (706xxx).
  * Résultat mis en cache longue durée (les comptes changent rarement).
+ * @param {object} [p]
+ * @param {boolean} [p.enabled=true]  passer `false` pour ne pas déclencher l'appel Pennylane
+ *   (ex. mode hub du dialogue de facturation : pas d'intégration PL requise).
  */
-export function useLedgerAccounts() {
+export function useLedgerAccounts({ enabled = true } = {}) {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const {
@@ -111,7 +114,7 @@ export function useLedgerAccounts() {
       if (error) throw error;
       return data;
     },
-    enabled: !!orgId,
+    enabled: !!orgId && enabled,
     staleTime: 24 * 60 * 60_000, // 24h — les comptes comptables bougent rarement
   });
 

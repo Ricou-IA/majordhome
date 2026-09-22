@@ -45,9 +45,17 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   const { zones, rates, discounts, equipmentTypes, categories, isLoading: loadingPricing } = usePricingData();
   const { overrides, isLoading: loadingOverrides } = useContractLineOverrides(contractId);
   const { settings, isLoading: loadingSettings } = useOrgSettings();
+  const invoiceSettings = pennylaneInvoiceSettings(settings);
+  const isDraft = invoiceSettings.mode === 'draft';
+  const isHub = invoiceSettings.mode === 'hub';
+  const invoicing = invoicingSettings(settings);
+  // Dérivé de `settings` (pas un hook dédié) : en mode hub, Majord'home émet lui-même et
+  // l'intégration Pennylane n'est pas requise — ne pas déclencher `useLedgerAccounts` inutilement.
+  const pennylaneEnabled = Boolean(settings?.pennylane?.enabled);
+  const ledgerEnabled = !loadingSettings && pennylaneEnabled;
   // Catalogue des comptes (déclinés par TVA) pour résoudre l'id du compte paramétré par numéro.
   // Indisponible (PL injoignable) → lignes sans compte + avertissement, jamais bloquant.
-  const { accounts: ledgerCatalog, isLoading: loadingLedger } = useLedgerAccounts();
+  const { accounts: ledgerCatalog, isLoading: loadingLedger } = useLedgerAccounts({ enabled: ledgerEnabled });
   const createInvoice = useCreateEntretienInvoice(orgId);
   const issueInvoice = useIssueEntretienInvoice(orgId);
 
@@ -74,11 +82,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     [equipmentTypes, categories],
   );
 
-  const invoiceSettings = pennylaneInvoiceSettings(settings);
-  const isDraft = invoiceSettings.mode === 'draft';
-  const isHub = invoiceSettings.mode === 'hub';
-  const invoicing = invoicingSettings(settings);
-  const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings || loadingLedger;
+  const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings || (ledgerEnabled && loadingLedger);
 
   const model = useMemo(() => {
     if (isLoading || !contract) return null;
@@ -105,7 +109,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings, ledgerCatalog]);
 
   const missingAddress = isHub && !(item.client_address && item.client_city);
-  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id || missingAddress;
+  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id || missingAddress || !!item.invoice_id;
 
   const handleConfirm = async () => {
     if (blocked || createInvoice.isPending || issueInvoice.isPending) return;
@@ -148,6 +152,12 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         onCreated?.();
       } catch (err) {
         toast.error(err?.message || 'La facture n’a pas pu être émise', { duration: 15000 });
+        // Le numéro a déjà été consommé (facture existante, carte marquée ou en cours de
+        // marquage) : ne pas laisser la modale proposer une seconde émission (review round 1).
+        if (err?.issued) {
+          onOpenChange(false);
+          onCreated?.();
+        }
       }
       return;
     }

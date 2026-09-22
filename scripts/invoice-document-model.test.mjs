@@ -115,6 +115,15 @@ test('buildInvoiceDraft : nom client = display_name, sinon "Prénom NOM"', () =>
   assert.equal(invoice.customer.name, 'Anna FERNANDEZ');
 });
 
+test('buildInvoiceDraft : sans catalogue Pennylane, resolveLedgerAccountId renvoie le numéro → pas un id PL, ledger_account_pl_id null', () => {
+  const model = { ...MODEL, lines: [{ ...MODEL.lines[0], ledgerAccountId: '70601', ledgerAccountNumber: '70601' }] };
+  const { lines } = buildInvoiceDraft({ model, orgId: 'org-1', client: CLIENT, dueDays: 30 });
+  assert.equal(lines[0].ledger_account_pl_id, null);
+  // Contre-exemple (fixture existante) : id PL résolu (catalogue disponible), distinct du numéro → conservé.
+  const { lines: withCatalog } = buildInvoiceDraft({ model: MODEL, orgId: 'org-1', client: CLIENT, dueDays: 30 });
+  assert.equal(withCatalog[0].ledger_account_pl_id, 123);
+});
+
 const ISSUED = {
   id: 'inv-1', number: 'F-2026-00012', kind: 'invoice', status: 'issued', invoice_date: '2026-09-23', due_at: '2026-10-23',
   subject: 'Entretien de votre poêle', customer: { name: 'Anna FERNANDEZ', address: '3 impasse des Lilas', postal_code: '81600', city: 'Gaillac', client_number: 286 },

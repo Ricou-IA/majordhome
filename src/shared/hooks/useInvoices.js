@@ -44,7 +44,11 @@ export function useIssueEntretienInvoice(orgId) {
         invoiced_at: invoicedAt || new Date().toISOString(),
       });
       if (cardError) {
-        throw new Error(`Facture ${number} émise, mais la carte n’a pas pu être marquée facturée : ${cardError.message || cardError}`);
+        // La facture existe déjà légalement (numéro attribué) : l'appelant ne doit pas
+        // ré-émettre — `e.issued` porte l'identité déjà consommée (review round 1, 2026-09-22).
+        const e = new Error(`Facture ${number} émise, mais la carte n’a pas pu être marquée facturée : ${cardError.message || cardError}`);
+        e.issued = { invoiceId, number };
+        throw e;
       }
 
       let pdfPath = null;
@@ -56,7 +60,9 @@ export function useIssueEntretienInvoice(orgId) {
         pdfPath = await unwrapResult(invoicesService.uploadPdf(orgId, invoice, blob));
         await unwrapResult(invoicesService.attachPdf(orgId, invoiceId, pdfPath));
       } catch (err) {
-        throw new Error(`Facture ${number} émise et carte marquée, mais le PDF n’a pas pu être archivé : ${err?.message || err}`);
+        const e = new Error(`Facture ${number} émise et carte marquée, mais le PDF n’a pas pu être archivé : ${err?.message || err}`);
+        e.issued = { invoiceId, number };
+        throw e;
       }
       return { invoiceId, number, pdfPath, blob };
     },

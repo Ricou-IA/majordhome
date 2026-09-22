@@ -178,7 +178,9 @@ export function buildInvoiceDraft({ model, orgId, context = 'contrat', client, c
       tva,
       ttc,
       ledger_account_number: l.ledgerAccountNumber ?? null,
-      ledger_account_pl_id: l.ledgerAccountId == null ? null : Number(l.ledgerAccountId),
+      // Sans catalogue Pennylane, `resolveLedgerAccountId` renvoie le numéro lui-même — ce
+      // n'est pas un id PL, on ne le stocke pas (review round 1, 2026-09-22).
+      ledger_account_pl_id: l.ledgerAccountId != null && String(l.ledgerAccountId) !== String(l.ledgerAccountNumber ?? '') ? Number(l.ledgerAccountId) : null,
       metier_key: l.equipmentTypeId ?? null,
       equipment_id: l.equipmentId ?? null,
       category_id: l.categoryId ?? null,
