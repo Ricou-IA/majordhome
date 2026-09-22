@@ -302,3 +302,28 @@ test('charge utile Pennylane : chaînes pour les montants, remise relative par l
   const finale = toPennylaneInvoicePayload(m, { customerId: 1, draft: false, externalReference: 'iv-1' });
   assert.equal('draft' in finale, false);
 });
+
+test('lignes : axes analytiques (compte par numero, equipement, type, categorie) pour le journal d\'integration', () => {
+  const m = buildEntretienInvoice(dalous({
+    pricing: pricingFor([EQ_POELE]),
+    parts: [{ designation: 'Joint', quantite: 1, prix_ht: 12 }],
+    ledgerAccounts: { byCategory: { 'cat-poele': '70601' }, parts: '7070', catalog: [] },
+  }));
+  const [eq, piece] = m.lines;
+  assert.equal(eq.kind, 'contrat');
+  assert.equal(eq.ledgerAccountNumber, '70601');
+  assert.equal(eq.equipmentId, 'eq-1');
+  assert.equal(eq.equipmentTypeId, 'type-poele');
+  assert.equal(eq.categoryId, 'cat-poele');
+  assert.equal(piece.kind, 'piece');
+  assert.equal(piece.ledgerAccountNumber, '7070');
+  assert.equal(piece.equipmentId, null);
+  assert.equal(piece.equipmentTypeId, null);
+  assert.equal(piece.categoryId, null);
+});
+
+test('lignes : compte non parametré → ledgerAccountNumber null (et avertissement existant)', () => {
+  const m = buildEntretienInvoice(dalous({ ledgerAccounts: {} }));
+  assert.equal(m.lines[0].ledgerAccountNumber, null);
+  assert.ok(m.warnings.some((w) => w.code === 'compte_manquant'));
+});

@@ -130,7 +130,7 @@ function categoryLabelForEquipment(eq, referentiel) {
  *   déclinaisons par TVA (`getLedgerAccounts()`) pour résoudre l'id. Absent → défaut PL + avertissement.
  * @param {number} [p.deadlineDays]
  * @param {string} p.today  YYYY-MM-DD
- * @returns {{ date: string, deadline: string, subject: string, lines: Array, discount: object|null, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
+ * @returns {{ date: string, deadline: string, subject: string, lines: Array<{ kind: string, label: string, description: string|null, quantity: number, vatPercent: number, vatCode: string|null, ledgerAccountId: number|string|null, ledgerAccountNumber: string|null, equipmentId: string|null, equipmentTypeId: string|null, categoryId: string|null, grossTtc: number, netTtc: number, discountPercent: number, unitPriceHt: string }>, discount: object|null, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
  */
 export function buildEntretienInvoice({
   intervention,
@@ -219,6 +219,10 @@ export function buildEntretienInvoice({
       discountPercent: line.discountPercent || 0,
       vatCode: vatCode || null,
       ledgerAccountId: line.ledgerAccountId ?? null,
+      ledgerAccountNumber: line.ledgerAccountNumber ?? null,
+      equipmentId: line.equipmentId ?? null,
+      equipmentTypeId: line.equipmentTypeId ?? null,
+      categoryId: line.categoryId ?? null,
       unitPriceHt: unitHt(grossTtc, line.quantity, line.vatPercent),
     });
   };
@@ -264,6 +268,7 @@ export function buildEntretienInvoice({
     if (ref) subjectRefs.push({ ref, category: catLabel });
     const label = it.labelWithUnits || it.label || 'Entretien';
     const vatPercent = resolveVat(typeId, label);
+    const ledgerNumber = catId ? (ledgerAccounts?.byCategory?.[catId] ?? null) : null;
     pushLine({
       kind: 'contrat',
       label,
@@ -271,6 +276,10 @@ export function buildEntretienInvoice({
       quantity: 1,
       vatPercent,
       ledgerAccountId: ledgerForCategory(catId, catLabel, VAT_CODES[vatPercent] || null),
+      ledgerAccountNumber: ledgerNumber ? String(ledgerNumber) : null,
+      equipmentId: eq?.id ?? null,
+      equipmentTypeId: typeId,
+      categoryId: catId,
       grossTtc,
       netTtc,
       discountPercent: discount ? discount.percent : 0,
@@ -301,6 +310,10 @@ export function buildEntretienInvoice({
       quantity: qty,
       vatPercent: partsVat,
       ledgerAccountId: partsLedgerId,
+      ledgerAccountNumber: ledgerAccounts?.parts ? String(ledgerAccounts.parts) : null,
+      equipmentId: null,
+      equipmentTypeId: null,
+      categoryId: null,
       grossTtc: unitTtc * qty,
     });
   }
