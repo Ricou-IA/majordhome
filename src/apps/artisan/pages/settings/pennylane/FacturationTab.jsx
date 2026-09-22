@@ -261,9 +261,12 @@ export default function FacturationTab() {
             >
               <option value="draft">Brouillon — à finaliser dans Pennylane</option>
               <option value="final">Finalisée — numérotée immédiatement</option>
+              <option value="hub">Émise par Majord&apos;home — numéro et PDF Majord&apos;home (import Pennylane : phase 2)</option>
             </select>
             <p className={HINT_CLASS}>
-              Commencez en brouillon : vous relisez et envoyez depuis Pennylane. Une facture finalisée est un document légal, irréversible (avoir).
+              Brouillon : vous relisez et envoyez depuis Pennylane. Finalisée : document légal immédiat. Émise par Majord&apos;home :
+              Majord&apos;home numérote, produit le PDF (onglet Émission) et l&apos;archive ; l&apos;import dans Pennylane viendra en phase 2 —
+              en attendant, rien n&apos;est envoyé à Pennylane dans ce mode.
             </p>
           </div>
           <div className="sm:col-span-2">
@@ -281,9 +284,8 @@ export default function FacturationTab() {
             </select>
             {journalsError && <p className={ERROR_CLASS}>Journaux Pennylane indisponibles : {journalsError.message || 'erreur'}</p>}
             <p className={HINT_CLASS}>
-              Le journal se crée dans Pennylane (Paramètres → Comptabilité → Journaux, type Ventes). Juste après la création d&apos;une facture,
-              son écriture comptable y est déplacée : tout ce que Majord&apos;home écrit se lit dans ce journal, le reste non. Si Pennylane
-              refuse le déplacement, la facture est quand même créée et l&apos;aperçu vous le dit.
+              Réglage conservé pour mémoire : Pennylane n&apos;accepte pas de déplacer l&apos;écriture d&apos;une facture par l&apos;API (vérifié le 22/09/2026),
+              les factures tombent dans le journal de ventes principal. Un changement de journal se fait dans Pennylane, à la main ou en masse.
             </p>
           </div>
         </div>

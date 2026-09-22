@@ -128,7 +128,9 @@ export function pennylaneInvoiceSettings(settings) {
   const journalId = Number(inv.journal_id);
   return {
     deadlineDays: Number.isInteger(days) && days >= 0 ? days : PENNYLANE_INVOICE_DEFAULTS.deadlineDays,
-    mode: inv.mode === 'final' ? 'final' : PENNYLANE_INVOICE_DEFAULTS.mode,
+    // 'draft' | 'final' = Pennylane crée la facture ; 'hub' = Majord'home émet, numérote et
+    // archive (phase 1 du hub, spec 2026-09-22) — l'import Pennylane arrive en phase 2.
+    mode: inv.mode === 'final' || inv.mode === 'hub' ? inv.mode : PENNYLANE_INVOICE_DEFAULTS.mode,
     ledgerAccounts: {
       byCategory: la.by_category && typeof la.by_category === 'object' ? la.by_category : {},
       parts: la.parts ?? null,
