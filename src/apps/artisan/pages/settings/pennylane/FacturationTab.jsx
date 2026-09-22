@@ -25,11 +25,23 @@ const LABEL_CLASS = 'block text-xs font-medium text-secondary-600 mb-1';
 const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
 const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 
+/**
+ * Numéro de compte stocké → valeur de formulaire. Un ancien enregistrement a pu
+ * sérialiser la chaîne "undefined" (option sans `value`) : on la traite comme vide,
+ * sinon elle repartirait telle quelle à la sauvegarde.
+ */
+function ledgerValue(v) {
+  if (v === undefined || v === null) return '';
+  const s = String(v);
+  return s === 'undefined' || s === 'null' ? '' : s;
+}
+
 function pickForm(settings) {
   const inv = pennylaneInvoiceSettings(settings);
   const byCategory = {};
   for (const [catId, id] of Object.entries(inv.ledgerAccounts.byCategory)) {
-    if (id) byCategory[catId] = String(id);
+    const num = ledgerValue(id);
+    if (num) byCategory[catId] = num;
   }
   return {
     enabled: Boolean(settings?.pennylane?.enabled),
@@ -37,7 +49,7 @@ function pickForm(settings) {
     mode: inv.mode,
     journal_id: inv.journalId ? String(inv.journalId) : '',
     ledger_by_category: byCategory,
-    ledger_parts: inv.ledgerAccounts.parts ? String(inv.ledgerAccounts.parts) : '',
+    ledger_parts: ledgerValue(inv.ledgerAccounts.parts),
   };
 }
 
@@ -331,7 +343,7 @@ export default function FacturationTab() {
             >
               <option value="">— Compte par défaut Pennylane —</option>
               {accountOptions.map((a) => (
-                <option key={a.id} value={String(a.id)}>{a.number} · {a.label}</option>
+                <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
               ))}
             </select>
             <p className={HINT_CLASS}>Pièces facturées avec l&apos;entretien (certificat).</p>
