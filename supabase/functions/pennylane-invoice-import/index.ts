@@ -39,6 +39,14 @@ const money = (n: unknown) => Number(n ?? 0).toFixed(2);
 const unitPrice = (n: unknown) => Number(n ?? 0).toFixed(6).replace(/\.?0+$/, "") || "0";
 const plError = (data: unknown) => (typeof data === "string" ? data : JSON.stringify(data ?? {})).slice(0, 1500);
 
+/** Taux FR standard → code TVA Pennylane. Finding I2 (revue finale 2026-09-22) : un taux hors
+ * table (ex. TVA export/UE future) ne doit JAMAIS retomber sur FR_200 en silence. */
+const VAT_CODES: Record<string, string> = { "20": "FR_200", "10": "FR_100", "5.5": "FR_55", "0": "exempt" };
+function vatCodeOf(l: Record<string, unknown>): string | null {
+  if (typeof l.vat_code === "string" && l.vat_code) return l.vat_code;
+  return VAT_CODES[String(Number(l.vat_rate))] ?? null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: buildCorsHeaders(req) });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, req);
@@ -56,9 +64,14 @@ Deno.serve(async (req: Request) => {
   if (!PENNYLANE_API_TOKEN) return jsonResponse({ error: "PENNYLANE_API_TOKEN manquant" }, 500, req);
   const { supabase, orgId, userId } = auth;
 
+  // Finding I3 (revue finale 2026-09-22) : n'écrit jamais sur un invoice_id qui n'a pas été
+  // vérifié org-owned (select + eq(org_id) + non-404 ci-dessous). Tant que ce n'est pas posé,
+  // recordResult (y compris depuis le catch externe) est un no-op — jamais body.invoice_id brut.
+  let verifiedInvoiceId: string | null = null;
   const recordResult = async (status: "imported" | "error", plId: number | null, ledgerId: number | null, error: string | null) => {
+    if (!verifiedInvoiceId) return null;
     const { error: rpcError } = await supabase.rpc("invoice_set_import_result", {
-      p_invoice_id: body.invoice_id, p_status: status, p_pennylane_invoice_id: plId,
+      p_invoice_id: verifiedInvoiceId, p_status: status, p_pennylane_invoice_id: plId,
       p_pennylane_ledger_entry_id: ledgerId, p_error: error,
     });
     return rpcError ? sanitizeError(rpcError, "invoice_set_import_result failed") : null;
@@ -70,8 +83,17 @@ Deno.serve(async (req: Request) => {
       .from("majordhome_invoices").select("*").eq("id", body.invoice_id).eq("org_id", orgId).maybeSingle();
     if (invErr) return jsonResponse({ error: sanitizeError(invErr, "lecture facture") }, 500, req);
     if (!invoice) return jsonResponse({ error: "invoice_not_found" }, 404, req);
+    verifiedInvoiceId = invoice.id;
     if (invoice.status !== "issued") return jsonResponse({ error: "invoice_not_issued", status: invoice.status }, 409, req);
     if (invoice.pennylane_invoice_id) {
+      // Finding I4 : la carte a déjà l'id PL mais un aléa a laissé import_status en pending/error
+      // (ex. le crash entre le POST PL et l'écriture RPC, cf. exception ci-dessous) — on répare
+      // avant de répondre plutôt que de laisser une facture importée signalée « à rejouer ».
+      if (invoice.import_status !== "imported") {
+        const recordError = await recordResult("imported", Number(invoice.pennylane_invoice_id), invoice.pennylane_ledger_entry_id ?? null, null);
+        if (recordError) console.error(`[pennylane-invoice-import] record failed (repair) for ${invoice.number}: ${recordError}`);
+        return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id, repaired: true, ...(recordError ? { record_error: recordError } : {}) }, 200, req);
+      }
       return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id }, 200, req);
     }
     if (!invoice.pdf_path) {
@@ -88,6 +110,17 @@ Deno.serve(async (req: Request) => {
       if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
       return jsonResponse({ error: "lines_required", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
     }
+    // Finding I2 (revue finale 2026-09-22) : un taux de TVA sans code Pennylane connu ne doit
+    // JAMAIS retomber sur FR_200 en silence (facture à un mauvais taux, invisible côté MDH).
+    // Vérifié tôt (avant tout appel Pennylane) : la facture est réparable sans rien avoir posé.
+    for (const l of lines as Record<string, unknown>[]) {
+      if (!vatCodeOf(l)) {
+        const detail = `ligne ${l.position} taux ${l.vat_rate}`;
+        const recordError = await recordResult("error", null, null, `vat_code_unmapped: ${detail}`);
+        if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+        return jsonResponse({ error: "vat_code_unmapped", detail, ...(recordError ? { record_error: recordError } : {}) }, 409, req);
+      }
+    }
 
     // 2. Client Pennylane (mapping posé par le front via getOrCreateCustomer)
     const { data: sync, error: syncErr } = await supabase
@@ -98,6 +131,35 @@ Deno.serve(async (req: Request) => {
       const recordError = await recordResult("error", null, null, "customer_not_synced");
       if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
       return jsonResponse({ error: "customer_not_synced", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
+    }
+
+    // Garde anti-doublon : un échec réseau après un précédent POST (réponse jamais lue) ne doit
+    // pas relancer un import — la facture peut déjà exister côté PL. Le probe est un GARDE-FOU,
+    // pas un GATE : son échec ne bloque pas l'import. Placé ICI, avant le téléchargement/upload
+    // du PDF (étape 3), pour qu'une récupération réussie ne pousse jamais de pièce jointe
+    // orpheline sur Pennylane (finding C1, revue finale 2026-09-22).
+    try {
+      const probeFilter = encodeURIComponent(JSON.stringify([{ field: "external_reference", operator: "eq", value: invoice.id }]));
+      const probe = await pl("GET", `/customer_invoices?limit=1&filter=${probeFilter}`);
+      if (probe.status < 300) {
+        const items = (probe.data as { items?: Array<{ id?: number; external_reference?: string; ledger_entry?: { id?: number } }> })?.items || [];
+        const existing = items[0];
+        if (existing?.id && existing.external_reference === invoice.id) {
+          const recordError = await recordResult("imported", existing.id, existing.ledger_entry?.id ?? null, null);
+          if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, ...(recordError ? { record_error: recordError } : {}) }, 200, req);
+        }
+        if (existing && existing.external_reference !== invoice.id) {
+          // Le filtre `external_reference eq` a été ignoré par Pennylane (ou l'API l'a mal
+          // interprété) : `items[0]` est alors la facture la plus récente du grand livre, PAS la
+          // nôtre. Ne jamais la relier — un faux positif ici colle notre id à un devis étranger.
+          console.error(`[pennylane-invoice-import] probe returned a non-matching invoice (filter ignored?) for ${invoice.number}: expected external_reference=${invoice.id}, got id=${existing.id} external_reference=${existing.external_reference}`);
+        }
+      } else {
+        console.error(`[pennylane-invoice-import] probe failed for ${invoice.number}: HTTP ${probe.status}`);
+      }
+    } catch (probeErr) {
+      console.error(`[pennylane-invoice-import] probe threw for ${invoice.number}:`, probeErr);
     }
 
     // 3. PDF archivé → Pennylane
@@ -146,37 +208,25 @@ Deno.serve(async (req: Request) => {
         // invoice_lines n'a pas d'unité (V1 entretien) : 'piece' pour toutes les lignes.
         unit: "piece",
         raw_currency_unit_price: unitPrice(l.unit_price_ht),
-        vat_rate: (l.vat_code as string) || "FR_200",
+        vat_rate: vatCodeOf(l),
         currency_amount: money(l.ttc),
         currency_tax: money(l.tva),
         ...(l.ledger_account_pl_id ? { ledger_account_id: Number(l.ledger_account_pl_id) } : {}),
       })),
     };
 
-    // Garde anti-doublon : un échec réseau après le POST (réponse jamais lue)
-    // ne doit pas relancer un import — la facture peut déjà exister côté PL.
-    // Le probe est un GARDE-FOU, pas un GATE : son échec ne bloque pas l'import.
-    try {
-      const probeFilter = encodeURIComponent(JSON.stringify([{ field: "external_reference", operator: "eq", value: invoice.id }]));
-      const probe = await pl("GET", `/customer_invoices?limit=1&filter=${probeFilter}`);
-      if (probe.status < 300) {
-        const existing = ((probe.data as { items?: Array<{ id?: number; ledger_entry?: { id?: number } }> })?.items || [])[0];
-        if (existing?.id) {
-          const recordError = await recordResult("imported", existing.id, existing.ledger_entry?.id ?? null, null);
-          if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
-          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, ...(recordError ? { record_error: recordError } : {}) }, 200, req);
-        }
-      } else {
-        console.error(`[pennylane-invoice-import] probe failed for ${invoice.number}: HTTP ${probe.status}`);
-      }
-    } catch (probeErr) {
-      console.error(`[pennylane-invoice-import] probe threw for ${invoice.number}:`, probeErr);
-    }
-
     const imported = await pl("POST", "/customer_invoices/import", payload);
     console.log(`[pennylane-invoice-import] ${imported.status} invoice=${invoice.number} by ${userId} (org ${orgId}) → ${JSON.stringify(imported.data).slice(0, 1500)}`);
     if (imported.status >= 300) {
       const detail = plError(imported.data);
+      // Finding I5 (revue finale 2026-09-22) : PL renvoie 422 « already been taken » quand notre
+      // external_reference existe déjà côté PL sous une AUTRE facture (ex. réconciliation manuelle
+      // après un incident) — rejouer ne fera jamais aboutir ce même import, direction Pennylane.
+      if (/already been taken/i.test(detail)) {
+        const recordError = await recordResult("error", null, null, `pennylane_reference_taken: ${detail}`);
+        if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
+        return jsonResponse({ error: "pennylane_reference_taken", step: "import", detail, ...(recordError ? { record_error: recordError } : {}) }, 502, req);
+      }
       const recordError = await recordResult("error", null, null, `import ${imported.status}: ${detail}`);
       if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
       return jsonResponse({ error: "pennylane_import_failed", step: "import", status: imported.status, detail, ...(recordError ? { record_error: recordError } : {}) }, 502, req);
