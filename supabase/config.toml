@@ -135,3 +135,6 @@ verify_jwt = false
 
 [functions.pennylane-ledger-push]
 verify_jwt = true
+
+[functions.pennylane-invoice-import]
+verify_jwt = true
