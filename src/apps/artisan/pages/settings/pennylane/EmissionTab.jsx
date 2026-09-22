@@ -89,6 +89,7 @@ export default function EmissionTab() {
             <p className={HINT_CLASS}>
               Numéro = préfixe-année-compteur, ex. {form.number_prefix || INVOICING_DEFAULTS.numberPrefix}-{new Date().getFullYear()}-00001. Le compteur repart à 1 chaque année,
               sans trou, attribué à l&apos;émission. Si Pennylane numérote aussi des factures (série « F »), choisissez un préfixe différent.
+              Le préfixe se fige au premier numéro émis dans l&apos;année : pour en changer, attendre l&apos;année suivante.
             </p>
           </div>
         </div>

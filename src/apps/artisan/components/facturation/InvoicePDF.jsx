@@ -59,7 +59,7 @@ export function InvoiceDocument({ model, company }) {
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={s.number}>N° {model.number}</Text>
             <Text style={s.meta}>Date : {model.dates.invoice}</Text>
-            <Text style={s.meta}>Échéance : {model.dates.due}</Text>
+            {model.dates.due ? <Text style={s.meta}>Échéance : {model.dates.due}</Text> : null}
           </View>
         </View>
 
@@ -114,7 +114,6 @@ export function InvoiceDocument({ model, company }) {
           <Text style={[sharedStyles.sectionTitle, { color: accent }]}>Règlement</Text>
           {model.payment.map((p, i) => <Text key={i} style={s.para}>{p}</Text>)}
           {model.legal.map((l, i) => <Text key={i} style={s.legal}>{l}</Text>)}
-          {model.rge ? <Text style={s.legal}>{model.rge}</Text> : null}
         </View>
 
         <View style={sharedStyles.footer} fixed>

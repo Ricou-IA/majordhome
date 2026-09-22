@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
+import { invoicesService } from '@services/invoices.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { entretienSavKeys } from '@hooks/cacheKeys';
@@ -262,15 +263,22 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                 <>
                   <button
                     type="button"
-                    disabled={!!item.invoice_id}
-                    onClick={(e) => {
+                    disabled={!!item.invoice_id && !isHubMode}
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      if (!item.invoice_id) setInvoiceOpen(true);
+                      if (!item.invoice_id) { setInvoiceOpen(true); return; }
+                      // Mode hub : `invoice_id` pointe une facture Majord'home archivée (PDF
+                      // dans le bucket `invoices`) — mode Pennylane : c'est un id PL, aucun PDF
+                      // local à ouvrir, le bouton reste inerte (finding F4, revue 2026-09-22).
+                      if (!isHubMode) return;
+                      const { data: url, error } = await invoicesService.getPdfUrl(orgId, item.invoice_id);
+                      if (error) toast.error(error.message || 'PDF non archivé');
+                      else window.open(url, '_blank', 'noopener');
                     }}
-                    title={item.invoice_id ? (isHubMode ? 'Facture émise' : 'Facture créée sur Pennylane') : (isHubMode ? 'Émettre la facture' : 'Créer la facture sur Pennylane')}
+                    title={item.invoice_id ? (isHubMode ? 'Ouvrir la facture (PDF)' : 'Facture créée sur Pennylane') : (isHubMode ? 'Émettre la facture' : 'Créer la facture sur Pennylane')}
                     className={`inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border transition-colors ${
                       item.invoice_id
-                        ? 'border-violet-300 text-violet-700 bg-violet-50 cursor-default'
+                        ? `border-violet-300 text-violet-700 bg-violet-50 ${isHubMode ? 'hover:bg-violet-100 cursor-pointer' : 'cursor-default'}`
                         : 'border-violet-400 text-white bg-violet-600 hover:bg-violet-700'
                     }`}
                   >

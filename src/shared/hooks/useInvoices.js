@@ -13,7 +13,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoicesService } from '@services/invoices.service';
 import { savService } from '@services/sav.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
-import { buildInvoicePdfModel } from '@/lib/invoiceDocumentModel';
+import { buildInvoicePdfModel, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
 import { invoiceKeys, entretienSavKeys } from './cacheKeys';
 
 export { invoiceKeys };
@@ -46,7 +46,7 @@ export function useIssueEntretienInvoice(orgId) {
       if (cardError) {
         // La facture existe déjà légalement (numéro attribué) : l'appelant ne doit pas
         // ré-émettre — `e.issued` porte l'identité déjà consommée (review round 1, 2026-09-22).
-        const e = new Error(`Facture ${number} émise, mais la carte n’a pas pu être marquée facturée : ${cardError.message || cardError}`);
+        const e = new Error(`Facture ${number} émise, mais la carte n’a pas pu être marquée facturée : ${invoiceErrorMessage(cardError, cardError.message || String(cardError))}`);
         e.issued = { invoiceId, number };
         throw e;
       }
@@ -60,7 +60,7 @@ export function useIssueEntretienInvoice(orgId) {
         pdfPath = await unwrapResult(invoicesService.uploadPdf(orgId, invoice, blob));
         await unwrapResult(invoicesService.attachPdf(orgId, invoiceId, pdfPath));
       } catch (err) {
-        const e = new Error(`Facture ${number} émise et carte marquée, mais le PDF n’a pas pu être archivé : ${err?.message || err}`);
+        const e = new Error(`Facture ${number} émise et carte marquée, mais le PDF n’a pas pu être archivé : ${invoiceErrorMessage(err, err?.message || String(err))}`);
         e.issued = { invoiceId, number };
         throw e;
       }

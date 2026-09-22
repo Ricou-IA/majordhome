@@ -23,8 +23,8 @@ import { useContractZone } from '@hooks/useContractZone';
 import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
 import { useCreateEntretienInvoice, useLedgerAccounts } from '@hooks/usePennylane';
 import { useIssueEntretienInvoice } from '@hooks/useInvoices';
-import { buildInvoiceDraft, invoicingSettings } from '@/lib/invoiceDocumentModel';
-import { buildCompanyInfo } from '@/lib/orgBranding';
+import { buildInvoiceDraft, invoicingSettings, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
+import { buildCompanyInfo, formatFullAddress } from '@/lib/orgBranding';
 import { generateInvoicePdfBlob } from '@/apps/artisan/components/facturation/InvoicePDF';
 import { computeContractLines } from '@/lib/contractPricing';
 import { buildEntretienInvoice, toPennylaneInvoicePayload } from '@/lib/entretienInvoiceModel';
@@ -83,6 +83,12 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   );
 
   const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings || (ledgerEnabled && loadingLedger);
+  // Identité légale de l'émetteur (finding F2, revue finale 2026-09-22) : buildCompanyInfo
+  // retombe sur des défauts neutres ("Votre entreprise", champs vides) si settings.legal_name /
+  // .siret / .address ne sont pas renseignés — sans cette garde, une org non paramétrée émet
+  // une facture légalement invalide (mentions obligatoires manquantes). Mémoïsé pour être
+  // réutilisé tel quel dans handleConfirm (mode hub).
+  const company = useMemo(() => buildCompanyInfo(settings), [settings]);
 
   const model = useMemo(() => {
     if (isLoading || !contract) return null;
@@ -108,8 +114,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     // eslint-disable-next-line react-hooks/exhaustive-deps -- invoiceSettings est dérivé de `settings` (objet stable de React Query)
   }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings, ledgerCatalog]);
 
-  const missingAddress = isHub && !(item.client_address && item.client_city);
-  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id || missingAddress || !!item.invoice_id;
+  const missingAddress = isHub && !(item.client_address && item.client_postal_code && item.client_city);
+  const missingIssuer = isHub && !(company.legalName && company.siret && formatFullAddress(company));
+  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id || missingAddress || missingIssuer || !!item.invoice_id;
 
   const handleConfirm = async () => {
     if (blocked || createInvoice.isPending || issueInvoice.isPending) return;
@@ -138,7 +145,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         const issued = await issueInvoice.mutateAsync({
           draft,
           numberPrefix: invoicing.numberPrefix,
-          company: buildCompanyInfo(settings),
+          company,
           invoicing,
           renderPdf: generateInvoicePdfBlob,
           interventionId: item.id,
@@ -151,7 +158,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         onOpenChange(false);
         onCreated?.();
       } catch (err) {
-        toast.error(err?.message || 'La facture n’a pas pu être émise', { duration: 15000 });
+        toast.error(invoiceErrorMessage(err), { duration: 15000 });
         // Le numéro a déjà été consommé (facture existante, carte marquée ou en cours de
         // marquage) : ne pas laisser la modale proposer une seconde émission (review round 1).
         if (err?.issued) {
@@ -223,6 +230,9 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         )}
         {!isLoading && missingAddress && (
           <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Adresse du client incomplète : une facture doit porter l’adresse de facturation (fiche client).</p>
+        )}
+        {!isLoading && missingIssuer && (
+          <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Identité de l’émetteur incomplète (raison sociale, SIRET, adresse) : Paramètres → Organisation.</p>
         )}
 
         {model && model.errors.map((e) => (

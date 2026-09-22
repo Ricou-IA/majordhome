@@ -51,6 +51,26 @@ export function invoicePdfPath(orgId, invoice) {
   return `${orgId}/${invoice.year}/${invoice.number}.pdf`;
 }
 
+/**
+ * URL signée du PDF archivé d'une facture (finding F4, revue finale 2026-09-22) : la carte
+ * n'offrait aucun moyen de retrouver le PDF d'une facture déjà émise. `pdf_path` NULL = le PDF
+ * n'a jamais été archivé (échec partiel de la chaîne d'émission, cf. useInvoices.js) — une
+ * erreur explicite plutôt qu'un lien mort.
+ */
+async function getPdfUrl(orgId, invoiceId) {
+  const { data: row, error } = await supabase
+    .from('majordhome_invoices')
+    .select('pdf_path')
+    .eq('id', invoiceId)
+    .eq('org_id', orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row?.pdf_path) throw new Error('PDF non archivé');
+  const { url, error: signError } = await storageService.getSignedUrl(INVOICES_BUCKET, row.pdf_path, 600);
+  if (signError) throw signError;
+  return url;
+}
+
 async function uploadPdf(orgId, invoice, blob) {
   const path = invoicePdfPath(orgId, invoice);
   const { error } = await storageService.uploadFile(INVOICES_BUCKET, path, blob, { contentType: 'application/pdf', upsert: true });
@@ -75,6 +95,7 @@ export const invoicesService = {
   createDraft: (params) => withErrorHandling(() => createDraft(params), 'invoices.createDraft'),
   issue: (invoiceId, numberPrefix) => withErrorHandling(() => issue(invoiceId, numberPrefix), 'invoices.issue'),
   getById: (orgId, invoiceId) => withErrorHandling(() => getById(orgId, invoiceId), 'invoices.getById'),
+  getPdfUrl: (orgId, invoiceId) => withErrorHandling(() => getPdfUrl(orgId, invoiceId), 'invoices.getPdfUrl'),
   uploadPdf: (orgId, invoice, blob) => withErrorHandling(() => uploadPdf(orgId, invoice, blob), 'invoices.uploadPdf'),
   attachPdf: (orgId, invoiceId, pdfPath) => withErrorHandling(() => attachPdf(orgId, invoiceId, pdfPath), 'invoices.attachPdf'),
 };
