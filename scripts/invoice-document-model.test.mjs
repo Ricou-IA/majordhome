@@ -234,6 +234,17 @@ test('invoiceErrorMessage : codes de l\'import Pennylane', () => {
   assert.match(invoiceErrorMessage(new Error('pennylane_import_failed (étape import)')), /Pennylane/);
 });
 
+test('invoiceErrorMessage : codes ajoutés par la revue finale (vat_code_unmapped, pennylane_reference_taken, invoice_without_client)', () => {
+  assert.match(invoiceErrorMessage(new Error('vat_code_unmapped')), /TVA.*Pennylane/i);
+  assert.match(invoiceErrorMessage(new Error('pennylane_reference_taken')), /Pennylane.*référence/i);
+  assert.match(invoiceErrorMessage(new Error('invoice_without_client')), /client rattaché/i);
+});
+
+test('INVOICE_RPC_MESSAGES : les codes morts pennylane_disabled/already_imported ont été retirés', () => {
+  assert.equal('pennylane_disabled' in INVOICE_RPC_MESSAGES, false);
+  assert.equal('already_imported' in INVOICE_RPC_MESSAGES, false);
+});
+
 test('invoiceErrorMessage : detail de l\'edge ajouté entre parenthèses, borné à 300 caractères', () => {
   const err = Object.assign(new Error('pennylane_import_failed'), { detail: '422 Unprocessable Entity' });
   assert.equal(invoiceErrorMessage(err), `${INVOICE_RPC_MESSAGES.pennylane_import_failed} (422 Unprocessable Entity)`);

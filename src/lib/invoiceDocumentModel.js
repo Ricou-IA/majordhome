@@ -289,12 +289,13 @@ export const INVOICE_RPC_MESSAGES = Object.freeze({
   intervention_already_invoiced: 'Cette intervention a déjà une facture émise.',
   invoice_not_found: 'Facture introuvable.',
   invoice_immutable: 'Facture émise : elle ne peut plus être modifiée (correction par avoir).',
-  customer_not_synced: "Le client n'a pas encore de fiche Pennylane : rejouez l'import depuis la carte (elle sera créée).",
-  pdf_missing: "Le PDF de la facture n'est pas archivé : rejouez l'export depuis la carte.",
-  invoice_not_issued: "Cette facture n'est pas émise : rien à importer.",
-  pennylane_import_failed: "Pennylane a refusé l'import de la facture : voir le détail et rejouer depuis la carte.",
-  pennylane_disabled: "Pennylane n'est pas activé pour cette organisation.",
-  already_imported: "Cette facture est déjà importée dans Pennylane.",
+  customer_not_synced: 'Le client n’a pas encore de fiche Pennylane : rejouez l’import depuis la carte (elle sera créée).',
+  pdf_missing: 'Le PDF de la facture n’est pas archivé : rejouez l’export depuis la carte.',
+  invoice_not_issued: 'Cette facture n’est pas émise : rien à importer.',
+  pennylane_import_failed: 'Pennylane a refusé l’import de la facture : voir le détail et rejouer depuis la carte.',
+  vat_code_unmapped: 'Taux de TVA d’une ligne sans équivalent Pennylane : facture à corriger avant import.',
+  pennylane_reference_taken: 'Pennylane connaît déjà cette référence de facture : import à réconcilier (voir Pennylane), pas à rejouer.',
+  invoice_without_client: 'Facture sans client rattaché : import Pennylane impossible.',
 });
 
 /**
