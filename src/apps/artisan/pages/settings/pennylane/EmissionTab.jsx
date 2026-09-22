@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { invoicingSettings, validateIban, validateBic, INVOICING_DEFAULTS } from '@/lib/invoiceDocumentModel';
+import { invoicingSettings, validateIban, validateBic, validateNumberPrefix, INVOICING_DEFAULTS } from '@/lib/invoiceDocumentModel';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -31,7 +31,7 @@ function pickForm(settings) {
 
 function validate(form) {
   const errors = {};
-  if (!/^[A-Z][A-Z0-9]{0,5}$/.test(form.number_prefix)) errors.number_prefix = '1 à 6 caractères A-Z / 0-9, commence par une lettre';
+  if (!validateNumberPrefix(form.number_prefix).ok) errors.number_prefix = '1 à 6 caractères A-Z / 0-9, commence par une lettre';
   if (!validateIban(form.iban).ok) errors.iban = 'IBAN invalide (ex. FR76 3000 6000 0112 3456 7890 189)';
   if (!validateBic(form.bic).ok) errors.bic = 'BIC invalide (8 ou 11 caractères)';
   if (!form.payment_terms.trim()) errors.payment_terms = 'Obligatoire sur une facture';
@@ -60,7 +60,7 @@ export default function EmissionTab() {
     try {
       const invoicing = {
         ...(settings?.invoicing || {}),
-        number_prefix: form.number_prefix.trim().toUpperCase(),
+        number_prefix: validateNumberPrefix(form.number_prefix).value,
         iban: validateIban(form.iban).value,
         bic: validateBic(form.bic).value,
         payment_terms: form.payment_terms.trim(),

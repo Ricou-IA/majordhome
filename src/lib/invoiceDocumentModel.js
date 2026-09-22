@@ -33,16 +33,22 @@ export const INVOICING_DEFAULTS = Object.freeze({
  */
 export function invoicingSettings(settings) {
   const s = settings?.invoicing || {};
-  const prefix = String(s.number_prefix || '').trim().toUpperCase();
+  const p = validateNumberPrefix(s.number_prefix);
   const str = (v, d) => (typeof v === 'string' && v.trim() ? v : d);
   return {
-    numberPrefix: /^[A-Z][A-Z0-9]{0,5}$/.test(prefix) ? prefix : INVOICING_DEFAULTS.numberPrefix,
+    numberPrefix: p.ok ? p.value : INVOICING_DEFAULTS.numberPrefix,
     iban: typeof s.iban === 'string' ? s.iban : '',
     bic: typeof s.bic === 'string' ? s.bic : '',
     paymentTerms: str(s.payment_terms, INVOICING_DEFAULTS.paymentTerms),
     latePenalty: str(s.late_penalty, INVOICING_DEFAULTS.latePenalty),
     discountNote: str(s.discount_note, INVOICING_DEFAULTS.discountNote),
   };
+}
+
+/** Préfixe de numérotation : 1 à 6 caractères A-Z / 0-9, commence par une lettre. Normalisé en majuscules. */
+export function validateNumberPrefix(raw) {
+  const value = String(raw || '').trim().toUpperCase();
+  return { ok: /^[A-Z][A-Z0-9]{0,5}$/.test(value), value };
 }
 
 /** IBAN : normalisé en majuscules par groupes de 4. Vide = OK (pas de bloc paiement). */

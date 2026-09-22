@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  INVOICING_DEFAULTS, invoicingSettings, validateIban, validateBic, splitTtc, fmtEur,
+  INVOICING_DEFAULTS, invoicingSettings, validateIban, validateBic, validateNumberPrefix, splitTtc, fmtEur,
   buildInvoiceDraft, buildInvoicePdfModel,
 } from '../src/lib/invoiceDocumentModel.js';
 import { buildCompanyInfo } from '../src/lib/orgBranding.js';
@@ -43,6 +43,14 @@ test('validateIban / validateBic : normalisation + format', () => {
   assert.deepEqual(validateBic('agrifrpp'), { ok: true, value: 'AGRIFRPP' });
   assert.deepEqual(validateBic('AGRIFRPP882'), { ok: true, value: 'AGRIFRPP882' });
   assert.equal(validateBic('AGRI').ok, false);
+});
+
+test('validateNumberPrefix : majuscules, 1 à 6 caractères, lettre en tête', () => {
+  assert.deepEqual(validateNumberPrefix(' fm '), { ok: true, value: 'FM' });
+  assert.equal(validateNumberPrefix('F-1').ok, false);
+  assert.equal(validateNumberPrefix('1F').ok, false);
+  assert.equal(validateNumberPrefix('ABCDEFG').ok, false);
+  assert.equal(validateNumberPrefix('').ok, false);
 });
 
 test('splitTtc : ht + tva = ttc au centime', () => {

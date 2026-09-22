@@ -70,7 +70,8 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   );
 
   const invoiceSettings = pennylaneInvoiceSettings(settings);
-  const isDraft = invoiceSettings.mode === 'draft';
+  // 'hub' (émission locale, câblée en phase 1 Task 6) retombe en brouillon Pennylane tant que la branche locale n'existe pas : jamais une facture finalisée par surprise.
+  const isDraft = invoiceSettings.mode !== 'final';
   const isLoading = loadingContract || loadingEquipments || loadingPricing || loadingOverrides || loadingSettings || loadingLedger;
 
   const model = useMemo(() => {
