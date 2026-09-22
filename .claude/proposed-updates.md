@@ -22,9 +22,9 @@
 *Confirmé PENDING le 2026-08-09 : rien à graver tant que les phases ne sont pas livrées. Reconfirmé le 2026-09-16 et le 2026-09-22.*
 ---
 
-## [2026-09-22 14:30] Hub de facturation — phase 1 (émission locale)
-**Statut** : PENDING (décision Eric 2026-09-22 : à graver avec la phase 2 — import Pennylane, `invoice_set_import_result`, statuts d'import — livrée le soir même dans une autre session, pour une section unique)
-**Commit** : f5d9196 · db8e39a
+## [2026-09-22 14:30] Hub de facturation — phases 1 et 2 (émission locale, import Pennylane)
+**Statut** : PENDING (à graver dans CLAUDE.md)
+**Commit** : f5d9196 · db8e39a · fb7d90e · 40e8924 · 10d7eff · ca40d0c · 877afa1 · cd9014e · f3f99c5 · 1236240 · 69d808a
 **Contexte** : Majord'home émet ses factures d'entretien (mode « Émise par Majord'home » dans Settings → Facturation) : numéro légal par la base, lignes/totaux figés, PDF archivé dans le bucket `invoices`. Pennylane n'est pas appelé (import en phase 2, journal de ventes principal — le journal dédié est reporté, l'API ne permet pas de déplacer l'écriture d'une facture).
 **Proposition** (nouvelle section « Module Facturation (hub) → spec 2026-09-22 ») :
 - **Numéro de facture = RPC `invoice_issue` sous verrou** (`majordhome.invoice_sequences` par org × année, `${prefix}-${YYYY}-${NNNNN}`) : jamais calculé côté front, jamais `MAX()+1`. Préfixe = `settings.invoicing.number_prefix` (Settings → Facturation → Émission) ; distinct de la série Pennylane (« F ») tant que PL numérote aussi.
@@ -32,4 +32,6 @@
 - **Chaîne d'émission = `useIssueEntretienInvoice` (point d'entrée unique)** : brouillon → numéro → carte marquée → PDF → Storage `invoices/${org}/${année}/${numéro}.pdf`. La carte est marquée AVANT le PDF (le numéro consommé fait exister la facture) ; tout échec aval dit ce qui EST fait.
 - **Modèle PUR `src/lib/invoiceDocumentModel.js`** (`node --test scripts/invoice-document-model.test.mjs`, dans `audit:quality`) : montants au centime (`ht + tva = ttc` par ligne, totaux = sommes, ventilation par taux), modèle PDF préformaté (PDF-safe). `InvoicePDF.jsx` ne calcule ni ne formate rien.
 - Réglages `settings.invoicing = { number_prefix, iban, bic, payment_terms, late_penalty, discount_note }` lus par `invoicingSettings()` (défauts neutres), objet sauvé COMPLET.
+- **Import Pennylane = edge `pennylane-invoice-import`** (team_leader+, org Pennylane activée) : PDF archivé → `/file_attachments` → `POST /customer_invoices/import` avec NOTRE numéro, `external_reference` = id facture, montants ENREGISTRÉS (jamais recalculés), journal de ventes principal (le déplacement d'écriture est refusé par l'API). Résultat écrit UNIQUEMENT par la RPC `invoice_set_import_result` (service_role) : `import_status` ∈ `pending | imported | error` + `import_error` + `import_attempted_at`. L'import n'échoue jamais l'émission : un échec est enregistré et rejoué depuis la carte (`useRetryInvoiceExport`, qui régénère aussi un PDF manquant). Le client Pennylane vient du mapping `pennylane_sync` type `client`, posé côté front (`ensurePennylaneCustomer`) — l'edge ne prend jamais un `customer_id` du payload.
+- `invoice_lines.vat_code` = code TVA Pennylane figé à la création (l'edge ne recopie pas `VAT_CODES`). `majordhome_entretien_sav.invoice_import_status` pilote le bouton de rejeu (cast `invoice_id::uuid` protégé par un CASE : la colonne porte aussi des ids Pennylane).
 ---

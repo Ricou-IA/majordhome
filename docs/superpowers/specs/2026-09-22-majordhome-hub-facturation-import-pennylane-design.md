@@ -88,7 +88,7 @@ déplacement d'écriture de l'edge de test restent en place mais ne sont plus un
    PDF et notre numéro ; le déplacement d'écriture est refusé (422). Décision : journal VT, journal
    dédié reporté (voir « Pourquoi changer de chemin »).
 1. ✅ **Livrée le 2026-09-22** — numérotation + tables + RPC d'émission + PDF + archivage (sans Pennylane). Plan : docs/superpowers/plans/2026-09-22-hub-facturation-phase1-emission-locale.md
-2. Import + statuts + rejeu (`import_status` ∈ `pending | imported | error`, plus de `journal_moved`).
+2. ✅ **Livrée le 2026-09-23** — import Pennylane (edge `pennylane-invoice-import`, journal de ventes principal), statuts `import_status`, rejeu PDF/import depuis la carte. Plan : docs/superpowers/plans/2026-09-22-hub-facturation-phase2-import-pennylane.md
 3. Avoir.
 4. Facturation électronique, envoi, rapprochement automatisé.
 
