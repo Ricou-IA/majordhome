@@ -150,6 +150,11 @@ SET search_path TO 'majordhome', 'public', 'core'
 AS $function$
 DECLARE
   v_status text;
+  v_status_out text;
+  v_error_out text;
+  v_attempted timestamptz;
+  v_pl_id bigint;
+  v_ledger_id bigint;
 BEGIN
   IF p_status NOT IN ('pending', 'imported', 'error') THEN
     RAISE EXCEPTION 'invalid_import_status' USING ERRCODE = '22023', DETAIL = p_status;
@@ -157,7 +162,7 @@ BEGIN
   SELECT status INTO v_status FROM majordhome.invoices WHERE id = p_invoice_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'invoice_not_found' USING ERRCODE = 'P0002'; END IF;
   IF v_status <> 'issued' THEN
-    RAISE EXCEPTION 'invoice_not_issued' USING ERRCODE = '42501', DETAIL = v_status;
+    RAISE EXCEPTION 'invoice_not_issued' USING ERRCODE = '22023', DETAIL = v_status;
   END IF;
   IF p_status = 'imported' AND p_pennylane_invoice_id IS NULL THEN
     RAISE EXCEPTION 'pennylane_invoice_id_required' USING ERRCODE = '22023';
@@ -169,10 +174,13 @@ BEGIN
          import_attempted_at = now(),
          pennylane_invoice_id = COALESCE(p_pennylane_invoice_id, pennylane_invoice_id),
          pennylane_ledger_entry_id = COALESCE(p_pennylane_ledger_entry_id, pennylane_ledger_entry_id)
-   WHERE id = p_invoice_id;
+   WHERE id = p_invoice_id
+   RETURNING import_status, import_error, import_attempted_at, pennylane_invoice_id, pennylane_ledger_entry_id
+     INTO v_status_out, v_error_out, v_attempted, v_pl_id, v_ledger_id;
 
-  RETURN jsonb_build_object('id', p_invoice_id, 'import_status', p_status,
-    'pennylane_invoice_id', p_pennylane_invoice_id, 'import_attempted_at', now());
+  RETURN jsonb_build_object('id', p_invoice_id, 'import_status', v_status_out,
+    'import_error', v_error_out, 'pennylane_invoice_id', v_pl_id,
+    'pennylane_ledger_entry_id', v_ledger_id, 'import_attempted_at', v_attempted);
 END;
 $function$;
 

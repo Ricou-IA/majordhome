@@ -32,6 +32,8 @@ DO $$
 DECLARE
   v_mayer uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
   v_membre uuid; v_id uuid; v_draft uuid; v_res jsonb; v_row record; ok boolean; n int;
+  v_client_id uuid; v_project_id uuid; v_interv_num uuid; v_interv_uuid uuid;
+  v_import_error_check text; v_card_status text;
 BEGIN
   SELECT om.user_id INTO v_membre FROM core.organization_members om JOIN core.profiles p ON p.id = om.user_id
    WHERE om.org_id = v_mayer AND om.user_id IS NOT NULL AND om.role IN ('org_admin','team_leader') LIMIT 1;
@@ -57,7 +59,8 @@ BEGIN
   IF NOT ok THEN RAISE EXCEPTION '(2) authenticated a posé un résultat d''import'; END IF;
   RESET ROLE;
 
-  -- (3) service_role : succès puis échec, colonnes de suivi ; brouillon refusé
+  -- (3) service_role : succès puis échec, colonnes de suivi ; le retour reflète la ligne
+  -- persistée (RETURNING), pas les paramètres reçus.
   SET LOCAL ROLE service_role;
   v_res := public.invoice_set_import_result(v_id, 'imported', 123, 456, NULL);
   SELECT import_status, import_error, import_attempted_at, pennylane_invoice_id, pennylane_ledger_entry_id INTO v_row
@@ -65,14 +68,46 @@ BEGIN
   IF v_row.import_status <> 'imported' OR v_row.pennylane_invoice_id <> 123 OR v_row.pennylane_ledger_entry_id <> 456
      OR v_row.import_attempted_at IS NULL OR v_row.import_error IS NOT NULL THEN
     RAISE EXCEPTION '(3) résultat imported mal posé : %', to_jsonb(v_row); END IF;
+  IF v_res->>'import_status' <> 'imported' OR (v_res->>'pennylane_invoice_id')::bigint <> 123 THEN
+    RAISE EXCEPTION '(3) retour imported ne reflète pas la ligne persistée : %', v_res; END IF;
+
   v_res := public.invoice_set_import_result(v_id, 'error', NULL, NULL, 'Pennylane 422 : test');
   SELECT import_status, import_error, pennylane_invoice_id INTO v_row FROM majordhome.invoices WHERE id = v_id;
   IF v_row.import_status <> 'error' OR v_row.import_error NOT LIKE 'Pennylane 422%' OR v_row.pennylane_invoice_id <> 123 THEN
     RAISE EXCEPTION '(3) résultat error mal posé : %', to_jsonb(v_row); END IF;
+  -- p_pennylane_invoice_id était NULL sur cet appel : le retour doit porter la valeur COALESCE
+  -- persistée (123), jamais le paramètre NULL reçu.
+  IF v_res->>'pennylane_invoice_id' <> '123' THEN
+    RAISE EXCEPTION '(3) retour error : pennylane_invoice_id % au lieu de 123 (reflète le paramètre reçu, pas la ligne)', v_res->>'pennylane_invoice_id'; END IF;
+
+  -- (3bis) Un nouvel import réussi après un échec efface l'erreur précédente (et remet
+  -- l'invoice en 'imported' pour la suite du test).
+  v_res := public.invoice_set_import_result(v_id, 'imported', 123, 456, NULL);
+  SELECT import_error INTO v_import_error_check FROM majordhome.invoices WHERE id = v_id;
+  IF v_import_error_check IS NOT NULL THEN
+    RAISE EXCEPTION '(3bis) import_error non effacé après un nouvel import réussi : %', v_import_error_check; END IF;
+
+  -- (3ter) statut imported sans pennylane_invoice_id refusé (22023)
+  ok := false;
+  BEGIN
+    PERFORM public.invoice_set_import_result(v_id, 'imported', NULL, NULL, NULL);
+  EXCEPTION WHEN SQLSTATE '22023' THEN ok := true;
+  END;
+  IF NOT ok THEN RAISE EXCEPTION '(3ter) imported sans pennylane_invoice_id accepté'; END IF;
+
+  -- (3quater) facture introuvable (P0002)
+  ok := false;
+  BEGIN
+    PERFORM public.invoice_set_import_result(gen_random_uuid(), 'imported', 1, NULL, NULL);
+  EXCEPTION WHEN SQLSTATE 'P0002' THEN ok := true;
+  END;
+  IF NOT ok THEN RAISE EXCEPTION '(3quater) facture inexistante acceptée'; END IF;
+
+  -- (3) brouillon refusé — 22023 (invoice_not_issued), pas 42501 (réservé aux violations de droits)
   ok := false;
   BEGIN
     PERFORM public.invoice_set_import_result(v_draft, 'imported', 1, NULL, NULL);
-  EXCEPTION WHEN SQLSTATE '42501' THEN ok := true;
+  EXCEPTION WHEN SQLSTATE '22023' THEN ok := true;
   END;
   IF NOT ok THEN RAISE EXCEPTION '(3) résultat posé sur un brouillon'; END IF;
   ok := false;
@@ -83,9 +118,28 @@ BEGIN
   IF NOT ok THEN RAISE EXCEPTION '(3) statut invalide accepté'; END IF;
   RESET ROLE;
 
-  -- (4) La vue carte expose le statut pour un invoice_id uuid, NULL pour un id Pennylane
+  -- (4) La vue carte expose le statut pour un invoice_id uuid réel (garde regex), NULL pour un
+  -- id Pennylane numérique — sans jamais lever 22P02 (cast uuid protégé par le CASE).
+  -- v_id est 'imported' à ce stade (remis par (3bis)).
+  SELECT c.id, c.project_id INTO v_client_id, v_project_id
+    FROM majordhome.clients c WHERE c.org_id = v_mayer LIMIT 1;
+  IF v_client_id IS NULL THEN RAISE EXCEPTION 'fixture (4) : aucun client Mayer'; END IF;
+
+  INSERT INTO majordhome.interventions (project_id, client_id, intervention_type, invoice_id)
+  VALUES (v_project_id, v_client_id, 'entretien', '123456')
+  RETURNING id INTO v_interv_num;
+  INSERT INTO majordhome.interventions (project_id, client_id, intervention_type, invoice_id)
+  VALUES (v_project_id, v_client_id, 'entretien', v_id::text)
+  RETURNING id INTO v_interv_uuid;
+
   SELECT count(*) INTO n FROM public.majordhome_entretien_sav WHERE invoice_import_status IS NOT NULL;
-  RAISE NOTICE '(4) % carte(s) avec statut d''import (0 attendu sur le snapshot : interventions sans données)', n;
+  IF n <> 1 THEN RAISE EXCEPTION '(4) % carte(s) avec statut d''import au lieu de 1 (1 uuid réel + 1 id Pennylane numérique)', n; END IF;
+
+  SELECT invoice_import_status INTO v_card_status FROM public.majordhome_entretien_sav WHERE id = v_interv_uuid;
+  IF v_card_status <> 'imported' THEN RAISE EXCEPTION '(4) carte à invoice_id uuid : statut % au lieu de imported', v_card_status; END IF;
+
+  SELECT invoice_import_status INTO v_card_status FROM public.majordhome_entretien_sav WHERE id = v_interv_num;
+  IF v_card_status IS NOT NULL THEN RAISE EXCEPTION '(4) carte à invoice_id Pennylane (numérique) : statut % au lieu de NULL', v_card_status; END IF;
 
   RAISE NOTICE 'assert-invoices-import B (fonctionnel) : OK';
 END $$;
