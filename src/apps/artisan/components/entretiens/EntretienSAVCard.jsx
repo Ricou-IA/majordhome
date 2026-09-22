@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -20,6 +20,10 @@ import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { usePennylaneEnabled, useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
+import { useRetryInvoiceExport } from '@hooks/useInvoices';
+import { buildCompanyInfo } from '@/lib/orgBranding';
+import { invoicingSettings, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
+import { generateInvoicePdfBlob } from '../facturation/InvoicePDF';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
 
 // ============================================================================
@@ -72,6 +76,8 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const pennylaneEnabled = usePennylaneEnabled();
   const { settings } = useOrgSettings();
   const isHubMode = pennylaneInvoiceSettings(settings).mode === 'hub';
+  const retryExport = useRetryInvoiceExport(orgId);
+  const needsExportRetry = isHubMode && !!item.invoice_id && (item.invoice_import_status === 'pending' || item.invoice_import_status === 'error');
   const queryClient = useQueryClient();
   const type = item.intervention_type;
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.entretien;
@@ -298,6 +304,36 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                     </div>
                   )}
                 </>
+              )}
+              {isTeamLeaderOrAbove && needsExportRetry && pennylaneEnabled && (
+                <button
+                  type="button"
+                  disabled={retryExport.isPending}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const r = await retryExport.mutateAsync({
+                        invoiceId: item.invoice_id,
+                        company: buildCompanyInfo(settings),
+                        invoicing: invoicingSettings(settings),
+                        renderPdf: generateInvoicePdfBlob,
+                        pennylaneEnabled,
+                      });
+                      toast.success(
+                        r.alreadyImported && !r.imported
+                          ? `Facture ${r.number} déjà importée dans Pennylane`
+                          : `Facture ${r.number}${r.pdfRegenerated ? ' — PDF régénéré,' : ''} importée dans Pennylane`,
+                      );
+                    } catch (err) {
+                      toast.error(invoiceErrorMessage(err), { duration: 15000 });
+                    }
+                  }}
+                  title={item.invoice_import_status === 'error' ? 'L’import Pennylane a échoué : rejouer' : 'Import Pennylane non fait : rejouer'}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${retryExport.isPending ? 'animate-spin' : ''}`} />
+                  {retryExport.isPending ? 'Import…' : 'Import Pennylane à rejouer'}
+                </button>
               )}
               {/* Marquage manuel « Facturé » (toggle) : facture faite directement dans
                   Pennylane, ou org sans intégration. La carte reste en Réalisé ; le RDV

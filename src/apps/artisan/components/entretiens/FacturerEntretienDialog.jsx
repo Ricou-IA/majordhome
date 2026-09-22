@@ -150,11 +150,16 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           renderPdf: generateInvoicePdfBlob,
           interventionId: item.id,
           invoicedAt: item.invoiced_at || null,
+          pennylane: pennylaneEnabled ? { enabled: true } : null,
         });
         if (issued.blob) downloadBlob(issued.blob, `${issued.number}.pdf`);
-        toast.success(`Facture ${issued.number} émise et archivée`, {
-          action: issued.blob ? { label: 'Télécharger', onClick: () => downloadBlob(issued.blob, `${issued.number}.pdf`) } : undefined,
-        });
+        toast.success(
+          issued.pennylaneInvoiceId
+            ? `Facture ${issued.number} émise, archivée et importée dans Pennylane`
+            : `Facture ${issued.number} émise et archivée`,
+          { action: issued.blob ? { label: 'Télécharger', onClick: () => downloadBlob(issued.blob, `${issued.number}.pdf`) } : undefined },
+        );
+        if (issued.importWarning) toast.warning(issued.importWarning, { duration: 15000 });
         onOpenChange(false);
         onCreated?.();
       } catch (err) {
@@ -210,7 +215,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       title={isHub ? 'Émettre la facture' : isDraft ? 'Créer le brouillon de facture' : 'Créer la facture'}
       description={
         isHub
-          ? `${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — Majord'home attribue le numéro (${invoicing.numberPrefix}-${new Date().getFullYear()}-…), génère le PDF et l'archive. Rien n'est envoyé à Pennylane (phase 2).`
+          ? `${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — Majord'home attribue le numéro (${invoicing.numberPrefix}-${new Date().getFullYear()}-…), génère le PDF et l'archive. ${pennylaneEnabled ? 'La facture est ensuite importée telle quelle dans Pennylane (journal de ventes).' : 'Pennylane n’est pas activé : pas d’import.'}`
           : `${clientLabel}${contractNumber ? ` · ${contractNumber}` : ''} — la facture sera créée sur Pennylane${isDraft ? ' en brouillon, à finaliser et envoyer depuis Pennylane' : ' et numérotée immédiatement'}.`
       }
       confirmLabel={isHub ? 'Émettre la facture' : isDraft ? 'Créer le brouillon' : 'Créer la facture'}
