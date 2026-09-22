@@ -39,3 +39,15 @@
 - **`update_majordhome_lead` a une liste de colonnes EXPLICITE** : une nouvelle colonne de `leads` est ignorée en silence par la RPC tant qu'on n'y ajoute pas sa ligne `CASE WHEN p_updates ? '…'`. Le REVOKE FROM PUBLIC, anon manquait (posé le 2026-09-22).
 - **Harnais de répétition** : `snapshot.mjs` déclare le sous-ensemble ; une migration qui touche une vue absente du sous-ensemble échoue en « relation does not exist » → étendre TABLES / VIEWS / FUNCTIONS (fait pour leads, appointments, sms_logs, lead_pennylane_quotes, les 3 vues chantiers / interventions / entretien_sav, project_org_id, quote_status_bucket).
 ---
+
+## [2026-09-22 14:30] Hub de facturation — phase 1 (émission locale)
+**Statut** : PENDING
+**Commit** : f5d9196 · db8e39a
+**Contexte** : Majord'home émet ses factures d'entretien (mode « Émise par Majord'home » dans Settings → Facturation) : numéro légal par la base, lignes/totaux figés, PDF archivé dans le bucket `invoices`. Pennylane n'est pas appelé (import en phase 2, journal de ventes principal — le journal dédié est reporté, l'API ne permet pas de déplacer l'écriture d'une facture).
+**Proposition** (nouvelle section « Module Facturation (hub) → spec 2026-09-22 ») :
+- **Numéro de facture = RPC `invoice_issue` sous verrou** (`majordhome.invoice_sequences` par org × année, `${prefix}-${YYYY}-${NNNNN}`) : jamais calculé côté front, jamais `MAX()+1`. Préfixe = `settings.invoicing.number_prefix` (Settings → Facturation → Émission) ; distinct de la série Pennylane (« F ») tant que PL numérote aussi.
+- **Une facture `issued` est figée par trigger** (`invoices_guard_immutable` + lignes) : seules `pdf_path`, `pennylane_*`, `import_*` bougent ; correction = avoir (phase 3). `customer` = photo du client à l'émission.
+- **Chaîne d'émission = `useIssueEntretienInvoice` (point d'entrée unique)** : brouillon → numéro → carte marquée → PDF → Storage `invoices/${org}/${année}/${numéro}.pdf`. La carte est marquée AVANT le PDF (le numéro consommé fait exister la facture) ; tout échec aval dit ce qui EST fait.
+- **Modèle PUR `src/lib/invoiceDocumentModel.js`** (`node --test scripts/invoice-document-model.test.mjs`, dans `audit:quality`) : montants au centime (`ht + tva = ttc` par ligne, totaux = sommes, ventilation par taux), modèle PDF préformaté (PDF-safe). `InvoicePDF.jsx` ne calcule ni ne formate rien.
+- Réglages `settings.invoicing = { number_prefix, iban, bic, payment_terms, late_penalty, discount_note }` lus par `invoicingSettings()` (défauts neutres), objet sauvé COMPLET.
+---
