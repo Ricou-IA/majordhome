@@ -325,11 +325,11 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                           : `Facture ${r.number}${r.pdfRegenerated ? ' — PDF régénéré,' : ''} importée dans Pennylane`,
                       );
                     } catch (err) {
-                      toast.error(invoiceErrorMessage(err), { duration: 15000 });
+                      toast.error(invoiceErrorMessage(err, 'Le rejeu de l’export a échoué'), { duration: 15000 });
                     }
                   }}
                   title={item.invoice_import_status === 'error' ? 'L’import Pennylane a échoué : rejouer' : 'Import Pennylane non fait : rejouer'}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] rounded border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${retryExport.isPending ? 'animate-spin' : ''}`} />
                   {retryExport.isPending ? 'Import…' : 'Import Pennylane à rejouer'}

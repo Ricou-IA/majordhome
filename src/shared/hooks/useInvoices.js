@@ -129,8 +129,10 @@ export function useRetryInvoiceExport(orgId) {
       let alreadyImported = Boolean(invoice.pennylane_invoice_id);
       if (pennylaneEnabled && !alreadyImported) {
         // Le client importé est TOUJOURS celui de la facture, jamais un client fourni par
-        // l'appelant (review round 1, 2026-09-23).
-        if (!invoice.client_id) throw new Error('customer_not_synced');
+        // l'appelant (review round 1, 2026-09-23). Absence de client ≠ client pas encore
+        // synchronisé Pennylane : deux causes distinctes, deux messages distincts (finding
+        // minor, revue finale 2026-09-22).
+        if (!invoice.client_id) throw new Error('invoice_without_client');
         await unwrapResult(invoicesService.ensurePennylaneCustomer(orgId, invoice.client_id));
         const res = await unwrapResult(invoicesService.importToPennylane(orgId, invoiceId));
         // `recovered` = la facture existait déjà côté PL (probe anti-doublon) et cet appel vient
