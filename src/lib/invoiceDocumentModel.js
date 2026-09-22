@@ -17,6 +17,8 @@
 // ============================================================================
 import { formatFullAddress, buildLegalFooter } from './orgBranding.js';
 
+export const CREDIT_NOTE_PAYMENT_NOTE = 'Avoir à déduire de votre prochain règlement, ou remboursé sur simple demande.';
+
 export const INVOICING_DEFAULTS = Object.freeze({
   numberPrefix: 'F',
   iban: '',
@@ -251,19 +253,20 @@ export function buildInvoicePdfModel({ invoice, lines, company, invoicing }) {
   const footerParts = [buildLegalFooter(company)];
   if (company.siret) footerParts.push(`SIRET ${company.siret}`);
   if (company.tvaIntra) footerParts.push(`TVA ${company.tvaIntra}`);
+  const isCreditNote = invoice.kind === 'credit_note';
   return {
-    title: invoice.kind === 'credit_note' ? 'AVOIR' : 'FACTURE',
+    title: isCreditNote ? 'AVOIR' : 'FACTURE',
     number: invoice.number,
-    creditedNumber: invoice.kind === 'credit_note' ? invoice.credited_number || null : null,
+    creditedNumber: isCreditNote ? invoice.credited_number || null : null,
     dates: { invoice: fmtDateFr(invoice.invoice_date), due: fmtDateFr(invoice.due_at) },
     customer,
     subject: invoice.subject || null,
     rows,
     vatRows,
     totals: { ht: fmtEur(invoice.total_ht), tva: fmtEur(invoice.total_tva), ttc: fmtEur(invoice.total_ttc) },
-    discountLine: discountLineOf(invoice.discount),
-    payment,
-    legal: [invoicing.latePenalty, invoicing.discountNote].filter(Boolean),
+    discountLine: isCreditNote ? null : discountLineOf(invoice.discount),
+    payment: isCreditNote ? [CREDIT_NOTE_PAYMENT_NOTE] : payment,
+    legal: isCreditNote ? [] : [invoicing.latePenalty, invoicing.discountNote].filter(Boolean),
     rge: company.rgeCertifications?.length ? `Certifications : ${company.rgeCertifications.join(', ')}` : null,
     companyAddress: formatFullAddress(company),
     footer: footerParts.filter(Boolean).join(' — '),
@@ -296,6 +299,9 @@ export const INVOICE_RPC_MESSAGES = Object.freeze({
   vat_code_unmapped: 'Taux de TVA d’une ligne sans équivalent Pennylane : facture à corriger avant import.',
   pennylane_reference_taken: 'Pennylane connaît déjà cette référence de facture : import à réconcilier (voir Pennylane), pas à rejouer.',
   invoice_without_client: 'Facture sans client rattaché : import Pennylane impossible.',
+  already_credited: 'Cette facture a déjà été annulée par un avoir.',
+  credit_note_source_invalid: 'Seule une facture émise (et non annulée) peut être annulée par un avoir.',
+  credited_invoice_not_imported: 'La facture d’origine n’est pas importée dans Pennylane : l’avoir y est importé sans lien.',
 });
 
 /**

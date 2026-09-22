@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INVOICING_DEFAULTS, invoicingSettings, validateIban, validateBic, validateNumberPrefix, splitTtc, fmtEur,
-  buildInvoiceDraft, buildInvoicePdfModel, invoiceErrorMessage, INVOICE_RPC_MESSAGES,
+  buildInvoiceDraft, buildInvoicePdfModel, invoiceErrorMessage, INVOICE_RPC_MESSAGES, CREDIT_NOTE_PAYMENT_NOTE,
 } from '../src/lib/invoiceDocumentModel.js';
 import { buildCompanyInfo } from '../src/lib/orgBranding.js';
 
@@ -203,6 +203,21 @@ test('buildInvoicePdfModel : aucun glyphe hors cp1252 dans les chaînes rendues'
   assert.ok(!/[\u202f\u2212\u2192\u2265\u2264\u0394\u03b8\u03a6]/.test(all), 'glyphe interdit trouvé');
 });
 
+test('buildInvoicePdfModel : avoir — titre, facture créditée, montants négatifs, mention de règlement dédiée', () => {
+  const avoir = { ...ISSUED, kind: 'credit_note', number: 'F-2026-00013', credited_number: 'F-2026-00012', subject: 'Avoir sur la facture F-2026-00012',
+    total_ht: -92.73, total_tva: -9.27, total_ttc: -102, vat_breakdown: [{ rate: 10, base: -92.73, amount: -9.27 }], discount: null };
+  const lignes = LINES.map((l) => ({ ...l, unit_price_ht: -l.unit_price_ht, ht: -l.ht, tva: -l.tva, ttc: -l.ttc }));
+  const pdf = buildInvoicePdfModel({ invoice: avoir, lines: lignes, company: COMPANY, invoicing: INVOICING });
+  assert.equal(pdf.title, 'AVOIR');
+  assert.equal(pdf.creditedNumber, 'F-2026-00012');
+  assert.equal(pdf.totals.ttc, '-102,00 €');
+  assert.equal(pdf.rows[0].ht, '-81,82 €');
+  assert.deepEqual(pdf.vatRows, [{ rate: '10 %', base: '-92,73 €', amount: '-9,27 €' }]);
+  assert.deepEqual(pdf.payment, [CREDIT_NOTE_PAYMENT_NOTE]);
+  assert.deepEqual(pdf.legal, []);
+  assert.equal(pdf.discountLine, null);
+});
+
 test('invoiceErrorMessage : code RPC connu (nu ou dans un message PostgREST) → français', () => {
   assert.equal(invoiceErrorMessage(new Error('intervention_already_invoiced')), 'Cette intervention a déjà une facture émise.');
   assert.equal(
@@ -238,6 +253,12 @@ test('invoiceErrorMessage : codes ajoutés par la revue finale (vat_code_unmappe
   assert.match(invoiceErrorMessage(new Error('vat_code_unmapped')), /TVA.*Pennylane/i);
   assert.match(invoiceErrorMessage(new Error('pennylane_reference_taken')), /Pennylane.*référence/i);
   assert.match(invoiceErrorMessage(new Error('invoice_without_client')), /client rattaché/i);
+});
+
+test('invoiceErrorMessage : codes de l\'avoir', () => {
+  assert.match(invoiceErrorMessage(new Error('already_credited')), /déjà.*avoir/i);
+  assert.match(invoiceErrorMessage(new Error('credit_note_source_invalid')), /émise/i);
+  assert.match(invoiceErrorMessage(new Error('credited_invoice_not_imported')), /Pennylane/);
 });
 
 test('INVOICE_RPC_MESSAGES : les codes morts pennylane_disabled/already_imported ont été retirés', () => {
