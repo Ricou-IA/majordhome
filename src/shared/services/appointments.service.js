@@ -278,6 +278,61 @@ export const appointmentsService = {
   },
 
   /**
+   * Tous les RDV d'un client (passés et futurs), avec leurs technician_ids.
+   * Un RDV est rattaché au client directement (client_id) OU via un lead du
+   * client (VT posées depuis le pipeline : lead_id seul, sans client_id).
+   * @param {Object} params
+   * @param {string} params.coreOrgId - ID core.organizations
+   * @param {string} params.clientId
+   */
+  async getClientAppointments({ coreOrgId, clientId }) {
+    try {
+      const orgId = await getMajordhomeOrgId(coreOrgId);
+
+      const { data: leads, error: leadsError } = await supabase
+        .from('majordhome_leads')
+        .select('id')
+        .eq('org_id', coreOrgId)
+        .eq('client_id', clientId);
+      if (leadsError) return { data: null, error: leadsError };
+
+      const leadIds = (leads || []).map((l) => l.id);
+      const links = [`client_id.eq.${clientId}`];
+      if (leadIds.length > 0) links.push(`lead_id.in.(${leadIds.join(',')})`);
+
+      const { data, error } = await supabase
+        .from('majordhome_appointments')
+        .select('*')
+        .eq('org_id', orgId)
+        .or(links.join(','))
+        .order('scheduled_date', { ascending: false })
+        .order('scheduled_start', { ascending: false });
+      if (error) return { data: null, error };
+      if (!data?.length) return { data: [], error: null };
+
+      const { data: techLinks, error: techError } = await supabase
+        .from('majordhome_appointment_technicians')
+        .select('appointment_id, technician_id')
+        .in('appointment_id', data.map((a) => a.id));
+      if (techError) return { data: null, error: techError };
+
+      const techMap = new Map();
+      (techLinks || []).forEach((t) => {
+        if (!techMap.has(t.appointment_id)) techMap.set(t.appointment_id, []);
+        techMap.get(t.appointment_id).push(t.technician_id);
+      });
+
+      return {
+        data: data.map((a) => ({ ...a, technician_ids: techMap.get(a.id) || [] })),
+        error: null,
+      };
+    } catch (err) {
+      console.error('[appointments] getClientAppointments error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
    * Récupérer un RDV par ID avec ses techniciens
    */
   async getAppointmentById(appointmentId) {

@@ -168,6 +168,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: (data) => unwrapResult(appointmentsService.createAppointment({ coreOrgId: orgId, ...data })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
     },
   });
 
@@ -177,6 +178,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       unwrapResult(appointmentsService.updateAppointment(appointmentId, updates)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
@@ -217,6 +219,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
@@ -227,6 +230,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       unwrapResult(appointmentsService.cancelAppointment(appointmentId, reason)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
     },
   });
 
@@ -235,6 +239,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: (appointmentId) => unwrapResult(appointmentsService.deleteAppointment(appointmentId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
@@ -366,6 +371,20 @@ export function useTeamMembers(orgId) {
     error,
     refresh: refetch,
   };
+}
+
+/**
+ * Tous les RDV d'un client (passés et futurs) — recherche client du planning.
+ */
+export function useClientAppointments(orgId, clientId) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: appointmentKeys.byClient(orgId, clientId),
+    queryFn: () => unwrapResult(appointmentsService.getClientAppointments({ coreOrgId: orgId, clientId })),
+    enabled: !!orgId && !!clientId,
+    staleTime: 15_000,
+  });
+
+  return { appointments: data || [], isLoading, error };
 }
 
 // ============================================================================

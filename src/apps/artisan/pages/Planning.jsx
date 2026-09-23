@@ -39,6 +39,7 @@ import { isoWeekNumber } from '@/lib/planningPrintModel';
 import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/planningPrintExport';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
+import { PlanningClientSearch } from '@/apps/artisan/components/planning/PlanningClientSearch';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
@@ -392,6 +393,8 @@ export default function Planning() {
   const [selectedChantier, setSelectedChantier] = useState(null);
   const [loadingChantier, setLoadingChantier] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  // RDV du client recherché (surlignés dans le calendrier) — null = pas de recherche
+  const [searchHitIds, setSearchHitIds] = useState(null);
 
   // Hooks données
   const {
@@ -469,6 +472,16 @@ export default function Planning() {
         : null
     );
   }, []);
+
+  // Recherche client : clic sur un RDV → le calendrier va à sa date
+  const handlePickSearchedAppointment = useCallback((appt) => {
+    calendarRef.current?.getApi().gotoDate(appt.scheduled_date);
+  }, []);
+
+  const eventClassNames = useCallback(
+    (arg) => (searchHitIds?.has(arg.event.extendedProps.id) ? ['mdh-search-hit'] : []),
+    [searchHitIds]
+  );
 
   // Changer de vue
   const handleViewChange = useCallback((viewName) => {
@@ -677,6 +690,12 @@ export default function Planning() {
           setFilters={setFilters}
           teamList={teamList}
         />
+        <PlanningClientSearch
+          orgId={orgId}
+          teamList={teamList}
+          onPickAppointment={handlePickSearchedAppointment}
+          onResultsChange={setSearchHitIds}
+        />
       </div>
 
       {/* Calendrier */}
@@ -708,6 +727,7 @@ export default function Planning() {
             // Événements
             events={events}
             eventContent={(eventInfo) => <PlanningEventContent eventInfo={eventInfo} />}
+            eventClassNames={eventClassNames}
             // Interactions
             editable={canCreateAppointment}
             selectable={canCreateAppointment}

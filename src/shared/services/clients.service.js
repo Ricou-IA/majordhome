@@ -972,25 +972,31 @@ export const clientsService = {
       const safeQuery = escapePostgrestSearchTerm(query);
       if (!safeQuery || safeQuery.length < 2) return [];
 
-      const { data, error } = await supabase
+      let request = supabase
         .from('majordhome_clients')
         .select('id, project_id, display_name, email, phone, city, postal_code, client_number, client_category, has_active_contract')
         .eq('org_id', orgId)
-        .eq('is_archived', false)
-        .or((() => {
-          const conditions = [
-            `display_name.ilike.%${safeQuery}%`,
-            `email.ilike.%${safeQuery}%`,
-            `phone.ilike.%${safeQuery}%`,
-            `city.ilike.%${safeQuery}%`,
-          ];
-          const phoneSpaced = formatPhoneForSearch(safeQuery);
-          if (phoneSpaced && phoneSpaced !== safeQuery) {
-            conditions.push(`phone.ilike.%${phoneSpaced}%`);
-          }
-          return conditions.join(',');
-        })())
-        .limit(limit);
+        .eq('is_archived', false);
+
+      // Multi-mots : chaque mot doit matcher un des champs (« jean gaillac »
+      // → prénom ET ville). Un numéro de téléphone saisi avec espaces reste
+      // un seul terme (sinon « 06 », « 12 »… matcheraient n'importe qui).
+      const phoneSpaced = formatPhoneForSearch(safeQuery);
+      const terms = phoneSpaced ? [safeQuery] : safeQuery.split(/\s+/).filter(Boolean);
+      for (const term of terms) {
+        const conditions = [
+          `display_name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+          `phone.ilike.%${term}%`,
+          `city.ilike.%${term}%`,
+        ];
+        if (phoneSpaced && phoneSpaced !== term) {
+          conditions.push(`phone.ilike.%${phoneSpaced}%`);
+        }
+        request = request.or(conditions.join(','));
+      }
+
+      const { data, error } = await request.limit(limit);
 
       if (error) throw error;
 
