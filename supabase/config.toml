@@ -138,3 +138,6 @@ verify_jwt = true
 
 [functions.pennylane-invoice-import]
 verify_jwt = true
+
+[functions.invoice-send]
+verify_jwt = true
