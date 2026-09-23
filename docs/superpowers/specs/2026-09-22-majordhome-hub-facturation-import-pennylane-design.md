@@ -89,7 +89,7 @@ déplacement d'écriture de l'edge de test restent en place mais ne sont plus un
    dédié reporté (voir « Pourquoi changer de chemin »).
 1. ✅ **Livrée le 2026-09-22** — numérotation + tables + RPC d'émission + PDF + archivage (sans Pennylane). Plan : docs/superpowers/plans/2026-09-22-hub-facturation-phase1-emission-locale.md
 2. ✅ **Livrée le 2026-09-23** — import Pennylane (edge `pennylane-invoice-import`, journal de ventes principal), statuts `import_status`, rejeu PDF/import depuis la carte. Plan : docs/superpowers/plans/2026-09-22-hub-facturation-phase2-import-pennylane.md
-3. Avoir.
+3. ✅ **Livrée le 2026-09-23** — avoir (annulation totale, même série, import lié). Plan : docs/superpowers/plans/2026-09-23-hub-facturation-phase3-avoir.md
 4. Facturation électronique, envoi, rapprochement automatisé.
 
 Estimation : 4 à 6 jours après le spike. Le chemin actuel (Pennylane crée la facture) reste actif

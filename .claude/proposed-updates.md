@@ -22,10 +22,10 @@
 *Confirmé PENDING le 2026-08-09 : rien à graver tant que les phases ne sont pas livrées. Reconfirmé le 2026-09-16 et le 2026-09-22.*
 ---
 
-## [2026-09-22 14:30] Hub de facturation — phases 1 et 2 (émission locale, import Pennylane)
+## [2026-09-22 14:30] Hub de facturation — phases 1 à 3 (émission locale, import Pennylane, avoir)
 **Statut** : PENDING (à graver dans CLAUDE.md)
-**Commit** : f5d9196 · db8e39a · fb7d90e · 40e8924 · 10d7eff · ca40d0c · 877afa1 · cd9014e · f3f99c5 · 1236240 · 69d808a
-**Contexte** : Majord'home émet ses factures d'entretien (mode « Émise par Majord'home » dans Settings → Facturation) : numéro légal par la base, lignes/totaux figés, PDF archivé dans le bucket `invoices`. Pennylane n'est pas appelé (import en phase 2, journal de ventes principal — le journal dédié est reporté, l'API ne permet pas de déplacer l'écriture d'une facture).
+**Commit** : f5d9196 · db8e39a · fb7d90e · 40e8924 · 10d7eff · ca40d0c · 877afa1 · cd9014e · f3f99c5 · 1236240 · 69d808a · 49a2931 · 4e43212 · 571914d · 7ac8776 · d7763b1
+**Contexte** : Majord'home émet ses factures d'entretien (mode « Émise par Majord'home » dans Settings → Facturation) : numéro légal par la base, lignes/totaux figés, PDF archivé dans le bucket `invoices`. Pennylane n'est pas appelé (import en phase 2, journal de ventes principal — le journal dédié est reporté, l'API ne permet pas de déplacer l'écriture d'une facture). Phase 3 ajoute les avoirs de correction.
 **Proposition** (nouvelle section « Module Facturation (hub) → spec 2026-09-22 ») :
 - **Numéro de facture = RPC `invoice_issue` sous verrou** (`majordhome.invoice_sequences` par org × année, `${prefix}-${YYYY}-${NNNNN}`) : jamais calculé côté front, jamais `MAX()+1`. Préfixe = `settings.invoicing.number_prefix` (Settings → Facturation → Émission) ; distinct de la série Pennylane (« F ») tant que PL numérote aussi.
 - **Une facture `issued` est figée par trigger** (`invoices_guard_immutable` + lignes) : seules `pdf_path`, `pennylane_*`, `import_*` bougent ; correction = avoir (phase 3). `customer` = photo du client à l'émission.
@@ -34,4 +34,5 @@
 - Réglages `settings.invoicing = { number_prefix, iban, bic, payment_terms, late_penalty, discount_note }` lus par `invoicingSettings()` (défauts neutres), objet sauvé COMPLET.
 - **Import Pennylane = edge `pennylane-invoice-import`** (team_leader+, org Pennylane activée) : PDF archivé → `/file_attachments` → `POST /customer_invoices/import` avec NOTRE numéro, `external_reference` = id facture, montants ENREGISTRÉS (jamais recalculés), journal de ventes principal (le déplacement d'écriture est refusé par l'API). Résultat écrit UNIQUEMENT par la RPC `invoice_set_import_result` (service_role) : `import_status` ∈ `pending | imported | error` + `import_error` + `import_attempted_at`. L'import n'échoue jamais l'émission : un échec est enregistré et rejoué depuis la carte (`useRetryInvoiceExport`, qui régénère aussi un PDF manquant). Le client Pennylane vient du mapping `pennylane_sync` type `client`, posé côté front (`ensurePennylaneCustomer`) — l'edge ne prend jamais un `customer_id` du payload.
 - `invoice_lines.vat_code` = code TVA Pennylane figé à la création (l'edge ne recopie pas `VAT_CODES`). `majordhome_entretien_sav.invoice_import_status` pilote le bouton de rejeu (cast `invoice_id::uuid` protégé par un CASE : la colonne porte aussi des ids Pennylane).
+- **Avoir = `invoice_cancel_with_credit_note`** (team_leader+, annulation TOTALE, une seule par facture) : copie négative émise dans la même série, original `cancelled`, carte remise à facturer (`invoice_id`/`invoiced_at` NULL), import Pennylane avec `credited_invoice_id`. L'index unique « un entretien = une facture émise » ne compte que `kind='invoice'`. Pas d'avoir partiel.
 ---
