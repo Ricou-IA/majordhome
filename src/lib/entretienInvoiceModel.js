@@ -27,6 +27,7 @@
  * isn't one of Product-based / Standard Invoice Line » (vécu 2026-09-22).
  */
 export const VAT_CODES = { 20: 'FR_200', 10: 'FR_100', 5.5: 'FR_55', 0: 'exempt' };
+const VALID_VATS = new Set(Object.keys(VAT_CODES).map(Number));
 
 export const DEFAULT_VAT_PERCENT = 20;
 export const DEFAULT_DEADLINE_DAYS = 30;
@@ -134,12 +135,13 @@ const cleanText = (v) => {
 /**
  * Gabarits de facture par catégorie d'équipement, normalisés depuis
  * `settings.pennylane.invoice.templates = { by_category: { [catId]: { label, subject,
- * offered: { label } } } }` (Settings → Facturation). Une entrée vide disparaît ; une ligne
- * offerte sans libellé est ignorée. Une entrée héritée portant `price_ht`/`vat_rate` (ancienne
- * forme) est acceptée, ces clés sont simplement ignorées : la ligne offerte suit désormais le
- * prix (0 €) et la TVA de la ligne d'équipement qu'elle accompagne (Eric, 2026-09-23).
+ * offered: { label, price_ht, vat_rate, discount_percent } } } }` (Settings → Facturation).
+ * Une entrée vide disparaît ; une ligne offerte sans libellé est ignorée. `price_ht` : nombre
+ * ≥ 0 sinon 0. `vat_rate` : vide/absent → `null` (TVA de la famille de l'équipement) ; hors
+ * table `VAT_CODES` → `null` également (jamais une valeur non facturable par Pennylane).
+ * `discount_percent` : hors bornes 0..100 → 100 (ligne offerte par défaut).
  * @param {object|null|undefined} invoiceSettingsRaw  `settings.pennylane.invoice`
- * @returns {{ byCategory: Object<string, { label: string|null, subject: string|null, offered: { label: string } | null }> }}
+ * @returns {{ byCategory: Object<string, { label: string|null, subject: string|null, offered: { label: string, priceHt: number, vatPercent: number|null, discountPercent: number } | null }> }}
  */
 export function invoiceTemplatesFromSettings(invoiceSettingsRaw) {
   const src = invoiceSettingsRaw?.templates?.by_category;
@@ -149,7 +151,18 @@ export function invoiceTemplatesFromSettings(invoiceSettingsRaw) {
       if (!t || typeof t !== 'object') continue;
       const o = t.offered && typeof t.offered === 'object' ? t.offered : null;
       const oLabel = cleanText(o?.label);
-      const offered = oLabel ? { label: oLabel } : null;
+      let offered = null;
+      if (oLabel) {
+        const price = Number(o.price_ht);
+        const vat = o.vat_rate === '' || o.vat_rate == null ? null : Number(o.vat_rate);
+        const disc = Number(o.discount_percent);
+        offered = {
+          label: oLabel,
+          priceHt: Number.isFinite(price) && price >= 0 ? round2(price) : 0,
+          vatPercent: vat != null && VALID_VATS.has(vat) ? vat : null,
+          discountPercent: Number.isFinite(disc) && disc >= 0 && disc <= 100 ? disc : 100,
+        };
+      }
       byCategory[catId] = { label: cleanText(t.label), subject: cleanText(t.subject), offered };
     }
   }
@@ -360,20 +373,23 @@ export function buildEntretienInvoice({
       discountPercent: discount ? discount.percent : 0,
     });
     if (tpl?.offered) {
+      const o = tpl.offered;
+      const oVat = o.vatPercent ?? vatPercent;
+      const oGross = round2(o.priceHt * (1 + oVat / 100));
       pushLine({
         kind: 'libre',
-        label: tpl.offered.label,
-        description: 'Offert dans le cadre du contrat d’entretien',
+        label: o.label,
+        description: o.discountPercent === 100 ? 'Offert dans le cadre du contrat d’entretien' : null,
         quantity: 1,
-        vatPercent,
-        ledgerAccountId: ledgerId,
+        vatPercent: oVat,
+        ledgerAccountId: oVat === vatPercent ? ledgerId : ledgerForCategory(catId, catLabel, VAT_CODES[oVat] || null),
         ledgerAccountNumber: ledgerNumber ? String(ledgerNumber) : null,
         equipmentId: eq?.id ?? null,
         equipmentTypeId: typeId,
         categoryId: catId,
-        grossTtc: 0,
-        netTtc: 0,
-        discountPercent: 0,
+        grossTtc: oGross,
+        netTtc: round2(oGross * (1 - o.discountPercent / 100)),
+        discountPercent: o.discountPercent,
       });
     }
   });
@@ -465,4 +481,103 @@ export function toPennylaneInvoicePayload(model, { customerId, draft, externalRe
   };
   if (draft) payload.draft = true;
   return payload;
+}
+
+/**
+ * Lignes du modèle → lignes ÉDITABLES (modale « Facturer », édition à la main — Eric,
+ * 2026-09-23 : « on paramètre 99 % des cas et on garde la main sur les edge cases »).
+ * `unitPriceHt` = HT unitaire BRUT en nombre (6 décimales du modèle), la remise reste en %.
+ * @param {ReturnType<typeof buildEntretienInvoice>} model
+ */
+export function lineEditsFromModel(model) {
+  return (model?.lines || []).map((l) => ({
+    kind: l.kind || 'libre',
+    label: l.label || '',
+    description: l.description ?? null,
+    quantity: Number(l.quantity) || 1,
+    unitPriceHt: Number(l.unitPriceHt) || 0,
+    vatPercent: Number(l.vatPercent),
+    discountPercent: Number(l.discountPercent) || 0,
+    ledgerAccountId: l.ledgerAccountId ?? null,
+    ledgerAccountNumber: l.ledgerAccountNumber ?? null,
+    equipmentId: l.equipmentId ?? null,
+    equipmentTypeId: l.equipmentTypeId ?? null,
+    categoryId: l.categoryId ?? null,
+  }));
+}
+
+/**
+ * Ligne libre vierge à ajouter à la main : hérite la TVA et le compte de vente de la
+ * PREMIÈRE ligne d'équipement (sinon 20 %, sans compte), sans équipement ni catégorie.
+ * @param {{ lines?: Array }} model
+ */
+export function newFreeLine(model) {
+  const first = (model?.lines || []).find((l) => l.kind === 'contrat') || null;
+  return {
+    kind: 'libre',
+    label: '',
+    description: null,
+    quantity: 1,
+    unitPriceHt: 0,
+    vatPercent: first ? Number(first.vatPercent) : DEFAULT_VAT_PERCENT,
+    discountPercent: 0,
+    ledgerAccountId: first?.ledgerAccountId ?? null,
+    ledgerAccountNumber: first?.ledgerAccountNumber ?? null,
+    equipmentId: null,
+    equipmentTypeId: null,
+    categoryId: null,
+  };
+}
+
+/**
+ * Recalcule le modèle à partir de lignes éditées : montants (brut = PU HT × qté × (1 + TVA),
+ * net = brut × (1 − remise)), code TVA, total, erreurs. Les erreurs de lignes du modèle
+ * d'origine (`tva_inconnue`, `aucune_ligne`) sont remplacées par celles des lignes éditées ;
+ * les autres (`montant_contrat_nul`…) sont conservées. `discount` (info remise contrat) et
+ * `warnings` sont conservés tels quels.
+ * @param {ReturnType<typeof buildEntretienInvoice>} model
+ * @param {ReturnType<typeof lineEditsFromModel>} edits
+ */
+export function applyLineEdits(model, edits) {
+  const kept = (model?.errors || []).filter((e) => e.code !== 'tva_inconnue' && e.code !== 'aucune_ligne');
+  const errors = [...kept];
+  const lines = [];
+  (edits || []).forEach((e, i) => {
+    const n = i + 1;
+    const label = (e.label || '').trim();
+    const quantity = Number(e.quantity);
+    const unit = Number(e.unitPriceHt);
+    const vatPercent = Number(e.vatPercent);
+    const discountPercent = Number(e.discountPercent) || 0;
+    const problems = [];
+    if (!label) problems.push('libellé manquant');
+    if (!(quantity > 0)) problems.push('quantité nulle');
+    if (!(unit >= 0)) problems.push('prix unitaire négatif');
+    if (!(discountPercent >= 0 && discountPercent <= 100)) problems.push('remise hors 0–100 %');
+    if (problems.length) errors.push({ code: 'ligne_invalide', message: `Ligne ${n} : ${problems.join(', ')}.` });
+    const vatCode = VAT_CODES[vatPercent];
+    if (!vatCode) errors.push({ code: 'tva_inconnue', message: `Taux de TVA ${e.vatPercent} % sans équivalent Pennylane sur « ${label || `ligne ${n}`} ».` });
+    const grossTtc = round2(unit * (quantity || 0) * (1 + (vatPercent || 0) / 100));
+    const netTtc = round2(grossTtc * (1 - discountPercent / 100));
+    lines.push({
+      kind: e.kind || 'libre',
+      label,
+      description: e.description ? String(e.description).trim() || null : null,
+      quantity,
+      vatPercent,
+      vatCode: vatCode || null,
+      ledgerAccountId: e.ledgerAccountId ?? null,
+      ledgerAccountNumber: e.ledgerAccountNumber ?? null,
+      equipmentId: e.equipmentId ?? null,
+      equipmentTypeId: e.equipmentTypeId ?? null,
+      categoryId: e.categoryId ?? null,
+      grossTtc,
+      netTtc,
+      discountPercent,
+      unitPriceHt: unitHt(grossTtc, quantity || 1, vatPercent || 0),
+    });
+  });
+  if (lines.length === 0) errors.push({ code: 'aucune_ligne', message: 'La facture n’a plus aucune ligne.' });
+  const totalTtc = round2(lines.reduce((s, l) => s + l.netTtc, 0));
+  return { ...model, lines, totalTtc, errors };
 }
