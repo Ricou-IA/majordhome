@@ -104,6 +104,21 @@ Deno.serve(async (req: Request) => {
     if (!invoice) return jsonResponse({ error: "invoice_not_found" }, 404, req);
     verifiedInvoiceId = invoice.id;
     if (invoice.status !== "issued") return jsonResponse({ error: "invoice_not_issued", status: invoice.status }, 409, req);
+
+    // Avoir (phase 3) : lié à sa facture d'origine côté Pennylane quand elle y est importée.
+    // Fix round 2 (2026-09-23) : calculé ICI (avant les branches already/repaired/recovered) pour
+    // que `extraWarnings` (ex. credited_invoice_not_imported) remonte aussi sur ces trois chemins
+    // — ne lit que `majordhome_invoices`, donc sans effet de bord à être avancé.
+    let creditedPlId: number | null = null;
+    const extraWarnings: string[] = [];
+    if (invoice.kind === "credit_note" && invoice.credited_invoice_id) {
+      const { data: src, error: srcErr } = await supabase
+        .from("majordhome_invoices").select("pennylane_invoice_id").eq("id", invoice.credited_invoice_id).eq("org_id", orgId).maybeSingle();
+      if (srcErr) return jsonResponse({ error: sanitizeError(srcErr, "lecture facture créditée") }, 500, req);
+      if (src?.pennylane_invoice_id) creditedPlId = Number(src.pennylane_invoice_id);
+      else extraWarnings.push("credited_invoice_not_imported");
+    }
+
     if (invoice.pennylane_invoice_id) {
       // Finding I4 : la carte a déjà l'id PL mais un aléa a laissé import_status en pending/error
       // (ex. le crash entre le POST PL et l'écriture RPC, cf. exception ci-dessous) — on répare
@@ -115,9 +130,9 @@ Deno.serve(async (req: Request) => {
         if (recordError) console.error(`[pennylane-invoice-import] record failed (repair) for ${invoice.number}: ${recordError}`);
         const syncWarning = await upsertInvoiceSync(invoice, plId, ledgerId);
         if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed (repair) for ${invoice.number}: ${syncWarning}`);
-        return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id, repaired: true, ...(recordError ? { record_error: recordError } : {}), ...(syncWarning ? { sync_warning: syncWarning } : {}) }, 200, req);
+        return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id, repaired: true, warnings: extraWarnings, ...(recordError ? { record_error: recordError } : {}), ...(syncWarning ? { sync_warning: syncWarning } : {}) }, 200, req);
       }
-      return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id }, 200, req);
+      return jsonResponse({ ok: true, already: true, pennylane_invoice_id: invoice.pennylane_invoice_id, warnings: extraWarnings }, 200, req);
     }
     if (!invoice.pdf_path) {
       const recordError = await recordResult("error", null, null, "pdf_missing");
@@ -156,17 +171,6 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "customer_not_synced", ...(recordError ? { record_error: recordError } : {}) }, 409, req);
     }
 
-    // Avoir (phase 3) : lié à sa facture d'origine côté Pennylane quand elle y est importée.
-    let creditedPlId: number | null = null;
-    const extraWarnings: string[] = [];
-    if (invoice.kind === "credit_note" && invoice.credited_invoice_id) {
-      const { data: src, error: srcErr } = await supabase
-        .from("majordhome_invoices").select("pennylane_invoice_id").eq("id", invoice.credited_invoice_id).eq("org_id", orgId).maybeSingle();
-      if (srcErr) return jsonResponse({ error: sanitizeError(srcErr, "lecture facture créditée") }, 500, req);
-      if (src?.pennylane_invoice_id) creditedPlId = Number(src.pennylane_invoice_id);
-      else extraWarnings.push("credited_invoice_not_imported");
-    }
-
     // Garde anti-doublon : un échec réseau après un précédent POST (réponse jamais lue) ne doit
     // pas relancer un import — la facture peut déjà exister côté PL. Le probe est un GARDE-FOU,
     // pas un GATE : son échec ne bloque pas l'import. Placé ICI, avant le téléchargement/upload
@@ -184,7 +188,7 @@ Deno.serve(async (req: Request) => {
           if (recordError) console.error(`[pennylane-invoice-import] record failed for ${invoice.number}: ${recordError}`);
           const syncWarning = await upsertInvoiceSync(invoice, existing.id, ledgerId);
           if (syncWarning) console.error(`[pennylane-invoice-import] pennylane_sync upsert failed (recovered) for ${invoice.number}: ${syncWarning}`);
-          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, ...(recordError ? { record_error: recordError } : {}), ...(syncWarning ? { sync_warning: syncWarning } : {}) }, 200, req);
+          return jsonResponse({ ok: true, already: true, pennylane_invoice_id: existing.id, recovered: true, warnings: extraWarnings, ...(recordError ? { record_error: recordError } : {}), ...(syncWarning ? { sync_warning: syncWarning } : {}) }, 200, req);
         }
         if (existing && existing.external_reference !== invoice.id) {
           // Le filtre `external_reference eq` a été ignoré par Pennylane (ou l'API l'a mal
