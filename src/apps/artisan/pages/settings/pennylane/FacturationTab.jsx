@@ -273,12 +273,13 @@ export default function FacturationTab() {
             >
               <option value="draft">Brouillon — à finaliser dans Pennylane</option>
               <option value="final">Finalisée — numérotée immédiatement</option>
-              <option value="hub">Émise par Majord&apos;home — numéro et PDF Majord&apos;home (import Pennylane : phase 2)</option>
+              <option value="hub">Émise par Majord&apos;home — numéro, PDF et avoir Majord&apos;home, comptabilisée dans Pennylane</option>
             </select>
             <p className={HINT_CLASS}>
               Brouillon : vous relisez et envoyez depuis Pennylane. Finalisée : document légal immédiat. Émise par Majord&apos;home :
-              Majord&apos;home numérote, produit le PDF (onglet Émission) et l&apos;archive ; l&apos;import dans Pennylane viendra en phase 2 —
-              en attendant, rien n&apos;est envoyé à Pennylane dans ce mode.
+              Majord&apos;home numérote (série continue par année, préfixe de l&apos;onglet Émission), produit le PDF, l&apos;archive, puis
+              importe la facture terminée dans Pennylane pour la comptabiliser ; l&apos;avoir se fait depuis la carte. Le premier numéro
+              de l&apos;année fige le préfixe.
             </p>
           </div>
           <div className="sm:col-span-2">
