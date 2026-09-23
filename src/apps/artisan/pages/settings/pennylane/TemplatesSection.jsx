@@ -68,8 +68,11 @@ function firstType(typesByCategory, catId) {
  * @param {Object<string, typeof EMPTY_TEMPLATE>} p.value  form.templates_by_category
  * @param {(catId: string, patch: object) => void} p.onChange
  * @param {Object<string, string>} [p.errors]  erreur de validation par catégorie (`errors.templates`)
+ * @param {{ value: Object<string, string>, options: Array<{ number: string, label: string }>, onChange: (catId: string, number: string) => void, disabled?: boolean }} [p.ledger]
+ *   compte de vente Pennylane par famille (Eric, 2026-09-23 : « traiter chaque famille dans sa globalité ») —
+ *   état `form.ledger_by_category` de FacturationTab, stockage inchangé (`ledger_accounts.by_category`)
  */
-export default function TemplatesSection({ categories, typesByCategory, value, onChange, errors }) {
+export default function TemplatesSection({ categories, typesByCategory, value, onChange, errors, ledger }) {
   // Une entrée par champ texte (`${catId}:${field}`) pour retrouver l'input au clic sur une chip.
   const inputRefs = useRef(new Map());
 
@@ -119,7 +122,25 @@ export default function TemplatesSection({ categories, typesByCategory, value, o
         const catError = errors?.[cat.id];
         return (
           <div key={cat.id} className="border border-secondary-200 rounded-md p-4">
-            <div className="text-sm font-medium text-secondary-900 mb-3">{cat.label}</div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="text-sm font-medium text-secondary-900">{cat.label}</div>
+              {ledger && (
+                <div className="w-full sm:w-80">
+                  <label className={LABEL_CLASS}>Compte de vente Pennylane</label>
+                  <select
+                    value={ledger.value?.[cat.id] || ''}
+                    onChange={(e) => ledger.onChange(cat.id, e.target.value)}
+                    disabled={ledger.disabled}
+                    className={INPUT_CLASS}
+                  >
+                    <option value="">— Compte par défaut Pennylane —</option>
+                    {(ledger.options || []).map((a) => (
+                      <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className={LABEL_CLASS}>Libellé de la ligne d&apos;entretien</label>

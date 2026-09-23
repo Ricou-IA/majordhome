@@ -390,12 +390,15 @@ export default function FacturationTab() {
         </div>
       </section>
 
+      {/* Eric, 2026-09-23 : « traiter chaque famille dans sa globalité » — le compte de vente
+          vit dans le bloc de sa famille (avec libellés et ligne offerte) ; seules les pièces
+          de rechange, qui ne sont pas une famille, gardent un compte à part. */}
       <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
-        <h3 className={SECTION_TITLE}>Contrats d&apos;entretien — compte de vente par catégorie d&apos;équipement</h3>
+        <h3 className={SECTION_TITLE}>Entretien — par famille d&apos;équipement : compte de vente, libellés, ligne offerte</h3>
         <p className="text-xs text-secondary-500 mb-3">
-          Contexte « contrat » : chaque ligne d&apos;une facture d&apos;entretien est comptabilisée sur le compte de sa catégorie
-          d&apos;équipement, la famille que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane
-          applique son compte par défaut. Les devis (articles du catalogue) et les travaux auront leur propre affectation.
+          Contexte « contrat » : chaque ligne d&apos;une facture d&apos;entretien est comptabilisée sur le compte de vente de sa famille,
+          celle que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane applique son compte par défaut.
+          Les devis (articles du catalogue) et les travaux auront leur propre affectation.
           {chart.length === 0 && (
             <> Aucun compte coché en colonne « Contrat » du plan comptable : toute la classe 7 est proposée (Paramètres → Plan comptable pour la réduire).</>
           )}
@@ -403,25 +406,22 @@ export default function FacturationTab() {
         {accountsError && (
           <p className={`${ERROR_CLASS} mb-3`}>Comptes Pennylane indisponibles : {accountsError.message || 'erreur'}</p>
         )}
-        <div className="grid sm:grid-cols-2 gap-4">
-          {categories.map((cat) => (
-            <div key={cat.id}>
-              <label className={LABEL_CLASS}>{cat.label}</label>
-              <select
-                value={form.ledger_by_category?.[cat.id] || ''}
-                onChange={(e) => setLedgerForCategory(cat.id, e.target.value)}
-                disabled={loadingAccounts}
-                className={INPUT_CLASS}
-              >
-                <option value="">— Compte par défaut Pennylane —</option>
-                {accountOptions.map((a) => (
-                  <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
-                ))}
-              </select>
-            </div>
-          ))}
+        <TemplatesSection
+          categories={categories}
+          typesByCategory={typesByCategory}
+          value={form.templates_by_category}
+          onChange={setTemplate}
+          errors={errors.templates}
+          ledger={{
+            value: form.ledger_by_category,
+            options: accountOptions,
+            onChange: setLedgerForCategory,
+            disabled: loadingAccounts,
+          }}
+        />
+        <div className="mt-6 grid sm:grid-cols-2 gap-4">
           <div>
-            <label className={LABEL_CLASS}>Pièces de rechange</label>
+            <label className={LABEL_CLASS}>Pièces de rechange — compte de vente</label>
             <select
               value={form.ledger_parts || ''}
               onChange={(e) => setForm({ ...form, ledger_parts: e.target.value })}
@@ -433,23 +433,9 @@ export default function FacturationTab() {
                 <option key={a.number} value={a.number}>{a.number} · {a.label}</option>
               ))}
             </select>
-            <p className={HINT_CLASS}>Pièces facturées avec l&apos;entretien (certificat).</p>
+            <p className={HINT_CLASS}>Pièces facturées avec l&apos;entretien (certificat), quelle que soit la famille.</p>
           </div>
         </div>
-        {categories.length === 0 && (
-          <p className={HINT_CLASS}>Aucune catégorie d&apos;équipement active (Paramètres → Équipements).</p>
-        )}
-      </section>
-
-      <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
-        <h3 className={SECTION_TITLE}>Entretien — gabarits par famille d&apos;équipement</h3>
-        <TemplatesSection
-          categories={categories}
-          typesByCategory={typesByCategory}
-          value={form.templates_by_category}
-          onChange={setTemplate}
-          errors={errors.templates}
-        />
       </section>
 
       {/* Spike 2026-09-22 (admin) : une écriture de vente poussée dans le journal choisi,
