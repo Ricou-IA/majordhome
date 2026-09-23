@@ -36,6 +36,16 @@ export function sanitizeFilename(s: string): string {
   return s.replace(/[^a-zA-Z0-9À-ÿ_\-]/g, "_").replace(/_+/g, "_");
 }
 
+/** Échappe `& < > " '` — pour insérer une valeur texte (jamais une URL/couleur) dans un gabarit HTML. */
+export function escapeHtml(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export interface OrgBranding {
   fromName: string;
   fromEmail: string;

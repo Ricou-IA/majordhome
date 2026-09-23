@@ -13,17 +13,24 @@
 //   2. Branding org (`_shared/mail.ts::orgBranding`) — `fromEmail` vide ⇒
 //      409 `no_from_email` (pas de fallback Mayer).
 //   3. Carte entretien (`majordhome_entretien_sav`, org CORE) → destinataire
-//      (`to` du body ou `client_email`) + `invoice_id`.
+//      (`client_email` uniquement, jamais d'override via le body) + `invoice_id`.
 //   4. Facture :
 //      - `invoice_id` au format uuid → hub (`majordhome_invoices` +
 //        bucket `invoices`, `status='issued'` + `pdf_path` requis).
 //      - sinon → miroir Pennylane (`majordhome_pennylane_sync`,
-//        entity_type='invoice', local_id=intervention_id) ; brouillon PL
-//        (`metadata.draft===true`) refusé, PDF distant obligatoire.
+//        entity_type='invoice', local_id=intervention_id). Le miroir n'est
+//        rafraîchi qu'une fois à la création (`draft`/`public_file_url`/
+//        `file_url` jamais réécrits depuis) : si `metadata.draft===true` OU
+//        qu'aucune URL de PDF n'est connue, un GET Pennylane ciblé
+//        (`/customer_invoices/{id}`) rafraîchit le miroir AVANT de refuser —
+//        une facture créée brouillon puis finalisée dans Pennylane doit
+//        pouvoir être envoyée sans repasser par un cron. Brouillon confirmé
+//        après rafraîchissement refusé, PDF distant obligatoire.
 //   5. Certificats cochés (`certificate_ids`) : doivent appartenir à
 //      l'intervention ou à ses enfants (`majordhome_interventions.parent_id`),
 //      PDF archivé obligatoire (bucket `certificats`).
-//   6. Plafond 35 Mo cumulés (marge sous la limite Resend 40 Mo).
+//   6. Plafond 29 Mo cumulés BRUTS (Resend limite à 40 Mo APRÈS encodage
+//      base64, ×4/3 la taille brute).
 //   7. Gabarit `mail_campaigns` clé `facture_entretien` (non archivé).
 //   8. Envoi Resend + log `majordhome_mailing_logs` (best-effort, jamais
 //      bloquant) dans les deux issues (sent/failed) — l'échec du log est
@@ -39,7 +46,9 @@
 // Succès (201) : { ok: true, provider_id, to, attachments: string[], log_warning? }
 //
 // Env requis : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (via `_shared/auth.ts`),
-// RESEND_API_KEY.
+// RESEND_API_KEY. PENNYLANE_API_TOKEN / PENNYLANE_BASE_URL optionnels — sans
+// token, le rafraîchissement du miroir Pennylane (I1) est sauté, repli sur les
+// métadonnées déjà en base.
 // ============================================================================
 import {
   requireOrgMembership,
@@ -52,22 +61,87 @@ import {
   brandingReplacements,
   wrapWithSkeleton,
   applyPlaceholders,
+  escapeHtml,
   sanitizeFilename,
   arrayBufferToBase64,
   sendResendEmail,
   insertMailingLog,
 } from "../_shared/mail.ts";
 import type { ResendAttachment } from "../_shared/mail.ts";
+import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const MAX_ATTACHMENTS_BYTES = 35 * 1024 * 1024;
+const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
+const PENNYLANE_BASE_URL = Deno.env.get("PENNYLANE_BASE_URL") || "https://app.pennylane.com/api/external/v2";
+// Resend limite les pièces jointes à 40 Mo APRÈS encodage base64 (×4/3 la taille
+// brute) : plafonner le cumul BRUT à 29 Mo laisse la marge nécessaire pour ne
+// jamais dépasser la limite réelle une fois encodé (29 × 4/3 ≈ 38,7 Mo).
+const MAX_ATTACHMENTS_BYTES = 29 * 1024 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Body {
   org_id?: string;
   intervention_id?: string;
   certificate_ids?: string[];
-  to?: string;
+}
+
+/**
+ * I1 — rafraîchit `majordhome_pennylane_sync.metadata` (posé une seule fois à
+ * la création, jamais réécrit depuis) avant de décider qu'une facture est un
+ * brouillon ou sans PDF. GET ciblé `/customer_invoices/{id}` (réponse = objet
+ * facture à la RACINE, même style que `pennylane-invoice-import`). Sans
+ * `PENNYLANE_API_TOKEN`, ou si le miroir n'a pas besoin d'être rafraîchi,
+ * renvoie les métadonnées telles quelles sans appel réseau.
+ */
+async function refreshPennylaneInvoiceMirror(
+  supabase: SupabaseClient,
+  orgId: string,
+  interventionId: string,
+  sync: { pennylane_id: number | string; pennylane_number: string | null; metadata: Record<string, unknown> | null },
+): Promise<{ metadata: Record<string, unknown>; error?: string }> {
+  const metadata = sync.metadata ?? {};
+  const needsRefresh = metadata.draft === true || (!metadata.public_file_url && !metadata.file_url);
+  if (!needsRefresh || !PENNYLANE_API_TOKEN) return { metadata };
+
+  let res: Response;
+  try {
+    res = await fetch(`${PENNYLANE_BASE_URL}/customer_invoices/${sync.pennylane_id}`, {
+      headers: { Authorization: `Bearer ${PENNYLANE_API_TOKEN}`, Accept: "application/json" },
+    });
+  } catch (err) {
+    return { metadata, error: err instanceof Error ? err.message : String(err) };
+  }
+  if (!res.ok) return { metadata, error: `Pennylane HTTP ${res.status}` };
+
+  let data: Record<string, unknown>;
+  try {
+    data = await res.json();
+  } catch {
+    return { metadata, error: "Pennylane HTTP invalid_json" };
+  }
+
+  const draft = data.draft === true || data.status === "draft";
+  const publicFileUrl = (data.public_file_url as string | null | undefined) ?? metadata.public_file_url;
+  const fileUrl = (data.file_url as string | null | undefined) ?? metadata.file_url;
+  const invoiceNumber = (data.invoice_number as string | null | undefined) || sync.pennylane_number;
+  const nextMetadata = {
+    ...metadata,
+    draft,
+    public_file_url: publicFileUrl,
+    file_url: fileUrl,
+    refreshed_at: new Date().toISOString(),
+  };
+
+  const { error: updErr } = await supabase
+    .from("majordhome_pennylane_sync")
+    .update({ pennylane_number: invoiceNumber, metadata: nextMetadata, last_synced_at: new Date().toISOString() })
+    .eq("org_id", orgId)
+    .eq("entity_type", "invoice")
+    .eq("local_id", interventionId);
+  if (updErr) {
+    console.warn("[invoice-send] pennylane_sync refresh update failed:", updErr.message);
+  }
+  return { metadata: nextMetadata };
 }
 
 /** `metadata.date` / `invoice_date` → dd/mm/yyyy. Valeur non parsable renvoyée telle quelle. */
@@ -143,7 +217,7 @@ Deno.serve(async (req: Request) => {
     if (cardErr) return jsonResponse({ error: sanitizeError(cardErr, "lecture intervention") }, 500, req);
     if (!card) return jsonResponse({ error: "intervention_not_found" }, 404, req);
 
-    const to = (body.to || card.client_email || "").trim();
+    const to = (card.client_email || "").trim();
     if (!to) return jsonResponse({ error: "client_email_missing" }, 409, req);
     if (!card.invoice_id) return jsonResponse({ error: "invoice_missing" }, 409, req);
 
@@ -185,7 +259,12 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (syncErr) return jsonResponse({ error: sanitizeError(syncErr, "lecture facture Pennylane") }, 500, req);
       if (!sync) return jsonResponse({ error: "invoice_missing" }, 409, req);
-      const metadata = (sync.metadata as Record<string, unknown> | null) ?? {};
+
+      const refreshed = await refreshPennylaneInvoiceMirror(supabase, orgId, interventionId, sync);
+      if (refreshed.error) {
+        return jsonResponse({ error: "invoice_pdf_missing", detail: refreshed.error }, 409, req);
+      }
+      const metadata = refreshed.metadata;
       if (metadata.draft === true) return jsonResponse({ error: "invoice_is_draft" }, 409, req);
       const url = (metadata.public_file_url as string | undefined) || (metadata.file_url as string | undefined);
       if (!url) return jsonResponse({ error: "invoice_pdf_missing" }, 409, req);
@@ -240,6 +319,16 @@ Deno.serve(async (req: Request) => {
         .in("id", certificateIds);
       if (certErr) return jsonResponse({ error: sanitizeError(certErr, "lecture certificats") }, 500, req);
 
+      // I2 — `equipement_type` est un CODE de catégorie (ex. `pac_air_air`), jamais un libellé
+      // client-friendly : résolu via le référentiel de l'org avant tout usage destiné au client
+      // ({{EQUIPMENTS}} du gabarit + libellé de fichier certificat).
+      const { data: categories, error: catErr } = await supabase
+        .from("majordhome_equipment_categories")
+        .select("code, label")
+        .eq("org_id", orgId);
+      if (catErr) return jsonResponse({ error: sanitizeError(catErr, "lecture catégories équipement") }, 500, req);
+      const labelByCode = new Map((categories || []).map((c) => [c.code as string, c.label as string]));
+
       const byId = new Map((certificats || []).map((c) => [c.id as string, c]));
       for (const id of certificateIds) {
         const cert = byId.get(id);
@@ -257,11 +346,14 @@ Deno.serve(async (req: Request) => {
         }
         const buf = await certBlob.arrayBuffer();
         totalBytes += buf.byteLength;
-        const label = cert.reference || cert.equipement_type || cert.id;
+        const equipmentLabel = cert.equipement_type
+          ? (labelByCode.get(cert.equipement_type as string) || (cert.equipement_type as string))
+          : null;
+        const label = cert.reference || equipmentLabel || cert.id;
         const filename = `Certificat_${sanitizeFilename(String(label))}.pdf`;
         attachments.push({ filename, content: arrayBufferToBase64(buf) });
         attachmentNames.push(filename);
-        const equipLabel = [cert.equipement_type, cert.equipement_marque, cert.equipement_modele]
+        const equipLabel = [equipmentLabel, cert.equipement_marque, cert.equipement_modele]
           .filter(Boolean)
           .join(" ");
         if (equipLabel) equipmentLabels.push(equipLabel);
@@ -283,7 +375,10 @@ Deno.serve(async (req: Request) => {
     if (tmplErr) return jsonResponse({ error: sanitizeError(tmplErr, "lecture gabarit") }, 500, req);
     if (!template) return jsonResponse({ error: "template_missing" }, 409, req);
 
-    // 6) Placeholders (marque + facture + certificats).
+    // 6) Placeholders (marque + facture + certificats). Le sujet garde des valeurs brutes
+    // (texte simple, pas de rendu HTML) ; le corps HTML échappe les champs texte qui peuvent
+    // contenir du contenu utilisateur (M3) — jamais les URLs/couleurs de branding, qui doivent
+    // rester utilisables telles quelles dans un `href`/`src`/style inline.
     const replacements: Record<string, string> = {
       ...brandingReplacements(branding),
       "{{CLIENT_NAME}}": card.client_name || "",
@@ -293,9 +388,17 @@ Deno.serve(async (req: Request) => {
       "{{EQUIPMENTS}}": equipmentLabels.length > 0 ? equipmentLabels.join(", ") : "vos équipements",
       "{{ATTACHMENTS}}": attachmentNames.join(", "),
     };
+    const ESCAPED_HTML_KEYS = [
+      "{{CLIENT_NAME}}", "{{INVOICE_NUMBER}}", "{{EQUIPMENTS}}", "{{ATTACHMENTS}}",
+      "{{BRAND_NAME}}", "{{ORG_EMAIL}}", "{{ORG_PHONE}}", "{{ORG_ADDRESS}}", "{{ORG_POSTAL_CODE}}", "{{ORG_CITY}}",
+    ];
+    const htmlReplacements: Record<string, string> = { ...replacements };
+    for (const key of ESCAPED_HTML_KEYS) {
+      if (key in htmlReplacements) htmlReplacements[key] = escapeHtml(htmlReplacements[key]);
+    }
 
     const subject = applyPlaceholders(template.subject || "", replacements);
-    const html = applyPlaceholders(wrapWithSkeleton(branding, template.html_body || ""), replacements);
+    const html = applyPlaceholders(wrapWithSkeleton(branding, template.html_body || ""), htmlReplacements);
 
     // 7) Envoi Resend + log mailing_logs (best-effort, jamais bloquant).
     const fromHeader = branding.fromName ? `${branding.fromName} <${branding.fromEmail}>` : branding.fromEmail;
