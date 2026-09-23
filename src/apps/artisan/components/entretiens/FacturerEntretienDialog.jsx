@@ -108,6 +108,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       parts: Array.isArray(item.parts_detail) ? item.parts_detail : [],
       referentiel,
       ledgerAccounts: { ...invoiceSettings.ledgerAccounts, catalog: ledgerCatalog || [] },
+      templates: invoiceSettings.templates,
       deadlineDays: invoiceSettings.deadlineDays,
       today: formatDateForInput(new Date()),
     });

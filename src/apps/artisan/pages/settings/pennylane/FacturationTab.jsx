@@ -1,7 +1,8 @@
 // src/apps/artisan/pages/settings/pennylane/FacturationTab.jsx
 // ============================================================================
 // Réglages `settings.pennylane` : { enabled, invoice: { deadline_days, mode,
-// ledger_accounts: { by_category: { [categoryId]: ledgerAccountId }, parts } } }.
+// ledger_accounts: { by_category: { [categoryId]: ledgerAccountId }, parts },
+// templates: { by_category } } }.
 // `org_update_settings` merge le JSONB au niveau 1 → on renvoie TOUJOURS l'objet
 // `pennylane` complet (jamais un sous-objet partiel), cf. Module Solaire.
 // Lecture côté métier : `usePennylaneEnabled()` et `pennylaneInvoiceSettings()`
@@ -11,6 +12,10 @@
 // pour les stats = son compte de vente Pennylane (706xxx), choisi PAR CATÉGORIE
 // d'équipement + un compte pour les pièces. Les comptes viennent de Pennylane
 // (`useLedgerAccounts`, GET /ledger_accounts 706*) : rien n'est créé côté PL.
+//
+// Gabarits (Eric, 2026-09-23) : libellé de ligne, objet de facture et ligne
+// offerte, PAR CATÉGORIE d'équipement. Présentationnel dans `TemplatesSection`,
+// état ici (`form.templates_by_category`), consommés par `buildEntretienInvoice`.
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -18,6 +23,7 @@ import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks
 import { useLedgerAccounts, useJournals } from '@hooks/usePennylane';
 import { pennylaneService } from '@services/pennylane.service';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import TemplatesSection, { EMPTY_TEMPLATE } from './TemplatesSection';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -43,6 +49,20 @@ function pickForm(settings) {
     const num = ledgerValue(id);
     if (num) byCategory[catId] = num;
   }
+  const templatesByCategory = {};
+  const raw = settings?.pennylane?.invoice?.templates?.by_category;
+  if (raw && typeof raw === 'object') {
+    for (const [catId, t] of Object.entries(raw)) {
+      if (!t || typeof t !== 'object') continue;
+      templatesByCategory[catId] = {
+        label: ledgerValue(t.label),
+        subject: ledgerValue(t.subject),
+        offered_label: ledgerValue(t.offered?.label),
+        offered_price_ht: ledgerValue(t.offered?.price_ht),
+        offered_vat: ledgerValue(t.offered?.vat_rate) || '10',
+      };
+    }
+  }
   return {
     enabled: Boolean(settings?.pennylane?.enabled),
     deadline_days: String(inv.deadlineDays),
@@ -50,6 +70,7 @@ function pickForm(settings) {
     journal_id: inv.journalId ? String(inv.journalId) : '',
     ledger_by_category: byCategory,
     ledger_parts: ledgerValue(inv.ledgerAccounts.parts),
+    templates_by_category: templatesByCategory,
   };
 }
 
@@ -62,10 +83,38 @@ function ledgerAccountsForSave(form) {
   return { by_category, parts: form.ledger_parts ? String(form.ledger_parts) : null };
 }
 
+/** Forme stockée des gabarits : seules les catégories renseignées, jamais de "undefined". */
+function templatesForSave(form) {
+  const by_category = {};
+  for (const [catId, t] of Object.entries(form.templates_by_category || {})) {
+    const label = (t.label || '').trim();
+    const subject = (t.subject || '').trim();
+    const oLabel = (t.offered_label || '').trim();
+    const oPrice = Number(t.offered_price_ht);
+    const entry = {};
+    if (label) entry.label = label;
+    if (subject) entry.subject = subject;
+    if (oLabel && oPrice > 0) entry.offered = { label: oLabel, price_ht: oPrice, vat_rate: Number(t.offered_vat) };
+    if (Object.keys(entry).length > 0) by_category[catId] = entry;
+  }
+  return { by_category };
+}
+
 function validate(form) {
   const errors = {};
   const n = Number(form.deadline_days);
   if (!Number.isInteger(n) || n < 0 || n > 120) errors.deadline_days = 'Entre 0 et 120 jours';
+  const templateErrors = {};
+  for (const [catId, t] of Object.entries(form.templates_by_category || {})) {
+    const oLabel = (t.offered_label || '').trim();
+    const oPrice = Number(t.offered_price_ht);
+    if (oLabel && !(oPrice > 0)) {
+      templateErrors[catId] = 'Indiquez un prix HT supérieur à 0 pour la ligne offerte';
+    } else if (oPrice > 0 && !oLabel) {
+      templateErrors[catId] = 'Indiquez le libellé de la ligne offerte';
+    }
+  }
+  if (Object.keys(templateErrors).length > 0) errors.templates = templateErrors;
   return errors;
 }
 
@@ -109,6 +158,14 @@ export default function FacturationTab() {
   }, [accounts]);
   const setLedgerForCategory = (catId, value) =>
     setForm((f) => ({ ...f, ledger_by_category: { ...f.ledger_by_category, [catId]: value } }));
+  const setTemplate = (catId, patch) =>
+    setForm((f) => ({
+      ...f,
+      templates_by_category: {
+        ...f.templates_by_category,
+        [catId]: { ...(f.templates_by_category?.[catId] || EMPTY_TEMPLATE), ...patch },
+      },
+    }));
 
   // --- Spike écriture dans le journal (admin) ---
   const [testAccount411, setTestAccount411] = useState('');
@@ -212,6 +269,7 @@ export default function FacturationTab() {
           deadline_days: Number(form.deadline_days),
           mode: form.mode,
           ledger_accounts: ledgerAccountsForSave(form),
+          templates: templatesForSave(form),
           journal_id: form.journal_id ? Number(form.journal_id) : null,
           journal_code: form.journal_id ? (journals.find((j) => String(j.id) === form.journal_id)?.code || '') : '',
         },
@@ -353,6 +411,16 @@ export default function FacturationTab() {
         {categories.length === 0 && (
           <p className={HINT_CLASS}>Aucune catégorie d&apos;équipement active (Paramètres → Équipements).</p>
         )}
+      </section>
+
+      <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
+        <h3 className={SECTION_TITLE}>Contrats d&apos;entretien — libellés et ligne offerte par catégorie</h3>
+        <TemplatesSection
+          categories={categories}
+          value={form.templates_by_category}
+          onChange={setTemplate}
+          errors={errors.templates}
+        />
       </section>
 
       {/* Spike 2026-09-22 (admin) : une écriture de vente poussée dans le journal choisi,

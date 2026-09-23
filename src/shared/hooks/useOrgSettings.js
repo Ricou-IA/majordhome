@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { orgSettingsService } from '@services/orgSettings.service';
 import { orgSettingsKeys } from './cacheKeys';
+import { invoiceTemplatesFromSettings } from '@/lib/entretienInvoiceModel';
 
 /**
  * Hook React Query pour les settings de l'org courante.
@@ -75,8 +76,9 @@ export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode
 /**
  * Réglages des factures créées depuis les cartes entretien (push MDH → PL,
  * spec 2026-09-21). Source `settings.pennylane.invoice = { deadline_days, mode,
- * ledger_accounts: { by_category: { [categoryId]: ledgerAccountId }, parts } }`,
- * `mode` ∈ `draft` (brouillon à finaliser dans PL) | `final`. Défauts si absent.
+ * ledger_accounts: { by_category: { [categoryId]: ledgerAccountId }, parts },
+ * templates: { by_category } }`, `mode` ∈ `draft` (brouillon à finaliser dans PL) |
+ * `final` | `hub` (Majord'home émet). Défauts si absent.
  *
  * Comptes comptables (Eric, 2026-09-21) : la famille d'une ligne pour les stats
  * = son compte de vente Pennylane (706xxx), paramétré PAR CATÉGORIE d'équipement
@@ -129,12 +131,15 @@ export function pennylaneInvoiceSettings(settings) {
   return {
     deadlineDays: Number.isInteger(days) && days >= 0 ? days : PENNYLANE_INVOICE_DEFAULTS.deadlineDays,
     // 'draft' | 'final' = Pennylane crée la facture ; 'hub' = Majord'home émet, numérote et
-    // archive (phase 1 du hub, spec 2026-09-22) — l'import Pennylane arrive en phase 2.
+    // archive (phases 1 émission + 2 import Pennylane livrées, spec 2026-09-22).
     mode: inv.mode === 'final' || inv.mode === 'hub' ? inv.mode : PENNYLANE_INVOICE_DEFAULTS.mode,
     ledgerAccounts: {
       byCategory: la.by_category && typeof la.by_category === 'object' ? la.by_category : {},
       parts: la.parts ?? null,
     },
+    // Gabarits par catégorie (libellé de ligne, objet, ligne offerte) — Settings → Facturation,
+    // consommés par buildEntretienInvoice dans les DEUX modes (brouillon PL et hub).
+    templates: invoiceTemplatesFromSettings(inv),
     // Journal des factures Majordhome (Eric, 2026-09-22 : journal « VA » créé dans PL) :
     // l'écriture de chaque facture créée est DÉPLACÉE dans ce journal juste après la
     // création (PUT /ledger_entries/{id}). null = journal de ventes par défaut de PL.
