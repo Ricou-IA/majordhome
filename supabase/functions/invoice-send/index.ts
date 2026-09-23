@@ -98,10 +98,11 @@ async function refreshPennylaneInvoiceMirror(
   orgId: string,
   interventionId: string,
   sync: { pennylane_id: number | string; pennylane_number: string | null; metadata: Record<string, unknown> | null },
-): Promise<{ metadata: Record<string, unknown>; error?: string }> {
+): Promise<{ metadata: Record<string, unknown>; pennylaneNumber: string | null; error?: string }> {
   const metadata = sync.metadata ?? {};
+  const pennylaneNumber = sync.pennylane_number;
   const needsRefresh = metadata.draft === true || (!metadata.public_file_url && !metadata.file_url);
-  if (!needsRefresh || !PENNYLANE_API_TOKEN) return { metadata };
+  if (!needsRefresh || !PENNYLANE_API_TOKEN) return { metadata, pennylaneNumber };
 
   let res: Response;
   try {
@@ -109,15 +110,15 @@ async function refreshPennylaneInvoiceMirror(
       headers: { Authorization: `Bearer ${PENNYLANE_API_TOKEN}`, Accept: "application/json" },
     });
   } catch (err) {
-    return { metadata, error: err instanceof Error ? err.message : String(err) };
+    return { metadata, pennylaneNumber, error: err instanceof Error ? err.message : String(err) };
   }
-  if (!res.ok) return { metadata, error: `Pennylane HTTP ${res.status}` };
+  if (!res.ok) return { metadata, pennylaneNumber, error: `Pennylane HTTP ${res.status}` };
 
   let data: Record<string, unknown>;
   try {
     data = await res.json();
   } catch {
-    return { metadata, error: "Pennylane HTTP invalid_json" };
+    return { metadata, pennylaneNumber, error: "Pennylane HTTP invalid_json" };
   }
 
   const draft = data.draft === true || data.status === "draft";
@@ -141,7 +142,9 @@ async function refreshPennylaneInvoiceMirror(
   if (updErr) {
     console.warn("[invoice-send] pennylane_sync refresh update failed:", updErr.message);
   }
-  return { metadata: nextMetadata };
+  // Le numéro relu chez Pennylane (attribué à la finalisation) doit servir à l'e-mail
+  // de CE même appel — pas la valeur pré-rafraîchissement du miroir (re-revue 2026-09-24).
+  return { metadata: nextMetadata, pennylaneNumber: invoiceNumber ?? null };
 }
 
 /** `metadata.date` / `invoice_date` → dd/mm/yyyy. Valeur non parsable renvoyée telle quelle. */
@@ -281,7 +284,7 @@ Deno.serve(async (req: Request) => {
       if (!pdfRes.ok) {
         return jsonResponse({ error: "invoice_pdf_missing", detail: `HTTP ${pdfRes.status}` }, 409, req);
       }
-      invoiceNumber = (sync.pennylane_number as string | null) || invoiceNumber;
+      invoiceNumber = refreshed.pennylaneNumber || (sync.pennylane_number as string | null) || invoiceNumber;
       invoiceAmount = metadata.amount;
       invoiceDateRaw = metadata.date;
       invoicePdfBuffer = await pdfRes.arrayBuffer();
