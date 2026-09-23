@@ -14,11 +14,11 @@
 // (`useLedgerAccounts`, GET /ledger_accounts 706*) : rien n'est créé côté PL.
 //
 // Gabarits (Eric, 2026-09-23, section « Entretien — gabarits par famille d'équipement » —
-// retour la même après-midi : la ligne offerte n'a ni prix ni TVA propres, un libellé
-// seul à 0 € au taux de la ligne d'équipement qu'elle suit) : libellé de ligne, objet de
-// facture et ligne offerte, PAR CATÉGORIE d'équipement. Présentationnel dans
-// `TemplatesSection`, état ici (`form.templates_by_category`), consommés par
-// `buildEntretienInvoice`.
+// retour suivant : la ligne offerte est TARIFÉE, prix HT + TVA (ou celle de la famille)
+// + remise % réglable, 100 % = offerte) : libellé de ligne, objet de facture et ligne
+// offerte, PAR CATÉGORIE d'équipement. Forme stockée `offered: { label, price_ht,
+// vat_rate, discount_percent }`. Présentationnel dans `TemplatesSection`, état ici
+// (`form.templates_by_category`), consommés par `buildEntretienInvoice`.
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -62,6 +62,9 @@ function pickForm(settings) {
         label: ledgerValue(t.label),
         subject: ledgerValue(t.subject),
         offered_label: ledgerValue(t.offered?.label),
+        offered_price_ht: ledgerValue(t.offered?.price_ht),
+        offered_vat: ledgerValue(t.offered?.vat_rate),
+        offered_discount: t.offered?.discount_percent == null ? '100' : ledgerValue(t.offered.discount_percent),
       };
     }
   }
@@ -95,7 +98,14 @@ function templatesForSave(form) {
     const entry = {};
     if (label) entry.label = label;
     if (subject) entry.subject = subject;
-    if (oLabel) entry.offered = { label: oLabel };
+    if (oLabel) {
+      entry.offered = {
+        label: oLabel,
+        price_ht: Number(t.offered_price_ht) || 0,
+        vat_rate: t.offered_vat === '' ? null : Number(t.offered_vat),
+        discount_percent: t.offered_discount === '' ? 100 : Number(t.offered_discount),
+      };
+    }
     if (Object.keys(entry).length > 0) by_category[catId] = entry;
   }
   return { by_category };
@@ -105,6 +115,25 @@ function validate(form) {
   const errors = {};
   const n = Number(form.deadline_days);
   if (!Number.isInteger(n) || n < 0 || n > 120) errors.deadline_days = 'Entre 0 et 120 jours';
+  const templateErrors = {};
+  for (const [catId, t] of Object.entries(form.templates_by_category || {})) {
+    const label = (t.offered_label || '').trim();
+    const priceRaw = t.offered_price_ht ?? '';
+    const priceNum = priceRaw === '' ? 0 : Number(priceRaw);
+    const priceInvalid = priceRaw !== '' && !Number.isFinite(priceNum);
+    const discRaw = t.offered_discount ?? '';
+    const discNum = discRaw === '' ? 100 : Number(discRaw);
+    if (label) {
+      if (priceInvalid || priceNum < 0) {
+        templateErrors[catId] = 'Prix HT invalide';
+      } else if (!Number.isFinite(discNum) || discNum < 0 || discNum > 100) {
+        templateErrors[catId] = 'Remise entre 0 et 100 %';
+      }
+    } else if (priceNum > 0) {
+      templateErrors[catId] = 'Indiquez le libellé de la ligne offerte';
+    }
+  }
+  if (Object.keys(templateErrors).length > 0) errors.templates = templateErrors;
   return errors;
 }
 
@@ -419,6 +448,7 @@ export default function FacturationTab() {
           typesByCategory={typesByCategory}
           value={form.templates_by_category}
           onChange={setTemplate}
+          errors={errors.templates}
         />
       </section>
 
