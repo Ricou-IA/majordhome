@@ -251,6 +251,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       }
       confirmLabel={isHub ? 'Émettre la facture' : isDraft ? 'Créer le brouillon' : 'Créer la facture'}
       variant="default"
+      size="xl"
       onConfirm={handleConfirm}
       loading={createInvoice.isPending || issueInvoice.isPending}
       confirmDisabled={isLoading || blocked}

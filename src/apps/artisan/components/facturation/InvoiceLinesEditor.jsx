@@ -9,7 +9,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { VAT_CODES, newFreeLine } from '@/lib/entretienInvoiceModel';
 
 const VAT_OPTIONS = Object.keys(VAT_CODES).map(Number).sort((a, b) => b - a);
-const CELL = 'w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary-500';
+const CELL = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500';
 
 /**
  * @param {object} p
@@ -23,15 +23,15 @@ export default function InvoiceLinesEditor({ lines, onChange, model }) {
   const add = () => onChange([...lines, newFreeLine(model)]);
   return (
     <div className="space-y-2">
-      <table className="w-full text-xs">
+      <table className="w-full text-sm">
         <thead>
           <tr className="text-gray-500 border-b border-gray-200">
             <th className="text-left font-medium py-1">Libellé / description</th>
-            <th className="text-right font-medium py-1 w-14">Qté</th>
-            <th className="text-right font-medium py-1 w-20">PU HT</th>
-            <th className="text-right font-medium py-1 w-16">TVA</th>
-            <th className="text-right font-medium py-1 w-16">Rem. %</th>
-            <th className="w-6" />
+            <th className="text-right font-medium py-1 w-20">Qté</th>
+            <th className="text-right font-medium py-1 w-32">PU HT</th>
+            <th className="text-right font-medium py-1 w-24">TVA</th>
+            <th className="text-right font-medium py-1 w-20">Rem. %</th>
+            <th className="w-8" />
           </tr>
         </thead>
         <tbody>

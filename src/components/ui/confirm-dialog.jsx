@@ -32,11 +32,13 @@ export function ConfirmDialog({
   onConfirm,
   loading = false,
   confirmDisabled = false, // bloque la confirmation (ex. aperçu en erreur) sans masquer le bouton
+  size = 'md', // 'md' (confirmation simple) | 'lg' | 'xl' (contenu éditable : tableau de lignes, aperçu de facture)
   children,
 }) {
   const confirmButtonClass = variant === 'destructive'
     ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
     : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500';
+  const sizeClass = { md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size] || 'max-w-md';
 
   return (
     <AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -46,8 +48,9 @@ export function ConfirmDialog({
         />
         <AlertDialogPrimitive.Content
           className={cn(
-            'fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%]',
-            'rounded-xl border border-gray-200 bg-white p-6 shadow-xl',
+            'fixed left-[50%] top-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%]',
+            sizeClass,
+            'max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-xl',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
