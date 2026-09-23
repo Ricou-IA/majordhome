@@ -343,7 +343,7 @@ test('renderInvoiceTemplate : variables, inconnue vide, espaces réduits, ponctu
   assert.equal(renderInvoiceTemplate('{marque} · {modele}', { marque: 'Cola', modele: '' }), 'Cola');
 });
 
-test('invoiceTemplatesFromSettings : normalise, ignore les vides et les "undefined", TVA hors table → null', () => {
+test('invoiceTemplatesFromSettings : normalise, ignore les vides et les "undefined", une entrée héritée (price_ht/vat_rate) est acceptée et ses clés ignorées', () => {
   const t = invoiceTemplatesFromSettings({
     templates: { by_category: {
       'cat-poele': { label: ' Entretien Performance {type} ', subject: '', offered: { label: 'Ramonage conduit de fumée', price_ht: '60', vat_rate: '10' } },
@@ -351,9 +351,9 @@ test('invoiceTemplatesFromSettings : normalise, ignore les vides et les "undefin
       'cat-x': { offered: { label: 'Truc', price_ht: '5', vat_rate: '7' } },
     } },
   });
-  assert.deepEqual(t.byCategory['cat-poele'], { label: 'Entretien Performance {type}', subject: null, offered: { label: 'Ramonage conduit de fumée', priceHt: 60, vatPercent: 10 } });
+  assert.deepEqual(t.byCategory['cat-poele'], { label: 'Entretien Performance {type}', subject: null, offered: { label: 'Ramonage conduit de fumée' } });
   assert.deepEqual(t.byCategory['cat-pac'], { label: null, subject: null, offered: null });
-  assert.deepEqual(t.byCategory['cat-x'], { label: null, subject: null, offered: null });
+  assert.deepEqual(t.byCategory['cat-x'], { label: null, subject: null, offered: { label: 'Truc' } });
   assert.deepEqual(invoiceTemplatesFromSettings({}), { byCategory: {} });
   assert.deepEqual(invoiceTemplatesFromSettings(null), { byCategory: {} });
 });
@@ -379,8 +379,8 @@ test('gabarits : libellé et objet rendus par catégorie, suffixe d’unités co
   assert.equal(none.subject, 'Entretien de votre poêle à bois : Cola · Fire HR acciaio');
 });
 
-test('ligne offerte : après sa ligne d’équipement, remise 100 %, TTC net 0, compte de la catégorie à SON taux, total inchangé, charge utile Pennylane', () => {
-  const templates = { byCategory: { 'cat-poele': { label: null, subject: null, offered: { label: 'Ramonage conduit de fumée', priceHt: 60, vatPercent: 10 } } } };
+test('ligne offerte : après sa ligne d’équipement, sans prix ni TVA propres (suit sa ligne d’équipement), TTC net 0, compte de la catégorie, total inchangé, charge utile Pennylane', () => {
+  const templates = { byCategory: { 'cat-poele': { label: null, subject: null, offered: { label: 'Ramonage conduit de fumée' } } } };
   const catalog = [{ id: 1, number: '70601', vatRate: 'any' }, { id: 2, number: '70601', vatRate: 'FR_100' }, { id: 3, number: '70601', vatRate: 'FR_55' }];
   const refPoele55 = { ...referentiel, categoriesById: new Map([[CAT_POELE.id, { ...CAT_POELE, default_vat_rate: 5.5 }], [CAT_PAC.id, CAT_PAC], [CAT_SANS_TVA.id, CAT_SANS_TVA]]) };
   const m = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', amount: 90 }, pricing: pricingFor([EQ_POELE]), parts: [{ designation: 'Joint', quantite: 1, prix_ht: 12, offert: false }], referentiel: refPoele55, ledgerAccounts: { byCategory: { 'cat-poele': '70601' }, parts: null, catalog }, templates, today: '2026-09-23' });
@@ -388,24 +388,24 @@ test('ligne offerte : après sa ligne d’équipement, remise 100 %, TTC net 0, 
   assert.deepEqual(m.lines.map((l) => l.kind), ['contrat', 'libre', 'piece']);
   const off = m.lines[1];
   assert.equal(off.label, 'Ramonage conduit de fumée');
-  assert.equal(off.description, 'Offert dans le cadre du contrat d’entretien (valeur 60,00 € HT)');
+  assert.equal(off.description, 'Offert dans le cadre du contrat d’entretien');
   assert.equal(off.quantity, 1);
-  assert.equal(off.vatPercent, 10);
-  assert.equal(off.vatCode, 'FR_100');
-  assert.equal(off.discountPercent, 100);
-  assert.equal(off.grossTtc, 66);
+  assert.equal(off.vatPercent, 5.5);
+  assert.equal(off.vatCode, 'FR_55');
+  assert.equal(off.discountPercent, 0);
+  assert.equal(off.grossTtc, 0);
   assert.equal(off.netTtc, 0);
-  assert.equal(off.unitPriceHt, '60');
-  assert.equal(off.ledgerAccountId, 2);
+  assert.equal(off.unitPriceHt, '0');
+  assert.equal(off.ledgerAccountId, 3);
   assert.equal(off.ledgerAccountNumber, '70601');
   assert.equal(off.categoryId, 'cat-poele');
   assert.equal(off.equipmentId, 'eq-1');
   assert.equal(m.totalTtc, 102); // 90 + pièce 12, la ligne offerte ne pèse rien
   const payload = toPennylaneInvoicePayload(m, { customerId: 1, draft: true, externalReference: 'x' });
-  assert.deepEqual(payload.invoice_lines[1].discount, { type: 'relative', value: '100' });
-  assert.equal(payload.invoice_lines[1].raw_currency_unit_price, '60');
-  assert.equal(payload.invoice_lines[1].vat_rate, 'FR_100');
-  assert.equal(payload.invoice_lines[1].ledger_account_id, 2);
+  assert.equal(payload.invoice_lines[1].discount, undefined);
+  assert.equal(payload.invoice_lines[1].raw_currency_unit_price, '0');
+  assert.equal(payload.invoice_lines[1].vat_rate, 'FR_55');
+  assert.equal(payload.invoice_lines[1].ledger_account_id, 3);
   // 2 poêles → 2 lignes offertes, une derrière chaque équipement
   const m2 = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', amount: 162 }, pricing: pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-3' }]), parts: [], referentiel, templates, today: '2026-09-23' });
   assert.deepEqual(m2.lines.map((l) => l.kind), ['contrat', 'libre', 'contrat', 'libre']);

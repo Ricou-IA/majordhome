@@ -13,9 +13,12 @@
 // d'équipement + un compte pour les pièces. Les comptes viennent de Pennylane
 // (`useLedgerAccounts`, GET /ledger_accounts 706*) : rien n'est créé côté PL.
 //
-// Gabarits (Eric, 2026-09-23) : libellé de ligne, objet de facture et ligne
-// offerte, PAR CATÉGORIE d'équipement. Présentationnel dans `TemplatesSection`,
-// état ici (`form.templates_by_category`), consommés par `buildEntretienInvoice`.
+// Gabarits (Eric, 2026-09-23, section « Entretien — gabarits par famille d'équipement » —
+// retour la même après-midi : la ligne offerte n'a ni prix ni TVA propres, un libellé
+// seul à 0 € au taux de la ligne d'équipement qu'elle suit) : libellé de ligne, objet de
+// facture et ligne offerte, PAR CATÉGORIE d'équipement. Présentationnel dans
+// `TemplatesSection`, état ici (`form.templates_by_category`), consommés par
+// `buildEntretienInvoice`.
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -23,6 +26,7 @@ import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks
 import { useLedgerAccounts, useJournals } from '@hooks/usePennylane';
 import { pennylaneService } from '@services/pennylane.service';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import TemplatesSection, { EMPTY_TEMPLATE } from './TemplatesSection';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -58,8 +62,6 @@ function pickForm(settings) {
         label: ledgerValue(t.label),
         subject: ledgerValue(t.subject),
         offered_label: ledgerValue(t.offered?.label),
-        offered_price_ht: ledgerValue(t.offered?.price_ht),
-        offered_vat: ledgerValue(t.offered?.vat_rate) || '10',
       };
     }
   }
@@ -90,11 +92,10 @@ function templatesForSave(form) {
     const label = (t.label || '').trim();
     const subject = (t.subject || '').trim();
     const oLabel = (t.offered_label || '').trim();
-    const oPrice = Number(t.offered_price_ht);
     const entry = {};
     if (label) entry.label = label;
     if (subject) entry.subject = subject;
-    if (oLabel && oPrice > 0) entry.offered = { label: oLabel, price_ht: oPrice, vat_rate: Number(t.offered_vat) };
+    if (oLabel) entry.offered = { label: oLabel };
     if (Object.keys(entry).length > 0) by_category[catId] = entry;
   }
   return { by_category };
@@ -104,17 +105,6 @@ function validate(form) {
   const errors = {};
   const n = Number(form.deadline_days);
   if (!Number.isInteger(n) || n < 0 || n > 120) errors.deadline_days = 'Entre 0 et 120 jours';
-  const templateErrors = {};
-  for (const [catId, t] of Object.entries(form.templates_by_category || {})) {
-    const oLabel = (t.offered_label || '').trim();
-    const oPrice = Number(t.offered_price_ht);
-    if (oLabel && !(oPrice > 0)) {
-      templateErrors[catId] = 'Indiquez un prix HT supérieur à 0 pour la ligne offerte';
-    } else if (oPrice > 0 && !oLabel) {
-      templateErrors[catId] = 'Indiquez le libellé de la ligne offerte';
-    }
-  }
-  if (Object.keys(templateErrors).length > 0) errors.templates = templateErrors;
   return errors;
 }
 
@@ -122,7 +112,16 @@ export default function FacturationTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const [form, setForm] = useState(() => pickForm({}));
   const [initial, setInitial] = useState(() => pickForm({}));
-  const { categories } = useEquipmentReferential();
+  const { categories, index } = useEquipmentReferential();
+  // Map(catId → types) pour le libellé d'exemple de l'aperçu (TemplatesSection) —
+  // regroupement centralisé du référentiel équipements, pas une copie locale.
+  const typesByCategory = useMemo(() => {
+    const map = new Map();
+    for (const g of grouperTypesParCategorie(index)) {
+      if (g.category) map.set(g.category.id, g.types);
+    }
+    return map;
+  }, [index]);
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
   const { journals, isLoading: loadingJournals, error: journalsError } = useJournals();
   // Pennylane décline chaque compte par taux de TVA (70601 × any / 10 % / 5,5 % / 20 %) :
@@ -414,12 +413,12 @@ export default function FacturationTab() {
       </section>
 
       <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
-        <h3 className={SECTION_TITLE}>Contrats d&apos;entretien — libellés et ligne offerte par catégorie</h3>
+        <h3 className={SECTION_TITLE}>Entretien — gabarits par famille d&apos;équipement</h3>
         <TemplatesSection
           categories={categories}
+          typesByCategory={typesByCategory}
           value={form.templates_by_category}
           onChange={setTemplate}
-          errors={errors.templates}
         />
       </section>
 

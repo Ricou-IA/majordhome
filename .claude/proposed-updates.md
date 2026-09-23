@@ -39,12 +39,12 @@
 
 ## [2026-09-23 15:30] Gabarits de facture d'entretien par catégorie (libellé, objet, ligne offerte)
 **Statut** : PENDING (à graver dans CLAUDE.md)
-**Commit** : 81edfd6 (modèle, Task 1) · 793adf2 (Settings → Facturation + branchement, Task 2) · vague finale
+**Commit** : 81edfd6 (modèle, Task 1) · 793adf2 (Settings → Facturation + branchement, Task 2) · vague finale · itération Eric
 **Contexte** : Eric, 2026-09-23 : « pas une usine à gaz, paramétrable facilement pour un tiers ». Le libellé de ligne d'entretien, l'objet de la facture et une éventuelle ligne offerte (type ramonage) étaient jusqu'ici implicites dans `buildEntretienInvoice`. Un gabarit par catégorie d'équipement, éditable dans Settings → Facturation, couvre les deux modes de facturation (brouillon Pennylane et hub) sans dupliquer la logique.
 **Proposition** (§ Module Pennylane ou § Module Contrats, à côté de la facturation d'entretien) :
-- `settings.pennylane.invoice.templates.by_category[catId] = { label, subject, offered: { label, price_ht, vat_rate } }`, tous les champs facultatifs, catégorie absente = comportement par défaut. Normalisé par `invoiceTemplatesFromSettings()` (`src/lib/entretienInvoiceModel.js`, Task 1), exposé par `pennylaneInvoiceSettings(settings).templates`.
-- Variables de gabarit `{type} {marque} {modele} {serie} {contrat}`, rendues par `renderInvoiceTemplate()` (une variable vide/inconnue disparaît, ponctuation orpheline finale nettoyée).
-- Ligne offerte = ligne libre (`kind='libre'`) ajoutée sous les lignes de la catégorie, remisée à 100 % (n'affecte jamais le total) — un libellé sans prix > 0 ou un prix sans libellé est ignoré côté modèle et bloqué côté formulaire (`validate` de `FacturationTab.jsx`).
+- `settings.pennylane.invoice.templates.by_category[catId] = { label, subject, offered: { label } }`, tous les champs facultatifs, catégorie absente = comportement par défaut. Normalisé par `invoiceTemplatesFromSettings()` (`src/lib/entretienInvoiceModel.js`, Task 1) — une entrée héritée portant `price_ht`/`vat_rate` (ancienne forme) est acceptée, ces clés sont ignorées. Exposé par `pennylaneInvoiceSettings(settings).templates`.
+- Variables de gabarit `{type} {marque} {modele} {serie} {contrat}`, rendues par `renderInvoiceTemplate()` (une variable vide/inconnue disparaît, ponctuation orpheline finale nettoyée). Chips cliquables sous chaque champ dans `TemplatesSection.jsx` (insertion au curseur), aperçu en direct sous chaque champ.
+- Ligne offerte = ligne libre (`kind='libre'`) ajoutée sous sa ligne d'équipement — retour Eric du 2026-09-23 après-midi : libellé seul, ligne à 0 € (netTtc/grossTtc nuls, discountPercent 0) au taux de TVA et sur le compte comptable de la famille qu'elle suit (n'affecte jamais le total).
 - Source unique de consommation : `buildEntretienInvoice({ …, templates })`, appelée par `FacturerEntretienDialog.jsx` dans les DEUX modes (brouillon Pennylane et hub) — pas de branche séparée par mode.
-- Éditable Settings → Facturation Pennylane, section « Contrats d'entretien — libellés et ligne offerte par catégorie » (`TemplatesSection.jsx`, présentationnel ; état dans `FacturationTab.jsx::form.templates_by_category`), un bloc par catégorie active du référentiel équipements.
+- Éditable Settings → Facturation Pennylane, section « Entretien — gabarits par famille d'équipement » (`TemplatesSection.jsx`, présentationnel ; état dans `FacturationTab.jsx::form.templates_by_category`), un bloc par catégorie active du référentiel équipements.
 ---

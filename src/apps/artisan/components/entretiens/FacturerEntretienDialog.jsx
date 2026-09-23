@@ -266,11 +266,8 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
                     <td className="py-1.5 text-right text-gray-700">{l.quantity}</td>
                     <td className="py-1.5 text-right text-gray-700">{l.vatPercent} %</td>
                     <td className="py-1.5 text-right text-gray-900 font-medium">
-                      {l.discountPercent === 100 ? (
-                        <>
-                          <span className="text-gray-400 line-through mr-1">{formatEuro(l.grossTtc)}</span>
-                          <span className="text-gray-700 font-normal">offert</span>
-                        </>
+                      {l.kind === 'libre' && l.netTtc === 0 ? (
+                        <span className="text-gray-700">offert</span>
                       ) : (
                         formatEuro(l.netTtc)
                       )}

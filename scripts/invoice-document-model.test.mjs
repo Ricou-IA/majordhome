@@ -129,13 +129,13 @@ test('buildInvoiceDraft : sans catalogue Pennylane, resolveLedgerAccountId renvo
   assert.equal(withCatalog[0].ledger_account_pl_id, 123);
 });
 
-test('buildInvoiceDraft + buildInvoicePdfModel : ligne offerte (gabarit par catégorie) — remisée à 100 %, net 0, total et TVA inchangés', () => {
+test('buildInvoiceDraft + buildInvoicePdfModel : ligne offerte (gabarit par catégorie) — sans prix ni remise propres, net 0, total et TVA inchangés', () => {
   const OFFERED = {
     kind: 'libre', label: 'Ramonage conduit de fumée',
-    description: 'Offert dans le cadre du contrat d’entretien (valeur 60,00 € HT)',
+    description: 'Offert dans le cadre du contrat d’entretien',
     quantity: 1, vatPercent: 10, vatCode: 'FR_100', ledgerAccountId: 2, ledgerAccountNumber: '70601',
     equipmentId: 'eq-1', equipmentTypeId: 'type-poele', categoryId: 'cat-poele',
-    grossTtc: 66, netTtc: 0, discountPercent: 100, unitPriceHt: '60',
+    grossTtc: 0, netTtc: 0, discountPercent: 0, unitPriceHt: '0',
   };
   const modelSansOffert = MODEL;
   const model = { ...MODEL, lines: [...MODEL.lines, OFFERED] };
@@ -147,7 +147,7 @@ test('buildInvoiceDraft + buildInvoicePdfModel : ligne offerte (gabarit par cat�
   assert.equal(offeredLine.ht, 0);
   assert.equal(offeredLine.tva, 0);
   assert.equal(offeredLine.ttc, 0);
-  assert.equal(offeredLine.discount_percent, 100);
+  assert.equal(offeredLine.discount_percent, 0);
   assert.equal(offeredLine.vat_code, 'FR_100');
   assert.equal(offeredLine.ledger_account_number, '70601');
   assert.equal(offeredLine.ledger_account_pl_id, 2);

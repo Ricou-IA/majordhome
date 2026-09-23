@@ -95,9 +95,6 @@ export function referenceEquipement(eq) {
   return parts.length ? parts.join(' · ') : null;
 }
 
-/** Nombre en € HT, format FR, PDF-safe (espace simple, virgule). */
-const fmtHt = (n) => `${(Number(n) || 0).toFixed(2).replace('.', ',')} € HT`;
-
 /**
  * Rend un gabarit de libellé : `{type} {marque} {modele} {serie} {contrat}`. Variable inconnue
  * ou vide → rien ; espaces réduits ; ponctuation orpheline finale retirée (« Entretien Poêle : »
@@ -129,7 +126,6 @@ export function renderInvoiceTemplate(template, vars) {
   return kept.join(' ').trim().replace(/[\s:\-–—·,]+$/u, '').trim();
 }
 
-const VALID_VATS = new Set(Object.keys(VAT_CODES).map(Number));
 const cleanText = (v) => {
   const s = v == null ? '' : String(v).trim();
   return s && s !== 'undefined' && s !== 'null' ? s : null;
@@ -138,10 +134,12 @@ const cleanText = (v) => {
 /**
  * Gabarits de facture par catégorie d'équipement, normalisés depuis
  * `settings.pennylane.invoice.templates = { by_category: { [catId]: { label, subject,
- * offered: { label, price_ht, vat_rate } } } }` (Settings → Facturation). Une entrée vide
- * disparaît ; une ligne offerte sans libellé, sans prix > 0 ou à TVA hors table est ignorée.
+ * offered: { label } } } }` (Settings → Facturation). Une entrée vide disparaît ; une ligne
+ * offerte sans libellé est ignorée. Une entrée héritée portant `price_ht`/`vat_rate` (ancienne
+ * forme) est acceptée, ces clés sont simplement ignorées : la ligne offerte suit désormais le
+ * prix (0 €) et la TVA de la ligne d'équipement qu'elle accompagne (Eric, 2026-09-23).
  * @param {object|null|undefined} invoiceSettingsRaw  `settings.pennylane.invoice`
- * @returns {{ byCategory: Object<string, { label: string|null, subject: string|null, offered: { label: string, priceHt: number, vatPercent: number } | null }> }}
+ * @returns {{ byCategory: Object<string, { label: string|null, subject: string|null, offered: { label: string } | null }> }}
  */
 export function invoiceTemplatesFromSettings(invoiceSettingsRaw) {
   const src = invoiceSettingsRaw?.templates?.by_category;
@@ -151,9 +149,7 @@ export function invoiceTemplatesFromSettings(invoiceSettingsRaw) {
       if (!t || typeof t !== 'object') continue;
       const o = t.offered && typeof t.offered === 'object' ? t.offered : null;
       const oLabel = cleanText(o?.label);
-      const oPrice = Number(o?.price_ht);
-      const oVat = Number(o?.vat_rate);
-      const offered = oLabel && oPrice > 0 && VALID_VATS.has(oVat) ? { label: oLabel, priceHt: oPrice, vatPercent: oVat } : null;
+      const offered = oLabel ? { label: oLabel } : null;
       byCategory[catId] = { label: cleanText(t.label), subject: cleanText(t.subject), offered };
     }
   }
@@ -345,13 +341,16 @@ export function buildEntretienInvoice({
     if (tpl?.subject) subjectTemplates.push(renderInvoiceTemplate(tpl.subject, vars));
     const vatPercent = resolveVat(typeId, label);
     const ledgerNumber = catId ? (ledgerAccounts?.byCategory?.[catId] ?? null) : null;
+    // Un seul compte résolu (et un seul avertissement éventuel) : la ligne offerte
+    // partage le compte — et donc la déclinaison de TVA — de sa ligne d'équipement.
+    const ledgerId = ledgerForCategory(catId, catLabel, VAT_CODES[vatPercent] || null);
     pushLine({
       kind: 'contrat',
       label,
       description: ref,
       quantity: 1,
       vatPercent,
-      ledgerAccountId: ledgerForCategory(catId, catLabel, VAT_CODES[vatPercent] || null),
+      ledgerAccountId: ledgerId,
       ledgerAccountNumber: ledgerNumber ? String(ledgerNumber) : null,
       equipmentId: eq?.id ?? null,
       equipmentTypeId: typeId,
@@ -361,21 +360,20 @@ export function buildEntretienInvoice({
       discountPercent: discount ? discount.percent : 0,
     });
     if (tpl?.offered) {
-      const o = tpl.offered;
       pushLine({
         kind: 'libre',
-        label: o.label,
-        description: `Offert dans le cadre du contrat d’entretien (valeur ${fmtHt(o.priceHt)})`,
+        label: tpl.offered.label,
+        description: 'Offert dans le cadre du contrat d’entretien',
         quantity: 1,
-        vatPercent: o.vatPercent,
-        ledgerAccountId: ledgerForCategory(catId, catLabel, VAT_CODES[o.vatPercent] || null),
+        vatPercent,
+        ledgerAccountId: ledgerId,
         ledgerAccountNumber: ledgerNumber ? String(ledgerNumber) : null,
         equipmentId: eq?.id ?? null,
         equipmentTypeId: typeId,
         categoryId: catId,
-        grossTtc: round2(o.priceHt * (1 + o.vatPercent / 100)),
+        grossTtc: 0,
         netTtc: 0,
-        discountPercent: 100,
+        discountPercent: 0,
       });
     }
   });
