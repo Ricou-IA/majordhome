@@ -27,13 +27,13 @@ test('invoiceEmailAvailability : invisible sans module, sinon activée seulement
   assert.deepEqual(invoiceEmailAvailability({ settings: OK, mode: 'resend', clientEmail: 'a@b.fr', hasInvoice: true }), { visible: true, enabled: true, reason: null });
 });
 
-test('certificateAttachmentRows : PDF requis pour être joignable, cochés par défaut, non signé marqué, libellé depuis l’équipement', () => {
+test('certificateAttachmentRows : PDF requis pour être joignable, JAMAIS coché par défaut (Eric : le non-envoi est la norme), non signé marqué, libellé depuis l’équipement', () => {
   const rows = certificateAttachmentRows([
     { id: 'c1', equipement_type: 'poele', equipement_marque: 'MCZ', equipement_modele: 'Ego', statut: 'signe', pdf_storage_path: 'x/1.pdf', reference: 'CERT-1' },
     { id: 'c2', equipement_type: 'pac_air_air', equipement_marque: null, equipement_modele: null, statut: 'brouillon', pdf_storage_path: 'x/2.pdf', reference: null },
     { id: 'c3', equipement_type: null, statut: 'brouillon', pdf_storage_path: null, reference: null },
   ]);
-  assert.deepEqual(rows.map((r) => [r.id, r.attachable, r.defaultChecked, r.badge]), [['c1', true, true, null], ['c2', true, true, 'non signé'], ['c3', false, false, 'PDF non généré']]);
+  assert.deepEqual(rows.map((r) => [r.id, r.attachable, r.defaultChecked, r.badge]), [['c1', true, false, null], ['c2', true, false, 'non signé'], ['c3', false, false, 'PDF non généré']]);
   assert.equal(rows[0].label, 'Certificat CERT-1');
   assert.equal(rows[0].sublabel, 'poele · MCZ · Ego');
   assert.equal(rows[1].label, 'Certificat d’entretien');

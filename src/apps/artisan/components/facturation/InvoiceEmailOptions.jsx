@@ -58,7 +58,7 @@ export default function InvoiceEmailOptions({
 
       {availability.enabled && (lockChecked || checked) && (
         <div className="mt-2 pl-6 space-y-1.5">
-          <p className="text-xs text-gray-500">Pièces jointes : la facture</p>
+          <p className="text-xs text-gray-500">Pièces jointes : la facture. Cochez les certificats à joindre (aucun n&apos;est joint par défaut).</p>
           {loadingCertificates ? (
             <p className="text-xs text-gray-500">Chargement des certificats…</p>
           ) : rows.length === 0 ? (

@@ -59,7 +59,9 @@ export function certificateAttachmentRows(certificats, { labelByCode } = {}) {
       label: c.reference ? `Certificat ${c.reference}` : 'Certificat d’entretien',
       sublabel: [equipmentLabel, c.equipement_marque, c.equipement_modele].filter(Boolean).join(' · '),
       attachable,
-      defaultChecked: attachable,
+      // Eric, 2026-09-24 : « le non-envoi du certificat est la norme, c'est plus safe » — rien
+      // ne part sans un geste explicite, un certificat n'est JAMAIS coché d'office.
+      defaultChecked: false,
       badge: !attachable ? 'PDF non généré' : !signed ? 'non signé' : null,
     };
   });
