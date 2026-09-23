@@ -10,12 +10,18 @@
  * modèle pur `buildEntretienInvoice` (remise, TVA, pièces, objet). Ce composant
  * ne calcule rien : il charge et affiche. Un avertissement s'affiche, une erreur
  * bloque : on ne crée jamais une facture qu'on n'a pas su calculer.
+ *
+ * Édition manuelle (2026-09-23, Eric : « on paramètre 99 % des cas et on garde
+ * la main sur les edge cases ») : `model` reste le calcul automatique intouché ;
+ * `effectiveModel` (= `applyLineEdits(model, edits)` si l'utilisateur a ouvert
+ * l'éditeur, sinon `model` tel quel) est ce qui s'affiche et part en facture —
+ * ce composant ne calcule toujours rien, `applyLineEdits` fait le recalcul.
  * ============================================================================
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, XCircle, ExternalLink, Pencil, RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { usePricingData, useContractLineOverrides } from '@hooks/usePricing';
 import { useContract, useContractEquipments } from '@hooks/useContracts';
@@ -26,8 +32,9 @@ import { useIssueEntretienInvoice } from '@hooks/useInvoices';
 import { buildInvoiceDraft, invoicingSettings, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
 import { buildCompanyInfo, formatFullAddress } from '@/lib/orgBranding';
 import { generateInvoicePdfBlob } from '@/apps/artisan/components/facturation/InvoicePDF';
+import InvoiceLinesEditor from '@/apps/artisan/components/facturation/InvoiceLinesEditor';
 import { computeContractLines } from '@/lib/contractPricing';
-import { buildEntretienInvoice, toPennylaneInvoicePayload } from '@/lib/entretienInvoiceModel';
+import { buildEntretienInvoice, toPennylaneInvoicePayload, lineEditsFromModel, applyLineEdits } from '@/lib/entretienInvoiceModel';
 import { formatEuro, formatDateForInput, formatDateShortFR, downloadBlob } from '@/lib/utils';
 
 /**
@@ -115,16 +122,33 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     // eslint-disable-next-line react-hooks/exhaustive-deps -- invoiceSettings est dérivé de `settings` (objet stable de React Query)
   }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings, ledgerCatalog]);
 
+  // Édition manuelle des lignes (facultative) : `edits === null` ⇒ pas d'édition en cours,
+  // `effectiveModel` = `model` tel quel. Nouveau modèle (contrat/pricing rechargés) ou
+  // réouverture de la modale ⇒ retour aux lignes calculées, jamais d'édition périmée affichée.
+  const [edits, setEdits] = useState(null);
+  useEffect(() => { setEdits(null); }, [model, open]);
+  const effectiveModel = useMemo(() => (model && edits ? applyLineEdits(model, edits) : model), [model, edits]);
+
+  // Détail de la remise (dégressivité / exceptionnelle / commerciale) : calculé une seule
+  // fois, réutilisé par le tableau lecture seule ET par le bloc sous l'éditeur (mêmes chiffres).
+  const discountDetail = effectiveModel?.discount
+    ? [
+        effectiveModel.discount.degressivitePercent > 0 ? `dégressivité ${effectiveModel.discount.degressivitePercent} %` : null,
+        effectiveModel.discount.exceptionalAmount > 0 ? `remise exceptionnelle ${formatEuro(effectiveModel.discount.exceptionalAmount)}` : null,
+        effectiveModel.discount.commercialAmount > 0 ? `remise commerciale ${formatEuro(effectiveModel.discount.commercialAmount)}` : null,
+      ].filter(Boolean).join(' + ') || 'montant du contrat'
+    : null;
+
   const missingAddress = isHub && !(item.client_address && item.client_postal_code && item.client_city);
   const missingIssuer = isHub && !(company.legalName && company.siret && formatFullAddress(company));
-  const blocked = !model || model.errors.length > 0 || model.lines.length === 0 || !item.client_id || missingAddress || missingIssuer || !!item.invoice_id;
+  const blocked = !effectiveModel || effectiveModel.errors.length > 0 || effectiveModel.lines.length === 0 || !item.client_id || missingAddress || missingIssuer || !!item.invoice_id;
 
   const handleConfirm = async () => {
     if (blocked || createInvoice.isPending || issueInvoice.isPending) return;
     if (isHub) {
       try {
         const draft = buildInvoiceDraft({
-          model,
+          model: effectiveModel,
           orgId,
           context: 'contrat',
           client: {
@@ -184,7 +208,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         // taken », 2026-09-22) : intervention + suffixe d'essai. L'idempotence, elle, est
         // portée par le mapping pennylane_sync relu avant tout POST, pas par ce champ.
         buildPayload: (customerId) =>
-          toPennylaneInvoicePayload(model, { customerId, draft: isDraft, externalReference: `${item.id}-${Date.now().toString(36)}` }),
+          toPennylaneInvoicePayload(effectiveModel, { customerId, draft: isDraft, externalReference: `${item.id}-${Date.now().toString(36)}` }),
         journalId: invoiceSettings.journalId,
       });
       if (created.journalWarning) {
@@ -241,66 +265,96 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Identité de l’émetteur incomplète (raison sociale, SIRET, adresse) : Paramètres → Organisation.</p>
         )}
 
-        {model && model.errors.map((e) => (
+        {effectiveModel && effectiveModel.errors.map((e) => (
           <p key={e.code} className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{e.message}</p>
         ))}
 
         {model && model.lines.length > 0 && (
           <>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-500 border-b border-gray-200">
-                  <th className="text-left font-medium py-1">Ligne</th>
-                  <th className="text-right font-medium py-1 w-10">Qté</th>
-                  <th className="text-right font-medium py-1 w-14">TVA</th>
-                  <th className="text-right font-medium py-1 w-20">TTC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {model.lines.map((l, i) => (
-                  <tr key={i} className="border-b border-gray-100 align-top">
-                    <td className="py-1.5 pr-2">
-                      <div className="text-gray-900">{l.label}</div>
-                      {l.description && <div className="text-gray-500">{l.description}</div>}
-                    </td>
-                    <td className="py-1.5 text-right text-gray-700">{l.quantity}</td>
-                    <td className="py-1.5 text-right text-gray-700">{l.vatPercent} %</td>
-                    <td className="py-1.5 text-right text-gray-900 font-medium">
-                      {l.kind === 'libre' && l.netTtc === 0 ? (
-                        <span className="text-gray-700">offert</span>
-                      ) : (
-                        formatEuro(l.netTtc)
-                      )}
-                    </td>
+            <div className="flex justify-end">
+              {edits === null ? (
+                <button type="button" onClick={() => setEdits(lineEditsFromModel(model))} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline">
+                  <Pencil className="w-3.5 h-3.5" /> Modifier les lignes
+                </button>
+              ) : (
+                <button type="button" onClick={() => setEdits(null)} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline">
+                  <RotateCcw className="w-3.5 h-3.5" /> Revenir aux lignes calculées
+                </button>
+              )}
+            </div>
+
+            {edits === null ? (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-200">
+                    <th className="text-left font-medium py-1">Ligne</th>
+                    <th className="text-right font-medium py-1 w-10">Qté</th>
+                    <th className="text-right font-medium py-1 w-14">TVA</th>
+                    <th className="text-right font-medium py-1 w-20">TTC</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                {model.discount && (
-                  <tr className="text-gray-700">
-                    <td colSpan={3} className="pt-2 text-right">
-                      Remise {model.discount.percent} % sur les équipements
-                      <span className="text-gray-500">
-                        {' '}({[
-                          model.discount.degressivitePercent > 0 ? `dégressivité ${model.discount.degressivitePercent} %` : null,
-                          model.discount.exceptionalAmount > 0 ? `remise exceptionnelle ${formatEuro(model.discount.exceptionalAmount)}` : null,
-                          model.discount.commercialAmount > 0 ? `remise commerciale ${formatEuro(model.discount.commercialAmount)}` : null,
-                        ].filter(Boolean).join(' + ') || 'montant du contrat'})
+                </thead>
+                <tbody>
+                  {effectiveModel.lines.map((l, i) => (
+                    <tr key={i} className="border-b border-gray-100 align-top">
+                      <td className="py-1.5 pr-2">
+                        <div className="text-gray-900">{l.label}</div>
+                        {l.description && <div className="text-gray-500">{l.description}</div>}
+                      </td>
+                      <td className="py-1.5 text-right text-gray-700">{l.quantity}</td>
+                      <td className="py-1.5 text-right text-gray-700">{l.vatPercent} %</td>
+                      <td className="py-1.5 text-right text-gray-900 font-medium">
+                        {l.kind === 'libre' && l.netTtc === 0 ? (
+                          <span className="text-gray-700">offert</span>
+                        ) : (
+                          formatEuro(l.netTtc)
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  {effectiveModel.discount && (
+                    <tr className="text-gray-700">
+                      <td colSpan={3} className="pt-2 text-right">
+                        Remise {effectiveModel.discount.percent} % sur les équipements
+                        <span className="text-gray-500"> ({discountDetail})</span>
+                      </td>
+                      <td className="pt-2 text-right">−{formatEuro(effectiveModel.discount.amount)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={3} className="pt-2 text-right font-semibold text-gray-900">Total TTC</td>
+                    <td className="pt-2 text-right font-semibold text-gray-900">{formatEuro(effectiveModel.totalTtc)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            ) : (
+              <>
+                <InvoiceLinesEditor lines={edits} onChange={setEdits} model={model} />
+                <div className="space-y-1 text-xs">
+                  {effectiveModel.discount && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>
+                        Remise {effectiveModel.discount.percent} % sur les équipements
+                        <span className="text-gray-500"> ({discountDetail})</span>
                       </span>
-                    </td>
-                    <td className="pt-2 text-right">−{formatEuro(model.discount.amount)}</td>
-                  </tr>
-                )}
-                <tr>
-                  <td colSpan={3} className="pt-2 text-right font-semibold text-gray-900">Total TTC</td>
-                  <td className="pt-2 text-right font-semibold text-gray-900">{formatEuro(model.totalTtc)}</td>
-                </tr>
-              </tfoot>
-            </table>
+                      <span>−{formatEuro(effectiveModel.discount.amount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold text-gray-900">
+                    <span>Total TTC</span>
+                    <span>{formatEuro(effectiveModel.totalTtc)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Les lignes modifiées partent telles quelles (brouillon Pennylane ou facture émise). La remise du contrat reste appliquée sur les lignes d’équipement via leur colonne Rem.
+                </p>
+              </>
+            )}
 
             <div className="text-xs text-gray-600 space-y-0.5">
-              <div><span className="text-gray-500">Objet :</span> {model.subject}</div>
-              <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(model.deadline)} ({invoiceSettings.deadlineDays} j)</div>
+              <div><span className="text-gray-500">Objet :</span> {effectiveModel.subject}</div>
+              <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(effectiveModel.deadline)} ({invoiceSettings.deadlineDays} j)</div>
               {!isHub && invoiceSettings.journalId && (
                 <div><span className="text-gray-500">Journal :</span> {invoiceSettings.journalCode || `#${invoiceSettings.journalId}`} (Pennylane refuse le déplacement, la facture tombe dans le journal de ventes principal)</div>
               )}
@@ -309,7 +363,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           </>
         )}
 
-        {model && model.warnings.map((w, i) => (
+        {effectiveModel && effectiveModel.warnings.map((w, i) => (
           <p key={`${w.code}-${i}`} className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 text-xs">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />{w.message}
           </p>
