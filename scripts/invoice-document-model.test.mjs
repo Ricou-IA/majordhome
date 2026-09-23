@@ -129,6 +129,54 @@ test('buildInvoiceDraft : sans catalogue Pennylane, resolveLedgerAccountId renvo
   assert.equal(withCatalog[0].ledger_account_pl_id, 123);
 });
 
+test('buildInvoiceDraft + buildInvoicePdfModel : ligne offerte (gabarit par catégorie) — remisée à 100 %, net 0, total et TVA inchangés', () => {
+  const OFFERED = {
+    kind: 'libre', label: 'Ramonage conduit de fumée',
+    description: 'Offert dans le cadre du contrat d’entretien (valeur 60,00 € HT)',
+    quantity: 1, vatPercent: 10, vatCode: 'FR_100', ledgerAccountId: 2, ledgerAccountNumber: '70601',
+    equipmentId: 'eq-1', equipmentTypeId: 'type-poele', categoryId: 'cat-poele',
+    grossTtc: 66, netTtc: 0, discountPercent: 100, unitPriceHt: '60',
+  };
+  const modelSansOffert = MODEL;
+  const model = { ...MODEL, lines: [...MODEL.lines, OFFERED] };
+
+  const { invoice, lines } = buildInvoiceDraft({ model, orgId: 'org-1', context: 'contrat', client: CLIENT, dueDays: 30 });
+  const offeredLine = lines[lines.length - 1];
+  assert.equal(offeredLine.kind, 'libre');
+  assert.equal(offeredLine.unit_price_ht, 0);
+  assert.equal(offeredLine.ht, 0);
+  assert.equal(offeredLine.tva, 0);
+  assert.equal(offeredLine.ttc, 0);
+  assert.equal(offeredLine.discount_percent, 100);
+  assert.equal(offeredLine.vat_code, 'FR_100');
+  assert.equal(offeredLine.ledger_account_number, '70601');
+  assert.equal(offeredLine.ledger_account_pl_id, 2);
+
+  // Le total ne bouge pas : la ligne offerte est nette de 0, comme sans elle.
+  const { invoice: invoiceSansOffert } = buildInvoiceDraft({ model: modelSansOffert, orgId: 'org-1', context: 'contrat', client: CLIENT, dueDays: 30 });
+  assert.equal(invoice.total_ttc, invoiceSansOffert.total_ttc);
+  assert.equal(invoice.total_ht, invoiceSansOffert.total_ht);
+  assert.equal(invoice.total_tva, invoiceSansOffert.total_tva);
+
+  const rate10 = invoice.vat_breakdown.find((v) => v.rate === 10);
+  assert.ok(rate10, 'ventilation TVA 10 % absente');
+  assert.equal(invoice.vat_breakdown.reduce((s, v) => s + v.base, 0), invoice.total_ht);
+
+  const pdf = buildInvoicePdfModel({
+    invoice: {
+      ...ISSUED,
+      total_ht: invoice.total_ht, total_tva: invoice.total_tva, total_ttc: invoice.total_ttc, vat_breakdown: invoice.vat_breakdown,
+    },
+    lines,
+    company: COMPANY,
+    invoicing: INVOICING,
+  });
+  const offeredRow = pdf.rows[pdf.rows.length - 1];
+  assert.equal(offeredRow.unitHt, '0,00 €');
+  assert.equal(offeredRow.ht, '0,00 €');
+  assert.equal(offeredRow.description, OFFERED.description);
+});
+
 const ISSUED = {
   id: 'inv-1', number: 'F-2026-00012', kind: 'invoice', status: 'issued', invoice_date: '2026-09-23', due_at: '2026-10-23',
   subject: 'Entretien de votre poêle', customer: { name: 'Anna FERNANDEZ', address: '3 impasse des Lilas', postal_code: '81600', city: 'Gaillac', client_number: 286 },

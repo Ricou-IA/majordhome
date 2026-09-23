@@ -105,13 +105,28 @@ const fmtHt = (n) => `${(Number(n) || 0).toFixed(2).replace('.', ',')} € HT`;
  * @param {string|null|undefined} template
  * @param {Object<string, string|null|undefined>} vars
  */
+const SEPARATOR_TOKEN_RE = /^[:\-–—·,]+$/u;
+
 export function renderInvoiceTemplate(template, vars) {
   if (typeof template !== 'string' || !template.trim()) return '';
   const out = template.replace(/\{([a-z_]+)\}/gi, (_, key) => {
     const v = vars?.[key.toLowerCase()];
     return v == null ? '' : String(v);
   });
-  return out.replace(/\s+/g, ' ').trim().replace(/[\s:\-–—·,]+$/u, '').trim();
+  const tokens = out.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  // Ponctuation orpheline laissée par une variable vide : un séparateur seul en tête, en
+  // fin, ou immédiatement suivi d'un autre séparateur n'a plus rien à relier → il disparaît.
+  const kept = [];
+  tokens.forEach((tok, i) => {
+    if (SEPARATOR_TOKEN_RE.test(tok)) {
+      const isStart = kept.length === 0;
+      const isEnd = i === tokens.length - 1;
+      const nextIsSeparator = i + 1 < tokens.length && SEPARATOR_TOKEN_RE.test(tokens[i + 1]);
+      if (isStart || isEnd || nextIsSeparator) return;
+    }
+    kept.push(tok);
+  });
+  return kept.join(' ').trim().replace(/[\s:\-–—·,]+$/u, '').trim();
 }
 
 const VALID_VATS = new Set(Object.keys(VAT_CODES).map(Number));

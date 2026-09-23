@@ -39,7 +39,7 @@
 
 ## [2026-09-23 15:30] Gabarits de facture d'entretien par catégorie (libellé, objet, ligne offerte)
 **Statut** : PENDING (à graver dans CLAUDE.md)
-**Commit** : 81edfd6 (modèle, Task 1) · (commit de cette entrée) (Settings → Facturation + branchement, Task 2)
+**Commit** : 81edfd6 (modèle, Task 1) · 793adf2 (Settings → Facturation + branchement, Task 2) · vague finale
 **Contexte** : Eric, 2026-09-23 : « pas une usine à gaz, paramétrable facilement pour un tiers ». Le libellé de ligne d'entretien, l'objet de la facture et une éventuelle ligne offerte (type ramonage) étaient jusqu'ici implicites dans `buildEntretienInvoice`. Un gabarit par catégorie d'équipement, éditable dans Settings → Facturation, couvre les deux modes de facturation (brouillon Pennylane et hub) sans dupliquer la logique.
 **Proposition** (§ Module Pennylane ou § Module Contrats, à côté de la facturation d'entretien) :
 - `settings.pennylane.invoice.templates.by_category[catId] = { label, subject, offered: { label, price_ht, vat_rate } }`, tous les champs facultatifs, catégorie absente = comportement par défaut. Normalisé par `invoiceTemplatesFromSettings()` (`src/lib/entretienInvoiceModel.js`, Task 1), exposé par `pennylaneInvoiceSettings(settings).templates`.

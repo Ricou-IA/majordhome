@@ -339,6 +339,8 @@ test('renderInvoiceTemplate : variables, inconnue vide, espaces réduits, ponctu
   assert.equal(renderInvoiceTemplate('Contrat {contrat} — {inconnue}', vars), 'Contrat CTR-00063');
   assert.equal(renderInvoiceTemplate('   ', vars), '');
   assert.equal(renderInvoiceTemplate(null, vars), '');
+  assert.equal(renderInvoiceTemplate('{marque} · {modele} — contrat {contrat}', { marque: '', modele: '', contrat: 'CTR-1' }), 'contrat CTR-1');
+  assert.equal(renderInvoiceTemplate('{marque} · {modele}', { marque: 'Cola', modele: '' }), 'Cola');
 });
 
 test('invoiceTemplatesFromSettings : normalise, ignore les vides et les "undefined", TVA hors table → null', () => {
