@@ -10,7 +10,11 @@ import { moduleActif } from './modules.js';
 /**
  * @param {object} p
  * @param {object} p.settings  settings de l'org
- * @param {'draft'|'final'|'hub'} p.mode  mode de création (pennylaneInvoiceSettings)
+ * @param {'draft'|'final'|'hub'|'resend'} p.mode  mode de création (pennylaneInvoiceSettings), ou
+ *   `'resend'` pour un renvoi depuis la carte : ce mode ne déclenche JAMAIS `draft_mode`, car le
+ *   mode de création COURANT de l'org ne dit rien de l'état de la facture déjà émise sur cette
+ *   carte (une org en mode brouillon peut très bien renvoyer une facture ancienne déjà finalisée
+ *   dans Pennylane — I1, 2026-09-24). L'edge `invoice-send` reste seul juge du brouillon réel.
  * @param {string|null|undefined} p.clientEmail
  * @param {boolean} [p.hasInvoice=true]  renvoi depuis la carte : la carte porte-t-elle une facture ?
  * @param {boolean} [p.isDraftInvoice]  renvoi : la facture Pennylane est-elle encore un brouillon ? (si connu)
@@ -40,15 +44,20 @@ export const INVOICE_EMAIL_REASONS = Object.freeze({
 /**
  * Certificats de l'intervention → lignes cochables. Joignable = PDF archivé.
  * @param {Array<{ id, reference?, equipement_type?, equipement_marque?, equipement_modele?, statut?, pdf_storage_path? }>|null} certificats
+ * @param {object} [opts]
+ * @param {Record<string,string>} [opts.labelByCode]  code de catégorie → libellé (référentiel de
+ *   l'org). `equipement_type` est un CODE (`pac_air_air`), jamais un libellé client-friendly (I2) —
+ *   sans cette table, le code brut reste affiché tel quel (repli, pas une erreur).
  */
-export function certificateAttachmentRows(certificats) {
+export function certificateAttachmentRows(certificats, { labelByCode } = {}) {
   return (certificats || []).map((c) => {
     const attachable = Boolean(c.pdf_storage_path);
     const signed = c.statut === 'signe';
+    const equipmentLabel = c.equipement_type ? (labelByCode?.[c.equipement_type] || c.equipement_type) : c.equipement_type;
     return {
       id: c.id,
       label: c.reference ? `Certificat ${c.reference}` : 'Certificat d’entretien',
-      sublabel: [c.equipement_type, c.equipement_marque, c.equipement_modele].filter(Boolean).join(' · '),
+      sublabel: [equipmentLabel, c.equipement_marque, c.equipement_modele].filter(Boolean).join(' · '),
       attachable,
       defaultChecked: attachable,
       badge: !attachable ? 'PDF non généré' : !signed ? 'non signé' : null,
@@ -57,7 +66,7 @@ export function certificateAttachmentRows(certificats) {
 }
 
 export const INVOICE_EMAIL_ERROR_MESSAGES = Object.freeze({
-  module_communication_inactif: 'Le module Communication n’est pas ouvert pour cette organisation.',
+  module_communication_inactif: 'Module Communication fermé pour cette organisation, ou droits insuffisants (chef d’équipe requis).',
   intervention_not_found: 'Intervention introuvable.',
   invoice_missing: 'Cette carte n’a pas de facture à envoyer.',
   invoice_is_draft: 'La facture est encore un brouillon dans Pennylane : finalisez-la d’abord.',
@@ -66,7 +75,7 @@ export const INVOICE_EMAIL_ERROR_MESSAGES = Object.freeze({
   certificate_pdf_missing: 'Un certificat sélectionné n’a pas de PDF généré : ouvrez-le et générez le PDF.',
   template_missing: 'Gabarit « Facture d’entretien » absent : créez-le dans Paramètres → Communication → Emails.',
   client_email_missing: 'Le client n’a pas d’adresse e-mail.',
-  attachments_too_large: 'Pièces jointes trop volumineuses (plus de 35 Mo) : retirez des certificats.',
+  attachments_too_large: 'Pièces jointes trop volumineuses (plus de 29 Mo) : retirez des certificats.',
   resend_failed: 'Resend a refusé l’envoi.',
 });
 

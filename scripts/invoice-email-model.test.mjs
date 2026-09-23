@@ -21,6 +21,10 @@ test('invoiceEmailAvailability : invisible sans module, sinon activée seulement
   assert.equal(invoiceEmailAvailability({ settings: OK, mode: 'final', clientEmail: 'a@b.fr', hasInvoice: true, isDraftInvoice: true }).reason, 'draft_invoice');
   // ordre des raisons : module, puis e-mail, puis expéditeur, puis domaine, puis facture
   assert.equal(invoiceEmailAvailability({ settings: { modules: { communication: true } }, mode: 'draft', clientEmail: '' }).reason, 'no_email');
+  // I1 — renvoi (`mode: 'resend'`) : ne déclenche JAMAIS draft_mode, quel que soit le mode de
+  // création courant de l'org (une facture déjà émise peut être renvoyée même si l'org crée
+  // aujourd'hui en brouillon).
+  assert.deepEqual(invoiceEmailAvailability({ settings: OK, mode: 'resend', clientEmail: 'a@b.fr', hasInvoice: true }), { visible: true, enabled: true, reason: null });
 });
 
 test('certificateAttachmentRows : PDF requis pour être joignable, cochés par défaut, non signé marqué, libellé depuis l’équipement', () => {
@@ -36,6 +40,14 @@ test('certificateAttachmentRows : PDF requis pour être joignable, cochés par d
   assert.equal(rows[1].sublabel, 'pac_air_air');
   assert.equal(rows[2].sublabel, '');
   assert.deepEqual(certificateAttachmentRows(null), []);
+});
+
+test('certificateAttachmentRows : I2 — labelByCode traduit le code de catégorie en libellé, sans option le code brut reste affiché', () => {
+  const fixture = [{ id: 'c1', equipement_type: 'poele', equipement_marque: 'MCZ', equipement_modele: 'Ego', statut: 'signe', pdf_storage_path: 'x/1.pdf', reference: 'CERT-1' }];
+  const rows = certificateAttachmentRows(fixture, { labelByCode: { poele: 'Poêle' } });
+  assert.equal(rows[0].sublabel, 'Poêle · MCZ · Ego');
+  const rowsNoOption = certificateAttachmentRows(fixture);
+  assert.equal(rowsNoOption[0].sublabel, 'poele · MCZ · Ego');
 });
 
 test('messages d’erreur : chaque code de l’edge a un message FR, détail ajouté, inconnu → fallback', () => {

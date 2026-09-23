@@ -8,7 +8,8 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { useInterventionCertificats } from '@hooks/useCertificats';
 import { useSendInvoiceEmail } from '@hooks/useInvoices';
 import { invoiceEmailAvailability, certificateAttachmentRows, invoiceEmailErrorMessage } from '@/lib/invoiceEmailModel';
@@ -23,19 +24,24 @@ import InvoiceEmailOptions from './InvoiceEmailOptions';
  */
 export default function SendInvoiceEmailDialog({ item, orgId, open, onOpenChange }) {
   const { settings } = useOrgSettings();
-  const invoiceSettings = pennylaneInvoiceSettings(settings);
+  // I1 — renvoi explicite : ne gate JAMAIS sur le mode de création COURANT de l'org
+  // (`invoiceSettings.mode`). Une facture déjà émise peut être finalisée dans Pennylane
+  // longtemps après, indépendamment du mode dans lequel l'org crée aujourd'hui — `mode: 'resend'`
+  // ne déclenche jamais `draft_mode` (cf. invoiceEmailModel.js), l'edge `invoice-send` tranche
+  // en rafraîchissant le miroir Pennylane avant de refuser un vrai brouillon.
   const availability = useMemo(
     () => invoiceEmailAvailability({
       settings,
-      mode: invoiceSettings.mode,
+      mode: 'resend',
       clientEmail: item.client_email,
       hasInvoice: !!item.invoice_id,
-      isDraftInvoice: undefined,
     }),
-    [settings, invoiceSettings.mode, item.client_email, item.invoice_id],
+    [settings, item.client_email, item.invoice_id],
   );
   const { certificats, isLoading: loadingCerts } = useInterventionCertificats(orgId, item.id, { enabled: open });
-  const certRows = useMemo(() => certificateAttachmentRows(certificats), [certificats]);
+  const { categories } = useEquipmentReferential();
+  const labelByCode = useMemo(() => Object.fromEntries((categories || []).map((c) => [c.code, c.label])), [categories]);
+  const certRows = useMemo(() => certificateAttachmentRows(certificats, { labelByCode }), [certificats, labelByCode]);
   const [selectedCertIds, setSelectedCertIds] = useState(null);
   const effectiveCertIds = selectedCertIds ?? new Set(certRows.filter((r) => r.defaultChecked).map((r) => r.id));
 
@@ -75,6 +81,7 @@ export default function SendInvoiceEmailDialog({ item, orgId, open, onOpenChange
           availability={availability}
           email={item.client_email}
           checked
+          lockChecked
           onCheckedChange={() => {}}
           rows={certRows}
           selectedIds={effectiveCertIds}

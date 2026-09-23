@@ -173,8 +173,8 @@ export function useCancelInvoiceWithCreditNote(orgId) {
  */
 export function useSendInvoiceEmail(orgId) {
   return useMutation({
-    mutationFn: ({ interventionId, certificateIds, to }) =>
-      unwrapResult(invoicesService.sendByEmail(orgId, { interventionId, certificateIds, to })),
+    mutationFn: ({ interventionId, certificateIds }) =>
+      unwrapResult(invoicesService.sendByEmail(orgId, { interventionId, certificateIds })),
   });
 }
 

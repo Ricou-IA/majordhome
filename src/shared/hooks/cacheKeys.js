@@ -148,6 +148,10 @@ export const mailCampaignKeys = {
   // Gabarit transactionnel par clé (ex. `facture_entretien`) — Settings → Communication →
   // Emails (2026-09-23) : invalider via `mailCampaignKeys.all(orgId)` comme le reste de la famille.
   byKey: (orgId, key) => [...mailCampaignKeys.all(orgId), 'by-key', key],
+  // Détection d'un gabarit ARCHIVÉ par clé (M5, 2026-09-24) : distingue « jamais créé » (bouton de
+  // création) de « archivé » (lien de restauration) — évite de refaire buter la contrainte
+  // unique `(org_id, key)` sur un create.
+  archivedByKey: (orgId, key) => [...mailCampaignKeys.all(orgId), 'archived-by-key', key],
 };
 
 // --- Mail Segments (catalogue de ciblages réutilisables) ---

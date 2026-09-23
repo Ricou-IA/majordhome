@@ -18,6 +18,8 @@ import { INVOICE_EMAIL_REASONS } from '@/lib/invoiceEmailModel';
  * @param {Set<string>} p.selectedIds
  * @param {(id: string) => void} p.onToggleCertificate
  * @param {boolean} p.loadingCertificates
+ * @param {boolean} [p.lockChecked=false]  coche verrouillée cochée (renvoi explicite depuis la
+ *   carte : on est déjà dans un dialogue « Envoyer », pas de raison de proposer de la décocher).
  */
 export default function InvoiceEmailOptions({
   availability,
@@ -28,6 +30,7 @@ export default function InvoiceEmailOptions({
   selectedIds,
   onToggleCertificate,
   loadingCertificates,
+  lockChecked = false,
 }) {
   if (!availability.visible) return null;
 
@@ -36,20 +39,24 @@ export default function InvoiceEmailOptions({
       <label className="flex items-start gap-2 cursor-pointer">
         <input
           type="checkbox"
-          checked={checked && availability.enabled}
-          disabled={!availability.enabled}
+          checked={lockChecked ? true : checked && availability.enabled}
+          disabled={lockChecked || !availability.enabled}
           onChange={(e) => onCheckedChange(e.target.checked)}
           className="mt-0.5"
         />
         <span>
-          Envoyer la facture par e-mail à <strong>{email || 'au client'}</strong>
+          {lockChecked ? (
+            <>La facture sera envoyée à <strong>{email || 'au client'}</strong></>
+          ) : (
+            <>Envoyer la facture par e-mail à <strong>{email || 'au client'}</strong></>
+          )}
         </span>
       </label>
       {!availability.enabled && (
         <p className="mt-1 text-xs text-amber-700">{INVOICE_EMAIL_REASONS[availability.reason]}</p>
       )}
 
-      {availability.enabled && checked && (
+      {availability.enabled && (lockChecked || checked) && (
         <div className="mt-2 pl-6 space-y-1.5">
           <p className="text-xs text-gray-500">Pièces jointes : la facture</p>
           {loadingCertificates ? (

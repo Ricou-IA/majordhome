@@ -145,14 +145,15 @@ async function importToPennylane(orgId, invoiceId) {
 /**
  * Envoie la facture de l'intervention au client par e-mail (edge `invoice-send`, Resend),
  * avec les certificats cochés en pièces jointes. Module Communication requis (vérifié serveur).
- * Même normalisation d'erreur que `importToPennylane` (`err.code`/`err.detail` depuis le corps
- * JSON de la réponse edge, non-2xx).
+ * Destinataire = `client_email` de la carte, résolu côté edge — jamais d'override du destinataire
+ * depuis le front (M2, 2026-09-24). Même normalisation d'erreur que `importToPennylane`
+ * (`err.code`/`err.detail` depuis le corps JSON de la réponse edge, non-2xx).
  */
-async function sendByEmail(orgId, { interventionId, certificateIds = [], to = null }) {
+async function sendByEmail(orgId, { interventionId, certificateIds = [] }) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Non authentifié');
   const { data, error } = await supabase.functions.invoke('invoice-send', {
-    body: { org_id: orgId, intervention_id: interventionId, certificate_ids: certificateIds, to },
+    body: { org_id: orgId, intervention_id: interventionId, certificate_ids: certificateIds },
   });
   if (error) {
     let detail = null;

@@ -15,6 +15,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useAuth } from '@contexts/AuthContext';
 import { mailCampaignsService } from '@services/mailCampaigns.service';
 import { mailCampaignKeys } from '@hooks/cacheKeys';
+import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL, INVOICE_EMAIL_TEMPLATE_KEY, INVOICE_EMAIL_PLACEHOLDERS } from '@/lib/invoiceEmailTemplate';
 import ResendDomainSection from './ResendDomainSection';
 
@@ -50,6 +51,8 @@ export default function EmailsTab() {
   const [initial, setInitial] = useState(() => pickFields({}));
   const [creatingTemplate, setCreatingTemplate] = useState(false);
 
+  const communicationActive = moduleActif(settings, 'communication');
+
   const { data: invoiceTemplate, isLoading: loadingTemplate } = useQuery({
     queryKey: mailCampaignKeys.byKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY),
     queryFn: async () => {
@@ -57,7 +60,19 @@ export default function EmailsTab() {
       if (error) throw error;
       return data;
     },
-    enabled: !!orgId,
+    enabled: !!orgId && communicationActive,
+  });
+
+  // M5 — un gabarit ARCHIVÉ (existant mais `is_archived=true`) doit proposer une restauration,
+  // jamais le bouton de création : la contrainte unique `(org_id, key)` refuserait le create.
+  const { data: archivedTemplate, isLoading: loadingArchived } = useQuery({
+    queryKey: mailCampaignKeys.archivedByKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY),
+    queryFn: async () => {
+      const { data, error } = await mailCampaignsService.list(orgId, { includeArchived: true });
+      if (error) throw error;
+      return (data || []).find((c) => c.key === INVOICE_EMAIL_TEMPLATE_KEY && c.is_archived) || null;
+    },
+    enabled: !!orgId && communicationActive && !loadingTemplate && !invoiceTemplate,
   });
 
   const handleCreateInvoiceTemplate = async () => {
@@ -136,35 +151,41 @@ export default function EmailsTab() {
           </div>
         </section>
 
-        <section>
-          <h3 className={SECTION_TITLE}>Gabarits transactionnels</h3>
-          <div className="border border-secondary-200 rounded-md p-3 text-sm flex items-center justify-between gap-4">
-            <div>
-              <p className="text-secondary-900 font-medium">Facture d&apos;entretien (envoi au client)</p>
-              {invoiceTemplate && (
-                <p className="mt-1 text-xs text-secondary-500">
-                  Variables : {INVOICE_EMAIL_PLACEHOLDERS.map((v) => <code key={v} className="mr-1">{v}</code>)}
-                </p>
+        {communicationActive && (
+          <section>
+            <h3 className={SECTION_TITLE}>Gabarits transactionnels</h3>
+            <div className="border border-secondary-200 rounded-md p-3 text-sm flex items-center justify-between gap-4">
+              <div>
+                <p className="text-secondary-900 font-medium">Facture d&apos;entretien (envoi au client)</p>
+                {invoiceTemplate && (
+                  <p className="mt-1 text-xs text-secondary-500">
+                    Variables : {INVOICE_EMAIL_PLACEHOLDERS.map((v) => <code key={v} className="mr-1">{v}</code>)}
+                  </p>
+                )}
+              </div>
+              {loadingTemplate || (!invoiceTemplate && loadingArchived) ? (
+                <span className="text-xs text-secondary-500">Chargement…</span>
+              ) : invoiceTemplate ? (
+                <Link to="/mailing" className="text-sm text-primary-600 hover:underline whitespace-nowrap">
+                  Modifier dans Mailing → Éditeur
+                </Link>
+              ) : archivedTemplate ? (
+                <Link to="/mailing" className="text-sm text-amber-700 hover:underline whitespace-nowrap">
+                  Gabarit archivé : restaurez-le dans Mailing → Éditeur
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCreateInvoiceTemplate}
+                  disabled={creatingTemplate}
+                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {creatingTemplate ? 'Création…' : 'Créer le gabarit par défaut'}
+                </button>
               )}
             </div>
-            {loadingTemplate ? (
-              <span className="text-xs text-secondary-500">Chargement…</span>
-            ) : invoiceTemplate ? (
-              <Link to="/mailing" className="text-sm text-primary-600 hover:underline whitespace-nowrap">
-                Modifier dans Mailing → Éditeur
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleCreateInvoiceTemplate}
-                disabled={creatingTemplate}
-                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
-              >
-                {creatingTemplate ? 'Création…' : 'Créer le gabarit par défaut'}
-              </button>
-            )}
-          </div>
-        </section>
+          </section>
+        )}
 
         <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
           <button

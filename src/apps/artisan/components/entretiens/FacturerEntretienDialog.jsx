@@ -145,7 +145,11 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     [settings, invoiceSettings.mode, item.client_email],
   );
   const { certificats, isLoading: loadingCerts } = useInterventionCertificats(orgId, item.id, { enabled: open && emailAvailability.visible });
-  const certRows = useMemo(() => certificateAttachmentRows(certificats), [certificats]);
+  // I2 — `equipement_type` du certificat est un CODE de catégorie (`pac_air_air`), jamais un
+  // libellé client-friendly : traduit via le référentiel `categories` déjà chargé par
+  // `usePricingData()` pour le calcul des lignes.
+  const labelByCode = useMemo(() => Object.fromEntries((categories || []).map((c) => [c.code, c.label])), [categories]);
+  const certRows = useMemo(() => certificateAttachmentRows(certificats, { labelByCode }), [certificats, labelByCode]);
   const [sendEmail, setSendEmail] = useState(true);
   const [selectedCertIds, setSelectedCertIds] = useState(null);
   useEffect(() => { setSendEmail(true); setSelectedCertIds(null); }, [open, item.id]);
@@ -177,7 +181,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   const blocked = !effectiveModel || effectiveModel.errors.length > 0 || effectiveModel.lines.length === 0 || !item.client_id || missingAddress || missingIssuer || !!item.invoice_id;
 
   const handleConfirm = async () => {
-    if (blocked || createInvoice.isPending || issueInvoice.isPending) return;
+    if (blocked || createInvoice.isPending || issueInvoice.isPending || sendInvoiceEmail.isPending) return;
     if (isHub) {
       try {
         const draft = buildInvoiceDraft({
@@ -285,7 +289,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       variant="default"
       size="xl"
       onConfirm={handleConfirm}
-      loading={createInvoice.isPending || issueInvoice.isPending}
+      loading={createInvoice.isPending || issueInvoice.isPending || sendInvoiceEmail.isPending}
       confirmDisabled={isLoading || blocked}
     >
       <div className="mt-4 space-y-3 text-sm">
