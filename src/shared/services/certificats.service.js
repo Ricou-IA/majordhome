@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // SERVICE
@@ -232,6 +233,32 @@ export const certificatsService = {
       return { data: data?.signedUrl || null, error: null };
     } catch (err) {
       console.error('[certificats] getSignedUrl error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Certificats de l'intervention ET de ses interventions enfants (1 par équipement,
+   * `parent_id`) — liste des pièces joignables à l'e-mail de facture (module Communication).
+   * @param {string} orgId  org core
+   * @param {string} interventionId
+   */
+  async listForInterventionTree(orgId, interventionId) {
+    try {
+      const { data: children, error: childErr } = await supabase
+        .from('majordhome_interventions').select('id').eq('parent_id', interventionId);
+      if (childErr) return { data: null, error: childErr };
+      const ids = [interventionId, ...(children || []).map((c) => c.id)];
+      const { data, error } = await supabase
+        .from('majordhome_certificats')
+        .select('id, intervention_id, equipment_id, reference, equipement_type, equipement_marque, equipement_modele, statut, signed_at, pdf_storage_path, pdf_generated_at')
+        .eq('org_id', orgId)
+        .in('intervention_id', ids)
+        .order('created_at', { ascending: true });
+      if (error) return { data: null, error };
+      return { data: data || [], error: null };
+    } catch (err) {
+      logger.error('[certificats] listForInterventionTree error:', err);
       return { data: null, error: err };
     }
   },

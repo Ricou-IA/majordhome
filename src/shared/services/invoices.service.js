@@ -142,6 +142,30 @@ async function importToPennylane(orgId, invoiceId) {
   return data;
 }
 
+/**
+ * Envoie la facture de l'intervention au client par e-mail (edge `invoice-send`, Resend),
+ * avec les certificats cochés en pièces jointes. Module Communication requis (vérifié serveur).
+ * Même normalisation d'erreur que `importToPennylane` (`err.code`/`err.detail` depuis le corps
+ * JSON de la réponse edge, non-2xx).
+ */
+async function sendByEmail(orgId, { interventionId, certificateIds = [], to = null }) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Non authentifié');
+  const { data, error } = await supabase.functions.invoke('invoice-send', {
+    body: { org_id: orgId, intervention_id: interventionId, certificate_ids: certificateIds, to },
+  });
+  if (error) {
+    let detail = null;
+    try { detail = await error.context?.json?.(); } catch { /* corps illisible */ }
+    const err = new Error(detail?.error ? `${detail.error}${detail.step ? ` (étape ${detail.step})` : ''}${detail.detail ? ` — ${detail.detail}` : ''}` : error.message);
+    err.code = detail?.error || null;
+    err.step = detail?.step || null;
+    err.detail = detail?.detail || null;
+    throw err;
+  }
+  return { providerId: data.provider_id, to: data.to, attachments: data.attachments || [] };
+}
+
 export const invoicesService = {
   createDraft: (params) => withErrorHandling(() => createDraft(params), 'invoices.createDraft'),
   issue: (invoiceId, numberPrefix) => withErrorHandling(() => issue(invoiceId, numberPrefix), 'invoices.issue'),
@@ -151,5 +175,6 @@ export const invoicesService = {
   attachPdf: (orgId, invoiceId, pdfPath) => withErrorHandling(() => attachPdf(orgId, invoiceId, pdfPath), 'invoices.attachPdf'),
   ensurePennylaneCustomer: (orgId, clientId) => withErrorHandling(() => ensurePennylaneCustomer(orgId, clientId), 'invoices.ensurePennylaneCustomer'),
   importToPennylane: (orgId, invoiceId) => withErrorHandling(() => importToPennylane(orgId, invoiceId), 'invoices.importToPennylane'),
+  sendByEmail: (orgId, params) => withErrorHandling(() => sendByEmail(orgId, params), 'invoices.sendByEmail'),
   cancelWithCreditNote: (orgId, invoiceId, numberPrefix, reason) => withErrorHandling(() => cancelWithCreditNote(orgId, invoiceId, numberPrefix, reason), 'invoices.cancelWithCreditNote'),
 };

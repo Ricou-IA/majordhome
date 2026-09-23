@@ -166,6 +166,19 @@ export function useCancelInvoiceWithCreditNote(orgId) {
 }
 
 /**
+ * Envoi de la facture d'entretien au client par e-mail (Resend, edge `invoice-send`), pièces
+ * jointes = certificats cochés. Module Communication requis (gate côté modèle pur
+ * `invoiceEmailAvailability`, vérifié aussi côté edge).
+ * @param {string} orgId  org CORE
+ */
+export function useSendInvoiceEmail(orgId) {
+  return useMutation({
+    mutationFn: ({ interventionId, certificateIds, to }) =>
+      unwrapResult(invoicesService.sendByEmail(orgId, { interventionId, certificateIds, to })),
+  });
+}
+
+/**
  * Rejeu de l'export d'une facture ÉMISE : régénère et archive le PDF s'il manque, puis
  * importe dans Pennylane si l'org l'a activé et que l'import n'est pas complet — soit parce que
  * la facture n'y est pas encore, soit parce qu'un `pennylane_invoice_id` existe mais que

@@ -41,6 +41,17 @@ export function useCertificat(interventionId) {
   return { certificat, isLoading, error, refetch };
 }
 
+/** Certificats de l'intervention + enfants (pièces joignables à l'e-mail de facture). */
+export function useInterventionCertificats(orgId, interventionId, { enabled = true } = {}) {
+  const query = useQuery({
+    queryKey: certificatKeys.tree(orgId, interventionId),
+    queryFn: () => unwrapResult(certificatsService.listForInterventionTree(orgId, interventionId)),
+    enabled: !!orgId && !!interventionId && enabled,
+    staleTime: 30_000,
+  });
+  return { certificats: query.data || [], isLoading: query.isLoading, error: query.error };
+}
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================

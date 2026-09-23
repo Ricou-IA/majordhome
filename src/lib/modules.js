@@ -71,3 +71,16 @@ export const MODULES = [
 export function tuilesParametrage() {
   return MODULES.flatMap((m) => m.tiles.map((t) => ({ ...t, module: m.key })));
 }
+
+/**
+ * Un module est-il ouvert pour l'org ? Source : `core.organizations.settings.modules[key] === true`,
+ * posé en base par nous (décision commerciale, pas un réglage de l'org_admin). Le socle est
+ * toujours ouvert. Premier consommateur : l'envoi de la facture par e-mail (module
+ * `communication`, Eric 2026-09-23) ; la sidebar et la page Paramètres s'y brancheront.
+ * @param {object|null|undefined} settings
+ * @param {string} key
+ */
+export function moduleActif(settings, key) {
+  if (key === 'socle') return true;
+  return settings?.modules?.[key] === true;
+}

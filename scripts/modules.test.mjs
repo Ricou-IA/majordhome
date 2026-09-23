@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MODULES, tuilesParametrage } from '../src/lib/modules.js';
+import { MODULES, tuilesParametrage, moduleActif } from '../src/lib/modules.js';
 
 const routesSource = readFileSync(new URL('../src/apps/artisan/routes.jsx', import.meta.url), 'utf8');
 const routesDeclarees = new Set([...routesSource.matchAll(/path:\s*'(settings(?:\/[a-z-]+)?)'/g)].map((m) => `/${m[1]}`));
@@ -43,4 +43,13 @@ test('tuilesParametrage conserve l’ordre des modules et porte le module de cha
   const tuiles = tuilesParametrage();
   const ordreModules = [...new Set(tuiles.map((t) => t.module))];
   assert.deepEqual(ordreModules, MODULES.map((m) => m.key));
+});
+
+test('moduleActif : socle toujours ouvert ; un module n’est ouvert que par settings.modules[key] === true', () => {
+  assert.equal(moduleActif({}, 'socle'), true);
+  assert.equal(moduleActif(null, 'socle'), true);
+  assert.equal(moduleActif({}, 'communication'), false);
+  assert.equal(moduleActif({ modules: { communication: true } }, 'communication'), true);
+  assert.equal(moduleActif({ modules: { communication: 'true' } }, 'communication'), false);
+  assert.equal(moduleActif({ modules: { communication: true } }, 'solaire'), false);
 });
