@@ -95,6 +95,56 @@ export function referenceEquipement(eq) {
   return parts.length ? parts.join(' · ') : null;
 }
 
+/** Nombre en € HT, format FR, PDF-safe (espace simple, virgule). */
+const fmtHt = (n) => `${(Number(n) || 0).toFixed(2).replace('.', ',')} € HT`;
+
+/**
+ * Rend un gabarit de libellé : `{type} {marque} {modele} {serie} {contrat}`. Variable inconnue
+ * ou vide → rien ; espaces réduits ; ponctuation orpheline finale retirée (« Entretien Poêle : »
+ * → « Entretien Poêle »). Gabarit vide/null → ''.
+ * @param {string|null|undefined} template
+ * @param {Object<string, string|null|undefined>} vars
+ */
+export function renderInvoiceTemplate(template, vars) {
+  if (typeof template !== 'string' || !template.trim()) return '';
+  const out = template.replace(/\{([a-z_]+)\}/gi, (_, key) => {
+    const v = vars?.[key.toLowerCase()];
+    return v == null ? '' : String(v);
+  });
+  return out.replace(/\s+/g, ' ').trim().replace(/[\s:\-–—·,]+$/u, '').trim();
+}
+
+const VALID_VATS = new Set(Object.keys(VAT_CODES).map(Number));
+const cleanText = (v) => {
+  const s = v == null ? '' : String(v).trim();
+  return s && s !== 'undefined' && s !== 'null' ? s : null;
+};
+
+/**
+ * Gabarits de facture par catégorie d'équipement, normalisés depuis
+ * `settings.pennylane.invoice.templates = { by_category: { [catId]: { label, subject,
+ * offered: { label, price_ht, vat_rate } } } }` (Settings → Facturation). Une entrée vide
+ * disparaît ; une ligne offerte sans libellé, sans prix > 0 ou à TVA hors table est ignorée.
+ * @param {object|null|undefined} invoiceSettingsRaw  `settings.pennylane.invoice`
+ * @returns {{ byCategory: Object<string, { label: string|null, subject: string|null, offered: { label: string, priceHt: number, vatPercent: number } | null }> }}
+ */
+export function invoiceTemplatesFromSettings(invoiceSettingsRaw) {
+  const src = invoiceSettingsRaw?.templates?.by_category;
+  const byCategory = {};
+  if (src && typeof src === 'object') {
+    for (const [catId, t] of Object.entries(src)) {
+      if (!t || typeof t !== 'object') continue;
+      const o = t.offered && typeof t.offered === 'object' ? t.offered : null;
+      const oLabel = cleanText(o?.label);
+      const oPrice = Number(o?.price_ht);
+      const oVat = Number(o?.vat_rate);
+      const offered = oLabel && oPrice > 0 && VALID_VATS.has(oVat) ? { label: oLabel, priceHt: oPrice, vatPercent: oVat } : null;
+      byCategory[catId] = { label: cleanText(t.label), subject: cleanText(t.subject), offered };
+    }
+  }
+  return { byCategory };
+}
+
 /**
  * TVA (en %) d'un type d'équipement via sa catégorie. `null` si non configurée.
  * @param {string|null} typeId
@@ -128,6 +178,7 @@ function categoryLabelForEquipment(eq, referentiel) {
  *   comptes de vente Pennylane (706xxx) par catégorie d'équipement + pièces — la « famille »
  *   comptable d'une ligne (Settings → Facturation Pennylane), stockés par NUMÉRO ; `catalog` =
  *   déclinaisons par TVA (`getLedgerAccounts()`) pour résoudre l'id. Absent → défaut PL + avertissement.
+ * @param {{ byCategory: Object }} [p.templates]  `invoiceTemplatesFromSettings(...)`
  * @param {number} [p.deadlineDays]
  * @param {string} p.today  YYYY-MM-DD
  * @returns {{ date: string, deadline: string, subject: string, lines: Array<{ kind: string, label: string, description: string|null, quantity: number, vatPercent: number, vatCode: string|null, ledgerAccountId: number|string|null, ledgerAccountNumber: string|null, equipmentId: string|null, equipmentTypeId: string|null, categoryId: string|null, grossTtc: number, netTtc: number, discountPercent: number, unitPriceHt: string }>, discount: object|null, totalTtc: number, warnings: Array<{code:string,message:string}>, errors: Array<{code:string,message:string}> }}
@@ -139,6 +190,7 @@ export function buildEntretienInvoice({
   parts = [],
   referentiel,
   ledgerAccounts = {},
+  templates = { byCategory: {} },
   deadlineDays = DEFAULT_DEADLINE_DAYS,
   today,
 }) {
@@ -250,6 +302,7 @@ export function buildEntretienInvoice({
 
   // --- 1 ligne par équipement ---
   const subjectRefs = [];
+  const subjectTemplates = [];
   let allocatedNet = 0;
   priced.forEach((it, i) => {
     const last = i === priced.length - 1;
@@ -266,7 +319,15 @@ export function buildEntretienInvoice({
     const catId = referentiel?.typesById?.get(typeId)?.category_id ?? eq?.category_id ?? null;
     const catLabel = categoryLabelForEquipment(eq, referentiel);
     if (ref) subjectRefs.push({ ref, category: catLabel });
-    const label = it.labelWithUnits || it.label || 'Entretien';
+    const tpl = catId ? templates?.byCategory?.[catId] : null;
+    const typeLabel = referentiel?.typesById?.get(typeId)?.label || it.label || 'Équipement';
+    const vars = { type: typeLabel, marque: clean(eq?.brand), modele: clean(eq?.model), serie: clean(eq?.serial_number), contrat: contractNumber };
+    const baseLabel = it.label || 'Entretien';
+    const withUnits = it.labelWithUnits || baseLabel;
+    const unitsSuffix = withUnits.startsWith(baseLabel) ? withUnits.slice(baseLabel.length) : '';
+    const rendered = tpl?.label ? renderInvoiceTemplate(tpl.label, vars) : '';
+    const label = rendered ? `${rendered}${unitsSuffix}` : withUnits;
+    if (tpl?.subject) subjectTemplates.push(renderInvoiceTemplate(tpl.subject, vars));
     const vatPercent = resolveVat(typeId, label);
     const ledgerNumber = catId ? (ledgerAccounts?.byCategory?.[catId] ?? null) : null;
     pushLine({
@@ -284,6 +345,24 @@ export function buildEntretienInvoice({
       netTtc,
       discountPercent: discount ? discount.percent : 0,
     });
+    if (tpl?.offered) {
+      const o = tpl.offered;
+      pushLine({
+        kind: 'libre',
+        label: o.label,
+        description: `Offert dans le cadre du contrat d’entretien (valeur ${fmtHt(o.priceHt)})`,
+        quantity: 1,
+        vatPercent: o.vatPercent,
+        ledgerAccountId: ledgerForCategory(catId, catLabel, VAT_CODES[o.vatPercent] || null),
+        ledgerAccountNumber: ledgerNumber ? String(ledgerNumber) : null,
+        equipmentId: eq?.id ?? null,
+        equipmentTypeId: typeId,
+        categoryId: catId,
+        grossTtc: round2(o.priceHt * (1 + o.vatPercent / 100)),
+        netTtc: 0,
+        discountPercent: 100,
+      });
+    }
   });
 
   // --- Pièces non offertes, TVA de la première ligne d'équipement, sans remise ---
@@ -320,7 +399,9 @@ export function buildEntretienInvoice({
 
   // --- Objet du PDF ---
   let subject;
-  if (subjectRefs.length === 1) {
+  if (subjectTemplates.length === 1 && priced.length === 1 && subjectTemplates[0]) {
+    subject = subjectTemplates[0];
+  } else if (subjectRefs.length === 1) {
     const cat = subjectRefs[0].category;
     const what = cat ? cat.charAt(0).toLowerCase() + cat.slice(1) : 'équipement';
     subject = `Entretien de votre ${what} : ${subjectRefs[0].ref}`;

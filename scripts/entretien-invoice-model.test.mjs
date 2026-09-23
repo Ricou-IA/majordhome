@@ -10,7 +10,7 @@
 // F-2026-09372 saisie à la main le 2026-09-21 (90 € TTC, 81,82 HT, TVA 10 %).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildEntretienInvoice, toPennylaneInvoicePayload, resolveLedgerAccountId } from '../src/lib/entretienInvoiceModel.js';
+import { buildEntretienInvoice, toPennylaneInvoicePayload, resolveLedgerAccountId, renderInvoiceTemplate, invoiceTemplatesFromSettings } from '../src/lib/entretienInvoiceModel.js';
 import { computeContractLines, calculateContractTotal } from '../src/lib/contractPricing.js';
 
 const ZONE = { id: 'z1', name: 'Zone 1', supplement: 0 };
@@ -326,4 +326,86 @@ test('lignes : compte non parametré → ledgerAccountNumber null (et avertissem
   const m = buildEntretienInvoice(dalous({ ledgerAccounts: {} }));
   assert.equal(m.lines[0].ledgerAccountNumber, null);
   assert.ok(m.warnings.some((w) => w.code === 'compte_manquant'));
+});
+
+// ---------------------------------------------------------------------------
+// Gabarits par catégorie (libellé / objet / ligne offerte)
+// ---------------------------------------------------------------------------
+
+test('renderInvoiceTemplate : variables, inconnue vide, espaces réduits, ponctuation orpheline retirée', () => {
+  const vars = { type: 'Poêle à granulés', marque: 'Cola', modele: 'Fire HR acciaio', serie: '', contrat: 'CTR-00063' };
+  assert.equal(renderInvoiceTemplate('Entretien de votre {type} : {marque} {modele}', vars), 'Entretien de votre Poêle à granulés : Cola Fire HR acciaio');
+  assert.equal(renderInvoiceTemplate('Entretien {type} : {marque} {modele}', { ...vars, marque: '', modele: '' }), 'Entretien Poêle à granulés');
+  assert.equal(renderInvoiceTemplate('Contrat {contrat} — {inconnue}', vars), 'Contrat CTR-00063');
+  assert.equal(renderInvoiceTemplate('   ', vars), '');
+  assert.equal(renderInvoiceTemplate(null, vars), '');
+});
+
+test('invoiceTemplatesFromSettings : normalise, ignore les vides et les "undefined", TVA hors table → null', () => {
+  const t = invoiceTemplatesFromSettings({
+    templates: { by_category: {
+      'cat-poele': { label: ' Entretien Performance {type} ', subject: '', offered: { label: 'Ramonage conduit de fumée', price_ht: '60', vat_rate: '10' } },
+      'cat-pac': { label: 'undefined', offered: { label: '', price_ht: '10', vat_rate: '20' } },
+      'cat-x': { offered: { label: 'Truc', price_ht: '5', vat_rate: '7' } },
+    } },
+  });
+  assert.deepEqual(t.byCategory['cat-poele'], { label: 'Entretien Performance {type}', subject: null, offered: { label: 'Ramonage conduit de fumée', priceHt: 60, vatPercent: 10 } });
+  assert.deepEqual(t.byCategory['cat-pac'], { label: null, subject: null, offered: null });
+  assert.deepEqual(t.byCategory['cat-x'], { label: null, subject: null, offered: null });
+  assert.deepEqual(invoiceTemplatesFromSettings({}), { byCategory: {} });
+  assert.deepEqual(invoiceTemplatesFromSettings(null), { byCategory: {} });
+});
+
+test('gabarits : libellé et objet rendus par catégorie, suffixe d’unités conservé, défaut inchangé sans gabarit', () => {
+  const templates = { byCategory: { 'cat-poele': { label: 'Entretien Performance {type} Multimarque', subject: 'Entretien de votre {type} : {marque} {modele}', offered: null } } };
+  const eq = { ...EQ_POELE, brand: 'Cola', model: 'Fire HR acciaio', serial_number: null };
+  const m = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', contract_number: 'CTR-00063', amount: 90 }, pricing: pricingFor([eq]), parts: [], referentiel, templates, today: '2026-09-23' });
+  assert.equal(m.errors.length, 0);
+  assert.equal(m.lines.length, 1);
+  assert.equal(m.lines[0].label, 'Entretien Performance Entretien et ramonage de conduit poêle à bois Multimarque');
+  assert.equal(m.subject, 'Entretien de votre Entretien et ramonage de conduit poêle à bois : Cola Fire HR acciaio');
+  // bi-split : suffixe d'unités conservé après gabarit
+  const tPac = { byCategory: { 'cat-pac': { label: 'Entretien {type}', subject: null, offered: null } } };
+  const pac = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', amount: 210 }, pricing: pricingFor([{ ...EQ_PAC, unit_count: 2 }], { discounts: [] }), parts: [], referentiel, templates: tPac, today: '2026-09-23' });
+  const base = pricingFor([{ ...EQ_PAC, unit_count: 2 }], { discounts: [] }).items[0];
+  const suffix = base.labelWithUnits.slice(base.label.length);
+  assert.ok(suffix.length > 0, 'la fixture bi-split doit produire un suffixe d’unités');
+  assert.equal(pac.lines[0].label, `Entretien Entretien PAC Air/Air${suffix}`);
+  // sans gabarit : identique à avant
+  const none = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', contract_number: 'CTR-00063', amount: 90 }, pricing: pricingFor([eq]), parts: [], referentiel, templates: { byCategory: {} }, today: '2026-09-23' });
+  assert.equal(none.lines[0].label, pricingFor([eq]).items[0].labelWithUnits);
+  assert.equal(none.subject, 'Entretien de votre poêle à bois : Cola · Fire HR acciaio');
+});
+
+test('ligne offerte : après sa ligne d’équipement, remise 100 %, TTC net 0, compte de la catégorie à SON taux, total inchangé, charge utile Pennylane', () => {
+  const templates = { byCategory: { 'cat-poele': { label: null, subject: null, offered: { label: 'Ramonage conduit de fumée', priceHt: 60, vatPercent: 10 } } } };
+  const catalog = [{ id: 1, number: '70601', vatRate: 'any' }, { id: 2, number: '70601', vatRate: 'FR_100' }, { id: 3, number: '70601', vatRate: 'FR_55' }];
+  const refPoele55 = { ...referentiel, categoriesById: new Map([[CAT_POELE.id, { ...CAT_POELE, default_vat_rate: 5.5 }], [CAT_PAC.id, CAT_PAC], [CAT_SANS_TVA.id, CAT_SANS_TVA]]) };
+  const m = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', amount: 90 }, pricing: pricingFor([EQ_POELE]), parts: [{ designation: 'Joint', quantite: 1, prix_ht: 12, offert: false }], referentiel: refPoele55, ledgerAccounts: { byCategory: { 'cat-poele': '70601' }, parts: null, catalog }, templates, today: '2026-09-23' });
+  assert.equal(m.errors.length, 0);
+  assert.deepEqual(m.lines.map((l) => l.kind), ['contrat', 'libre', 'piece']);
+  const off = m.lines[1];
+  assert.equal(off.label, 'Ramonage conduit de fumée');
+  assert.equal(off.description, 'Offert dans le cadre du contrat d’entretien (valeur 60,00 € HT)');
+  assert.equal(off.quantity, 1);
+  assert.equal(off.vatPercent, 10);
+  assert.equal(off.vatCode, 'FR_100');
+  assert.equal(off.discountPercent, 100);
+  assert.equal(off.grossTtc, 66);
+  assert.equal(off.netTtc, 0);
+  assert.equal(off.unitPriceHt, '60');
+  assert.equal(off.ledgerAccountId, 2);
+  assert.equal(off.ledgerAccountNumber, '70601');
+  assert.equal(off.categoryId, 'cat-poele');
+  assert.equal(off.equipmentId, 'eq-1');
+  assert.equal(m.totalTtc, 102); // 90 + pièce 12, la ligne offerte ne pèse rien
+  const payload = toPennylaneInvoicePayload(m, { customerId: 1, draft: true, externalReference: 'x' });
+  assert.deepEqual(payload.invoice_lines[1].discount, { type: 'relative', value: '100' });
+  assert.equal(payload.invoice_lines[1].raw_currency_unit_price, '60');
+  assert.equal(payload.invoice_lines[1].vat_rate, 'FR_100');
+  assert.equal(payload.invoice_lines[1].ledger_account_id, 2);
+  // 2 poêles → 2 lignes offertes, une derrière chaque équipement
+  const m2 = buildEntretienInvoice({ intervention: { id: 'i1' }, contract: { id: 'c1', amount: 162 }, pricing: pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-3' }]), parts: [], referentiel, templates, today: '2026-09-23' });
+  assert.deepEqual(m2.lines.map((l) => l.kind), ['contrat', 'libre', 'contrat', 'libre']);
+  assert.equal(m2.totalTtc, 162);
 });
