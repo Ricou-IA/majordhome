@@ -28,6 +28,13 @@ import { buildExplorerRows, filterExplorerRows, EXPLORER_VIEWS } from '@/lib/quo
 // Re-export for backward compatibility
 export { pennylaneKeys } from '@hooks/cacheKeys';
 
+// Références stables (module-level) pour les hooks qui retombent sur `data || []` :
+// un `[]` littéral recréé à chaque render change d'identité et invalide tout useMemo
+// qui le prend en dépendance (vécu 2026-09-23 — cf. `useLedgerAccounts` : l'éditeur de
+// la modale Facturer se réinitialisait tout seul à chaque re-render).
+const EMPTY_LEDGER_ACCOUNTS = Object.freeze([]);
+const EMPTY_JOURNALS = Object.freeze([]);
+
 // ============================================================================
 // SYNC DEVIS
 // ============================================================================
@@ -118,7 +125,7 @@ export function useLedgerAccounts({ enabled = true } = {}) {
     staleTime: 24 * 60 * 60_000, // 24h — les comptes comptables bougent rarement
   });
 
-  return { accounts: accounts || [], isLoading, error, refetch };
+  return { accounts: accounts || EMPTY_LEDGER_ACCOUNTS, isLoading, error, refetch };
 }
 
 // ============================================================================
@@ -179,7 +186,7 @@ export function useJournals() {
     enabled: !!orgId,
     staleTime: 24 * 60 * 60_000,
   });
-  return { journals: data || [], isLoading, error };
+  return { journals: data || EMPTY_JOURNALS, isLoading, error };
 }
 
 export function useCreateEntretienInvoice(orgId) {

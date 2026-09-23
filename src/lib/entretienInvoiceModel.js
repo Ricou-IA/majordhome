@@ -487,6 +487,10 @@ export function toPennylaneInvoicePayload(model, { customerId, draft, externalRe
  * Lignes du modèle → lignes ÉDITABLES (modale « Facturer », édition à la main — Eric,
  * 2026-09-23 : « on paramètre 99 % des cas et on garde la main sur les edge cases »).
  * `unitPriceHt` = HT unitaire BRUT en nombre (6 décimales du modèle), la remise reste en %.
+ * `original` porte un instantané des valeurs calculées (montants + `unitPriceHtStr`
+ * littéral) : `applyLineEdits` s'y compare pour savoir si la ligne a réellement changé
+ * (cf. vague finale 2026-09-23, I2) — sans ça, ré-appliquer une édition sans y toucher
+ * recalcule chaque ligne au lieu de rejouer l'arrondi absorbé par la dernière.
  * @param {ReturnType<typeof buildEntretienInvoice>} model
  */
 export function lineEditsFromModel(model) {
@@ -503,6 +507,15 @@ export function lineEditsFromModel(model) {
     equipmentId: l.equipmentId ?? null,
     equipmentTypeId: l.equipmentTypeId ?? null,
     categoryId: l.categoryId ?? null,
+    original: {
+      quantity: Number(l.quantity) || 1,
+      unitPriceHt: Number(l.unitPriceHt) || 0,
+      vatPercent: Number(l.vatPercent),
+      discountPercent: Number(l.discountPercent) || 0,
+      grossTtc: l.grossTtc,
+      netTtc: l.netTtc,
+      unitPriceHtStr: l.unitPriceHt,
+    },
   }));
 }
 
@@ -529,26 +542,48 @@ export function newFreeLine(model) {
   };
 }
 
+/** Parse un nombre saisi à la main : virgule décimale tolérée (« 2,5 » → 2.5). */
+const parseNum = (v) => Number(typeof v === 'string' ? v.replace(',', '.').trim() : v);
+
 /**
  * Recalcule le modèle à partir de lignes éditées : montants (brut = PU HT × qté × (1 + TVA),
  * net = brut × (1 − remise)), code TVA, total, erreurs. Les erreurs de lignes du modèle
  * d'origine (`tva_inconnue`, `aucune_ligne`) sont remplacées par celles des lignes éditées ;
- * les autres (`montant_contrat_nul`…) sont conservées. `discount` (info remise contrat) et
- * `warnings` sont conservés tels quels.
+ * les autres (`montant_contrat_nul`…) sont conservées. `warnings` est conservé tel quel.
+ *
+ * Une ligne dont quantité/PU HT/TVA/remise sont IDENTIQUES à son `original` (posé par
+ * `lineEditsFromModel`) garde ses montants et son `unitPriceHt` VERBATIM (label/description
+ * peuvent changer) : sinon un round-trip sans modification recalcule chaque ligne au lieu de
+ * rejouer l'arrondi que `buildEntretienInvoice` fait absorber par la dernière ligne d'un
+ * contrat (vague finale 2026-09-23, I2). Une ligne de TVA modifiée (ou sans `original`, donc
+ * nouvelle) ré-résout son compte comptable via `catalog` + `ledgerAccountNumber` (I4) — les
+ * comptes Pennylane sont déclinés par taux. `discount` (mention de la remise contrat en pied
+ * de facture / PDF) repasse à `null` dès qu'une ligne `kind: 'contrat'` change de MONTANT ou
+ * est retirée (I3) : sinon le PDF continue d'afficher une remise qui ne correspond plus aux
+ * lignes envoyées.
  * @param {ReturnType<typeof buildEntretienInvoice>} model
  * @param {ReturnType<typeof lineEditsFromModel>} edits
+ * @param {{ catalog?: Array }} [opts]  catalogue `getLedgerAccounts()` pour re-résoudre le compte sur changement de TVA
  */
-export function applyLineEdits(model, edits) {
+export function applyLineEdits(model, edits, { catalog = [] } = {}) {
   const kept = (model?.errors || []).filter((e) => e.code !== 'tva_inconnue' && e.code !== 'aucune_ligne');
   const errors = [...kept];
   const lines = [];
+  let contratChangedAmount = false;
+  let contratMissingOriginal = false;
+  let contratEditsWithOriginal = 0;
+  const contratLinesInModelCount = (model?.lines || []).filter((l) => l.kind === 'contrat').length;
+
   (edits || []).forEach((e, i) => {
     const n = i + 1;
     const label = (e.label || '').trim();
-    const quantity = Number(e.quantity);
-    const unit = Number(e.unitPriceHt);
-    const vatPercent = Number(e.vatPercent);
-    const discountPercent = Number(e.discountPercent) || 0;
+    let quantity = parseNum(e.quantity);
+    if (Number.isFinite(quantity)) quantity = Math.round(quantity * 1000) / 1000;
+    const unit = parseNum(e.unitPriceHt);
+    const vatPercent = parseNum(e.vatPercent);
+    const discountPercentRaw = parseNum(e.discountPercent);
+    const discountPercent = Number.isFinite(discountPercentRaw) ? discountPercentRaw : 0;
+
     const problems = [];
     if (!label) problems.push('libellé manquant');
     if (!(quantity > 0)) problems.push('quantité nulle');
@@ -557,8 +592,39 @@ export function applyLineEdits(model, edits) {
     if (problems.length) errors.push({ code: 'ligne_invalide', message: `Ligne ${n} : ${problems.join(', ')}.` });
     const vatCode = VAT_CODES[vatPercent];
     if (!vatCode) errors.push({ code: 'tva_inconnue', message: `Taux de TVA ${e.vatPercent} % sans équivalent Pennylane sur « ${label || `ligne ${n}`} ».` });
-    const grossTtc = round2(unit * (quantity || 0) * (1 + (vatPercent || 0) / 100));
-    const netTtc = round2(grossTtc * (1 - discountPercent / 100));
+
+    const original = e.original || null;
+    const unchanged = !!original
+      && quantity === original.quantity
+      && unit === original.unitPriceHt
+      && vatPercent === original.vatPercent
+      && discountPercent === original.discountPercent;
+
+    const vatChanged = !original || vatPercent !== original.vatPercent;
+    let ledgerAccountId = e.ledgerAccountId ?? null;
+    if (vatChanged && e.ledgerAccountNumber) {
+      ledgerAccountId = resolveLedgerAccountId(catalog, e.ledgerAccountNumber, vatCode || null);
+    }
+
+    let grossTtc;
+    let netTtc;
+    let unitPriceHt;
+    if (unchanged) {
+      grossTtc = original.grossTtc;
+      netTtc = original.netTtc;
+      unitPriceHt = original.unitPriceHtStr;
+    } else {
+      grossTtc = round2(unit * (quantity || 0) * (1 + (vatPercent || 0) / 100));
+      netTtc = round2(grossTtc * (1 - discountPercent / 100));
+      unitPriceHt = unitHt(grossTtc, quantity || 1, vatPercent || 0);
+    }
+
+    if (e.kind === 'contrat') {
+      if (!original) contratMissingOriginal = true;
+      else contratEditsWithOriginal++;
+      if (!unchanged) contratChangedAmount = true;
+    }
+
     lines.push({
       kind: e.kind || 'libre',
       label,
@@ -566,7 +632,7 @@ export function applyLineEdits(model, edits) {
       quantity,
       vatPercent,
       vatCode: vatCode || null,
-      ledgerAccountId: e.ledgerAccountId ?? null,
+      ledgerAccountId: ledgerAccountId ?? null,
       ledgerAccountNumber: e.ledgerAccountNumber ?? null,
       equipmentId: e.equipmentId ?? null,
       equipmentTypeId: e.equipmentTypeId ?? null,
@@ -574,10 +640,14 @@ export function applyLineEdits(model, edits) {
       grossTtc,
       netTtc,
       discountPercent,
-      unitPriceHt: unitHt(grossTtc, quantity || 1, vatPercent || 0),
+      unitPriceHt,
     });
   });
   if (lines.length === 0) errors.push({ code: 'aucune_ligne', message: 'La facture n’a plus aucune ligne.' });
+
+  const contratRemoved = contratEditsWithOriginal < contratLinesInModelCount;
+  const discount = (contratChangedAmount || contratRemoved || contratMissingOriginal) ? null : (model?.discount ?? null);
+
   const totalTtc = round2(lines.reduce((s, l) => s + l.netTtc, 0));
-  return { ...model, lines, totalTtc, errors };
+  return { ...model, lines, totalTtc, errors, discount };
 }

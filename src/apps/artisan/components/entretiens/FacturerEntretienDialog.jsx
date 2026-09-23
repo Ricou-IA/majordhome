@@ -123,11 +123,17 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   }, [isLoading, contract, equipments, rates, equipmentTypes, activeZone, overrides, discounts, item, referentiel, settings, ledgerCatalog]);
 
   // Édition manuelle des lignes (facultative) : `edits === null` ⇒ pas d'édition en cours,
-  // `effectiveModel` = `model` tel quel. Nouveau modèle (contrat/pricing rechargés) ou
-  // réouverture de la modale ⇒ retour aux lignes calculées, jamais d'édition périmée affichée.
+  // `effectiveModel` = `model` tel quel. Réinitialisée seulement à la réouverture de la
+  // modale ou au changement de carte — PAS sur `[model]` : `model` peut être recalculé à
+  // chaque render (ex. `ledgerCatalog` retombant sur un tableau vide non stable côté hook)
+  // sans que rien n'ait réellement changé, et un reset sur ce useMemo effaçait l'édition en
+  // cours juste après avoir cliqué « Modifier les lignes » (vague finale 2026-09-23, C1).
   const [edits, setEdits] = useState(null);
-  useEffect(() => { setEdits(null); }, [model, open]);
-  const effectiveModel = useMemo(() => (model && edits ? applyLineEdits(model, edits) : model), [model, edits]);
+  useEffect(() => { setEdits(null); }, [open, item.id]);
+  const effectiveModel = useMemo(
+    () => (model && edits ? applyLineEdits(model, edits, { catalog: ledgerCatalog || [] }) : model),
+    [model, edits, ledgerCatalog],
+  );
 
   // Détail de la remise (dégressivité / exceptionnelle / commerciale) : calculé une seule
   // fois, réutilisé par le tableau lecture seule ET par le bloc sous l'éditeur (mêmes chiffres).
@@ -265,8 +271,8 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           <p className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />Identité de l’émetteur incomplète (raison sociale, SIRET, adresse) : Paramètres → Organisation.</p>
         )}
 
-        {effectiveModel && effectiveModel.errors.map((e) => (
-          <p key={e.code} className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{e.message}</p>
+        {effectiveModel && effectiveModel.errors.map((e, i) => (
+          <p key={`${e.code}-${i}`} className="flex items-start gap-2 text-red-700"><XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{e.message}</p>
         ))}
 
         {model && model.lines.length > 0 && (

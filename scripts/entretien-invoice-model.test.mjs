@@ -495,3 +495,92 @@ test('applyLineEdits : modifier, ajouter (newFreeLine hérite TVA + compte de la
   assert.equal(empty.vatPercent, 20);
   assert.equal(empty.ledgerAccountId, null);
 });
+
+// ---------------------------------------------------------------------------
+// Vague finale 2026-09-23 — I2/I3/I4/M6/M8
+// ---------------------------------------------------------------------------
+
+test('I2 : round-trip sans modification conserve l’arrondi absorbé par la dernière ligne (3 poêles, contrat 250)', () => {
+  const m = buildEntretienInvoice({
+    intervention: { id: 'i1' },
+    contract: { id: 'c1', amount: 250 },
+    pricing: pricingFor([EQ_POELE, { ...EQ_POELE, id: 'eq-2' }, { ...EQ_POELE, id: 'eq-3' }], { discounts: [] }),
+    parts: [],
+    referentiel,
+    today: '2026-09-23',
+  });
+  assert.deepEqual(m.lines.map((l) => l.netTtc), [83.33, 83.33, 83.34]);
+  assert.equal(m.totalTtc, 250);
+
+  const back = applyLineEdits(m, lineEditsFromModel(m));
+  assert.deepEqual(back.lines.map((l) => l.netTtc), [83.33, 83.33, 83.34]);
+  assert.equal(back.totalTtc, 250);
+
+  // changer SEULEMENT le libellé de la 3e ligne : le net absorbé par l'arrondi ne bouge pas
+  const edits = lineEditsFromModel(m);
+  edits[2] = { ...edits[2], label: 'Entretien annuel (poêle 3)' };
+  const relabeled = applyLineEdits(m, edits);
+  assert.equal(relabeled.lines[2].netTtc, 83.34);
+  assert.equal(relabeled.lines[2].label, 'Entretien annuel (poêle 3)');
+  assert.equal(relabeled.totalTtc, 250);
+});
+
+test('I3 : éditer une ligne contrat en montant retire la mention de remise ; pièce ou ligne libre la conservent ; supprimer une ligne contrat aussi', () => {
+  const m = buildEntretienInvoice(dalous({
+    contract: { contract_number: 'CTR-1', amount: 225 },
+    pricing: pricingFor([EQ_POELE, EQ_PAC]),
+    parts: [{ designation: 'Joint', quantite: 1, prix_ht: 11, offert: false }],
+  }));
+  assert.ok(m.discount);
+  const edits = lineEditsFromModel(m);
+  const [poele, pac, piece] = edits;
+
+  const editedContrat = applyLineEdits(m, [{ ...poele, discountPercent: 0 }, pac, piece]);
+  assert.equal(editedContrat.discount, null);
+
+  const relabelOnly = applyLineEdits(m, [{ ...poele, label: 'Entretien poêle (label modifié)' }, pac, piece]);
+  assert.deepEqual(relabelOnly.discount, m.discount);
+
+  const editedPiece = applyLineEdits(m, [poele, pac, { ...piece, quantity: 2 }]);
+  assert.deepEqual(editedPiece.discount, m.discount);
+
+  const withFree = applyLineEdits(m, [poele, pac, piece, { ...newFreeLine(m), label: 'Déplacement', unitPriceHt: 20 }]);
+  assert.deepEqual(withFree.discount, m.discount);
+
+  const removedContrat = applyLineEdits(m, [poele, piece]);
+  assert.equal(removedContrat.discount, null);
+});
+
+test('I4 : changer la TVA d’une ligne re-résout le compte comptable via le catalogue (Pennylane décline un compte par taux)', () => {
+  const catalog = [
+    { id: 1, number: '70601', vatRate: 'any' },
+    { id: 2, number: '70601', vatRate: 'FR_100' },
+    { id: 4, number: '70601', vatRate: 'FR_200' },
+  ];
+  const m = buildEntretienInvoice(dalous({ ledgerAccounts: { byCategory: { 'cat-poele': '70601' }, catalog } }));
+  const edits = lineEditsFromModel(m);
+  assert.equal(edits[0].ledgerAccountId, 2);
+
+  const unchanged = applyLineEdits(m, edits, { catalog });
+  assert.equal(unchanged.lines[0].ledgerAccountId, 2);
+
+  const changedVat = applyLineEdits(m, [{ ...edits[0], vatPercent: 20 }], { catalog });
+  assert.equal(changedVat.lines[0].ledgerAccountId, 4);
+});
+
+test('M6 : quantité arrondie au millième AVANT validation', () => {
+  const m = buildEntretienInvoice(dalous({ ledgerAccounts: { byCategory: { 'cat-poele': '70601' }, catalog: [] } }));
+  const edits = lineEditsFromModel(m);
+  const quasiZero = applyLineEdits(m, [{ ...edits[0], quantity: 0.0004 }]);
+  assert.ok(quasiZero.errors.some((e) => e.code === 'ligne_invalide' && /quantité nulle/.test(e.message)));
+  const rounded = applyLineEdits(m, [{ ...edits[0], quantity: 1.2345 }]);
+  assert.equal(rounded.lines[0].quantity, 1.235);
+});
+
+test('M8 : virgule décimale tolérée sur la quantité (saisie FR)', () => {
+  const m = buildEntretienInvoice(dalous({ ledgerAccounts: { byCategory: { 'cat-poele': '70601' }, catalog: [] } }));
+  const edits = lineEditsFromModel(m);
+  const withComma = applyLineEdits(m, [{ ...edits[0], quantity: '2,5' }]);
+  assert.equal(withComma.errors.length, 0);
+  assert.equal(withComma.lines[0].quantity, 2.5);
+});
