@@ -97,7 +97,14 @@
       "mcp__supabase__get_edge_function",
       "Bash(iconv -f UTF-16LE -t UTF-8 \"C:/Users/epude/Downloads/Keyword Stats 2026-04-27 at 11_56_19.csv\")",
       "Read(//tmp/**)",
-      "Bash(python3)"
+      "Bash(python3)",
+      "Bash(npm run *)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Bash(cat /tmp_lint_out.txt)",
+      "Bash(rm -f /tmp_lint_out.txt)",
+      "Bash(npx vite *)",
+      "Bash(tail -5 /tmp_build_log_ignore.txt)",
+      "Bash(rm -f /tmp_build_log_ignore.txt)"
     ]
   }
 }
