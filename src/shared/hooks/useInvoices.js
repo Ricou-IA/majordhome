@@ -148,7 +148,11 @@ export function useCancelInvoiceWithCreditNote(orgId) {
             importWarning = invoiceErrorMessage(new Error('credited_invoice_not_imported'));
           }
         } catch (err) {
-          importWarning = `Avoir ${number} émis et archivé, mais pas encore importé dans Pennylane : ${invoiceErrorMessage(err, err?.message || String(err))}`;
+          // Contrairement à une facture (bouton « Import Pennylane à rejouer » tant que
+          // invoice_id reste posé sur la carte), un avoir n'a pas de surface de rejeu : la
+          // carte est déjà remise à NULL (review round 1, 2026-09-23) — le message doit dire
+          // que c'est définitif côté carte, pas promettre un retry qui n'apparaîtra jamais.
+          importWarning = `Avoir ${number} émis et archivé, mais son import Pennylane a échoué : à saisir dans Pennylane (aucun rejeu possible depuis la carte pour un avoir) — ${invoiceErrorMessage(err, err?.message || String(err))}`;
         }
       }
       return { creditNoteId, number, creditedNumber: res.credited_number, blob, pdfPath, importWarning };

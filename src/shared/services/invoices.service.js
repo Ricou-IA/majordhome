@@ -115,7 +115,7 @@ async function ensurePennylaneCustomer(orgId, clientId) {
 
 /**
  * Annulation d'une facture émise par un avoir (phase 3, hub). `orgId` est reçu pour
- * homogénéité et journalisation ; la RPC dérive l'org de la facture elle-même.
+ * homogénéité de signature ; la RPC dérive l'org de la facture elle-même.
  */
 async function cancelWithCreditNote(orgId, invoiceId, numberPrefix, reason) {
   const { data, error } = await supabase.rpc('invoice_cancel_with_credit_note', {
