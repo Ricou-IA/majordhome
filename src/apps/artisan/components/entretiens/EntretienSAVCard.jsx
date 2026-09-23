@@ -307,7 +307,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                   )}
                 </>
               )}
-              {isTeamLeaderOrAbove && isHubMode && item.invoice_id && (
+              {isTeamLeaderOrAbove && isHubMode && item.invoice_id && item.invoice_import_status != null && type === 'entretien' && (
                 <>
                   <button
                     type="button"

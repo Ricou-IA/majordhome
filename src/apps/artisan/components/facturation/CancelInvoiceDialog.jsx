@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useOrgSettings, usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useCancelInvoiceWithCreditNote } from '@hooks/useInvoices';
 import { invoicesService } from '@services/invoices.service';
 import { buildCompanyInfo } from '@/lib/orgBranding';
@@ -14,11 +14,11 @@ import { formatEuro, downloadBlob } from '@/lib/utils';
 
 export default function CancelInvoiceDialog({ item, orgId, open, onOpenChange, onDone }) {
   const { settings } = useOrgSettings();
+  const pennylaneEnabled = usePennylaneEnabled();
   const cancel = useCancelInvoiceWithCreditNote(orgId);
   const [invoice, setInvoice] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [reason, setReason] = useState('');
-  const pennylaneEnabled = Boolean(settings?.pennylane?.enabled);
 
   useEffect(() => {
     if (!open || !item.invoice_id) return;
@@ -32,7 +32,8 @@ export default function CancelInvoiceDialog({ item, orgId, open, onOpenChange, o
     return () => { alive = false; };
   }, [open, item.invoice_id, orgId]);
 
-  const blocked = !invoice || invoice.status !== 'issued' || invoice.kind !== 'invoice';
+  const originalNotImported = pennylaneEnabled && invoice && invoice.import_status !== 'imported';
+  const blocked = !invoice || invoice.status !== 'issued' || invoice.kind !== 'invoice' || originalNotImported;
 
   const handleConfirm = async () => {
     if (blocked || cancel.isPending) return;
@@ -71,10 +72,13 @@ export default function CancelInvoiceDialog({ item, orgId, open, onOpenChange, o
     >
       <div className="mt-4 space-y-2 text-sm">
         {invoice && invoice.status !== 'issued' && <p className="text-red-700">Cette facture n’est pas émise (statut {invoice.status}).</p>}
+        {invoice && invoice.kind !== 'invoice' && <p className="text-red-700">Ce document est déjà un avoir : il ne peut pas être annulé.</p>}
         <label className="block text-xs font-medium text-gray-600">Motif (optionnel, porté sur l’avoir)</label>
         <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200}
           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Erreur de tarif, prestation non réalisée…" />
-        {pennylaneEnabled && <p className="text-xs text-gray-500">L’avoir sera importé dans Pennylane, lié à la facture d’origine si elle y est.</p>}
+        {originalNotImported
+          ? <p className="text-red-700">La facture d’origine n’est pas importée dans Pennylane (statut : {invoice.import_status}) : importez-la d’abord depuis la carte, sinon l’avoir créerait une écriture négative isolée.</p>
+          : pennylaneEnabled && <p className="text-xs text-gray-500">L’avoir sera importé dans Pennylane, lié à la facture d’origine si elle y est.</p>}
       </div>
     </ConfirmDialog>
   );
