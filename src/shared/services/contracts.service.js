@@ -264,7 +264,11 @@ export const contractsService = {
   },
 
   /**
-   * Ajoute un équipement au contrat
+   * Ajoute un équipement au contrat.
+   * Idempotent : `contract_equipments` porte un UNIQUE (contract_id, equipment_id),
+   * et « déjà lié » est le résultat voulu, pas une erreur. Sans ce traitement, un
+   * clic sur un lien que l'UI croyait absent (cache périmé) remontait un 23505 en
+   * toast rouge alors que l'équipement ÉTAIT sous contrat (vécu CTR-00834, 2026-09-23).
    */
   async addEquipmentToContract(contractId, equipmentId) {
     return withErrorHandling(async () => {
@@ -274,7 +278,10 @@ export const contractsService = {
         .insert({ contract_id: contractId, equipment_id: equipmentId })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') return { contract_id: contractId, equipment_id: equipmentId, alreadyLinked: true };
+        throw error;
+      }
       return data;
     }, 'contracts.addEquipmentToContract');
   },

@@ -25,7 +25,9 @@ import {
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
+import { contractKeys, clientKeys, entretienSavKeys } from '@/shared/hooks/cacheKeys';
 import { useClientSearch, useDuplicateCheck } from '@hooks/useClients';
 import { useCreateContractWithClient } from '@hooks/useContracts';
 import { usePricingData, usePricingCalculator } from '@hooks/usePricing';
@@ -84,6 +86,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
+  const queryClient = useQueryClient();
 
   // ========== State machine ==========
   const [step, setStep] = useState(0); // 0 = client, 1 = équipements, 2 = contrat
@@ -294,11 +297,21 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
       }
     }
 
+    // Équipements et liens sont écrits APRÈS la mutation : son `onSuccess` a déjà
+    // invalidé les caches sur un état intermédiaire (contrat sans équipement) et
+    // rien ne les rafraîchit ensuite. Sans cette seconde invalidation, la fiche
+    // client sert 30 s (staleTime) un contrat « sans équipement lié » : badge
+    // « Hors contrat » et proposition de rattacher un équipement déjà rattaché
+    // (vécu CTR-00834, 2026-09-23).
+    queryClient.invalidateQueries({ queryKey: contractKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+
     const isPending = contractDefaults?.status === 'pending';
     toast.success(isPending ? 'Proposition créée — visible dans Pipeline Contrats' : 'Contrat créé avec succès');
     onClose();
     onSuccess?.();
-  }, [isCreating, orgId, userId, calculator, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess]);
+  }, [isCreating, orgId, userId, calculator, contractData, clientMode, selectedClient, newClientData, createContractWithClient, contractDefaults, onClose, onSuccess, queryClient]);
 
   // ========== Render ==========
 

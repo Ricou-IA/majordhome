@@ -30,10 +30,19 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
   // renverrait `{ error }` sans throw et le catch ne verrait jamais le refus.
   const {
     equipments: contractEquipments,
+    error: contractEquipmentsError,
     addEquipment: addEquipmentToContract,
     removeEquipment: removeEquipmentFromContract,
   } = useContractEquipments(contract?.id);
   const queryClient = useQueryClient();
+
+  // Si la liste des liens ne charge pas, tout apparaît « Hors contrat » : le dire,
+  // sinon l'écran invite à rattacher des équipements qui le sont déjà.
+  useEffect(() => {
+    if (!contractEquipmentsError) return;
+    console.error('[TabEquipments] Liens contrat illisibles:', contractEquipmentsError);
+    toast.error('Les équipements liés au contrat n\'ont pas pu être chargés — le statut affiché n\'est pas fiable.');
+  }, [contractEquipmentsError]);
 
   const hasContract = !!contract?.id;
   const contractEquipmentIds = useMemo(() => {
@@ -198,7 +207,13 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
   const handleAddToContract = async (equipment) => {
     if (!hasContract) return;
     try {
-      await addEquipmentToContract(equipment.id);
+      const link = await addEquipmentToContract(equipment.id);
+      // Déjà lié : rien n'a changé, donc pas de re-signature à demander.
+      if (link?.alreadyLinked) {
+        invalidateAll();
+        toast.info('Cet équipement était déjà lié au contrat');
+        return;
+      }
       await resetSignatureIfNeeded();
       invalidateAll();
       toast.success('Équipement ajouté au contrat');
