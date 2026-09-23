@@ -300,6 +300,13 @@ export const contractsService = {
    * @param {string} contractId
    * @param {string} clientId
    * @param {Array} pricingItems - [{ equipmentTypeId, equipmentTypeCode, label, quantity }]
+   *
+   * ⚠️ 1 ligne tarifaire = 1 SEUL équipement. Sur un type `has_unit_pricing`
+   * (PAC Air/Air), `quantity` est un nombre d'UNITÉS (splits), pas un nombre
+   * d'équipements : il se range dans `equipments.unit_count`, comme le fait la
+   * fiche équipement. Créer N équipements refacture N fois le prix de base au
+   * lieu du barème « base + supplément par split » ET gonfle le compteur de la
+   * dégressivité (vécu sur CTR-00833 le 2026-09-23 : 484,50 € au lieu de 315 €).
    */
   async createEquipmentsFromPricingItems(contractId, clientId, pricingItems) {
     if (!contractId || !clientId || !pricingItems?.length) return { data: null, error: null };
@@ -314,22 +321,21 @@ export const contractsService = {
 
       const equipmentIds = [];
       for (const item of pricingItems) {
-        const qty = item.quantity || 1;
-        for (let i = 0; i < qty; i++) {
-          // La catégorie est dérivée du type par le trigger equipments_sync_category :
-          // plus d'heuristique code → enum côté front (elle divergeait déjà de la donnée).
-          const { data: eq, error: eqError } = await supabase
-            .from('majordhome_equipments')
-            .insert({
-              project_id: client.project_id,
-              equipment_type_id: item.equipmentTypeId || null,
-              contract_status: 'active',
-            })
-            .select('id')
-            .single();
-          if (eqError) { console.warn('[contracts] equipment insert skipped:', eqError); continue; }
-          equipmentIds.push(eq.id);
-        }
+        const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+        // La catégorie est dérivée du type par le trigger equipments_sync_category :
+        // plus d'heuristique code → enum côté front (elle divergeait déjà de la donnée).
+        const { data: eq, error: eqError } = await supabase
+          .from('majordhome_equipments')
+          .insert({
+            project_id: client.project_id,
+            equipment_type_id: item.equipmentTypeId || null,
+            unit_count: qty,
+            contract_status: 'active',
+          })
+          .select('id')
+          .single();
+        if (eqError) { console.warn('[contracts] equipment insert skipped:', eqError); continue; }
+        equipmentIds.push(eq.id);
       }
 
       if (equipmentIds.length > 0) {
