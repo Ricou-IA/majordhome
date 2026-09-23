@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2 } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -21,10 +21,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { usePennylaneEnabled, useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
 import { useRetryInvoiceExport } from '@hooks/useInvoices';
+import { moduleActif } from '@/lib/modules';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { invoicingSettings, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
 import { generateInvoicePdfBlob } from '../facturation/InvoicePDF';
 import CancelInvoiceDialog from '../facturation/CancelInvoiceDialog';
+import SendInvoiceEmailDialog from '../facturation/SendInvoiceEmailDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
 
 // ============================================================================
@@ -74,6 +76,7 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const { isTeamLeaderOrAbove } = useAuth();
   const pennylaneEnabled = usePennylaneEnabled();
   const { settings } = useOrgSettings();
@@ -87,6 +90,9 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   // Les SAV restent hors périmètre (montant issu d'un devis PL).
   // Mode hub : Majord'home émet lui-même, l'intégration Pennylane n'est pas requise.
   const canPushInvoice = (pennylaneEnabled || isHubMode) && type === 'entretien';
+  // Envoi de la facture par e-mail (module Communication, spec 2026-09-23) : renvoi depuis
+  // la carte facturée, indépendant du mode hub/Pennylane.
+  const canSendInvoiceEmail = moduleActif(settings, 'communication') && !!item.invoice_id && type === 'entretien';
 
   const name = item.client_name || `${item.client_last_name || ''} ${item.client_first_name || ''}`.trim() || 'Sans nom';
   // Montant : SAV = devis + contrat si entretien inclus, Entretien = contrat
@@ -321,6 +327,24 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
                   {cancelOpen && (
                     <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                       <CancelInvoiceDialog item={item} orgId={orgId} open={cancelOpen} onOpenChange={setCancelOpen} onDone={() => onRefresh?.()} />
+                    </div>
+                  )}
+                </>
+              )}
+              {isTeamLeaderOrAbove && canSendInvoiceEmail && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSendEmailOpen(true); }}
+                    title="Envoyer la facture par e-mail au client"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-medium rounded-md border border-gray-300 text-gray-600 bg-white hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700"
+                  >
+                    <Mail className="w-3 h-3" />
+                    Envoyer par e-mail
+                  </button>
+                  {sendEmailOpen && (
+                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <SendInvoiceEmailDialog item={item} orgId={orgId} open={sendEmailOpen} onOpenChange={setSendEmailOpen} />
                     </div>
                   )}
                 </>

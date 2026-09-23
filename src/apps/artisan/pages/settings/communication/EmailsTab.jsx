@@ -8,8 +8,14 @@
 // (merge JSONB niveau 1 : on n'envoie que ces deux clés).
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useAuth } from '@contexts/AuthContext';
+import { mailCampaignsService } from '@services/mailCampaigns.service';
+import { mailCampaignKeys } from '@hooks/cacheKeys';
+import { DEFAULT_INVOICE_EMAIL, INVOICE_EMAIL_TEMPLATE_KEY, INVOICE_EMAIL_PLACEHOLDERS } from '@/lib/invoiceEmailTemplate';
 import ResendDomainSection from './ResendDomainSection';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
@@ -37,8 +43,37 @@ function pickFields(settings) {
 
 export default function EmailsTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(() => pickFields({}));
   const [initial, setInitial] = useState(() => pickFields({}));
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+
+  const { data: invoiceTemplate, isLoading: loadingTemplate } = useQuery({
+    queryKey: mailCampaignKeys.byKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY),
+    queryFn: async () => {
+      const { data, error } = await mailCampaignsService.getByKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId,
+  });
+
+  const handleCreateInvoiceTemplate = async () => {
+    if (!orgId || creatingTemplate) return;
+    setCreatingTemplate(true);
+    try {
+      const { error } = await mailCampaignsService.create({ org_id: orgId, ...DEFAULT_INVOICE_EMAIL });
+      if (error) throw error;
+      toast.success('Gabarit « Facture d’entretien » créé');
+      queryClient.invalidateQueries({ queryKey: mailCampaignKeys.all(orgId) });
+    } catch (err) {
+      toast.error(err.message || 'Création du gabarit échouée');
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
 
   useEffect(() => {
     const picked = pickFields(settings);
@@ -98,6 +133,36 @@ export default function EmailsTab() {
               {errors.reply_to && <p className={ERROR_CLASS}>{errors.reply_to}</p>}
               <p className={HINT_CLASS}>Laisse vide pour utiliser l&apos;email expéditeur.</p>
             </div>
+          </div>
+        </section>
+
+        <section>
+          <h3 className={SECTION_TITLE}>Gabarits transactionnels</h3>
+          <div className="border border-secondary-200 rounded-md p-3 text-sm flex items-center justify-between gap-4">
+            <div>
+              <p className="text-secondary-900 font-medium">Facture d&apos;entretien (envoi au client)</p>
+              {invoiceTemplate && (
+                <p className="mt-1 text-xs text-secondary-500">
+                  Variables : {INVOICE_EMAIL_PLACEHOLDERS.map((v) => <code key={v} className="mr-1">{v}</code>)}
+                </p>
+              )}
+            </div>
+            {loadingTemplate ? (
+              <span className="text-xs text-secondary-500">Chargement…</span>
+            ) : invoiceTemplate ? (
+              <Link to="/mailing" className="text-sm text-primary-600 hover:underline whitespace-nowrap">
+                Modifier dans Mailing → Éditeur
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCreateInvoiceTemplate}
+                disabled={creatingTemplate}
+                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {creatingTemplate ? 'Création…' : 'Créer le gabarit par défaut'}
+              </button>
+            )}
           </div>
         </section>
 

@@ -145,6 +145,9 @@ export const mailCampaignKeys = {
   lists: (orgId) => [...mailCampaignKeys.all(orgId), 'list'],
   list: (orgId) => [...mailCampaignKeys.lists(orgId)],
   detail: (orgId, id) => [...mailCampaignKeys.all(orgId), 'detail', id],
+  // Gabarit transactionnel par clé (ex. `facture_entretien`) — Settings → Communication →
+  // Emails (2026-09-23) : invalider via `mailCampaignKeys.all(orgId)` comme le reste de la famille.
+  byKey: (orgId, key) => [...mailCampaignKeys.all(orgId), 'by-key', key],
 };
 
 // --- Mail Segments (catalogue de ciblages réutilisables) ---

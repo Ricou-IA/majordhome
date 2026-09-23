@@ -28,11 +28,14 @@ import { useContract, useContractEquipments } from '@hooks/useContracts';
 import { useContractZone } from '@hooks/useContractZone';
 import { useOrgSettings, pennylaneInvoiceSettings } from '@hooks/useOrgSettings';
 import { useCreateEntretienInvoice, useLedgerAccounts } from '@hooks/usePennylane';
-import { useIssueEntretienInvoice } from '@hooks/useInvoices';
+import { useIssueEntretienInvoice, useSendInvoiceEmail } from '@hooks/useInvoices';
+import { useInterventionCertificats } from '@hooks/useCertificats';
 import { buildInvoiceDraft, invoicingSettings, invoiceErrorMessage } from '@/lib/invoiceDocumentModel';
+import { invoiceEmailAvailability, certificateAttachmentRows, invoiceEmailErrorMessage } from '@/lib/invoiceEmailModel';
 import { buildCompanyInfo, formatFullAddress } from '@/lib/orgBranding';
 import { generateInvoicePdfBlob } from '@/apps/artisan/components/facturation/InvoicePDF';
 import InvoiceLinesEditor from '@/apps/artisan/components/facturation/InvoiceLinesEditor';
+import InvoiceEmailOptions from '@/apps/artisan/components/facturation/InvoiceEmailOptions';
 import { computeContractLines } from '@/lib/contractPricing';
 import { buildEntretienInvoice, toPennylaneInvoicePayload, lineEditsFromModel, applyLineEdits } from '@/lib/entretienInvoiceModel';
 import { formatEuro, formatDateForInput, formatDateShortFR, downloadBlob } from '@/lib/utils';
@@ -135,6 +138,30 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     [model, edits, ledgerCatalog],
   );
 
+  // Envoi de la facture par e-mail (module Communication) : proposé comme une SUITE de la
+  // création, jamais un blocage — cf. `sendEmailAfterCreation` plus bas.
+  const emailAvailability = useMemo(
+    () => invoiceEmailAvailability({ settings, mode: invoiceSettings.mode, clientEmail: item.client_email }),
+    [settings, invoiceSettings.mode, item.client_email],
+  );
+  const { certificats, isLoading: loadingCerts } = useInterventionCertificats(orgId, item.id, { enabled: open && emailAvailability.visible });
+  const certRows = useMemo(() => certificateAttachmentRows(certificats), [certificats]);
+  const [sendEmail, setSendEmail] = useState(true);
+  const [selectedCertIds, setSelectedCertIds] = useState(null);
+  useEffect(() => { setSendEmail(true); setSelectedCertIds(null); }, [open, item.id]);
+  const effectiveCertIds = selectedCertIds ?? new Set(certRows.filter((r) => r.defaultChecked).map((r) => r.id));
+  const sendInvoiceEmail = useSendInvoiceEmail(orgId);
+
+  const sendEmailAfterCreation = async () => {
+    if (!emailAvailability.enabled || !sendEmail) return;
+    try {
+      const sent = await sendInvoiceEmail.mutateAsync({ interventionId: item.id, certificateIds: [...effectiveCertIds] });
+      toast.success(`Facture envoyée à ${sent.to}${sent.attachments?.length > 1 ? ` (${sent.attachments.length} pièces jointes)` : ''}`);
+    } catch (err) {
+      toast.error(`${invoiceEmailErrorMessage(err)} La facture est créée : renvoyez l’e-mail depuis la carte.`, { duration: 15000 });
+    }
+  };
+
   // Détail de la remise (dégressivité / exceptionnelle / commerciale) : calculé une seule
   // fois, réutilisé par le tableau lecture seule ET par le bloc sous l'éditeur (mêmes chiffres).
   const discountDetail = effectiveModel?.discount
@@ -191,6 +218,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           { action: issued.blob ? { label: 'Télécharger', onClick: () => downloadBlob(issued.blob, `${issued.number}.pdf`) } : undefined },
         );
         if (issued.importWarning) toast.warning(issued.importWarning, { duration: 15000 });
+        await sendEmailAfterCreation();
         onOpenChange(false);
         onCreated?.();
       } catch (err) {
@@ -229,6 +257,10 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           ? { action: { label: 'Ouvrir', onClick: () => window.open(created.publicFileUrl, '_blank', 'noopener') } }
           : undefined,
       );
+      // Une facture déjà existante (brouillon ou déjà créée) se renvoie depuis la carte,
+      // jamais depuis cette modale : `sendEmailAfterCreation` suppose une facture FINALISÉE
+      // qui vient d'être créée à l'instant.
+      if (!created.draft && !created.alreadyExisted) await sendEmailAfterCreation();
       onOpenChange(false);
       onCreated?.();
     } catch (err) {
@@ -367,6 +399,21 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
               )}
               {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
+
+            <InvoiceEmailOptions
+              availability={emailAvailability}
+              email={item.client_email}
+              checked={sendEmail}
+              onCheckedChange={setSendEmail}
+              rows={certRows}
+              selectedIds={effectiveCertIds}
+              onToggleCertificate={(id) => setSelectedCertIds((prev) => {
+                const next = new Set(prev ?? effectiveCertIds);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                return next;
+              })}
+              loadingCertificates={loadingCerts}
+            />
           </>
         )}
 
