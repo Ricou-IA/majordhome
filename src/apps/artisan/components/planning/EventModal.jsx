@@ -21,7 +21,7 @@ import { CertificatsSection } from '@/apps/artisan/components/entretiens/Certifi
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards, useLeadCommercials, leadKeys } from '@hooks/useLeads';
-import { resolveCommercialMemberId } from '@/lib/planningEvents';
+import { resolveCommercialMemberId, PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
 import { leadsService, BOUCLABLE_STATUS_IDS } from '@services/leads.service';
 import { resolveCardForAppointment } from '@services/appointmentActivation.service';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
@@ -54,7 +54,7 @@ import {
 // Une visite technique sans numéro = un commercial qui ne peut ni confirmer ni
 // prévenir d'un retard (vécu : lead LOLLENFANT, 2026-09-14). Si un client ou une
 // carte est liée, le numéro vient de sa fiche : c'est là qu'il faut le compléter.
-const VT_PHONE_REQUIRED_MESSAGE = 'Téléphone requis : renseignez le numéro du client (sur sa fiche s’il est lié) avant de poser la visite technique';
+const VT_PHONE_REQUIRED_MESSAGE = 'Téléphone requis : renseignez le numéro du client (sur sa fiche s’il est lié) avant de poser le RDV';
 
 // ID du statut "RDV planifié" (table majordhome.statuses)
 const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
@@ -478,12 +478,12 @@ export function EventModal({
       ? !!(formData.assigned_commercial_id || commercialMemberId)
       : ((formData.technicianIds || []).length > 0 || !!formData.assigned_commercial_id);
     if (!hasPerson) newErrors[isCommercialType ? 'assigned_commercial_id' : 'technicianIds'] = 'Une personne est requise';
-    // Pas de visite technique sans numéro (à la pose, ou à la re-catégorisation en VT —
-    // une VT déjà posée reste éditable).
-    const becomesVt = formData.appointment_type === 'rdv_technical'
-      && (!isEdit || appointment?.appointment_type !== 'rdv_technical');
+    // Pas de RDV R1 (VT / commercial) sans numéro (à la pose, ou à la re-catégorisation —
+    // un RDV déjà posé reste éditable).
+    const becomesVt = PHONE_REQUIRED_TYPES.includes(formData.appointment_type)
+      && (!isEdit || !PHONE_REQUIRED_TYPES.includes(appointment?.appointment_type));
     if (becomesVt && !hasPhoneNumber(formData.client_phone)) {
-      newErrors.client_phone = 'Téléphone requis pour une visite technique';
+      newErrors.client_phone = 'Téléphone requis pour ce type de RDV';
       toast.error(VT_PHONE_REQUIRED_MESSAGE);
     }
 
@@ -840,8 +840,8 @@ export function EventModal({
       toast.error('Nom du client requis');
       return;
     }
-    if (formData.appointment_type === 'rdv_technical' && !hasPhoneNumber(formData.client_phone)) {
-      setErrors((prev) => ({ ...prev, client_phone: 'Téléphone requis pour une visite technique' }));
+    if (PHONE_REQUIRED_TYPES.includes(formData.appointment_type) && !hasPhoneNumber(formData.client_phone)) {
+      setErrors((prev) => ({ ...prev, client_phone: 'Téléphone requis pour ce type de RDV' }));
       toast.error(VT_PHONE_REQUIRED_MESSAGE);
       return;
     }

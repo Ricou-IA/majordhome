@@ -15,6 +15,8 @@ import { toleranceDe } from './tournee/arrets.js';
 
 export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical', 'rdv_closing'];
 export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
+// RDV R1 (visite technique, RDV commercial) : pas de pose sans numéro du client.
+export const PHONE_REQUIRED_TYPES = ['rdv_technical', 'rdv_agency'];
 
 // Violet foncé — RDV facturé (override). Réservé : aucune personne ne doit l'avoir.
 export const INVOICED_EVENT_COLOR = '#6D28D9';

@@ -20,6 +20,7 @@ import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
 import {
   APPOINTMENT_TYPES,
   COMMERCIAL_TYPES,
+  PHONE_REQUIRED_TYPES,
   TECHNICIAN_TYPES,
 } from '@services/appointments.service';
 import { TechnicianSelect } from './TechnicianSelect';
@@ -462,7 +463,7 @@ export const SectionClient = ({
         </FormField>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Téléphone" required={formData.appointment_type === 'rdv_technical'} error={errors.client_phone}>
+        <FormField label="Téléphone" required={PHONE_REQUIRED_TYPES.includes(formData.appointment_type)} error={errors.client_phone}>
           <TextInput
             value={formData.client_phone}
             onChange={(v) => updateField('client_phone', v)}

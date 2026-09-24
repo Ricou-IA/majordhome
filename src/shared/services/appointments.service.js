@@ -22,7 +22,7 @@ import { logger } from '@lib/logger';
 
 // Buckets de type — source unique dans le module pur (re-export pour les callers
 // existants : EventModal, EventFormSections).
-export { COMMERCIAL_TYPES, TECHNICIAN_TYPES } from '@/lib/planningEvents';
+export { COMMERCIAL_TYPES, TECHNICIAN_TYPES, PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
 
 
 // ============================================================================
