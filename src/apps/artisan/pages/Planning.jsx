@@ -43,6 +43,7 @@ import { PlanningClientSearch } from '@/apps/artisan/components/planning/Plannin
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
+import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================
 // HELPERS
@@ -496,7 +497,9 @@ export default function Planning() {
       open: true,
       mode: 'create',
       appointment: null,
-      defaultDate: startDate.toISOString().split('T')[0],
+      // Date LOCALE : toISOString() passe en UTC et recule d'un jour une sélection
+      // « journée entière » (minuit local = veille 22h UTC).
+      defaultDate: formatDateForInput(startDate),
       defaultTime: selectInfo.allDay ? '09:00' : `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`,
     });
     calendarRef.current?.getApi().unselect();

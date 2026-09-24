@@ -1265,7 +1265,10 @@ export function EventModal({
                   appointmentTypeValue={formData.appointment_type}
                   defaultDuration={dureeContratClient || Number(formData.duration_minutes) || 60}
                   fixedDuration={formData.appointment_type === 'maintenance' ? dureeContratClient : null}
-                  initialDate={(rescheduleMode || continuationMode) ? (formData.scheduled_date || null) : null}
+                  initialDate={(rescheduleMode || continuationMode)
+                    ? (formData.scheduled_date || null)
+                    // Création depuis un créneau du calendrier : l'assistant s'ouvre sur ce jour.
+                    : (!isEdit ? defaultDate : null)}
                   multi={!rescheduleMode && formData.appointment_type === 'installation'}
                 />
               )}
