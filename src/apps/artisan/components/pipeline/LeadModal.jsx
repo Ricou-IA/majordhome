@@ -44,6 +44,7 @@ import { savService } from '@services/sav.service';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
 import { formatDateForInput } from '@/lib/utils';
+import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
 // Sous-composants extraits
@@ -83,6 +84,10 @@ import { useDevisMutations } from '@hooks/useDevis';
  * @param {Function} props.onClose - Fermer
  * @param {Function} props.onSaved - Callback après save/create
  */
+// Une visite technique sans numéro = un commercial qui ne peut ni confirmer ni
+// prévenir d'un retard (vécu : lead LOLLENFANT, 2026-09-14).
+const VT_PHONE_REQUIRED_MESSAGE = 'Téléphone requis : renseignez le numéro du client avant de planifier la visite technique';
+
 export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = false, autoQuote = false, onOpenLead = null }) {
   const isEditing = !!leadId;
   const { organization, user, effectiveRole } = useAuth();
@@ -285,9 +290,13 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   useEffect(() => {
     if (!autoSchedule || !isOpen || !isEditing || !lead || !statuses.length) return;
     const rdvStatus = statuses.find((s) => s.label === 'RDV planifié');
-    if (rdvStatus) {
-      setPendingRdvStatusId(rdvStatus.id);
+    if (!rdvStatus) return;
+    // Pas de visite technique sans numéro : la fiche reste ouverte pour le saisir.
+    if (!hasPhoneNumber(lead.phone)) {
+      toast.error(VT_PHONE_REQUIRED_MESSAGE);
+      return;
     }
+    setPendingRdvStatusId(rdvStatus.id);
   }, [autoSchedule, isOpen, isEditing, lead, statuses]);
 
   // Auto-quote : ouvrir directement la modale d'attache de devis Pennylane
@@ -522,6 +531,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
       // régression → on tombe dans le flux de changement direct ci-dessous
     }
     if (targetStatus?.label === 'RDV planifié') {
+      if (!hasPhoneNumber(form.phone)) {
+        toast.error(VT_PHONE_REQUIRED_MESSAGE);
+        return;
+      }
       setPendingRdvStatusId(newStatusId);
       return;
     }
@@ -600,6 +613,10 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const handleConfirmScheduling = async (slots) => {
     if (!pendingRdvStatusId) return;
     if (!slots || slots.length === 0) return;
+    if (!hasPhoneNumber(form.phone)) {
+      toast.error(VT_PHONE_REQUIRED_MESSAGE);
+      return;
+    }
     setSchedulingLoading(true);
     try {
       const payload = buildPayload();

@@ -33,6 +33,7 @@ import { useDureeContratClient } from '@hooks/useTournees';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
+import { hasPhoneNumber } from '@/lib/phoneUtils';
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
 import { SchedulingAssistant } from './scheduling/SchedulingAssistant';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
@@ -49,6 +50,11 @@ import {
 // ============================================================================
 // CONSTANTES
 // ============================================================================
+
+// Une visite technique sans numéro = un commercial qui ne peut ni confirmer ni
+// prévenir d'un retard (vécu : lead LOLLENFANT, 2026-09-14). Si un client ou une
+// carte est liée, le numéro vient de sa fiche : c'est là qu'il faut le compléter.
+const VT_PHONE_REQUIRED_MESSAGE = 'Téléphone requis : renseignez le numéro du client (sur sa fiche s’il est lié) avant de poser la visite technique';
 
 // ID du statut "RDV planifié" (table majordhome.statuses)
 const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
@@ -472,10 +478,18 @@ export function EventModal({
       ? !!(formData.assigned_commercial_id || commercialMemberId)
       : ((formData.technicianIds || []).length > 0 || !!formData.assigned_commercial_id);
     if (!hasPerson) newErrors[isCommercialType ? 'assigned_commercial_id' : 'technicianIds'] = 'Une personne est requise';
+    // Pas de visite technique sans numéro (à la pose, ou à la re-catégorisation en VT —
+    // une VT déjà posée reste éditable).
+    const becomesVt = formData.appointment_type === 'rdv_technical'
+      && (!isEdit || appointment?.appointment_type !== 'rdv_technical');
+    if (becomesVt && !hasPhoneNumber(formData.client_phone)) {
+      newErrors.client_phone = 'Téléphone requis pour une visite technique';
+      toast.error(VT_PHONE_REQUIRED_MESSAGE);
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, isCommercialType, commercialMemberId]);
+  }, [formData, isCommercialType, commercialMemberId, isEdit, appointment]);
 
   // --------------------------------------------------------------------------
   // Sélection / déliaison client
@@ -824,6 +838,11 @@ export function EventModal({
     if (formData.appointment_type !== 'other' && !isClosing && !fromFiche && !formData.client_name?.trim()) {
       setErrors((prev) => ({ ...prev, client_name: 'Nom requis' }));
       toast.error('Nom du client requis');
+      return;
+    }
+    if (formData.appointment_type === 'rdv_technical' && !hasPhoneNumber(formData.client_phone)) {
+      setErrors((prev) => ({ ...prev, client_phone: 'Téléphone requis pour une visite technique' }));
+      toast.error(VT_PHONE_REQUIRED_MESSAGE);
       return;
     }
     setBatchSaving(true);

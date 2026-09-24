@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isMobileFR } from '../src/lib/phoneUtils.js';
+import { isMobileFR, hasPhoneNumber } from '../src/lib/phoneUtils.js';
 import { formatPhoneDisplay } from '../src/lib/utils.js';
 
 test('isMobileFR — mobiles nationaux 06/07', () => {
@@ -40,4 +40,18 @@ test('formatPhoneDisplay — tout ce qui n’est pas 10 chiffres est rendu tel q
   assert.equal(formatPhoneDisplay(''), '');
   assert.equal(formatPhoneDisplay(null), '');
   assert.equal(formatPhoneDisplay(undefined), '');
+});
+
+test('hasPhoneNumber — un numéro joignable, quel que soit son format', () => {
+  assert.equal(hasPhoneNumber('06 12 34 56 78'), true);
+  assert.equal(hasPhoneNumber('+33 6 12 34 56 78'), true);
+  assert.equal(hasPhoneNumber('679217420'), true); // format Pennylane sans 0
+});
+
+test('hasPhoneNumber — vide ou incomplet = pas de numéro', () => {
+  assert.equal(hasPhoneNumber(''), false);
+  assert.equal(hasPhoneNumber(null), false);
+  assert.equal(hasPhoneNumber('   '), false);
+  assert.equal(hasPhoneNumber('06 12'), false);
+  assert.equal(hasPhoneNumber('à demander'), false);
 });

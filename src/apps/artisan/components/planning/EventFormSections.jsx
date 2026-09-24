@@ -462,7 +462,7 @@ export const SectionClient = ({
         </FormField>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Téléphone">
+        <FormField label="Téléphone" required={formData.appointment_type === 'rdv_technical'} error={errors.client_phone}>
           <TextInput
             value={formData.client_phone}
             onChange={(v) => updateField('client_phone', v)}
