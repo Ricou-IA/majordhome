@@ -25,8 +25,16 @@ const NOMS = [
 // copiés à plat dans _shared/. Même règle : source unique = src/lib, copie régénérée.
 const PARTAGES = ['smsCampaigns', 'phoneUtils'];
 
+// Module Maintenance (règle d'échéance + contenu de l'e-mail du soir) → edge maintenance-digest.
+// Copiés dans _shared/maintenance/ : digestModel importe './echeances.js' (même dossier).
+const MAINTENANCE = ['echeances', 'digestModel'];
+
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),
+  ...MAINTENANCE.map((n) => ({
+    source: path.join(racine, 'src', 'lib', 'maintenance', `${n}.js`),
+    cible: path.join(racine, 'supabase', 'functions', '_shared', 'maintenance', `${n}.js`),
+  })),
   { source: path.join(racine, 'src', 'lib', 'sectorClustering.js'), cible: path.join(DST, 'sectorClustering.js') },
   ...PARTAGES.map((n) => ({
     source: path.join(racine, 'src', 'lib', `${n}.js`),
@@ -50,8 +58,8 @@ export function transformer(source, contenu) {
 
 const lanceDirectement = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (lanceDirectement) {
-  mkdirSync(DST, { recursive: true });
   for (const { source, cible } of FICHIERS) {
+    mkdirSync(path.dirname(cible), { recursive: true });
     writeFileSync(cible, transformer(source, readFileSync(source, 'utf8')));
   }
   console.log(`${FICHIERS.length} fichiers synchronisés vers ${path.relative(racine, DST)}`);

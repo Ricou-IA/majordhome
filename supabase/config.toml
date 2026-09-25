@@ -141,3 +141,6 @@ verify_jwt = true
 
 [functions.invoice-send]
 verify_jwt = true
+
+[functions.maintenance-digest]
+verify_jwt = false
