@@ -42,6 +42,18 @@ export function formatPhoneForSearch(term) {
 }
 
 /**
+ * Teste si un champ téléphone contient un numéro joignable (≥ 9 chiffres :
+ * tolère le format Pennylane sans 0 initial « 679217420 »). Sert de garde
+ * avant la prise d'une visite technique : pas de numéro, pas de RDV.
+ * @param {string} phone - Numéro brut
+ * @returns {boolean}
+ */
+export function hasPhoneNumber(phone) {
+  if (!phone) return false;
+  return String(phone).replace(/\D/g, '').length >= 9;
+}
+
+/**
  * Teste si un numéro est un mobile français (06/07), au format national
  * (0612345678) ou international (+33/0033/33). Tolère espaces, points, tirets.
  * @param {string} phone - Numéro brut
