@@ -60,3 +60,16 @@
 - **Trace** = `mailing_logs` avec `campaign_name='facture_entretien'` (visible fiche client → onglet Mailings), même mécanique que le reste du mailing transactionnel.
 - **Non refondu, à signaler séparément** : `mailing-send` (broadcast) et `contract-signed-notify` restent sur leur propre logique d'envoi — pas de fusion avec `invoice-send` dans cette tâche.
 ---
+
+## [2026-09-25 19:00] Module Maintenance (tâches récurrentes, borne d'atelier, traçabilité)
+**Statut** : PENDING
+**Commit** : 0322997 (spec) · de8e697 · 146420d · 39e0db1 · 689132b · 40068cc
+**Contexte** : nouveau module opt-in générique (1er client : usine Bricafeu, nouvelle org). Unités → tâches à fréquence, borne TV + Raspberry Pi qui sert d'écran d'affichage ET de saisie (prénom + PIN), suivi responsable, e-mail du soir, registre PDF. Migrations 20260925_1 (répétée OK) et 20260925_2 (cron) NON appliquées en prod à la date du commit.
+**Proposition** (nouvelle section « Module Maintenance → docs/superpowers/specs/2026-09-25-module-maintenance-taches-recurrentes-design.md ») :
+- **Règle d'échéance = `src/lib/maintenance/echeances.js`**, seule définition de « dû / en retard » (borne, suivi, e-mail, PDF), copiée pour Deno par `sync:tournee-engine` (`_shared/maintenance/`). Échéance jamais stockée. Jours cochés : un retard ne s'empile pas ; intervalle : depuis la réalisation effective ; « pas pu faire » ⇒ J+1.
+- **Borne = compte Supabase membre (option 1-B, choix Eric)** : voit ce que voit tout membre ⇒ création refusée si l'org a des clients (`BorneTab`). Org avec clients qui veut une borne ⇒ jeton d'appareil (option 1-A de la spec), jamais un compte membre.
+- **PIN** : `pin_hash` illisible (privilèges colonne + vue sans la colonne + REVOKE `baikal_reader`, que les ACL par défaut du schéma `majordhome` servent en SELECT). `maint_record_completion` RETOURNE `{ok:false}` sur PIN faux au lieu de RAISE — un RAISE annulerait l'incrément `failed_attempts` et le blocage ne s'enclencherait jamais.
+- **Journal `maint_task_logs` append-only** : aucune policy d'écriture + trigger anti UPDATE/DELETE ; horodatage `clock_timestamp()` (deux réalisations d'une même transaction restent ordonnées).
+- **`settings.modules.crm === false`** (`crmActif`, `modulesVisibles` dans `src/lib/modules.js`) : sidebar et Paramètres réduits au module + tuiles `horsCrm` ; `/` → `/maintenance` ; compte borne (`settings.maintenance.kiosk_user_ids`) → `/maintenance/borne`. Module opt-in : `optIn: true` dans le registre.
+- **E-mail du soir** : edge `maintenance-digest` (cron horaire :05, `MDH_CRON_SECRET`), part même si tout est à jour, expéditeur org sinon `MDH_PLATFORM_FROM_EMAIL` sinon `skipped:no_sender`, `maint_digest_mark_sent` (service_role only) après 2xx Resend.
+---
