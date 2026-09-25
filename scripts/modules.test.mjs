@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MODULES, tuilesParametrage, moduleActif } from '../src/lib/modules.js';
+import { MODULES, tuilesParametrage, moduleActif, modulesVisibles, crmActif } from '../src/lib/modules.js';
 
 const routesSource = readFileSync(new URL('../src/apps/artisan/routes.jsx', import.meta.url), 'utf8');
 const routesDeclarees = new Set([...routesSource.matchAll(/path:\s*'(settings(?:\/[a-z-]+)?)'/g)].map((m) => `/${m[1]}`));
@@ -52,4 +52,20 @@ test('moduleActif : socle toujours ouvert ; un module n’est ouvert que par set
   assert.equal(moduleActif({ modules: { communication: true } }, 'communication'), true);
   assert.equal(moduleActif({ modules: { communication: 'true' } }, 'communication'), false);
   assert.equal(moduleActif({ modules: { communication: true } }, 'solaire'), false);
+});
+
+test('modulesVisibles : Maintenance opt-in, masqué tant que settings.modules.maintenance n’est pas vrai', () => {
+  const cles = (s) => modulesVisibles(s, { isOrgAdmin: true }).map((m) => m.key);
+  assert.ok(!cles({}).includes('maintenance'), 'Mayer (sans drapeau) ne doit pas voir Maintenance');
+  assert.ok(cles({ modules: { maintenance: true } }).includes('maintenance'));
+  assert.ok(cles({}).includes('entretiens'), 'les modules historiques restent visibles sans drapeau');
+});
+
+test('modulesVisibles : sans CRM, seules les tuiles horsCrm restent (Organisation, Emails, Maintenance)', () => {
+  const s = { modules: { maintenance: true, crm: false } };
+  const tuiles = modulesVisibles(s, { isOrgAdmin: true }).flatMap((m) => m.tiles.map((t) => t.key));
+  assert.deepEqual(tuiles.sort(), ['emails', 'maintenance', 'organization']);
+  assert.equal(crmActif(s), false);
+  assert.equal(crmActif({}), true);
+  assert.deepEqual(modulesVisibles(s, { isOrgAdmin: false }), []);
 });

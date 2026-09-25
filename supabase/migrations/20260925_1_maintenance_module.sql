@@ -238,17 +238,28 @@ CREATE VIEW public.majordhome_maint_task_logs WITH (security_invoker = true) AS
   SELECT id, org_id, task_id, unit_id, operator_id, status, comment, due_date, done_at, recorded_by
     FROM majordhome.maint_task_logs;
 
+-- Dernière réalisation de chaque tâche (lecture seule, DISTINCT ON) : l'échéance en dépend,
+-- quelle que soit son ancienneté (tâche mensuelle, annuelle…) — sans relire tout le journal.
+DROP VIEW IF EXISTS public.majordhome_maint_last_logs;
+CREATE VIEW public.majordhome_maint_last_logs WITH (security_invoker = true) AS
+  SELECT DISTINCT ON (task_id)
+         id, org_id, task_id, unit_id, operator_id, status, comment, due_date, done_at, recorded_by
+    FROM majordhome.maint_task_logs
+   ORDER BY task_id, done_at DESC;
+
 DROP VIEW IF EXISTS public.majordhome_maint_digest_runs;
 CREATE VIEW public.majordhome_maint_digest_runs WITH (security_invoker = true) AS
   SELECT org_id, day, sent_at, provider_id FROM majordhome.maint_digest_runs;
 
 REVOKE ALL ON public.majordhome_maint_units, public.majordhome_maint_tasks, public.majordhome_maint_operators,
-              public.majordhome_maint_task_logs, public.majordhome_maint_digest_runs FROM anon, authenticated;
+              public.majordhome_maint_task_logs, public.majordhome_maint_last_logs,
+              public.majordhome_maint_digest_runs FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.majordhome_maint_units, public.majordhome_maint_tasks TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.majordhome_maint_operators TO authenticated;
-GRANT SELECT ON public.majordhome_maint_task_logs TO authenticated;
+GRANT SELECT ON public.majordhome_maint_task_logs, public.majordhome_maint_last_logs TO authenticated;
 GRANT SELECT ON public.majordhome_maint_units, public.majordhome_maint_tasks, public.majordhome_maint_operators,
-                public.majordhome_maint_task_logs, public.majordhome_maint_digest_runs TO service_role;
+                public.majordhome_maint_task_logs, public.majordhome_maint_last_logs,
+                public.majordhome_maint_digest_runs TO service_role;
 
 -- ----------------------------------------------------------------------------
 -- 9. RPC — PIN d'un opérateur (org_admin)
@@ -400,8 +411,10 @@ BEGIN
     UPDATE majordhome.maint_operators SET failed_attempts = 0, locked_until = NULL WHERE id = v_op.id;
   END IF;
 
-  INSERT INTO majordhome.maint_task_logs (org_id, task_id, unit_id, operator_id, status, comment, due_date, recorded_by)
-  VALUES (v_task.org_id, v_task.id, v_task.unit_id, v_op.id, p_status, nullif(trim(p_comment), ''), p_due_date, v_user)
+  -- clock_timestamp() et non now() : deux réalisations dans une même transaction gardent
+  -- un ordre strict (la « dernière réalisation » d'une tâche ne doit jamais être ambiguë).
+  INSERT INTO majordhome.maint_task_logs (org_id, task_id, unit_id, operator_id, status, comment, due_date, done_at, recorded_by)
+  VALUES (v_task.org_id, v_task.id, v_task.unit_id, v_op.id, p_status, nullif(trim(p_comment), ''), p_due_date, clock_timestamp(), v_user)
   RETURNING id, done_at INTO v_log_id, v_done_at;
 
   RETURN jsonb_build_object('ok', true, 'log_id', v_log_id, 'done_at', v_done_at);

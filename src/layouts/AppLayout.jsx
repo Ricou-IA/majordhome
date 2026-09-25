@@ -4,6 +4,8 @@ import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useOrgMembers } from '@hooks/usePermissions';
 import { useTaskMutations } from '@hooks/useTasks';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { moduleActif, crmActif } from '@/lib/modules';
 import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
 import {
   Plus,
@@ -30,6 +32,7 @@ import {
   Sun,
   ShoppingCart,
   Thermometer,
+  ClipboardCheck,
 } from 'lucide-react';
 
 // =============================================================================
@@ -54,7 +57,17 @@ const navigation = [
   { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study' },
+  // Module opt-in (src/lib/modules.js) : visible seulement si settings.modules.maintenance.
+  { name: 'Maintenance', href: '/maintenance', icon: ClipboardCheck, resource: 'maintenance', module: 'maintenance' },
 ];
+
+/**
+ * Un item de navigation est-il affiché pour cette org ? Item d'un module opt-in : si le
+ * module est activé. Item du CRM artisan (tous les autres) : sauf si l'org n'a pas de CRM
+ * (settings.modules.crm === false, org « Maintenance seule »).
+ */
+const itemVisiblePourOrg = (item, settings) =>
+  item.module ? moduleActif(settings, item.module) : crmActif(settings);
 
 // =============================================================================
 // APP LAYOUT
@@ -64,6 +77,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { user, profile, organization, effectiveRole, signOut } = useAuth();
   const { can } = useCanAccess();
+  const { settings: orgSettings } = useOrgSettings();
 
   // État sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -171,7 +185,7 @@ export default function AppLayout() {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {navigation
-          .filter((item) => can(item.resource, 'view'))
+          .filter((item) => itemVisiblePourOrg(item, orgSettings) && can(item.resource, 'view'))
           .map((item) => (
           <NavLink
             key={item.name}
@@ -258,7 +272,7 @@ export default function AppLayout() {
             <div className="flex-1" />
 
             {/* Quick task button */}
-            {can('tasks', 'create') && (
+            {can('tasks', 'create') && crmActif(orgSettings) && (
               <button
                 onClick={() => setShowTaskCreate(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 mr-3 text-sm font-medium text-white

@@ -91,6 +91,7 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/permissionsRegistry.js', // Phase 1 — inerte (seed only) ; consommé par can() en Phase 3
   'src/apps/solaire/lib/pvgisHourly.js', // cœur moteur autoconso horaire (testé scripts/pvgis-hourly.test.mjs) — branchement UI à venir
   'src/lib/tournee/proposer-contrat.js', // consommé par l'edge slots-propose via sa copie _shared/tournee (sync-tournee-engine), jamais importé depuis src/
+  'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
 ]);
 
 const allFiles = walk(SRC);

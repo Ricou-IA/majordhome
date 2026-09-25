@@ -321,6 +321,15 @@ export const invoiceKeys = {
   detail: (orgId, invoiceId) => [...invoiceKeys.all(orgId), 'detail', invoiceId],
 };
 
+// --- Module Maintenance (tâches récurrentes, borne d'atelier) ---
+export const maintenanceKeys = {
+  all: (orgId) => ['maintenance', orgId],
+  referentiel: (orgId) => [...maintenanceKeys.all(orgId), 'referentiel'],
+  derniersLogs: (orgId) => [...maintenanceKeys.all(orgId), 'derniers-logs'],
+  logs: (orgId, filtres) => [...maintenanceKeys.all(orgId), 'logs', filtres],
+  clientsCount: (orgId) => [...maintenanceKeys.all(orgId), 'clients-count'],
+};
+
 // --- Meta Ads ---
 export const metaAdsKeys = {
   all: (orgId) => ['meta-ads', orgId],

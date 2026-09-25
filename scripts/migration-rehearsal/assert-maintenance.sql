@@ -142,6 +142,8 @@ BEGIN
   SELECT count(*) INTO n FROM public.majordhome_maint_task_logs
    WHERE id = v_log AND recorded_by = v_admin AND unit_id = v_unit AND status = 'done' AND comment IS NULL;
   IF n <> 1 THEN RAISE EXCEPTION '(6) log absent ou incomplet'; END IF;
+  SELECT count(*) INTO n FROM public.majordhome_maint_last_logs WHERE task_id = v_task AND id = v_log;
+  IF n <> 1 THEN RAISE EXCEPTION '(6) vue dernière réalisation incohérente'; END IF;
 
   -- (7) « Pas pu faire » sans commentaire : refusé ; avec : accepté
   ok := false;
@@ -152,6 +154,8 @@ BEGIN
   IF NOT ok THEN RAISE EXCEPTION '(7) pas pu faire sans commentaire accepté'; END IF;
   v_res := public.maint_record_completion(v_task, v_op, '4821', 'not_done', 'Graisse épuisée', v_today);
   IF (v_res->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION '(7) pas pu faire refusé : %', v_res; END IF;
+  SELECT count(*) INTO n FROM public.majordhome_maint_last_logs WHERE task_id = v_task AND status = 'not_done';
+  IF n <> 1 THEN RAISE EXCEPTION '(7) la dernière réalisation n''est pas le « pas pu faire »'; END IF;
 
   -- (8) Échéance future refusée
   ok := false;

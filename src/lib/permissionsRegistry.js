@@ -87,6 +87,13 @@ export const REGISTRY = {
   voice_recorder: { label: 'Compte-rendu vocal (PWA)', tables: { voice_memos: 'org' }, actions: {
     use: { sql: null, default: d([1, 0, 0]) },
   } },
+  // Module Maintenance (opt-in) : suivi/historique ouverts à tous (le compte borne est un
+  // simple membre) ; unités & tâches réservées à l'org_admin (bypass). Écritures DB : RLS
+  // org_admin + RPC signées (migration 20260925_1) — `tables` vide, rien à gouverner ici.
+  maintenance: { label: 'Maintenance', tables: {}, actions: {
+    view: { sql: null, default: d([1, 1, 1]) },
+    edit: { sql: null, default: d([0, 0, 0]) },
+  } },
   settings: { label: 'Paramètres', tables: {}, actions: {
     view: { sql: null, default: d([0, 0, 0]) },
     edit: { sql: null, default: d([0, 0, 0]) },

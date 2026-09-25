@@ -3,6 +3,8 @@ import { lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
+import MaintenanceGate from '@apps/maintenance/components/MaintenanceGate';
+import AccueilSelonOrg from '@apps/maintenance/components/AccueilSelonOrg';
 
 // =============================================================================
 // LAZY LOADING DES PAGES
@@ -69,6 +71,10 @@ const MetaAds = lazy(() => import('./pages/MetaAds'));
 const SolaireSimulateur = lazy(() => import('@apps/solaire/pages/Simulateur'));
 const SolaireHistorique = lazy(() => import('@apps/solaire/pages/Historique'));
 const SolaireAutoconso = lazy(() => import('@apps/solaire/pages/AutoconsoSimulateur'));
+
+// Maintenance (tâches récurrentes, borne d'atelier) — module opt-in
+const MaintenancePage = lazy(() => import('@apps/maintenance/pages/Maintenance'));
+const MaintenanceSettings = lazy(() => import('./pages/settings/MaintenanceSettings'));
 
 // Thermique (étude de déperditions)
 const ThermiqueWizard = lazy(() => import('@apps/thermique/pages/ThermiqueWizard'));
@@ -155,7 +161,19 @@ export const artisanRoutes = [
     index: true,
     element: (
       <SuspenseWrapper>
-        <Dashboard />
+        <AccueilSelonOrg>
+          <Dashboard />
+        </AccueilSelonOrg>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'maintenance',
+    element: (
+      <SuspenseWrapper>
+        <MaintenanceGate>
+          <MaintenancePage />
+        </MaintenanceGate>
       </SuspenseWrapper>
     ),
   },
@@ -310,6 +328,18 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <SolaireSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/maintenance',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <MaintenanceGate>
+            <MaintenanceSettings />
+          </MaintenanceGate>
         </RouteGuard>
       </SuspenseWrapper>
     ),

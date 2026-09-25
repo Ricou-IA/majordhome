@@ -187,6 +187,53 @@ export function ponctualite(logs) {
   return { faits, aLHeure, taux: faits ? aLHeure / faits : null, nonFaits };
 }
 
+/**
+ * Écran du jour (borne, suivi) : tâches en retard, puis par unité les tâches à faire
+ * aujourd'hui et les réalisations déjà saisies aujourd'hui. Unités et tâches archivées
+ * ignorées ; unités sans rien à montrer omises.
+ * @param {object} p
+ * @param {Array<{id:string,name:string,sort_order?:number,archived_at?:string|null}>} p.units
+ * @param {Array<Tache & {id:string,unit_id:string,label:string,sort_order?:number}>} p.tasks
+ * @param {Array<LogRealisation & {task_id:string}>} p.derniersLogs dernière réalisation de chaque tâche
+ * @param {Array<LogRealisation & {task_id:string}>} p.logsDuJour réalisations saisies aujourd'hui
+ * @param {string} p.aujourdhui
+ * @returns {{ enRetard: Array<{tache:object, unite:object, echeance:string, joursDeRetard:number, dernierLog:object|null}>,
+ *   unites: Array<{ unite:object, aFaire: Array<{tache:object, echeance:string}>, faites: Array<{tache:object, log:object}> }> }}
+ */
+export function tableauDuJour({ units, tasks, derniersLogs, logsDuJour, aujourdhui }) {
+  const actives = [...(units || [])].filter((u) => !u.archived_at)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.name).localeCompare(String(b.name)));
+  const uniteParId = new Map(actives.map((u) => [u.id, u]));
+  const derniers = dernierLogParTache(derniersLogs);
+  const tachesTriees = [...(tasks || [])]
+    .filter((t) => !t.archived_at && uniteParId.has(t.unit_id))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label).localeCompare(String(b.label)));
+  const tacheParId = new Map(tachesTriees.map((t) => [t.id, t]));
+
+  const enRetard = [];
+  const parUnite = new Map(actives.map((u) => [u.id, { unite: u, aFaire: [], faites: [] }]));
+  for (const t of tachesTriees) {
+    const dernier = derniers.get(t.id) || null;
+    const e = etatDuJour(t, dernier, aujourdhui);
+    if (e.etat === 'en_retard') {
+      enRetard.push({ tache: t, unite: uniteParId.get(t.unit_id), echeance: e.echeance, joursDeRetard: e.joursDeRetard, dernierLog: dernier });
+    } else if (e.etat === 'a_faire') {
+      parUnite.get(t.unit_id).aFaire.push({ tache: t, echeance: e.echeance });
+    }
+  }
+  const duJour = [...(logsDuJour || [])].filter((l) => jourParis(l.done_at) === aujourdhui)
+    .sort((a, b) => new Date(a.done_at) - new Date(b.done_at));
+  for (const l of duJour) {
+    const t = tacheParId.get(l.task_id);
+    if (t) parUnite.get(t.unit_id).faites.push({ tache: t, log: l });
+  }
+  enRetard.sort((a, b) => b.joursDeRetard - a.joursDeRetard);
+  return {
+    enRetard,
+    unites: [...parUnite.values()].filter((g) => g.aFaire.length || g.faites.length),
+  };
+}
+
 const JOURS_COURTS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
 /**

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   jourParis, ajouterJours, ajouterMois, jourIso,
-  prochaineEcheance, etatDuJour, dernierLogParTache, ponctualite, decrireFrequence,
+  prochaineEcheance, etatDuJour, dernierLogParTache, ponctualite, decrireFrequence, tableauDuJour,
 } from '../../src/lib/maintenance/echeances.js';
 
 const semaine = (jours, start = '2026-09-21') => ({
@@ -115,6 +115,34 @@ test('ponctualité : réalisations faites au plus tard à leur échéance', () =
   ]);
   assert.deepEqual(p, { faits: 3, aLHeure: 2, taux: 2 / 3, nonFaits: 1 });
   assert.deepEqual(ponctualite([]), { faits: 0, aLHeure: 0, taux: null, nonFaits: 0 });
+});
+
+test('tableau du jour : retards à part, à faire et faites par unité, archivés ignorés', () => {
+  const units = [
+    { id: 'u1', name: 'Ligne A', sort_order: 1 },
+    { id: 'u2', name: 'Presse', sort_order: 2 },
+    { id: 'u3', name: 'Ancienne', sort_order: 3, archived_at: '2026-01-01T00:00:00Z' },
+  ];
+  const tous = [1, 2, 3, 4, 5, 6, 7];
+  const tasks = [
+    { id: 't1', unit_id: 'u1', label: 'Nettoyage', ...semaine(tous) },
+    { id: 't2', unit_id: 'u1', label: 'Graissage', ...intervalle(1, 'week') },
+    { id: 't3', unit_id: 'u2', label: 'Huile', ...semaine(tous) },
+    { id: 't4', unit_id: 'u3', label: 'Fantôme', ...semaine(tous) },
+    { id: 't5', unit_id: 'u2', label: 'Hors service', ...semaine(tous), archived_at: '2026-01-01T00:00:00Z' },
+  ];
+  const faitAujourdhui = { task_id: 't3', status: 'done', done_at: '2026-09-25T07:00:00Z' };
+  const derniersLogs = [
+    { task_id: 't1', status: 'done', done_at: '2026-09-24T07:00:00Z' }, // dû aujourd'hui
+    { task_id: 't2', status: 'done', done_at: '2026-09-15T07:00:00Z' }, // dû le 22 → 3 j de retard
+    faitAujourdhui,
+  ];
+  const r = tableauDuJour({ units, tasks, derniersLogs, logsDuJour: [faitAujourdhui], aujourdhui: '2026-09-25' });
+  assert.deepEqual(r.enRetard.map((x) => [x.tache.id, x.joursDeRetard]), [['t2', 3]]);
+  assert.deepEqual(r.unites.map((g) => [g.unite.id, g.aFaire.map((x) => x.tache.id), g.faites.map((x) => x.tache.id)]), [
+    ['u1', ['t1'], []],
+    ['u2', [], ['t3']],
+  ]);
 });
 
 test('description lisible de la fréquence', () => {

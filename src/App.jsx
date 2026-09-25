@@ -23,6 +23,10 @@ const ClientLayout = lazy(() => import('@apps/client/layouts/ClientLayout'));
 import { voiceRoutes } from '@apps/voice/routes';
 const VoiceLayout = lazy(() => import('@apps/voice/layouts/VoiceLayout'));
 
+// Borne d'atelier du module Maintenance (plein écran, hors AppLayout)
+import MaintenanceGate from '@apps/maintenance/components/MaintenanceGate';
+const MaintenanceBorne = lazy(() => import('@apps/maintenance/pages/Borne'));
+
 // Pages utilitaires
 import NotFound from '@pages/NotFound';
 import Unauthorized from '@pages/Unauthorized';
@@ -155,6 +159,29 @@ export default function App() {
           />
         ))}
       </Route>
+
+      {/* ===================================================================
+          BORNE D'ATELIER — module Maintenance (auth + org, plein écran)
+          =================================================================== */}
+
+      <Route
+        path="/maintenance/borne"
+        element={
+          <ProtectedRoute>
+            <Suspense
+              fallback={
+                <div className="min-h-screen flex items-center justify-center bg-secondary-900">
+                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                </div>
+              }
+            >
+              <MaintenanceGate>
+                <MaintenanceBorne />
+              </MaintenanceGate>
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
 
       {/* ===================================================================
           ROUTES PROTÉGÉES (auth + organisation requises)

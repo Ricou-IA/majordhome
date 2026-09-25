@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { ROLE_LABELS } from '@lib/permissions';
-import { MODULES } from '@/lib/modules';
+import { modulesVisibles } from '@/lib/modules';
+import { useOrgSettings } from '@hooks/useOrgSettings';
 import {
   Building2,
   Users,
@@ -16,6 +17,7 @@ import {
   Thermometer,
   Receipt,
   BookOpen,
+  ClipboardCheck,
   HelpCircle,
 } from 'lucide-react';
 
@@ -26,16 +28,16 @@ import {
 // Le registre est un module pur : il nomme ses icônes, la page les résout.
 // ⚠️ Toute icône citée dans modules.js doit être listée ici, sinon la tuile
 // affiche un « ? » (HelpCircle) — vécu sur Facturation Pennylane, 2026-09-21.
-const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail, MessageSquare, Sun, Thermometer, Receipt, BookOpen };
+const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail, MessageSquare, Sun, Thermometer, Receipt, BookOpen, ClipboardCheck };
 
 export default function Settings() {
   const { organization, effectiveRole, isOrgAdmin } = useAuth();
+  const { settings } = useOrgSettings();
 
   // Socle en tête, puis les modules ; un module sans tuile visible pour ce rôle
-  // n'affiche pas son en-tête.
-  const groupes = MODULES
-    .map((m) => ({ ...m, tiles: m.tiles.filter((t) => !t.adminOnly || isOrgAdmin) }))
-    .filter((m) => m.tiles.length > 0);
+  // n'affiche pas son en-tête. Modules opt-in (Maintenance) seulement s'ils sont
+  // activés ; une org sans CRM ne voit que les tuiles `horsCrm`.
+  const groupes = modulesVisibles(settings, { isOrgAdmin });
 
   return (
     <div className="space-y-6">

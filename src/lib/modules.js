@@ -22,7 +22,7 @@ export const MODULES = [
     label: 'Socle',
     description: 'Votre entreprise, votre équipe, vos clients et leur parc — toujours inclus.',
     tiles: [
-      { key: 'organization', title: 'Organisation', description: 'Identité, coordonnées, siège et territoire', icon: 'Building2', href: '/settings/organization', adminOnly: true },
+      { key: 'organization', title: 'Organisation', description: 'Identité, coordonnées, siège et territoire', icon: 'Building2', href: '/settings/organization', adminOnly: true, horsCrm: true },
       { key: 'team', title: 'Équipe', description: 'Membres, rôles, couleur planning, compétences', icon: 'Users', href: '/settings/team', adminOnly: true },
       { key: 'permissions', title: 'Droits d\'accès', description: 'Permissions par rôle', icon: 'Shield', href: '/settings/permissions', adminOnly: true },
       { key: 'equipements', title: 'Équipements', description: 'Catégories et types d\'équipement du parc client', icon: 'Wrench', href: '/settings/equipements', adminOnly: true },
@@ -45,7 +45,7 @@ export const MODULES = [
     label: 'Communication',
     description: 'Emails, SMS et WhatsApp envoyés à vos clients.',
     tiles: [
-      { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true },
+      { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true },
       { key: 'sms', title: 'SMS & WhatsApp', description: 'Gabarits par campagne, rappel automatique des RDV', icon: 'MessageSquare', href: '/settings/sms', adminOnly: true },
     ],
   },
@@ -63,6 +63,18 @@ export const MODULES = [
     description: 'Études de déperditions et dimensionnement PAC.',
     tiles: [
       { key: 'thermique', title: 'Études de déperditions', description: 'Températures, ponts thermiques, calcul, bibliothèque de parois', icon: 'Thermometer', href: '/settings/thermique', adminOnly: true },
+    ],
+  },
+  {
+    // Module OPT-IN (settings.modules.maintenance === true), vendable seul : une org sans
+    // CRM (settings.modules.crm === false) n'a que lui (+ tuiles `horsCrm` du socle).
+    // Spec 2026-09-25-module-maintenance-taches-recurrentes-design.md.
+    key: 'maintenance',
+    label: 'Maintenance',
+    description: "Tâches récurrentes par unité, borne d'atelier, traçabilité.",
+    optIn: true,
+    tiles: [
+      { key: 'maintenance', title: 'Maintenance', description: 'Opérateurs et codes PIN, e-mail du soir, compte borne', icon: 'ClipboardCheck', href: '/settings/maintenance', adminOnly: true, horsCrm: true },
     ],
   },
 ];
@@ -83,4 +95,31 @@ export function tuilesParametrage() {
 export function moduleActif(settings, key) {
   if (key === 'socle') return true;
   return settings?.modules?.[key] === true;
+}
+
+/**
+ * Le CRM artisan (clients, planning, pipeline, entretiens…) est-il affiché ? Vrai par défaut :
+ * seule une org qui n'a acheté qu'un module autonome (ex. Maintenance) porte
+ * `settings.modules.crm === false` — sa sidebar et ses Paramètres se réduisent alors à ce module.
+ * @param {object|null|undefined} settings
+ */
+export function crmActif(settings) {
+  return settings?.modules?.crm !== false;
+}
+
+/**
+ * Groupes de tuiles à afficher dans Paramètres pour une org et un rôle :
+ * modules `optIn` seulement s'ils sont activés ; sans CRM, seules les tuiles `horsCrm`.
+ * @param {object|null|undefined} settings
+ * @param {{ isOrgAdmin: boolean }} ctx
+ */
+export function modulesVisibles(settings, { isOrgAdmin }) {
+  const crm = crmActif(settings);
+  return MODULES
+    .filter((m) => !m.optIn || moduleActif(settings, m.key))
+    .map((m) => ({
+      ...m,
+      tiles: m.tiles.filter((t) => (!t.adminOnly || isOrgAdmin) && (crm || t.horsCrm)),
+    }))
+    .filter((m) => m.tiles.length > 0);
 }

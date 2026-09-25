@@ -38,6 +38,7 @@ export const RESOURCES = [
   { key: 'tasks',      label: 'Tâches' },
   { key: 'meta_ads',   label: 'Meta Ads' },
   { key: 'voice_recorder', label: 'Compte-rendu vocal (PWA)' },
+  { key: 'maintenance', label: 'Maintenance' },
   { key: 'settings',   label: 'Paramètres' },
 ];
 
