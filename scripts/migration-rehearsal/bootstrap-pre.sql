@@ -15,6 +15,12 @@ CREATE SCHEMA IF NOT EXISTS auth;
 
 GRANT USAGE ON SCHEMA public, core, majordhome TO anon, authenticated, service_role, baikal_reader;
 
+-- pgcrypto vit dans le schéma `extensions` en prod (vérifié 2026-09-25) : crypt / gen_salt
+-- sont appelés qualifiés (extensions.crypt) par les RPC du module Maintenance.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+
 -- Stub Supabase : auth.uid() lit la claim `sub` posée par les tests via
 --   SET request.jwt.claim.sub = '<uuid>';  (RESET pour redevenir anonyme)
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
