@@ -317,3 +317,25 @@ export function requireSharedSecret(
   }
   return null;
 }
+
+/**
+ * Variante de requireSharedSecret pour un secret passé dans un EN-TÊTE NOMMÉ, quand
+ * `Authorization` est déjà pris par l'anon key publique (gateway). Cas d'usage : le canal
+ * d'administration de Baikal (`X-Baikal-Key`, edge baikal-admin). Même comparaison en
+ * temps constant, même réponse 401/500.
+ */
+export function requireHeaderSecret(
+  req: Request,
+  headerName: string,
+  expectedSecret: string,
+  secretName = "shared secret",
+): Response | null {
+  if (!expectedSecret) {
+    return jsonResponse({ error: `${secretName} not configured` }, 500);
+  }
+  const token = req.headers.get(headerName) || "";
+  if (!token || !timingSafeEqual(token, expectedSecret)) {
+    return jsonResponse({ error: "unauthorized" }, 401);
+  }
+  return null;
+}

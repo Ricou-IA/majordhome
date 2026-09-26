@@ -144,3 +144,6 @@ verify_jwt = true
 
 [functions.maintenance-digest]
 verify_jwt = false
+
+[functions.baikal-admin]
+verify_jwt = false
