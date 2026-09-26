@@ -9,6 +9,8 @@ import { Link } from 'react-router-dom';
 import { Activity, History, Boxes, MonitorPlay } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import SuiviTab from '../components/SuiviTab';
 import HistoriqueTab from '../components/HistoriqueTab';
 import UnitesTab from '../components/UnitesTab';
@@ -19,19 +21,21 @@ export default function Maintenance() {
   const { can } = useCanAccess();
   const peutEditer = can('maintenance', 'edit');
   const [onglet, setOnglet] = useState('suivi');
+  const { settings } = useOrgSettings();
+  const v = vocabulaire(settings);
 
   const onglets = [
     { key: 'suivi', label: 'Suivi', icon: Activity },
     { key: 'historique', label: 'Historique', icon: History },
-    ...(peutEditer ? [{ key: 'unites', label: 'Unités & tâches', icon: Boxes }] : []),
+    ...(peutEditer ? [{ key: 'unites', label: `${v.unites} & tâches`, icon: Boxes }] : []),
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Maintenance</h1>
-          <p className="text-secondary-600">Tâches récurrentes des unités, suivi et traçabilité.</p>
+          <h1 className="text-2xl font-bold text-secondary-900">{v.module}</h1>
+          <p className="text-secondary-600">Tâches récurrentes, suivi et traçabilité.</p>
         </div>
         <Link
           to="/maintenance/borne"
@@ -59,9 +63,9 @@ export default function Maintenance() {
         ))}
       </div>
 
-      {onglet === 'suivi' && <SuiviTab orgId={orgId} />}
-      {onglet === 'historique' && <HistoriqueTab orgId={orgId} />}
-      {onglet === 'unites' && peutEditer && <UnitesTab orgId={orgId} />}
+      {onglet === 'suivi' && <SuiviTab orgId={orgId} v={v} />}
+      {onglet === 'historique' && <HistoriqueTab orgId={orgId} v={v} />}
+      {onglet === 'unites' && peutEditer && <UnitesTab orgId={orgId} v={v} />}
     </div>
   );
 }

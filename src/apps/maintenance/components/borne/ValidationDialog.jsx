@@ -43,7 +43,7 @@ function messageRefus(res) {
   return { message: "Enregistrement refusé. Réessayez ou prévenez le responsable." };
 }
 
-export default function ValidationDialog({ cible, operateurs, onFermer, onEnregistrer }) {
+export default function ValidationDialog({ cible, operateurs, libelleModule, onFermer, onEnregistrer }) {
   const [s, dispatch] = useReducer(reducer, initial);
   const minuteur = useRef(null);
 
@@ -139,7 +139,7 @@ export default function ValidationDialog({ cible, operateurs, onFermer, onEnregi
             <p className="text-2xl font-semibold text-slate-800">Qui es-tu ?</p>
             {s.message && <p className="rounded-xl bg-amber-50 p-3 text-lg text-amber-800">{s.message}</p>}
             {operateurs.length === 0 && (
-              <p className="text-lg text-slate-600">Aucun opérateur : le responsable doit en créer dans Paramètres → Maintenance.</p>
+              <p className="text-lg text-slate-600">Aucun opérateur : le responsable doit en créer dans Paramètres → {libelleModule}.</p>
             )}
             <div className="grid grid-cols-3 gap-3">
               {operateurs.map((o) => (

@@ -3,7 +3,7 @@
 // maintenance-digest — e-mail du soir du module Maintenance (toutes orgs)
 // ============================================================================
 // pg_cron toutes les heures → cette edge (verify_jwt:false, MDH_CRON_SECRET). Pour
-// chaque org dont `settings.modules.maintenance === true` et
+// chaque org dont le module `maintenance` est ouvert (catalogue _shared/modules.js) et
 // `settings.maintenance.digest = { enabled: true, recipients: [...], hour }`, à
 // l'heure de Paris configurée : récapitulatif du jour (réalisé, en attente, « pas pu
 // faire », opérateurs bloqués) construit par `_shared/maintenance/digestModel.js`
@@ -35,6 +35,8 @@ import {
 import { orgBranding, sendResendEmail } from "../_shared/mail.ts";
 import { construireDigest, digestHtml } from "../_shared/maintenance/digestModel.js";
 import { jourParis, ajouterJours } from "../_shared/maintenance/echeances.js";
+import { vocabulaire } from "../_shared/maintenance/vocabulaire.js";
+import { moduleActif } from "../_shared/modules.js";
 
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
@@ -94,7 +96,7 @@ Deno.serve(async (req: Request) => {
       const settings = (org.settings || {}) as Record<string, any>;
       const report: OrgReport = { org_id: org.id, name: org.name };
       const digest = settings.maintenance?.digest;
-      if (settings.modules?.maintenance !== true) continue; // module non souscrit : hors périmètre, pas de bruit
+      if (!moduleActif(settings, "maintenance")) continue; // module non souscrit : hors périmètre, pas de bruit
       if (digest?.enabled !== true) { report.skipped = "disabled"; reports.push(report); continue; }
       const destinataires = (Array.isArray(digest.recipients) ? digest.recipients : []).filter((e: unknown) => typeof e === "string" && e.includes("@"));
       if (destinataires.length === 0) { report.skipped = "no_recipient"; reports.push(report); continue; }
@@ -128,6 +130,7 @@ Deno.serve(async (req: Request) => {
           aujourdhui,
           maintenant: maintenant.toISOString(),
           orgName: branding.brandName || org.name || "",
+          libelleModule: vocabulaire(settings).module,
         });
         report.sujet = d.sujet;
 

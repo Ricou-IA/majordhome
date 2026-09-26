@@ -56,6 +56,11 @@ test('tâches en attente triées du plus ancien retard, « pas pu faire » du jo
   assert.deepEqual(d.faitsParUnite, []);
 });
 
+test('le titre suit le vocabulaire de l’org', () => {
+  const d = construireDigest({ units, tasks: [], logs: [], operators: [], aujourdhui, maintenant, orgName: 'Dépôt', libelleModule: 'Traçabilité' });
+  assert.match(d.sujet, /^Traçabilité — vendredi 25 septembre 2026/);
+});
+
 test('le HTML échappe les saisies des opérateurs', () => {
   const tasks = [tache('t1', 'u1', 'Nettoyage')];
   const logs = [{ task_id: 't1', operator_id: 'o1', status: 'not_done', comment: '<script>x</script>', due_date: aujourdhui, done_at: '2026-09-25T09:00:00Z' }];

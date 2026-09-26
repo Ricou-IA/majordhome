@@ -17,6 +17,7 @@ import {
   useMaintenanceReferentiel, useMaintenanceDerniersLogs, useMaintenanceLogs, useMaintenanceMutations,
 } from '@hooks/useMaintenance';
 import { buildCompanyInfo } from '@/lib/orgBranding';
+import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import { jourParis, ajouterJours, tableauDuJour } from '@/lib/maintenance/echeances';
 import { useEnLigne, useMaintenant } from '../lib/useEnLigne';
 import TuileTache from '../components/borne/TuileTache';
@@ -73,7 +74,7 @@ export default function Borne() {
           {company.logoUrl && <img src={company.logoUrl} alt="" className="h-12 w-auto rounded bg-white p-1" />}
           <div>
             <p className="text-2xl font-bold">{settings?.brand_name || organization?.name}</p>
-            <p className="text-lg text-slate-400">Maintenance du jour</p>
+            <p className="text-lg text-slate-400">{vocabulaire(settings).module} — tâches du jour</p>
           </div>
         </div>
         <div className="text-right">
@@ -140,7 +141,7 @@ export default function Borne() {
       </main>
 
       {cible && (
-        <ValidationDialog cible={cible} operateurs={operateursActifs} onFermer={fermer} onEnregistrer={enregistrer} />
+        <ValidationDialog cible={cible} operateurs={operateursActifs} libelleModule={vocabulaire(settings).module} onFermer={fermer} onEnregistrer={enregistrer} />
       )}
     </div>
   );

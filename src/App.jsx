@@ -24,7 +24,8 @@ import { voiceRoutes } from '@apps/voice/routes';
 const VoiceLayout = lazy(() => import('@apps/voice/layouts/VoiceLayout'));
 
 // Borne d'atelier du module Maintenance (plein écran, hors AppLayout)
-import MaintenanceGate from '@apps/maintenance/components/MaintenanceGate';
+import ModuleGate from '@components/ModuleGate';
+import { moduleDeRoute } from '@/lib/modules';
 const MaintenanceBorne = lazy(() => import('@apps/maintenance/pages/Borne'));
 
 // Pages utilitaires
@@ -175,9 +176,9 @@ export default function App() {
                 </div>
               }
             >
-              <MaintenanceGate>
+              <ModuleGate module="maintenance" resource="maintenance">
                 <MaintenanceBorne />
-              </MaintenanceGate>
+              </ModuleGate>
             </Suspense>
           </ProtectedRoute>
         }
@@ -195,14 +196,19 @@ export default function App() {
         }
       >
         {/* Routes du module Artisan */}
-        {artisanRoutes.map((route, index) => (
-          <Route
-            key={index}
-            index={route.index}
-            path={route.path}
-            element={route.element}
-          />
-        ))}
+        {/* Chaque route appartient à un module (src/lib/modules.js) : fermé pour l'org ⇒
+            retour à l'accueil. L'index gère lui-même l'accueil (AccueilSelonOrg). */}
+        {artisanRoutes.map((route, index) => {
+          const module = route.index ? 'socle' : moduleDeRoute(route.path);
+          return (
+            <Route
+              key={index}
+              index={route.index}
+              path={route.path}
+              element={module === 'socle' ? route.element : <ModuleGate module={module}>{route.element}</ModuleGate>}
+            />
+          );
+        })}
       </Route>
 
       {/* ===================================================================

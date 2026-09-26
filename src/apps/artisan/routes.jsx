@@ -3,7 +3,6 @@ import { lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useCanAccess } from '@hooks/usePermissions';
-import MaintenanceGate from '@apps/maintenance/components/MaintenanceGate';
 import AccueilSelonOrg from '@apps/maintenance/components/AccueilSelonOrg';
 
 // =============================================================================
@@ -171,9 +170,9 @@ export const artisanRoutes = [
     path: 'maintenance',
     element: (
       <SuspenseWrapper>
-        <MaintenanceGate>
+        <RouteGuard resource="maintenance">
           <MaintenancePage />
-        </MaintenanceGate>
+        </RouteGuard>
       </SuspenseWrapper>
     ),
   },
@@ -337,9 +336,7 @@ export const artisanRoutes = [
     element: (
       <SuspenseWrapper>
         <RouteGuard resource="settings">
-          <MaintenanceGate>
-            <MaintenanceSettings />
-          </MaintenanceGate>
+          <MaintenanceSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

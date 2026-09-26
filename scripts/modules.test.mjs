@@ -8,7 +8,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MODULES, tuilesParametrage, moduleActif, modulesVisibles, crmActif } from '../src/lib/modules.js';
+import {
+  MODULES, CATALOGUE, tuilesParametrage, moduleActif, modulesVisibles, crmActif,
+  modulesEffectifs, validerModules, accueilSansCrm, moduleDeRoute,
+} from '../src/lib/modules.js';
 
 const routesSource = readFileSync(new URL('../src/apps/artisan/routes.jsx', import.meta.url), 'utf8');
 const routesDeclarees = new Set([...routesSource.matchAll(/path:\s*'(settings(?:\/[a-z-]+)?)'/g)].map((m) => `/${m[1]}`));
@@ -45,27 +48,77 @@ test('tuilesParametrage conserve l’ordre des modules et porte le module de cha
   assert.deepEqual(ordreModules, MODULES.map((m) => m.key));
 });
 
-test('moduleActif : socle toujours ouvert ; un module n’est ouvert que par settings.modules[key] === true', () => {
+test('catalogue : clés uniques, CRM en tête, chaque module activable a un groupe de Paramètres (sauf le CRM)', () => {
+  const cles = CATALOGUE.map((m) => m.key);
+  assert.equal(new Set(cles).size, cles.length);
+  assert.equal(cles[0], 'crm');
+  for (const m of CATALOGUE) {
+    assert.equal(typeof m.parDefaut, 'boolean', `${m.key} sans parDefaut`);
+    assert.ok(m.label && m.description, `${m.key} incomplet`);
+    if (m.key !== 'crm') assert.ok(MODULES.some((g) => g.key === m.key), `${m.key} sans groupe de Paramètres`);
+  }
+  assert.ok(!cles.includes('socle'), 'le socle n’est pas activable');
+});
+
+test('moduleActif : drapeau booléen explicite, sinon défaut du catalogue ; socle toujours ouvert', () => {
   assert.equal(moduleActif({}, 'socle'), true);
-  assert.equal(moduleActif(null, 'socle'), true);
+  assert.equal(moduleActif(null, 'crm'), true);
+  assert.equal(moduleActif({}, 'solaire'), true, 'modules historiques ouverts par défaut (rien ne change pour Mayer)');
   assert.equal(moduleActif({}, 'communication'), false);
+  assert.equal(moduleActif({}, 'maintenance'), false);
   assert.equal(moduleActif({ modules: { communication: true } }, 'communication'), true);
-  assert.equal(moduleActif({ modules: { communication: 'true' } }, 'communication'), false);
-  assert.equal(moduleActif({ modules: { communication: true } }, 'solaire'), false);
+  assert.equal(moduleActif({ modules: { communication: 'true' } }, 'communication'), false, 'une chaîne n’ouvre rien');
+  assert.equal(moduleActif({ modules: { solaire: false } }, 'solaire'), false);
+  assert.equal(moduleActif({ modules: { inconnu: true } }, 'inconnu'), false, 'clé hors catalogue = fermée');
+  assert.equal(crmActif({ modules: { crm: false } }), false);
 });
 
-test('modulesVisibles : Maintenance opt-in, masqué tant que settings.modules.maintenance n’est pas vrai', () => {
+test('modulesVisibles : un module fermé disparaît des Paramètres ; sans CRM seules les tuiles horsCrm du socle restent', () => {
   const cles = (s) => modulesVisibles(s, { isOrgAdmin: true }).map((m) => m.key);
-  assert.ok(!cles({}).includes('maintenance'), 'Mayer (sans drapeau) ne doit pas voir Maintenance');
+  assert.deepEqual(cles({}), ['socle', 'entretiens', 'solaire', 'thermique']);
   assert.ok(cles({ modules: { maintenance: true } }).includes('maintenance'));
-  assert.ok(cles({}).includes('entretiens'), 'les modules historiques restent visibles sans drapeau');
-});
-
-test('modulesVisibles : sans CRM, seules les tuiles horsCrm restent (Organisation, Emails, Maintenance)', () => {
-  const s = { modules: { maintenance: true, crm: false } };
+  assert.ok(!cles({ modules: { solaire: false } }).includes('solaire'));
+  const s = { modules: { maintenance: true, crm: false, entretiens: false, solaire: false, thermique: false } };
   const tuiles = modulesVisibles(s, { isOrgAdmin: true }).flatMap((m) => m.tiles.map((t) => t.key));
   assert.deepEqual(tuiles.sort(), ['emails', 'maintenance', 'organization']);
-  assert.equal(crmActif(s), false);
-  assert.equal(crmActif({}), true);
   assert.deepEqual(modulesVisibles(s, { isOrgAdmin: false }), []);
+});
+
+test('modulesEffectifs : état de chaque module du catalogue, défauts appliqués', () => {
+  assert.deepEqual(modulesEffectifs({ modules: { maintenance: true, crm: false } }), {
+    crm: false, entretiens: true, communication: false, solaire: true, thermique: true, maintenance: true,
+  });
+});
+
+test('validerModules : refuse objet vide, valeur non booléenne, clé hors catalogue', () => {
+  assert.deepEqual(validerModules({ maintenance: true, crm: false }), { ok: true, modules: { maintenance: true, crm: false } });
+  assert.equal(validerModules({}).erreur, 'invalid_body');
+  assert.equal(validerModules(null).erreur, 'invalid_body');
+  assert.equal(validerModules([true]).erreur, 'invalid_body');
+  assert.equal(validerModules({ crm: 'false' }).erreur, 'invalid_body');
+  assert.deepEqual(validerModules({ crm: true, geogrid: true, socle: false }), { ok: false, erreur: 'unknown_module', inconnues: ['geogrid', 'socle'] });
+});
+
+test('accueilSansCrm : premier module ouvert qui a un écran, sinon Paramètres', () => {
+  assert.equal(accueilSansCrm({ modules: { crm: false, maintenance: true } }), '/entretiens');
+  assert.equal(accueilSansCrm({ modules: { crm: false, entretiens: false, maintenance: true } }), '/solaire');
+  assert.equal(accueilSansCrm({ modules: { crm: false, entretiens: false, solaire: false, thermique: false, maintenance: true } }), '/maintenance');
+  assert.equal(accueilSansCrm({ modules: { crm: false, entretiens: false, solaire: false, thermique: false } }), '/settings');
+});
+
+test('moduleDeRoute : chaque route de routes.jsx appartient au socle ou à un module du catalogue', () => {
+  const chemins = [...routesSource.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(chemins.length > 30, 'routes.jsx non lu');
+  const cles = new Set(['socle', ...CATALOGUE.map((m) => m.key)]);
+  for (const c of chemins) {
+    assert.ok(cles.has(moduleDeRoute(c)), `route ${c} : module ${moduleDeRoute(c)} inconnu`);
+  }
+  assert.equal(moduleDeRoute('entretiens'), 'entretiens');
+  assert.equal(moduleDeRoute('clients/:clientId/contrat/signer'), 'entretiens');
+  assert.equal(moduleDeRoute('solaire/historique'), 'solaire');
+  assert.equal(moduleDeRoute('settings/sms'), 'communication');
+  assert.equal(moduleDeRoute('settings/emails'), 'socle');
+  assert.equal(moduleDeRoute('maintenance'), 'maintenance');
+  assert.equal(moduleDeRoute('clients/:id'), 'crm');
+  assert.equal(moduleDeRoute('route-future-non-declaree'), 'crm', 'par défaut une route appartient au CRM');
 });

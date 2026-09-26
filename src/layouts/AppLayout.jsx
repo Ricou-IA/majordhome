@@ -6,6 +6,7 @@ import { useOrgMembers } from '@hooks/usePermissions';
 import { useTaskMutations } from '@hooks/useTasks';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { moduleActif, crmActif } from '@/lib/modules';
+import { vocabulaire } from '@/lib/maintenance/vocabulaire';
 import TaskCreateModal from '@apps/artisan/components/tasks/TaskCreateModal';
 import {
   Plus,
@@ -47,27 +48,26 @@ const navigation = [
   { name: 'Pipeline',   href: '/pipeline',   icon: Kanban,          resource: 'pipeline' },
   { name: 'Webshop',    href: '/webshop',    icon: ShoppingCart,    resource: 'pipeline' },
   { name: 'Chantiers',  href: '/chantiers',  icon: HardHat,        resource: 'chantiers' },
-  { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens' },
-  { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens' },
+  { name: 'Contrats',   href: '/contrats',   icon: FileText,        resource: 'entretiens', module: 'entretiens' },
+  { name: 'Entretiens', href: '/entretiens', icon: Wrench,          resource: 'entretiens', module: 'entretiens' },
   { name: 'Tâches',     href: '/tasks',      icon: ListTodo,        resource: 'tasks' },
   { name: 'Cédants',    href: '/cedants',    icon: Factory,         resource: 'cedants' },
   { name: 'Prospection', href: '/prospection', icon: Target,        resource: 'prospection_commerciale' },
   { name: 'GeoGrid',     href: '/geogrid',     icon: Grid3x3,       resource: 'settings' },
   { name: 'Mailing',     href: '/mailing',     icon: Mail,          resource: 'settings' },
   { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
-  { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator' },
-  { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study' },
-  // Module opt-in (src/lib/modules.js) : visible seulement si settings.modules.maintenance.
+  { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire' },
+  { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique' },
+  // Tâches récurrentes : libellé = vocabulaire de l'org (« Maintenance », « Traçabilité »…).
   { name: 'Maintenance', href: '/maintenance', icon: ClipboardCheck, resource: 'maintenance', module: 'maintenance' },
 ];
 
 /**
- * Un item de navigation est-il affiché pour cette org ? Item d'un module opt-in : si le
- * module est activé. Item du CRM artisan (tous les autres) : sauf si l'org n'a pas de CRM
- * (settings.modules.crm === false, org « Maintenance seule »).
+ * Un item de navigation est-il affiché pour cette org ? Son module (catalogue
+ * src/lib/modules.js, ouvert ou fermé depuis Baikal) doit être ouvert ; un item sans
+ * `module` appartient au CRM artisan.
  */
-const itemVisiblePourOrg = (item, settings) =>
-  item.module ? moduleActif(settings, item.module) : crmActif(settings);
+const itemVisiblePourOrg = (item, settings) => moduleActif(settings, item.module || 'crm');
 
 // =============================================================================
 // APP LAYOUT
@@ -200,7 +200,7 @@ export default function AppLayout() {
             }
           >
             <item.icon className="w-5 h-5" />
-            {item.name}
+            {item.module === 'maintenance' ? vocabulaire(orgSettings).module : item.name}
           </NavLink>
         ))}
       </nav>

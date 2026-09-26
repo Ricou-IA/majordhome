@@ -15,7 +15,7 @@ const DATE_HEURE = new Intl.DateTimeFormat('fr-FR', {
   timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
 });
 
-export default function HistoriqueTab({ orgId }) {
+export default function HistoriqueTab({ orgId, v }) {
   const { settings } = useOrgSettings();
   const aujourdhui = jourParis(new Date());
   const [f, setF] = useState({ du: ajouterJours(aujourdhui, -30), au: aujourdhui, unitId: null, taskId: null, operatorId: null, status: null });
@@ -56,6 +56,7 @@ export default function HistoriqueTab({ orgId }) {
         logs: lignes,
         du: f.du,
         au: f.au,
+        libelleModule: v.module,
       });
     } catch (err) {
       toast.error(`Export du registre impossible : ${err?.message || 'erreur inconnue'}`);
@@ -69,7 +70,7 @@ export default function HistoriqueTab({ orgId }) {
       <div className="card grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
         <FormField label="Du"><TextInput type="date" value={f.du} onChange={maj('du')} /></FormField>
         <FormField label="Au"><TextInput type="date" value={f.au} onChange={maj('au')} /></FormField>
-        <FormField label="Unité">
+        <FormField label={v.unite}>
           <SelectInput value={f.unitId} onChange={maj('unitId')} placeholder="Toutes"
             options={units.map((u) => ({ value: u.id, label: u.archived_at ? `${u.name} (archivée)` : u.name }))} />
         </FormField>
@@ -110,7 +111,7 @@ export default function HistoriqueTab({ orgId }) {
             <thead className="bg-secondary-50 text-left text-secondary-500">
               <tr>
                 <th className="px-4 py-2 font-medium">Date</th>
-                <th className="px-4 py-2 font-medium">Unité</th>
+                <th className="px-4 py-2 font-medium">{v.unite}</th>
                 <th className="px-4 py-2 font-medium">Tâche</th>
                 <th className="px-4 py-2 font-medium">Statut</th>
                 <th className="px-4 py-2 font-medium">Opérateur</th>

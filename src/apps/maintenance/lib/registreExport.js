@@ -16,11 +16,12 @@ const GENERE_LE = new Intl.DateTimeFormat('fr-FR', {
  * @param {Array} p.units @param {Array} p.tasks @param {Array} p.operators
  * @param {Array} p.logs réalisations DÉJÀ filtrées (période, unité…)
  * @param {string} p.du 'YYYY-MM-DD' @param {string} p.au 'YYYY-MM-DD'
+ * @param {string} p.libelleModule vocabulaire de l'org (« Maintenance », « Traçabilité »…)
  */
-export async function telechargerRegistre({ settings, units, tasks, operators, logs, du, au }) {
+export async function telechargerRegistre({ settings, units, tasks, operators, logs, du, au, libelleModule }) {
   const registre = construireRegistre({ units, tasks, logs, operators, du, au });
   const company = buildCompanyInfo(settings);
   const { generateRegistrePdfBlob } = await import('../components/RegistrePDF');
-  const blob = await generateRegistrePdfBlob({ registre, company, genereLe: GENERE_LE.format(new Date()).replace(/\s/g, ' ') });
-  downloadBlob(blob, `registre-maintenance-${du}-au-${au}.pdf`);
+  const blob = await generateRegistrePdfBlob({ registre, company, titre: `Registre — ${libelleModule}`, genereLe: GENERE_LE.format(new Date()).replace(/\s/g, ' ') });
+  downloadBlob(blob, `registre-${du}-au-${au}.pdf`);
 }

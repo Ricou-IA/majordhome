@@ -29,7 +29,7 @@ function NomEditable({ valeur, onValider, onAnnuler, placeholder }) {
   );
 }
 
-export default function UnitesTab({ orgId }) {
+export default function UnitesTab({ orgId, v }) {
   const referentiel = useMaintenanceReferentiel(orgId);
   const derniers = useMaintenanceDerniersLogs(orgId);
   const { saveUnit, setUnitArchived, saveTask, setTaskArchived } = useMaintenanceMutations(orgId);
@@ -56,38 +56,38 @@ export default function UnitesTab({ orgId }) {
   };
 
   const creerUnite = async (name) => {
-    if (await executer(saveUnit.mutateAsync({ name, sort_order: units.length + 1 }), 'Unité créée')) setNouvelleUnite(false);
+    if (await executer(saveUnit.mutateAsync({ name, sort_order: units.length + 1 }), 'Enregistré')) setNouvelleUnite(false);
   };
   const renommerUnite = async (u, name) => {
-    if (await executer(saveUnit.mutateAsync({ id: u.id, name }), 'Unité renommée')) setUniteEnEdition(null);
+    if (await executer(saveUnit.mutateAsync({ id: u.id, name }), 'Enregistré')) setUniteEnEdition(null);
   };
 
   if (referentiel.isLoading) {
     return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>;
   }
-  if (referentiel.isError) return <div className="card text-red-700">Impossible de charger les unités.</div>;
+  if (referentiel.isError) return <div className="card text-red-700">Impossible de charger les {v.unites.toLowerCase()}.</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {nouvelleUnite ? (
-          <NomEditable placeholder="Nom de l'unité (ex. Presse 2)" onValider={creerUnite} onAnnuler={() => setNouvelleUnite(false)} />
+          <NomEditable placeholder={`${v.unite} : nom`} onValider={creerUnite} onAnnuler={() => setNouvelleUnite(false)} />
         ) : (
           <button type="button" onClick={() => setNouvelleUnite(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">
-            <Plus className="w-4 h-4" /> Nouvelle unité
+            <Plus className="w-4 h-4" /> {v.unite}
           </button>
         )}
         {nbArchivees > 0 && (
           <label className="inline-flex items-center gap-2 text-sm text-secondary-600">
             <input type="checkbox" checked={voirArchives} onChange={(e) => setVoirArchives(e.target.checked)} />
-            Afficher les unités archivées ({nbArchivees})
+            Afficher les archives ({nbArchivees})
           </label>
         )}
       </div>
 
       {unitesVisibles.length === 0 && (
-        <div className="card text-secondary-600">Aucune unité. Commencez par créer une machine, une ligne ou un poste.</div>
+        <div className="card text-secondary-600">Rien pour l&apos;instant : commencez par créer vos {v.unites.toLowerCase()}.</div>
       )}
 
       {unitesVisibles.map((u) => {
@@ -109,15 +109,15 @@ export default function UnitesTab({ orgId }) {
                       className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm text-primary-700 hover:bg-primary-50">
                       <Plus className="w-4 h-4" /> Tâche
                     </button>
-                    <button type="button" onClick={() => setUniteEnEdition(u.id)} className="p-2 rounded-lg text-secondary-500 hover:bg-secondary-100" aria-label="Renommer l'unité">
+                    <button type="button" onClick={() => setUniteEnEdition(u.id)} className="p-2 rounded-lg text-secondary-500 hover:bg-secondary-100" aria-label="Renommer">
                       <Pencil className="w-4 h-4" />
                     </button>
                   </>
                 )}
                 <button type="button"
-                  onClick={() => executer(setUnitArchived.mutateAsync({ id: u.id, archived: !u.archived_at }), u.archived_at ? 'Unité restaurée' : 'Unité archivée')}
+                  onClick={() => executer(setUnitArchived.mutateAsync({ id: u.id, archived: !u.archived_at }), u.archived_at ? 'Restauration effectuée' : 'Archivage effectué')}
                   className="p-2 rounded-lg text-secondary-500 hover:bg-secondary-100"
-                  aria-label={u.archived_at ? "Restaurer l'unité" : "Archiver l'unité"} title={u.archived_at ? 'Restaurer' : 'Archiver'}>
+                  aria-label={u.archived_at ? 'Restaurer' : 'Archiver'} title={u.archived_at ? 'Restaurer' : 'Archiver'}>
                   {u.archived_at ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                 </button>
               </div>

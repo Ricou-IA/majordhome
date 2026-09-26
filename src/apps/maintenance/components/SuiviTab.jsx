@@ -26,7 +26,7 @@ function Kpi({ icon: Icon, label, value, ton }) {
   );
 }
 
-export default function SuiviTab({ orgId }) {
+export default function SuiviTab({ orgId, v }) {
   const aujourdhui = jourParis(new Date());
   const debutMois = `${aujourdhui.slice(0, 8)}01`;
   const debut = [debutMois, ajouterJours(aujourdhui, -7)].sort()[0];
@@ -61,7 +61,7 @@ export default function SuiviTab({ orgId }) {
     return <div className="card text-red-700">Impossible de charger le suivi de maintenance. Réessayez.</div>;
   }
   if (tasks.length === 0) {
-    return <div className="card text-secondary-600">Aucune tâche pour l&apos;instant : créez vos unités et leurs tâches dans l&apos;onglet « Unités &amp; tâches ».</div>;
+    return <div className="card text-secondary-600">Aucune tâche pour l&apos;instant : créez vos {v.unites.toLowerCase()} et leurs tâches dans l&apos;onglet « {v.unites} &amp; tâches ».</div>;
   }
 
   const aFaire = tableau.unites.flatMap((g) => g.aFaire.map((x) => ({ ...x, unite: g.unite })));
@@ -115,12 +115,12 @@ export default function SuiviTab({ orgId }) {
       </div>
 
       <section className="card space-y-3">
-        <h2 className="font-semibold text-secondary-900">Ponctualité du mois par unité</h2>
+        <h2 className="font-semibold text-secondary-900">Ponctualité du mois</h2>
         <p className="text-sm text-secondary-500">Part des réalisations faites au plus tard à leur échéance.</p>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-secondary-500">
-              <th className="py-1 font-medium">Unité</th>
+              <th className="py-1 font-medium">{v.unite}</th>
               <th className="py-1 font-medium text-right">Faites</th>
               <th className="py-1 font-medium text-right">À l&apos;heure</th>
               <th className="py-1 font-medium text-right">Pas pu faire</th>

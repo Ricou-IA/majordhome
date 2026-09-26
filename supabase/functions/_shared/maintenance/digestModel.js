@@ -33,13 +33,14 @@ const parOrdre = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a
  * @param {string} p.aujourdhui 'YYYY-MM-DD' (Paris)
  * @param {string} p.maintenant instant ISO
  * @param {string} p.orgName
+ * @param {string} [p.libelleModule] vocabulaire de l'org (vocabulaire.js), « Maintenance » par défaut
  * @returns {{ sujet: string, titre: string, orgName: string, toutAJour: boolean,
  *   faitsParUnite: Array<{unite:string,n:number}>,
  *   enAttente: Array<{unite:string,tache:string,echeance:string,joursDeRetard:number}>,
  *   nonFaits: Array<{unite:string,tache:string,operateur:string,commentaire:string}>,
  *   bloques: Array<{prenom:string,jusqua:string}> }}
  */
-export function construireDigest({ units, tasks, logs, operators, aujourdhui, maintenant, orgName }) {
+export function construireDigest({ units, tasks, logs, operators, aujourdhui, maintenant, orgName, libelleModule = 'Maintenance' }) {
   const unitesTriees = [...(units || [])].sort(parOrdre);
   const rang = new Map(unitesTriees.map((u, i) => [u.id, i]));
   const nomUnite = new Map(unitesTriees.map((u) => [u.id, u.name]));
@@ -86,7 +87,7 @@ export function construireDigest({ units, tasks, logs, operators, aujourdhui, ma
     .map((o) => ({ prenom: o.first_name, jusqua: HEURE.format(new Date(o.locked_until)) }));
 
   const toutAJour = enAttente.length === 0 && nonFaits.length === 0;
-  const titre = `Maintenance — ${dateLongue(aujourdhui)}`;
+  const titre = `${libelleModule} — ${dateLongue(aujourdhui)}`;
   const n = enAttente.length;
   const sujet = toutAJour
     ? `${titre} — ✓ Tout est à jour`

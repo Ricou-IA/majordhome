@@ -23,11 +23,11 @@ const NOMS = [
 
 // Modules purs hors moteur de tournées, partagés avec d'autres edges (sms-rappel-rdv) :
 // copiés à plat dans _shared/. Même règle : source unique = src/lib, copie régénérée.
-const PARTAGES = ['smsCampaigns', 'phoneUtils'];
+const PARTAGES = ['smsCampaigns', 'phoneUtils', 'modules'];
 
 // Module Maintenance (règle d'échéance + contenu de l'e-mail du soir) → edge maintenance-digest.
 // Copiés dans _shared/maintenance/ : digestModel importe './echeances.js' (même dossier).
-const MAINTENANCE = ['echeances', 'digestModel'];
+const MAINTENANCE = ['echeances', 'digestModel', 'vocabulaire'];
 
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),

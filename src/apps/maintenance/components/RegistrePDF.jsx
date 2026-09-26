@@ -25,12 +25,12 @@ const texteSur = (s) => String(s ?? '')
 
 const cellule = (col) => (col.flex ? { flex: col.flex, paddingRight: 4 } : { width: col.largeur, paddingRight: 4 });
 
-function RegistreDocument({ registre, company, genereLe }) {
+function RegistreDocument({ registre, company, titre, genereLe }) {
   return (
-    <Document title={`Registre de maintenance ${registre.periode}`}>
+    <Document title={`${titre} ${registre.periode}`}>
       <Page size="A4" style={sharedStyles.page}>
         <CompanyHeader company={company} />
-        <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: accentOf(company) }}>Registre de maintenance</Text>
+        <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: accentOf(company) }}>{texteSur(titre)}</Text>
         <Text style={{ fontSize: 8.5, color: C.grisTxt, marginTop: 2 }}>Période {registre.periode}</Text>
 
         {registre.sections.length === 0 && (
@@ -69,6 +69,6 @@ function RegistreDocument({ registre, company, genereLe }) {
   );
 }
 
-export async function generateRegistrePdfBlob({ registre, company, genereLe }) {
-  return pdf(<RegistreDocument registre={registre} company={company} genereLe={genereLe} />).toBlob();
+export async function generateRegistrePdfBlob({ registre, company, titre, genereLe }) {
+  return pdf(<RegistreDocument registre={registre} company={company} titre={titre} genereLe={genereLe} />).toBlob();
 }
