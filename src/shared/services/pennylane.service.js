@@ -191,25 +191,46 @@ async function upsertSyncRecord(record) {
 // CLIENTS — sync vers Pennylane /customers (V2)
 // ============================================================================
 
+/**
+ * Corps `POST /customers`. Pennylane valide contre UN des deux schémas « Individual
+ * customer » / « Company customer », tous deux `additionalProperties: false` : un champ
+ * de l'autre forme (`customer_type`, `name` sur un particulier, `first_name` sur une
+ * entreprise…) fait échouer les deux → 400 « The root of the schema isn't one of … »
+ * (vécu 2026-09-28, GRANIER). Champs requis : particulier = first_name + last_name +
+ * billing_address ; entreprise = name + billing_address ; adresse = 4 champs requis.
+ * Throw en clair si une donnée obligatoire manque (échec bruyant, pas un 400 opaque).
+ */
 function buildPennylaneCustomer(client) {
   const address = [client.address, client.address_complement].filter(Boolean).join(', ');
+  const missing = [];
+  if (!address) missing.push('adresse');
+  if (!client.postal_code) missing.push('code postal');
+  if (!client.city) missing.push('ville');
 
-  return {
-    customer_type: client.client_category === 'entreprise' ? 'company' : 'individual',
-    first_name: client.first_name || undefined,
-    last_name: client.last_name || undefined,
-    name: client.display_name || `${client.first_name || ''} ${client.last_name || ''}`.trim(),
+  const isCompany = client.client_category === 'entreprise';
+  const companyName = client.display_name || `${client.first_name || ''} ${client.last_name || ''}`.trim();
+  if (isCompany && !companyName) missing.push('raison sociale');
+  if (!isCompany && !client.first_name) missing.push('prénom');
+  if (!isCompany && !client.last_name) missing.push('nom');
+  if (missing.length > 0) {
+    throw new Error(`Fiche client incomplète pour Pennylane : ${missing.join(', ')} manquant(s)`);
+  }
+
+  const common = {
     emails: client.email ? [client.email] : [],
     phone: client.phone || undefined,
     reference: client.client_number || undefined,
-    reg_no: client.siren || undefined,
+    external_reference: client.id,
     billing_address: {
-      address: address || undefined,
-      postal_code: client.postal_code || undefined,
-      city: client.city || undefined,
+      address,
+      postal_code: client.postal_code,
+      city: client.city,
       country_alpha2: 'FR',
     },
   };
+  return isCompany
+    ? { ...common, name: companyName, reg_no: client.siren || undefined }
+    : { ...common, first_name: client.first_name, last_name: client.last_name };
 }
 
 /**
