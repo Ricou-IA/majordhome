@@ -1,14 +1,10 @@
 // src/apps/artisan/components/devis/metre/ReleveForm.jsx
 // Formulaire généré depuis fum_gabarits.troncons (aucun champ codé en dur). `si` masque un
 // paramètre conditionnel ({ nbEtages: 1 } ou { angle: '>0' }). Les inputs portent id=`fum-${cle}`
-// pour le focus depuis la coupe cotée.
+// pour le focus depuis la coupe cotée. Visibilité = même règle que la validation du moteur.
+import { parametreVisible as visible } from '@/lib/fumisterie/index.js';
 
 const INPUT = 'w-full px-2 py-1.5 border border-secondary-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500';
-
-function visible(p, releve) {
-  if (!p.si) return true;
-  return Object.entries(p.si).every(([k, v]) => (v === '>0' ? Number(releve[k]) > 0 : releve[k] === v));
-}
 
 function libelleChoix(p, c) {
   if (typeof c === 'number' && p.unite === '°') return c === 0 ? 'Aucun' : `${c}°`;

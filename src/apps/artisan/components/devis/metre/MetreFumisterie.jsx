@@ -75,7 +75,7 @@ export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) 
       toast.error(`Métré non injecté : ${message}`);
       return;
     }
-    if (resultat.alertes.some((a) => a.niveau === 'warn' && a.code !== 'article_manquant')) {
+    if (resultat.alertes.some((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu')) {
       if (!window.confirm('Des contrôles sont en alerte (zone, dévoiement, buse…). Injecter quand même les lignes dans le devis ?')) return;
     }
     onValidate({
@@ -96,7 +96,13 @@ export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) 
           : sansFournisseur ? <Blocage titre="Aucun fournisseur de fumisterie configuré (MODINOX / ALTEMA) — importer le tarif" />
           : etape === 0 ? (confsQ.isLoading ? <Spinner /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onSelect={setConfigurationId} />)
           : (!bundle || !releve || articlesQ.isLoading || !resultat) ? <Spinner />
-          : <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat} />}
+          : (
+            <div className="space-y-4">
+              {/* Relevé incomplet / hors plage : blocage visible au-dessus du formulaire (l'injection est désactivée). */}
+              {resultat.erreur && <Blocage titre="Métré non calculable — corrigez le relevé" message={resultat.erreur} />}
+              <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat} />
+            </div>
+          )}
       </main>
       <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
         <button type="button" onClick={() => (etape === 0 ? onClose() : setEtape(0))} className="btn-secondary"><ArrowLeft className="w-4 h-4 mr-1" />{etape === 0 ? 'Annuler' : 'Qualification'}</button>

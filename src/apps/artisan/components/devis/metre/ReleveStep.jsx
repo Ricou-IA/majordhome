@@ -10,7 +10,8 @@ import ListePieces, { Alertes } from './ListePieces';
 export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat }) {
   const minSortie = resultat.geometrie ? resultat.geometrie.minSortie : null;
   const focusChamp = (cle) => { const el = document.getElementById(`fum-${cle}`); if (el) { el.focus(); el.select?.(); } };
-  const ajuster = () => setReleve({ ...releve, hSortie: sortieMinimale({ ...bundle, reglages, releve }) });
+  // Relevé incomplet ailleurs → minimum incalculable (NaN) : on ne l'écrit pas dans le champ.
+  const ajuster = () => { const h = sortieMinimale({ ...bundle, reglages, releve }); if (Number.isFinite(h)) setReleve({ ...releve, hSortie: h }); };
   return (
     <div className="space-y-5">
       <div className="grid lg:grid-cols-[1.45fr_1fr] gap-5 items-start">

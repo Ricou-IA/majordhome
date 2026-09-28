@@ -13,6 +13,50 @@ const GABARITS = {
 };
 
 /**
+ * Un paramètre conditionnel (`si`) n'est affiché — donc exigé — que si sa condition est remplie :
+ * `{ nbEtages: 1 }` (égalité) ou `{ angle: '>0' }`.
+ * @param {{ si?: Record<string, unknown> }} p paramètre du gabarit
+ * @param {Record<string, unknown>} releve
+ * @returns {boolean}
+ */
+export function parametreVisible(p, releve) {
+  if (!p.si) return true;
+  return Object.entries(p.si).every(([k, v]) => (v === '>0' ? Number(releve[k]) > 0 : releve[k] === v));
+}
+
+const fmt = (v) => String(v).replace('.', ',');
+
+/**
+ * Contrôle le relevé contre les paramètres du gabarit : chaque paramètre visible doit être un
+ * nombre fini dans [min, max] (ou l'une des valeurs de `choix`). Un champ vidé ne doit JAMAIS
+ * devenir un 0 silencieux dans la géométrie.
+ * @param {{ troncons?: Array<{ parametres: Array<object> }> } | null | undefined} gabarit
+ * @param {Record<string, unknown> | null | undefined} releve
+ * @returns {{ ok: boolean, erreurs: string[] }}
+ */
+export function validerReleve(gabarit, releve) {
+  if (!gabarit?.troncons?.length) return { ok: false, erreurs: ['gabarit de métré absent'] };
+  const r = releve || {};
+  const erreurs = [];
+  for (const t of gabarit.troncons) {
+    for (const p of t.parametres || []) {
+      if (!parametreVisible(p, r)) continue;
+      const v = r[p.cle];
+      if (p.choix) {
+        if (!p.choix.includes(v)) erreurs.push(`${p.libelle} (valeur attendue parmi ${p.choix.map(fmt).join(', ')})`);
+        continue;
+      }
+      if (v === '' || v == null || typeof v !== 'number' || !Number.isFinite(v)) { erreurs.push(`${p.libelle} (non renseigné)`); continue; }
+      const u = p.unite ? ` ${p.unite}` : '';
+      if ((p.min != null && v < p.min) || (p.max != null && v > p.max)) {
+        erreurs.push(`${p.libelle} (${fmt(v)}${u} hors plage ${fmt(p.min ?? '−∞')}–${fmt(p.max ?? '+∞')}${u})`);
+      }
+    }
+  }
+  return { ok: erreurs.length === 0, erreurs };
+}
+
+/**
  * @param {{ configuration: {code:string, gabarit_code:string}, gabarit: object, composants: object[], mapping: object[],
  *   articles: object[], reglages: object, releve: object }} p
  */
@@ -20,6 +64,8 @@ export function calculerMetre({ configuration, gabarit, composants, mapping, art
   const code = gabarit?.code || configuration?.gabarit_code;
   const moteur = GABARITS[code];
   if (!moteur) throw new Error(`Gabarit ${code} non pris en charge par le moteur (${ENGINE_VERSION})`);
+  const validation = validerReleve(gabarit, releve);
+  if (!validation.ok) throw new Error(`Relevé incomplet : ${validation.erreurs.join(' ; ')}`);
   const geometrie = moteur.geometrie(releve, reglages);
   const alertes = moteur.controles(geometrie, releve, reglages);
   const nomenclature = construireNomenclature({ composants, mapping, articles, geometrie, releve, reglages });

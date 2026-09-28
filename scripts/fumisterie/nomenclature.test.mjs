@@ -1,7 +1,7 @@
 // scripts/fumisterie/nomenclature.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculerMetre, ENGINE_VERSION } from '../../src/lib/fumisterie/index.js';
+import { calculerMetre, construireNomenclature, geometrieG1, ENGINE_VERSION } from '../../src/lib/fumisterie/index.js';
 import { resoudreArticle } from '../../src/lib/fumisterie/articles.js';
 import { buildFumisterieConfig } from '../../src/lib/fumisterie/config.js';
 import { ARTICLES, COMPOSANTS, MAPPING, GABARIT, CONFIGURATION, RELEVE } from './fixtures/g1-o150.mjs';
@@ -54,7 +54,10 @@ test('résolution directe : préférence finition exacte, puis motif de code', (
 });
 test('quantité calculée nulle → aucune ligne émise (createQuote ferait 0 || 1)', () => {
   const comp = { repere: 9, ordre: 99, composant_code: 'collier_test', libelle: 'Collier test', troncon: 'sortie_toit', statut: 'provisoire', gammes: ['PTR30'], regle_quantite: 'par_emboitement:sortie_toit' };
-  const r = calculerMetre({ ...base, composants: [comp], releve: { ...RELEVE, hSortie: 0 } });
+  // hSortie 0 est refusé par la validation du relevé : on attaque la nomenclature directement.
+  const releve0 = { ...RELEVE, hSortie: 0 };
+  const r = construireNomenclature({ composants: [comp], mapping: MAPPING, articles: ARTICLES, releve: releve0, reglages: base.reglages,
+    geometrie: geometrieG1(releve0, base.reglages) });
   assert.equal(r.lignes.length, 0);
   assert.ok(!r.alertes.some((a) => a.code === 'article_manquant'));
   // mapping à quantite_par_unite 0 sur une règle unitaire : quantité 0 → pas de ligne non plus
