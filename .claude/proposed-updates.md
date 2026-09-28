@@ -90,3 +90,17 @@ Règles qui mordent :
 - `fum_metres` = relevé + résultat **figés** (`engine_version`) ; un devis rouvert doit relire `resultat`, pas recalculer (relecture non branchée en tranche 1). Vue `majordhome_fum_articles` = `supplier_products` × attrs ; `fum_article_attrs` n'est jamais écrite par l'app.
 - Différés (tranche 2+) : gabarits G3-G6, `groupe_alternative` « ou », `fournisseur_id`/PRH/émaillé dans les réglages, coupe dans le PDF, DINAK, edge `fum-metre` pour Hermes.
 ---
+
+## [2026-09-29 12:00] Module Fumisterie — tranche 2 G4 tubage (compléments à la section « Module Fumisterie »)
+**Statut** : PENDING
+**Commit** : 9ff11fa
+**Contexte** : la section CLAUDE.md décrit la tranche 1 (G1 création intérieure). La tranche 2 ajoute le gabarit G4 tubage (CFG-34/26 flexible, CFG-35/27 rigide) et quatre mécanismes de moteur que les prochains gabarits (G5, POLYPERF, G3) réutiliseront.
+**Proposition** : ajouter à la section « Module Fumisterie » les puces suivantes :
+- **Gabarits G4 (flexible) / G4R (rigide PRH) = même géométrie** (`gabarits/g4.js`) : le code du gabarit dit si le conduit existant reçoit un flexible au ml (conduit + `flexible_marge_m`, arrondi à `flexible_arrondi_m`) ou des tuyaux PRH composés en `longueurs_prh_mm` (6/10, Ø ≥ 130) ou `longueurs_prh_5_10_mm` (5/10, Ø 80/100). Un gabarit n'affiche que les choix qui le concernent (le rigide n'a ni `raccord` ni `chapeau`) : un champ affiché mais ignoré est un piège silencieux.
+- **Alternatives « ou » = `groupe_alternative` + `option`** sur `fum_config_composants` : le composant n'est retenu que si `releve[groupe] == option` (ex. `entree` plafond / mur, `raccord` émaillé 1,2 / 0,7 / acier peint, `kit_air`). Un groupe sans `option` (kit RT2012) reste un simple regroupement.
+- **`par_longueur` itère la composition du tronçon**, pas la liste d'org (un tronçon PRH se compose en 330) ; **`par_longueur_ml:<tronçon>`** pour un article vendu au mètre (`tr.ml`, déjà arrondi par la géométrie).
+- **Placeholder `{BOI}`** dans `motif_code` = indice de section de boisseau (1..6 : 20×20, 25×25, 30×30, 20×40, 40×40, 30×50) ; MODINOX numérote pareil kits de couronnement (`2DIVKCIRN{BOI}{D}`) et plaques ventilées (`2FLEPHV{BOI}N{D}NO`). Les plaques ventilées ont une gamme tarif PAR taille → 6 lignes de mapping à priorité, le motif écarte les mauvaises.
+- **Un mapping dont le motif ne cite pas `{D}` désigne un article indépendant du Ø** (`motifDependDuDiametre`) : le résolveur ne filtre plus sur le Ø et `getArticles` charge la gamme entière (2ᵉ requête, pas de `.or()` : les noms de gammes portent parenthèses et virgules). Vécu : kit d'entrée d'air Ø100 sur un conduit Ø80 sortait « à chiffrer ».
+- **Le seed remplace le mapping MODINOX par l'union des fichiers `data/*-mapping.json`** ; un composant partagé par plusieurs configurations (`kit_couronnement`) n'a qu'une définition. Tarif : trous honnêtes (chapeau plat Ø100, acier peint 2 mm Ø100, plaque ARP Ø80 en 5/10) → « à chiffrer », jamais un article approchant.
+- **Recette 2026-09-28** : la qualification hérite de la famille du devis (`criteresDepuisFamille`), un brouillon restauré se dit (bandeau + « Repartir de zéro », le brouillon est par lead, pas par devis), et l'écran liste les configurations métrables quand la sélection n'en a aucune. **Prix jugé élevé par Eric** (tarif public sans remise) → remise par famille de pièces à cadrer avant la mise en main de Philippe.
+---
