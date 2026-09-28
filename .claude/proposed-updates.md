@@ -74,3 +74,19 @@
 - **Vocabulaire** du module (`settings.maintenance.vocabulaire`, `src/lib/maintenance/vocabulaire.js`) : jamais « Maintenance » / « unité » en dur dans un nouvel écran du module, et pas d'adjectif accordé au mot choisi (« + Zone », pas « Nouvelle zone »).
 - **E-mail du soir** : edge `maintenance-digest` (cron horaire :05, `MDH_CRON_SECRET`), part même si tout est à jour, expéditeur org sinon `MDH_PLATFORM_FROM_EMAIL` sinon `skipped:no_sender`, `maint_digest_mark_sent` (service_role only) après 2xx Resend.
 ---
+
+## [2026-09-28 18:30] Module Fumisterie (assistant de devis) — section CLAUDE.md
+**Statut** : PENDING
+**Commit** : 5f65516..b832d9d (tranche 1 G1)
+**Contexte** : Livraison de la tranche 1 de l'assistant de devis fumisterie (spec `docs/superpowers/specs/2026-09-28-assistant-devis-fumisterie-design.md`, plan `docs/superpowers/plans/2026-09-28-assistant-devis-fumisterie-tranche1-g1.md`, handoff/maquette/tarif dans `docs/devis-fumisterie/`). Nouveau module transverse (tables, moteur pur, écran, Pennylane) avec des règles qui mordent.
+**Proposition** : ajouter à CLAUDE.md, après « Module Contrats », la section suivante :
+
+## Module Fumisterie (assistant de devis conduits) → `docs/superpowers/specs/2026-09-28-assistant-devis-fumisterie-design.md`
+Règles qui mordent :
+- **Moteur PUR `src/lib/fumisterie/`** (aucun import React/Supabase/alias, JSDoc, copie Deno prévue pour Hermes) ; **point d'entrée unique `calculerMetre()`** (`index.js`), `ENGINE_VERSION` à incrémenter à tout changement de règle. Rien en dur : tarif, codes, longueurs, seuils viennent des paramètres (`settings.fumisterie` via `buildFumisterieConfig`, Settings → Entretiens & Contrats → Fumisterie).
+- **Rien n'est avalé** : article introuvable ou ambigu ⇒ ligne « à chiffrer » à prix `null` + alerte (`article_manquant` / `article_ambigu`) ; relevé incomplet ⇒ `validerReleve` refuse le calcul ; quantité ≤ 0 ⇒ pas de ligne (sinon `createQuote` la remonte à 1). L'envoi Pennylane est refusé tant qu'une ligne est à 0 € ou « À CHIFFRER », et si le rattachement au lead renvoie `attached = 0`.
+- **Résolution d'article = attributs (`fum_article_attrs`) + `motif_code` FILTRE** (regex sur la référence, placeholders `{D}` `{LG}` `{A}` `{D-n}`), ordre par `priorite` ; plusieurs candidats restants = ambiguïté, jamais un choix alphabétique. Le test `scripts/fumisterie/tarif-reel.test.mjs` fait tourner le moteur sur le **tarif réel** (xlsx) et pinne les 14 références de la maquette (1 480,90 € HT d'achat) : toute modif du parseur, du mapping ou des règles doit le laisser vert.
+- **Prix** : vente = tarif public fournisseur, achat = « Prix pour client » (net Mayer, jamais recalculé). Tarif importé dans `supplier_products` (fournisseur « MODINOX / ALTEMA ») par `scripts/fumisterie/import-tarif-modinox.mjs` → SQL rejouable (`out/`, gitignoré) appliqué par `scripts/fumisterie/apply-sql.mjs` (API de management, `SUPABASE_ACCESS_TOKEN` dans `.env.local`) ; un article disparu passe `is_active=false`, jamais supprimé. Seed des configurations : `seed-configurations.mjs` (idempotent). ⚠️ après tout changement de `data/*.json`, régénérer ET rejouer le seed en prod, sinon le mapping en base diverge du test.
+- `fum_metres` = relevé + résultat **figés** (`engine_version`) ; un devis rouvert doit relire `resultat`, pas recalculer (relecture non branchée en tranche 1). Vue `majordhome_fum_articles` = `supplier_products` × attrs ; `fum_article_attrs` n'est jamais écrite par l'app.
+- Différés (tranche 2+) : gabarits G3-G6, `groupe_alternative` « ou », `fournisseur_id`/PRH/émaillé dans les réglages, coupe dans le PDF, DINAK, edge `fum-metre` pour Hermes.
+---
