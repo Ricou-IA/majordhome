@@ -349,6 +349,16 @@ export const devisKeys = {
   byClient: (orgId, clientId) => [...devisKeys.all(orgId), 'byClient', clientId],
 };
 
+// --- Fumisterie (assistant devis fumisterie) ---
+export const fumisterieKeys = {
+  all: (orgId) => ['fumisterie', orgId],
+  configurations: (orgId) => [...fumisterieKeys.all(orgId), 'configurations'],
+  bundle: (orgId, configurationId) => [...fumisterieKeys.all(orgId), 'bundle', configurationId],
+  articles: (orgId, supplierId, gammes, diametre) => [...fumisterieKeys.all(orgId), 'articles', supplierId, [...(gammes || [])].sort().join('|'), diametre],
+  supplier: (orgId) => [...fumisterieKeys.all(orgId), 'supplier'],
+  metreByQuote: (orgId, quoteId) => [...fumisterieKeys.all(orgId), 'metre', quoteId],
+};
+
 // Settings de l'organisation — convention P0.11 (orgId scoped)
 export const orgSettingsKeys = {
   all: (orgId) => ['orgSettings', orgId],
