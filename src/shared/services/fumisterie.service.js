@@ -33,8 +33,13 @@ export const fumisterieService = {
     if (regleLinks.error) throw regleLinks.error;
     const composants = comps.data || [];
     const codes = [...new Set(composants.map((c) => c.composant_code))];
-    const { data: mapping, error: e4 } = codes.length
-      ? await supabase.from('majordhome_fum_composant_mapping').select('*').eq('org_id', orgId).in('composant_code', codes)
+    // Le mapping est propre à UN fournisseur (motifs de références) : ne jamais mélanger ceux
+    // d'un autre fournisseur de l'org. Fournisseur absent → aucun mapping (l'écran bloque déjà).
+    const { data: supplier, error: eSup } = await supabase.from('majordhome_suppliers').select('id')
+      .eq('org_id', orgId).eq('name', NOM_FOURNISSEUR).maybeSingle();
+    if (eSup) throw eSup;
+    const { data: mapping, error: e4 } = codes.length && supplier
+      ? await supabase.from('majordhome_fum_composant_mapping').select('*').eq('org_id', orgId).eq('supplier_id', supplier.id).in('composant_code', codes)
       : { data: [], error: null };
     if (e4) throw e4;
     // PostgREST ne peut pas détecter de FK entre deux VUES (majordhome_fum_config_regles →

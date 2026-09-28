@@ -62,3 +62,22 @@ test('quantité calculée nulle → aucune ligne émise (createQuote ferait 0 ||
   const m = [{ composant_code: 'piece_zero', gamme_catalogue: 'PTR30', finition: null, gamme_tarif: 'X', type_piece: 'x', motif_code: '^2PTICHARN{D}NO$', quantite_par_unite: 0 }];
   assert.equal(calculerMetre({ ...base, composants: [unit], mapping: m, releve: RELEVE }).lignes.length, 0);
 });
+test('plusieurs articles possibles → ligne à chiffrer + alerte article_ambigu listant les références (jamais un choix alphabétique)', () => {
+  const sansMotif = MAPPING.map((m) => (m.composant_code === 'collier_jonction_exterieur' ? { ...m, motif_code: null } : m));
+  const galva = { ...ARTICLES.find((a) => a.reference === '2PTICOJO150NO'), id: '2PTGCOJO150NO', reference: '2PTGCOJO150NO' };
+  const r = calculerMetre({ ...base, mapping: sansMotif, articles: [...ARTICLES, galva], releve: RELEVE });
+  const collier = r.lignes.find((l) => l.composant_code === 'collier_jonction_exterieur');
+  assert.equal(collier.reference, null); assert.equal(collier.prix_vente_ht, null);
+  const a = r.alertes.find((x) => x.code === 'article_ambigu');
+  assert.equal(a.niveau, 'warn');
+  assert.match(a.message, /2PTGCOJO150NO, 2PTICOJO150NO/);
+  assert.ok(!r.alertes.some((x) => x.code === 'article_manquant'));
+  // avec le motif, la pièce galva est écartée
+  assert.ok(refs(calculerMetre({ ...base, articles: [...ARTICLES, galva], releve: RELEVE }).lignes).includes('2PTICOJO150NO×3'));
+});
+test('motif : placeholders {LG} inconnu → toute longueur, {D-n} arithmétique', () => {
+  const m = [{ composant_code: 'r', gamme_catalogue: 'PTR30', finition: null, gamme_tarif: 'PTR30+ I', type_piece: 'raccord_simple_paroi', motif_code: '^2PTIRASR{D}{D-2}$' }];
+  assert.equal(resoudreArticle(ARTICLES, m, { composant_code: 'r', gamme_catalogue: 'PTR30', diametre: 150 }).article.reference, '2PTIRASR150148');
+  const e = [{ composant_code: 'e', gamme_catalogue: 'PTR30', finition: 'noir', gamme_tarif: 'PTR30+ LAQ', type_piece: 'element_reglable', motif_code: '^2PTIEL(DR|RE){D}{LG}(NO)?$' }];
+  assert.equal(resoudreArticle(ARTICLES, e, { composant_code: 'e', gamme_catalogue: 'PTR30', diametre: 150, finition: 'noir' }).article.reference, '2PTIELRE150500NO');
+});

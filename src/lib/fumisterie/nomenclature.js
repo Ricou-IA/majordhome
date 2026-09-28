@@ -26,13 +26,24 @@ export function construireNomenclature({ composants, mapping, articles, geometri
   const gamme = (comp) => comp.gammes?.[0] || '';
   const manquant = (comp, criteres) => alertes.push({ niveau: 'warn', code: 'article_manquant', source: 'catalogue',
     message: `${comp.libelle} : aucun article ${criteres} au tarif — ligne à chiffrer.` });
-  const resoudre = (comp, c) => resoudreArticle(articles, mapping, { composant_code: comp.composant_code, gamme_catalogue: gamme(comp), diametre: releve.diametre, finition: releve.finition, ...c });
+  const ambigu = (comp, criteres, refs) => alertes.push({ niveau: 'warn', code: 'article_ambigu', source: 'catalogue',
+    message: `${comp.libelle} : plusieurs articles possibles ${criteres} (${refs.join(', ')}) — ligne à chiffrer, préciser le mapping.` });
+  // Le résultat de résolution (article + éventuels candidats ambigus) est mémorisé pour `pousser`.
+  let derniersAmbigus = null;
+  const resoudre = (comp, c) => {
+    const res = resoudreArticle(articles, mapping, { composant_code: comp.composant_code, gamme_catalogue: gamme(comp), diametre: releve.diametre, finition: releve.finition, ...c });
+    derniersAmbigus = res.ambigus;
+    return res;
+  };
   const qte = (m, q) => q * Number(m?.quantite_par_unite ?? 1);
 
   // Une quantité calculée ≤ 0 n'émet AUCUNE ligne (ni alerte) : createQuote ferait `|| 1` sur un 0.
   const pousser = (comp, article, quantite, criteresManquant, extra) => {
     if (!(quantite > 0)) return;
-    if (!article) manquant(comp, criteresManquant);
+    if (!article) {
+      if (derniersAmbigus?.length) ambigu(comp, criteresManquant, derniersAmbigus);
+      else manquant(comp, criteresManquant);
+    }
     lignes.push(ligne(comp, article, quantite, { ...extra, tva: reglages.tva_fournitures }));
   };
 

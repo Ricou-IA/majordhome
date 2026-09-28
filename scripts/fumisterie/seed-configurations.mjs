@@ -89,8 +89,8 @@ for (const [ligne, cols] of Object.entries(biblio.guide_de_choix_gammes.lignes))
 // Mapping CFG-24 (fournisseur MODINOX)
 sql.push(`  DELETE FROM majordhome.fum_composant_mapping WHERE org_id = v_org AND supplier_id = v_sup AND composant_code IN (${[...new Set(map24.map((m) => q(m.composant_code)))].join(',')});`);
 for (const m of map24) {
-  sql.push(`  INSERT INTO majordhome.fum_composant_mapping (org_id, supplier_id, composant_code, gamme_catalogue, finition, gamme_tarif, type_piece, quantite_par_unite, motif_code, statut)
-  VALUES (v_org, v_sup, ${q(m.composant_code)}, ${q(m.gamme_catalogue)}, ${q(m.finition)}, ${q(m.gamme_tarif)}, ${q(m.type_piece)}, ${m.quantite_par_unite ?? 1}, ${q(m.motif_code)}, ${q(m.statut || 'catalogue')});`);
+  sql.push(`  INSERT INTO majordhome.fum_composant_mapping (org_id, supplier_id, composant_code, gamme_catalogue, finition, gamme_tarif, type_piece, quantite_par_unite, motif_code, priorite, statut, notes)
+  VALUES (v_org, v_sup, ${q(m.composant_code)}, ${q(m.gamme_catalogue)}, ${q(m.finition)}, ${q(m.gamme_tarif)}, ${q(m.type_piece)}, ${m.quantite_par_unite ?? 1}, ${q(m.motif_code)}, ${m.priorite ?? 100}, ${q(m.statut || 'catalogue')}, ${q(m.notes)});`);
 }
 sql.push('END $$;');
 mkdirSync(path.join(racine, 'scripts', 'fumisterie', 'out'), { recursive: true });
