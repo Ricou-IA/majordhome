@@ -247,11 +247,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         // portée par le mapping pennylane_sync relu avant tout POST, pas par ce champ.
         buildPayload: (customerId) =>
           toPennylaneInvoicePayload(effectiveModel, { customerId, draft: isDraft, externalReference: `${item.id}-${Date.now().toString(36)}` }),
-        journalId: invoiceSettings.journalId,
       });
-      if (created.journalWarning) {
-        toast.warning(created.journalWarning, { duration: 12000 });
-      }
       const ref = created.invoiceNumber || (created.draft ? 'brouillon' : `#${created.invoiceId}`);
       toast.success(
         created.alreadyExisted
@@ -398,9 +394,6 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
             <div className="text-xs text-gray-600 space-y-0.5">
               <div><span className="text-gray-500">Objet :</span> {effectiveModel.subject}</div>
               <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(effectiveModel.deadline)} ({invoiceSettings.deadlineDays} j)</div>
-              {!isHub && invoiceSettings.journalId && (
-                <div><span className="text-gray-500">Journal :</span> {invoiceSettings.journalCode || `#${invoiceSettings.journalId}`} (Pennylane refuse le déplacement, la facture tombe dans le journal de ventes principal)</div>
-              )}
               {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
 

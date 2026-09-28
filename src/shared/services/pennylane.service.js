@@ -1075,9 +1075,9 @@ async function pushLedgerEntry(body) {
  * l'écriture MDH avait échoué après la création PL). Le client est ponté via
  * `pennylane_sync` type `client`, sinon créé (même chemin que le push devis).
  *
- * Journal (2026-09-22) : si `journalId` est fourni, l'écriture de la facture créée
- * est déplacée dans ce journal ; un refus PL ou une écriture absente (brouillon)
- * remonte en `journalWarning`, la facture reste créée.
+ * Journal : la facture tombe dans le journal de ventes par défaut de Pennylane (VT).
+ * Aucun déplacement n'est tenté : `PUT /ledger_entries/{id}` répond 422 sur toute
+ * écriture issue d'une facture (décision Eric 2026-09-22, voie API close).
  *
  * @param {object} p
  * @param {string} p.orgId
@@ -1085,10 +1085,9 @@ async function pushLedgerEntry(body) {
  * @param {string} p.clientId
  * @param {(customerId: number) => object} p.buildPayload — corps `POST /customer_invoices`
  *   (cf. `toPennylaneInvoicePayload` de `src/lib/entretienInvoiceModel.js`)
- * @param {number|null} [p.journalId] — journal des factures Majordhome (réglage org)
- * @returns {Promise<{ invoiceId: number, invoiceNumber: string|null, publicFileUrl: string|null, draft: boolean|null, alreadyExisted: boolean, ledgerEntryId: number|null, journalMoved: boolean, journalWarning: string|null }>}
+ * @returns {Promise<{ invoiceId: number, invoiceNumber: string|null, publicFileUrl: string|null, draft: boolean|null, alreadyExisted: boolean, ledgerEntryId: number|null }>}
  */
-async function createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload, journalId = null }) {
+async function createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload }) {
   if (!orgId || !interventionId || !clientId) throw new Error('orgId, interventionId et clientId sont requis');
 
   const existing = await getSyncRecord(orgId, 'invoice', interventionId);
@@ -1100,8 +1099,6 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
       draft: existing.metadata?.draft ?? null,
       alreadyExisted: true,
       ledgerEntryId: existing.metadata?.ledger_entry_id ?? null,
-      journalMoved: existing.metadata?.journal_moved === true,
-      journalWarning: null,
     };
   }
 
@@ -1125,23 +1122,7 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
 
   const draft = created.draft ?? Boolean(payload.draft);
 
-  // Journal Majordhome : déplacer l'écriture de la facture. Jamais bloquant.
   const ledgerEntryId = created.ledger_entry?.id ?? null;
-  let journalMoved = false;
-  let journalWarning = null;
-  if (journalId) {
-    if (!ledgerEntryId) {
-      journalWarning = 'Pennylane n’a pas encore créé l’écriture comptable de ce brouillon : le journal sera à poser après finalisation.';
-    } else {
-      try {
-        await moveLedgerEntryToJournal(ledgerEntryId, journalId);
-        journalMoved = true;
-      } catch (err) {
-        journalWarning = `Écriture laissée dans le journal de ventes par défaut — Pennylane a refusé le déplacement : ${err?.message || err}`;
-        logger.warn('[pennylane.createInvoiceFromEntretien] journal move refused', { ledgerEntryId, journalId, err });
-      }
-    }
-  }
 
   await upsertSyncRecord({
     org_id: orgId,
@@ -1160,9 +1141,6 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
       date: payload.date,
       deadline: payload.deadline,
       ledger_entry_id: ledgerEntryId,
-      journal_id: journalId || null,
-      journal_moved: journalMoved,
-      journal_warning: journalWarning,
     },
   });
 
@@ -1173,8 +1151,6 @@ async function createInvoiceFromEntretien({ orgId, interventionId, clientId, bui
     draft,
     alreadyExisted: false,
     ledgerEntryId,
-    journalMoved,
-    journalWarning,
   };
 }
 

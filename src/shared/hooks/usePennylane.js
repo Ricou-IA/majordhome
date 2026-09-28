@@ -192,9 +192,9 @@ export function useJournals() {
 export function useCreateEntretienInvoice(orgId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ interventionId, clientId, invoicedAt, buildPayload, journalId = null }) => {
+    mutationFn: async ({ interventionId, clientId, invoicedAt, buildPayload }) => {
       const created = await unwrapResult(
-        pennylaneService.createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload, journalId }),
+        pennylaneService.createInvoiceFromEntretien({ orgId, interventionId, clientId, buildPayload }),
       );
       const { error } = await savService.updateFields(interventionId, {
         invoice_id: String(created.invoiceId),
