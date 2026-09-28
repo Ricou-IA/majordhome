@@ -18,12 +18,18 @@ export function resoudreArticle(articles, mappings, c) {
     .sort((a, b) => (b.finition ? 1 : 0) - (a.finition ? 1 : 0) || (a.priorite ?? 100) - (b.priorite ?? 100));
   for (const m of candidats) {
     const type = c.type_piece || m.type_piece;
+    // Un article sans couleur détectée ne peut pas satisfaire un mapping à finition : accepter
+    // `a.couleur == null` ici ouvrirait un fail-open dès que de vraies lignes catalogue sans
+    // couleur renseignée arrivent (l'article surgirait sous la mauvaise finition). Sans couleur
+    // exacte, l'article est rejeté et la ligne sort « à chiffrer », jamais un mauvais article.
     const parAttributs = articles.filter((a) => a.is_active !== false && !a.sur_mesure && !a.hors_perimetre
       && a.gamme_tarif === m.gamme_tarif && a.type_piece === type && a.diametre_int === c.diametre
       && (c.longueur == null || a.longueur_mm === c.longueur)
       && (c.angle == null || a.angle === c.angle)
       && (c.pente == null || (a.pente_min != null && a.pente_max != null && c.pente >= a.pente_min && c.pente <= a.pente_max))
-      && (!m.finition || a.couleur === m.finition || a.couleur == null));
+      && (!m.finition || a.couleur === m.finition));
+    // Solin : quand la pente saisie chevauche deux plages, la plage la plus basse (pente_min la
+    // plus petite) est retenue — même règle que le `find` de la maquette.
     if (parAttributs.length) {
       parAttributs.sort((a, b) => (a.pente_min ?? 0) - (b.pente_min ?? 0) || String(a.reference).localeCompare(String(b.reference)));
       return { article: parAttributs[0], mapping: m, via: 'attributs' };
