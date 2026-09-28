@@ -1,0 +1,27 @@
+{
+  "code": "G1",
+  "libelle": "Création intérieure verticale",
+  "description": "Conduit intérieur vertical, avec ou sans dévoiement dans les combles, sortie en toiture (CFG-24, CFG-28, CFG-32).",
+  "troncons": [
+    { "type": "appareil", "libelle": "Appareil", "parametres": [
+      { "cle": "diametre", "libelle": "Diamètre conduit", "unite": "mm", "choix": [80, 100, 130, 150, 180], "defaut": 150 },
+      { "cle": "hBuse", "libelle": "Hauteur de buse", "unite": "m", "min": 0.3, "max": 2, "pas": 0.05, "defaut": 1.05 } ] },
+    { "type": "raccordement_sp", "libelle": "Raccordement simple paroi", "parametres": [
+      { "cle": "hsp1", "libelle": "Hauteur sous plafond (pièce)", "unite": "m", "min": 2, "max": 5, "pas": 0.05, "defaut": 2.5 } ] },
+    { "type": "traversee_plancher", "libelle": "Niveaux traversés", "parametres": [
+      { "cle": "epPl", "libelle": "Épaisseur plancher", "unite": "m", "min": 0.1, "max": 0.6, "pas": 0.01, "defaut": 0.25 },
+      { "cle": "nbEtages", "libelle": "Étage intermédiaire", "choix": [0, 1], "defaut": 1 },
+      { "cle": "hsp2", "libelle": "Hauteur sous plafond (étage)", "unite": "m", "min": 2, "max": 5, "pas": 0.05, "defaut": 2.5, "optionnel": true, "si": { "nbEtages": 1 } } ] },
+    { "type": "combles", "libelle": "Combles et toiture", "parametres": [
+      { "cle": "hCombles", "libelle": "Hauteur combles au droit du conduit", "unite": "m", "min": 0.3, "max": 6, "pas": 0.05, "defaut": 1.4 },
+      { "cle": "pente", "libelle": "Pente de toiture", "unite": "°", "min": 0, "max": 60, "pas": 1, "defaut": 35 },
+      { "cle": "epToit", "libelle": "Épaisseur toiture", "unite": "m", "min": 0.1, "max": 0.8, "pas": 0.05, "defaut": 0.3 },
+      { "cle": "dFaitage", "libelle": "Distance sortie → faîtage", "unite": "m", "min": 0, "max": 8, "pas": 0.05, "defaut": 1.6 } ] },
+    { "type": "devoiement", "libelle": "Dévoiement (combles)", "parametres": [
+      { "cle": "angle", "libelle": "Angle des coudes", "unite": "°", "choix": [0, 15, 30, 45], "defaut": 30 },
+      { "cle": "decal", "libelle": "Décalage horizontal", "unite": "m", "min": 0.05, "max": 2, "pas": 0.05, "defaut": 0.4, "optionnel": true, "si": { "angle": ">0" } } ] },
+    { "type": "sortie_toit", "libelle": "Sortie de toit", "parametres": [
+      { "cle": "hSortie", "libelle": "Hauteur visée au-dessus du toit", "unite": "m", "min": 0.3, "max": 5, "pas": 0.05, "defaut": 1.6 },
+      { "cle": "finition", "libelle": "Finition extérieure", "choix": ["noir", "inox"], "defaut": "noir" } ] }
+  ]
+}

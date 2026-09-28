@@ -1,0 +1,16 @@
+[
+  { "composant_code": "chapeau_anti_refouleur", "gamme_catalogue": "PTR30", "finition": "noir", "gamme_tarif": "PTR30+ LAQ", "type_piece": "chapeau_anti_refouleur" },
+  { "composant_code": "chapeau_anti_refouleur", "gamme_catalogue": "PTR30", "finition": "inox", "gamme_tarif": "PTR30+ I", "type_piece": "chapeau_anti_refouleur" },
+  { "composant_code": "element_droit_exterieur", "gamme_catalogue": "PTR30", "finition": "noir", "gamme_tarif": "PTR30+ LAQ", "type_piece": "element_droit" },
+  { "composant_code": "element_droit_exterieur", "gamme_catalogue": "PTR30", "finition": "inox", "gamme_tarif": "PTR30+ I", "type_piece": "element_droit" },
+  { "composant_code": "collier_jonction_exterieur", "gamme_catalogue": "PTR30", "finition": "noir", "gamme_tarif": "PTR30+ LAQ", "type_piece": "collier_jonction", "statut": "provisoire" },
+  { "composant_code": "collier_jonction_exterieur", "gamme_catalogue": "PTR30", "finition": "inox", "gamme_tarif": "PTR30+ I", "type_piece": "collier_jonction", "statut": "provisoire" },
+  { "composant_code": "solin", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "SOLIN INOX", "type_piece": "solin" },
+  { "composant_code": "collier_sous_toiture", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "COLLIER UNIVERSEL (SOUS TOIT)", "type_piece": "collier_sous_toiture", "statut": "provisoire" },
+  { "composant_code": "coude_devoiement", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "PTR30+ I", "type_piece": "coude" },
+  { "composant_code": "element_droit_interieur", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "PTR30+ I", "type_piece": "element_droit" },
+  { "composant_code": "plaque_proprete_rt2012", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "PTR30+ I", "type_piece": "plaque_proprete", "statut": "provisoire" },
+  { "composant_code": "couronne_coupe_feu", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "PTR30+ G", "type_piece": "couronne_coupe_feu", "statut": "provisoire" },
+  { "composant_code": "raccord_simple_paroi", "gamme_catalogue": "PTR30", "finition": null, "gamme_tarif": "PTR30+ I", "type_piece": "raccord_simple_paroi" },
+  { "composant_code": "tuyau_emaille", "gamme_catalogue": "ÉMAILLÉ", "finition": null, "gamme_tarif": "EMAIL LIGNE +", "type_piece": "element_droit" }
+]
