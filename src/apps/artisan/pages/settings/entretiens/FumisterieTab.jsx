@@ -48,9 +48,44 @@ function validate(form) {
     const n = form.longueurs.split(',').filter((s) => s.trim() !== '').length;
     if (n !== 3) errors.longueurs = 'Exactement 3 longueurs (ex. 1000, 500, 250)';
   }
-  if (!(Number(form.reglable_min) > 0 && Number(form.reglable_max) > Number(form.reglable_min))) errors.reglable = 'Plage min < max';
+  const rMin = nombre(form.reglable_min); const rMax = nombre(form.reglable_max);
+  if (rMin == null || rMax == null) errors.reglable = 'Min et max obligatoires';
+  else if (!Number.isInteger(rMin) || !Number.isInteger(rMax)) errors.reglable = 'Valeurs entières en mm';
+  else if (rMin < 100 || rMax > 1000 || rMin >= rMax) errors.reglable = 'Plage entre 100 et 1000 mm, min < max';
+  const tva = borne(form.tva_fournitures, 0, 30) || borne(form.tva_pose, 0, 30);
+  if (tva) errors.tva = tva;
+  for (const [k, min, max, entier] of BORNES) {
+    const e = borne(form[k], min, max, entier);
+    if (e) errors[k] = e;
+  }
   return errors;
 }
+
+/** Valeur numérique d'un champ, ou null si vide / non numérique (jamais un 0 implicite). */
+function nombre(v) {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Message d'erreur si hors bornes (ou vide), sinon null. */
+function borne(v, min, max, entier = false) {
+  const n = nombre(v);
+  if (n == null) return 'Champ obligatoire';
+  if (entier && !Number.isInteger(n)) return 'Nombre entier attendu';
+  if (n < min || n > max) return `Entre ${String(min).replace('.', ',')} et ${String(max).replace('.', ',')}`;
+  return null;
+}
+
+// [clé du formulaire, min, max, entier]
+const BORNES = [
+  ['colliers_par_emboitement', 1, 3, true],
+  ['marge_combles_cm', 0, 50, true],
+  ['haubanage_m', 1, 6, false],
+  ['zone1_pente_cm', 10, 200, true],
+  ['zone1_plat_cm', 50, 300, true],
+  ['zone1_pente_plat_deg', 0, 30, false],
+];
 
 function Champ({ label, hint, error, children }) {
   return (<div><label className={LABEL_CLASS}>{label}</label>{children}{error ? <p className="mt-1 text-xs text-primary-700">⚠ {error}</p> : hint ? <p className={HINT_CLASS}>{hint}</p> : null}</div>);
@@ -83,27 +118,27 @@ export default function FumisterieTab() {
           <Champ label="Finition extérieure proposée">
             <select value={form.finition_defaut} onChange={set('finition_defaut')} className={INPUT_CLASS}><option value="noir">Laqué noir</option><option value="inox">Inox</option></select>
           </Champ>
-          <Champ label="TVA fournitures / pose (%)"><div className="flex gap-2"><input type="number" value={form.tva_fournitures} onChange={set('tva_fournitures')} className={INPUT_CLASS} /><input type="number" value={form.tva_pose} onChange={set('tva_pose')} className={INPUT_CLASS} /></div></Champ>
+          <Champ label="TVA fournitures / pose (%)" hint="Entre 0 et 30" error={errors.tva}><div className="flex gap-2"><input type="number" min={0} max={30} value={form.tva_fournitures} onChange={set('tva_fournitures')} className={INPUT_CLASS} /><input type="number" min={0} max={30} value={form.tva_pose} onChange={set('tva_pose')} className={INPUT_CLASS} /></div></Champ>
         </div>
       </section>
       <section>
         <h3 className={SECTION_TITLE}>Éléments et fixations (règles provisoires)</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <Champ label="Longueurs d'éléments droits (mm)" hint="Du plus long au plus court, ex. 1000, 500, 250" error={errors.longueurs}><input value={form.longueurs} onChange={set('longueurs')} className={INPUT_CLASS} /></Champ>
-          <Champ label="Élément réglable (mm)" error={errors.reglable}><div className="flex gap-2"><input type="number" value={form.reglable_min} onChange={set('reglable_min')} className={INPUT_CLASS} /><input type="number" value={form.reglable_max} onChange={set('reglable_max')} className={INPUT_CLASS} /></div></Champ>
+          <Champ label="Élément réglable (mm)" hint="Min / max, entre 100 et 1000" error={errors.reglable}><div className="flex gap-2"><input type="number" min={100} max={1000} value={form.reglable_min} onChange={set('reglable_min')} className={INPUT_CLASS} /><input type="number" min={100} max={1000} value={form.reglable_max} onChange={set('reglable_max')} className={INPUT_CLASS} /></div></Champ>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.reglable_interieur} onChange={set('reglable_interieur')} /> Réglable sur la partie intérieure</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.reglable_exterieur} onChange={set('reglable_exterieur')} /> Réglable au-dessus du toit</label>
-          <Champ label="Colliers de jonction par emboîtement extérieur"><input type="number" min={0} max={3} value={form.colliers_par_emboitement} onChange={set('colliers_par_emboitement')} className={INPUT_CLASS} /></Champ>
-          <Champ label="Marge sous toiture pour le dévoiement (cm)"><input type="number" min={0} max={50} value={form.marge_combles_cm} onChange={set('marge_combles_cm')} className={INPUT_CLASS} /></Champ>
-          <Champ label="Conduit libre au-dessus du toit avant haubanage (m)" hint="Catalogue p.33"><input type="number" step="0.5" min={1} max={6} value={form.haubanage_m} onChange={set('haubanage_m')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Colliers de jonction par emboîtement extérieur" hint="De 1 à 3" error={errors.colliers_par_emboitement}><input type="number" min={1} max={3} value={form.colliers_par_emboitement} onChange={set('colliers_par_emboitement')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Marge sous toiture pour le dévoiement (cm)" hint="De 0 à 50" error={errors.marge_combles_cm}><input type="number" min={0} max={50} value={form.marge_combles_cm} onChange={set('marge_combles_cm')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Conduit libre au-dessus du toit avant haubanage (m)" hint="Catalogue p.33 — de 1 à 6 m" error={errors.haubanage_m}><input type="number" step="0.5" min={1} max={6} value={form.haubanage_m} onChange={set('haubanage_m')} className={INPUT_CLASS} /></Champ>
         </div>
       </section>
       <section>
         <h3 className={SECTION_TITLE}>Zone 1 (catalogue p.23)</h3>
         <div className="grid sm:grid-cols-3 gap-4">
-          <Champ label="Au-dessus du faîtage (cm)"><input type="number" value={form.zone1_pente_cm} onChange={set('zone1_pente_cm')} className={INPUT_CLASS} /></Champ>
-          <Champ label="Au-dessus d'un toit plat (cm)"><input type="number" value={form.zone1_plat_cm} onChange={set('zone1_plat_cm')} className={INPUT_CLASS} /></Champ>
-          <Champ label="Pente traitée comme toit plat (≤ °)"><input type="number" value={form.zone1_pente_plat_deg} onChange={set('zone1_pente_plat_deg')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Au-dessus du faîtage (cm)" hint="De 10 à 200" error={errors.zone1_pente_cm}><input type="number" min={10} max={200} value={form.zone1_pente_cm} onChange={set('zone1_pente_cm')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Au-dessus d'un toit plat (cm)" hint="De 50 à 300" error={errors.zone1_plat_cm}><input type="number" min={50} max={300} value={form.zone1_plat_cm} onChange={set('zone1_plat_cm')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Pente traitée comme toit plat (≤ °)" hint="De 0 à 30" error={errors.zone1_pente_plat_deg}><input type="number" min={0} max={30} value={form.zone1_pente_plat_deg} onChange={set('zone1_pente_plat_deg')} className={INPUT_CLASS} /></Champ>
         </div>
       </section>
       <div className="flex justify-end">
