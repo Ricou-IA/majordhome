@@ -13,7 +13,8 @@ import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devisService } from '@services/devis.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
-import { devisKeys, leadKeys } from '@hooks/cacheKeys';
+import { pennylaneService } from '@services/pennylane.service';
+import { devisKeys, leadKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -208,7 +209,48 @@ export function useDevisMutations(leadId) {
     onSuccess: invalidateAll,
   });
 
+  // Envoyer dans Pennylane : push du devis (brouillon PL) → rattachement au lead
+  // (carte pipeline « Devis envoyé ») → devis MDH passé « envoyé ».
+  // Chaque étape rejette sur refus : le devis MDH reste « brouillon » tant que
+  // les trois n'ont pas réussi. Un push réussi suivi d'un attach en échec se
+  // rejoue sans doublon : pushQuote relit le mapping pennylane_sync et fait un
+  // PUT sur le devis PL existant au lieu d'un second POST.
+  const pushMutation = useMutation({
+    mutationFn: async ({ quote, lines, client }) => {
+      if (!client) throw new Error('Le devis doit être lié à un client pour partir dans Pennylane');
+      const pushed = await unwrapResult(pennylaneService.pushQuote(quote, lines, client, orgId));
+      if (!pushed?.pennylane_id) throw new Error('Pennylane n\'a pas renvoyé d\'identifiant de devis');
+
+      let attached = 0;
+      if (quote.lead_id) {
+        const res = await unwrapResult(pennylaneService.attachQuotesAndSendLead(orgId, quote.lead_id, [{
+          quote_pl_id: pushed.pennylane_id,
+          amount_ht: Number(quote.total_ht) || null,
+          label: pushed.pennylane_number || quote.quote_number,
+          date: new Date().toISOString().slice(0, 10),
+          status: 'draft',
+          pdf_url: pushed.url || null,
+        }]));
+        attached = res?.attached ?? 0;
+      }
+
+      await unwrapResult(devisService.markPushedToPennylane(quote.id, {
+        pennylaneQuoteId: pushed.pennylane_id,
+        pennylaneNumber: pushed.pennylane_number,
+      }));
+      return { ...pushed, attached };
+    },
+    onSuccess: (_, { quote }) => {
+      queryClient.invalidateQueries({ queryKey: devisKeys.detail(orgId, quote.id) });
+      if (quote.lead_id) queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+      invalidateAll();
+    },
+  });
+
   return {
+    pushToPennylane: pushMutation.mutateAsync,
+    isPushing: pushMutation.isPending,
     createQuote: createMutation.mutateAsync,
     updateQuote: useCallback((quoteId, updates) => updateMutation.mutateAsync({ quoteId, updates }), [updateMutation]),
     upsertLines: useCallback((quoteId, lines, globalDiscountPercent) => upsertLinesMutation.mutateAsync({ quoteId, lines, globalDiscountPercent }), [upsertLinesMutation]),

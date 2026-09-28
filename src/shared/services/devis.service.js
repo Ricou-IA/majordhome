@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -436,6 +437,35 @@ export const devisService = {
       return { data, error: null };
     } catch (error) {
       console.error('[devisService] sendQuote:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Après un push Pennylane réussi : le devis MDH est « envoyé » et porte l'id PL.
+   * Ne touche QUE status / sent_at / pennylane_quote_id / pennylane_synced_at.
+   */
+  async markPushedToPennylane(quoteId, { pennylaneQuoteId, pennylaneNumber } = {}) {
+    try {
+      if (!quoteId || !pennylaneQuoteId) throw new Error('[devisService] quoteId et pennylaneQuoteId requis');
+
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('majordhome_quotes_write')
+        .update({
+          status: 'envoye',
+          sent_at: now,
+          pennylane_quote_id: String(pennylaneQuoteId),
+          pennylane_synced_at: now,
+        })
+        .eq('id', quoteId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data: { ...data, pennylane_number: pennylaneNumber || null }, error: null };
+    } catch (error) {
+      logger.error('[devisService] markPushedToPennylane:', error);
       return { data: null, error };
     }
   },

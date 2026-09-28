@@ -15,8 +15,11 @@ import DevisTvaSummary from './DevisTvaSummary';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import {
   X, CheckCircle, XCircle, Copy, Trash2, Pencil,
-  FileText, Download, Loader2, User, MapPin, Phone, Mail, BookmarkPlus,
+  FileText, Download, Loader2, User, MapPin, Phone, Mail, BookmarkPlus, Send,
 } from 'lucide-react';
+import { useClient } from '@hooks/useClients';
+import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { logger } from '@lib/logger';
 import { toast } from 'sonner';
 import { leadsService } from '@services/leads.service';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -27,9 +30,11 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const { quote, isLoading: loadingQuote } = useDevisDetail(quoteId);
   const { lines, isLoading: loadingLines } = useDevisLines(quoteId);
   const {
-    acceptQuote, refuseQuote, duplicateQuote, deleteQuote,
-    isDeleting,
+    acceptQuote, refuseQuote, duplicateQuote, deleteQuote, pushToPennylane,
+    isDeleting, isPushing,
   } = useDevisMutations(leadId);
+  const { client } = useClient(quote?.client_id);
+  const pennylaneEnabled = usePennylaneEnabled();
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -89,6 +94,17 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       onStatusChange?.();
     } catch (err) {
       toast.error(err?.message || 'Erreur');
+    }
+  };
+
+  const handlePush = async () => {
+    try {
+      const res = await pushToPennylane({ quote, lines, client });
+      toast.success(`Devis ${res?.pennylane_number || ''} créé dans Pennylane${res?.attached ? ' et rattaché au lead' : ''}`);
+      onStatusChange?.();
+    } catch (err) {
+      logger.error('[DevisModal] push Pennylane', err);
+      toast.error(err?.message || 'Envoi Pennylane impossible');
     }
   };
 
@@ -378,6 +394,24 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             {quote.quote_pdf_path && (
               <button onClick={handleDownloadPdf} className="btn-secondary btn-sm">
                 <Download className="w-4 h-4 mr-1" /> PDF
+              </button>
+            )}
+
+            {/* Pennylane */}
+            {pennylaneEnabled && quote.pennylane_quote_id && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary-100 text-secondary-700 text-xs font-medium" title="Devis créé dans Pennylane">
+                <Send className="w-3.5 h-3.5" /> Dans Pennylane · n° {quote.pennylane_quote_id}
+              </span>
+            )}
+            {pennylaneEnabled && isBrouillon && !quote.pennylane_quote_id && (
+              <button
+                onClick={handlePush}
+                disabled={isPushing || !client}
+                className="btn-primary btn-sm"
+                title={!client ? 'Lier un client au lead avant l\'envoi' : 'Créer le devis dans Pennylane et le rattacher au lead'}
+              >
+                {isPushing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
+                Envoyer dans Pennylane
               </button>
             )}
 
