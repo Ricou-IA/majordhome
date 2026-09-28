@@ -127,7 +127,6 @@ export function pennylaneInvoiceSettings(settings) {
   const inv = settings?.pennylane?.invoice || {};
   const days = Number(inv.deadline_days);
   const la = inv.ledger_accounts || {};
-  const journalId = Number(inv.journal_id);
   return {
     deadlineDays: Number.isInteger(days) && days >= 0 ? days : PENNYLANE_INVOICE_DEFAULTS.deadlineDays,
     // 'draft' | 'final' = Pennylane crée la facture ; 'hub' = Majord'home émet, numérote et
@@ -140,10 +139,7 @@ export function pennylaneInvoiceSettings(settings) {
     // Gabarits par catégorie (libellé de ligne, objet, ligne offerte) — Settings → Facturation,
     // consommés par buildEntretienInvoice dans les DEUX modes (brouillon PL et hub).
     templates: invoiceTemplatesFromSettings(inv),
-    // Journal des factures Majordhome (Eric, 2026-09-22 : journal « VA » créé dans PL) :
-    // l'écriture de chaque facture créée est DÉPLACÉE dans ce journal juste après la
-    // création (PUT /ledger_entries/{id}). null = journal de ventes par défaut de PL.
-    journalId: Number.isFinite(journalId) && journalId > 0 ? journalId : null,
-    journalCode: typeof inv.journal_code === 'string' ? inv.journal_code : '',
+    // Pas de réglage de journal : l'API Pennylane ne permet pas de choisir ni de
+    // déplacer le journal d'une facture (422, 2026-09-22) → journal de ventes par défaut.
   };
 }

@@ -23,8 +23,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks/useOrgSettings';
-import { useLedgerAccounts, useJournals } from '@hooks/usePennylane';
-import { pennylaneService } from '@services/pennylane.service';
+import { useLedgerAccounts } from '@hooks/usePennylane';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import TemplatesSection, { EMPTY_TEMPLATE } from './TemplatesSection';
@@ -72,7 +71,6 @@ function pickForm(settings) {
     enabled: Boolean(settings?.pennylane?.enabled),
     deadline_days: String(inv.deadlineDays),
     mode: inv.mode,
-    journal_id: inv.journalId ? String(inv.journalId) : '',
     ledger_by_category: byCategory,
     ledger_parts: ledgerValue(inv.ledgerAccounts.parts),
     templates_by_category: templatesByCategory,
@@ -152,7 +150,6 @@ export default function FacturationTab() {
     return map;
   }, [index]);
   const { accounts, isLoading: loadingAccounts, error: accountsError } = useLedgerAccounts();
-  const { journals, isLoading: loadingJournals, error: journalsError } = useJournals();
   // Pennylane décline chaque compte par taux de TVA (70601 × any / 10 % / 5,5 % / 20 %) :
   // on paramètre le NUMÉRO, une fois ; la facture choisit la déclinaison du taux de la ligne.
   // Options = plan comptable de GESTION, contexte « contrat » (Settings → Plan comptable) ;
@@ -195,86 +192,6 @@ export default function FacturationTab() {
       },
     }));
 
-  // --- Spike écriture dans le journal (admin) ---
-  const [testAccount411, setTestAccount411] = useState('');
-  const [testAccount706, setTestAccount706] = useState('706');
-  const [testRunning, setTestRunning] = useState(false);
-  const [testResult, setTestResult] = useState('');
-  const handleTestLedgerEntry = async () => {
-    if (!form.journal_id || !testAccount411) return;
-    if (!window.confirm('Pousser une écriture de test de 1,20 € dans ce journal Pennylane ? Elle devra être contrepassée.')) return;
-    setTestRunning(true);
-    setTestResult('');
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    const journal = journals.find((j) => String(j.id) === form.journal_id);
-    const piece = `MDH-TEST-${stamp}`;
-    const { data, error } = await pennylaneService.pushLedgerEntry({
-      journal_id: Number(form.journal_id),
-      date: new Date().toISOString().slice(0, 10),
-      due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-      label: `TEST Majordhome ${piece} — écriture d’essai à contrepasser`,
-      piece_number: piece,
-      lines: [
-        { account_number: testAccount411, debit: 1.2, credit: 0, label: `Client test ${piece}` },
-        { account_number: testAccount706, vat_rate: 'FR_200', debit: 0, credit: 1.0, label: 'Prestation test' },
-        { account_number: '44571', vat_rate: 'FR_200', debit: 0, credit: 0.2, label: 'TVA collectée 20 %' },
-      ],
-      test_pdf_text: `TEST Majordhome ${piece} - journal ${journal?.code || form.journal_id} - a contrepasser`,
-    });
-    setTestRunning(false);
-    if (error) {
-      setTestResult(JSON.stringify({ error: error.message, steps: error.steps || null }, null, 2));
-      toast.error(error.message || 'Écriture de test refusée');
-      return;
-    }
-    setTestResult(JSON.stringify(data, null, 2));
-    toast.success(`Écriture ${piece} poussée — vérifiez dans Pennylane (journal ${journal?.code || ''})`);
-  };
-
-  // Test 2 : facture IMPORTÉE (PDF + montants exacts) puis déplacement de son écriture dans le journal.
-  // Une facture importée est « créée via l'API » : c'est ce qui manquait à la voie « Facturer ».
-  const [testCustomerId, setTestCustomerId] = useState('');
-  const handleTestImportInvoice = async () => {
-    if (!form.journal_id || !testCustomerId) return;
-    if (!window.confirm('Importer une facture de test de 1,20 € (avec PDF) puis déplacer son écriture dans ce journal ? À annuler ensuite dans Pennylane.')) return;
-    setTestRunning(true);
-    setTestResult('');
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    const journal = journals.find((j) => String(j.id) === form.journal_id);
-    const number = `MDH-TEST-${stamp}`;
-    const { data, error } = await pennylaneService.pushLedgerEntry({
-      mode: 'import_invoice',
-      journal_id: Number(form.journal_id),
-      date: new Date().toISOString().slice(0, 10),
-      due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-      label: `TEST Majordhome ${number} — facture importée d’essai`,
-      invoice_number: number,
-      external_reference: number,
-      customer_id: Number(testCustomerId),
-      currency_amount_before_tax: '1.00',
-      currency_tax: '0.20',
-      currency_amount: '1.20',
-      invoice_lines: [
-        { label: 'Prestation test', quantity: 1, unit: 'piece', raw_currency_unit_price: '1.00', vat_rate: 'FR_200', currency_amount: '1.20', currency_tax: '0.20', account_number: testAccount706 || '706' },
-      ],
-      test_pdf_text: `TEST Majordhome ${number} - facture importee d essai - journal ${journal?.code || form.journal_id}`,
-      lines: [],
-    });
-    setTestRunning(false);
-    if (error) {
-      setTestResult(JSON.stringify({ error: error.message, steps: error.steps || null }, null, 2));
-      toast.error(error.message || 'Import de test refusé');
-      return;
-    }
-    setTestResult(JSON.stringify(data, null, 2));
-    toast[data?.journal_moved ? 'success' : 'warning'](
-      data?.journal_moved
-        ? `Facture ${number} importée et écriture déplacée dans ${journal?.code || 'le journal'}`
-        : `Facture ${number} importée, mais l’écriture n’a pas pu être déplacée — voir le détail`,
-      { duration: 12000 },
-    );
-  };
-
   useEffect(() => {
     const picked = pickForm(settings);
     setForm(picked);
@@ -289,17 +206,19 @@ export default function FacturationTab() {
     if (!isValid) return;
     try {
       // Objet `pennylane` COMPLET : on préserve les clés qu'on n'édite pas ici.
+      // `journal_id` / `journal_code` (réglage retiré, l'API PL ne sait pas déplacer
+      // une facture de journal) sont purgés au passage.
+      // eslint-disable-next-line no-unused-vars
+      const { journal_id, journal_code, ...invoiceRest } = settings?.pennylane?.invoice || {};
       const pennylane = {
         ...(settings?.pennylane || {}),
         enabled: form.enabled,
         invoice: {
-          ...(settings?.pennylane?.invoice || {}),
+          ...invoiceRest,
           deadline_days: Number(form.deadline_days),
           mode: form.mode,
           ledger_accounts: ledgerAccountsForSave(form),
           templates: templatesForSave(form),
-          journal_id: form.journal_id ? Number(form.journal_id) : null,
-          journal_code: form.journal_id ? (journals.find((j) => String(j.id) === form.journal_id)?.code || '') : '',
         },
       };
       await save({ pennylane });
@@ -368,25 +287,6 @@ export default function FacturationTab() {
               de l&apos;année fige le préfixe.
             </p>
           </div>
-          <div className="sm:col-span-2">
-            <label className={LABEL_CLASS}>Journal des factures Majordhome</label>
-            <select
-              value={form.journal_id || ''}
-              onChange={(e) => setForm({ ...form, journal_id: e.target.value })}
-              disabled={loadingJournals}
-              className={INPUT_CLASS}
-            >
-              <option value="">— Journal de ventes par défaut de Pennylane —</option>
-              {journals.map((j) => (
-                <option key={j.id} value={String(j.id)}>{j.code} · {j.label}{j.type ? ` (${j.type})` : ''}</option>
-              ))}
-            </select>
-            {journalsError && <p className={ERROR_CLASS}>Journaux Pennylane indisponibles : {journalsError.message || 'erreur'}</p>}
-            <p className={HINT_CLASS}>
-              Réglage conservé pour mémoire : Pennylane n&apos;accepte pas de déplacer l&apos;écriture d&apos;une facture par l&apos;API (vérifié le 22/09/2026),
-              les factures tombent dans le journal de ventes principal. Un changement de journal se fait dans Pennylane, à la main ou en masse.
-            </p>
-          </div>
         </div>
       </section>
 
@@ -437,80 +337,6 @@ export default function FacturationTab() {
           </div>
         </div>
       </section>
-
-      {/* Spike 2026-09-22 (admin) : une écriture de vente poussée dans le journal choisi,
-          avec un PDF, est-elle convertie en facture par Pennylane (voie « logiciel de
-          facturation tiers », article 301073) ? Montant symbolique, à contrepasser. */}
-      {form.enabled && form.journal_id && (
-        <section>
-          <h3 className={SECTION_TITLE}>Test d&apos;écriture dans le journal (administrateur)</h3>
-          <p className="text-xs text-secondary-500 mb-3">
-            Pousse une écriture de vente de 1,20 € TTC (1,00 € HT + 0,20 € de TVA à 20 %) dans le journal sélectionné, avec un PDF
-            d&apos;essai, pour vérifier si Pennylane la convertit en facture. À contrepasser ensuite dans Pennylane.
-          </p>
-          <div className="grid sm:grid-cols-3 gap-4 items-end">
-            <div>
-              <label className={LABEL_CLASS}>Compte 411 du client de test</label>
-              <input
-                type="text"
-                value={testAccount411}
-                onChange={(e) => setTestAccount411(e.target.value.trim())}
-                placeholder="411000197"
-                className={INPUT_CLASS}
-              />
-              <p className={HINT_CLASS}>Numéro de compte auxiliaire du client (fiche client, « n° Pennylane »).</p>
-            </div>
-            <div>
-              <label className={LABEL_CLASS}>Compte de vente</label>
-              <input
-                type="text"
-                value={testAccount706}
-                onChange={(e) => setTestAccount706(e.target.value.trim())}
-                placeholder="706"
-                className={INPUT_CLASS}
-              />
-            </div>
-            <div>
-              <button
-                type="button"
-                onClick={handleTestLedgerEntry}
-                disabled={testRunning || !testAccount411 || !testAccount706}
-                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 w-full"
-              >
-                {testRunning ? 'Envoi…' : 'Pousser l’écriture de test'}
-              </button>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-4 items-end mt-4">
-            <div>
-              <label className={LABEL_CLASS}>Client Pennylane (identifiant) — test 2 : facture importée</label>
-              <input
-                type="text"
-                value={testCustomerId}
-                onChange={(e) => setTestCustomerId(e.target.value.trim())}
-                placeholder="244601347"
-                className={INPUT_CLASS}
-              />
-              <p className={HINT_CLASS}>Importe une facture de 1,20 € avec PDF, puis tente de déplacer son écriture dans le journal.</p>
-            </div>
-            <div className="sm:col-span-2">
-              <button
-                type="button"
-                onClick={handleTestImportInvoice}
-                disabled={testRunning || !testCustomerId}
-                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 w-full"
-              >
-                {testRunning ? 'Envoi…' : 'Importer une facture de test puis déplacer l’écriture'}
-              </button>
-            </div>
-          </div>
-          {testResult && (
-            <pre className="mt-3 max-h-80 overflow-auto text-[11px] bg-secondary-50 border border-secondary-200 rounded-md p-3 whitespace-pre-wrap break-all">
-              {testResult}
-            </pre>
-          )}
-        </section>
-      )}
 
       <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
         <button

@@ -1022,51 +1022,6 @@ async function getInvoicesByClient(clientId, orgId) {
 // ============================================================================
 
 /**
- * Journaux comptables de la société Pennylane (`GET /journals`, lecture seule ici —
- * le journal « VA · Ventes automatiques » a été créé dans PL par Eric le 2026-09-22).
- * @returns {Promise<Array<{ id: number, code: string, label: string, type: string|null }>>}
- */
-async function getJournals() {
-  const result = await apiCall('GET', '/journals?limit=100');
-  const items = result?.items || result?.data || (Array.isArray(result) ? result : []);
-  return items
-    .map((j) => ({ id: j.id, code: j.code || '', label: j.label || '', type: j.type || null }))
-    .sort((a, b) => a.code.localeCompare(b.code));
-}
-
-/**
- * Déplace l'écriture comptable d'une facture dans un journal (`PUT /ledger_entries/{id}`).
- * L'API de création de facture n'a pas de champ journal : c'est le seul chemin pour
- * qu'une facture du module de facturation tombe dans le journal Majordhome, tout en
- * gardant numérotation, PDF, relances et facturation électronique côté Pennylane.
- * Throw si PL refuse (l'appelant transforme en avertissement, jamais en blocage).
- */
-async function moveLedgerEntryToJournal(ledgerEntryId, journalId) {
-  if (!ledgerEntryId || !journalId) throw new Error('ledgerEntryId et journalId requis');
-  return apiCall('PUT', `/ledger_entries/${ledgerEntryId}`, { journal_id: Number(journalId) });
-}
-
-/**
- * Pousse une écriture comptable (+ PDF) dans un journal Pennylane via l'edge
- * `pennylane-ledger-push` (org_admin). Voie « logiciel de facturation tiers » :
- * Pennylane convertit une écriture de vente en facture (spike 2026-09-22, spec hub).
- * Renvoie le détail de chaque étape (comptes résolus, pièce jointe, écriture, relecture).
- */
-async function pushLedgerEntry(body) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Non authentifié');
-  const { data, error } = await supabase.functions.invoke('pennylane-ledger-push', { body });
-  if (error) {
-    let detail = null;
-    try { detail = await error.context?.json?.(); } catch { /* corps illisible */ }
-    const err = new Error(detail?.error ? `${detail.error}${detail.step ? ` (étape ${detail.step})` : ''}` : error.message);
-    err.steps = detail?.steps || null;
-    throw err;
-  }
-  return data;
-}
-
-/**
  * Crée la facture Pennylane d'un entretien réalisé.
  *
  * Idempotent : si un mapping `pennylane_sync` de type `invoice` existe déjà pour
@@ -1923,9 +1878,6 @@ export const pennylaneService = {
   pullInvoices: (orgId, since) => withErrorHandling(() => pullInvoices(orgId, since), 'pennylane.pullInvoices'),
   getInvoicesByClient: (clientId, orgId) => withErrorHandling(() => getInvoicesByClient(clientId, orgId), 'pennylane.getInvoicesByClient'),
   createInvoiceFromEntretien: (params) => withErrorHandling(() => createInvoiceFromEntretien(params), 'pennylane.createInvoiceFromEntretien'),
-  getJournals: () => withErrorHandling(() => getJournals(), 'pennylane.getJournals'),
-  pushLedgerEntry: (body) => withErrorHandling(() => pushLedgerEntry(body), 'pennylane.pushLedgerEntry'),
-  moveLedgerEntryToJournal: (ledgerEntryId, journalId) => withErrorHandling(() => moveLedgerEntryToJournal(ledgerEntryId, journalId), 'pennylane.moveLedgerEntryToJournal'),
 
   // Config
   getLedgerAccounts: () => withErrorHandling(() => getLedgerAccounts(), 'pennylane.getLedgerAccounts'),

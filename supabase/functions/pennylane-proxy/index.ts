@@ -45,16 +45,13 @@ const MAX_RETRIES = 3;
 //     `/{id}/finalize`, `/{id}/send_by_email`… restent bloquées, spec 2026-09-21)
 // DELETE et PATCH ne sont autorisés nulle part.
 // ---------------------------------------------------------------------------
-//   - OU le chemin est `prefix/<id numérique>` et la méthode est dans `idMethods`
-//     (déplacement de l'écriture d'une facture vers le journal Majordhome :
-//     `PUT /ledger_entries/{id}` — rien d'autre sur les écritures, 2026-09-22)
-const ALLOWED_ROUTES: { prefix: string; methods: string[]; exactMethods?: string[]; idMethods?: string[] }[] = [
+// `/journals` et `PUT /ledger_entries/{id}` retirés le 2026-09-28 : le déplacement
+// d'une facture vers un journal dédié est refusé par Pennylane (422), voie close.
+const ALLOWED_ROUTES: { prefix: string; methods: string[]; exactMethods?: string[] }[] = [
   { prefix: "/customers", methods: ["GET", "POST"] },
   { prefix: "/customer_invoices", methods: ["GET"], exactMethods: ["POST"] },
   { prefix: "/quotes", methods: ["GET", "POST", "PUT"] },
   { prefix: "/ledger_accounts", methods: ["GET"] },
-  { prefix: "/journals", methods: ["GET"] },
-  { prefix: "/ledger_entries", methods: ["GET"], idMethods: ["PUT"] },
 ];
 
 function isRouteAllowed(method: string, path: string): boolean {
@@ -62,9 +59,7 @@ function isRouteAllowed(method: string, path: string): boolean {
   for (const route of ALLOWED_ROUTES) {
     if (cleanPath === route.prefix || cleanPath.startsWith(route.prefix + "/")) {
       if (route.methods.includes(method)) return true;
-      if (cleanPath === route.prefix && (route.exactMethods ?? []).includes(method)) return true;
-      const rest = cleanPath.slice(route.prefix.length + 1);
-      return /^\d+$/.test(rest) && (route.idMethods ?? []).includes(method);
+      return cleanPath === route.prefix && (route.exactMethods ?? []).includes(method);
     }
   }
   return false;

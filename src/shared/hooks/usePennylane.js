@@ -33,7 +33,6 @@ export { pennylaneKeys } from '@hooks/cacheKeys';
 // qui le prend en dépendance (vécu 2026-09-23 — cf. `useLedgerAccounts` : l'éditeur de
 // la modale Facturer se réinitialisait tout seul à chaque re-render).
 const EMPTY_LEDGER_ACCOUNTS = Object.freeze([]);
-const EMPTY_JOURNALS = Object.freeze([]);
 
 // ============================================================================
 // SYNC DEVIS
@@ -170,25 +169,6 @@ export function usePennylaneInvoices(clientId, orgId) {
  *
  * @param {string} orgId — org core
  */
-/**
- * Journaux comptables Pennylane (réglage « Journal des factures Majordhome »).
- */
-export function useJournals() {
-  const { organization } = useAuth();
-  const orgId = organization?.id;
-  const { data, isLoading, error } = useQuery({
-    queryKey: pennylaneKeys.journals(orgId),
-    queryFn: async () => {
-      const { data, error } = await pennylaneService.getJournals();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId,
-    staleTime: 24 * 60 * 60_000,
-  });
-  return { journals: data || EMPTY_JOURNALS, isLoading, error };
-}
-
 export function useCreateEntretienInvoice(orgId) {
   const queryClient = useQueryClient();
   return useMutation({
