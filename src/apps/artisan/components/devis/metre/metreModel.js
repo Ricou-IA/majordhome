@@ -22,6 +22,37 @@ export const CRITERES = {
 
 export const CRITERES_VIDES = { projet: null, appareil: null, combustible: null, zone: null, prise_air: null };
 
+/** La question de l'écran de qualification : [code, titre, sous-titre]. */
+export const PROJETS = [
+  ['creation_interieur', 'Créer un conduit dans la maison', 'Neuf, à travers les planchers et la toiture'],
+  ['creation_exterieur', 'Créer un conduit en façade', 'Neuf, le long du mur extérieur'],
+  ['tubage', 'Tuber un conduit existant', 'Boisseau maçonné ou conduit isolé en place'],
+  ['raccordement', 'Raccorder seulement', 'Le conduit existant est conforme'],
+];
+
+/** Libellés courts, en français métier, des configurations du catalogue (titre catalogue en sous-titre). */
+export const LIBELLES_COURTS = {
+  'CFG-24': 'Conduit isolé PTR30 neuf, à travers la maison',
+  'CFG-25': 'Conduit isolé PTR neuf, le long de la façade',
+  'CFG-26': 'Flexible POLYLISSE dans le conduit existant (bois)',
+  'CFG-27': 'Tubage rigide PRH / ATRINOX (bois)',
+  'CFG-28': 'Conduit concentrique PLA neuf (appareil étanche)',
+  'CFG-29': 'Sortie ventouse en façade PLA (appareil étanche)',
+  'CFG-30': 'Kit rénovation PLA dans un boisseau maçonné (appareil étanche)',
+  'CFG-31': 'Kit rénovation PLA dans un conduit isolé existant (appareil étanche)',
+  'CFG-32': 'Conduit isolé PTR neuf avec souche Polytoit',
+  'CFG-33': 'PLA à l\'intérieur + PTR en façade (appareil étanche)',
+  'CFG-34': 'Flexible POLYLISSE dans le conduit existant (pellets)',
+  'CFG-35': 'Tubage rigide PRH (pellets)',
+  'CFG-37': 'Gaine isolée POLYPERF (conduit maçonné conforme DTU 24.1)',
+  'CFG-39': 'Gaine isolée POLYPERF (épaisseur du conduit non vérifiable)',
+  'CFG-40': 'Conduit multi-flux MFI (appareil étanche, fiche appareil requise)',
+  'CFG-42': 'Foyer raccordé par les combles, souche Polytoit',
+  'CFG-43': 'Foyer raccordé au flexible POLYLISSE',
+  'CFG-45': 'Tuyau simple paroi émaillé ou acier peint',
+  'CFG-48': 'Conduit PLA pour chaudière à pellets étanche',
+};
+
 /**
  * Critères déduits de la famille d'installation choisie à l'étape 1 du devis (QUOTE_TEMPLATE_FAMILIES) :
  * on ne redemande pas ce que le devis sait déjà. Famille inconnue ⇒ rien de pré-rempli.

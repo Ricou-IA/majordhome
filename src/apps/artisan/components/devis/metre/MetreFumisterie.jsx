@@ -2,8 +2,8 @@
 // Métré assisté (plein écran, au-dessus de CreateDevisModal) : qualification → relevé → validation.
 // Les lignes validées sont injectées dans la section FUMISTERIE du devis ; le métré (relevé +
 // résultat FIGÉ + engine_version) est rendu à l'appelant, qui l'enregistre après création du devis.
-import { useMemo, useState } from 'react';
-import { X, ArrowLeft, ArrowRight, Check, Loader2, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, ArrowLeft, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -80,6 +80,16 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
     setEtape(1);
     setDraft({ etape: 1, criteres, configurationId, releve: r });
   };
+  // Cliquer une carte de configuration = la choisir ET ouvrir son relevé dès que son gabarit est chargé.
+  const [versReleve, setVersReleve] = useState(false);
+  const choisirEtContinuer = (id) => { if (id !== configurationId) setReleveState(null); setConfigurationId(id); setVersReleve(true); };
+  useEffect(() => {
+    if (!versReleve || etape !== 0 || !bundle || bundle.configuration?.id !== configurationId) return;
+    setVersReleve(false);
+    allerAuReleve();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versReleve, bundle, configurationId, etape]);
+  const fermer = () => { if (draft || releve) toast.info('Métré mis de côté : la saisie reste en brouillon sur ce lead.'); onClose(); };
   const valider = () => {
     if (!resultat || resultat.erreur) {
       const message = resultat?.erreur || 'Calcul du métré indisponible';
@@ -101,7 +111,7 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
     <div className="fixed inset-0 z-[60] bg-secondary-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-secondary-200">
         <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : bundle?.configuration?.titre}</h2></div>
-        <button type="button" onClick={() => { if (window.confirm('Quitter le métré ? La saisie en cours reste en brouillon.')) onClose(); }} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
+        <button type="button" onClick={fermer} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
       </header>
       <main className="flex-1 overflow-y-auto p-4">
         {brouillonRestaure && (
@@ -116,7 +126,7 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
         )}
         {erreurRequete ? <Blocage titre="Chargement du catalogue fumisterie impossible" message={erreurRequete.message || String(erreurRequete)} />
           : sansFournisseur ? <Blocage titre="Aucun fournisseur de fumisterie configuré (MODINOX / ALTEMA) — importer le tarif" />
-          : etape === 0 ? (confsQ.isLoading ? <Spinner /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onSelect={setConfigurationId} />)
+          : etape === 0 ? (confsQ.isLoading ? <Spinner /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onContinue={choisirEtContinuer} />)
           : (!bundle || !releve || articlesQ.isLoading || !resultat) ? <Spinner />
           : (
             <div className="space-y-4">
@@ -126,12 +136,13 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
             </div>
           )}
       </main>
-      <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
-        <button type="button" onClick={() => (etape === 0 ? onClose() : setEtape(0))} className="btn-secondary"><ArrowLeft className="w-4 h-4 mr-1" />{etape === 0 ? 'Annuler' : 'Qualification'}</button>
-        {etape === 0
-          ? <button type="button" disabled={!configurationId || bundleQ.isLoading || sansFournisseur || !!erreurRequete} onClick={allerAuReleve} className="btn-primary">Relevé <ArrowRight className="w-4 h-4 ml-1" /></button>
-          : <button type="button" disabled={!injectable} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>}
-      </footer>
+      {/* À la qualification, la carte cliquée est l'action : pas de pied, une seule sortie (la croix). */}
+      {etape === 1 && (
+        <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
+          <button type="button" onClick={() => setEtape(0)} className="btn-secondary"><ArrowLeft className="w-4 h-4 mr-1" />Changer de configuration</button>
+          <button type="button" disabled={!injectable} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>
+        </footer>
+      )}
     </div>
   );
 }
