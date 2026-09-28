@@ -27,7 +27,9 @@ const COLONNES = ['Références articles', 'Désignation Article', 'Famille N1',
   "Remise à l'article", 'Prix net', 'Prix pour client'];
 
 const q = (v) => (v == null || v === '' ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
-const n = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? 'NULL' : String(Number(v)));
+// Arrondi à 4 décimales avant sérialisation : évite le bruit flottant IEEE-754 (ex. 87.24000000000001)
+// dans le SQL généré — purchase_price_ht/tarif_public doivent porter le prix exact enregistré.
+const n = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? 'NULL' : String(Math.round(Number(v) * 10000) / 10000));
 const cell = (row, i) => { const v = row.getCell(i + 1).value; return v && typeof v === 'object' && 'result' in v ? v.result : v; };
 const normaliser = (s) => String(s ?? '').normalize('NFC').trim();
 
@@ -86,6 +88,9 @@ BEGIN
   IF v_sup IS NULL THEN
     INSERT INTO majordhome.suppliers (org_id, name, notes, is_active) VALUES (v_org, 'MODINOX / ALTEMA', 'Conduits de fumée — tarif importé par scripts/fumisterie/import-tarif-modinox.mjs', true) RETURNING id INTO v_sup;
   END IF;
+  -- ⚠️ Ne JAMAIS concaténer deux fichiers de chunk dans un seul appel execute_sql :
+  -- la temp table t_imp n'est droppée qu'au COMMIT (ON COMMIT DROP), un 2ᵉ CREATE TEMP TABLE
+  -- dans la même transaction échouerait sur "relation t_imp already exists".
   CREATE TEMP TABLE t_imp (reference text, name text, code_famille text, gamme text, code_ean text, tarif_public numeric, taux_remise numeric,
     purchase_price_ht numeric, unit text, diametre text,
     famille_n1 text, libelle_n1 text, famille_n2 text, libelle_n2 text, famille_n3 text, famille_n4 text, gamme_tarif text, type_piece text,
