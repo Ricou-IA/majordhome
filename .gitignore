@@ -12,6 +12,7 @@ dist/
 dist-ssr/
 build/
 *.local
+scripts/fumisterie/out/
 
 # =============================================================================
 # ENVIRONMENT VARIABLES
