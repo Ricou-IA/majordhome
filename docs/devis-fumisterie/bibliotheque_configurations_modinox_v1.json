@@ -1,0 +1,1808 @@
+{
+  "_meta": {
+    "source": "Catalogue MODINOX / ALTEMA - Conduit de cheminée - Édition 2026",
+    "url_catalogue": "https://catalogues.altema.pro/html/catalogue_modinox_1048/",
+    "url_image_page": "https://it4resources.interactiv-doc.fr/catalogues/catalogue_modinox_1048/pages/page{index}.png",
+    "regle_index": "index image = numéro de page imprimé + 2",
+    "version_schema": "1.1",
+    "date_extraction": "2026-09-28",
+    "perimetre": "Section 'Configurations types' p.20 à 49 - périmètre bois bûches + granulés uniquement : 19 configurations + guide de choix + règles POLYPERF / MFI / conduit extérieur / chaudière pellets",
+    "legende_statuts": {
+      "catalogue": "lu directement sur la page du catalogue",
+      "deduit": "déduit par Claude (croisement avec le guide de choix ou le schéma) - À CONFIRMER",
+      "propose": "proposé par Claude pour le métré - À VALIDER par un installateur Mayer Énergie",
+      "a_completer": "information absente du catalogue - savoir-faire interne ou fiches produits"
+    },
+    "lecture_pictogrammes": {
+      "prise_air_dans_piece": "pictogramme maison + flèches bleues entrant en bas à gauche",
+      "prise_air_dans_conduit": "pictogramme maison + flèches rouge ET bleue en haut du conduit",
+      "note": "Interprétation des pictogrammes par Claude, cohérente avec la légende p.22"
+    },
+    "format_references_observe": {
+      "source": "Fiche appareil MFI p.41",
+      "exemples": {
+        "2MFIT135150AF100": "MFI té 135° Ø150 piquage air Ø100",
+        "2PLAMAFF100": "Manchon F-F Ø100 (gamme PLA)",
+        "2PRWCO45100": "PRH coude 45° Ø100",
+        "2PRWTUYA100330": "PRH élément droit Lg330 Ø100",
+        "2PRWTUYR100500": "PRH élément réglable Ø100"
+      },
+      "suffixe_NO": "variante noire (ex. 2PRWCO45100NO)",
+      "interet": "Les codes encodent gamme + type + diamètre + longueur : exploitable pour le mapping composant -> article"
+    },
+    "exclusions": "Configurations gaz retirées (p.46 et p.47) - Mayer Énergie ne traite ni gaz ni fioul"
+  },
+  "referentiels": {
+    "appareils": {
+      "chaudiere": "Chaudière",
+      "foyer_insert": "Foyer ou insert",
+      "poele_cuisiniere": "Poêle ou cuisinière"
+    },
+    "combustibles": {
+      "bois_buches": "Bois bûches",
+      "pellets": "Pellets / granulés"
+    },
+    "prise_air": {
+      "dans_conduit": "Air comburant pris directement dans le conduit (appareil étanche : concentrique, multiflux, ou tubage avec air en périphérie)",
+      "dans_piece": "Air pris dans la pièce, via une arrivée d'air indépendante depuis l'extérieur (grille, kit air frais, plaque vide sanitaire...)"
+    },
+    "projets": {
+      "creation_exterieur": "Création de conduit extérieur (le long de la façade)",
+      "creation_interieur": "Création de conduit intérieur",
+      "tubage": "Tubage flexible ou rigide d'un conduit existant",
+      "raccordement": "Raccordement de l'appareil au conduit"
+    },
+    "zones": {
+      "zone_1": {
+        "definition": "Évacuation au-dessus du toit à plus de 40 cm du faîtage (pente > 15°) ou à plus de 120 cm du faîtage (toit plat)",
+        "appareils_autorises": "Tous les appareils",
+        "statut": "catalogue",
+        "page": 23
+      },
+      "zone_2": {
+        "definition": "Évacuation au-dessus du toit, entre la gouttière et le faîtage",
+        "appareils_autorises": "Uniquement certains appareils étanches, sous certaines conditions",
+        "statut": "catalogue",
+        "page": 23,
+        "conditions": "a_completer - avis technique de l'appareil ; chapitre PLA p.80-89 (référencé p.48)"
+      },
+      "zone_3": {
+        "definition": "Évacuation en façade (ventouse)",
+        "appareils_autorises": "Uniquement certains appareils étanches, sous certaines conditions",
+        "statut": "catalogue",
+        "page": 23,
+        "conditions": "a_completer - chapitre PLA p.80-89 (référencé p.48)"
+      }
+    },
+    "questions_metre_par_projet": {
+      "statut": "propose",
+      "communes": [
+        "Marque / modèle de l'appareil et diamètre de buse (fumées, et air si étanche) ?",
+        "Appareil étanche sous avis technique ? (obligatoire pour prise d'air dans le conduit, zone 2 et zone 3)",
+        "Position de la sortie : zone 1, 2 ou 3 ?"
+      ],
+      "creation_interieur": [
+        "Hauteur sous plafond de la pièce de l'appareil ?",
+        "Nombre de planchers traversés et épaisseur de chacun ?",
+        "Hauteur des combles (longueur de conduit dans les combles) ?",
+        "Dévoiement nécessaire ? Angle (15/30/45°) et décalage horizontal ?",
+        "Type de couverture et pente de toiture ?",
+        "Hauteur de conduit au-dessus de la toiture pour respecter la zone ?",
+        "Finition souhaitée (inox, noir, souche Polytoit) ?"
+      ],
+      "creation_exterieur": [
+        "Hauteur totale de la façade jusqu'à la sortie (sol -> faîtage + dépassement) ?",
+        "Traversée de mur : épaisseur et nature du mur ?",
+        "Débord de toiture à contourner ? (coudes)",
+        "Hauteur libre au-dessus du dernier point de fixation (au-delà de 3 m : haubanage) ?",
+        "Couleur finition (inox / noir) ?"
+      ],
+      "tubage": [
+        "Longueur du conduit existant (du plafond / de la hotte au sommet de la souche) ?",
+        "Section intérieure du conduit existant (cm x cm ou Ø) ?",
+        "Nature du conduit existant (maçonné brique, boisseau, GI-DI, PTR...) ?",
+        "Épaisseur du conduit vérifiable ? Distance aux matériaux combustibles ?",
+        "Dévoiements dans le conduit existant ?",
+        "État de la souche (plaque de couronnement possible ?) ?"
+      ],
+      "raccordement": [
+        "Distance verticale sortie appareil -> plafond / départ conduit ?",
+        "Longueur horizontale et nombre de coudes ?",
+        "Finition simple paroi : émaillé 1,2 mm, émaillé 0,7 mm, acier peint 2 mm, PRH, ATRINOX ?",
+        "Couleur (noir / inox) ?"
+      ]
+    }
+  },
+  "guide_de_choix_gammes": {
+    "_description": "Matrice combustible x type d'évacuation -> gammes Modinox compatibles. Cellule vide = pas de solution proposée. Périmètre Mayer Énergie : bois bûches et granulés uniquement (lignes gaz, fioul, charbon retirées).",
+    "statut": "catalogue",
+    "page": 49,
+    "colonnes": [
+      "raccordement_double_paroi",
+      "raccordement_simple_paroi",
+      "tubage_flexible",
+      "tubage_simple_paroi",
+      "carneau_double_paroi",
+      "carneau_simple_paroi",
+      "conduit_exterieur_double_paroi",
+      "conduit_interieur_double_paroi",
+      "conduit_interieur_simple_paroi"
+    ],
+    "lignes": {
+      "bois_chaudiere_poele_buches": {
+        "raccordement_double_paroi": [
+          "PTR30",
+          "MFI"
+        ],
+        "raccordement_simple_paroi": [
+          "ÉMAILLÉ",
+          "ATRINOX",
+          "PRH"
+        ],
+        "tubage_flexible": [
+          "POLYLISSE XT",
+          "POLYLISSE ISOLÉ",
+          "POLYPERF"
+        ],
+        "tubage_simple_paroi": [
+          "ATRINOX",
+          "PRH"
+        ],
+        "carneau_double_paroi": [
+          "PTR30"
+        ],
+        "carneau_simple_paroi": [
+          "ATRINOX OVALISÉ",
+          "PRH"
+        ],
+        "conduit_exterieur_double_paroi": [
+          "PTR30",
+          "MFI"
+        ],
+        "conduit_interieur_double_paroi": [
+          "POLYPERF",
+          "PTR30",
+          "MFI"
+        ],
+        "conduit_interieur_simple_paroi": []
+      },
+      "bois_foyer_ouvert_ferme_insert": {
+        "raccordement_double_paroi": [
+          "PTR30",
+          "MFI"
+        ],
+        "raccordement_simple_paroi": [
+          "ATRINOX",
+          "PRH"
+        ],
+        "tubage_flexible": [
+          "POLYLISSE XT",
+          "POLYLISSE ISOLÉ",
+          "POLYPERF"
+        ],
+        "tubage_simple_paroi": [
+          "ATRINOX",
+          "PRH"
+        ],
+        "carneau_double_paroi": [
+          "PTR30"
+        ],
+        "carneau_simple_paroi": [
+          "ATRINOX OVALISÉ",
+          "PRH"
+        ],
+        "conduit_exterieur_double_paroi": [
+          "PTR30",
+          "MFI"
+        ],
+        "conduit_interieur_double_paroi": [
+          "POLYPERF",
+          "PTR30",
+          "MFI"
+        ],
+        "conduit_interieur_simple_paroi": []
+      },
+      "bois_pellets_granules": {
+        "raccordement_double_paroi": [
+          "PLA"
+        ],
+        "raccordement_simple_paroi": [
+          "ÉMAILLÉ PELLET",
+          "PRH"
+        ],
+        "tubage_flexible": [
+          "POLYLISSE XT",
+          "POLYLISSE ISOLÉ",
+          "POLYPERF"
+        ],
+        "tubage_simple_paroi": [
+          "PRH"
+        ],
+        "carneau_double_paroi": [
+          "PLA"
+        ],
+        "carneau_simple_paroi": [
+          "PRH"
+        ],
+        "conduit_exterieur_double_paroi": [
+          "PTR30"
+        ],
+        "conduit_interieur_double_paroi": [
+          "POLYPERF",
+          "PLA"
+        ],
+        "conduit_interieur_simple_paroi": []
+      }
+    }
+  },
+  "regles_techniques": [
+    {
+      "id": "R-POLYPERF-01",
+      "gamme": "POLYPERF",
+      "page": 36,
+      "statut": "catalogue",
+      "regle": "Installation dans un conduit existant thermiquement satisfaisant selon NF DTU 24.1 : distance de sécurité de 100 mm minimum aux matériaux combustibles, mesurée depuis la face extérieure du conduit existant (conduit maçonné non isolé).",
+      "reference": "DTA CSTB n°14.2/20-2290_V2 publié le 09/07/2024"
+    },
+    {
+      "id": "R-POLYPERF-02",
+      "gamme": "POLYPERF",
+      "page": 36,
+      "statut": "catalogue",
+      "regle": "Finition basse avec le kit de raccordement boisseau : jusqu'au Ø150 uniquement."
+    },
+    {
+      "id": "R-POLYPERF-03",
+      "gamme": "POLYPERF",
+      "page": 38,
+      "statut": "catalogue",
+      "regle": "Épaisseur du conduit maçonné non vérifiable : installation possible selon NF EN 15287-1, avec 40 mm minimum mesurés depuis la face extérieure du conduit existant, désignation d'ouvrage T450 G."
+    },
+    {
+      "id": "R-POLYPERF-04",
+      "gamme": "POLYPERF",
+      "page": 38,
+      "statut": "catalogue",
+      "regle": "Conduit en brique d'épaisseur vérifiable : distance de 80 mm minimum aux matériaux combustibles, mesurée depuis la face intérieure du conduit existant. Épaisseur >= 80 mm : aucune distance de sécurité requise. Épaisseur 60 mm : distance requise 20 mm."
+    },
+    {
+      "id": "R-POLYPERF-05",
+      "gamme": "POLYPERF",
+      "page": 38,
+      "statut": "catalogue",
+      "regle": "Le kit bas s'utilise avec un raccord simple paroi et une plaque d'habillage ventilée blanche ou noire."
+    },
+    {
+      "id": "R-MFI-01",
+      "gamme": "MFI",
+      "page": 41,
+      "statut": "catalogue",
+      "regle": "Raccordement d'un appareil en MFI : l'appareil doit avoir été testé par le laboratoire d'essai Modinox (fiche appareil). Se rapprocher de l'agence ALTEMA pour les appareils validés. Gamme MFI sous DTA n°14/16-2231, Ø150/250.",
+      "consequence_devis": "Hermes doit bloquer toute config MFI si l'appareil n'a pas de fiche appareil Modinox."
+    },
+    {
+      "id": "R-MFI-02",
+      "gamme": "MFI",
+      "page": 41,
+      "statut": "catalogue",
+      "regle": "Dimensionnement du conduit d'amenée d'air et d'évacuation selon NF EN 13384-1 (fonctionnement sans condensation en régime nominal et réduit). Installation dans le respect du DTU 24.1."
+    },
+    {
+      "id": "R-EXT-01",
+      "gamme": "PLA/PTR",
+      "page": 33,
+      "statut": "catalogue",
+      "regle": "Conduit extérieur : solution de non-haubanage jusqu'à 3 m au-dessus du dernier support ; au-delà, haubanage obligatoire."
+    },
+    {
+      "id": "R-CHAUDIERE-PELLETS-01",
+      "gamme": "PLA",
+      "page": 48,
+      "statut": "catalogue",
+      "regle": "Chaudières à pellets étanches : préconisations validées par fabricant et modèle (voir configuration CFG-48). Zones 1, 2 ou 3 : voir pages 80 à 89 du catalogue."
+    }
+  ],
+  "configurations": [
+    {
+      "id": "CFG-24-CREATION-INT-PTR30-BUCHE",
+      "titre": "Créer un conduit intérieur vertical avec la gamme de conduit isolé PTR 30 sur un appareil à bois bûche",
+      "page_catalogue": 24,
+      "index_image": 26,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_interieur"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "PTR30",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur",
+          "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI",
+          "gamme": "PTR30"
+        },
+        {
+          "ordre": 2,
+          "position": "au-dessus de la toiture",
+          "composant": "Élément droit laqué noir",
+          "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI",
+          "gamme": "PTR30"
+        },
+        {
+          "ordre": 3,
+          "position": "traversée de toiture",
+          "composant": "Solin",
+          "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI",
+          "gamme": "PTR30"
+        },
+        {
+          "ordre": 4,
+          "position": "combles (dévoiement)",
+          "composant": "Élément coudé avec collier",
+          "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI",
+          "gamme": "PTR30"
+        },
+        {
+          "ordre": 5,
+          "position": "traversée de plancher",
+          "composant": "Kit RT2012",
+          "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI",
+          "gamme": "PTR30",
+          "note": "2 traversées sur le schéma"
+        },
+        {
+          "ordre": 6,
+          "position": "raccordement appareil",
+          "composant": "Élément droit simple paroi (Émaillé 1,2 mm / Acier peint 2 mm)",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": "ÉMAILLÉ"
+        }
+      ]
+    },
+    {
+      "id": "CFG-25-CREATION-EXT-PTR-BUCHE",
+      "titre": "Créer un conduit extérieur vertical avec la gamme de conduit isolé PTR",
+      "page_catalogue": 25,
+      "index_image": 27,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_exterieur"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "PTR",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 2,
+          "position": "le long de la façade",
+          "composant": "Conduit double paroi isolé inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 3,
+          "position": "fixations façade",
+          "composant": "Collier mural inox ou support mural (selon hauteur)",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 4,
+          "position": "départ en façade",
+          "composant": "Support mural inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 5,
+          "position": "pied de conduit",
+          "composant": "Té 90° inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 6,
+          "position": "bas du té",
+          "composant": "Purge inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 7,
+          "position": "traversée du mur",
+          "composant": "Kit RT2012 avec plaques de propreté inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        }
+      ],
+      "remarques": "Raccordement intérieur appareil -> traversée murale non détaillé sur la page (à compléter)."
+    },
+    {
+      "id": "CFG-26-TUBAGE-POLYLISSE-BUCHE",
+      "titre": "Tuber un conduit vertical existant avec du flexible POLYLISSE (bois bûche)",
+      "page_catalogue": 26,
+      "index_image": 28,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "POLYLISSE XT",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau plat sur collier",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 2,
+          "position": "haut de souche",
+          "composant": "Collerette de solin + Plaque de couronnement",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 3,
+          "position": "haut de souche",
+          "composant": "Collier de tubage gaine",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 4,
+          "position": "dans le conduit existant",
+          "composant": "Tubage flexible Polylisse XT + embout de finition",
+          "chapitre": "FLEXIBLES",
+          "gamme": "POLYLISSE XT"
+        },
+        {
+          "ordre": 5,
+          "position": "bas du conduit",
+          "composant": "RDE (Raccord Double Emboîtement)",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 6,
+          "position": "plafond",
+          "composant": "Plaque d'habillage ventilée",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 7,
+          "position": "raccordement appareil",
+          "composant": "Raccordement simple paroi Émaillé 1,2 mm ou 0,7 mm ou Acier peint 2 mm",
+          "chapitre": "SIMPLE PAROI"
+        }
+      ]
+    },
+    {
+      "id": "CFG-27-TUBAGE-RIGIDE-PRH-ATRINOX-BUCHE",
+      "titre": "Tuber un conduit vertical existant avec du conduit rigide PRH ou ATRINOX",
+      "page_catalogue": 27,
+      "index_image": 29,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "PRH ou ATRINOX",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur PRH ou ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": [
+            "PRH",
+            "ATRINOX"
+          ]
+        },
+        {
+          "ordre": 2,
+          "position": "haut de souche",
+          "composant": "Collerette de solin + Plaque de couronnement",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 3,
+          "position": "dans le conduit existant",
+          "composant": "Élément droit PRH ou ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": [
+            "PRH",
+            "ATRINOX"
+          ]
+        },
+        {
+          "ordre": 4,
+          "position": "traversée de plancher",
+          "composant": "Traversée ventilée",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 5,
+          "position": "sous plancher / hotte",
+          "composant": "Support mural ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": "ATRINOX"
+        },
+        {
+          "ordre": 6,
+          "position": "dans la hotte",
+          "composant": "Coude coulissant ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": "ATRINOX"
+        },
+        {
+          "ordre": 7,
+          "position": "sortie de l'appareil",
+          "composant": "Manchon de raccordement sur buse PRH ou ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": [
+            "PRH",
+            "ATRINOX"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CFG-28-CREATION-INT-PLA-PELLETS-ETANCHE",
+      "titre": "Créer un conduit intérieur vertical avec la gamme de conduit concentrique PLA sur un appareil étanche sous avis technique",
+      "page_catalogue": 28,
+      "index_image": 30,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_interieur"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1",
+          "zone_2"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true
+      },
+      "gamme_principale": "PLA",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 2,
+          "position": "traversée de toiture",
+          "composant": "Collerette de solin + collier",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 3,
+          "position": "traversée de toiture",
+          "composant": "Solin",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 4,
+          "position": "combles",
+          "composant": "Élément droit",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 5,
+          "position": "traversée de plancher",
+          "composant": "Kit RT2012",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 6,
+          "position": "plafond",
+          "composant": "Plaque de propreté laquée blanche",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 7,
+          "position": "raccordement appareil - fumées",
+          "composant": "Té piquage fumée",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 8,
+          "position": "raccordement appareil - air",
+          "composant": "Té piquage air",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        }
+      ]
+    },
+    {
+      "id": "CFG-29-CREATION-INT-HORIZONTAL-PLA-ZONE3",
+      "titre": "Créer un conduit intérieur horizontal avec la gamme de conduit concentrique PLA sur un appareil étanche sous avis technique (ventouse)",
+      "page_catalogue": 29,
+      "index_image": 31,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_interieur"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_3"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true,
+        "sortie": "horizontale en façade"
+      },
+      "gamme_principale": "PLA",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie façade",
+          "composant": "Terminal horizontal",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 2,
+          "position": "traversée de mur",
+          "composant": "Élément droit",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 3,
+          "position": "mur intérieur",
+          "composant": "Rosaces de finition",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 4,
+          "position": "changement de direction",
+          "composant": "Coude 90°",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 5,
+          "position": "raccordement appareil - fumées",
+          "composant": "Té piquage fumée",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 6,
+          "position": "raccordement appareil - air",
+          "composant": "Té piquage air",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        }
+      ],
+      "remarques": "Prise d'air non représentée par pictogramme ; déduite du principe concentrique (statut: deduit). Conditions de zone 3 à récupérer p.80-89."
+    },
+    {
+      "id": "CFG-30-TUBAGE-MACONNE-KIT-PLA-PELLETS-ETANCHE",
+      "titre": "Tuber un conduit existant maçonné vertical avec kit rénovation PLA sur un appareil étanche sous avis technique",
+      "page_catalogue": 30,
+      "index_image": 32,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1",
+          "zone_2"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true,
+        "conduit_existant": "maçonné vertical"
+      },
+      "gamme_principale": "PLA (kit rénovation) + POLYLISSE XT",
+      "principe": "Fumées dans la gaine Polylisse XT, air comburant dans l'espace annulaire entre la gaine et le conduit maçonné.",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 2,
+          "position": "haut de cheminée",
+          "composant": "Adaptateur sur gaine flexible - haut de cheminée",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 3,
+          "position": "dans le conduit existant",
+          "composant": "Gaine Polylisse XT",
+          "chapitre": "FLEXIBLES",
+          "gamme": "POLYLISSE XT"
+        },
+        {
+          "ordre": 4,
+          "position": "niveau plafond",
+          "composant": "Adaptateur sur gaine flexible - niveau plafond",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 5,
+          "position": "raccordement",
+          "composant": "Élément droit inox",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 6,
+          "position": "raccordement appareil - fumées",
+          "composant": "Té piquage fumée",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 7,
+          "position": "raccordement appareil - air",
+          "composant": "Té piquage air inox",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        }
+      ],
+      "conditions": "a_completer - section minimale du conduit existant pour l'espace annulaire."
+    },
+    {
+      "id": "CFG-31-TUBAGE-GIDI-PTR-KIT-PLA-PELLETS-ETANCHE",
+      "titre": "Tuber un conduit isolé GI-DI ou PTR existant vertical avec kit rénovation PLA sur un appareil étanche sous avis technique",
+      "page_catalogue": 31,
+      "index_image": 33,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1",
+          "zone_2"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true,
+        "conduit_existant": "isolé GI-DI ou PTR"
+      },
+      "gamme_principale": "PLA (kit rénovation) + POLYLISSE XT",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de souche",
+          "composant": "Adaptateur chapeau GI-DI et PTR/Flexible",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 2,
+          "position": "toiture",
+          "composant": "Souche Polytoit",
+          "chapitre": "SOUCHES DE TOIT",
+          "gamme": "POLYTOIT",
+          "note": "présente sur le schéma (souche existante possible)"
+        },
+        {
+          "ordre": 3,
+          "position": "dans le conduit existant",
+          "composant": "Gaine Polylisse XT",
+          "chapitre": "FLEXIBLES",
+          "gamme": "POLYLISSE XT"
+        },
+        {
+          "ordre": 4,
+          "position": "traversée de plancher",
+          "composant": "Kit RT2012",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 5,
+          "position": "sous plafond",
+          "composant": "Adaptateur fixe PLA noir sur GI-DI et PTR",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 6,
+          "position": "raccordement",
+          "composant": "Élément droit",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 7,
+          "position": "raccordement appareil - fumées",
+          "composant": "Té piquage fumée",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 8,
+          "position": "raccordement appareil - air",
+          "composant": "Té piquage air",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        }
+      ]
+    },
+    {
+      "id": "CFG-32-CREATION-INT-PTR-BUCHE-PELLETS",
+      "titre": "Créer un conduit intérieur vertical de la gamme de conduit isolé PTR (souche Polytoit)",
+      "page_catalogue": 32,
+      "index_image": 34,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_interieur"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches",
+          "pellets"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false,
+        "restriction": "pellets : poêle uniquement ; bûches : foyer/insert ou poêle (2 pictogrammes distincts sur la page)"
+      },
+      "gamme_principale": "PTR",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "toiture",
+          "composant": "Souche Polytoit",
+          "chapitre": "SOUCHES DE TOIT",
+          "gamme": "POLYTOIT"
+        },
+        {
+          "ordre": 2,
+          "position": "combles",
+          "composant": "Conduit double paroi isolé",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 3,
+          "position": "traversée de plancher",
+          "composant": "Kit RT2012",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "note": "chapitre indiqué tel quel sur la page"
+        },
+        {
+          "ordre": 4,
+          "position": "plafond",
+          "composant": "Solutions de finitions (cache raccord, élément de départ...)",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 5,
+          "position": "raccordement appareil",
+          "composant": "Raccordement simple paroi Émaillé 1,2 mm Ligne+ ou 0,7 mm Mat+",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 6,
+          "position": "arrivée d'air appareil",
+          "composant": "Kit entrée d'air",
+          "chapitre": "AIR CHAUD / AIR FRAIS"
+        }
+      ]
+    },
+    {
+      "id": "CFG-33-CREATION-EXT-PLA-PTR-PELLETS-ETANCHE",
+      "titre": "Créer un conduit extérieur vertical PLA/PTR sur un appareil étanche sous avis technique",
+      "page_catalogue": 33,
+      "index_image": 35,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_exterieur"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1",
+          "zone_2"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true
+      },
+      "gamme_principale": "PLA (intérieur / traversée) + PTR (façade)",
+      "regles_associees": [
+        "R-EXT-01"
+      ],
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 2,
+          "position": "haut du conduit",
+          "composant": "Collier multifonction",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 3,
+          "position": "fixations façade",
+          "composant": "Collier mural inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 4,
+          "position": "le long de la façade",
+          "composant": "Conduit double paroi isolé inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 5,
+          "position": "départ en façade",
+          "composant": "Support mural inox",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR"
+        },
+        {
+          "ordre": 6,
+          "position": "pied de conduit",
+          "composant": "Té prise d'air PLA/PTR inox",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA/PTR"
+        },
+        {
+          "ordre": 7,
+          "position": "bas du té",
+          "composant": "Purge inox",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 8,
+          "position": "traversée du mur",
+          "composant": "Kit RT2012",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 9,
+          "position": "traversée du mur",
+          "composant": "Élément droit inox",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 10,
+          "position": "raccordement appareil",
+          "composant": "Pièce de piquage air / fumée inox",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        }
+      ]
+    },
+    {
+      "id": "CFG-34-TUBAGE-POLYLISSE-PELLETS",
+      "titre": "Tuber un conduit vertical existant avec le flexible POLYLISSE (pellets)",
+      "page_catalogue": 34,
+      "index_image": 36,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "POLYLISSE XT",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau plat sur collier (+ option grillage anti-volatile)",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 2,
+          "position": "haut de souche",
+          "composant": "Collerette de solin + Plaque de couronnement",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 3,
+          "position": "haut de souche",
+          "composant": "Collier de tubage gaine",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 4,
+          "position": "dans le conduit existant",
+          "composant": "Tubage flexible Polylisse XT + embout de finition",
+          "chapitre": "FLEXIBLES",
+          "gamme": "POLYLISSE XT"
+        },
+        {
+          "ordre": 5,
+          "position": "bas du conduit",
+          "composant": "RDE (Raccord Double Emboîtement)",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 6,
+          "position": "plafond",
+          "composant": "Plaque d'habillage ventilée",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 7,
+          "position": "raccordement appareil",
+          "composant": "Raccordement simple paroi Émaillé 1,2 mm ou 0,7 mm",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 8,
+          "position": "arrivée d'air appareil",
+          "composant": "Kit entrée d'air",
+          "chapitre": "AIR CHAUD / AIR FRAIS"
+        }
+      ]
+    },
+    {
+      "id": "CFG-35-TUBAGE-RIGIDE-PRH-PELLETS",
+      "titre": "Tuber un conduit vertical existant avec du tubage rigide PRH (pellets)",
+      "page_catalogue": 35,
+      "index_image": 37,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "PRH",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur PRH Pellets",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": "PRH"
+        },
+        {
+          "ordre": 2,
+          "position": "haut de souche",
+          "composant": "Collerette de solin + Plaque de couronnement",
+          "chapitre": "FLEXIBLES"
+        },
+        {
+          "ordre": 3,
+          "position": "dans le conduit existant",
+          "composant": "Élément droit PRH",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": "PRH"
+        },
+        {
+          "ordre": 4,
+          "position": "traversée de plancher",
+          "composant": "Traversée ventilée",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 5,
+          "position": "sortie de l'appareil",
+          "composant": "Manchon de raccordement sur buse",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": "PRH"
+        }
+      ]
+    },
+    {
+      "id": "CFG-37-TUBAGE-POLYPERF-DTU241",
+      "titre": "Tuber un conduit vertical maçonné existant thermiquement satisfaisant selon la norme française DTU 24.1 avec le flexible isolé POLYPERF",
+      "page_catalogue": 37,
+      "index_image": 39,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets",
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false,
+        "conduit_existant": "maçonné, thermiquement satisfaisant DTU 24.1"
+      },
+      "gamme_principale": "POLYPERF",
+      "regles_associees": [
+        "R-POLYPERF-01",
+        "R-POLYPERF-02",
+        "R-POLYPERF-04"
+      ],
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Chapeau pour gaine (au choix : standard, plat sur manchette, plat à visser)",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 2,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Collerette",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 3,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Plaque de couronnement",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 4,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Collier pour gaine",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 5,
+          "groupe": "flexible",
+          "composant": "Pièce de finition haute",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 6,
+          "groupe": "flexible",
+          "composant": "Gaine isolée Polyperf",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 7,
+          "groupe": "flexible",
+          "composant": "Pièce de finition basse",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 8,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Raccord RDE (raccordement du flexible avec le tuyau de poêle) + Plaque d'habillage ventilée",
+          "choix": "option A"
+        },
+        {
+          "ordre": 9,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Kit de raccordement boisseau bas sur simple paroi",
+          "choix": "option B",
+          "note": "jusqu'au Ø150 uniquement (R-POLYPERF-02)"
+        },
+        {
+          "ordre": 10,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Raccord GRIFFAFLEX (raccordement du flexible sur la buse du foyer)",
+          "choix": "option C"
+        },
+        {
+          "ordre": 11,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Té 90° pour flexible + tampon (piquage haut avec doublure à l'emboîtement)",
+          "choix": "option D"
+        }
+      ],
+      "remarques": "Les accessoires bas sont des alternatives ('ou') : Hermes doit en proposer une seule selon le type de raccordement."
+    },
+    {
+      "id": "CFG-39-TUBAGE-POLYPERF-EPAISSEUR-NON-VERIFIABLE",
+      "titre": "Tuber un conduit vertical maçonné existant dont l'épaisseur ne peut pas être vérifiée avec le flexible isolé POLYPERF",
+      "page_catalogue": 39,
+      "index_image": 41,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "tubage"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "pellets",
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1"
+        ],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false,
+        "conduit_existant": "maçonné, épaisseur non vérifiable"
+      },
+      "gamme_principale": "POLYPERF",
+      "regles_associees": [
+        "R-POLYPERF-03",
+        "R-POLYPERF-05"
+      ],
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Chapeau pour gaine (au choix : standard, plat sur manchette, plat à visser)",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 2,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Collerette",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 3,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Plaque de couronnement",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 4,
+          "groupe": "accessoires haut de conduit",
+          "composant": "Collier pour gaine",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 5,
+          "groupe": "flexible",
+          "composant": "Pièce de finition",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 6,
+          "groupe": "flexible",
+          "composant": "Gaine isolée Polyperf",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 7,
+          "groupe": "flexible",
+          "composant": "Adaptateur sur accessoire isolé",
+          "gamme": "POLYPERF"
+        },
+        {
+          "ordre": 8,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Kit bas pour plaque ventilée (raccord simple paroi + plaque ventilée)",
+          "choix": "option A"
+        },
+        {
+          "ordre": 9,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Raccord simple paroi laqué",
+          "choix": "option B"
+        },
+        {
+          "ordre": 10,
+          "groupe": "accessoires bas de conduit",
+          "composant": "Té 90° isolé",
+          "choix": "option C"
+        }
+      ]
+    },
+    {
+      "id": "CFG-40-CREATION-RACCORD-MFI-BUCHE-ETANCHE",
+      "titre": "Créer et raccorder un appareil étanche avec un conduit multi flux isolé MFI",
+      "page_catalogue": 40,
+      "index_image": 42,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_interieur",
+          "creation_exterieur",
+          "raccordement"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [
+          "zone_1",
+          "zone_2"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true,
+        "condition_bloquante": "appareil testé par le laboratoire Modinox (fiche appareil) - R-MFI-01"
+      },
+      "gamme_principale": "MFI",
+      "regles_associees": [
+        "R-MFI-01",
+        "R-MFI-02"
+      ],
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "sortie de toit",
+          "composant": "Chapeau anti-refouleur MFI",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 2,
+          "position": "au-dessus de la toiture",
+          "composant": "Élément droit MFI inox",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 3,
+          "position": "traversée de toiture",
+          "composant": "Collerette de solin + joint + Solin",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 4,
+          "position": "combles / intérieur",
+          "composant": "Élément droit MFI galva",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 5,
+          "position": "traversées de plancher/plafond",
+          "composant": "Kit RT2012",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 6,
+          "position": "pièce de l'appareil",
+          "composant": "Élément droit MFI galvé laqué",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 7,
+          "position": "raccordement appareil",
+          "composant": "Té 135° piquage air et fumées inox laqué noir",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        },
+        {
+          "ordre": 8,
+          "position": "sortie de l'appareil",
+          "composant": "Kit de raccordement (pièce spécifique à l'appareil, raccordé par le dessus)",
+          "chapitre": "TRIPLE PAROI",
+          "gamme": "MFI"
+        }
+      ],
+      "exemple_fiche_appareil": {
+        "page": 41,
+        "composants_types": [
+          "MFI té fumée 135° Ø150 piquage air Ø100",
+          "Kit de raccordement spécifique Ø150",
+          "Manchon F-F Ø100",
+          "PRH coude 45° Ø100",
+          "PRH élément droit Lg330 Ø100",
+          "PRH élément réglable Ø100",
+          "Coude spécifique Ø100 (inclus dans le kit)"
+        ],
+        "note": "La nomenclature exacte dépend de la fiche appareil ; à intégrer par modèle d'appareil validé."
+      }
+    },
+    {
+      "id": "CFG-42-RACCORDEMENT-FOYER-ATRINOX",
+      "titre": "Raccorder un foyer bois avec la gamme de conduit rigide ATRINOX",
+      "page_catalogue": 42,
+      "index_image": 44,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "raccordement"
+        ],
+        "appareils": [
+          "foyer_insert"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "ATRINOX ou PRH (simple paroi) + double paroi isolé dans les combles",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "toiture",
+          "composant": "Souche Polytoit",
+          "chapitre": "SOUCHES DE TOIT",
+          "gamme": "POLYTOIT"
+        },
+        {
+          "ordre": 2,
+          "position": "combles",
+          "composant": "Conduit double paroi isolé",
+          "chapitre": "DOUBLE PAROI",
+          "gamme": "PTR30",
+          "statut_gamme": "deduit"
+        },
+        {
+          "ordre": 3,
+          "position": "traversée de plancher",
+          "composant": "Kit RT2012",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 4,
+          "position": "sous plafond / hotte",
+          "composant": "Raccord simple paroi",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 5,
+          "position": "dans la hotte",
+          "composant": "Élément droit PRH ou ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": [
+            "PRH",
+            "ATRINOX"
+          ]
+        },
+        {
+          "ordre": 6,
+          "position": "sortie du foyer",
+          "composant": "Manchon de raccordement PRH ou ATRINOX",
+          "chapitre": "SIMPLE PAROI",
+          "gamme": [
+            "PRH",
+            "ATRINOX"
+          ]
+        }
+      ],
+      "remarques": "Pas de pictogramme de zone (raccordement seul). La souche Polytoit implique une sortie en zone 1."
+    },
+    {
+      "id": "CFG-43-RACCORDEMENT-FOYER-POLYLISSE",
+      "titre": "Raccorder un foyer bois avec la gamme de conduit flexible POLYLISSE",
+      "page_catalogue": 43,
+      "index_image": 45,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "raccordement"
+        ],
+        "appareils": [
+          "foyer_insert",
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches"
+        ],
+        "zones": [],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "POLYLISSE",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "dans le conduit",
+          "composant": "Gaine Polylisse",
+          "chapitre": "FLEXIBLES",
+          "gamme": "POLYLISSE"
+        },
+        {
+          "ordre": 2,
+          "position": "sortie du foyer",
+          "composant": "Raccord Griffaflex",
+          "chapitre": "FLEXIBLES"
+        }
+      ],
+      "remarques": "Page centrée sur le raccordement : accessoires de haut de conduit non détaillés (reprendre ceux de CFG-26)."
+    },
+    {
+      "id": "CFG-45-RACCORDEMENT-POELE-SIMPLE-PAROI",
+      "titre": "Raccorder un poêle à bois ou pellets avec la gamme de conduit simple paroi émaillé ou peint",
+      "page_catalogue": 45,
+      "index_image": 47,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "raccordement"
+        ],
+        "appareils": [
+          "poele_cuisiniere"
+        ],
+        "combustibles": [
+          "bois_buches",
+          "pellets"
+        ],
+        "zones": [],
+        "prise_air": [
+          "dans_piece"
+        ],
+        "appareil_etanche_requis": false
+      },
+      "gamme_principale": "Simple paroi émaillé / acier peint",
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "raccordement appareil",
+          "composant": "Raccordement simple paroi : Émaillé 1,2 mm (bois et pellets) / Émaillé 0,7 mm (pellets) / Acier peint 2 mm",
+          "chapitre": "SIMPLE PAROI"
+        },
+        {
+          "ordre": 2,
+          "position": "plafond",
+          "composant": "Solutions de finitions : raccord + cache raccord, OU élément de départ",
+          "chapitre": "DOUBLE PAROI",
+          "choix": "alternatives"
+        },
+        {
+          "ordre": 3,
+          "position": "arrivée d'air appareil",
+          "composant": "Kit entrée d'air",
+          "chapitre": "AIR CHAUD / AIR FRAIS"
+        }
+      ],
+      "regle_materiau": "Émaillé 0,7 mm réservé aux pellets ; bois bûche -> émaillé 1,2 mm ou acier peint 2 mm (statut: catalogue)."
+    },
+    {
+      "id": "CFG-48-CHAUDIERE-PELLETS-ETANCHE-PLA",
+      "titre": "Créer un conduit pour une chaudière à pellets étanche",
+      "page_catalogue": 48,
+      "index_image": 50,
+      "statut": "catalogue",
+      "criteres": {
+        "projet": [
+          "creation_interieur"
+        ],
+        "appareils": [
+          "chaudiere"
+        ],
+        "combustibles": [
+          "pellets"
+        ],
+        "zones": [
+          "zone_1",
+          "zone_2",
+          "zone_3"
+        ],
+        "prise_air": [
+          "dans_conduit"
+        ],
+        "appareil_etanche_requis": true,
+        "condition_bloquante": "chaudière présente dans la liste des modèles préconisés ci-dessous"
+      },
+      "gamme_principale": "PLA",
+      "regles_associees": [
+        "R-CHAUDIERE-PELLETS-01"
+      ],
+      "modeles_preconises": {
+        "DOMUSA TEKNIK": [
+          "BIOCLASS IC V"
+        ],
+        "FRÖLING": [
+          "PE1C Pellet"
+        ],
+        "HARGASSNER": [
+          "NANO PK 6-32 kW",
+          "NANO PK PLUS 6-32 kW (= Nano PK avec condenseur)",
+          "SMART PK 17-32 kW"
+        ],
+        "ÖKOFEN": [
+          "PELLMATIC CONDENS 10 à 32 kW",
+          "PELLMATIC SMART XS 10 à 18 kW",
+          "PELLMATIC COMPACT 10 à 18 kW"
+        ],
+        "MORVAN": [
+          "GM EASY 12",
+          "GM EASY 18",
+          "GM EASY 24"
+        ],
+        "KWB": [
+          "Easyfire"
+        ]
+      },
+      "nomenclature": [
+        {
+          "ordre": 1,
+          "position": "traversée de mur",
+          "composant": "Kit RT2012",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA"
+        },
+        {
+          "ordre": 2,
+          "position": "ensemble conduit",
+          "composant": "Kit PLA CPE Zone 3",
+          "chapitre": "CONDUITS CONCENTRIQUES",
+          "gamme": "PLA",
+          "note": "exemple représenté : sortie zone 3 ; zones 1 et 2 voir p.80-89"
+        }
+      ]
+    }
+  ],
+  "a_completer_etape_suivante": {
+    "catalogue": [
+      "Pages 80-89 (chapitre PLA) : conditions précises des zones 2 et 3 et variantes chaudières pellets",
+      "Chapitres produits (p.50-263) : longueurs d'éléments disponibles et diamètres par gamme -> base du métré",
+      "Chapitre réglementation (p.264-293) : règles DTU 24.1 (hauteurs, dévoiements, distances)"
+    ],
+    "savoir_faire_mayer": [
+      "Composants implicites par configuration (colliers, supports, tampons de ramonage, plaques de finition)",
+      "Règles de calcul des quantités (longueur -> nombre d'éléments, supports tous les X m)",
+      "Choix par défaut quand le catalogue propose des alternatives ('ou')"
+    ],
+    "base_articles": [
+      "Mapping composant + gamme + diamètre -> code article (format des codes observé p.41)"
+    ]
+  }
+}

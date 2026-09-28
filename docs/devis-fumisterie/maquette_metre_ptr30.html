@@ -1,0 +1,539 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Métré conduit PTR30</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#F3F6FA; --panel:#FFFFFF; --ink:#12233D; --ink-2:#4A5B75; --ink-3:#8494AB;
+  --line:#D5DDE8; --line-2:#E7ECF3;
+  --blue:#2196F3; --blue-2:#1565C0; --blue-3:#0D47A1; --blue-tint:#E6F1FC;
+  --yellow:#F5C542; --yellow-2:#FFD166; --yellow-tint:#FFF6DA; --yellow-ink:#6B4E00;
+  --wall:#E9EEF5; --slab:#C9D3E0; --roof:#AEB9C9; --ground:#B7C2D1;
+  --steel:#5E7FA8; --pipe-sp:#1B2A41;
+  --f-disp:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow","Segoe UI",Arial,sans-serif;
+  --f-mono:"JetBrains Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0B1524; --panel:#122036; --ink:#E7EEF8; --ink-2:#A9B8CE; --ink-3:#6F819C;
+    --line:#26374F; --line-2:#1B2B42;
+    --blue-tint:#10294A; --yellow-tint:#2E2610; --yellow-ink:#FFD166;
+    --wall:#15253C; --slab:#2B3D57; --roof:#3A4D69; --ground:#2B3D57;
+    --steel:#7FA3D1; --pipe-sp:#C9D6E8;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0B1524; --panel:#122036; --ink:#E7EEF8; --ink-2:#A9B8CE; --ink-3:#6F819C;
+  --line:#26374F; --line-2:#1B2B42;
+  --blue-tint:#10294A; --yellow-tint:#2E2610; --yellow-ink:#FFD166;
+  --wall:#15253C; --slab:#2B3D57; --roof:#3A4D69; --ground:#2B3D57;
+  --steel:#7FA3D1; --pipe-sp:#C9D6E8;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:20px 40px}
+.wrap{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;color:var(--ink-2);text-transform:uppercase}
+h1{font-family:var(--f-disp);font-weight:700;font-size:clamp(26px,3.2vw,36px);line-height:1.05;margin:4px 0 0;text-wrap:balance;letter-spacing:.01em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--f-mono);font-size:12px;padding:4px 9px;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--ink-2)}
+.chip b{color:var(--ink);font-weight:600}
+.banner{display:flex;gap:10px;align-items:flex-start;background:var(--yellow-tint);border-left:4px solid var(--yellow);padding:10px 14px;color:var(--ink);font-size:14px}
+.banner .ic{font-weight:700;color:var(--yellow-ink)}
+.grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.sheet{background:var(--panel);border:1px solid var(--line);position:relative}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--f-disp);font-weight:600;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
+.sheet-head small{font-family:var(--f-mono);font-size:11px;font-weight:400;color:var(--ink-3);text-transform:none;letter-spacing:0}
+.draw{padding:8px;overflow-x:auto}
+.draw svg{display:block;width:100%;height:auto;max-height:78vh}
+.legend{display:flex;flex-wrap:wrap;gap:14px;padding:8px 14px 12px;border-top:1px solid var(--line-2);font-size:12.5px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:18px;height:8px;display:inline-block;border-radius:1px}
+@media (min-width:901px){.sticky{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}}
+
+/* SVG classes */
+.s-wall{fill:var(--wall);stroke:var(--line);stroke-width:1}
+.s-slab{fill:var(--slab)}
+.s-roof{fill:var(--roof)}
+.s-ground{fill:var(--ground)}
+.s-sky{fill:none}
+.s-outline{fill:none;stroke:var(--ink-3);stroke-width:1.2}
+.s-ptr{fill:none;stroke:var(--steel);stroke-linecap:butt;stroke-linejoin:round}
+.s-ptr-core{fill:none;stroke:var(--panel);stroke-linejoin:round}
+.s-ext{fill:none;stroke:var(--blue-3);stroke-linejoin:round}
+.s-ext.inox{stroke:var(--blue)}
+.s-sp{fill:none;stroke:var(--pipe-sp)}
+.s-app{fill:var(--pipe-sp)}
+.s-appwin{fill:var(--yellow)}
+.s-cap{fill:var(--blue-3)}
+.s-cap.inox{fill:var(--blue)}
+.s-solin{fill:var(--blue-2)}
+.s-dim{stroke:var(--ink-2);stroke-width:1;fill:none}
+.s-dimtxt{font-family:var(--f-mono);font-size:13px;fill:var(--ink);font-weight:600}
+.s-dimtxt-bg{fill:var(--panel)}
+.s-dimg{cursor:pointer}
+.s-dimg:hover .s-dimtxt,.s-dimg:focus .s-dimtxt{fill:var(--blue-2)}
+.s-dimg:focus{outline:none}
+.s-dimg:focus .s-dimtxt-bg{stroke:var(--blue);stroke-width:1.5}
+.s-ridge{stroke:var(--ink-3);stroke-dasharray:4 4;stroke-width:1}
+.s-zone{stroke:var(--yellow);stroke-dasharray:8 5;stroke-width:2.2}
+.s-zone.ok{stroke:var(--blue)}
+.s-zonetxt{font-family:var(--f-body);font-size:12.5px;font-weight:600;fill:var(--ink)}
+.s-call{fill:var(--yellow);stroke:var(--ink);stroke-width:1.2}
+.s-calltxt{font-family:var(--f-disp);font-weight:700;font-size:15px;fill:#12233D;text-anchor:middle;dominant-baseline:central}
+.s-leader{stroke:var(--ink);stroke-width:1}
+.s-lbl{font-family:var(--f-body);font-size:12px;fill:var(--ink-2)}
+
+/* Controls */
+.ctrl{display:flex;flex-direction:column}
+fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+fieldset:first-of-type{border-top:0}
+legend{font-family:var(--f-disp);font-weight:600;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);padding:0;float:left;width:100%;margin-bottom:2px}
+legend + *{clear:both}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f.full{grid-column:1/-1}
+.f label{font-size:13px;color:var(--ink-2)}
+.in{display:flex;align-items:stretch;border:1px solid var(--line);background:var(--bg);border-radius:3px;overflow:hidden}
+.in:focus-within{border-color:var(--blue);box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 25%,transparent)}
+.in input,.in select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-family:var(--f-mono);font-size:14px;padding:7px 8px;font-variant-numeric:tabular-nums}
+.in input:focus,.in select:focus{outline:none}
+.in .u{font-family:var(--f-mono);font-size:12px;color:var(--ink-3);padding:0 8px;display:flex;align-items:center;border-left:1px solid var(--line-2)}
+.seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);color:var(--ink);font-family:var(--f-mono);font-size:13px;padding:7px 4px;cursor:pointer;border-left:1px solid var(--line-2)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--blue-2);color:#fff;font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--yellow);outline-offset:-2px}
+.btn{grid-column:1/-1;border:1px solid var(--blue-2);background:var(--blue-tint);color:var(--ink);font-family:var(--f-body);font-weight:600;font-size:14px;padding:8px 10px;border-radius:3px;cursor:pointer;text-align:left;display:flex;gap:8px;align-items:center}
+.btn:hover{background:var(--blue-2);color:#fff}
+.btn:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.hint{grid-column:1/-1;font-size:12.5px;color:var(--ink-3);margin:-2px 0 0}
+.flash{animation:fl .9s ease}
+@keyframes fl{0%{box-shadow:0 0 0 3px var(--yellow)}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.flash{animation:none}}
+
+/* Alerts */
+.alerts{display:flex;flex-direction:column;gap:8px;padding:12px 14px}
+.al{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;padding:9px 12px;border-left:4px solid;font-size:14px}
+.al .tag{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:2px;white-space:nowrap}
+.al.warn{background:var(--yellow-tint);border-color:var(--yellow)}
+.al.warn .tag{background:var(--yellow);color:#3A2A00}
+.al.ok{background:var(--blue-tint);border-color:var(--blue)}
+.al.ok .tag{background:var(--blue-2);color:#fff}
+.al.info{background:var(--bg);border-color:var(--ink-3)}
+.al.info .tag{background:var(--line);color:var(--ink)}
+
+/* BOM */
+.bom-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
+th{font-family:var(--f-disp);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);text-align:left;padding:9px 10px;border-bottom:2px solid var(--ink);background:var(--panel)}
+td{padding:8px 10px;border-bottom:1px solid var(--line-2);vertical-align:top}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-mono);font-size:13px;white-space:nowrap}
+td.ref{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+td.rep span{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#12233D;font-family:var(--f-disp);font-weight:700;border:1.2px solid var(--ink)}
+.st{display:inline-block;font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:2px;margin-left:6px;vertical-align:1px}
+.st.cat{background:var(--blue-tint);color:var(--blue-2);border:1px solid var(--blue)}
+.st.imp{background:var(--bg);color:var(--ink-2);border:1px solid var(--line)}
+.st.pro{background:var(--yellow-tint);color:var(--yellow-ink);border:1px solid var(--yellow)}
+.sub{display:block;font-size:12.5px;color:var(--ink-3);margin-top:2px}
+tfoot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:600;padding-top:10px}
+tfoot .big{font-family:var(--f-disp);font-size:22px;font-weight:700}
+.foot{font-size:12.5px;color:var(--ink-3);padding:10px 14px 14px;display:flex;flex-wrap:wrap;gap:6px 18px}
+.foot b{color:var(--ink-2);font-weight:600}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Gabarit G1 · Création intérieure verticale · CFG-24 (catalogue p.24)</div>
+      <h1>Métré conduit PTR30 — poêle ou insert bois bûche</h1>
+    </div>
+    <div class="chips" id="chips">
+      <span class="chip">Zone <b>1</b></span>
+      <span class="chip">Combustible <b>bois bûche</b></span>
+      <span class="chip">Prise d'air <b>pièce</b></span>
+      <span class="chip">Tarif <b>MAYER002 · 06/26</b></span>
+    </div>
+  </header>
+
+  <div class="banner" role="note"><span class="ic">⚠ Maquette</span><span>Les quantités suivent des règles de calcul provisoires (combinaison d'éléments, fixations, composition du kit RT2012). Elles doivent être validées par un technicien Mayer avant tout usage en devis. Les prix sont les prix nets réels du tarif Mayer.</span></div>
+
+  <div class="grid">
+    <section class="sheet sticky" aria-label="Schéma coté">
+      <div class="sheet-head"><span>Coupe cotée</span><small>Cliquez une cote pour la modifier</small></div>
+      <div class="draw"><svg id="svg" role="img" aria-label="Coupe du conduit avec cotes"></svg></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--pipe-sp)"></i>Simple paroi émaillé</span>
+        <span><i class="sw" style="background:var(--steel)"></i>PTR30+ inox (intérieur)</span>
+        <span><i class="sw" id="lgExt" style="background:var(--blue-3)"></i><span id="lgExtTxt">PTR30+ laqué noir (extérieur)</span></span>
+        <span><i class="sw" style="background:var(--blue)"></i><i class="sw" style="background:var(--yellow)"></i>Minimum zone 1 (bleu : respecté · jaune : non respecté)</span>
+      </div>
+    </section>
+
+    <section class="sheet ctrl" aria-label="Relevé de chantier">
+      <div class="sheet-head"><span>Relevé chantier</span><small>mètres · degrés</small></div>
+      <form id="form" autocomplete="off">
+        <fieldset>
+          <legend>Appareil</legend>
+          <div class="f"><label for="diam">Diamètre conduit</label>
+            <div class="in"><select id="diam"><option value="150" selected>Ø 150</option><option value="180">Ø 180</option></select></div></div>
+          <div class="f"><label for="hBuse">Hauteur de buse</label>
+            <div class="in"><input id="hBuse" type="number" step="0.05" min="0.3" max="2" value="1.05"><span class="u">m</span></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Niveaux traversés</legend>
+          <div class="f"><label for="hsp1">Hauteur sous plafond (pièce)</label>
+            <div class="in"><input id="hsp1" type="number" step="0.05" min="2" max="5" value="2.50"><span class="u">m</span></div></div>
+          <div class="f"><label for="epPl">Épaisseur plancher</label>
+            <div class="in"><input id="epPl" type="number" step="0.01" min="0.1" max="0.6" value="0.25"><span class="u">m</span></div></div>
+          <div class="f"><label>Étage intermédiaire</label>
+            <div class="seg" id="segEtage" role="group" aria-label="Étage intermédiaire">
+              <button type="button" data-v="0" aria-pressed="false">Aucun</button>
+              <button type="button" data-v="1" aria-pressed="true">1 étage</button></div></div>
+          <div class="f" id="fHsp2"><label for="hsp2">Hauteur sous plafond (étage)</label>
+            <div class="in"><input id="hsp2" type="number" step="0.05" min="2" max="5" value="2.50"><span class="u">m</span></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Combles et toiture</legend>
+          <div class="f"><label for="hCombles">Hauteur combles au droit du conduit</label>
+            <div class="in"><input id="hCombles" type="number" step="0.05" min="0.3" max="6" value="1.40"><span class="u">m</span></div></div>
+          <div class="f"><label for="pente">Pente de toiture</label>
+            <div class="in"><input id="pente" type="number" step="1" min="0" max="60" value="35"><span class="u">°</span></div></div>
+          <div class="f"><label for="epToit">Épaisseur toiture</label>
+            <div class="in"><input id="epToit" type="number" step="0.05" min="0.1" max="0.8" value="0.30"><span class="u">m</span></div></div>
+          <div class="f"><label for="dFaitage">Distance sortie → faîtage</label>
+            <div class="in"><input id="dFaitage" type="number" step="0.05" min="0" max="8" value="1.60"><span class="u">m</span></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Dévoiement (combles)</legend>
+          <div class="f full"><label>Angle des coudes</label>
+            <div class="seg" id="segAngle" role="group" aria-label="Angle de dévoiement">
+              <button type="button" data-v="0" aria-pressed="false">Aucun</button>
+              <button type="button" data-v="15" aria-pressed="false">15°</button>
+              <button type="button" data-v="30" aria-pressed="true">30°</button>
+              <button type="button" data-v="45" aria-pressed="false">45°</button></div></div>
+          <div class="f" id="fDecal"><label for="decal">Décalage horizontal</label>
+            <div class="in"><input id="decal" type="number" step="0.05" min="0.05" max="2" value="0.40"><span class="u">m</span></div></div>
+        </fieldset>
+        <fieldset>
+          <legend>Sortie de toit</legend>
+          <div class="f"><label for="hSortie">Hauteur visée au-dessus du toit</label>
+            <div class="in"><input id="hSortie" type="number" step="0.05" min="0.3" max="5" value="1.60"><span class="u">m</span></div></div>
+          <div class="f"><label>Finition extérieure</label>
+            <div class="seg" id="segFin" role="group" aria-label="Finition extérieure">
+              <button type="button" data-v="noir" aria-pressed="true">Noir</button>
+              <button type="button" data-v="inox" aria-pressed="false">Inox</button></div></div>
+          <button type="button" class="btn" id="btnAjust">↥ Ajuster la sortie au minimum zone 1</button>
+          <p class="hint" id="hintMin"></p>
+        </fieldset>
+      </form>
+    </section>
+  </div>
+
+  <section class="sheet" aria-label="Contrôles réglementaires">
+    <div class="sheet-head"><span>Contrôles</span><small>recalculés à chaque modification</small></div>
+    <div class="alerts" id="alerts"></div>
+  </section>
+
+  <section class="sheet" aria-label="Liste de pièces">
+    <div class="sheet-head"><span>Liste de pièces chiffrée</span><small id="bomMeta"></small></div>
+    <div class="bom-wrap">
+      <table>
+        <thead><tr><th>Rep.</th><th>Désignation</th><th>Référence</th><th class="num">Qté</th><th class="num">PU net</th><th class="num">Total HT</th></tr></thead>
+        <tbody id="bom"></tbody>
+        <tfoot><tr><td></td><td colspan="4">Total fournitures (hors pose, hors main d'œuvre)</td><td class="num big" id="bomTotal"></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="foot">
+      <span><span class="st cat">Catalogue</span> composant du schéma Modinox p.24</span>
+      <span><span class="st imp">Implicite</span> nécessaire au montage, non dessiné</span>
+      <span><span class="st pro">Provisoire</span> règle de quantité à valider</span>
+      <span><b>Prix :</b> colonne « Prix pour client » du tarif MAYER002 (remises incluses)</span>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Données tarif (MAYER002, juin 2026, prix nets) ---------- */
+const P={
+ 150:{eltI:{1000:["2PTIELDR1501000",108.45],500:["2PTIELDR150500",77.40],250:["2PTIELDR150250",62.50]},
+      eltN:{1000:["2PTIELDR1501000NO",130.15],500:["2PTIELDR150500NO",92.85],250:["2PTIELDR150250NO",74.95]},
+      regI:["2PTIELRE150500",107.60],regN:["2PTIELRE150500NO",129.15],
+      chapI:["2PTICHARN150",86.70],chapN:["2PTICHARN150NO",108.35],
+      coude:{15:["2PTICO15150",70.60],30:["2PTICO30150",70.60],45:["2PTICO45150",70.60]},
+      ppRT:["2PTIPPDR150",48.95],ccf:["2PTGCOCF150",16.80],
+      rac:["2PTIRASR150148",55.15,"Raccord simple paroi réduit Ø150/148 (pour tuyau émaillé Ø150)"],
+      cojoI:["2PTICOJO150",9.80],cojoN:["2PTICOJO150NO",12.60],ctos:["2DIVCTOS150",34.98],
+      sp:{1000:["2LEPTUYA1501000NO",26.96],500:["2LEPTUYA150500NO",17.52],250:["2LEPTUYA150250NO",13.56]},
+      solins:[[15,25,"2DIVS1525IN230KEI",72.04],[20,30,"2DIVS2030IN230KEI",72.04],[25,35,"2DIVS2535IN230KEI",87.24],[30,40,"2DIVS3040IN230KEI",87.24],[40,50,"2DIVS4050IN230KEI",114.96]]},
+ 180:{eltI:{1000:["2PTIELDR1801000",126.90],500:["2PTIELDR180500",94.15],250:["2PTIELDR180250",72.20]},
+      eltN:{1000:["2PTIELDR1801000NO",158.65],500:["2PTIELDR180500NO",117.75],250:["2PTIELDR180250NO",90.25]},
+      regI:["2PTIELRE180500",128.60],regN:["2PTIELRE180500NO",160.75],
+      chapI:["2PTICHARN180",101.65],chapN:["2PTICHARN180NO",127.10],
+      coude:{15:["2PTICO15180",81.65],30:["2PTICO30180",81.65],45:["2PTICO45180",81.65]},
+      ppRT:["2PTIPPDR180",50.60],ccf:["2PTGCOCF180",16.80],
+      rac:["2PTIRASS180",50.50,"Raccord simple paroi Ø180"],
+      cojoI:["2PTICOJO180",10.45],cojoN:["2PTICOJO180NO",13.40],ctos:["2DIVCTOS180",66.00],
+      sp:{1000:["2LEPTUYA1801000NO",33.92],500:["2LEPTUYA180500NO",22.16],250:["2LEPTUYA180250NO",17.04]},
+      solins:[[20,30,"2DIVS2030IN250KEI",72.04],[25,35,"2DIVS2535IN250KEI",87.24],[30,40,"2DIVS3040IN250KEI",87.24],[40,50,"2DIVS4050IN250KEI",114.96]]}
+};
+const ZONE1_PENTE=0.40, ZONE1_PLAT=1.20, HAUBAN=3.0;
+
+/* ---------- État ---------- */
+const $=id=>document.getElementById(id);
+const S={nbEtages:1,angle:30,fin:"noir"};
+function num(id){const v=parseFloat($(id).value.replace(",","."));return isFinite(v)?v:0;}
+function read(){return{diam:+$("diam").value,hBuse:num("hBuse"),hsp1:num("hsp1"),epPl:num("epPl"),hsp2:num("hsp2"),
+  nbEtages:S.nbEtages,hCombles:num("hCombles"),pente:num("pente"),epToit:num("epToit"),dFaitage:num("dFaitage"),
+  angle:S.angle,decal:S.angle>0?num("decal"):0,hSortie:num("hSortie"),fin:S.fin};}
+
+/* ---------- Combinaison d'éléments (règle provisoire) ---------- */
+function compose(Lmm,withReg){
+  const out={1000:0,500:0,250:0,reg:0};let L=Math.max(0,Math.round(Lmm));
+  out[1000]=Math.floor(L/1000);let r=L-out[1000]*1000;
+  if(r<=0){}
+  else if(r<=250){out[250]=1;}
+  else if(withReg&&r>=320&&r<=500){out.reg=1;out.regLen=r;}
+  else if(r<=500){out[500]=1;}
+  else if(r<=750){out[500]=1;out[250]=1;}
+  else if(withReg&&r-500>=320&&r-500<=500){out[500]=1;out.reg=1;out.regLen=r-500;}
+  else{out[1000]+=1;}
+  out.total=out[1000]*1000+out[500]*500+out[250]*250+(out.reg?(out.regLen||0):0);
+  out.over=out.total-L;out.count=out[1000]+out[500]+out[250]+out.reg;
+  return out;
+}
+const rad=d=>d*Math.PI/180;
+const fmt=(v,d=2)=>v.toLocaleString("fr-FR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const eur=v=>v.toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
+
+/* ---------- Calcul ---------- */
+function compute(i){
+  const t=Math.tan(rad(Math.max(i.pente,0.1)));
+  const planchers=1+i.nbEtages;
+  const yC=i.hsp1+i.epPl+(i.nbEtages?i.hsp2+i.epPl:0);
+  const dec=i.angle>0?i.decal:0;
+  const yRoofTop=yC+i.hCombles+i.epToit;
+  const yRidge=yRoofTop+i.dFaitage*Math.tan(rad(i.pente));
+  const flat=i.pente<=15;
+  const reqAbove=flat?ZONE1_PLAT:ZONE1_PENTE;
+  const yReq=(flat?yRoofTop:yRidge)+reqAbove;
+  const vg=i.angle>0?dec/Math.tan(rad(i.angle)):0;
+  const obl=i.angle>0?dec/Math.sin(rad(i.angle)):0;
+  const yDevS=yC+0.30, yDevE=yDevS+vg;
+  const devOK=i.angle===0||yDevE<=yRoofTop-i.epToit-0.10;
+  const Lsp=Math.max(0,i.hsp1-i.hBuse);
+  const Lint=(yRoofTop-i.hsp1)-vg+obl;
+  const cInt=compose(Lint*1000,true);
+  const cExt=compose(i.hSortie*1000,true);
+  const cSp=compose(Lsp*1000,false);
+  const topAct=yRoofTop+cExt.total/1000+cInt.over/1000;
+  const hAct=topAct-yRoofTop;
+  const minSortie=yReq-yRoofTop;
+  const d=P[i.diam];
+  const sol=d.solins.find(s=>i.pente>=s[0]&&i.pente<=s[1])||null;
+  return {i,t,planchers,yC,dec,yRoofTop,yRidge,flat,yReq,reqAbove,vg,obl,yDevS,yDevE,devOK,Lsp,Lint,cInt,cExt,cSp,topAct,hAct,minSortie,sol,d};
+}
+
+/* ---------- Liste de pièces ---------- */
+function bom(c){
+  const i=c.i,d=c.d,noir=i.fin==="noir",D="Ø"+i.diam,rows=[];
+  const add=(rep,lib,sub,ref,q,pu,st)=>{if(q>0)rows.push({rep,lib,sub,ref,q,pu,st});};
+  add(1,"Chapeau anti-refouleur PTR30+ "+(noir?"laqué noir":"inox")+" "+D,"",(noir?d.chapN:d.chapI)[0],1,(noir?d.chapN:d.chapI)[1],"cat");
+  const E=noir?d.eltN:d.eltI, R=noir?d.regN:d.regI, fx=noir?"laqué noir":"inox";
+  [1000,500,250].forEach(l=>add(2,"Élément droit PTR30+ "+fx+" "+D+" · Lg "+l,"Partie extérieure au-dessus du toit",E[l][0],c.cExt[l],E[l][1],"cat"));
+  add(2,"Élément réglable PTR30+ "+fx+" "+D+" · 320 à 500","Réglé à "+(c.cExt.regLen||0)+" mm",R[0],c.cExt.reg,R[1],"cat");
+  const cj=noir?d.cojoN:d.cojoI;
+  add(2,"Collier de jonction PTR30+ "+fx+" "+D,"1 par emboîtement extérieur",cj[0],c.cExt.count,cj[1],"pro");
+  if(c.sol) add(3,"Solin inox "+c.sol[0]+" à "+c.sol[1]+"° pour PTR "+D,"Choisi d'après la pente saisie ("+i.pente+"°)",c.sol[2],1,c.sol[3],"cat");
+  else rows.push({rep:3,lib:"Solin hors gamme standard pour "+i.pente+"°",sub:"À chiffrer sur demande",ref:"—",q:1,pu:null,st:"pro"});
+  add(3,"Collier universel sous toiture "+D,"Reprise de charge sous la couverture",d.ctos[0],1,d.ctos[1],"pro");
+  if(i.angle>0) add(4,"Coude "+i.angle+"° PTR30+ inox "+D,"Dévoiement : 2 coudes",d.coude[i.angle][0],2,d.coude[i.angle][1],"cat");
+  [1000,500,250].forEach(l=>add(4,"Élément droit PTR30+ inox "+D+" · Lg "+l,"Conduit intérieur (plafond → toiture)",d.eltI[l][0],c.cInt[l],d.eltI[l][1],"imp"));
+  add(4,"Élément réglable PTR30+ inox "+D+" · 320 à 520","Réglé à "+(c.cInt.regLen||0)+" mm",d.regI[0],c.cInt.reg,d.regI[1],"imp");
+  add(5,"Plaque de propreté RT2012 560×560 inox "+D,"Kit RT2012 · 1 par plancher traversé",d.ppRT[0],c.planchers,d.ppRT[1],"pro");
+  add(5,"Couronne coupe-feu PTR30+ "+D,"Kit RT2012 · 1 par plancher traversé",d.ccf[0],c.planchers,d.ccf[1],"pro");
+  add(6,d.rac[2],"Liaison simple paroi / PTR sous plafond",d.rac[0],1,d.rac[1],"imp");
+  [1000,500,250].forEach(l=>add(6,"Tuyau émaillé Ligne+ noir "+D+" · Lg "+l,"Raccordement appareil → plafond",d.sp[l][0],c.cSp[l],d.sp[l][1],"cat"));
+  return rows;
+}
+
+/* ---------- Dessin SVG ---------- */
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;if(parent)parent.appendChild(e);return e;}
+
+function draw(c){
+  const i=c.i,svg=$("svg");svg.innerHTML="";
+  const tp=Math.tan(rad(Math.max(i.pente,1)));
+  const dec=c.dec, xr=dec+i.dFaitage;
+  const yTop=x=>c.yRoofTop+(x<=xr?(x-dec):(2*xr-x-dec))*tp;
+  let xL=dec-(c.yRoofTop-i.epToit-c.yC)/tp;
+  xL=Math.max(Math.min(xL,-1.1),-5.5);
+  const xR=Math.min(xr+(xr-xL),xr+6);
+  const over=0.45;
+  const topY=Math.max(c.topAct,c.yReq,c.yRidge)+0.55;
+  const minX=xL-3.3, maxX=Math.max(xR,dec+1.2)+2.4, minY=-0.45, maxY=topY+0.25;
+  const W=maxX-minX,H=maxY-minY;
+  const sc=Math.min(760/W,980/H);
+  const VW=W*sc,VH=H*sc;
+  svg.setAttribute("viewBox","0 0 "+VW.toFixed(1)+" "+VH.toFixed(1));
+  const X=x=>(x-minX)*sc, Y=y=>(maxY-y)*sc;
+  const g=el("g",{},svg);
+
+  // sol
+  el("rect",{x:X(xL-0.6),y:Y(0),width:(xR-xL+1.2)*sc,height:0.35*sc,class:"s-ground"},g);
+  // murs
+  const wallPts=[[xL,0],[xL,yTop(xL)-i.epToit],[xr,yTop(xr)-i.epToit],[xR,yTop(xR)-i.epToit],[xR,0]].map(p=>X(p[0])+","+Y(p[1])).join(" ");
+  el("polygon",{points:wallPts,class:"s-wall"},g);
+  // planchers
+  const slabs=[i.hsp1];if(i.nbEtages)slabs.push(i.hsp1+i.epPl+i.hsp2);
+  slabs.forEach(y=>el("rect",{x:X(xL),y:Y(y+i.epPl),width:(xR-xL)*sc,height:i.epPl*sc,class:"s-slab"},g));
+  // toiture
+  const xa=xL-over,xb=xR+over;
+  const roofPts=[[xa,yTop(xa)],[xr,yTop(xr)],[xb,yTop(xb)],[xb,yTop(xb)-i.epToit],[xr,yTop(xr)-i.epToit],[xa,yTop(xa)-i.epToit]].map(p=>X(p[0])+","+Y(p[1])).join(" ");
+  el("polygon",{points:roofPts,class:"s-roof"},g);
+  el("polyline",{points:[[xa,yTop(xa)],[xr,yTop(xr)],[xb,yTop(xb)]].map(p=>X(p[0])+","+Y(p[1])).join(" "),class:"s-outline"},g);
+
+  // appareil
+  const aw=0.62;
+  el("rect",{x:X(-aw/2),y:Y(i.hBuse-0.06),width:aw*sc,height:(i.hBuse-0.06)*sc,rx:4,class:"s-app"},g);
+  el("rect",{x:X(-aw/2+0.1),y:Y(i.hBuse*0.62),width:(aw-0.2)*sc,height:i.hBuse*0.3*sc,rx:2,class:"s-appwin"},g);
+
+  const pw=Math.max(6,(i.diam===180?0.24:0.21)*sc);
+  // simple paroi
+  el("line",{x1:X(0),y1:Y(i.hBuse-0.06),x2:X(0),y2:Y(i.hsp1),class:"s-sp","stroke-width":Math.max(4,pw*0.62)},g);
+  // PTR intérieur
+  const intPts=i.angle>0?[[0,i.hsp1],[0,c.yDevS],[dec,c.yDevE],[dec,c.yRoofTop]]:[[0,i.hsp1],[0,c.yRoofTop]];
+  const ip=intPts.map(p=>X(p[0])+","+Y(p[1])).join(" ");
+  el("polyline",{points:ip,class:"s-ptr","stroke-width":pw},g);
+  el("polyline",{points:ip,class:"s-ptr-core","stroke-width":Math.max(1.5,pw*0.28)},g);
+  // PTR extérieur
+  el("line",{x1:X(dec),y1:Y(c.yRoofTop-0.02),x2:X(dec),y2:Y(c.topAct),class:"s-ext"+(i.fin==="inox"?" inox":""),"stroke-width":pw},g);
+  // solin
+  const sw=0.34;
+  el("polygon",{points:[[dec-sw,yTop(dec-sw)+0.03],[dec+sw,yTop(dec+sw)+0.03],[dec+pw/sc*0.7,yTop(dec)+0.28],[dec-pw/sc*0.7,yTop(dec)+0.22]].map(p=>X(p[0])+","+Y(p[1])).join(" "),class:"s-solin"},g);
+  // chapeau
+  const cw=0.36;
+  el("rect",{x:X(dec-cw/2),y:Y(c.topAct+0.12),width:cw*sc,height:0.045*sc,rx:2,class:"s-cap"+(i.fin==="inox"?" inox":"")},g);
+  el("rect",{x:X(dec-0.07),y:Y(c.topAct+0.08),width:0.14*sc,height:0.08*sc,class:"s-cap"+(i.fin==="inox"?" inox":"")},g);
+
+  // lignes faîtage & zone 1
+  el("line",{x1:X(xr-1.2),y1:Y(c.yRidge),x2:X(maxX-0.2),y2:Y(c.yRidge),class:"s-ridge"},g);
+  el("text",{x:X(xr)+8,y:Y(c.yRidge)+15,class:"s-lbl"},g,"Faîtage");
+  const zoneOK=c.topAct>=c.yReq-1e-6;
+  el("line",{x1:X(dec-0.9),y1:Y(c.yReq),x2:X(maxX-0.2),y2:Y(c.yReq),class:"s-zone"+(zoneOK?" ok":"")},g);
+  el("text",{x:X(maxX-0.2),y:Y(c.yReq)-7,class:"s-zonetxt","text-anchor":"end"},g,(zoneOK?"✓ ":"⚠ ")+(c.flat?"Toit plat : +1,20 m":"Faîtage + 40 cm (zone 1)"));
+
+  // cotes
+  function vdim(x,y1,y2,label,forId,side){
+    const gg=el("g",{class:"s-dimg",tabindex:"0",role:"button","aria-label":"Modifier "+label,"data-for":forId},g);
+    const t=5;
+    el("line",{x1:X(x),y1:Y(y1),x2:X(x),y2:Y(y2),class:"s-dim"},gg);
+    [y1,y2].forEach(y=>el("line",{x1:X(x)-t,y1:Y(y)+t,x2:X(x)+t,y2:Y(y)-t,class:"s-dim"},gg));
+    const tx=fmt(Math.abs(y2-y1))+" m";const my=(Y(y1)+Y(y2))/2;
+    const bw=tx.length*8.2+10;const bx=side==="r"?X(x)+6:X(x)-bw-6;
+    el("rect",{x:bx,y:my-11,width:bw,height:22,rx:3,class:"s-dimtxt-bg"},gg);
+    el("text",{x:bx+bw/2,y:my+4.5,class:"s-dimtxt","text-anchor":"middle"},gg,tx);
+    const ttl=el("title",{},gg,label);
+    return gg;
+  }
+  function hdim(y,x1,x2,label,forId){
+    const gg=el("g",{class:"s-dimg",tabindex:"0",role:"button","aria-label":"Modifier "+label,"data-for":forId},g);
+    const t=5;
+    el("line",{x1:X(x1),y1:Y(y),x2:X(x2),y2:Y(y),class:"s-dim"},gg);
+    [x1,x2].forEach(x=>el("line",{x1:X(x)-t,y1:Y(y)+t,x2:X(x)+t,y2:Y(y)-t,class:"s-dim"},gg));
+    const tx=fmt(Math.abs(x2-x1))+" m";const bw=tx.length*8.2+10;const mx=(X(x1)+X(x2))/2;
+    el("rect",{x:mx-bw/2,y:Y(y)-27,width:bw,height:22,rx:3,class:"s-dimtxt-bg"},gg);
+    el("text",{x:mx,y:Y(y)-11.5,class:"s-dimtxt","text-anchor":"middle"},gg,tx);
+    el("title",{},gg,label);
+  }
+  const dx1=xL-0.55, dx2=xL-1.35;
+  vdim(dx1,0,i.hBuse,"Hauteur de buse","hBuse");
+  vdim(dx1,i.hBuse,i.hsp1,"Raccordement simple paroi (calculé)","hBuse");
+  vdim(dx2,0,i.hsp1,"Hauteur sous plafond","hsp1");
+  if(i.nbEtages) vdim(dx2,i.hsp1+i.epPl,i.hsp1+i.epPl+i.hsp2,"Hauteur étage","hsp2");
+  vdim(dx2,c.yC,c.yC+i.hCombles,"Hauteur combles","hCombles");
+  const rx=Math.max(xR,dec+0.6)+0.6;
+  vdim(rx,c.yRoofTop,c.topAct,"Hauteur de sortie au-dessus du toit","hSortie","r");
+  if(i.angle>0) hdim(c.yDevS-0.35,0,dec,"Décalage du dévoiement","decal");
+  if(i.dFaitage>0.05) hdim(Math.max(c.topAct,c.yReq)+0.35,dec,xr,"Distance sortie → faîtage","dFaitage");
+
+  // repères
+  function call(n,x,y,lx,ly){
+    el("line",{x1:X(x),y1:Y(y),x2:X(lx),y2:Y(ly),class:"s-leader"},g);
+    el("circle",{cx:X(lx),cy:Y(ly),r:12,class:"s-call"},g);
+    el("text",{x:X(lx),y:Y(ly),class:"s-calltxt"},g,String(n));
+  }
+  const cxL=dec-0.85;
+  call(1,dec-cw/2,c.topAct+0.12,cxL,c.topAct+0.25);
+  call(2,dec,(c.yRoofTop+c.topAct)/2+0.1,cxL,(c.yRoofTop+c.topAct)/2+0.1);
+  call(3,dec-sw*0.6,yTop(dec-sw*0.6)+0.05,cxL-0.2,yTop(dec)-0.45);
+  if(i.angle>0) call(4,dec/2,(c.yDevS+c.yDevE)/2,0.8+dec,(c.yDevS+c.yDevE)/2-0.1);
+  else call(4,0,(c.yC+c.yRoofTop)/2,0.8,(c.yC+c.yRoofTop)/2);
+  call(5,0,i.hsp1+i.epPl/2,0.9,i.hsp1+i.epPl/2+0.35);
+  call(6,0,(i.hBuse+i.hsp1)/2,0.85,(i.hBuse+i.hsp1)/2);
+
+  // interactions cotes
+  svg.querySelectorAll(".s-dimg").forEach(n=>{
+    const go=()=>{const inp=$(n.dataset.for);if(!inp)return;inp.focus();inp.select&&inp.select();const box=inp.closest(".in");box.classList.remove("flash");void box.offsetWidth;box.classList.add("flash");};
+    n.addEventListener("click",go);
+    n.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}});
+  });
+}
+
+/* ---------- Contrôles ---------- */
+function alerts(c){
+  const i=c.i,a=[];
+  const marge=(c.topAct-c.yReq)*100;
+  if(marge>=-0.5) a.push(["ok","Conforme","Zone 1 respectée : la sortie dépasse le minimum de "+fmt(Math.max(0,marge),0)+" cm (hauteur réelle "+fmt(c.hAct)+" m au-dessus du toit)."]);
+  else a.push(["warn","À corriger","Sortie trop basse de "+fmt(-marge,0)+" cm pour la zone 1. Il faut au moins "+fmt(c.minSortie)+" m au-dessus du toit ("+(c.flat?"toit ≤ 15° : 1,20 m":"faîtage + 40 cm")+")."]);
+  if(c.flat) a.push(["info","Info","Pente ≤ 15° : la toiture est traitée comme un toit plat (règle zone 1 du catalogue p.23)."]);
+  if(!c.devOK) a.push(["warn","À corriger","Le dévoiement ne tient pas dans les combles : il demande "+fmt(c.vg)+" m de hauteur. Réduisez le décalage ou augmentez l'angle."]);
+  if(c.hAct>HAUBAN) a.push(["warn","À vérifier","Plus de 3 m de conduit libre au-dessus du toit : prévoir un kit de non-haubanage ou un haubanage (règle catalogue p.33, à confirmer en toiture)."]);
+  if(!c.sol) a.push(["warn","À chiffrer","Aucun solin standard Ø"+i.diam+" pour une pente de "+i.pente+"°. Ligne à chiffrer sur demande."]);
+  if(c.Lsp<=0.05) a.push(["warn","À corriger","La buse est au niveau du plafond ou au-dessus : vérifiez la hauteur de buse."]);
+  if(c.cInt.over>0) a.push(["info","Info","Conduit intérieur : "+c.cInt.over+" mm de surlongueur avec les éléments standard, reportés sur la hauteur de sortie."]);
+  if(c.cSp.over>0) a.push(["info","Info","Raccordement émaillé : "+c.cSp.over+" mm de trop, à recouper ou à remplacer par un tuyau coulissant."]);
+  $("alerts").innerHTML=a.map(x=>'<div class="al '+x[0]+'"><span class="tag">'+(x[0]==="warn"?"⚠ ":x[0]==="ok"?"✓ ":"ⓘ ")+x[1]+'</span><span>'+x[2]+'</span></div>').join("");
+}
+
+function renderBom(c){
+  const rows=bom(c);let tot=0;
+  $("bom").innerHTML=rows.map(r=>{const t=r.pu!=null?r.pu*r.q:null;if(t)tot+=t;
+    const st=r.st==="cat"?'<span class="st cat">Catalogue</span>':r.st==="imp"?'<span class="st imp">Implicite</span>':'<span class="st pro">Provisoire</span>';
+    return '<tr><td class="rep"><span>'+r.rep+'</span></td><td>'+r.lib+st+(r.sub?'<span class="sub">'+r.sub+'</span>':'')+'</td><td class="ref">'+r.ref+'</td><td class="num">'+r.q+'</td><td class="num">'+(r.pu!=null?eur(r.pu):"—")+'</td><td class="num">'+(t!=null?eur(t):"sur devis")+'</td></tr>';}).join("");
+  $("bomTotal").textContent=eur(tot);
+  $("bomMeta").textContent=rows.length+" lignes · Ø"+c.i.diam;
+}
+
+function update(){
+  const i=read();const c=compute(i);
+  $("fHsp2").hidden=!i.nbEtages;$("fDecal").hidden=i.angle===0;
+  $("hintMin").textContent="Minimum réglementaire calculé : "+fmt(c.minSortie)+" m au-dessus du toit.";
+  const inox=i.fin==="inox";
+  $("lgExt").style.background=inox?"var(--blue)":"var(--blue-3)";
+  $("lgExtTxt").textContent="PTR30+ "+(inox?"inox":"laqué noir")+" (extérieur)";
+  draw(c);alerts(c);renderBom(c);
+}
+
+/* ---------- Événements ---------- */
+function seg(id,key,cast){const s=$(id);s.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  s.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));S[key]=cast(b.dataset.v);update();});}
+seg("segEtage","nbEtages",v=>+v);seg("segAngle","angle",v=>+v);seg("segFin","fin",v=>v);
+$("form").addEventListener("input",update);
+$("form").addEventListener("submit",e=>e.preventDefault());
+$("btnAjust").addEventListener("click",()=>{
+  const i=read();const c=compute(i);
+  let h=Math.ceil((c.minSortie-c.cInt.over/1000)*20-1e-9)/20;
+  for(let k=0;k<12;k++){const t=compute(Object.assign({},i,{hSortie:h}));if(t.topAct>=t.yReq-1e-6)break;h+=0.05;}
+  $("hSortie").value=h.toFixed(2);update();
+});
+update();
+})();
+</script>
+</body></html>
