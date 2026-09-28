@@ -91,6 +91,20 @@ export function computeLineTotals(line) {
 }
 
 /**
+ * Marge brute sur les lignes portant un prix d'achat (fournitures), avant remise globale
+ * (qui s'applique au total, pas ligne à ligne). Affichée dans le pied de la modale de devis.
+ * @param {Array<object>} lines - lignes du devis
+ * @returns {{ nb: number, vente: number, achat: number, marge: number, taux: number }}
+ */
+export function margeFournitures(lines) {
+  const produits = lines.filter((l) => l.line_type !== 'section_title' && l.purchase_price_ht != null && l.purchase_price_ht !== '');
+  const vente = produits.reduce((s, l) => s + (parseFloat(l.unit_price_ht) || 0) * (parseFloat(l.quantity) || 0), 0);
+  const achat = produits.reduce((s, l) => s + (parseFloat(l.purchase_price_ht) || 0) * (parseFloat(l.quantity) || 0), 0);
+  const marge = vente - achat;
+  return { nb: produits.length, vente, achat, marge, taux: vente > 0 ? (marge / vente) * 100 : 0 };
+}
+
+/**
  * Calcule les totaux globaux du devis avec ventilation TVA
  */
 export function computeQuoteTotals(lines, globalDiscountPercent = 0) {

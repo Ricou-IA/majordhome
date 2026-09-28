@@ -10,9 +10,8 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { TVA_RATES, computeLineTotals, computeQuoteTotals } from '@services/devis.service';
+import { TVA_RATES, computeLineTotals } from '@services/devis.service';
 import DevisProductPicker from './DevisProductPicker';
-import DevisTvaSummary from './DevisTvaSummary';
 import MetreFumisterie from './metre/MetreFumisterie';
 import { formatEuro } from '@/lib/utils';
 import {
@@ -140,6 +139,10 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
               {productCount} article{productCount > 1 ? 's' : ''} · {formatEuro(sectionTotalTtc)} TTC
             </span>
           )}
+          {/* Le métré assisté est l'action principale de la section FUMISTERIE : un vrai bouton, pas un chip près du « + » */}
+          {isFumisterie && onMetre && (
+            <button type="button" onClick={() => onMetre(sectionIndex)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-900 bg-primary-400 hover:bg-primary-500 rounded-lg" title="Métré assisté sur coupe cotée"><Ruler className="w-4 h-4" /> Métré assisté</button>
+          )}
         </div>
       </div>
 
@@ -174,9 +177,6 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 
       {/* Action button inside section */}
       <div className="flex gap-2 px-4 py-1.5 bg-secondary-50/50 border-t border-secondary-100">
-        {isFumisterie && onMetre && (
-          <button type="button" onClick={() => onMetre(sectionIndex)} className="flex items-center gap-1 px-2 h-6 text-xs font-medium text-secondary-800 bg-primary-100 hover:bg-primary-200 rounded-full border border-primary-300" title="Métré assisté sur coupe cotée"><Ruler className="w-3.5 h-3.5" /> Métré assisté</button>
-        )}
         {isLaborSection ? (
           <button
             type="button"
@@ -214,7 +214,7 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, globalDiscountPercent, leadId, family, onMetreValidated }) {
+export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, category }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
   const pickerCategory = pickerForSection?.category || null;
@@ -383,8 +383,6 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
     }]);
   }, [setLines]);
 
-  const totals = computeQuoteTotals(lines, globalDiscountPercent);
-
   // Vérifier si on a des sections
   const hasSections = lines.some((l) => l.line_type === 'section_title');
 
@@ -431,7 +429,7 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
       ) : (
         <div className="text-center py-8 text-secondary-500 text-sm">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          Sélectionnez une famille à l&apos;étape précédente pour commencer
+          Choisissez une installation ci-dessus pour créer les sections du devis
         </div>
       )}
 
@@ -439,11 +437,6 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
       <button type="button" onClick={addSection} className="btn-secondary btn-sm w-full">
         <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter une section
       </button>
-
-      {/* Totals */}
-      {lines.filter((l) => l.line_type !== 'section_title').length > 0 && (
-        <DevisTvaSummary totals={totals} globalDiscountPercent={globalDiscountPercent} />
-      )}
 
       {/* Product picker modal */}
       {pickerForSection && (
