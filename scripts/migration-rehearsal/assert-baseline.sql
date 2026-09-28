@@ -29,7 +29,11 @@ BEGIN
       ('majordhome.quote_status_bucket(text)'),
       ('public.update_majordhome_lead(uuid, jsonb)'),
       ('public.sync_intervention_from_visit()'),
-      ('majordhome.update_client_on_visit()')
+      ('majordhome.update_client_on_visit()'),
+      ('majordhome.maintenance_visit_date_guard()'),
+      ('majordhome.auto_expire_contract_on_end_date()'),
+      ('majordhome.update_client_on_contract_change()'),
+      ('majordhome.contract_activation_promote_cards()')
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
@@ -51,13 +55,26 @@ BEGIN
   -- Triggers utilisateur de majordhome.maintenance_visits (TRIGGER_TABLES)
   FOR r IN SELECT * FROM (VALUES
       ('sync_intervention_from_visit_trg', 'public.sync_intervention_from_visit()'),
-      ('trg_update_client_on_visit', 'majordhome.update_client_on_visit()')
+      ('trg_update_client_on_visit', 'majordhome.update_client_on_visit()'),
+      ('trg_maintenance_visit_date_guard', 'majordhome.maintenance_visit_date_guard()')
     ) AS t(trg, fn)
   LOOP
     PERFORM 1 FROM pg_trigger
      WHERE tgrelid = 'majordhome.maintenance_visits'::regclass AND NOT tgisinternal
        AND tgname = r.trg AND tgfoid = to_regprocedure(r.fn);
     IF NOT FOUND THEN RAISE EXCEPTION 'trigger % → % absent sur majordhome.maintenance_visits', r.trg, r.fn; END IF;
+  END LOOP;
+  -- Triggers utilisateur de majordhome.contracts (TRIGGER_TABLES)
+  FOR r IN SELECT * FROM (VALUES
+      ('trg_auto_expire_contract', 'majordhome.auto_expire_contract_on_end_date()'),
+      ('trg_update_client_on_contract', 'majordhome.update_client_on_contract_change()'),
+      ('trg_contract_activation_promote_cards', 'majordhome.contract_activation_promote_cards()')
+    ) AS t(trg, fn)
+  LOOP
+    PERFORM 1 FROM pg_trigger
+     WHERE tgrelid = 'majordhome.contracts'::regclass AND NOT tgisinternal
+       AND tgname = r.trg AND tgfoid = to_regprocedure(r.fn);
+    IF NOT FOUND THEN RAISE EXCEPTION 'trigger % → % absent sur majordhome.contracts', r.trg, r.fn; END IF;
   END LOOP;
 
   -- Vues (liste VIEWS) ; celles exposées via PostgREST doivent être security_invoker=true

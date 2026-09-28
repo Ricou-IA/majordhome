@@ -70,10 +70,15 @@ const FUNCTIONS = [
   // 20260928_1 : triggers de majordhome.maintenance_visits
   'public.sync_intervention_from_visit()',
   'majordhome.update_client_on_visit()',
+  'majordhome.maintenance_visit_date_guard()', // posé par 20260928_1
+  // 20260928_3 : triggers de majordhome.contracts
+  'majordhome.auto_expire_contract_on_end_date()',
+  'majordhome.update_client_on_contract_change()',
+  'majordhome.contract_activation_promote_cards()',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
-const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits'];
+const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits', 'majordhome.contracts'];
 
 const VIEWS = [
   'public.profiles', // cible des sous-requêtes « nom de l'auteur » des vues majordhome_* (interactions prospects…)

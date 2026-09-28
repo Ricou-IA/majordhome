@@ -162,24 +162,53 @@ export function getKanbanColumnConfig(columnValue) {
  * Vérifie si tous les enfants d'un parent sont en `realise` (rempli ou néant)
  * et déclenche `completeParentEntretien` le cas échéant.
  * Récupère l'org_id (core) via la vue `majordhome_entretien_sav`.
- * Erreurs loggées silencieusement — ne propage jamais (fire-and-forget).
+ * Remonte l'échec de la clôture (visite non enregistrée) : l'avaler reproduisait
+ * « Réalisé sans visite » en silence (DUBREUIL CTR-00036, 2026-09-10).
+ * @returns {Promise<{ error: any }>}
  */
 async function maybeCompleteParent(parentId) {
-  try {
-    const { data: parentRow } = await supabase
-      .from('majordhome_entretien_sav')
-      .select('id, org_id, workflow_status')
-      .eq('id', parentId)
-      .maybeSingle();
+  const { data: parentRow } = await supabase
+    .from('majordhome_entretien_sav')
+    .select('id, org_id, workflow_status')
+    .eq('id', parentId)
+    .maybeSingle();
 
-    if (!parentRow || !parentRow.org_id) return;
-    // Ne pas re-déclencher si parent déjà clôturé
-    if (parentRow.workflow_status === 'realise' || parentRow.workflow_status === 'facture') return;
+  if (!parentRow || !parentRow.org_id) return { error: null };
+  // Ne pas re-déclencher si parent déjà clôturé
+  if (parentRow.workflow_status === 'realise' || parentRow.workflow_status === 'facture') return { error: null };
 
-    await savService.completeParentEntretien(parentId, parentRow.org_id);
-  } catch (err) {
-    console.warn('[sav] maybeCompleteParent silent error:', err);
-  }
+  const { error } = await savService.completeParentEntretien(parentId, parentRow.org_id);
+  return { error: error || null };
+}
+
+/**
+ * Contrat d'une carte entretien racine. Une carte posée pendant que le contrat du client
+ * était résilié naît sans `contract_id` (carte « dégradée » d'`ensureEntretienCard`) : on la
+ * rattache au contrat ACTIF du client (1 contrat par client, `contracts_client_id_key`)
+ * avant d'enregistrer la visite — sinon aucune visite n'est possible. La réactivation d'un
+ * contrat rattache aussi ces cartes côté DB (migration 20260928_3).
+ * @param {{ id: string, contract_id?: string|null, client_id?: string|null }} root
+ * @param {string} orgId - org core
+ * @returns {Promise<string|null>} contract_id, ou null si le client n'a pas de contrat actif
+ */
+async function resolveRootContractId(root, orgId) {
+  if (root.contract_id) return root.contract_id;
+  if (!root.client_id || !orgId) return null;
+  const { data: contract, error } = await supabase
+    .from('majordhome_contracts')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('client_id', root.client_id)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (error) throw error;
+  if (!contract?.id) return null;
+  const { error: upErr } = await supabase
+    .from('majordhome_interventions')
+    .update({ contract_id: contract.id })
+    .eq('id', root.id);
+  if (upErr) throw upErr;
+  return contract.id;
 }
 
 /**
@@ -897,17 +926,20 @@ export const savService = {
         .from('majordhome_interventions')
         .update({ workflow_status: 'realise', status: 'completed' })
         .eq('id', interventionId)
-        .select('id, parent_id, intervention_type, contract_id, scheduled_date, technician_id, technician_name, created_by')
+        .select('id, parent_id, intervention_type, client_id, contract_id, scheduled_date, technician_id, technician_name, created_by')
         .single();
 
       if (error) throw error;
 
       if (data?.parent_id) {
-        await maybeCompleteParent(data.parent_id);
-      } else if (data?.intervention_type === 'entretien' && data?.contract_id) {
+        const { error: parentError } = await maybeCompleteParent(data.parent_id);
+        if (parentError) throw new Error(`visite non enregistrée : ${parentError.message || parentError}`);
+      } else if (data?.intervention_type === 'entretien') {
         const orgId = await getCoreOrgIdForRoot(data.id);
+        const contractId = await resolveRootContractId(data, orgId);
+        if (!contractId) throw new Error('visite non enregistrée : la carte n’est liée à aucun contrat actif');
         const today = new Date().toISOString().split('T')[0];
-        const { error: visitError } = await recordRootVisit(data, orgId, {
+        const { error: visitError } = await recordRootVisit({ ...data, contract_id: contractId }, orgId, {
           visitDate: visitDate || data.scheduled_date || today,
         });
         // La carte est déjà « Réalisé » : on remonte l'échec au lieu de l'avaler,
@@ -936,7 +968,8 @@ export const savService = {
       if (error) throw error;
 
       if (data?.parent_id) {
-        await maybeCompleteParent(data.parent_id);
+        const { error: parentError } = await maybeCompleteParent(data.parent_id);
+        if (parentError) throw new Error(`visite non enregistrée : ${parentError.message || parentError}`);
       }
 
       return data;
@@ -991,7 +1024,7 @@ export const savService = {
       // 2) Lire le parent pour récupérer scheduled_date + infos technicien
       const { data: parent } = await supabase
         .from('majordhome_interventions')
-        .select('contract_id, scheduled_date, technician_id, technician_name, created_by')
+        .select('id, client_id, contract_id, scheduled_date, technician_id, technician_name, created_by')
         .eq('id', parentId)
         .single();
 
@@ -1012,10 +1045,12 @@ export const savService = {
 
       if (parentErr) throw parentErr;
 
-      // 4) Insert maintenance_visit (chaînage annuel)
-      if (parent?.contract_id) {
-        await recordRootVisit(parent, orgId, { visitDate, notes: reportNotes });
-      }
+      // 4) Insert maintenance_visit (chaînage annuel) — jamais sauté en silence :
+      //    carte sans contrat → rattachée au contrat actif du client, sinon erreur.
+      const contractId = await resolveRootContractId({ ...parent, id: parentId }, orgId);
+      if (!contractId) throw new Error('la carte n’est liée à aucun contrat actif');
+      const { error: visitError } = await recordRootVisit({ ...parent, contract_id: contractId }, orgId, { visitDate, notes: reportNotes });
+      if (visitError) throw visitError;
 
       return { allDone: true };
     }, 'sav.completeParentEntretien');
