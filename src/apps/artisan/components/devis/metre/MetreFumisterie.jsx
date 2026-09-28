@@ -39,6 +39,14 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
   const [configurationId, setConfigurationId] = useState(draft?.configurationId ?? null);
   const [releve, setReleveState] = useState(draft?.releve ?? null);
   const setReleve = (r) => { setReleveState(r); setDraft({ etape, criteres, configurationId, releve: r }); };
+  // Un brouillon restauré se DIT (il peut rouvrir directement le relevé d'une autre configuration
+  // que celle qu'on attend) et se jette d'un geste. Contradiction famille ↔ brouillon = alerte.
+  const [brouillonRestaure, setBrouillonRestaure] = useState(!!draft);
+  const familleCriteres = criteresDepuisFamille(family);
+  const brouillonContradictoire = !!(draft?.criteres?.combustible && familleCriteres.combustible && draft.criteres.combustible !== familleCriteres.combustible);
+  const repartirDeZero = () => {
+    clear(); setBrouillonRestaure(false); setEtape(0); setCriteres(familleCriteres); setConfigurationId(null); setReleveState(null);
+  };
 
   const confsQ = useFumConfigurations(orgId);
   const bundleQ = useFumBundle(orgId, configurationId);
@@ -93,6 +101,16 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
         <button type="button" onClick={() => { if (window.confirm('Quitter le métré ? La saisie en cours reste en brouillon.')) onClose(); }} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
       </header>
       <main className="flex-1 overflow-y-auto p-4">
+        {brouillonRestaure && (
+          <div role="status" className={`flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-lg border text-sm ${brouillonContradictoire ? 'border-primary-300 bg-primary-50 text-primary-900' : 'border-secondary-200 bg-white text-secondary-700'}`}>
+            <span>
+              {brouillonContradictoire ? <AlertTriangle className="w-4 h-4 inline mr-1.5 -mt-0.5" /> : null}
+              Saisie précédente restaurée pour ce lead{bundle?.configuration ? ` : ${bundle.configuration.code} · ${bundle.configuration.titre}` : ''}.
+              {brouillonContradictoire && ` Ce métré est « ${draft.criteres.combustible === 'pellets' ? 'pellets' : 'bois bûches'} » alors que le devis est « ${family} ».`}
+            </span>
+            <button type="button" onClick={repartirDeZero} className="btn-secondary shrink-0">Repartir de zéro</button>
+          </div>
+        )}
         {erreurRequete ? <Blocage titre="Chargement du catalogue fumisterie impossible" message={erreurRequete.message || String(erreurRequete)} />
           : sansFournisseur ? <Blocage titre="Aucun fournisseur de fumisterie configuré (MODINOX / ALTEMA) — importer le tarif" />
           : etape === 0 ? (confsQ.isLoading ? <Spinner /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onSelect={setConfigurationId} />)
