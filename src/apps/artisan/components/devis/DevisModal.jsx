@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useDevisDetail, useDevisLines, useDevisMutations } from '@hooks/useDevis';
-import { computeQuoteTotals, devisService, QUOTE_TEMPLATE_FAMILIES } from '@services/devis.service';
+import { computeQuoteTotals, devisService, QUOTE_TEMPLATE_FAMILIES, hasUnpricedLines, UNPRICED_LINES_MESSAGE } from '@services/devis.service';
 import DevisStatusBadge from './DevisStatusBadge';
 import DevisTvaSummary from './DevisTvaSummary';
 import { formatEuro, formatDateFR } from '@/lib/utils';
@@ -57,6 +57,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   if (!quote) return null;
 
   const totals = computeQuoteTotals(lines, quote.global_discount_percent);
+  const unpriced = hasUnpricedLines(lines);
   const isBrouillon = quote.status === 'brouillon';
   const isEnvoye = quote.status === 'envoye';
 
@@ -406,9 +407,9 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             {pennylaneEnabled && isBrouillon && !quote.pennylane_quote_id && (
               <button
                 onClick={handlePush}
-                disabled={isPushing || !client}
+                disabled={isPushing || !client || unpriced}
                 className="btn-primary btn-sm"
-                title={!client ? 'Lier un client au lead avant l\'envoi' : 'Créer le devis dans Pennylane et le rattacher au lead'}
+                title={!client ? 'Lier un client au lead avant l\'envoi' : unpriced ? UNPRICED_LINES_MESSAGE : 'Créer le devis dans Pennylane et le rattacher au lead'}
               >
                 {isPushing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
                 Envoyer dans Pennylane

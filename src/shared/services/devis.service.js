@@ -144,6 +144,20 @@ export function computeQuoteTotals(lines, globalDiscountPercent = 0) {
 // SERVICE PRINCIPAL
 // ============================================================================
 
+/** Message unique (hook + bouton) : un devis avec des lignes « à chiffrer » ne part pas dans Pennylane. */
+export const UNPRICED_LINES_MESSAGE = 'Des lignes sont encore « à chiffrer » (0 €) : complétez le devis avant l’envoi dans Pennylane';
+
+/**
+ * Lignes non chiffrées : hors titres de section, prix unitaire ≤ 0 ou mention « À CHIFFRER »
+ * (injectée par le métré fumisterie quand aucun article n'a été résolu).
+ * @param {Array<{line_type?: string, unit_price_ht?: number|string|null, description?: string|null}>} lines
+ * @returns {boolean}
+ */
+export function hasUnpricedLines(lines) {
+  return (lines || []).some((l) => l.line_type !== 'section_title'
+    && (!(Number(l.unit_price_ht) > 0) || /À CHIFFRER/i.test(String(l.description || ''))));
+}
+
 export const devisService = {
   // ==========================================================================
   // LECTURE
@@ -445,9 +459,9 @@ export const devisService = {
    * Après un push Pennylane réussi : le devis MDH est « envoyé » et porte l'id PL.
    * Ne touche QUE status / sent_at / pennylane_quote_id / pennylane_synced_at.
    */
-  async markPushedToPennylane(quoteId, { pennylaneQuoteId, pennylaneNumber } = {}) {
+  async markPushedToPennylane(quoteId, orgId, { pennylaneQuoteId, pennylaneNumber } = {}) {
     try {
-      if (!quoteId || !pennylaneQuoteId) throw new Error('[devisService] quoteId et pennylaneQuoteId requis');
+      if (!quoteId || !orgId || !pennylaneQuoteId) throw new Error('[devisService] quoteId, orgId et pennylaneQuoteId requis');
 
       const now = new Date().toISOString();
       const { data, error } = await supabase
@@ -459,6 +473,7 @@ export const devisService = {
           pennylane_synced_at: now,
         })
         .eq('id', quoteId)
+        .eq('org_id', orgId)
         .select()
         .single();
 

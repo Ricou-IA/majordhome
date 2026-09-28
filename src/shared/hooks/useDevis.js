@@ -11,7 +11,7 @@
 
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { devisService } from '@services/devis.service';
+import { devisService, hasUnpricedLines, UNPRICED_LINES_MESSAGE } from '@services/devis.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { pennylaneService } from '@services/pennylane.service';
 import { devisKeys, leadKeys, kanbanCardKeys } from '@hooks/cacheKeys';
@@ -218,6 +218,7 @@ export function useDevisMutations(leadId) {
   const pushMutation = useMutation({
     mutationFn: async ({ quote, lines, client }) => {
       if (!client) throw new Error('Le devis doit être lié à un client pour partir dans Pennylane');
+      if (hasUnpricedLines(lines)) throw new Error(UNPRICED_LINES_MESSAGE);
       const pushed = await unwrapResult(pennylaneService.pushQuote(quote, lines, client, orgId));
       if (!pushed?.pennylane_id) throw new Error('Pennylane n\'a pas renvoyé d\'identifiant de devis');
 
@@ -232,9 +233,12 @@ export function useDevisMutations(leadId) {
           pdf_url: pushed.url || null,
         }]));
         attached = res?.attached ?? 0;
+        // Rattachement refusé en silence (0 ligne) : le devis MDH reste brouillon, un nouvel
+        // essai rejoue le PUT sur le même devis PL puis le rattachement.
+        if (!attached || !res?.results?.length) throw new Error('Devis créé dans Pennylane mais non rattaché au lead — réessayez');
       }
 
-      await unwrapResult(devisService.markPushedToPennylane(quote.id, {
+      await unwrapResult(devisService.markPushedToPennylane(quote.id, orgId, {
         pennylaneQuoteId: pushed.pennylane_id,
         pennylaneNumber: pushed.pennylane_number,
       }));
