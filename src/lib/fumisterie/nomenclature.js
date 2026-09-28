@@ -27,7 +27,7 @@ export function construireNomenclature({ composants, mapping, articles, geometri
   const manquant = (comp, criteres) => alertes.push({ niveau: 'warn', code: 'article_manquant', source: 'catalogue',
     message: `${comp.libelle} : aucun article ${criteres} au tarif — ligne à chiffrer.` });
   const ambigu = (comp, criteres, refs) => alertes.push({ niveau: 'warn', code: 'article_ambigu', source: 'catalogue',
-    message: `${comp.libelle} : plusieurs articles possibles ${criteres} (${refs.join(', ')}) — ligne à chiffrer, préciser le mapping.` });
+    message: `${comp.libelle} : plusieurs articles possibles ${criteres} (${refs.slice(0, 6).join(', ')}${refs.length > 6 ? ` … ${refs.length} au total` : ''}) — ligne à chiffrer, préciser le mapping.` });
   // Le résultat de résolution (article + éventuels candidats ambigus) est mémorisé pour `pousser`.
   let derniersAmbigus = null;
   const resoudre = (comp, c) => {
@@ -54,7 +54,10 @@ export function construireNomenclature({ composants, mapping, articles, geometri
     const [regle, arg] = String(comp.regle_quantite || 'unitaire').split(':');
     const tr = arg ? geometrie.troncons[arg] : null;
     if (regle === 'unitaire') {
-      const pente = comp.composant_code === 'solin' ? releve.pente : null;
+      // La pente du toit ne départage que les pièces à plage de pente (solins, souches) : passée aux
+      // autres, elle écarterait tout article sans plage (chapeau, plaque…).
+      const typeMap = mapping.find((m) => m.composant_code === comp.composant_code && m.gamme_catalogue === gamme(comp))?.type_piece;
+      const pente = (comp.composant_code === 'solin' || typeMap === 'solin' || typeMap === 'souche') && releve.pente != null ? releve.pente : null;
       const { article, mapping: m } = resoudre(comp, { pente });
       pousser(comp, article, qte(m, 1), pente != null ? `pour Ø${releve.diametre} et une pente de ${pente}°` : `Ø${releve.diametre}`,
         { sous_libelle: pente != null && article ? `Choisi d'après la pente saisie (${pente}°)` : undefined });
@@ -78,6 +81,19 @@ export function construireNomenclature({ composants, mapping, articles, geometri
       if (tr.ml == null) { alertes.push({ niveau: 'warn', code: 'troncon_non_ml', source: 'gabarit', message: `${comp.libelle} : le tronçon ${arg} n'a pas de longueur au mètre.` }); continue; }
       const { article, mapping: m } = resoudre(comp, {});
       pousser(comp, article, qte(m, tr.ml), `au ml Ø${releve.diametre}`, { sous_libelle: `${String(tr.ml).replace('.', ',')} m au mètre linéaire` });
+    } else if (regle === 'kit_longueur') {
+      // Kit vendu par longueur entière (gaine isolée POLYPERF « N ML ») : un kit, choisi au mètre supérieur.
+      if (!tr || tr.ml == null) { alertes.push({ niveau: 'warn', code: 'troncon_non_ml', source: 'gabarit', message: `${comp.libelle} : le tronçon ${arg} n'a pas de longueur au mètre.` }); continue; }
+      const ml = Math.ceil(tr.ml - 1e-9);
+      const { article, mapping: m } = resoudre(comp, { ml });
+      pousser(comp, article, qte(m, 1), `kit ${ml} m Ø${releve.diametre}`, { sous_libelle: `Kit de ${ml} m (${String(tr.ml).replace('.', ',')} m nécessaires)` });
+    } else if (regle === 'par_intervalle') {
+      // Fixations réparties le long d'un tronçon (supports muraux en façade) : 1 tous les N m, au moins 1.
+      if (!tr) { alertes.push({ niveau: 'warn', code: 'troncon_inconnu', source: 'gabarit', message: `${comp.libelle} : tronçon ${arg} absent de la géométrie.` }); continue; }
+      const pas = reglages.supports_muraux_tous_les_m > 0 ? reglages.supports_muraux_tous_les_m : 2;
+      const n = Math.max(1, Math.ceil(tr.longueur_mm / 1000 / pas - 1e-9));
+      const { article, mapping: m } = resoudre(comp, {});
+      pousser(comp, article, qte(m, n), `Ø${releve.diametre}`, { sous_libelle: `1 tous les ${String(pas).replace('.', ',')} m` });
     } else if (regle === 'par_emboitement') {
       const n = tr?.composition ? tr.composition.nb * (reglages.colliers_par_emboitement ?? 1) : 0;
       if (n > 0) {

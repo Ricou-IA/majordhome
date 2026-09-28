@@ -1,0 +1,24 @@
+[
+  { "ordre": 1, "composant_code": "pla_chapeau_ar", "libelle": "Chapeau anti-refouleur PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_toit", "repere": 1, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 2, "composant_code": "pla_element_exterieur", "libelle": "Élément droit PLA au-dessus du toit", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_toit", "repere": 2, "statut": "catalogue", "regle_quantite": "par_longueur:sortie_toit" },
+  { "ordre": 3, "composant_code": "pla_collier_jonction", "libelle": "Collier de jonction PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_toit", "repere": 2, "statut": "provisoire", "regle_quantite": "par_emboitement:sortie_toit" },
+  { "ordre": 4, "composant_code": "solin_pla", "libelle": "Solin", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "traversee_toiture", "repere": 3, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Solin au Ø extérieur du PLA — à chiffrer si absent du tarif" },
+  { "ordre": 5, "composant_code": "pla_coude_devoiement", "libelle": "Coudes de dévoiement PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "devoiement", "repere": 4, "statut": "catalogue", "regle_quantite": "coudes:devoiement" },
+  { "ordre": 6, "composant_code": "pla_element_interieur", "libelle": "Élément droit PLA (plafond → toiture)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "conduit_interieur", "repere": 4, "statut": "implicite", "regle_quantite": "par_longueur:conduit_interieur" },
+  { "ordre": 7, "composant_code": "pla_plaque_proprete", "libelle": "Plaque de propreté RT2012 PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "traversee_plancher", "repere": 5, "statut": "provisoire", "regle_quantite": "par_plancher" },
+  { "ordre": 8, "composant_code": "pla_couronne_coupe_feu", "libelle": "Couronne coupe-feu PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "traversee_plancher", "repere": 5, "statut": "provisoire", "regle_quantite": "par_plancher" },
+  { "ordre": 9, "composant_code": "pla_element_raccord", "libelle": "Élément droit PLA (raccordement concentrique)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement_sp", "repere": 6, "statut": "catalogue", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 10, "composant_code": "pla_manchon_appareil", "libelle": "Manchon de raccordement PLA sur l'appareil", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement_sp", "repere": 6, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 11, "composant_code": "pla_raccord_air", "libelle": "Raccord d'air comburant (té piquage PLA)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement_sp", "repere": 6, "statut": "provisoire", "regle_quantite": "unitaire" }
+]

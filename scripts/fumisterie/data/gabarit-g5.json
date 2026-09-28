@@ -1,0 +1,33 @@
+{
+  "code": "G5", "libelle": "Raccordement seul (conduit existant conforme)", "description": "Tuyau simple paroi de l'appareil au conduit existant, par le plafond ou par le mur, avec sa finition. Le conduit n'est pas métré. Règles provisoires (tranche 3).", "troncons": [
+  { "type": "appareil", "libelle": "Appareil", "parametres": [
+  { "cle": "diametre", "libelle": "Diamètre conduit", "unite": "mm", "choix": [
+            80,
+            100,
+            130,
+            150,
+            180 ], "defaut": 150 },
+  { "cle": "hBuse", "libelle": "Hauteur de buse", "unite": "m", "min": 0.3, "max": 2, "pas": 0.05, "defaut": 1.05 } ] },
+  { "type": "raccordement", "libelle": "Raccordement", "parametres": [
+  { "cle": "entree", "libelle": "Entrée dans le conduit", "choix": [
+            "plafond", "mur" ], "libelles": {
+            "plafond": "Par le plafond", "mur": "Par le mur"
+          }, "defaut": "plafond" },
+  { "cle": "hsp1", "libelle": "Hauteur sous plafond", "unite": "m", "min": 2, "max": 5, "pas": 0.05, "defaut": 2.5 },
+  { "cle": "hEntree", "libelle": "Hauteur du piquage dans le conduit", "unite": "m", "min": 0.5, "max": 4, "pas": 0.05, "defaut": 1.5, "optionnel": true, "si": {
+            "entree": "mur" }
+        },
+  { "cle": "lHoriz", "libelle": "Longueur horizontale jusqu'au conduit", "unite": "m", "min": 0.1, "max": 3, "pas": 0.05, "defaut": 0.5, "optionnel": true, "si": {
+            "entree": "mur" }
+        },
+  { "cle": "raccord", "libelle": "Tuyau de raccordement", "choix": [
+            "emaille_12", "emaille_07", "acier_peint" ], "libelles": {
+            "emaille_12": "Émaillé 1,2 mm", "emaille_07": "Émaillé 0,7 mm (pellets)", "acier_peint": "Acier peint 2 mm"
+          }, "defaut": "emaille_12" } ] },
+  { "type": "options", "libelle": "Options", "parametres": [
+  { "cle": "kit_air", "libelle": "Kit d'entrée d'air", "choix": [
+            0,
+            1 ], "libelles": {
+            "0": "Non", "1": "Oui"
+          }, "defaut": 0 } ] } ]
+}

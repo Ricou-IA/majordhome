@@ -15,6 +15,7 @@
  *   flexible_arrondi_m: number,
  *   longueurs_prh_mm: number[],
  *   longueurs_prh_5_10_mm: number[],
+ *   supports_muraux_tous_les_m: number,
  *   tva_fournitures: number,
  *   tva_pose: number,
  * }}
@@ -34,6 +35,7 @@ export const DEFAULTS_FUMISTERIE = Object.freeze({
   flexible_arrondi_m: 0.50,             // le flexible (vendu au ml) se commande au multiple supérieur
   longueurs_prh_mm: Object.freeze([1000, 500, 330]), // tuyaux rigides PRH 6/10 (Ø ≥ 130), du plus long au plus court
   longueurs_prh_5_10_mm: Object.freeze([1000, 500, 250]), // tuyaux rigides PRH 5/10 (Ø 80/100, pellets)
+  supports_muraux_tous_les_m: 2,        // façade (G3) : 1 support mural tous les N m — PROVISOIRE
   tva_fournitures: 20,
   tva_pose: 10,
 });

@@ -14,8 +14,9 @@
 //
 // Placeholders du motif : {D} diamètre, {D-n}/{D+n} diamètre ± n (ex. raccord réduit pour tuyau
 // émaillé : Ø150 → femelle 148), {LG} longueur, {A} angle, {BOI} indice de section de boisseau
-// (1..6, même numérotation MODINOX pour les kits de couronnement et les plaques ventilées).
-// Valeur inconnue → `\d+`.
+// (1..6, même numérotation MODINOX pour les kits de couronnement et les plaques ventilées), {BOI4}
+// la même section en 4 chiffres (références PLA « 2020 », « 3050 »), {ML} longueur entière en mètres
+// d'un kit (gaine isolée vendue par kit de N ml). Valeur inconnue → `\d+`.
 
 /**
  * Compile un motif de code en RegExp pour les critères donnés.
@@ -30,13 +31,23 @@ export function compilerMotif(motif, c) {
     .replace(/\{D\}/g, val(c.diametre))
     .replace(/\{LG\}/g, val(c.longueur))
     .replace(/\{A\}/g, val(c.angle))
-    .replace(/\{BOI\}/g, val(c.boisseau));
+    .replace(/\{BOI\}/g, val(c.boisseau))
+    .replace(/\{BOI4\}/g, val(BOISSEAU_4CHIFFRES[c.boisseau]))
+    .replace(/\{ML\}/g, val(c.ml));
   return new RegExp(src);
 }
 
-/** Un motif sans `{D…}` désigne un article indépendant du diamètre (kit d'entrée d'air…). */
+/** Sections de boisseau (indice 1..6 du relevé) → 4 chiffres des références PLA (adaptateurs n°6 / n°7). */
+export const BOISSEAU_4CHIFFRES = Object.freeze({ 1: '2020', 2: '2525', 3: '3030', 4: '2040', 5: '4040', 6: '3050' });
+
+/**
+ * Un motif sans `{D}` désigne un article dont le diamètre NOMINAL n'est pas celui du relevé : kit
+ * d'entrée d'air (aucun placeholder), ou pièce référencée par un Ø extérieur (`{D+60}` seul :
+ * support mural intermédiaire PTR, collier Polytoit, solin MFI). Le chargement et la résolution ne
+ * filtrent alors pas sur le Ø ; le motif fait le tri.
+ */
 export function motifDependDuDiametre(motif) {
-  return /\{D[+-]?\d*\}/.test(String(motif || ''));
+  return /\{D\}/.test(String(motif || ''));
 }
 
 /**
@@ -76,7 +87,9 @@ export function resoudreArticle(articles, mappings, c) {
     const criteresOk = (a) => a.is_active !== false && !a.sur_mesure && !a.hors_perimetre
       && (c.longueur == null || a.longueur_mm === c.longueur)
       && (c.angle == null || a.angle === c.angle)
-      && (c.pente == null || (a.pente_min != null && a.pente_max != null && c.pente >= a.pente_min && c.pente <= a.pente_max))
+      // Une pièce sans plage de pente (collerette PLA) n'est pas écartée par la pente : la plage ne
+      // départage que les articles qui en ont une (solins inox, souches).
+      && (c.pente == null || a.pente_min == null || a.pente_max == null || (c.pente >= a.pente_min && c.pente <= a.pente_max))
       && (!m.finition || a.couleur === m.finition);
     // Un mapping dont le motif ne cite pas le diamètre désigne un article indépendant du Ø (kit
     // d'entrée d'air Ø100 posé sur un conduit Ø80) : le Ø du relevé ne filtre pas les candidats.

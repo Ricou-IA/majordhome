@@ -11,14 +11,17 @@ export default function CoupeCoteeG4({ geometrie: c, releve: i, onFocusChamp }) 
     const mur = c.mur;
     const xB = mur ? Math.max(0.9, Number(i.lHoriz) + 0.45) : 0; // axe du boisseau
     const bw = 0.5; // largeur dessinée du boisseau
-    const minX = -2.6; const maxX = xB + bw + 1.6; const minY = -0.4; const maxY = c.ySouche + 0.9;
+    // Raccordement seul (G5) ou foyer : pas de conduit métré → on en dessine 1,5 m à titre indicatif.
+    const ySouche = c.ySouche > c.yEntree + 0.2 ? c.ySouche : c.yEntree + 1.5;
+    const minX = -2.6; const maxX = xB + bw + 1.6; const minY = -0.4; const maxY = ySouche + 0.9;
     const sc = Math.min(760 / (maxX - minX), 980 / (maxY - minY));
-    return { mur, xB, bw, minX, maxX, maxY, sc, VW: (maxX - minX) * sc, VH: (maxY - minY) * sc, X: (x) => (x - minX) * sc, Y: (y) => (maxY - y) * sc };
+    return { mur, xB, bw, ySouche, minX, maxX, maxY, sc, VW: (maxX - minX) * sc, VH: (maxY - minY) * sc, X: (x) => (x - minX) * sc, Y: (y) => (maxY - y) * sc };
   }, [c, i]);
-  const { mur, xB, bw, minX, sc, VW, VH, X, Y } = scene;
+  const { mur, xB, bw, ySouche, minX, sc, VW, VH, X, Y } = scene;
   const pts = (arr) => arr.map(([x, y]) => `${X(x)},${Y(y)}`).join(' ');
   const pw = Math.max(6, (Number(i.diametre) >= 150 ? 0.2 : 0.15) * sc);
-  const yEntree = c.yEntree; const yS = c.ySouche;
+  const conduitMetre = c.ySouche > c.yEntree + 0.2;
+  const yEntree = c.yEntree; const yS = ySouche;
   const cote = (key, cle, label, x1, y1, x2, y2, horizontal = false, side = 'l') => {
     const tx = `${fmt(horizontal ? Math.abs(x2 - x1) : Math.abs(y2 - y1))} m`; const bwT = tx.length * 8.2 + 10;
     const mx = horizontal ? (X(x1) + X(x2)) / 2 : (side === 'r' ? X(x1) + 6 + bwT / 2 : X(x1) - 6 - bwT / 2);
@@ -81,7 +84,8 @@ export default function CoupeCoteeG4({ geometrie: c, releve: i, onFocusChamp }) 
       {cote('hsp1', 'hsp1', 'Hauteur sous plafond', dx2, 0, dx2, hsp)}
       {mur ? cote('hEntree', 'hEntree', 'Hauteur du piquage', dx1, i.hBuse, dx1, yEntree) : null}
       {mur ? cote('lHoriz', 'lHoriz', 'Longueur horizontale', 0, yEntree + 0.3, xB - bw / 2, yEntree + 0.3, true) : null}
-      {cote('conduit', 'hConduit', 'Hauteur du conduit existant', dxB, yEntree, dxB, yS, false, 'r')}
+      {conduitMetre ? cote('conduit', 'hConduit', 'Hauteur du conduit existant', dxB, yEntree, dxB, yS, false, 'r')
+        : <text x={X(xB)} y={Y(yEntree + 0.75)} textAnchor="middle" className="fill-secondary-500 text-[12px]">non métré</text>}
       {repere(1, xB + 0.2, yS + 0.3, xB - 0.9, yS + 0.55)}
       {repere(2, xB + bw / 2 + 0.05, yS + 0.02, xB - 0.9, yS + 0.05)}
       {repere(3, xB, (yEntree + yS) / 2, xB - 0.9, (yEntree + yS) / 2)}

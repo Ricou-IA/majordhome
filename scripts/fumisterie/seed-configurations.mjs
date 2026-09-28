@@ -18,11 +18,17 @@ const ORG = args[args.indexOf('--org') + 1] || '3c68193e-783b-4aa9-bc0d-fb2ce21e
 const lire = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const biblio = lire(path.join(racine, 'docs', 'devis-fumisterie', 'bibliotheque_configurations_modinox_v1.json'));
 const data = (f) => lire(path.join(racine, 'scripts', 'fumisterie', 'data', f));
-const GABARITS = ['gabarit-g1.json', 'gabarit-g4.json', 'gabarit-g4r.json'].map(data);
+const GABARITS = ['g1', 'g3', 'g3p', 'g4', 'g4r', 'g4p', 'g4k', 'g4f', 'g5', 'g6'].map((g) => data(`gabarit-${g}.json`));
 const VERSION = 'modinox_2026';
-const GABARIT_PAR_CODE = { 'CFG-24': 'G1', 'CFG-34': 'G4', 'CFG-26': 'G4', 'CFG-35': 'G4R', 'CFG-27': 'G4R' };
-const COMPOSANTS_PAR_CODE = Object.fromEntries(['24', '26', '27', '34', '35'].map((n) => [`CFG-${n}`, data(`cfg${n}-composants.json`)]));
-const MAPPING = ['cfg24-mapping.json', 'g4-mapping.json'].flatMap(data);
+// Gabarit de chaque configuration métrable (tranche 1 : G1 ; tranche 2 : G4/G4R ; tranche 3 : le reste).
+export const GABARIT_PAR_CODE = {
+  'CFG-24': 'G1', 'CFG-32': 'G1', 'CFG-42': 'G1', 'CFG-28': 'G1', 'CFG-48': 'G1', 'CFG-40': 'G1',
+  'CFG-25': 'G3', 'CFG-33': 'G3P',
+  'CFG-34': 'G4', 'CFG-26': 'G4', 'CFG-35': 'G4R', 'CFG-27': 'G4R', 'CFG-37': 'G4P', 'CFG-39': 'G4P', 'CFG-30': 'G4K', 'CFG-31': 'G4K', 'CFG-43': 'G4F',
+  'CFG-45': 'G5', 'CFG-29': 'G6',
+};
+const COMPOSANTS_PAR_CODE = Object.fromEntries(Object.keys(GABARIT_PAR_CODE).map((code) => [code, data(`cfg${code.slice(4)}-composants.json`)]));
+const MAPPING = ['cfg24-mapping.json', 'g4-mapping.json', 'tranche3-mapping.json'].flatMap(data);
 
 const q = (v) => (v == null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
 const arr = (a) => `ARRAY[${(a || []).map(q).join(',')}]::text[]`;

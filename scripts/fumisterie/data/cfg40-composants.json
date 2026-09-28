@@ -1,0 +1,26 @@
+[
+  { "ordre": 1, "composant_code": "mfi_chapeau_ar", "libelle": "Chapeau anti-refouleur MFI", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "sortie_toit", "repere": 1, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 2, "composant_code": "mfi_element_exterieur", "libelle": "Élément droit MFI au-dessus du toit", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "sortie_toit", "repere": 2, "statut": "catalogue", "regle_quantite": "par_longueur:sortie_toit" },
+  { "ordre": 3, "composant_code": "mfi_collier_jonction", "libelle": "Collier de jonction MFI", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "sortie_toit", "repere": 2, "statut": "provisoire", "regle_quantite": "par_emboitement:sortie_toit" },
+  { "ordre": 4, "composant_code": "solin_mfi", "libelle": "Solin", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "traversee_toiture", "repere": 3, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Solin au Ø extérieur du MFI — à chiffrer si absent du tarif" },
+  { "ordre": 5, "composant_code": "mfi_coude_devoiement", "libelle": "Coudes de dévoiement MFI", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "devoiement", "repere": 4, "statut": "catalogue", "regle_quantite": "coudes:devoiement" },
+  { "ordre": 6, "composant_code": "mfi_element_interieur", "libelle": "Élément droit MFI (plafond → toiture)", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "conduit_interieur", "repere": 4, "statut": "implicite", "regle_quantite": "par_longueur:conduit_interieur" },
+  { "ordre": 7, "composant_code": "mfi_plaque_proprete", "libelle": "Plaque de propreté RT2012 MFI", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "traversee_plancher", "repere": 5, "statut": "provisoire", "regle_quantite": "par_plancher" },
+  { "ordre": 8, "composant_code": "mfi_couronne_coupe_feu", "libelle": "Couronne coupe-feu MFI", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "traversee_plancher", "repere": 5, "statut": "provisoire", "regle_quantite": "par_plancher" },
+  { "ordre": 9, "composant_code": "mfi_te_air", "libelle": "Té 135° piquage d'air MFI", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "raccordement_sp", "repere": 6, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Piquage air Ø100 par défaut — à valider" },
+  { "ordre": 10, "composant_code": "mfi_kit_raccordement", "libelle": "Kit de raccordement MFI (selon l'appareil)", "chapitre": "MULTI-FLUX ISOLÉ MFI", "gammes": [
+      "MFI" ], "troncon": "raccordement_sp", "repere": 6, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Un kit par modèle d'appareil (fiche R-MFI-01) : à chiffrer d'après la fiche" },
+  { "ordre": 11, "composant_code": "raccord_simple_paroi", "libelle": "Raccord simple paroi (sous plafond)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "raccordement_sp", "repere": 6, "statut": "implicite", "regle_quantite": "unitaire" },
+  { "ordre": 12, "composant_code": "tuyau_emaille", "libelle": "Tuyau émaillé (raccordement appareil → plafond)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement_sp", "repere": 6, "statut": "catalogue", "regle_quantite": "par_longueur:raccordement_sp" }
+]

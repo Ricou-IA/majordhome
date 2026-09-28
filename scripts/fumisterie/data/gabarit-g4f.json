@@ -1,0 +1,27 @@
+{
+  "code": "G4F", "libelle": "Tubage flexible raccordé directement au foyer", "description": "Foyer ou insert raccordé au flexible POLYLISSE par un raccord Griffaflex, sans tuyau simple paroi. Zone 1 non vérifiée. Règles provisoires (tranche 3).", "troncons": [
+  { "type": "appareil", "libelle": "Foyer", "parametres": [
+  { "cle": "diametre", "libelle": "Diamètre conduit", "unite": "mm", "choix": [
+            80,
+            100,
+            130,
+            150,
+            180 ], "defaut": 150 },
+  { "cle": "hBuse", "libelle": "Hauteur de la buse du foyer", "unite": "m", "min": 0.3, "max": 2, "pas": 0.05, "defaut": 1.05 } ] },
+  { "type": "conduit_existant", "libelle": "Conduit existant", "parametres": [
+  { "cle": "hConduit", "libelle": "Hauteur du conduit (buse du foyer → haut de souche)", "unite": "m", "min": 1, "max": 25, "pas": 0.1, "defaut": 7 },
+  { "cle": "boisseau", "libelle": "Section intérieure du boisseau (cm)", "choix": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6 ], "libelles": {
+            "1": "20 × 20", "2": "25 × 25", "3": "30 × 30", "4": "20 × 40", "5": "40 × 40", "6": "30 × 50"
+          }, "defaut": 1 } ] },
+  { "type": "sortie_souche", "libelle": "Sortie de souche", "parametres": [
+  { "cle": "chapeau", "libelle": "Chapeau de gaine", "choix": [
+            "standard", "plat" ], "libelles": {
+            "standard": "Standard", "plat": "Plat"
+          }, "defaut": "standard" } ] } ]
+}

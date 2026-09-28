@@ -1,0 +1,16 @@
+[
+  { "ordre": 1, "composant_code": "pla_terminal_horizontal", "libelle": "Terminal horizontal PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_facade", "repere": 1, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 2, "composant_code": "pla_rosace_mur", "libelle": "Rosace de finition murale PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_facade", "repere": 2, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 3, "composant_code": "pla_element_horizontal", "libelle": "Élément droit PLA (horizontal)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_facade", "repere": 2, "statut": "catalogue", "regle_quantite": "par_longueur:horizontal" },
+  { "ordre": 4, "composant_code": "pla_coude_90", "libelle": "Coude 90° PLA", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_facade", "repere": 3, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 5, "composant_code": "pla_element_vertical", "libelle": "Élément droit PLA (vertical)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "appareil", "repere": 4, "statut": "catalogue", "regle_quantite": "par_longueur:vertical" },
+  { "ordre": 6, "composant_code": "pla_manchon_appareil", "libelle": "Manchon de raccordement PLA sur l'appareil", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "appareil", "repere": 5, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 7, "composant_code": "pla_raccord_air", "libelle": "Raccord d'air comburant (té piquage PLA)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "appareil", "repere": 5, "statut": "provisoire", "regle_quantite": "unitaire" }
+]

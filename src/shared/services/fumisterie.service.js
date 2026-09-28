@@ -73,10 +73,11 @@ export const fumisterieService = {
   getArticles: (orgId, supplierId, { gammesTarif, diametre, gammesSansDiametre = [] }) => withErrorHandling(async () => {
     if (!orgId || !supplierId || !diametre || !gammesTarif?.length) return [];
     const base = () => supabase.from('majordhome_fum_articles').select('*').eq('org_id', orgId).eq('supplier_id', supplierId).eq('is_active', true);
-    const { data, error } = await base().in('gamme_tarif', gammesTarif).eq('diametre_int', diametre);
+    // Ø du relevé + articles sans Ø parsé (plaque de propreté MFI « MFI 130 » sans « D ») : le motif tranche.
+    const { data, error } = await base().in('gamme_tarif', gammesTarif).or(`diametre_int.eq.${Number(diametre)},diametre_int.is.null`);
     if (error) throw error;
     if (!gammesSansDiametre.length) return data || [];
-    const { data: sansD, error: e2 } = await base().in('gamme_tarif', gammesSansDiametre).neq('diametre_int', diametre);
+    const { data: sansD, error: e2 } = await base().in('gamme_tarif', gammesSansDiametre).not('diametre_int', 'is', null).neq('diametre_int', diametre);
     if (e2) throw e2;
     return [...(data || []), ...(sansD || [])];
   }, 'fumisterie.getArticles'),

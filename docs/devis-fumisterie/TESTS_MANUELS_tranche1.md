@@ -78,3 +78,36 @@ Settings → Entretiens & Contrats → Fumisterie → section « Tubage » : dé
 
 ## Retours d'usage
 _(à remplir)_
+
+---
+
+# Tests manuels — tranche 3 (toutes les configurations) — 2026-09-29
+
+Les 19 configurations du catalogue sont métrables. Spec : `docs/superpowers/specs/2026-09-29-fumisterie-tranche3-toutes-configurations-design.md`. Toutes les règles sont **provisoires** (badge PROVISOIRE dans la liste de pièces) ; ce qui suit donne, pour chaque famille, un relevé et le résultat attendu (achat HT, tarif juin 2026).
+
+| Cas | Relevé | Attendu |
+|---|---|---|
+| **H. CFG-45** raccordement seul, Ø150, plafond, émaillé 1,2, kit d'air Oui | buse 1,05 · HSP 2,5 | 4 lignes, **132,15 €**, info « conduit non métré » |
+| **I. CFG-43** foyer sur flexible, Ø150 | buse 1,2 · conduit 7 · boisseau 30×30 | 6 lignes, **441,53 €**, Griffaflex `2FLERAGRM150156`, 7,5 m de gaine, pas de tuyau |
+| **J. CFG-37** POLYPERF Ø150, bas de conduit « RDE + plaque ventilée » | buse 1,05 · HSP 2,5 · conduit 6,2 · boisseau 30×30 | 9 lignes, **1 100,11 €**, kit `2FLIPOPEN1507` (7 m pour 6,7 nécessaires). Passer le bas sur « Griffaflex » : les tuyaux disparaissent |
+| **K. CFG-30** kit rénovation PLA Ø80, plafond | buse 0,9 · HSP 2,4 · conduit 6 · boisseau 20×20 | 7 lignes, **411,04 €**, adaptateurs `2PLAADA6802020` / `2PLAADA7802020` |
+| **L. CFG-31** conduit isolé existant Ø80, mur | piquage 1,3 · horizontal 0,4 · conduit 6 · boisseau 25×25 | 7 lignes, **2 à chiffrer** (adaptateurs n°4 / n°2 sur mesure) |
+| **M. CFG-29** ventouse Ø80 | buse 0,9 · axe de sortie 1,8 · horizontal 0,6 · mur 0,3 | 8 lignes, **361,09 €**, ⚠ « zone 3 non vérifiée » |
+| **N. CFG-25** façade PTR Ø150 noir | buse 1,05 · HSP 2,5 · traversée 1,6 · appareil→mur 0,6 · mur 0,3 · égout 5,5 · pente 35 · faîtage 4 · sommet +3,5 | 14 lignes, **2 216,86 €**, zone 1 ✓, ⚠ haubanage (> 3 m), 4 supports muraux `2DIVSUMIR210NO`. Bouton « Ajuster » : le sommet descend au minimum de zone 1 |
+| **O. CFG-33** façade PLA + PTR Ø80 inox | idem N avec pente 30, faîtage 3, sommet +2,5 | 15 lignes, **1 à chiffrer** (support de départ Ø80) |
+| **P. CFG-32** création PTR + souche Polytoit Ø150 (relevé de la maquette) | comme le test A | 10 lignes, **1 731,48 €**, souche `2SOU109L3238PTG150` (pente 35 → 32-38°) ; pente 20 → `2SOU107L1623PTG150` |
+| **Q. CFG-42** foyer via combles + Polytoit + PRH hotte Ø150 | maquette, sans dévoiement | 12 lignes, **1 697,09 €** |
+| **R. CFG-28** création PLA Ø80 étanche | maquette, Ø80, inox | 14 lignes, **983,31 €**, collerette `2PLACSOL80RT` |
+| **S. CFG-48** chaudière PLA Ø100 | maquette, Ø100, sans dévoiement | 15 lignes, **1 à chiffrer** (solin Ø100), condition bloquante (modèle de chaudière) affichée |
+| **T. CFG-40** MFI Ø150 inox | maquette | 15 lignes, **2 376,42 €**, solin `2DIVS2535IN250KEI`, kit de raccordement **à chiffrer** (1 kit par appareil) |
+
+## Choix métier à valider (Philippe) — tranche 3
+- Façade : 1 support mural tous les 2 m (réglage), té 90° + purge au pied, 2 plaques de propreté pour la traversée de mur, coude 90° émaillé quel que soit le tuyau.
+- Souche Polytoit : « Souche 1000 corps lisse, hauteur 700/800/900 selon la pente, PTR G » + raccord Polytoit + collier de fixation bas.
+- PLA : manchon F/M recoupable sur l'appareil, té de piquage d'air, adaptateurs n°6 / n°7 inox (V1) par section de boisseau.
+- POLYPERF : kit fibre de N m (pièces de finition incluses), kit bas pour plaque ventilée, collier de gaine au Ø nominal.
+- MFI : té 135° piquage air Ø100 par défaut, kit de raccordement à chiffrer d'après la fiche appareil (R-MFI-01).
+- Ventouse (zone 3) : terminal horizontal inox standard, rosace plate 2 parties ; distances réglementaires non vérifiées.
+
+## Retours d'usage
+_(à remplir)_

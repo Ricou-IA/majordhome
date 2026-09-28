@@ -1,0 +1,16 @@
+[
+  { "ordre": 1, "composant_code": "pla_adapt_chapeau", "libelle": "Adaptateur n°6 chapeau sur boisseau", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "sortie_souche", "repere": 1, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Choisi d'après la section du boisseau" },
+  { "ordre": 2, "composant_code": "pla_adapt_bas", "libelle": "Adaptateur n°7 bas de boisseau", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement", "repere": 4, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Choisi d'après la section du boisseau" },
+  { "ordre": 3, "composant_code": "gaine_polylisse", "libelle": "Tubage flexible POLYLISSE XT (au mètre)", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "conduit_existant", "repere": 3, "statut": "catalogue", "regle_quantite": "par_longueur_ml:conduit_existant", "note": "Épaisseur 10/100 à la coupe — à valider" },
+  { "ordre": 4, "composant_code": "pla_coude_90", "libelle": "Coude 90° PLA (entrée par le mur)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "entree", "option": "mur", "regle_quantite": "unitaire" },
+  { "ordre": 5, "composant_code": "pla_element_raccord", "libelle": "Élément droit PLA (raccordement concentrique)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 6, "composant_code": "pla_manchon_appareil", "libelle": "Manchon de raccordement PLA sur l'appareil", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement", "repere": 5, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Manchon F/M recoupable par défaut ; certains appareils ont leur manchon dédié" },
+  { "ordre": 7, "composant_code": "pla_raccord_air", "libelle": "Raccord d'air comburant (té piquage PLA)", "chapitre": "CONCENTRIQUE PLA", "gammes": [
+      "PLA" ], "troncon": "raccordement", "repere": 6, "statut": "provisoire", "regle_quantite": "unitaire" }
+]

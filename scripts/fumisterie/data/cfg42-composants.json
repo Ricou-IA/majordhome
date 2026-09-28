@@ -1,0 +1,22 @@
+[
+  { "ordre": 1, "composant_code": "souche_polytoit", "libelle": "Souche Polytoit", "chapitre": "SOUCHES", "gammes": [
+      "POLYTOIT" ], "troncon": "sortie_toit", "repere": 1, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Souche 1000 corps lisse, hauteur standard (700 à 900 selon la pente) — modèle et finition à confirmer" },
+  { "ordre": 2, "composant_code": "raccord_polytoit", "libelle": "Raccord PTR → Polytoit", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "sortie_toit", "repere": 1, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 3, "composant_code": "collier_fixation_polytoit", "libelle": "Collier de fixation bas de souche", "chapitre": "SOUCHES", "gammes": [
+      "POLYTOIT" ], "troncon": "sortie_toit", "repere": 1, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 4, "composant_code": "coude_devoiement", "libelle": "Coudes de dévoiement", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "devoiement", "repere": 4, "statut": "catalogue", "regle_quantite": "coudes:devoiement" },
+  { "ordre": 5, "composant_code": "element_droit_interieur", "libelle": "Élément droit intérieur (plafond → toiture)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "conduit_interieur", "repere": 4, "statut": "implicite", "regle_quantite": "par_longueur:conduit_interieur" },
+  { "ordre": 6, "composant_code": "plaque_proprete_rt2012", "libelle": "Plaque de propreté RT2012 (kit RT2012)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "traversee_plancher", "repere": 5, "statut": "provisoire", "regle_quantite": "par_plancher", "note": "Kit RT2012 reconstitué — à confirmer" },
+  { "ordre": 7, "composant_code": "couronne_coupe_feu", "libelle": "Couronne coupe-feu (kit RT2012)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "traversee_plancher", "repere": 5, "statut": "provisoire", "regle_quantite": "par_plancher" },
+  { "ordre": 8, "composant_code": "raccord_simple_paroi", "libelle": "Raccord simple paroi / PTR sous plafond", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "raccordement_sp", "repere": 6, "statut": "implicite", "regle_quantite": "unitaire" },
+  { "ordre": 9, "composant_code": "tuyau_prh_raccord", "libelle": "Tuyau rigide PRH dans la hotte (foyer → plafond)", "chapitre": "RIGIDES SIMPLE PAROI", "gammes": [
+      "PRH" ], "troncon": "raccordement_sp", "repere": 6, "statut": "catalogue", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 10, "composant_code": "manchon_buse", "libelle": "Manchon de raccordement sur la buse du foyer", "chapitre": "RIGIDES SIMPLE PAROI", "gammes": [
+      "PRH" ], "troncon": "raccordement_sp", "repere": 6, "statut": "catalogue", "regle_quantite": "unitaire" }
+]

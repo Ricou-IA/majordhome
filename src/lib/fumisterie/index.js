@@ -4,16 +4,29 @@
 // et l'écran affiche une bannière si le résultat enregistré vient d'une autre version.
 import { geometrieG1, hauteurSortieMinimale } from './gabarits/g1.js';
 import { geometrieG4 } from './gabarits/g4.js';
-import { controlesG1, controlesG4 } from './controles.js';
+import { geometrieG3, hauteurSortieMinimaleG3 } from './gabarits/g3.js';
+import { geometrieG6 } from './gabarits/g6.js';
+import { controlesG1, controlesG3, controlesG4, controlesG5, controlesG6 } from './controles.js';
 import { construireNomenclature, totaliser } from './nomenclature.js';
 
-export const ENGINE_VERSION = 'g4-2026.09';
+export const ENGINE_VERSION = 'g6-2026.09';
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },
   // Tubage : même géométrie, le code du gabarit dit si le conduit est flexible (G4) ou rigide PRH (G4R).
   G4: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false }, cfg), controles: controlesG4, sortieMinimale: null },
   G4R: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: true }, cfg), controles: controlesG4, sortieMinimale: null },
+  // Flexible isolé POLYPERF : le bas de conduit (`bas`) décide de l'entrée ; sur un foyer, pas de tuyau de raccordement.
+  G4P: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, entree: r.bas === 'mur' ? 'mur' : 'plafond', hsp1: r.bas === 'foyer' ? r.hBuse : r.hsp1 }, cfg), controles: (g, r, cfg) => controlesG4(g, r, cfg).filter((a) => !(a.code === 'buse' && r.bas === 'foyer')), sortieMinimale: null },
+  // Kit rénovation PLA (adaptateurs haut/bas) : même géométrie qu'un tubage flexible.
+  G4K: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false }, cfg), controles: controlesG4, sortieMinimale: null },
+  // Foyer raccordé directement au flexible (Griffaflex) : pas de tuyau simple paroi.
+  G4F: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, entree: 'plafond', hsp1: r.hBuse }, cfg), controles: (g, r, cfg) => controlesG4(g, r, cfg).filter((a) => a.code !== 'buse'), sortieMinimale: null },
+  // Raccordement seul : pas de conduit métré (dessiné à titre indicatif).
+  G5: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false, hConduit: 0 }, cfg), controles: controlesG5, sortieMinimale: null },
+  G3: { geometrie: geometrieG3, controles: controlesG3, sortieMinimale: hauteurSortieMinimaleG3 },
+  G3P: { geometrie: geometrieG3, controles: controlesG3, sortieMinimale: hauteurSortieMinimaleG3 },
+  G6: { geometrie: geometrieG6, controles: controlesG6, sortieMinimale: null },
 };
 
 /**
@@ -84,4 +97,4 @@ export function sortieMinimale({ configuration, gabarit, reglages, releve }) {
   return fn ? fn(releve, reglages) : null;
 }
 
-export { geometrieG1, geometrieG4, controlesG1, controlesG4, construireNomenclature, totaliser };
+export { geometrieG1, geometrieG3, geometrieG4, geometrieG6, controlesG1, controlesG3, controlesG4, controlesG5, controlesG6, construireNomenclature, totaliser };

@@ -24,6 +24,7 @@ function depuisSettings(settings) {
     zone1_pente_plat_deg: c.zone1.pente_plat_deg, tva_fournitures: c.tva_fournitures, tva_pose: c.tva_pose,
     flexible_marge_cm: Math.round(c.flexible_marge_m * 100), flexible_arrondi_cm: Math.round(c.flexible_arrondi_m * 100),
     longueurs_prh: c.longueurs_prh_mm.join(', '), longueurs_prh_5_10: c.longueurs_prh_5_10_mm.join(', '),
+    supports_muraux_tous_les_m: c.supports_muraux_tous_les_m,
   };
 }
 
@@ -43,6 +44,7 @@ function versSettings(form, existant) {
     tva_fournitures: Number(form.tva_fournitures), tva_pose: Number(form.tva_pose),
     flexible_marge_m: Number(form.flexible_marge_cm) / 100, flexible_arrondi_m: Number(form.flexible_arrondi_cm) / 100,
     longueurs_prh_mm: listeLongueurs(form.longueurs_prh), longueurs_prh_5_10_mm: listeLongueurs(form.longueurs_prh_5_10),
+    supports_muraux_tous_les_m: Number(form.supports_muraux_tous_les_m),
   };
 }
 
@@ -97,6 +99,7 @@ const BORNES = [
   ['zone1_pente_plat_deg', 0, 30, false],
   ['flexible_marge_cm', 0, 200, true],
   ['flexible_arrondi_cm', 10, 100, true],
+  ['supports_muraux_tous_les_m', 1, 4, false],
 ];
 
 function Champ({ label, hint, error, children }) {
@@ -160,6 +163,12 @@ export default function FumisterieTab() {
           <Champ label="Arrondi de commande du flexible (cm)" hint="Vendu au mètre, commandé au multiple supérieur — de 10 à 100" error={errors.flexible_arrondi_cm}><input type="number" min={10} max={100} value={form.flexible_arrondi_cm} onChange={set('flexible_arrondi_cm')} className={INPUT_CLASS} /></Champ>
           <Champ label="Longueurs des tuyaux rigides PRH 6/10 (mm)" hint="Ø 130 et plus — ex. 1000, 500, 330" error={errors.longueurs_prh}><input value={form.longueurs_prh} onChange={set('longueurs_prh')} className={INPUT_CLASS} /></Champ>
           <Champ label="Longueurs des tuyaux rigides PRH 5/10 (mm)" hint="Ø 80 et 100 (pellets) — ex. 1000, 500, 250" error={errors.longueurs_prh_5_10}><input value={form.longueurs_prh_5_10} onChange={set('longueurs_prh_5_10')} className={INPUT_CLASS} /></Champ>
+        </div>
+      </section>
+      <section>
+        <h3 className={SECTION_TITLE}>{'Conduit extérieur en façade (règles provisoires)'}</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Champ label="Un support mural tous les (m)" hint="De 1 à 4 m de conduit en façade" error={errors.supports_muraux_tous_les_m}><input type="number" step="0.5" min={1} max={4} value={form.supports_muraux_tous_les_m} onChange={set('supports_muraux_tous_les_m')} className={INPUT_CLASS} /></Champ>
         </div>
       </section>
       <div className="flex justify-end">

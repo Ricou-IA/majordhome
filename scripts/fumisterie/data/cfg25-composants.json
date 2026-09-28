@@ -1,0 +1,28 @@
+[
+  { "ordre": 1, "composant_code": "chapeau_anti_refouleur", "libelle": "Chapeau anti-refouleur", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "sortie_toit", "repere": 1, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 2, "composant_code": "element_droit_exterieur", "libelle": "Élément droit isolé le long de la façade", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "facade", "repere": 2, "statut": "catalogue", "regle_quantite": "par_longueur:facade" },
+  { "ordre": 3, "composant_code": "collier_jonction_exterieur", "libelle": "Collier de jonction extérieur", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "facade", "repere": 2, "statut": "provisoire", "regle_quantite": "par_emboitement:facade", "note": "1 par emboîtement — à valider" },
+  { "ordre": 4, "composant_code": "support_mural_intermediaire", "libelle": "Support mural intermédiaire", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "facade", "repere": 3, "statut": "provisoire", "regle_quantite": "par_intervalle:facade", "note": "1 tous les N m (réglage) — à valider" },
+  { "ordre": 5, "composant_code": "support_mural_depart", "libelle": "Support mural de départ", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "facade", "repere": 4, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 6, "composant_code": "te_90_ptr", "libelle": "Té 90° isolé (pied de conduit)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "facade", "repere": 5, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 7, "composant_code": "purge_ptr", "libelle": "Purge (bas du té)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "facade", "repere": 6, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 8, "composant_code": "element_traversee_mur", "libelle": "Élément droit isolé (traversée du mur)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "traversee_mur", "repere": 7, "statut": "catalogue", "regle_quantite": "par_longueur:traversee_mur" },
+  { "ordre": 9, "composant_code": "plaque_proprete_rt2012", "libelle": "Plaques de propreté RT2012 (traversée de mur)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "traversee_mur", "repere": 7, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Kit RT2012 mural = 2 plaques de propreté (intérieur + extérieur) — à valider" },
+  { "ordre": 10, "composant_code": "raccord_simple_paroi", "libelle": "Raccord simple paroi / PTR (côté intérieur)", "chapitre": "CONDUITS ISOLÉS DOUBLE PAROI", "gammes": [
+      "PTR30" ], "troncon": "raccordement", "repere": 8, "statut": "implicite", "regle_quantite": "unitaire" },
+  { "ordre": 11, "composant_code": "coude_90_raccord", "libelle": "Coude 90° de raccordement", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 8, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 12, "composant_code": "tuyau_emaille_12", "libelle": "Tuyau émaillé 1,2 mm (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 8, "statut": "catalogue", "groupe_alternative": "raccord", "option": "emaille_12", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 13, "composant_code": "tuyau_acier_peint", "libelle": "Tuyau acier peint 2 mm (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ACIER PEINT" ], "troncon": "raccordement", "repere": 8, "statut": "catalogue", "groupe_alternative": "raccord", "option": "acier_peint", "regle_quantite": "par_longueur:raccordement_sp" }
+]

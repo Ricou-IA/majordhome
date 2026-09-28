@@ -1,0 +1,32 @@
+{
+  "code": "G4K", "libelle": "Tubage d'un conduit existant — kit rénovation PLA (appareil étanche)", "description": "Conduit existant tubé au flexible POLYLISSE XT avec les adaptateurs PLA haut et bas (kit rénovation) et un raccordement concentrique PLA jusqu'à l'appareil étanche. Zone 1 non vérifiée. Règles provisoires (tranche 3).", "troncons": [
+  { "type": "appareil", "libelle": "Appareil", "parametres": [
+  { "cle": "diametre", "libelle": "Diamètre conduit", "unite": "mm", "choix": [
+            80,
+            100,
+            130 ], "defaut": 80 },
+  { "cle": "hBuse", "libelle": "Hauteur de buse", "unite": "m", "min": 0.3, "max": 2, "pas": 0.05, "defaut": 1.05 } ] },
+  { "type": "raccordement", "libelle": "Raccordement concentrique", "parametres": [
+  { "cle": "entree", "libelle": "Entrée dans le conduit", "choix": [
+            "plafond", "mur" ], "libelles": {
+            "plafond": "Par le plafond", "mur": "Par le mur"
+          }, "defaut": "plafond" },
+  { "cle": "hsp1", "libelle": "Hauteur sous plafond", "unite": "m", "min": 2, "max": 5, "pas": 0.05, "defaut": 2.5 },
+  { "cle": "hEntree", "libelle": "Hauteur du piquage dans le conduit", "unite": "m", "min": 0.5, "max": 4, "pas": 0.05, "defaut": 1.5, "optionnel": true, "si": {
+            "entree": "mur" }
+        },
+  { "cle": "lHoriz", "libelle": "Longueur horizontale jusqu'au conduit", "unite": "m", "min": 0.1, "max": 3, "pas": 0.05, "defaut": 0.5, "optionnel": true, "si": {
+            "entree": "mur" }
+        } ] },
+  { "type": "conduit_existant", "libelle": "Conduit existant", "parametres": [
+  { "cle": "hConduit", "libelle": "Hauteur du conduit (entrée → haut de souche)", "unite": "m", "min": 1, "max": 25, "pas": 0.1, "defaut": 6 },
+  { "cle": "boisseau", "libelle": "Section intérieure du boisseau (cm)", "choix": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6 ], "libelles": {
+            "1": "20 × 20", "2": "25 × 25", "3": "30 × 30", "4": "20 × 40", "5": "40 × 40", "6": "30 × 50"
+          }, "defaut": 1 } ] } ]
+}

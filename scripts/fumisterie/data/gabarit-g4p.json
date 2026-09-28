@@ -1,0 +1,43 @@
+{
+  "code": "G4P", "libelle": "Tubage d'un conduit existant — flexible isolé POLYPERF", "description": "Conduit maçonné existant tubé avec la gaine isolée POLYPERF (kit de N mètres). Le bas de conduit est au choix (plafond, mur, foyer, té). Zone 1 non vérifiée. Règles provisoires (tranche 3).", "troncons": [
+  { "type": "appareil", "libelle": "Appareil", "parametres": [
+  { "cle": "diametre", "libelle": "Diamètre conduit", "unite": "mm", "choix": [
+            80,
+            100,
+            130,
+            150,
+            180 ], "defaut": 150 },
+  { "cle": "hBuse", "libelle": "Hauteur de buse", "unite": "m", "min": 0.3, "max": 2, "pas": 0.05, "defaut": 1.05 } ] },
+  { "type": "raccordement", "libelle": "Bas de conduit et raccordement", "parametres": [
+  { "cle": "bas", "libelle": "Bas de conduit", "choix": [
+            "plafond", "mur", "foyer", "te" ], "libelles": {
+            "plafond": "RDE + plaque ventilée (plafond)", "mur": "Kit boisseau bas sur simple paroi (mur)", "foyer": "Raccord Griffaflex sur la buse du foyer", "te": "Té 90° + tampon"
+          }, "defaut": "plafond" },
+  { "cle": "hsp1", "libelle": "Hauteur sous plafond", "unite": "m", "min": 2, "max": 5, "pas": 0.05, "defaut": 2.5 },
+  { "cle": "hEntree", "libelle": "Hauteur du piquage dans le conduit", "unite": "m", "min": 0.5, "max": 4, "pas": 0.05, "defaut": 1.5, "optionnel": true, "si": {
+            "bas": "mur" }
+        },
+  { "cle": "lHoriz", "libelle": "Longueur horizontale jusqu'au conduit", "unite": "m", "min": 0.1, "max": 3, "pas": 0.05, "defaut": 0.5, "optionnel": true, "si": {
+            "bas": "mur" }
+        },
+  { "cle": "raccord", "libelle": "Tuyau de raccordement", "choix": [
+            "emaille_12", "emaille_07", "acier_peint" ], "libelles": {
+            "emaille_12": "Émaillé 1,2 mm", "emaille_07": "Émaillé 0,7 mm (pellets)", "acier_peint": "Acier peint 2 mm"
+          }, "defaut": "emaille_12" } ] },
+  { "type": "conduit_existant", "libelle": "Conduit existant", "parametres": [
+  { "cle": "hConduit", "libelle": "Hauteur du conduit (entrée → haut de souche)", "unite": "m", "min": 1, "max": 25, "pas": 0.1, "defaut": 6 },
+  { "cle": "boisseau", "libelle": "Section intérieure du boisseau (cm)", "choix": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6 ], "libelles": {
+            "1": "20 × 20", "2": "25 × 25", "3": "30 × 30", "4": "20 × 40", "5": "40 × 40", "6": "30 × 50"
+          }, "defaut": 1 } ] },
+  { "type": "sortie_souche", "libelle": "Sortie de souche", "parametres": [
+  { "cle": "chapeau", "libelle": "Chapeau de gaine", "choix": [
+            "standard", "plat" ], "libelles": {
+            "standard": "Standard", "plat": "Plat"
+          }, "defaut": "standard" } ] } ]
+}

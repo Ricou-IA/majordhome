@@ -1,0 +1,16 @@
+[
+  { "ordre": 1, "composant_code": "coude_90_raccord", "libelle": "Coude 90° de raccordement", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 5, "statut": "provisoire", "groupe_alternative": "entree", "option": "mur", "regle_quantite": "unitaire", "note": "Coude émaillé quel que soit le tuyau choisi — à valider" },
+  { "ordre": 2, "composant_code": "tuyau_emaille_12", "libelle": "Tuyau émaillé 1,2 mm (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "raccord", "option": "emaille_12", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 3, "composant_code": "tuyau_emaille_07", "libelle": "Tuyau émaillé 0,7 mm pellets (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "raccord", "option": "emaille_07", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 4, "composant_code": "tuyau_acier_peint", "libelle": "Tuyau acier peint 2 mm (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ACIER PEINT" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "raccord", "option": "acier_peint", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 5, "composant_code": "rosace_plafond", "libelle": "Rosace de finition au plafond", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 4, "statut": "provisoire", "groupe_alternative": "entree", "option": "plafond", "regle_quantite": "unitaire", "note": "Catalogue : raccord + cache raccord OU élément de départ — rosace bord tombé retenue, à valider" },
+  { "ordre": 6, "composant_code": "rosace_sceller", "libelle": "Rosace à sceller (entrée par le mur)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 4, "statut": "provisoire", "groupe_alternative": "entree", "option": "mur", "regle_quantite": "unitaire" },
+  { "ordre": 7, "composant_code": "kit_entree_air", "libelle": "Kit d'entrée d'air", "chapitre": "ACCESSOIRES", "gammes": [
+      "ACCESSOIRES" ], "troncon": "options", "repere": 6, "statut": "provisoire", "groupe_alternative": "kit_air", "option": "1", "regle_quantite": "unitaire", "note": "Kit Ø100 noir obturable par défaut — à valider" }
+]

@@ -1,0 +1,16 @@
+[
+  { "ordre": 1, "composant_code": "chapeau_gaine_standard", "libelle": "Chapeau pour gaine", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "sortie_souche", "repere": 1, "statut": "catalogue", "groupe_alternative": "chapeau", "option": "standard", "regle_quantite": "unitaire" },
+  { "ordre": 2, "composant_code": "chapeau_gaine_plat", "libelle": "Chapeau plat pour gaine", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "sortie_souche", "repere": 1, "statut": "catalogue", "groupe_alternative": "chapeau", "option": "plat", "regle_quantite": "unitaire" },
+  { "ordre": 3, "composant_code": "kit_couronnement", "libelle": "Kit de couronnement (collerette + plaque de couronnement)", "chapitre": "ACCESSOIRES", "gammes": [
+      "ACCESSOIRES" ], "troncon": "sortie_souche", "repere": 2, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Choisi d'après la section du boisseau — à valider" },
+  { "ordre": 4, "composant_code": "collier_tubage", "libelle": "Collier de tubage pour gaine", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "sortie_souche", "repere": 2, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 5, "composant_code": "gaine_polylisse", "libelle": "Tubage flexible POLYLISSE (au mètre)", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "conduit_existant", "repere": 3, "statut": "catalogue", "regle_quantite": "par_longueur_ml:conduit_existant", "note": "Épaisseur 10/100 à la coupe — à valider" },
+  { "ordre": 6, "composant_code": "embout_finition", "libelle": "Embout de finition pour gaine", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "conduit_existant", "repere": 3, "statut": "catalogue", "regle_quantite": "unitaire" },
+  { "ordre": 7, "composant_code": "griffaflex", "libelle": "Raccord Griffaflex sur la buse du foyer", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "catalogue", "regle_quantite": "unitaire", "note": "Griffaflex foyer mâle / gaine de même Ø" }
+]

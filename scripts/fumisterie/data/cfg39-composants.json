@@ -1,0 +1,36 @@
+[
+  { "ordre": 1, "composant_code": "chapeau_gaine_standard", "libelle": "Chapeau pour gaine", "chapitre": "FLEXIBLES ISOLÉS", "gammes": [
+      "POLYPERF" ], "troncon": "sortie_souche", "repere": 1, "statut": "catalogue", "groupe_alternative": "chapeau", "option": "standard", "regle_quantite": "unitaire" },
+  { "ordre": 2, "composant_code": "chapeau_gaine_plat", "libelle": "Chapeau plat pour gaine", "chapitre": "FLEXIBLES ISOLÉS", "gammes": [
+      "POLYPERF" ], "troncon": "sortie_souche", "repere": 1, "statut": "catalogue", "groupe_alternative": "chapeau", "option": "plat", "regle_quantite": "unitaire" },
+  { "ordre": 3, "composant_code": "kit_couronnement", "libelle": "Kit de couronnement (collerette + plaque de couronnement)", "chapitre": "ACCESSOIRES", "gammes": [
+      "ACCESSOIRES" ], "troncon": "sortie_souche", "repere": 2, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Choisi d'après la section du boisseau — à valider" },
+  { "ordre": 4, "composant_code": "collier_gaine_polyperf", "libelle": "Collier pour gaine isolée", "chapitre": "FLEXIBLES ISOLÉS", "gammes": [
+      "POLYPERF" ], "troncon": "sortie_souche", "repere": 2, "statut": "provisoire", "regle_quantite": "unitaire", "note": "Collier de tubage au Ø extérieur de la gaine isolée — à valider" },
+  { "ordre": 5, "composant_code": "gaine_polyperf", "libelle": "Gaine isolée POLYPERF (kit avec pièces de finition haute et basse)", "chapitre": "FLEXIBLES ISOLÉS", "gammes": [
+      "POLYPERF" ], "troncon": "conduit_existant", "repere": 3, "statut": "catalogue", "regle_quantite": "kit_longueur:conduit_existant", "note": "Kit fibre de N m, au mètre supérieur — à valider" },
+  { "ordre": 6, "composant_code": "adaptateur_polyperf", "libelle": "Adaptateur gaine / accessoire isolé", "chapitre": "FLEXIBLES ISOLÉS", "gammes": [
+      "POLYPERF" ], "troncon": "conduit_existant", "repere": 3, "statut": "provisoire", "regle_quantite": "unitaire" },
+  { "ordre": 7, "composant_code": "rde", "libelle": "RDE (raccord double emboîtement) tuyau → gaine", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "catalogue", "groupe_alternative": "bas", "option": "plafond", "regle_quantite": "unitaire" },
+  { "ordre": 8, "composant_code": "kit_bas_plaque_ventilee", "libelle": "Kit bas pour plaque ventilée", "chapitre": "FLEXIBLES ISOLÉS", "gammes": [
+      "POLYPERF" ], "troncon": "raccordement", "repere": 4, "statut": "provisoire", "groupe_alternative": "bas", "option": "plafond", "regle_quantite": "unitaire" },
+  { "ordre": 9, "composant_code": "plaque_ventilee", "libelle": "Plaque d'habillage ventilée (plafond)", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "catalogue", "groupe_alternative": "bas", "option": "plafond", "regle_quantite": "unitaire", "note": "Choisie d'après la section du boisseau" },
+  { "ordre": 10, "composant_code": "adaptateur_piquage", "libelle": "Kit de raccordement boisseau bas sur simple paroi (jusqu'au Ø150)", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "provisoire", "groupe_alternative": "bas", "option": "mur", "regle_quantite": "unitaire", "note": "R-POLYPERF-02 : jusqu'au Ø150" },
+  { "ordre": 11, "composant_code": "griffaflex", "libelle": "Raccord Griffaflex sur la buse du foyer", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "catalogue", "groupe_alternative": "bas", "option": "foyer", "regle_quantite": "unitaire" },
+  { "ordre": 12, "composant_code": "te_gaine", "libelle": "Té 90° pour flexible", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "catalogue", "groupe_alternative": "bas", "option": "te", "regle_quantite": "unitaire" },
+  { "ordre": 13, "composant_code": "tampon_gaine", "libelle": "Tampon pour té de gaine", "chapitre": "FLEXIBLES", "gammes": [
+      "POLYLISSE XT" ], "troncon": "raccordement", "repere": 4, "statut": "catalogue", "groupe_alternative": "bas", "option": "te", "regle_quantite": "unitaire" },
+  { "ordre": 14, "composant_code": "coude_90_raccord", "libelle": "Coude 90° de raccordement", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 5, "statut": "provisoire", "groupe_alternative": "entree", "option": "mur", "regle_quantite": "unitaire", "note": "Coude émaillé quel que soit le tuyau choisi — à valider" },
+  { "ordre": 15, "composant_code": "tuyau_emaille_12", "libelle": "Tuyau émaillé 1,2 mm (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "raccord", "option": "emaille_12", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 16, "composant_code": "tuyau_emaille_07", "libelle": "Tuyau émaillé 0,7 mm pellets (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ÉMAILLÉ" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "raccord", "option": "emaille_07", "regle_quantite": "par_longueur:raccordement_sp" },
+  { "ordre": 17, "composant_code": "tuyau_acier_peint", "libelle": "Tuyau acier peint 2 mm (raccordement)", "chapitre": "SIMPLE PAROI", "gammes": [
+      "ACIER PEINT" ], "troncon": "raccordement", "repere": 5, "statut": "catalogue", "groupe_alternative": "raccord", "option": "acier_peint", "regle_quantite": "par_longueur:raccordement_sp" }
+]

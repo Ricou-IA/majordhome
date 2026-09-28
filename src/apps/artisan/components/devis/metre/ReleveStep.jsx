@@ -5,10 +5,13 @@
 import { sortieMinimale } from '@/lib/fumisterie/index.js';
 import CoupeCotee from './CoupeCotee';
 import CoupeCoteeG4 from './CoupeCoteeG4';
+import CoupeCoteeG3 from './CoupeCoteeG3';
+import CoupeCoteeG6 from './CoupeCoteeG6';
 import ReleveForm from './ReleveForm';
 
-// Une coupe par gabarit : la géométrie n'a pas la même forme (toiture + faîtage en G1, boisseau en G4).
-const COUPES = { G1: CoupeCotee, G4: CoupeCoteeG4, G4R: CoupeCoteeG4 };
+// Une coupe par famille de gabarits : toiture + faîtage (G1), boisseau existant (G4 et variantes, G5),
+// façade (G3), sortie horizontale (G6).
+const COUPES = { G1: CoupeCotee, G4: CoupeCoteeG4, G4R: CoupeCoteeG4, G4P: CoupeCoteeG4, G4K: CoupeCoteeG4, G4F: CoupeCoteeG4, G5: CoupeCoteeG4, G3: CoupeCoteeG3, G3P: CoupeCoteeG3, G6: CoupeCoteeG6 };
 import ListePieces, { Alertes } from './ListePieces';
 
 export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat }) {
