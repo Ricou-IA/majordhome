@@ -29,6 +29,9 @@ const TABLES = [
   { schema: 'core', table: 'organization_members', columns: null },
   { schema: 'core', table: 'projects', columns: ['id', 'org_id', 'name', 'status', 'identity'] },
   { schema: 'majordhome', table: 'organizations', columns: null },
+  { schema: 'majordhome', table: 'suppliers', columns: null, data: false }, // 20260929_1 : FK fum_composant_mapping
+  { schema: 'majordhome', table: 'supplier_products', columns: null, data: false }, // 20260929_1 : FK fum_article_attrs + vue majordhome_fum_articles
+  { schema: 'majordhome', table: 'quotes', columns: null, data: false }, // 20260929_1 : FK fum_metres
   { schema: 'majordhome', table: 'equipment_categories', columns: null }, // M1 (20260913_1) en prod : cible des FK pricing_equipment_types / equipments et de la vue client_equipment_kinds
   { schema: 'majordhome', table: 'pricing_zones', columns: null },
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
