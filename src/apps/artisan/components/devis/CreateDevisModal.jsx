@@ -242,6 +242,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
               setLines={setLines}
               globalDiscountPercent={parseFloat(form.globalDiscountPercent) || 0}
               leadId={lead?.id}
+              family={selectedFamily}
               onMetreValidated={setMetre}
             />
           )}

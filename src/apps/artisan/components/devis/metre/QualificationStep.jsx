@@ -26,7 +26,11 @@ export default function QualificationStep({ configurations, criteres, setCritere
         {Object.entries(CRITERES).map(([k, opts]) => <Choix key={k} label={{ projet: 'Projet', appareil: 'Appareil', combustible: 'Combustible', zone: 'Sortie', prise_air: 'Prise d\'air' }[k]} options={opts} value={criteres[k]} onChange={(v) => setCriteres((c) => ({ ...c, [k]: v }))} />)}
       </div>
       <div className="space-y-2">
-        <p className="text-xs font-medium text-secondary-600">{compatibles.length} configuration{compatibles.length > 1 ? 's' : ''} compatible{compatibles.length > 1 ? 's' : ''}</p>
+        {(() => {
+          const n = compatibles.length; const m = compatibles.filter((c) => !!c.gabarit_id).length; const s = n > 1 ? 's' : '';
+          // Le nombre qui compte pour l'utilisateur est celui des configurations MÉTRABLES, pas des compatibles.
+          return <p className="text-xs font-medium text-secondary-600">{n} configuration{s} compatible{s} · <span className={m === 0 && n > 0 ? 'text-primary-800' : ''}>{m} avec métré</span></p>;
+        })()}
         {compatibles.map((c) => {
           const metrable = !!c.gabarit_id; const bloquee = !!c.condition_bloquante; const zoneSensible = (c.zones || []).some((z) => z !== 'zone_1');
           return (

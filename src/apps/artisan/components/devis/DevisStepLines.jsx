@@ -214,7 +214,7 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, globalDiscountPercent, leadId, onMetreValidated }) {
+export default function DevisStepLines({ orgId, lines, setLines, globalDiscountPercent, leadId, family, onMetreValidated }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, category }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
   const pickerCategory = pickerForSection?.category || null;
@@ -460,6 +460,7 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
         <MetreFumisterie
           orgId={orgId}
           leadId={leadId}
+          family={family}
           onClose={() => setMetreForSection(null)}
           onValidate={handleMetreValidate}
         />

@@ -13,7 +13,7 @@ import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
 import { useMetreDraft } from './useMetreDraft';
-import { releveInitial, versLignesDevis, calculerMetreSurEcran } from './metreModel';
+import { releveInitial, versLignesDevis, calculerMetreSurEcran, criteresDepuisFamille } from './metreModel';
 
 const EMPTY = [];
 const Spinner = () => <Loader2 className="w-6 h-6 animate-spin text-secondary-500" />;
@@ -28,13 +28,14 @@ function Blocage({ titre, message }) {
   );
 }
 
-export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) {
+export default function MetreFumisterie({ orgId, leadId, family, onClose, onValidate }) {
   const { user } = useAuth();
   const { settings } = useOrgSettings();
   const reglages = useMemo(() => buildFumisterieConfig(settings), [settings]);
   const { draft, setDraft, clear } = useMetreDraft(user?.id, leadId);
   const [etape, setEtape] = useState(draft?.etape ?? 0);
-  const [criteres, setCriteres] = useState(draft?.criteres ?? { projet: null, appareil: null, combustible: null, zone: null, prise_air: null });
+  // Brouillon en cours ⇒ ses critères ; sinon appareil + combustible viennent de la famille du devis.
+  const [criteres, setCriteres] = useState(draft?.criteres ?? criteresDepuisFamille(family));
   const [configurationId, setConfigurationId] = useState(draft?.configurationId ?? null);
   const [releve, setReleveState] = useState(draft?.releve ?? null);
   const setReleve = (r) => { setReleveState(r); setDraft({ etape, criteres, configurationId, releve: r }); };

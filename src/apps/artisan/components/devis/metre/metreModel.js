@@ -20,6 +20,20 @@ export const CRITERES = {
   prise_air: [['dans_piece', 'Air pris dans la pièce'], ['dans_conduit', 'Air pris dans le conduit (appareil étanche)']],
 };
 
+export const CRITERES_VIDES = { projet: null, appareil: null, combustible: null, zone: null, prise_air: null };
+
+/**
+ * Critères déduits de la famille d'installation choisie à l'étape 1 du devis (QUOTE_TEMPLATE_FAMILIES) :
+ * on ne redemande pas ce que le devis sait déjà. Famille inconnue ⇒ rien de pré-rempli.
+ */
+export function criteresDepuisFamille(family) {
+  const parFamille = {
+    'Poêle à Granulé': { appareil: 'poele_cuisiniere', combustible: 'pellets' },
+    'Poêle à Bois': { appareil: 'poele_cuisiniere', combustible: 'bois_buches' },
+  };
+  return { ...CRITERES_VIDES, ...(parFamille[family] || {}) };
+}
+
 /** Configurations compatibles avec les critères (un critère vide = pas de filtre). */
 export function filtrerConfigurations(configurations, q) {
   return configurations.filter((c) =>
