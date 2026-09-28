@@ -64,17 +64,43 @@ async function ensureRealisedCardForVisit({ contractId, visitDate, notes, userId
 
   if (!client?.project_id) return;
 
+  // Carte existante du contrat — OU carte du client restée sans contrat (posée avant la
+  // création/réactivation du contrat) : sans ce second cas, on créait un doublon
+  // (LECARPENTIER CTR-00783, 2026-09-02). Ids issus de la base, pas d'input utilisateur.
   const { data: existingParent } = await supabase
     .from('majordhome_interventions')
-    .select('id')
-    .eq('contract_id', contractId)
+    .select('id, contract_id')
+    .or(`contract_id.eq.${contractId},and(client_id.eq.${contract.client_id},contract_id.is.null)`)
     .eq('intervention_type', 'entretien')
     .is('parent_id', null)
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  // Carte existante : le trigger l'a déjà passée en Réalisé à l'UPSERT de la visite.
-  if (existingParent?.id) return;
+  if (existingParent?.id && existingParent.contract_id) {
+    // Le trigger l'a déjà passée en Réalisé à l'UPSERT de la visite.
+    return;
+  }
+  if (existingParent?.id) {
+    // Carte sans contrat : invisible du trigger (il cherche par contrat) → on la rattache
+    // et on la clôture nous-mêmes.
+    const { error: attachErr } = await supabase
+      .from('majordhome_interventions')
+      .update({ contract_id: contractId, status: 'completed', scheduled_date: visitDate, report_date: visitDate })
+      .eq('id', existingParent.id);
+    if (attachErr) {
+      logger.error('[entretiensService] rattachement carte sans contrat error:', attachErr);
+      return;
+    }
+    // « facture » est un état plus avancé que « realise » : on ne le rétrograde pas.
+    const { error: wfErr } = await supabase
+      .from('majordhome_interventions')
+      .update({ workflow_status: 'realise' })
+      .eq('id', existingParent.id)
+      .neq('workflow_status', 'facture');
+    if (wfErr) logger.error('[entretiensService] clôture carte rattachée error:', wfErr);
+    return;
+  }
 
   const { error: insertErr } = await supabase
     .from('majordhome_interventions')
