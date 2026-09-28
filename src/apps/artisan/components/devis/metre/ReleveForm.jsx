@@ -31,7 +31,7 @@ export default function ReleveForm({ gabarit, releve, onChange, onAjuster, minSo
               <div key={p.cle} className={p.choix && p.choix.length > 2 ? 'col-span-2' : ''}>
                 <label htmlFor={`fum-${p.cle}`} className="block text-xs text-secondary-600 mb-1">{p.libelle}</label>
                 {p.choix ? (
-                  <div className="flex border border-secondary-300 rounded-md overflow-hidden" role="group" aria-label={p.libelle}>
+                  <div id={`fum-${p.cle}`} tabIndex={-1} className="flex border border-secondary-300 rounded-md overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500" role="group" aria-label={p.libelle}>
                     {p.choix.map((c) => (
                       <button key={String(c)} type="button" aria-pressed={releve[p.cle] === c} onClick={() => set(p.cle, c)}
                         className={`flex-1 px-2 py-1.5 text-sm font-mono border-l first:border-l-0 border-secondary-200 ${releve[p.cle] === c ? 'bg-secondary-700 text-white font-semibold' : 'bg-secondary-50 text-secondary-800'}`}>

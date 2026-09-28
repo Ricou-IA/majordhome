@@ -29,44 +29,48 @@ export function construireNomenclature({ composants, mapping, articles, geometri
   const resoudre = (comp, c) => resoudreArticle(articles, mapping, { composant_code: comp.composant_code, gamme_catalogue: gamme(comp), diametre: releve.diametre, finition: releve.finition, ...c });
   const qte = (m, q) => q * Number(m?.quantite_par_unite ?? 1);
 
+  // Une quantité calculée ≤ 0 n'émet AUCUNE ligne (ni alerte) : createQuote ferait `|| 1` sur un 0.
+  const pousser = (comp, article, quantite, criteresManquant, extra) => {
+    if (!(quantite > 0)) return;
+    if (!article) manquant(comp, criteresManquant);
+    lignes.push(ligne(comp, article, quantite, { ...extra, tva: reglages.tva_fournitures }));
+  };
+
   for (const comp of [...composants].sort((a, b) => a.ordre - b.ordre)) {
     const [regle, arg] = String(comp.regle_quantite || 'unitaire').split(':');
     const tr = arg ? geometrie.troncons[arg] : null;
     if (regle === 'unitaire') {
       const pente = comp.composant_code === 'solin' ? releve.pente : null;
       const { article, mapping: m } = resoudre(comp, { pente });
-      if (!article) manquant(comp, pente != null ? `pour Ø${releve.diametre} et une pente de ${pente}°` : `Ø${releve.diametre}`);
-      lignes.push(ligne(comp, article, qte(m, 1), { sous_libelle: pente != null && article ? `Choisi d'après la pente saisie (${pente}°)` : undefined, tva: reglages.tva_fournitures }));
+      pousser(comp, article, qte(m, 1), pente != null ? `pour Ø${releve.diametre} et une pente de ${pente}°` : `Ø${releve.diametre}`,
+        { sous_libelle: pente != null && article ? `Choisi d'après la pente saisie (${pente}°)` : undefined });
     } else if (regle === 'par_longueur') {
       if (!tr) { alertes.push({ niveau: 'warn', code: 'troncon_inconnu', source: 'gabarit', message: `${comp.libelle} : tronçon ${arg} absent de la géométrie.` }); continue; }
       const comp2 = tr.composition;
       for (const l of reglages.longueurs_elements_mm) {
         if (!comp2.elements[l]) continue;
         const { article, mapping: m } = resoudre(comp, { longueur: l });
-        if (!article) manquant(comp, `Lg ${l} Ø${releve.diametre}`);
-        lignes.push(ligne(comp, article, qte(m, comp2.elements[l]), { sous_libelle: `Lg ${l} mm`, tva: reglages.tva_fournitures }));
+        pousser(comp, article, qte(m, comp2.elements[l]), `Lg ${l} Ø${releve.diametre}`, { sous_libelle: `Lg ${l} mm` });
       }
       if (comp2.reglable) {
         const { article, mapping: m } = resoudre(comp, { type_piece: 'element_reglable' });
-        if (!article) manquant(comp, `réglable Ø${releve.diametre}`);
-        lignes.push(ligne(comp, article, qte(m, comp2.reglable.n), { sous_libelle: `Réglé à ${comp2.reglable.longueur} mm`, tva: reglages.tva_fournitures }));
+        pousser(comp, article, qte(m, comp2.reglable.n), `réglable Ø${releve.diametre}`, { sous_libelle: `Réglé à ${comp2.reglable.longueur} mm` });
       }
     } else if (regle === 'par_emboitement') {
       const n = tr ? tr.composition.nb * (reglages.colliers_par_emboitement ?? 1) : 0;
       if (n > 0) {
         const { article, mapping: m } = resoudre(comp, {});
-        if (!article) manquant(comp, `Ø${releve.diametre}`);
-        lignes.push(ligne(comp, article, qte(m, n), { sous_libelle: '1 par emboîtement', tva: reglages.tva_fournitures }));
+        pousser(comp, article, qte(m, n), `Ø${releve.diametre}`, { sous_libelle: '1 par emboîtement' });
       }
     } else if (regle === 'par_plancher') {
-      const { article, mapping: m } = resoudre(comp, {});
-      if (!article) manquant(comp, `Ø${releve.diametre}`);
-      lignes.push(ligne(comp, article, qte(m, geometrie.planchers), { sous_libelle: '1 par plancher traversé', tva: reglages.tva_fournitures }));
+      if (geometrie.planchers > 0) {
+        const { article, mapping: m } = resoudre(comp, {});
+        pousser(comp, article, qte(m, geometrie.planchers), `Ø${releve.diametre}`, { sous_libelle: '1 par plancher traversé' });
+      }
     } else if (regle === 'coudes') {
       if (releve.angle > 0) {
         const { article, mapping: m } = resoudre(comp, { angle: releve.angle });
-        if (!article) manquant(comp, `${releve.angle}° Ø${releve.diametre}`);
-        lignes.push(ligne(comp, article, qte(m, 2), { sous_libelle: `Dévoiement ${releve.angle}° : 2 coudes`, tva: reglages.tva_fournitures }));
+        pousser(comp, article, qte(m, 2), `${releve.angle}° Ø${releve.diametre}`, { sous_libelle: `Dévoiement ${releve.angle}° : 2 coudes` });
       }
     } else {
       alertes.push({ niveau: 'warn', code: 'regle_inconnue', source: 'nomenclature', message: `${comp.libelle} : règle « ${comp.regle_quantite} » inconnue du moteur.` });

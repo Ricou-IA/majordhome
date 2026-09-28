@@ -1,17 +1,13 @@
 // src/apps/artisan/components/devis/metre/ReleveStep.jsx
 // Étape 2 du métré : coupe cotée + formulaire de relevé + contrôles + liste de pièces,
-// recalculés en direct par le moteur pur (src/lib/fumisterie).
-import { useMemo } from 'react';
-import { calculerMetre, sortieMinimale } from '@/lib/fumisterie/index.js';
+// recalculés en direct par le moteur pur (src/lib/fumisterie). Le résultat est calculé UNE fois
+// par l'orchestrateur (calculerMetreSurEcran) : ce qui s'affiche est ce qui sera injecté.
+import { sortieMinimale } from '@/lib/fumisterie/index.js';
 import CoupeCotee from './CoupeCotee';
 import ReleveForm from './ReleveForm';
 import ListePieces, { Alertes } from './ListePieces';
 
-export default function ReleveStep({ bundle, articles, reglages, releve, setReleve }) {
-  const resultat = useMemo(() => {
-    try { return calculerMetre({ ...bundle, articles, reglages, releve }); }
-    catch (e) { return { erreur: e.message, lignes: [], alertes: [{ niveau: 'warn', code: 'moteur', message: e.message, source: 'moteur' }], totaux: { vente_ht: 0, achat_ht: 0, marge_ht: 0, lignes_a_chiffrer: 0 }, geometrie: null }; }
-  }, [bundle, articles, reglages, releve]);
+export default function ReleveStep({ bundle, reglages, releve, setReleve, resultat }) {
   const minSortie = resultat.geometrie ? resultat.geometrie.minSortie : null;
   const focusChamp = (cle) => { const el = document.getElementById(`fum-${cle}`); if (el) { el.focus(); el.select?.(); } };
   const ajuster = () => setReleve({ ...releve, hSortie: sortieMinimale({ ...bundle, reglages, releve }) });

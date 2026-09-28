@@ -1,5 +1,5 @@
 // src/shared/hooks/useFumisterie.js
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { fumisterieService } from '@services/fumisterie.service';
 import { fumisterieKeys } from '@hooks/cacheKeys';
 import { unwrapResult } from '@/lib/serviceHelpers';
@@ -20,6 +20,8 @@ export function useFumArticles(orgId, supplierId, gammesTarif, diametre) {
     queryKey: fumisterieKeys.articles(orgId, supplierId, gammesTarif, diametre),
     queryFn: () => unwrapResult(fumisterieService.getArticles(orgId, supplierId, { gammesTarif, diametre })),
     enabled: !!orgId && !!supplierId && !!diametre && (gammesTarif?.length || 0) > 0, staleTime: 5 * 60 * 1000,
+    // Changement de Ø : garder les articles précédents le temps du fetch (le relevé ne se démonte pas)
+    placeholderData: keepPreviousData,
   });
 }
 export function useFumMetreByQuote(orgId, quoteId) {

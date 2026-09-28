@@ -3,17 +3,30 @@
 // Les lignes validées sont injectées dans la section FUMISTERIE du devis ; le métré (relevé +
 // résultat FIGÉ + engine_version) est rendu à l'appelant, qui l'enregistre après création du devis.
 import { useMemo, useState } from 'react';
-import { X, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { X, ArrowLeft, ArrowRight, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFumConfigurations, useFumBundle, useFumSupplier, useFumArticles } from '@hooks/useFumisterie';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
-import { calculerMetre } from '@/lib/fumisterie/index.js';
+import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
 import { useMetreDraft } from './useMetreDraft';
-import { releveInitial, versLignesDevis } from './metreModel';
+import { releveInitial, versLignesDevis, calculerMetreSurEcran } from './metreModel';
+
+const EMPTY = [];
+const Spinner = () => <Loader2 className="w-6 h-6 animate-spin text-secondary-500" />;
+
+/** Blocage explicite (erreur de requête, fournisseur absent) : jamais un écran vide. */
+function Blocage({ titre, message }) {
+  return (
+    <div role="alert" className="flex items-start gap-3 max-w-2xl p-4 rounded-xl border-l-4 border-primary-500 bg-primary-50 text-secondary-800">
+      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0 text-primary-800" />
+      <div><p className="font-semibold">{titre}</p>{message && <p className="text-sm text-secondary-600 mt-1">{message}</p>}</div>
+    </div>
+  );
+}
 
 export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) {
   const { user } = useAuth();
@@ -26,11 +39,27 @@ export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) 
   const [releve, setReleveState] = useState(draft?.releve ?? null);
   const setReleve = (r) => { setReleveState(r); setDraft({ etape, criteres, configurationId, releve: r }); };
 
-  const { data: configurations = [], isLoading: loadingConfs } = useFumConfigurations(orgId);
-  const { data: bundle, isLoading: loadingBundle } = useFumBundle(orgId, configurationId);
-  const { data: supplier } = useFumSupplier(orgId);
+  const confsQ = useFumConfigurations(orgId);
+  const bundleQ = useFumBundle(orgId, configurationId);
+  const supplierQ = useFumSupplier(orgId);
+  const configurations = confsQ.data ?? EMPTY;
+  const bundle = bundleQ.data;
+  const supplier = supplierQ.data;
   const gammes = useMemo(() => [...new Set((bundle?.mapping || []).map((m) => m.gamme_tarif))], [bundle]);
-  const { data: articles = [], isLoading: loadingArticles } = useFumArticles(orgId, supplier?.id, gammes, releve?.diametre);
+  const articlesQ = useFumArticles(orgId, supplier?.id, gammes, releve?.diametre);
+  const articles = articlesQ.data ?? EMPTY;
+
+  // Une requête en erreur n'est JAMAIS présentée comme un catalogue vide.
+  const erreurRequete = [confsQ, bundleQ, supplierQ, articlesQ].find((q) => q.isError)?.error;
+  const sansFournisseur = supplierQ.isSuccess && !supplier;
+
+  // Calcul UNIQUE : ce qui s'affiche est ce qui sera injecté.
+  const resultat = useMemo(
+    () => (etape === 1 && bundle && releve ? calculerMetreSurEcran({ ...bundle, articles, reglages, releve }) : null),
+    [etape, bundle, articles, reglages, releve],
+  );
+  // Articles d'un autre Ø affichés le temps du fetch (placeholder) : on n'injecte pas ça.
+  const injectable = !!resultat && !resultat.erreur && !articlesQ.isPlaceholderData && !sansFournisseur && !erreurRequete;
 
   const allerAuReleve = () => {
     if (!bundle?.gabarit) { toast.error('Cette configuration n\'a pas encore de gabarit de métré'); return; }
@@ -40,7 +69,12 @@ export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) 
     setDraft({ etape: 1, criteres, configurationId, releve: r });
   };
   const valider = () => {
-    const resultat = calculerMetre({ ...bundle, articles, reglages, releve });
+    if (!resultat || resultat.erreur) {
+      const message = resultat?.erreur || 'Calcul du métré indisponible';
+      logger.error('[MetreFumisterie] calcul moteur', message);
+      toast.error(`Métré non injecté : ${message}`);
+      return;
+    }
     if (resultat.alertes.some((a) => a.niveau === 'warn' && a.code !== 'article_manquant')) {
       if (!window.confirm('Des contrôles sont en alerte (zone, dévoiement, buse…). Injecter quand même les lignes dans le devis ?')) return;
     }
@@ -58,14 +92,17 @@ export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) 
         <button type="button" onClick={() => { if (window.confirm('Quitter le métré ? La saisie en cours reste en brouillon.')) onClose(); }} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
       </header>
       <main className="flex-1 overflow-y-auto p-4">
-        {etape === 0 && (loadingConfs ? <Loader2 className="w-6 h-6 animate-spin text-secondary-500" /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onSelect={setConfigurationId} />)}
-        {etape === 1 && bundle && releve && (loadingArticles && articles.length === 0 ? <Loader2 className="w-6 h-6 animate-spin text-secondary-500" /> : <ReleveStep bundle={bundle} articles={articles} reglages={reglages} releve={releve} setReleve={setReleve} />)}
+        {erreurRequete ? <Blocage titre="Chargement du catalogue fumisterie impossible" message={erreurRequete.message || String(erreurRequete)} />
+          : sansFournisseur ? <Blocage titre="Aucun fournisseur de fumisterie configuré (MODINOX / ALTEMA) — importer le tarif" />
+          : etape === 0 ? (confsQ.isLoading ? <Spinner /> : <QualificationStep configurations={configurations} criteres={criteres} setCriteres={setCriteres} selectedId={configurationId} onSelect={setConfigurationId} />)
+          : (!bundle || !releve || articlesQ.isLoading || !resultat) ? <Spinner />
+          : <ReleveStep bundle={bundle} reglages={reglages} releve={releve} setReleve={setReleve} resultat={resultat} />}
       </main>
       <footer className="flex items-center justify-between px-4 py-3 bg-white border-t border-secondary-200">
         <button type="button" onClick={() => (etape === 0 ? onClose() : setEtape(0))} className="btn-secondary"><ArrowLeft className="w-4 h-4 mr-1" />{etape === 0 ? 'Annuler' : 'Qualification'}</button>
         {etape === 0
-          ? <button type="button" disabled={!configurationId || loadingBundle} onClick={allerAuReleve} className="btn-primary">Relevé <ArrowRight className="w-4 h-4 ml-1" /></button>
-          : <button type="button" disabled={!bundle || !releve} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>}
+          ? <button type="button" disabled={!configurationId || bundleQ.isLoading || sansFournisseur || !!erreurRequete} onClick={allerAuReleve} className="btn-primary">Relevé <ArrowRight className="w-4 h-4 ml-1" /></button>
+          : <button type="button" disabled={!injectable} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>}
       </footer>
     </div>
   );

@@ -52,3 +52,13 @@ test('résolution directe : préférence finition exacte, puis motif de code', (
   assert.equal(a.article.reference, '2PTICHARN150NO'); assert.equal(a.via, 'motif');
   assert.equal(resoudreArticle(ARTICLES, [], { composant_code: 'x', gamme_catalogue: 'PTR30', diametre: 150 }).article, null);
 });
+test('quantité calculée nulle → aucune ligne émise (createQuote ferait 0 || 1)', () => {
+  const comp = { repere: 9, ordre: 99, composant_code: 'collier_test', libelle: 'Collier test', troncon: 'sortie_toit', statut: 'provisoire', gammes: ['PTR30'], regle_quantite: 'par_emboitement:sortie_toit' };
+  const r = calculerMetre({ ...base, composants: [comp], releve: { ...RELEVE, hSortie: 0 } });
+  assert.equal(r.lignes.length, 0);
+  assert.ok(!r.alertes.some((a) => a.code === 'article_manquant'));
+  // mapping à quantite_par_unite 0 sur une règle unitaire : quantité 0 → pas de ligne non plus
+  const unit = { ...comp, composant_code: 'piece_zero', regle_quantite: 'unitaire' };
+  const m = [{ composant_code: 'piece_zero', gamme_catalogue: 'PTR30', finition: null, gamme_tarif: 'X', type_piece: 'x', motif_code: '^2PTICHARN{D}NO$', quantite_par_unite: 0 }];
+  assert.equal(calculerMetre({ ...base, composants: [unit], mapping: m, releve: RELEVE }).lignes.length, 0);
+});
