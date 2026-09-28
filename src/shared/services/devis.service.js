@@ -144,18 +144,19 @@ export function computeQuoteTotals(lines, globalDiscountPercent = 0) {
 // SERVICE PRINCIPAL
 // ============================================================================
 
-/** Message unique (hook + bouton) : un devis avec des lignes « à chiffrer » ne part pas dans Pennylane. */
-export const UNPRICED_LINES_MESSAGE = 'Des lignes sont encore « à chiffrer » (0 €) : complétez le devis avant l’envoi dans Pennylane';
+/** Message unique (hook + bouton) : une ligne produit à 0 € bloque l'envoi dans Pennylane. */
+export const UNPRICED_LINES_MESSAGE = 'Des lignes produit sont encore à 0 € : chiffrez-les avant l’envoi dans Pennylane';
 
 /**
- * Lignes non chiffrées : hors titres de section, prix unitaire ≤ 0 ou mention « À CHIFFRER »
- * (injectée par le métré fumisterie quand aucun article n'a été résolu).
- * @param {Array<{line_type?: string, unit_price_ht?: number|string|null, description?: string|null}>} lines
+ * Lignes produit non chiffrées (prix unitaire ≤ 0). Seul le PRIX compte : le marqueur
+ * « À CHIFFRER » posé par le métré dans la description reste informatif (la description
+ * n'est pas éditable dans le devis — une ligne chiffrée à la main doit pouvoir partir).
+ * Main d'œuvre et titres de section ne bloquent jamais.
+ * @param {Array<{line_type?: string, unit_price_ht?: number|string|null}>} lines
  * @returns {boolean}
  */
 export function hasUnpricedLines(lines) {
-  return (lines || []).some((l) => l.line_type !== 'section_title'
-    && (!(Number(l.unit_price_ht) > 0) || /À CHIFFRER/i.test(String(l.description || ''))));
+  return (lines || []).some((l) => l.line_type === 'product' && !(Number(l.unit_price_ht) > 0));
 }
 
 export const devisService = {
