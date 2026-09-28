@@ -32,7 +32,7 @@ export default function MetreFumisterie({ orgId, leadId, onClose, onValidate }) 
   const { user } = useAuth();
   const { settings } = useOrgSettings();
   const reglages = useMemo(() => buildFumisterieConfig(settings), [settings]);
-  const { draft, setDraft, clear } = useMetreDraft(user?.id);
+  const { draft, setDraft, clear } = useMetreDraft(user?.id, leadId);
   const [etape, setEtape] = useState(draft?.etape ?? 0);
   const [criteres, setCriteres] = useState(draft?.criteres ?? { projet: null, appareil: null, combustible: null, zone: null, prise_air: null });
   const [configurationId, setConfigurationId] = useState(draft?.configurationId ?? null);

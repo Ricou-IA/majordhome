@@ -75,7 +75,7 @@ export default function CoupeCotee({ geometrie: c, releve: i, onFocusChamp }) {
       <line x1={X(xr - 1.2)} y1={Y(c.yRidge)} x2={X(maxX - 0.2)} y2={Y(c.yRidge)} className="stroke-secondary-400" strokeDasharray="4 4" />
       <text x={X(xr) + 8} y={Y(c.yRidge) + 15} className="fill-secondary-500 text-[12px]">Faîtage</text>
       <line x1={X(dec - 0.9)} y1={Y(c.yReq)} x2={X(maxX - 0.2)} y2={Y(c.yReq)} className={zoneOK ? 'stroke-secondary-600' : 'stroke-primary-500'} strokeDasharray="8 5" strokeWidth={2.2} />
-      <text x={X(maxX - 0.2)} y={Y(c.yReq) - 7} textAnchor="end" className="fill-secondary-900 text-[12.5px] font-semibold">{(zoneOK ? '✓ ' : '⚠ ') + (c.flat ? 'Toit plat : +1,20 m' : 'Faîtage + 40 cm (zone 1)')}</text>
+      <text x={X(maxX - 0.2)} y={Y(c.yReq) - 7} textAnchor="end" className="fill-secondary-900 text-[12.5px] font-semibold">{(zoneOK ? '✓ ' : '⚠ ') + (c.flat ? `Toit plat : +${c.reqAbove.toFixed(2).replace('.', ',')} m` : `Faîtage + ${Math.round(c.reqAbove * 100)} cm (zone 1)`)}</text>
       {cote('buse', 'hBuse', 'Hauteur de buse', dx1, 0, dx1, i.hBuse)}
       {cote('sp', 'hBuse', 'Raccordement simple paroi (calculé)', dx1, i.hBuse, dx1, i.hsp1)}
       {cote('hsp1', 'hsp1', 'Hauteur sous plafond', dx2, 0, dx2, i.hsp1)}
