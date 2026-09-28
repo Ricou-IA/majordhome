@@ -10,11 +10,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useDevisMutations } from '@hooks/useDevis';
+import { useFumMetreMutations } from '@hooks/useFumisterie';
 import { devisService, QUOTE_TEMPLATE_FAMILIES, buildDefaultSections } from '@services/devis.service';
+import { logger } from '@lib/logger';
 import DevisStepClient from './DevisStepClient';
 import DevisStepLines from './DevisStepLines';
 import DevisStepSummary from './DevisStepSummary';
-import { X, Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { X, Loader2, ChevronLeft, ChevronRight, Check, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const STEPS = [
@@ -27,9 +29,12 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const { createQuote, isCreating } = useDevisMutations(lead?.id);
+  const { saveMetre } = useFumMetreMutations(orgId);
 
   const [step, setStep] = useState(0);
   const [lines, setLines] = useState([]);
+  // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
+  const [metre, setMetre] = useState(null);
   const [form, setForm] = useState({
     subject: '',
     validityDays: '30',
@@ -57,6 +62,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
     if (!template) return;
     const parsedLines = typeof template.lines === 'string' ? JSON.parse(template.lines) : template.lines;
     setLines(parsedLines || []);
+    setMetre(null); // lignes remplacées → le métré injecté n'a plus de lignes
     if (template.global_discount_percent) {
       setForm((prev) => ({ ...prev, globalDiscountPercent: String(template.global_discount_percent) }));
     }
@@ -66,6 +72,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
 
   const clearTemplate = useCallback(() => {
     setLines([]);
+    setMetre(null);
     setSelectedTemplateId(null);
     setForm((prev) => ({ ...prev, globalDiscountPercent: '0' }));
   }, []);
@@ -106,6 +113,12 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
         lines,
         createdBy: user?.id,
       });
+
+      // Le devis existe quoi qu'il arrive : l'échec du métré est signalé, jamais avalé
+      if (metre) {
+        try { await saveMetre({ ...metre, quoteId: created.id, createdBy: user?.id }); }
+        catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning('Devis créé, mais le relevé de métré n\'a pas pu être enregistré'); }
+      }
 
       toast.success('Devis créé');
       onCreated?.(created);
@@ -152,6 +165,14 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
         <div className="flex-1 overflow-y-auto p-6">
           {step === 0 && (
             <div className="space-y-6">
+              {/* Lead sans client lié : non bloquant, mais Pennylane exigera un client */}
+              {!lead?.client_id && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-primary-300 bg-primary-50 text-sm text-primary-800">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>Ce lead n&apos;a pas de client lié : l&apos;envoi Pennylane exigera un client.</span>
+                </div>
+              )}
+
               {/* Famille de produit */}
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-1.5">Installation</label>
@@ -164,6 +185,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
                         const isDeselect = selectedFamily === f;
                         setSelectedFamily(isDeselect ? '' : f);
                         if (selectedTemplateId) clearTemplate();
+                        setMetre(null);
                         // Auto-créer les sections par défaut si on sélectionne une famille
                         if (!isDeselect) {
                           setLines(buildDefaultSections(f));
@@ -219,6 +241,8 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
               lines={lines}
               setLines={setLines}
               globalDiscountPercent={parseFloat(form.globalDiscountPercent) || 0}
+              leadId={lead?.id}
+              onMetreValidated={setMetre}
             />
           )}
           {step === 2 && (

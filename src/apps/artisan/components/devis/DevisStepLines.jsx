@@ -13,10 +13,11 @@ import { useState, useCallback, useMemo } from 'react';
 import { TVA_RATES, computeLineTotals, computeQuoteTotals } from '@services/devis.service';
 import DevisProductPicker from './DevisProductPicker';
 import DevisTvaSummary from './DevisTvaSummary';
+import MetreFumisterie from './metre/MetreFumisterie';
 import { formatEuro } from '@/lib/utils';
 import {
   Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
-  Package,
+  Package, Ruler,
 } from 'lucide-react';
 
 // =============================================================================
@@ -108,7 +109,7 @@ function LineRow({ line, index, onUpdate, onRemove, onMoveUp, onMoveDown, isFirs
 // BLOC SECTION (titre + lignes enfants + boutons d'ajout)
 // =============================================================================
 
-function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, onMoveUp, onMoveDown, onAddProducts, onAddLabor, onAddFreeform }) {
+function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, onMoveUp, onMoveDown, onAddProducts, onAddLabor, onAddFreeform, onMetre }) {
   const productCount = childLines.length;
   const sectionTotalTtc = childLines.reduce((sum, { line }) => {
     const t = computeLineTotals(line);
@@ -119,6 +120,8 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
   const isLaborSection = /main\s*d[''\u2019]?\s*[oœ]/i.test(section.designation);
   // Section AUTRE / PRESTATIONS → saisie libre
   const isFreeformSection = /^(autre|prestations?)$/i.test(section.designation.trim());
+  // Section FUMISTERIE → métré assisté en plus du picker
+  const isFumisterie = /fumisterie/i.test(section.designation);
 
   return (
     <div className="border border-secondary-200 rounded-xl overflow-hidden">
@@ -171,6 +174,9 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 
       {/* Action button inside section */}
       <div className="flex gap-2 px-4 py-1.5 bg-secondary-50/50 border-t border-secondary-100">
+        {isFumisterie && onMetre && (
+          <button type="button" onClick={() => onMetre(sectionIndex)} className="flex items-center gap-1 px-2 h-6 text-xs font-medium text-secondary-800 bg-primary-100 hover:bg-primary-200 rounded-full border border-primary-300" title="Métré assisté sur coupe cotée"><Ruler className="w-3.5 h-3.5" /> Métré assisté</button>
+        )}
         {isLaborSection ? (
           <button
             type="button"
@@ -208,8 +214,9 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, globalDiscountPercent }) {
+export default function DevisStepLines({ orgId, lines, setLines, globalDiscountPercent, leadId, onMetreValidated }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, category }
+  const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
   const pickerCategory = pickerForSection?.category || null;
 
   const updateLine = useCallback((index, updatedLine) => {
@@ -291,6 +298,24 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
       return result;
     });
   }, [pickerForSection, setLines]);
+
+  // Métré assisté validé → lignes insérées après le dernier enfant de la section FUMISTERIE
+  const handleMetreValidate = useCallback(({ lignesDevis, metre }) => {
+    if (metreForSection == null) return;
+    const sectionIdx = metreForSection;
+    setLines((prev) => {
+      let insertAt = sectionIdx + 1;
+      for (let i = sectionIdx + 1; i < prev.length; i++) {
+        if (prev[i].line_type === 'section_title') break;
+        insertAt = i + 1;
+      }
+      const result = [...prev];
+      result.splice(insertAt, 0, ...lignesDevis);
+      return result;
+    });
+    onMetreValidated?.(metre);
+    setMetreForSection(null);
+  }, [metreForSection, setLines, onMetreValidated]);
 
   // Ajouter une ligne main d'œuvre dans une section
   const addLaborToSection = useCallback((sectionGlobalIndex) => {
@@ -398,6 +423,7 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
                 onAddProducts={handleAddProductsToSection}
                 onAddLabor={addLaborToSection}
                 onAddFreeform={addFreeformToSection}
+                onMetre={setMetreForSection}
               />
             );
           })}
@@ -426,6 +452,16 @@ export default function DevisStepLines({ orgId, lines, setLines, globalDiscountP
           category={pickerCategory}
           onAddLines={handlePickerAddLines}
           onClose={() => setPickerForSection(null)}
+        />
+      )}
+
+      {/* Métré assisté fumisterie (plein écran) */}
+      {metreForSection != null && (
+        <MetreFumisterie
+          orgId={orgId}
+          leadId={leadId}
+          onClose={() => setMetreForSection(null)}
+          onValidate={handleMetreValidate}
         />
       )}
     </div>
