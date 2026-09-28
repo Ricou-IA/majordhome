@@ -30,6 +30,7 @@ const SolaireSettings = lazy(() => import('./pages/settings/SolaireSettings'));
 const ThermiqueSettings = lazy(() => import('./pages/settings/ThermiqueSettings'));
 const EquipementsSettings = lazy(() => import('./pages/settings/EquipementsSettings'));
 const TourneesSettings = lazy(() => import('./pages/settings/TourneesSettings'));
+const FumisterieSettings = lazy(() => import('./pages/settings/FumisterieSettings'));
 const EmailsSettings = lazy(() => import('./pages/settings/EmailsSettings'));
 const SmsSettings = lazy(() => import('./pages/settings/SmsSettings'));
 const PennylaneSettings = lazy(() => import('./pages/settings/PennylaneSettings'));
@@ -357,6 +358,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <EquipementsSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/fumisterie',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <FumisterieSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

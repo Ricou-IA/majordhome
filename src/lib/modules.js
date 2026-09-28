@@ -43,6 +43,7 @@ export const MODULES = [
     tiles: [
       { key: 'pricing', title: 'Tarification', description: 'Zones, grille de prix, remises, options, durées d\'entretien', icon: 'Calculator', href: '/settings/pricing', adminOnly: true },
       { key: 'tournees', title: 'Tournées', description: 'Horizons, pauses, souplesse des RDV, figeage des journées', icon: 'Route', href: '/settings/tournees', adminOnly: true },
+      { key: 'fumisterie', title: 'Fumisterie', description: 'Finition par défaut, longueurs d\'éléments, fixations, règle de zone 1', icon: 'Flame', href: '/settings/fumisterie', adminOnly: true },
     ],
   },
   {
@@ -172,7 +173,7 @@ const ROUTES_PAR_MODULE = {
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
-    'settings/pricing', 'settings/tournees',
+    'settings/pricing', 'settings/tournees', 'settings/fumisterie',
   ],
   communication: ['settings/sms'],
   solaire: ['solaire', 'solaire/autoconso', 'solaire/historique', 'settings/solaire'],
