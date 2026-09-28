@@ -15,10 +15,10 @@ export function useFumBundle(orgId, configurationId) {
 export function useFumSupplier(orgId) {
   return useQuery({ queryKey: fumisterieKeys.supplier(orgId), queryFn: () => unwrapResult(fumisterieService.getSupplier(orgId)), enabled: !!orgId, staleTime: 30 * 60 * 1000 });
 }
-export function useFumArticles(orgId, supplierId, gammesTarif, diametre) {
+export function useFumArticles(orgId, supplierId, gammesTarif, diametre, gammesSansDiametre = []) {
   return useQuery({
-    queryKey: fumisterieKeys.articles(orgId, supplierId, gammesTarif, diametre),
-    queryFn: () => unwrapResult(fumisterieService.getArticles(orgId, supplierId, { gammesTarif, diametre })),
+    queryKey: fumisterieKeys.articles(orgId, supplierId, [...gammesTarif, ...gammesSansDiametre.map((g) => `*${g}`)], diametre),
+    queryFn: () => unwrapResult(fumisterieService.getArticles(orgId, supplierId, { gammesTarif, diametre, gammesSansDiametre })),
     enabled: !!orgId && !!supplierId && !!diametre && (gammesTarif?.length || 0) > 0, staleTime: 5 * 60 * 1000,
     // Changement de Ø : garder les articles précédents le temps du fetch (le relevé ne se démonte pas)
     placeholderData: keepPreviousData,

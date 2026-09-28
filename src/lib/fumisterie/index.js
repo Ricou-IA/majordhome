@@ -3,13 +3,17 @@
 // ENGINE_VERSION à incrémenter à tout changement de règle : fum_metres.engine_version le porte
 // et l'écran affiche une bannière si le résultat enregistré vient d'une autre version.
 import { geometrieG1, hauteurSortieMinimale } from './gabarits/g1.js';
-import { controlesG1 } from './controles.js';
+import { geometrieG4 } from './gabarits/g4.js';
+import { controlesG1, controlesG4 } from './controles.js';
 import { construireNomenclature, totaliser } from './nomenclature.js';
 
-export const ENGINE_VERSION = 'g1-2026.09';
+export const ENGINE_VERSION = 'g4-2026.09';
 
 const GABARITS = {
   G1: { geometrie: geometrieG1, controles: controlesG1, sortieMinimale: hauteurSortieMinimale },
+  // Tubage : même géométrie, le code du gabarit dit si le conduit est flexible (G4) ou rigide PRH (G4R).
+  G4: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: false }, cfg), controles: controlesG4, sortieMinimale: null },
+  G4R: { geometrie: (r, cfg) => geometrieG4({ ...r, rigide: true }, cfg), controles: controlesG4, sortieMinimale: null },
 };
 
 /**
@@ -73,10 +77,11 @@ export function calculerMetre({ configuration, gabarit, composants, mapping, art
   return { engine_version: ENGINE_VERSION, geometrie, lignes, alertes: [...alertes, ...nomenclature.alertes], totaux: totaliser(lignes) };
 }
 
-/** Hauteur de sortie minimale conforme pour le gabarit de la configuration (bouton « Ajuster »). */
+/** Hauteur de sortie minimale conforme pour le gabarit de la configuration (bouton « Ajuster »). null si le gabarit n'a pas de sortie de toit (tubage). */
 export function sortieMinimale({ configuration, gabarit, reglages, releve }) {
   const code = gabarit?.code || configuration?.gabarit_code;
-  return GABARITS[code].sortieMinimale(releve, reglages);
+  const fn = GABARITS[code]?.sortieMinimale;
+  return fn ? fn(releve, reglages) : null;
 }
 
-export { geometrieG1, controlesG1, construireNomenclature, totaliser };
+export { geometrieG1, geometrieG4, controlesG1, controlesG4, construireNomenclature, totaliser };

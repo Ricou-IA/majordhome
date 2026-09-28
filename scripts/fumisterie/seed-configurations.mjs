@@ -1,10 +1,11 @@
 // ============================================================================
 // Bibliothèque MODINOX (docs/devis-fumisterie/bibliotheque_configurations_modinox_v1.json)
-// + gabarit G1 + nomenclature/mapping CFG-24 (scripts/fumisterie/data/*.json)
+// + gabarits (G1, G4, G4R) + nomenclatures / mapping par configuration (scripts/fumisterie/data/*.json)
 // → SQL idempotent (upsert sur code) : scripts/fumisterie/out/seed_configurations.sql.
 // Le JSON fait foi pour les 19 configurations (critères, règles, guide, appareils) ;
 // les composants avec repère/règle de quantité ne sont posés QUE pour les configurations
-// décrites dans data/ (tranche 1 : CFG-24). Les autres gardent leur nomenclature brute.
+// décrites dans data/ (tranche 1 : CFG-24 ; tranche 2 : CFG-26/27/34/35). Les autres gardent
+// leur nomenclature brute. Le mapping MODINOX est REMPLACÉ par l'union des fichiers de mapping.
 // Usage : node scripts/fumisterie/seed-configurations.mjs [--org <uuid>]
 // ============================================================================
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -16,12 +17,12 @@ const args = process.argv.slice(2);
 const ORG = args[args.indexOf('--org') + 1] || '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
 const lire = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const biblio = lire(path.join(racine, 'docs', 'devis-fumisterie', 'bibliotheque_configurations_modinox_v1.json'));
-const g1 = lire(path.join(racine, 'scripts', 'fumisterie', 'data', 'gabarit-g1.json'));
-const cfg24 = lire(path.join(racine, 'scripts', 'fumisterie', 'data', 'cfg24-composants.json'));
-const map24 = lire(path.join(racine, 'scripts', 'fumisterie', 'data', 'cfg24-mapping.json'));
+const data = (f) => lire(path.join(racine, 'scripts', 'fumisterie', 'data', f));
+const GABARITS = ['gabarit-g1.json', 'gabarit-g4.json', 'gabarit-g4r.json'].map(data);
 const VERSION = 'modinox_2026';
-const GABARIT_PAR_CODE = { 'CFG-24': 'G1' };
-const COMPOSANTS_PAR_CODE = { 'CFG-24': cfg24 };
+const GABARIT_PAR_CODE = { 'CFG-24': 'G1', 'CFG-34': 'G4', 'CFG-26': 'G4', 'CFG-35': 'G4R', 'CFG-27': 'G4R' };
+const COMPOSANTS_PAR_CODE = Object.fromEntries(['24', '26', '27', '34', '35'].map((n) => [`CFG-${n}`, data(`cfg${n}-composants.json`)]));
+const MAPPING = ['cfg24-mapping.json', 'g4-mapping.json'].flatMap(data);
 
 const q = (v) => (v == null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
 const arr = (a) => `ARRAY[${(a || []).map(q).join(',')}]::text[]`;
@@ -34,9 +35,11 @@ BEGIN
   SELECT id INTO v_sup FROM majordhome.suppliers WHERE org_id = v_org AND name = 'MODINOX / ALTEMA';
   IF v_sup IS NULL THEN RAISE EXCEPTION 'Fournisseur MODINOX / ALTEMA absent : lancer l''import du tarif d''abord'; END IF;`];
 
-// Gabarit G1
-sql.push(`  INSERT INTO majordhome.fum_gabarits (org_id, code, libelle, description, troncons) VALUES (v_org, ${q(g1.code)}, ${q(g1.libelle)}, ${q(g1.description)}, ${q(JSON.stringify(g1.troncons))}::jsonb)
+// Gabarits (G1, G4, G4R)
+for (const g of GABARITS) {
+  sql.push(`  INSERT INTO majordhome.fum_gabarits (org_id, code, libelle, description, troncons) VALUES (v_org, ${q(g.code)}, ${q(g.libelle)}, ${q(g.description)}, ${q(JSON.stringify(g.troncons))}::jsonb)
   ON CONFLICT (org_id, code) DO UPDATE SET libelle = EXCLUDED.libelle, description = EXCLUDED.description, troncons = EXCLUDED.troncons, updated_at = now();`);
+}
 
 // Règles
 for (const r of biblio.regles_techniques) {
@@ -86,13 +89,13 @@ for (const [ligne, cols] of Object.entries(biblio.guide_de_choix_gammes.lignes))
   }
 }
 
-// Mapping CFG-24 (fournisseur MODINOX)
-sql.push(`  DELETE FROM majordhome.fum_composant_mapping WHERE org_id = v_org AND supplier_id = v_sup AND composant_code IN (${[...new Set(map24.map((m) => q(m.composant_code)))].join(',')});`);
-for (const m of map24) {
+// Mapping (fournisseur MODINOX) : les composants présents dans les fichiers sont remplacés en bloc
+sql.push(`  DELETE FROM majordhome.fum_composant_mapping WHERE org_id = v_org AND supplier_id = v_sup AND composant_code IN (${[...new Set(MAPPING.map((m) => q(m.composant_code)))].join(',')});`);
+for (const m of MAPPING) {
   sql.push(`  INSERT INTO majordhome.fum_composant_mapping (org_id, supplier_id, composant_code, gamme_catalogue, finition, gamme_tarif, type_piece, quantite_par_unite, motif_code, priorite, statut, notes)
   VALUES (v_org, v_sup, ${q(m.composant_code)}, ${q(m.gamme_catalogue)}, ${q(m.finition)}, ${q(m.gamme_tarif)}, ${q(m.type_piece)}, ${m.quantite_par_unite ?? 1}, ${q(m.motif_code)}, ${m.priorite ?? 100}, ${q(m.statut || 'catalogue')}, ${q(m.notes)});`);
 }
 sql.push('END $$;');
 mkdirSync(path.join(racine, 'scripts', 'fumisterie', 'out'), { recursive: true });
 writeFileSync(path.join(racine, 'scripts', 'fumisterie', 'out', 'seed_configurations.sql'), sql.join('\n'), 'utf8');
-console.log(`seed : ${biblio.configurations.length} configurations, ${biblio.regles_techniques.length} règles, ${map24.length} lignes de mapping`);
+console.log(`seed : ${biblio.configurations.length} configurations, ${GABARITS.length} gabarits, ${Object.keys(COMPOSANTS_PAR_CODE).length} nomenclatures, ${biblio.regles_techniques.length} règles, ${MAPPING.length} lignes de mapping`);

@@ -11,6 +11,10 @@
  *   marge_combles_m: number,
  *   haubanage_m: number,
  *   zone1: { pente_m: number, plat_m: number, pente_plat_deg: number },
+ *   flexible_marge_m: number,
+ *   flexible_arrondi_m: number,
+ *   longueurs_prh_mm: number[],
+ *   longueurs_prh_5_10_mm: number[],
  *   tva_fournitures: number,
  *   tva_pose: number,
  * }}
@@ -25,6 +29,11 @@ export const DEFAULTS_FUMISTERIE = Object.freeze({
   marge_combles_m: 0.10,                // marge sous toiture pour le dévoiement
   haubanage_m: 3,                       // conduit libre au-dessus du toit avant haubanage (catalogue p.33)
   zone1: Object.freeze({ pente_m: 0.40, plat_m: 1.20, pente_plat_deg: 15 }), // catalogue p.23
+  // Tubage (G4) — règles PROVISOIRES à valider par Philippe
+  flexible_marge_m: 0.50,               // débord du flexible (haut de souche + raccord bas) ajouté à la hauteur du conduit
+  flexible_arrondi_m: 0.50,             // le flexible (vendu au ml) se commande au multiple supérieur
+  longueurs_prh_mm: Object.freeze([1000, 500, 330]), // tuyaux rigides PRH 6/10 (Ø ≥ 130), du plus long au plus court
+  longueurs_prh_5_10_mm: Object.freeze([1000, 500, 250]), // tuyaux rigides PRH 5/10 (Ø 80/100, pellets)
   tva_fournitures: 20,
   tva_pose: 10,
 });
@@ -41,5 +50,7 @@ export function buildFumisterieConfig(settings) {
   out.zone1 = { ...DEFAULTS_FUMISTERIE.zone1, ...(s.zone1 || {}) };
   out.reglable = { ...DEFAULTS_FUMISTERIE.reglable, ...(s.reglable || {}) };
   out.longueurs_elements_mm = [...(s.longueurs_elements_mm || DEFAULTS_FUMISTERIE.longueurs_elements_mm)].sort((a, b) => b - a);
+  out.longueurs_prh_mm = [...(s.longueurs_prh_mm || DEFAULTS_FUMISTERIE.longueurs_prh_mm)].sort((a, b) => b - a);
+  out.longueurs_prh_5_10_mm = [...(s.longueurs_prh_5_10_mm || DEFAULTS_FUMISTERIE.longueurs_prh_5_10_mm)].sort((a, b) => b - a);
   return out;
 }

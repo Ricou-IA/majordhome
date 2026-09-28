@@ -31,7 +31,7 @@ export function construireNomenclature({ composants, mapping, articles, geometri
   // Le résultat de résolution (article + éventuels candidats ambigus) est mémorisé pour `pousser`.
   let derniersAmbigus = null;
   const resoudre = (comp, c) => {
-    const res = resoudreArticle(articles, mapping, { composant_code: comp.composant_code, gamme_catalogue: gamme(comp), diametre: releve.diametre, finition: releve.finition, ...c });
+    const res = resoudreArticle(articles, mapping, { composant_code: comp.composant_code, gamme_catalogue: gamme(comp), diametre: releve.diametre, finition: releve.finition, boisseau: releve.boisseau ?? null, ...c });
     derniersAmbigus = res.ambigus;
     return res;
   };
@@ -48,6 +48,9 @@ export function construireNomenclature({ composants, mapping, articles, geometri
   };
 
   for (const comp of [...composants].sort((a, b) => a.ordre - b.ordre)) {
+    // Alternative (« ou ») : un composant qui porte groupe_alternative + option n'est retenu que si le
+    // relevé a choisi cette option. Un groupe sans option (kit RT2012) reste un simple regroupement.
+    if (comp.groupe_alternative && comp.option != null && String(releve[comp.groupe_alternative]) !== String(comp.option)) continue;
     const [regle, arg] = String(comp.regle_quantite || 'unitaire').split(':');
     const tr = arg ? geometrie.troncons[arg] : null;
     if (regle === 'unitaire') {
@@ -58,7 +61,9 @@ export function construireNomenclature({ composants, mapping, articles, geometri
     } else if (regle === 'par_longueur') {
       if (!tr) { alertes.push({ niveau: 'warn', code: 'troncon_inconnu', source: 'gabarit', message: `${comp.libelle} : tronçon ${arg} absent de la géométrie.` }); continue; }
       const comp2 = tr.composition;
-      for (const l of reglages.longueurs_elements_mm) {
+      if (!comp2) { alertes.push({ niveau: 'warn', code: 'troncon_non_compose', source: 'gabarit', message: `${comp.libelle} : le tronçon ${arg} n'est pas composé en éléments (vendu au mètre ?).` }); continue; }
+      // Les longueurs sont celles de la composition du tronçon (PRH en 330, émaillé en 250…), pas une liste globale.
+      for (const l of Object.keys(comp2.elements).map(Number).sort((a, b) => b - a)) {
         if (!comp2.elements[l]) continue;
         const { article, mapping: m } = resoudre(comp, { longueur: l });
         pousser(comp, article, qte(m, comp2.elements[l]), `Lg ${l} Ø${releve.diametre}`, { sous_libelle: `Lg ${l} mm` });
@@ -67,8 +72,14 @@ export function construireNomenclature({ composants, mapping, articles, geometri
         const { article, mapping: m } = resoudre(comp, { type_piece: 'element_reglable' });
         pousser(comp, article, qte(m, comp2.reglable.n), `réglable Ø${releve.diametre}`, { sous_libelle: `Réglé à ${comp2.reglable.longueur} mm` });
       }
+    } else if (regle === 'par_longueur_ml') {
+      // Article vendu au mètre (flexible) : la quantité est la longueur déjà arrondie par la géométrie.
+      if (!tr) { alertes.push({ niveau: 'warn', code: 'troncon_inconnu', source: 'gabarit', message: `${comp.libelle} : tronçon ${arg} absent de la géométrie.` }); continue; }
+      if (tr.ml == null) { alertes.push({ niveau: 'warn', code: 'troncon_non_ml', source: 'gabarit', message: `${comp.libelle} : le tronçon ${arg} n'a pas de longueur au mètre.` }); continue; }
+      const { article, mapping: m } = resoudre(comp, {});
+      pousser(comp, article, qte(m, tr.ml), `au ml Ø${releve.diametre}`, { sous_libelle: `${String(tr.ml).replace('.', ',')} m au mètre linéaire` });
     } else if (regle === 'par_emboitement') {
-      const n = tr ? tr.composition.nb * (reglages.colliers_par_emboitement ?? 1) : 0;
+      const n = tr?.composition ? tr.composition.nb * (reglages.colliers_par_emboitement ?? 1) : 0;
       if (n > 0) {
         const { article, mapping: m } = resoudre(comp, {});
         pousser(comp, article, qte(m, n), `Ø${releve.diametre}`, { sous_libelle: '1 par emboîtement' });

@@ -26,3 +26,26 @@ export function controlesG1(g, r, cfg) {
   if (ss > 0) a.push({ niveau: 'info', code: 'surlongueur_emaillee', source: 'calcul', message: `Raccordement émaillé : ${ss} mm de trop, à recouper ou à remplacer par un tuyau coulissant.` });
   return a;
 }
+
+/**
+ * Contrôles du tubage (G4 / G4R). Le débouché est celui du conduit existant : la zone 1 n'est
+ * PAS vérifiée par le métré, et l'écran le dit (info) plutôt que de se taire.
+ * @param {ReturnType<import('./gabarits/g4.js').geometrieG4>} g
+ * @param {Parameters<import('./gabarits/g4.js').geometrieG4>[0]} r
+ * @param {Parameters<import('./gabarits/g4.js').geometrieG4>[1]} cfg
+ * @returns {{niveau:string, code:string, message:string, source:string}[]}
+ */
+export function controlesG4(g, r, cfg) {
+  const a = [];
+  a.push({ niveau: 'info', code: 'zone1_non_verifiee', source: 'catalogue p.23', message: 'Conduit existant : la hauteur du débouché (zone 1) n\'est pas vérifiée par le métré — à contrôler sur place.' });
+  if (g.Lsp_v <= 0.05) a.push({ niveau: 'warn', code: 'buse', source: 'géométrie', message: g.mur ? 'La buse est au niveau du piquage ou au-dessus : vérifiez la hauteur de buse et celle du piquage.' : 'La buse est au niveau du plafond ou au-dessus : vérifiez la hauteur de buse.' });
+  if (Number(r.hConduit) < 1) a.push({ niveau: 'warn', code: 'conduit_court', source: 'géométrie', message: `Conduit existant de ${fmt(r.hConduit)} m seulement : vérifiez la hauteur relevée.` });
+  if (g.mur && Number(r.diametre) > 150) a.push({ niveau: 'warn', code: 'piquage_diametre', source: 'catalogue (R-POLYPERF-02)', message: `Entrée par le mur en Ø${r.diametre} : l'adaptateur de piquage boisseau bas existe jusqu'au Ø150. Prévoir un té ou une entrée par le plafond.` });
+  if (!g.rigide && g.Lflex > 30) a.push({ niveau: 'info', code: 'flexible_long', source: 'tarif', message: `${fmt(g.Lflex, 1)} m de flexible : au-delà d'un rouleau de 30 m, vérifier le conditionnement au tarif.` });
+  const ss = g.troncons.raccordement_sp.composition.surlongueur;
+  if (ss > 0) a.push({ niveau: 'info', code: g.rigide ? 'surlongueur_prh' : 'surlongueur_emaillee', source: 'calcul', message: `Raccordement : ${ss} mm de trop, à recouper ou à remplacer par un tuyau coulissant.` });
+  const sc = g.troncons.conduit_existant.composition?.surlongueur || 0;
+  if (sc > 0) a.push({ niveau: 'info', code: 'surlongueur_conduit', source: 'calcul', message: `Tuyaux rigides : ${sc} mm de trop dans le conduit, à recouper.` });
+  if (!g.rigide) a.push({ niveau: 'info', code: 'flexible_marge', source: 'réglage', message: `Flexible commandé : ${fmt(g.Lflex, 1)} m (${fmt(r.hConduit, 2)} m de conduit + ${fmt(cfg.flexible_marge_m, 2)} m de débord, arrondi au ${fmt(cfg.flexible_arrondi_m, 2)} m).` });
+  return a;
+}

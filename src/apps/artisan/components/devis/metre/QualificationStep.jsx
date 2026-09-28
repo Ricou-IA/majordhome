@@ -28,8 +28,20 @@ export default function QualificationStep({ configurations, criteres, setCritere
       <div className="space-y-2">
         {(() => {
           const n = compatibles.length; const m = compatibles.filter((c) => !!c.gabarit_id).length; const s = n > 1 ? 's' : '';
+          const metrables = configurations.filter((c) => !!c.gabarit_id);
           // Le nombre qui compte pour l'utilisateur est celui des configurations MÉTRABLES, pas des compatibles.
-          return <p className="text-xs font-medium text-secondary-600">{n} configuration{s} compatible{s} · <span className={m === 0 && n > 0 ? 'text-primary-800' : ''}>{m} avec métré</span></p>;
+          // Et quand la sélection n'en contient aucune, on dit lesquelles le sont (recette 2026-09-28 : deux
+          // « 0 avec métré » de suite se lisaient « rien n'est possible »).
+          return (
+            <>
+              <p className="text-xs font-medium text-secondary-600">{n} configuration{s} compatible{s} · <span className={m === 0 && n > 0 ? 'text-primary-800' : ''}>{m} avec métré</span></p>
+              {m === 0 && metrables.length > 0 && (
+                <p className="text-xs text-secondary-600 border-l-4 border-primary-400 bg-primary-50 px-3 py-2">
+                  Métré disponible dans cette version pour : {metrables.map((c) => c.code).join(', ')}. Modifiez les critères (projet, combustible…) pour y arriver.
+                </p>
+              )}
+            </>
+          );
         })()}
         {compatibles.map((c) => {
           const metrable = !!c.gabarit_id; const bloquee = !!c.condition_bloquante; const zoneSensible = (c.zones || []).some((z) => z !== 'zone_1');

@@ -1,0 +1,115 @@
+[
+  {
+    "ordre": 1,
+    "composant_code": "chapeau_prh",
+    "libelle": "Chapeau anti-refouleur PRH",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "sortie_souche",
+    "repere": 1,
+    "statut": "catalogue",
+    "regle_quantite": "unitaire"
+  },
+  {
+    "ordre": 2,
+    "composant_code": "kit_couronnement",
+    "libelle": "Kit de couronnement (collerette + plaque de couronnement)",
+    "chapitre": "ACCESSOIRES",
+    "gammes": [
+      "ACCESSOIRES"
+    ],
+    "troncon": "sortie_souche",
+    "repere": 2,
+    "statut": "provisoire",
+    "regle_quantite": "unitaire",
+    "note": "Collerette de solin + plaque de couronnement du catalogue = kit de couronnement MODINOX choisi d'après la section du boisseau — à valider"
+  },
+  {
+    "ordre": 3,
+    "composant_code": "tuyau_prh_conduit",
+    "libelle": "Tuyau rigide PRH dans le conduit",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "conduit_existant",
+    "repere": 3,
+    "statut": "catalogue",
+    "regle_quantite": "par_longueur:conduit_existant",
+    "note": "Catalogue : PRH ou ATRINOX — PRH retenu en tranche 2, ATRINOX à ajouter en alternative"
+  },
+  {
+    "ordre": 4,
+    "composant_code": "plaque_arp",
+    "libelle": "Traversée de plafond ventilée (plaque ARP)",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "raccordement",
+    "repere": 4,
+    "statut": "provisoire",
+    "groupe_alternative": "entree",
+    "option": "plafond",
+    "regle_quantite": "unitaire",
+    "note": "Plaque ARP 300 × 300 tuyau PRH par défaut — à valider"
+  },
+  {
+    "ordre": 5,
+    "composant_code": "coude_90_purge_prh",
+    "libelle": "Coude 90° à purge PRH (entrée par le mur)",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "raccordement",
+    "repere": 4,
+    "statut": "provisoire",
+    "groupe_alternative": "entree",
+    "option": "mur",
+    "regle_quantite": "unitaire"
+  },
+  {
+    "ordre": 6,
+    "composant_code": "tampon_prh",
+    "libelle": "Tampon à poignée pour coude à purge",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "raccordement",
+    "repere": 4,
+    "statut": "provisoire",
+    "groupe_alternative": "entree",
+    "option": "mur",
+    "regle_quantite": "unitaire"
+  },
+  {
+    "ordre": 7,
+    "composant_code": "tuyau_prh_raccord",
+    "libelle": "Tuyau rigide PRH (raccordement appareil → conduit)",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "raccordement",
+    "repere": 5,
+    "statut": "implicite",
+    "regle_quantite": "par_longueur:raccordement_sp"
+  },
+  {
+    "ordre": 8,
+    "composant_code": "manchon_buse",
+    "libelle": "Manchon de raccordement sur buse",
+    "chapitre": "RIGIDES SIMPLE PAROI",
+    "gammes": [
+      "PRH"
+    ],
+    "troncon": "raccordement",
+    "repere": 5,
+    "statut": "catalogue",
+    "regle_quantite": "unitaire"
+  }
+]

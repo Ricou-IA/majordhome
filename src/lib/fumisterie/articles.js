@@ -13,12 +13,14 @@
 // Rien de trouvé → article null : l'appelant crée une ligne « à chiffrer », jamais une omission.
 //
 // Placeholders du motif : {D} diamètre, {D-n}/{D+n} diamètre ± n (ex. raccord réduit pour tuyau
-// émaillé : Ø150 → femelle 148), {LG} longueur, {A} angle. Valeur inconnue → `\d+`.
+// émaillé : Ø150 → femelle 148), {LG} longueur, {A} angle, {BOI} indice de section de boisseau
+// (1..6, même numérotation MODINOX pour les kits de couronnement et les plaques ventilées).
+// Valeur inconnue → `\d+`.
 
 /**
  * Compile un motif de code en RegExp pour les critères donnés.
  * @param {string} motif
- * @param {{diametre:number, longueur?:number|null, angle?:number|null}} c
+ * @param {{diametre:number, longueur?:number|null, angle?:number|null, boisseau?:number|string|null}} c
  * @returns {RegExp}
  */
 export function compilerMotif(motif, c) {
@@ -27,8 +29,14 @@ export function compilerMotif(motif, c) {
     .replace(/\{D([+-])(\d+)\}/g, (_, s, n) => (c.diametre == null ? '\\d+' : String(c.diametre + (s === '+' ? 1 : -1) * Number(n))))
     .replace(/\{D\}/g, val(c.diametre))
     .replace(/\{LG\}/g, val(c.longueur))
-    .replace(/\{A\}/g, val(c.angle));
+    .replace(/\{A\}/g, val(c.angle))
+    .replace(/\{BOI\}/g, val(c.boisseau));
   return new RegExp(src);
+}
+
+/** Un motif sans `{D…}` désigne un article indépendant du diamètre (kit d'entrée d'air…). */
+export function motifDependDuDiametre(motif) {
+  return /\{D[+-]?\d*\}/.test(String(motif || ''));
 }
 
 /**
@@ -70,8 +78,11 @@ export function resoudreArticle(articles, mappings, c) {
       && (c.angle == null || a.angle === c.angle)
       && (c.pente == null || (a.pente_min != null && a.pente_max != null && c.pente >= a.pente_min && c.pente <= a.pente_max))
       && (!m.finition || a.couleur === m.finition);
+    // Un mapping dont le motif ne cite pas le diamètre désigne un article indépendant du Ø (kit
+    // d'entrée d'air Ø100 posé sur un conduit Ø80) : le Ø du relevé ne filtre pas les candidats.
+    const parDiametre = !m.motif_code || motifDependDuDiametre(m.motif_code);
     const parAttributs = articles.filter((a) => criteresOk(a)
-      && a.gamme_tarif === m.gamme_tarif && a.type_piece === type && a.diametre_int === c.diametre);
+      && a.gamme_tarif === m.gamme_tarif && a.type_piece === type && (!parDiametre || a.diametre_int === c.diametre));
     const re = m.motif_code ? compilerMotif(m.motif_code, c) : null;
     if (parAttributs.length) {
       const filtres = re ? parAttributs.filter((a) => re.test(String(a.reference))) : parAttributs;

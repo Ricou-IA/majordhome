@@ -64,14 +64,21 @@ export const fumisterieService = {
     return data;
   }, 'fumisterie.getSupplier'),
 
-  /** Articles candidats : toutes les gammes tarif du mapping, au diamètre du relevé. */
-  getArticles: (orgId, supplierId, { gammesTarif, diametre }) => withErrorHandling(async () => {
+  /**
+   * Articles candidats : toutes les gammes tarif du mapping, au diamètre du relevé — plus, entières,
+   * les gammes dont le mapping ne dépend pas du Ø (`gammesSansDiametre`, ex. kit d'entrée d'air Ø100
+   * posé sur un conduit Ø80). Deux requêtes plutôt qu'un `.or()` : les noms de gammes portent
+   * parenthèses et virgules, qui casseraient la syntaxe PostgREST.
+   */
+  getArticles: (orgId, supplierId, { gammesTarif, diametre, gammesSansDiametre = [] }) => withErrorHandling(async () => {
     if (!orgId || !supplierId || !diametre || !gammesTarif?.length) return [];
-    const { data, error } = await supabase.from('majordhome_fum_articles').select('*')
-      .eq('org_id', orgId).eq('supplier_id', supplierId).eq('is_active', true)
-      .in('gamme_tarif', gammesTarif).eq('diametre_int', diametre);
+    const base = () => supabase.from('majordhome_fum_articles').select('*').eq('org_id', orgId).eq('supplier_id', supplierId).eq('is_active', true);
+    const { data, error } = await base().in('gamme_tarif', gammesTarif).eq('diametre_int', diametre);
     if (error) throw error;
-    return data || [];
+    if (!gammesSansDiametre.length) return data || [];
+    const { data: sansD, error: e2 } = await base().in('gamme_tarif', gammesSansDiametre).neq('diametre_int', diametre);
+    if (e2) throw e2;
+    return [...(data || []), ...(sansD || [])];
   }, 'fumisterie.getArticles'),
 
   saveMetre: ({ orgId, quoteId = null, leadId = null, configurationId, gabaritCode, diametre, finition, releve, resultat, engineVersion, createdBy }) =>

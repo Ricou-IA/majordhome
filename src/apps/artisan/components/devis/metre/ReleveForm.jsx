@@ -7,6 +7,7 @@ import { parametreVisible as visible } from '@/lib/fumisterie/index.js';
 const INPUT = 'w-full px-2 py-1.5 border border-secondary-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 function libelleChoix(p, c) {
+  if (p.libelles && p.libelles[String(c)] != null) return p.libelles[String(c)];
   if (typeof c === 'number' && p.unite === '°') return c === 0 ? 'Aucun' : `${c}°`;
   if (typeof c === 'number' && p.cle === 'nbEtages') return c === 0 ? 'Aucun' : '1 étage';
   if (typeof c === 'number') return `Ø ${c}`;

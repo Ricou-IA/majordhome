@@ -9,6 +9,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFumConfigurations, useFumBundle, useFumSupplier, useFumArticles } from '@hooks/useFumisterie';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
+import { motifDependDuDiametre } from '@/lib/fumisterie/articles.js';
 import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
@@ -55,7 +56,9 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
   const bundle = bundleQ.data;
   const supplier = supplierQ.data;
   const gammes = useMemo(() => [...new Set((bundle?.mapping || []).map((m) => m.gamme_tarif))], [bundle]);
-  const articlesQ = useFumArticles(orgId, supplier?.id, gammes, releve?.diametre);
+  // Gammes dont le mapping ne cite pas le Ø (kit d'entrée d'air…) : chargées entières, pas au Ø du relevé.
+  const gammesSansDiametre = useMemo(() => [...new Set((bundle?.mapping || []).filter((m) => !motifDependDuDiametre(m.motif_code)).map((m) => m.gamme_tarif))], [bundle]);
+  const articlesQ = useFumArticles(orgId, supplier?.id, gammes, releve?.diametre, gammesSansDiametre);
   const articles = articlesQ.data ?? EMPTY;
 
   // Une requête en erreur n'est JAMAIS présentée comme un catalogue vide.

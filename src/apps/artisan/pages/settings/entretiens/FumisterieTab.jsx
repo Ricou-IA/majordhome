@@ -22,8 +22,12 @@ function depuisSettings(settings) {
     colliers_par_emboitement: c.colliers_par_emboitement, marge_combles_cm: Math.round(c.marge_combles_m * 100),
     haubanage_m: c.haubanage_m, zone1_pente_cm: Math.round(c.zone1.pente_m * 100), zone1_plat_cm: Math.round(c.zone1.plat_m * 100),
     zone1_pente_plat_deg: c.zone1.pente_plat_deg, tva_fournitures: c.tva_fournitures, tva_pose: c.tva_pose,
+    flexible_marge_cm: Math.round(c.flexible_marge_m * 100), flexible_arrondi_cm: Math.round(c.flexible_arrondi_m * 100),
+    longueurs_prh: c.longueurs_prh_mm.join(', '), longueurs_prh_5_10: c.longueurs_prh_5_10_mm.join(', '),
   };
 }
+
+const listeLongueurs = (s) => s.split(',').map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n > 0);
 
 function versSettings(form, existant) {
   const longueurs = form.longueurs.split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
@@ -37,6 +41,8 @@ function versSettings(form, existant) {
     haubanage_m: Number(form.haubanage_m),
     zone1: { pente_m: Number(form.zone1_pente_cm) / 100, plat_m: Number(form.zone1_plat_cm) / 100, pente_plat_deg: Number(form.zone1_pente_plat_deg) },
     tva_fournitures: Number(form.tva_fournitures), tva_pose: Number(form.tva_pose),
+    flexible_marge_m: Number(form.flexible_marge_cm) / 100, flexible_arrondi_m: Number(form.flexible_arrondi_cm) / 100,
+    longueurs_prh_mm: listeLongueurs(form.longueurs_prh), longueurs_prh_5_10_mm: listeLongueurs(form.longueurs_prh_5_10),
   };
 }
 
@@ -54,6 +60,10 @@ function validate(form) {
   else if (rMin < 100 || rMax > 1000 || rMin >= rMax) errors.reglable = 'Plage entre 100 et 1000 mm, min < max';
   const tva = borne(form.tva_fournitures, 0, 30) || borne(form.tva_pose, 0, 30);
   if (tva) errors.tva = tva;
+  for (const k of ['longueurs_prh', 'longueurs_prh_5_10']) {
+    if (!/^\d+(\s*,\s*\d+)*$/.test(String(form[k]).trim())) errors[k] = 'Liste de longueurs en mm, séparées par des virgules';
+    else if (listeLongueurs(form[k]).length !== 3) errors[k] = 'Exactement 3 longueurs (ex. 1000, 500, 330)';
+  }
   for (const [k, min, max, entier] of BORNES) {
     const e = borne(form[k], min, max, entier);
     if (e) errors[k] = e;
@@ -85,6 +95,8 @@ const BORNES = [
   ['zone1_pente_cm', 10, 200, true],
   ['zone1_plat_cm', 50, 300, true],
   ['zone1_pente_plat_deg', 0, 30, false],
+  ['flexible_marge_cm', 0, 200, true],
+  ['flexible_arrondi_cm', 10, 100, true],
 ];
 
 function Champ({ label, hint, error, children }) {
@@ -139,6 +151,15 @@ export default function FumisterieTab() {
           <Champ label="Au-dessus du faîtage (cm)" hint="De 10 à 200" error={errors.zone1_pente_cm}><input type="number" min={10} max={200} value={form.zone1_pente_cm} onChange={set('zone1_pente_cm')} className={INPUT_CLASS} /></Champ>
           <Champ label="Au-dessus d'un toit plat (cm)" hint="De 50 à 300" error={errors.zone1_plat_cm}><input type="number" min={50} max={300} value={form.zone1_plat_cm} onChange={set('zone1_plat_cm')} className={INPUT_CLASS} /></Champ>
           <Champ label="Pente traitée comme toit plat (≤ °)" hint="De 0 à 30" error={errors.zone1_pente_plat_deg}><input type="number" min={0} max={30} value={form.zone1_pente_plat_deg} onChange={set('zone1_pente_plat_deg')} className={INPUT_CLASS} /></Champ>
+        </div>
+      </section>
+      <section>
+        <h3 className={SECTION_TITLE}>{'Tubage d\'un conduit existant (règles provisoires)'}</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Champ label="Débord du flexible ajouté à la hauteur du conduit (cm)" hint="Haut de souche + raccord bas — de 0 à 200" error={errors.flexible_marge_cm}><input type="number" min={0} max={200} value={form.flexible_marge_cm} onChange={set('flexible_marge_cm')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Arrondi de commande du flexible (cm)" hint="Vendu au mètre, commandé au multiple supérieur — de 10 à 100" error={errors.flexible_arrondi_cm}><input type="number" min={10} max={100} value={form.flexible_arrondi_cm} onChange={set('flexible_arrondi_cm')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Longueurs des tuyaux rigides PRH 6/10 (mm)" hint="Ø 130 et plus — ex. 1000, 500, 330" error={errors.longueurs_prh}><input value={form.longueurs_prh} onChange={set('longueurs_prh')} className={INPUT_CLASS} /></Champ>
+          <Champ label="Longueurs des tuyaux rigides PRH 5/10 (mm)" hint="Ø 80 et 100 (pellets) — ex. 1000, 500, 250" error={errors.longueurs_prh_5_10}><input value={form.longueurs_prh_5_10} onChange={set('longueurs_prh_5_10')} className={INPUT_CLASS} /></Champ>
         </div>
       </section>
       <div className="flex justify-end">
