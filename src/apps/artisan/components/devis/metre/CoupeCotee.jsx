@@ -30,10 +30,19 @@ export default function CoupeCotee({ geometrie: c, releve: i, onFocusChamp }) {
     const mx = horizontal ? (X(x1) + X(x2)) / 2 : (side === 'r' ? X(x1) + 6 + bw / 2 : X(x1) - 6 - bw / 2);
     const my = horizontal ? Y(y1) - 16 : (Y(y1) + Y(y2)) / 2;
     const go = () => onFocusChamp?.(cle);
+    const t = 5;
+    const ticks = horizontal
+      ? [x1, x2].map((x, idx) => (
+          <line key={`t${idx}`} x1={X(x) - t} y1={Y(y1) + t} x2={X(x) + t} y2={Y(y1) - t} className="stroke-secondary-500" strokeWidth={1} />
+        ))
+      : [y1, y2].map((y, idx) => (
+          <line key={`t${idx}`} x1={X(x1) - t} y1={Y(y) + t} x2={X(x1) + t} y2={Y(y) - t} className="stroke-secondary-500" strokeWidth={1} />
+        ));
     return (
       <g key={key} role="button" tabIndex={0} aria-label={`Modifier ${label}`} className="cursor-pointer outline-none [&:focus_rect]:stroke-primary-500 [&:hover_text]:fill-secondary-700" onClick={go} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }}>
         <title>{label}</title>
         <line x1={X(x1)} y1={Y(y1)} x2={X(x2)} y2={Y(y2)} className="stroke-secondary-500" strokeWidth={1} />
+        {ticks}
         <rect x={mx - bw / 2} y={my - 11} width={bw} height={22} rx={3} className="fill-white stroke-transparent" strokeWidth={1.5} />
         <text x={mx} y={my + 4.5} textAnchor="middle" className="fill-secondary-900 font-mono text-[13px] font-semibold">{tx}</text>
       </g>
@@ -53,6 +62,7 @@ export default function CoupeCotee({ geometrie: c, releve: i, onFocusChamp }) {
       <polygon points={pts([[xL, 0], [xL, yTop(xL) - i.epToit], [xr, yTop(xr) - i.epToit], [xR, yTop(xR) - i.epToit], [xR, 0]])} className="fill-secondary-100 stroke-secondary-300" />
       {slabs.map((y) => <rect key={y} x={X(xL)} y={Y(y + i.epPl)} width={(xR - xL) * sc} height={i.epPl * sc} className="fill-secondary-300" />)}
       <polygon points={pts([[xa, yTop(xa)], [xr, yTop(xr)], [xb, yTop(xb)], [xb, yTop(xb) - i.epToit], [xr, yTop(xr) - i.epToit], [xa, yTop(xa) - i.epToit]])} className="fill-secondary-400" />
+      <polyline points={pts([[xa, yTop(xa)], [xr, yTop(xr)], [xb, yTop(xb)]])} fill="none" className="stroke-secondary-500" strokeWidth={1.2} />
       <rect x={X(-aw / 2)} y={Y(i.hBuse - 0.06)} width={aw * sc} height={(i.hBuse - 0.06) * sc} rx={4} className="fill-secondary-800" />
       <rect x={X(-aw / 2 + 0.1)} y={Y(i.hBuse * 0.62)} width={(aw - 0.2) * sc} height={i.hBuse * 0.3 * sc} rx={2} className="fill-primary-400" />
       <line x1={X(0)} y1={Y(i.hBuse - 0.06)} x2={X(0)} y2={Y(i.hsp1)} className="stroke-secondary-800" strokeWidth={Math.max(4, pw * 0.62)} />
