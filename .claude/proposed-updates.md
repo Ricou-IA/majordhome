@@ -104,3 +104,15 @@ Règles qui mordent :
 - **Le seed remplace le mapping MODINOX par l'union des fichiers `data/*-mapping.json`** ; un composant partagé par plusieurs configurations (`kit_couronnement`) n'a qu'une définition. Tarif : trous honnêtes (chapeau plat Ø100, acier peint 2 mm Ø100, plaque ARP Ø80 en 5/10) → « à chiffrer », jamais un article approchant.
 - **Recette 2026-09-28** : la qualification hérite de la famille du devis (`criteresDepuisFamille`), un brouillon restauré se dit (bandeau + « Repartir de zéro », le brouillon est par lead, pas par devis), et l'écran liste les configurations métrables quand la sélection n'en a aucune. **Prix jugé élevé par Eric** (tarif public sans remise) → remise par famille de pièces à cadrer avant la mise en main de Philippe.
 ---
+
+## [2026-09-29 16:00] Module Fumisterie — tranche 3 (toutes les configurations) — compléments CLAUDE.md
+**Statut** : PENDING
+**Commit** : 8169343
+**Contexte** : les 19 configurations du catalogue MODINOX sont métrables (10 gabarits). Quatre règles de moteur et un piège de résolution méritent d'être gravés pour les prochaines évolutions (ATRINOX, zones 2/3, DINAK).
+**Proposition** : ajouter à la section « Module Fumisterie » :
+- **10 gabarits pour 19 configurations** (`GABARIT_PAR_CODE` dans `seed-configurations.mjs`, source unique) : `G1` création intérieure (PTR30, Polytoit, PLA, MFI), `G3`/`G3P` façade (zone 1 depuis l'égout, `sortieMinimale`), `G4`/`G4R`/`G4P`/`G4K`/`G4F` tubages (flexible, rigide, POLYPERF, kit PLA, foyer), `G5` raccordement seul (conduit non métré), `G6` ventouse (zone 3 **non vérifiée**, alerte warn). Les variantes G4P/G4K/G4F/G5 réutilisent `geometrieG4` avec des paramètres forcés dans `index.js` — ne pas dupliquer la géométrie.
+- **Règles de quantité** (`nomenclature.js`) : `unitaire`, `par_longueur:<t>` (longueurs de la composition), `par_longueur_ml:<t>` (au mètre), `kit_longueur:<t>` (kit de N m, `{ML}`), `par_emboitement:<t>`, `par_plancher`, `par_intervalle:<t>` (réglage `supports_muraux_tous_les_m`), `coudes:<t>`. Placeholders de motif : `{D}`, `{D±n}`, `{LG}`, `{A}`, `{BOI}`, `{BOI4}`, `{ML}`.
+- **La pente ne départage que les mappings de type `solin` / `souche`** ; une pièce sans plage (collerette PLA) n'est pas écartée.
+- **Un motif sans `{D}` = article dont le Ø nominal n'est pas celui du relevé** (kit d'air, `{D+60}` seul pour un support mural au Ø extérieur, solin MFI) : ni le service ni le résolveur ne filtrent sur le Ø, le motif tranche. Le service charge aussi les articles **sans Ø parsé** (plaque de propreté MFI « MFI 130 »). Un article « D XXX » est sur mesure → à chiffrer, jamais approché.
+- **Toutes les règles de la tranche 3 sont provisoires** (choix listés dans `TESTS_MANUELS_tranche1.md`) ; les tests `tranche3-tarif-reel.test.mjs` pinnent 14 cas et les « à chiffrer » voulus (adaptateurs PLA sur mesure, support de départ Ø80/100, solin PLA Ø100, kit MFI par appareil). Prochaine étape décidée : règle de prix (remise par famille) puis bloc B Pennylane.
+---
