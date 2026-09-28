@@ -76,7 +76,7 @@
 ---
 
 ## [2026-09-28 18:30] Module Fumisterie (assistant de devis) — section CLAUDE.md
-**Statut** : PENDING
+**Statut** : RESOLU (intégré le 2026-09-28 après « Module Contrats », accord Eric)
 **Commit** : 5f65516..b832d9d (tranche 1 G1)
 **Contexte** : Livraison de la tranche 1 de l'assistant de devis fumisterie (spec `docs/superpowers/specs/2026-09-28-assistant-devis-fumisterie-design.md`, plan `docs/superpowers/plans/2026-09-28-assistant-devis-fumisterie-tranche1-g1.md`, handoff/maquette/tarif dans `docs/devis-fumisterie/`). Nouveau module transverse (tables, moteur pur, écran, Pennylane) avec des règles qui mordent.
 **Proposition** : ajouter à CLAUDE.md, après « Module Contrats », la section suivante :
