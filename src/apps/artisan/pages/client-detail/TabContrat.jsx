@@ -131,6 +131,11 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
       toast.error('La date de passage est requise');
       return;
     }
+    // Une visite consigne un passage déjà fait : programmer = planifier un RDV (garde DB 20260928_1).
+    if (!isRefusal && visitForm.date > formatDateForInput(new Date())) {
+      toast.error('La date de passage ne peut pas être dans le futur. Pour programmer un entretien, planifiez un RDV.');
+      return;
+    }
     try {
       await recordVisit({
         contractId: contract.id,
@@ -280,6 +285,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
                             value={visitForm.date}
                             onChange={(v) => setVisitForm((p) => ({ ...p, date: v }))}
                             type="date"
+                            max={formatDateForInput(new Date())}
                           />
                         </FormField>
                         <FormField label="Note (optionnel)">

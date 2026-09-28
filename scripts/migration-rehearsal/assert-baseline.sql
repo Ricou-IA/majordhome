@@ -27,7 +27,9 @@ BEGIN
       ('public.team_member_set_routing_settings(uuid, integer, boolean, text[])'),
       ('majordhome.project_org_id(uuid)'),
       ('majordhome.quote_status_bucket(text)'),
-      ('public.update_majordhome_lead(uuid, jsonb)')
+      ('public.update_majordhome_lead(uuid, jsonb)'),
+      ('public.sync_intervention_from_visit()'),
+      ('majordhome.update_client_on_visit()')
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
@@ -45,6 +47,17 @@ BEGIN
      WHERE tgrelid = 'majordhome.equipments'::regclass AND NOT tgisinternal
        AND tgname = r.trg AND tgfoid = to_regprocedure(r.fn);
     IF NOT FOUND THEN RAISE EXCEPTION 'trigger % → % absent sur majordhome.equipments', r.trg, r.fn; END IF;
+  END LOOP;
+  -- Triggers utilisateur de majordhome.maintenance_visits (TRIGGER_TABLES)
+  FOR r IN SELECT * FROM (VALUES
+      ('sync_intervention_from_visit_trg', 'public.sync_intervention_from_visit()'),
+      ('trg_update_client_on_visit', 'majordhome.update_client_on_visit()')
+    ) AS t(trg, fn)
+  LOOP
+    PERFORM 1 FROM pg_trigger
+     WHERE tgrelid = 'majordhome.maintenance_visits'::regclass AND NOT tgisinternal
+       AND tgname = r.trg AND tgfoid = to_regprocedure(r.fn);
+    IF NOT FOUND THEN RAISE EXCEPTION 'trigger % → % absent sur majordhome.maintenance_visits', r.trg, r.fn; END IF;
   END LOOP;
 
   -- Vues (liste VIEWS) ; celles exposées via PostgREST doivent être security_invoker=true

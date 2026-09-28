@@ -47,6 +47,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: ['id', 'lead_id', 'org_id', 'quote_status', 'quote_amount_ht', 'ejected_at'], data: false },
   { schema: 'majordhome', table: 'appointments', columns: ['id', 'org_id', 'lead_id', 'intervention_id', 'client_id', 'appointment_type', 'status', 'scheduled_date', 'scheduled_start', 'created_at'], data: false },
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
+  { schema: 'majordhome', table: 'invoices', columns: ['id', 'import_status'], data: false }, // lue par la vue majordhome_entretien_sav (hub de facturation, 20260923_3)
+  { schema: 'majordhome', table: 'maintenance_visits', columns: null, data: false }, // 20260928_1 : garde-fou date de visite (triggers ci-dessous)
 ];
 
 const FUNCTIONS = [
@@ -65,10 +67,13 @@ const FUNCTIONS = [
   // 20260922_3 : REVOKE PUBLIC/anon/authenticated — l'ACL de départ (anon/authenticated/service_role
   // = EXECUTE) est reproduite par les privilèges par défaut de bootstrap-pre.sql, comme en prod.
   'public.exec_sql(text)',
+  // 20260928_1 : triggers de majordhome.maintenance_visits
+  'public.sync_intervention_from_visit()',
+  'majordhome.update_client_on_visit()',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
-const TRIGGER_TABLES = ['majordhome.equipments'];
+const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits'];
 
 const VIEWS = [
   'public.profiles', // cible des sous-requêtes « nom de l'auteur » des vues majordhome_* (interactions prospects…)
