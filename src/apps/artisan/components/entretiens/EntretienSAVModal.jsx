@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
   User, MapPin, Phone, ClipboardCheck, Wrench, Mail, FileText,
-  ExternalLink, Calendar, Check, UserPlus, Archive,
+  ExternalLink, Calendar, Check, UserPlus, Archive, Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,6 +41,7 @@ import {
   KANBAN_COLUMNS,
 } from '@services/sav.service';
 import { appointmentsService } from '@services/appointments.service';
+import { autoRdvService } from '@services/autoRdv.service';
 import { clientsService } from '@services/clients.service';
 import { EntretienPartsSection } from './EntretienPartsSection';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
@@ -70,6 +71,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   const { organization } = useAuth();
   const { can } = useCanAccess();
   const orgId = organization?.id;
+  const [lienBusy, setLienBusy] = useState(false); // copie du lien de prise de RDV (auto-RDV)
 
   const {
     updateWorkflowStatus,
@@ -387,6 +389,24 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       }
       onClose();
       navigate(`/clients/${item.client_id}`);
+    }
+  };
+
+  // Lien de prise de rendez-vous (auto-RDV) : la page que le client verra depuis
+  // son mail. Miroir du maillon de EntretienSAVCard, ici lisible en clair.
+  const handleCopierLien = async () => {
+    if (lienBusy || !contractId) return;
+    setLienBusy(true);
+    try {
+      const { data, error } = await autoRdvService.signerLien({ orgId, contractId });
+      if (error || !data?.url) throw error || new Error('lien indisponible');
+      await navigator.clipboard.writeText(data.url);
+      const fin = data.expires_at ? new Date(data.expires_at).toLocaleDateString('fr-FR') : null;
+      toast.success(fin ? `Lien de prise de rendez-vous copié — valable jusqu'au ${fin}` : 'Lien de prise de rendez-vous copié');
+    } catch (err) {
+      toast.error(`Lien non copié : ${err?.message || 'erreur'}`);
+    } finally {
+      setLienBusy(false);
     }
   };
 
@@ -782,6 +802,20 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   >
                     <Archive className="w-3.5 h-3.5" />
                     Ranger
+                  </button>
+                )}
+
+                {/* Lien de prise de RDV (À planifier, contrat requis) : page client de l'auto-RDV */}
+                {item.workflow_status === 'a_planifier' && contractId && (
+                  <button
+                    type="button"
+                    onClick={handleCopierLien}
+                    disabled={lienBusy}
+                    title="Copier le lien de la page où le client choisit sa demi-journée"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-600 bg-white transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    {lienBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                    Lien de RDV client
                   </button>
                 )}
 
