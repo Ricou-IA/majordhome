@@ -11,6 +11,7 @@
 
 import { Euro, TrendingUp, FileCheck, Wrench, Package, FileText } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
+import { PlanificationJournal } from '@/apps/artisan/components/tournees/PlanificationJournal';
 
 // ============================================================================
 // SOUS-COMPOSANT : Info Card (non cliquable)
@@ -52,7 +53,7 @@ function InfoCard({
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
-export function EntretiensDashboard({ stats, savStats, isLoading }) {
+export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId }) {
   if (isLoading || (!stats && !savStats)) {
     return (
       <div className="space-y-6">
@@ -148,6 +149,14 @@ export function EntretiensDashboard({ stats, savStats, isLoading }) {
               bgColor="bg-blue-100"
             />
           </div>
+        </div>
+      )}
+
+      {/* Journal du cron de figeage — ce que la machine a fait, passage par passage */}
+      {coreOrgId && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Planification automatique</h2>
+          <PlanificationJournal coreOrgId={coreOrgId} />
         </div>
       )}
     </div>

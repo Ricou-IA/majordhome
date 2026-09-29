@@ -526,6 +526,7 @@ export default function Entretiens() {
             stats={contractStats}
             savStats={savStats}
             isLoading={contractStatsLoading || savStatsLoading}
+            coreOrgId={orgId}
           />
         </TabsContent>
       </Tabs>
