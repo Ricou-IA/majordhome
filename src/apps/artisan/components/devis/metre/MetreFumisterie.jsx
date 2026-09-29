@@ -76,7 +76,7 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
 
   const allerAuReleve = () => {
     if (!bundle?.gabarit) { toast.error('Cette configuration n\'a pas encore de gabarit de métré'); return; }
-    const r = releve || releveInitial(bundle.gabarit, reglages);
+    const r = releve || releveInitial(bundle.gabarit, reglages, criteres);
     setReleveState(r);
     setEtape(1);
     setDraft({ etape: 1, criteres, configurationId, releve: r });

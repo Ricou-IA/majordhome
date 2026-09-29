@@ -75,10 +75,18 @@ export function filtrerConfigurations(configurations, q) {
     && (!q.prise_air || c.prise_air.includes(q.prise_air)));
 }
 
-/** Relevé initial : défauts du gabarit, finition = défaut d'org. */
-export function releveInitial(gabarit, reglages) {
+/**
+ * Relevé initial : défauts du gabarit, finition = défaut d'org, et les défauts qui dépendent du
+ * combustible (recette 2026-09-29 : un poêle à granulés démarrait en Ø150 / émaillé 1,2 mm, qui n'existe
+ * pas sous le Ø125 → deux lignes « à chiffrer » pour rien) : pellets → Ø80 et émaillé 0,7 mm.
+ */
+export function releveInitial(gabarit, reglages, criteres = null) {
   const r = {};
   for (const t of gabarit.troncons) for (const p of t.parametres) r[p.cle] = p.defaut ?? null;
+  const pellets = criteres?.combustible === 'pellets';
+  const param = (cle) => gabarit.troncons.flatMap((t) => t.parametres).find((p) => p.cle === cle);
+  if (pellets && param('diametre')?.choix?.includes(80)) r.diametre = 80;
+  if (pellets && param('raccord')?.choix?.includes('emaille_07')) r.raccord = 'emaille_07';
   r.finition = reglages.finition_defaut;
   return r;
 }
