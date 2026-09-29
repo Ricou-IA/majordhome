@@ -19,7 +19,7 @@ test('CFG-45 raccordement seul Ø150 plafond : tuyaux + rosace + kit d\'air, 132
   assert.ok(r.alertes.some((a) => a.code === 'conduit_non_metre'));
 });
 test('CFG-45 Ø80 pellets par le mur : coude + tuyau + rosace à sceller (replis EMAIL PEL), 71 €', () => {
-  const r = calculerSurTarif(TARIF, 'CFG-45', 'G5', { diametre: 80, finition: 'noir', hBuse: 0.9, entree: 'mur', hsp1: 2.4, hEntree: 1.4, lHoriz: 0.4, raccord: 'emaille_07', kit_air: 0 });
+  const r = calculerSurTarif(TARIF, 'CFG-45', 'G5', { diametre: 80, finition: 'noir', hBuse: 0.9, entree: 'mur', hsp1: 2.4, hEntree: 1.4, lHoriz: 0.4, raccord: 'emaille_12', kit_air: 0 });
   assert.deepEqual(refs(r), ['2PELCO9080NO×1', '2PELTUYA801000NO×1', '2PELROSAS80NO×1']);
   assert.equal(r.totaux.achat_ht, 71);
 });
@@ -37,7 +37,7 @@ test('CFG-37 POLYPERF Ø150 plafond : kit de 7 m (6,7 nécessaires), kit bas + R
   assert.ok(refs(foyer).includes('2FLERAGRM150156×1') && !refs(foyer).some((x) => x.startsWith('2LEPTUYA')));
 });
 test('CFG-39 POLYPERF Ø80 sur té : adaptateur + té + tampon, 698,12 €', () => {
-  const r = calculerSurTarif(TARIF, 'CFG-39', 'G4P', { diametre: 80, finition: 'noir', hBuse: 0.9, bas: 'te', hsp1: 2.4, raccord: 'emaille_07', hConduit: 5, boisseau: 1, chapeau: 'standard' });
+  const r = calculerSurTarif(TARIF, 'CFG-39', 'G4P', { diametre: 80, finition: 'noir', hBuse: 0.9, bas: 'te', hsp1: 2.4, raccord: 'emaille_12', hConduit: 5, boisseau: 1, chapeau: 'standard' });
   assert.deepEqual(refs(r), ['2FLECHSI80×1', '2DIVKCIRN180×1', '2FLECGAI80×1', '2FLIPOPEN806×1', '2FLIPIADN80×1', '2FLET09080×1', '2FLETAMP80×1', '2PELTUYA801000NO×1', '2PELTUYA80500NO×1']);
   assert.equal(r.totaux.achat_ht, 698.12);
 });

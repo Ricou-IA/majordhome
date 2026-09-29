@@ -22,7 +22,7 @@
         },
   { "cle": "raccord", "libelle": "Tuyau de raccordement", "choix": [
             "emaille_12", "emaille_07", "acier_peint" ], "libelles": {
-            "emaille_12": "Émaillé 1,2 mm", "emaille_07": "Émaillé 0,7 mm (pellets)", "acier_peint": "Acier peint 2 mm"
+            "emaille_12": "Émaillé 1,2 mm", "emaille_07": "Émaillé 0,7 mm (pellets MAT+)", "acier_peint": "Acier peint 2 mm"
           }, "defaut": "emaille_12" } ] },
   { "type": "conduit_existant", "libelle": "Conduit existant", "parametres": [
   { "cle": "hConduit", "libelle": "Hauteur du conduit (entrée → haut de souche)", "unite": "m", "min": 1, "max": 25, "pas": 0.1, "defaut": 6 },

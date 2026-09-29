@@ -22,7 +22,7 @@
         },
   { "cle": "raccord", "libelle": "Tuyau de raccordement", "choix": [
             "emaille_12", "emaille_07", "acier_peint" ], "libelles": {
-            "emaille_12": "Émaillé 1,2 mm", "emaille_07": "Émaillé 0,7 mm (pellets)", "acier_peint": "Acier peint 2 mm"
+            "emaille_12": "Émaillé 1,2 mm", "emaille_07": "Émaillé 0,7 mm (pellets MAT+)", "acier_peint": "Acier peint 2 mm"
           }, "defaut": "emaille_12" } ] },
   { "type": "options", "libelle": "Options", "parametres": [
   { "cle": "kit_air", "libelle": "Kit d'entrée d'air", "choix": [

@@ -76,17 +76,15 @@ export function filtrerConfigurations(configurations, q) {
 }
 
 /**
- * Relevé initial : défauts du gabarit, finition = défaut d'org, et les défauts qui dépendent du
- * combustible (recette 2026-09-29 : un poêle à granulés démarrait en Ø150 / émaillé 1,2 mm, qui n'existe
- * pas sous le Ø125 → deux lignes « à chiffrer » pour rien) : pellets → Ø80 et émaillé 0,7 mm.
+ * Relevé initial : défauts du gabarit, finition = défaut d'org, et le diamètre qui dépend du
+ * combustible (recette 2026-09-29 : un poêle à granulés démarrait en Ø150) : pellets → Ø80.
+ * Le tuyau reste « émaillé 1,2 mm » (Mayer pose du 1,2 mm ; en Ø80/100 c'est la gamme pellets standard).
  */
 export function releveInitial(gabarit, reglages, criteres = null) {
   const r = {};
   for (const t of gabarit.troncons) for (const p of t.parametres) r[p.cle] = p.defaut ?? null;
-  const pellets = criteres?.combustible === 'pellets';
   const param = (cle) => gabarit.troncons.flatMap((t) => t.parametres).find((p) => p.cle === cle);
-  if (pellets && param('diametre')?.choix?.includes(80)) r.diametre = 80;
-  if (pellets && param('raccord')?.choix?.includes('emaille_07')) r.raccord = 'emaille_07';
+  if (criteres?.combustible === 'pellets' && param('diametre')?.choix?.includes(80)) r.diametre = 80;
   r.finition = reglages.finition_defaut;
   return r;
 }

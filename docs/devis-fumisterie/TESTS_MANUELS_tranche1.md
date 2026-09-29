@@ -55,7 +55,7 @@ Configurations métrables ajoutées : **CFG-34** (tubage flexible POLYLISSE, pel
 ## D. Tubage flexible pellets (CFG-34)
 1. Nouveau devis → **Poêle à Granulé** → Suivant → FUMISTERIE → Métré assisté. Attendu : Appareil et Combustible pré-cochés par la famille ; si un brouillon existe sur le lead, bandeau « Saisie précédente restaurée » + « Repartir de zéro ».
 2. Projet **Tubage d'un conduit existant**. Attendu : « N configurations compatibles · 2 avec métré » (CFG-34 et CFG-35 sans cadenas, CFG-37/39 POLYPERF cadenassées).
-3. CFG-34 → Relevé. Saisir : Ø **80**, buse 0,9, entrée **par le plafond**, HSP 2,4, tuyau **Émaillé 0,7 mm**, hauteur du conduit **6,2**, boisseau **20 × 20**, chapeau Standard, kit d'air **Oui**.
+3. CFG-34 → Relevé. Saisir : Ø **80**, buse 0,9, entrée **par le plafond**, HSP 2,4, tuyau **Émaillé 1,2 mm**, hauteur du conduit **6,2**, boisseau **20 × 20**, chapeau Standard, kit d'air **Oui**.
 4. Attendu : **10 lignes**, achat **502,17 € HT**, 0 à chiffrer. Flexible `2FLEPOLIXT1080C` × **7** (6,2 + 0,5 de débord → 7,0 m), kit de couronnement `2DIVKCIRN180`, plaque ventilée `2FLEPHV1N80NO`, RDE `2FLERADE8086`, kit d'air `2KITEAIR033` (Ø100, indépendant du Ø). Contrôles : info « zone 1 non vérifiée » + info flexible commandé ; aucun ⚠.
 5. Passer l'entrée **par le mur** (piquage 1,6 m, horizontal 0,45). Attendu : RDE et plaque ventilée disparaissent, adaptateur de piquage `2FLEADA180NO` + coude 90° `2PELCO9080NO` apparaissent.
 

@@ -101,7 +101,7 @@ const calculerG4 = (code, releve) => {
 };
 
 test('tarif réel — CFG-34 tubage flexible pellets Ø80, entrée plafond, kit d\'air : 10 lignes, 502,17 € HT d\'achat', () => {
-  const r = calculerG4('CFG-34', { diametre: 80, finition: 'noir', hBuse: 0.9, entree: 'plafond', hsp1: 2.4, raccord: 'emaille_07', hConduit: 6.2, boisseau: 1, chapeau: 'standard', kit_air: 1 });
+  const r = calculerG4('CFG-34', { diametre: 80, finition: 'noir', hBuse: 0.9, entree: 'plafond', hsp1: 2.4, raccord: 'emaille_12', hConduit: 6.2, boisseau: 1, chapeau: 'standard', kit_air: 1 });
   assert.deepEqual(alertesCatalogue(r), []);
   assert.deepEqual(refs(r.lignes), [
     '2FLECHSI80×1', '2DIVKCIRN180×1', '2FLECGAI80×1', '2FLEPOLIXT1080C×7', '2FLEEMFI80×1',
@@ -151,4 +151,12 @@ test('tarif réel — G4 aux autres Ø : Ø180 flexible et Ø130 rigide complets
   const r100 = calculerG4('CFG-34', { diametre: 100, finition: 'noir', hBuse: 0.9, entree: 'mur', hsp1: 2.4, hEntree: 1.2, lHoriz: 0.3, raccord: 'acier_peint', hConduit: 5, boisseau: 5, chapeau: 'plat', kit_air: 0 });
   assert.equal(r100.totaux.lignes_a_chiffrer, 3);
   assert.ok(refs(r100.lignes).includes('2FLEADA1100NO×1'));
+});
+test('tarif réel — émaillé pellets Ø80 : « 1,2 mm » = gamme standard PN…V, « 0,7 mm » = variante MAT+ (vérifié avec Eric le 2026-09-29)', () => {
+  const base = { diametre: 80, finition: 'noir', hBuse: 0.9, entree: 'plafond', hsp1: 2.4, hConduit: 6.2, boisseau: 1, chapeau: 'standard', kit_air: 0 };
+  assert.ok(refs(calculerG4('CFG-34', { ...base, raccord: 'emaille_12' }).lignes).includes('2PELTUYA801000NO×1'));
+  assert.ok(refs(calculerG4('CFG-34', { ...base, raccord: 'emaille_07' }).lignes).includes('2PELTUYAN801000NO×1'));
+  // Ø150 : le 1,2 mm est la LIGNE +, le 0,7 mm n'existe pas → à chiffrer, jamais un article approchant
+  assert.ok(refs(calculerG4('CFG-26', { ...base, diametre: 150, raccord: 'emaille_12' }).lignes).includes('2LEPTUYA1501000NO×1'));
+  assert.equal(calculerG4('CFG-26', { ...base, diametre: 150, raccord: 'emaille_07' }).totaux.lignes_a_chiffrer, 2);
 });
