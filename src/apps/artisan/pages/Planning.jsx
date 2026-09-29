@@ -11,6 +11,7 @@
 
 import { estTypeAdaptable } from '@/lib/souplesse';
 import { useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -33,6 +34,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
+import { useEtatsJournees } from '@hooks/useTournees';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { isoWeekNumber } from '@/lib/planningPrintModel';
@@ -40,6 +42,7 @@ import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/pla
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { PlanningClientSearch } from '@/apps/artisan/components/planning/PlanningClientSearch';
+import { JourneeEtatChips } from '@/apps/artisan/components/planning/JourneeEtatChips';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
@@ -397,6 +400,26 @@ export default function Planning() {
   // RDV du client recherché (surlignés dans le calendrier) — null = pas de recherche
   const [searchHitIds, setSearchHitIds] = useState(null);
 
+  // État de chaque journée de technicien (vide / ouverte / pleine / figée / à
+  // arbitrer) pour la plage visible — puces sous l'en-tête du jour. `orgId` du
+  // Planning = org CORE, c'est bien le coreOrgId attendu par le hook.
+  const navigate = useNavigate();
+  const { etats: etatsJournees } = useEtatsJournees({ coreOrgId: orgId, startDate: dateRange.startDate, endDate: dateRange.endDate });
+  const ouvrirJournee = useCallback((item) => {
+    navigate(`/entretiens?tab=tournees&journee=${item.date}&tech=${item.technicienId}`);
+  }, [navigate]);
+  const dayHeaderContent = useCallback((arg) => {
+    const date = arg.date.toLocaleDateString('fr-CA');
+    return (
+      <div className="flex flex-col items-start">
+        <span>{arg.text}</span>
+        {arg.view.type !== 'dayGridMonth' && (
+          <JourneeEtatChips date={date} etats={etatsJournees} onOpen={ouvrirJournee} />
+        )}
+      </div>
+    );
+  }, [etatsJournees, ouvrirJournee]);
+
   // Hooks données
   const {
     events,
@@ -748,6 +771,7 @@ export default function Planning() {
             // RDV concurrents (2 techniciens) côte à côte sans se recouvrir
             slotEventOverlap={false}
             dayHeaderFormat={{ weekday: 'short', day: 'numeric', month: 'short' }}
+            dayHeaderContent={dayHeaderContent}
             allDaySlot={false}
             expandRows={true}
             stickyHeaderDates={true}
