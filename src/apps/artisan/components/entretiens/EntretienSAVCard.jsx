@@ -10,11 +10,12 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
 import { savService } from '@services/sav.service';
+import { autoRdvService } from '@services/autoRdv.service';
 import { invoicesService } from '@services/invoices.service';
 import { PARTS_ORDER_STATUSES } from '@services/sav.service';
 import { useQueryClient } from '@tanstack/react-query';
@@ -78,6 +79,26 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [sendEmailOpen, setSendEmailOpen] = useState(false);
   const { isTeamLeaderOrAbove } = useAuth();
+  // Lien de prise de RDV (auto-RDV) : copié dans le presse-papiers pour tester
+  // la page client ou poser par téléphone en la lisant avec le client.
+  const [lienBusy, setLienBusy] = useState(false);
+  const contractIdPourLien = item.effective_contract_id || item.contract_id || null;
+  const handleCopierLien = async (e) => {
+    e.stopPropagation();
+    if (lienBusy || !contractIdPourLien) return;
+    setLienBusy(true);
+    try {
+      const { data, error } = await autoRdvService.signerLien({ orgId, contractId: contractIdPourLien });
+      if (error || !data?.url) throw error || new Error('lien indisponible');
+      await navigator.clipboard.writeText(data.url);
+      const fin = data.expires_at ? new Date(data.expires_at).toLocaleDateString('fr-FR') : null;
+      toast.success(fin ? `Lien de prise de rendez-vous copié — valable jusqu'au ${fin}` : 'Lien de prise de rendez-vous copié');
+    } catch (err) {
+      toast.error(`Lien non copié : ${err?.message || 'erreur'}`);
+    } finally {
+      setLienBusy(false);
+    }
+  };
   const pennylaneEnabled = usePennylaneEnabled();
   const { settings } = useOrgSettings();
   const isHubMode = pennylaneInvoiceSettings(settings).mode === 'hub';
@@ -164,6 +185,17 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
           className="absolute bottom-1 left-1 z-10 p-1 rounded-md text-white/70 hover:text-white hover:bg-white/25 transition-all"
         >
           <Archive className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {item.workflow_status === 'a_planifier' && isTeamLeaderOrAbove && contractIdPourLien && (
+        <button
+          type="button"
+          onClick={handleCopierLien}
+          disabled={lienBusy}
+          title="Copier le lien de prise de rendez-vous (page client)"
+          className="absolute bottom-1 left-7 z-10 p-1 rounded-md text-white/70 hover:text-white hover:bg-white/25 transition-all disabled:opacity-50"
+        >
+          {lienBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
         </button>
       )}
       <div className="flex">
