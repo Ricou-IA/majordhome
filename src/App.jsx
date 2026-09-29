@@ -30,6 +30,7 @@ const MaintenanceBorne = lazy(() => import('@apps/maintenance/pages/Borne'));
 
 // Pages utilitaires
 import NotFound from '@pages/NotFound';
+const PriseRdv = lazy(() => import('@pages/PriseRdv'));
 import Unauthorized from '@pages/Unauthorized';
 import JoinOrganization from '@pages/JoinOrganization';
 import AuthCallback from '@pages/AuthCallback';
@@ -75,6 +76,16 @@ export default function App() {
       <Route
         path="/auth/callback"
         element={<AuthCallback />}
+      />
+
+      {/* Prise de rendez-vous d'entretien par le client (lien signé, sans compte) */}
+      <Route
+        path="/rdv/:token"
+        element={(
+          <Suspense fallback={<div className="min-h-screen bg-secondary-50" />}>
+            <PriseRdv />
+          </Suspense>
+        )}
       />
 
       {/* ===================================================================
