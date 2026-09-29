@@ -32,9 +32,8 @@ import { construireMatrice, trajetLocal } from "../_shared/tournee/matrice.js";
 import { construireReglages } from "../_shared/tournee/reglages.js";
 import { construireArretsExistants, minutesVersHeure } from "../_shared/tournee/arrets.js";
 import { techniciensEligibles } from "../_shared/tournee/proposer-contrat.js";
-import { cleCoord } from "../_shared/tournee/geo.js";
 import {
-  bornesMois, journeesProposables, creneauxPourContrat, empreinteJournee, demiJournees, placerDansDemiJournee,
+  bornesMois, journeesProposables, creneauxPourContrat, empreinteJournee, demiJournees, placerParSequencement,
 } from "../_shared/tournee/auto-rdv.js";
 
 const SECRET = Deno.env.get("MDH_AUTO_RDV_SECRET") || "";
@@ -348,20 +347,11 @@ async function actionBook(req: Request, body: Record<string, unknown>, via: "cli
   }
   const { trajet } = await trajetPour(ctx, [journee]);
   const demiObj = demiJournees(ctx.reglages as never).find((d) => d.code === demi)!;
-  const reglages = ctx.reglages as Record<string, number | number[] | undefined>;
-  const arrets = construireArretsExistants(journee.rdvs as Parameters<typeof construireArretsExistants>[0], ctx.depot, {
-    flexDefaut: Number(reglages.souplesse_defaut_minutes ?? 0), amplitude: journee.amplitude as never, demiJournee: ctx.reglages.demi_journee as never,
-  });
-  const place = placerDansDemiJournee({
-    arrets,
-    candidat: { id: ctx.contrat.id, key: cleCoord(ctx.contrat), dureeMinutes: ctx.contrat.dureeMinutes },
-    demi: demiObj,
-    ctx: {
-      trajet, depotKey: cleCoord(ctx.depot) ?? "", amplitude: journee.amplitude as never,
-      budgetMinutes: Number(journee.budgetMinutes ?? 0) + Number(reglages.depassement_journee_minutes ?? 0),
-      pause: { minutes: Number(reglages.pause_minutes ?? 0), fenetre: [((reglages.pause_fenetre as number[])?.[0] ?? 12) * 60, ((reglages.pause_fenetre as number[])?.[1] ?? 14) * 60] },
-      trajetMaxMinutes: (reglages.trajet_max_entre_clients_minutes as number | undefined) ?? null,
-    },
+  // La journée entière est réordonnancée avec le contrat en plus : les voisins
+  // adaptables glissent dans leur souplesse, et ces décalages sont écrits par la
+  // RPC avec le RDV (tout ou rien).
+  const place = placerParSequencement({
+    journee: journee as never, contrat: ctx.contrat as never, demi: demiObj, depot: ctx.depot, reglages: ctx.reglages as never, trajet,
   });
   if (!place.faisable) return jsonResponse({ error: "creneau_indisponible", raison: place.raison }, 409, req);
 
@@ -376,10 +366,11 @@ async function actionBook(req: Request, body: Record<string, unknown>, via: "cli
     p_empreinte: empreinte,
     p_grand_secteur: prop.secteur,
     p_source: `auto_rdv:${via}`,
+    p_decalages: place.decalages,
   });
   if (error) {
     const msg = String(error.message || "");
-    const conflit = ["journee_modifiee", "deja_planifie", "journee_figee", "hors_mois", "technicien_invalide", "contrat_inactif"].find((m) => msg.includes(m));
+    const conflit = ["journee_modifiee", "decalage_refuse", "deja_planifie", "journee_figee", "hors_mois", "technicien_invalide", "contrat_inactif"].find((m) => msg.includes(m));
     if (conflit) return jsonResponse({ error: conflit }, 409, req);
     console.error("[auto-rdv] auto_rdv_poser", error);
     return jsonResponse({ error: sanitizeError(error, "pose refusée") }, 500, req);
@@ -388,6 +379,7 @@ async function actionBook(req: Request, body: Record<string, unknown>, via: "cli
     appointment_id: (data as { appointment_id: string }).appointment_id,
     date, demi, technicien: String((journee as { technicienNom?: string }).technicienNom ?? "").split(" ")[0],
     debut: minutesVersHeure(place.arriveeMinutes!),
+    decales: (data as { decales?: number }).decales ?? 0,
   }, 200, req);
 }
 

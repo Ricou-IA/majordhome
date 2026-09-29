@@ -338,3 +338,24 @@ test('journée infaisable : le diagnostic dit ce que la journée TELLE QUE POSÉ
   assert.equal(ok.planning.find((p) => p.id === 'EKOUE').arriveeMinutes, 8 * 60 + 40, 'arrivée 8h38, RDV annoncé 8h40 : on garde 8h40');
   assert.equal(ok.diagnostic, undefined);
 });
+
+// ============================================================================
+// TOLÉRANCE DU RETOUR AU DÉPÔT (Eric, 2026-09-30 : « ils accélèrent pour rentrer »)
+// ============================================================================
+
+test('retour au dépôt : le dernier client finit dans l amplitude, le retour peut la déborder de la tolérance', () => {
+  // C : 40 min du dépôt. Amplitude 8h–18h. Un arrêt de 9 h à C : 8h40 → 17h40, retour 18h20.
+  // Sans pause pour isoler la règle (une pause prise « en retard » s'ajoute après le retour).
+  const base = { ...ctx, budgetMinutes: 2000, pause: { minutes: 0, fenetre: [0, 0] } };
+  const long = [arret('c', 'C', 9 * 60)];
+  const sans = sequencerTournee({ ...base, arrets: long });
+  assert.equal(sans.faisable, false);
+  assert.equal(sans.raison, 'amplitude');
+  const avec = sequencerTournee({ ...base, arrets: long, toleranceRetourMinutes: 20 });
+  assert.equal(avec.faisable, true, 'retour à 18h20 ≤ 18h00 + 20');
+  assert.equal(avec.finMinutes, 18 * 60 + 20);
+  // Mais le client, lui, ne peut pas finir après 18 h même avec la tolérance : 9 h 30 → 18h10.
+  const trop = sequencerTournee({ ...base, arrets: [arret('c', 'C', 9 * 60 + 30)], toleranceRetourMinutes: 60 });
+  assert.equal(trop.faisable, false);
+  assert.equal(trop.raison, 'amplitude');
+});

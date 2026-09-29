@@ -3,8 +3,12 @@
 
 -- ── A. Exposition : service_role seulement ─────────────────────────────────
 DO $$
-DECLARE sig text := 'public.auto_rdv_poser(uuid, uuid, date, text, time, time, int, text, text, text)';
+DECLARE sig text := 'public.auto_rdv_poser(uuid, uuid, date, text, time, time, int, text, text, text, jsonb)';
 BEGIN
+  -- Une seule surcharge : l'ancienne signature (10 args) a été supprimée par 20260930_4.
+  IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'auto_rdv_poser') <> 1 THEN
+    RAISE EXCEPTION 'auto_rdv_poser : plusieurs surcharges';
+  END IF;
   IF has_function_privilege('anon', sig, 'EXECUTE') THEN RAISE EXCEPTION 'anon exécute auto_rdv_poser'; END IF;
   IF has_function_privilege('authenticated', sig, 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute auto_rdv_poser'; END IF;
   IF NOT has_function_privilege('service_role', sig, 'EXECUTE') THEN RAISE EXCEPTION 'service_role n''exécute pas auto_rdv_poser'; END IF;

@@ -22,7 +22,7 @@ const ERROR_CLASS = 'mt-1 text-xs text-red-600';
 /** Champs édités ici ; les autres clés de `settings.tournees` sont conservées telles quelles. */
 const CHAMPS = [
   'souplesse_defaut_minutes', 'reste_utile_min_minutes', 'trajet_max_entre_clients_minutes',
-  'gain_multi_equipements_pct', 'depassement_journee_minutes', 'figer_journee_pleine', 'figer_sms',
+  'gain_multi_equipements_pct', 'depassement_journee_minutes', 'tolerance_retour_depot_minutes', 'figer_journee_pleine', 'figer_sms',
   'pause_minutes',
 ];
 
@@ -45,6 +45,7 @@ function validate(form) {
   entier('trajet_max_entre_clients_minutes', 5, 180);
   entier('gain_multi_equipements_pct', 0, 50);
   entier('depassement_journee_minutes', 0, 120);
+  entier('tolerance_retour_depot_minutes', 0, 60);
   entier('pause_minutes', 0, 120);
   return errors;
 }
@@ -132,6 +133,11 @@ export default function TourneesTab() {
             label="Dépassement toléré de la journée" valeur={form.depassement_journee_minutes} onChange={set('depassement_journee_minutes')} min={0} max={120}
             error={errors.depassement_journee_minutes}
             hint="Le budget journalier (Settings → Équipe) reste ce qu’on affiche ; le moteur accepte de le dépasser d’autant. Certains jours sont « fini-parti », d’autres finissent plus tard."
+          />
+          <ChampMinutes
+            label="Tolérance du retour au dépôt" valeur={form.tolerance_retour_depot_minutes} onChange={set('tolerance_retour_depot_minutes')} min={0} max={60}
+            error={errors.tolerance_retour_depot_minutes}
+            hint="Le dernier client finit toujours dans l’amplitude de la journée (Settings → Équipe) ; seul le trajet de retour au dépôt peut la déborder d’autant."
           />
           <ChampMinutes
             label="Pause déjeuner" valeur={form.pause_minutes} onChange={set('pause_minutes')} min={0} max={120}

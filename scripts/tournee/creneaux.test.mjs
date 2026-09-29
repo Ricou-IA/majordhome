@@ -496,3 +496,36 @@ test('classerParCreneaux / placerPlusieurs refusent un placement qui exigerait d
   assert.equal(places.length, 0);
   assert.equal(refuses.length, 1);
 });
+
+// ============================================================================
+// TRAJET MAXIMUM = DÉTOUR AJOUTÉ ; TOLÉRANCE DU RETOUR AU DÉPÔT (2026-09-30)
+// ============================================================================
+
+test('trajet max : entre deux clients, c est le détour ajouté qui compte, pas le tronçon brut', () => {
+  // a → b : 65 min (déjà à faire). x est à 5 min de a et à 65 de b : détour = 5 + 65 − 65 = 5.
+  const M = { 'd|a': 10, 'a|d': 10, 'd|b': 10, 'b|d': 10, 'a|b': 65, 'b|a': 65, 'a|x': 5, 'x|a': 5, 'x|b': 65, 'b|x': 65, 'd|x': 10, 'x|d': 10 };
+  const trajet = (p, q) => (p === q ? 0 : M[`${p}|${q}`] ?? 999);
+  const arrets = [arret('a', 540, 60), arret('b', 900, 60)]; // 9h-10h, 15h-16h
+  const r = placerCandidat({ arrets, candidat: candidat('x', 60), ...ctx(trajet, { trajetMaxMinutes: 45, budgetMinutes: 2000 }) });
+  assert.equal(r.faisable, true, `détour de 5 min accepté (raison ${r.raison})`);
+  assert.equal(r.avantId, 'a');
+  // y à 60 min de a ET de b alors que a→b = 65 : détour 55 > 45 → refusé pour trajet.
+  const M2 = { ...M, 'a|y': 60, 'y|a': 60, 'y|b': 60, 'b|y': 60, 'd|y': 10, 'y|d': 10 };
+  const trajet2 = (p, q) => (p === q ? 0 : M2[`${p}|${q}`] ?? 999);
+  const r2 = placerCandidat({ arrets, candidat: candidat('y', 60), ...ctx(trajet2, { trajetMaxMinutes: 45, budgetMinutes: 2000, amplitude: { debut: 480, fin: 720 } }) });
+  assert.equal(r2.faisable, false);
+  assert.equal(r2.raison, 'trajet');
+});
+
+test('tolérance du retour au dépôt : le client finit dans l amplitude, le retour peut déborder', () => {
+  const arrets = [arret('a', 480, 480)]; // 8h -> 16h
+  // 16h45 → 17h45 chez le client, retour 18h30 : refusé sans tolérance, accepté avec 30 min.
+  const sans = placerCandidat({ arrets, candidat: candidat('x', 60), ...ctx(uniforme(45), { budgetMinutes: 2000 }) });
+  assert.equal(sans.faisable, false);
+  const avec = placerCandidat({ arrets, candidat: candidat('x', 60), ...ctx(uniforme(45), { budgetMinutes: 2000, toleranceRetourMinutes: 30 }) });
+  assert.equal(avec.faisable, true);
+  assert.equal(avec.departMinutes, 17 * 60 + 45);
+  // Mais 16h45 → 18h15 chez le client dépasse l amplitude quelle que soit la tolérance.
+  const trop = placerCandidat({ arrets, candidat: candidat('x', 90), ...ctx(uniforme(45), { budgetMinutes: 2000, toleranceRetourMinutes: 60 }) });
+  assert.equal(trop.faisable, false);
+});

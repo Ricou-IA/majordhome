@@ -3,19 +3,24 @@
 // Spec 2026-09-29 « auto-RDV d'entretien mensuel » § 4.2. Partagé navigateur /
 // Deno (copie par `npm run sync:tournee-engine`, consommé par l'edge `auto-rdv`).
 //
-// Règles gravées (décisions Eric, 2026-09-29) :
+// Règles gravées (décisions Eric, 2026-09-29 / 30) :
 // - le client choisit une DEMI-JOURNÉE (reglages.demi_journee), jamais une heure ;
-// - horizon = mois en cours, borne dure : aucune journée du mois suivant ;
+// - horizon = mois en cours, prolongé au mois suivant s'il reste < 7 jours ;
 // - une journée est proposable si elle porte un secteur (étiquette ou déduit des
 //   entretiens déjà posés) et n'est pas figée — une journée vide sans étiquette
 //   n'est pas proposée (l'étiquetage machine des journées vides = cron) ;
-// - l'arrivée ET le départ du contrat tiennent dans la demi-journée, et la pose
-//   ne déplace aucun voisin (pas de souplesse « écrite » depuis la page client).
+// - **la journée entière est réordonnancée avec le contrat en plus** (Eric,
+//   2026-09-30 : « on pourrait attendre du modèle qu'il configure mieux la
+//   journée avec les critères ») : chaque entretien déjà posé glisse dans SA
+//   souplesse (time_flex_minutes, ancré sur l'heure annoncée), les figés ne
+//   bougent pas, le contrat est contraint à la demi-journée choisie, budget et
+//   retour au dépôt (tolérance) vérifiés par `sequencerTournee`. Les décalages
+//   des voisins sont renvoyés et ÉCRITS avec la pose (RPC, tout ou rien).
 // ============================================================================
 
 import { deduireSecteur } from './etat.js';
-import { construireArretsExistants } from './arrets.js';
-import { placerCandidat, chargeExistante } from './creneaux.js';
+import { construireArretsPourConsolidation, minutesVersHeure } from './arrets.js';
+import { sequencerTournee } from './sequence.js';
 import { cleCoord } from './geo.js';
 
 const STATUTS_EXCLUS = new Set(['cancelled', 'no_show']);
@@ -99,38 +104,105 @@ export function journeesProposables({ journees, etiquettes, bornes }) {
   return out;
 }
 
+/** Minutes depuis minuit d'une heure `HH:MM[:SS]`. */
+function minutesDe(hhmm) {
+  const s = String(hhmm || '');
+  return Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+}
+
 /**
- * Place un candidat dans une demi-journée précise : `placerCandidat` borné à
- * l'arrivée dans la demi-journée, puis refus si le départ en sort ou si la pose
- * supposait un voisin déplacé.
- *
- * @param {{ arrets: Array<object>, candidat: { id: string, key: string|null, dureeMinutes: number }, demi: { code: string, debut: number, fin: number }, ctx: { trajet: Function, depotKey: string, amplitude: { debut: number, fin: number }, budgetMinutes: number, pause: { minutes: number, fenetre: [number, number] }, trajetMaxMinutes?: number|null } }} p
- * @returns {{ faisable: boolean, raison: string|null, arriveeMinutes: number|null, departMinutes: number|null, coutMinutes: number|null }}
+ * Contexte de séquencement d'une journée depuis les réglages de l'org.
+ * @param {object} journee  `{ amplitude, budgetMinutes }`
+ * @param {object} reglages
+ * @param {{ lat: number, lng: number }} depot
+ * @param {Function} trajet
  */
-export function placerDansDemiJournee({ arrets, candidat, demi, ctx }) {
-  const chargeDeja = chargeExistante(arrets, { trajet: ctx.trajet, depotKey: ctx.depotKey });
-  const place = placerCandidat({
-    arrets,
-    candidat,
-    trajet: ctx.trajet,
-    depotKey: ctx.depotKey,
-    amplitude: ctx.amplitude,
-    budgetMinutes: ctx.budgetMinutes,
-    pause: ctx.pause,
-    chargeDeja,
-    fenetreArrivee: { min: demi.debut, max: demi.fin - candidat.dureeMinutes },
-    trajetMaxMinutes: ctx.trajetMaxMinutes ?? null,
+function contexteSequencement(journee, reglages, depot, trajet) {
+  return {
+    depotKey: cleCoord(depot) ?? '',
+    trajet,
+    amplitude: journee.amplitude,
+    budgetMinutes: (journee.budgetMinutes || 0) + (reglages.depassement_journee_minutes ?? 0),
+    pause: {
+      minutes: reglages.pause_minutes ?? 0,
+      fenetre: [(reglages.pause_fenetre?.[0] ?? 12) * 60, (reglages.pause_fenetre?.[1] ?? 14) * 60],
+    },
+    toleranceRetourMinutes: reglages.tolerance_retour_depot_minutes ?? 0,
+    figesSontDesFaits: true,
+  };
+}
+
+/**
+ * Place le contrat dans une demi-journée en RÉORDONNANÇANT la journée : les
+ * entretiens déjà posés glissent dans leur souplesse (ancrée sur l'heure
+ * annoncée), les figés restent, le contrat est contraint à la demi-journée.
+ *
+ * @param {{ journee: object, contrat: { id: string, lat: number|null, lng: number|null, dureeMinutes: number }, demi: { code: string, debut: number, fin: number }, depot: { lat: number, lng: number }, reglages: object, trajet: Function }} p
+ * @returns {{ faisable: boolean, raison: string|null, arriveeMinutes: number|null, departMinutes: number|null, coutMinutes: number|null,
+ *   decalages: Array<{ id: string, attendu: string, scheduled_start: string, scheduled_end: string, duration_minutes: number }> }}
+ *   `raison` ∈ position · demi_journee · fenetre · budget · amplitude · trajet.
+ */
+export function placerParSequencement({ journee, contrat, demi, depot, reglages, trajet }) {
+  const key = cleCoord(contrat);
+  if (!key) return { faisable: false, raison: 'position', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
+  const duree = contrat.dureeMinutes || 0;
+  const rdvs = (journee.rdvs || []).filter((r) => !STATUTS_EXCLUS.has(r.status));
+  const flexDefaut = reglages.souplesse_defaut_minutes ?? 0;
+  const arrets = construireArretsPourConsolidation(rdvs, depot, {
+    souplesse: true, flexDefaut, amplitude: journee.amplitude, demiJournee: reglages.demi_journee,
   });
-  if (!place.faisable) {
-    return { faisable: false, raison: place.raison || 'creneau', arriveeMinutes: null, departMinutes: null, coutMinutes: null };
+  // Le contrat : n'importe où dans la demi-journée, à condition d'y FINIR.
+  const finMax = Math.min(demi.fin, journee.amplitude?.fin ?? demi.fin) - duree;
+  if (finMax < demi.debut) {
+    return { faisable: false, raison: 'demi_journee', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
   }
-  if (place.departMinutes > demi.fin) {
-    return { faisable: false, raison: 'demi_journee', arriveeMinutes: place.arriveeMinutes, departMinutes: place.departMinutes, coutMinutes: place.coutMinutes };
+  const candidat = { id: contrat.id, key, dureeMinutes: duree, fenetre: { debut: demi.debut, fin: finMax }, prevu: demi.debut };
+  const ctx = contexteSequencement(journee, reglages, depot, trajet);
+
+  const sans = sequencerTournee({ ...ctx, arrets });
+  const avec = sequencerTournee({ ...ctx, arrets: [...arrets, candidat] });
+  if (!avec.faisable) {
+    return { faisable: false, raison: avec.raison || 'fenetre', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
   }
-  if ((place.decalages || []).length > 0) {
-    return { faisable: false, raison: 'decalage', arriveeMinutes: place.arriveeMinutes, departMinutes: place.departMinutes, coutMinutes: place.coutMinutes };
+  const moi = avec.planning.find((p) => p.id === contrat.id);
+  if (!moi) return { faisable: false, raison: 'fenetre', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
+
+  // Trajet maximum : le DÉTOUR ajouté entre les deux voisins clients (dépôt exempté).
+  const max = reglages.trajet_max_entre_clients_minutes ?? null;
+  if (max != null) {
+    const parId = new Map(arrets.map((a) => [a.id, a]));
+    const i = avec.ordre.indexOf(contrat.id);
+    const avant = i > 0 ? parId.get(avec.ordre[i - 1]) : null;
+    const apres = i < avec.ordre.length - 1 ? parId.get(avec.ordre[i + 1]) : null;
+    const allee = avant?.key ? trajet(avant.key, key) : 0;
+    const retour = apres?.key ? trajet(key, apres.key) : 0;
+    const evite = avant?.key && apres?.key ? trajet(avant.key, apres.key) : 0;
+    const tropLoin = (avant && apres) ? (allee + retour - evite > max) : ((avant && allee > max) || (apres && retour > max));
+    if (tropLoin) return { faisable: false, raison: 'trajet', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
   }
-  return { faisable: true, raison: null, arriveeMinutes: place.arriveeMinutes, departMinutes: place.departMinutes, coutMinutes: place.coutMinutes };
+
+  // Décalages : les voisins adaptables dont l'heure ordonnancée diffère de l'heure posée.
+  const rdvParId = new Map(rdvs.map((r) => [r.id, r]));
+  const decalages = [];
+  for (const p of avec.planning) {
+    if (p.id === contrat.id) continue;
+    const r = rdvParId.get(p.id);
+    const a = arrets.find((x) => x.id === p.id);
+    if (!r || !a?.tolerance) continue; // figé ou non adaptable : ne bouge pas
+    const prevu = minutesDe(r.scheduled_start);
+    if (p.arriveeMinutes === prevu) continue;
+    decalages.push({
+      id: r.id,
+      attendu: String(r.scheduled_start || '').slice(0, 5),
+      scheduled_start: minutesVersHeure(p.arriveeMinutes),
+      scheduled_end: minutesVersHeure(p.arriveeMinutes + a.dureeMinutes),
+      duration_minutes: a.dureeMinutes,
+    });
+  }
+  const coutMinutes = (avec.chargeMinutes ?? 0) - (sans.faisable ? (sans.chargeMinutes ?? 0) : 0);
+  return {
+    faisable: true, raison: null, arriveeMinutes: moi.arriveeMinutes, departMinutes: moi.departMinutes, coutMinutes, decalages,
+  };
 }
 
 /** `HH:MM` depuis des minutes depuis minuit. */
@@ -143,38 +215,21 @@ function hhmm(minutes) {
 /**
  * Les créneaux (journée × demi-journée) où le contrat s'insère encore, triés :
  * secteur du contrat d'abord, puis date, puis matin avant après-midi, puis coût ;
- * tronqués à `maxCreneaux`.
+ * tronqués à `maxCreneaux`. Chaque créneau porte l'empreinte de la journée et les
+ * décalages de voisins que la pose devra écrire.
  *
  * @param {{ contrat: { id: string, dureeMinutes: number, lat: number|null, lng: number|null }, proposables: Array<{ journee: object, secteur: string }>, depot: { lat: number, lng: number }, reglages: object, trajet: Function, secteurContrat?: string|null, maxCreneaux?: number }} p
- * @returns {{ creneaux: Array<{ id: string, date: string, demi: string, technicienId: string, technicienNom: string, secteur: string, propre: boolean, debutMinutes: number, finMinutes: number, debut: string, fin: string, coutMinutes: number, empreinte: string }>, refus: Record<string, number> }}
+ * @returns {{ creneaux: Array<{ id: string, date: string, demi: string, technicienId: string, technicienNom: string, secteur: string, propre: boolean, debutMinutes: number, finMinutes: number, debut: string, fin: string, coutMinutes: number, empreinte: string, decalages: Array<object> }>, refus: Record<string, number> }}
  */
 export function creneauxPourContrat({ contrat, proposables, depot, reglages, trajet, secteurContrat = null, maxCreneaux = 6 }) {
-  const depotKey = cleCoord(depot) ?? '';
-  const candidat = { id: contrat.id, key: cleCoord(contrat), dureeMinutes: contrat.dureeMinutes };
-  const pause = {
-    minutes: reglages.pause_minutes ?? 0,
-    fenetre: [(reglages.pause_fenetre?.[0] ?? 12) * 60, (reglages.pause_fenetre?.[1] ?? 14) * 60],
-  };
-  const flexDefaut = reglages.souplesse_defaut_minutes ?? 0;
   const demis = demiJournees(reglages);
   const refus = {};
   const creneaux = [];
+  const meme = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
   for (const { journee: j, secteur } of proposables || []) {
-    // Tolérance PONCTUELLE (souplesse non demandée) : la page client n'écrit
-    // jamais de décalage, donc le moteur ne doit pas en supposer — sinon il
-    // préfère glisser le voisin de 9 h plutôt que poser après lui, et refuse.
-    // Même choix que le remplissage de journée (classerParCreneaux).
-    const arrets = construireArretsExistants(j.rdvs, depot, {
-      flexDefaut, amplitude: j.amplitude, demiJournee: reglages.demi_journee,
-    });
-    const ctx = {
-      trajet, depotKey, amplitude: j.amplitude,
-      budgetMinutes: (j.budgetMinutes || 0) + (reglages.depassement_journee_minutes ?? 0),
-      pause, trajetMaxMinutes: reglages.trajet_max_entre_clients_minutes ?? null,
-    };
     const empreinte = empreinteJournee(j.rdvs);
     for (const demi of demis) {
-      const r = placerDansDemiJournee({ arrets, candidat, demi, ctx });
+      const r = placerParSequencement({ journee: j, contrat, demi, depot, reglages, trajet });
       if (!r.faisable) {
         refus[r.raison] = (refus[r.raison] || 0) + 1;
         continue;
@@ -186,13 +241,14 @@ export function creneauxPourContrat({ contrat, proposables, depot, reglages, tra
         technicienId: j.technicienId,
         technicienNom: j.technicienNom,
         secteur,
-        propre: !!secteurContrat && secteur === secteurContrat,
+        propre: meme(secteur, secteurContrat),
         debutMinutes: r.arriveeMinutes,
         finMinutes: r.departMinutes,
         debut: hhmm(r.arriveeMinutes),
         fin: hhmm(r.departMinutes),
         coutMinutes: r.coutMinutes,
         empreinte,
+        decalages: r.decalages,
       });
     }
   }

@@ -58,6 +58,7 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
       trajet,
       amplitude: journee.amplitude,
       budgetMinutes: journee.budgetMinutes + (reglages.depassement_journee_minutes ?? 0),
+      toleranceRetourMinutes: reglages.tolerance_retour_depot_minutes ?? 0,
       pause: { minutes: reglages.pause_minutes, fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60] },
       // Un figé est un fait : arriver « en retard » selon nos estimations ne
       // bloque pas la journée (leçon du 31/08).

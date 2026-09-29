@@ -43,6 +43,10 @@ export const REGLAGES_DEFAUT = {
   // affiché reste daily_work_minutes ; le moteur refuse au-delà de
   // budget + dépassement.
   depassement_journee_minutes: 30,
+  // Le retour au dépôt peut déborder l'amplitude de ce délai (« dans les faits
+  // ils accélèrent pour rentrer », Eric 2026-09-30). Le dernier client, lui,
+  // finit toujours dans l'amplitude.
+  tolerance_retour_depot_minutes: 15,
   // Figeage automatique d'une journée PLEINE (edge tournees-figer, cron
   // horaire) : dès qu'il ne rentre plus rien, les heures deviennent
   // définitives et les clients reçoivent l'heure de passage. Décision Eric

@@ -89,6 +89,7 @@ export function verdictJournee({ journee, depot, reglages, trajet }) {
   });
   if (!remplissage.pleine) return { verdict: 'non_pleine', adaptables, remplissage, sequence: null };
   const sequence = sequencerTournee({
+    toleranceRetourMinutes: reglages.tolerance_retour_depot_minutes ?? 0,
     depotKey, arrets, trajet, amplitude: journee.amplitude,
     budgetMinutes: journee.budgetMinutes + depassementMinutes,
     pause: { minutes: reglages.pause_minutes ?? 0, fenetre: [(reglages.pause_fenetre?.[0] ?? 12) * 60, (reglages.pause_fenetre?.[1] ?? 14) * 60] },

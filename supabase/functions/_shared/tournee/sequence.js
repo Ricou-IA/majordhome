@@ -44,7 +44,7 @@ function* permutations(items) {
  * Déroule une journée dans un ordre donné et retourne son coût, ou `null` si
  * une contrainte est violée (avec la raison).
  */
-function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits = false }) {
+function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits = false, toleranceRetourMinutes = 0 }) {
   let t = amplitude.debut;
   let charge = 0;
 
@@ -108,6 +108,10 @@ function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, fig
     position = arret.key;
   }
 
+  // Le dernier client finit DANS l'amplitude ; seul le retour au dépôt peut la
+  // déborder de `toleranceRetourMinutes` (réglage tolerance_retour_depot_minutes :
+  // « dans les faits ils accélèrent pour rentrer », Eric 2026-09-30).
+  const finChezLeClient = t;
   if (ordre.length > 0) {
     const retour = trajet(position, depotKey);
     t += retour;
@@ -122,7 +126,8 @@ function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, fig
   }
 
   if (charge > budgetMinutes) return { echec: 'budget' };
-  if (t > amplitude.fin) return { echec: 'amplitude' };
+  if (finChezLeClient > amplitude.fin) return { echec: 'amplitude' };
+  if (t > amplitude.fin + Math.max(0, toleranceRetourMinutes)) return { echec: 'amplitude' };
 
   return { charge, finMinutes: t, planning, pauseHorsFenetre };
 }
@@ -263,6 +268,7 @@ function estMeilleur(sim, ordre, meilleurActuel) {
  * @param {number} p.budgetMinutes
  * @param {{ minutes: number, fenetre: number[] }} [p.pause]
  * @param {boolean} [p.figesSontDesFaits]  un figé atteint « en retard » selon nos estimations reste un fait
+ * @param {number} [p.toleranceRetourMinutes]  le retour au dépôt peut déborder l'amplitude de ce délai (le dernier client, lui, finit dedans)
  * @returns {{ faisable: boolean, raison: string|null, ordre: string[],
  *   planning: Array<{ id: string, arriveeMinutes: number, departMinutes: number, rang: number }>,
  *   chargeMinutes: number|null, finMinutes: number|null, pauseHorsFenetre: boolean,
@@ -276,8 +282,9 @@ export function sequencerTournee({
   budgetMinutes,
   pause = { minutes: 0, fenetre: [0, 0] },
   figesSontDesFaits = false,
+  toleranceRetourMinutes = 0,
 }) {
-  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits };
+  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits, toleranceRetourMinutes };
 
   if (arrets.length === 0) {
     return {

@@ -202,7 +202,12 @@ function pausePossible(places, pause) {
  *   « l'après-midi » = { min: 720 }. Absent : comportement inchangé.
  * @param {number} [params.trajetMaxMinutes]  trajet maximum entre le candidat et
  *   un voisin CLIENT (les trajets dépôt↔candidat ne comptent pas). Au-delà,
- *   l'intervalle est refusé pour « trajet ». Absent : pas de limite.
+ *   l'intervalle est refusé pour « trajet ». Absent : pas de limite. Entre deux
+ *   clients, c'est le DÉTOUR ajouté (aller + retour − arc évité) qui est comparé,
+ *   pas le tronçon brut : un client à 5 min du précédent sur un arc déjà long
+ *   n'est pas un « long trajet » (2026-09-30).
+ * @param {number} [params.toleranceRetourMinutes]  le retour au dépôt peut déborder
+ *   l'amplitude de ce délai (le candidat, lui, finit dans l'amplitude).
  * @returns {{
  *   faisable: boolean, raison: ('budget'|'creneau'|'pause'|'position'|null),
  *   arriveeMinutes: number|null, departMinutes: number|null,
@@ -221,6 +226,7 @@ function pausePossible(places, pause) {
  */
 export function placerCandidat({
   arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, fenetreArrivee, trajetMaxMinutes,
+  toleranceRetourMinutes = 0,
 }) {
   const echec = (raison) => ({
     faisable: false,
@@ -271,7 +277,12 @@ export function placerCandidat({
     // Trajet maximum entre deux clients : une insertion à 80 min de trajet
     // « rentre » mais n'est pas raisonnable — mieux vaut ouvrir une journée.
     if (trajetMaxMinutes != null) {
-      if ((iv.avantId && allee > trajetMaxMinutes) || (iv.apresId && retour > trajetMaxMinutes)) {
+      // Entre deux clients : le DÉTOUR ajouté (l'arc évité était déjà à faire).
+      // En bord de journée (un seul voisin client) : le tronçon vers ce voisin.
+      const tropLoin = (iv.avantId && iv.apresId)
+        ? (allee + retour - evite > trajetMaxMinutes)
+        : ((iv.avantId && allee > trajetMaxMinutes) || (iv.apresId && retour > trajetMaxMinutes));
+      if (tropLoin) {
         noterRaison('trajet');
         return { placeIci: false, manque: 0 };
       }
@@ -305,7 +316,10 @@ export function placerCandidat({
     let placeIci = false;
     for (const arrivee of departsPossibles) {
       const depart = arrivee + duree;
-      if (depart + retour > dispoJusqua) { noterRaison('creneau'); continue; }
+      // Dernier intervalle (retour au dépôt) : le client finit dans l'amplitude,
+      // le retour peut la déborder de toleranceRetourMinutes.
+      const margeRetour = iv.apresId ? 0 : Math.max(0, toleranceRetourMinutes);
+      if (depart > dispoJusqua || depart + retour > dispoJusqua + margeRetour) { noterRaison('creneau'); continue; }
       if (charge + cout > budgetMinutes) { noterRaison('budget'); continue; }
 
       // Pause : test DIFFÉRENTIEL. Si le technicien ne pouvait déjà pas
@@ -386,7 +400,7 @@ export function placerCandidat({
  */
 export function classerParCreneaux(arrets, candidats, ctx, { scoreParId = {} } = {}) {
   const {
-    trajet, depotKey, amplitude, budgetMinutes, pause,
+    trajet, depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes = 0,
   } = ctx;
   const chargeDeja = chargeExistante(arrets, { trajet, depotKey });
 
@@ -395,7 +409,7 @@ export function classerParCreneaux(arrets, candidats, ctx, { scoreParId = {} } =
 
   for (const candidat of candidats || []) {
     const place = placerCandidat({
-      arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja,
+      arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, toleranceRetourMinutes,
     });
     if (!place.faisable) {
       raisonsRejet[place.raison] = (raisonsRejet[place.raison] || 0) + 1;
@@ -444,7 +458,7 @@ export function classerParCreneaux(arrets, candidats, ctx, { scoreParId = {} } =
  */
 export function placerPlusieurs(arrets, candidats, ctx) {
   const {
-    trajet, depotKey, amplitude, budgetMinutes, pause,
+    trajet, depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes = 0,
   } = ctx;
 
   let courants = [...(arrets || [])];
@@ -453,7 +467,7 @@ export function placerPlusieurs(arrets, candidats, ctx) {
 
   for (const candidat of candidats || []) {
     const placement = placerCandidat({
-      arrets: courants, candidat, trajet, depotKey, amplitude, budgetMinutes, pause,
+      arrets: courants, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes,
     });
     if (!placement.faisable || placement.decalages?.length) {
       // idem classerParCreneaux : un décalage de voisin n'est pas propagé ici.

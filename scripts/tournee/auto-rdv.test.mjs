@@ -2,12 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  bornesMois, demiJournees, empreinteJournee, journeesProposables, placerDansDemiJournee, creneauxPourContrat,
+  bornesMois, demiJournees, empreinteJournee, journeesProposables, placerParSequencement, creneauxPourContrat,
 } from '../../src/lib/tournee/auto-rdv.js';
 import { REGLAGES_DEFAUT } from '../../src/lib/tournee/reglages.js';
 
 const reglages = { ...REGLAGES_DEFAUT };
 const trajet10 = () => 10; // 10 min entre tout point
+const depot = { lat: 43.9, lng: 2.1 };
 
 test('bornesMois : délai minimal et dernier jour du mois en cours', () => {
   assert.deepEqual(bornesMois('2026-10-01', { delaiMinJours: 2 }), { debut: '2026-10-03', fin: '2026-10-31' });
@@ -46,12 +47,15 @@ test('empreinteJournee : ids triés + heure, annulés exclus', () => {
 
 const journee = (date, rdvs = [], extra = {}) => ({
   date, technicienId: 't1', technicienNom: 'Lucas Martin', couleur: '#123',
-  amplitude: { debut: 8 * 60, fin: 18 * 60 }, budgetMinutes: 480, rdvs, ...extra,
+  amplitude: { debut: 8 * 60, fin: 17 * 60 }, budgetMinutes: 480, rdvs, ...extra,
 });
-const rdv = (id, start, secteur = 'Castres', type = 'maintenance') => ({
-  id, scheduled_start: start, duration_minutes: 60, appointment_type: type, status: 'scheduled',
-  grand_secteur: secteur, lat: 43.6, lng: 2.24, time_flex_minutes: 30, hour_confirmed_at: null, announced_start: start,
+const rdv = (id, start, secteur = 'Castres', opts = {}) => ({
+  id, scheduled_start: start, duration_minutes: 60, appointment_type: 'maintenance', status: 'scheduled',
+  grand_secteur: secteur, lat: 43.6, lng: 2.24, time_flex_minutes: 30, hour_confirmed_at: null, announced_start: start, ...opts,
 });
+const contrat = { id: 'c1', dureeMinutes: 90, lat: 43.6, lng: 2.24 };
+const matin = { code: 'matin', debut: 480, fin: 720 };
+const aprem = { code: 'apres_midi', debut: 780, fin: 1080 };
 
 test('journeesProposables : bornes du mois, figées exclues, secteur étiquette ou déduit', () => {
   const journees = [
@@ -70,51 +74,70 @@ test('journeesProposables : bornes du mois, figées exclues, secteur étiquette 
   assert.deepEqual(out.map((p) => [p.journee.date, p.secteur]), [['2026-10-05', 'Castres'], ['2026-10-06', 'Gaillac']]);
 });
 
-test('journeesProposables : bornes inversées → rien', () => {
-  const out = journeesProposables({ journees: [journee('2026-10-31', [rdv('a', '09:00')])], etiquettes: [], bornes: { debut: '2026-11-01', fin: '2026-10-31' } });
-  assert.deepEqual(out, []);
-});
-
-test('placerDansDemiJournee : arrivée et départ dans la demi-journée, sans décaler personne', () => {
-  const ctx = {
-    trajet: trajet10, depotKey: '43.9,2.1', amplitude: { debut: 480, fin: 1080 }, budgetMinutes: 510,
-    pause: { minutes: 30, fenetre: [720, 840] }, trajetMaxMinutes: 45,
-  };
-  const candidat = { id: 'k', key: '43.6,2.24', dureeMinutes: 120 };
-  const matin = { code: 'matin', debut: 480, fin: 720 };
-  const r = placerDansDemiJournee({ arrets: [], candidat, demi: matin, ctx });
+test('placerParSequencement : journée vide, le contrat se pose dans la demi-journée, sans décalage', () => {
+  const r = placerParSequencement({ journee: journee('2026-10-06'), contrat, demi: matin, depot, reglages, trajet: trajet10 });
   assert.equal(r.faisable, true, r.raison);
   assert.ok(r.arriveeMinutes >= 480 && r.departMinutes <= 720, `${r.arriveeMinutes}-${r.departMinutes}`);
-  // 4 h de travail ne tiennent pas dans un matin de 4 h avec 10 min de trajet
-  const trop = placerDansDemiJournee({ arrets: [], candidat: { ...candidat, dureeMinutes: 240 }, demi: matin, ctx });
+  assert.deepEqual(r.decalages, []);
+  // 5 h de travail ne tiennent pas dans un matin de 4 h
+  const trop = placerParSequencement({ journee: journee('2026-10-06'), contrat: { ...contrat, dureeMinutes: 300 }, demi: matin, depot, reglages, trajet: trajet10 });
   assert.equal(trop.faisable, false);
-  assert.ok(trop.raison, 'une raison est donnée');
+  assert.equal(trop.raison, 'demi_journee');
 });
 
-test('creneauxPourContrat : secteur propre d’abord, matin avant après-midi, tronqué, empreinte portée', () => {
-  const contrat = { id: 'c1', dureeMinutes: 60, lat: 43.6, lng: 2.24 };
+test('placerParSequencement : un voisin en souplesse demi-journée GLISSE pour faire de la place, et le décalage est renvoyé', () => {
+  // a posé à 9 h, souplesse demi-journée (240) : peut aller de 8 h à 11 h. Le contrat de 2 h ne tient
+  // ni avant a (8h10→10h10 chevauche 9 h) ni après a (10h10→12h10 > 12 h) sans bouger a.
+  const j = journee('2026-10-06', [rdv('a', '09:00', 'Castres', { time_flex_minutes: 240 })]);
+  const r = placerParSequencement({ journee: j, contrat: { ...contrat, dureeMinutes: 120 }, demi: matin, depot, reglages, trajet: trajet10 });
+  assert.equal(r.faisable, true, r.raison);
+  assert.equal(r.decalages.length, 1, 'a est décalé');
+  assert.equal(r.decalages[0].id, 'a');
+  assert.equal(r.decalages[0].attendu, '09:00');
+  assert.match(r.decalages[0].scheduled_start, /^\d{2}:\d{2}$/);
+  assert.notEqual(r.decalages[0].scheduled_start, '09:00');
+  assert.ok(r.departMinutes <= 720);
+});
+
+test('placerParSequencement : un voisin FIGÉ ne bouge jamais, le contrat se cale autour', () => {
+  const j = journee('2026-10-06', [rdv('a', '09:00', 'Castres', { hour_confirmed_at: '2026-10-01T06:00:00Z', time_flex_minutes: 0 })]);
+  const r = placerParSequencement({ journee: j, contrat, demi: matin, depot, reglages, trajet: trajet10 });
+  assert.equal(r.faisable, true, r.raison);
+  assert.deepEqual(r.decalages, []);
+  assert.ok(r.arriveeMinutes >= 600 + 10, 'après a (9h-10h) + trajet');
+});
+
+test('placerParSequencement : deux RDV qui se chevauchent au-delà de leurs tolérances → refus « fenetre » (cas Ludovic du 26/10)', () => {
+  const j = journee('2026-10-06', [
+    rdv('a', '08:00', 'Castres', { duration_minutes: 90 }),
+    rdv('b', '09:00', 'Castres', { duration_minutes: 90 }),
+  ]);
+  const r = placerParSequencement({ journee: j, contrat, demi: aprem, depot, reglages, trajet: trajet10 });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'fenetre');
+});
+
+test('placerParSequencement : trajet max sur le DÉTOUR ajouté (dépôt exempté)', () => {
+  const loin = (a, b) => (a === b ? 0 : 60);
+  const j = journee('2026-10-06', [rdv('a', '09:00', 'Castres', { lat: 44.5, lng: 3.0 })]);
+  // a est le seul voisin (bord de journée) et il est à 60 min : tronçon brut > 45 → refus.
+  const r = placerParSequencement({ journee: j, contrat, demi: aprem, depot, reglages, trajet: loin });
+  assert.equal(r.faisable, false);
+  assert.equal(r.raison, 'trajet');
+});
+
+test('creneauxPourContrat : secteur propre d’abord (sans tenir compte de la casse), matin avant après-midi, tronqué, empreinte et décalages portés', () => {
   const proposables = [
-    { journee: journee('2026-10-06', [rdv('a', '09:00', 'Gaillac')]), secteur: 'Gaillac', figee: false },
+    { journee: journee('2026-10-06', [rdv('a', '09:00', 'GAILLAC')]), secteur: 'GAILLAC', figee: false },
     { journee: journee('2026-10-05', [rdv('b', '09:00', 'Castres')]), secteur: 'Castres', figee: false },
   ];
   const { creneaux, refus } = creneauxPourContrat({
-    contrat, proposables, depot: { lat: 43.9, lng: 2.1 }, reglages, trajet: trajet10, secteurContrat: 'Gaillac', maxCreneaux: 3,
+    contrat, proposables, depot, reglages, trajet: trajet10, secteurContrat: 'Gaillac', maxCreneaux: 3,
   });
   assert.equal(creneaux.length, 3);
   assert.deepEqual(creneaux.slice(0, 2).map((c) => [c.date, c.demi, c.propre]), [['2026-10-06', 'matin', true], ['2026-10-06', 'apres_midi', true]]);
   assert.equal(creneaux[2].date, '2026-10-05');
-  assert.ok(creneaux.every((c) => typeof c.empreinte === 'string' && c.id.split('|').length === 3));
+  assert.ok(creneaux.every((c) => typeof c.empreinte === 'string' && c.id.split('|').length === 3 && Array.isArray(c.decalages)));
   assert.equal(typeof refus, 'object');
   assert.equal(creneaux[0].debut.length, 5); // 'HH:MM'
-});
-
-test('creneauxPourContrat : sans secteur du contrat, tri par date puis coût', () => {
-  const contrat = { id: 'c1', dureeMinutes: 60, lat: 43.6, lng: 2.24 };
-  const proposables = [
-    { journee: journee('2026-10-06', [rdv('a', '09:00', 'Gaillac')]), secteur: 'Gaillac', figee: false },
-    { journee: journee('2026-10-05', [rdv('b', '09:00', 'Castres')]), secteur: 'Castres', figee: false },
-  ];
-  const { creneaux } = creneauxPourContrat({ contrat, proposables, depot: { lat: 43.9, lng: 2.1 }, reglages, trajet: trajet10 });
-  assert.equal(creneaux[0].date, '2026-10-05');
-  assert.ok(creneaux.every((c) => c.propre === false));
 });

@@ -208,6 +208,7 @@ export function proposerPourContrat({
       // dépassement réglé (finir 30 min plus tard certains jours est normal).
       budgetMinutes: j.budgetMinutes + (reglages.depassement_journee_minutes ?? 0), pause, chargeDeja,
       trajetMaxMinutes: reglages.trajet_max_entre_clients_minutes ?? null,
+      toleranceRetourMinutes: reglages.tolerance_retour_depot_minutes ?? 0,
     });
     if (!place.faisable) {
       raisons[place.raison] = (raisons[place.raison] || 0) + 1;
