@@ -144,3 +144,6 @@ verify_jwt = false
 
 [functions.baikal-admin]
 verify_jwt = false
+
+[functions.auto-rdv]
+verify_jwt = false
