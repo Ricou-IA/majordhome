@@ -68,6 +68,7 @@ interface Rdv {
 interface JourneeReport {
   date: string;
   technicien: string;
+  technicien_id: string;
   rdvs: number;
   adaptables: number;
   reste_utile_minutes?: number;
@@ -149,7 +150,10 @@ Deno.serve(async (req: Request) => {
     if (orgErr) return jsonResponse({ error: sanitizeError(orgErr, "organizations unreadable") }, 500, req);
 
     const reports: OrgReport[] = [];
+    const debuts = new Map<string, number>();
+    const durees = new Map<string, number>();
     for (const org of (orgs ?? []) as Array<{ id: string; name: string | null; settings: Record<string, unknown> | null }>) {
+      debuts.set(org.id, Date.now());
       const settings = org.settings ?? {};
       const sms = settings.sms as SmsSettings | undefined;
       const tournees = (settings.tournees ?? {}) as Record<string, unknown>;
@@ -195,13 +199,13 @@ Deno.serve(async (req: Request) => {
       const flexDefaut = reglages.souplesse_defaut_minutes ?? 0;
       const depotKey = cleCoord(depot) ?? "";
 
-      for (const j of journees as Array<{ date: string; technicienNom: string; rdvs: Rdv[]; amplitude: { debut: number; fin: number }; budgetMinutes: number }>) {
+      for (const j of journees as Array<{ date: string; technicienId: string; technicienNom: string; rdvs: Rdv[]; amplitude: { debut: number; fin: number }; budgetMinutes: number }>) {
         if (j.date <= aujourdhui) continue; // aujourd'hui : le geste reste humain
         if (onlyDate && j.date !== onlyDate) continue;
         const rdvs = j.rdvs; // TOUS les RDV du jour chargent la journée (une pose aussi)
         const adaptables = rdvs.filter((r) => estAdaptable(r, flexDefaut));
         if (rdvs.length === 0 || adaptables.length === 0) continue;
-        const jr: JourneeReport = { date: j.date, technicien: j.technicienNom, rdvs: rdvs.length, adaptables: adaptables.length, verdict: "non_pleine" };
+        const jr: JourneeReport = { date: j.date, technicien: j.technicienNom, technicien_id: j.technicienId, rdvs: rdvs.length, adaptables: adaptables.length, verdict: "non_pleine" };
         report.journees.push(jr);
         try {
           const arrets = construireArretsPourConsolidation(
@@ -309,6 +313,29 @@ Deno.serve(async (req: Request) => {
           jr.verdict = "erreur";
           jr.error = sanitizeError(e, "journée en échec");
         }
+      }
+      durees.set(org.id, Date.now() - (debuts.get(org.id) ?? Date.now()));
+    }
+
+    // Journal : une ligne par org traitée (skip compris), même en échec. Avant
+    // cette table, le rapport ne vivait que dans net._http_response — personne
+    // ne pouvait savoir si une journée avait été figée par la machine.
+    if (reports.length > 0) {
+      const lignesJournal = reports.map((r) => ({
+        org_id: r.org_id,
+        job: "tournees-figer",
+        dry_run: dryRun,
+        rapport: { skipped: r.skipped ?? null, sms: r.sms ?? null, journees: r.journees ?? [] },
+        duree_ms: durees.get(r.org_id) ?? (Date.now() - (debuts.get(r.org_id) ?? Date.now())),
+        erreur: r.error ?? null,
+      }));
+      const { error: journalErr } = await admin.from("majordhome_planification_runs").insert(lignesJournal);
+      if (journalErr) {
+        console.error("[tournees-figer] journal planification_runs non écrit :", journalErr);
+        return jsonResponse(
+          { aujourdhui, dry_run: dryRun, orgs: reports, journal_error: sanitizeError(journalErr, "planification_runs insert failed") },
+          500, req,
+        );
       }
     }
 
