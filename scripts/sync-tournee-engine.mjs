@@ -19,6 +19,7 @@ const DST = path.join(racine, 'supabase', 'functions', '_shared', 'tournee');
 const NOMS = [
   'arrets', 'creneaux', 'duree', 'eligibilite', 'geo', 'matrice', 'timeline', 'sequence',
   'proposer-contrat', 'loaders', 'trajets-core', 'reglages', 'plein', 'competences', 'etat', 'auto-rdv',
+  'populations', 'secteurs',
 ];
 
 // Modules purs hors moteur de tournées, partagés avec d'autres edges (sms-rappel-rdv) :
