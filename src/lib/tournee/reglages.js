@@ -58,8 +58,34 @@ export const REGLAGES_DEFAUT = {
   // prévenu par SMS tant que ce réglage n'est pas activé — et il faut aussi le
   // gabarit `heure_de_passage` (Settings → SMS).
   figer_sms: false,
+  // Prise de rendez-vous par le client (auto-RDV, spec 2026-09-29 § 7).
+  // `enabled` gouverne le cron mensuel (mail + étiquetage + relances) ; la page
+  // publique et « Copier le lien » marchent quel que soit ce réglage.
+  auto_rdv: {
+    enabled: false,
+    capacite_cible: 4,             // contrats par journée pour dimensionner l'étiquetage
+    marge_pct: 20,                 // journées étiquetées en plus du strict besoin
+    seuil_reouverture_pct: 75,     // remplissage à partir duquel une journée vide de plus est étiquetée
+    delai_min_jours: 2,            // pas de créneau avant J+2
+    max_creneaux: 6,               // créneaux affichés au client
+    relance_sms_jours: 7,
+    escalade_appel_jours: 15,
+    inclure_retardataires: true,   // anniversaire passé sans visite
+    duree_moyenne_minutes: 90,     // pour convertir le reste d'une journée amorcée en places
+  },
 };
 
+/**
+ * Réglages effectifs d'une org : défauts + `settings.tournees`. Fusion superficielle,
+ * sauf `auto_rdv` (objet imbriqué) fusionné clé par clé — sinon un réglage saisi
+ * dans Settings effacerait tous les défauts voisins.
+ * @param {object|null|undefined} settings  `core.organizations.settings`
+ */
 export function construireReglages(settings) {
-  return { ...REGLAGES_DEFAUT, ...(settings?.tournees || {}) };
+  const t = settings?.tournees || {};
+  return {
+    ...REGLAGES_DEFAUT,
+    ...t,
+    auto_rdv: { ...REGLAGES_DEFAUT.auto_rdv, ...(t.auto_rdv || {}) },
+  };
 }
