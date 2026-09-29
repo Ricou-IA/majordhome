@@ -126,3 +126,12 @@ Règles qui mordent :
 - **Figeage = une seule fonction** `majordhome.figer_journee` (cron `tournees_figer_journee` service_role ; bouton `tournees_figer_journee_user` authenticated) — tout ou rien, trace `figee_at`/`figee_par`. Ne jamais réintroduire une boucle `updateAppointment` pour figer.
 - **Tout cron de planification écrit `majordhome.planification_runs`**, même en échec ; un cron sans ligne dans le journal ne tourne pas.
 ---
+
+## [2026-09-30 00:30] Auto-RDV tranche 2 — page client, lien signé, RPC de pose
+**Statut** : PENDING
+**Commit** : 0a51355..bbd6216
+**Contexte** : Page publique `/rdv/:token` + edge `auto-rdv` + RPC `auto_rdv_poser` + bouton « Copier le lien ». Détail : `docs/MODULE_TOURNEES.md` § « Auto-RDV ».
+**Proposition** (CLAUDE.md § Module Tournées) :
+- **Auto-RDV : l'offre est calculée à l'instant, jamais figée dans un mail** (`src/lib/tournee/auto-rdv.js`, edge `auto-rdv`) ; horizon = mois en cours ; une journée vide sans étiquette n'est pas proposée ; la page ne déplace jamais un voisin. **`empreinteJournee` (JS) et le `string_agg` de `auto_rdv_poser` (SQL) sont la même formule** : modifier l'une sans l'autre refuse toute pose en `journee_modifiee`.
+- **Lien = jeton HMAC `MDH_AUTO_RDV_SECRET`** (edge env), org toujours dérivée du contrat du jeton ; « Copier le lien » sur la carte À planifier pour tester ou poser par téléphone.
+---
