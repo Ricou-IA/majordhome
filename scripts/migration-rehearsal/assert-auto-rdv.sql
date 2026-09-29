@@ -28,12 +28,24 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM <> 'invalid_args' THEN RAISE EXCEPTION 'attendu invalid_args, obtenu %', SQLERRM; END IF;
   END;
-  -- B3. date du mois suivant → hors_mois (borne dure)
+  -- B3. date à deux mois → hors_mois (borne dure ; le mois suivant n'est toléré
+  --     que dans les 7 derniers jours du mois, cf. 20260930_3)
   BEGIN
-    PERFORM public.auto_rdv_poser(gen_random_uuid(), gen_random_uuid(), (date_trunc('month', current_date) + interval '1 month')::date, 'matin', '09:00', '10:00', 60, '', NULL, NULL);
-    RAISE EXCEPTION 'date du mois suivant acceptée';
+    PERFORM public.auto_rdv_poser(gen_random_uuid(), gen_random_uuid(), (date_trunc('month', current_date) + interval '2 month')::date, 'matin', '09:00', '10:00', 60, '', NULL, NULL);
+    RAISE EXCEPTION 'date à deux mois acceptée';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM <> 'hors_mois' THEN RAISE EXCEPTION 'attendu hors_mois, obtenu %', SQLERRM; END IF;
+  END;
+  -- B3bis. mois suivant : accepté seulement dans les 7 derniers jours du mois
+  BEGIN
+    PERFORM public.auto_rdv_poser(gen_random_uuid(), gen_random_uuid(), (date_trunc('month', current_date) + interval '1 month')::date, 'matin', '09:00', '10:00', 60, '', NULL, NULL);
+    RAISE EXCEPTION 'contrat inconnu accepté (B3bis)';
+  EXCEPTION WHEN OTHERS THEN
+    IF (date_trunc('month', current_date) + interval '1 month - 1 day')::date - current_date < 7 THEN
+      IF SQLERRM <> 'contrat_introuvable' THEN RAISE EXCEPTION 'fin de mois : attendu contrat_introuvable (mois suivant toléré), obtenu %', SQLERRM; END IF;
+    ELSE
+      IF SQLERRM <> 'hors_mois' THEN RAISE EXCEPTION 'attendu hors_mois, obtenu %', SQLERRM; END IF;
+    END IF;
   END;
   -- B4. date passée → hors_mois
   BEGIN

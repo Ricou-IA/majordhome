@@ -27,17 +27,22 @@ function iso(d) {
 
 /**
  * Bornes de l'offre pour un jour donné : de `aujourdhui + delaiMinJours` au
- * dernier jour du mois d'`aujourdhui`. Si le délai déborde du mois, `debut > fin`
- * et aucune journée n'est proposable (le mois est fini).
+ * dernier jour du mois d'`aujourdhui`. **Fin de mois** : s'il reste moins de
+ * `prolongerSiResteMoins` jours (7, comme l'expiration du lien), l'offre s'étend
+ * au dernier jour du mois SUIVANT — sinon un lien ouvert le 29 ne propose rien
+ * (vécu le 2026-09-29). Ça n'expose que des journées déjà amorcées ou étiquetées
+ * (`journeesProposables`), jamais une journée vierge du mois suivant.
  *
  * @param {string} aujourdhui  `YYYY-MM-DD` (Europe/Paris côté appelant)
- * @param {{ delaiMinJours?: number }} [opts]
+ * @param {{ delaiMinJours?: number, prolongerSiResteMoins?: number }} [opts]
  * @returns {{ debut: string, fin: string }}
  */
-export function bornesMois(aujourdhui, { delaiMinJours = 2 } = {}) {
+export function bornesMois(aujourdhui, { delaiMinJours = 2, prolongerSiResteMoins = 7 } = {}) {
   const [y, m, d] = aujourdhui.split('-').map(Number);
   const debut = new Date(Date.UTC(y, m - 1, d + Math.max(0, delaiMinJours)));
-  const fin = new Date(Date.UTC(y, m, 0)); // jour 0 du mois suivant = dernier jour du mois
+  const dernierJour = new Date(Date.UTC(y, m, 0)).getUTCDate(); // jour 0 du mois suivant = dernier jour du mois
+  const prolonger = dernierJour - d < prolongerSiResteMoins;
+  const fin = new Date(Date.UTC(y, prolonger ? m + 1 : m, 0));
   return { debut: iso(debut), fin: iso(fin) };
 }
 

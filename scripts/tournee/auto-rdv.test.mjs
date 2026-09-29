@@ -9,13 +9,21 @@ import { REGLAGES_DEFAUT } from '../../src/lib/tournee/reglages.js';
 const reglages = { ...REGLAGES_DEFAUT };
 const trajet10 = () => 10; // 10 min entre tout point
 
-test('bornesMois : délai minimal et dernier jour du mois, jamais le mois suivant', () => {
+test('bornesMois : délai minimal et dernier jour du mois en cours', () => {
   assert.deepEqual(bornesMois('2026-10-01', { delaiMinJours: 2 }), { debut: '2026-10-03', fin: '2026-10-31' });
   assert.deepEqual(bornesMois('2026-10-15'), { debut: '2026-10-17', fin: '2026-10-31' });
-  // mois fini (le délai déborde) → bornes inversées, aucune journée
-  const fin = bornesMois('2026-10-30', { delaiMinJours: 2 });
-  assert.ok(fin.debut > fin.fin, JSON.stringify(fin));
   assert.deepEqual(bornesMois('2026-02-10', { delaiMinJours: 0 }), { debut: '2026-02-10', fin: '2026-02-28' });
+  // le 24 il reste 7 jours : on ne prolonge pas encore
+  assert.deepEqual(bornesMois('2026-10-24'), { debut: '2026-10-26', fin: '2026-10-31' });
+});
+
+test('bornesMois : fin de mois (moins de 7 jours restants) → prolongée au mois suivant', () => {
+  assert.deepEqual(bornesMois('2026-09-29'), { debut: '2026-10-01', fin: '2026-10-31' }); // vécu : lien ouvert le 29, rien proposé
+  assert.deepEqual(bornesMois('2026-10-30', { delaiMinJours: 2 }), { debut: '2026-11-01', fin: '2026-11-30' });
+  assert.deepEqual(bornesMois('2026-12-28'), { debut: '2026-12-30', fin: '2027-01-31' });
+  // prolongation désactivée → bornes inversées, aucune journée
+  const sans = bornesMois('2026-10-30', { delaiMinJours: 2, prolongerSiResteMoins: 0 });
+  assert.ok(sans.debut > sans.fin, JSON.stringify(sans));
 });
 
 test('demiJournees lit reglages.demi_journee', () => {

@@ -153,13 +153,14 @@ interface Contexte {
   journees: Array<Record<string, unknown> & { date: string; technicienId: string; rdvs: Array<Record<string, unknown>> }>;
   etiquettes: Array<{ date: string; team_member_id: string; grand_secteur: string | null; figee_at: string | null }>;
   secteurContrat: string | null;
+  clientPrenom: string | null;
 }
 
 type ChargementErreur = { error: string; status: number };
 
 async function charger(admin: ReturnType<typeof getAdminClient>, contractId: string): Promise<Contexte | ChargementErreur> {
   const { data: ct, error: ctErr } = await admin
-    .from("majordhome_contracts").select("id, org_id, client_id, status").eq("id", contractId).maybeSingle();
+    .from("majordhome_contracts").select("id, org_id, client_id, status, client_first_name").eq("id", contractId).maybeSingle();
   if (ctErr) return { error: sanitizeError(ctErr, "contrat illisible"), status: 500 };
   if (!ct) return { error: "contrat_introuvable", status: 404 };
   if (ct.status !== "active") return { error: "contrat_inactif", status: 410 };
@@ -213,6 +214,7 @@ async function charger(admin: ReturnType<typeof getAdminClient>, contractId: str
     journees: (journees as Contexte["journees"]).filter((j) => eligibles.has(j.technicienId)),
     etiquettes: (etiquettes ?? []) as Contexte["etiquettes"],
     secteurContrat: (dernier?.grand_secteur as string | undefined) ?? null,
+    clientPrenom: (ct.client_first_name as string | null) ?? null,
   };
 }
 
@@ -297,7 +299,7 @@ async function actionSlots(req: Request, token: string): Promise<Response> {
   const deja = await rdvDejaPris(ctx);
   const base = {
     org: branding(ctx.settings),
-    client: { prenom: String(ctx.contrat.clientName ?? "").split(" ")[0] || null },
+    client: { prenom: ctx.clientPrenom || null },
     contrat: { categories: ctx.contrat.categories.map((c: { label: string }) => c.label), duree_minutes: ctx.contrat.dureeMinutes },
     mois: ctx.bornes,
     deja,
