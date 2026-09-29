@@ -15,6 +15,7 @@ import DevisEntete from './DevisEntete';
 import DevisStepLines from './DevisStepLines';
 import DevisConditions from './DevisConditions';
 import { X, Loader2 } from 'lucide-react';
+import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { toast } from 'sonner';
 
 export default function CreateDevisModal({ lead, onClose, onCreated }) {
@@ -61,16 +62,19 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
 
   const setField = useCallback((field, value) => setForm((prev) => ({ ...prev, [field]: value })), []);
 
-  // Changer d'installation remplace les sections : on ne jette pas des lignes saisies sans prévenir.
-  const handleSelectFamily = (f) => {
+  // Changer d'installation remplace les sections : on ne jette pas des lignes saisies sans prévenir
+  // (modale de l'app, pas le dialogue système).
+  const [familleEnAttente, setFamilleEnAttente] = useState(null);
+  const appliquerFamille = (f) => {
     const isDeselect = selectedFamily === f;
-    if (nbLignes > 0 && !window.confirm('Changer d\'installation remplace les sections et supprime les lignes déjà saisies. Continuer ?')) return;
+    setFamilleEnAttente(null);
     setSelectedFamily(isDeselect ? '' : f);
     setSelectedTemplateId(null);
     setMetre(null);
     setForm((prev) => ({ ...prev, globalDiscountPercent: '0' }));
     setLines(isDeselect ? [] : buildDefaultSections(f));
   };
+  const handleSelectFamily = (f) => { if (nbLignes > 0) setFamilleEnAttente(f); else appliquerFamille(f); };
 
   const handleSelectTemplate = (templateId) => {
     const tpl = templates.find((t) => t.id === templateId);
@@ -138,6 +142,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated }) {
           </div>
         </div>
       </div>
+      <ConfirmDialog open={familleEnAttente != null} onOpenChange={(o) => { if (!o) setFamilleEnAttente(null); }} title="Changer d'installation ?"
+        description={`Les sections seront remplacées et les ${nbLignes} ligne${nbLignes > 1 ? 's' : ''} déjà saisie${nbLignes > 1 ? 's' : ''} seront supprimées.`}
+        confirmLabel="Remplacer" cancelLabel="Garder mes lignes" onConfirm={() => appliquerFamille(familleEnAttente)} />
     </div>
   );
 }

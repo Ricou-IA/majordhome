@@ -10,6 +10,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFumConfigurations, useFumBundle, useFumSupplier, useFumArticles } from '@hooks/useFumisterie';
 import { buildFumisterieConfig } from '@/lib/fumisterie/config.js';
 import { motifDependDuDiametre } from '@/lib/fumisterie/articles.js';
+import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { logger } from '@lib/logger';
 import QualificationStep from './QualificationStep';
 import ReleveStep from './ReleveStep';
@@ -90,6 +91,18 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versReleve, bundle, configurationId, etape]);
   const fermer = () => { if (draft || releve) toast.info('Métré mis de côté : la saisie reste en brouillon sur ce lead.'); onClose(); };
+  // Alertes de contrôle (zone, dévoiement, buse…) : on demande confirmation dans une modale de l'app,
+  // pas dans le dialogue système du navigateur. Les lignes « à chiffrer » ne bloquent pas.
+  const [confirmationAlertes, setConfirmationAlertes] = useState(false);
+  const alertesBloquantes = resultat ? resultat.alertes.filter((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu') : [];
+  const injecter = () => {
+    setConfirmationAlertes(false);
+    onValidate({
+      lignesDevis: versLignesDevis(resultat.lignes, supplier?.id, supplier?.name),
+      metre: { configurationId, gabaritCode: bundle.gabarit.code, diametre: releve.diametre, finition: releve.finition, releve, resultat, engineVersion: resultat.engine_version, leadId },
+    });
+    clear();
+  };
   const valider = () => {
     if (!resultat || resultat.erreur) {
       const message = resultat?.erreur || 'Calcul du métré indisponible';
@@ -97,18 +110,12 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
       toast.error(`Métré non injecté : ${message}`);
       return;
     }
-    if (resultat.alertes.some((a) => a.niveau === 'warn' && a.code !== 'article_manquant' && a.code !== 'article_ambigu')) {
-      if (!window.confirm('Des contrôles sont en alerte (zone, dévoiement, buse…). Injecter quand même les lignes dans le devis ?')) return;
-    }
-    onValidate({
-      lignesDevis: versLignesDevis(resultat.lignes, supplier?.id, supplier?.name),
-      metre: { configurationId, gabaritCode: bundle.gabarit.code, diametre: releve.diametre, finition: releve.finition, releve, resultat, engineVersion: resultat.engine_version, leadId },
-    });
-    clear();
+    if (alertesBloquantes.length) { setConfirmationAlertes(true); return; }
+    injecter();
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-secondary-100 flex flex-col">
+    <div className="fixed inset-0 z-50 bg-secondary-100 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-secondary-200">
         <div><p className="text-xs uppercase tracking-wide text-secondary-500">Métré assisté · fumisterie</p><h2 className="text-lg font-semibold text-secondary-900">{etape === 0 ? 'Qualifier le projet' : bundle?.configuration?.titre}</h2></div>
         <button type="button" onClick={fermer} className="p-2 rounded hover:bg-secondary-100" aria-label="Fermer"><X className="w-5 h-5" /></button>
@@ -143,6 +150,12 @@ export default function MetreFumisterie({ orgId, leadId, family, onClose, onVali
           <button type="button" disabled={!injectable} onClick={valider} className="btn-primary"><Check className="w-4 h-4 mr-1" /> Injecter dans le devis</button>
         </footer>
       )}
+      <ConfirmDialog open={confirmationAlertes} onOpenChange={setConfirmationAlertes} variant="default" title="Des contrôles sont en alerte"
+        description="Vous pouvez injecter les lignes quand même : les alertes restent visibles dans le métré enregistré." confirmLabel="Injecter quand même" cancelLabel="Revenir au relevé" onConfirm={injecter}>
+        <ul className="mt-3 space-y-1.5 text-sm text-secondary-800">
+          {alertesBloquantes.map((a, i) => <li key={`${a.code}-${i}`} className="flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-primary-700" /><span>{a.message}</span></li>)}
+        </ul>
+      </ConfirmDialog>
     </div>
   );
 }
