@@ -153,8 +153,10 @@ export function placerParSequencement({ journee, contrat, demi, depot, reglages,
     souplesse: true, flexDefaut, amplitude: journee.amplitude, demiJournee: reglages.demi_journee,
   });
   // Le contrat COMMENCE dans la demi-journée (engagement de début, Eric 2026-09-30 :
-  // « ils savent adapter leur pause pour finir le job ») ; seule l'amplitude borne la fin.
-  const finMax = Math.min(demi.fin - 1, (journee.amplitude?.fin ?? demi.fin) - duree);
+  // « ils savent adapter leur pause pour finir le job »), avec au moins la MOITIÉ
+  // du travail dedans (« commencer à 11 h 59, c'est compliqué à justifier ») ;
+  // seule l'amplitude borne la fin. Même règle que toleranceDe (arrets.js).
+  const finMax = Math.min(demi.fin - Math.ceil(duree / 2), (journee.amplitude?.fin ?? demi.fin) - duree);
   if (finMax < demi.debut) {
     return { faisable: false, raison: 'demi_journee', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
   }

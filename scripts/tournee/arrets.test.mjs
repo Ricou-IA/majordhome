@@ -150,8 +150,8 @@ test('toleranceDe : NULL = défaut d org ; 0 = figé ; ±15/±30 = plage bornée
 });
 
 test('toleranceDe : demi-journée = la demi-journée qui contient l heure provisoire', () => {
-  // Engagement de DÉBUT : un entretien du matin peut commencer jusqu'à 11 h 59 et finir après midi (2026-09-30).
-  assert.deepEqual(toleranceDe({ scheduled_start: '09:30', duration_minutes: 90, time_flex_minutes: 240, appointment_type: 'maintenance' }, { souplesse: true, flexDefaut: 30, amplitude: AMP }), { min: 480, max: 719, flex: 240 });
+  // Engagement de DÉBUT avec au moins la moitié du travail dans la demi-journée : 90 min → dernier début 11 h 15, fin après midi acceptée (2026-09-30).
+  assert.deepEqual(toleranceDe({ scheduled_start: '09:30', duration_minutes: 90, time_flex_minutes: 240, appointment_type: 'maintenance' }, { souplesse: true, flexDefaut: 30, amplitude: AMP }), { min: 480, max: 675, flex: 240 });
   assert.deepEqual(toleranceDe({ scheduled_start: '15:00', duration_minutes: 60, time_flex_minutes: 240, appointment_type: 'service' }, { souplesse: true, flexDefaut: 30, amplitude: AMP }), { min: 780, max: 1020, flex: 240 });
   assert.equal(toleranceDe({ scheduled_start: null }, { souplesse: true, flexDefaut: 30 }), null);
 });

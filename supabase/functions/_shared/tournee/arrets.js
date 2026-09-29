@@ -133,10 +133,11 @@ export function toleranceDe(rdv, { souplesse = false, flexDefaut = 0, amplitude,
     const [d, f] = ancre < mFin ? [mDebut, mFin] : [aDebut, aFin];
     min = d;
     // La demi-journée est un engagement de DÉBUT, pas de fin (Eric, 2026-09-30 :
-    // « ils savent adapter leur pause pour finir le job ») : le RDV commence
-    // avant la fin de la demi-journée ; la pause glisse ensuite dans sa fenêtre.
+    // « ils savent adapter leur pause pour finir le job ») — mais « commencer à
+    // 11 h 59, c'est compliqué à justifier » : au moins la MOITIÉ du travail
+    // tombe dans la demi-journée promise (90 min → dernier début 11 h 15).
     // L'amplitude, elle, borne toujours la fin (clamp ci-dessous).
-    max = Math.max(d, f - 1);
+    max = Math.max(d, f - Math.ceil(duree / 2));
   } else {
     min = ancre - flex;
     max = ancre + flex;
