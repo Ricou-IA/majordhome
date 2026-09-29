@@ -152,8 +152,9 @@ export function placerParSequencement({ journee, contrat, demi, depot, reglages,
   const arrets = construireArretsPourConsolidation(rdvs, depot, {
     souplesse: true, flexDefaut, amplitude: journee.amplitude, demiJournee: reglages.demi_journee,
   });
-  // Le contrat : n'importe où dans la demi-journée, à condition d'y FINIR.
-  const finMax = Math.min(demi.fin, journee.amplitude?.fin ?? demi.fin) - duree;
+  // Le contrat COMMENCE dans la demi-journée (engagement de début, Eric 2026-09-30 :
+  // « ils savent adapter leur pause pour finir le job ») ; seule l'amplitude borne la fin.
+  const finMax = Math.min(demi.fin - 1, (journee.amplitude?.fin ?? demi.fin) - duree);
   if (finMax < demi.debut) {
     return { faisable: false, raison: 'demi_journee', arriveeMinutes: null, departMinutes: null, coutMinutes: null, decalages: [] };
   }

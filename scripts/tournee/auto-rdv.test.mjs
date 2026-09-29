@@ -79,24 +79,28 @@ test('placerParSequencement : journée vide, le contrat se pose dans la demi-jou
   assert.equal(r.faisable, true, r.raison);
   assert.ok(r.arriveeMinutes >= 480 && r.departMinutes <= 720, `${r.arriveeMinutes}-${r.departMinutes}`);
   assert.deepEqual(r.decalages, []);
-  // 5 h de travail ne tiennent pas dans un matin de 4 h
-  const trop = placerParSequencement({ journee: journee('2026-10-06'), contrat: { ...contrat, dureeMinutes: 300 }, demi: matin, depot, reglages, trajet: trajet10 });
+  // La demi-journée est un engagement de DÉBUT : 5 h commencées le matin finissent l'après-midi, c'est accepté…
+  const long = placerParSequencement({ journee: journee('2026-10-06'), contrat: { ...contrat, dureeMinutes: 300 }, demi: matin, depot, reglages, trajet: trajet10 });
+  assert.equal(long.faisable, true, long.raison);
+  assert.ok(long.arriveeMinutes < 720 && long.departMinutes > 720);
+  // …mais 10 h ne tiennent pas dans l'amplitude (8 h → 17 h).
+  const trop = placerParSequencement({ journee: journee('2026-10-06'), contrat: { ...contrat, dureeMinutes: 600 }, demi: matin, depot, reglages, trajet: trajet10 });
   assert.equal(trop.faisable, false);
   assert.equal(trop.raison, 'demi_journee');
 });
 
 test('placerParSequencement : un voisin en souplesse demi-journée GLISSE pour faire de la place, et le décalage est renvoyé', () => {
-  // a posé à 9 h, souplesse demi-journée (240) : peut aller de 8 h à 11 h. Le contrat de 2 h ne tient
-  // ni avant a (8h10→10h10 chevauche 9 h) ni après a (10h10→12h10 > 12 h) sans bouger a.
-  const j = journee('2026-10-06', [rdv('a', '09:00', 'Castres', { time_flex_minutes: 240 })]);
+  // Journée courte (8 h → 12 h). a posé à 10 h, souplesse demi-journée : peut aller de 8 h à 11 h.
+  // Le contrat de 2 h ne tient pas après a (11h10 → 13h10 > 12 h) : il passe AVANT, et a glisse.
+  const j = journee('2026-10-06', [rdv('a', '10:00', 'Castres', { time_flex_minutes: 240 })], { amplitude: { debut: 8 * 60, fin: 12 * 60 } });
   const r = placerParSequencement({ journee: j, contrat: { ...contrat, dureeMinutes: 120 }, demi: matin, depot, reglages, trajet: trajet10 });
   assert.equal(r.faisable, true, r.raison);
   assert.equal(r.decalages.length, 1, 'a est décalé');
   assert.equal(r.decalages[0].id, 'a');
-  assert.equal(r.decalages[0].attendu, '09:00');
+  assert.equal(r.decalages[0].attendu, '10:00');
   assert.match(r.decalages[0].scheduled_start, /^\d{2}:\d{2}$/);
-  assert.notEqual(r.decalages[0].scheduled_start, '09:00');
-  assert.ok(r.departMinutes <= 720);
+  assert.notEqual(r.decalages[0].scheduled_start, '10:00');
+  assert.ok(r.arriveeMinutes < 600, 'le contrat passe avant a');
 });
 
 test('placerParSequencement : un voisin FIGÉ ne bouge jamais, le contrat se cale autour', () => {
