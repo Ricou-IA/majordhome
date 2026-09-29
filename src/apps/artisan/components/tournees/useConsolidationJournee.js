@@ -15,7 +15,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { appointmentsService } from '@services/appointments.service';
+import { tourneesService } from '@services/tournees.service';
 import { savService } from '@services/sav.service';
 import { appointmentKeys, entretienSavKeys, tourneeKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
@@ -120,24 +120,34 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
         bilan.echecs.push(...perimes.map((l) => ({ label: l.label, message: 'modifié depuis l’aperçu — rouvrez « Figer la journée »' })));
         return;
       }
-      // 2. Les heures, une par une ; au premier refus on s'arrête : la suite
-      //    reposait sur un ordre qui n'est plus entièrement écrit.
-      const maintenant = new Date().toISOString();
-      const figes = [];
-      for (const l of aChanger) {
-        const { error } = await appointmentsService.updateAppointment(l.id, {
-          scheduled_start: l.apres,
-          // R1 : le bloc suit le barème au figeage (durée = celle vue par le moteur).
-          scheduled_end: minutesVersHeure(l.arriveeMinutes + l.dureeMinutes),
-          duration_minutes: l.dureeMinutes,
-          time_flex_minutes: 0,
-          hour_confirmed_at: maintenant,
-          announced_start: l.apres,
-        });
-        if (error) { bilan.echecs.push({ label: l.label, message: error.message || 'refusé' }); break; }
-        bilan.figes += 1;
-        figes.push(l);
+      // 2. Tout ou rien : la même RPC que le cron (`tournees_figer_journee_user`,
+      //    migration 20260930_1). Un RDV changé entre la relecture et l'écriture
+      //    ⇒ rien n'est écrit, et la trace du figeage (journees_secteur) est
+      //    posée dans la même transaction. Avant : une boucle updateAppointment
+      //    RDV par RDV, qui pouvait laisser une journée à moitié figée.
+      const lignes = aChanger.map((l) => ({
+        id: l.id,
+        attendu: l.avant,
+        scheduled_start: l.apres,
+        // R1 : le bloc suit le barème au figeage (durée = celle vue par le moteur).
+        scheduled_end: minutesVersHeure(l.arriveeMinutes + l.dureeMinutes),
+        duration_minutes: l.dureeMinutes,
+      }));
+      const { data: ecrit, error: rpcErr } = await tourneesService.figerJourneeUser({ lignes });
+      if (rpcErr) {
+        bilan.echecs.push({ label: 'journée', message: rpcErr.message || 'refusé' });
+        return;
       }
+      if (!ecrit || ecrit.figes === 0) {
+        bilan.perime = true;
+        const refuses = new Set(ecrit?.refuses || []);
+        bilan.echecs.push(...aChanger
+          .filter((l) => refuses.has(l.id))
+          .map((l) => ({ label: l.label, message: 'modifié depuis l’aperçu — rouvrez « Figer la journée »' })));
+        return;
+      }
+      bilan.figes = ecrit.figes;
+      const figes = aChanger;
       // 3. Les SMS, seulement si TOUT est écrit : une heure annoncée doit être
       //    définitive, et une journée à moitié figée peut encore bouger — et
       //    seulement si le réglage `figer_sms` est actif (OFF pour l'instant).
