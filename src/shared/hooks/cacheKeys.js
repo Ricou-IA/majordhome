@@ -438,4 +438,8 @@ export const tourneeKeys = {
   creneauxContrat: (orgId, contractId, constraints) => [
     ...tourneeKeys.all(orgId), 'creneauxContrat', contractId, JSON.stringify(constraints || {}),
   ],
+  // Étiquettes de secteur + trace de figeage (majordhome_journees_secteur) sur une plage.
+  journeesSecteur: (orgId, from, to) => [...tourneeKeys.all(orgId), 'journeesSecteur', from, to],
+  // Journal des crons de planification (majordhome_planification_runs), par job.
+  runs: (orgId, job) => [...tourneeKeys.all(orgId), 'runs', job],
 };

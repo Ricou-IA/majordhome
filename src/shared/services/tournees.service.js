@@ -413,4 +413,64 @@ export const tourneesService = {
       return { data: [], chargeMinutes: 0, raisonsRejet: {}, estime: false, paires: null, error };
     }
   },
+
+  // ==========================================================================
+  // ÉTAT DES JOURNÉES — étiquettes de secteur, figeage, journal des crons
+  // (spec 2026-09-29 auto-RDV, tranche 1 « Voir »)
+  // ==========================================================================
+
+  /**
+   * Étiquettes de secteur + trace de figeage des journées d'une plage (org CORE).
+   * @param {{ coreOrgId: string, from: string, to: string }} p  bornes ISO `YYYY-MM-DD` incluses
+   * @returns {Promise<{ data: Array<{ id: string, date: string, team_member_id: string, grand_secteur: string|null, origine: string, figee_at: string|null, figee_par: string|null }>, error: Error|null }>}
+   */
+  async getJourneesSecteur({ coreOrgId, from, to }) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_journees_secteur')
+        .select('id, date, team_member_id, grand_secteur, origine, figee_at, figee_par')
+        .eq('org_id', coreOrgId).gte('date', from).lte('date', to);
+      return { data: data || [], error };
+    } catch (error) {
+      logger.error('[tournees] getJourneesSecteur', error);
+      return { data: [], error };
+    }
+  },
+
+  /**
+   * Derniers passages d'un cron de planification (org CORE), le plus récent d'abord.
+   * @param {{ coreOrgId: string, job?: string, limit?: number }} p
+   * @returns {Promise<{ data: Array<{ id: number, job: string, ran_at: string, dry_run: boolean, rapport: object, duree_ms: number|null, erreur: string|null }>, error: Error|null }>}
+   */
+  async getPlanificationRuns({ coreOrgId, job = 'tournees-figer', limit = 10 }) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_planification_runs')
+        .select('id, job, ran_at, dry_run, rapport, duree_ms, erreur')
+        .eq('org_id', coreOrgId).eq('job', job)
+        .order('ran_at', { ascending: false }).limit(limit);
+      return { data: data || [], error };
+    } catch (error) {
+      logger.error('[tournees] getPlanificationRuns', error);
+      return { data: [], error };
+    }
+  },
+
+  /**
+   * Figeage atomique depuis le bouton « Figer la journée » — même mécanique
+   * tout-ou-rien que le cron (RPC `tournees_figer_journee_user` : org dérivée
+   * des RDV, org_admin / team_leader seulement). `figes = 0` + `refuses`
+   * signifie qu'un RDV a changé depuis l'aperçu : rien n'a été écrit.
+   * @param {{ lignes: Array<{ id: string, attendu: string, scheduled_start: string, scheduled_end: string, duration_minutes: number }> }} p
+   * @returns {Promise<{ data: { figes: number, refuses: string[] }|null, error: Error|null }>}
+   */
+  async figerJourneeUser({ lignes }) {
+    try {
+      const { data, error } = await supabase.rpc('tournees_figer_journee_user', { p_lignes: lignes });
+      return { data: data || null, error };
+    } catch (error) {
+      logger.error('[tournees] figerJourneeUser', error);
+      return { data: null, error };
+    }
+  },
 };

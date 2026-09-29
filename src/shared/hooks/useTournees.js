@@ -30,6 +30,7 @@ import { construireReglages } from '@/lib/tournee/reglages.js';
 import { chargerContrat } from '@/lib/tournee/loaders.js';
 import { verdictJournee } from '@/lib/tournee/plein.js';
 import { trajetLocal } from '@/lib/tournee/matrice.js';
+import { etatJournee, deduireSecteur } from '@/lib/tournee/etat.js';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 
 // Re-export for backward compatibility
@@ -256,5 +257,93 @@ export function useJourneesAArbitrer(coreOrgId) {
       .filter((v) => v.verdict === 'a_arbitrer');
   }, [horizon, settings]);
   return { journees, isLoading, error: error || null };
+}
+
+/** Nombre de jours entre aujourd'hui et `endDate` (borne exclusive FullCalendar), borné à [0, 120]. */
+function joursJusqua(endDate) {
+  const fin = new Date(endDate);
+  const aujourdhui = new Date();
+  aujourdhui.setHours(0, 0, 0, 0);
+  const n = Math.ceil((fin - aujourdhui) / 86400000);
+  return Number.isFinite(n) ? Math.max(0, Math.min(120, n)) : 0;
+}
+
+/**
+ * État de chaque journée (technicien × date) d'une plage — spec 2026-09-29 § 3.1.
+ * Verdict du moteur à vol d'oiseau (`estime: true`, comme `useJourneesAArbitrer`)
+ * + étiquette de secteur + trace de figeage lues en base. Les journées passées ne
+ * sont pas chargées (`chargerJournees` part d'aujourd'hui) ; « figée » vient de
+ * la base et est donc toujours vrai, le reste est une estimation.
+ *
+ * @param {{ coreOrgId: string, startDate: string, endDate: string }} p  ISO `YYYY-MM-DD`, `endDate` exclusive
+ * @returns {{ etats: Map<string, object>, isLoading: boolean, error: Error|null }}
+ *   clé = `${date}|${technicienId}` ; valeur = `{ date, technicienId, technicienNom, couleur,
+ *   etat, verdict, remplissage, etiquette, origine, figeeAt, figeePar, nbRdvs, estime }`.
+ */
+export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
+  const { settings } = useOrgSettings();
+  const joursApres = joursJusqua(endDate);
+  const { data: horizon, isLoading: hLoading, error: hError } = useJourneesHorizon(coreOrgId, joursApres);
+  const { data: etiquettes, isLoading: eLoading, error: eError } = useQuery({
+    queryKey: tourneeKeys.journeesSecteur(coreOrgId, startDate, endDate),
+    queryFn: async () => {
+      const { data, error } = await tourneesService.getJourneesSecteur({ coreOrgId, from: startDate, to: endDate });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!coreOrgId && !!startDate && !!endDate,
+    staleTime: 60 * 1000,
+  });
+  const etats = useMemo(() => {
+    const map = new Map();
+    if (!horizon || !settings) return map;
+    const reglages = construireReglages(settings);
+    const depot = getOrgHeadquarters(settings);
+    const parCle = new Map((etiquettes || []).map((e) => [`${e.date}|${e.team_member_id}`, e]));
+    for (const j of horizon) {
+      if (j.date < startDate || j.date >= endDate) continue;
+      const cle = `${j.date}|${j.technicienId}`;
+      const e = parCle.get(cle) || null;
+      const v = depot
+        ? verdictJournee({ journee: j, depot, reglages, trajet: trajetLocal })
+        : { verdict: null, remplissage: null };
+      const etiquette = e?.grand_secteur || deduireSecteur(j.rdvs);
+      map.set(cle, {
+        date: j.date,
+        technicienId: j.technicienId,
+        technicienNom: j.technicienNom,
+        couleur: j.couleur,
+        etat: etatJournee({ rdvs: j.rdvs, verdict: v.verdict, figeeAt: e?.figee_at, etiquette }),
+        verdict: v.verdict,
+        remplissage: v.remplissage,
+        etiquette,
+        origine: e?.origine || (etiquette ? 'deduite' : null),
+        figeeAt: e?.figee_at || null,
+        figeePar: e?.figee_par || null,
+        nbRdvs: (j.rdvs || []).length,
+        estime: true,
+      });
+    }
+    return map;
+  }, [horizon, etiquettes, settings, startDate, endDate]);
+  return { etats, isLoading: hLoading || eLoading, error: hError || eError || null };
+}
+
+/**
+ * Derniers passages d'un cron de planification (journal `planification_runs`).
+ * @param {string} coreOrgId
+ * @param {string} [job='tournees-figer']
+ */
+export function usePlanificationRuns(coreOrgId, job = 'tournees-figer') {
+  return useQuery({
+    queryKey: tourneeKeys.runs(coreOrgId, job),
+    queryFn: async () => {
+      const { data, error } = await tourneesService.getPlanificationRuns({ coreOrgId, job });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!coreOrgId,
+    staleTime: 60 * 1000,
+  });
 }
 
