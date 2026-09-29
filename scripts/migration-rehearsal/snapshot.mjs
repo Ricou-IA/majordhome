@@ -48,7 +48,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'certificats', columns: ['id', 'org_id', 'equipment_id', 'intervention_id', 'equipement_type', 'type_document', 'tva_taux', 'pieces_remplacees', 'created_at'] },
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: ['id', 'lead_id', 'org_id', 'quote_status', 'quote_amount_ht', 'ejected_at'], data: false },
-  { schema: 'majordhome', table: 'appointments', columns: ['id', 'org_id', 'lead_id', 'intervention_id', 'client_id', 'appointment_type', 'status', 'scheduled_date', 'scheduled_start', 'created_at'], data: false },
+  { schema: 'majordhome', table: 'appointments', columns: ['id', 'org_id', 'lead_id', 'intervention_id', 'client_id', 'appointment_type', 'status', 'scheduled_date', 'scheduled_start', 'scheduled_end', 'duration_minutes', 'time_flex_minutes', 'hour_confirmed_at', 'announced_start', 'grand_secteur', 'created_at', 'updated_at'], data: false },
+  { schema: 'majordhome', table: 'appointment_technicians', columns: null, data: false },
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
   { schema: 'majordhome', table: 'invoices', columns: ['id', 'import_status'], data: false }, // lue par la vue majordhome_entretien_sav (hub de facturation, 20260923_3)
   { schema: 'majordhome', table: 'maintenance_visits', columns: null, data: false }, // 20260928_1 : garde-fou date de visite (triggers ci-dessous)
