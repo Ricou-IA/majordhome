@@ -175,30 +175,38 @@ function DailyBudgetInput({ value, onSave, disabled }) {
 }
 
 // =============================================================================
-// COMPOSANT — RoutingToggle (inclusion dans l'optimisation des tournées)
+// COMPOSANT — PlanificationSelect (qui planifie ce membre : la machine ou la main)
 // =============================================================================
+//
+// Porte `team_members.include_in_routing`. L'ancien interrupteur sans libellé
+// n'était lisible qu'au survol : Eric ne savait pas où indiquer qu'un
+// technicien est un sous-traitant ponctuel (2026-09-29). Le vocabulaire est
+// celui de l'usage, pas celui du moteur.
 
-const INCLUDE_IN_ROUTING_HELP = 'Décocher pour un renfort ponctuel organisé hors outil.';
+const PLANIFICATION_OPTIONS = [
+  { value: 'machine', label: 'Par la machine' },
+  { value: 'main', label: 'À la main (sous-traitant ponctuel)' },
+];
 
-function RoutingToggle({ checked, onChange, disabled }) {
+const PLANIFICATION_HELP = {
+  machine: 'Salarié : proposé par les tournées et l’auto-RDV.',
+  main: 'Jamais proposé par la machine ; assignable dans le Planning (installations).',
+};
+
+const planificationDe = (includeInRouting) => ((includeInRouting ?? true) ? 'machine' : 'main');
+
+function PlanificationSelect({ includeInRouting, onChange, disabled }) {
+  const value = planificationDe(includeInRouting);
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      disabled={disabled}
-      title={INCLUDE_IN_ROUTING_HELP}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-        checked ? 'bg-primary-600' : 'bg-secondary-300'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`}
+    <div className="min-w-[14rem]">
+      <SelectInput
+        value={value}
+        onChange={(next) => next && next !== value && onChange(next === 'machine')}
+        options={PLANIFICATION_OPTIONS}
+        disabled={disabled}
       />
-    </button>
+      <p className="mt-1 text-xs text-secondary-400">{PLANIFICATION_HELP[value]}</p>
+    </div>
   );
 }
 
@@ -466,19 +474,22 @@ function MemberRow({
         )}
       </td>
 
-      {/* Inclusion dans l'optimisation des tournées */}
+      {/* Planification : par la machine (salarié) ou à la main (sous-traitant ponctuel) */}
       <td className="py-4 px-4">
         {!teamMember ? (
           <span className="text-xs text-secondary-400">—</span>
         ) : canEditColor ? (
-          <RoutingToggle
-            checked={teamMember.include_in_routing ?? true}
+          <PlanificationSelect
+            includeInRouting={teamMember.include_in_routing}
             onChange={(next) => onIncludeInRoutingChange(teamMember.id, next)}
             disabled={isRoutingSaving}
           />
         ) : (
-          <span className="text-xs text-secondary-500" title={INCLUDE_IN_ROUTING_HELP}>
-            {(teamMember.include_in_routing ?? true) ? 'Incluse' : 'Exclue'}
+          <span
+            className="text-xs text-secondary-500"
+            title={PLANIFICATION_HELP[planificationDe(teamMember.include_in_routing)]}
+          >
+            {PLANIFICATION_OPTIONS.find((o) => o.value === planificationDe(teamMember.include_in_routing)).label}
           </span>
         )}
       </td>
@@ -710,9 +721,9 @@ export default function TeamManagement() {
     setSavingRoutingId(teamMemberId);
     try {
       await setRoutingSettings({ teamMemberId, includeInRouting: include });
-      toast.success(include ? 'Membre inclus dans les tournées' : 'Membre exclu des tournées');
+      toast.success(include ? 'Planifié par la machine' : 'Planifié à la main (sous-traitant ponctuel)');
     } catch (err) {
-      toast.error(routingSettingsErrorMessage(err, "Erreur lors de la mise à jour de l'inclusion dans les tournées"));
+      toast.error(routingSettingsErrorMessage(err, 'Erreur lors de la mise à jour de la planification'));
     } finally {
       setSavingRoutingId(null);
     }
@@ -792,8 +803,8 @@ export default function TeamManagement() {
                   <span className="block text-xs font-normal text-secondary-400">Tournées, trajets + interventions</span>
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
-                  Tournées
-                  <span className="block text-xs font-normal text-secondary-400">Inclusion dans l&apos;optimisation</span>
+                  Planification
+                  <span className="block text-xs font-normal text-secondary-400">Qui pose ses rendez-vous</span>
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Compétences

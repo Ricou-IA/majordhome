@@ -36,6 +36,7 @@ Lecture : le mois est déjà dense. Les places pour les entretiens sont **les de
 8. **Tout automatique** : le 1ᵉʳ du mois la machine étiquette, envoie, et personne ne valide. Contrepartie exigée : **la page du client lit le planning en temps réel** ; le mail ne porte aucun créneau, seulement un lien.
 9. Le client qui appelle avec une date imposée reste un geste humain dans le Planning, comme aujourd'hui ; ça fige de fait le secteur de la journée pour ce technicien.
 10. Relance SMS aux non-répondants (« votre entretien approche, consultez vos mails »).
+11. **Préalable (livré le 2026-09-29)** : un membre est planifié « par la machine » (salarié) ou « à la main » (sous-traitant ponctuel, ex. Mohammed). C'est `team_members.include_in_routing`, désormais présenté sous ce vocabulaire dans Settings → Équipe, colonne « Planification ». L'étiquetage et l'auto-RDV ne regardent que les membres « par la machine », comme le moteur aujourd'hui.
 
 ## 3. Les objets
 
