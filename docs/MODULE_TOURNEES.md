@@ -105,3 +105,14 @@ npx supabase functions deploy slots-propose --project-ref ejqqqwudmizqisdkxohw
 npx supabase functions deploy tournees-figer --project-ref ejqqqwudmizqisdkxohw
 ```
 Dry-run du cron (SQL, secret du vault) : `net.http_post(url := '…/functions/v1/tournees-figer', headers := …mdh_cron_secret…, body := '{"dry_run": true, "org_id": "<core>", "date": "YYYY-MM-DD"}')` puis `select content from net._http_response where id = <request_id>`.
+
+## État de journée, étiquettes de secteur, journal des crons (auto-RDV tranche 1, 2026-09-29)
+
+Spec : `docs/superpowers/specs/2026-09-29-auto-rdv-entretien-mensuel-design.md` · plan : `docs/superpowers/plans/2026-09-29-auto-rdv-tranche1-voir.md` · migration `20260930_1`.
+
+- **Un seul état par journée de technicien**, dérivé à la lecture par `src/lib/tournee/etat.js::etatJournee` (module pur, testé `scripts/tournee/etat.test.mjs`) : `vide` · `ouverte` · `pleine` (verdict `figeable`) · `figee` (trace en base) · `a_arbitrer`. Libellés UI = `LIBELLES_ETAT`. Jamais stocké, jamais recopié.
+- **`majordhome.journees_secteur`** (org **core**, `UNIQUE (org_id, team_member_id, date)`) : étiquette de secteur d'une journée (`origine` = `deduite` des RDV posés · `machine` · `humain`) + **trace du figeage** `figee_at` / `figee_par` (`cron` ou `user:<uuid>`). Une journée est disponible par nature : personne ne l'ouvre, l'étiquette dit seulement à quel secteur elle est dédiée. `deduireSecteur(rdvs)` = secteur majoritaire des entretiens/SAV du jour (une journée qui porte un entretien à Castres EST une journée Castres).
+- **`majordhome.planification_runs`** : journal des passages des crons (`tournees-figer` ; `auto-rdv-*` à venir), écrit par l'edge **même en échec** (500 explicite si le journal ne s'écrit pas). Lu par le Dashboard entretiens (`PlanificationJournal`). Avant : le rapport n'existait que dans `net._http_response`.
+- **Figeage = une seule fonction** `majordhome.figer_journee(p_mdh_org_id, p_lignes, p_par)` (interne), appelée par `public.tournees_figer_journee` (cron, service_role only) **et** `public.tournees_figer_journee_user(p_lignes)` (bouton « Figer la journée », authenticated, org dérivée des RDV, org_admin/team_leader). Tout ou rien, et la trace `figee_at` est posée dans la même transaction. Le bouton ne boucle plus sur `updateAppointment`.
+- **Planning** : `useEtatsJournees({ coreOrgId, startDate, endDate })` calcule l'état de la plage visible (verdict à **vol d'oiseau**, `estime: true` ; « figée » vient de la base et est donc toujours vrai) ; `JourneeEtatChips` affiche une puce par technicien sous l'en-tête du jour (`dayHeaderContent`), clic → `/entretiens?tab=tournees&journee=…&tech=…`.
+- Harnais : `scripts/migration-rehearsal/assert-journees-secteur.sql` ; le snapshot photographie désormais `appointment_technicians` et les colonnes de souplesse d'`appointments`.

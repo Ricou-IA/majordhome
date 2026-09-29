@@ -116,3 +116,13 @@ Règles qui mordent :
 - **Un motif sans `{D}` = article dont le Ø nominal n'est pas celui du relevé** (kit d'air, `{D+60}` seul pour un support mural au Ø extérieur, solin MFI) : ni le service ni le résolveur ne filtrent sur le Ø, le motif tranche. Le service charge aussi les articles **sans Ø parsé** (plaque de propreté MFI « MFI 130 »). Un article « D XXX » est sur mesure → à chiffrer, jamais approché.
 - **Toutes les règles de la tranche 3 sont provisoires** (choix listés dans `TESTS_MANUELS_tranche1.md`) ; les tests `tranche3-tarif-reel.test.mjs` pinnent 14 cas et les « à chiffrer » voulus (adaptateurs PLA sur mesure, support de départ Ø80/100, solin PLA Ø100, kit MFI par appareil). Prochaine étape décidée : règle de prix (remise par famille) puis bloc B Pennylane.
 ---
+
+## [2026-09-29 23:00] Auto-RDV tranche 1 « Voir » — état de journée, journal des crons, figeage partagé
+**Statut** : PENDING
+**Commit** : e93a05e..640344f
+**Contexte** : Spec `docs/superpowers/specs/2026-09-29-auto-rdv-entretien-mensuel-design.md` (décisions Eric : demi-journée, journée de secteur, tout automatique, page client temps réel, mois en cours = borne dure). Tranche 1 livrée : module pur `etat.js`, tables `journees_secteur` + `planification_runs`, RPC `tournees_figer_journee_user`, puces d'état dans le Planning, journal dans le Dashboard entretiens. Détail : `docs/MODULE_TOURNEES.md` § « État de journée ».
+**Proposition** (à ajouter dans CLAUDE.md § Module Tournées, « règles qui mordent ») :
+- **État d'une journée = `src/lib/tournee/etat.js::etatJournee`** (vide · ouverte · pleine · figée · à arbitrer), dérivé à la lecture, jamais stocké ni recopié. Une journée est **disponible par nature** (l'absence d'installation la laisse libre) ; l'étiquette `journees_secteur` dit seulement à quel secteur elle est dédiée (déduite des RDV posés, sinon posée par la machine) — l'humain n'ouvre pas de journée. **Horizon entretien = mois en cours, borne dure** : une journée vierge du mois suivant appartient aux installations.
+- **Figeage = une seule fonction** `majordhome.figer_journee` (cron `tournees_figer_journee` service_role ; bouton `tournees_figer_journee_user` authenticated) — tout ou rien, trace `figee_at`/`figee_par`. Ne jamais réintroduire une boucle `updateAppointment` pour figer.
+- **Tout cron de planification écrit `majordhome.planification_runs`**, même en échec ; un cron sans ligne dans le journal ne tourne pas.
+---
