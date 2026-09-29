@@ -26,15 +26,22 @@ export default function ListePieces({ lignes, totaux }) {
         <thead><tr className="text-left text-xs uppercase tracking-wide text-secondary-500 border-b-2 border-secondary-900">
           <th className="py-2 pr-2">Rep.</th><th className="py-2 pr-2">Désignation</th><th className="py-2 pr-2">Référence</th><th className="py-2 pr-2 text-right">Qté</th><th className="py-2 pr-2 text-right">PU vente HT</th><th className="py-2 pr-2 text-right">PU achat HT</th><th className="py-2 text-right">Total vente HT</th></tr></thead>
         <tbody>
+          {/* Lignes de hauteur fixe (une seule ligne de texte, précision en gris à la suite) : la liste se lit d'un coup. */}
           {lignes.map((l, i) => (
-            <tr key={i} className="border-b border-secondary-100 align-top">
-              <td className="py-2 pr-2"><span className="inline-grid place-items-center w-6 h-6 rounded-full bg-primary-400 text-secondary-900 font-bold border border-secondary-900 text-xs">{l.repere}</span></td>
-              <td className="py-2 pr-2">{l.libelle}<span className={`ml-2 inline-block border rounded px-1.5 text-[10px] uppercase font-mono ${STATUT[l.statut] || STATUT.implicite}`}>{l.statut}</span>{l.sous_libelle && <span className="block text-xs text-secondary-500">{l.sous_libelle}</span>}</td>
-              <td className="py-2 pr-2 font-mono text-xs text-secondary-600">{l.reference || '—'}</td>
-              <td className="py-2 pr-2 text-right font-mono">{l.quantite}</td>
-              <td className="py-2 pr-2 text-right font-mono">{l.prix_vente_ht != null ? formatEuro(l.prix_vente_ht) : '—'}</td>
-              <td className="py-2 pr-2 text-right font-mono text-secondary-500">{l.prix_achat_ht != null ? formatEuro(l.prix_achat_ht) : '—'}</td>
-              <td className="py-2 text-right font-mono">{l.prix_vente_ht != null ? formatEuro(l.prix_vente_ht * l.quantite) : <span className="text-primary-800">à chiffrer</span>}</td>
+            <tr key={i} className="border-b border-secondary-100 h-11">
+              <td className="pr-2 align-middle"><span className="inline-grid place-items-center w-6 h-6 rounded-full bg-primary-400 text-secondary-900 font-bold border border-secondary-900 text-xs">{l.repere}</span></td>
+              <td className="pr-2 align-middle max-w-0" title={[l.libelle, l.sous_libelle].filter(Boolean).join(' — ')}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate">{l.libelle}</span>
+                  <span className={`shrink-0 inline-block border rounded px-1.5 text-[10px] uppercase font-mono ${STATUT[l.statut] || STATUT.implicite}`}>{l.statut}</span>
+                  {l.sous_libelle && <span className="shrink-0 max-w-[38%] truncate text-xs text-secondary-500">· {l.sous_libelle}</span>}
+                </div>
+              </td>
+              <td className="pr-2 align-middle font-mono text-xs text-secondary-600 whitespace-nowrap">{l.reference || '—'}</td>
+              <td className="pr-2 align-middle text-right font-mono">{l.quantite}</td>
+              <td className="pr-2 align-middle text-right font-mono whitespace-nowrap">{l.prix_vente_ht != null ? formatEuro(l.prix_vente_ht) : '—'}</td>
+              <td className="pr-2 align-middle text-right font-mono text-secondary-500 whitespace-nowrap">{l.prix_achat_ht != null ? formatEuro(l.prix_achat_ht) : '—'}</td>
+              <td className="align-middle text-right font-mono whitespace-nowrap">{l.prix_vente_ht != null ? formatEuro(l.prix_vente_ht * l.quantite) : <span className="text-primary-800">à chiffrer</span>}</td>
             </tr>
           ))}
         </tbody>
