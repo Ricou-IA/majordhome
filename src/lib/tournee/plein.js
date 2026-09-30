@@ -21,7 +21,7 @@ import { cleCoord } from './geo.js';
  * @param {Array<object>} p.arrets   construireArretsPourConsolidation(...)
  * @param {Function} p.trajet        (keyA, keyB) → minutes
  * @param {string} p.depotKey
- * @param {number} p.budgetMinutes         daily_work_minutes du technicien
+ * @param {number} p.budgetMinutes         budget de la journée (loaders.js::budgetDuJour)
  * @param {number} [p.depassementMinutes=0]  réglage depassement_journee_minutes
  * @param {number} p.resteUtileMinMinutes   réglage reste_utile_min_minutes
  * @returns {{ pleine: boolean, vide: boolean, resteUtileMinutes: number, chargeMinutes: number,
@@ -61,7 +61,7 @@ export function rdvAdaptable(rdv, flexDefaut) {
 /**
  * Verdict d'une journée pour le figeage automatique (R2/R3) — la même
  * mécanique dans l'edge `tournees-figer` (avec la matrice Mapbox) et dans
- * l'onglet Tournées (alerte « à arbitrer », trajets estimés).
+ * le navigateur (puces du Planning, alerte « à arbitrer », trajets estimés).
  *
  * @param {object} p
  * @param {{ date: string, rdvs: Array<object>, amplitude: {debut:number, fin:number}, budgetMinutes: number }} p.journee
@@ -71,12 +71,14 @@ export function rdvAdaptable(rdv, flexDefaut) {
  * @returns {{ verdict: 'sans_adaptable'|'non_pleine'|'figeable'|'a_arbitrer', adaptables: number,
  *   remplissage: ReturnType<typeof evaluerRemplissage>|null,
  *   sequence: ReturnType<typeof sequencerTournee>|null }}
+ *   `remplissage` n'est null que pour une journée sans RDV ; `sequence` n'existe
+ *   que pour une journée pleine qui porte des adaptables.
  */
 export function verdictJournee({ journee, depot, reglages, trajet }) {
   const flexDefaut = reglages.souplesse_defaut_minutes ?? 0;
   const rdvs = (journee.rdvs || []).filter((r) => r.status !== 'cancelled');
   const adaptables = rdvs.filter((r) => rdvAdaptable(r, flexDefaut)).length;
-  if (rdvs.length === 0 || adaptables === 0) return { verdict: 'sans_adaptable', adaptables, remplissage: null, sequence: null };
+  if (rdvs.length === 0) return { verdict: 'sans_adaptable', adaptables, remplissage: null, sequence: null };
   const arrets = construireArretsPourConsolidation(rdvs, depot, {
     souplesse: true, flexDefaut, amplitude: journee.amplitude, demiJournee: reglages.demi_journee,
   });
@@ -86,6 +88,10 @@ export function verdictJournee({ journee, depot, reglages, trajet }) {
     arrets, trajet, depotKey, budgetMinutes: journee.budgetMinutes, depassementMinutes,
     resteUtileMinMinutes: reglages.reste_utile_min_minutes ?? 75,
   });
+  // Rien d'adaptable : rien à ordonnancer ni à figer, le verdict ne change pas.
+  // Mais le remplissage se mesure quand même — sans lui, une journée pleine et
+  // déjà figée, ou une installation qui occupe le jour, se lisait « ouverte ».
+  if (adaptables === 0) return { verdict: 'sans_adaptable', adaptables, remplissage, sequence: null };
   if (!remplissage.pleine) return { verdict: 'non_pleine', adaptables, remplissage, sequence: null };
   const sequence = sequencerTournee({
     toleranceRetourMinutes: reglages.tolerance_retour_depot_minutes ?? 0,

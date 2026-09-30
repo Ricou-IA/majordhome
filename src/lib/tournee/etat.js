@@ -24,25 +24,42 @@ const TYPES_ENTRETIEN = new Set(['maintenance', 'service']);
 const STATUTS_EXCLUS = new Set(['cancelled', 'no_show']);
 
 /**
- * Secteur déduit d'une journée : le grand secteur majoritaire de ses entretiens
- * et SAV non annulés. Une journée qui porte un entretien à Castres EST une
- * journée Castres (décision Eric, 2026-09-29) — la machine ne choisit un
- * secteur que pour une journée entièrement vide. Égalité → ordre alphabétique.
+ * Secteur déduit d'une journée : **le premier entretien posé sur la journée
+ * vierge fixe le secteur** (décision Eric, 2026-09-30) — celui du plus ancien
+ * entretien / SAV non annulé (`created_at`) qui porte un grand secteur. Une
+ * journée qui porte un entretien à Castres EST une journée Castres ; la machine
+ * ne choisit un secteur que pour une journée entièrement vide. Ceux qui
+ * s'ajoutent ensuite ne le changent pas (l'ancienne règle « secteur
+ * majoritaire » tranchait les égalités par ordre alphabétique). Sans date de
+ * création, l'heure du RDV départage, puis le nom — toujours déterministe.
  *
- * @param {Array<{ appointment_type?: string, status?: string, grand_secteur?: string|null }>|null|undefined} rdvs
+ * @param {Array<{ appointment_type?: string, status?: string, grand_secteur?: string|null, created_at?: string|null, scheduled_start?: string|null }>|null|undefined} rdvs
  * @returns {string|null} nom du grand secteur, ou null si aucun entretien localisé
  */
 export function deduireSecteur(rdvs) {
-  const comptes = new Map();
+  const localises = [];
   for (const r of rdvs || []) {
     if (!TYPES_ENTRETIEN.has(r.appointment_type)) continue;
     if (STATUTS_EXCLUS.has(r.status)) continue;
     const s = typeof r.grand_secteur === 'string' ? r.grand_secteur.trim() : '';
     if (!s) continue;
-    comptes.set(s, (comptes.get(s) || 0) + 1);
+    localises.push({ secteur: s, pose: String(r.created_at || ''), heure: String(r.scheduled_start || '') });
   }
-  if (comptes.size === 0) return null;
-  return [...comptes.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr'))[0][0];
+  if (localises.length === 0) return null;
+  // '' (date inconnue) passe APRÈS toute date connue : un RDV daté fait foi.
+  const ordre = (a, b) => (a === b ? 0 : a === '' ? 1 : b === '' ? -1 : a < b ? -1 : 1);
+  localises.sort((a, b) => ordre(a.pose, b.pose) || ordre(a.heure, b.heure) || a.secteur.localeCompare(b.secteur, 'fr'));
+  return localises[0].secteur;
+}
+
+/**
+ * Les heures de la journée sont-elles toutes communiquées ? Vrai quand elle
+ * porte au moins un entretien / SAV actif et que chacun a son heure confirmée.
+ * @param {Array<{ appointment_type?: string, hour_confirmed_at?: string|null }>} actifs
+ */
+function heuresToutesCommuniquees(actifs) {
+  const entretiens = actifs.filter((r) => TYPES_ENTRETIEN.has(r.appointment_type));
+  return entretiens.length > 0 && entretiens.every((r) => !!r.hour_confirmed_at);
 }
 
 /**
@@ -52,16 +69,22 @@ export function deduireSecteur(rdvs) {
  * - figée (trace en base) prime sur tout : les heures sont définitives ;
  * - aucun RDV actif et aucune étiquette → vide ; étiquetée → ouverte ;
  * - `a_arbitrer` / `figeable` (= pleine) viennent du moteur ;
- * - tout le reste (`non_pleine`, `sans_adaptable` avec des RDV, verdict absent) → ouverte.
+ * - journée SANS RDV adaptable (`sans_adaptable`) : le moteur n'a rien à y
+ *   ordonnancer, mais elle n'est pas « ouverte » pour autant. Pleine (`pleine`,
+ *   le `remplissage.pleine` du verdict) → **figée** si toutes ses heures
+ *   d'entretien sont communiquées (journée figée avant que la trace existe, ou
+ *   RDV par RDV), sinon **pleine** (une installation qui occupe le jour) ;
+ * - tout le reste (`non_pleine`, `sans_adaptable` avec de la place, verdict absent) → ouverte.
  *
- * @param {{ rdvs: Array<{ status?: string }>|null|undefined, verdict: string|null|undefined, figeeAt: string|null|undefined, etiquette: string|null|undefined }} p
+ * @param {{ rdvs: Array<{ status?: string, appointment_type?: string, hour_confirmed_at?: string|null }>|null|undefined, verdict: string|null|undefined, figeeAt: string|null|undefined, etiquette: string|null|undefined, pleine?: boolean|null }} p
  * @returns {EtatJournee}
  */
-export function etatJournee({ rdvs, verdict, figeeAt, etiquette }) {
+export function etatJournee({ rdvs, verdict, figeeAt, etiquette, pleine = false }) {
   if (figeeAt) return 'figee';
   const actifs = (rdvs || []).filter((r) => !STATUTS_EXCLUS.has(r.status));
   if (actifs.length === 0) return etiquette ? 'ouverte' : 'vide';
   if (verdict === 'a_arbitrer') return 'a_arbitrer';
   if (verdict === 'figeable') return 'pleine';
+  if (verdict === 'sans_adaptable' && pleine) return heuresToutesCommuniquees(actifs) ? 'figee' : 'pleine';
   return 'ouverte';
 }

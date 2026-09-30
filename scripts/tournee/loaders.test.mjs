@@ -4,7 +4,7 @@
 // Run : node --test scripts/tournee/loaders.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chargerJournees, chargerContrat } from '../../src/lib/tournee/loaders.js';
+import { chargerJournees, chargerContrat, budgetDuJour } from '../../src/lib/tournee/loaders.js';
 
 /**
  * Faux client : chaque table renvoie ses lignes quel que soit le filtre.
@@ -73,6 +73,41 @@ test('chargerJournees : une journée par technicien × jour ouvré, RDV coordonn
   assert.deepEqual(data[0].competences, { entretien: ['clim', 'poele_g'], pose: ['clim'] });
   assert.deepEqual(techniciens, [{ id: 't1', nom: 'Antoine', competences: { entretien: ['clim', 'poele_g'], pose: ['clim'] }, couleur: '#f00' }]);
   assert.ok(client.lues.includes('majordhome_team_member_skills'));
+});
+
+test('budgetDuJour : le budget du technicien, plafonné par l amplitude du jour moins la pause', () => {
+  const mayer = { pause_minutes: 60, pause_fenetre: [11.5, 14] };
+  // Lundi 8 h – 17 h : 9 h moins 1 h de pause = 8 h, le budget du technicien tient.
+  assert.equal(budgetDuJour(480, { debut: 480, fin: 1020 }, mayer), 480);
+  // Vendredi 8 h – 16 h : 7 h utiles, pas 8 (la journée n'était jamais « pleine »).
+  assert.equal(budgetDuJour(480, { debut: 480, fin: 960 }, mayer), 420);
+  // Un budget plus petit que l'amplitude reste le budget.
+  assert.equal(budgetDuJour(360, { debut: 480, fin: 960 }, mayer), 360);
+  // Matinée seule : elle ne traverse pas la fenêtre de pause, rien à déduire.
+  assert.equal(budgetDuJour(480, { debut: 480, fin: 690 }, mayer), 210);
+  // Sans réglages : l'amplitude plafonne, sans pause. Budget absent : 480.
+  assert.equal(budgetDuJour(480, { debut: 480, fin: 960 }), 480);
+  assert.equal(budgetDuJour(null, { debut: 480, fin: 1080 }, mayer), 480);
+  // Amplitude illisible : budget du technicien, jamais NaN.
+  assert.equal(budgetDuJour(480, { debut: NaN, fin: NaN }, mayer), 480);
+  assert.equal(budgetDuJour(480, null, mayer), 480);
+});
+
+test('chargerJournees : le budget de la journée suit l amplitude du jour (vendredi court)', async () => {
+  const client = fauxClient({
+    majordhome_team_members: [{
+      id: 't1', display_name: 'Antoine', calendar_color: null, daily_work_minutes: 480, include_in_routing: true,
+      default_availability: { monday: { active: true, start: '08:00', end: '17:00' }, tuesday: { active: true, start: '08:00', end: '16:00' } },
+    }],
+    majordhome_team_member_skills: [], majordhome_appointments: [], majordhome_clients: [], majordhome_leads: [],
+    majordhome_appointment_technicians: [],
+  });
+  const { data, error } = await chargerJournees({
+    client, coreOrgId: 'core', mdhOrgId: 'mdh', joursApres: 1, maintenant: LUNDI, logger: silencieux,
+    reglages: { pause_minutes: 60, pause_fenetre: [11.5, 14] },
+  });
+  assert.equal(error, null);
+  assert.deepEqual(data.map((j) => j.budgetMinutes), [480, 420]);
 });
 
 test('chargerJournees : un RDV rattaché à un lead prend les coordonnées du lead ; sans rien, lat/lng null (jamais écarté)', async () => {

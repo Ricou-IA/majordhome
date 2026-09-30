@@ -33,6 +33,9 @@ function titre(item) {
   if (item.etiquette) parts.push(`Secteur ${item.etiquette}${item.origine === 'deduite' ? ' (déduit des RDV posés)' : ''}`);
   if (item.figeeAt) {
     parts.push(`Figée le ${formatFige(item.figeeAt)} par ${item.figeePar === 'cron' ? 'le cron' : 'un membre de l’équipe'}`);
+  } else if (item.etat === 'figee') {
+    // Figée sans trace de journée : pleine, et chaque entretien a son heure communiquée.
+    parts.push('Journée pleine, toutes les heures sont communiquées aux clients');
   } else if (item.remplissage) {
     parts.push(`Reste utile ≈ ${Math.round(item.remplissage.resteUtileMinutes)} min (estimé à vol d’oiseau)`);
   }

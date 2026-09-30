@@ -48,7 +48,14 @@ test('verdictJournee : sans adaptable → rien ; pleine et tenable → figeable 
   const base = { date: '2026-09-15', amplitude: AMP, budgetMinutes: 480 };
   const rdv = (id, lat, lng, duree, debut, extra = {}) => ({ id, lat, lng, duration_minutes: duree, scheduled_start: debut, appointment_type: 'maintenance', ...extra });
   const figes = { ...base, rdvs: [rdv('a', 43.79476, 1.604971, 162, '08:00', { hour_confirmed_at: 'x' }), rdv('b', 43.941915, 1.720688, 216, '12:30', { time_flex_minutes: 0 })] };
-  assert.equal(verdictJournee({ journee: figes, depot: DEPOT, reglages, trajet }).verdict, 'sans_adaptable');
+  const vf = verdictJournee({ journee: figes, depot: DEPOT, reglages, trajet });
+  assert.equal(vf.verdict, 'sans_adaptable');
+  // Rien à ordonnancer, mais le remplissage est mesuré : c'est lui qui dit « pleine » à l'écran.
+  assert.equal(vf.sequence, null);
+  assert.equal(vf.remplissage.pleine, true);
+  assert.equal(vf.remplissage.chargeMinutes, 478);
+  // Une journée sans aucun RDV n'a pas de remplissage.
+  assert.equal(verdictJournee({ journee: { ...base, rdvs: [] }, depot: DEPOT, reglages, trajet }).remplissage, null);
   // 15/09 tel que posé (EKOUE 8h00 ±30 à 38 min du dépôt ouvert à 8h00) : pleine (reste 32)
   // mais le trajet vers Bessières ne tient pas → à arbitrer (Eric, 2026-09-12).
   const pose = { ...base, rdvs: [rdv('EKOUE', 43.79476, 1.604971, 162, '08:00'), rdv('GOMES', 43.941915, 1.720688, 216, '12:30')] };

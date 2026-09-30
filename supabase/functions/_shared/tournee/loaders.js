@@ -27,7 +27,7 @@ const hhmmEnMinutes = (s) => {
  * @property {string} technicienNom
  * @property {string|null} couleur
  * @property {{ debut: number, fin: number }} amplitude  minutes depuis minuit
- * @property {number} budgetMinutes
+ * @property {number} budgetMinutes  budget de LA journée (`budgetDuJour`) : celui du technicien, plafonné par l'amplitude du jour moins la pause
  * @property {Array<object>} rdvs  RDV du jour pour ce technicien (colonnes
  *   majordhome_appointments + `lat`/`lng` résolus client → lead → null).
  *   ⚠️ R1 (spec 2026-09-12 « bloc contrat ») : pour un Entretien rattaché à un
@@ -40,9 +40,33 @@ const hhmmEnMinutes = (s) => {
  */
 
 /**
+ * Budget de travail d'UNE journée (temps d'homme, trajets compris, hors pause) :
+ * le budget du technicien (`daily_work_minutes`), plafonné par ce que
+ * l'amplitude du jour laisse réellement — sa durée moins la pause quand la
+ * journée traverse la fenêtre de pause. Sans ce plafond, un vendredi 8 h – 16 h
+ * (7 h utiles) gardait 8 h de budget : la journée n'était jamais « pleine » par
+ * le budget alors que plus rien n'y rentrait, donc jamais figée (vécu le
+ * 2026-09-30, vendredi 16/10). Amplitude illisible ⇒ budget du technicien.
+ *
+ * @param {number|null|undefined} dailyWorkMinutes  team_members.daily_work_minutes (défaut 480)
+ * @param {{ debut: number, fin: number }|null|undefined} amplitude  minutes depuis minuit
+ * @param {{ pause_minutes?: number, pause_fenetre?: [number, number] }|null} [reglages]
+ * @returns {number}
+ */
+export function budgetDuJour(dailyWorkMinutes, amplitude, reglages = null) {
+  const budget = dailyWorkMinutes || 480;
+  const duree = (amplitude?.fin ?? NaN) - (amplitude?.debut ?? NaN);
+  if (!(duree > 0)) return budget;
+  const pauseMinutes = reglages?.pause_minutes ?? 0;
+  const [pauseDebut, pauseFin] = reglages?.pause_fenetre ?? [12, 14];
+  const pauseDue = pauseMinutes > 0 && amplitude.debut < pauseFin * 60 && amplitude.fin > pauseDebut * 60;
+  return Math.min(budget, duree - (pauseDue ? pauseMinutes : 0));
+}
+
+/**
  * Journées de l'horizon par technicien inclus dans l'optimisation
  * (`include_in_routing = true`, actif). Charge et annote, ne filtre PAS
- * horizon/amorçage (à l'appelant : onglet Tournées ou proposerPourContrat).
+ * horizon/amorçage (à l'appelant : panneau de remplissage ou proposerPourContrat).
  *
  * @param {object} p
  * @param {object} p.client      client supabase-js
@@ -77,7 +101,7 @@ export async function chargerJournees({
       // SELECT, `r.lead_id` vaut `undefined`, `leadIds` reste vide et TOUT le repli
       // lead est du code mort — silencieusement, puisque le repli suivant (siège)
       // fournit quand même une position plausible. Vécu : livré ainsi, jamais vu.
-      .select('id, client_id, lead_id, intervention_id, scheduled_date, scheduled_start, scheduled_end, duration_minutes, appointment_type, status, subject, client_name, client_first_name, client_phone, address, city, postal_code, time_flex_minutes, hour_confirmed_at, announced_start, grand_secteur')
+      .select('id, client_id, lead_id, intervention_id, scheduled_date, scheduled_start, scheduled_end, duration_minutes, appointment_type, status, subject, client_name, client_first_name, client_phone, address, city, postal_code, time_flex_minutes, hour_confirmed_at, announced_start, grand_secteur, created_at')
       .eq('org_id', orgId).gte('scheduled_date', iso(debut)).lte('scheduled_date', iso(fin))
       .not('status', 'in', '(cancelled,no_show)'),
   ]);
@@ -178,13 +202,14 @@ export async function chargerJournees({
       const duJour = rdvsAvecCoords.filter(
         (r) => r.scheduled_date === date && (techsParRdv.get(r.id) || []).includes(m.id),
       );
+      const amplitude = { debut: hhmmEnMinutes(dispo.start), fin: hhmmEnMinutes(dispo.end) };
       journees.push({
         date,
         technicienId: m.id,
         technicienNom: m.display_name,
         couleur: m.calendar_color,
-        amplitude: { debut: hhmmEnMinutes(dispo.start), fin: hhmmEnMinutes(dispo.end) },
-        budgetMinutes: m.daily_work_minutes || 480,
+        amplitude,
+        budgetMinutes: budgetDuJour(m.daily_work_minutes, amplitude, reglages),
         rdvs: duJour,
         chargeMinutes: duJour.reduce((s, r) => s + (r.duration_minutes || 60), 0),
         estAmorcee: duJour.some((r) => r.appointment_type === 'maintenance'),

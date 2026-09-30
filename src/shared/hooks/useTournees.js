@@ -316,7 +316,9 @@ export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
         technicienId: j.technicienId,
         technicienNom: j.technicienNom,
         couleur: j.couleur,
-        etat: etatJournee({ rdvs: j.rdvs, verdict: v.verdict, figeeAt: e?.figee_at, etiquette }),
+        etat: etatJournee({
+          rdvs: j.rdvs, verdict: v.verdict, figeeAt: e?.figee_at, etiquette, pleine: v.remplissage?.pleine ?? false,
+        }),
         verdict: v.verdict,
         remplissage: v.remplissage,
         etiquette,
