@@ -173,3 +173,15 @@ Règles qui mordent :
 **Proposition** (CLAUDE.md § Module Entretiens, règles qui mordent) :
 - **Un contrat dont le client a refusé l'entretien de l'année n'est pas « à faire »** : lecture unique `statutVisiteAnnee` / `compterVisitesAnnee` (`src/lib/entretienVisitStatus.js`) — jamais un test `current_year_visit_status === 'completed'` recopié dans un écran ou un compteur (tout le reste y devient « à faire », refus compris). Ni Planifier, ni SMS de rappel, ni CA à faire sur un refus.
 ---
+
+## [2026-09-30 22:00] Module Chantiers — entité par devis (2026-09-30)
+**Statut** : PENDING
+**Commit** : 44321e4
+**Contexte** : un chantier n'est plus une colonne du lead mais une ligne de `majordhome.chantiers` (1 lead → N chantiers, 1 devis validé → 1 chantier) : un lead qui signe deux devis (ex. PAC + poêle) a deux cartes, deux plannings d'installation, deux PV. Migrations `20260930_11..13` (à appliquer en prod, dans l'ordre), harnais `scripts/migration-rehearsal/assert-chantiers.sql`. Spec : `docs/superpowers/specs/2026-09-30-chantier-entite-par-devis-design.md` ; schéma : `docs/DATABASE.md` § majordhome.chantiers.
+**Proposition** (CLAUDE.md, nouvelle section « Module Chantiers — entité par devis » + gotcha DB) :
+- **Un chantier = une ligne de `majordhome.chantiers`, son `id` ≠ l'id du lead** : `majordhome_chantiers.id` est l'id du chantier, le lead est `lead_id`. Toute clé de cache, tout appel de mutation et toute jointure prennent l'id du chantier.
+- **Un devis validé sans chantier en crée un** (trigger `chantier_ensure_for_quote`, sur la transition vers « validé ») ; un devis refusé ou éjecté ne supprime pas son chantier (carte ambre « aucun devis validé », suppression à la main via `chantier_delete`, refusée s'il reste devis validé / RDV / PV).
+- **Les RDV d'installation portent `chantier_id`** (`appointments.chantier_id`, `lead_id` reste renseigné) ; `target_invoiced` (violet) se calcule par chantier, jamais par lead.
+- **Écrire un chantier via `majordhome_chantiers_write`** (miroir simple updatable, `.eq('id', chantierId).eq('org_id', orgId)`, lire `{ error }`), **jamais via `update_majordhome_lead`** : les colonnes chantier de `leads` sont legacy (plus écrites, contraction à venir).
+- **Grouper / détacher / supprimer = RPC** `chantier_group` / `chantier_detach` / `chantier_delete` (org_admin, team_leader via `role_can(…, 'chantiers', 'edit')`) ; aperçus par le module pur `src/lib/chantierSplit.js`. Ne jamais recopier l'allowlist des statuts de devis : `majordhome.chantier_quote_stats` (via `quote_status_bucket()`) est la seule définition de « devis validé » d'un chantier.
+---

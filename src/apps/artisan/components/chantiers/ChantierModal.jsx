@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car, Layers, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuroCeil } from '@/lib/utils';
@@ -23,6 +23,8 @@ import {
   chantiersService,
 } from '@services/chantiers.service';
 import { useChantierMutations } from '@hooks/useChantiers';
+import { useCanAccess } from '@hooks/usePermissions';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useTeamMembers, useChantierAppointments } from '@hooks/useAppointments';
 import { appointmentsService } from '@services/appointments.service';
 import { appointmentKeys } from '@hooks/cacheKeys';
@@ -33,6 +35,7 @@ import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFie
 import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
+import { GroupChantiersDialog } from './GroupChantiersDialog';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
 
@@ -47,8 +50,11 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     updateChantierNotes,
     updatePlannedOrder,
     updateLabel,
+    deleteChantier,
     isUpdatingStatus,
+    isDeleting,
   } = useChantierMutations();
+  const { can } = useCanAccess();
 
   const { members } = useTeamMembers(orgId);
   const queryClient = useQueryClient();
@@ -70,6 +76,10 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [showContractModal, setShowContractModal] = useState(false);
   const [clientForContract, setClientForContract] = useState(null);
   const [loadingContract, setLoadingContract] = useState(false);
+
+  // Grouper / supprimer ce chantier
+  const [showGroup, setShowGroup] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   // Planification installation (assistant créneaux)
   const [showScheduler, setShowScheduler] = useState(false);
@@ -145,6 +155,10 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     : canEditChantier
       ? allTransitions
       : [];
+  // Grouper (≥ 2 chantiers sur le lead) / supprimer (chantier vide : ni devis validé, ni RDV, ni PV)
+  const canGroup = can('chantiers', 'edit') && Number(chantier.lead_chantiers_count) >= 2;
+  const canDelete = can('chantiers', 'edit') && Number(chantier.validated_quotes_count) === 0
+    && !installAppointments.length && !pvPath;
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
   const amount = getChantierAmount(chantier);
 
@@ -591,7 +605,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         </div>
 
         {/* Footer : transitions */}
-        {allowedTransitions.length > 0 && (() => {
+        {(allowedTransitions.length > 0 || canGroup || canDelete) && (() => {
           const currentOrder = statusConfig.display_order;
           const backTransitions = allowedTransitions.filter((t) => {
             const cfg = getChantierStatusConfig(t);
@@ -620,6 +634,19 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                   </button>
                 );
               })}
+
+              {canGroup && (
+                <button type="button" onClick={() => setShowGroup(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-100">
+                  <Layers className="w-3.5 h-3.5" /> Grouper avec…
+                </button>
+              )}
+              {canDelete && (
+                <button type="button" onClick={() => setShowDelete(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50">
+                  <Trash2 className="w-3.5 h-3.5" /> Supprimer ce chantier
+                </button>
+              )}
 
               <div className="flex-1" />
 
@@ -666,6 +693,28 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
         contractDefaults={{ status: 'pending', workflowStatus: 'nouveau', source: 'chantier' }}
       />
     )}
+
+    {showGroup && <GroupChantiersDialog chantier={chantier} onClose={() => setShowGroup(false)} onGrouped={onUpdated} />}
+    <ConfirmDialog
+      open={showDelete}
+      onOpenChange={setShowDelete}
+      title="Supprimer ce chantier ?"
+      description="Le chantier disparaît du kanban. Les devis non validés restent attachés au lead. Aucun devis validé, RDV ni PV ne sera perdu (la suppression est refusée s'il en reste)."
+      confirmLabel={isDeleting ? 'Suppression…' : 'Supprimer'}
+      cancelLabel="Annuler"
+      variant="destructive"
+      loading={isDeleting}
+      onConfirm={async () => {
+        try {
+          await deleteChantier(chantier.id);
+          toast.success('Chantier supprimé');
+          onUpdated?.();
+          onClose();
+        } catch (err) {
+          toast.error(err?.message || 'Suppression refusée');
+        }
+      }}
+    />
     </>
   );
 }

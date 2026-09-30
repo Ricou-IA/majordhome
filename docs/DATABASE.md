@@ -1,6 +1,6 @@
 # DATABASE.md - Schéma Supabase Majord'home
 
-> **Dernière MàJ** : 2026-03-10 — Sprint 6 Chantiers (colonnes leads, vues, intervention_technicians)
+> **Dernière MàJ** : 2026-09-30 — Chantiers = entité `majordhome.chantiers` (colonnes chantier de `leads` legacy) ; précédemment 2026-03-10 Sprint 6 Chantiers (colonnes leads, vues, intervention_technicians)
 > Ce fichier documente toutes les tables du schéma `majordhome` et les tables clés de `core`.
 
 ## Organisation cible
@@ -24,7 +24,7 @@
 | `public.majordhome_interventions` | `majordhome.interventions` | `supabase.from('majordhome_interventions')` |
 | `public.majordhome_contracts` | `majordhome.contracts` JOIN `majordhome.clients` | `supabase.from('majordhome_contracts')` — vue enrichie avec client_name, client_address, client_postal_code, client_city, client_phone, client_email, client_project_id |
 | `public.majordhome_contract_equipments` | `majordhome.contract_equipments` | `supabase.from('majordhome_contract_equipments')` — pivot contrat↔équipement |
-| `public.majordhome_chantiers` | `majordhome.leads` (filtrés) + JOINs | `supabase.from('majordhome_chantiers')` — leads avec chantier_status IS NOT NULL + equipment_type_label + intervention parent |
+| `public.majordhome_chantiers` | `majordhome.chantiers` JOIN `majordhome.leads` | `supabase.from('majordhome_chantiers')` — 1 ligne par chantier (`id` = chantier, `lead_id`, `label`, `quotes_count`, `is_invoiced`, `lead_chantiers_count`) ; écriture via `majordhome_chantiers_write` (2026-09-30) |
 | `public.majordhome_intervention_technicians` | `majordhome.intervention_technicians` | `supabase.from('majordhome_intervention_technicians')` — junction intervention↔team_members |
 | `public.majordhome_maintenance_visits` | `majordhome.maintenance_visits` | `supabase.from('majordhome_maintenance_visits')` — visites de maintenance |
 | `public.projects` | `core.projects` | Legacy — ne plus utiliser pour les clients |
@@ -318,14 +318,17 @@ Table pivot interventions ↔ team_members (Sprint 6 Chantiers).
 - `appointment_id` uuid FK nullable → majordhome.appointments (lien retour RDV planifié)
 - `appointment_date`, `quote_sent_date`, `won_date` (dates pipeline)
 - `external_id/source/data` (intégrations N8N)
-- **Colonnes chantier (Sprint 6)** :
-  - `chantier_status` TEXT CHECK (gagne, commande_a_faire, commande_recue, planification, realise, facture)
-  - `equipment_order_status` TEXT CHECK (na, commande, recu)
-  - `materials_order_status` TEXT CHECK (na, commande, recu)
-  - `estimated_date` DATE — date estimative pose
-  - `planification_date` DATE — date passage en planification (auto-set)
-  - `chantier_notes` TEXT
-- Index : `idx_leads_chantier_status` (org_id, chantier_status) WHERE chantier_status IS NOT NULL
+- **Chantiers (2026-09-30)** : un chantier n'est plus une colonne du lead mais une ligne de `majordhome.chantiers` (1 lead → N chantiers, 1 devis validé → 1 chantier) — cf. § majordhome.chantiers ci-dessous. Les colonnes chantier de `leads` (`chantier_status`, `equipment_order_status`, `materials_order_status`, `estimated_date`, `planification_date`, `chantier_notes`, `pv_reception_path`, `planned_team_size`, `planned_days`) sont **legacy : plus écrites par le front ni lues par la vue, contraction (DROP) à venir**.
+
+### majordhome.chantiers (2026-09-30)
+Migrations `20260930_11` (entité, vues, trigger), `_12` (RPC), `_13` (`lead_merge`). Spec : `docs/superpowers/specs/2026-09-30-chantier-entite-par-devis-design.md`.
+- Colonnes : `id`, `org_id` (FK `core.organizations`), `lead_id` NOT NULL (FK `leads` ON DELETE CASCADE), `client_id` (FK SET NULL), `label` (objet du devis fondateur, éditable), `chantier_status` NOT NULL (CHECK gagne, commande_a_faire, commande_recue, planification, realise, facture), `equipment_order_status` / `materials_order_status` (na, commande, recu), `estimated_date`, `planification_date`, `won_date`, `chantier_notes`, `pv_reception_path`, `planned_team_size` (1-20), `planned_days` (1-60), `equipment_type_id` (FK `pricing_equipment_types`), `sort_order`, `created_at`, `updated_at`.
+- RLS : SELECT membres de l'org ; UPDATE via `role_can(org_id, 'chantiers', 'edit' | 'edit_own')` ; aucune policy INSERT / DELETE pour `authenticated` (création par trigger ou RPC, suppression par RPC). `GRANT SELECT` à `service_role`. Mouchard : `trg_audit_chantiers`.
+- Colonnes de rattachement : `lead_pennylane_quotes.chantier_id` (NULL = devis rattaché au lead mais à aucun chantier), `appointments.chantier_id` (RDV `installation` ; `lead_id` reste renseigné), `chantier_line_receptions.chantier_id` (FK CASCADE, réécrit depuis l'id du lead).
+- Vues : `majordhome.chantier_quote_stats` (par chantier, via `quote_status_bucket()`, jamais d'allowlist recopiée) ; `public.majordhome_chantiers` (lecture, **`id` = id du chantier**, + `lead_id`, `label`, `quotes_count`, `is_invoiced`, `lead_chantiers_count`) ; `public.majordhome_chantiers_write` (miroir simple updatable, seule voie d'écriture front) ; `majordhome_appointments.target_invoiced` (branche installation) calculé par chantier.
+- Trigger `majordhome.chantier_ensure_for_quote()` : un devis qui devient validé sans chantier en crée un et lui rattache le devis (`facture` s'il est déjà facturé, sinon `gagne`).
+- RPC (SECURITY DEFINER, REVOKE PUBLIC/anon, GRANT authenticated, garde positive `auth.uid()` + `role_can`) : `chantier_ensure_for_lead(p_lead_id)`, `chantier_group(p_target_id, p_source_ids)`, `chantier_detach(p_chantier_id, p_quote_ids, p_appointment_ids, p_move_planned_order, p_label)`, `chantier_delete(p_chantier_id)` (refuse si devis validé, RDV actif ou PV).
+- `lead_merge` re-parente les chantiers du lead absorbé ; `lead_hard_delete` les purge par cascade FK.
 
 ### majordhome.sources (8 rows)
 id, name, description, color, is_active
