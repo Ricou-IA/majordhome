@@ -412,6 +412,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                 chantier={chantier}
                 onUpdated={onUpdated}
                 disabled={!canEditChantier}
+                appointments={installAppointments}
               />
 
               {/* Date estimative de réalisation (déconnectée des commandes) */}

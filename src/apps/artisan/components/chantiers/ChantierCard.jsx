@@ -99,6 +99,22 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
           </span>
         </div>
 
+        {(chantier.label || Number(chantier.quotes_count) >= 2 || Number(chantier.validated_quotes_count) === 0) && (
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+            {chantier.label && <p className="text-xs text-gray-500 truncate">{chantier.label}</p>}
+            {Number(chantier.quotes_count) >= 2 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0" title="Devis groupés sur ce chantier">
+                {chantier.quotes_count} devis
+              </span>
+            )}
+            {Number(chantier.validated_quotes_count) === 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold shrink-0" title="Aucun devis validé sur ce chantier">
+                sans devis validé
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Ligne 2 : CP + Commandes + Commercial */}
         <div className="flex items-center gap-1.5 mt-1.5">
           {chantier.postal_code && (

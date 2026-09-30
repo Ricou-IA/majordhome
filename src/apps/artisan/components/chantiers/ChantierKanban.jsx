@@ -82,7 +82,7 @@ export function ChantierKanban() {
     const fields = [
       chantier.first_name, chantier.last_name,
       chantier.postal_code, chantier.city,
-      chantier.equipment_type_label,
+      chantier.equipment_type_label, chantier.label,
     ];
     return fields.some((f) => f && f.toLowerCase().includes(term));
   }, []);

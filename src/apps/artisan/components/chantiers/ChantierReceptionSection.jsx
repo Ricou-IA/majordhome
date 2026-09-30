@@ -25,12 +25,14 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { Package, ExternalLink, X } from 'lucide-react';
+import { Package, ExternalLink, X, Scissors } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
 import { ORDER_STATUSES } from '@services/chantiers.service';
 import { useChantierMutations } from '@hooks/useChantiers';
+import { useCanAccess } from '@hooks/usePermissions';
+import { DetachChantierDialog } from './DetachChantierDialog';
 import {
   useLinkedPennylaneQuotes,
   useLinkedPennylaneQuotesMutations,
@@ -81,9 +83,11 @@ function ApproToggle({ label, value, onChange, disabled }) {
   );
 }
 
-export function ChantierReceptionSection({ chantier, onUpdated, disabled = false }) {
+export function ChantierReceptionSection({ chantier, onUpdated, disabled = false, appointments = [] }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
+  const { can } = useCanAccess();
+  const [showDetach, setShowDetach] = useState(false);
 
   const { updateOrderStatus, isUpdatingOrder } = useChantierMutations();
 
@@ -245,7 +249,23 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
               </div>
             );
           })}
+          {can('chantiers', 'edit') && quotes.filter((q) => q.is_validated).length >= 2 && (
+            <button type="button" onClick={() => setShowDetach(true)}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-1">
+              <Scissors className="w-3.5 h-3.5" /> Détacher en chantier distinct
+            </button>
+          )}
         </div>
+      )}
+
+      {showDetach && (
+        <DetachChantierDialog
+          chantier={chantier}
+          quotes={quotes}
+          appointments={appointments}
+          onClose={() => setShowDetach(false)}
+          onDetached={onUpdated}
+        />
       )}
     </div>
   );
