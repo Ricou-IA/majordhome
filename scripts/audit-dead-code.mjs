@@ -92,6 +92,11 @@ const ALLOW_ORPHAN = new Set([
   'src/apps/solaire/lib/pvgisHourly.js', // cœur moteur autoconso horaire (testé scripts/pvgis-hourly.test.mjs) — branchement UI à venir
   'src/lib/tournee/proposer-contrat.js', // consommé par l'edge slots-propose via sa copie _shared/tournee (sync-tournee-engine), jamais importé depuis src/
   'src/lib/tournee/auto-rdv.js', // consommé par l'edge auto-rdv via sa copie _shared/tournee (sync-tournee-engine), jamais importé depuis src/
+  // Consommés par l'edge auto-rdv-cron via leurs copies _shared/tournee, jamais importés depuis src/ :
+  'src/lib/tournee/invitations.js',
+  'src/lib/tournee/etiquetage.js',
+  'src/lib/tournee/secteurs.js',
+  'src/lib/tournee/populations.js',
   'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
 ]);
 
