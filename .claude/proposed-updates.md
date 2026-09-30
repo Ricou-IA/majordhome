@@ -155,3 +155,13 @@ Règles qui mordent :
 - Ajouter : **Remplir / figer une journée = sa puce d'état dans le Planning** (`RemplirJourneePanel`, seule porte de programmation au fil de l'eau ; l'onglet Tournées de la page Entretiens n'existe plus). Lien direct `/planning?journee=&tech=` via `lienJourneePlanning` (`tourneesPanelUtils.js`), jamais une URL recopiée. La journée affichée est dérivée en direct de `useEtatsJournees().journees`, jamais un objet capturé au clic.
 - Ajouter : **CTA « Trouver le créneau » borné au mois par l'appelant** (`constraints.date_to` = `bornesMois(…, { delaiMinJours: 0 }).fin`) ; l'edge `slots-propose` appelée sans `date_to` (Hermes / MCP) propose encore au-delà — à borner côté edge avant de la brancher sur une machine.
 ---
+
+## [2026-09-30 16:00] État d'une journée : budget du jour, journée sans adaptable, secteur du premier RDV
+**Statut** : PENDING
+**Commit** : 3e48be4
+**Contexte** : Vendredi 16/10 lu dans le Planning avec Eric : journée figée et pleine affichée « Ouverte », vendredi jamais « plein », secteur tiré à l'alphabet. Détail : `docs/MODULE_TOURNEES.md` § « Lecture de l'état d'une journée ».
+**Proposition** (CLAUDE.md § Module Tournées, règles qui mordent) :
+- Compléter « **Budget** = `team_members.daily_work_minutes` » par : **plafonné chaque jour par l'amplitude moins la pause** (`budgetDuJour` dans `loaders.js`, source unique — ne jamais relire `daily_work_minutes` ailleurs dans le moteur) ; un vendredi 8 h – 16 h vaut 7 h.
+- Ajouter : **une journée sans RDV adaptable n'est pas « ouverte » par défaut** — pleine + toutes les heures d'entretien communiquées ⇒ figée, pleine sinon ; `verdictJournee` renvoie le remplissage même en `sans_adaptable` (le cron, lui, n'y touche pas).
+- Ajouter : **le premier entretien posé sur une journée vierge fixe son secteur** (`deduireSecteur`, `created_at`) ; plus de « secteur majoritaire ».
+---
