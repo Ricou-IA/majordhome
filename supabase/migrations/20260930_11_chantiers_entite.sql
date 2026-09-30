@@ -127,7 +127,7 @@ END $$;
 -- ----------------------------------------------------------------------------
 -- 4. Vues
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW majordhome.chantier_quote_stats AS
+CREATE OR REPLACE VIEW majordhome.chantier_quote_stats WITH (security_invoker = true) AS
 SELECT chantier_id, org_id,
        count(*)                                                                             AS quotes_count,
        count(*) FILTER (WHERE majordhome.quote_status_bucket(quote_status) = 'validated')   AS validated_count,
@@ -170,6 +170,7 @@ SELECT c.id, c.org_id,
      WHERE a.chantier_id = c.id AND a.appointment_type = 'installation'
        AND a.status <> ALL (ARRAY['cancelled'::text, 'no_show'::text])
   ) rdv ON true;
+REVOKE ALL ON public.majordhome_chantiers FROM anon;
 GRANT SELECT ON public.majordhome_chantiers TO authenticated, service_role;
 COMMENT ON VIEW public.majordhome_chantiers IS
   'Chantiers (majordhome.chantiers × identité du lead). id = CHANTIER (plus le lead). Montant = devis validés du chantier (chantier_quote_stats). Lecture seule : écrire via majordhome_chantiers_write.';
@@ -234,7 +235,11 @@ CREATE POLICY chantiers_update_role_can ON majordhome.chantiers
 -- Pas de policy INSERT / DELETE : création par trigger et RPC SECURITY DEFINER, suppression par RPC.
 
 REVOKE ALL ON majordhome.chantiers FROM anon, authenticated;
-GRANT SELECT, UPDATE ON majordhome.chantiers TO authenticated;
+GRANT SELECT ON majordhome.chantiers TO authenticated;
+-- UPDATE par colonne : lead_id / org_id / client_id / id ne sont pas re-pointables par un membre via la vue write.
+GRANT UPDATE (label, chantier_status, equipment_order_status, materials_order_status, estimated_date, planification_date,
+              won_date, chantier_notes, pv_reception_path, planned_team_size, planned_days, equipment_type_id, sort_order, updated_at)
+  ON majordhome.chantiers TO authenticated;
 GRANT SELECT ON majordhome.chantiers TO service_role;
 
 -- Mouchard : seulement si la fonction existe (absente du harnais de répétition, fail-safe en prod).
