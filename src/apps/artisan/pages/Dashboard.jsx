@@ -31,7 +31,6 @@ import {
   MapPin,
 } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
-import { JourneesAArbitrer } from '@apps/artisan/components/tournees/JourneesAArbitrer';
 import { PennylaneDoublonsClients } from '@apps/artisan/components/devis/PennylaneDoublonsClients';
 import { PennylaneLeadsMultiPayeurs } from '@apps/artisan/components/devis/PennylaneLeadsMultiPayeurs';
 
@@ -322,9 +321,6 @@ export default function Dashboard() {
           />
         )}
       </div>
-
-      {/* Journées pleines que le moteur ne sait pas figer : l'admin arbitre (spec 2026-09-12, R3) */}
-      {isOrgAdmin && <JourneesAArbitrer coreOrgId={orgId} />}
 
       {/* Fiches client Pennylane en double : à fusionner dans Pennylane (décision 2026-09-16) */}
       {showQuotesKpi && <PennylaneDoublonsClients />}

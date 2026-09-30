@@ -1,8 +1,9 @@
 // tourneesPanelUtils.js - Majord'home Artisan
 // ============================================================================
 // Petits formatteurs de présentation partagés entre RemplirJourneePanel,
-// PropositionRow et useJourneePose. Aucune règle métier ici (le calcul vit
-// dans src/lib/tournee/) — uniquement de la mise en forme texte.
+// PropositionRow, useJourneePose et les cartes du tableau de bord. Aucune règle
+// métier ici (le calcul vit dans src/lib/tournee/) — uniquement de la mise en
+// forme texte et le lien vers une journée du Planning.
 // ============================================================================
 
 /**
@@ -17,6 +18,15 @@ export const RAISON_LABELS = {
   pause: 'il ne resterait plus de quoi déjeuner',
   position: 'ce client n’est pas géolocalisé',
 };
+
+/**
+ * Lien vers une journée de technicien dans le Planning : le calendrier s'ouvre
+ * sur la date et le panneau de remplissage sur la journée (lu par Planning.jsx).
+ * Source unique — tableau de bord des entretiens, alertes, journées à arbitrer.
+ */
+export function lienJourneePlanning({ date, technicienId }) {
+  return `/planning?journee=${date}&tech=${technicienId}`;
+}
 
 /** Minutes depuis minuit -> "HH:MM". */
 export function minutesEnHHMM(total) {

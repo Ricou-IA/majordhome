@@ -277,9 +277,11 @@ function joursJusqua(endDate) {
  * la base et est donc toujours vrai, le reste est une estimation.
  *
  * @param {{ coreOrgId: string, startDate: string, endDate: string }} p  ISO `YYYY-MM-DD`, `endDate` exclusive
- * @returns {{ etats: Map<string, object>, isLoading: boolean, error: Error|null }}
+ * @returns {{ etats: Map<string, object>, journees: Array<object>|undefined, isLoading: boolean, error: Error|null }}
  *   clé = `${date}|${technicienId}` ; valeur = `{ date, technicienId, technicienNom, couleur,
  *   etat, verdict, remplissage, etiquette, origine, figeeAt, figeePar, nbRdvs, estime }`.
+ *   `journees` = les `Journee` brutes de l'horizon (d'aujourd'hui à `endDate`), celles
+ *   qu'attend `RemplirJourneePanel` — `undefined` tant qu'elles ne sont pas chargées.
  */
 export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
   const { settings } = useOrgSettings();
@@ -327,7 +329,7 @@ export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
     }
     return map;
   }, [horizon, etiquettes, settings, startDate, endDate]);
-  return { etats, isLoading: hLoading || eLoading, error: hError || eError || null };
+  return { etats, journees: horizon, isLoading: hLoading || eLoading, error: hError || eError || null };
 }
 
 /**

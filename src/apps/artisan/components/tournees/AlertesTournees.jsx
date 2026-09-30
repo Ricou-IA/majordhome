@@ -1,7 +1,9 @@
 /**
  * AlertesTournees.jsx - Majord'home Artisan
  * ============================================================================
- * Les quatre filets du module Tournées (spec §3.7 et §10) : sans eux, des
+ * Les quatre filets du module Tournées (spec §3.7 et §10), affichés dans le
+ * Dashboard des entretiens depuis la suppression de l'onglet Tournées (spec
+ * auto-RDV 2026-09-29 § 9) : sans eux, des
  * échecs deviennent des silences.
  *   - Journées sous-remplies qui approchent (J-7) : une graine isolée qui
  *     reste isolée jusqu'au jour J fait un aller-retour pour un seul client.
@@ -18,12 +20,12 @@
  *     client dont l'adresse est à corriger à la main.
  *
  * ⚠️ `journees`/`candidats` peuvent valoir `undefined` pendant que le parent
- * (TourneesTab) charge ses deux requêtes, ou en cas d'échec de l'une d'elles.
+ * (EntretiensDashboard) charge ses deux requêtes, ou en cas d'échec de l'une d'elles.
  * Dans ce cas on affiche un état de chargement — JAMAIS un zéro, qui serait
  * exactement le mensonge que ces alertes existent pour empêcher (« 0
  * retardataire » sur une requête qui a échoué). Les deux cas (chargement en
  * cours vs échec) sont eux-mêmes distingués via `journeesError`/`candidatsError`
- * (passés par TourneesTab) : sans eux, un échec réel de `useContratsDus`
+ * (passés par le parent) : sans eux, un échec réel de `useContratsDus`
  * ferait tourner le spinner « Calcul des alertes… » indéfiniment, sans jamais
  * dire qu'il s'agit d'un échec.
  *
@@ -34,7 +36,7 @@
  * absentes). `chargement` (qui teste `=== undefined`) vaut donc `false` dans
  * ce cas précis, et un test d'erreur qui ne vivrait que sous `if (chargement)`
  * serait sauté — les alertes s'afficheraient sur des données obsolètes sans
- * le moindre signal. Scénario réel, pas théorique : TourneesTab invalide ces
+ * le moindre signal. Scénario réel, pas théorique : la pose de RDV invalide ces
  * caches après CHAQUE pose de RDV, donc un refetch a lieu à ce moment précis ;
  * un aléa réseau juste après une pose reproduit exactement ce trou. D'où le
  * bandeau « périmé » rendu indépendamment de `chargement` ci-dessous.
@@ -104,7 +106,7 @@ function AlerteCard({
  * @param {Error|null} [props.candidatsError]  error de useContratsDus — sans elle, un échec de ce
  *   hook laisse `candidats` à `undefined` indéfiniment et ce composant ne pourrait jamais
  *   distinguer "encore en chargement" de "a échoué" (spinner sans fin sur un échec réel).
- * @param {Function} [props.onOpenJournee]   (journee) => void — ouvre RemplirJourneePanel
+ * @param {Function} [props.onOpenJournee]   (journee) => void — ouvre la journée dans le Planning
  * @param {Function} [props.onOpenContract]  (contractId) => void — ouvre ContractModal
  * @param {number} [props.toleranceAnniversaireMois]  reglages.tolerance_anniversaire_mois
  *   (I1, revue finale) — jamais une constante en dur ici.

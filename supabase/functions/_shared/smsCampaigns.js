@@ -82,11 +82,11 @@ export const SMS_CAMPAIGNS = [
     },
   },
   {
-    // Émetteur : savService.sendHeureDePassage (« Figer la journée », onglet Tournées).
+    // Émetteur : savService.sendHeureDePassage (« Figer la journée », journée ouverte depuis le Planning).
     // `date` et `heure` arrivent déjà lisibles (« 14 octobre 2026 », « 10h30 »).
     key: 'heure_de_passage',
     label: 'Heure de passage (journée figée)',
-    trigger: 'Bouton « Figer la journée » de l’onglet Tournées : l’heure définitive est envoyée à chaque client dont le rendez-vous était adaptable.',
+    trigger: 'Bouton « Figer la journée » (journée ouverte depuis sa puce dans le Planning) : l’heure définitive est envoyée à chaque client dont le rendez-vous était adaptable.',
     variables: [
       { name: 'first_name', label: 'Prénom du client' },
       { name: 'name', label: 'Nom du client' },

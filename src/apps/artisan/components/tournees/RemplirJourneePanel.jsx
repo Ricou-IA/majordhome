@@ -45,10 +45,11 @@ import { X, Loader2, AlertTriangle, RotateCcw, Lock } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useCanAccess } from '@hooks/usePermissions';
-import { usePropositions } from '@hooks/useTournees';
+import { usePropositions, useContratsDus } from '@hooks/useTournees';
 import { construireReglages } from '@services/tournees.service';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 import { construireArretsExistants } from '@/lib/tournee/arrets.js';
+import { LIBELLES_ETAT } from '@/lib/tournee/etat.js';
 import { formatDateFR } from '@/lib/utils';
 import { Button } from '@components/ui/button';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -61,21 +62,26 @@ import { FigerJourneeDialog } from './FigerJourneeDialog';
 import { RAISON_LABELS, minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 
 /**
+ * Ouvert depuis le Planning (puce d'état d'une journée) : le panneau charge
+ * lui-même les contrats dus, l'appelant ne fournit que la journée — dérivée EN
+ * DIRECT de useJourneesHorizon, jamais un objet capturé au clic (après une pose,
+ * un nouvel essai doit voir la charge à jour).
+ *
  * @param {object} props
  * @param {object} props.journee    Journee (cf. tournees.service.js)
- * @param {Array|undefined} props.candidats  data de useContratsDus (peut être undefined pendant le chargement)
- * @param {Error|null} [props.candidatsError]  error de useContratsDus — undefined ET pas d'erreur = encore en chargement
+ * @param {object} [props.etat]     état de la journée (item de useEtatsJournees) — rappelé sous la date
  * @param {Function} props.onClose
  */
-export function RemplirJourneePanel({
-  journee, candidats, candidatsError, onClose,
-}) {
+export function RemplirJourneePanel({ journee, etat, onClose }) {
   const { organization, user } = useAuth();
   const coreOrgId = organization?.id;
   const { settings } = useOrgSettings();
   const { can } = useCanAccess();
   const canCreer = can('entretiens', 'create');
 
+  // `candidats` undefined ET pas d'erreur = encore en chargement ; jamais un
+  // « aucun entretien à proposer » sur une liste qui n'est pas arrivée.
+  const { data: candidats, error: candidatsError } = useContratsDus(coreOrgId);
   const candidatsIndisponibles = candidats === undefined;
 
   // Décalages manuels des RDV déjà posés. `journeeAjustee` DOIT alimenter tout
@@ -158,7 +164,15 @@ export function RemplirJourneePanel({
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-gray-900 truncate">{journee.technicienNom}</h3>
-            <p className="text-sm text-gray-500">{formatDateFR(journee.date)}</p>
+            <p className="text-sm text-gray-500">
+              {formatDateFR(journee.date)}
+              {etat && (
+                <span className="text-gray-400">
+                  {' '}· {LIBELLES_ETAT[etat.etat]}
+                  {etat.etiquette ? ` · secteur ${etat.etiquette}` : ''}
+                </span>
+              )}
+            </p>
           </div>
           <button
             type="button"

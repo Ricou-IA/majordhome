@@ -381,8 +381,8 @@ export function useJourneePose({
         try {
           // Attend la fin du refetch avant de rendre la main : un nouvel essai
           // doit voir la journée à jour (charge/RDV), pas l'ancienne capturée
-          // avant la pose (TourneesTab dérive `selectedJournee` en direct des
-          // données de useJourneesHorizon, cf. TourneesTab.jsx).
+          // avant la pose (le Planning dérive la journée ouverte en direct des
+          // données de useJourneesHorizon, cf. Planning.jsx).
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: tourneeKeys.all(coreOrgId) }),
             queryClient.invalidateQueries({ queryKey: appointmentKeys.all(coreOrgId) }),

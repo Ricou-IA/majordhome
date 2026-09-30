@@ -2,19 +2,19 @@
 // ============================================================================
 // Journées PLEINES que l'ordonnanceur ne sait pas tenir (spec 2026-09-12
 // « bloc contrat et journée pleine », R3) : le figeage automatique les laisse
-// de côté, il faut un humain. Affichées sur le TABLEAU DE BORD de l'admin
-// (décision Eric : pas dans l'onglet Tournées), même verdict que l'edge
-// `tournees-figer` — avec des trajets estimés à vol d'oiseau, le navigateur
-// n'ayant pas la matrice de chaque journée.
-// Un clic ouvre la journée dans l'onglet Tournées (?journee=&tech=).
+// de côté, il faut un humain. Affichées dans le Dashboard des entretiens (spec
+// auto-RDV 2026-09-29 § 5), même verdict que l'edge `tournees-figer` — avec des
+// trajets estimés à vol d'oiseau, le navigateur n'ayant pas la matrice de
+// chaque journée.
+// Un clic ouvre la journée dans le Planning (lienJourneePlanning).
 // ============================================================================
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Route } from 'lucide-react';
 import { useJourneesAArbitrer } from '@hooks/useTournees';
 import { formatDateFR } from '@/lib/utils';
-import { formatDuree } from './tourneesPanelUtils';
+import { formatDuree, lienJourneePlanning } from './tourneesPanelUtils';
 
-/** Carte du tableau de bord (org_admin). Rien à afficher = rien ; un échec de chargement, lui, se voit. */
+/** Carte du Dashboard des entretiens. Rien à afficher = rien ; un échec de chargement, lui, se voit. */
 export function JourneesAArbitrer({ coreOrgId }) {
   const navigate = useNavigate();
   const { journees, error } = useJourneesAArbitrer(coreOrgId);
@@ -36,7 +36,7 @@ export function JourneesAArbitrer({ coreOrgId }) {
       </h2>
       <p className="text-xs text-secondary-500 mb-3">
         Pleines, mais impossibles à ordonnancer dans les tolérances : le figeage automatique les laisse de côté.
-        Trajets estimés à vol d’oiseau — l’onglet Tournées donne les chiffres réels.
+        Trajets estimés à vol d’oiseau — ouvrez la journée dans le Planning pour les chiffres réels.
       </p>
       <ul className="divide-y divide-gray-100">
         {journees.map(({ journee: j, sequence }) => {
@@ -49,7 +49,7 @@ export function JourneesAArbitrer({ coreOrgId }) {
             <li key={`${j.date}-${j.technicienId}`}>
               <button
                 type="button"
-                onClick={() => navigate(`/entretiens?tab=tournees&journee=${j.date}&tech=${j.technicienId}`)}
+                onClick={() => navigate(lienJourneePlanning(j))}
                 className="w-full flex items-center justify-between gap-3 text-left px-2 py-2 rounded hover:bg-gray-50"
               >
                 <span className="min-w-0">

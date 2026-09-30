@@ -3,13 +3,15 @@
  * ============================================================================
  * Module unifié Entretien (visites annuelles) & SAV (réparations).
  *
- * 5 onglets :
+ * 4 onglets (+ raccourci « Clos ») :
  *   - Kanban (défaut) : board unifié EntretienSAVKanban
  *   - Contrats : liste contrats existante
  *   - Programmation : vue secteurs avec CTA « Planifier »
- *   - Tournées : optimisation tournées d'entretien (insertion la moins
- *     coûteuse en trajet dans une journée technicien déjà planifiée)
- *   - Dashboard : KPIs contrats + SAV
+ *   - Dashboard : KPIs contrats + SAV, tournées à surveiller, planification
+ *     automatique
+ * L'ancien onglet Tournées a disparu (spec auto-RDV 2026-09-29 § 9) : remplir
+ * une journée se fait depuis le Planning (puce d'état de la journée), ses
+ * alertes vivent dans le Dashboard.
  *
  * Header : 4 stat cards workflow (Entretiens à planifier, SAV en cours,
  * Planifiés, Réalisés) basées sur useEntretienSAVStats.
@@ -32,7 +34,6 @@ import {
   Calendar,
   CheckCircle2,
   Archive,
-  Route,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -50,7 +51,6 @@ import { ContractsList } from '@apps/artisan/components/entretiens/ContractsList
 import { SectorGroupView } from '@apps/artisan/components/entretiens/SectorGroupView';
 import { ContractModal } from '@apps/artisan/components/entretiens/ContractModal';
 import { CreateContractModal } from '@apps/artisan/components/entretiens/CreateContractModal';
-import { TourneesTab } from '@apps/artisan/components/tournees/TourneesTab';
 
 // ============================================================================
 // SOUS-COMPOSANTS
@@ -112,6 +112,8 @@ export default function Entretiens() {
   // Tab par défaut : kanban (backward compat : si ?filter= → onglet contrats)
   const [activeTab, setActiveTab] = useState(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
+    // Ancien lien vers l'onglet Tournées (supprimé) : ses alertes sont dans le Dashboard.
+    if (tab === 'tournees') return 'dashboard';
     if (tab) return tab;
     const filter = new URLSearchParams(window.location.search).get('filter');
     return filter ? 'contrats' : 'kanban';
@@ -447,10 +449,6 @@ export default function Entretiens() {
             <Map className="h-4 w-4" />
             Programmation
           </TabsTrigger>
-          <TabsTrigger value="tournees" className="gap-2 data-[state=active]:bg-white">
-            <Route className="w-4 h-4" />
-            Tournées
-          </TabsTrigger>
           <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-white">
             <BarChart3 className="h-4 w-4" />
             Dashboard
@@ -515,11 +513,6 @@ export default function Entretiens() {
           />
         </TabsContent>
 
-        {/* TAB TOURNEES */}
-        <TabsContent value="tournees" className="mt-6">
-          <TourneesTab />
-        </TabsContent>
-
         {/* TAB DASHBOARD */}
         <TabsContent value="dashboard" className="mt-6">
           <EntretiensDashboard
@@ -527,6 +520,7 @@ export default function Entretiens() {
             savStats={savStats}
             isLoading={contractStatsLoading || savStatsLoading}
             coreOrgId={orgId}
+            onOpenContract={(contractId) => handleContractClick({ id: contractId })}
           />
         </TabsContent>
       </Tabs>

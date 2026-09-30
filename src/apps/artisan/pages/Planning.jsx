@@ -10,8 +10,8 @@
  */
 
 import { estTypeAdaptable } from '@/lib/souplesse';
-import { useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -43,6 +43,7 @@ import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { PlanningClientSearch } from '@/apps/artisan/components/planning/PlanningClientSearch';
 import { JourneeEtatChips } from '@/apps/artisan/components/planning/JourneeEtatChips';
+import { RemplirJourneePanel } from '@/apps/artisan/components/tournees/RemplirJourneePanel';
 import { ChantierModal } from '@/apps/artisan/components/chantiers/ChantierModal';
 import { EquipmentKindIcons } from '@/apps/artisan/components/shared/EquipmentKindIcons';
 import { supabase } from '@/lib/supabaseClient';
@@ -403,11 +404,55 @@ export default function Planning() {
   // État de chaque journée de technicien (vide / ouverte / pleine / figée / à
   // arbitrer) pour la plage visible — puces sous l'en-tête du jour. `orgId` du
   // Planning = org CORE, c'est bien le coreOrgId attendu par le hook.
-  const navigate = useNavigate();
-  const { etats: etatsJournees } = useEtatsJournees({ coreOrgId: orgId, startDate: dateRange.startDate, endDate: dateRange.endDate });
+  const {
+    etats: etatsJournees, journees: journeesHorizon, isLoading: etatsLoading, error: etatsError,
+  } = useEtatsJournees({ coreOrgId: orgId, startDate: dateRange.startDate, endDate: dateRange.endDate });
+
+  // Journée ouverte dans le panneau de remplissage : clic sur une puce, ou lien
+  // direct depuis le tableau de bord des entretiens (/planning?journee=&tech=,
+  // cf. lienJourneePlanning). On garde la CLÉ, pas l'objet : la journée affichée
+  // est dérivée en direct de l'horizon, pour qu'un nouvel essai après une pose
+  // voie la charge à jour et non l'état capturé au clic.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [journeeOuverte, setJourneeOuverte] = useState(() => {
+    const date = searchParams.get('journee');
+    const technicienId = searchParams.get('tech');
+    return date && technicienId ? { date, technicienId } : null;
+  });
+  const [dateInitiale] = useState(() => searchParams.get('journee') || undefined);
   const ouvrirJournee = useCallback((item) => {
-    navigate(`/entretiens?tab=tournees&journee=${item.date}&tech=${item.technicienId}`);
-  }, [navigate]);
+    setJourneeOuverte({ date: item.date, technicienId: item.technicienId });
+  }, []);
+  const fermerJournee = useCallback(() => {
+    setJourneeOuverte(null);
+    // Le lien direct a servi : sans ce nettoyage, un rechargement rouvrirait le panneau.
+    if (searchParams.has('journee') || searchParams.has('tech')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('journee');
+      next.delete('tech');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+  const journeeSelectionnee = useMemo(() => {
+    if (!journeeOuverte || !journeesHorizon) return null;
+    return journeesHorizon.find(
+      (j) => j.date === journeeOuverte.date && j.technicienId === journeeOuverte.technicienId,
+    ) || null;
+  }, [journeeOuverte, journeesHorizon]);
+  // Journée demandée mais absente de l'horizon chargé (jour passé, non travaillé,
+  // technicien planifié « à la main ») : on le dit, plutôt qu'un lien qui n'ouvre
+  // rien. Tant que la plage visible ne couvre pas la date, on attend son chargement.
+  useEffect(() => {
+    if (!journeeOuverte || journeeSelectionnee) return;
+    if (etatsError) {
+      toast.error(`Journée indisponible — chargement des tournées en échec (${etatsError.message || 'échec inconnu'})`);
+      fermerJournee();
+      return;
+    }
+    if (etatsLoading || !journeesHorizon || journeeOuverte.date >= dateRange.endDate) return;
+    toast.info('Cette journée n’est pas planifiée par la machine (jour passé, non travaillé, ou technicien planifié à la main).');
+    fermerJournee();
+  }, [journeeOuverte, journeeSelectionnee, etatsError, etatsLoading, journeesHorizon, dateRange.endDate, fermerJournee]);
   const dayHeaderContent = useCallback((arg) => {
     const date = arg.date.toLocaleDateString('fr-CA');
     return (
@@ -738,6 +783,7 @@ export default function Planning() {
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="timeGridWeek"
+            initialDate={dateInitiale}
             locale="fr"
             headerToolbar={false}
             height="auto"
@@ -803,6 +849,16 @@ export default function Planning() {
         onCancel={handleModalCancel}
         isSaving={isCreating || isUpdating}
       />
+
+      {/* Remplir / figer une journée de technicien — clic sur sa puce d'état.
+          Seule porte de programmation au fil de l'eau (spec auto-RDV § 5). */}
+      {journeeSelectionnee && (
+        <RemplirJourneePanel
+          journee={journeeSelectionnee}
+          etat={etatsJournees.get(`${journeeSelectionnee.date}|${journeeSelectionnee.technicienId}`)}
+          onClose={fermerJournee}
+        />
+      )}
 
       {/* Modale Chantier — clic sur slot chantier (Phase 0) */}
       {selectedChantier && (

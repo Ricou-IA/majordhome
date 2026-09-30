@@ -5,8 +5,8 @@
  * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté). Source
  * unique de l'état : src/lib/tournee/etat.js, via useEtatsJournees.
  * Répond à « je ne sais pas quand une journée est complète et si le cron l'a
- * organisée » (Eric, 2026-09-29). Le clic ouvre la journée dans l'outil de
- * remplissage (tranche 4 : l'action viendra ici même).
+ * organisée » (Eric, 2026-09-29). Le clic ouvre la journée dans le panneau de
+ * remplissage, sur place (RemplirJourneePanel, monté par Planning.jsx).
  * ============================================================================
  */
 

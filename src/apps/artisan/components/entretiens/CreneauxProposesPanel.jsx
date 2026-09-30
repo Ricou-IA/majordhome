@@ -2,19 +2,28 @@
 // ============================================================================
 // Les créneaux les moins coûteux pour un contrat d'entretien, explicables
 // (technicien, heure, voisins de tournée, minutes ajoutées). Aucune logique de
-// calcul ici : tout vient de l'edge slots-propose (même moteur que l'onglet
-// Tournées). Le clic remonte un `slot` dans la forme consommée par
-// savService.scheduleEntretien — la pose reste le chemin existant.
+// calcul ici : tout vient de l'edge slots-propose (même moteur que le panneau
+// de remplissage du Planning). Le clic remonte un `slot` dans la forme
+// consommée par savService.scheduleEntretien — la pose reste le chemin existant.
+//
+// Borne du mois (spec auto-RDV 2026-09-29 § 5) : comme la page client, les
+// propositions s'arrêtent à la fin du mois en cours — le mois suivant appartient
+// aux installations. Même règle de fin de mois que `bornesMois` (moins de 7
+// jours restants ⇒ mois suivant inclus), mais SANS délai minimal : l'opérateur
+// qui a le client au téléphone peut poser pour demain.
 // ============================================================================
+import { useMemo } from 'react';
 import { Loader2, Route, CalendarPlus, AlertTriangle } from 'lucide-react';
 import { useCreneauxProposes } from '@hooks/useTournees';
+import { bornesMois } from '@/lib/tournee/auto-rdv.js';
 import { formatDateShortFR } from '@/lib/utils';
 import { Button } from '@components/ui/button';
 
 const MOTIFS = {
   competence: 'technicien(s) sans la compétence',
   horizon: 'journée(s) vide(s) hors horizon ferme',
-  contrainte: 'journée(s) exclue(s) par les contraintes',
+  // Seule contrainte passée par ce panneau : la borne du mois.
+  contrainte: 'journée(s) au-delà du mois en cours',
   creneau: 'pas de trou assez grand',
   budget: 'journée(s) pleine(s)',
   pause: 'pause déjeuner impossible',
@@ -59,7 +68,14 @@ function lectureReste(reste, apres) {
  * @param {boolean} [props.busy]
  */
 export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir, onFermer, busy = false }) {
-  const { data, isLoading, error } = useCreneauxProposes({ orgId, contractId });
+  // Date locale du navigateur (fr-CA = YYYY-MM-DD), figée à l'ouverture du panneau.
+  const finOffre = useMemo(
+    () => bornesMois(new Date().toLocaleDateString('fr-CA'), { delaiMinJours: 0 }).fin,
+    [],
+  );
+  const { data, isLoading, error } = useCreneauxProposes({
+    orgId, contractId, constraints: { date_to: finOffre },
+  });
 
   if (isLoading) {
     return (
@@ -104,10 +120,14 @@ export function CreneauxProposesPanel({ orgId, contractId, clientName, onChoisir
         </p>
       )}
 
+      <p className="text-xs text-secondary-500">
+        Créneaux proposés jusqu&apos;au {formatDateShortFR(finOffre)} (mois en cours).
+      </p>
+
       {creneaux.length === 0 && (
         <p className="text-sm text-secondary-600">
           Aucune insertion raisonnable dans une tournée existante{motifs.length ? ` — ${motifs.join(', ')}` : ''}.
-          {nouvellesJournees.length > 0 && ' Ouvrez une nouvelle journée, puis remplissez-la avec les clients du secteur (onglet Tournées).'}
+          {nouvellesJournees.length > 0 && ' Ouvrez une nouvelle journée, puis remplissez-la avec les clients du secteur depuis le Planning (puce de la journée).'}
         </p>
       )}
 
