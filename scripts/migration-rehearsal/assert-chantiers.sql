@@ -351,3 +351,20 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub', '', true);
   RAISE NOTICE 'assert-chantiers §B : OK';
 END $$;
+
+-- ── §C lead_merge (20260930_13) ────────────────────────────────────────────────
+-- lead_merge est recréée sans ses tables satellites (le harnais n'en photographie pas 16) : on vérifie donc le
+-- TEXTE de la fonction et ses droits, sans l'appeler.
+DO $$
+DECLARE v_def text;
+BEGIN
+  SELECT pg_get_functiondef('public.lead_merge(uuid, uuid)'::regprocedure) INTO v_def;
+  IF v_def NOT LIKE '%UPDATE majordhome.chantiers%SET lead_id = p_survivor_id%' THEN
+    RAISE EXCEPTION 'lead_merge ne re-parente pas majordhome.chantiers';
+  END IF;
+  IF v_def LIKE '%chantier_line_receptions SET chantier_id = p_survivor_id%' THEN
+    RAISE EXCEPTION 'lead_merge re-parente encore chantier_line_receptions par lead';
+  END IF;
+  IF has_function_privilege('anon', 'public.lead_merge(uuid, uuid)', 'EXECUTE') THEN RAISE EXCEPTION 'lead_merge exécutable par anon'; END IF;
+  RAISE NOTICE 'assert-chantiers §C : OK';
+END $$;
