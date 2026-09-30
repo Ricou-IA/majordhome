@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chevauche, fusionnerCreneau, basculerJournee, etatCommande, libelleCommande,
+  chevauche, fusionnerCreneau, basculerJournee, etatCommande, libelleCommande, joursDepuisRdv,
 } from '../src/lib/installOrder.js';
 
 // ── chevauche ─────────────────────────────────────────────────────────────
@@ -164,6 +164,44 @@ test('etatCommande : trop de jours posés n’est pas une erreur', () => {
   ]);
   assert.equal(e.complete, true);
   assert.equal(e.joursPoses, 2);
+});
+
+// ── joursDepuisRdv (RDV persistés → jours de commande) ────────────────────
+// Cas GOUIN BATISTE (prod, 2026-09-30) : commande 2 pers. × 3 j, 4 jours posés à
+// 2 techniciens, et pourtant « Il manque 3 jours » — les RDV bruts (scheduled_date,
+// technician_ids) étaient passés tels quels à etatCommande, qui lit date/technicianIds.
+const rdvGouin = [
+  { id: 'r1', scheduled_date: '2026-09-15', scheduled_start: '08:00', technician_ids: ['antoine', 'ludovic'] },
+  { id: 'r2', scheduled_date: '2026-09-16', scheduled_start: '08:00', technician_ids: ['antoine', 'ludovic'] },
+  { id: 'r3', scheduled_date: '2026-09-17', scheduled_start: '08:00', technician_ids: ['antoine', 'ludovic'] },
+  { id: 'r4', scheduled_date: '2026-09-18', scheduled_start: '08:00', technician_ids: ['antoine', 'ludovic'] },
+];
+
+test('joursDepuisRdv : mappe scheduled_date / technician_ids vers date / technicianIds', () => {
+  assert.deepEqual(joursDepuisRdv(rdvGouin.slice(0, 1)), [
+    { date: '2026-09-15', technicianIds: ['antoine', 'ludovic'] },
+  ]);
+});
+
+test('joursDepuisRdv : RDV sans technicien → technicianIds vide, jamais undefined', () => {
+  assert.deepEqual(joursDepuisRdv([{ scheduled_date: '2026-09-15' }]), [
+    { date: '2026-09-15', technicianIds: [] },
+  ]);
+  assert.deepEqual(joursDepuisRdv(null), []);
+});
+
+test('etatCommande sur des RDV persistés : commande 2 pers. × 3 j, 4 jours posés = complète (GOUIN)', () => {
+  const e = etatCommande({ teamSize: 2, days: 3 }, joursDepuisRdv(rdvGouin));
+  assert.equal(e.joursPoses, 4);
+  assert.equal(e.complete, true);
+  assert.equal(e.message, null);
+});
+
+test('etatCommande sur des RDV persistés : un jour en sous-effectif est signalé', () => {
+  const rdv = rdvGouin.map((r) => (r.id === 'r4' ? { ...r, technician_ids: ['antoine'] } : r));
+  const e = etatCommande({ teamSize: 2, days: 3 }, joursDepuisRdv(rdv));
+  assert.equal(e.complete, false);
+  assert.equal(e.message, 'Il manque 1 personne le 18/09');
 });
 
 // ── libelleCommande ───────────────────────────────────────────────────────

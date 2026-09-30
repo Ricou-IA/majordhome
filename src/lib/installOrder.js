@@ -143,6 +143,23 @@ export function etatCommande(commande, jours) {
 }
 
 /**
+ * RDV persistés (`majordhome_appointments` + `technician_ids` mergés par
+ * `useChantierAppointments`) → jours au format attendu par `etatCommande`.
+ * Sans cet adaptateur, `etatCommande` reçoit `scheduled_date` / `technician_ids`,
+ * ne lit rien et annonce « Il manque N jours » même quand tout est posé
+ * (GOUIN BATISTE, prod 2026-09-30).
+ * @param {Array<{scheduled_date?: string|null, technician_ids?: string[]|null}>} appointments
+ * @returns {Array<{date: string, technicianIds: string[]}>}
+ */
+export function joursDepuisRdv(appointments) {
+  const list = Array.isArray(appointments) ? appointments : [];
+  return list.map((apt) => ({
+    date: apt?.scheduled_date,
+    technicianIds: Array.isArray(apt?.technician_ids) ? apt.technician_ids : [],
+  }));
+}
+
+/**
  * Libellé court de la commande : '2 pers. × 3 j', '2 j', '2 pers.' ou null.
  * @param {{teamSize?: number|null, days?: number|null}} commande
  * @returns {string|null}

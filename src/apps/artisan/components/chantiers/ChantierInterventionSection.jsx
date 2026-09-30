@@ -15,7 +15,7 @@
 import { useMemo } from 'react';
 import { CalendarDays, Plus, Trash2, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { etatCommande, libelleCommande } from '@/lib/installOrder';
+import { etatCommande, joursDepuisRdv, libelleCommande } from '@/lib/installOrder';
 
 const INACTIVE_STATUSES = new Set(['cancelled', 'no_show']);
 
@@ -58,7 +58,11 @@ export function ChantierInterventionSection({
 }) {
   const installationDays = useMemo(() => orderInstallationDays(appointments), [appointments]);
   // Commande renseignée → N = jours commandés ; sinon N = jours posés (comportement historique).
-  const commande = useMemo(() => etatCommande(plannedOrder, installationDays), [plannedOrder, installationDays]);
+  // RDV persistés → { date, technicianIds } : etatCommande ne lit PAS scheduled_date / technician_ids.
+  const commande = useMemo(
+    () => etatCommande(plannedOrder, joursDepuisRdv(installationDays)),
+    [plannedOrder, installationDays]
+  );
   const totalDays = plannedOrder?.days ?? installationDays.length;
   const libelle = libelleCommande(plannedOrder);
 
