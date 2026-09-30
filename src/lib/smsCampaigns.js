@@ -104,6 +104,27 @@ export const SMS_CAMPAIGNS = [
       deburr: true,
     },
   },
+  {
+    // Émetteur : edge auto-rdv-cron (mode relances), J+7 après le mail d'invitation
+    // sans rendez-vous pris. Le lien reste dans le mail : le SMS renvoie vers lui.
+    key: 'auto_rdv_relance',
+    label: 'Relance auto-RDV (entretien à programmer)',
+    trigger: 'Cron auto-rdv-cron, 7 jours (réglable) après le mail d’invitation, si le client n’a pas encore choisi sa demi-journée.',
+    variables: [
+      { name: 'first_name', label: 'Prénom du client' },
+      { name: 'entreprise', label: 'Nom de l’entreprise' },
+    ],
+    sample: { first_name: 'Véronique', entreprise: 'Mayer Énergie' },
+    suggested: {
+      whatsapp:
+        'Bonjour {{first_name}},\n\nVotre entretien annuel approche : nous vous avons envoyé par e-mail les demi-journées '
+        + 'disponibles dans votre secteur. Un clic suffit pour réserver.\n\n{{entreprise}}',
+      sms:
+        'Bonjour {{first_name}}, votre entretien annuel approche : consultez vos e-mails, nous vous avons envoyé les '
+        + 'demi-journées disponibles. Un clic suffit. {{entreprise}}',
+      deburr: true,
+    },
+  },
 ];
 
 export function getSmsCampaign(key) {
