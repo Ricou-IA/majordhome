@@ -147,3 +147,6 @@ verify_jwt = false
 
 [functions.auto-rdv]
 verify_jwt = false
+
+[functions.auto-rdv-cron]
+verify_jwt = false

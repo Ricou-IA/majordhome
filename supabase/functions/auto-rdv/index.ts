@@ -2,30 +2,31 @@
 // ============================================================================
 // auto-rdv — prise de rendez-vous d'entretien par le client (page publique)
 // ============================================================================
-// Spec 2026-09-29 « auto-RDV d'entretien mensuel » § 4.2 ; plan tranche 2.
+// Spec 2026-09-29 « auto-RDV d'entretien mensuel » § 4.2 ; plans tranches 2-3.
 // verify_jwt:false (page sans compte) — trois actions :
 //   POST { action: "sign", org_id, contract_id } + JWT utilisateur
-//        → requireOrgMembership (le helper valide le JWT lui-même) ; le contrat
-//          doit appartenir à l'org → { url, expires_at }. Sert au bouton
-//          « Copier le lien » (test interne, pose par téléphone) et, en tranche 3,
-//          au cron d'invitation.
+//        → requireOrgMembership ; le contrat doit appartenir à l'org → { url, expires_at }.
 //   GET  ?token=<jeton>
-//        → créneaux calculés À L'INSTANT sur le planning : journées proposables
-//          du mois (étiquetées ou déduites, non figées), demi-journées où le
-//          contrat s'insère encore (auto-rdv.js), branding de l'org.
+//        → créneaux calculés À L'INSTANT : journées proposables du mois (étiquetées
+//          ou déduites, non figées), demi-journées où le contrat s'insère en
+//          réordonnançant la journée dans la souplesse de chaque RDV (auto-rdv.js).
+//          Marque l'invitation du mois : opened_at, outcome = no_slot si vide.
 //   POST { action: "book", token, creneau: { date, technicien_id, demi, empreinte } }
-//        → recalcul du placement sur cette journée seule, puis RPC
-//          auto_rdv_poser (tout ou rien, empreinte revérifiée en base).
-// Jeton = rdv.<contract_id>.<exp>.<sig>, HMAC-SHA256(MDH_AUTO_RDV_SECRET), sans
-// état (même mécanique que mailing-unsubscribe). L'org est TOUJOURS dérivée du
-// contrat porté par le jeton, jamais du payload.
+//        → recalcul du placement, RPC auto_rdv_poser (RDV + décalages des voisins,
+//          tout ou rien), invitation bookée, e-mail de confirmation (best-effort).
+// Jeton : _shared/autoRdvToken.ts (HMAC MDH_AUTO_RDV_SECRET, sans état). L'org est
+// TOUJOURS dérivée du contrat porté par le jeton, jamais du payload.
 // Env : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MDH_AUTO_RDV_SECRET,
-// MDH_MAPBOX_TOKEN (sinon vol d'oiseau, signalé), MDH_APP_URL (optionnel).
+// MDH_MAPBOX_TOKEN (sinon vol d'oiseau, signalé), MDH_APP_URL, RESEND_API_KEY.
 // ============================================================================
 
 import {
-  requireOrgMembership, jsonResponse, buildCorsHeaders, getAdminClient, sanitizeError, timingSafeEqual,
+  requireOrgMembership, jsonResponse, buildCorsHeaders, getAdminClient, sanitizeError,
 } from "../_shared/auth.ts";
+import { signer, verifier, expirationLien, isoLocal, secretConfigure, UUID_RE } from "../_shared/autoRdvToken.ts";
+import {
+  orgBranding, brandingReplacements, wrapWithSkeleton, applyPlaceholders, escapeHtml, sendResendEmail, insertMailingLog,
+} from "../_shared/mail.ts";
 import { chargerJournees, chargerContrat } from "../_shared/tournee/loaders.js";
 import { creerChargeurMatrice } from "../_shared/tournee/trajets-core.js";
 import { construireMatrice, trajetLocal } from "../_shared/tournee/matrice.js";
@@ -35,79 +36,14 @@ import { techniciensEligibles } from "../_shared/tournee/proposer-contrat.js";
 import {
   bornesMois, journeesProposables, creneauxPourContrat, empreinteJournee, demiJournees, placerParSequencement,
 } from "../_shared/tournee/auto-rdv.js";
+import { AUTO_RDV_CONFIRMATION_TEMPLATE_KEY } from "../_shared/autoRdvEmailTemplates.js";
 
-const SECRET = Deno.env.get("MDH_AUTO_RDV_SECRET") || "";
 const APP_URL = (Deno.env.get("MDH_APP_URL") || "https://majordhome.vercel.app").replace(/\/+$/, "");
-const FUSEAU = "Europe/Paris";
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const CONCURRENCE_MATRICE = 4;
 const ROLE_COMPETENCE = "entretien";
 const LIMITE_PAR_HEURE = 60;
-
-// ── Jeton ─────────────────────────────────────────────────────────────────
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-async function hmac(message: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return base64UrlEncode(new Uint8Array(sig));
-}
-
-async function signer(contractId: string, exp: number): Promise<string> {
-  const base = `rdv.${contractId}.${exp}`;
-  return `${base}.${await hmac(base)}`;
-}
-
-type Verif = { ok: true; contractId: string; exp: number } | { ok: false; status: number; error: string };
-
-async function verifier(token: string): Promise<Verif> {
-  if (!SECRET) return { ok: false, status: 500, error: "secret_non_configure" };
-  if (!token) return { ok: false, status: 400, error: "invalid_token" };
-  const parts = token.split(".");
-  if (parts.length !== 4 || parts[0] !== "rdv") return { ok: false, status: 400, error: "invalid_token" };
-  const [, contractId, expStr, sig] = parts;
-  if (!UUID.test(contractId)) return { ok: false, status: 400, error: "invalid_token" };
-  const exp = Number.parseInt(expStr, 10);
-  if (!Number.isFinite(exp)) return { ok: false, status: 400, error: "invalid_token" };
-  const attendu = await hmac(`rdv.${contractId}.${expStr}`);
-  if (!timingSafeEqual(sig, attendu)) return { ok: false, status: 401, error: "signature_mismatch" };
-  if (exp < Math.floor(Date.now() / 1000)) return { ok: false, status: 410, error: "token_expired" };
-  return { ok: true, contractId, exp };
-}
-
-/** Composantes de la date locale Europe/Paris. */
-function localParis(now = new Date()): { y: number; m: number; d: number; minutes: number } {
-  const parts = new Intl.DateTimeFormat("fr-FR", {
-    timeZone: FUSEAU, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-  }).formatToParts(now);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? "0");
-  return { y: get("year"), m: get("month"), d: get("day"), minutes: get("hour") * 60 + get("minute") };
-}
-
-function isoLocal(): string {
-  const { y, m, d } = localParis();
-  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
-
-/**
- * Expiration du lien : fin du mois en cours (23:59:59 Paris, approché en UTC+2),
- * ou fin du mois suivant s'il reste moins de 7 jours — un lien copié le 28 pour
- * poser par téléphone ne doit pas mourir le 31.
- */
-function expirationLien(): number {
-  const { y, m, d } = localParis();
-  const dernierJour = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const cible = dernierJour - d < 7 ? new Date(Date.UTC(y, m + 1, 0)) : new Date(Date.UTC(y, m, 0));
-  // 23:59:59 heure de Paris ≈ 21:59:59 UTC (été) / 22:59:59 (hiver) — on prend 22:59:59 UTC, sans conséquence métier.
-  return Math.floor(Date.UTC(cible.getUTCFullYear(), cible.getUTCMonth(), cible.getUTCDate(), 22, 59, 59) / 1000);
-}
+const LIBELLE_DEMI: Record<string, string> = { matin: "le matin", apres_midi: "l’après-midi" };
 
 // ── Limite de débit (par jeton, en mémoire) ───────────────────────────────
 
@@ -139,6 +75,11 @@ function joursEntre(debutIso: string, finIso: string): number {
   return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000);
 }
 
+/** 1er du mois d'`aujourdhui` (`YYYY-MM-01`) : clé de l'invitation courante. */
+function moisCourant(aujourdhui: string): string {
+  return `${aujourdhui.slice(0, 7)}-01`;
+}
+
 interface Contexte {
   admin: ReturnType<typeof getAdminClient>;
   coreOrgId: string;
@@ -153,13 +94,14 @@ interface Contexte {
   etiquettes: Array<{ date: string; team_member_id: string; grand_secteur: string | null; figee_at: string | null }>;
   secteurContrat: string | null;
   clientPrenom: string | null;
+  clientEmail: string | null;
 }
 
 type ChargementErreur = { error: string; status: number };
 
 async function charger(admin: ReturnType<typeof getAdminClient>, contractId: string): Promise<Contexte | ChargementErreur> {
   const { data: ct, error: ctErr } = await admin
-    .from("majordhome_contracts").select("id, org_id, client_id, status, client_first_name").eq("id", contractId).maybeSingle();
+    .from("majordhome_contracts").select("id, org_id, client_id, status, client_first_name, client_email").eq("id", contractId).maybeSingle();
   if (ctErr) return { error: sanitizeError(ctErr, "contrat illisible"), status: 500 };
   if (!ct) return { error: "contrat_introuvable", status: 404 };
   if (ct.status !== "active") return { error: "contrat_inactif", status: 410 };
@@ -201,7 +143,6 @@ async function charger(admin: ReturnType<typeof getAdminClient>, contractId: str
     .eq("org_id", coreOrgId).gte("date", bornes.debut).lte("date", bornes.fin);
   if (eErr) return { error: sanitizeError(eErr, "étiquettes illisibles"), status: 500 };
 
-  // Secteur « du contrat » = celui du dernier RDV du client (photo grand_secteur), sinon inconnu.
   const { data: dernier } = await admin
     .from("majordhome_appointments").select("grand_secteur")
     .eq("org_id", mdhOrg.id).eq("client_id", ct.client_id).not("grand_secteur", "is", null)
@@ -214,6 +155,7 @@ async function charger(admin: ReturnType<typeof getAdminClient>, contractId: str
     etiquettes: (etiquettes ?? []) as Contexte["etiquettes"],
     secteurContrat: (dernier?.grand_secteur as string | undefined) ?? null,
     clientPrenom: (ct.client_first_name as string | null) ?? null,
+    clientEmail: (ct.client_email as string | null) ?? null,
   };
 }
 
@@ -270,15 +212,69 @@ function branding(settings: Record<string, unknown>) {
   };
 }
 
+/** Invitation du mois courant pour ce contrat : mise à jour best-effort (jamais bloquante). */
+async function marquerInvitation(ctx: Contexte, patch: Record<string, unknown>, ouSeulementNonBookee = true) {
+  try {
+    let q = ctx.admin.from("majordhome_auto_rdv_invitations").update(patch)
+      .eq("org_id", ctx.coreOrgId).eq("contract_id", ctx.contrat.id).eq("mois", moisCourant(ctx.aujourdhui));
+    if (ouSeulementNonBookee) q = q.is("booked_at", null);
+    const { error } = await q;
+    if (error) console.error("[auto-rdv] invitation non mise à jour :", error);
+  } catch (e) {
+    console.error("[auto-rdv] invitation :", e);
+  }
+}
+
+function formatDateLongue(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+}
+
+/** E-mail de confirmation (gabarit auto_rdv_confirmation), best-effort : l'échec n'annule pas la pose. */
+async function envoyerConfirmation(ctx: Contexte, p: { date: string; demi: string; technicien: string }): Promise<string | null> {
+  try {
+    if (!RESEND_API_KEY || !ctx.clientEmail) return null;
+    const { data: tpl } = await ctx.admin
+      .from("majordhome_mail_campaigns").select("subject, html_body")
+      .eq("org_id", ctx.coreOrgId).eq("key", AUTO_RDV_CONFIRMATION_TEMPLATE_KEY).eq("is_archived", false).maybeSingle();
+    if (!tpl) return "template_missing";
+    const b = orgBranding(ctx.settings as never);
+    if (!b.fromEmail) return "no_from_email";
+    const valeurs: Record<string, string> = {
+      "{{PRENOM}}": ctx.clientPrenom || "",
+      "{{DATE_RDV}}": formatDateLongue(p.date),
+      "{{DEMI_JOURNEE}}": LIBELLE_DEMI[p.demi] || p.demi,
+      "{{TECHNICIEN}}": p.technicien || "notre technicien",
+    };
+    const html = Object.fromEntries(Object.entries(valeurs).map(([k, v]) => [k, escapeHtml(v)]));
+    const remplacements = { ...brandingReplacements(b), ...html };
+    const subject = applyPlaceholders(String(tpl.subject || ""), { ...brandingReplacements(b), ...valeurs });
+    const body = applyPlaceholders(wrapWithSkeleton(b, String(tpl.html_body || "")), remplacements);
+    const res = await sendResendEmail(RESEND_API_KEY, {
+      from: b.fromName ? `${b.fromName} <${b.fromEmail}>` : b.fromEmail, to: [ctx.clientEmail],
+      replyTo: b.replyTo || undefined, subject, html: body,
+    });
+    await insertMailingLog(ctx.admin, {
+      client_id: ctx.contrat.clientId, org_id: ctx.coreOrgId, campaign_name: AUTO_RDV_CONFIRMATION_TEMPLATE_KEY,
+      subject, email_to: ctx.clientEmail, status: res.ok ? "sent" : "failed", provider_id: res.id ?? null,
+      error_message: res.ok ? null : (res.message || `resend_${res.status}`),
+    } as never);
+    return res.ok ? "sent" : "failed";
+  } catch (e) {
+    console.error("[auto-rdv] confirmation :", e);
+    return "failed";
+  }
+}
+
 // ── Actions ───────────────────────────────────────────────────────────────
 
 async function actionSign(req: Request, body: Record<string, unknown>): Promise<Response> {
   const orgId = String(body.org_id || "");
   const contractId = String(body.contract_id || "");
-  if (!orgId || !UUID.test(contractId)) return jsonResponse({ error: "org_id et contract_id requis" }, 400, req);
+  if (!orgId || !UUID_RE.test(contractId)) return jsonResponse({ error: "org_id et contract_id requis" }, 400, req);
   const auth = await requireOrgMembership(req, { orgId });
   if (!auth.ok) return auth.response;
-  if (!SECRET) return jsonResponse({ error: "secret_non_configure" }, 500, req);
+  if (!secretConfigure()) return jsonResponse({ error: "secret_non_configure" }, 500, req);
   const { data: ct, error } = await auth.supabase
     .from("majordhome_contracts").select("id, org_id").eq("id", contractId).eq("org_id", orgId).maybeSingle();
   if (error) return jsonResponse({ error: sanitizeError(error, "contrat illisible") }, 500, req);
@@ -312,6 +308,14 @@ async function actionSlots(req: Request, token: string): Promise<Response> {
     contrat: ctx.contrat, proposables, depot: ctx.depot, reglages: ctx.reglages, trajet,
     secteurContrat: ctx.secteurContrat, maxCreneaux: Number(autoRdv.max_creneaux ?? 6),
   });
+  // Suivi de l'invitation du mois : page ouverte ; « sans créneau » si rien à proposer.
+  await marquerInvitation(ctx, creneaux.length === 0
+    ? { opened_at: new Date().toISOString(), outcome: "no_slot" }
+    : { opened_at: new Date().toISOString() });
+  if (creneaux.length > 0) {
+    // Ne pas laisser un « no_slot » d'une visite précédente masquer une offre revenue.
+    await marquerInvitation(ctx, { outcome: null });
+  }
   return jsonResponse({
     ...base,
     creneaux: creneaux.map((c) => ({
@@ -332,7 +336,7 @@ async function actionBook(req: Request, body: Record<string, unknown>, via: "cli
   const technicienId = String(k.technicien_id || "");
   const demi = String(k.demi || "");
   const empreinte = String(k.empreinte ?? "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !UUID.test(technicienId) || !["matin", "apres_midi"].includes(demi)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !UUID_RE.test(technicienId) || !["matin", "apres_midi"].includes(demi)) {
     return jsonResponse({ error: "creneau_invalide" }, 400, req);
   }
   const ctx = await charger(getAdminClient(), v.contractId);
@@ -347,9 +351,6 @@ async function actionBook(req: Request, body: Record<string, unknown>, via: "cli
   }
   const { trajet } = await trajetPour(ctx, [journee]);
   const demiObj = demiJournees(ctx.reglages as never).find((d) => d.code === demi)!;
-  // La journée entière est réordonnancée avec le contrat en plus : les voisins
-  // adaptables glissent dans leur souplesse, et ces décalages sont écrits par la
-  // RPC avec le RDV (tout ou rien).
   const place = placerParSequencement({
     journee: journee as never, contrat: ctx.contrat as never, demi: demiObj, depot: ctx.depot, reglages: ctx.reglages as never, trajet,
   });
@@ -375,11 +376,15 @@ async function actionBook(req: Request, body: Record<string, unknown>, via: "cli
     console.error("[auto-rdv] auto_rdv_poser", error);
     return jsonResponse({ error: sanitizeError(error, "pose refusée") }, 500, req);
   }
+  const res = data as { appointment_id: string; intervention_id: string; decales?: number };
+  const technicien = String((journee as { technicienNom?: string }).technicienNom ?? "").split(" ")[0];
+  await marquerInvitation(ctx, {
+    booked_at: new Date().toISOString(), appointment_id: res.appointment_id, intervention_id: res.intervention_id, outcome: "booked",
+  });
+  const confirmation = await envoyerConfirmation(ctx, { date, demi, technicien });
   return jsonResponse({
-    appointment_id: (data as { appointment_id: string }).appointment_id,
-    date, demi, technicien: String((journee as { technicienNom?: string }).technicienNom ?? "").split(" ")[0],
-    debut: minutesVersHeure(place.arriveeMinutes!),
-    decales: (data as { decales?: number }).decales ?? 0,
+    appointment_id: res.appointment_id, date, demi, technicien,
+    debut: minutesVersHeure(place.arriveeMinutes!), decales: res.decales ?? 0, confirmation,
   }, 200, req);
 }
 

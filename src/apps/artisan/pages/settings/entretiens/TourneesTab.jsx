@@ -32,8 +32,24 @@ function depuisSettings(settings) {
   CHAMPS.forEach((c) => { out[c] = t[c] ?? REGLAGES_DEFAUT[c] ?? null; });
   if (out.figer_journee_pleine == null) out.figer_journee_pleine = true; // absent = actif
   out.figer_sms = out.figer_sms === true; // absent = OFF
+  // Fenêtre de pause (heures décimales, ex. 11.5 = 11 h 30) et prise de RDV par le client (objet imbriqué).
+  const fen = Array.isArray(t.pause_fenetre) ? t.pause_fenetre : REGLAGES_DEFAUT.pause_fenetre;
+  out.pause_debut = Number(fen[0]);
+  out.pause_fin = Number(fen[1]);
+  out.auto_rdv = { ...REGLAGES_DEFAUT.auto_rdv, ...(t.auto_rdv || {}) };
   return out;
 }
+
+const AUTO_RDV_ENTIERS = [
+  ['capacite_cible', 1, 12, 'Contrats visés par journée', 'Dimensionne le nombre de journées vides étiquetées par secteur. La capacité réelle reste calculée par le moteur, trajets compris.'],
+  ['marge_pct', 0, 100, 'Marge de journées étiquetées', 'En plus du strict besoin, parce que tout le monde ne clique pas la même semaine.'],
+  ['seuil_reouverture_pct', 50, 100, 'Réouverture d’une journée', 'Quand les journées étiquetées d’un secteur sont remplies à ce taux, une journée vide de plus lui est dédiée.'],
+  ['delai_min_jours', 0, 14, 'Délai minimal', 'Aucune demi-journée proposée avant ce nombre de jours.'],
+  ['max_creneaux', 2, 12, 'Créneaux affichés au client', ''],
+  ['relance_sms_jours', 1, 30, 'Relance SMS', 'Jours après le mail sans rendez-vous pris.'],
+  ['escalade_appel_jours', 2, 31, 'Passage en liste d’appels', 'Jours après le mail sans rendez-vous pris.'],
+  ['duree_moyenne_minutes', 30, 240, 'Durée moyenne d’un entretien', 'Sert à convertir le reste d’une journée déjà amorcée en places.'],
+];
 
 function validate(form) {
   const errors = {};
@@ -47,6 +63,19 @@ function validate(form) {
   entier('depassement_journee_minutes', 0, 120);
   entier('tolerance_retour_depot_minutes', 0, 60);
   entier('pause_minutes', 0, 120);
+  const heure = (k, min, max) => {
+    const v = Number(form[k]);
+    if (!Number.isFinite(v) || v < min || v > max || Math.round(v * 2) !== v * 2) errors[k] = `Heure entre ${min} et ${max}, par demi-heure`;
+  };
+  heure('pause_debut', 6, 20);
+  heure('pause_fin', 6, 22);
+  if (!errors.pause_debut && !errors.pause_fin && Number(form.pause_fin) * 60 - Number(form.pause_debut) * 60 < Number(form.pause_minutes || 0)) {
+    errors.pause_fin = 'La fenêtre doit contenir la pause entière';
+  }
+  for (const [k, min, max] of AUTO_RDV_ENTIERS) {
+    const v = Number(form.auto_rdv?.[k]);
+    if (!Number.isInteger(v) || v < min || v > max) errors[`auto_rdv.${k}`] = `Entier entre ${min} et ${max}`;
+  }
   return errors;
 }
 
@@ -78,6 +107,7 @@ export default function TourneesTab() {
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
   const isValid = Object.keys(errors).length === 0;
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+  const setAuto = (k) => (v) => setForm((f) => ({ ...f, auto_rdv: { ...(f.auto_rdv || {}), [k]: v } }));
 
   const handleSave = async () => {
     if (!isValid) {
@@ -85,7 +115,9 @@ export default function TourneesTab() {
       return;
     }
     try {
-      const complet = { ...(settings?.tournees || {}), ...form };
+      // `pause_debut` / `pause_fin` sont des champs d'écran : en base, c'est `pause_fenetre: [debut, fin]`.
+      const { pause_debut: pd, pause_fin: pf, ...reste } = form;
+      const complet = { ...(settings?.tournees || {}), ...reste, pause_fenetre: [Number(pd), Number(pf)] };
       await save({ tournees: complet });
       toast.success('Réglages des tournées enregistrés');
       setInitial(form);
@@ -142,9 +174,48 @@ export default function TourneesTab() {
           <ChampMinutes
             label="Pause déjeuner" valeur={form.pause_minutes} onChange={set('pause_minutes')} min={0} max={120}
             error={errors.pause_minutes}
-            hint="Prise entre deux arrêts, à la première occasion dans sa fenêtre (12h-14h)."
+            hint="Prise entre deux arrêts, à la première occasion dans sa fenêtre, sur la route. La pause entière doit tenir dans la fenêtre."
+          />
+          <ChampMinutes
+            label="Fenêtre de pause : au plus tôt" valeur={form.pause_debut} onChange={set('pause_debut')} min={6} max={20} unite="h"
+            error={errors.pause_debut} hint="Heure décimale : 11.5 = 11 h 30."
+          />
+          <ChampMinutes
+            label="Fenêtre de pause : au plus tard" valeur={form.pause_fin} onChange={set('pause_fin')} min={6} max={22} unite="h"
+            error={errors.pause_fin} hint="La pause doit être finie à cette heure."
           />
         </div>
+      </section>
+
+      <section>
+        <h3 className={SECTION_TITLE}>Prise de rendez-vous par le client</h3>
+        <label className="flex items-start gap-3 text-sm text-secondary-700 mb-4">
+          <input type="checkbox" checked={!!form.auto_rdv?.enabled} onChange={(e) => setAuto('enabled')(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="font-medium">Chaque 1ᵉʳ du mois, inviter par e-mail les clients dont l’entretien est dû.</span>
+            <br />
+            La machine dédie des journées vides du mois à chaque secteur selon les contrats dus, envoie à chaque client un lien
+            vers la page où il choisit sa demi-journée (gabarit « auto_rdv » dans Communication → Emails), relance par SMS puis
+            passe en liste d’appels. Désactivé : rien n’est envoyé ; la page et « Copier le lien » restent utilisables à la main.
+          </span>
+        </label>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {AUTO_RDV_ENTIERS.map(([k, min, max, label, hint]) => (
+            <ChampMinutes
+              key={k} label={label} valeur={form.auto_rdv?.[k]} onChange={setAuto(k)} min={min} max={max}
+              unite={k.endsWith('_pct') ? '%' : k.endsWith('_jours') ? 'j' : k.endsWith('_minutes') ? 'min' : ''}
+              error={errors[`auto_rdv.${k}`]} hint={hint}
+            />
+          ))}
+        </div>
+        <label className="flex items-start gap-3 text-sm text-secondary-700 mt-4">
+          <input type="checkbox" checked={form.auto_rdv?.inclure_retardataires !== false} onChange={(e) => setAuto('inclure_retardataires')(e.target.checked)} className="mt-0.5" />
+          <span>
+            <span className="font-medium">Inviter aussi les retardataires.</span>
+            <br />
+            Contrats dont l’anniversaire est passé sans visite cette année. Sinon un contrat de septembre non fait ne serait jamais invité.
+          </span>
+        </label>
       </section>
 
       <section>
