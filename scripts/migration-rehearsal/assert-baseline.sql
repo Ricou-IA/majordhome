@@ -33,7 +33,11 @@ BEGIN
       ('majordhome.maintenance_visit_date_guard()'),
       ('majordhome.auto_expire_contract_on_end_date()'),
       ('majordhome.update_client_on_contract_change()'),
-      ('majordhome.contract_activation_promote_cards()')
+      ('majordhome.contract_activation_promote_cards()'),
+      ('majordhome.lead_pennylane_quotes_invariant_winning()'),
+      ('majordhome.role_can(uuid, text, text)'),
+      ('majordhome.user_effective_role(uuid)'),
+      ('public.lead_merge(uuid, uuid)')
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
@@ -76,6 +80,12 @@ BEGIN
        AND tgname = r.trg AND tgfoid = to_regprocedure(r.fn);
     IF NOT FOUND THEN RAISE EXCEPTION 'trigger % → % absent sur majordhome.contracts', r.trg, r.fn; END IF;
   END LOOP;
+  -- Triggers utilisateur de majordhome.lead_pennylane_quotes (TRIGGER_TABLES)
+  PERFORM 1 FROM pg_trigger
+   WHERE tgrelid = 'majordhome.lead_pennylane_quotes'::regclass AND NOT tgisinternal
+     AND tgname = 'trg_lead_pennylane_quotes_invariant_winning'
+     AND tgfoid = to_regprocedure('majordhome.lead_pennylane_quotes_invariant_winning()');
+  IF NOT FOUND THEN RAISE EXCEPTION 'trigger invariant_winning absent sur majordhome.lead_pennylane_quotes'; END IF;
 
   -- Vues (liste VIEWS) ; celles exposées via PostgREST doivent être security_invoker=true
   FOR r IN SELECT * FROM (VALUES
@@ -91,7 +101,9 @@ BEGIN
       ('majordhome.lead_quote_stats', true),
       ('public.majordhome_interventions', true),
       ('public.majordhome_chantiers', true),
-      ('public.majordhome_entretien_sav', true)
+      ('public.majordhome_entretien_sav', true),
+      ('public.majordhome_lead_pennylane_quotes', true),
+      ('public.majordhome_appointments', true)
     ) AS t(vue, invoker)
   LOOP
     IF to_regclass(r.vue) IS NULL THEN RAISE EXCEPTION 'vue absente : %', r.vue; END IF;
@@ -101,7 +113,7 @@ BEGIN
   END LOOP;
 
   -- RLS activée + au moins une policy (POLICY_TABLES)
-  FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members')) AS t(tbl)
+  FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members'), ('leads')) AS t(tbl)
   LOOP
     PERFORM 1 FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
      WHERE ns.nspname = 'majordhome' AND c.relname = r.tbl AND c.relrowsecurity;
@@ -170,7 +182,7 @@ BEGIN
   IF n_types <> 14 THEN RAISE EXCEPTION 'pricing_equipment_types attendu 14, trouvé % (type créé/supprimé en prod ? ré-aligner §3)', n_types; END IF;
 
   SELECT count(*) INTO n_membres FROM majordhome.team_members;
-  IF n_membres <> 7 THEN RAISE EXCEPTION 'team_members attendu 7, trouvé % (membre créé/supprimé en prod ? ré-aligner §3)', n_membres; END IF;
+  IF n_membres <> 8 THEN RAISE EXCEPTION 'team_members attendu 8, trouvé % (membre créé/supprimé en prod ? ré-aligner §3)', n_membres; END IF;
 
   SELECT count(*), count(*) FILTER (WHERE equipment_type_id IS NULL) INTO n_eq, n_sans_type FROM majordhome.equipments;
   SELECT count(*) INTO n_cert FROM majordhome.certificats;

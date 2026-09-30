@@ -34,7 +34,7 @@ clients…) : ces chiffres bougent chaque jour en prod et ne prouvent rien, `run
 chargé `data.json` ligne à ligne. Il vérifie la structure (fonctions, triggers, vues +
 `security_invoker`, RLS/policies, enum, colonne GENERATED, ACL), les invariants tenus par les
 triggers de prod (typé ⇒ catégorie du type, code de catégorie dénormalisé) et les seuls comptes
-stables : 14 types d'équipement, 7 membres d'équipe, 11 valeurs d'enum. Le `NOTICE` final
+stables : 14 types d'équipement, 8 membres d'équipe, 11 valeurs d'enum. Le `NOTICE` final
 affiche les volumes du snapshot à titre indicatif.
 
 Il faut l'éditer quand, et seulement quand :

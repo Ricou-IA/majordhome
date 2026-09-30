@@ -37,7 +37,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
   { schema: 'majordhome', table: 'team_members', columns: null },
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at'] },
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number'] }, // 20260930_11 : lus par la vue majordhome_lead_pennylane_quotes
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -47,9 +47,14 @@ const TABLES = [
   { schema: 'majordhome', table: 'interventions', columns: null, data: false },
   { schema: 'majordhome', table: 'certificats', columns: ['id', 'org_id', 'equipment_id', 'intervention_id', 'equipement_type', 'type_document', 'tva_taux', 'pieces_remplacees', 'created_at'] },
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
-  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: ['id', 'lead_id', 'org_id', 'quote_status', 'quote_amount_ht', 'ejected_at'], data: false },
+  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_11 : chantier_id + trigger chantier_ensure_for_quote
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine
   { schema: 'majordhome', table: 'appointment_technicians', columns: null, data: false },
+  { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_11 : libellé du chantier
+  { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_11 : chantier_id → majordhome.chantiers
+  { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_12 : activités chantier_*
+  { schema: 'majordhome', table: 'role_permissions', columns: null }, // role_can() (policies chantiers)
+  { schema: 'majordhome', table: 'app_role_permissions', columns: null }, // role_can() défauts app-level
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
   { schema: 'majordhome', table: 'invoices', columns: ['id', 'import_status'], data: false }, // lue par la vue majordhome_entretien_sav (hub de facturation, 20260923_3)
   { schema: 'majordhome', table: 'maintenance_visits', columns: null, data: false }, // 20260928_1 : garde-fou date de visite (triggers ci-dessous)
@@ -79,10 +84,15 @@ const FUNCTIONS = [
   'majordhome.auto_expire_contract_on_end_date()',
   'majordhome.update_client_on_contract_change()',
   'majordhome.contract_activation_promote_cards()',
+  // 20260930_11..13 : entité chantier
+  'majordhome.lead_pennylane_quotes_invariant_winning()',
+  'majordhome.role_can(uuid, text, text)',
+  'majordhome.user_effective_role(uuid)',
+  'public.lead_merge(uuid, uuid)', // recréée sans ses 16 tables satellites : plpgsql ne résout les tables qu'à l'exécution
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
-const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits', 'majordhome.contracts'];
+const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits', 'majordhome.contracts', 'majordhome.lead_pennylane_quotes'];
 
 const VIEWS = [
   'public.profiles', // cible des sous-requêtes « nom de l'auteur » des vues majordhome_* (interactions prospects…)
@@ -99,11 +109,14 @@ const VIEWS = [
   'public.majordhome_interventions',
   'public.majordhome_chantiers',
   'public.majordhome_entretien_sav',
+  // 20260930_11 : cibles du CREATE OR REPLACE
+  'public.majordhome_lead_pennylane_quotes',
+  'public.majordhome_appointments',
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
 // sous-ensemble (equipments.* référencent role_can/project_org_id → exclues).
-const POLICY_TABLES = ['pricing_zones', 'pricing_equipment_types', 'team_members'];
+const POLICY_TABLES = ['pricing_zones', 'pricing_equipment_types', 'team_members', 'leads'];
 
 function lireEnv(fichier) {
   const txt = fs.readFileSync(fichier, 'utf8');
