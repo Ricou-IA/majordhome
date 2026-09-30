@@ -192,12 +192,14 @@ async function upsertSyncRecord(record) {
 // ============================================================================
 
 /**
- * Corps `POST /customers`. Pennylane valide contre UN des deux schémas « Individual
- * customer » / « Company customer », tous deux `additionalProperties: false` : un champ
- * de l'autre forme (`customer_type`, `name` sur un particulier, `first_name` sur une
- * entreprise…) fait échouer les deux → 400 « The root of the schema isn't one of … »
- * (vécu 2026-09-28, GRANIER). Champs requis : particulier = first_name + last_name +
- * billing_address ; entreprise = name + billing_address ; adresse = 4 champs requis.
+ * Corps `POST /customers` (schéma de référence : pennylane.readme.io/reference/postcustomer —
+ * PAS celui de `/individual_customers`, qui n'a pas de `customer_type`). Pennylane valide
+ * contre UN des deux schémas « Individual customer » / « Company customer », tous deux
+ * `additionalProperties: false` : un champ de l'autre forme (`name` sur un particulier,
+ * `first_name` sur une entreprise…) ou l'absence de `customer_type` fait échouer les deux
+ * → 400 « The root of the schema isn't one of … » (vécu 2026-09-28/30, GRANIER).
+ * Requis : particulier = customer_type + first_name + last_name + billing_address ;
+ * entreprise = customer_type + name + billing_address ; adresse = 4 champs requis.
  * Throw en clair si une donnée obligatoire manque (échec bruyant, pas un 400 opaque).
  */
 function buildPennylaneCustomer(client) {
@@ -229,8 +231,8 @@ function buildPennylaneCustomer(client) {
     },
   };
   return isCompany
-    ? { ...common, name: companyName, reg_no: client.siren || undefined }
-    : { ...common, first_name: client.first_name, last_name: client.last_name };
+    ? { ...common, customer_type: 'company', name: companyName, reg_no: client.siren || undefined }
+    : { ...common, customer_type: 'individual', first_name: client.first_name, last_name: client.last_name };
 }
 
 /**
