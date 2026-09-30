@@ -405,7 +405,10 @@ export default function Entretiens() {
           icon={Calendar}
           label="Entretiens à faire"
           value={savStatsLoading ? '...' : (savStats?.entretien_a_faire ?? 0)}
-          subtitle={!savStatsLoading && savStats?.ca_a_faire != null ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €` : null}
+          // Les refus du client ne sont pas « à faire » : on les nomme pour que le compteur s'explique.
+          subtitle={!savStatsLoading && savStats?.ca_a_faire != null
+            ? `CA : ${Math.round(savStats.ca_a_faire).toLocaleString('fr-FR')} €${savStats.entretien_refuse > 0 ? ` · ${savStats.entretien_refuse} refus` : ''}`
+            : null}
           color="blue"
         />
         <StatCard

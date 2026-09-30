@@ -3,7 +3,7 @@
  * Petit badge réutilisable avec icône + label coloré.
  */
 
-import { Check, Clock, Minus, X, CalendarClock } from 'lucide-react';
+import { Check, Clock, Minus, X, CalendarClock, Ban } from 'lucide-react';
 
 const VISIT_CONFIG = {
   completed: {
@@ -45,6 +45,12 @@ const VISIT_CONFIG = {
     label: 'Non réalisé',
     className: 'bg-gray-100 text-gray-600',
     Icon: Minus,
+  },
+  // Entretien de l'année refusé par le client : à ne pas faire, à ne pas relancer.
+  refuse: {
+    label: 'Refusé',
+    className: 'bg-gray-200 text-gray-700',
+    Icon: Ban,
   },
 };
 

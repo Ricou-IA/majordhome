@@ -13,6 +13,7 @@
  */
 
 import { FileCheck, Clock, Archive, MapPin, Phone, ChevronRight, Globe } from 'lucide-react';
+import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
 import { VisitBadge } from './VisitBadge';
 import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
 
@@ -70,15 +71,14 @@ export function ContractCard({ contract, onClick, selected = false }) {
     amount,
     status,
     source,
-    current_year_visit_status,
   } = contract;
 
   // Adresse formatée (rue séparée du CP + ville)
   const streetAddress = client_address || null;
   const cityLine = [client_postal_code, client_city].filter(Boolean).join(', ');
 
-  // Statut visite basé sur current_year_visit_status (visite année en cours)
-  const visitStatus = current_year_visit_status === 'completed' ? 'completed' : 'pending';
+  // Statut visite de l'année : réalisé, refusé par le client, ou à faire.
+  const visitStatus = { realise: 'completed', refuse: 'refuse', a_faire: 'pending' }[statutVisiteAnnee(contract)];
 
   const formatAmount = (n) => {
     if (!n && n !== 0) return null;

@@ -26,8 +26,10 @@ import {
   Loader2,
   Map as MapIcon,
   MessageSquare,
+  Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { statutVisiteAnnee, compterVisitesAnnee } from '@/lib/entretienVisitStatus';
 import { VisitBadge } from './VisitBadge';
 import { SearchBar } from '../shared/SearchBar';
 import { EquipmentKindIcons } from '../shared/EquipmentKindIcons';
@@ -51,13 +53,17 @@ const MONTHS = [
   { value: 12, label: 'Décembre' },
 ];
 
+// Statut de visite de l'année (statutVisiteAnnee) → clé du VisitBadge.
+const BADGE_PAR_STATUT = { realise: 'completed', refuse: 'refuse', a_faire: 'pending' };
+
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
 
 function GrandSecteurHeader({ group, isExpanded, onToggle, canPlan, onPlanGroup, isPlanningDisabled, plannableCount }) {
-  const completionPct =
-    group.totalContracts > 0 ? Math.round((group.visitsDone / group.totalContracts) * 100) : 0;
+  // Avancement sur ce qui est à faire cette année : un refus sort du dénominateur.
+  const attendus = group.visitsDone + group.visitsPending;
+  const completionPct = attendus > 0 ? Math.round((group.visitsDone / attendus) * 100) : 0;
   const isNonLocalise = group.id === 'non-localise';
 
   return (
@@ -90,6 +96,15 @@ function GrandSecteurHeader({ group, isExpanded, onToggle, canPlan, onPlanGroup,
               <Clock className="h-3.5 w-3.5" />
               {group.visitsPending}
             </span>
+            {group.visitsRefused > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="inline-flex items-center gap-1 text-gray-500" title="Refusés par le client cette année">
+                  <Ban className="h-3.5 w-3.5" />
+                  {group.visitsRefused}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </button>
@@ -120,12 +135,13 @@ function ContractRow({
   onSendReminder,
   canSendReminder,
 }) {
-  // Statut visite : basé sur current_year_visit_status (visite année en cours)
-  const visitStatus =
-    contract.current_year_visit_status === 'completed' ? 'completed' : 'pending';
+  // Statut visite de l'année : réalisé, refusé par le client, ou à faire.
+  const statut = statutVisiteAnnee(contract);
+  const aFaire = statut === 'a_faire';
+  const visitStatus = BADGE_PAR_STATUT[statut];
 
-  // Traité pour l'année = entretien en cours OU visite effectuée
-  const isDone = isAlreadyPlanned || visitStatus === 'completed';
+  // Traité pour l'année = entretien en cours, visite effectuée OU refusée par le client
+  const isDone = isAlreadyPlanned || !aFaire;
 
   // Mois de référence
   const monthLabel = contract.maintenance_month
@@ -133,9 +149,9 @@ function ContractRow({
     : null;
 
   // Bulle SMS : visible uniquement quand le contrat est « à planifier »
-  // (même condition que le bouton « Planifier » — jamais sur une ligne grisée).
-  const canShowReminder =
-    canSendReminder && !isAlreadyPlanned && visitStatus !== 'completed';
+  // (même condition que le bouton « Planifier » — jamais sur une ligne grisée,
+  // donc jamais sur un refus : on ne relance pas un client qui a dit non).
+  const canShowReminder = canSendReminder && !isAlreadyPlanned && aFaire;
   const [smsLoading, setSmsLoading] = useState(false);
   // « Déjà relancé » = DÉRIVÉ de la liste à chaque rendu, jamais figé dans un useState : la ligne
   // peut se monter avant que la requête `remindedClients` ait répondu (les deux requêtes sont
@@ -238,14 +254,14 @@ function ContractRow({
         </button>
       )}
 
-      {/* CTA Planifier / badge Planifié / rien (si visite déjà effectuée) */}
+      {/* CTA Planifier / badge Planifié / rien (visite déjà effectuée, ou refusée par le client) */}
       {canPlan &&
         (isAlreadyPlanned ? (
           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded flex-shrink-0">
             <CheckCircle2 className="h-3 w-3" />
             Planifié
           </span>
-        ) : visitStatus === 'completed' ? null : (
+        ) : !aFaire ? null : (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -349,16 +365,16 @@ export function SectorGroupView({
           });
         }
 
-        const visitsDone = filtered.filter(
-          (c) => c.current_year_visit_status === 'completed',
-        ).length;
+        // Un refus n'est ni fait ni à faire : compté à part (compterVisitesAnnee).
+        const compte = compterVisitesAnnee(filtered);
 
         return {
           ...sector,
           contracts: filtered,
           totalContracts: filtered.length,
-          visitsDone,
-          visitsPending: filtered.length - visitsDone,
+          visitsDone: compte.realises,
+          visitsRefused: compte.refuses,
+          visitsPending: compte.aFaire,
         };
       })
       .filter((s) => s.contracts.length > 0);
@@ -379,6 +395,7 @@ export function SectorGroupView({
           contracts: [],
           totalContracts: 0,
           visitsDone: 0,
+          visitsRefused: 0,
           visitsPending: 0,
         });
       }
@@ -386,6 +403,7 @@ export function SectorGroupView({
       g.contracts.push(...s.contracts);
       g.totalContracts += s.totalContracts;
       g.visitsDone += s.visitsDone;
+      g.visitsRefused += s.visitsRefused;
       g.visitsPending += s.visitsPending;
     }
     const groups = [...map.values()];
@@ -443,6 +461,7 @@ export function SectorGroupView({
   // Stats globales (calculées sur les secteurs filtrés)
   const totalContracts = filteredSectors.reduce((s, sec) => s + sec.totalContracts, 0);
   const totalDone = filteredSectors.reduce((s, sec) => s + sec.visitsDone, 0);
+  const totalRefused = filteredSectors.reduce((s, sec) => s + sec.visitsRefused, 0);
   const totalPending = filteredSectors.reduce((s, sec) => s + sec.visitsPending, 0);
 
   return (
@@ -474,6 +493,14 @@ export function SectorGroupView({
           <span className="text-amber-600">
             <strong>{totalPending}</strong> à faire
           </span>
+          {totalRefused > 0 && (
+            <>
+              <span className="text-gray-300">|</span>
+              <span className="text-gray-500" title="Entretien de l'année refusé par le client : ni à planifier, ni à relancer">
+                <strong>{totalRefused}</strong> refusé{totalRefused > 1 ? 's' : ''}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -534,9 +561,11 @@ export function SectorGroupView({
         <div className="space-y-3">
           {grandSecteurs.map((group) => {
             const isGroupExpanded = searchQuery.trim() ? true : !collapsedGroups.has(group.id);
-            const groupPlannable = group.contracts.filter(
-              (c) => !plannedContractIds?.has(c.id) && c.current_year_visit_status !== 'completed',
-            ).length;
+            // À planifier = ni déjà planifié, ni réalisé, ni refusé par le client.
+            const plannable = group.contracts.filter(
+              (c) => !plannedContractIds?.has(c.id) && statutVisiteAnnee(c) === 'a_faire',
+            );
+            const groupPlannable = plannable.length;
             return (
               <div key={group.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <GrandSecteurHeader
@@ -544,16 +573,7 @@ export function SectorGroupView({
                   isExpanded={isGroupExpanded}
                   onToggle={() => toggleGroup(group.id)}
                   canPlan={canPlan}
-                  onPlanGroup={(g) =>
-                    onPlanSector?.({
-                      codePostal: g.name,
-                      contracts: g.contracts.filter(
-                        (c) =>
-                          !plannedContractIds?.has(c.id) &&
-                          c.current_year_visit_status !== 'completed',
-                      ),
-                    })
-                  }
+                  onPlanGroup={(g) => onPlanSector?.({ codePostal: g.name, contracts: plannable })}
                   isPlanningDisabled={isPlanningDisabled}
                   plannableCount={groupPlannable}
                 />

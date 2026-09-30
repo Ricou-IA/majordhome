@@ -404,7 +404,7 @@ export function ContractModal({ contractId, isOpen, onClose }) {
                               <td className="px-3 py-2 text-gray-900">{visit.visit_year}</td>
                               <td className="px-3 py-2 text-gray-600">{done ? formatDateFR(visit.visit_date) : '—'}</td>
                               <td className="px-3 py-2">
-                                <VisitBadge status={done ? 'completed' : 'non_realise'} />
+                                <VisitBadge status={done ? 'completed' : visit.status === 'cancelled' ? 'refuse' : 'non_realise'} />
                               </td>
                             </tr>
                           );

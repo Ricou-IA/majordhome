@@ -23,6 +23,7 @@ import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { CONTRACT_STATUSES, CONTRACT_FREQUENCIES } from '@services/contracts.service';
 import { clusterSectorsByProximity } from '@/lib/sectorClustering';
 import { fetchCityPopulations } from '@/lib/communePopulation';
+import { statutVisiteAnnee, compterVisitesAnnee } from '@/lib/entretienVisitStatus';
 
 // ============================================================================
 // RÉEXPORT DES CONSTANTES (pour backward-compat des imports)
@@ -406,9 +407,13 @@ export const entretiensService = {
       const cancelledContracts = allContracts.filter((c) => c.status === 'cancelled');
 
       // Comptages visites basés sur current_year_visit_status (colonne calculée de la vue)
-      const visitsDone = activeContracts.filter((c) => c.current_year_visit_status === 'completed').length;
+      // Un refus du client n'est ni fait ni à faire (compterVisitesAnnee) : il sort
+      // des visites restantes ET du dénominateur du taux de réalisation.
+      const compte = compterVisitesAnnee(activeContracts);
+      const visitsDone = compte.realises;
+      const visitsRefused = compte.refuses;
       const visitsScheduled = activeContracts.filter((c) => c.current_year_visit_status === 'scheduled').length;
-      const visitesRestantes = Math.max(0, activeContracts.length - visitsDone - visitsScheduled);
+      const visitesRestantes = Math.max(0, compte.aFaire - visitsScheduled);
 
       const totalRevenue = activeContracts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 
@@ -432,8 +437,9 @@ export const entretiensService = {
           closedContracts: cancelledContracts.length,
           totalRevenue,
           visitsDone,
+          visitsRefused,
           visitesRestantes,
-          completionRate: activeContracts.length > 0 ? Math.round((visitsDone / activeContracts.length) * 100) : 0,
+          completionRate: compte.tauxRealisation,
           byType: Object.values(byType).sort((a, b) => b.count - a.count),
         },
         error: null,
@@ -504,6 +510,7 @@ export const entretiensService = {
             contracts: [],
             totalContracts: 0,
             visitsDone: 0,
+            visitsRefused: 0,
             visitsPending: 0,
           };
         }
@@ -511,12 +518,12 @@ export const entretiensService = {
         sectors[cp].contracts.push(contract);
         sectors[cp].totalContracts++;
 
-        // Basé sur current_year_visit_status : visite enregistrée cette année = fait
-        if (contract.current_year_visit_status === 'completed') {
-          sectors[cp].visitsDone++;
-        } else {
-          sectors[cp].visitsPending++;
-        }
+        // Basé sur current_year_visit_status : réalisé, refusé par le client (ni
+        // fait ni à faire), sinon à faire.
+        const statut = statutVisiteAnnee(contract);
+        if (statut === 'realise') sectors[cp].visitsDone++;
+        else if (statut === 'refuse') sectors[cp].visitsRefused++;
+        else sectors[cp].visitsPending++;
       }
 
       // Trier par visites à faire (décroissant)

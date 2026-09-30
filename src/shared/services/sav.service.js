@@ -18,6 +18,7 @@ import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
 import { entretiensService } from './entretiens.service';
 import { logger } from '@lib/logger';
+import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
 import { minutesVersHeure as minutesVersHHMM, minutesDepuisMinuit } from '@/lib/tournee/arrets.js';
 
 const STATUTS_CLOS = ['cancelled', 'completed', 'no_show'];
@@ -369,22 +370,24 @@ export const savService = {
 
       // Compteurs basés sur les contrats
       let entretienRealise = 0;
+      let entretienRefuse = 0;
       let entretienAFaire = 0;
       let caAFaire = 0;
       let caRealise = 0;
 
       for (const c of allContracts) {
         const amt = Number(c.amount) || 0;
-        if (c.current_year_visit_status === 'completed') {
+        const statut = statutVisiteAnnee(c);
+        if (statut === 'realise') {
           entretienRealise++;
           caRealise += amt;
-        } else {
-          // Pas de visite cette année → à faire
-          // Si pas dans le kanban → "à faire" (non planifié)
-          if (!plannedContractIds.has(c.id)) {
-            entretienAFaire++;
-            caAFaire += amt;
-          }
+        } else if (statut === 'refuse') {
+          // Refusé par le client cette année : ni à faire, ni dans le CA à faire.
+          entretienRefuse++;
+        } else if (!plannedContractIds.has(c.id)) {
+          // Pas de visite cette année et pas dans le kanban → "à faire" (non planifié)
+          entretienAFaire++;
+          caAFaire += amt;
         }
       }
 
@@ -396,7 +399,8 @@ export const savService = {
         .eq('status', 'pending');
 
       const stats = {
-        entretien_a_faire: entretienAFaire,       // Contrats sans visite ET sans entretien planifié
+        entretien_a_faire: entretienAFaire,       // Contrats sans visite ET sans entretien planifié (refus exclus)
+        entretien_refuse: entretienRefuse,         // Contrats dont le client a refusé l'entretien de l'année
         entretien_planifie: entretienPlanifie,     // Entretiens dans le kanban en statut planifié
         entretien_realise: entretienRealise,       // Contrats avec visite complétée cette année
         sav_en_cours: savCount,                    // Nombre total de SAV gérés cette année
