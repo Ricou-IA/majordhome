@@ -12,14 +12,15 @@
 
 ---
 
-## [DROITS APP-LEVEL] Modèle de permissions canonical — Phases 4-6 à graver
-**Statut** : PENDING (volontairement différé — fusionne 4 anciennes entrées du 2026-06-02 : spec 01:22 / registre 01:39 / socle DB 01:55 / Phase 3 RLS 02:21)
-**Commits** : cc9ac2b · 74a9e00 · 4285f82 · ed671ec
-**État** : Phases 1-3 livrées en prod (registre `src/lib/permissionsRegistry.js` ; table `majordhome.app_role_permissions` + fonctions `user_effective_role`/`role_can` ; écritures `equipments`+`interventions` gouvernées par `role_can(project_org_id(...), 'clients', …)`). Garde-fou déjà présent dans CLAUDE.md § Rôles & Permissions (ne pas éditer `app_role_permissions` à la main ; ne pas brancher de policy RLS sur `role_can` avant Phase 4).
-**Reste (avec Eric, prod partagée)** : policies `clients`/`contracts`/`leads`, branchement front `can()`, retrait du seed Mayer `org_seed_permissions`.
-**À faire** : graver la doc complète dans CLAUDE.md § Rôles & Permissions quand Phases 4-6 atterrissent. Spec : `docs/superpowers/specs/2026-06-02-permissions-app-level-canonical-design.md`.
-
-*Confirmé PENDING le 2026-08-09 : rien à graver tant que les phases ne sont pas livrées. Reconfirmé le 2026-09-16 et le 2026-09-22.*
+## [2026-09-30 23:00] Droits app-level — phases 4-6 livrées (remplace l'entrée « Phases 4-6 à graver » du 2026-06-02)
+**Statut** : PENDING (texte prêt, accord Eric attendu pour éditer CLAUDE.md)
+**Commits** : migrations `20260930_12..15` + registre / harnais / script de cohérence (commit de cette tâche)
+**Contexte** : Eric, 2026-09-30 : « supprimer = org_admin seul », « go de bout en bout ». Les écritures de `leads` / `contracts` / `quotes` / `tasks` passent par `role_can` ; défauts app regénérés (123, dont `pv_calculator` / `thermal_study` / `maintenance`) ; surcharges purgées (Mayer 10 vrais choix, Cimaj 0) ; `org_seed_permissions` supprimée. Vérifié par impersonation sur le harnais ET en prod.
+**Proposition** : dans CLAUDE.md § Rôles & Permissions, **remplacer** le paragraphe « ⚠️ Droits app-level (WIP — modèle en cours, ne PAS consommer prématurément) » et la puce `org_seed_permissions` par :
+- **Droits = registre `src/lib/permissionsRegistry.js`, source unique** (défauts par rôle × ressource × action ; `org_admin` = bypass, jamais listé). Défauts DB `majordhome.app_role_permissions` **générés** du registre (`node scripts/gen-app-role-permissions-sql.mjs` → migration versionnée), surcharges par org dans `majordhome.role_permissions` (éditeur Settings → Droits d'accès, anneau ambre = surcharge). Arbitre unique `majordhome.role_can(org, resource, action)` (surcharge → défaut → refus), même verdict côté écran (`useCanAccess().can`) et côté base.
+- **Écritures sous `role_can`** : `clients`, `equipments`, `interventions` (via `project_org_id`), `contracts` (sous `clients` : le contrat fait partie de la fiche), `leads` (`pipeline`), `quotes` (`devis`), `tasks`. **Supprimer = `org_admin` seul, toute entité** (Eric 2026-06-02, reconfirmé 2026-09-30) ; `edit_own` autorisé en base dès que le rôle a `edit` ou `edit_own`, le « c'est le mien » reste tenu par l'écran. `appointments` volontairement hors modèle (supprimer un RDV = geste de planning). Toute nouvelle ressource : registre → régénérer les défauts → policies `role_can` ; jamais une policy « tout membre » ni un `UPDATE` à la main sur `app_role_permissions`.
+- **Mesure** : `node scripts/permissions-coherence.mjs --env .env.local` (prod, lecture seule) — échoue si défauts DB ≠ registre, table gouvernée sans `role_can` ou policy legacy restante ; liste les 18 tables enfant encore « tout membre » (activités, interactions, certificats, `quote_templates`…). `verify-permissions-registry.mjs` est dans `audit:quality`. Écart connu : les policies d'`interventions` citent `clients` là où le registre dit `entretiens` (union `entretiens|chantiers` prévue, même verdict aujourd'hui).
+- Plus de gabarit Mayer : une nouvelle org sans surcharge tombe sur les défauts app (`org_seed_permissions` supprimée le 2026-09-30).
 ---
 
 ## [2026-09-22 14:30] Hub de facturation — phases 1 à 3 (émission locale, import Pennylane, avoir)

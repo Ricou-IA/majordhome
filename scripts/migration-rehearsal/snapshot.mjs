@@ -37,7 +37,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
   { schema: 'majordhome', table: 'team_members', columns: null },
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at'] },
+  // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at'] },
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -53,6 +54,11 @@ const TABLES = [
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
   { schema: 'majordhome', table: 'invoices', columns: ['id', 'import_status'], data: false }, // lue par la vue majordhome_entretien_sav (hub de facturation, 20260923_3)
   { schema: 'majordhome', table: 'maintenance_visits', columns: null, data: false }, // 20260928_1 : garde-fou date de visite (triggers ci-dessous)
+  // 20260930_12..15 (droits app-level phases 4-6) : défauts app + surcharges par org AVEC données
+  // (la purge se vérifie sur les vraies lignes), tasks pour ses policies role_can.
+  { schema: 'majordhome', table: 'app_role_permissions', columns: null },
+  { schema: 'majordhome', table: 'role_permissions', columns: null },
+  { schema: 'majordhome', table: 'tasks', columns: null, data: false },
 ];
 
 const FUNCTIONS = [
@@ -79,6 +85,10 @@ const FUNCTIONS = [
   'majordhome.auto_expire_contract_on_end_date()',
   'majordhome.update_client_on_contract_change()',
   'majordhome.contract_activation_promote_cards()',
+  // 20260930_12..15 : arbitre des droits (RLS role_can) + seed Mayer à retirer
+  'majordhome.user_effective_role(uuid)',
+  'majordhome.role_can(uuid, text, text)',
+  'public.org_seed_permissions(uuid)',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
@@ -102,8 +112,15 @@ const VIEWS = [
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
-// sous-ensemble (equipments.* référencent role_can/project_org_id → exclues).
-const POLICY_TABLES = ['pricing_zones', 'pricing_equipment_types', 'team_members'];
+// sous-ensemble. role_can / project_org_id / user_can_read_project sont dans FUNCTIONS
+// (equipments/interventions restent exclues : user_can_read_project non listée).
+const POLICY_TABLES = [
+  'pricing_zones', 'pricing_equipment_types', 'team_members',
+  // 20260930_13 : bascule des écritures sur role_can
+  'leads', 'contracts', 'quotes', 'tasks',
+  // 20260930_14 : purge des surcharges (lecture org / écriture org_admin)
+  'role_permissions', 'app_role_permissions',
+];
 
 function lireEnv(fichier) {
   const txt = fs.readFileSync(fichier, 'utf8');

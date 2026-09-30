@@ -55,8 +55,8 @@ export const REGISTRY = {
   } },
   // NOTE: asymétrie connue avec permissions.js (RESOURCES) : `sav` est ici mais pas
   // dans RESOURCES ; `cedants`/`prospection_commerciale` sont dans RESOURCES mais absents
-  // ici (=> fail-closed). Le registre reflète la réalité DB actuelle. Réconciliation
-  // (incl. fusion sav/entretiens + unification permissions.js) traitée en Phase 3 au câblage de can().
+  // ici (=> fail-closed). Réconciliation (fusion sav/entretiens, unification
+  // permissions.js) à traiter à part.
   sav: { label: 'SAV', tables: {}, actions: {
     view:   { sql: 'SELECT', default: d([1, 1, 1]) },
     create: { sql: 'INSERT', default: d([1, 0, 0]) },
@@ -86,6 +86,17 @@ export const REGISTRY = {
   } },
   voice_recorder: { label: 'Compte-rendu vocal (PWA)', tables: { voice_memos: 'org' }, actions: {
     use: { sql: null, default: d([1, 0, 0]) },
+  } },
+  // Outils d'aide à la vente (RouteGuard `resource=pv_calculator` / `thermal_study`).
+  // Jusqu'au 2026-09-30 ils n'existaient qu'en surcharges posées à la main chez Mayer et
+  // Cimaj : une org sans ces lignes ne voyait ni Solaire ni Thermique pour ses non-admins,
+  // sans aucune erreur. Défauts = ces lignes (responsable et commercial oui, technicien non).
+  // Écritures DB : RLS owner-or-admin des tables pv_simulations / thermal_studies — rien à gouverner ici.
+  pv_calculator: { label: 'Calculateur solaire', tables: {}, actions: {
+    view: { sql: null, default: d([1, 1, 0]) },
+  } },
+  thermal_study: { label: 'Étude thermique', tables: {}, actions: {
+    view: { sql: null, default: d([1, 1, 0]) },
   } },
   // Module Maintenance (opt-in) : suivi/historique ouverts à tous (le compte borne est un
   // simple membre) ; unités & tâches réservées à l'org_admin (bypass). Écritures DB : RLS

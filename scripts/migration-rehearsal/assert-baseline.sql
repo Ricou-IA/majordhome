@@ -33,7 +33,10 @@ BEGIN
       ('majordhome.maintenance_visit_date_guard()'),
       ('majordhome.auto_expire_contract_on_end_date()'),
       ('majordhome.update_client_on_contract_change()'),
-      ('majordhome.contract_activation_promote_cards()')
+      ('majordhome.contract_activation_promote_cards()'),
+      ('majordhome.user_effective_role(uuid)'),
+      ('majordhome.role_can(uuid, text, text)'),
+      ('public.org_seed_permissions(uuid)')
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
@@ -101,7 +104,8 @@ BEGIN
   END LOOP;
 
   -- RLS activée + au moins une policy (POLICY_TABLES)
-  FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members')) AS t(tbl)
+  FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members'),
+                                 ('leads'), ('contracts'), ('quotes'), ('tasks'), ('role_permissions'), ('app_role_permissions')) AS t(tbl)
   LOOP
     PERFORM 1 FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
      WHERE ns.nspname = 'majordhome' AND c.relname = r.tbl AND c.relrowsecurity;
@@ -170,7 +174,7 @@ BEGIN
   IF n_types <> 14 THEN RAISE EXCEPTION 'pricing_equipment_types attendu 14, trouvé % (type créé/supprimé en prod ? ré-aligner §3)', n_types; END IF;
 
   SELECT count(*) INTO n_membres FROM majordhome.team_members;
-  IF n_membres <> 7 THEN RAISE EXCEPTION 'team_members attendu 7, trouvé % (membre créé/supprimé en prod ? ré-aligner §3)', n_membres; END IF;
+  IF n_membres <> 8 THEN RAISE EXCEPTION 'team_members attendu 8, trouvé % (membre créé/supprimé en prod ? ré-aligner §3)', n_membres; END IF;
 
   SELECT count(*), count(*) FILTER (WHERE equipment_type_id IS NULL) INTO n_eq, n_sans_type FROM majordhome.equipments;
   SELECT count(*) INTO n_cert FROM majordhome.certificats;

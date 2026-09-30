@@ -38,6 +38,8 @@ export const RESOURCES = [
   { key: 'tasks',      label: 'Tâches' },
   { key: 'meta_ads',   label: 'Meta Ads' },
   { key: 'voice_recorder', label: 'Compte-rendu vocal (PWA)' },
+  { key: 'pv_calculator', label: 'Calculateur solaire' },
+  { key: 'thermal_study', label: 'Étude thermique' },
   { key: 'maintenance', label: 'Maintenance' },
   { key: 'settings',   label: 'Paramètres' },
 ];
