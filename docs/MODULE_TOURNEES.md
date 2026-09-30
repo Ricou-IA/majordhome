@@ -9,7 +9,7 @@
 ## Ce que ça fait
 
 Deux questions, un seul moteur :
-- **Journée → clients** (onglet Entretiens → Tournées, « remplir une journée ») : pour une journée d'un technicien, quels contrats dus insérer, dans quel ordre, à quel coût de trajet.
+- **Journée → clients** (Planning → puce d'état de la journée, « remplir une journée » ; l'onglet Tournées de la page Entretiens a été supprimé le 2026-09-30, cf. § Ranger) : pour une journée d'un technicien, quels contrats dus insérer, dans quel ordre, à quel coût de trajet.
 - **Contrat → créneaux** (CTA « Trouver le créneau optimisé » dans la fiche contrat, edge `slots-propose`) : pour ce contrat, quelles journées existantes l'accueillent au meilleur coût, sinon quelles journées vides ouvrir. C'est l'outil « machine-usable » qu'Hermes consommera (serveur MCP, tranche suivante).
 
 Et par-dessus, la **souplesse** : chaque entretien/SAV a une tolérance de déplacement ; le moteur peut glisser un voisin pour faire rentrer un client ; une **journée pleine se fige toute seule** (heures définitives) ; l'humain n'arbitre que ce que le moteur ne sait pas tenir.
@@ -26,12 +26,12 @@ Aucun import React / Supabase / alias Vite. Testés par `node --test "scripts/to
 | `geo.js` | `cleCoord` (3 décimales ≈ 100 m), haversine, filtre de proximité, barycentre. |
 | `matrice.js` / `trajets-core.js` | Matrice de trajets : cache `majordhome_travel_cache` → Mapbox Matrix (`MDH_MAPBOX_TOKEN`) → repli vol d'oiseau **toujours signalé** (`estime: true`). `creerChargeurMatrice({ client, coreOrgId, token })` est injectable (navigateur et Deno). |
 | `arrets.js` | RDV bruts → arrêts (`{ id, key, dureeMinutes, fenetre, tolerance, prevu }`). `toleranceDe` (souplesse **opt-in**), `construireArretsExistants`, `construireArretsPourConsolidation`, `minutesDepuisMinuit` / `minutesVersHeure`, `arrondirHeureFigee`, `TYPES_ADAPTABLES`. |
-| `creneaux.js` | `placerCandidat` : insertion d'un candidat dans les créneaux libres d'une journée (coût = allée + travail + retour − trajet évité), `fenetreArrivee`, `trajetMaxMinutes`, `tenterDecalage` (glisse UN voisin adaptable). `classerParCreneaux` / `placerPlusieurs` pour l'onglet Tournées (refusent tout placement qui supposerait un voisin déplacé). |
+| `creneaux.js` | `placerCandidat` : insertion d'un candidat dans les créneaux libres d'une journée (coût = allée + travail + retour − trajet évité), `fenetreArrivee`, `trajetMaxMinutes`, `tenterDecalage` (glisse UN voisin adaptable). `classerParCreneaux` / `placerPlusieurs` pour le panneau de remplissage (refusent tout placement qui supposerait un voisin déplacé). |
 | `sequence.js` | `sequencerTournee` : ordre + heures d'une journée dans les fenêtres, exact jusqu'à `MAX_ARRETS_EXACT`, heuristique plus-proche-voisin au-delà ; `figesSontDesFaits` ; `diagnostiquerJournee` (chiffres de la journée telle que posée quand rien ne tient). |
 | `plein.js` | `evaluerRemplissage` (reste utile), `verdictJournee` (`sans_adaptable` / `non_pleine` / `figeable` / `a_arbitrer`) — même verdict pour le cron et le tableau de bord. |
 | `proposer-contrat.js` | `techniciensEligibles`, `journeesCandidates`, `proposerPourContrat` (contrat → créneaux classés par score, `nouvellesJournees`, `raisonsRejet`). |
 | `loaders.js` | `chargerJournees` / `chargerContrat` / `chargerDureesBareme` — chargement **injectable** (client supabase en paramètre), même code navigateur et edge. |
-| `timeline.js` | Placement des RDV sur la barre horaire de l'onglet Tournées (segments, trous, `trajetDepuisPrecedent`, bornes d'un déplacement à la main). |
+| `timeline.js` | Placement des RDV sur la barre horaire du panneau de remplissage (segments, trous, `trajetDepuisPrecedent`, bornes d'un déplacement à la main). |
 
 Côté app : `tournees.service.js` et `trajets.service.js` ne sont que des wrappers navigateur ; hooks `useTournees.js` (`useContratsDus`, `useJourneesHorizon`, `usePropositions`, `useDureeContrat`, `useDureeContratClient`, `useJourneesAArbitrer`), clés `tourneeKeys` (orgId en 1ᵉʳ).
 
@@ -68,7 +68,7 @@ Pour un Entretien rattaché à un contrat, `chargerJournees` **remplace** `durat
 `DayResourceGrid` / `SchedulingAssistant` prennent `fixedDuration` : un clic pose le bloc entier à la durée du contrat (`useDureeContrat` / `useDureeContratClient`), plus d'étirement « à peu près ». Alimenté par `SchedulingTransitionModal` (kanban, fiche contrat) et `EventModal` (Entretien sur un client à contrat).
 
 ### Souplesse : opt-in, ancre annoncée, un seul voisin
-- `toleranceDe(rdv, { souplesse: true, flexDefaut, amplitude, demiJournee })` : **sans `souplesse: true`, tolérance ponctuelle** quel que soit `time_flex_minutes`. Seul un appelant qui sait **écrire** les décalages la demande : `proposerPourContrat` (pose via `scheduleEntretien({ decalages })`) et la consolidation. Le remplissage de journée (onglet Tournées) reste ponctuel et refuse tout placement qui supposerait un voisin déplacé.
+- `toleranceDe(rdv, { souplesse: true, flexDefaut, amplitude, demiJournee })` : **sans `souplesse: true`, tolérance ponctuelle** quel que soit `time_flex_minutes`. Seul un appelant qui sait **écrire** les décalages la demande : `proposerPourContrat` (pose via `scheduleEntretien({ decalages })`) et la consolidation. Le remplissage de journée (panneau ouvert depuis le Planning) reste ponctuel et refuse tout placement qui supposerait un voisin déplacé.
 - La plage est ancrée sur `announced_start` (des décalages successifs restent dans « 14 h ± 30 »), l'heure courante est toujours dans sa plage, l'amplitude prime (un adaptable qui déborde est ramené dedans à la consolidation), un figé n'est jamais borné.
 - `placerCandidat` glisse **au plus un** voisin adaptable (pousse le suivant / tire le précédent, sans casser le voisin du voisin). `scheduleEntretien` relit le voisin et le glisse **avant** la pose ; refus `decalage_refuse` (+ raison : `deplace`, `fige`, `souplesse_modifiee`, `introuvable`, `ecriture`) si son état a changé ; remis en place si la pose échoue. Une carte créée pour l'occasion redescend en « À planifier » si la pose échoue.
 - Un **drag** dans le Planning ré-ancre `announced_start` sans figer ; **figer** est un geste explicite (SouplesseDialog à la pose, `SectionSouplesse` sur le RDV, « Figer la journée »).
@@ -80,10 +80,10 @@ Décision Eric : « si c'est plein depuis 10 jours, pourquoi attendre ? » — *
 ### La journée commence au dépôt
 `simuler` part du dépôt à l'ouverture : le trajet vers le premier client compte. Le « départ anticipé » ne vaut que pour un RDV **figé** à l'ouverture (le client a exigé 8 h). Un adaptable posé à 8 h à 38 min du dépôt → à arbitrer, et le diagnostic nomme « dépôt (ouverture) → client ». Un figé atteint « en retard » selon nos estimations est un **fait** (`figesSontDesFaits`), pas un blocage (leçon du 31/08).
 
-### Pleine mais impossible (R3) → tableau de bord de l'admin
-`JourneesAArbitrer` (Dashboard, org_admin) liste les journées pleines que l'ordonnanceur ne sait pas tenir, avec le diagnostic (travail / trajets / budget / trajets qui ne tiennent pas, estimés à vol d'oiseau) ; clic → `/entretiens?tab=tournees&journee=YYYY-MM-DD&tech=<id>` ouvre la journée. Pas dans l'onglet Tournées (décision Eric).
+### Pleine mais impossible (R3) → Dashboard des entretiens
+`JourneesAArbitrer` (Entretiens → Dashboard, depuis le 2026-09-30 ; auparavant tableau de bord de l'admin) liste les journées pleines que l'ordonnanceur ne sait pas tenir, avec le diagnostic (travail / trajets / budget / trajets qui ne tiennent pas, estimés à vol d'oiseau) ; clic → `/planning?journee=YYYY-MM-DD&tech=<id>` (`lienJourneePlanning`) ouvre la journée dans le Planning.
 
-### « Figer la journée » (bouton, onglet Tournées)
+### « Figer la journée » (bouton du panneau de remplissage, Planning)
 `useConsolidationJournee` : aperçu (heures avant → après, figés grisés, diagnostic chiffré si impossible), relecture de l'état avant d'écrire (rien n'a bougé depuis l'aperçu, sinon rien n'est écrit), arrêt au premier refus, SMS seulement si tout est écrit **et** `figer_sms`, clients sans mobile listés « à prévenir par téléphone ». Même formats SMS que le cron (`formatSmsDate` / `formatSmsHour` / `capitaliserPrenom`).
 
 ### Contrat → créneaux (CTA, edge `slots-propose`)
@@ -114,7 +114,7 @@ Spec : `docs/superpowers/specs/2026-09-29-auto-rdv-entretien-mensuel-design.md` 
 - **`majordhome.journees_secteur`** (org **core**, `UNIQUE (org_id, team_member_id, date)`) : étiquette de secteur d'une journée (`origine` = `deduite` des RDV posés · `machine` · `humain`) + **trace du figeage** `figee_at` / `figee_par` (`cron` ou `user:<uuid>`). Une journée est disponible par nature : personne ne l'ouvre, l'étiquette dit seulement à quel secteur elle est dédiée. `deduireSecteur(rdvs)` = secteur majoritaire des entretiens/SAV du jour (une journée qui porte un entretien à Castres EST une journée Castres).
 - **`majordhome.planification_runs`** : journal des passages des crons (`tournees-figer` ; `auto-rdv-*` à venir), écrit par l'edge **même en échec** (500 explicite si le journal ne s'écrit pas). Lu par le Dashboard entretiens (`PlanificationJournal`). Avant : le rapport n'existait que dans `net._http_response`.
 - **Figeage = une seule fonction** `majordhome.figer_journee(p_mdh_org_id, p_lignes, p_par)` (interne), appelée par `public.tournees_figer_journee` (cron, service_role only) **et** `public.tournees_figer_journee_user(p_lignes)` (bouton « Figer la journée », authenticated, org dérivée des RDV, org_admin/team_leader). Tout ou rien, et la trace `figee_at` est posée dans la même transaction. Le bouton ne boucle plus sur `updateAppointment`.
-- **Planning** : `useEtatsJournees({ coreOrgId, startDate, endDate })` calcule l'état de la plage visible (verdict à **vol d'oiseau**, `estime: true` ; « figée » vient de la base et est donc toujours vrai) ; `JourneeEtatChips` affiche une puce par technicien sous l'en-tête du jour (`dayHeaderContent`), clic → `/entretiens?tab=tournees&journee=…&tech=…`.
+- **Planning** : `useEtatsJournees({ coreOrgId, startDate, endDate })` calcule l'état de la plage visible (verdict à **vol d'oiseau**, `estime: true` ; « figée » vient de la base et est donc toujours vrai) ; `JourneeEtatChips` affiche une puce par technicien sous l'en-tête du jour (`dayHeaderContent`), clic → panneau de remplissage de la journée, sur place (depuis la tranche 4 ; auparavant l'onglet Tournées).
 - Harnais : `scripts/migration-rehearsal/assert-journees-secteur.sql` ; le snapshot photographie désormais `appointment_technicians` et les colonnes de souplesse d'`appointments`.
 
 ## Auto-RDV : lien signé, créneaux en direct, pose atomique (tranche 2, 2026-09-29)
@@ -146,3 +146,13 @@ Plan : `docs/superpowers/plans/2026-09-30-auto-rdv-tranche3-inviter-relancer.md`
 - ⚠️ **Filtres `in` PostgREST par lots de 100** côté edge : 500 uuid dépassent la longueur d'URL (« error sending request », vécu à la première simulation).
 - Jeton partagé : `_shared/autoRdvToken.ts` (edge `auto-rdv` et cron). Gabarits e-mail : `src/lib/autoRdvEmailTemplates.js`, créés depuis Settings → Communication → Emails (`GabaritTransactionnel`).
 - **Activation = gestes d'Eric** : créer les deux gabarits e-mail, saisir les SMS `auto_rdv_relance` et `heure_de_passage` (Communication → SMS), cocher « Prise de rendez-vous par le client », puis `figer_sms`.
+
+## Auto-RDV : ranger (tranche 4, 2026-09-30)
+
+Spec § 9. Aucune migration, aucune edge redéployée, rien de retiré du moteur.
+
+- **L'onglet Tournées de la page Entretiens n'existe plus** (`components/tournees/TourneesTab.jsx` supprimé ; `?tab=tournees` retombe sur le Dashboard). Entretiens garde Kanban, Contrats, Programmation, Dashboard, Clos.
+- **Remplir / figer une journée = clic sur sa puce dans le Planning** : `Planning.jsx` monte `RemplirJourneePanel` sur place. Le panneau charge lui-même les contrats dus ; le Planning ne lui passe que la journée, **dérivée en direct** de l'horizon (`useEtatsJournees` renvoie aussi `journees`), jamais un objet capturé au clic. Lien direct : `/planning?journee=YYYY-MM-DD&tech=<team_member id>` (source unique `lienJourneePlanning` de `tourneesPanelUtils.js`) — le calendrier s'ouvre sur la date ; une journée absente de l'horizon (passée, non travaillée, technicien « à la main ») ou un chargement en échec donne un message, pas un lien muet.
+- **Dashboard des entretiens** : `JourneesAArbitrer` (retiré du tableau de bord général) et `AlertesTournees` (sous-remplies à J-7, retardataires, clients non localisés, équipements à typer), au-dessus de « Planification automatique ». Même horizon pour les deux (`useJourneesHorizon` par défaut) ; journée → Planning, contrat → fiche contrat.
+- **CTA « Trouver le créneau » borné au mois** : `CreneauxProposesPanel` passe `constraints.date_to` = fin de `bornesMois(aujourd'hui, { delaiMinJours: 0 })` — mois en cours, mois suivant inclus s'il reste moins de 7 jours, sans délai minimal (l'opérateur peut poser pour demain). La borne s'affiche dans le panneau. ⚠️ Elle est posée par l'**appelant** : l'edge `slots-propose` appelée sans `date_to` (Hermes, MCP) propose encore au-delà du mois.
+- Non fait ici : corriger l'étiquette de secteur d'une journée depuis le Planning (spec § 5 — la table accepte l'origine `humain`, aucun écran ne l'écrit) ; action « Arbitrer » sur la puce rouge.

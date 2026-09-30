@@ -145,3 +145,13 @@ Règles qui mordent :
 - **L'auto-RDV réordonnance la journée entière** (`placerParSequencement`) et écrit les décalages des voisins avec le RDV (`auto_rdv_poser(..., p_decalages)`), tout ou rien. Le moteur ne change jamais un RDV de demi-journée ni de jour de lui-même.
 - **Cron `auto-rdv-cron` gouverné par `settings.tournees.auto_rdv.enabled`** ; gabarit absent ou client sans e-mail ⇒ invitation `phone` (liste d'appels), journalisé ; filtres `in` par lots de 100 côté edge.
 ---
+
+## [2026-09-30 14:00] Auto-RDV tranche 4 « Ranger » — onglet Tournées supprimé, journée ouverte depuis le Planning
+**Statut** : PENDING
+**Commit** : a4ebe70
+**Contexte** : Spec auto-RDV § 9. `TourneesTab.jsx` (page Entretiens) supprimé ; `RemplirJourneePanel` monté par `Planning.jsx` au clic sur une puce d'état ; `JourneesAArbitrer` + `AlertesTournees` dans le Dashboard des entretiens ; CTA fiche contrat borné au mois. Détail : `docs/MODULE_TOURNEES.md` § « Auto-RDV : ranger ».
+**Proposition** (CLAUDE.md § Module Tournées — deux phrases existantes deviennent fausses) :
+- Remplacer « Pleine mais impossible → **tableau de bord de l'admin** (`JourneesAArbitrer`), pas l'onglet Tournées » par : « Pleine mais impossible → **Dashboard des entretiens** (`JourneesAArbitrer`, avec les filets `AlertesTournees`) ».
+- Ajouter : **Remplir / figer une journée = sa puce d'état dans le Planning** (`RemplirJourneePanel`, seule porte de programmation au fil de l'eau ; l'onglet Tournées de la page Entretiens n'existe plus). Lien direct `/planning?journee=&tech=` via `lienJourneePlanning` (`tourneesPanelUtils.js`), jamais une URL recopiée. La journée affichée est dérivée en direct de `useEtatsJournees().journees`, jamais un objet capturé au clic.
+- Ajouter : **CTA « Trouver le créneau » borné au mois par l'appelant** (`constraints.date_to` = `bornesMois(…, { delaiMinJours: 0 }).fin`) ; l'edge `slots-propose` appelée sans `date_to` (Hermes / MCP) propose encore au-delà — à borner côté edge avant de la brancher sur une machine.
+---
