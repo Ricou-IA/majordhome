@@ -1,6 +1,10 @@
 -- assert-permissions.sql — vérifie 20260930_12..15 (droits app-level, phases 4-6) sur le
 -- cluster de répétition. Un écart lève une exception → run.mjs sort en ECHEC.
 -- Identifiants figés sur la prod du 2026-09-30 (membres Mayer par rôle effectif).
+-- ⚠️ À lancer AVEC les migrations (--migration 20260930_12..15) : le harnais ne photographie
+-- pas les ACL des fonctions, seul le REVOKE de 20260930_13 rend (B) « anon sans EXECUTE » vrai.
+-- Sur une photo post-migrations sans les rejouer, (B) échoue à tort — la prod, elle, est
+-- vérifiée par scripts/permissions-coherence.mjs --env.
 --
 -- A. défauts app regénérés (123 lignes, nouvelles ressources)
 -- B. policies : plus aucune écriture « tout membre », tout passe par role_can
@@ -218,6 +222,8 @@ BEGIN
 END $$;
 
 -- ── F. Fin du gabarit Mayer ─────────────────────────────────────────────────
+-- (Depuis que 20260930_15 est en prod, la fonction n'est plus dans la photo : l'assertion
+-- reste vraie par construction, elle documente l'intention.)
 DO $$
 BEGIN
   IF to_regprocedure('public.org_seed_permissions(uuid)') IS NOT NULL THEN

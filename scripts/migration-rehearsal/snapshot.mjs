@@ -85,10 +85,10 @@ const FUNCTIONS = [
   'majordhome.auto_expire_contract_on_end_date()',
   'majordhome.update_client_on_contract_change()',
   'majordhome.contract_activation_promote_cards()',
-  // 20260930_12..15 : arbitre des droits (RLS role_can) + seed Mayer à retirer
+  // 20260930_12..15 : arbitre des droits (RLS role_can). org_seed_permissions a été
+  // supprimée en prod par 20260930_15 — ne plus la lister (le cast ::regprocedure échouerait).
   'majordhome.user_effective_role(uuid)',
   'majordhome.role_can(uuid, text, text)',
-  'public.org_seed_permissions(uuid)',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).

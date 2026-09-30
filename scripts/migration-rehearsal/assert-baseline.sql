@@ -35,8 +35,7 @@ BEGIN
       ('majordhome.update_client_on_contract_change()'),
       ('majordhome.contract_activation_promote_cards()'),
       ('majordhome.user_effective_role(uuid)'),
-      ('majordhome.role_can(uuid, text, text)'),
-      ('public.org_seed_permissions(uuid)')
+      ('majordhome.role_can(uuid, text, text)')
     ) AS t(fn)
   LOOP
     IF to_regprocedure(r.fn) IS NULL THEN RAISE EXCEPTION 'fonction absente : %', r.fn; END IF;
