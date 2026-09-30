@@ -125,6 +125,11 @@ export const AUDIT_FIELD_LABELS = {
     parts_used: 'Pièces utilisées',
     photos_urls: 'Photos',
     signature_url: 'Signature',
+    chantier_id: 'Chantier lié',
+  },
+  chantiers: {
+    label: 'Libellé du chantier',
+    chantier_id: 'Chantier lié',
   },
 };
 
@@ -150,10 +155,15 @@ export const AUDIT_SOURCE_LABELS = {
   pennylane_sync_ensure_winning_quotes: 'synchro Pennylane',
   tournees_figer_journee: 'figeage de la journée',
   meta_ads_backfill_lead_attribution: 'attribution Meta Ads',
+  chantier_group: 'groupement de chantiers',
+  chantier_detach: 'détachement de chantier',
+  chantier_delete: 'suppression de chantier',
+  chantier_ensure_for_lead: 'gain sans devis',
+  majordhome_chantiers_write: 'fiche chantier',
 };
 
 /** Sujet affiché selon la table auditée. */
-const SUBJECTS = { leads: 'Lead', appointments: 'RDV' };
+const SUBJECTS = { leads: 'Lead', appointments: 'RDV', chantiers: 'Chantier' };
 
 /**
  * À la création, seuls ces champs sont détaillés (la ligne entière noierait

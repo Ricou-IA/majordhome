@@ -887,7 +887,7 @@ export function useAttachQuotesAndSend(orgId, leadId) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotes(orgId) });
       queryClient.invalidateQueries({ queryKey: pennylaneKeys.candidatesByLead(orgId, leadId) });
       queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes'] });
       queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes-count'] });
@@ -921,7 +921,7 @@ export function useMarkLeadWonWithQuote(orgId, leadId) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
-      queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
+      queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotes(orgId) });
       queryClient.invalidateQueries({ queryKey: ['chantiers'] });
       // Vue kanban_cards recalculée (winning quote modifié → carte Gagné refresh)
       queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });

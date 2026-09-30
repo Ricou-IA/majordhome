@@ -6,7 +6,7 @@
  *        → le PDF est généré avec les 2 signatures, uploadé, et le chantier
  *        peut passer en "Réceptionné".
  *
- * Route : /artisan/chantiers/:leadId/pv-reception
+ * Route : /artisan/chantiers/:chantierId/pv-reception
  * ============================================================================
  */
 
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { buildCompanyInfo } from '@/lib/orgBranding';
 import { chantierKeys } from '@hooks/cacheKeys';
-import { chantiersService } from '@services/chantiers.service';
+import { chantiersService, getChantierAmount } from '@services/chantiers.service';
 import { storageService } from '@services/storage.service';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import { generatePvReceptionPdfBlob } from '../components/chantiers/PvReceptionPDF';
@@ -31,23 +31,23 @@ import { supabase } from '@/lib/supabaseClient';
 // HOOK : Charger le chantier (via vue majordhome_chantiers)
 // ============================================================================
 
-function useChantier(leadId) {
+function useChantier(chantierId) {
   const [chantier, setChantier] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!leadId) { setIsLoading(false); return; }
+    if (!chantierId) { setIsLoading(false); return; }
     async function load() {
       const { data } = await supabase
         .from('majordhome_chantiers')
         .select('*')
-        .eq('id', leadId)
+        .eq('id', chantierId)
         .single();
       setChantier(data || null);
       setIsLoading(false);
     }
     load();
-  }, [leadId]);
+  }, [chantierId]);
 
   return { chantier, isLoading };
 }
@@ -57,7 +57,7 @@ function useChantier(leadId) {
 // ============================================================================
 
 export default function PvReceptionSign() {
-  const { leadId } = useParams();
+  const { chantierId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, organization } = useAuth();
@@ -65,7 +65,7 @@ export default function PvReceptionSign() {
   const company = useMemo(() => buildCompanyInfo(organization?.settings), [organization]);
 
   // -- Données --
-  const { chantier, isLoading } = useChantier(leadId);
+  const { chantier, isLoading } = useChantier(chantierId);
 
   // -- State : formulaire --
   const [receptionType, setReceptionType] = useState('sans_reserves');
@@ -105,7 +105,7 @@ export default function PvReceptionSign() {
 
   const amount = useMemo(() => {
     if (!chantier) return 0;
-    return Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
+    return getChantierAmount(chantier);
   }, [chantier]);
 
   // -- Validation --
@@ -163,7 +163,7 @@ export default function PvReceptionSign() {
       if (uploadError) throw uploadError;
 
       // Enregistrer le chemin en DB
-      const { error: dbError } = await chantiersService.updatePvReceptionPath(chantier.id, storagePath);
+      const { error: dbError } = await chantiersService.updatePvReceptionPath(orgId, chantier.id, storagePath);
       if (dbError) throw dbError;
 
       // Invalider le cache

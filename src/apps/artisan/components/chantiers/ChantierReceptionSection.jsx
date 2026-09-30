@@ -99,8 +99,8 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
 
   // Devis Pennylane rattachés (référence + éjection). Léger : pas de chargement
   // des lignes, juste le pivot lead_pennylane_quotes.
-  const { linkedQuotes } = useLinkedPennylaneQuotes(chantier?.id);
-  const { ejectQuote, isEjecting } = useLinkedPennylaneQuotesMutations(orgId, chantier?.id);
+  const { linkedQuotes } = useLinkedPennylaneQuotes(chantier?.lead_id, { chantierId: chantier?.id });
+  const { ejectQuote, isEjecting } = useLinkedPennylaneQuotesMutations(orgId, chantier?.lead_id);
 
   // Validés d'abord, puis les autres
   const quotes = useMemo(
@@ -191,7 +191,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
       {quotes.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-gray-400">
-            Devis rattaché{quotes.length > 1 ? 's' : ''}
+            Devis de ce chantier
           </p>
           {quotes.map((q) => {
             const qid = q.pennylane_quote_id;

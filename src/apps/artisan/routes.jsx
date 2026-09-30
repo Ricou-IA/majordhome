@@ -459,7 +459,7 @@ export const artisanRoutes = [
     ),
   },
   {
-    path: 'chantiers/:leadId/pv-reception',
+    path: 'chantiers/:chantierId/pv-reception',
     element: (
       <SuspenseWrapper>
         <RouteGuard resource="chantiers">

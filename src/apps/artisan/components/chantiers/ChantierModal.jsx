@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, Archive, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuroCeil } from '@/lib/utils';
@@ -46,12 +46,13 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     updateEstimatedDate,
     updateChantierNotes,
     updatePlannedOrder,
+    updateLabel,
     isUpdatingStatus,
   } = useChantierMutations();
 
   const { members } = useTeamMembers(orgId);
   const queryClient = useQueryClient();
-  // Jours d'installation = appointments `installation` liés au chantier (lead_id = chantier.id)
+  // Jours d'installation = appointments `installation` du chantier (chantier_id)
   const { appointments: installAppointments, refresh: refreshInstallAppointments } =
     useChantierAppointments(orgId, chantier?.id);
 
@@ -59,6 +60,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   const [estimatedDate, setEstimatedDate] = useState(chantier?.estimated_date || '');
   const [notes, setNotes] = useState(chantier?.chantier_notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [label, setLabel] = useState(chantier?.label || '');
+  useEffect(() => { setLabel(chantier?.label || ''); }, [chantier?.id, chantier?.label]);
 
   // PV de réception
   const [pvPath] = useState(chantier?.pv_reception_path || null);
@@ -168,6 +171,16 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     }
   };
 
+  const handleSaveLabel = async () => {
+    if ((label || '').trim() === (chantier.label || '')) return;
+    try {
+      await updateLabel(chantier.id, label);
+      onUpdated?.();
+    } catch {
+      toast.error('Impossible d\'enregistrer le libellé');
+    }
+  };
+
   const handleViewPv = async () => {
     const { url, error } = await chantiersService.getPvReceptionUrl(pvPath);
     if (error || !url) {
@@ -232,7 +245,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       const { error } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
         appointment_type: 'installation',
-        lead_id: chantier.id,
+        chantier_id: chantier.id,
+        lead_id: chantier.lead_id,
         client_id: chantier.client_id || null,
         client_name: chantier.last_name || 'Sans nom',
         client_first_name: chantier.first_name || null,
@@ -321,6 +335,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             <div className="min-w-0">
               <h2 className="text-base font-semibold text-gray-900 truncate">{name}</h2>
               <p className="text-xs text-gray-500">{statusConfig.label}</p>
+              {chantier.label && <p className="text-xs text-gray-500 truncate">{chantier.label}</p>}
             </div>
           </div>
           <button
@@ -376,6 +391,17 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium">
                 {chantier.equipment_type_label}
               </span>
+            )}
+            {!isTechnicien && (
+              <FormField label="Libellé du chantier">
+                <TextInput
+                  value={label}
+                  onChange={setLabel}
+                  onBlur={handleSaveLabel}
+                  placeholder="Ex. Installation d'une pompe à chaleur"
+                  disabled={!canEditChantier}
+                />
+              </FormField>
             )}
           </div>
 
@@ -571,7 +597,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
             return cfg.display_order < currentOrder;
           });
           const forwardTransitions = allowedTransitions.filter((t) => {
-            if (t === 'archive') return true;
             const cfg = getChantierStatusConfig(t);
             return cfg.display_order > currentOrder;
           });
@@ -599,20 +624,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
               {/* Avancer à droite */}
               {forwardTransitions.map((targetStatus) => {
-                if (targetStatus === 'archive') {
-                  return (
-                    <button
-                      key={targetStatus}
-                      type="button"
-                      onClick={() => handleTransition(targetStatus)}
-                      disabled={isUpdatingStatus}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-500 bg-gray-50 transition-colors hover:shadow-sm hover:bg-gray-100 disabled:opacity-50"
-                    >
-                      <Archive className="w-3.5 h-3.5" />
-                      Archiver
-                    </button>
-                  );
-                }
                 const config = getChantierStatusConfig(targetStatus);
                 const needsPv = targetStatus === 'realise' && !pvPath;
                 return (
