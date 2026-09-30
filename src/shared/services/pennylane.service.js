@@ -1196,12 +1196,14 @@ async function getLedgerAccounts() {
  * Liste les devis Pennylane liés à un lead (chantier), actifs uniquement.
  * Triés par date de devis desc (le plus récent en haut).
  */
-async function getLinkedQuotesByLead(leadId) {
-  const { data, error } = await supabase
+async function getLinkedQuotesByLead(leadId, { chantierId = null } = {}) {
+  let query = supabase
     .from('majordhome_lead_pennylane_quotes')
-    .select('id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_amount_ht, quote_label, quote_date, quote_status, is_winning_quote, is_validated, assigned_at, pdf_url')
+    .select('id, lead_id, chantier_id, pennylane_quote_id, pennylane_customer_id, quote_amount_ht, quote_label, quote_date, quote_status, is_winning_quote, is_validated, assigned_at, pdf_url')
     .eq('lead_id', leadId)
-    .is('ejected_at', null)
+    .is('ejected_at', null);
+  if (chantierId) query = query.eq('chantier_id', chantierId);
+  const { data, error } = await query
     .order('quote_date', { ascending: false, nullsFirst: false })
     .order('assigned_at', { ascending: true });
   if (error) throw error;
@@ -1914,7 +1916,7 @@ export const pennylaneService = {
   importPennylaneCustomerToMdh: (orgId, plCustomer, userId) => withErrorHandling(() => importPennylaneCustomerToMdh(orgId, plCustomer, userId), 'pennylane.importPennylaneCustomerToMdh'),
 
   // Liaison lead ↔ devis (multi-devis par chantier)
-  getLinkedQuotesByLead: (leadId) => withErrorHandling(() => getLinkedQuotesByLead(leadId), 'pennylane.getLinkedQuotesByLead'),
+  getLinkedQuotesByLead: (leadId, opts) => withErrorHandling(() => getLinkedQuotesByLead(leadId, opts), 'pennylane.getLinkedQuotesByLead'),
   ejectQuoteFromLead: (orgId, pennylaneQuoteId, reason) => withErrorHandling(() => ejectQuoteFromLead(orgId, pennylaneQuoteId, reason), 'pennylane.ejectQuoteFromLead'),
 
   // Bridge Pipeline ↔ Pennylane (spec 2026-05-23 PR 4+)

@@ -101,7 +101,7 @@ export const appointmentKeys = {
   teamMembers: (orgId) => ['team-members', orgId],
   technicians: (orgId, appointmentIds) => [...appointmentKeys.all(orgId), 'technicians', appointmentIds],
   dayAvailability: (orgId, date) => [...appointmentKeys.all(orgId), 'day-availability', date],
-  chantier: (orgId, leadId) => [...appointmentKeys.all(orgId), 'chantier', leadId],
+  chantier: (orgId, chantierId) => [...appointmentKeys.all(orgId), 'chantier', chantierId],
   audit: (orgId, id) => [...appointmentKeys.all(orgId), 'audit', id],
 };
 
@@ -118,6 +118,7 @@ export const chantierKeys = {
   all: (orgId) => ['chantiers', orgId],
   lists: (orgId) => [...chantierKeys.all(orgId), 'list'],
   list: (orgId) => [...chantierKeys.lists(orgId)],
+  byClient: (orgId, clientId) => [...chantierKeys.all(orgId), 'client', clientId],
 };
 
 // --- Prospects ---
@@ -297,7 +298,9 @@ export const pennylaneKeys = {
   invoicesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'invoices', clientId],
   quotesByClient: (orgId, clientId) => [...pennylaneKeys.all(orgId), 'quotes', clientId],
   quoteLines: (orgId, pennylaneQuoteId) => [...pennylaneKeys.all(orgId), 'quote-lines', pennylaneQuoteId],
-  linkedQuotesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'linked-quotes', leadId],
+  linkedQuotes: (orgId) => [...pennylaneKeys.all(orgId), 'linked-quotes'],
+  linkedQuotesByLead: (orgId, leadId) => [...pennylaneKeys.linkedQuotes(orgId), leadId],
+  linkedQuotesByChantier: (orgId, chantierId) => [...pennylaneKeys.linkedQuotes(orgId), 'chantier', chantierId],
   // PR 4 bridge : candidats fuzzy + devis PL non rattachés (exploration + compteur)
   candidatesByLead: (orgId, leadId) => [...pennylaneKeys.all(orgId), 'candidates', leadId],
   unlinkedQuotes: (orgId, sinceDays) => [...pennylaneKeys.all(orgId), 'unlinked-quotes', sinceDays],

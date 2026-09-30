@@ -16,7 +16,7 @@ import { pennylaneCustomerDuplicatesService } from '@services/pennylaneCustomerD
 import { leadsService } from '@services/leads.service';
 import { quoteDismissalsService } from '@services/quoteDismissals.service';
 import { savService } from '@services/sav.service';
-import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys, entretienSavKeys } from '@hooks/cacheKeys';
+import { pennylaneKeys, devisKeys, leadKeys, clientKeys, kanbanCardKeys, entretienSavKeys, chantierKeys } from '@hooks/cacheKeys';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
@@ -333,7 +333,7 @@ export function useMultiplePennylaneQuoteLines(pennylaneQuoteIds) {
  * Liste des devis Pennylane liés à un lead (chantier), actifs uniquement.
  * Source : vue majordhome_lead_pennylane_quotes (filtre ejected_at IS NULL côté service).
  */
-export function useLinkedPennylaneQuotes(leadId) {
+export function useLinkedPennylaneQuotes(leadId, { chantierId = null } = {}) {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const {
@@ -342,9 +342,11 @@ export function useLinkedPennylaneQuotes(leadId) {
     error,
     refetch,
   } = useQuery({
-    queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId),
+    queryKey: chantierId
+      ? pennylaneKeys.linkedQuotesByChantier(orgId, chantierId)
+      : pennylaneKeys.linkedQuotesByLead(orgId, leadId),
     queryFn: async () => {
-      const { data, error } = await pennylaneService.getLinkedQuotesByLead(leadId);
+      const { data, error } = await pennylaneService.getLinkedQuotesByLead(leadId, { chantierId });
       if (error) throw error;
       return data;
     },
@@ -388,18 +390,18 @@ export function usePrefetchLinkedPennylaneQuotes() {
  * Le pendant attach n'existe plus côté front (le rattachement se fait dans le
  * pipeline) : seules les edge functions appellent encore la RPC d'attache.
  */
-export function useLinkedPennylaneQuotesMutations(orgId, leadId) {
+export function useLinkedPennylaneQuotesMutations(orgId, _leadId) {
   const queryClient = useQueryClient();
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotesByLead(orgId, leadId) });
-    queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+    queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotes(orgId) });
+    queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
     // La RPC peut basculer le lead en "Devis envoyé" + créer une lead_activity
     // → invalider tout le sous-arbre leadKeys (liste Kanban + détail + activities)
     queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     // Vue kanban_cards recalculée — placement et compteurs colonnes
     queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
-  }, [queryClient, leadId, orgId]);
+  }, [queryClient, orgId]);
 
   const ejectMutation = useMutation({
     mutationFn: async ({ pennylaneQuoteId, reason }) => {

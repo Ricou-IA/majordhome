@@ -1,19 +1,16 @@
 /**
  * chantiers.service.js - Majord'home Artisan
  * ============================================================================
- * Service de gestion des chantiers (workflow post-vente).
+ * Un chantier = une commande à exécuter (table majordhome.chantiers).
+ * Lectures : vue majordhome_chantiers (id = chantier). Écritures : vue miroir
+ * majordhome_chantiers_write (RLS role_can) ; gestes par RPC.
  *
- * Un chantier = un lead gagné suivi dans le Kanban chantiers.
- * Utilise la vue publique majordhome_chantiers pour les lectures.
- * Utilise la RPC update_majordhome_lead pour les écritures.
- *
- * @version 1.0.0 - Sprint 6 Chantiers
+ * @version 2.0.0 - chantier = entité (un devis validé = un chantier)
  * ============================================================================
  */
 
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
-import { leadsService } from '@services/leads.service';
 import { storageService } from '@services/storage.service';
 
 // ============================================================================
@@ -44,7 +41,7 @@ export const CHANTIER_TRANSITIONS = {
   commande_recue: ['planification', 'commande_a_faire'],
   planification: ['realise', 'commande_recue'],
   realise: ['facture'],
-  facture: ['archive'],
+  facture: [],
 };
 
 // ============================================================================
@@ -80,177 +77,110 @@ function shouldAutoTransitionToCommandeRecue(equipmentStatus, materialsStatus) {
 // SERVICE PRINCIPAL
 // ============================================================================
 
-export const chantiersService = {
-  // ==========================================================================
-  // LECTURE
-  // ==========================================================================
+/**
+ * Patch d'un chantier par la vue miroir updatable. `.eq('org_id')` = défense en profondeur ;
+ * 0 ligne renvoyée = chantier inconnu OU RLS refusée → on le DIT (jamais de succès silencieux).
+ */
+async function patchChantier(orgId, chantierId, patch) {
+  if (!orgId) throw new Error('[chantiers] orgId requis');
+  if (!chantierId) throw new Error('[chantiers] chantierId requis');
+  const { data, error } = await supabase
+    .from('majordhome_chantiers_write')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', chantierId)
+    .eq('org_id', orgId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('[chantiers] chantier introuvable ou modification refusée');
+  return data;
+}
 
-  /**
-   * Récupère tous les chantiers d'une organisation (vue majordhome_chantiers)
-   */
+async function rpc(name, params, label) {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase.rpc(name, params);
+    if (error) throw error;
+    return data;
+  }, label);
+}
+
+export const chantiersService = {
   async getChantiers({ orgId, limit = 200 }) {
     return withErrorHandling(async () => {
       if (!orgId) throw new Error('[chantiers] orgId requis');
       const { data, error } = await supabase
-        .from('majordhome_chantiers')
-        .select('*')
-        .eq('org_id', orgId)
-        .order('won_date', { ascending: false })
-        .limit(limit);
+        .from('majordhome_chantiers').select('*').eq('org_id', orgId)
+        .order('won_date', { ascending: false }).limit(limit);
       if (error) throw error;
       return data || [];
     }, 'chantiers.getChantiers');
   },
 
-  /**
-   * Récupère le chantier lié à un client (via lead.client_id)
-   */
-  async getChantierByClientId(clientId) {
-    if (!clientId) return { data: null, error: null };
+  /** Tous les chantiers d'un client (un client peut en porter plusieurs). */
+  async getChantiersByClientId(clientId) {
+    if (!clientId) return { data: [], error: null };
     return withErrorHandling(async () => {
       const { data, error } = await supabase
-        .from('majordhome_chantiers')
-        .select('*')
-        .eq('client_id', clientId)
-        .limit(1)
-        .maybeSingle();
+        .from('majordhome_chantiers').select('*').eq('client_id', clientId)
+        .order('won_date', { ascending: false });
       if (error) throw error;
-      return data;
-    }, 'chantiers.getChantierByClientId');
+      return data || [];
+    }, 'chantiers.getChantiersByClientId');
   },
 
-  // ==========================================================================
-  // MUTATIONS
-  // ==========================================================================
-
-  /**
-   * Met à jour le statut chantier d'un lead
-   */
-  async updateChantierStatus(leadId, newStatus) {
-    if (!leadId || !newStatus) throw new Error('[chantiers] leadId et newStatus requis');
-    const validStatuses = CHANTIER_STATUSES.map(s => s.value);
+  async updateChantierStatus(orgId, chantierId, newStatus) {
+    const validStatuses = CHANTIER_STATUSES.map((s) => s.value);
     if (!validStatuses.includes(newStatus)) throw new Error(`[chantiers] Statut invalide: ${newStatus}`);
-
     return withErrorHandling(async () => {
-      const updates = { chantier_status: newStatus };
-      if (newStatus === 'planification') {
-        updates.planification_date = new Date().toISOString().split('T')[0];
-      }
-      const result = await leadsService.updateLead(leadId, updates);
-      if (result.error) throw result.error;
-      return result.data;
+      const patch = { chantier_status: newStatus };
+      if (newStatus === 'planification') patch.planification_date = new Date().toISOString().split('T')[0];
+      return patchChantier(orgId, chantierId, patch);
     }, 'chantiers.updateChantierStatus');
   },
 
-  /**
-   * Met à jour les statuts commande (équipement + matériaux)
-   * Auto-transition vers commande_recue si conditions remplies
-   */
-  async updateOrderStatus(leadId, { equipmentOrderStatus, materialsOrderStatus, currentChantierStatus }) {
-    if (!leadId) throw new Error('[chantiers] leadId requis');
-
-    const updates = {};
-    if (equipmentOrderStatus !== undefined) updates.equipment_order_status = equipmentOrderStatus;
-    if (materialsOrderStatus !== undefined) updates.materials_order_status = materialsOrderStatus;
-
-    const effectiveEquip = equipmentOrderStatus ?? null;
-    const effectiveMat = materialsOrderStatus ?? null;
+  async updateOrderStatus(orgId, chantierId, { equipmentOrderStatus, materialsOrderStatus, currentChantierStatus }) {
+    const patch = {};
+    if (equipmentOrderStatus !== undefined) patch.equipment_order_status = equipmentOrderStatus;
+    if (materialsOrderStatus !== undefined) patch.materials_order_status = materialsOrderStatus;
+    const allReceived = equipmentOrderStatus && materialsOrderStatus &&
+      shouldAutoTransitionToCommandeRecue(equipmentOrderStatus, materialsOrderStatus);
     let autoTransitioned = false;
-
-    const allReceived = effectiveEquip && effectiveMat &&
-      shouldAutoTransitionToCommandeRecue(effectiveEquip, effectiveMat);
-
-    if (currentChantierStatus === 'commande_a_faire' && allReceived) {
-      updates.chantier_status = 'commande_recue';
-      autoTransitioned = true;
-    } else if (currentChantierStatus === 'commande_recue' && !allReceived) {
-      updates.chantier_status = 'commande_a_faire';
-      autoTransitioned = true;
-    }
-
-    const result = await leadsService.updateLead(leadId, updates);
+    if (currentChantierStatus === 'commande_a_faire' && allReceived) { patch.chantier_status = 'commande_recue'; autoTransitioned = true; }
+    else if (currentChantierStatus === 'commande_recue' && !allReceived) { patch.chantier_status = 'commande_a_faire'; autoTransitioned = true; }
+    const result = await withErrorHandling(() => patchChantier(orgId, chantierId, patch), 'chantiers.updateOrderStatus');
     return { ...result, autoTransitioned };
   },
 
-  /**
-   * Met à jour la date estimative
-   */
-  async updateEstimatedDate(leadId, estimatedDate) {
-    if (!leadId) throw new Error('[chantiers] leadId requis');
+  updateEstimatedDate: (orgId, chantierId, estimatedDate) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { estimated_date: estimatedDate || null }), 'chantiers.updateEstimatedDate'),
+  updateChantierNotes: (orgId, chantierId, notes) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { chantier_notes: notes || null }), 'chantiers.updateChantierNotes'),
+  updateLabel: (orgId, chantierId, label) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { label: (label || '').trim() || null }), 'chantiers.updateLabel'),
+  updatePlannedOrder: (orgId, chantierId, { teamSize, days }) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { planned_team_size: teamSize ?? null, planned_days: days ?? null }), 'chantiers.updatePlannedOrder'),
 
-    return leadsService.updateLead(leadId, {
-      estimated_date: estimatedDate || null,
-    });
-  },
-
-  /**
-   * Met à jour les notes chantier
-   */
-  async updateChantierNotes(leadId, notes) {
-    if (!leadId) throw new Error('[chantiers] leadId requis');
-
-    return leadsService.updateLead(leadId, {
-      chantier_notes: notes || null,
-    });
-  },
-
-  /**
-   * Commande « personnes × jours » de l'installation (spec 2026-09-21).
-   * null = non renseigné (la RPC pose NULL quand la clé est présente et vide).
-   */
-  async updatePlannedOrder(leadId, { teamSize, days }) {
-    if (!leadId) throw new Error('[chantiers] leadId requis');
-
-    return leadsService.updateLead(leadId, {
-      planned_team_size: teamSize ?? null,
-      planned_days: days ?? null,
-    });
-  },
-
-  // ==========================================================================
-  // PV DE RÉCEPTION
-  // ==========================================================================
-
-  /**
-   * Upload le PV de réception et enregistre le chemin sur le lead
-   */
-  async uploadPvReception(leadId, file) {
-    if (!leadId || !file) throw new Error('[chantiers] leadId et file requis');
-
+  async uploadPvReception(orgId, chantierId, file) {
+    if (!chantierId || !file) throw new Error('[chantiers] chantierId et file requis');
     const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-    const storagePath = `pv-reception/${leadId}/PV_Reception_${Date.now()}.${ext}`;
-
-    const { error: uploadError } = await storageService.uploadFile(
-      'interventions',
-      storagePath,
-      file,
-      { upsert: true, contentType: file.type },
-    );
+    const storagePath = `pv-reception/${chantierId}/PV_Reception_${Date.now()}.${ext}`;
+    const { error: uploadError } = await storageService.uploadFile('interventions', storagePath, file, { upsert: true, contentType: file.type });
     if (uploadError) return { data: null, error: uploadError };
-
-    const result = await leadsService.updateLead(leadId, {
-      pv_reception_path: storagePath,
-    });
-    return result;
+    return withErrorHandling(() => patchChantier(orgId, chantierId, { pv_reception_path: storagePath }), 'chantiers.uploadPvReception');
   },
-
-  /**
-   * Met à jour uniquement le chemin PV (utilisé par la page de signature)
-   */
-  async updatePvReceptionPath(leadId, storagePath) {
-    if (!leadId) throw new Error('[chantiers] leadId requis');
-    return leadsService.updateLead(leadId, {
-      pv_reception_path: storagePath,
-    });
-  },
-
-  /**
-   * Retourne une URL signée pour le PV de réception
-   */
+  updatePvReceptionPath: (orgId, chantierId, storagePath) =>
+    withErrorHandling(() => patchChantier(orgId, chantierId, { pv_reception_path: storagePath }), 'chantiers.updatePvReceptionPath'),
   async getPvReceptionUrl(pdfPath) {
     if (!pdfPath) return { url: null, error: null };
     return storageService.getSignedUrl('interventions', pdfPath);
   },
+
+  // ── Gestes (RPC SECURITY DEFINER, garde role_can chantiers.edit côté base) ──
+  ensureChantierForLead: (leadId) => rpc('chantier_ensure_for_lead', { p_lead_id: leadId }, 'chantiers.ensureChantierForLead'),
+  groupChantiers: (targetId, sourceIds) => rpc('chantier_group', { p_target_id: targetId, p_source_ids: sourceIds }, 'chantiers.groupChantiers'),
+  detachChantier: ({ chantierId, quoteIds, appointmentIds = [], movePlannedOrder = false, label = null }) =>
+    rpc('chantier_detach', { p_chantier_id: chantierId, p_quote_ids: quoteIds, p_appointment_ids: appointmentIds, p_move_planned_order: movePlannedOrder, p_label: label }, 'chantiers.detachChantier'),
+  deleteChantier: (chantierId) => rpc('chantier_delete', { p_chantier_id: chantierId }, 'chantiers.deleteChantier'),
 };
 
 export default chantiersService;

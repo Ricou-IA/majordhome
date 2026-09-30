@@ -10,7 +10,7 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chantiersService } from '@services/chantiers.service';
-import { chantierKeys } from '@hooks/cacheKeys';
+import { chantierKeys, appointmentKeys, pennylaneKeys, leadKeys, kanbanCardKeys } from '@hooks/cacheKeys';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { useAuth } from '@contexts/AuthContext';
 
@@ -53,79 +53,132 @@ export function useChantierMutations() {
   const invalidateChantiers = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
   }, [queryClient, orgId]);
+  // Grouper / détacher / supprimer déplacent devis et RDV : invalidation croisée.
+  const invalidateCroisee = useCallback(() => {
+    invalidateChantiers();
+    queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotes(orgId) });
+    queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
+  }, [invalidateChantiers, queryClient, orgId]);
 
   // Mutation : changer le statut chantier
   const statusMutation = useMutation({
-    mutationFn: ({ leadId, newStatus }) =>
-      chantiersService.updateChantierStatus(leadId, newStatus),
+    mutationFn: ({ chantierId, newStatus }) =>
+      unwrapResult(chantiersService.updateChantierStatus(orgId, chantierId, newStatus)),
     onSuccess: invalidateChantiers,
   });
 
-  // Mutation : mettre à jour les commandes (équipement + matériaux)
+  // Mutation : mettre à jour les commandes (équipement + matériaux).
+  // Exception au contrat unwrapResult : garde le retour composite
+  // { data, error, autoTransitioned }, lu tel quel par ChantierReceptionSection.
   const orderMutation = useMutation({
-    mutationFn: ({ leadId, ...params }) =>
-      chantiersService.updateOrderStatus(leadId, params),
+    mutationFn: ({ chantierId, ...params }) =>
+      chantiersService.updateOrderStatus(orgId, chantierId, params),
     onSuccess: invalidateChantiers,
   });
 
   // Mutation : date estimative
   const dateMutation = useMutation({
-    mutationFn: ({ leadId, estimatedDate }) =>
-      chantiersService.updateEstimatedDate(leadId, estimatedDate),
+    mutationFn: ({ chantierId, estimatedDate }) =>
+      unwrapResult(chantiersService.updateEstimatedDate(orgId, chantierId, estimatedDate)),
     onSuccess: invalidateChantiers,
   });
 
   // Mutation : notes
   const notesMutation = useMutation({
-    mutationFn: ({ leadId, notes }) =>
-      chantiersService.updateChantierNotes(leadId, notes),
+    mutationFn: ({ chantierId, notes }) =>
+      unwrapResult(chantiersService.updateChantierNotes(orgId, chantierId, notes)),
+    onSuccess: invalidateChantiers,
+  });
+
+  // Mutation : intitulé du chantier
+  const labelMutation = useMutation({
+    mutationFn: ({ chantierId, label }) =>
+      unwrapResult(chantiersService.updateLabel(orgId, chantierId, label)),
     onSuccess: invalidateChantiers,
   });
 
   // Mutation : commande « personnes × jours » (spec 2026-09-21)
   const plannedOrderMutation = useMutation({
-    mutationFn: ({ leadId, teamSize, days }) =>
-      unwrapResult(chantiersService.updatePlannedOrder(leadId, { teamSize, days })),
+    mutationFn: ({ chantierId, teamSize, days }) =>
+      unwrapResult(chantiersService.updatePlannedOrder(orgId, chantierId, { teamSize, days })),
     onSuccess: invalidateChantiers,
   });
 
   // Mutation : upload PV de réception
   const pvMutation = useMutation({
-    mutationFn: ({ leadId, file }) =>
-      chantiersService.uploadPvReception(leadId, file),
+    mutationFn: ({ chantierId, file }) =>
+      unwrapResult(chantiersService.uploadPvReception(orgId, chantierId, file)),
     onSuccess: invalidateChantiers,
+  });
+
+  // Gestes (RPC) : regrouper, détacher, supprimer un chantier
+  const groupMutation = useMutation({
+    mutationFn: ({ targetId, sourceIds }) =>
+      unwrapResult(chantiersService.groupChantiers(targetId, sourceIds)),
+    onSuccess: invalidateCroisee,
+  });
+
+  const detachMutation = useMutation({
+    mutationFn: (params) => unwrapResult(chantiersService.detachChantier(params)),
+    onSuccess: invalidateCroisee,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (chantierId) => unwrapResult(chantiersService.deleteChantier(chantierId)),
+    onSuccess: invalidateCroisee,
   });
 
   return {
     updateChantierStatus: useCallback(
-      (leadId, newStatus) => statusMutation.mutateAsync({ leadId, newStatus }),
+      (chantierId, newStatus) => statusMutation.mutateAsync({ chantierId, newStatus }),
       [statusMutation]
     ),
     updateOrderStatus: useCallback(
-      (leadId, params) => orderMutation.mutateAsync({ leadId, ...params }),
+      (chantierId, params) => orderMutation.mutateAsync({ chantierId, ...params }),
       [orderMutation]
     ),
     updateEstimatedDate: useCallback(
-      (leadId, estimatedDate) => dateMutation.mutateAsync({ leadId, estimatedDate }),
+      (chantierId, estimatedDate) => dateMutation.mutateAsync({ chantierId, estimatedDate }),
       [dateMutation]
     ),
     updateChantierNotes: useCallback(
-      (leadId, notes) => notesMutation.mutateAsync({ leadId, notes }),
+      (chantierId, notes) => notesMutation.mutateAsync({ chantierId, notes }),
       [notesMutation]
     ),
+    updateLabel: useCallback(
+      (chantierId, label) => labelMutation.mutateAsync({ chantierId, label }),
+      [labelMutation]
+    ),
     uploadPvReception: useCallback(
-      (leadId, file) => pvMutation.mutateAsync({ leadId, file }),
+      (chantierId, file) => pvMutation.mutateAsync({ chantierId, file }),
       [pvMutation]
     ),
     updatePlannedOrder: useCallback(
-      (leadId, { teamSize, days }) => plannedOrderMutation.mutateAsync({ leadId, teamSize, days }),
+      (chantierId, { teamSize, days }) => plannedOrderMutation.mutateAsync({ chantierId, teamSize, days }),
       [plannedOrderMutation]
+    ),
+    groupChantiers: useCallback(
+      (targetId, sourceIds) => groupMutation.mutateAsync({ targetId, sourceIds }),
+      [groupMutation]
+    ),
+    detachChantier: useCallback(
+      (params) => detachMutation.mutateAsync(params),
+      [detachMutation]
+    ),
+    deleteChantier: useCallback(
+      (chantierId) => deleteMutation.mutateAsync(chantierId),
+      [deleteMutation]
     ),
 
     // États
     isUpdatingStatus: statusMutation.isPending,
     isUpdatingOrder: orderMutation.isPending,
     isUploadingPv: pvMutation.isPending,
+    isGrouping: groupMutation.isPending,
+    isDetaching: detachMutation.isPending,
+    isDeleting: deleteMutation.isPending,
 
     invalidate: invalidateChantiers,
   };
