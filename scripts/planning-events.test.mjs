@@ -99,11 +99,20 @@ test('expandAppointmentBlocks: mono-tech -> 1 bloc unique (idSuffix null)', () =
   assert.equal(blocks[0].idSuffix, null);
 });
 
-test('expandAppointmentBlocks: facturé multi-tech -> 1 bloc violet', () => {
+test('expandAppointmentBlocks: facturé multi-tech -> 1 bloc violet PAR technicien', () => {
   const appt = { appointment_type: 'installation', technician_ids: ['tm-ludo', 'tm-phil'], target_invoiced: true };
+  const blocks = expandAppointmentBlocks(appt, maps, null);
+  assert.equal(blocks.length, 2);
+  assert.deepEqual(blocks.map((b) => b.color), [INVOICED_EVENT_COLOR, INVOICED_EVENT_COLOR]);
+  assert.deepEqual(blocks.map((b) => b.idSuffix), ['tm-ludo', 'tm-phil']);
+});
+
+test('expandAppointmentBlocks: facturé mono-tech -> 1 bloc violet', () => {
+  const appt = { appointment_type: 'installation', technician_ids: ['tm-ludo'], target_invoiced: true };
   const blocks = expandAppointmentBlocks(appt, maps, null);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].color, INVOICED_EVENT_COLOR);
+  assert.equal(blocks[0].idSuffix, null);
 });
 
 test('expandAppointmentBlocks: RDV commercial ne se découpe pas', () => {

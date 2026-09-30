@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Loader2, Trash2, Ban, CalendarDays } from 'lucide-react';
 import { CertificatsSection } from '@/apps/artisan/components/entretiens/CertificatsSection';
-import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, appointmentsService } from '@services/appointments.service';
+import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, FREE_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards, useLeadCommercials, leadKeys } from '@hooks/useLeads';
 import { resolveCommercialMemberId, PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
@@ -174,6 +174,10 @@ export function EventModal({
   // - « Autre » → colonnes = tous les membres (soi en 1ʳᵉ colonne), client optionnel.
   // --------------------------------------------------------------------------
   const isCommercialType = COMMERCIAL_TYPES.includes(formData.appointment_type);
+  // « Autre » / « Congés » : sans client ni carte — nom facultatif, personnes = toute l'équipe.
+  const isFreeType = FREE_TYPES.includes(formData.appointment_type);
+  // Congés : pas de bloc Client du tout, journée entière au clic, un objet par personne.
+  const isLeave = formData.appointment_type === 'leave';
   // RDV Bouclage R2 : rattachement STRICT à une carte pipeline existante (leadOnly).
   // On ne saisit jamais un client libre ; on ne crée jamais de lead (zéro doublon).
   const isClosing = formData.appointment_type === 'rdv_closing';
@@ -216,17 +220,17 @@ export function EventModal({
     () => (allTeamMembers || []).find((m) => m.user_id === userId)?.id || null,
     [allTeamMembers, userId],
   );
-  // Mode colonnes de l'assistant selon le type : VT→commerciaux, entretien/SAV/install→techniciens, « Autre »→tous.
+  // Mode colonnes de l'assistant selon le type : VT→commerciaux, entretien/SAV/install→techniciens, « Autre »/« Congés »→tous.
   const assistantAssigneeType = isCommercialType
     ? 'commercial'
-    : (formData.appointment_type === 'other' ? 'all' : 'technician');
-  // « Autre » : place l'utilisateur connecté en 1ʳᵉ colonne (défaut naturel, réaffectable en cliquant une autre colonne).
+    : (isFreeType ? 'all' : 'technician');
+  // « Autre » / « Congés » : place l'utilisateur connecté en 1ʳᵉ colonne (défaut naturel, réaffectable en cliquant une autre colonne).
   const assistantMembers = useMemo(() => {
-    if (formData.appointment_type !== 'other' || !currentMemberId) return allTeamMembers;
+    if (!isFreeType || !currentMemberId) return allTeamMembers;
     const mine = (allTeamMembers || []).filter((m) => m.id === currentMemberId);
     const others = (allTeamMembers || []).filter((m) => m.id !== currentMemberId);
     return [...mine, ...others];
-  }, [allTeamMembers, formData.appointment_type, currentMemberId]);
+  }, [allTeamMembers, isFreeType, currentMemberId]);
   // Objet « lead-like » consommé par l'assistant (pré-remplit nom/objet). Pas
   // d'owner figé depuis EventModal → assigned_user_id null (colonnes sélectionnables).
   const schedulingLead = useMemo(() => ({
@@ -469,7 +473,7 @@ export function EventModal({
 
     if (!formData.scheduled_date) newErrors.scheduled_date = 'Date requise';
     if (!formData.scheduled_start) newErrors.scheduled_start = 'Heure de début requise';
-    if (formData.appointment_type !== 'other' && !formData.client_name?.trim()) newErrors.client_name = 'Nom requis';
+    if (!isFreeType && !formData.client_name?.trim()) newErrors.client_name = 'Nom requis';
     if (!formData.appointment_type) newErrors.appointment_type = 'Type requis';
     // Un RDV a toujours une personne (l'assistant tient l'invariant en création ; ici
     // c'est l'édition classique). Commercial → assigned_commercial_id (id stocké, même
@@ -489,7 +493,7 @@ export function EventModal({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, isCommercialType, commercialMemberId, isEdit, appointment]);
+  }, [formData, isCommercialType, isFreeType, commercialMemberId, isEdit, appointment]);
 
   // --------------------------------------------------------------------------
   // Sélection / déliaison client
@@ -834,8 +838,8 @@ export function EventModal({
       return;
     }
     // Nom client requis pour les RDV liés à un client (VT/entretien/SAV/install) hors fiche.
-    // « Autre » : client optionnel (RDV perso / interne). R2 : identité portée par la carte.
-    if (formData.appointment_type !== 'other' && !isClosing && !fromFiche && !formData.client_name?.trim()) {
+    // « Autre » / « Congés » : client optionnel (RDV perso / interne). R2 : identité portée par la carte.
+    if (!isFreeType && !isClosing && !fromFiche && !formData.client_name?.trim()) {
       setErrors((prev) => ({ ...prev, client_name: 'Nom requis' }));
       toast.error('Nom du client requis');
       return;
@@ -861,12 +865,17 @@ export function EventModal({
 
       // Objet AUTO (type + client) — pas de champ Objet/Notes dans le flux assistant
       // (RDV rapide = type + créneau). Notes éditables après coup via l'édition du RDV.
+      // Congés : « Congés — Prénom » par créneau (la personne, pas un client).
       const typeLabel = getAppointmentTypeConfig(formData.appointment_type).label;
       const clientLabel = [formData.client_name, formData.client_first_name].filter(Boolean).join(' ').trim();
       const autoSubject = clientLabel
         ? `${typeLabel} — ${clientLabel}`
         : (formData.appointment_type === 'other' ? 'Rendez-vous' : typeLabel);
-      const slots = assistantSlots.map((s) => ({ ...s, subject: autoSubject, notes: null }));
+      const prenomsDe = (ids) => (ids || [])
+        .map((id) => (allTeamMembers || []).find((m) => m.id === id)?.display_name?.trim().split(' ')[0])
+        .filter(Boolean).join(', ');
+      const subjectFor = (s) => (isLeave && prenomsDe(s.technicianIds) ? `${typeLabel} — ${prenomsDe(s.technicianIds)}` : autoSubject);
+      const slots = assistantSlots.map((s) => ({ ...s, subject: subjectFor(s), notes: null }));
 
       const { error: batchErr } = await appointmentsService.createAppointmentBatch(slots, {
         coreOrgId: orgId,
@@ -913,7 +922,7 @@ export function EventModal({
       toast.error('Une erreur est survenue');
       setBatchSaving(false);
     }
-  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, reportActivationError, isCommercialType, orgId, formData, selectedClient, queryClient, onClose]);
+  }, [assistantSlots, fromFiche, isClosing, selectedLead, resolveActivation, reportActivationError, isCommercialType, isFreeType, isLeave, allTeamMembers, orgId, formData, selectedClient, queryClient, onClose]);
 
   // --------------------------------------------------------------------------
   // Re-planifier (édition) : 1 créneau choisi dans l'assistant → update du RDV
@@ -1092,7 +1101,7 @@ export function EventModal({
     if (attachContext?.lockedType) {
       return APPOINTMENT_TYPES.filter(t => t.value === attachContext.lockedType);
     }
-    const allowed = ['rdv_technical', 'rdv_closing', 'maintenance', 'service', 'other'];
+    const allowed = ['rdv_technical', 'rdv_closing', 'maintenance', 'service', 'leave', 'other'];
     return APPOINTMENT_TYPES.filter(
       t => allowed.includes(t.value) || t.value === formData.appointment_type
     );
@@ -1203,9 +1212,9 @@ export function EventModal({
                     setAssistantSlots([]);
                     setRescheduleMode(true);
                   }}
-                  // « Suite » sans carte liée (RDV « Autre » libre) = simple nouveau RDV : pas proposé.
+                  // « Suite » sans carte liée (RDV « Autre » / « Congés » libre) = simple nouveau RDV : pas proposé.
                   onRequestContinuation={
-                    (appointment?.lead_id || appointment?.intervention_id || formData.appointment_type !== 'other')
+                    (appointment?.lead_id || appointment?.intervention_id || !isFreeType)
                       ? () => {
                         setAssistantSlots([]);
                         setContinuationMode(true);
@@ -1215,11 +1224,12 @@ export function EventModal({
                 />
               )}
 
-              {/* Client : masqué si on vient d'une fiche (implicite). Sinon recherche/lien
-                  (« Autre » inclus → lié au client, sans carte kanban).
+              {/* Client : masqué si on vient d'une fiche (implicite) et pour des Congés
+                  (une absence n'a pas de client). Sinon recherche/lien (« Autre » inclus →
+                  lié au client, sans carte kanban).
                   Bouclage R2 : toujours affiché (même depuis une fiche) en mode leadOnly —
                   la sélection d'une carte pipeline existante est obligatoire. */}
-              {(!fromFiche || isClosing) && (
+              {((!fromFiche || isClosing) && !isLeave) && (
                 <SectionClient
                   formData={formData}
                   updateField={updateField}
@@ -1269,7 +1279,10 @@ export function EventModal({
                     ? (formData.scheduled_date || null)
                     // Création depuis un créneau du calendrier : l'assistant s'ouvre sur ce jour.
                     : (!isEdit ? defaultDate : null)}
-                  multi={!rescheduleMode && formData.appointment_type === 'installation'}
+                  // Installation : N jours ; Congés : N jours d'absence en une saisie, un clic
+                  // sur la personne = sa journée (une partie de journée reste possible au glisser).
+                  multi={!rescheduleMode && (formData.appointment_type === 'installation' || isLeave)}
+                  fullDayClick={isLeave}
                 />
               )}
 

@@ -43,8 +43,16 @@ export const APPOINTMENT_TYPES = [
   { value: 'installation', label: 'Installation', color: '#8B5CF6', bgClass: 'bg-violet-500' },
   { value: 'maintenance', label: 'Entretien', color: '#10B981', bgClass: 'bg-emerald-500' },
   { value: 'service', label: 'SAV', color: '#EF4444', bgClass: 'bg-red-500' },
+  // Congés : absence d'une personne, sans client ni carte (2026-09-30). Journée entière
+  // au clic dans l'assistant ; bloque la journée du technicien pour le moteur de
+  // tournées comme n'importe quel RDV posé sur lui (arrêt fixe, journée non « vide »).
+  { value: 'leave', label: 'Congés', color: '#64748B', bgClass: 'bg-slate-500' },
+  // « Autre » reste EN DERNIER : getAppointmentTypeConfig y replie tout type inconnu.
   { value: 'other', label: 'Autre', color: '#6B7280', bgClass: 'bg-gray-500' },
 ];
+
+/** Types sans client ni carte kanban (RDV interne / absence) : nom facultatif, personne(s) = toute l'équipe. */
+export const FREE_TYPES = ['other', 'leave'];
 
 /**
  * Statuts de RDV
@@ -949,7 +957,11 @@ export const appointmentsService = {
       textColor: '#FFFFFF',
       // Souplesse : un RDV adaptable est dessiné en pointillé (heure provisoire),
       // la bande de tolérance est un événement de fond séparé (useAppointments).
-      classNames: adaptable ? ['mdh-flex'] : [],
+      // Congés : hachuré (couleur de la personne conservée, ce n'est pas du travail).
+      classNames: [
+        ...(adaptable ? ['mdh-flex'] : []),
+        ...(appointment.appointment_type === 'leave' ? ['mdh-leave'] : []),
+      ],
       extendedProps: {
         ...appointment,
         typeConfig,

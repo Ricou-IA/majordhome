@@ -45,6 +45,7 @@ function formatSlotDate(dateStr) {
  * @param {boolean} [props.showTechSelect] - afficher le sélecteur par ligne (défaut true)
  * @param {number|null} [props.expectedTeamSize] - commande : personnes attendues par créneau
  * @param {number|null} [props.expectedDays] - commande : jours attendus
+ * @param {string} [props.emptyHint] - consigne affichée sans créneau (dépend du mode de la grille)
  */
 export function SlotDraftList({
   slots = [],
@@ -56,6 +57,7 @@ export function SlotDraftList({
   showTechSelect = true,
   expectedTeamSize = null,
   expectedDays = null,
+  emptyHint = 'Cliquez-glissez dans la colonne d’une personne ci-dessus.',
 }) {
   const joursPoses = new Set(slots.map((s) => s.date).filter(Boolean)).size;
   return (
@@ -71,9 +73,7 @@ export function SlotDraftList({
       </h4>
 
       {slots.length === 0 ? (
-        <p className="text-xs text-gray-400 italic px-1 py-2">
-          Cliquez-glissez dans la colonne d&apos;une personne ci-dessus.
-        </p>
+        <p className="text-xs text-gray-400 italic px-1 py-2">{emptyHint}</p>
       ) : (
         <ul className="space-y-2">
           {slots.map((slot) => {

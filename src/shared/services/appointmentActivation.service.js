@@ -9,7 +9,7 @@
  *     « en sommeil » du client en dédup, jamais de doublon ; pas de formulaire prospect)
  *   - installation -> rien ici (la carte chantier pré-existe, rattachée en passthrough
  *     depuis le Kanban Chantier ; interdite depuis la fiche client)
- *   - other -> aucun work item (créneau calendrier pur)
+ *   - other / leave (Congés) -> aucun work item (créneau calendrier pur)
  *
  * Ne crée JAMAIS de prospect : ce cas (walk-in inconnu sans fiche) est géré en amont
  * dans EventModal, seul endroit où un vrai lead prospect est créé.
@@ -19,6 +19,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { ensureEntretienCard } from '@services/entretiens.service';
 import { leadsService } from '@services/leads.service';
+import { FREE_TYPES } from '@services/appointments.service';
 
 const RDV_PLANIFIE_STATUS_ID = 'e23d04b8-da2e-4477-8e1c-b92868b682ae';
 const STATUS_GAGNE = 'c717780c-0ba7-4bf1-9e1e-5f014c1e9e2f';
@@ -55,8 +56,8 @@ export async function resolveCardForAppointment({
   // JAMAIS de création de lead (c'est tout l'intérêt du motif : zéro doublon).
   if (type === 'rdv_closing') return { error: 'bouclage_requiert_carte' };
 
-  // 2. Type calendaire pur
-  if (type === 'other') return {};
+  // 2. Type calendaire pur (« Autre », « Congés ») : jamais de carte
+  if (FREE_TYPES.includes(type)) return {};
 
   // 3. Entretien / SAV -> intervention (matérialise si absente)
   if (type === 'maintenance' || type === 'service') {

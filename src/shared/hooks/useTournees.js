@@ -326,6 +326,9 @@ export function useEtatsJournees({ coreOrgId, startDate, endDate }) {
         figeeAt: e?.figee_at || null,
         figeePar: e?.figee_par || null,
         nbRdvs: (j.rdvs || []).length,
+        // Journée qui ne porte que des Congés : le moteur la voit « pleine » (arrêt fixe),
+        // la puce dit « Congés » — affichage seul, l'état du moteur n'est pas touché.
+        enConges: (j.rdvs || []).length > 0 && j.rdvs.every((r) => r.appointment_type === 'leave'),
         estime: true,
       });
     }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  chevauche, fusionnerCreneau, etatCommande, libelleCommande,
+  chevauche, fusionnerCreneau, basculerJournee, etatCommande, libelleCommande,
 } from '../src/lib/installOrder.js';
 
 // ── chevauche ─────────────────────────────────────────────────────────────
@@ -60,6 +60,48 @@ test('fusion : ne mute pas l’entrée', () => {
   const entree = [{ ...jourA, technicianIds: ['antoine'] }];
   fusionnerCreneau(entree, { id: 'b', date: '2026-09-23', startTime: '08:00', endTime: '17:00', technicianIds: ['ludovic'] });
   assert.deepEqual(entree[0].technicianIds, ['antoine']);
+});
+
+// ── basculerJournee ───────────────────────────────────────────────────────
+const journeeLudovic = { id: 'l', date: '2026-09-23', startTime: '08:00', endTime: '17:00', duration: 540, technicianIds: ['ludovic'] };
+
+test('bascule : journée vide → la personne est posée sur sa journée', () => {
+  const out = basculerJournee([], journeeLudovic);
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0].technicianIds, ['ludovic']);
+  assert.equal(out[0].endTime, '17:00');
+});
+
+test('bascule : deuxième personne le même jour → réunie sur le RDV existant (horaire du premier)', () => {
+  const antoine = { id: 'a', date: '2026-09-23', startTime: '08:00', endTime: '16:00', duration: 480, technicianIds: ['antoine'] };
+  const out = basculerJournee([antoine], journeeLudovic);
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0].technicianIds, ['antoine', 'ludovic']);
+  assert.equal(out[0].endTime, '16:00');
+});
+
+test('bascule : re-cliquer une personne déjà posée la retire ; le brouillon reste pour l’autre', () => {
+  const deux = { ...jourA, technicianIds: ['antoine', 'ludovic'] };
+  const out = basculerJournee([deux], journeeLudovic);
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0].technicianIds, ['antoine']);
+});
+
+test('bascule : retirer la dernière personne supprime le brouillon du jour, les autres jours restent', () => {
+  const autreJour = { id: 'x', date: '2026-09-24', startTime: '08:00', endTime: '17:00', technicianIds: ['ludovic'] };
+  const out = basculerJournee([journeeLudovic, autreJour], { ...journeeLudovic, id: 'n' });
+  assert.deepEqual(out.map((s) => s.id), ['x']);
+});
+
+test('bascule : la personne posée sur une demi-journée est retirée par un clic (pas de second brouillon)', () => {
+  const matin = { id: 'm', date: '2026-09-23', startTime: '08:00', endTime: '12:00', technicianIds: ['ludovic'] };
+  const out = basculerJournee([matin], journeeLudovic);
+  assert.equal(out.length, 0);
+});
+
+test('bascule : sans personne → inchangé', () => {
+  const out = basculerJournee([jourA], { ...journeeLudovic, technicianIds: [] });
+  assert.deepEqual(out, [jourA]);
 });
 
 // ── etatCommande ──────────────────────────────────────────────────────────

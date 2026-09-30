@@ -74,19 +74,19 @@ export function resolveAppointmentColor(appt, maps) {
 
 /**
  * Décompose un RDV en blocs à rendre sur le calendrier (1 entrée = 1 bloc coloré).
- * - Facturé → 1 bloc violet (la couleur ne distingue pas les personnes).
  * - Intervention/Autre à ≥2 techniciens → 1 bloc PAR technicien (chacun sa couleur),
  *   restreint aux techniciens visibles si un filtre équipe est actif. C'est ce qui
  *   rend un RDV partagé (ex. Antoine + Ludovic) lisible côte à côte, comme 2 RDV séparés.
+ *   Un RDV facturé se découpe de la même façon — un bloc violet par personne : le
+ *   violet dit « facturé », le nombre de colonnes dit toujours qui y est (Eric,
+ *   2026-09-30 : GOUIN, 3 jours à 2 techniciens, n'affichait qu'une colonne).
  * - Sinon (0-1 technicien, ou RDV commercial) → 1 bloc unique (couleur du propriétaire).
  * `idSuffix` rend l'event FullCalendar unique par bloc ; l'id réel du RDV reste dans
  * extendedProps (cf. toCalendarEvent) pour le drag/resize/clic.
  * @returns {Array<{ color: string, idSuffix: (string|null) }>}
  */
 export function expandAppointmentBlocks(appt, maps, selectedRecordIds) {
-  if (appt?.target_invoiced === true) {
-    return [{ color: INVOICED_EVENT_COLOR, idSuffix: null }];
-  }
+  const invoiced = appt?.target_invoiced === true;
   const techIds = appt?.technician_ids || [];
   const isCommercial = COMMERCIAL_TYPES.includes(appt?.appointment_type);
   if (!isCommercial && techIds.length >= 2) {
@@ -94,7 +94,9 @@ export function expandAppointmentBlocks(appt, maps, selectedRecordIds) {
     const visible = hasFilter ? techIds.filter((id) => selectedRecordIds.has(id)) : techIds;
     const shown = visible.length ? visible : techIds;
     return shown.map((techId) => ({
-      color: maps.colorByProfile.get(maps.techProfileById.get(techId)) || FALLBACK_PERSON_COLOR,
+      color: invoiced
+        ? INVOICED_EVENT_COLOR
+        : (maps.colorByProfile.get(maps.techProfileById.get(techId)) || FALLBACK_PERSON_COLOR),
       idSuffix: techId,
     }));
   }

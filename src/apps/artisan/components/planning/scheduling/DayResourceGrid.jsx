@@ -15,7 +15,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, AlertTriangle, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, CalendarDays, Check } from 'lucide-react';
 import { getAppointmentTypeConfig } from '@services/appointments.service';
 import { formatDateForInput } from '@/lib/utils';
 import { findMemberConflicts, memberWorkingHoursForDate, timeToMinutes } from '@/lib/scheduleConflicts';
@@ -95,6 +95,13 @@ function formatMonthLabel(dateStr) {
  * @param {number|null} [props.fixedDuration] - « bloc contrat » (spec 2026-09-12, R5) :
  *   quand la durée est connue (temps contrat d'un entretien), un CLIC pose le bloc
  *   entier à cette durée — plus d'étirement « à peu près ». null = étirement libre.
+ * @param {boolean} [props.fullDayClick] - « journée entière » (installation, congés —
+ *   Eric, 2026-09-30 : « je clique sur les intervenants pour choisir la journée ») :
+ *   un clic sur le prénom en tête de colonne, ou un clic simple dans la colonne, pose
+ *   ou retire la personne sur SA journée de travail (default_availability ; sans
+ *   horaire déclaré : 08:00–18:00). Le cliquer-glisser reste possible pour une
+ *   partie de journée.
+ * @param {Function} [props.onToggleDay] - ({ memberId, date, startTime, endTime, duration }) => void
  *
  * Pas de colonne « À assigner » : poser un créneau, c'est le poser dans la colonne
  * de quelqu'un (Eric, 2026-09-17 : « on décide sur l'instant », pas de planning
@@ -108,6 +115,8 @@ export function DayResourceGrid({
   draftSlots = [],
   onPlaceSlot,
   fixedDuration = null,
+  fullDayClick = false,
+  onToggleDay,
 }) {
   const todayStr = formatDate(new Date());
   // État du drag : { memberId, startIndex, currentIndex }
@@ -264,17 +273,34 @@ export function DayResourceGrid({
     setDragState((prev) => ({ ...prev, currentIndex: slotIndex }));
   }, [dragState, isOccupied]);
 
+  // Journée entière d'une personne (fullDayClick) : ses horaires du jour, ou 08:00–18:00
+  // à défaut (même repli que memberWorkingHoursForDate pour un jour sans réglage).
+  const toggleDay = useCallback((memberId) => {
+    const hours = hoursByMember.get(memberId) || { start: '08:00', end: '18:00' };
+    const duration = timeToMinutes(hours.end) - timeToMinutes(hours.start);
+    onToggleDay?.({ memberId, date, startTime: hours.start, endTime: hours.end, duration });
+  }, [hoursByMember, date, onToggleDay]);
+
   const handleDragEnd = useCallback(() => {
     if (!dragState) return;
+    // Clic simple (pas d'étirement) en mode journée entière = la journée de la personne.
+    if (fullDayClick && dragState.currentIndex === dragState.startIndex) {
+      toggleDay(dragState.memberId);
+      setDragState(null);
+      return;
+    }
     const numSlots = dragState.currentIndex - dragState.startIndex + 1;
     const duration = numSlots * SLOT_MINUTES;
     const startTime = slotIndexToTime(dragState.startIndex);
     const endTime = slotIndexToTime(dragState.currentIndex + 1);
     onPlaceSlot?.({ memberId: dragState.memberId, date, startTime, endTime, duration });
     setDragState(null);
-  }, [dragState, date, onPlaceSlot]);
+  }, [dragState, date, onPlaceSlot, fullDayClick, toggleDay]);
 
-  // Listener global mouseup (finalise même hors grille)
+  // Listener global mouseup (finalise même hors grille). C'est le SEUL point de fin :
+  // un second `onMouseUp` sur la cellule pouvait rejouer la fin du même événement
+  // (React puis window, `dragState` pas encore remis à null) — sans conséquence pour
+  // un créneau fusionné, fatal pour une bascule de journée (posée puis retirée).
   useEffect(() => {
     if (!dragState) return;
     const onGlobalMouseUp = () => handleDragEnd();
@@ -380,9 +406,10 @@ export function DayResourceGrid({
           <div className={`grid ${dragState ? 'select-none' : ''}`} style={{ gridTemplateColumns }}>
             {/* Header colonnes membres */}
             <div className="border-b border-r bg-gray-50" />
-            {members.map((m) => (
-              <div key={m.id} className="border-b border-r bg-gray-50 px-1 py-1.5 text-center" title={m.display_name}>
-                <div className="flex items-center justify-center gap-1">
+            {members.map((m) => {
+              const posee = fullDayClick && (draftsByMember.get(m.id) || []).length > 0;
+              const entete = (
+                <>
                   <span
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: m.calendar_color || '#6B7280' }}
@@ -391,9 +418,26 @@ export function DayResourceGrid({
                   <span className="text-xs font-medium text-gray-700 truncate">
                     {(m.display_name || '').trim().split(' ')[0] || m.display_name}
                   </span>
+                  {posee && <Check className="w-3 h-3 text-blue-600 shrink-0" />}
+                </>
+              );
+              // Journée entière : le prénom est un bouton qui pose / retire la journée de la personne.
+              return fullDayClick ? (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => toggleDay(m.id)}
+                  className={`border-b border-r px-1 py-1.5 text-center transition-colors hover:bg-blue-50 ${posee ? 'bg-blue-50' : 'bg-gray-50'}`}
+                  title={`${posee ? 'Retirer' : 'Poser'} la journée de ${m.display_name}`}
+                >
+                  <div className="flex items-center justify-center gap-1">{entete}</div>
+                </button>
+              ) : (
+                <div key={m.id} className="border-b border-r bg-gray-50 px-1 py-1.5 text-center" title={m.display_name}>
+                  <div className="flex items-center justify-center gap-1">{entete}</div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Lignes de créneaux */}
             {slotLabels.map((slot) => (
@@ -431,7 +475,6 @@ export function DayResourceGrid({
                       key={`${m.id}-${slot.index}`}
                       onMouseDown={(e) => handleSlotMouseDown(e, m.id, slot.index)}
                       onMouseEnter={() => handleSlotMouseEnter(m.id, slot.index)}
-                      onMouseUp={handleDragEnd}
                       className={cellClass}
                       style={{ height: `${SLOT_HEIGHT}px` }}
                       title={off ? 'Hors horaires' : slot.time}
@@ -490,7 +533,11 @@ export function DayResourceGrid({
           <span className="w-2.5 h-2.5 bg-amber-400 rounded-sm" />
           Conflit (planif. quand même)
         </span>
-        <span className="text-gray-400 italic">Cliquer-glisser dans une colonne</span>
+        <span className="text-gray-400 italic">
+          {fullDayClick
+            ? 'Cliquer sur une personne = sa journée · glisser = une partie de journée'
+            : 'Cliquer-glisser dans une colonne'}
+        </span>
       </div>
     </div>
   );

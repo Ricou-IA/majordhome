@@ -425,6 +425,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                 defaultDuration={480}
                 multi
                 mergeOverlapping
+                fullDayClick
                 expectedTeamSize={plannedOrder.teamSize}
                 expectedDays={plannedOrder.days}
                 onConfirm={handleConfirmInstallation}

@@ -61,6 +61,29 @@ export function fusionnerCreneau(draftSlots, slot) {
   return list.map((s, i) => (i === idx ? { ...s, technicianIds: union } : s));
 }
 
+/**
+ * Un clic sur une personne pose (ou retire) SA JOURNÉE : si elle figure déjà sur un
+ * brouillon de cette date, elle en est retirée (brouillon supprimé s'il se vide) ;
+ * sinon `slot` (sa journée de travail, une seule personne) rejoint les brouillons
+ * via `fusionnerCreneau` — un jour = un RDV à N techniciens, l'horaire du premier
+ * posé est conservé. Ne mute rien.
+ * @param {Array<{id: string, date: string, startTime: string, endTime?: string|null, technicianIds?: string[]}>} draftSlots
+ * @param {{id: string, date: string, startTime: string, endTime?: string|null, duration?: number, technicianIds: string[]}} slot  journée entière d'UNE personne
+ * @returns {Array} nouveau tableau
+ */
+export function basculerJournee(draftSlots, slot) {
+  const list = Array.isArray(draftSlots) ? draftSlots : [];
+  const memberId = slot?.technicianIds?.[0];
+  if (!memberId) return list;
+  const dejaPosee = list.some((s) => s.date === slot.date && (s.technicianIds || []).includes(memberId));
+  if (!dejaPosee) return fusionnerCreneau(list, slot);
+  return list
+    .map((s) => (s.date === slot.date && (s.technicianIds || []).includes(memberId)
+      ? { ...s, technicianIds: s.technicianIds.filter((id) => id !== memberId) }
+      : s))
+    .filter((s) => (s.technicianIds || []).length > 0 || s.date !== slot.date);
+}
+
 /** '2026-09-23' → '23/09'. */
 function dateCourte(iso) {
   if (!iso || typeof iso !== 'string') return '?';

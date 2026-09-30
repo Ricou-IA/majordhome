@@ -27,7 +27,7 @@ import { SlotDraftList } from './SlotDraftList';
 import { AssignSlotModal } from './AssignSlotModal';
 import { useTeamDayAvailability } from '@hooks/useAppointments';
 import { findMemberConflicts } from '@/lib/scheduleConflicts';
-import { fusionnerCreneau, etatCommande } from '@/lib/installOrder';
+import { fusionnerCreneau, basculerJournee, etatCommande } from '@/lib/installOrder';
 import { formatDateForInput } from '@/lib/utils';
 
 // ============================================================================
@@ -78,6 +78,9 @@ function newId() {
  *   personne à ce créneau au lieu d'en créer un second (un jour = un RDV à N techniciens).
  * @param {number|null} [props.expectedTeamSize] - personnes attendues par jour (commande de la carte)
  * @param {number|null} [props.expectedDays] - jours attendus (commande de la carte)
+ * @param {boolean} [props.fullDayClick] - journée entière : un clic sur une personne (en-tête
+ *   ou colonne) la pose / la retire sur sa journée de travail (`basculerJournee`) ; le
+ *   glisser reste possible pour une partie de journée (installation, congés).
  */
 export function SchedulingAssistant({
   lead,
@@ -103,6 +106,7 @@ export function SchedulingAssistant({
   mergeOverlapping = false,
   expectedTeamSize = null,
   expectedDays = null,
+  fullDayClick = false,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -187,6 +191,12 @@ export function SchedulingAssistant({
       return mergeOverlapping ? fusionnerCreneau(prev, slot) : [...prev, slot];
     });
   }, [multi, defaultDuration, defaultTechIds, mergeOverlapping]);
+
+  // --- Journée entière d'une personne (clic sur son prénom / sa colonne) : pose ou retire ---
+  const handleToggleDay = useCallback(({ memberId, date, startTime, endTime, duration }) => {
+    const slot = { id: newId(), date, startTime, endTime, duration, technicianIds: [memberId] };
+    setDraftSlots((prev) => (multi ? basculerJournee(prev, slot) : [slot]));
+  }, [multi]);
 
   const handleAssignPrompt = useCallback((ids) => {
     const slotId = assignPromptSlot?.id;
@@ -358,6 +368,8 @@ export function SchedulingAssistant({
         draftSlots={draftSlots}
         onPlaceSlot={handlePlaceSlot}
         fixedDuration={fixedDuration}
+        fullDayClick={fullDayClick}
+        onToggleDay={handleToggleDay}
       />
 
       {/* « Qui prend ce RDV ? » — filet quand le sélecteur d'un créneau a été vidé */}
@@ -388,6 +400,7 @@ export function SchedulingAssistant({
         showTechSelect={!commercialMode}
         expectedTeamSize={expectedTeamSize}
         expectedDays={expectedDays}
+        emptyHint={fullDayClick ? 'Cliquez sur une personne ci-dessus pour lui poser la journée.' : undefined}
       />
 
       {/* Commande incomplète (personnes × jours) : avertissement, pas de blocage */}

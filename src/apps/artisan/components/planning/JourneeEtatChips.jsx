@@ -14,6 +14,7 @@ import { Lock, AlertTriangle } from 'lucide-react';
 import { LIBELLES_ETAT } from '@/lib/tournee/etat.js';
 
 const STYLES = {
+  conges: 'bg-slate-100 text-slate-600 border-slate-300',
   vide: 'bg-secondary-50 text-secondary-500 border-secondary-200',
   ouverte: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   pleine: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -27,9 +28,15 @@ function formatFige(iso) {
   return `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+/** Libellé affiché : « Congés » quand la journée ne porte que des congés, sinon l'état du moteur. */
+function libelle(item) {
+  return item.enConges ? 'Congés' : LIBELLES_ETAT[item.etat];
+}
+
 /** Aide au survol : ce que la puce ne dit pas (secteur, figeage, reste utile estimé). */
 function titre(item) {
-  const parts = [`${item.technicienNom} — ${LIBELLES_ETAT[item.etat]}`];
+  const parts = [`${item.technicienNom} — ${libelle(item)}`];
+  if (item.enConges) return parts.join('\n');
   if (item.etiquette) parts.push(`Secteur ${item.etiquette}${item.origine === 'deduite' ? ' (déduit des RDV posés)' : ''}`);
   if (item.figeeAt) {
     parts.push(`Figée le ${formatFige(item.figeeAt)} par ${item.figeePar === 'cron' ? 'le cron' : 'un membre de l’équipe'}`);
@@ -59,14 +66,14 @@ export function JourneeEtatChips({ date, etats, onOpen }) {
           type="button"
           onClick={() => onOpen?.(item)}
           title={titre(item)}
-          className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-normal leading-tight ${STYLES[item.etat]}`}
+          className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-normal leading-tight ${STYLES[item.enConges ? 'conges' : item.etat]}`}
         >
           <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: item.couleur || '#94A3B8' }} />
           <span className="max-w-[5rem] truncate">{String(item.technicienNom || '').split(' ')[0]}</span>
-          {item.etat === 'figee' && <Lock className="h-3 w-3" />}
-          {item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3" />}
-          <span>{LIBELLES_ETAT[item.etat]}</span>
-          {item.etiquette && item.etat !== 'vide' && <span className="opacity-70">· {item.etiquette}</span>}
+          {!item.enConges && item.etat === 'figee' && <Lock className="h-3 w-3" />}
+          {!item.enConges && item.etat === 'a_arbitrer' && <AlertTriangle className="h-3 w-3" />}
+          <span>{libelle(item)}</span>
+          {item.etiquette && item.etat !== 'vide' && !item.enConges && <span className="opacity-70">· {item.etiquette}</span>}
         </button>
       ))}
     </div>

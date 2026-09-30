@@ -238,6 +238,10 @@
 .fc .mdh-flex-band {
   opacity: 0.18;
 }
+/* Congés : bloc hachuré à la couleur de la personne (une absence, pas un RDV de travail) */
+.fc .mdh-leave {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0 6px, transparent 6px 12px);
+}
 
 /* Recherche client du planning : RDV du client surlignés */
 .fc .mdh-search-hit {
