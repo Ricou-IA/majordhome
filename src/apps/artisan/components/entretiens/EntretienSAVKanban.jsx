@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useEntretienSAV, useEntretienSAVMutations } from '@hooks/useEntretienSAV';
+import { useInvitationsDuMois } from '@hooks/useTournees';
 import { KANBAN_COLUMNS, getTransitions, savService } from '@services/sav.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { LancerAppelButton } from '../appels/LancerAppelButton';
@@ -242,9 +243,15 @@ export function EntretienSAVKanban() {
   // RENDER
   // =========================================================================
 
+  // Invitations auto-RDV du mois : badge « invité / relancé / à appeler » sur les cartes À planifier.
+  const { parContrat: invitationsParContrat } = useInvitationsDuMois(orgId);
+
   const renderCard = useCallback((item) => (
-    <EntretienSAVCard item={item} onClick={setSelectedItem} onRefresh={refresh} orgId={orgId} />
-  ), [refresh, orgId]);
+    <EntretienSAVCard
+      item={item} onClick={setSelectedItem} onRefresh={refresh} orgId={orgId}
+      invitation={invitationsParContrat.get(item.effective_contract_id || item.contract_id) || null}
+    />
+  ), [refresh, orgId, invitationsParContrat]);
 
   if (isLoading) {
     return (

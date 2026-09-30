@@ -72,7 +72,22 @@ function PartsOrderBadge({ status }) {
 // COMPOSANT
 // ============================================================================
 
-export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
+/** « Invité le 1/10 · page ouverte · relancé le 8/10 · à appeler » — suivi de l'invitation auto-RDV du mois. */
+function libelleInvitation(inv) {
+  if (!inv) return null;
+  const jour = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' });
+  const parts = [];
+  if (inv.sent_at) parts.push(`Invité le ${jour(inv.sent_at)}`);
+  else if (inv.outcome === 'phone') parts.push('Sans e-mail');
+  if (inv.opened_at && !inv.booked_at) parts.push('page ouverte');
+  if (inv.outcome === 'no_slot') parts.push('aucun créneau');
+  if (inv.sms_relance_at) parts.push(`relancé le ${jour(inv.sms_relance_at)}`);
+  if (!inv.booked_at && (inv.escalade_appel_at || inv.outcome === 'phone' || inv.outcome === 'no_slot')) parts.push('à appeler');
+  if (inv.relances > 0) parts.push(`${inv.relances + 1}ᵉ mois`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation = null }) {
   const [smsLoading, setSmsLoading] = useState(false);
   const [smsSent, setSmsSent] = useState(item.sms_avis_sent === true);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -280,6 +295,13 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId }) {
           {item.contract_number && (
             <div className="text-[10px] text-gray-400">
               {item.contract_number}
+            </div>
+          )}
+
+          {/* Suivi de l'invitation auto-RDV du mois (À planifier uniquement) */}
+          {item.workflow_status === 'a_planifier' && libelleInvitation(invitation) && (
+            <div className="text-[10px] text-indigo-600 mt-0.5">
+              {libelleInvitation(invitation)}
             </div>
           )}
 

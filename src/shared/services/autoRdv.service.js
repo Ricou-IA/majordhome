@@ -31,4 +31,23 @@ export const autoRdvService = {
       return { data: null, error };
     }
   },
+
+  /**
+   * Invitations d'un mois (vue `majordhome_auto_rdv_invitations`, org CORE) :
+   * mail envoyé, page ouverte, RDV pris, relance SMS, liste d'appels, expiration.
+   * @param {{ orgId: string, mois: string }} p  `mois` = `YYYY-MM-01`
+   * @returns {Promise<{ data: Array<object>, error: Error|null }>}
+   */
+  async getInvitationsDuMois({ orgId, mois }) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_auto_rdv_invitations')
+        .select('id, contract_id, client_id, mois, raison, sent_at, opened_at, booked_at, sms_relance_at, escalade_appel_at, outcome, relances')
+        .eq('org_id', orgId).eq('mois', mois);
+      return { data: data || [], error };
+    } catch (error) {
+      logger.error('[autoRdv] getInvitationsDuMois', error);
+      return { data: [], error };
+    }
+  },
 };

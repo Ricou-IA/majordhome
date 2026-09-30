@@ -442,4 +442,6 @@ export const tourneeKeys = {
   journeesSecteur: (orgId, from, to) => [...tourneeKeys.all(orgId), 'journeesSecteur', from, to],
   // Journal des crons de planification (majordhome_planification_runs), par job.
   runs: (orgId, job) => [...tourneeKeys.all(orgId), 'runs', job],
+  // Invitations auto-RDV d'un mois (majordhome_auto_rdv_invitations), `mois` = YYYY-MM-01.
+  invitations: (orgId, mois) => [...tourneeKeys.all(orgId), 'invitations', mois],
 };

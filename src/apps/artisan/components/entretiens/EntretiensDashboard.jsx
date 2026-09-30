@@ -12,6 +12,7 @@
 import { Euro, TrendingUp, FileCheck, Wrench, Package, FileText } from 'lucide-react';
 import { formatEuro } from '@/lib/utils';
 import { PlanificationJournal } from '@/apps/artisan/components/tournees/PlanificationJournal';
+import { AutoRdvMois } from '@/apps/artisan/components/tournees/AutoRdvMois';
 
 // ============================================================================
 // SOUS-COMPOSANT : Info Card (non cliquable)
@@ -156,7 +157,12 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId }) {
       {coreOrgId && (
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Planification automatique</h2>
-          <PlanificationJournal coreOrgId={coreOrgId} />
+          <div className="space-y-4">
+            <AutoRdvMois coreOrgId={coreOrgId} />
+            <PlanificationJournal coreOrgId={coreOrgId} job="tournees-figer" />
+            <PlanificationJournal coreOrgId={coreOrgId} job="auto-rdv-ouverture" />
+            <PlanificationJournal coreOrgId={coreOrgId} job="auto-rdv-relances" />
+          </div>
         </div>
       )}
     </div>

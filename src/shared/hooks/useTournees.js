@@ -22,6 +22,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { tourneesService } from '@services/tournees.service';
+import { autoRdvService } from '@services/autoRdv.service';
 import { contractsService } from '@services/contracts.service';
 import { tourneeKeys } from '@hooks/cacheKeys';
 import { useOrgSettings } from '@hooks/useOrgSettings';
@@ -345,5 +346,45 @@ export function usePlanificationRuns(coreOrgId, job = 'tournees-figer') {
     enabled: !!coreOrgId,
     staleTime: 60 * 1000,
   });
+}
+
+/** `YYYY-MM-01` du mois courant (heure locale du navigateur). */
+export function moisCourantIso(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/**
+ * Invitations auto-RDV d'un mois, indexées par contrat, avec les compteurs du
+ * tableau de bord. `parContrat` sert au badge de la carte Kanban.
+ *
+ * @param {string} coreOrgId
+ * @param {string} [mois]  `YYYY-MM-01`, défaut = mois courant
+ * @returns {{ parContrat: Map<string, object>, compteurs: { invitees: number, ouvertes: number, prises: number, sans_creneau: number, a_appeler: number, expirees: number }, isLoading: boolean, error: Error|null }}
+ */
+export function useInvitationsDuMois(coreOrgId, mois = moisCourantIso()) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: tourneeKeys.invitations(coreOrgId, mois),
+    queryFn: async () => {
+      const { data: rows, error: err } = await autoRdvService.getInvitationsDuMois({ orgId: coreOrgId, mois });
+      if (err) throw err;
+      return rows;
+    },
+    enabled: !!coreOrgId,
+    staleTime: 60 * 1000,
+  });
+  return useMemo(() => {
+    const parContrat = new Map();
+    const compteurs = { invitees: 0, ouvertes: 0, prises: 0, sans_creneau: 0, a_appeler: 0, expirees: 0 };
+    for (const inv of data || []) {
+      parContrat.set(inv.contract_id, inv);
+      if (inv.sent_at) compteurs.invitees += 1;
+      if (inv.opened_at) compteurs.ouvertes += 1;
+      if (inv.booked_at) compteurs.prises += 1;
+      if (inv.outcome === 'no_slot') compteurs.sans_creneau += 1;
+      if (!inv.booked_at && (inv.outcome === 'phone' || inv.escalade_appel_at || inv.outcome === 'no_slot')) compteurs.a_appeler += 1;
+      if (inv.outcome === 'expired') compteurs.expirees += 1;
+    }
+    return { parContrat, compteurs, isLoading, error: error || null };
+  }, [data, isLoading, error]);
 }
 

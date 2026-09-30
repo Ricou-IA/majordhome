@@ -135,3 +135,13 @@ Règles qui mordent :
 - **Auto-RDV : l'offre est calculée à l'instant, jamais figée dans un mail** (`src/lib/tournee/auto-rdv.js`, edge `auto-rdv`) ; horizon = mois en cours ; une journée vide sans étiquette n'est pas proposée ; la page ne déplace jamais un voisin. **`empreinteJournee` (JS) et le `string_agg` de `auto_rdv_poser` (SQL) sont la même formule** : modifier l'une sans l'autre refuse toute pose en `journee_modifiee`.
 - **Lien = jeton HMAC `MDH_AUTO_RDV_SECRET`** (edge env), org toujours dérivée du contrat du jeton ; « Copier le lien » sur la carte À planifier pour tester ou poser par téléphone.
 ---
+
+## [2026-09-30 09:00] Auto-RDV tranche 3 + règles moteur du 30/09 (souplesse, demi-journée, pause, retour dépôt)
+**Statut** : PENDING
+**Commit** : 11b5bf4..HEAD
+**Contexte** : Cron `auto-rdv-cron` (invitations mensuelles, étiquetage des journées vides, relances), table `auto_rdv_invitations`, réglages `settings.tournees.auto_rdv`. Décisions d'Eric du 30/09 sur le moteur. Détail : `docs/MODULE_TOURNEES.md`.
+**Proposition** (CLAUDE.md § Module Tournées, règles qui mordent) :
+- **La souplesse est une variable du MOTEUR, pas une promesse au client** : au client on annonce un rang dans sa demi-journée (« 1er passage du matin »), sauf RDV figé (heure imposée). Défaut d'org = demi-journée (`souplesse_defaut_minutes = 240`). **La demi-journée est un engagement de DÉBUT** avec au moins la moitié du travail dedans (90 min → dernier début 11 h 15) ; l'amplitude borne la fin ; la pause (entière dans `pause_fenetre`) glisse, prise sur la route ; le retour au dépôt peut déborder l'amplitude de `tolerance_retour_depot_minutes`. Trajet max = DÉTOUR ajouté, pas tronçon brut.
+- **L'auto-RDV réordonnance la journée entière** (`placerParSequencement`) et écrit les décalages des voisins avec le RDV (`auto_rdv_poser(..., p_decalages)`), tout ou rien. Le moteur ne change jamais un RDV de demi-journée ni de jour de lui-même.
+- **Cron `auto-rdv-cron` gouverné par `settings.tournees.auto_rdv.enabled`** ; gabarit absent ou client sans e-mail ⇒ invitation `phone` (liste d'appels), journalisé ; filtres `in` par lots de 100 côté edge.
+---

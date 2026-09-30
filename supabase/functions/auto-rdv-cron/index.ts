@@ -38,6 +38,7 @@ const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const APP_URL = (Deno.env.get("MDH_APP_URL") || "https://majordhome.vercel.app").replace(/\/+$/, "");
 const SMS_CAMPAIGN = "auto_rdv_relance";
+const LOT_IN = 100; // taille max d'un filtre `in` PostgREST (longueur d'URL)
 const MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 
 type Admin = ReturnType<typeof getAdminClient>;
@@ -109,10 +110,12 @@ async function chargerDonnees(admin: Admin, org: { id: string; settings: Record<
 
   const clientIds = [...new Set(contrats.map((c) => c.client_id).filter(Boolean))];
   const clients = new Map<string, Record<string, unknown>>();
-  for (let i = 0; i < clientIds.length; i += 500) {
+  // Lots de 100 : 500 uuid dans un filtre `in` dépassent la longueur d'URL acceptée
+  // par PostgREST (« error sending request », vécu à la première simulation).
+  for (let i = 0; i < clientIds.length; i += LOT_IN) {
     const { data, error } = await admin.from("majordhome_clients")
       .select("id, email, first_name, last_name, phone, mail_optin, email_unsubscribed_at, is_archived, latitude, longitude, postal_code")
-      .eq("org_id", org.id).in("id", clientIds.slice(i, i + 500));
+      .eq("org_id", org.id).in("id", clientIds.slice(i, i + LOT_IN));
     if (error) return { error: sanitizeError(error, "clients illisibles") };
     for (const cl of data ?? []) clients.set(String(cl.id), cl as Record<string, unknown>);
   }
@@ -139,13 +142,18 @@ async function chargerDonnees(admin: Admin, org: { id: string; settings: Record<
 
   // Équipements (libellés de catégorie) pour le mail : 3 requêtes, pas une par contrat.
   const equipementsParContrat = new Map<string, string[]>();
-  const { data: ce } = await lireTout<{ contract_id: string; equipment_id: string }>(
-    admin.from("majordhome_contract_equipments").select("contract_id, equipment_id").in("contract_id", contrats.map((c) => c.id)).order("contract_id") as never,
-  );
-  const equipIds = [...new Set((ce ?? []).map((r) => r.equipment_id))];
+  const ce: Array<{ contract_id: string; equipment_id: string }> = [];
+  const contratIds = contrats.map((c) => c.id);
+  for (let i = 0; i < contratIds.length; i += LOT_IN) {
+    const { data, error } = await admin.from("majordhome_contract_equipments").select("contract_id, equipment_id").in("contract_id", contratIds.slice(i, i + LOT_IN));
+    if (error) return { error: sanitizeError(error, "équipements de contrat illisibles") };
+    ce.push(...((data ?? []) as typeof ce));
+  }
+  const equipIds = [...new Set(ce.map((r) => r.equipment_id))];
   const catParEquip = new Map<string, string | null>();
-  for (let i = 0; i < equipIds.length; i += 500) {
-    const { data } = await admin.from("majordhome_equipments").select("id, category_id").in("id", equipIds.slice(i, i + 500));
+  for (let i = 0; i < equipIds.length; i += LOT_IN) {
+    const { data, error } = await admin.from("majordhome_equipments").select("id, category_id").in("id", equipIds.slice(i, i + LOT_IN));
+    if (error) return { error: sanitizeError(error, "équipements illisibles") };
     for (const e of data ?? []) catParEquip.set(String(e.id), (e.category_id as string | null) ?? null);
   }
   const { data: cats } = await admin.from("majordhome_equipment_categories").select("id, label").eq("org_id", org.id);
@@ -383,7 +391,9 @@ Deno.serve(async (req: Request) => {
       const { data: mdhOrg } = await admin.from("majordhome_organizations").select("id").eq("core_org_id", org.id).maybeSingle();
       if (!mdhOrg) { if (onlyOrgId) reports.push({ ...report, skipped: "org_majordhome_introuvable" }); continue; }
       const reglages = construireReglages(org.settings ?? {}) as { auto_rdv: { enabled?: boolean } };
-      if (reglages.auto_rdv?.enabled !== true) { reports.push({ ...report, skipped: "auto_rdv_off" }); durees.set(org.id, Date.now() - debut); continue; }
+      // `force` n'a de sens qu'à blanc : simuler une org avant de l'activer, sans rien écrire ni envoyer.
+      const force = dryRun && body.force === true;
+      if (reglages.auto_rdv?.enabled !== true && !force) { reports.push({ ...report, skipped: "auto_rdv_off" }); durees.set(org.id, Date.now() - debut); continue; }
       if (!siegeDepuis(org.settings ?? {})) { reports.push({ ...report, skipped: "siege_non_configure" }); durees.set(org.id, Date.now() - debut); continue; }
       reports.push(report);
       try {

@@ -18,6 +18,10 @@ import { mailCampaignKeys } from '@hooks/cacheKeys';
 import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL, INVOICE_EMAIL_TEMPLATE_KEY, INVOICE_EMAIL_PLACEHOLDERS } from '@/lib/invoiceEmailTemplate';
 import ResendDomainSection from './ResendDomainSection';
+import GabaritTransactionnel from './GabaritTransactionnel';
+import {
+  DEFAULT_AUTO_RDV_EMAIL, DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL, AUTO_RDV_PLACEHOLDERS, AUTO_RDV_CONFIRMATION_PLACEHOLDERS,
+} from '@/lib/autoRdvEmailTemplates';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -184,6 +188,15 @@ export default function EmailsTab() {
                 </button>
               )}
             </div>
+            {/* Prise de rendez-vous par le client (auto-RDV) : invitation du 1er du mois + confirmation */}
+            <GabaritTransactionnel
+              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_EMAIL} placeholders={AUTO_RDV_PLACEHOLDERS}
+              titre="Prise de rendez-vous : invitation mensuelle"
+            />
+            <GabaritTransactionnel
+              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL} placeholders={AUTO_RDV_CONFIRMATION_PLACEHOLDERS}
+              titre="Prise de rendez-vous : confirmation"
+            />
           </section>
         )}
 
