@@ -9,19 +9,10 @@
 > Revue du 2026-09-20 (soir) : 1 entrée intégrée (gotcha « un fichier `sql/*.sql` n'est pas une migration appliquée », § Gotchas DB + correction des vues `majordhome_prospects` / `_prospect_interactions`, § Vues publiques principales).
 > Revue du 2026-09-21 : 2 entrées intégrées (facturation d'entretien → Pennylane, condensée en 4 puces § Module Pennylane + remise exceptionnelle § Module Contrats ; `create-user` : écritures `core` + lecture de `{ error }`, § Edge functions).
 > Revue du 2026-09-22 : 2 entrées intégrées (plan comptable de gestion par métier § Module Pennylane + icônes des tuiles § Paramétrage par module ; commande « personnes × jours » § Module Planning + gotchas `update_majordhome_lead` / harnais de répétition § Gotchas DB). Hub de facturation phase 1 gardé PENDING en attendant la phase 2 (import Pennylane livré le soir même, à documenter d'un bloc).
+> Revue du 2026-09-30 : 1 entrée intégrée (droits app-level phases 4-6 livrées le jour même — § Rôles & Permissions réécrit, `org_seed_permissions` retirée) ; entrée Fumisterie tranche 1 (déjà RESOLU) retirée.
 
 ---
 
-## [2026-09-30 23:00] Droits app-level — phases 4-6 livrées (remplace l'entrée « Phases 4-6 à graver » du 2026-06-02)
-**Statut** : PENDING (texte prêt, accord Eric attendu pour éditer CLAUDE.md)
-**Commits** : migrations `20260930_12..15` + registre / harnais / script de cohérence (commit de cette tâche)
-**Contexte** : Eric, 2026-09-30 : « supprimer = org_admin seul », « go de bout en bout ». Les écritures de `leads` / `contracts` / `quotes` / `tasks` passent par `role_can` ; défauts app regénérés (123, dont `pv_calculator` / `thermal_study` / `maintenance`) ; surcharges purgées (Mayer 10 vrais choix, Cimaj 0) ; `org_seed_permissions` supprimée. Vérifié par impersonation sur le harnais ET en prod.
-**Proposition** : dans CLAUDE.md § Rôles & Permissions, **remplacer** le paragraphe « ⚠️ Droits app-level (WIP — modèle en cours, ne PAS consommer prématurément) » et la puce `org_seed_permissions` par :
-- **Droits = registre `src/lib/permissionsRegistry.js`, source unique** (défauts par rôle × ressource × action ; `org_admin` = bypass, jamais listé). Défauts DB `majordhome.app_role_permissions` **générés** du registre (`node scripts/gen-app-role-permissions-sql.mjs` → migration versionnée), surcharges par org dans `majordhome.role_permissions` (éditeur Settings → Droits d'accès, anneau ambre = surcharge). Arbitre unique `majordhome.role_can(org, resource, action)` (surcharge → défaut → refus), même verdict côté écran (`useCanAccess().can`) et côté base.
-- **Écritures sous `role_can`** : `clients`, `equipments`, `interventions` (via `project_org_id`), `contracts` (sous `clients` : le contrat fait partie de la fiche), `leads` (`pipeline`), `quotes` (`devis`), `tasks`. **Supprimer = `org_admin` seul, toute entité** (Eric 2026-06-02, reconfirmé 2026-09-30) ; `edit_own` autorisé en base dès que le rôle a `edit` ou `edit_own`, le « c'est le mien » reste tenu par l'écran. `appointments` volontairement hors modèle (supprimer un RDV = geste de planning). Toute nouvelle ressource : registre → régénérer les défauts → policies `role_can` ; jamais une policy « tout membre » ni un `UPDATE` à la main sur `app_role_permissions`.
-- **Mesure** : `node scripts/permissions-coherence.mjs --env .env.local` (prod, lecture seule) — échoue si défauts DB ≠ registre, table gouvernée sans `role_can` ou policy legacy restante ; liste les 18 tables enfant encore « tout membre » (activités, interactions, certificats, `quote_templates`…). `verify-permissions-registry.mjs` est dans `audit:quality`. Écart connu : les policies d'`interventions` citent `clients` là où le registre dit `entretiens` (union `entretiens|chantiers` prévue, même verdict aujourd'hui).
-- Plus de gabarit Mayer : une nouvelle org sans surcharge tombe sur les défauts app (`org_seed_permissions` supprimée le 2026-09-30).
----
 
 ## [2026-09-22 14:30] Hub de facturation — phases 1 à 3 (émission locale, import Pennylane, avoir)
 **Statut** : PENDING (à graver dans CLAUDE.md)
@@ -76,21 +67,6 @@
 - **E-mail du soir** : edge `maintenance-digest` (cron horaire :05, `MDH_CRON_SECRET`), part même si tout est à jour, expéditeur org sinon `MDH_PLATFORM_FROM_EMAIL` sinon `skipped:no_sender`, `maint_digest_mark_sent` (service_role only) après 2xx Resend.
 ---
 
-## [2026-09-28 18:30] Module Fumisterie (assistant de devis) — section CLAUDE.md
-**Statut** : RESOLU (intégré le 2026-09-28 après « Module Contrats », accord Eric)
-**Commit** : 5f65516..b832d9d (tranche 1 G1)
-**Contexte** : Livraison de la tranche 1 de l'assistant de devis fumisterie (spec `docs/superpowers/specs/2026-09-28-assistant-devis-fumisterie-design.md`, plan `docs/superpowers/plans/2026-09-28-assistant-devis-fumisterie-tranche1-g1.md`, handoff/maquette/tarif dans `docs/devis-fumisterie/`). Nouveau module transverse (tables, moteur pur, écran, Pennylane) avec des règles qui mordent.
-**Proposition** : ajouter à CLAUDE.md, après « Module Contrats », la section suivante :
-
-## Module Fumisterie (assistant de devis conduits) → `docs/superpowers/specs/2026-09-28-assistant-devis-fumisterie-design.md`
-Règles qui mordent :
-- **Moteur PUR `src/lib/fumisterie/`** (aucun import React/Supabase/alias, JSDoc, copie Deno prévue pour Hermes) ; **point d'entrée unique `calculerMetre()`** (`index.js`), `ENGINE_VERSION` à incrémenter à tout changement de règle. Rien en dur : tarif, codes, longueurs, seuils viennent des paramètres (`settings.fumisterie` via `buildFumisterieConfig`, Settings → Entretiens & Contrats → Fumisterie).
-- **Rien n'est avalé** : article introuvable ou ambigu ⇒ ligne « à chiffrer » à prix `null` + alerte (`article_manquant` / `article_ambigu`) ; relevé incomplet ⇒ `validerReleve` refuse le calcul ; quantité ≤ 0 ⇒ pas de ligne (sinon `createQuote` la remonte à 1). L'envoi Pennylane est refusé tant qu'une ligne est à 0 € ou « À CHIFFRER », et si le rattachement au lead renvoie `attached = 0`.
-- **Résolution d'article = attributs (`fum_article_attrs`) + `motif_code` FILTRE** (regex sur la référence, placeholders `{D}` `{LG}` `{A}` `{D-n}`), ordre par `priorite` ; plusieurs candidats restants = ambiguïté, jamais un choix alphabétique. Le test `scripts/fumisterie/tarif-reel.test.mjs` fait tourner le moteur sur le **tarif réel** (xlsx) et pinne les 14 références de la maquette (1 480,90 € HT d'achat) : toute modif du parseur, du mapping ou des règles doit le laisser vert.
-- **Prix** : vente = tarif public fournisseur, achat = « Prix pour client » (net Mayer, jamais recalculé). Tarif importé dans `supplier_products` (fournisseur « MODINOX / ALTEMA ») par `scripts/fumisterie/import-tarif-modinox.mjs` → SQL rejouable (`out/`, gitignoré) appliqué par `scripts/fumisterie/apply-sql.mjs` (API de management, `SUPABASE_ACCESS_TOKEN` dans `.env.local`) ; un article disparu passe `is_active=false`, jamais supprimé. Seed des configurations : `seed-configurations.mjs` (idempotent). ⚠️ après tout changement de `data/*.json`, régénérer ET rejouer le seed en prod, sinon le mapping en base diverge du test.
-- `fum_metres` = relevé + résultat **figés** (`engine_version`) ; un devis rouvert doit relire `resultat`, pas recalculer (relecture non branchée en tranche 1). Vue `majordhome_fum_articles` = `supplier_products` × attrs ; `fum_article_attrs` n'est jamais écrite par l'app.
-- Différés (tranche 2+) : gabarits G3-G6, `groupe_alternative` « ou », `fournisseur_id`/PRH/émaillé dans les réglages, coupe dans le PDF, DINAK, edge `fum-metre` pour Hermes.
----
 
 ## [2026-09-29 12:00] Module Fumisterie — tranche 2 G4 tubage (compléments à la section « Module Fumisterie »)
 **Statut** : PENDING
