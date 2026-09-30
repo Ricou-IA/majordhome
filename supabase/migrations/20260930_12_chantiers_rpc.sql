@@ -84,6 +84,7 @@ BEGIN
   IF (EXISTS (SELECT 1 FROM core.organization_members om WHERE om.org_id = v_lead.org_id AND om.user_id = v_user)) IS NOT TRUE THEN
     RAISE EXCEPTION 'not_authorized' USING ERRCODE = '42501';
   END IF;
+  IF COALESCE(v_lead.is_deleted, false) THEN RAISE EXCEPTION 'lead_deleted' USING ERRCODE = '22023'; END IF;
 
   SELECT id INTO v_id FROM majordhome.chantiers WHERE lead_id = p_lead_id ORDER BY created_at LIMIT 1;
   IF v_id IS NOT NULL THEN RETURN v_id; END IF;
@@ -102,7 +103,7 @@ REVOKE EXECUTE ON FUNCTION public.chantier_ensure_for_lead(uuid) FROM PUBLIC, an
 GRANT EXECUTE ON FUNCTION public.chantier_ensure_for_lead(uuid) TO authenticated;
 
 -- ----------------------------------------------------------------------------
--- 3. Helpers privés : rang de statut, appro la moins avancée
+-- 3. Helpers privés : rang de statut, état d'approvisionnement le moins avancé
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION majordhome.chantier_status_rank(p_status text)
 RETURNS int LANGUAGE sql IMMUTABLE SET search_path TO '' AS $function$
@@ -113,13 +114,14 @@ $function$;
 
 CREATE OR REPLACE FUNCTION majordhome.order_status_min(p_a text, p_b text)
 RETURNS text LANGUAGE sql IMMUTABLE SET search_path TO '' AS $function$
-  -- na < commande < recu ; NULL ignoré ('recu' seulement si tous 'recu').
+  -- 'na' = non applicable (rien à commander), compté comme reçu par l'auto-transition du front.
+  -- 'commande' (en attente) l'emporte sur tout ; sinon 'recu' s'il y en a un ; sinon 'na' ; NULL ignoré.
   SELECT CASE
     WHEN p_a IS NULL THEN p_b
     WHEN p_b IS NULL THEN p_a
-    WHEN p_a = 'na' OR p_b = 'na' THEN 'na'
-    WHEN p_a = 'commande' OR p_b = 'commande' THEN 'commande'
-    ELSE 'recu' END;
+    WHEN 'commande' IN (p_a, p_b) THEN 'commande'
+    WHEN 'recu' IN (p_a, p_b) THEN 'recu'
+    ELSE 'na' END;
 $function$;
 
 -- ----------------------------------------------------------------------------
@@ -136,6 +138,7 @@ DECLARE
   v_t    majordhome.chantiers%ROWTYPE;
   v_s    majordhome.chantiers%ROWTYPE;
   v_sid  uuid;
+  v_sources uuid[];
   n int; n_q int := 0; n_a int := 0; n_r int := 0;
 BEGIN
   IF v_user IS NULL THEN RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501'; END IF;
@@ -148,7 +151,10 @@ BEGIN
     RAISE EXCEPTION 'not_authorized' USING ERRCODE = '42501';
   END IF;
 
-  FOREACH v_sid IN ARRAY p_source_ids LOOP
+  -- Doublons dans la sélection : un 2ᵉ tour trouverait la source déjà supprimée (faux chantier_not_found).
+  SELECT array_agg(DISTINCT x) INTO v_sources FROM unnest(p_source_ids) AS x;
+
+  FOREACH v_sid IN ARRAY v_sources LOOP
     SELECT * INTO v_s FROM majordhome.chantiers WHERE id = v_sid FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'chantier_not_found' USING ERRCODE = 'P0002'; END IF;
     IF v_s.lead_id <> v_t.lead_id OR v_s.org_id <> v_t.org_id THEN
@@ -195,8 +201,8 @@ BEGIN
 
   INSERT INTO majordhome.lead_activities (lead_id, user_id, activity_type, description, metadata, org_id)
   VALUES (v_t.lead_id, v_user, 'chantier_grouped',
-          'Chantiers groupés : ' || cardinality(p_source_ids) || ' carte(s) réunie(s) (' || n_q || ' devis, ' || n_a || ' RDV)',
-          jsonb_build_object('target_id', p_target_id, 'source_ids', to_jsonb(p_source_ids),
+          'Chantiers groupés : ' || cardinality(v_sources) || ' carte(s) réunie(s) (' || n_q || ' devis, ' || n_a || ' RDV)',
+          jsonb_build_object('target_id', p_target_id, 'source_ids', to_jsonb(v_sources),
                              'counts', jsonb_build_object('quotes', n_q, 'appointments', n_a, 'line_receptions', n_r)),
           v_t.org_id);
 
