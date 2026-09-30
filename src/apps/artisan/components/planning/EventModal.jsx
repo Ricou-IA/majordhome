@@ -1028,6 +1028,7 @@ export function EventModal({
         coreOrgId: orgId,
         appointment_type: appointment?.appointment_type,
         lead_id: appointment?.lead_id || null,
+        chantier_id: appointment?.chantier_id || null,
         intervention_id: appointment?.intervention_id || null,
         client_id: appointment?.client_id || null,
         client_name: appointment?.client_name || null,

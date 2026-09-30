@@ -148,6 +148,27 @@ async function syncCardStateOnCreate(appt) {
     if (error) console.error('[appointments] syncCreate entretien error:', error);
     return;
   }
+
+  // Installation -> chantier « planification » si en amont (clé = chantier, plus le lead)
+  if (appt.appointment_type === 'installation') {
+    if (!appt.chantier_id) return;
+    const { data: chantier, error: readError } = await supabase
+      .from('majordhome_chantiers').select('id, org_id, chantier_status').eq('id', appt.chantier_id).maybeSingle();
+    if (readError) { console.error('[appointments] syncCreate install read error:', readError); return; }
+    const order = CHANTIER_ORDER[chantier?.chantier_status] ?? 0;
+    if (chantier && order < CHANTIER_ORDER.planification) {
+      // planification_date = date de passage en planification (même sémantique que
+      // chantiersService.updateChantierStatus ; affichée « Planif. » sur la carte chantier)
+      const now = new Date();
+      const { data: patched, error } = await supabase
+        .from('majordhome_chantiers_write')
+        .update({ chantier_status: 'planification', planification_date: now.toISOString().split('T')[0], updated_at: now.toISOString() })
+        .eq('id', chantier.id).eq('org_id', chantier.org_id)
+        .select('id').maybeSingle();
+      if (error || !patched) console.error('[appointments] syncCreate install chantier error:', error || 'aucune ligne (RLS ?)');
+    }
+    return;
+  }
   if (!appt.lead_id) return;
 
   // Visite Technique -> pipeline « RDV planifié » si en amont
@@ -163,27 +184,6 @@ async function syncCardStateOnCreate(appt) {
       if (error) console.error('[appointments] syncCreate VT lead error:', error);
     }
     return;
-  }
-
-  // Installation -> chantier « planification » si en amont
-  if (appt.appointment_type === 'installation') {
-    const { data: lead } = await supabase
-      .from('majordhome_leads').select('chantier_status').eq('id', appt.lead_id).maybeSingle();
-    const order = CHANTIER_ORDER[lead?.chantier_status] ?? 0;
-    if (lead?.chantier_status && order < CHANTIER_ORDER.planification) {
-      // planification_date = date de passage en planification (même sémantique que
-      // chantiersService.updateChantierStatus ; affichée « Planif. » sur la carte chantier)
-      const now = new Date();
-      const { error } = await supabase.rpc('update_majordhome_lead', {
-        p_lead_id: appt.lead_id,
-        p_updates: {
-          chantier_status: 'planification',
-          planification_date: now.toISOString().split('T')[0],
-          updated_at: now.toISOString(),
-        },
-      });
-      if (error) console.error('[appointments] syncCreate install lead error:', error);
-    }
   }
 }
 
@@ -462,10 +462,10 @@ export const appointmentsService = {
       // actuel AVANT l'update pour pouvoir refluer l'ancienne carte après coup.
       // Drag & drop / éditions simples (date, heure, notes) : previous reste null, no-op.
       let previous = null;
-      if ('appointment_type' in updates || 'intervention_id' in updates || 'lead_id' in updates) {
+      if ('appointment_type' in updates || 'intervention_id' in updates || 'lead_id' in updates || 'chantier_id' in updates) {
         const { data: prev } = await supabase
           .from('majordhome_appointments')
-          .select('appointment_type, intervention_id, lead_id')
+          .select('appointment_type, intervention_id, lead_id, chantier_id')
           .eq('id', appointmentId)
           .maybeSingle();
         previous = prev || null;
@@ -501,7 +501,8 @@ export const appointmentsService = {
         const targetChanged =
           previous.appointment_type !== appointment?.appointment_type ||
           previous.intervention_id !== appointment?.intervention_id ||
-          previous.lead_id !== appointment?.lead_id;
+          previous.lead_id !== appointment?.lead_id ||
+          previous.chantier_id !== appointment?.chantier_id;
         if (targetChanged) {
           if (previous.intervention_id && previous.intervention_id !== appointment?.intervention_id) {
             await recomputeEntretienWorkflow(previous.intervention_id);
@@ -841,7 +842,7 @@ export const appointmentsService = {
    * slots[] = [{ date, startTime, endTime, duration, technicianIds, subject?, notes?, timeFlexMinutes? }]
    *   timeFlexMinutes : souplesse (0 figé / 15 / 30 / 240 demi-journée) ; absent = défaut d'org (NULL en base).
    *   0 ⇒ hour_confirmed_at = maintenant (l'heure est annoncée ferme au client).
-   * shared = { coreOrgId, appointment_type, lead_id?, intervention_id?, client_id?,
+   * shared = { coreOrgId, appointment_type, lead_id?, chantier_id?, intervention_id?, client_id?,
    *            client_name?, client_first_name?, client_phone?, client_email?,
    *            address?, city?, postal_code?, assigned_commercial_id?, description?, subjectPrefix? }
    * Retourne { data: [appointments...], error } — error = 1ère erreur rencontrée (best-effort, ne rollback pas les précédents).
@@ -862,6 +863,7 @@ export const appointmentsService = {
         scheduled_end: slot.endTime || null,
         duration_minutes: slot.duration || 60,
         lead_id: shared.lead_id || null,
+        chantier_id: shared.chantier_id || null,
         intervention_id: shared.intervention_id || null,
         client_id: shared.client_id || null,
         client_name: shared.client_name || null,

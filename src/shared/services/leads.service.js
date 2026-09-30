@@ -481,7 +481,6 @@ export const leadsService = {
         if (extra.quoteAmount != null) updates.order_amount_ht = extra.quoteAmount;
       } else if (newStatusLabel === 'Gagn\u00e9') {
         updates.won_date = today;
-        updates.chantier_status = 'gagne';
 
         // Verrouiller la fiche technique terrain (fire-and-forget)
         technicalVisitService.getByLeadId(leadId).then(({ data: visit }) => {
@@ -505,6 +504,12 @@ export const leadsService = {
       });
 
       if (updateError) throw updateError;
+
+      // Gagné : le lead a désormais un chantier (celui du devis PL s'il existe, sinon un chantier sans devis).
+      if (newStatusLabel === 'Gagné') {
+        const { error: chantierError } = await supabase.rpc('chantier_ensure_for_lead', { p_lead_id: leadId });
+        if (chantierError) throw chantierError;
+      }
 
       const updatedLead = Array.isArray(data) ? data[0] : data;
 

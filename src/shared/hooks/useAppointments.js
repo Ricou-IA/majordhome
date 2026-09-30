@@ -505,19 +505,19 @@ export function useTeamDayAvailability(orgId, date) {
 // ============================================================================
 
 /**
- * Appointments d'installation d'un chantier (lead_id), triés par date puis début.
+ * Appointments d'installation d'un chantier (chantier_id), triés par date puis début.
  * Exclut annulés/no_show.
  */
-export function useChantierAppointments(orgId, leadId) {
+export function useChantierAppointments(orgId, chantierId) {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: appointmentKeys.chantier(orgId, leadId),
+    queryKey: appointmentKeys.chantier(orgId, chantierId),
     queryFn: async () => {
       const mhOrg = await getMajordhomeOrgId(orgId);
       const { data, error } = await supabase
         .from('majordhome_appointments')
         .select('*')
         .eq('org_id', mhOrg)
-        .eq('lead_id', leadId)
+        .eq('chantier_id', chantierId)
         .eq('appointment_type', 'installation')
         .not('status', 'in', '(cancelled,no_show)')
         .order('scheduled_date', { ascending: true })
@@ -541,7 +541,7 @@ export function useChantierAppointments(orgId, leadId) {
       });
       return rows.map((r) => ({ ...r, technician_ids: byAppt.get(r.id) || [] }));
     },
-    enabled: !!orgId && !!leadId,
+    enabled: !!orgId && !!chantierId,
     staleTime: 15_000,
   });
   return { appointments: data || [], isLoading, error, refresh: refetch };
