@@ -165,3 +165,11 @@ Règles qui mordent :
 - Ajouter : **une journée sans RDV adaptable n'est pas « ouverte » par défaut** — pleine + toutes les heures d'entretien communiquées ⇒ figée, pleine sinon ; `verdictJournee` renvoie le remplissage même en `sans_adaptable` (le cron, lui, n'y touche pas).
 - Ajouter : **le premier entretien posé sur une journée vierge fixe son secteur** (`deduireSecteur`, `created_at`) ; plus de « secteur majoritaire ».
 ---
+
+## [2026-09-30 17:30] Entretien refusé par le client ≠ « à faire »
+**Statut** : PENDING
+**Commit** : d7f9355
+**Contexte** : 13 contrats actifs avec un refus 2026 (visite `cancelled`) restaient « À faire » dans Programmation (bouton Planifier, bulle SMS) et dans le compteur « Entretiens à faire ». Détail : `docs/MODULE_ENTRETIENS.md` § « Entretien de l'année refusé par le client ».
+**Proposition** (CLAUDE.md § Module Entretiens, règles qui mordent) :
+- **Un contrat dont le client a refusé l'entretien de l'année n'est pas « à faire »** : lecture unique `statutVisiteAnnee` / `compterVisitesAnnee` (`src/lib/entretienVisitStatus.js`) — jamais un test `current_year_visit_status === 'completed'` recopié dans un écran ou un compteur (tout le reste y devient « à faire », refus compris). Ni Planifier, ni SMS de rappel, ni CA à faire sur un refus.
+---

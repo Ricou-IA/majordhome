@@ -75,3 +75,14 @@ Spec : `docs/superpowers/specs/2026-09-12-referentiel-equipements-tarifs-compete
 - **Sémantique** : coché = compétent ; **rien coché pour un rôle = jamais proposé** (l'ancien « `specialties` vide = polyvalent » n'existe plus). À la reprise (M1) tout est coché pour les techniciens actifs, Entretien et Pose ; un nouveau technicien démarre à zéro (alerte « jamais proposé » sur sa ligne).
 - **Règle d'éligibilité** (`techniciensEligibles(contrat, techniciens, role)`, module pur `proposer-contrat.js`, rôle **obligatoire**) : chaque équipement du contrat impose son `typeId` s'il est typé, sinon sa `categoryId` (satisfaite par **au moins un** type coché de la catégorie) ; un équipement non catégorisé n'impose rien. Les exigences et `typesParCategorie` sont calculés par `chargerContrat` ; `chargerJournees` porte `competences { entretien, pose }` par technicien. L'edge `slots-propose` applique `role = 'entretien'` ; `pose` est stocké mais consommé par rien (planification des installations à venir).
 - Durées et replis (`dureeContrat` / `construireFallbacks`) sont clés sur `category_id` (uuid du référentiel), plus sur le code enum.
+
+## Entretien de l'année refusé par le client (2026-09-30)
+
+Un refus = une visite `cancelled` de l'année (saisie « Proposé mais refusé par le client » dans la fiche client, ou geste « refus » du moteur d'appels). La vue `majordhome_contracts` le remonte dans `current_year_visit_status = 'cancelled'`.
+
+- **Un contrat refusé n'est pas « à faire »** (Eric). Lecture unique : `statutVisiteAnnee(contract)` → `realise` / `refuse` / `a_faire` et `compterVisitesAnnee(contracts)` (`src/lib/entretienVisitStatus.js`, pur, testé `scripts/entretien-visit-status.test.mjs`, dans `audit:quality`). Ne pas recopier un test `=== 'completed'` dans un écran : c'est lui qui rangeait les refus dans « à faire ».
+- **Programmation** : ligne grisée, badge « Refusé », ni bouton Planifier ni bulle SMS de rappel, exclue de « Planifier le grand secteur » ; compteur « N refusés » en tête et par grand secteur ; l'avancement se calcule sur réalisés + à faire.
+- **Compteurs** : « Entretiens à faire » et son CA excluent les refus (`sav.service.getStats`, `entretien_refuse` affiché à côté du CA) ; taux de réalisation du Dashboard = réalisés ÷ (réalisés + à faire).
+- **Onglet Contrats et fiche contrat** : badge « Refusé » (au lieu de « À faire » / « Non réalisé »).
+- Le moteur de tournées et l'auto-RDV excluaient déjà les refus (allowlist `current_year_visit_status === null`). Mesure du 2026-09-30 : 13 contrats actifs refusés sur 435 (2 880 € sortis du CA à faire, 195 → 182 à faire).
+- Non touché : l'ordre d'affichage des grands secteurs (`sectorClustering.js`, copié pour Deno) compte encore un refus comme « en attente » — sans effet sur les chiffres affichés.
