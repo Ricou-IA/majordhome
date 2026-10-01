@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   chevauche, fusionnerCreneau, basculerJournee, etatCommande, libelleCommande, joursDepuisRdv,
+  approsRecues, poseProvisoire,
 } from '../src/lib/installOrder.js';
 
 // ── chevauche ─────────────────────────────────────────────────────────────
@@ -211,4 +212,31 @@ test('libelleCommande', () => {
   assert.equal(libelleCommande({ teamSize: null, days: 2 }), '2 j');
   assert.equal(libelleCommande({ teamSize: 2, days: null }), '2 pers.');
   assert.equal(libelleCommande({ teamSize: null, days: null }), null);
+});
+
+// ── approsRecues / poseProvisoire ─────────────────────────────────────────
+test('approsRecues : Reçu et N/A sont des réponses, NULL n’en est pas une', () => {
+  assert.equal(approsRecues('recu', 'recu'), true);
+  assert.equal(approsRecues('na', 'na'), true, 'prestation sans matériel : rien à recevoir');
+  assert.equal(approsRecues('recu', 'na'), true);
+  assert.equal(approsRecues('commande', 'recu'), false);
+  assert.equal(approsRecues(null, 'na'), false, 'case jamais qualifiée = on ne sait pas');
+  assert.equal(approsRecues(undefined, undefined), false);
+});
+
+test('poseProvisoire : appros non reçues sur un chantier en amont', () => {
+  assert.equal(poseProvisoire({ chantier_status: 'commande_a_faire', equipment_order_status: 'commande', materials_order_status: 'na' }), true);
+  assert.equal(poseProvisoire({ chantier_status: 'gagne', equipment_order_status: null, materials_order_status: null }), true);
+  assert.equal(poseProvisoire({ chantier_status: 'planification', equipment_order_status: 'recu', materials_order_status: null }), true);
+});
+
+test('poseProvisoire : appros reçues ou qualifiées N/A ⇒ pose ferme', () => {
+  assert.equal(poseProvisoire({ chantier_status: 'commande_a_faire', equipment_order_status: 'na', materials_order_status: 'na' }), false);
+  assert.equal(poseProvisoire({ chantier_status: 'planification', equipment_order_status: 'recu', materials_order_status: 'recu' }), false);
+});
+
+test('poseProvisoire : un chantier réceptionné ou facturé n’est jamais provisoire', () => {
+  assert.equal(poseProvisoire({ chantier_status: 'realise', equipment_order_status: null, materials_order_status: null }), false);
+  assert.equal(poseProvisoire({ chantier_status: 'facture', equipment_order_status: 'commande', materials_order_status: null }), false);
+  assert.equal(poseProvisoire(null), false);
 });

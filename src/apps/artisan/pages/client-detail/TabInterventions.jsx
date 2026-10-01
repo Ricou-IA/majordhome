@@ -188,11 +188,6 @@ const ChantierSummary = ({ clientId }) => {
                   <span className="text-secondary-400">Gagné le :</span> {formatDateFR(chantier.won_date)}
                 </p>
               )}
-              {chantier.estimated_date && (
-                <p className="text-secondary-600">
-                  <span className="text-secondary-400">Date estimée :</span> {formatDateFR(chantier.estimated_date)}
-                </p>
-              )}
               {chantier.equipment_order_status && (
                 <p className="text-secondary-600">
                   <span className="text-secondary-400">Équipement :</span> {orderLabels[chantier.equipment_order_status] || '—'}

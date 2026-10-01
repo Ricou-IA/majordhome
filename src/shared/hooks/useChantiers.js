@@ -72,16 +72,15 @@ export function useChantierMutations() {
   // Mutation : mettre à jour les commandes (équipement + matériaux).
   // Exception au contrat unwrapResult : garde le retour composite
   // { data, error, autoTransitioned }, lu tel quel par ChantierReceptionSection.
+  // Déballage à la main : le service porte `autoTransitioned` / `newChantierStatus`
+  // hors `data` (contrat des mutations, cf. CLAUDE.md → Hooks). Rejette sur { error }.
   const orderMutation = useMutation({
-    mutationFn: ({ chantierId, ...params }) =>
-      chantiersService.updateOrderStatus(orgId, chantierId, params),
-    onSuccess: invalidateChantiers,
-  });
-
-  // Mutation : date estimative
-  const dateMutation = useMutation({
-    mutationFn: ({ chantierId, estimatedDate }) =>
-      unwrapResult(chantiersService.updateEstimatedDate(orgId, chantierId, estimatedDate)),
+    mutationFn: async ({ chantierId, ...params }) => {
+      const { data, error, autoTransitioned, newChantierStatus } =
+        await chantiersService.updateOrderStatus(orgId, chantierId, params);
+      if (error) throw error;
+      return { chantier: data, autoTransitioned, newChantierStatus };
+    },
     onSuccess: invalidateChantiers,
   });
 
@@ -138,10 +137,6 @@ export function useChantierMutations() {
     updateOrderStatus: useCallback(
       (chantierId, params) => orderMutation.mutateAsync({ chantierId, ...params }),
       [orderMutation]
-    ),
-    updateEstimatedDate: useCallback(
-      (chantierId, estimatedDate) => dateMutation.mutateAsync({ chantierId, estimatedDate }),
-      [dateMutation]
     ),
     updateChantierNotes: useCallback(
       (chantierId, notes) => notesMutation.mutateAsync({ chantierId, notes }),
