@@ -242,6 +242,12 @@
 .fc .mdh-leave {
   background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0 6px, transparent 6px 12px);
 }
+/* Pose provisoire : installation posée avant réception des appros du chantier
+   (installOrder.poseProvisoire). Hachures à 45° pour ne pas se confondre avec un congé. */
+.fc .mdh-provisional {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.32) 0 4px, transparent 4px 10px);
+  border-style: dashed !important;
+}
 
 /* Recherche client du planning : RDV du client surlignés */
 .fc .mdh-search-hit {

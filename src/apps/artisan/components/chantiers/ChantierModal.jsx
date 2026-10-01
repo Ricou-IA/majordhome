@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, CalendarDays, Car, Layers, Trash2 } from 'lucide-react';
+import { X, Loader2, ArrowLeft, ArrowRight, User, MapPin, FileText, ExternalLink, CheckCircle2, PenTool, ScrollText, Car, Layers, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuroCeil } from '@/lib/utils';
@@ -32,6 +32,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { contractsService } from '@services/contracts.service';
 import { supabase } from '@/lib/supabaseClient';
 import { FormField, TextInput, TextArea } from '@apps/artisan/components/FormFields';
+import { poseProvisoire } from '@/lib/installOrder';
 import { CreateContractModal } from '../entretiens/CreateContractModal';
 import { ChantierReceptionSection } from './ChantierReceptionSection';
 import { ChantierInterventionSection } from './ChantierInterventionSection';
@@ -46,7 +47,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
 
   const {
     updateChantierStatus,
-    updateEstimatedDate,
     updateChantierNotes,
     updatePlannedOrder,
     updateLabel,
@@ -63,7 +63,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     useChantierAppointments(orgId, chantier?.id);
 
   // État local
-  const [estimatedDate, setEstimatedDate] = useState(chantier?.estimated_date || '');
   const [notes, setNotes] = useState(chantier?.chantier_notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [label, setLabel] = useState(chantier?.label || '');
@@ -161,16 +160,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
     && !installAppointments.length && !pvPath;
   const name = `${chantier.last_name || ''} ${chantier.first_name || ''}`.trim() || 'Sans nom';
   const amount = getChantierAmount(chantier);
-
-  const handleEstimatedDateChange = async (val) => {
-    setEstimatedDate(val);
-    try {
-      await updateEstimatedDate(chantier.id, val || null);
-      onUpdated?.();
-    } catch {
-      toast.error('Erreur de mise à jour');
-    }
-  };
 
   const handleSaveNotes = async () => {
     setIsSavingNotes(true);
@@ -429,18 +418,6 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
                 appointments={installAppointments}
               />
 
-              {/* Date estimative de réalisation (déconnectée des commandes) */}
-              <FormField label="Date estimative de réalisation">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
-                  <TextInput
-                    type="date"
-                    value={estimatedDate || ''}
-                    onChange={handleEstimatedDateChange}
-                    disabled={!canEditChantier}
-                  />
-                </div>
-              </FormField>
             </>
           )}
 
@@ -480,7 +457,8 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               plannedOrder={plannedOrder}
               onSchedule={() => setShowScheduler(true)}
               onDeleteAppointment={handleDeleteInstallAppointment}
-              disabled={chantier.chantier_status === 'gagne'}
+              provisoire={poseProvisoire(chantier)}
+              disabled={!canEditChantier}
             />
           )}
 

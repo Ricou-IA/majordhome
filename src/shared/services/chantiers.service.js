@@ -12,6 +12,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
 import { storageService } from '@services/storage.service';
+import { approsRecues } from '@/lib/installOrder';
 
 // ============================================================================
 // CONSTANTES
@@ -68,10 +69,6 @@ export function getChantierAmount(chantier) {
   return Number(chantier.order_amount_ht) || Number(chantier.estimated_revenue) || 0;
 }
 
-function shouldAutoTransitionToCommandeRecue(equipmentStatus, materialsStatus) {
-  const valid = ['recu', 'na'];
-  return valid.includes(equipmentStatus) && valid.includes(materialsStatus);
-}
 
 // ============================================================================
 // SERVICE PRINCIPAL
@@ -138,21 +135,33 @@ export const chantiersService = {
     }, 'chantiers.updateChantierStatus');
   },
 
-  async updateOrderStatus(orgId, chantierId, { equipmentOrderStatus, materialsOrderStatus, currentChantierStatus }) {
+  /**
+   * Appros (équipement / matériaux) + transition automatique du chantier.
+   * Appros closes (`approsRecues`, N/A = réponse qualifiée) depuis « Commande à
+   * faire » → « À planifier », ou directement « Planification » si une pose
+   * provisoire est déjà posée (`hasActiveRdv`) : la carte ne bouge qu'une fois
+   * les appros reçues, le RDV seul ne la déplace pas (règle 2026-10-01).
+   * Retour : `{ data, error, autoTransitioned, newChantierStatus }`.
+   */
+  async updateOrderStatus(orgId, chantierId, { equipmentOrderStatus, materialsOrderStatus, currentChantierStatus, hasActiveRdv = false }) {
     const patch = {};
     if (equipmentOrderStatus !== undefined) patch.equipment_order_status = equipmentOrderStatus;
     if (materialsOrderStatus !== undefined) patch.materials_order_status = materialsOrderStatus;
-    const allReceived = equipmentOrderStatus && materialsOrderStatus &&
-      shouldAutoTransitionToCommandeRecue(equipmentOrderStatus, materialsOrderStatus);
-    let autoTransitioned = false;
-    if (currentChantierStatus === 'commande_a_faire' && allReceived) { patch.chantier_status = 'commande_recue'; autoTransitioned = true; }
-    else if (currentChantierStatus === 'commande_recue' && !allReceived) { patch.chantier_status = 'commande_a_faire'; autoTransitioned = true; }
+    const allReceived = approsRecues(equipmentOrderStatus, materialsOrderStatus);
+    let newChantierStatus = null;
+    if (currentChantierStatus === 'commande_a_faire' && allReceived) {
+      newChantierStatus = hasActiveRdv ? 'planification' : 'commande_recue';
+    } else if (currentChantierStatus === 'commande_recue' && !allReceived) {
+      newChantierStatus = 'commande_a_faire';
+    }
+    if (newChantierStatus) {
+      patch.chantier_status = newChantierStatus;
+      if (newChantierStatus === 'planification') patch.planification_date = new Date().toISOString().split('T')[0];
+    }
     const result = await withErrorHandling(() => patchChantier(orgId, chantierId, patch), 'chantiers.updateOrderStatus');
-    return { ...result, autoTransitioned };
+    return { ...result, autoTransitioned: Boolean(newChantierStatus), newChantierStatus };
   },
 
-  updateEstimatedDate: (orgId, chantierId, estimatedDate) =>
-    withErrorHandling(() => patchChantier(orgId, chantierId, { estimated_date: estimatedDate || null }), 'chantiers.updateEstimatedDate'),
   updateChantierNotes: (orgId, chantierId, notes) =>
     withErrorHandling(() => patchChantier(orgId, chantierId, { chantier_notes: notes || null }), 'chantiers.updateChantierNotes'),
   updateLabel: (orgId, chantierId, label) =>

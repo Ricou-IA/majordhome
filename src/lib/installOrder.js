@@ -172,3 +172,34 @@ export function libelleCommande(commande) {
   if (days) parts.push(`${days} j`);
   return parts.length ? parts.join(' × ') : null;
 }
+
+/** Réponses qui closent un axe d'appro : reçu, ou « rien à recevoir » (prestation). */
+const APPRO_CLOSE = new Set(['recu', 'na']);
+/** Statuts chantier où la question des appros ne se pose plus. */
+const STATUTS_TERMINES = new Set(['realise', 'facture']);
+
+/**
+ * Les deux appros (équipement, matériaux) sont-elles closes ? « N/A » est une
+ * réponse qualifiée (pas de matériel à recevoir) ; une case jamais renseignée
+ * (NULL) ne l'est pas — on ne sait pas, donc non.
+ * @param {string|null|undefined} equipmentStatus 'na' | 'commande' | 'recu' | null
+ * @param {string|null|undefined} materialsStatus
+ * @returns {boolean}
+ */
+export function approsRecues(equipmentStatus, materialsStatus) {
+  return APPRO_CLOSE.has(equipmentStatus) && APPRO_CLOSE.has(materialsStatus);
+}
+
+/**
+ * Une pose posée au planning est PROVISOIRE tant que les appros du chantier ne
+ * sont pas closes (règle Eric, 2026-10-01 : on programme souvent avant de
+ * commander ; le planning hachure le bloc, la carte reste dans sa colonne).
+ * Un chantier réceptionné ou facturé n'est jamais provisoire.
+ * @param {{chantier_status?: string|null, equipment_order_status?: string|null, materials_order_status?: string|null}|null} chantier
+ * @returns {boolean}
+ */
+export function poseProvisoire(chantier) {
+  if (!chantier) return false;
+  if (STATUTS_TERMINES.has(chantier.chantier_status)) return false;
+  return !approsRecues(chantier.equipment_order_status, chantier.materials_order_status);
+}

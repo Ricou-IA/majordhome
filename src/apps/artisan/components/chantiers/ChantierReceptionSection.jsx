@@ -94,12 +94,14 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
 
   // État local optimiste : la modale garde un `chantier` figé (sélection kanban),
   // on reflète donc le changement immédiatement plutôt que d'attendre un refetch.
-  const [equip, setEquip] = useState(chantier?.equipment_order_status || 'na');
-  const [mat, setMat] = useState(chantier?.materials_order_status || 'na');
+  // NULL reste NULL (aucun bouton actif) : « N/A » est une réponse qualifiée (rien à
+  // recevoir, prestation) qui confirme une pose provisoire — on ne la présélectionne pas.
+  const [equip, setEquip] = useState(chantier?.equipment_order_status || null);
+  const [mat, setMat] = useState(chantier?.materials_order_status || null);
 
   useEffect(() => {
-    setEquip(chantier?.equipment_order_status || 'na');
-    setMat(chantier?.materials_order_status || 'na');
+    setEquip(chantier?.equipment_order_status || null);
+    setMat(chantier?.materials_order_status || null);
   }, [chantier?.id, chantier?.equipment_order_status, chantier?.materials_order_status]);
 
   // Devis Pennylane rattachés (référence + éjection). Léger : pas de chargement
@@ -131,19 +133,18 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
         equipmentOrderStatus: newEquip,
         materialsOrderStatus: newMat,
         currentChantierStatus: chantier.chantier_status,
+        hasActiveRdv: Boolean(chantier.has_active_rdv),
       });
-      if (res?.error) throw res.error;
 
       onUpdated?.();
 
       if (res?.autoTransitioned) {
-        const allReceived =
-          ['recu', 'na'].includes(newEquip) && ['recu', 'na'].includes(newMat);
-        toast.success(
-          allReceived
-            ? 'Chantier déplacé en « À planifier »'
-            : 'Chantier repassé en « Commande à faire »'
-        );
+        const libelles = {
+          planification: 'Appros reçues : pose confirmée, chantier déplacé en « Planification »',
+          commande_recue: 'Chantier déplacé en « À planifier »',
+          commande_a_faire: 'Chantier repassé en « Commande à faire »',
+        };
+        toast.success(libelles[res.newChantierStatus] || 'Statut du chantier mis à jour');
       }
     } catch {
       // Rollback

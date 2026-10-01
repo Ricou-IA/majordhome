@@ -11,6 +11,14 @@
 import { MapPin, Calendar, CalendarClock } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
 import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
+import { poseProvisoire } from '@/lib/installOrder';
+
+/** Puce de date hachurée (pose provisoire : appros non reçues), même motif que le planning. */
+const PROVISIONAL_CHIP_STYLE = {
+  backgroundColor: '#F59E0B14',
+  borderColor: '#F59E0B40',
+  backgroundImage: 'repeating-linear-gradient(45deg, rgba(245, 158, 11, 0.18) 0 4px, transparent 4px 8px)',
+};
 
 function formatShortDate(dateStr) {
   if (!dateStr) return null;
@@ -56,7 +64,22 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
     ? formatShortDate(chantier.next_rdv_date)
     : formatShortDate(chantier.won_date);
   const needsReplan = chantier.chantier_status === 'planification' && !hasActiveRdv;
+  // Pose provisoire : RDV posé avant réception des appros → puce hachurée ambre, la carte
+  // reste dans sa colonne (règle 2026-10-01, cf. installOrder.poseProvisoire).
+  const provisoire = hasActiveRdv && poseProvisoire(chantier);
   const commercial = commercialsMap?.[chantier.assigned_user_id];
+
+  let chipStyle = { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` };
+  let chipTitle = hasActiveRdv ? 'Date RDV installation' : 'Date signature';
+  let chipColor = statusConfig.color;
+  if (needsReplan) {
+    chipStyle = { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' };
+    chipTitle = 'Installation à replanifier';
+  } else if (provisoire) {
+    chipStyle = PROVISIONAL_CHIP_STYLE;
+    chipTitle = 'Pose provisoire : appros non reçues';
+    chipColor = '#B45309';
+  }
 
   return (
     <button
@@ -68,19 +91,17 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
       {/* Bande date à gauche */}
       <div
         className="flex flex-col items-center justify-center px-2 py-2 rounded-l-lg min-w-[44px] border-r"
-        style={needsReplan
-          ? { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' }
-          : { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` }}
-        title={needsReplan ? 'Installation à replanifier' : (hasActiveRdv ? 'Date RDV installation' : 'Date signature')}
+        style={chipStyle}
+        title={chipTitle}
       >
         {needsReplan ? (
           <CalendarClock className="h-4 w-4 text-amber-500" />
         ) : chipDate ? (
           <>
-            <span className="text-sm font-bold leading-none" style={{ color: statusConfig.color }}>
+            <span className="text-sm font-bold leading-none" style={{ color: chipColor }}>
               {chipDate.day}
             </span>
-            <span className="text-[10px] uppercase leading-tight" style={{ color: statusConfig.color }}>
+            <span className="text-[10px] uppercase leading-tight" style={{ color: chipColor }}>
               {chipDate.month}
             </span>
           </>
@@ -145,15 +166,13 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
           )}
         </div>
 
-        {/* Ligne 4 : Dates estimative + planification */}
-        <p className="text-[10px] text-gray-400 mt-1">
-          Estim. : {formatDateSlash(chantier.estimated_date) || '—'}
-          {chantier.planification_date && (
-            <span className="ml-2">
-              Planif. : {formatDateSlash(chantier.planification_date)}
-            </span>
-          )}
-        </p>
+        {/* Ligne 4 : date de passage en planification (la date estimative a disparu :
+            c'est le RDV d'installation, provisoire ou non, qui porte la date) */}
+        {chantier.planification_date && (
+          <p className="text-[10px] text-gray-400 mt-1">
+            Planif. : {formatDateSlash(chantier.planification_date)}
+          </p>
+        )}
       </div>
     </button>
   );

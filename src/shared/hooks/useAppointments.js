@@ -20,6 +20,7 @@ import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
+import { poseProvisoire } from '@/lib/installOrder';
 import { useLeadCommercials } from '@hooks/useLeads';
 import {
   buildPersonColorMaps, buildTeamList, expandAppointmentBlocks, estAdaptable, fenetreDe,
@@ -101,6 +102,31 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     staleTime: 15_000,
   });
 
+  // Appros des chantiers des RDV d'installation (2ᵉ requête mergée en mémoire, comme les
+  // techniciens — la vue appointments reste un miroir simple). Sert à hachurer une pose
+  // provisoire : appros non reçues (installOrder.poseProvisoire).
+  const chantierIds = useMemo(
+    () => Array.from(new Set((appointments || [])
+      .filter((a) => a.appointment_type === 'installation' && a.chantier_id)
+      .map((a) => a.chantier_id))).sort(),
+    [appointments]
+  );
+  const { data: chantierOrders } = useQuery({
+    queryKey: appointmentKeys.chantierOrders(orgId, chantierIds),
+    queryFn: async () => {
+      if (chantierIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('majordhome_chantiers')
+        .select('id, chantier_status, equipment_order_status, materials_order_status')
+        .eq('org_id', orgId)
+        .in('id', chantierIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!orgId && chantierIds.length > 0,
+    staleTime: 15_000,
+  });
+
   // Membres + commerciaux (caches partagés avec Planning) → maps couleur + teamList unifié.
   const { members } = useTeamMembers(orgId);
   const { commercials } = useLeadCommercials(orgId);
@@ -137,12 +163,16 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
 
     const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
     const aujourdhui = new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD, fuseau local
+    const chantierById = new Map((chantierOrders || []).map((c) => [c.id, c]));
     return enriched
       .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
       .flatMap((a) => {
         const adaptable = estAdaptable(a, reglages.souplesse_defaut_minutes, { aujourdhui });
+        // Chantier non encore chargé ⇒ pas provisoire (le bloc se hachure à l'arrivée des appros).
+        const provisoire = a.appointment_type === 'installation'
+          && poseProvisoire(chantierById.get(a.chantier_id));
         const blocs = expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
-          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable })
+          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable, provisoire })
         );
         if (!filters.showTolerance || !adaptable || !a.scheduled_start) return blocs;
         // Bande de tolérance : « on voit toujours des blocs » — le RDV reste à son
@@ -161,14 +191,13 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         });
         return blocs;
       });
-  }, [appointments, techLinks, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
+  }, [appointments, techLinks, chantierOrders, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
     mutationFn: (data) => unwrapResult(appointmentsService.createAppointment({ coreOrgId: orgId, ...data })),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
     },
   });
 
@@ -177,8 +206,13 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: ({ appointmentId, updates }) =>
       unwrapResult(appointmentsService.updateAppointment(appointmentId, updates)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
+      // Tout le domaine RDV (`all`), pas seulement `lists` : les liens technicien ↔ RDV
+      // (`technicians`) et les colonnes de l'assistant (`dayAvailability`) sont des
+      // requêtes séparées dont la clé ne bouge pas quand seule la personne change.
+      // N'invalider que `lists` laissait le bloc sur l'ancien technicien jusqu'au F5
+      // (vécu 2026-09-30, réassignation d'une installation). Même règle sur les
+      // autres mutations de ce hook.
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
@@ -218,8 +252,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });
@@ -229,8 +262,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     mutationFn: ({ appointmentId, reason }) =>
       unwrapResult(appointmentsService.cancelAppointment(appointmentId, reason)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
     },
   });
 
@@ -238,8 +270,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   const deleteMutation = useMutation({
     mutationFn: (appointmentId) => unwrapResult(appointmentsService.deleteAppointment(appointmentId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.lists(orgId) });
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.clients(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
     },
   });

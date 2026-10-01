@@ -16,6 +16,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
+import { poseProvisoire } from '@/lib/installOrder';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
 import { logger } from '@lib/logger';
@@ -149,14 +150,19 @@ async function syncCardStateOnCreate(appt) {
     return;
   }
 
-  // Installation -> chantier « planification » si en amont (clé = chantier, plus le lead)
+  // Installation -> chantier « planification » si en amont (clé = chantier, plus le lead),
+  // SEULEMENT si les appros sont closes : une pose posée avant réception des commandes
+  // est provisoire (`poseProvisoire`, hachurée au planning) et laisse la carte dans sa
+  // colonne ; c'est la réception des appros qui la fera avancer (updateOrderStatus).
   if (appt.appointment_type === 'installation') {
     if (!appt.chantier_id) return;
     const { data: chantier, error: readError } = await supabase
-      .from('majordhome_chantiers').select('id, org_id, chantier_status').eq('id', appt.chantier_id).maybeSingle();
+      .from('majordhome_chantiers')
+      .select('id, org_id, chantier_status, equipment_order_status, materials_order_status')
+      .eq('id', appt.chantier_id).maybeSingle();
     if (readError) { console.error('[appointments] syncCreate install read error:', readError); return; }
     const order = CHANTIER_ORDER[chantier?.chantier_status] ?? 0;
-    if (chantier && order < CHANTIER_ORDER.planification) {
+    if (chantier && order < CHANTIER_ORDER.planification && !poseProvisoire(chantier)) {
       // planification_date = date de passage en planification (même sémantique que
       // chantiersService.updateChantierStatus ; affichée « Planif. » sur la carte chantier)
       const now = new Date();
@@ -937,7 +943,7 @@ export const appointmentsService = {
    * @param {string} [opts.idSuffix] rend l'event unique quand un RDV est découpé en
    *   plusieurs blocs (1 par technicien). L'id réel du RDV reste dans extendedProps.id.
    */
-  toCalendarEvent(appointment, { color, idSuffix, adaptable = false } = {}) {
+  toCalendarEvent(appointment, { color, idSuffix, adaptable = false, provisoire = false } = {}) {
     const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
 
     // Construire les datetimes ISO
@@ -960,14 +966,17 @@ export const appointmentsService = {
       // Souplesse : un RDV adaptable est dessiné en pointillé (heure provisoire),
       // la bande de tolérance est un événement de fond séparé (useAppointments).
       // Congés : hachuré (couleur de la personne conservée, ce n'est pas du travail).
+      // Pose provisoire (appros du chantier non reçues) : hachuré aussi, autre angle.
       classNames: [
         ...(adaptable ? ['mdh-flex'] : []),
         ...(appointment.appointment_type === 'leave' ? ['mdh-leave'] : []),
+        ...(provisoire ? ['mdh-provisional'] : []),
       ],
       extendedProps: {
         ...appointment,
         typeConfig,
         adaptable,
+        provisoire,
       },
     };
   },

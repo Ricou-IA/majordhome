@@ -54,6 +54,7 @@ export function ChantierInterventionSection({
   onSchedule,
   onDeleteAppointment,
   disabled = false,
+  provisoire = false,
   plannedOrder = { teamSize: null, days: null },
 }) {
   const installationDays = useMemo(() => orderInstallationDays(appointments), [appointments]);
@@ -86,6 +87,15 @@ export function ChantierInterventionSection({
           </span>
         )}
       </h3>
+
+      {/* Pose provisoire : appros non closes → les jours posés sont hachurés au planning
+          et la carte reste dans sa colonne tant que les appros ne sont pas reçues */}
+      {provisoire && appointments.length > 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 shrink-0" />
+          Pose provisoire : elle sera confirmée au planning quand les appros seront reçues (ou N/A).
+        </p>
+      )}
 
       {/* Commande incomplète : on prévient (le planning reste modifiable), sans bloquer */}
       {!commande.complete && appointments.length > 0 && (

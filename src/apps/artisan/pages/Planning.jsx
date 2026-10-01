@@ -344,7 +344,7 @@ function CalendarFilters({ filters, setFilters, teamList }) {
 function PlanningEventContent({ eventInfo }) {
   const {
     typeConfig, client_name, client_first_name, status, grand_secteur, client_id, adaptable, hour_confirmed_at,
-    appointment_type,
+    appointment_type, provisoire,
   } = eventInfo.event.extendedProps;
   const typeSouple = estTypeAdaptable(appointment_type);
   const isCancelled = status === 'cancelled';
@@ -362,6 +362,10 @@ function PlanningEventContent({ eventInfo }) {
         ) : (typeSouple && hour_confirmed_at) ? (
           <span className="mr-0.5 opacity-90" title="Heure communiquée au client">🔒</span>
         ) : null}
+        {/* Pose provisoire : appros du chantier non reçues (bloc hachuré) */}
+        {provisoire && (
+          <span className="mr-0.5 opacity-90" title="Pose provisoire : appros du chantier non reçues">⏳</span>
+        )}
         {eventInfo.timeText && (
           <span className="mr-1">{eventInfo.timeText}</span>
         )}
