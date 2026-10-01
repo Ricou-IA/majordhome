@@ -72,10 +72,10 @@ Index `(org_id, chantier_status)`, `(lead_id)`. `GRANT SELECT ON majordhome.chan
 
 Condition : `NEW.ejected_at IS NULL AND NEW.chantier_id IS NULL AND quote_status_bucket(NEW.quote_status) = 'validated'` et transition réelle (`TG_OP = 'INSERT'` ou `quote_status_bucket(OLD.quote_status) <> 'validated'` ou `OLD.ejected_at IS NOT NULL`), lead non supprimé.
 
-Effet : `INSERT chantiers` (org, lead, `client_id` et `equipment_type_id` du lead, `label` = `pdf_invoice_subject` du miroir `pennylane_quotes` s'il existe, `won_date` = `quote_date` sinon `current_date`, `chantier_status` = `facture` si le devis est déjà `invoiced`, sinon `gagne`), puis `UPDATE lead_pennylane_quotes SET chantier_id = <id> WHERE id = NEW.id` (pas de récursion : `chantier_id` n'est pas dans la liste `UPDATE OF`). Activité `chantier_created` sur le lead.
+Effet : `INSERT chantiers` (org, lead, `client_id` et `equipment_type_id` du lead, `label` = `pdf_invoice_subject` du miroir `pennylane_quotes` s'il existe, `won_date` = `quote_date` sinon `current_date`, `chantier_status` = `realise` si le devis est déjà `invoiced` (décision Eric 2026-10-01, migration `20261001_1` : la colonne Facturé est masquée du kanban, le passage en Facturé reste un geste humain), sinon `gagne`), puis `UPDATE lead_pennylane_quotes SET chantier_id = <id> WHERE id = NEW.id` (pas de récursion : `chantier_id` n'est pas dans la liste `UPDATE OF`). Activité `chantier_created` sur le lead.
 
 Conséquences assumées :
-- Un devis facturé rattaché après coup crée un chantier directement en `facture` (colonne masquée du kanban) : pas de carte parasite.
+- Un devis facturé rattaché après coup crée un chantier en `realise` (visible au kanban, à passer en Facturé à la main). Avant `20261001_1` il naissait en `facture`, colonne masquée : les deux cartes VEOLIA détachées le 2026-10-01 étaient invisibles.
 - Un devis refusé ou éjecté **ne touche pas** son chantier : la carte reste, la vue expose `validated_quotes_count = 0` et l'UI la marque en ambre « aucun devis validé ». Suppression à la main (§ 4.5).
 - Les 5 leads sans `chantier_status` qui portent un vieux devis `invoiced` (RENOU, TRAIN MINIATURE, BASILE, SDIS 81, REY, tous en Perdu / Devis envoyé) ne sont pas touchés : le trigger ne se déclenche que sur une transition, la migration ne leur crée rien. Cohérent avec le garde-fou existant de `ensure_winning_quotes` (pas de chantier rétroactif).
 
@@ -102,7 +102,7 @@ Même garde que `chantier_group`.
 
 Validations : chaque devis appartient au chantier et n'est pas éjecté ; la sélection contient ≥ 1 devis validé **et** il reste ≥ 1 devis validé sur le chantier d'origine (sinon ce n'est pas un détachement) ; chaque RDV appartient au chantier, est `installation`, ni annulé ni `no_show`.
 
-Effets : `INSERT chantiers` (org, lead, client, `label` = `p_label` sinon objet du premier devis sélectionné, `equipment_type_id` du chantier d'origine, `won_date` = date du devis validé sélectionné le plus récent, tie-break `pennylane_quote_id DESC`), `chantier_status` = `facture` si tous les devis validés déplacés sont facturés, sinon `planification` si des RDV suivent (+ `planification_date = current_date`), sinon `gagne` ; appro NULL. Déplacement des devis, de leurs `chantier_line_receptions` (par `pennylane_quote_id`) et des RDV. Si `p_move_planned_order` : commande déplacée et remise à NULL sur l'origine. Activité `chantier_detached` sur le lead.
+Effets : `INSERT chantiers` (org, lead, client, `label` = `p_label` sinon objet du premier devis sélectionné, `equipment_type_id` du chantier d'origine, `won_date` = date du devis validé sélectionné le plus récent, tie-break `pennylane_quote_id DESC`), `chantier_status` = `realise` si tous les devis validés déplacés sont facturés (décision Eric 2026-10-01, `20261001_1`), sinon `planification` si des RDV suivent (+ `planification_date = current_date`), sinon `gagne` ; appro NULL. Déplacement des devis, de leurs `chantier_line_receptions` (par `pennylane_quote_id`) et des RDV. Si `p_move_planned_order` : commande déplacée et remise à NULL sur l'origine. Activité `chantier_detached` sur le lead.
 
 Retour `{ new_chantier_id, origin_chantier_id, counts }`.
 

@@ -376,3 +376,19 @@ BEGIN
   IF has_function_privilege('anon', 'public.lead_merge(uuid, uuid)', 'EXECUTE') THEN RAISE EXCEPTION 'lead_merge exécutable par anon'; END IF;
   RAISE NOTICE 'assert-chantiers §C : OK';
 END $$;
+-- ── §D Naissance en Réceptionné (20261001_1) ────────────────────────────────────
+DO $$
+DECLARE v_ch uuid; v_status text; v_def text;
+BEGIN
+  -- Un devis DÉJÀ facturé qui arrive sur un lead sans chantier pour ce devis → carte en realise (plus facture).
+  INSERT INTO majordhome.lead_pennylane_quotes (id, org_id, lead_id, pennylane_quote_id, pennylane_customer_id, quote_amount_ht, quote_label, quote_date, quote_status, is_winning_quote, assigned_at)
+  VALUES ('aaaa0004-0000-0000-0000-000000000001', '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1', '44444444-4444-4444-4444-444444444444', 60000000000001, 77, 800, 'D-2026-09990', DATE '2026-09-20', 'invoiced', false, now());
+  SELECT q.chantier_id INTO v_ch FROM majordhome.lead_pennylane_quotes q WHERE q.id = 'aaaa0004-0000-0000-0000-000000000001';
+  IF v_ch IS NULL THEN RAISE EXCEPTION '§D : le devis facturé devait créer un chantier'; END IF;
+  SELECT chantier_status INTO v_status FROM majordhome.chantiers WHERE id = v_ch;
+  IF v_status <> 'realise' THEN RAISE EXCEPTION '§D : chantier né d''un devis facturé attendu realise, trouvé %', v_status; END IF;
+  SELECT pg_get_functiondef('public.chantier_detach(uuid, uuid[], uuid[], boolean, text)'::regprocedure) INTO v_def;
+  IF v_def NOT LIKE '%v_all_invoiced THEN ''realise''%' THEN RAISE EXCEPTION '§D : chantier_detach doit naître en realise quand tout est facturé'; END IF;
+  IF v_def LIKE '%v_all_invoiced THEN ''facture''%' THEN RAISE EXCEPTION '§D : chantier_detach naît encore en facture'; END IF;
+  RAISE NOTICE 'assert-chantiers §D : OK';
+END $$;
