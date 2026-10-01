@@ -33,6 +33,7 @@ import { ORDER_STATUSES } from '@services/chantiers.service';
 import { useChantierMutations } from '@hooks/useChantiers';
 import { useCanAccess } from '@hooks/usePermissions';
 import { DetachChantierDialog } from './DetachChantierDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   useLinkedPennylaneQuotes,
   useLinkedPennylaneQuotesMutations,
@@ -152,15 +153,16 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
     }
   };
 
-  const handleEject = async (pennylaneQuoteId, label) => {
-    if (
-      !window.confirm(
-        `Retirer le devis ${label || `#${pennylaneQuoteId}`} de ce chantier ?`
-      )
-    )
-      return;
+  // Retrait d'un devis : confirmation dans l'app (plus de window.confirm) qui dit ce que le geste
+  // fait — le devis quitte le lead, il n'est pas déplacé. Vécu 2026-10-01 : la borne GOUIN retirée
+  // au lieu d'être détachée. { pennylaneQuoteId, label } pendant la confirmation, null sinon.
+  const [ejectTarget, setEjectTarget] = useState(null);
+
+  const handleEject = async () => {
+    if (!ejectTarget) return;
     try {
-      await ejectQuote(pennylaneQuoteId, 'manual_ui');
+      await ejectQuote(ejectTarget.pennylaneQuoteId, 'manual_ui');
+      setEjectTarget(null);
       onUpdated?.();
       toast.success('Devis retiré du chantier');
     } catch (e) {
@@ -237,7 +239,7 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
                 {!disabled && (
                   <button
                     type="button"
-                    onClick={() => handleEject(qid, label)}
+                    onClick={() => setEjectTarget({ pennylaneQuoteId: qid, label })}
                     disabled={isEjecting}
                     title="Retirer ce devis du chantier"
                     aria-label={`Retirer le devis ${label}`}
@@ -257,6 +259,23 @@ export function ChantierReceptionSection({ chantier, onUpdated, disabled = false
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(ejectTarget)}
+        onOpenChange={(open) => { if (!open) setEjectTarget(null); }}
+        title={`Retirer le devis ${ejectTarget?.label || ''} de ce chantier ?`}
+        description="Le devis quitte le chantier ET le lead : il redevient « non rattaché » dans l'explorateur de devis, le montant de la carte est recalculé sans lui. Aucun jour d'installation n'est touché. À utiliser pour un devis mal rattaché ou annulé par un avoir."
+        confirmLabel={isEjecting ? 'Retrait…' : 'Retirer ce devis'}
+        cancelLabel="Annuler"
+        variant="destructive"
+        loading={isEjecting}
+        onConfirm={handleEject}
+      >
+        <p className="mt-3 text-sm text-gray-600">
+          Pour séparer ce devis sur sa propre carte (autre commande du même client), utilisez plutôt
+          <span className="font-medium text-gray-900"> « Détacher en chantier distinct »</span>.
+        </p>
+      </ConfirmDialog>
 
       {showDetach && (
         <DetachChantierDialog
