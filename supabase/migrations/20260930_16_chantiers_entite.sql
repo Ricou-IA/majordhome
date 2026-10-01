@@ -1,10 +1,10 @@
--- supabase/migrations/20260930_11_chantiers_entite.sql
+-- supabase/migrations/20260930_16_chantiers_entite.sql
 -- ============================================================================
 -- Chantier = entité (spec 2026-09-30-chantier-entite-par-devis-design.md).
 -- Règle Eric 2026-09-30 : un lead = N devis ; chaque devis accepté = 1 chantier,
 -- regroupable. Cette migration pose la structure et REPREND l'existant tel quel
 -- (1 chantier par lead à chantier_status, tous ses devis dessus) ; la règle
--- « un devis = un chantier » s'applique aux devis validés APRÈS (20260930_12).
+-- « un devis = un chantier » s'applique aux devis validés APRÈS (20260930_17).
 --   1. majordhome.chantiers (RLS org, UPDATE via role_can chantiers.edit|edit_own)
 --   2. lead_pennylane_quotes.chantier_id, appointments.chantier_id,
 --      chantier_line_receptions.chantier_id → FK chantiers

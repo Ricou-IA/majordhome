@@ -27,7 +27,7 @@ Décisions qui en découlent :
 
 ## 3. Modèle de données
 
-Migration versionnée `supabase/migrations/20260930_11_chantiers_entite.sql`, répétée sur `scripts/migration-rehearsal/` (extension de `snapshot.mjs`, cf. § 10).
+Migration versionnée `supabase/migrations/20260930_16_chantiers_entite.sql`, répétée sur `scripts/migration-rehearsal/` (extension de `snapshot.mjs`, cf. § 10).
 
 ### 3.1 Table `majordhome.chantiers`
 

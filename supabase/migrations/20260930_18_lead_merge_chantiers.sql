@@ -1,9 +1,9 @@
 -- ============================================================================
--- 20260930_13 — lead_merge : re-parentage des chantiers
+-- 20260930_18 — lead_merge : re-parentage des chantiers
 -- ============================================================================
 --
 -- Recrée public.lead_merge(p_survivor_id, p_absorbed_id) (20260916_2) : les chantiers
--- (majordhome.chantiers, 20260930_11) suivent le lead survivant ; les réceptions de
+-- (majordhome.chantiers, 20260930_16) suivent le lead survivant ; les réceptions de
 -- lignes suivent leur chantier (plus de re-parentage direct par lead). Corps identique
 -- à 20260916_2 hors ces deux points.
 --

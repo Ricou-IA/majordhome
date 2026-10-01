@@ -1,4 +1,4 @@
--- supabase/migrations/20260930_12_chantiers_rpc.sql
+-- supabase/migrations/20260930_17_chantiers_rpc.sql
 -- ============================================================================
 -- Entité chantier — création automatique et gestes (spec 2026-09-30-chantier-entite-par-devis).
 --   - trigger chantier_ensure_for_quote : un devis qui DEVIENT validé sans chantier en crée un

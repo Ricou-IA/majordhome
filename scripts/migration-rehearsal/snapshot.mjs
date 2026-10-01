@@ -37,7 +37,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
   { schema: 'majordhome', table: 'team_members', columns: null },
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number'] }, // 20260930_11 : lus par la vue majordhome_lead_pennylane_quotes
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number'] }, // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -47,12 +47,12 @@ const TABLES = [
   { schema: 'majordhome', table: 'interventions', columns: null, data: false },
   { schema: 'majordhome', table: 'certificats', columns: ['id', 'org_id', 'equipment_id', 'intervention_id', 'equipement_type', 'type_document', 'tva_taux', 'pieces_remplacees', 'created_at'] },
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
-  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_11 : chantier_id + trigger chantier_ensure_for_quote
+  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine
   { schema: 'majordhome', table: 'appointment_technicians', columns: null, data: false },
-  { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_11 : libellé du chantier
-  { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_11 : chantier_id → majordhome.chantiers
-  { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_12 : activités chantier_*
+  { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_16 : libellé du chantier
+  { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_16 : chantier_id → majordhome.chantiers
+  { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_17 : activités chantier_*
   { schema: 'majordhome', table: 'role_permissions', columns: null }, // role_can() (policies chantiers)
   { schema: 'majordhome', table: 'app_role_permissions', columns: null }, // role_can() défauts app-level
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
@@ -84,7 +84,7 @@ const FUNCTIONS = [
   'majordhome.auto_expire_contract_on_end_date()',
   'majordhome.update_client_on_contract_change()',
   'majordhome.contract_activation_promote_cards()',
-  // 20260930_11..13 : entité chantier
+  // 20260930_16..13 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
   'majordhome.role_can(uuid, text, text)',
   'majordhome.user_effective_role(uuid)',
@@ -109,7 +109,7 @@ const VIEWS = [
   'public.majordhome_interventions',
   'public.majordhome_chantiers',
   'public.majordhome_entretien_sav',
-  // 20260930_11 : cibles du CREATE OR REPLACE
+  // 20260930_16 : cibles du CREATE OR REPLACE
   'public.majordhome_lead_pennylane_quotes',
   'public.majordhome_appointments',
 ];

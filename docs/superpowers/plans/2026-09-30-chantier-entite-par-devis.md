@@ -28,9 +28,9 @@
 ## Carte des fichiers
 
 **Créés**
-- `supabase/migrations/20260930_11_chantiers_entite.sql` — table, colonnes, reprise, vues, RLS, grants, audit.
-- `supabase/migrations/20260930_12_chantiers_rpc.sql` — trigger `chantier_ensure_for_quote`, RPC `chantier_ensure_for_lead`, `chantier_group`, `chantier_detach`, `chantier_delete`.
-- `supabase/migrations/20260930_13_lead_merge_chantiers.sql` — `lead_merge` re-parente les chantiers.
+- `supabase/migrations/20260930_16_chantiers_entite.sql` — table, colonnes, reprise, vues, RLS, grants, audit.
+- `supabase/migrations/20260930_17_chantiers_rpc.sql` — trigger `chantier_ensure_for_quote`, RPC `chantier_ensure_for_lead`, `chantier_group`, `chantier_detach`, `chantier_delete`.
+- `supabase/migrations/20260930_18_lead_merge_chantiers.sql` — `lead_merge` re-parente les chantiers.
 - `scripts/migration-rehearsal/fixture-chantiers.sql` — leads GOUIN / SANS DEVIS / RENOU, devis, RDV (jouée AVANT la migration via `--migration`).
 - `scripts/migration-rehearsal/assert-chantiers.sql` — assertions §A structure + reprise, §B trigger + RPC, §C `lead_merge`.
 - `src/lib/chantierSplit.js` + `scripts/chantier-split.test.mjs` — règles pures d'aperçu (détacher / grouper).
@@ -50,7 +50,7 @@
 ### Task 1 : Migration 1 — table `chantiers`, reprise, vues, RLS + fixture et harnais
 
 **Files:**
-- Create: `supabase/migrations/20260930_11_chantiers_entite.sql`
+- Create: `supabase/migrations/20260930_16_chantiers_entite.sql`
 - Create: `scripts/migration-rehearsal/fixture-chantiers.sql`
 - Create: `scripts/migration-rehearsal/assert-chantiers.sql` (§A)
 - Modify: `scripts/migration-rehearsal/snapshot.mjs:26-106`
@@ -64,10 +64,10 @@
 Dans `TABLES`, remplacer la ligne `lead_pennylane_quotes` et ajouter après `appointment_technicians` :
 
 ```js
-  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_11 : chantier_id + trigger chantier_ensure_for_quote
-  { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_11 : libellé du chantier
-  { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_11 : chantier_id → majordhome.chantiers
-  { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_12 : activités chantier_*
+  { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
+  { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_16 : libellé du chantier
+  { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_16 : chantier_id → majordhome.chantiers
+  { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_17 : activités chantier_*
   { schema: 'majordhome', table: 'role_permissions', columns: null }, // role_can() (policies chantiers)
   { schema: 'majordhome', table: 'app_role_permissions', columns: null }, // role_can() défauts app-level
 ```
@@ -75,7 +75,7 @@ Dans `TABLES`, remplacer la ligne `lead_pennylane_quotes` et ajouter après `app
 Dans `FUNCTIONS`, ajouter :
 
 ```js
-  // 20260930_11..13 : entité chantier
+  // 20260930_16..13 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
   'majordhome.role_can(uuid, text, text)',
   'majordhome.user_effective_role(uuid)',
@@ -91,7 +91,7 @@ const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits'
 Dans `VIEWS`, ajouter en fin :
 
 ```js
-  // 20260930_11 : cibles du CREATE OR REPLACE
+  // 20260930_16 : cibles du CREATE OR REPLACE
   'public.majordhome_lead_pennylane_quotes',
   'public.majordhome_appointments',
 ```
@@ -134,7 +134,7 @@ Attendu : `assert-baseline : OK`. Si `role_can` échoue au chargement faute d'un
 - [ ] **Step 4 : Écrire la fixture** `scripts/migration-rehearsal/fixture-chantiers.sql`
 
 ```sql
--- fixture-chantiers.sql — données de répétition pour 20260930_11..13 (jouée via --migration AVANT la migration).
+-- fixture-chantiers.sql — données de répétition pour 20260930_16..13 (jouée via --migration AVANT la migration).
 -- Reproduit GOUIN (borne facturée + PAC acceptée + variante refusée, 4 RDV), un lead gagné SANS devis,
 -- et RENOU (Perdu, vieux devis facturé, chantier_status NULL → ne doit produire aucun chantier).
 DO $$
@@ -178,16 +178,16 @@ END $$;
 
 Si une colonne NOT NULL manque à l'un des INSERT (le schéma généré le dira à l'exécution), la renseigner dans la fixture avec une valeur neutre ; ne pas retirer de colonne de `snapshot.mjs`.
 
-- [ ] **Step 5 : Écrire la migration** `supabase/migrations/20260930_11_chantiers_entite.sql`
+- [ ] **Step 5 : Écrire la migration** `supabase/migrations/20260930_16_chantiers_entite.sql`
 
 ```sql
--- supabase/migrations/20260930_11_chantiers_entite.sql
+-- supabase/migrations/20260930_16_chantiers_entite.sql
 -- ============================================================================
 -- Chantier = entité (spec 2026-09-30-chantier-entite-par-devis-design.md).
 -- Règle Eric 2026-09-30 : un lead = N devis ; chaque devis accepté = 1 chantier,
 -- regroupable. Cette migration pose la structure et REPREND l'existant tel quel
 -- (1 chantier par lead à chantier_status, tous ses devis dessus) ; la règle
--- « un devis = un chantier » s'applique aux devis validés APRÈS (20260930_12).
+-- « un devis = un chantier » s'applique aux devis validés APRÈS (20260930_17).
 --   1. majordhome.chantiers (RLS org, UPDATE via role_can chantiers.edit|edit_own)
 --   2. lead_pennylane_quotes.chantier_id, appointments.chantier_id,
 --      chantier_line_receptions.chantier_id → FK chantiers
@@ -426,7 +426,7 @@ END $$;
 - [ ] **Step 6 : Écrire les assertions §A** `scripts/migration-rehearsal/assert-chantiers.sql`
 
 ```sql
--- assert-chantiers.sql — vérifie 20260930_11 (§A), 20260930_12 (§B), 20260930_13 (§C) sur le cluster
+-- assert-chantiers.sql — vérifie 20260930_16 (§A), 20260930_17 (§B), 20260930_18 (§C) sur le cluster
 -- de répétition, après fixture-chantiers.sql. Un écart lève une exception → run.mjs sort en ECHEC.
 
 -- ── §A Structure + reprise ────────────────────────────────────────────────────
@@ -501,7 +501,7 @@ END $$;
 - [ ] **Step 7 : Répéter et boucler jusqu'au vert**
 
 ```bash
-node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_11_chantiers_entite.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
+node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_16_chantiers_entite.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
 ```
 
 Attendu : `assert-chantiers §A : OK`. Une colonne NOT NULL inconnue de la fixture → compléter la fixture. Une relation absente → étendre `snapshot.mjs` puis re-snapshot.
@@ -509,9 +509,9 @@ Attendu : `assert-chantiers §A : OK`. Une colonne NOT NULL inconnue de la fixtu
 - [ ] **Step 8 : Vérifier les fins de ligne et committer**
 
 ```bash
-file supabase/migrations/20260930_11_chantiers_entite.sql scripts/migration-rehearsal/fixture-chantiers.sql scripts/migration-rehearsal/assert-chantiers.sql
-git add supabase/migrations/20260930_11_chantiers_entite.sql scripts/migration-rehearsal/
-git commit -m "feat(chantiers): table majordhome.chantiers, reprise 1 chantier par lead, vues par chantier (migration 20260930_11 + harnais)"
+file supabase/migrations/20260930_16_chantiers_entite.sql scripts/migration-rehearsal/fixture-chantiers.sql scripts/migration-rehearsal/assert-chantiers.sql
+git add supabase/migrations/20260930_16_chantiers_entite.sql scripts/migration-rehearsal/
+git commit -m "feat(chantiers): table majordhome.chantiers, reprise 1 chantier par lead, vues par chantier (migration 20260930_16 + harnais)"
 ```
 
 ---
@@ -519,17 +519,17 @@ git commit -m "feat(chantiers): table majordhome.chantiers, reprise 1 chantier p
 ### Task 2 : Migration 2 — trigger `chantier_ensure_for_quote` et RPC `ensure_for_lead` / `group` / `detach` / `delete`
 
 **Files:**
-- Create: `supabase/migrations/20260930_12_chantiers_rpc.sql`
+- Create: `supabase/migrations/20260930_17_chantiers_rpc.sql`
 - Modify: `scripts/migration-rehearsal/assert-chantiers.sql` (ajouter §B)
 
 **Interfaces:**
 - Consumes: Task 1 (table, colonnes, vues).
 - Produces: trigger `trg_chantier_ensure_for_quote` ; `public.chantier_ensure_for_lead(p_lead_id uuid) RETURNS uuid` ; `public.chantier_group(p_target_id uuid, p_source_ids uuid[]) RETURNS jsonb {target_id, counts{quotes, appointments, line_receptions}}` ; `public.chantier_detach(p_chantier_id uuid, p_quote_ids uuid[], p_appointment_ids uuid[], p_move_planned_order boolean, p_label text) RETURNS jsonb {new_chantier_id, origin_chantier_id, counts{…}}` ; `public.chantier_delete(p_chantier_id uuid) RETURNS jsonb {deleted_id, quotes_released}`. Erreurs : `unauthenticated` (42501), `not_authorized` (42501), `chantier_not_found` / `lead_not_found` (P0002), `invalid_selection`, `different_lead`, `invalid_quotes`, `no_validated_quote_selected`, `origin_would_be_empty`, `invalid_appointments`, `has_validated_quotes`, `has_appointments`, `has_pv` (22023).
 
-- [ ] **Step 1 : Écrire la migration** `supabase/migrations/20260930_12_chantiers_rpc.sql`
+- [ ] **Step 1 : Écrire la migration** `supabase/migrations/20260930_17_chantiers_rpc.sql`
 
 ```sql
--- supabase/migrations/20260930_12_chantiers_rpc.sql
+-- supabase/migrations/20260930_17_chantiers_rpc.sql
 -- ============================================================================
 -- Entité chantier — création automatique et gestes (spec 2026-09-30-chantier-entite-par-devis).
 --   - trigger chantier_ensure_for_quote : un devis qui DEVIENT validé sans chantier en crée un
@@ -884,7 +884,7 @@ GRANT EXECUTE ON FUNCTION public.chantier_delete(uuid) TO authenticated;
 - [ ] **Step 2 : Ajouter les assertions §B** en fin de `assert-chantiers.sql`
 
 ```sql
--- ── §B Trigger + RPC (20260930_12) ─────────────────────────────────────────────
+-- ── §B Trigger + RPC (20260930_17) ─────────────────────────────────────────────
 DO $$
 DECLARE
   v_admin uuid; v_origin uuid; v_new uuid; v_ch2 uuid; v_lead2 uuid; v_res jsonb; n int; v_label text; v_status text;
@@ -1002,7 +1002,7 @@ END $$;
 - [ ] **Step 3 : Répéter**
 
 ```bash
-node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_11_chantiers_entite.sql --migration supabase/migrations/20260930_12_chantiers_rpc.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
+node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_16_chantiers_entite.sql --migration supabase/migrations/20260930_17_chantiers_rpc.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
 ```
 
 Attendu : `§A : OK` puis `§B : OK`. Si `user_effective_role` échoue faute d'une colonne de `core.profiles`, la table est déjà complète (`columns: null`) ; si c'est `majordhome.role_permissions`, elle est ajoutée en Task 1 Step 1.
@@ -1010,8 +1010,8 @@ Attendu : `§A : OK` puis `§B : OK`. Si `user_effective_role` échoue faute d'u
 - [ ] **Step 4 : Commit**
 
 ```bash
-git add supabase/migrations/20260930_12_chantiers_rpc.sql scripts/migration-rehearsal/assert-chantiers.sql
-git commit -m "feat(chantiers): trigger un devis validé = un chantier, RPC ensure/group/detach/delete (20260930_12)"
+git add supabase/migrations/20260930_17_chantiers_rpc.sql scripts/migration-rehearsal/assert-chantiers.sql
+git commit -m "feat(chantiers): trigger un devis validé = un chantier, RPC ensure/group/detach/delete (20260930_17)"
 ```
 
 ---
@@ -1019,14 +1019,14 @@ git commit -m "feat(chantiers): trigger un devis validé = un chantier, RPC ensu
 ### Task 3 : Migration 3 — `lead_merge` re-parente les chantiers
 
 **Files:**
-- Create: `supabase/migrations/20260930_13_lead_merge_chantiers.sql`
+- Create: `supabase/migrations/20260930_18_lead_merge_chantiers.sql`
 - Modify: `scripts/migration-rehearsal/assert-chantiers.sql` (§C)
 
 - [ ] **Step 1 : Vérifier que le repo reflète la prod**
 
 Dans le SQL Editor / MCP (lecture seule) : `SELECT pg_get_functiondef('public.lead_merge(uuid, uuid)'::regprocedure);` et comparer au corps de `supabase/migrations/20260916_2_lead_merge.sql`. Si le texte diffère ailleurs que par la mise en forme, partir du texte PROD.
 
-- [ ] **Step 2 : Écrire la migration** : copie intégrale de `20260916_2_lead_merge.sql` (en-tête adapté : « 20260930_13 — lead_merge : re-parentage des chantiers ») avec trois modifications :
+- [ ] **Step 2 : Écrire la migration** : copie intégrale de `20260916_2_lead_merge.sql` (en-tête adapté : « 20260930_18 — lead_merge : re-parentage des chantiers ») avec trois modifications :
 
 1. Dans le `jsonb_build_object` des compteurs, remplacer la ligne `'line_receptions', (SELECT count(*) FROM majordhome.chantier_line_receptions WHERE chantier_id = p_absorbed_id)` par :
 
@@ -1046,7 +1046,7 @@ Dans le SQL Editor / MCP (lecture seule) : `SELECT pg_get_functiondef('public.le
 - [ ] **Step 3 : Assertions §C** en fin de `assert-chantiers.sql`
 
 ```sql
--- ── §C lead_merge (20260930_13) ────────────────────────────────────────────────
+-- ── §C lead_merge (20260930_18) ────────────────────────────────────────────────
 DO $$
 DECLARE v_def text;
 BEGIN
@@ -1065,9 +1065,9 @@ END $$;
 - [ ] **Step 4 : Répéter les trois migrations, puis committer**
 
 ```bash
-node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_11_chantiers_entite.sql --migration supabase/migrations/20260930_12_chantiers_rpc.sql --migration supabase/migrations/20260930_13_lead_merge_chantiers.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
-git add supabase/migrations/20260930_13_lead_merge_chantiers.sql scripts/migration-rehearsal/assert-chantiers.sql
-git commit -m "feat(chantiers): lead_merge re-parente les chantiers (20260930_13)"
+node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_16_chantiers_entite.sql --migration supabase/migrations/20260930_17_chantiers_rpc.sql --migration supabase/migrations/20260930_18_lead_merge_chantiers.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
+git add supabase/migrations/20260930_18_lead_merge_chantiers.sql scripts/migration-rehearsal/assert-chantiers.sql
+git commit -m "feat(chantiers): lead_merge re-parente les chantiers (20260930_18)"
 ```
 
 ---
@@ -2041,7 +2041,7 @@ Imports : `Layers, Trash2` (lucide), `GroupChantiersDialog`, `ConfirmDialog` (`@
 ```bash
 npm run audit:quality
 npx vite build
-node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_11_chantiers_entite.sql --migration supabase/migrations/20260930_12_chantiers_rpc.sql --migration supabase/migrations/20260930_13_lead_merge_chantiers.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
+node scripts/migration-rehearsal/run.mjs --migration scripts/migration-rehearsal/fixture-chantiers.sql --migration supabase/migrations/20260930_16_chantiers_entite.sql --migration supabase/migrations/20260930_17_chantiers_rpc.sql --migration supabase/migrations/20260930_18_lead_merge_chantiers.sql --assert scripts/migration-rehearsal/assert-chantiers.sql
 git status --short
 ```
 

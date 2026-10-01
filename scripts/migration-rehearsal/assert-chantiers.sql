@@ -1,4 +1,4 @@
--- assert-chantiers.sql — vérifie 20260930_11 (§A), 20260930_12 (§B), 20260930_13 (§C) sur le cluster
+-- assert-chantiers.sql — vérifie 20260930_16 (§A), 20260930_17 (§B), 20260930_18 (§C) sur le cluster
 -- de répétition, après fixture-chantiers.sql. Un écart lève une exception → run.mjs sort en ECHEC.
 
 -- ── §A Structure + reprise ────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ BEGIN
   RAISE NOTICE 'assert-chantiers §A : OK';
 END $$;
 
--- ── §B Trigger + RPC (20260930_12) ─────────────────────────────────────────────
+-- ── §B Trigger + RPC (20260930_17) ─────────────────────────────────────────────
 -- Helper de refus : exécute le SQL, exige l'échec ET le message exact (+ SQLSTATE). Une autre cause, ou
 -- l'absence d'échec, lève une exception qui cite le message reçu : un refus ne « passe » jamais par hasard.
 CREATE OR REPLACE FUNCTION pg_temp.expect_err(p_label text, p_sql text, p_msg text, p_state text)
@@ -360,7 +360,7 @@ BEGIN
   RAISE NOTICE 'assert-chantiers §B : OK';
 END $$;
 
--- ── §C lead_merge (20260930_13) ────────────────────────────────────────────────
+-- ── §C lead_merge (20260930_18) ────────────────────────────────────────────────
 -- lead_merge est recréée sans ses tables satellites (le harnais n'en photographie pas 16) : on vérifie donc le
 -- TEXTE de la fonction et ses droits, sans l'appeler.
 DO $$

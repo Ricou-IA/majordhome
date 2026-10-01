@@ -1,4 +1,4 @@
--- fixture-chantiers.sql — données de répétition pour 20260930_11..13 (jouée via --migration AVANT la migration).
+-- fixture-chantiers.sql — données de répétition pour 20260930_16..13 (jouée via --migration AVANT la migration).
 -- Reproduit GOUIN (borne facturée + PAC acceptée + variante refusée, 4 RDV), un lead gagné SANS devis,
 -- et RENOU (Perdu, vieux devis facturé, chantier_status NULL → ne doit produire aucun chantier).
 DO $$
