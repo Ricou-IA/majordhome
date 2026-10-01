@@ -25,6 +25,11 @@ assert(resolvePermission({}, 'commercial', 'pipeline', 'create') === true, 'com 
 assert(resolvePermission({}, 'technicien', 'clients', 'delete') === false, 'tech clients.delete = false');
 assert(resolvePermission({}, 'team_leader', 'devis', 'delete')  === false, 'TL devis.delete = false (delta)');
 assert(resolvePermission({}, 'org_admin', 'settings', 'edit')   === true,  'admin bypass');
+// Outils d'aide à la vente : défauts app (plus seulement des surcharges Mayer/Cimaj)
+assert(resolvePermission({}, 'commercial', 'pv_calculator', 'view') === true, 'com pv_calculator.view = true');
+assert(resolvePermission({}, 'technicien', 'pv_calculator', 'view') === false, 'tech pv_calculator.view = false');
+assert(resolvePermission({}, 'team_leader', 'thermal_study', 'view') === true, 'TL thermal_study.view = true');
+assert(resolvePermission({}, 'technicien', 'maintenance', 'view') === true, 'tech maintenance.view = true');
 
 // 3. Override per-org prime sur le défaut
 assert(resolvePermission({ 'technicien:clients:create': true }, 'technicien', 'clients', 'create') === true,

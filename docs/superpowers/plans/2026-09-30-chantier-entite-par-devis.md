@@ -75,7 +75,7 @@ Dans `TABLES`, remplacer la ligne `lead_pennylane_quotes` et ajouter après `app
 Dans `FUNCTIONS`, ajouter :
 
 ```js
-  // 20260930_16..13 : entité chantier
+  // 20260930_16..18 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
   'majordhome.role_can(uuid, text, text)',
   'majordhome.user_effective_role(uuid)',
@@ -134,7 +134,7 @@ Attendu : `assert-baseline : OK`. Si `role_can` échoue au chargement faute d'un
 - [ ] **Step 4 : Écrire la fixture** `scripts/migration-rehearsal/fixture-chantiers.sql`
 
 ```sql
--- fixture-chantiers.sql — données de répétition pour 20260930_16..13 (jouée via --migration AVANT la migration).
+-- fixture-chantiers.sql — données de répétition pour 20260930_16..18 (jouée via --migration AVANT la migration).
 -- Reproduit GOUIN (borne facturée + PAC acceptée + variante refusée, 4 RDV), un lead gagné SANS devis,
 -- et RENOU (Perdu, vieux devis facturé, chantier_status NULL → ne doit produire aucun chantier).
 DO $$

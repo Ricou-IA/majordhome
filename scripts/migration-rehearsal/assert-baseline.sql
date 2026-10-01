@@ -34,9 +34,9 @@ BEGIN
       ('majordhome.auto_expire_contract_on_end_date()'),
       ('majordhome.update_client_on_contract_change()'),
       ('majordhome.contract_activation_promote_cards()'),
-      ('majordhome.lead_pennylane_quotes_invariant_winning()'),
-      ('majordhome.role_can(uuid, text, text)'),
       ('majordhome.user_effective_role(uuid)'),
+      ('majordhome.role_can(uuid, text, text)'),
+      ('majordhome.lead_pennylane_quotes_invariant_winning()'),
       ('public.lead_merge(uuid, uuid)')
     ) AS t(fn)
   LOOP
@@ -113,7 +113,8 @@ BEGIN
   END LOOP;
 
   -- RLS activée + au moins une policy (POLICY_TABLES)
-  FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members'), ('leads')) AS t(tbl)
+  FOR r IN SELECT * FROM (VALUES ('pricing_zones'), ('pricing_equipment_types'), ('team_members'),
+                                 ('leads'), ('contracts'), ('quotes'), ('tasks'), ('role_permissions'), ('app_role_permissions')) AS t(tbl)
   LOOP
     PERFORM 1 FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
      WHERE ns.nspname = 'majordhome' AND c.relname = r.tbl AND c.relrowsecurity;
