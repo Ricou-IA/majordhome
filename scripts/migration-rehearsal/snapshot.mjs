@@ -52,6 +52,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine
   { schema: 'majordhome', table: 'appointment_technicians', columns: null, data: false },
   { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_16 : libellé du chantier
+  { schema: 'majordhome', table: 'chantiers', columns: null, data: false }, // 20261001_2 : realized_date (entité en prod depuis 20260930_16)
   { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_16 : chantier_id → majordhome.chantiers
   { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_17 : activités chantier_*
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
@@ -94,6 +95,7 @@ const FUNCTIONS = [
   'majordhome.role_can(uuid, text, text)',
   // 20260930_16..18 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
+  'majordhome.chantier_ensure_for_quote()', // trigger de prod sur lead_pennylane_quotes (20260930_16) : sans elle le schéma ne charge plus
   'public.lead_merge(uuid, uuid)', // recréée sans ses 16 tables satellites : plpgsql ne résout les tables qu'à l'exécution
 ];
 
@@ -113,7 +115,9 @@ const VIEWS = [
   // 20260922_1 : cibles du CREATE OR REPLACE (l'ordre compte : lead_quote_stats avant chantiers)
   'majordhome.lead_quote_stats',
   'public.majordhome_interventions',
+  'majordhome.chantier_quote_stats', // 20261001_2 : lue par majordhome_chantiers (entité en prod)
   'public.majordhome_chantiers',
+  'public.majordhome_chantiers_write',
   'public.majordhome_entretien_sav',
   // 20260930_16 : cibles du CREATE OR REPLACE
   'public.majordhome_lead_pennylane_quotes',

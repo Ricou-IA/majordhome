@@ -61,6 +61,18 @@ export function getChantierStatusConfig(status) {
  * pour « aucun devis rattaché » : seul validated_quotes_count les distingue,
  * d'où le branchement explicite plutôt qu'une cascade ||.
  */
+/**
+ * Date portée par la carte kanban (puce gauche + tri des colonnes), ISO 'YYYY-MM-DD' ou null :
+ * Réceptionné / Facturé → date de réalisation figée (`realized_date`, 20261001_2) ;
+ * sinon RDV d'installation actif à venir ; sinon date de signature.
+ */
+export function getChantierCardDate(chantier) {
+  if (!chantier) return null;
+  if (['realise', 'facture'].includes(chantier.chantier_status) && chantier.realized_date) return chantier.realized_date;
+  if (chantier.has_active_rdv && chantier.next_rdv_date) return chantier.next_rdv_date;
+  return chantier.won_date || null;
+}
+
 export function getChantierAmount(chantier) {
   if (!chantier) return 0;
   if (Number(chantier.validated_quotes_count) > 0) {

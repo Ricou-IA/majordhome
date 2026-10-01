@@ -10,7 +10,7 @@
 
 import { MapPin, Calendar, CalendarClock } from 'lucide-react';
 import { formatEuroCeil } from '@/lib/utils';
-import { getChantierStatusConfig, getChantierAmount } from '@services/chantiers.service';
+import { getChantierStatusConfig, getChantierAmount, getChantierCardDate } from '@services/chantiers.service';
 import { poseProvisoire } from '@/lib/installOrder';
 
 /** Puce de date hachurée (pose provisoire : appros non reçues), même motif que le planning. */
@@ -60,9 +60,10 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
   // Marqueur ambre « à replanifier » réactivé en Bloc B stage 4 (flux de planif installation
   // depuis ChantierModal) : chantier en planification sans RDV d'installation actif.
   const hasActiveRdv = Boolean(chantier.has_active_rdv);
-  const chipDate = (hasActiveRdv && chantier.next_rdv_date)
-    ? formatShortDate(chantier.next_rdv_date)
-    : formatShortDate(chantier.won_date);
+  // Réceptionné / Facturé : date de réalisation figée au passage en Réceptionné
+  // (chantiers.realized_date = dernier jour d'installation posé au planning, 20261001_2).
+  const isDone = ['realise', 'facture'].includes(chantier.chantier_status);
+  const chipDate = formatShortDate(getChantierCardDate(chantier));
   const needsReplan = chantier.chantier_status === 'planification' && !hasActiveRdv;
   // Pose provisoire : RDV posé avant réception des appros → puce hachurée ambre, la carte
   // reste dans sa colonne (règle 2026-10-01, cf. installOrder.poseProvisoire).
@@ -70,7 +71,9 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
   const commercial = commercialsMap?.[chantier.assigned_user_id];
 
   let chipStyle = { backgroundColor: `${statusConfig.color}10`, borderColor: `${statusConfig.color}30` };
-  let chipTitle = hasActiveRdv ? 'Date RDV installation' : 'Date signature';
+  let chipTitle = (isDone && chantier.realized_date)
+    ? 'Date de réalisation (figée au planning)'
+    : hasActiveRdv ? 'Date RDV installation' : 'Date signature';
   let chipColor = statusConfig.color;
   if (needsReplan) {
     chipStyle = { backgroundColor: '#F59E0B14', borderColor: '#F59E0B40' };

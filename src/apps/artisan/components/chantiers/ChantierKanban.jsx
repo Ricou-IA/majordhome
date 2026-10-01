@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useChantiers } from '@hooks/useChantiers';
 import { useLeadCommercials } from '@hooks/useLeads';
-import { CHANTIER_STATUSES, getChantierAmount } from '@services/chantiers.service';
+import { CHANTIER_STATUSES, getChantierAmount, getChantierCardDate } from '@services/chantiers.service';
 import { KanbanBoard } from '@/apps/artisan/components/shared/KanbanBoard';
 import { ChantierCard } from './ChantierCard';
 import { ChantierModal } from './ChantierModal';
@@ -76,7 +76,7 @@ export function ChantierKanban() {
     if (effectiveRole === 'technicien') {
       result = result.filter((c) => TECHNICIEN_STATUSES.includes(c.chantier_status));
     }
-    const cardDate = (c) => (c.has_active_rdv && c.next_rdv_date) || c.won_date || '';
+    const cardDate = (c) => getChantierCardDate(c) || '';
     return [...result].sort((a, b) => cardDate(b).localeCompare(cardDate(a)));
   }, [chantiers, effectiveRole, user?.id]);
 

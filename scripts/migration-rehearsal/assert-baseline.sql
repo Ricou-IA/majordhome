@@ -37,6 +37,7 @@ BEGIN
       ('majordhome.user_effective_role(uuid)'),
       ('majordhome.role_can(uuid, text, text)'),
       ('majordhome.lead_pennylane_quotes_invariant_winning()'),
+      ('majordhome.chantier_ensure_for_quote()'),
       ('public.lead_merge(uuid, uuid)')
     ) AS t(fn)
   LOOP
@@ -100,7 +101,9 @@ BEGIN
       ('public.majordhome_organizations', true),
       ('majordhome.lead_quote_stats', true),
       ('public.majordhome_interventions', true),
+      ('majordhome.chantier_quote_stats', true),
       ('public.majordhome_chantiers', true),
+      ('public.majordhome_chantiers_write', true),
       ('public.majordhome_entretien_sav', true),
       ('public.majordhome_lead_pennylane_quotes', true),
       ('public.majordhome_appointments', true)
