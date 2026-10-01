@@ -21,6 +21,8 @@
 // (`form.templates_by_category`), consommés par `buildEntretienInvoice`.
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks/useOrgSettings';
 import { useLedgerAccounts } from '@hooks/usePennylane';
@@ -294,7 +296,13 @@ export default function FacturationTab() {
           vit dans le bloc de sa famille (avec libellés et ligne offerte) ; seules les pièces
           de rechange, qui ne sont pas une famille, gardent un compte à part. */}
       <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>
-        <h3 className={SECTION_TITLE}>Entretien — par famille d&apos;équipement : compte de vente, libellés, ligne offerte</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+          <h3 className={`${SECTION_TITLE} mb-0`}>Entretien — par famille d&apos;équipement : compte de vente, libellés, ligne offerte</h3>
+          <Link to="/settings/equipements" className="inline-flex items-center gap-1 text-xs text-primary-600 hover:underline">
+            <Wrench className="w-3.5 h-3.5" />
+            Familles et types d&apos;équipement
+          </Link>
+        </div>
         <p className="text-xs text-secondary-500 mb-3">
           Contexte « contrat » : chaque ligne d&apos;une facture d&apos;entretien est comptabilisée sur le compte de vente de sa famille,
           celle que votre comptable retrouvera dans les statistiques Pennylane. Sans compte, Pennylane applique son compte par défaut.

@@ -55,10 +55,10 @@ function buildOfferedPreview(t) {
   return `Aperçu : ${t.offered_label} — ${fmt2(price)} € HT · ${vatText} · remise ${discText} % → ${outcome}`;
 }
 
-/** Premier type d'une catégorie (`typesByCategory` = Map ou objet, selon l'appelant). */
-function firstType(typesByCategory, catId) {
+/** Types d'une catégorie (`typesByCategory` = Map ou objet, selon l'appelant). */
+function typesOf(typesByCategory, catId) {
   const arr = typesByCategory instanceof Map ? typesByCategory.get(catId) : typesByCategory?.[catId];
-  return Array.isArray(arr) && arr.length > 0 ? arr[0] : null;
+  return Array.isArray(arr) ? arr : [];
 }
 
 /**
@@ -109,8 +109,9 @@ export default function TemplatesSection({ categories, typesByCategory, value, o
       </p>
       {categories.map((cat) => {
         const t = value?.[cat.id] || EMPTY_TEMPLATE;
+        const types = typesOf(typesByCategory, cat.id);
         const sampleVars = {
-          type: firstType(typesByCategory, cat.id)?.label || cat.label,
+          type: types[0]?.label || cat.label,
           marque: 'Cola',
           modele: 'Fire HR acciaio',
           serie: '0160067',
@@ -123,7 +124,16 @@ export default function TemplatesSection({ categories, typesByCategory, value, o
         return (
           <div key={cat.id} className="border border-secondary-200 rounded-md p-4">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <div className="text-sm font-medium text-secondary-900">{cat.label}</div>
+              <div>
+                <div className="text-sm font-medium text-secondary-900">{cat.label}</div>
+                {types.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {types.map((ty) => (
+                      <span key={ty.id || ty.label} className="text-[11px] px-2 py-0.5 rounded-full bg-secondary-100 text-secondary-600">{ty.label}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
               {ledger && (
                 <div className="w-full sm:w-80">
                   <label className={LABEL_CLASS}>Compte de vente Pennylane</label>
