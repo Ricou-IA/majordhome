@@ -252,28 +252,31 @@ export function CertificatWizard({
     }
   };
 
-  // ── Signature ──
+  // ── Signature → clôture en UN geste ──
+  // « Valider la signature » enregistre la signature PUIS enchaîne la clôture
+  // (entretien réalisé + PDF). Avant, la clôture attendait un 2ᵉ bouton
+  // (« Valider et générer le certificat PDF ») que le technicien ne pressait
+  // pas après le toast « Signature enregistrée » : 7 certificats signés en prod
+  // (25/09 et 01/10) sans clôture ni PDF, cartes restées « À faire » au kanban.
   const handleSign = async (signatureBase64, signataireNom) => {
-    // Toujours sauvegarder la signature dans le formData local (indépendamment du DB)
-    setFormData(prev => ({
-      ...prev,
+    const signature = {
       signature_client_base64: signatureBase64,
       signature_client_nom: signataireNom,
       signed_at: new Date().toISOString(),
-    }));
+    };
+    setFormData(prev => ({ ...prev, ...signature }));
 
-    // Tenter de sauvegarder en DB (best-effort)
+    let certId = certificatId;
     try {
-      const savedId = await doSave();
-      const certId = savedId || certificatId;
-      if (certId) {
-        await signCertificat(certId, signatureBase64, signataireNom);
-      }
-    } catch {
-      // Non-bloquant : la signature est capturée côté client
+      certId = (await doSave()) || certificatId;
+      if (certId) await signCertificat(certId, signatureBase64, signataireNom);
+    } catch (err) {
+      console.error('[CertificatWizard] signature non enregistrée:', err);
+      toast.error(`Signature non enregistrée : ${err?.message || 'erreur inconnue'}`);
+      return;
     }
 
-    toast.success('Signature enregistrée');
+    await finaliser({ certId, signature });
   };
 
   // ── Sync équipement → DB (mise à jour des champs complétés par le technicien) ──
@@ -308,27 +311,60 @@ export function CertificatWizard({
     }
   }, [formData, equipment]);
 
-  // ── Génération PDF ──
-  const handleGeneratePdf = async () => {
+  // ── Clôture : entretien réalisé PUIS PDF ──
+  // Appelée par handleSign (enchaînement automatique, `signature` = valeurs qui
+  // ne sont pas encore dans le state) et par le bouton « Valider et générer le
+  // certificat PDF » (reprise d'un certificat signé sans PDF, ou réessai).
+  const finaliser = async ({ certId = certificatId, signature = null } = {}) => {
     setIsGeneratingPdf(true);
     setPdfError(null);
+    const data = signature ? { ...formData, ...signature } : formData;
 
     try {
-      // Sync équipement avant de finaliser
-      await syncEquipmentBack();
-
-      // S'assurer que le brouillon est sauvegardé (obtenir certificatId)
-      let currentCertId = certificatId;
+      // Pas de ligne certificat en base ⇒ rien à clôturer : une signature qui
+      // n'existe pas en base ne doit pas passer la carte en « Réalisé » (doSave a
+      // déjà affiché la cause du refus).
+      let currentCertId = certId;
+      if (!currentCertId) currentCertId = await doSave();
       if (!currentCertId) {
-        currentCertId = await doSave();
+        const msg = "Certificat non enregistré en base — l'entretien reste à faire.";
+        setPdfError(msg);
+        toast.error(msg);
+        return;
       }
+
+      // 1. Entretien réalisé — AVANT le PDF : la carte du kanban ne dépend pas
+      //    d'un rendu react-pdf réussi côté navigateur (le PDF est régénérable
+      //    depuis les données du certificat, pas la signature). Sur une racine,
+      //    markRealise pose aussi la visite annuelle à la date saisie — un échec
+      //    laisserait la carte « Réalisé » sans date, il doit se voir.
+      //    Reprise d'un certificat sur une RACINE déjà close (réalisée / facturée,
+      //    18 certificats d'Antoine sans PDF en prod) : ne pas repasser markRealise,
+      //    qui redescendrait « Facturé » en « Réalisé » et reposerait une visite.
+      //    Un enfant, lui, repasse toujours (un « Néant » posé à la main redevient
+      //    « Rempli » ; le parent déjà clos n'est pas retouché).
+      const racineDejaClose = !intervention.parent_id
+        && ['realise', 'facture'].includes(intervention.workflow_status);
+      const { error: realiseError } = racineDejaClose
+        ? { error: null }
+        : await savService.markRealise(intervention.id, { visitDate: data.date_intervention || null });
+      if (realiseError) {
+        console.error('[CertificatWizard] markRealise error:', realiseError);
+        const msg = `Certificat signé, mais la clôture de l'entretien a échoué : ${realiseError.message || 'erreur inconnue'}`;
+        setPdfError(msg);
+        toast.error(msg);
+        return; // le bouton « Valider et générer » reste affiché pour réessayer
+      }
+
+      // 2. Sync équipement (best effort) puis PDF
+      await syncEquipmentBack();
 
       // Préparer les données pour le PDF (merge formData + infos client)
       const pdfData = {
-        ...formData,
+        ...data,
         // Gabarit et libellé résolus ici, depuis le référentiel : le PDF n'en connaît rien.
         profil,
-        equipement_type_label: referentiel.categoriesByCode.get(formData.equipement_type)?.label || formData.equipement_type,
+        equipement_type_label: referentiel.categoriesByCode.get(data.equipement_type)?.label || data.equipement_type,
         reference: contract?.contract_number || existingCertificat?.reference || '',
         client_name: client?.display_name || client?.last_name || '',
         client_address: [client?.address, client?.postal_code, client?.city].filter(Boolean).join(', '),
@@ -338,72 +374,51 @@ export function CertificatWizard({
       // Générer le blob PDF
       const blob = await generatePdfBlob(pdfData, buildCompanyInfo(organization?.settings));
 
-      // Upload + DB uniquement si on a un certificatId.
-      // Un échec d'archivage du PDF ne doit PAS annuler la bascule « réalisé » :
-      // le certificat est déjà signé en base, et le PDF est régénérable depuis
-      // ses données. Interrompre ici laissait l'entretien « planifié » au kanban
-      // alors que le technicien l'avait fait signer (régression bucket Storage
-      // `certificats` absent après le cutover, 2026-08-11 → 2026-08-27).
-      let erreurArchivagePdf = null;
-      if (currentCertId) {
-        try {
-          // uploadPdf résout avec { path, storagePath } et rejette si Storage refuse ;
-          // updatePdfInfo rejette si la ligne certificat ne prend pas le chemin.
-          const { storagePath } = await uploadPdf({
-            orgId: organization?.id,
-            clientId: client.id,
-            certificatId: currentCertId,
-            pdfBlob: blob,
-          });
-          const urlResult = await getSignedUrl(storagePath);
-          const signedUrl = urlResult?.data || '';
-          await updatePdfInfo(currentCertId, storagePath, signedUrl);
-          setPdfUrl(signedUrl);
-        } catch (archiveErr) {
-          erreurArchivagePdf = archiveErr?.message || 'archivage impossible';
-          console.error('[CertificatWizard] archivage PDF impossible:', archiveErr);
-          // Le technicien garde un PDF ouvrable pour le client, même non archivé.
-          setPdfUrl(URL.createObjectURL(blob));
-        }
-      } else {
-        // Pas de certificatId (table pas encore créée) — générer le PDF en local
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
-      }
-
-      // Transition → réalisé (workflow + status). Sur une racine, markRealise pose
-      // aussi la visite annuelle à la date saisie par le technicien — un échec ici
-      // laisserait la carte « Réalisé » sans date, il doit se voir.
-      const { error: realiseError } = await savService.markRealise(intervention.id, {
-        visitDate: formData.date_intervention || null,
-      });
-      if (erreurArchivagePdf) {
+      // 3. Archivage. Un échec ici n'annule pas la bascule « réalisé » (déjà
+      //    faite) : le PDF est régénérable depuis les données du certificat.
+      //    Interrompre laissait l'entretien « planifié » au kanban alors que le
+      //    technicien l'avait fait signer (régression bucket Storage `certificats`
+      //    absent après le cutover, 2026-08-11 → 2026-08-27).
+      try {
+        // uploadPdf résout avec { path, storagePath } et rejette si Storage refuse ;
+        // updatePdfInfo rejette si la ligne certificat ne prend pas le chemin.
+        const { storagePath } = await uploadPdf({
+          orgId: organization?.id,
+          clientId: client.id,
+          certificatId: currentCertId,
+          pdfBlob: blob,
+        });
+        const urlResult = await getSignedUrl(storagePath);
+        const signedUrl = urlResult?.data || '';
+        await updatePdfInfo(currentCertId, storagePath, signedUrl);
+        setPdfUrl(signedUrl);
+      } catch (archiveErr) {
+        console.error('[CertificatWizard] archivage PDF impossible:', archiveErr);
         // On reste sur l'écran : StepSignature affiche l'erreur et le lien vers
         // le PDF local, seul exemplaire disponible tant que l'archivage échoue.
-        setPdfError(`PDF non archivé : ${erreurArchivagePdf}`);
+        setPdfUrl(URL.createObjectURL(blob));
+        setPdfError(`PDF non archivé : ${archiveErr?.message || 'archivage impossible'}`);
         toast.warning(
           "Entretien marqué réalisé, mais le PDF n'a pas pu être archivé — récupérez-le ci-dessous."
         );
         return;
       }
 
-      if (realiseError) {
-        console.error('[CertificatWizard] markRealise error:', realiseError);
-        toast.error(`Certificat signé, mais la clôture de l'entretien a échoué : ${realiseError.message || 'erreur inconnue'}`);
-      } else {
-        toast.success('Certificat généré — entretien marqué réalisé');
-      }
-
-      // Retour à la page précédente (modale entretien)
+      toast.success('Certificat généré — entretien marqué réalisé');
+      // Retour à la page précédente (modale entretien ou RDV du planning)
       navigate(-1);
     } catch (err) {
+      // Le PDF n'a pas pu être rendu : l'entretien est déjà « Réalisé », le
+      // bouton « Valider et générer » reste affiché pour réessayer.
       console.error('[CertificatWizard] PDF generation error:', err);
-      setPdfError(err.message || 'Erreur de génération');
-      toast.error('Erreur lors de la génération du PDF');
+      setPdfError(`Entretien marqué réalisé, mais PDF non généré : ${err.message || 'erreur de génération'}`);
+      toast.error("Entretien marqué réalisé, mais le PDF n'a pas pu être généré");
     } finally {
       setIsGeneratingPdf(false);
     }
   };
+
+  const handleGeneratePdf = () => finaliser();
 
   // ── Rendu step courant ──
   const currentStepConfig = steps[currentStep];

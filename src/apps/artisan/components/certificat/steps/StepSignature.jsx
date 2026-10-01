@@ -2,7 +2,9 @@
  * StepSignature.jsx - Étape finale du wizard certificat
  * ============================================================================
  * Résumé compact + signature client + génération PDF.
- * Déclenche : signature → PDF → upload → transition réalisé.
+ * « Valider la signature » déclenche tout : signature → entretien réalisé → PDF → upload.
+ * Le bouton « Valider et générer le certificat PDF » ne sert qu'à reprendre un
+ * certificat déjà signé sans PDF (ou à réessayer après une erreur).
  * ============================================================================
  */
 
