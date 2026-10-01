@@ -69,7 +69,10 @@ function ApproToggle({ label, value, onChange, disabled }) {
             <button
               key={s.value}
               type="button"
-              onClick={() => onChange(s.value)}
+              // Re-cliquer le statut actif le désactive (retour à « non renseigné ») :
+              // sans ça, un clic était définitif — on ne pouvait plus sortir d'un N/A posé par erreur.
+              onClick={() => onChange(active ? null : s.value)}
+              title={active ? 'Cliquer à nouveau pour effacer' : undefined}
               disabled={disabled}
               className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-gray-200 last:border-r-0 disabled:cursor-not-allowed disabled:opacity-60 ${
                 active ? ORDER_ACTIVE_CLASS[s.value] : 'bg-white text-gray-500 hover:bg-gray-50'
