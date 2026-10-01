@@ -17,6 +17,7 @@ module.exports = {
     '*.config.cjs',
     '*.config.mjs',
     'supabase/functions/**',
+    'scripts/certificats/out/**', // bundle esbuild généré (gitignoré)
   ],
   parserOptions: {
     ecmaVersion: 'latest',

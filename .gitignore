@@ -83,3 +83,6 @@ supabase/.branches/
 # Cluster PostgreSQL local de répétition des migrations (données prod, jamais versionnées)
 scripts/migration-rehearsal/scratch/
 deno.lock
+
+# Scripts certificats : bundle esbuild + PDF de contrôle
+scripts/certificats/out/
