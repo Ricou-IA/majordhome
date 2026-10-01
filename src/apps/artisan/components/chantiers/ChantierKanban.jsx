@@ -65,7 +65,9 @@ export function ChantierKanban() {
     return statuses.map((s) => ({ id: s.value, label: s.label, color: s.color }));
   }, [effectiveRole]);
 
-  // Filtrer par rôle avant de passer au KanbanBoard
+  // Filtrer par rôle avant de passer au KanbanBoard, puis trier par la date que la
+  // puce affiche (RDV d'installation s'il y en a un, sinon signature), la plus
+  // récente en haut ; sans date en dernier (Eric, 2026-10-01).
   const roleFilteredChantiers = useMemo(() => {
     let result = chantiers;
     if (effectiveRole === 'commercial' && user?.id) {
@@ -74,7 +76,8 @@ export function ChantierKanban() {
     if (effectiveRole === 'technicien') {
       result = result.filter((c) => TECHNICIEN_STATUSES.includes(c.chantier_status));
     }
-    return result;
+    const cardDate = (c) => (c.has_active_rdv && c.next_rdv_date) || c.won_date || '';
+    return [...result].sort((a, b) => cardDate(b).localeCompare(cardDate(a)));
   }, [chantiers, effectiveRole, user?.id]);
 
   const searchFilter = useCallback((chantier, query) => {
