@@ -250,7 +250,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
   };
 
   // Planifier des jours d'installation : l'assistant remonte slots[] → N appointments
-  // `installation` (lead_id = chantier). createAppointment → syncCardStateOnCreate avance
+  // `installation` (chantier_id = chantier, lead_id = son lead). createAppointment → syncCardStateOnCreate avance
   // le chantier en « planification » (forward-only, Bloc A) ; onUpdated rafraîchit le kanban.
   const handleConfirmInstallation = async (slots) => {
     if (!slots || slots.length === 0) return;

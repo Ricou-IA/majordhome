@@ -73,11 +73,20 @@ test('commandeSuitParDefaut : vrai quand les jours sélectionnés valent planned
 });
 
 test('resumeGroupement : montants et devis additionnés, statut le plus avancé', () => {
-  const cible = { linked_quotes_amount_ht: '1260.76', quotes_count: 1, validated_quotes_count: 1, chantier_status: 'facture' };
-  const s1 = { linked_quotes_amount_ht: 11540, quotes_count: 2, validated_quotes_count: 1, chantier_status: 'planification' };
-  const s2 = { linked_quotes_amount_ht: 0, quotes_count: 0, validated_quotes_count: 0, chantier_status: 'gagne' };
-  assert.deepEqual(resumeGroupement(cible, [s1, s2]), { montant: 12800.76, devis: 3, devisValides: 2, statut: 'facture' });
+  const cible = { linked_quotes_amount_ht: '1260.76', quotes_count: 1, validated_quotes_count: 1, chantier_status: 'facture', is_invoiced: true };
+  const s1 = { linked_quotes_amount_ht: 11540, quotes_count: 2, validated_quotes_count: 1, chantier_status: 'planification', is_invoiced: false };
+  const s2 = { linked_quotes_amount_ht: 0, quotes_count: 0, validated_quotes_count: 0, chantier_status: 'gagne', is_invoiced: false };
+  // Cible facturée + source non facturée : plafond « realise » (pas « facture »).
+  assert.deepEqual(resumeGroupement(cible, [s1, s2]), { montant: 12800.76, devis: 3, devisValides: 2, statut: 'realise' });
   assert.deepEqual(resumeGroupement(s2, [s1]), { montant: 11540, devis: 2, devisValides: 1, statut: 'planification' });
+});
+
+test('resumeGroupement : tout facturé → facture ; sans devis validé → jamais facture', () => {
+  const a = { linked_quotes_amount_ht: 1000, quotes_count: 1, validated_quotes_count: 1, chantier_status: 'facture', is_invoiced: true };
+  const b = { linked_quotes_amount_ht: 500, quotes_count: 1, validated_quotes_count: 1, chantier_status: 'facture', is_invoiced: true };
+  assert.equal(resumeGroupement(a, [b]).statut, 'facture');
+  const vide = { linked_quotes_amount_ht: 0, quotes_count: 0, validated_quotes_count: 0, chantier_status: 'facture', is_invoiced: false };
+  assert.equal(resumeGroupement(vide, []).statut, 'realise');
 });
 
 test('STATUT_ORDRE : gagne < … < facture', () => {

@@ -319,6 +319,14 @@ BEGIN
   SELECT count(*) INTO n FROM majordhome.lead_activities WHERE lead_id = v_gouin AND activity_type = 'chantier_grouped';
   IF n <> 1 THEN RAISE EXCEPTION 'B5 : activité chantier_grouped attendue'; END IF;
 
+  -- B5b. Plafond : une source forcée en « facture » ne rend PAS la cible facturée tant que tous ses devis validés ne le sont pas
+  v_res := public.chantier_detach(v_origin, ARRAY['aaaa0001-0000-0000-0000-000000000002'::uuid], NULL, false, NULL);
+  v_new := (v_res->>'new_chantier_id')::uuid;
+  UPDATE majordhome.chantiers SET chantier_status = 'facture' WHERE id = v_new;
+  PERFORM public.chantier_group(v_origin, ARRAY[v_new]);
+  SELECT chantier_status INTO v_status FROM majordhome.chantiers WHERE id = v_origin;
+  IF v_status IS DISTINCT FROM 'realise' THEN RAISE EXCEPTION 'B5b : groupe non intégralement facturé, statut plafonné à realise attendu, trouvé %', v_status; END IF;
+
   -- B6. Gain sans devis : ensure_for_lead crée puis renvoie le même id ; lead introuvable / supprimé refusés
   v_lead2 := public.chantier_ensure_for_lead('22222222-2222-2222-2222-222222222222');
   IF v_lead2 <> public.chantier_ensure_for_lead('22222222-2222-2222-2222-222222222222') THEN RAISE EXCEPTION 'B6 : ensure_for_lead non idempotent'; END IF;

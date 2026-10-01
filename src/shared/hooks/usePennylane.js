@@ -636,7 +636,7 @@ export function useEjectLeadCustomerQuotes() {
       queryClient.invalidateQueries({ queryKey: pennylaneKeys.quotesExplorer(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
-      queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
     },
   });
 
@@ -891,7 +891,7 @@ export function useAttachQuotesAndSend(orgId, leadId) {
       queryClient.invalidateQueries({ queryKey: pennylaneKeys.candidatesByLead(orgId, leadId) });
       queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes'] });
       queryClient.invalidateQueries({ queryKey: ['pennylane', orgId, 'unlinked-quotes-count'] });
-      queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
       // Client potentiellement créé → invalider listes clients
       queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
       // Vue kanban_cards recalculée (lead a basculé en Devis envoyé, ou MAJ count)
@@ -922,7 +922,7 @@ export function useMarkLeadWonWithQuote(orgId, leadId) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: pennylaneKeys.linkedQuotes(orgId) });
-      queryClient.invalidateQueries({ queryKey: ['chantiers'] });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
       // Vue kanban_cards recalculée (winning quote modifié → carte Gagné refresh)
       queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
     },

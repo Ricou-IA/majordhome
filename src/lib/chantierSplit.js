@@ -70,7 +70,9 @@ export function commandeSuitParDefaut(plannedOrder, joursSelectionnes) {
 
 /**
  * Aperçu d'un groupement : cible + sources réunies (mêmes règles que chantier_group).
- * @param {{linked_quotes_amount_ht?: number|string, quotes_count?: number|string, validated_quotes_count?: number|string, chantier_status?: string}} cible
+ * Statut = le plus avancé, SAUF « facture » qui exige que tout le groupe soit facturé
+ * (au moins un devis validé, et toute ligne qui en porte est `is_invoiced`) ; sinon plafond « realise ».
+ * @param {{linked_quotes_amount_ht?: number|string, quotes_count?: number|string, validated_quotes_count?: number|string, chantier_status?: string, is_invoiced?: boolean}} cible
  * @param {Array<typeof cible>} sources
  * @returns {{montant: number, devis: number, devisValides: number, statut: string}}
  */
@@ -79,9 +81,13 @@ export function resumeGroupement(cible, sources) {
   const montant = Math.round(tous.reduce((acc, c) => acc + (Number(c.linked_quotes_amount_ht) || 0), 0) * 100) / 100;
   const devis = tous.reduce((acc, c) => acc + (Number(c.quotes_count) || 0), 0);
   const devisValides = tous.reduce((acc, c) => acc + (Number(c.validated_quotes_count) || 0), 0);
-  const statut = tous.reduce(
+  let statut = tous.reduce(
     (best, c) => (STATUT_ORDRE.indexOf(c.chantier_status) > STATUT_ORDRE.indexOf(best) ? c.chantier_status : best),
     cible?.chantier_status || 'gagne',
   );
+  // Même plafond que chantier_group (revue finale 2026-10-01) : facture = tous les devis validés facturés.
+  const avecDevis = tous.filter((c) => (Number(c.validated_quotes_count) || 0) > 0);
+  const toutFacture = avecDevis.length > 0 && avecDevis.every((c) => c.is_invoiced === true);
+  if (statut === 'facture' && !toutFacture) statut = 'realise';
   return { montant, devis, devisValides, statut };
 }

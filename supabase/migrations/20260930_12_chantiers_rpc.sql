@@ -86,6 +86,8 @@ BEGIN
   END IF;
   IF COALESCE(v_lead.is_deleted, false) THEN RAISE EXCEPTION 'lead_deleted' USING ERRCODE = '22023'; END IF;
 
+  -- Deux appels concurrents (double clic, 2 onglets) ne doivent pas créer 2 chantiers pour le même lead.
+  PERFORM pg_advisory_xact_lock(hashtext(p_lead_id::text));
   SELECT id INTO v_id FROM majordhome.chantiers WHERE lead_id = p_lead_id ORDER BY created_at LIMIT 1;
   IF v_id IS NOT NULL THEN RETURN v_id; END IF;
 
@@ -139,6 +141,7 @@ DECLARE
   v_s    majordhome.chantiers%ROWTYPE;
   v_sid  uuid;
   v_sources uuid[];
+  v_validated bigint; v_invoiced bigint;
   n int; n_q int := 0; n_a int := 0; n_r int := 0;
 BEGIN
   IF v_user IS NULL THEN RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501'; END IF;
@@ -190,6 +193,16 @@ BEGIN
     DELETE FROM majordhome.chantiers WHERE id = v_sid;
   END LOOP;
 
+  -- facture = tous les devis validés du groupe facturés ; sinon plafond realise (revue finale 2026-10-01).
+  -- Les devis ont déjà été déplacés sur la cible : chantier_quote_stats reflète le groupe entier.
+  IF v_t.chantier_status = 'facture' THEN
+    SELECT validated_count, invoiced_count INTO v_validated, v_invoiced
+      FROM majordhome.chantier_quote_stats WHERE chantier_id = p_target_id;
+    IF COALESCE(v_validated, 0) = 0 OR COALESCE(v_invoiced, 0) < v_validated THEN
+      v_t.chantier_status := 'realise';
+    END IF;
+  END IF;
+
   UPDATE majordhome.chantiers SET
     label = v_t.label, planned_team_size = v_t.planned_team_size, planned_days = v_t.planned_days,
     estimated_date = v_t.estimated_date, equipment_type_id = v_t.equipment_type_id,
@@ -227,6 +240,7 @@ DECLARE
   v_user   uuid := auth.uid();
   v_c      majordhome.chantiers%ROWTYPE;
   v_appts  uuid[] := COALESCE(p_appointment_ids, '{}'::uuid[]);
+  v_quotes uuid[];
   v_new    uuid;
   v_label  text;
   v_won    date;
@@ -235,7 +249,12 @@ DECLARE
   n int; n_q int; n_a int; n_r int;
 BEGIN
   IF v_user IS NULL THEN RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501'; END IF;
-  IF p_chantier_id IS NULL OR p_quote_ids IS NULL OR cardinality(p_quote_ids) = 0 THEN
+  IF p_chantier_id IS NULL OR p_quote_ids IS NULL THEN
+    RAISE EXCEPTION 'invalid_selection' USING ERRCODE = '22023';
+  END IF;
+  -- Doublons dans la sélection : le compte de validation serait faux (invalid_quotes à tort).
+  SELECT array_agg(DISTINCT x) INTO v_quotes FROM unnest(p_quote_ids) AS x;
+  IF v_quotes IS NULL OR cardinality(v_quotes) = 0 THEN
     RAISE EXCEPTION 'invalid_selection' USING ERRCODE = '22023';
   END IF;
   SELECT * INTO v_c FROM majordhome.chantiers WHERE id = p_chantier_id FOR UPDATE;
@@ -246,30 +265,30 @@ BEGIN
 
   -- Validations
   SELECT count(*) INTO n FROM majordhome.lead_pennylane_quotes
-   WHERE id = ANY (p_quote_ids) AND chantier_id = p_chantier_id AND ejected_at IS NULL;
-  IF n <> cardinality(p_quote_ids) THEN RAISE EXCEPTION 'invalid_quotes' USING ERRCODE = '22023'; END IF;
+   WHERE id = ANY (v_quotes) AND chantier_id = p_chantier_id AND ejected_at IS NULL;
+  IF n <> cardinality(v_quotes) THEN RAISE EXCEPTION 'invalid_quotes' USING ERRCODE = '22023'; END IF;
   SELECT count(*) INTO n FROM majordhome.lead_pennylane_quotes
-   WHERE id = ANY (p_quote_ids) AND majordhome.quote_status_bucket(quote_status) = 'validated';
+   WHERE id = ANY (v_quotes) AND majordhome.quote_status_bucket(quote_status) = 'validated';
   IF n = 0 THEN RAISE EXCEPTION 'no_validated_quote_selected' USING ERRCODE = '22023'; END IF;
   SELECT count(*) INTO n FROM majordhome.lead_pennylane_quotes
-   WHERE chantier_id = p_chantier_id AND ejected_at IS NULL AND id <> ALL (p_quote_ids)
+   WHERE chantier_id = p_chantier_id AND ejected_at IS NULL AND id <> ALL (v_quotes)
      AND majordhome.quote_status_bucket(quote_status) = 'validated';
   IF n = 0 THEN RAISE EXCEPTION 'origin_would_be_empty' USING ERRCODE = '22023'; END IF;
   SELECT count(*) INTO n FROM majordhome.appointments
    WHERE id = ANY (v_appts) AND chantier_id = p_chantier_id AND appointment_type = 'installation'
-     AND status <> ALL (ARRAY['cancelled', 'no_show']);
+     AND COALESCE(status, '') <> ALL (ARRAY['cancelled', 'no_show']);
   IF n <> cardinality(v_appts) THEN RAISE EXCEPTION 'invalid_appointments' USING ERRCODE = '22023'; END IF;
 
   -- Libellé, date de gain, statut du nouveau chantier
   SELECT NULLIF(trim(pq.pdf_invoice_subject), ''), q.quote_date INTO v_label, v_won
     FROM majordhome.lead_pennylane_quotes q
     LEFT JOIN majordhome.pennylane_quotes pq ON pq.org_id = q.org_id AND pq.pennylane_quote_id = q.pennylane_quote_id
-   WHERE q.id = ANY (p_quote_ids) AND majordhome.quote_status_bucket(q.quote_status) = 'validated'
+   WHERE q.id = ANY (v_quotes) AND majordhome.quote_status_bucket(q.quote_status) = 'validated'
    ORDER BY q.pennylane_quote_id DESC LIMIT 1;
   v_label := COALESCE(NULLIF(trim(p_label), ''), v_label);
   SELECT bool_and(quote_status = 'invoiced') INTO v_all_invoiced
     FROM majordhome.lead_pennylane_quotes
-   WHERE id = ANY (p_quote_ids) AND majordhome.quote_status_bucket(quote_status) = 'validated';
+   WHERE id = ANY (v_quotes) AND majordhome.quote_status_bucket(quote_status) = 'validated';
   v_status := CASE WHEN v_all_invoiced THEN 'facture'
                    WHEN cardinality(v_appts) > 0 THEN 'planification'
                    ELSE 'gagne' END;
@@ -283,11 +302,11 @@ BEGIN
           CASE WHEN p_move_planned_order THEN v_c.planned_days END)
   RETURNING id INTO v_new;
 
-  UPDATE majordhome.lead_pennylane_quotes SET chantier_id = v_new WHERE id = ANY (p_quote_ids);
+  UPDATE majordhome.lead_pennylane_quotes SET chantier_id = v_new WHERE id = ANY (v_quotes);
   GET DIAGNOSTICS n_q = ROW_COUNT;
   UPDATE majordhome.chantier_line_receptions SET chantier_id = v_new
    WHERE chantier_id = p_chantier_id
-     AND pennylane_quote_id IN (SELECT pennylane_quote_id FROM majordhome.lead_pennylane_quotes WHERE id = ANY (p_quote_ids));
+     AND pennylane_quote_id IN (SELECT pennylane_quote_id FROM majordhome.lead_pennylane_quotes WHERE id = ANY (v_quotes));
   GET DIAGNOSTICS n_r = ROW_COUNT;
   UPDATE majordhome.appointments SET chantier_id = v_new WHERE id = ANY (v_appts);
   GET DIAGNOSTICS n_a = ROW_COUNT;
@@ -299,7 +318,7 @@ BEGIN
   VALUES (v_c.lead_id, v_user, 'chantier_detached',
           'Chantier détaché : ' || n_q || ' devis, ' || n_a || ' RDV vers « ' || COALESCE(v_label, 'nouveau chantier') || ' »',
           jsonb_build_object('origin_chantier_id', p_chantier_id, 'new_chantier_id', v_new,
-                             'quote_ids', to_jsonb(p_quote_ids), 'appointment_ids', to_jsonb(v_appts),
+                             'quote_ids', to_jsonb(v_quotes), 'appointment_ids', to_jsonb(v_appts),
                              'moved_planned_order', p_move_planned_order),
           v_c.org_id);
 
@@ -335,7 +354,7 @@ BEGIN
     RAISE EXCEPTION 'has_validated_quotes' USING ERRCODE = '22023';
   END IF;
   IF EXISTS (SELECT 1 FROM majordhome.appointments WHERE chantier_id = p_chantier_id
-              AND status <> ALL (ARRAY['cancelled', 'no_show'])) THEN
+              AND COALESCE(status, '') <> ALL (ARRAY['cancelled', 'no_show'])) THEN
     RAISE EXCEPTION 'has_appointments' USING ERRCODE = '22023';
   END IF;
   IF v_c.pv_reception_path IS NOT NULL THEN RAISE EXCEPTION 'has_pv' USING ERRCODE = '22023'; END IF;
