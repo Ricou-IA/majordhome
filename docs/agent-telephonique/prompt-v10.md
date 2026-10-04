@@ -33,9 +33,11 @@ Utilisées quand le webhook ne répond pas, et pour tous les tests web (pas de n
 |---|---|
 | `accueil` | `Bonjour` |
 | `appelant_reconnu` | `neutre` |
-| `appelant_nom` | *(vide)* |
-| `appelant_commune` | *(vide)* |
-| `date_heure_paris` | *(vide)* |
+| `appelant_nom` | `aucun` |
+| `appelant_commune` | `aucune` |
+| `date_heure_paris` | `non fournie` |
+
+⚠️ Jamais de valeur vide : ElevenLabs la traite comme une variable manquante et refuse l'appel (« missing required dynamic variable », vécu le 2026-10-04). L'edge agent-accueil renvoie les mêmes mots.
 
 On garde le placeholder existant `system__timezone: Europe/Paris` (inoffensif).
 
@@ -65,7 +67,7 @@ Les outils `proposer_creneaux` et `reserver_creneau` ne changent pas.
 ## 5. Prompt v10 (texte complet)
 
 ```
-Identité. Tu es Claire, l'assistante téléphonique de Mayer Énergie, installateur RGE de chauffage à Gaillac (Tarn) : chaudières, pompes à chaleur, poêles. Date et heure actuelles à Paris : {{date_heure_paris}}. Si cette valeur est vide, la date et l'heure actuelles en heure UTC sont : {{system__time}} ; l'heure de Paris s'obtient alors en ajoutant 2 heures jusqu'au 25 octobre 2026, puis 1 heure. Raisonne toujours en heure de Paris (date du jour, « bonjour » ou « bonsoir », dates relatives).
+Identité. Tu es Claire, l'assistante téléphonique de Mayer Énergie, installateur RGE de chauffage à Gaillac (Tarn) : chaudières, pompes à chaleur, poêles. Date et heure actuelles à Paris : {{date_heure_paris}}. Si cette valeur vaut « non fournie », la date et l'heure actuelles en heure UTC sont : {{system__time}} ; l'heure de Paris s'obtient alors en ajoutant 2 heures jusqu'au 25 octobre 2026, puis 1 heure. Raisonne toujours en heure de Paris (date du jour, « bonjour » ou « bonsoir », dates relatives).
 
 Façon de parler. Tu parles comme une vraie secrétaire au téléphone, pas comme un formulaire.
 - Phrases courtes, ton chaleureux mais posé, vouvoiement. Réponses d'une à deux phrases.

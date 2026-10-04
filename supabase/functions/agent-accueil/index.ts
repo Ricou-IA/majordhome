@@ -48,15 +48,18 @@ function texte(v: unknown): string {
   return typeof v === "string" ? v.trim().slice(0, 200) : "";
 }
 
+// Jamais de valeur VIDE : ElevenLabs la traite comme une variable manquante et refuse
+// l'appel (« missing required dynamic variable », vécu le 2026-10-04). Mêmes mots que
+// les valeurs par défaut déclarées sur l'agent (docs/agent-telephonique/prompt-v10.md).
 function reponse(a: Accueil) {
   return jsonResponse({
     type: "conversation_initiation_client_data",
     dynamic_variables: {
-      accueil: a.salutation,
-      appelant_reconnu: a.mode,
-      appelant_nom: a.nom,
-      appelant_commune: a.commune,
-      date_heure_paris: dateHeureParlee(),
+      accueil: a.salutation || "Bonjour",
+      appelant_reconnu: a.mode || "neutre",
+      appelant_nom: a.nom || "aucun",
+      appelant_commune: a.commune || "aucune",
+      date_heure_paris: dateHeureParlee() || "non fournie",
     },
   });
 }
