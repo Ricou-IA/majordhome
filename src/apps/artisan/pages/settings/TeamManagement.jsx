@@ -40,6 +40,8 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
 import { SkillsPanel } from './team/SkillsPanel';
+import { AvailabilityPanel } from './team/AvailabilityPanel';
+import { resumeHoraires } from '@/lib/workingHours';
 import { useTeamSkills } from '@hooks/useTeamSkills';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 
@@ -371,6 +373,7 @@ function MemberRow({
   onDailyBudgetChange,
   onIncludeInRoutingChange,
   onOpenSkills,
+  onOpenAvailability,
   skillsSummary,
   isRoutingSaving,
 }) {
@@ -494,6 +497,24 @@ function MemberRow({
         )}
       </td>
 
+      {/* Horaires de travail (default_availability) — bornent tournées, agent téléphonique, planning */}
+      <td className="py-4 px-4">
+        {!teamMember ? (
+          <span className="text-xs text-secondary-400">—</span>
+        ) : (
+          <div className="flex flex-col items-start gap-1">
+            <button
+              type="button"
+              onClick={() => onOpenAvailability(teamMember)}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-secondary-300 text-secondary-700 hover:border-primary-400 hover:text-primary-700"
+            >
+              Horaires
+            </button>
+            <span className="text-xs text-secondary-500">{resumeHoraires(teamMember.default_availability)}</span>
+          </div>
+        )}
+      </td>
+
       {/* Compétences (types d'équipement × rôle, cochées comme des droits) — filtre dur des tournées */}
       <td className="py-4 px-4">
         {!teamMember || teamMember.role !== 'technician' ? (
@@ -555,6 +576,7 @@ export default function TeamManagement() {
   const { skillsByMember } = useTeamSkills(orgId, technicianIds);
   const { equipmentTypes: activeTypes } = useEquipmentReferential();
   const [skillsFor, setSkillsFor] = useState(null);
+  const [availabilityFor, setAvailabilityFor] = useState(null);
   const tmByUser = useMemo(() => {
     const map = new Map();
     (teamMembers || []).forEach((t) => { if (t.user_id) map.set(t.user_id, t); });
@@ -807,6 +829,10 @@ export default function TeamManagement() {
                   <span className="block text-xs font-normal text-secondary-400">Qui pose ses rendez-vous</span>
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
+                  Horaires
+                  <span className="block text-xs font-normal text-secondary-400">Jours et heures travaillés</span>
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Compétences
                   <span className="block text-xs font-normal text-secondary-400">Types d&apos;équipement, par rôle — coché = compétent</span>
                 </th>
@@ -830,6 +856,7 @@ export default function TeamManagement() {
                     onDailyBudgetChange={handleDailyBudgetChange}
                     onIncludeInRoutingChange={handleIncludeInRoutingChange}
                     onOpenSkills={setSkillsFor}
+                    onOpenAvailability={setAvailabilityFor}
                     skillsSummary={tm && tm.role === 'technician' && skillsByMember.has(tm.id)
                       ? {
                         entretien: skillsByMember.get(tm.id).entretien.size,
@@ -895,6 +922,15 @@ export default function TeamManagement() {
         onConfirm={handleRoleChangeConfirm}
         loading={updatingUserId === roleChangeConfirm?.member?.user_id}
       />
+
+      {/* Horaires de travail d'un membre */}
+      {availabilityFor && (
+        <AvailabilityPanel
+          teamMember={availabilityFor}
+          canEdit={isOrgAdmin}
+          onClose={() => setAvailabilityFor(null)}
+        />
+      )}
 
       {/* Grille de compétences (types × rôles) d'un technicien */}
       {skillsFor && (
