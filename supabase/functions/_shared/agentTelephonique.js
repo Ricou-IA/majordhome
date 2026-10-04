@@ -328,6 +328,26 @@ export function accueilDepuisCandidats(candidats) {
 }
 
 /**
+ * Premier message personnalisé d'un appel Twilio : le message d'accueil de l'org
+ * (`settings.telephonie.message_accueil`, saisi dans Settings → Communication → Agent
+ * téléphonique, identique au premier message de l'agent ElevenLabs) dont le « Bonjour »
+ * initial est remplacé par la salutation (« Bonjour Jean Dupont »). Le webhook d'accueil
+ * le renvoie en surcharge du premier message (v10.2 : plus aucune variable dynamique
+ * personnalisée — sans webhook, un appel exigeait des variables que personne ne fournit).
+ * `null` = ne rien surcharger : salutation neutre, ou message absent / ne commençant pas
+ * par « Bonjour » (on ne bricole jamais un accueil).
+ * @param {string|null|undefined} modele
+ * @param {string|null|undefined} salutation  `accueilDepuisCandidats(...).salutation`
+ * @returns {string|null}
+ */
+export function messageAccueilPersonnalise(modele, salutation) {
+  const m = String(modele || '').trim();
+  const s = String(salutation || '').trim();
+  if (!/^Bonjour(?![\p{L}])/u.test(m) || !s || s === 'Bonjour') return null;
+  return s + m.slice('Bonjour'.length);
+}
+
+/**
  * Date et heure de Paris en toutes lettres, pour le prompt (le réglage `system__timezone`
  * d'ElevenLabs est ignoré : `system__time` reste en UTC).
  * @param {Date} [maintenant]

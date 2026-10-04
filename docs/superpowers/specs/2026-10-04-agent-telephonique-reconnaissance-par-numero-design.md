@@ -6,6 +6,15 @@
 > recherche par numéro, trouve la fiche, “à Gaillac, c'est bien ça ?”, “vous pouvez me
 > confirmer votre adresse ?” — c'est plus fluide ».
 
+> **Mise à jour 2026-10-04 (v10.2, en ligne)** : le mécanisme décrit au § 5 par variables
+> dynamiques (`accueil`, `appelant_*`, `date_heure_paris`) est **abandonné** — ElevenLabs refuse
+> tout appel dont une variable n'est pas fournie (« missing required dynamic variable »), et ses
+> valeurs par défaut ne servent qu'aux tests du tableau de bord. L'edge `agent-accueil` renvoie
+> désormais une **surcharge du premier message** (message d'accueil saisi dans Settings →
+> Communication → Agent téléphonique, « Bonjour » remplacé par la salutation) ; le prompt déduit
+> l'accueil de ce premier message. Abandonnés : le cas « dossier à Gaillac » (accueil neutre) et
+> l'heure de Paris fournie par le serveur. Référence à jour : `docs/agent-telephonique/prompt-v10.md`.
+
 ## 1. Le problème
 
 Aujourd'hui (prompt v9), Claire demande dans l'ordre : nom (épelé), commune, adresse, numéro

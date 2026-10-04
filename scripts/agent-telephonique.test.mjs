@@ -124,6 +124,22 @@ test('nomParle : casse lisible pour la voix', () => {
   assert.equal(nomParle('  jean  '), 'Jean');
 });
 
+test('messageAccueilPersonnalise : « Bonjour » du message d\'accueil remplacé par la salutation', async () => {
+  const { messageAccueilPersonnalise } = await import('../src/lib/agentTelephonique.js');
+  const modele = "Bonjour, Mayer Énergie, je suis Claire, l'assistante virtuelle. Quel est l'objet de votre appel ?";
+  assert.equal(messageAccueilPersonnalise(modele, 'Bonjour Jean Dupont'),
+    "Bonjour Jean Dupont, Mayer Énergie, je suis Claire, l'assistante virtuelle. Quel est l'objet de votre appel ?");
+  assert.equal(messageAccueilPersonnalise(modele, 'Bonjour Madame, Monsieur Dupont').startsWith('Bonjour Madame, Monsieur Dupont, Mayer'), true);
+  // Rien à personnaliser → null (on garde le premier message de l'agent)
+  assert.equal(messageAccueilPersonnalise(modele, 'Bonjour'), null);
+  assert.equal(messageAccueilPersonnalise(modele, ''), null);
+  // Message absent ou ne commençant pas par « Bonjour » → null, jamais un accueil bricolé
+  assert.equal(messageAccueilPersonnalise('', 'Bonjour Jean Dupont'), null);
+  assert.equal(messageAccueilPersonnalise(null, 'Bonjour Jean Dupont'), null);
+  assert.equal(messageAccueilPersonnalise('Mayer Énergie, bonjour !', 'Bonjour Jean Dupont'), null);
+  assert.equal(messageAccueilPersonnalise('Bonjours à tous', 'Bonjour Jean Dupont'), null);
+});
+
 test('accueil : une seule fiche avec un prénom → « Bonjour Prénom Nom »', () => {
   const a = accueilDepuisCandidats([fiche('DUPONT', 'JEAN')]);
   assert.deepEqual([a.mode, a.salutation, a.nom, a.commune], ['nom', 'Bonjour Jean Dupont', 'Dupont', 'Gaillac']);
