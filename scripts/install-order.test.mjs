@@ -100,6 +100,22 @@ test('bascule : la personne posée sur une demi-journée est retirée par un cli
   assert.equal(out.length, 0);
 });
 
+// Congés (Eric 2026-10-04) : un congé par personne, chacun sur SES horaires — regrouper
+// sous l'horaire du premier cliqué laissait libre la fin de journée des autres
+// (Mathis 8 h – 12 h cliqué d'abord un lundi férié ⇒ les techniciens libres l'après-midi).
+test('bascule sans regrouper : chaque personne garde son propre brouillon et ses horaires', () => {
+  const mathis = { id: 'm', date: '2026-09-23', startTime: '08:00', endTime: '12:00', duration: 240, technicianIds: ['mathis'] };
+  const out = basculerJournee([mathis], journeeLudovic, { regrouper: false });
+  assert.equal(out.length, 2);
+  assert.deepEqual(out.map((s) => [s.technicianIds.join(), s.endTime]), [['mathis', '12:00'], ['ludovic', '17:00']]);
+});
+
+test('bascule sans regrouper : re-cliquer retire seulement la personne', () => {
+  const mathis = { id: 'm', date: '2026-09-23', startTime: '08:00', endTime: '12:00', technicianIds: ['mathis'] };
+  const out = basculerJournee([mathis, journeeLudovic], { ...journeeLudovic, id: 'n' }, { regrouper: false });
+  assert.deepEqual(out.map((s) => s.id), ['m']);
+});
+
 test('bascule : sans personne → inchangé', () => {
   const out = basculerJournee([jourA], { ...journeeLudovic, technicianIds: [] });
   assert.deepEqual(out, [jourA]);

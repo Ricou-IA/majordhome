@@ -1284,6 +1284,9 @@ export function EventModal({
                   // sur la personne = sa journée (une partie de journée reste possible au glisser).
                   multi={!rescheduleMode && (formData.appointment_type === 'installation' || isLeave)}
                   fullDayClick={isLeave}
+                  // Congés : un RDV par personne, chacun sur SES horaires (jamais l'horaire
+                  // du premier cliqué pour tous : la fin de journée des autres restait libre).
+                  regrouperJournees={!isLeave}
                 />
               )}
 

@@ -81,6 +81,9 @@ function newId() {
  * @param {boolean} [props.fullDayClick] - journée entière : un clic sur une personne (en-tête
  *   ou colonne) la pose / la retire sur sa journée de travail (`basculerJournee`) ; le
  *   glisser reste possible pour une partie de journée (installation, congés).
+ * @param {boolean} [props.regrouperJournees] - (fullDayClick) true = les personnes cliquées
+ *   le même jour forment UN RDV à l'horaire du premier (installation) ; false = un RDV par
+ *   personne, chacun sur ses horaires (congés).
  */
 export function SchedulingAssistant({
   lead,
@@ -107,6 +110,7 @@ export function SchedulingAssistant({
   expectedTeamSize = null,
   expectedDays = null,
   fullDayClick = false,
+  regrouperJournees = true,
 }) {
   const subjectPrefix = defaultSubjectPrefix || appointmentTypeLabel;
 
@@ -195,8 +199,8 @@ export function SchedulingAssistant({
   // --- Journée entière d'une personne (clic sur son prénom / sa colonne) : pose ou retire ---
   const handleToggleDay = useCallback(({ memberId, date, startTime, endTime, duration }) => {
     const slot = { id: newId(), date, startTime, endTime, duration, technicianIds: [memberId] };
-    setDraftSlots((prev) => (multi ? basculerJournee(prev, slot) : [slot]));
-  }, [multi]);
+    setDraftSlots((prev) => (multi ? basculerJournee(prev, slot, { regrouper: regrouperJournees }) : [slot]));
+  }, [multi, regrouperJournees]);
 
   const handleAssignPrompt = useCallback((ids) => {
     const slotId = assignPromptSlot?.id;
