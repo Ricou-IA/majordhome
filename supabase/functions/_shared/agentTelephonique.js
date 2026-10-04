@@ -157,6 +157,44 @@ export function correspondAdresse(dit, fiche) {
   return levenshtein(va, vb) <= Math.floor(Math.max(va.length, vb.length) * 0.2);
 }
 
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+/**
+ * Date telle qu'on la dit au téléphone : « jeudi 15 octobre » (« 1er » le premier du mois).
+ * @param {string} isoDate  `YYYY-MM-DD`
+ * @returns {string}
+ */
+export function jourParle(isoDate) {
+  const [y, m, d] = String(isoDate || '').split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const jour = JOURS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${jour} ${d === 1 ? '1er' : d} ${MOIS[m - 1]}`;
+}
+
+/** « 8 h », « 13 h 30 » depuis des minutes depuis minuit. */
+function heureParlee(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
+}
+
+/**
+ * Créneau tel qu'on le dit au téléphone : la demi-journée et ses bornes — jamais
+ * l'heure calculée (le client choisit une demi-journée, l'heure reste provisoire).
+ * @param {{ date: string, demi: string }} creneau
+ * @param {Array<{ code: string, debut: number, fin: number }>} demis  `demiJournees(reglages)`
+ * @returns {{ jour: string, demi: string, plage: string }}
+ */
+export function creneauParle(creneau, demis) {
+  const d = (demis || []).find((x) => x.code === creneau.demi);
+  return {
+    jour: jourParle(creneau.date),
+    demi: creneau.demi === 'matin' ? 'le matin' : "l'après-midi",
+    plage: d ? `entre ${heureParlee(d.debut)} et ${heureParlee(d.fin)}` : '',
+  };
+}
+
 /**
  * @typedef {{ nom: string, commune: string, adresse: string, telephone: string }} EntreeAppelant
  * @typedef {{ client_id: string, last_name: string, address: string, city: string }} Candidat

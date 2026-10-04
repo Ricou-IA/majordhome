@@ -73,3 +73,15 @@ test('verdict : fiche en double → jamais de choix au hasard', () => {
   assert.equal(r.verifie, false);
   assert.equal(r.motif, 'doublon');
 });
+
+test('créneau parlé : jour, demi-journée et plage, jamais l’heure calculée', async () => {
+  const { jourParle, creneauParle } = await import('../src/lib/agentTelephonique.js');
+  assert.equal(jourParle('2026-10-15'), 'jeudi 15 octobre');
+  assert.equal(jourParle('2026-11-01'), 'dimanche 1er novembre');
+  assert.equal(jourParle(''), '');
+  const demis = [{ code: 'matin', debut: 480, fin: 720 }, { code: 'apres_midi', debut: 810, fin: 1080 }];
+  assert.deepEqual(creneauParle({ date: '2026-10-16', demi: 'matin' }, demis),
+    { jour: 'vendredi 16 octobre', demi: 'le matin', plage: 'entre 8 h et 12 h' });
+  assert.deepEqual(creneauParle({ date: '2026-10-16', demi: 'apres_midi' }, demis),
+    { jour: 'vendredi 16 octobre', demi: "l'après-midi", plage: 'entre 13 h 30 et 18 h' });
+});

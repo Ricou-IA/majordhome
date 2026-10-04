@@ -28,6 +28,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { requireSharedSecret, jsonResponse, getAdminClient, sanitizeError } from "../_shared/auth.ts";
 import { normaliserTelephone, verifierCandidats } from "../_shared/agentTelephonique.js";
+import { resoudreOrgAgent } from "../_shared/agentOrg.ts";
 
 const MDH_VOICE_AGENT_SECRET = Deno.env.get("MDH_VOICE_AGENT_SECRET") || "";
 const MAX_TENTATIVES = 3;
@@ -74,18 +75,13 @@ Deno.serve(async (req: Request) => {
   const supabase = getAdminClient();
 
   try {
-    // Org résolue depuis l'agent : un agent inconnu (ou relié à plusieurs orgs) est refusé.
-    const { data: orgs, error: orgError } = await supabase
-      .schema("core")
-      .from("organizations")
-      .select("id")
-      .filter("settings->telephonie->>elevenlabs_agent_id", "eq", agentId);
-    if (orgError) throw orgError;
-    if (!orgs || orgs.length !== 1) {
-      console.error(`agent-verifier-client: agent_id ${agentId} relié à ${orgs?.length ?? 0} org(s)`);
+    // Org résolue depuis l'agent (_shared/agentOrg.ts) : un agent inconnu ou ambigu est refusé.
+    const org = await resoudreOrgAgent(supabase, agentId);
+    if ("erreur" in org) {
+      console.error(`agent-verifier-client: agent_id ${agentId} relié à ${org.nb} org(s)`);
       return jsonResponse({ error: "agent_inconnu" }, 403);
     }
-    const orgId = orgs[0].id as string;
+    const orgId = org.orgId;
 
     const journaliser = async (verifie: boolean, clientId: string | null, nb: number, motif: string | null) => {
       const { error } = await supabase.rpc("agent_verification_enregistrer", {

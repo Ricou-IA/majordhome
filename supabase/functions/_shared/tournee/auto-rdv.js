@@ -53,6 +53,51 @@ export function bornesMois(aujourdhui, { delaiMinJours = 2, prolongerSiResteMoin
 }
 
 /**
+ * Bornes d'une offre FAITE PAR TÉLÉPHONE (agent, spec 2026-10-04 « agent téléphonique —
+ * créneaux ») : de `aujourdhui + delaiMinJours` à `aujourdhui + horizonJours` (horizon
+ * d'ouverture des tournées, 45 j). Plus large que `bornesMois` : au téléphone, le client
+ * peut demander une date ; la page client, elle, reste au mois en cours.
+ *
+ * @param {string} aujourdhui  `YYYY-MM-DD` (Europe/Paris côté appelant)
+ * @param {{ delaiMinJours?: number, horizonJours?: number }} [opts]
+ * @returns {{ debut: string, fin: string }}
+ */
+export function bornesHorizon(aujourdhui, { delaiMinJours = 2, horizonJours = 45 } = {}) {
+  const [y, m, d] = aujourdhui.split('-').map(Number);
+  return {
+    debut: iso(new Date(Date.UTC(y, m - 1, d + Math.max(0, delaiMinJours)))),
+    fin: iso(new Date(Date.UTC(y, m - 1, d + Math.max(0, horizonJours)))),
+  };
+}
+
+/**
+ * Journées proposables pour UNE date demandée par le client (agent téléphonique) :
+ * à la différence de `journeesProposables`, une journée SANS secteur est acceptée —
+ * c'est « ouvrir un créneau » (décision Eric 2026-10-04) ; elle prend le secteur du
+ * contrat (`secteurContrat`, peut être null). Les journées figées restent exclues, et
+ * seules les journées présentes dans `journees` existent (technicien qui travaille ce
+ * jour-là, éligible au contrat — filtrés en amont).
+ *
+ * @param {{ journees: Array<object>, etiquettes: Array<{ date: string, team_member_id: string, grand_secteur?: string|null, figee_at?: string|null }>, date: string, bornes: { debut: string, fin: string }, secteurContrat?: string|null }} p
+ * @returns {{ proposables: Array<{ journee: object, secteur: string|null, figee: false }>, raison: null|'date_hors_horizon'|'aucune_journee' }}
+ */
+export function journeesPourDate({ journees, etiquettes, date, bornes, secteurContrat = null }) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) || date < bornes.debut || date > bornes.fin) {
+    return { proposables: [], raison: 'date_hors_horizon' };
+  }
+  const parCle = new Map((etiquettes || []).map((e) => [`${e.date}|${e.team_member_id}`, e]));
+  const proposables = [];
+  for (const j of journees || []) {
+    if (j.date !== date) continue;
+    const e = parCle.get(`${j.date}|${j.technicienId}`);
+    if (e?.figee_at) continue;
+    const secteur = (e?.grand_secteur && String(e.grand_secteur).trim()) || deduireSecteur(j.rdvs) || secteurContrat || null;
+    proposables.push({ journee: j, secteur, figee: false });
+  }
+  return { proposables, raison: proposables.length ? null : 'aucune_journee' };
+}
+
+/**
  * Les deux demi-journées de l'org, en minutes depuis minuit.
  * @param {{ demi_journee?: { matin?: [number, number], apres_midi?: [number, number] } }} reglages
  * @returns {Array<{ code: 'matin'|'apres_midi', debut: number, fin: number }>}
@@ -222,8 +267,8 @@ function hhmm(minutes) {
  * tronqués à `maxCreneaux`. Chaque créneau porte l'empreinte de la journée et les
  * décalages de voisins que la pose devra écrire.
  *
- * @param {{ contrat: { id: string, dureeMinutes: number, lat: number|null, lng: number|null }, proposables: Array<{ journee: object, secteur: string }>, depot: { lat: number, lng: number }, reglages: object, trajet: Function, secteurContrat?: string|null, maxCreneaux?: number }} p
- * @returns {{ creneaux: Array<{ id: string, date: string, demi: string, technicienId: string, technicienNom: string, secteur: string, propre: boolean, debutMinutes: number, finMinutes: number, debut: string, fin: string, coutMinutes: number, empreinte: string, decalages: Array<object> }>, refus: Record<string, number> }}
+ * @param {{ contrat: { id: string, dureeMinutes: number, lat: number|null, lng: number|null }, proposables: Array<{ journee: object, secteur: string|null }>, depot: { lat: number, lng: number }, reglages: object, trajet: Function, secteurContrat?: string|null, maxCreneaux?: number }} p
+ * @returns {{ creneaux: Array<{ id: string, date: string, demi: string, technicienId: string, technicienNom: string, secteur: string|null, propre: boolean, debutMinutes: number, finMinutes: number, debut: string, fin: string, coutMinutes: number, empreinte: string, decalages: Array<object> }>, refus: Record<string, number> }}
  */
 export function creneauxPourContrat({ contrat, proposables, depot, reglages, trajet, secteurContrat = null, maxCreneaux = 6 }) {
   const demis = demiJournees(reglages);

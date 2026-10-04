@@ -85,6 +85,10 @@ verify_jwt = false
 [functions.agent-verifier-client]
 verify_jwt = false
 
+# Agent téléphonique — outils proposer_creneaux / reserver_creneau (même secret partagé).
+[functions.agent-creneaux]
+verify_jwt = false
+
 # Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
 [functions.pvgis-proxy]
 verify_jwt = true

@@ -145,3 +145,37 @@ test('creneauxPourContrat : secteur propre d’abord (sans tenir compte de la ca
   assert.equal(typeof refus, 'object');
   assert.equal(creneaux[0].debut.length, 5); // 'HH:MM'
 });
+
+test('bornesHorizon : délai minimal → horizon d’ouverture (agent téléphonique)', async () => {
+  const { bornesHorizon } = await import('../../src/lib/tournee/auto-rdv.js');
+  assert.deepEqual(bornesHorizon('2026-10-04', { delaiMinJours: 2, horizonJours: 45 }), { debut: '2026-10-06', fin: '2026-11-18' });
+  assert.deepEqual(bornesHorizon('2026-12-20'), { debut: '2026-12-22', fin: '2027-02-03' });
+});
+
+test('journeesPourDate : date demandée — journée vide acceptée (ouvrir un créneau), figée exclue, hors horizon refusé', async () => {
+  const { journeesPourDate } = await import('../../src/lib/tournee/auto-rdv.js');
+  const bornes = { debut: '2026-10-06', fin: '2026-11-18' };
+  const vide = journee('2026-10-20');
+  const vide2 = journee('2026-10-20', [], { technicienId: 't2' });
+  const amorcee = journee('2026-10-20', [rdv('r1', '08:00', 'Gaillac')], { technicienId: 't3' });
+  const autreJour = journee('2026-10-21');
+  const etiquettes = [{ date: '2026-10-20', team_member_id: 't2', grand_secteur: null, figee_at: '2026-10-19T10:00:00Z' }];
+  const r = journeesPourDate({ journees: [vide, vide2, amorcee, autreJour], etiquettes, date: '2026-10-20', bornes, secteurContrat: 'Albi' });
+  assert.equal(r.raison, null);
+  assert.deepEqual(r.proposables.map((p) => [p.journee.technicienId, p.secteur]), [['t1', 'Albi'], ['t3', 'Gaillac']]);
+  // sans secteur connu du contrat, la journée vide reste proposée, secteur null
+  assert.equal(journeesPourDate({ journees: [vide], etiquettes: [], date: '2026-10-20', bornes }).proposables[0].secteur, null);
+  assert.equal(journeesPourDate({ journees: [vide], etiquettes: [], date: '2026-11-30', bornes }).raison, 'date_hors_horizon');
+  assert.equal(journeesPourDate({ journees: [vide], etiquettes: [], date: '2026-10-05', bornes }).raison, 'date_hors_horizon');
+  assert.equal(journeesPourDate({ journees: [vide], etiquettes: [], date: 'demain', bornes }).raison, 'date_hors_horizon');
+  assert.equal(journeesPourDate({ journees: [autreJour], etiquettes: [], date: '2026-10-20', bornes }).raison, 'aucune_journee');
+});
+
+test('creneauxPourContrat accepte une journée ouverte sans secteur (propre = false)', async () => {
+  const r = creneauxPourContrat({
+    contrat, proposables: [{ journee: journee('2026-10-20'), secteur: null }], depot, reglages, trajet: trajet10, secteurContrat: 'Albi',
+  });
+  assert.ok(r.creneaux.length >= 1, JSON.stringify(r.refus));
+  assert.equal(r.creneaux[0].propre, false);
+  assert.equal(r.creneaux[0].secteur, null);
+});

@@ -63,6 +63,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'app_role_permissions', columns: null },
   { schema: 'majordhome', table: 'role_permissions', columns: null },
   { schema: 'majordhome', table: 'tasks', columns: null, data: false },
+  { schema: 'majordhome', table: 'journees_secteur', columns: null, data: false }, // 20261004_3 : auto_rdv_poser (journée figée, étiquette déduite)
 ];
 
 const FUNCTIONS = [
