@@ -104,6 +104,7 @@ export const appointmentKeys = {
   chantier: (orgId, chantierId) => [...appointmentKeys.all(orgId), 'chantier', chantierId],
   // Appros des chantiers des RDV d'installation affichés (pose provisoire hachurée)
   chantierOrders: (orgId, chantierIds) => [...appointmentKeys.all(orgId), 'chantier-orders', chantierIds],
+  quotedLeads: (orgId, leadIds) => [...appointmentKeys.all(orgId), 'quoted-leads', leadIds],
   audit: (orgId, id) => [...appointmentKeys.all(orgId), 'audit', id],
 };
 

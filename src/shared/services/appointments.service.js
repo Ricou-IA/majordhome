@@ -943,7 +943,7 @@ export const appointmentsService = {
    * @param {string} [opts.idSuffix] rend l'event unique quand un RDV est découpé en
    *   plusieurs blocs (1 par technicien). L'id réel du RDV reste dans extendedProps.id.
    */
-  toCalendarEvent(appointment, { color, idSuffix, adaptable = false, provisoire = false } = {}) {
+  toCalendarEvent(appointment, { color, idSuffix, adaptable = false, provisoire = false, devisFait = false } = {}) {
     const typeConfig = getAppointmentTypeConfig(appointment.appointment_type);
 
     // Construire les datetimes ISO
@@ -967,16 +967,19 @@ export const appointmentsService = {
       // la bande de tolérance est un événement de fond séparé (useAppointments).
       // Congés : hachuré (couleur de la personne conservée, ce n'est pas du travail).
       // Pose provisoire (appros du chantier non reçues) : hachuré aussi, autre angle.
+      // Visite technique dont le devis Pennylane est rattaché au lead : encadré noir.
       classNames: [
         ...(adaptable ? ['mdh-flex'] : []),
         ...(appointment.appointment_type === 'leave' ? ['mdh-leave'] : []),
         ...(provisoire ? ['mdh-provisional'] : []),
+        ...(devisFait ? ['mdh-quoted'] : []),
       ],
       extendedProps: {
         ...appointment,
         typeConfig,
         adaptable,
         provisoire,
+        devisFait,
       },
     };
   },

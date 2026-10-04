@@ -249,6 +249,12 @@
   border-style: dashed !important;
 }
 
+/* Visite technique dont le devis Pennylane est rattaché au lead (demande Philippe) :
+   encadré noir en bordure intérieure — distinct du contour extérieur de la recherche. */
+.fc .mdh-quoted {
+  border: 3px solid #111827 !important;
+}
+
 /* Recherche client du planning : RDV du client surlignés */
 .fc .mdh-search-hit {
   outline: 3px solid #111827;

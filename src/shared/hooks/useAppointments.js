@@ -127,6 +127,31 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     staleTime: 15_000,
   });
 
+  // Leads des visites techniques ayant un devis Pennylane rattaché (2ᵉ requête mergée en
+  // mémoire, même pattern) : le bloc VT est encadré de noir dès que le devis est fait.
+  const vtLeadIds = useMemo(
+    () => Array.from(new Set((appointments || [])
+      .filter((a) => a.appointment_type === 'rdv_technical' && a.lead_id)
+      .map((a) => a.lead_id))).sort(),
+    [appointments]
+  );
+  const { data: quotedLeadIds } = useQuery({
+    queryKey: appointmentKeys.quotedLeads(orgId, vtLeadIds),
+    queryFn: async () => {
+      if (vtLeadIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('majordhome_lead_pennylane_quotes')
+        .select('lead_id')
+        .eq('org_id', orgId)
+        .is('ejected_at', null)
+        .in('lead_id', vtLeadIds);
+      if (error) throw error;
+      return Array.from(new Set((data || []).map((r) => r.lead_id)));
+    },
+    enabled: !!orgId && vtLeadIds.length > 0,
+    staleTime: 15_000,
+  });
+
   // Membres + commerciaux (caches partagés avec Planning) → maps couleur + teamList unifié.
   const { members } = useTeamMembers(orgId);
   const { commercials } = useLeadCommercials(orgId);
@@ -164,6 +189,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
     const aujourdhui = new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD, fuseau local
     const chantierById = new Map((chantierOrders || []).map((c) => [c.id, c]));
+    const quotedLeadSet = new Set(quotedLeadIds || []);
     return enriched
       .filter((a) => matchesKindFilter(a, filters.kinds) && matchesMemberFilter(a, selectedRecordIds))
       .flatMap((a) => {
@@ -171,8 +197,9 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         // Chantier non encore chargé ⇒ pas provisoire (le bloc se hachure à l'arrivée des appros).
         const provisoire = a.appointment_type === 'installation'
           && poseProvisoire(chantierById.get(a.chantier_id));
+        const devisFait = a.appointment_type === 'rdv_technical' && quotedLeadSet.has(a.lead_id);
         const blocs = expandAppointmentBlocks(a, colorMaps, selectedRecordIds).map((b) =>
-          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable, provisoire })
+          appointmentsService.toCalendarEvent(a, { color: b.color, idSuffix: b.idSuffix, adaptable, provisoire, devisFait })
         );
         if (!filters.showTolerance || !adaptable || !a.scheduled_start) return blocs;
         // Bande de tolérance : « on voit toujours des blocs » — le RDV reste à son
@@ -191,7 +218,7 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
         });
         return blocs;
       });
-  }, [appointments, techLinks, chantierOrders, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
+  }, [appointments, techLinks, chantierOrders, quotedLeadIds, filters.kinds, filters.showTolerance, selectedRecordIds, colorMaps, reglages]);
 
   // Mutation : créer un RDV
   const createMutation = useMutation({
