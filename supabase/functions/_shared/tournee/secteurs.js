@@ -28,6 +28,27 @@ export function normaliserSecteur(s) {
 }
 
 /**
+ * Secteur le plus fréquent d'une liste (noms normalisés, vides ignorés ; égalité →
+ * ordre alphabétique, pour un résultat stable). Sert à donner un secteur à un client
+ * qui n'a jamais eu de RDV : majorité des RDV déjà posés dans son code postal.
+ * @param {Array<string|null|undefined>|null|undefined} valeurs
+ * @returns {string|null}
+ */
+export function secteurMajoritaire(valeurs) {
+  const compte = new Map();
+  for (const v of valeurs || []) {
+    const s = normaliserSecteur(v);
+    if (s) compte.set(s, (compte.get(s) || 0) + 1);
+  }
+  let meilleur = null;
+  for (const [s, n] of compte) {
+    const m = meilleur ? compte.get(meilleur) : 0;
+    if (n > m || (n === m && s < meilleur)) meilleur = s;
+  }
+  return meilleur;
+}
+
+/**
  * Partition des contrats en grands secteurs et maps de résolution.
  *
  * @param {Array<{ id?: string, client_id: string, client_postal_code?: string|null, client_city?: string|null,

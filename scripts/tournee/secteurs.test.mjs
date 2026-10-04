@@ -53,3 +53,13 @@ test('chargerPopulations : fetch injecté, dédoublonnage des CP, erreur réseau
   assert.equal(pops.get('albi'), 51000, 'population max retenue');
   assert.equal(pops.size, 1);
 });
+
+import { secteurMajoritaire } from '../../src/lib/tournee/secteurs.js';
+
+test('secteurMajoritaire : le plus fréquent, casse confondue, égalité → ordre alphabétique', () => {
+  assert.equal(secteurMajoritaire(['ALBI', 'Albi', 'Lavaur', 'albi ']), 'Albi');
+  assert.equal(secteurMajoritaire(['Lavaur', 'Albi']), 'Albi');
+  assert.equal(secteurMajoritaire(['', null, '  ']), null);
+  assert.equal(secteurMajoritaire([]), null);
+  assert.equal(secteurMajoritaire(null), null);
+});

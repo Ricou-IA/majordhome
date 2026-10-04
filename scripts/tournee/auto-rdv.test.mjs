@@ -179,3 +179,35 @@ test('creneauxPourContrat accepte une journée ouverte sans secteur (propre = fa
   assert.equal(r.creneaux[0].propre, false);
   assert.equal(r.creneaux[0].secteur, null);
 });
+
+// ── Agent téléphonique : journées vides en complément (Eric 2026-10-04 : « c'est un appel
+//    entrant, s'il n'y a pas de créneaux on propose des jours vides ; le premier RDV fixe la zone »)
+import { journeesSansSecteur } from '../../src/lib/tournee/auto-rdv.js';
+
+test('journeesSansSecteur : journées sans étiquette ni entretien, non figées, dans les bornes', () => {
+  const journees = [
+    { date: '2026-10-06', technicienId: 'a', rdvs: [] },                                                    // vide → oui
+    { date: '2026-10-06', technicienId: 'b', rdvs: [{ appointment_type: 'installation', status: 'scheduled' }] }, // pas d'entretien → oui
+    { date: '2026-10-07', technicienId: 'a', rdvs: [{ appointment_type: 'maintenance', status: 'scheduled', grand_secteur: 'Albi' }] }, // secteur déduit → non
+    { date: '2026-10-08', technicienId: 'a', rdvs: [] },                                                    // étiquetée → non (déjà proposable)
+    { date: '2026-10-09', technicienId: 'a', rdvs: [] },                                                    // figée → non
+    { date: '2026-10-05', technicienId: 'a', rdvs: [] },                                                    // avant les bornes → non
+    { date: '2026-10-07', technicienId: 'b', rdvs: [{ appointment_type: 'maintenance', status: 'cancelled', grand_secteur: 'Albi' }] }, // entretien annulé → oui
+  ];
+  const etiquettes = [
+    { date: '2026-10-08', team_member_id: 'a', grand_secteur: 'Lavaur', figee_at: null },
+    { date: '2026-10-09', team_member_id: 'a', grand_secteur: null, figee_at: '2026-10-01T00:00:00Z' },
+  ];
+  const r = journeesSansSecteur({ journees, etiquettes, bornes: { debut: '2026-10-06', fin: '2026-10-31' }, secteur: 'Gaillac' });
+  assert.deepEqual(r.map((p) => `${p.journee.date}|${p.journee.technicienId}`), ['2026-10-06|a', '2026-10-06|b', '2026-10-07|b']);
+  assert.ok(r.every((p) => p.secteur === 'Gaillac' && p.figee === false));
+  // complémentaire de journeesProposables : aucune journée dans les deux
+  const prop = journeesProposables({ journees, etiquettes, bornes: { debut: '2026-10-06', fin: '2026-10-31' } });
+  const cles = new Set(prop.map((p) => `${p.journee.date}|${p.journee.technicienId}`));
+  assert.ok(r.every((p) => !cles.has(`${p.journee.date}|${p.journee.technicienId}`)));
+});
+
+test('journeesSansSecteur : secteur absent → null (la pose ne fixera pas de zone)', () => {
+  const r = journeesSansSecteur({ journees: [{ date: '2026-10-06', technicienId: 'a', rdvs: [] }], etiquettes: [], bornes: { debut: '2026-10-01', fin: '2026-10-31' } });
+  assert.equal(r[0].secteur, null);
+});

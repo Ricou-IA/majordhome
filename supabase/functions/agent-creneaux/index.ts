@@ -13,13 +13,18 @@
 // Même moteur que la page client /rdv/:token (_shared/autoRdvContexte.ts +
 // _shared/tournee/auto-rdv.js) :
 //   - sans date : demi-journées sur les journées à secteur du mois en cours (prolongé),
-//     les 3 meilleures pour nos tournées, présentées dans l'ordre chronologique ;
+//     les meilleures pour nos tournées ; s'il en manque, complétées par des journées
+//     VIDES (sans secteur), jusqu'à l'horizon d'ouverture — c'est un appel entrant, on
+//     satisfait la demande (Eric 2026-10-04 ; vécu : 1 seul créneau proposé à DIEZ alors
+//     que 24 journées vides avaient de la place). Au plus 3, une par date × demi-journée,
+//     présentées dans l'ordre chronologique (`choisirCreneauxAgent`) ;
 //   - avec `date_souhaitee` : ce jour-là seulement, y compris une journée vide d'un
-//     technicien compétent (« ouvrir un créneau », Eric 2026-10-04), jusqu'à l'horizon
-//     d'ouverture (45 j).
+//     technicien compétent (« ouvrir un créneau »), jusqu'à l'horizon d'ouverture (45 j).
+// Sur une journée vide, « le premier RDV fixe la zone » : elle prend le secteur du client
+// (`secteurClient`), que auto_rdv_poser écrit sur la journée.
 // Les créneaux proposés restent côté serveur (agent_propositions) : l'agent ne manipule
-// qu'un numéro. La pose recalcule le placement et passe par auto_rdv_poser (source
-// `auto_rdv:agent`, p_date_max = horizon), tout ou rien.
+// qu'un numéro. La pose ne relit que la journée choisie, recalcule le placement et passe
+// par auto_rdv_poser (source `auto_rdv:agent`, p_date_max = horizon), tout ou rien.
 //
 // Body : { action: "proposer", date_souhaitee?, periode?, conversation_id, agent_id }
 //        { action: "reserver", numero, conversation_id, agent_id }
@@ -29,12 +34,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { requireSharedSecret, jsonResponse, getAdminClient, sanitizeError } from "../_shared/auth.ts";
 import { resoudreOrgAgent } from "../_shared/agentOrg.ts";
-import { charger, rdvDejaPris, trajetPour, type Contexte } from "../_shared/autoRdvContexte.ts";
+import { charger, rdvDejaPris, secteurClient, trajetPour, type Contexte } from "../_shared/autoRdvContexte.ts";
 import { minutesVersHeure } from "../_shared/tournee/arrets.js";
 import {
-  bornesMois, journeesProposables, journeesPourDate, creneauxPourContrat, empreinteJournee, demiJournees, placerParSequencement,
+  bornesMois, journeesProposables, journeesPourDate, journeesSansSecteur, creneauxPourContrat, empreinteJournee, demiJournees,
+  placerParSequencement,
 } from "../_shared/tournee/auto-rdv.js";
-import { creneauParle, jourParle } from "../_shared/agentTelephonique.js";
+import { choisirCreneauxAgent, creneauParle, jourParle } from "../_shared/agentTelephonique.js";
 
 const MDH_VOICE_AGENT_SECRET = Deno.env.get("MDH_VOICE_AGENT_SECRET") || "";
 const NB_PROPOSITIONS = 3;
@@ -45,13 +51,21 @@ function texte(v: unknown): string {
 }
 
 type Admin = ReturnType<typeof getAdminClient>;
+type Journee = Contexte["journees"][number];
 
-/** Client vérifié dans cet appel + contrat actif, puis contexte d'offre à l'horizon. */
-async function contexteAppel(admin: Admin, orgId: string, conversationId: string): Promise<{ ctx: Contexte } | { raison: string }> {
+/** Client vérifié dans cet appel + son contrat actif. */
+async function contratAppel(admin: Admin, orgId: string, conversationId: string): Promise<{ contractId: string } | { raison: string }> {
   const { data, error } = await admin.rpc("agent_creneaux_contexte", { p_org_id: orgId, p_conversation_id: conversationId });
   if (error) throw error;
   if (data?.erreur) return { raison: String(data.erreur) };
-  const ctx = await charger(admin, String(data.contract_id), { mode: "horizon" });
+  return { contractId: String(data.contract_id) };
+}
+
+/** Contexte d'offre à l'horizon (toutes les journées, ou une seule avec `jour`). */
+async function contexteAppel(admin: Admin, orgId: string, conversationId: string, jour: string | null = null): Promise<{ ctx: Contexte } | { raison: string }> {
+  const c = await contratAppel(admin, orgId, conversationId);
+  if ("raison" in c) return c;
+  const ctx = await charger(admin, c.contractId, { mode: "horizon", jour });
   if ("error" in ctx) {
     console.error("[agent-creneaux] contexte :", ctx.error);
     return { raison: ctx.error };
@@ -59,45 +73,61 @@ async function contexteAppel(admin: Admin, orgId: string, conversationId: string
   return { ctx };
 }
 
+function creneaux(ctx: Contexte, proposables: Array<{ journee: object; secteur: string | null }>, trajet: (a: string, b: string) => number) {
+  return creneauxPourContrat({
+    contrat: ctx.contrat, proposables, depot: ctx.depot, reglages: ctx.reglages, trajet,
+    secteurContrat: ctx.secteurContrat, maxCreneaux: 50,
+  });
+}
+
 async function proposer(admin: Admin, orgId: string, conversationId: string, body: Record<string, unknown>) {
+  const t0 = Date.now();
   const date = texte(body.date_souhaitee);
   const periode = PERIODES.has(texte(body.periode)) ? texte(body.periode) : null;
 
   const r = await contexteAppel(admin, orgId, conversationId);
   if ("raison" in r) return { creneaux: [], raison: r.raison };
   const { ctx } = r;
+  const tContexte = Date.now() - t0;
 
   const deja = await rdvDejaPris(ctx);
   if (deja) return { creneaux: [], raison: "rdv_existant", rdv: { jour: jourParle(deja.date), demi: deja.demi === "matin" ? "le matin" : "l'après-midi" } };
 
-  let proposables;
+  let retenus;
+  const trace: Record<string, unknown> = { date, periode };
   if (date) {
-    const p = journeesPourDate({ journees: ctx.journees, etiquettes: ctx.etiquettes, date, bornes: ctx.bornes, secteurContrat: ctx.secteurContrat });
+    // Une date demandée peut tomber sur une journée vide : elle prend le secteur du client.
+    const secteur = ctx.secteurContrat ?? await secteurClient(ctx);
+    const p = journeesPourDate({ journees: ctx.journees, etiquettes: ctx.etiquettes, date, bornes: ctx.bornes, secteurContrat: secteur });
     if (p.raison) return { creneaux: [], raison: p.raison };
-    proposables = p.proposables;
+    const { trajet } = await trajetPour(ctx, p.proposables.map((x) => x.journee as Journee));
+    const res = creneaux(ctx, p.proposables, trajet);
+    trace.refus = res.refus;
+    retenus = choisirCreneauxAgent({ dansSecteur: res.creneaux, nombre: NB_PROPOSITIONS, periode });
   } else {
     const autoRdv = (ctx.reglages.auto_rdv ?? {}) as Record<string, unknown>;
     const mois = bornesMois(ctx.aujourdhui, { delaiMinJours: Number(autoRdv.delai_min_jours ?? 2) });
-    proposables = journeesProposables({ journees: ctx.journees, etiquettes: ctx.etiquettes, bornes: mois });
-  }
+    const aSecteur = journeesProposables({ journees: ctx.journees, etiquettes: ctx.etiquettes, bornes: mois });
+    const t1 = await trajetPour(ctx, aSecteur.map((x) => x.journee as Journee));
+    const dansSecteur = creneaux(ctx, aSecteur, t1.trajet);
+    trace.secteur = { journees: aSecteur.length, creneaux: dansSecteur.creneaux.length, refus: dansSecteur.refus };
+    retenus = choisirCreneauxAgent({ dansSecteur: dansSecteur.creneaux, nombre: NB_PROPOSITIONS, periode });
 
-  const { trajet } = await trajetPour(ctx, proposables.map((p) => p.journee as Contexte["journees"][number]));
-  const { creneaux, refus } = creneauxPourContrat({
-    contrat: ctx.contrat, proposables, depot: ctx.depot, reglages: ctx.reglages, trajet,
-    secteurContrat: ctx.secteurContrat, maxCreneaux: 50,
-  });
-  // Les meilleurs pour nos tournées (ordre du moteur), au plus un par demi-journée de date,
-  // puis présentés dans l'ordre chronologique.
-  const vus = new Set<string>();
-  const retenus = creneaux
-    .filter((c) => !periode || c.demi === periode)
-    .filter((c) => { const k = `${c.date}|${c.demi}`; if (vus.has(k)) return false; vus.add(k); return true; })
-    .slice(0, NB_PROPOSITIONS)
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.demi === "matin" ? -1 : 1));
-  if (!retenus.length) {
-    console.log("[agent-creneaux] aucun créneau", JSON.stringify({ date, periode, refus }));
-    return { creneaux: [], raison: "aucun_creneau" };
+    if (retenus.length < NB_PROPOSITIONS) {
+      // Journées vides en complément, du début du mois à l'horizon d'ouverture : les
+      // plus proches d'abord (ordre du moteur pour une journée hors secteur = la date).
+      const secteur = await secteurClient(ctx);
+      const vides = journeesSansSecteur({
+        journees: ctx.journees, etiquettes: ctx.etiquettes, bornes: { debut: mois.debut, fin: ctx.bornes.fin }, secteur,
+      });
+      const t2 = await trajetPour(ctx, vides.map((x) => x.journee as Journee));
+      const complement = creneaux(ctx, vides, t2.trajet);
+      trace.vides = { journees: vides.length, creneaux: complement.creneaux.length, refus: complement.refus, secteur };
+      retenus = choisirCreneauxAgent({ dansSecteur: dansSecteur.creneaux, vides: complement.creneaux, nombre: NB_PROPOSITIONS, periode });
+    }
   }
+  console.log("[agent-creneaux] proposer", JSON.stringify({ ...trace, retenus: retenus.length, contexte_ms: tContexte, total_ms: Date.now() - t0 }));
+  if (!retenus.length) return { creneaux: [], raison: "aucun_creneau" };
 
   const { data: numeros, error } = await admin.rpc("agent_propositions_enregistrer", {
     p_org_id: orgId, p_conversation_id: conversationId, p_contract_id: ctx.contrat.id,
@@ -113,18 +143,24 @@ async function proposer(admin: Admin, orgId: string, conversationId: string, bod
 const CONFLITS = ["journee_modifiee", "decalage_refuse", "deja_planifie", "journee_figee", "hors_mois", "technicien_invalide", "contrat_inactif"];
 
 async function reserver(admin: Admin, orgId: string, conversationId: string, body: Record<string, unknown>) {
+  const t0 = Date.now();
   const numero = Number(body.numero);
   if (!Number.isInteger(numero) || numero <= 0) return { reserve: false, raison: "numero_invalide" };
 
-  const r = await contexteAppel(admin, orgId, conversationId);
-  if ("raison" in r) return { reserve: false, raison: r.raison };
-  const { ctx } = r;
-
+  const c = await contratAppel(admin, orgId, conversationId);
+  if ("raison" in c) return { reserve: false, raison: c.raison };
   const { data: prop, error: pErr } = await admin.rpc("agent_proposition_lire", {
     p_org_id: orgId, p_conversation_id: conversationId, p_numero: numero,
   });
   if (pErr) throw pErr;
-  if (!prop || prop.contract_id !== ctx.contrat.id) return { reserve: false, raison: "proposition_expiree" };
+  if (!prop || prop.contract_id !== c.contractId) return { reserve: false, raison: "proposition_expiree" };
+
+  // Seule la journée choisie est relue : c'est la seule que la pose revérifie.
+  const ctx = await charger(admin, c.contractId, { mode: "horizon", jour: String(prop.date) });
+  if ("error" in ctx) {
+    console.error("[agent-creneaux] contexte :", ctx.error);
+    return { reserve: false, raison: ctx.error };
+  }
 
   const journee = ctx.journees.find((j) => j.date === prop.date && j.technicienId === prop.technicien_id);
   if (!journee || empreinteJournee(journee.rdvs as Parameters<typeof empreinteJournee>[0]) !== prop.empreinte) {
@@ -151,6 +187,7 @@ async function reserver(admin: Admin, orgId: string, conversationId: string, bod
     p_decalages: place.decalages,
     p_date_max: ctx.bornes.fin,
   });
+  console.log("[agent-creneaux] reserver", JSON.stringify({ ok: !error, total_ms: Date.now() - t0 }));
   if (error) {
     const conflit = CONFLITS.find((m) => String(error.message || "").includes(m));
     if (conflit) return { reserve: false, raison: conflit === "deja_planifie" ? "rdv_existant" : "creneau_indisponible" };

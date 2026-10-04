@@ -195,6 +195,38 @@ export function creneauParle(creneau, demis) {
 }
 
 /**
+ * Les créneaux que l'agent lit au client (outil `proposer_creneaux` sans date) :
+ * d'abord les journées qui ont déjà un secteur (ordre du moteur = meilleur pour nos
+ * tournées), puis, s'il en manque, les journées VIDES (par date) — c'est un appel
+ * entrant, on satisfait la demande (Eric 2026-10-04). Une seule proposition par date ×
+ * demi-journée (deux techniciens le même matin = la même offre pour le client), une seule
+ * par DATE parmi les journées vides, puis présentées dans l'ordre chronologique.
+ * @template {{ date: string, demi: string }} C
+ * @param {{ dansSecteur: C[], vides?: C[], nombre?: number, periode?: string|null }} p
+ * @returns {C[]}
+ */
+export function choisirCreneauxAgent({ dansSecteur, vides = [], nombre = 3, periode = null }) {
+  const vus = new Set();
+  /** @type {C[]} */
+  const out = [];
+  const prendre = (liste, cle) => {
+    for (const c of liste || []) {
+      if (out.length >= nombre) return;
+      if (periode && c.demi !== periode) continue;
+      if (vus.has(`${c.date}|${c.demi}`) || vus.has(cle(c))) continue;
+      vus.add(`${c.date}|${c.demi}`);
+      vus.add(cle(c));
+      out.push(c);
+    }
+  };
+  prendre(dansSecteur, (c) => `${c.date}|${c.demi}`);
+  // Journées vides : une DATE par proposition (trois jours au choix plutôt que le matin et
+  // l'après-midi d'un même jour) ; la préférence matin / après-midi passe par `periode`.
+  prendre(vides, (c) => `${c.date}|vide`);
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.demi === b.demi ? 0 : a.demi === 'matin' ? -1 : 1));
+}
+
+/**
  * @typedef {{ nom: string, commune: string, adresse: string, telephone: string }} EntreeAppelant
  * @typedef {{ client_id: string, last_name: string, address: string, city: string }} Candidat
  * @typedef {'telephone_invalide'|'telephone_inconnu'|'nom'|'commune'|'adresse'|'doublon'} MotifEchec

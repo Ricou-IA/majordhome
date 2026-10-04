@@ -149,6 +149,31 @@ export function journeesProposables({ journees, etiquettes, bornes }) {
   return out;
 }
 
+/**
+ * Journées SANS secteur (agent téléphonique, Eric 2026-10-04 : « c'est un appel entrant,
+ * s'il n'y a pas de créneaux on propose des jours vides ; le premier RDV fixe la zone ») :
+ * le complément exact de `journeesProposables` — dans les bornes, non figées, sans
+ * étiquette de secteur et sans entretien actif dont on déduirait un secteur (une journée
+ * vide, ou qui ne porte que des installations / absences ; le séquenceur dira si
+ * l'entretien y tient). Elles prennent le secteur du CLIENT (`secteur`), que la pose
+ * écrira sur la journée.
+ *
+ * @param {{ journees: Array<object>, etiquettes: Array<{ date: string, team_member_id: string, grand_secteur?: string|null, figee_at?: string|null }>, bornes: { debut: string, fin: string }, secteur?: string|null }} p
+ * @returns {Array<{ journee: object, secteur: string|null, figee: false }>}
+ */
+export function journeesSansSecteur({ journees, etiquettes, bornes, secteur = null }) {
+  const parCle = new Map((etiquettes || []).map((e) => [`${e.date}|${e.team_member_id}`, e]));
+  const out = [];
+  for (const j of journees || []) {
+    if (j.date < bornes.debut || j.date > bornes.fin) continue;
+    const e = parCle.get(`${j.date}|${j.technicienId}`);
+    if (e?.figee_at) continue;
+    if ((e?.grand_secteur && String(e.grand_secteur).trim()) || deduireSecteur(j.rdvs)) continue;
+    out.push({ journee: j, secteur: secteur || null, figee: false });
+  }
+  return out;
+}
+
 /** Minutes depuis minuit d'une heure `HH:MM[:SS]`. */
 function minutesDe(hhmm) {
   const s = String(hhmm || '');

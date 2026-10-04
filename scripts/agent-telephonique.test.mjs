@@ -85,3 +85,29 @@ test('créneau parlé : jour, demi-journée et plage, jamais l’heure calculée
   assert.deepEqual(creneauParle({ date: '2026-10-16', demi: 'apres_midi' }, demis),
     { jour: 'vendredi 16 octobre', demi: "l'après-midi", plage: 'entre 13 h 30 et 18 h' });
 });
+
+import { choisirCreneauxAgent } from '../src/lib/agentTelephonique.js';
+
+const cr = (date, demi, tech = 't1') => ({ date, demi, technicienId: tech });
+
+test('choisirCreneauxAgent : journées du secteur d\'abord, journées vides en complément, ordre chronologique', () => {
+  const dansSecteur = [cr('2026-10-27', 'matin', 'a'), cr('2026-10-27', 'matin', 'b')]; // même demi-journée → 1 seule
+  const vides = [cr('2026-10-06', 'matin'), cr('2026-10-06', 'apres_midi'), cr('2026-10-07', 'matin')];
+  const r = choisirCreneauxAgent({ dansSecteur, vides });
+  assert.deepEqual(r.map((c) => `${c.date} ${c.demi}`), ['2026-10-06 matin', '2026-10-07 matin', '2026-10-27 matin']); // journées vides : une par date
+  assert.equal(r.find((c) => c.date === '2026-10-27').technicienId, 'a'); // le meilleur du moteur, pas le doublon
+});
+
+test('choisirCreneauxAgent : assez de créneaux dans le secteur → aucune journée vide', () => {
+  const dansSecteur = [cr('2026-10-20', 'matin'), cr('2026-10-12', 'apres_midi'), cr('2026-10-15', 'matin'), cr('2026-10-16', 'matin')];
+  const r = choisirCreneauxAgent({ dansSecteur, vides: [cr('2026-10-06', 'matin')] });
+  assert.deepEqual(r.map((c) => c.date), ['2026-10-12', '2026-10-15', '2026-10-20']); // les 3 meilleurs, puis chrono
+});
+
+test('choisirCreneauxAgent : période demandée et nombre', () => {
+  const vides = [cr('2026-10-06', 'matin'), cr('2026-10-06', 'apres_midi'), cr('2026-10-07', 'apres_midi')];
+  assert.deepEqual(choisirCreneauxAgent({ dansSecteur: [], vides, periode: 'apres_midi' }).map((c) => c.date), ['2026-10-06', '2026-10-07']);
+  assert.deepEqual(choisirCreneauxAgent({ dansSecteur: [], vides }).map((c) => `${c.date} ${c.demi}`), ['2026-10-06 matin', '2026-10-07 apres_midi']);
+  assert.equal(choisirCreneauxAgent({ dansSecteur: [], vides, nombre: 1 }).length, 1);
+  assert.deepEqual(choisirCreneauxAgent({ dansSecteur: [], vides: [] }), []);
+});
