@@ -20,7 +20,8 @@
 // → Agent téléphonique). Limite : 3 tentatives par conversation.
 //
 // Body : { nom, commune, adresse, telephone, conversation_id, agent_id }
-// Réponse : { verifie: true, equipements, dernier_entretien, contrat_actif } | { verifie: false }
+// Réponse : { verifie: true, equipements, dernier_entretien, contrat_actif, prochain_rdv } | { verifie: false }
+// prochain_rdv = { date, heure, motif } du prochain RDV à venir du client, ou null (20261004_2).
 // Env requis : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MDH_VOICE_AGENT_SECRET.
 // ============================================================================
 
@@ -40,6 +41,7 @@ interface Candidat {
   equipements: string[];
   dernier_entretien: string | null;
   contrat_actif: boolean;
+  prochain_rdv: { date: string; heure: string | null; motif: string } | null;
 }
 
 function texte(v: unknown): string {
@@ -130,6 +132,7 @@ Deno.serve(async (req: Request) => {
       equipements: client.equipements ?? [],
       dernier_entretien: client.dernier_entretien,
       contrat_actif: client.contrat_actif === true,
+      prochain_rdv: client.prochain_rdv ?? null,
     });
   } catch (err) {
     // Échec bruyant côté serveur (logs), neutre côté agent : le prompt traite l'appelant
