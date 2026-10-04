@@ -32,7 +32,7 @@ export function SchedulingTransitionModal({ item, orgId, onConfirm, onCancel, so
   const [timeFlexMinutes, setTimeFlexMinutes] = useState(null);
   // Bloc contrat (R5) : un entretien se pose à la durée du contrat, d'un clic.
   const { dureeMinutes: dureeContratMinutes } = useDureeContrat(
-    orgId, item?.intervention_type === 'entretien' ? (item?.contract_id || null) : null,
+    orgId, item?.intervention_type === 'entretien' ? (item?.effective_contract_id || item?.contract_id || null) : null,
   );
 
   // Objet "lead-like" pour le SchedulingAssistant — déclaré AVANT early return

@@ -197,3 +197,22 @@ test('mergeTimeline fusionne activités et audit par date décroissante en garda
   assert.deepEqual(merged.map((x) => [x.kind, x.id]), [['audit', 'audit-1'], ['activity', 'act-2'], ['activity', 'act-1']]);
   assert.equal(merged[1].at, '2026-09-16T12:53:19Z');
 });
+
+test('un RDV posé sans humain dit QUI l’a posé : agent téléphonique, client en ligne, sinon automatisation', () => {
+  const pose = (source) => buildAuditEntry({
+    id: 9, table_name: 'appointments', record_id: '96e39f2e-0cca-4dc1-8c55-a53a51ab7cdb', lead_id: null,
+    action: 'INSERT', changed_fields: ['scheduled_date', 'source'],
+    old_values: null, new_values: { scheduled_date: '2026-10-16', appointment_type: 'maintenance', source },
+    changed_by: null, changed_by_name: null, changed_by_role: 'service_role', source: 'auto_rdv_poser',
+    changed_at: '2026-10-04T10:00:00Z',
+  });
+  assert.equal(pose('auto_rdv:agent').title, 'Créé par l’agent téléphonique via prise de rendez-vous');
+  assert.equal(pose('auto_rdv:agent').isHuman, false);
+  assert.equal(pose('auto_rdv:client').title, 'Créé par le client (prise de RDV en ligne) via prise de rendez-vous');
+  assert.equal(pose('autre').author, 'Automatisation');
+  // Les décalages de voisins (UPDATE) ne disent pas qui a déclenché la pose : automatisation.
+  const decale = buildAuditEntry({ ...leadUpdate, table_name: 'appointments', changed_by: null, changed_by_name: null,
+    changed_by_role: 'service_role', source: 'auto_rdv_poser', new_values: { scheduled_start: '09:00', source: 'auto_rdv:agent' },
+    old_values: { scheduled_start: '08:30' }, changed_fields: ['scheduled_start'] });
+  assert.equal(decale.author, 'Automatisation');
+});

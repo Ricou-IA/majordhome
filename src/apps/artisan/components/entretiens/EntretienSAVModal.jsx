@@ -46,6 +46,7 @@ import { clientsService } from '@services/clients.service';
 import { EntretienPartsSection } from './EntretienPartsSection';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
+import { useDureeContrat } from '@hooks/useTournees';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { SAVPartsSection } from './SAVPartsSection';
@@ -109,6 +110,9 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
   // sur le contrat actif du client. Tout ce qui suit doit consommer CETTE valeur,
   // jamais `item.contract_id` brut, sinon la section certificats reste muette.
   const contractId = item?.effective_contract_id || item?.contract_id || null;
+
+  // Bloc contrat (R5) : un entretien se pose à la durée du contrat (barème), d'un clic.
+  const { dureeMinutes: dureeContratMinutes } = useDureeContrat(orgId, isEntretien ? contractId : null);
 
   // Certificats : seulement une fois le RDV planifié (déclencheur de la suite),
   // pas en "Demande de contrat" ni "À planifier"
@@ -531,10 +535,11 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 appointmentTypeValue={type === 'sav' ? 'service' : 'maintenance'}
                 assigneeType="technician"
                 members={teamMembers || []}
+                fixedDuration={!isSav && dureeContratMinutes ? dureeContratMinutes : null}
                 defaultDuration={
-                  item.estimated_time
+                  (!isSav && dureeContratMinutes) || (item.estimated_time
                     ? Math.round(Number(item.estimated_time) * 60)
-                    : 60
+                    : 60)
                 }
                 defaultSubjectPrefix={
                   type === 'sav'

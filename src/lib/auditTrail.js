@@ -154,6 +154,7 @@ export const AUDIT_SOURCE_LABELS = {
   pennylane_sync_update_quote_fields: 'synchro Pennylane',
   pennylane_sync_ensure_winning_quotes: 'synchro Pennylane',
   tournees_figer_journee: 'figeage de la journée',
+  auto_rdv_poser: 'prise de rendez-vous',
   meta_ads_backfill_lead_attribution: 'attribution Meta Ads',
   chantier_group: 'groupement de chantiers',
   chantier_detach: 'détachement de chantier',
@@ -265,8 +266,22 @@ export function auditFieldLabel(table, field) {
 // Entrée de journal
 // ----------------------------------------------------------------------------
 
+/**
+ * Auteur d'un RDV posé SANS humain connecté, lu dans `appointments.source` (gravé à la
+ * création par auto_rdv_poser) : sans lui, la page client et l'agent téléphonique
+ * apparaissent tous deux en « Automatisation » (Eric 2026-10-04 : savoir qui a posé le RDV,
+ * humain ou agent, pour éviter les incompréhensions).
+ */
+export const AUDIT_RDV_SOURCE_AUTHORS = {
+  'auto_rdv:agent': 'l’agent téléphonique',
+  'auto_rdv:client': 'le client (prise de RDV en ligne)',
+  'auto_rdv:operateur': 'la prise de RDV en ligne (lien opérateur)',
+};
+
 function authorOf(row) {
   if (row.changed_by) return { author: row.changed_by_name || 'Utilisateur inconnu', isHuman: true };
+  const rdvSource = row.table_name === 'appointments' && row.action === 'INSERT' ? row.new_values?.source : null;
+  if (rdvSource && AUDIT_RDV_SOURCE_AUTHORS[rdvSource]) return { author: AUDIT_RDV_SOURCE_AUTHORS[rdvSource], isHuman: false };
   return { author: row.changed_by_role === 'service_role' ? 'Automatisation' : 'Système', isHuman: false };
 }
 
