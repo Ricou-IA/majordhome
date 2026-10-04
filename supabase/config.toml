@@ -89,6 +89,11 @@ verify_jwt = false
 [functions.agent-creneaux]
 verify_jwt = false
 
+# Agent téléphonique — webhook d'initiation des appels Twilio (accueil personnalisé par le
+# numéro appelant, spec 2026-10-04-agent-telephonique-reconnaissance-par-numero), même secret.
+[functions.agent-accueil]
+verify_jwt = false
+
 # Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
 [functions.pvgis-proxy]
 verify_jwt = true

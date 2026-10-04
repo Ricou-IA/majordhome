@@ -233,21 +233,29 @@ export function choisirCreneauxAgent({ dansSecteur, vides = [], nombre = 3, peri
  */
 
 /**
- * Verdict sur les candidats (fiches portant déjà le téléphone dit). Ordre des motifs =
+ * Verdict sur les candidats (fiches portant déjà le téléphone). Ordre des motifs =
  * premier critère qui élimine le DERNIER candidat restant — usage interne uniquement.
- * @param {EntreeAppelant} entree
+ *
+ * `numeroAppelant` : le téléphone est celui QUI APPELLE, relevé par le serveur au décroché
+ * (table agent_accueils), jamais un numéro dicté ni passé par l'agent. Le client a été
+ * salué par son nom ou sa commune et a confirmé : on ne lui redemande ni l'un ni l'autre,
+ * l'ADRESSE suffit (spec 2026-10-04 « reconnaissance par numéro »). Un nom ou une commune
+ * DITS restent comparés. Sans `numeroAppelant`, rien ne change : les quatre champs.
+ * @param {Partial<EntreeAppelant>} entree
  * @param {Candidat[]} candidats
+ * @param {{ numeroAppelant?: boolean }} [opts]
  * @returns {{ verifie: boolean, candidat: Candidat|null, motif: MotifEchec|null }}
  */
-export function verifierCandidats(entree, candidats) {
-  if (!normaliserTelephone(entree?.telephone)) return { verifie: false, candidat: null, motif: 'telephone_invalide' };
+export function verifierCandidats(entree, candidats, { numeroAppelant = false } = {}) {
+  if (!numeroAppelant && !normaliserTelephone(entree?.telephone)) return { verifie: false, candidat: null, motif: 'telephone_invalide' };
   let restants = Array.isArray(candidats) ? candidats : [];
   if (!restants.length) return { verifie: false, candidat: null, motif: 'telephone_inconnu' };
+  const facultatif = (v) => numeroAppelant && !String(v || '').trim();
   /** @type {Array<[MotifEchec, (c: Candidat) => boolean]>} */
   const filtres = [
-    ['nom', (c) => correspondNom(entree.nom, c.last_name)],
-    ['commune', (c) => correspondCommune(entree.commune, c.city)],
-    ['adresse', (c) => correspondAdresse(entree.adresse, c.address)],
+    ['nom', (c) => facultatif(entree?.nom) || correspondNom(entree.nom, c.last_name)],
+    ['commune', (c) => facultatif(entree?.commune) || correspondCommune(entree.commune, c.city)],
+    ['adresse', (c) => correspondAdresse(entree?.adresse, c.address)],
   ];
   for (const [motif, garde] of filtres) {
     restants = restants.filter(garde);
@@ -255,4 +263,81 @@ export function verifierCandidats(entree, candidats) {
   }
   if (restants.length > 1) return { verifie: false, candidat: null, motif: 'doublon' };
   return { verifie: true, candidat: restants[0], motif: null };
+}
+
+// ── Accueil personnalisé par le numéro appelant ────────────────────────────────
+// Spec 2026-10-04 « reconnaissance par numéro » : au décroché (webhook d'initiation),
+// les fiches qui portent le numéro QUI APPELLE donnent la première phrase de Claire.
+// Jamais de « Monsieur » / « Madame » deviné : la fiche n'a pas de civilité.
+
+const PRENOMS_VIDES = new Set(['', 'a renseigner', 'inconnu', 'inconnue', 'nc', 'n c', 'm', 'mr', 'mme', 'mlle', 'monsieur', 'madame', 'mademoiselle', 'x']);
+const SOCIETE = /\b(sarl|sas|sasu|eurl|sci|sa|scea|gaec|earl|snc|mairie|commune|sdis|association|asso|syndic|syndicat|copropriete|residence|ehpad|camping|hotel|restaurant|ste|societe|entreprise|ets|etablissements|cabinet|eglise|paroisse|college|lycee|ecole|communaute|departement|region)\b/;
+
+/**
+ * Nom propre lisible par la voix : « DE LA FONTAINE » → « De La Fontaine ».
+ * @param {string|null|undefined} s
+ * @returns {string}
+ */
+export function nomParle(s) {
+  return String(s || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/(^|[\s'’-])(\p{L})/gu, (m, sep, l) => sep + l.toUpperCase());
+}
+
+/**
+ * Commune commune à toutes les fiches (comparaison `normaliserCommune`), en clair pour la
+ * voix (« St » / « Ste » développés, sinon lus lettre par lettre) ; `null` si plusieurs ou aucune.
+ * @param {Array<{ city?: string|null }>|null|undefined} candidats
+ * @returns {string|null}
+ */
+export function communeUnique(candidats) {
+  const villes = (candidats || []).map((c) => String(c?.city || '').trim());
+  if (!villes.length || villes.some((v) => !normaliserCommune(v))) return null;
+  if (new Set(villes.map(normaliserCommune)).size !== 1) return null;
+  return nomParle(villes[0].replace(/\bste\b/gi, 'Sainte').replace(/\bst\b/gi, 'Saint').replace(/-/g, ' '));
+}
+
+/**
+ * Première phrase de l'appel selon les fiches du numéro appelant :
+ * - `nom`     : une seule fiche, prénom exploitable → « Bonjour Jean Dupont » ;
+ * - `famille` : un seul nom de famille (couple, prénom vide ou double) → « Bonjour Madame, Monsieur Dupont » ;
+ * - `commune` : noms différents (ou société) mais une seule commune → « Bonjour », l'agent cite la commune ;
+ * - `neutre`  : rien d'exploitable → « Bonjour ».
+ * @param {Array<{ last_name?: string|null, first_name?: string|null, city?: string|null }>|null|undefined} candidats
+ * @returns {{ mode: 'nom'|'famille'|'commune'|'neutre', salutation: string, nom: string, commune: string }}
+ */
+export function accueilDepuisCandidats(candidats) {
+  const liste = Array.isArray(candidats) ? candidats : [];
+  const commune = communeUnique(liste) || '';
+  const neutre = { mode: /** @type {const} */ ('neutre'), salutation: 'Bonjour', nom: '', commune: '' };
+  if (!liste.length) return neutre;
+  const noms = new Set(liste.map((c) => normaliserTexte(c?.last_name)));
+  const nomFamille = noms.size === 1 ? [...noms][0] : '';
+  if (!nomFamille || SOCIETE.test(nomFamille)) {
+    return commune ? { mode: 'commune', salutation: 'Bonjour', nom: '', commune } : neutre;
+  }
+  const nom = nomParle(liste[0].last_name);
+  const prenom = String(liste[0].first_name || '').trim();
+  const prenomSimple = liste.length === 1 && !PRENOMS_VIDES.has(normaliserTexte(prenom))
+    && !/[&/,+]|\bet\b/i.test(prenom);
+  if (prenomSimple) return { mode: 'nom', salutation: `Bonjour ${nomParle(prenom)} ${nom}`, nom, commune };
+  return { mode: 'famille', salutation: `Bonjour Madame, Monsieur ${nom}`, nom, commune };
+}
+
+/**
+ * Date et heure de Paris en toutes lettres, pour le prompt (le réglage `system__timezone`
+ * d'ElevenLabs est ignoré : `system__time` reste en UTC).
+ * @param {Date} [maintenant]
+ * @returns {string}  ex. « dimanche 4 octobre 2026, 14 h 05 »
+ */
+export function dateHeureParlee(maintenant = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23',
+  }).formatToParts(maintenant).map((x) => [x.type, x.value]));
+  const iso = `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+  const h = Number(p.hour);
+  const m = Number(p.minute);
+  return `${jourParle(iso)} ${p.year}, ${m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`}`;
 }

@@ -111,3 +111,70 @@ test('choisirCreneauxAgent : période demandée et nombre', () => {
   assert.equal(choisirCreneauxAgent({ dansSecteur: [], vides, nombre: 1 }).length, 1);
   assert.deepEqual(choisirCreneauxAgent({ dansSecteur: [], vides: [] }), []);
 });
+
+// ── Accueil personnalisé par le numéro appelant (spec 2026-10-04 reconnaissance par numéro)
+import { accueilDepuisCandidats, communeUnique, nomParle, dateHeureParlee } from '../src/lib/agentTelephonique.js';
+
+const fiche = (last_name, first_name, city = 'GAILLAC') => ({ client_id: last_name + first_name, last_name, first_name, address: '1 rue X', city });
+
+test('nomParle : casse lisible pour la voix', () => {
+  assert.equal(nomParle('DUPONT'), 'Dupont');
+  assert.equal(nomParle('de la FONTAINE'), 'De La Fontaine');
+  assert.equal(nomParle("D'ARTAGNAN-SMITH"), "D'Artagnan-Smith");
+  assert.equal(nomParle('  jean  '), 'Jean');
+});
+
+test('accueil : une seule fiche avec un prénom → « Bonjour Prénom Nom »', () => {
+  const a = accueilDepuisCandidats([fiche('DUPONT', 'JEAN')]);
+  assert.deepEqual([a.mode, a.salutation, a.nom, a.commune], ['nom', 'Bonjour Jean Dupont', 'Dupont', 'Gaillac']);
+});
+
+test('accueil : couple ou prénom inexploitable → « Madame, Monsieur Nom », jamais un genre deviné', () => {
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', 'JEAN'), fiche('DUPONT', 'MARIE')]).salutation, 'Bonjour Madame, Monsieur Dupont');
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', 'Jean et Marie')]).mode, 'famille');
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', '')]).mode, 'famille');
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', 'À renseigner')]).mode, 'famille');
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', 'Mme')]).mode, 'famille');
+  // casse et accents ne font pas deux familles
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', 'JEAN'), fiche('Dupont', 'Marie')]).mode, 'famille');
+});
+
+test('accueil : noms différents → la commune seule si elle est unique, sinon neutre', () => {
+  const a = accueilDepuisCandidats([fiche('DUPONT', 'JEAN'), fiche('MARTIN', 'LEA', 'Gaillac ')]);
+  assert.deepEqual([a.mode, a.salutation, a.nom, a.commune], ['commune', 'Bonjour', '', 'Gaillac']);
+  assert.equal(accueilDepuisCandidats([fiche('DUPONT', 'JEAN'), fiche('MARTIN', 'LEA', 'ALBI')]).mode, 'neutre');
+});
+
+test('accueil : une société n\'est pas saluée comme une personne', () => {
+  assert.equal(accueilDepuisCandidats([fiche('SARL DUPONT CHAUFFAGE', '')]).mode, 'commune');
+  assert.equal(accueilDepuisCandidats([fiche('MAIRIE DE BRENS', '')]).mode, 'commune');
+});
+
+test('accueil : aucun candidat ou entrée invalide → neutre', () => {
+  for (const v of [[], null, undefined]) {
+    const a = accueilDepuisCandidats(v);
+    assert.deepEqual([a.mode, a.salutation, a.nom, a.commune], ['neutre', 'Bonjour', '', '']);
+  }
+});
+
+test('communeUnique : normalisée, null si plusieurs ou aucune', () => {
+  assert.equal(communeUnique([fiche('A', 'B', 'ST SULPICE'), fiche('C', 'D', 'Saint-Sulpice')]), 'Saint Sulpice'); // « St » se lirait lettre par lettre
+  assert.equal(communeUnique([fiche('A', 'B', 'ALBI'), fiche('C', 'D', 'GAILLAC')]), null);
+  assert.equal(communeUnique([fiche('A', 'B', '')]), null);
+});
+
+test('dateHeureParlee : heure de Paris en toutes lettres (été / hiver)', () => {
+  assert.equal(dateHeureParlee(new Date('2026-10-04T12:05:00Z')), 'dimanche 4 octobre 2026, 14 h 05');
+  assert.equal(dateHeureParlee(new Date('2026-11-01T07:00:00Z')), 'dimanche 1er novembre 2026, 8 h');
+});
+
+test('verdict par numéro APPELANT : l\'adresse suffit, nom et commune non dits', () => {
+  const r = verifierCandidats({ adresse: '7 bis route des Bardis' }, [FICHE], { numeroAppelant: true });
+  assert.equal(r.verifie, true);
+  // même entrée sans numéro appelant (numéro non authentifié) → refus
+  assert.equal(verifierCandidats({ adresse: '7 bis route des Bardis' }, [FICHE]).verifie, false);
+  // nom DIT et faux : toujours refusé, même par le numéro appelant
+  assert.equal(verifierCandidats({ nom: 'Durand', adresse: '7 bis route des Bardis' }, [FICHE], { numeroAppelant: true }).motif, 'nom');
+  // couple au même numéro, même adresse (fiches doublon) → doublon, pas un choix au hasard
+  assert.equal(verifierCandidats({ adresse: '7 bis route des Bardis' }, [FICHE, { ...FICHE, client_id: 'c2', last_name: 'MARTIN' }], { numeroAppelant: true }).motif, 'doublon');
+});

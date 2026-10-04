@@ -19,7 +19,14 @@
 // core.organizations.settings.telephonie.elevenlabs_agent_id (Settings → Communication
 // → Agent téléphonique). Limite : 3 tentatives par conversation.
 //
-// Body : { nom, commune, adresse, telephone, conversation_id, agent_id }
+// Numéro appelant (spec 2026-10-04 « reconnaissance par numéro ») : si l'appel a été
+// accueilli par l'edge agent-accueil, le numéro QUI APPELLE est relevé en base
+// (agent_accueils) et relu ici par la RPC — jamais reçu de l'agent. Dans ce cas
+// (`numero_appelant` vrai), l'appelant a été salué par son nom ou sa commune et l'a
+// confirmé : l'ADRESSE suffit, nom et commune ne sont comparés que s'ils sont dits.
+//
+// Body : { nom?, commune?, adresse, telephone?, conversation_id, agent_id }
+//   telephone absent → numéro appelant relevé à l'accueil de cette conversation.
 // Réponse : { verifie: true, equipements, dernier_entretien, contrat_actif, prochain_rdv } | { verifie: false }
 // prochain_rdv = { date, heure, motif } du prochain RDV à venir du client, ou null (20261004_2).
 // Env requis : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MDH_VOICE_AGENT_SECRET.
@@ -96,12 +103,8 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
     };
 
+    // Numéro dicté s'il est valide ; sinon NULL → la RPC relit le numéro appelant de l'accueil.
     const telephone = normaliserTelephone(entree.telephone);
-    if (!telephone) {
-      await journaliser(false, null, 0, "telephone_invalide");
-      return jsonResponse(NON_VERIFIE);
-    }
-
     const { data, error } = await supabase.rpc("agent_verifier_client_candidats", {
       p_org_id: orgId,
       p_conversation_id: conversationId,
@@ -110,12 +113,17 @@ Deno.serve(async (req: Request) => {
     if (error) throw error;
 
     const candidats = (data?.candidats ?? []) as Candidat[];
+    const numeroAppelant = data?.numero_appelant === true;
     if ((data?.tentatives ?? 0) >= MAX_TENTATIVES) {
       await journaliser(false, null, candidats.length, "limite");
       return jsonResponse(NON_VERIFIE);
     }
+    if (!telephone && !numeroAppelant) {
+      await journaliser(false, null, 0, "telephone_invalide");
+      return jsonResponse(NON_VERIFIE);
+    }
 
-    const verdict = verifierCandidats(entree, candidats);
+    const verdict = verifierCandidats(entree, candidats, { numeroAppelant });
     if (!verdict.verifie || !verdict.candidat) {
       await journaliser(false, null, candidats.length, verdict.motif);
       return jsonResponse(NON_VERIFIE);
