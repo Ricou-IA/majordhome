@@ -52,6 +52,7 @@ export const MODULES = [
     description: 'Emails, SMS et WhatsApp envoyés à vos clients.',
     tiles: [
       { key: 'sms', title: 'SMS & WhatsApp', description: 'Gabarits par campagne, rappel automatique des RDV', icon: 'MessageSquare', href: '/settings/sms', adminOnly: true },
+      { key: 'telephonie', title: 'Agent téléphonique', description: 'Assistante vocale des appels non répondus', icon: 'Phone', href: '/settings/telephonie', adminOnly: true },
     ],
   },
   {
@@ -175,7 +176,7 @@ const ROUTES_PAR_MODULE = {
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',
     'settings/pricing', 'settings/tournees', 'settings/fumisterie',
   ],
-  communication: ['settings/sms'],
+  communication: ['settings/sms', 'settings/telephonie'],
   solaire: ['solaire', 'solaire/autoconso', 'solaire/historique', 'settings/solaire'],
   thermique: ['thermique', 'thermique/historique', 'settings/thermique'],
   maintenance: ['maintenance', 'settings/maintenance'],

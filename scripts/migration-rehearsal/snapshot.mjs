@@ -38,7 +38,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
   { schema: 'majordhome', table: 'team_members', columns: null },
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number'] }, // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived'] }, // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.

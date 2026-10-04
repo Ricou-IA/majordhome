@@ -98,6 +98,7 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/tournee/secteurs.js',
   'src/lib/tournee/populations.js',
   'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
+  'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/
 ]);
 
 const allFiles = walk(SRC);

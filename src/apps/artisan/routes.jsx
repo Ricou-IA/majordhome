@@ -33,6 +33,7 @@ const TourneesSettings = lazy(() => import('./pages/settings/TourneesSettings'))
 const FumisterieSettings = lazy(() => import('./pages/settings/FumisterieSettings'));
 const EmailsSettings = lazy(() => import('./pages/settings/EmailsSettings'));
 const SmsSettings = lazy(() => import('./pages/settings/SmsSettings'));
+const TelephonieSettings = lazy(() => import('./pages/settings/TelephonieSettings'));
 const PennylaneSettings = lazy(() => import('./pages/settings/PennylaneSettings'));
 const PlanComptableSettings = lazy(() => import('./pages/settings/PlanComptableSettings'));
 
@@ -398,6 +399,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <SmsSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/telephonie',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <TelephonieSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),

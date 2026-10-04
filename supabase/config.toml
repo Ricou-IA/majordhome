@@ -80,6 +80,11 @@ verify_jwt = true
 [functions.sms-rappel-rdv]
 verify_jwt = false
 
+# Agent téléphonique (ElevenLabs) — outil verifier_client, appelé pendant l'appel :
+# secret partagé MDH_VOICE_AGENT_SECRET (spec 2026-10-04-agent-telephonique-verifier-client).
+[functions.agent-verifier-client]
+verify_jwt = false
+
 # Solaire — proxy CORS PVGIS (peakpower=1 forcé serveur)
 [functions.pvgis-proxy]
 verify_jwt = true
