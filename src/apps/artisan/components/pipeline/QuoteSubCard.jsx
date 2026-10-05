@@ -6,7 +6,9 @@
  *
  * Pas d'icône statut : l'expand filtre déjà par statut pertinent pour la
  * colonne (Gagné = accepted, Devis envoyé = pending, Perdu = refused), donc
- * l'icône est redondante avec le contexte colonne.
+ * l'icône est redondante avec le contexte colonne. Seule exception : un devis
+ * refusé listé sur une carte Devis envoyé (refus partiel) porte la puce
+ * « Refusé » (prop `refused`).
  *
  * Pas de numéro de devis : l'espace de la carte Kanban est trop restreint.
  * Le lien externe ouvre directement le PDF Pennylane (q.public_file_url
@@ -21,7 +23,7 @@
 import { ExternalLink } from 'lucide-react';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
 
-export function QuoteSubCard({ quote }) {
+export function QuoteSubCard({ quote, refused = false }) {
   const baseClass = 'flex items-center justify-between gap-2 px-2 py-1 bg-white border border-gray-100 rounded text-xs transition-colors';
   const content = (
     <>
@@ -29,9 +31,14 @@ export function QuoteSubCard({ quote }) {
         {quote.quote_date && (
           <span className="text-gray-500 shrink-0">{formatDateShortFR(quote.quote_date)}</span>
         )}
+        {refused && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-200 text-gray-600 shrink-0">
+            Refusé
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <span className="font-semibold text-gray-900">
+        <span className={`font-semibold ${refused ? 'text-gray-400' : 'text-gray-900'}`}>
           {quote.quote_amount_ht != null ? formatEuro(Math.round(Number(quote.quote_amount_ht))) : '—'}
         </span>
         <ExternalLink className="w-3 h-3 text-gray-400" />

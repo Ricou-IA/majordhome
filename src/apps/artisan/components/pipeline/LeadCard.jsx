@@ -16,6 +16,13 @@ import { useLinkedPennylaneQuotes, usePrefetchLinkedPennylaneQuotes } from '@hoo
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { QuoteSubCard } from './QuoteSubCard';
 
+// Statuts depuis lesquels un lead peut partir en suivi MT-LT : tout le funnel
+// actif. Un prospect intéressé mais à échéance lointaine n'a pas forcément de
+// devis (Nouveau / Contacté / RDV planifié). Gagné / Perdu sont exclus.
+const LONG_TERM_ELIGIBLE_STATUSES = new Set(['Nouveau', 'Contacté', 'RDV planifié', 'Devis envoyé']);
+
+const REFUSED_QUOTE_STATUSES = ['refused', 'denied', 'canceled'];
+
 /**
  * Calcule le nombre de jours depuis une date
  */
@@ -128,7 +135,7 @@ function getCommercialColor(index) {
  * @param {Function} props.onClick - Callback clic sur la carte
  * @param {Object} props.commercialsMap - Map { id: { initials, name, colorIndex } }
  * @param {Function} props.onMoveToLongTerm - (lead) => void — affiche un bouton MT-LT
- *   sur les cartes "Devis envoyé" si fourni
+ *   sur les cartes du funnel actif (Nouveau → Devis envoyé) si fourni
  * @param {Object} [props.card] - Carte Kanban courante (column_key, devis_count) passée par LeadKanban (Phase 1 pipeline multi-devis)
  */
 export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card }) {
@@ -154,16 +161,27 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
   // - gagne groupe accepted+invoiced
   // - perdu groupe refused+denied+canceled (expired exclu)
   // useMemo doit rester avant tout return conditionnel (règles des hooks React)
+  // Exception (Eric, 2026-10-05) : la carte Devis envoye liste AUSSI les devis
+  // refuses du lead, marques « Refusé » et ranges apres les devis en cours —
+  // le lead ne passe en Perdu que si 100 % de ses devis sont refuses, un refus
+  // partiel doit donc rester visible ici. Badge et montant ne comptent que
+  // les devis en cours.
   const filteredQuotes = useMemo(() => {
-    return (linkedQuotes || []).filter(q => {
+    const quotes = (linkedQuotes || []).filter(q => {
       if (!card?.column_key) return true;
       const status = q.quote_status;
-      if (card.column_key === 'devis_envoye') return ['pending', 'draft', 'expired'].includes(status);
+      if (card.column_key === 'devis_envoye') {
+        return ['pending', 'draft', 'expired'].includes(status) || REFUSED_QUOTE_STATUSES.includes(status);
+      }
       if (card.column_key === 'gagne') return ['accepted', 'invoiced'].includes(status);
-      if (card.column_key === 'perdu') return ['refused', 'denied', 'canceled'].includes(status);
+      if (card.column_key === 'perdu') return REFUSED_QUOTE_STATUSES.includes(status);
       return true;
     });
+    if (card?.column_key !== 'devis_envoye') return quotes;
+    const isRefused = (q) => REFUSED_QUOTE_STATUSES.includes(q.quote_status);
+    return [...quotes.filter(q => !isRefused(q)), ...quotes.filter(isRefused)];
   }, [linkedQuotes, card?.column_key]);
+  const partialRefusedCount = card?.column_key === 'devis_envoye' ? (card?.refused_count || 0) : 0;
 
   if (!lead) return null;
 
@@ -248,7 +266,7 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
         <div className="flex items-start justify-between gap-2">
           <p className="font-medium text-sm text-gray-900 truncate">{name}</p>
           <div className="flex items-center gap-1.5 shrink-0">
-            {onMoveToLongTerm && lead.statuses?.label === 'Devis envoyé' && (
+            {onMoveToLongTerm && LONG_TERM_ELIGIBLE_STATUSES.has(lead.statuses?.label) && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onMoveToLongTerm(lead); }}
@@ -298,11 +316,20 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
               {daysInStatus}j
             </span>
           )}
+          {hasDevis && partialRefusedCount > 0 && (
+            <span
+              className="ml-auto inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-200 text-gray-600 whitespace-nowrap"
+              title={`${partialRefusedCount} devis refusé${partialRefusedCount > 1 ? 's' : ''} sur ce lead`}
+            >
+              <XCircle className="w-3 h-3" />
+              {partialRefusedCount} refusé{partialRefusedCount > 1 ? 's' : ''}
+            </span>
+          )}
           {hasDevis && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-              className="ml-auto inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
+              className={`${partialRefusedCount > 0 ? '' : 'ml-auto '}inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors`}
               style={{
                 backgroundColor: card?.column_key === 'gagne' ? '#d97706'
                   : card?.column_key === 'perdu' ? '#94a3b8'
@@ -336,7 +363,11 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
         {expanded && filteredQuotes.length > 0 && (
           <div className="mt-2 flex flex-col gap-1">
             {filteredQuotes.map(q => (
-              <QuoteSubCard key={q.id} quote={q} />
+              <QuoteSubCard
+                key={q.id}
+                quote={q}
+                refused={card?.column_key === 'devis_envoye' && REFUSED_QUOTE_STATUSES.includes(q.quote_status)}
+              />
             ))}
           </div>
         )}
