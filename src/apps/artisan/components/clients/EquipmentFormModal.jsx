@@ -38,7 +38,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
-import { useSuppliers, useAllProducts } from '@hooks/useSuppliers';
+import { useSuppliers, useSupplierProducts } from '@hooks/useSuppliers';
+import { useDebounce } from '@hooks/useDebounce';
 
 // ============================================================================
 // UTILITAIRES
@@ -88,7 +89,6 @@ export function EquipmentFormModal({
   const [form, setForm] = useState(INITIAL_FORM);
   const { suppliers, isLoading: suppliersLoading } = useSuppliers(orgId);
   const { equipmentTypes, index: referentiel, isLoading: typesLoading } = useEquipmentReferential();
-  const { products: allProducts } = useAllProducts(orgId);
 
   // Trouver le supplier correspondant à la saisie marque (match exact par nom)
   const matchedSupplier = useMemo(() => {
@@ -96,11 +96,15 @@ export function EquipmentFormModal({
     return suppliers.find(s => s.name.toLowerCase() === form.brand.toLowerCase()) || null;
   }, [form.brand, suppliers]);
 
-  // Produits du fournisseur matché (si la marque correspond à un fournisseur connu)
-  const supplierProducts = useMemo(() => {
-    if (!matchedSupplier || !allProducts.length) return [];
-    return allProducts.filter(p => p.supplier_id === matchedSupplier.id);
-  }, [matchedSupplier, allProducts]);
+  // Produits du fournisseur matché, filtrés côté base par la saisie modèle (nom / référence).
+  // Lecture filtrée : un catalogue de 12 000 références (Dinak, Modinox) dépasse le plafond
+  // de 1 000 lignes PostgREST — charger « tous les produits de l'org » tronquait en silence
+  // les fournisseurs situés après les premiers dans l'ordre alphabétique (Invicta, Solipac…).
+  const debouncedModel = useDebounce(form.model, 300);
+  const { products: supplierProducts } = useSupplierProducts(matchedSupplier?.id, {
+    search: debouncedModel,
+    pageSize: 50,
+  });
 
   // Mode édition ou ajout
   const isEditMode = !!equipment;

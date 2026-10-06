@@ -163,30 +163,9 @@ export function useAccessoriesForProduct(productId) {
 }
 
 /**
- * Tous les produits de l'org (pour le picker dans le devis)
- */
-export function useAllProducts(orgId) {
-  const {
-    data: products,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: supplierKeys.allProducts(orgId),
-    queryFn: async () => {
-      const { data, error } = await suppliersService.getProductsByOrg(orgId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId,
-    staleTime: 60_000,
-  });
-
-  return { products: products || [], isLoading, error };
-}
-
-/**
- * Produits actifs d'une catégorie (tous fournisseurs) — lecture filtrée côté base, donc jamais
- * tronquée par le plafond de 1 000 lignes qui frappe useAllProducts sur une grosse org.
+ * Produits actifs d'une catégorie (tous fournisseurs) — lecture filtrée côté base.
+ * Ne jamais réintroduire un « tous les produits de l'org » sans filtre : PostgREST plafonne
+ * à 1 000 lignes et tronque en silence (24 000 références chez Mayer, retiré le 2026-10-06).
  */
 export function useProductsByCategory(orgId, category) {
   const { data, isLoading, error } = useQuery({
@@ -231,7 +210,6 @@ export function useProductMutations(orgId, supplierId) {
 
   const invalidateAll = () => {
     if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
-    queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
   };
 
   const createMutation = useMutation({
@@ -313,7 +291,6 @@ export function useProductImageMutations(orgId, productId, supplierId) {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, productId) });
     if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
-    queryClient.invalidateQueries({ queryKey: supplierKeys.allProducts(orgId) });
   };
 
   const uploadMutation = useMutation({

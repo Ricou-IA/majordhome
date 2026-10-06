@@ -241,30 +241,11 @@ export const suppliersService = {
     }
   },
 
-  async getProductsByOrg(orgId) {
-    try {
-      if (!orgId) throw new Error('[suppliersService] orgId requis');
-
-      const { data, error } = await supabase
-        .from('majordhome_supplier_products')
-        .select('*')
-        .eq('org_id', orgId)
-        .eq('is_active', true)
-        .order('supplier_name')
-        .order('name');
-
-      if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      console.error('[suppliersService] getProductsByOrg:', error);
-      return { data: [], error };
-    }
-  },
-
   /**
    * Produits ACTIFS d'une catégorie, tous fournisseurs confondus (ex. dimensionnement clim).
-   * ⚠ getProductsByOrg plafonne à 1 000 lignes (max-rows PostgREST) : avec 24 000 articles
-   * Dinak + Modinox devant, un fournisseur plus loin dans l'ordre n'y apparaît jamais.
+   * ⚠ Pas de lecture « tous les produits de l'org » sans filtre : PostgREST plafonne à 1 000
+   * lignes (max-rows) et, avec 24 000 articles Dinak + Modinox devant, un fournisseur plus loin
+   * dans l'ordre n'apparaît jamais (retiré le 2026-10-06, cf. EquipmentFormModal).
    * @param {string} orgId
    * @param {string} category valeur de PRODUCT_CATEGORIES
    */
