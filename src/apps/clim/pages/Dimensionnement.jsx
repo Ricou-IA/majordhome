@@ -10,6 +10,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useProductsByCategory } from '@hooks/useSuppliers';
 import { useLead } from '@hooks/useLeads';
 import { buildDefaultSections } from '@services/devis.service';
+import { buildDevisConfig } from '@/lib/devisConfig.js';
 import { buildClimConfig } from '@/lib/clim/config.js';
 import { dimensionner, lignesDevis } from '@/lib/clim/dimensionnement.js';
 import CreateDevisModal from '@apps/artisan/components/devis/CreateDevisModal';
@@ -20,8 +21,8 @@ import { releveInitial, releveVersMoteur, loadDraft, saveDraft, clearDraft } fro
 const FAMILLE = 'Climatisation';
 
 /** Lignes initiales du devis : sections par défaut de la famille, équipement puis accessoires. */
-function lignesInitiales(proposition) {
-  const sections = buildDefaultSections(FAMILLE);
+function lignesInitiales(proposition, devisConfig) {
+  const sections = buildDefaultSections(FAMILLE, devisConfig);
   const equipements = lignesDevis(proposition.postes.filter((p) => !p.article.liquide));
   const accessoires = lignesDevis(proposition.postes.filter((p) => p.article.liquide));
   const out = [];
@@ -38,10 +39,10 @@ export default function Dimensionnement() {
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-[300px]"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>;
   }
-  return <DimensionnementInner cfg={buildClimConfig(settings)} />;
+  return <DimensionnementInner cfg={buildClimConfig(settings)} devisConfig={buildDevisConfig(settings)} />;
 }
 
-function DimensionnementInner({ cfg }) {
+function DimensionnementInner({ cfg, devisConfig }) {
   const { user, organization } = useAuth();
   const userId = user?.id;
   const orgId = organization?.id;
@@ -90,7 +91,7 @@ function DimensionnementInner({ cfg }) {
       </div>
 
       {devisOuvert && lead && proposition && (
-        <CreateDevisModal lead={lead} initialFamily={FAMILLE} initialLines={lignesInitiales(proposition)} onClose={() => setDevisOuvert(false)} />
+        <CreateDevisModal lead={lead} initialFamily={FAMILLE} initialLines={lignesInitiales(proposition, devisConfig)} onClose={() => setDevisOuvert(false)} />
       )}
     </div>
   );

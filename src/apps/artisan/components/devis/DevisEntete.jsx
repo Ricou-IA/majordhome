@@ -6,9 +6,12 @@
 
 import { AlertTriangle, User, Phone, Mail, MapPin } from 'lucide-react';
 import { QUOTE_TEMPLATE_FAMILIES } from '@services/devis.service';
+
+/** `familles` = labels des familles actives de l'org (famillesActives(devisConfig)) ; défauts si absent. */
 import { inputClass } from '../FormFields';
 
-export default function DevisEntete({ lead, form, setField, selectedFamily, onSelectFamily, templates, selectedTemplateId, onSelectTemplate }) {
+export default function DevisEntete({ lead, form, setField, selectedFamily, onSelectFamily, templates, selectedTemplateId, onSelectTemplate, familles }) {
+  const listeFamilles = familles?.length ? familles : QUOTE_TEMPLATE_FAMILIES;
   const clientName = [lead?.first_name, lead?.last_name].filter(Boolean).join(' ') || '—';
   const clientAddress = [lead?.address, lead?.postal_code, lead?.city].filter(Boolean).join(', ');
   const familyTemplates = selectedFamily ? templates.filter((t) => t.family === selectedFamily) : [];
@@ -31,7 +34,7 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1.5">Installation</label>
           <div className="flex flex-wrap gap-2">
-            {QUOTE_TEMPLATE_FAMILIES.map((f) => (
+            {listeFamilles.map((f) => (
               <button key={f} type="button" onClick={() => onSelectFamily(f)}
                 className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${selectedFamily === f ? 'bg-primary-100 border-primary-400 text-primary-800 font-medium' : 'bg-white border-secondary-200 text-secondary-600 hover:border-primary-300 hover:bg-primary-50/50'}`}>
                 {f}

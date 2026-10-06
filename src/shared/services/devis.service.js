@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { DEFAULT_FAMILLES, buildDevisConfig, sectionsParDefaut, categoriePourSection } from '@/lib/devisConfig.js';
 import { logger } from '@lib/logger';
 
 // ============================================================================
@@ -29,64 +30,36 @@ export const TVA_RATES = [
   { value: 5.5, label: '5,5% (réduit)', description: 'Matériel rénovation énergétique éligible' },
 ];
 
-export const QUOTE_TEMPLATE_FAMILIES = [
-  'Poêle à Granulé',
-  'Poêle à Bois',
-  'Climatisation',
-  'Chauffage/PAC',
-  'Electricité',
-  'VMC',
-  'Autre',
-];
-
-// Sections prédéfinies par famille (auto-créées si pas de devis type)
-export const FAMILY_DEFAULT_SECTIONS = {
-  'Poêle à Granulé': ['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE'],
-  'Poêle à Bois': ['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE'],
-  'Climatisation': ['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE'],
-  'Chauffage/PAC': ['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE'],
-  'Electricité': ['MATÉRIEL', 'MAIN D\'ŒUVRE'],
-  'VMC': ['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE'],
-  'Autre': ['PRESTATIONS', 'MAIN D\'ŒUVRE'],
-};
-
-// Catégorie produit (PRODUCT_CATEGORIES de suppliers.service) portée par la famille d'installation,
-// pour les sections dont le nom n'est pas lui-même une catégorie (« ÉQUIPEMENT », « ACCESSOIRES »…).
-export const FAMILY_PRODUCT_CATEGORY = {
-  'Poêle à Granulé': 'poele',
-  'Poêle à Bois': 'poele',
-  'Climatisation': 'climatisation',
-  'Chauffage/PAC': 'chauffage',
-};
-
-const normaliserCategorie = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-const CATEGORIES_PRODUIT = new Set(['poele', 'climatisation', 'chauffage', 'fumisterie']);
+// Familles d'installation et chapitres : paramétrés par org dans settings.devis (src/lib/devisConfig.js,
+// Settings → Socle → Devis). Les constantes ci-dessous sont les DÉFAUTS, gardées pour les lecteurs qui
+// n'ont pas la config sous la main (metreModel, devis types) ; tout écran passe la config de l'org.
+export const QUOTE_TEMPLATE_FAMILIES = DEFAULT_FAMILLES.map((f) => f.label);
+export const FAMILY_DEFAULT_SECTIONS = Object.fromEntries(DEFAULT_FAMILLES.map((f) => [f.label, [...f.sections]]));
 
 /**
- * Catégorie produit à proposer au picker pour une section d'un devis : le nom de la section s'il est
- * une catégorie (« POÊLE », « FUMISTERIE »), sinon celle de la famille (« ÉQUIPEMENT » d'un devis
- * Climatisation ⇒ climatisation), sinon null (tous les fournisseurs). Avant ce helper, le « + » d'une
- * section ÉQUIPEMENT cherchait un fournisseur de catégorie « equipement » : picker vide en silence.
- * @param {string} sectionName
- * @param {string} [family]
- * @returns {string|null}
+ * Lignes « titre de chapitre » d'une famille (config de l'org, sinon défauts).
+ * @param {string} family  key ou label de la famille
+ * @param {object} [config]  buildDevisConfig(settings)
  */
-export function productCategoryForSection(sectionName, family) {
-  const n = normaliserCategorie(sectionName);
-  if (CATEGORIES_PRODUIT.has(n)) return n;
-  return FAMILY_PRODUCT_CATEGORY[family] || null;
-}
-
-export function buildDefaultSections(family) {
-  const sections = FAMILY_DEFAULT_SECTIONS[family];
-  if (!sections) return [];
-  return sections.map((name) => ({
+export function buildDefaultSections(family, config) {
+  return sectionsParDefaut(config || buildDevisConfig(null), family).map((name) => ({
     line_type: 'section_title',
     designation: name,
     quantity: 0,
     unit_price_ht: 0,
     tva_rate: 0,
   }));
+}
+
+/**
+ * Catégorie produit du picker pour une section d'un devis (voir categoriePourSection de devisConfig).
+ * @param {string} sectionName
+ * @param {string} [family]
+ * @param {object} [config]  buildDevisConfig(settings)
+ * @returns {string|null}
+ */
+export function productCategoryForSection(sectionName, family, config) {
+  return categoriePourSection(config || buildDevisConfig(null), sectionName, family);
 }
 
 export const LINE_TYPES = [

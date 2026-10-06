@@ -6,6 +6,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
 import { useDevisMutations } from '@hooks/useDevis';
 import { useFumMetreMutations } from '@hooks/useFumisterie';
 import { devisService, buildDefaultSections, computeQuoteTotals, margeFournitures } from '@services/devis.service';
@@ -29,11 +31,15 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const orgId = organization?.id;
   const { createQuote, isCreating } = useDevisMutations(lead?.id);
   const { saveMetre } = useFumMetreMutations(orgId);
+  // Familles, chapitres, conditions et validité par défaut : Settings → Socle → Devis
+  const { settings } = useOrgSettings();
+  const devisConfig = useMemo(() => buildDevisConfig(settings), [settings]);
 
   const [lines, setLines] = useState(() => (Array.isArray(initialLines) ? initialLines : []));
   // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
   const [metre, setMetre] = useState(null);
   const [form, setForm] = useState({ subject: '', validityDays: '30', conditions: '', notesInternes: '', globalDiscountPercent: '0' });
+  useEffect(() => { setForm((prev) => ({ ...prev, validityDays: String(devisConfig.document.validite_jours) })); }, [devisConfig.document.validite_jours]);
 
   // Templates
   const [templates, setTemplates] = useState([]);
@@ -78,14 +84,14 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     setSelectedTemplateId(null);
     setMetre(null);
     setForm((prev) => ({ ...prev, globalDiscountPercent: '0' }));
-    setLines(isDeselect ? [] : buildDefaultSections(f));
+    setLines(isDeselect ? [] : buildDefaultSections(f, devisConfig));
   };
   const handleSelectFamily = (f) => { if (nbLignes > 0) setFamilleEnAttente(f); else appliquerFamille(f); };
 
   const handleSelectTemplate = (templateId) => {
     const tpl = templates.find((t) => t.id === templateId);
     if (tpl) applyTemplate(tpl);
-    else { clearTemplate(); if (selectedFamily) setLines(buildDefaultSections(selectedFamily)); }
+    else { clearTemplate(); if (selectedFamily) setLines(buildDefaultSections(selectedFamily, devisConfig)); }
   };
 
   const handleCreate = async () => {
@@ -127,9 +133,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <DevisEntete lead={lead} form={form} setField={setField} selectedFamily={selectedFamily} onSelectFamily={handleSelectFamily}
-            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={handleSelectTemplate} />
-          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} />
-          {nbLignes > 0 && <DevisConditions form={form} setField={setField} lines={lines} />}
+            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={handleSelectTemplate} familles={famillesActives(devisConfig).map((f) => f.label)} />
+          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} />
+          {nbLignes > 0 && <DevisConditions form={form} setField={setField} lines={lines} devisConfig={devisConfig} />}
         </div>
 
         {/* Pied : totaux vivants + action unique */}

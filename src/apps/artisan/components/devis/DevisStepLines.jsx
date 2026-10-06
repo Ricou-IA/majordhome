@@ -214,7 +214,7 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated }) {
+export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, category }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
   const pickerCategory = pickerForSection?.category || null;
@@ -280,8 +280,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
 
   // Ajouter des produits après la section (avant la section suivante)
   const handleAddProductsToSection = useCallback((sectionGlobalIndex, sectionName) => {
-    setPickerForSection({ index: sectionGlobalIndex, category: productCategoryForSection(sectionName, family) });
-  }, [family]);
+    setPickerForSection({ index: sectionGlobalIndex, category: productCategoryForSection(sectionName, family, devisConfig) });
+  }, [family, devisConfig]);
 
   const handlePickerAddLines = useCallback((newLines, _sectionTitle) => {
     if (!pickerForSection) return;

@@ -10,18 +10,17 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { computeQuoteTotals } from '@services/devis.service';
 import { FormField, TextInput, TextArea } from '../../components/FormFields';
 import DevisTvaSummary from './DevisTvaSummary';
+import { buildDevisConfig } from '@/lib/devisConfig.js';
 
-const DEFAULT_CONDITIONS = `- Devis valable pour la durée indiquée ci-dessus.
-- Acompte de 30% à la commande, solde à la réception des travaux.
-- TVA applicable selon la nature des travaux (art. 278-0 bis du CGI).
-- Garantie matériel selon les conditions du fabricant.`;
-
-export default function DevisConditions({ form, setField, lines }) {
+/** @param {{ devisConfig?: object }} p  devisConfig = buildDevisConfig(settings) : conditions et validité par défaut de l'org */
+export default function DevisConditions({ form, setField, lines, devisConfig }) {
   const [ouvert, setOuvert] = useState(false);
+  const cfg = devisConfig || buildDevisConfig(null);
+  const DEFAULT_CONDITIONS = cfg.document.conditions;
   const totals = computeQuoteTotals(lines, form.globalDiscountPercent);
   const resume = [
     `remise ${form.globalDiscountPercent || 0} %`,
-    `validité ${form.validityDays || 30} j`,
+    `validité ${form.validityDays || cfg.document.validite_jours} j`,
     form.conditions ? 'conditions personnalisées' : 'conditions par défaut',
     form.notesInternes ? 'notes internes' : null,
   ].filter(Boolean).join(' · ');
@@ -42,7 +41,7 @@ export default function DevisConditions({ form, setField, lines }) {
               <TextInput value={form.globalDiscountPercent} onChange={(v) => setField('globalDiscountPercent', v)} type="number" min="0" max="100" step="0.5" placeholder="0" />
             </FormField>
             <FormField label="Durée de validité (jours)">
-              <TextInput value={form.validityDays} onChange={(v) => setField('validityDays', v)} type="number" min="1" placeholder="30" />
+              <TextInput value={form.validityDays} onChange={(v) => setField('validityDays', v)} type="number" min="1" placeholder={String(cfg.document.validite_jours)} />
             </FormField>
           </div>
           <DevisTvaSummary totals={totals} globalDiscountPercent={form.globalDiscountPercent} />

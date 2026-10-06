@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useDevisDetail, useDevisLines, useDevisMutations } from '@hooks/useDevis';
-import { computeQuoteTotals, devisService, QUOTE_TEMPLATE_FAMILIES, hasUnpricedLines, UNPRICED_LINES_MESSAGE } from '@services/devis.service';
+import { computeQuoteTotals, devisService, hasUnpricedLines, UNPRICED_LINES_MESSAGE } from '@services/devis.service';
 import DevisStatusBadge from './DevisStatusBadge';
 import DevisTvaSummary from './DevisTvaSummary';
 import { formatEuro, formatDateFR } from '@/lib/utils';
@@ -18,7 +18,8 @@ import {
   FileText, Download, Loader2, User, MapPin, Phone, Mail, BookmarkPlus, Send,
 } from 'lucide-react';
 import { useClient } from '@hooks/useClients';
-import { usePennylaneEnabled } from '@hooks/useOrgSettings';
+import { usePennylaneEnabled, useOrgSettings } from '@hooks/useOrgSettings';
+import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
 import { logger } from '@lib/logger';
 import { toast } from 'sonner';
 import { leadsService } from '@services/leads.service';
@@ -27,6 +28,8 @@ import { ConfirmDialog } from '@components/ui/confirm-dialog';
 export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, onEdit }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
+  const { settings } = useOrgSettings();
+  const devisConfig = buildDevisConfig(settings);
   const { quote, isLoading: loadingQuote } = useDevisDetail(quoteId);
   const { lines, isLoading: loadingLines } = useDevisLines(quoteId);
   const {
@@ -137,26 +140,15 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       const { generateDevisPdfBlob } = await import('./DevisPDF');
       const { devisService } = await import('@services/devis.service');
       const { buildCompanyInfo } = await import('@/lib/orgBranding');
-      const company = buildCompanyInfo(organization?.settings);
+      const { buildDevisDocumentModel } = await import('@/lib/devisDocumentModel.js');
+      const { invoicingSettings } = await import('@/lib/invoiceDocumentModel.js');
+      // Une seule source : le modèle de document (même rendu que l'aperçu de Settings → Devis)
+      const model = buildDevisDocumentModel({
+        quote, lines, totals, company: buildCompanyInfo(settings || organization?.settings),
+        config: devisConfig, invoicing: invoicingSettings(settings || organization?.settings),
+      });
 
-      const pdfData = {
-        quoteNumber: quote.quote_number,
-        date: quote.created_at,
-        validityDate: quote.validity_date,
-        subject: quote.subject,
-        clientName: quote.client_display_name,
-        clientAddress: quote.client_address,
-        clientPostalCode: quote.client_postal_code,
-        clientCity: quote.client_city,
-        clientPhone: quote.client_phone,
-        clientEmail: quote.client_email,
-        lines: lines,
-        globalDiscountPercent: quote.global_discount_percent,
-        totals,
-        conditions: quote.conditions,
-      };
-
-      const blob = await generateDevisPdfBlob(pdfData, company);
+      const blob = await generateDevisPdfBlob(model);
       const result = await devisService.uploadQuotePdf(quoteId, blob, orgId);
       if (result?.error) throw result.error;
 
@@ -350,7 +342,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
               className="w-full px-3 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="">— Famille de produit —</option>
-              {QUOTE_TEMPLATE_FAMILIES.map((f) => (
+              {famillesActives(devisConfig).map((f) => f.label).map((f) => (
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
