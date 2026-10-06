@@ -122,15 +122,26 @@ export function appDefault(role, resource, action) {
 }
 
 /**
- * Résolution canonique : override per-org si présent, sinon défaut app, sinon false.
+ * Résolution canonique — même chaîne que majordhome.role_can (20261006_1) :
+ *   surcharge du profil maison (orgRoleCode) → surcharge per-org du modèle (role)
+ *   → défaut app du modèle → false.
+ * `role` est TOUJOURS le rôle standard (modèle) ; `orgRoleCode` = code du profil maison
+ * actif du membre, ou null/'' s'il n'en porte pas.
  * @param {Object|null} orgOverrideMap - map "role:resource:action" -> boolean (lignes role_permissions) (null => aucun override, on retombe sur appDefault)
+ * @param {string} role - 'org_admin' | 'team_leader' | 'commercial' | 'technicien'
+ * @param {string} resource
+ * @param {string} action
+ * @param {string|null} [orgRoleCode]
  */
-export function resolvePermission(orgOverrideMap, role, resource, action) {
+export function resolvePermission(orgOverrideMap, role, resource, action, orgRoleCode = null) {
   if (role === 'org_admin') return true;
-  const key = `${role}:${resource}:${action}`;
-  if (orgOverrideMap && Object.prototype.hasOwnProperty.call(orgOverrideMap, key)) {
-    return orgOverrideMap[key] === true;
+  const has = (key) => !!orgOverrideMap && Object.prototype.hasOwnProperty.call(orgOverrideMap, key);
+  if (orgRoleCode) {
+    const ownKey = `${orgRoleCode}:${resource}:${action}`;
+    if (has(ownKey)) return orgOverrideMap[ownKey] === true;
   }
+  const key = `${role}:${resource}:${action}`;
+  if (has(key)) return orgOverrideMap[key] === true;
   return appDefault(role, resource, action);
 }
 
