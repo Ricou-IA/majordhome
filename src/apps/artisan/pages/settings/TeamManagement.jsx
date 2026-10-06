@@ -16,6 +16,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
 import { useLeadCommercials, useSetLeadCommercial } from '@hooks/useLeads';
+import { useOrgRoles } from '@hooks/useOrgRoles';
+import { buildRoleOptions, parseRoleChoice, roleChoiceValue, memberRoleDisplay } from '@/lib/orgRoles';
 import { useTeamMembers, useSetTeamMemberColor, useSetTeamMemberRouting, useEnsureTeamMember } from '@hooks/useAppointments';
 import { logger } from '@lib/logger';
 import {
@@ -69,11 +71,6 @@ const getInitials = (name) => {
     .toUpperCase()
     .slice(0, 2);
 };
-
-const ROLE_OPTIONS = EFFECTIVE_ROLES.map((role) => ({
-  value: role,
-  label: ROLE_LABELS[role],
-}));
 
 // Erreurs RPC `team_member_set_routing_settings` traduites en français — jamais le
 // message Postgres brut à l'écran. 22023 = confirmé (p_daily_work_minutes hors
@@ -217,7 +214,7 @@ function PlanificationSelect({ includeInRouting, onChange, disabled }) {
 // COMPOSANT — InviteModal
 // =============================================================================
 
-function InviteModal({ open, onClose, onInvite, isInviting }) {
+function InviteModal({ open, onClose, onInvite, isInviting, roleOptions }) {
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -329,7 +326,7 @@ function InviteModal({ open, onClose, onInvite, isInviting }) {
             <SelectInput
               value={form.effectiveRole}
               onChange={updateField('effectiveRole')}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
             />
           </FormField>
 
@@ -364,6 +361,8 @@ function InviteModal({ open, onClose, onInvite, isInviting }) {
 function MemberRow({
   member,
   teamMember,
+  orgRole,
+  roleOptions,
   canEditColor,
   isCurrentUser,
   isUpdating,
@@ -382,6 +381,9 @@ function MemberRow({
   isRoutingSaving,
 }) {
   const effectiveRole = computeEffectiveRole(member.profile, { role: member.role });
+  // Profil maison : libellé propre, sous-ligne « d'après <modèle> » ; le badge garde la couleur du modèle.
+  const roleDisplay = memberRoleDisplay(effectiveRole, orgRole, ROLE_LABELS);
+  const currentChoice = orgRole ? roleChoiceValue({ id: orgRole.org_role_id }) : effectiveRole;
 
   return (
     <tr className="border-b border-secondary-100 last:border-0">
@@ -411,8 +413,11 @@ function MemberRow({
       <td className="py-4 px-4">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${getRoleColor(effectiveRole)}`}>
           <Shield className="w-3 h-3" />
-          {ROLE_LABELS[effectiveRole] || effectiveRole}
+          {roleDisplay.label}
         </span>
+        {roleDisplay.sub && (
+          <span className="block mt-1 text-[11px] text-secondary-400">{roleDisplay.sub}</span>
+        )}
       </td>
 
       {/* Changement de rôle */}
@@ -424,14 +429,14 @@ function MemberRow({
         ) : (
           <div className="flex items-center gap-2">
             <select
-              value={effectiveRole}
-              onChange={(e) => onRoleChangeRequest(member, effectiveRole, e.target.value)}
+              value={currentChoice}
+              onChange={(e) => onRoleChangeRequest(member, currentChoice, e.target.value)}
               disabled={isUpdating || isUpdatingRole}
               className="text-sm border border-secondary-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
             >
-              {EFFECTIVE_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {ROLE_LABELS[role]}
+              {roleOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
@@ -584,6 +589,13 @@ export default function TeamManagement() {
   const { setColor } = useSetTeamMemberColor(orgId);
   const { setRoutingSettings } = useSetTeamMemberRouting(orgId);
   const { ensureTeamMember } = useEnsureTeamMember(orgId);
+  // Profils maison : options des menus (standards + profils actifs), profil porté par membre.
+  const { activeOrgRoles, memberOrgRoleByUser, setMemberOrgRole } = useOrgRoles(orgId);
+  const roleOptions = useMemo(
+    () => buildRoleOptions(EFFECTIVE_ROLES, ROLE_LABELS, activeOrgRoles),
+    [activeOrgRoles],
+  );
+  const roleOptionLabel = (value) => roleOptions.find((o) => o.value === value)?.label || value;
   // Liste « Commercial assigné » des leads : un membre y figure s'il a une ligne
   // active dans majordhome.commercials (reliée par profile_id).
   const { commercials } = useLeadCommercials(orgId);
@@ -685,28 +697,40 @@ export default function TeamManagement() {
     if (!roleChangeConfirm) return;
 
     const { member, newRole } = roleChangeConfirm;
-    const mapping = ROLE_DB_MAPPING[newRole];
-    if (!mapping) return;
+    const choice = parseRoleChoice(newRole);
+    if (!choice) return;
+    const name = member.profile?.full_name || "l'utilisateur";
 
     setUpdatingUserId(member.user_id);
 
     try {
-      const result = await updateRole({
-        userId: member.user_id,
-        appRole: mapping.app_role,
-        businessRole: mapping.business_role,
-        membershipRole: mapping.membership_role,
-      });
-
-      if (result?.error) {
-        toast.error(result.error.message || 'Erreur lors du changement de rôle');
+      if (choice.kind === 'org') {
+        // Profil maison : la RPC pose le profil ET aligne les champs core sur le modèle
+        const code = await setMemberOrgRole({ userId: member.user_id, orgRoleId: choice.orgRoleId });
+        const picked = activeOrgRoles.find((r) => r.id === choice.orgRoleId);
+        toast.success(`${name} est maintenant ${picked?.label || code}`);
       } else {
-        toast.success(
-          `Rôle de ${member.profile?.full_name || "l'utilisateur"} changé en ${ROLE_LABELS[newRole]}`
-        );
+        const mapping = ROLE_DB_MAPPING[choice.role];
+        if (!mapping) return;
+        if (memberOrgRoleByUser.has(member.user_id)) {
+          // Quitte le profil maison avant de poser le standard
+          await setMemberOrgRole({ userId: member.user_id, orgRoleId: null });
+        }
+        const result = await updateRole({
+          userId: member.user_id,
+          appRole: mapping.app_role,
+          businessRole: mapping.business_role,
+          membershipRole: mapping.membership_role,
+        });
+
+        if (result?.error) {
+          toast.error(result.error.message || 'Erreur lors du changement de rôle');
+        } else {
+          toast.success(`Rôle de ${name} changé en ${ROLE_LABELS[choice.role]}`);
+        }
       }
     } catch (err) {
-      toast.error(err.message || 'Erreur inattendue');
+      toast.error(err?.code === '42501' ? 'Réservé à l’administrateur' : (err.message || 'Erreur inattendue'));
     } finally {
       setUpdatingUserId(null);
       setRoleChangeConfirm(null);
@@ -717,12 +741,27 @@ export default function TeamManagement() {
    * Invite un nouveau membre
    */
   const handleInvite = async (form) => {
+    // Profil maison choisi : le compte est créé avec le MODÈLE, puis le profil est posé.
+    const choice = parseRoleChoice(form.effectiveRole);
+    const orgRole = choice?.kind === 'org' ? activeOrgRoles.find((r) => r.id === choice.orgRoleId) : null;
+    const effectiveRole = orgRole ? orgRole.base_role : (choice?.role || 'technicien');
     const result = await inviteMember({
       email: form.email,
       password: form.password,
       fullName: form.fullName,
-      effectiveRole: form.effectiveRole,
+      effectiveRole,
     });
+    if (result?.error || !orgRole) return result;
+
+    const userId = result?.data?.user?.id;
+    if (!userId) {
+      return { error: new Error('Compte créé, mais profil non posé (identifiant manquant) — réglez-le dans la liste') };
+    }
+    try {
+      await setMemberOrgRole({ userId, orgRoleId: orgRole.id });
+    } catch (err) {
+      return { error: new Error(`Compte créé, mais profil non posé : ${err?.message || 'erreur'} — réglez-le dans la liste`) };
+    }
     return result;
   };
 
@@ -897,6 +936,8 @@ export default function TeamManagement() {
                     key={member.user_id}
                     member={member}
                     teamMember={tm}
+                    orgRole={memberOrgRoleByUser.get(member.user_id) || null}
+                    roleOptions={roleOptions}
                     canEditColor={isOrgAdmin}
                     isCurrentUser={member.user_id === user?.id}
                     isUpdating={updatingUserId === member.user_id}
@@ -944,6 +985,7 @@ export default function TeamManagement() {
               <li><strong>Responsable</strong> — Vision globale, supervision de l&apos;équipe</li>
               <li><strong>Commercial</strong> — Pipeline, ses leads et chantiers, planning</li>
               <li><strong>Technicien</strong> — Clients, chantiers planifiés, entretiens, planning</li>
+              <li><strong>Profil maison</strong> — créé dans Droits d&apos;accès à partir d&apos;un modèle ; hors de la grille des droits, l&apos;application le traite comme son modèle</li>
             </ul>
           </div>
         </div>
@@ -959,6 +1001,7 @@ export default function TeamManagement() {
         onClose={() => setShowInviteModal(false)}
         onInvite={handleInvite}
         isInviting={isInviting}
+        roleOptions={roleOptions}
       />
 
       {/* Confirm Role Change Dialog */}
@@ -968,7 +1011,7 @@ export default function TeamManagement() {
         title="Changer le rôle"
         description={
           roleChangeConfirm
-            ? `Voulez-vous changer le rôle de ${roleChangeConfirm.member.profile?.full_name || "l'utilisateur"} de "${ROLE_LABELS[roleChangeConfirm.oldRole]}" en "${ROLE_LABELS[roleChangeConfirm.newRole]}" ?`
+            ? `Voulez-vous changer le rôle de ${roleChangeConfirm.member.profile?.full_name || "l'utilisateur"} de "${roleOptionLabel(roleChangeConfirm.oldRole)}" en "${roleOptionLabel(roleChangeConfirm.newRole)}" ?`
             : ''
         }
         confirmLabel="Confirmer le changement"
