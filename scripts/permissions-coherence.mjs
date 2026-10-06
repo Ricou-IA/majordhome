@@ -132,6 +132,33 @@ async function main() {
   if (priv[0]?.anon) erreurs.push('anon a EXECUTE sur majordhome.role_can');
   if (!priv[0]?.auth) erreurs.push('authenticated sans EXECUTE sur majordhome.role_can');
 
+  // 4. Profils maison (20261006_1..2) : intégrité + role_can les consulte + ACL
+  const present = await sql(`SELECT to_regclass('majordhome.org_roles') IS NOT NULL AS ok`);
+  if (!present[0]?.ok) {
+    erreurs.push('majordhome.org_roles absente : migration 20261006_1_org_roles non appliquée');
+  }
+  const orgRoles = present[0]?.ok ? await sql(`SELECT org_id, code, base_role FROM majordhome.org_roles`) : [];
+  for (const r of orgRoles) {
+    if (!['team_leader', 'commercial', 'technicien'].includes(r.base_role)) erreurs.push(`profil maison ${r.code} (${r.org_id}) : modèle invalide ${r.base_role}`);
+    if (['org_admin', 'team_leader', 'commercial', 'technicien'].includes(r.code)) erreurs.push(`profil maison au code standard : ${r.code} (${r.org_id})`);
+  }
+  const codesParOrg = new Map();
+  for (const r of orgRoles) { if (!codesParOrg.has(r.org_id)) codesParOrg.set(r.org_id, new Set()); codesParOrg.get(r.org_id).add(r.code); }
+  const overrides = !present[0]?.ok ? [] : await sql(`SELECT org_id, role FROM majordhome.role_permissions
+    WHERE role NOT IN ('org_admin', 'team_leader', 'commercial', 'technicien')`);
+  for (const o of overrides) {
+    if (!codesParOrg.get(o.org_id)?.has(o.role)) erreurs.push(`surcharge orpheline : role=${o.role} org=${o.org_id} (aucun profil maison de cette org)`);
+  }
+  const roleCanSrc = !present[0]?.ok ? [] : await sql(`SELECT prosrc FROM pg_proc WHERE oid = 'majordhome.role_can(uuid, text, text)'::regprocedure`);
+  if (!/user_org_role_code/.test(roleCanSrc[0]?.prosrc || '')) erreurs.push('majordhome.role_can ne consulte pas user_org_role_code (profils maison ignorés en base)');
+  const fnsMaison = ['majordhome.user_org_role_code(uuid)', 'public.org_role_create(uuid, text, text)', 'public.org_role_update(uuid, text, boolean)',
+    'public.org_role_delete(uuid)', 'public.member_set_org_role(uuid, uuid, uuid)'];
+  for (const f of fnsMaison) {
+    const p = await sql(`SELECT has_function_privilege('anon', '${f}', 'EXECUTE') AS anon`);
+    if (p[0]?.anon) erreurs.push(`anon a EXECUTE sur ${f}`);
+  }
+  console.log(`${orgRoles.length} profil(s) maison, ${overrides.length} surcharge(s) sur profil maison`);
+
   for (const a of avertissements) console.log('⚠️ ', a);
   for (const e of erreurs) console.error('❌', e);
   console.log(`\n${reg.size} défauts app, ${GOVERNED.length} tables gouvernées, ${avertissements.length} à basculer, ${erreurs.length} erreur(s)`);

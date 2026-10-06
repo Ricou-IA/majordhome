@@ -48,7 +48,7 @@
 **Interfaces:**
 - Produces: un cluster de répétition où `core.update_member_role`, `public.team_member_sync_role_for_user`, `majordhome.planning_role_for`, `public.org_upsert_role_permission` existent (les RPC de la Task 2 les appellent ; `plpgsql` ne résout qu'à l'exécution, donc sans elles les assertions échouent en « function does not exist »).
 
-- [ ] **Step 1 : Ajouter les fonctions à `FUNCTIONS`**
+- [x] **Step 1 : Ajouter les fonctions à `FUNCTIONS`**
 
 Après la ligne `'majordhome.role_can(uuid, text, text)',` insérer :
 
@@ -62,7 +62,7 @@ Après la ligne `'majordhome.role_can(uuid, text, text)',` insérer :
   'public.org_upsert_role_permission(uuid, text, text, text, boolean)',
 ```
 
-- [ ] **Step 2 : Re-photographier la prod et contrôler le cluster**
+- [x] **Step 2 : Re-photographier la prod et contrôler le cluster**
 
 Run :
 ```bash
@@ -70,7 +70,7 @@ node scripts/migration-rehearsal/snapshot.mjs --env C:/Dev/Frontend-Majordhome/.
 ```
 Expected : `[rehearsal] OK`. Si `core.update_member_role` fait échouer le chargement (dépendance absente du sous-ensemble), lire `scratch/postgres.log`, ajouter la dépendance à `FUNCTIONS`/`TABLES`, ne pas contourner.
 
-- [ ] **Step 3 : Commit**
+- [x] **Step 3 : Commit**
 
 ```bash
 git add scripts/migration-rehearsal/snapshot.mjs
@@ -96,7 +96,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - trigger `role_permissions_check_role` sur `majordhome.role_permissions` (remplace le CHECK `role_permissions_role_check`)
   - `majordhome.role_can` : consulte `role_permissions(org, code maison)` avant la chaîne existante
 
-- [ ] **Step 1 : Écrire les assertions (elles échouent tant que la migration n'est pas jouée)**
+- [x] **Step 1 : Écrire les assertions (elles échouent tant que la migration n'est pas jouée)**
 
 Fichier `scripts/migration-rehearsal/assert-org-roles.sql` :
 
@@ -218,7 +218,7 @@ END $$;
 ROLLBACK;
 ```
 
-- [ ] **Step 2 : Vérifier que les assertions échouent sans la migration**
+- [x] **Step 2 : Vérifier que les assertions échouent sans la migration**
 
 Run :
 ```bash
@@ -226,7 +226,7 @@ node scripts/migration-rehearsal/run.mjs --assert scripts/migration-rehearsal/as
 ```
 Expected : ECHEC avec `(A) majordhome.org_roles absente`.
 
-- [ ] **Step 3 : Écrire la migration**
+- [x] **Step 3 : Écrire la migration**
 
 Fichier `supabase/migrations/20261006_1_org_roles.sql` :
 
@@ -398,7 +398,7 @@ $function$;
 -- ACL de role_can inchangées (REVOKE anon posé par 20260930_13) : CREATE OR REPLACE conserve les privilèges.
 ```
 
-- [ ] **Step 4 : Répéter la migration avec les assertions**
+- [x] **Step 4 : Répéter la migration avec les assertions**
 
 Run :
 ```bash
@@ -406,7 +406,7 @@ node scripts/migration-rehearsal/run.mjs --migration supabase/migrations/2026100
 ```
 Expected : `NOTICE: assert-org-roles OK` puis `[rehearsal] OK`. `assert-permissions.sql` (droits app-level de septembre) doit rester vert : la chaîne existante n'a pas bougé pour un membre sans profil maison. Si `assert-permissions.sql` section (B) échoue sur « anon a EXECUTE sur role_can » : le harnais ne photographie pas les ACL des fonctions — relancer avec `--migration supabase/migrations/20260930_13_permissions_rls_role_can_leads_contracts_quotes_tasks.sql` en premier, comme le note l'en-tête de ce fichier.
 
-- [ ] **Step 5 : Commit**
+- [x] **Step 5 : Commit**
 
 ```bash
 git add supabase/migrations/20261006_1_org_roles.sql scripts/migration-rehearsal/assert-org-roles.sql
@@ -431,7 +431,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `public.org_role_delete(p_org_role_id uuid) RETURNS jsonb` — `{ "members_reset": n, "overrides_deleted": n }` ; purge `role_permissions` du code, CASCADE `member_org_roles`
   - `public.member_set_org_role(p_org_id uuid, p_user_id uuid, p_org_role_id uuid) RETURNS text` — pose/retire (NULL) le profil ET réaligne les champs `core` sur le modèle, puis resynchronise le rôle planning ; retourne le code posé ou NULL ; `42501` si `p_user_id` n'est pas membre, `P0002` si profil d'une autre org
 
-- [ ] **Step 1 : Écrire les assertions**
+- [x] **Step 1 : Écrire les assertions**
 
 Fichier `scripts/migration-rehearsal/assert-org-roles-rpc.sql` :
 
@@ -574,7 +574,7 @@ END $$;
 ROLLBACK;
 ```
 
-- [ ] **Step 2 : Vérifier l'échec sans la migration 2**
+- [x] **Step 2 : Vérifier l'échec sans la migration 2**
 
 Run :
 ```bash
@@ -582,7 +582,7 @@ node scripts/migration-rehearsal/run.mjs --migration supabase/migrations/2026100
 ```
 Expected : ECHEC sur `(A)` — `function public.org_role_create(uuid, text, text) does not exist`.
 
-- [ ] **Step 3 : Écrire la migration**
+- [x] **Step 3 : Écrire la migration**
 
 Fichier `supabase/migrations/20261006_2_org_roles_rpc.sql` :
 
@@ -790,7 +790,7 @@ Notes pour l'exécutant :
 - `public.unaccent` : l'extension `unaccent` est installée en prod (vérifié 2026-10-06) ; sur le harnais, si `unaccent` manque, l'ajouter à `bootstrap-pre.sql` (`CREATE EXTENSION IF NOT EXISTS unaccent SCHEMA public;`) — ne pas remplacer par un `translate` maison.
 - `core.update_member_role` est SECURITY DEFINER côté `core` ; elle est appelée ici depuis une fonction déjà gardée org_admin. Si elle refuse (son propre check), lire son code (`pg_get_functiondef`) et adapter — ne pas la contourner par un UPDATE direct sur `core.profiles`.
 
-- [ ] **Step 4 : Répéter les deux migrations avec toutes les assertions**
+- [x] **Step 4 : Répéter les deux migrations avec toutes les assertions**
 
 Run :
 ```bash
@@ -798,7 +798,7 @@ node scripts/migration-rehearsal/run.mjs --migration supabase/migrations/2026100
 ```
 Expected : `assert-org-roles OK`, `assert-org-roles-rpc OK`, `[rehearsal] OK`. Les deux fichiers d'assertions tournent chacun sous `BEGIN … ROLLBACK` : le second part d'une org sans profil maison (d'où `secretaire` puis `secretaire_2` attendus). Si `run.mjs` exécute les assertions avec `ON_ERROR_STOP` et `--single-transaction`, retirer `BEGIN;`/`ROLLBACK;` des fichiers serait une erreur : vérifier d'abord dans `run.mjs` comment `psql` est appelé pour les `--assert` (sans `--single-transaction` : les `BEGIN`/`ROLLBACK` explicites sont corrects).
 
-- [ ] **Step 5 : Commit**
+- [x] **Step 5 : Commit**
 
 ```bash
 git add supabase/migrations/20261006_2_org_roles_rpc.sql scripts/migration-rehearsal/assert-org-roles-rpc.sql
@@ -819,7 +819,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces : `resolvePermission(orgOverrideMap, role, resource, action, orgRoleCode = null)` — `orgRoleCode` = code maison ACTIF du membre (ou `null`) ; `role` reste le rôle standard (modèle). Signature rétro-compatible : tous les appelants actuels (`hasPermission`, `getResourcePermissions` dans `src/lib/permissions.js`) passent 4 arguments et ne changent pas. La tranche 2 branchera `AuthContext.orgRole.code` sur ce 5ᵉ paramètre.
 
-- [ ] **Step 1 : Écrire le test (échoue : le 5ᵉ paramètre est ignoré)**
+- [x] **Step 1 : Écrire le test (échoue : le 5ᵉ paramètre est ignoré)**
 
 Fichier `scripts/permissions-resolve.test.mjs` :
 
@@ -865,12 +865,12 @@ test('code maison null / vide = pas de profil', () => {
 });
 ```
 
-- [ ] **Step 2 : Lancer le test, vérifier l'échec**
+- [x] **Step 2 : Lancer le test, vérifier l'échec**
 
 Run : `node --test scripts/permissions-resolve.test.mjs`
 Expected : FAIL sur « surcharge du profil maison > … » (`false !== true`).
 
-- [ ] **Step 3 : Implémenter**
+- [x] **Step 3 : Implémenter**
 
 Dans `src/lib/permissionsRegistry.js`, remplacer `resolvePermission` par :
 
@@ -900,14 +900,14 @@ export function resolvePermission(orgOverrideMap, role, resource, action, orgRol
 }
 ```
 
-- [ ] **Step 4 : Tests verts + ajout à `audit:quality`**
+- [x] **Step 4 : Tests verts + ajout à `audit:quality`**
 
 Dans `package.json`, dans la chaîne `audit:quality`, remplacer `scripts/working-hours.test.mjs && npm run audit:dead-code` par `scripts/working-hours.test.mjs scripts/permissions-resolve.test.mjs && npm run audit:dead-code`.
 
 Run : `node --test scripts/permissions-resolve.test.mjs && npm run audit:quality`
 Expected : tous les tests passent, `✅ Registre OK`.
 
-- [ ] **Step 5 : Commit**
+- [x] **Step 5 : Commit**
 
 ```bash
 git add src/lib/permissionsRegistry.js scripts/permissions-resolve.test.mjs package.json
@@ -927,7 +927,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes : tables de la Task 1 (`majordhome.org_roles`, `majordhome.role_permissions`), `majordhome.role_can` modifiée.
 - Produces : erreurs supplémentaires — profil maison au modèle hors liste ou au code standard ; surcharge `role_permissions` dont le `role` n'est ni standard ni un code maison de la même org ; `role_can` qui ne cite pas `user_org_role_code` ; `anon` avec EXECUTE sur `user_org_role_code` ou l'une des 4 RPC.
 
-- [ ] **Step 1 : Ajouter la section 4**
+- [x] **Step 1 : Ajouter la section 4**
 
 Juste avant `for (const a of avertissements) console.log('⚠️ ', a);` insérer :
 
@@ -956,7 +956,7 @@ Juste avant `for (const a of avertissements) console.log('⚠️ ', a);` insére
   console.log(`${orgRoles.length} profil(s) maison, ${overrides.length} surcharge(s) sur profil maison`);
 ```
 
-- [ ] **Step 2 : Vérifier sur le cluster de répétition (migrations jouées, cluster gardé)**
+- [x] **Step 2 : Vérifier sur le cluster de répétition (migrations jouées, cluster gardé)**
 
 Run :
 ```bash
@@ -964,7 +964,7 @@ node scripts/migration-rehearsal/run.mjs --migration supabase/migrations/2026100
 ```
 Expected : la ligne `0 profil(s) maison, 0 surcharge(s) sur profil maison` s'affiche (les assertions sont annulées par ROLLBACK) ; aucune erreur de la section 4 (les avertissements « pas encore sur role_can » existants restent des avertissements). Arrêter ensuite le cluster gardé (`run.mjs` sans `--keep` le remplace au prochain lancement).
 
-- [ ] **Step 3 : Commit**
+- [x] **Step 3 : Commit**
 
 ```bash
 git add scripts/permissions-coherence.mjs
