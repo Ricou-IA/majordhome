@@ -123,6 +123,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
       setDirty(false);
       queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, productId) });
       queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
+      queryClient.invalidateQueries({ queryKey: supplierKeys.productsByCategories(orgId) });
     } catch (err) {
       toast.error(err?.message || 'Erreur lors de la sauvegarde');
     } finally {

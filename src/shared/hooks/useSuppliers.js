@@ -210,6 +210,7 @@ export function useProductMutations(orgId, supplierId) {
 
   const invalidateAll = () => {
     if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productsByCategories(orgId) });
   };
 
   const createMutation = useMutation({
@@ -291,6 +292,7 @@ export function useProductImageMutations(orgId, productId, supplierId) {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: supplierKeys.productDetail(orgId, productId) });
     if (supplierId) queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productsByCategories(orgId) });
   };
 
   const uploadMutation = useMutation({

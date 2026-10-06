@@ -257,7 +257,11 @@ export const supplierKeys = {
   products: (orgId, supplierId) => [...supplierKeys.all(orgId), 'products', supplierId],
   productDetail: (orgId, productId) => [...supplierKeys.all(orgId), 'product', productId],
   productVariants: (orgId, parentId) => [...supplierKeys.all(orgId), 'variants', parentId],
-  productsByCategory: (orgId, category) => [...supplierKeys.all(orgId), 'products-by-category', category],
+  // Famille « catalogue par catégorie » (page /clim Dimensionnement, etc.) : toute mutation
+  // produit (CRUD, image, variante) l'invalide en bloc — une catégorie ne sait pas quel
+  // fournisseur vient de bouger.
+  productsByCategories: (orgId) => [...supplierKeys.all(orgId), 'products-by-category'],
+  productsByCategory: (orgId, category) => [...supplierKeys.productsByCategories(orgId), category],
   searchProducts: (orgId, query) => [...supplierKeys.all(orgId), 'search-products', query],
   productDocuments: (orgId, productId) => [...supplierKeys.all(orgId), 'product-documents', productId],
   productDocumentsByIds: (orgId, ids) => [...supplierKeys.all(orgId), 'product-documents-batch', ...(ids || [])],
