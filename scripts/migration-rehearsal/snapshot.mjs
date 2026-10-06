@@ -37,6 +37,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
   { schema: 'majordhome', table: 'pricing_rates', columns: null },
   { schema: 'majordhome', table: 'team_members', columns: null },
+  { schema: 'majordhome', table: 'commercials', columns: null }, // 20261005_1 : commercial_set_for_user (liste « Commercial assigné »)
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
   { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived'] }, // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
   { schema: 'majordhome', table: 'equipments', columns: null },

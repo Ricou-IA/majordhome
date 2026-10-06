@@ -15,6 +15,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
+import { useLeadCommercials, useSetLeadCommercial } from '@hooks/useLeads';
 import { useTeamMembers, useSetTeamMemberColor, useSetTeamMemberRouting, useEnsureTeamMember } from '@hooks/useAppointments';
 import { logger } from '@lib/logger';
 import {
@@ -368,6 +369,9 @@ function MemberRow({
   isUpdating,
   isUpdatingRole,
   onRoleChangeRequest,
+  isCommercial,
+  onCommercialChange,
+  isCommercialSaving,
   onColorChange,
   isColorSaving,
   onDailyBudgetChange,
@@ -436,6 +440,18 @@ function MemberRow({
             )}
           </div>
         )}
+      </td>
+
+      {/* Commercial : présent dans la liste « Commercial assigné » des leads */}
+      <td className="py-4 px-4">
+        <input
+          type="checkbox"
+          checked={isCommercial}
+          onChange={(e) => onCommercialChange(member, e.target.checked)}
+          disabled={!canEditColor || isCommercialSaving}
+          aria-label={`${member.profile?.full_name || 'Ce membre'} assignable aux leads`}
+          className="h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
+        />
       </td>
 
       {/* Couleur planning */}
@@ -568,6 +584,15 @@ export default function TeamManagement() {
   const { setColor } = useSetTeamMemberColor(orgId);
   const { setRoutingSettings } = useSetTeamMemberRouting(orgId);
   const { ensureTeamMember } = useEnsureTeamMember(orgId);
+  // Liste « Commercial assigné » des leads : un membre y figure s'il a une ligne
+  // active dans majordhome.commercials (reliée par profile_id).
+  const { commercials } = useLeadCommercials(orgId);
+  const { setCommercial } = useSetLeadCommercial(orgId);
+  const commercialUserIds = useMemo(
+    () => new Set(commercials.map((c) => c.profile_id).filter(Boolean)),
+    [commercials],
+  );
+  const [savingCommercialId, setSavingCommercialId] = useState(null);
   // Compétences (type × rôle) des techniciens : compteurs sur la ligne, grille dans SkillsPanel.
   const technicianIds = useMemo(
     () => (teamMembers || []).filter((t) => t.role === 'technician').map((t) => t.id),
@@ -702,6 +727,28 @@ export default function TeamManagement() {
   };
 
   /**
+   * Inscrit / retire un membre de la liste « Commercial assigné » des leads.
+   * Retirer ne désassigne rien : les leads déjà attribués gardent leur commercial.
+   */
+  const handleCommercialChange = async (member, active) => {
+    setSavingCommercialId(member.user_id);
+    const name = member.profile?.full_name || 'Ce membre';
+    try {
+      await setCommercial({ userId: member.user_id, active });
+      toast.success(
+        active
+          ? `${name} est assignable aux leads`
+          : `${name} n'est plus proposé à l'assignation des leads`
+      );
+    } catch (err) {
+      logger.error('[TeamManagement] setCommercial failed', err);
+      toast.error('Erreur lors de la mise à jour de la liste des commerciaux');
+    } finally {
+      setSavingCommercialId(null);
+    }
+  };
+
+  /**
    * Change la couleur planning d'un membre (team_member.calendar_color).
    */
   const handleColorChange = async (teamMemberId, color) => {
@@ -818,6 +865,10 @@ export default function TeamManagement() {
                   Changer le rôle
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
+                  Commercial
+                  <span className="block text-xs font-normal text-secondary-400">Assignable aux leads</span>
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Couleur planning
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
@@ -851,6 +902,9 @@ export default function TeamManagement() {
                     isUpdating={updatingUserId === member.user_id}
                     isUpdatingRole={isUpdatingRole}
                     onRoleChangeRequest={handleRoleChangeRequest}
+                    isCommercial={commercialUserIds.has(member.user_id)}
+                    onCommercialChange={handleCommercialChange}
+                    isCommercialSaving={savingCommercialId === member.user_id}
                     onColorChange={handleColorChange}
                     isColorSaving={!!tm && savingColorId === tm.id}
                     onDailyBudgetChange={handleDailyBudgetChange}

@@ -188,6 +188,28 @@ export const leadsService = {
     }, 'leads.getCommercials');
   },
 
+  /**
+   * Inscrit / retire un membre de la liste des commerciaux assignables aux leads.
+   * RPC SECURITY DEFINER org_admin only (seul écrivain de majordhome.commercials).
+   * Retirer = is_active false : les leads déjà assignés gardent leur commercial.
+   * @param {Object} params
+   * @param {string} params.coreOrgId - core.organizations.id
+   * @param {string} params.userId - auth.users.id du membre
+   * @param {boolean} params.active
+   */
+  async setCommercialForUser({ coreOrgId, userId, active }) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('commercial_set_for_user', {
+        p_core_org_id: coreOrgId,
+        p_user_id: userId,
+        p_active: active,
+      });
+
+      if (error) throw error;
+      return data;
+    }, 'leads.setCommercialForUser');
+  },
+
   // ==========================================================================
   // CRUD LEADS
   // ==========================================================================

@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsService } from '@services/leads.service';
 import { auditService } from '@services/audit.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
-import { leadKeys, clientKeys, appointmentKeys, kanbanCardKeys, chantierKeys, interventionKeys } from '@hooks/cacheKeys';
+import { leadKeys, clientKeys, appointmentKeys, kanbanCardKeys, chantierKeys, interventionKeys, metaAdsKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 
 // Re-export for backward compatibility
@@ -291,6 +291,23 @@ export function useLeadCommercials(orgId) {
   });
 
   return { commercials: commercials || [], isLoading, error };
+}
+
+/**
+ * Mutation : inscrit / retire un membre de la liste des commerciaux assignables
+ * (Settings → Équipe, case « Commercial »). org_admin only côté RPC.
+ */
+export function useSetLeadCommercial(orgId) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: ({ userId, active }) =>
+      unwrapResult(leadsService.setCommercialForUser({ coreOrgId: orgId, userId, active })),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadKeys.commercials(orgId) });
+      queryClient.invalidateQueries({ queryKey: metaAdsKeys.commercials(orgId) });
+    },
+  });
+  return { setCommercial: mutation.mutateAsync, isSaving: mutation.isPending };
 }
 
 // ============================================================================
