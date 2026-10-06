@@ -165,3 +165,14 @@
 - Page `/clim` (`resource=devis`, module CRM) ; `?lead=<id>` → `CreateDevisModal` avec `initialLines` / `initialFamily` (section ÉQUIPEMENT = unités / groupe, ACCESSOIRES = liaisons). Lien « Dimensionner une climatisation » dans la section devis du lead.
 - Gotcha : le jeton `SUPABASE_ACCESS_TOKEN` de `.env.local` était périmé (401) → import appliqué via le connecteur MCP `execute_sql` (un DO block de 22 Ko passe en un appel).
 ---
+
+## [2026-10-06 21:00] Paramétrage des devis par entreprise (Settings → Socle → Devis)
+**Statut** : PENDING
+**Commit** : (voir git log « feat(devis): paramétrage des devis par entreprise »)
+**Contexte** : Les familles d'installation, les chapitres de chaque famille et toutes les mentions du devis (titre, intro, acompte, conditions, mention spéciale, validité, signature, pied, bloc paiement, colonnes affichées) sont maintenant dans `settings.devis`, édités dans un écran à aperçu cliquable calqué sur l'éditeur de modèle Pennylane.
+**Proposition** : section CLAUDE.md « Module Devis — paramétrage et modèle de document » :
+- **`settings.devis` = source unique** (défauts = ancien code en dur) via `buildDevisConfig(settings)` (`src/lib/devisConfig.js`). `QUOTE_TEMPLATE_FAMILIES` / `FAMILY_DEFAULT_SECTIONS` de `devis.service` ne sont plus que les DÉFAUTS : tout écran passe la config (`buildDefaultSections(famille, config)`, `productCategoryForSection(section, famille, config)`, `famillesActives`). Une famille = `{ key immuable, label, actif, categorie produit du picker, sections }` ; les devis existants portent le label (`familleDe` résout key OU label).
+- **Le picker du « + » d'une section** prend la catégorie de la SECTION si c'en est une (POÊLE, FUMISTERIE), sinon celle de la FAMILLE. Avant, « ÉQUIPEMENT » cherchait un fournisseur « equipement » : picker vide en silence (vécu clim 2026-10-06).
+- **Modèle de document unique `src/lib/devisDocumentModel.js`** (`buildDevisDocumentModel`, `ZONES`, `exempleDevis`, testé dans `audit:quality`) : le PDF (`DevisPDF.jsx`) et l'aperçu (`settings/devis/ApercuDevis.jsx`) ne calculent ni ne formatent rien. Ajouter une zone = modèle + ZONES + PDF + aperçu. `generateDevisPdfBlob(model)` prend le modèle, plus `(data, company)`.
+- Gotcha outillage (déjà en mémoire feedback_bash_heredoc_backslashes) : le Bash tool divise par deux les barres obliques inverses même dans un heredoc quoté ; un script Python inline qui veut écrire une apostrophe échappée produit une apostrophe nue (parse error vécu dans modules.js). Tout script contenant des barres obliques inverses passe par un fichier écrit avec Write.
+---
