@@ -61,16 +61,17 @@ export function usePermissions(orgId) {
  *         can('pipeline', 'view') → true/false
  */
 export function useCanAccess() {
-  const { effectiveRole, organization, user } = useAuth();
+  const { effectiveRole, orgRole, organization, user } = useAuth();
   const { permissionMap, isLoading } = usePermissions(organization?.id);
+  const orgRoleCode = orgRole?.code || null;
 
   const can = useCallback(
     (resource, action) => {
       // Pendant le chargement, org_admin a toujours accès, les autres non
       if (isLoading) return effectiveRole === 'org_admin';
-      return hasPermission(permissionMap, effectiveRole, resource, action);
+      return hasPermission(permissionMap, effectiveRole, resource, action, orgRoleCode);
     },
-    [permissionMap, effectiveRole, isLoading]
+    [permissionMap, effectiveRole, orgRoleCode, isLoading]
   );
 
   /**
@@ -107,6 +108,7 @@ export function useCanAccess() {
     canEdit,
     isOwner,
     effectiveRole,
+    orgRole,
     permissionsLoading: isLoading,
   };
 }

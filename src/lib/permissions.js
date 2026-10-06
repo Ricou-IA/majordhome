@@ -140,10 +140,10 @@ export function buildPermissionMap(rows) {
  * @param {string} action - Ex: 'view', 'create', 'edit', 'delete'
  * @returns {boolean}
  */
-export function hasPermission(permissionMap, role, resource, action) {
-  // Délègue au registre : org_admin bypass, sinon override per-org (permissionMap)
-  // s'il existe, sinon défaut app-level. permissionMap = map des overrides per-org.
-  return resolvePermission(permissionMap, role, resource, action);
+export function hasPermission(permissionMap, role, resource, action, orgRoleCode = null) {
+  // Délègue au registre : org_admin bypass, puis surcharge du profil maison (orgRoleCode),
+  // puis surcharge per-org du rôle standard, puis défaut app-level.
+  return resolvePermission(permissionMap, role, resource, action, orgRoleCode);
 }
 
 /**
@@ -154,10 +154,10 @@ export function hasPermission(permissionMap, role, resource, action) {
  * @param {string} resource - Ex: 'pipeline'
  * @returns {Object} - Ex: { view: true, create: false, edit: false, ... }
  */
-export function getResourcePermissions(permissionMap, role, resource) {
+export function getResourcePermissions(permissionMap, role, resource, orgRoleCode = null) {
   const result = {};
   for (const a of ACTIONS) {
-    result[a.key] = resolvePermission(permissionMap, role, resource, a.key);
+    result[a.key] = resolvePermission(permissionMap, role, resource, a.key, orgRoleCode);
   }
   return result;
 }

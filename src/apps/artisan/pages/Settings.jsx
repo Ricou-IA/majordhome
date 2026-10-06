@@ -33,7 +33,7 @@ import {
 const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail, MessageSquare, Sun, Thermometer, Receipt, BookOpen, ClipboardCheck, Flame, Phone };
 
 export default function Settings() {
-  const { organization, effectiveRole, isOrgAdmin } = useAuth();
+  const { organization, effectiveRole, orgRole, isOrgAdmin } = useAuth();
   const { settings } = useOrgSettings();
 
   // Socle en tête, puis les modules ; un module sans tuile visible pour ce rôle
@@ -63,7 +63,9 @@ export default function Settings() {
                 {organization.name}
               </h2>
               <p className="text-sm text-secondary-600">
-                Votre rôle : {ROLE_LABELS[effectiveRole] || effectiveRole}
+                Votre rôle : {orgRole
+                  ? `${orgRole.label} (d’après ${ROLE_LABELS[orgRole.baseRole] || orgRole.baseRole})`
+                  : (ROLE_LABELS[effectiveRole] || effectiveRole)}
               </p>
             </div>
           </div>

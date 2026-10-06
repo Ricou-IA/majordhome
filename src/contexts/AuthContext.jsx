@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [organization, setOrganization] = useState(null);
   const [membership, setMembership] = useState(null);
+  const [orgRole, setOrgRole] = useState(null);         // Profil « maison » (20261006_1), null = rôle standard
   const [clientRecord, setClientRecord] = useState(null); // Portail client
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
@@ -58,6 +59,16 @@ export function AuthProvider({ children }) {
       if (userOrg) setOrganization(userOrg);
       if (userMembership) setMembership(userMembership);
 
+      // Profil maison : chargé APRÈS l'org, null si aucun / inactif / erreur.
+      // En cas d'erreur l'écran retombe sur le modèle (plus large) — la base, elle,
+      // applique toujours le profil via role_can : un geste non permis échouera bruyamment.
+      if (userOrg?.id) {
+        const roleResult = await authService.getMemberOrgRole(userId, userOrg.id);
+        setOrgRole(roleResult.orgRole);
+      } else {
+        setOrgRole(null);
+      }
+
       return { isClient: isClientUser };
     } catch (error) {
       console.error('[AuthContext] loadUserData error:', error);
@@ -70,6 +81,7 @@ export function AuthProvider({ children }) {
     setProfile(null);
     setOrganization(null);
     setMembership(null);
+    setOrgRole(null);
     setClientRecord(null);
     // Sécurité multi-tenant : vider tout le cache React Query au reset
     // (logout ou changement d'identité) pour éviter qu'un user voie les
@@ -296,7 +308,9 @@ export function AuthProvider({ children }) {
   const isTeamLeaderOrAbove = authService.isTeamLeaderOrAbove(membership);
   const canAccessPipeline = isOrgAdminFromProfile || isCommercialBusiness;
 
-  // Sprint 7 : rôle effectif unique (org_admin | team_leader | commercial | technicien)
+  // Sprint 7 : rôle effectif unique (org_admin | team_leader | commercial | technicien).
+  // Reste le rôle STANDARD même quand l'utilisateur porte un profil maison (= son modèle) ;
+  // seule la grille Droits d'accès (can()) distingue le profil via orgRole.code.
   const effectiveRole = computeEffectiveRole(profile, membership);
 
   // Portail client
@@ -314,7 +328,7 @@ export function AuthProvider({ children }) {
     isAuthenticated, hasOrganization,
     isOrgAdmin, isTeamLeader, isTeamLeaderOrAbove,
     appRole, businessRole, isOrgAdminFromProfile, isCommercialBusiness, canAccessPipeline,
-    effectiveRole,
+    effectiveRole, orgRole,
     isClient, clientId, clientProjectId, clientRecord,
     signIn, signUp, signOut, signInWithGoogle,
     resetPassword, updatePassword, updateProfile,

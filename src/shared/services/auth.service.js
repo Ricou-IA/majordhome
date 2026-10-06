@@ -402,6 +402,31 @@ export const authService = {
   },
 
   /**
+   * Profil « maison » ACTIF porté par l'utilisateur dans l'org (20261006_1), sinon null.
+   * Vue security_invoker (RLS membre de l'org). Lecture seule.
+   * @returns {Promise<{orgRole: {id, code, label, baseRole}|null, error: Error|null}>}
+   */
+  async getMemberOrgRole(userId, orgId) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_member_org_roles')
+        .select('org_role_id, code, label, base_role, is_active')
+        .eq('org_id', orgId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data || data.is_active === false) return { orgRole: null, error: null };
+      return {
+        orgRole: { id: data.org_role_id, code: data.code, label: data.label, baseRole: data.base_role },
+        error: null,
+      };
+    } catch (error) {
+      console.error('[authService] getMemberOrgRole error:', error);
+      return { orgRole: null, error };
+    }
+  },
+
+  /**
    * Rejoint une organisation via un code d'invitation
    * @param {string} inviteCode - Code d'invitation
    * @returns {Promise<{organization: Object|null, error: Error|null}>}
