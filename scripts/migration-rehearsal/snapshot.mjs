@@ -95,6 +95,13 @@ const FUNCTIONS = [
   // supprimée en prod par 20260930_15 — ne plus la lister (le cast ::regprocedure échouerait).
   'majordhome.user_effective_role(uuid)',
   'majordhome.role_can(uuid, text, text)',
+  // 20261006_1..2 (profils maison) : appelées par member_set_org_role / org_role_delete,
+  // et org_upsert_role_permission doit traverser le trigger role_permissions_check_role.
+  'core.update_member_role(uuid, uuid, text, text, text)',
+  'public.update_member_role(uuid, uuid, text, text, text)',
+  'public.team_member_sync_role_for_user(uuid, uuid)',
+  'majordhome.planning_role_for(text, text, text)',
+  'public.org_upsert_role_permission(uuid, text, text, text, boolean)',
   // 20260930_16..18 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
   'majordhome.chantier_ensure_for_quote()', // trigger de prod sur lead_pennylane_quotes (20260930_16) : sans elle le schéma ne charge plus
