@@ -7,10 +7,11 @@
  */
 
 import { Component } from 'react';
+import { Link } from 'react-router-dom';
 import { useDevisByLead } from '@hooks/useDevis';
 
 import { formatEuro } from '@/lib/utils';
-import { FileText, Plus, ChevronRight, Loader2, Send } from 'lucide-react';
+import { FileText, Plus, ChevronRight, Loader2, Send, Snowflake } from 'lucide-react';
 
 // Error boundary pour isoler les erreurs
 class DevisErrorBoundary extends Component {
@@ -97,6 +98,13 @@ function SectionDevisContent({ leadId, onCreateDevis, onOpenDevis, onSendDevis }
           >
             <Plus className="w-4 h-4" /> Ajouter un devis
           </button>
+          {/* Dimensionnement clim (/clim?lead=) : le devis se crée depuis la page avec les lignes proposées */}
+          <Link
+            to={`/clim?lead=${leadId}`}
+            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <Snowflake className="w-3.5 h-3.5" /> Dimensionner une climatisation
+          </Link>
         </div>
       )}
     </>

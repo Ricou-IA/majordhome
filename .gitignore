@@ -13,6 +13,7 @@ dist-ssr/
 build/
 *.local
 scripts/fumisterie/out/
+scripts/clim/out/
 
 # =============================================================================
 # ENVIRONMENT VARIABLES

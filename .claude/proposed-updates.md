@@ -138,3 +138,30 @@
 - **`chantiers.realized_date` figée par trigger `chantiers_freeze_realized_date`** (20261001_2) au passage en realise/facture = dernier jour d'installation actif, écrite une seule fois (un PV signé 6 mois après ou un RDV déplacé ne la changent pas). Vue : `COALESCE(figée, dernier RDV posé)`, repli pour les chantiers nés réceptionnés sans RDV (NULL → la carte retombe sur la signature).
 - **Harnais** : `majordhome.chantiers`, `chantier_quote_stats`, `majordhome_chantiers_write`, `chantier_ensure_for_quote()` sont dans les listes de `snapshot.mjs` depuis 20261001_2 (le trigger de prod cassait le chargement du schéma) ; la chaîne fixture + 20260930_16..18 ne se rejoue plus sur une photo récente (la table existe déjà, le trigger crée les chantiers à la fixture) — `assert-chantiers.sql` est figé sur la prod du 2026-09-30.
 ---
+
+## [2026-10-01 14:30] Certificat d'entretien : la signature clôture en un geste, « Réalisé » avant le PDF
+**Statut** : PENDING
+**Commit** : (non commité — CertificatWizard.jsx, StepSignature.jsx)
+**Contexte** : 7 certificats signés par Antoine (25/09 et 01/10) sans PDF ni bascule « Réalisé » : la clôture attendait un 2ᵉ bouton « Valider et générer le certificat PDF » jamais pressé après le toast « Signature enregistrée ». Preuve : syncEquipmentBack (1ʳᵉ instruction du bouton) n'avait jamais écrit marque/modèle alors que l'UPDATE passe pour son rôle. Depuis, « Valider la signature » enchaîne tout, et markRealise précède la génération du PDF.
+**Proposition** : ajouter sous « Module Entretiens » : « **Certificat = un seul geste** : `CertificatWizard.handleSign` → `finaliser()` enchaîne signature → `markRealise` → PDF → Storage. `markRealise` passe TOUJOURS avant le rendu react-pdf (la carte du kanban ne dépend jamais d'un rendu réussi côté navigateur) ; sans ligne `certificats` en base, pas de clôture. Le bouton « Valider et générer » ne sert qu'à reprendre un certificat signé sans PDF. Ne jamais réintroduire une étape de validation après la signature. »
+---
+
+## [2026-10-06 14:00] Profils « maison » par organisation (tranches 1-2 livrées)
+**Statut** : PENDING
+**Commit** : cda54c9 → 4758b85 + tranche 2 (PermissionsEditor, TeamManagement)
+**Contexte** : une org cliente a ses métiers (secrétaire, assistant commercial…). Un profil maison = libellé + MODÈLE standard (team_leader | commercial | technicien) ; seule la grille Droits d'accès le distingue de son modèle. Spec `docs/superpowers/specs/2026-10-06-profils-maison-par-org-design.md`, plans `2026-10-06-profils-maison-tranche-1-base.md` / `-tranche-2-ecrans.md`. Migrations `20261006_1_org_roles`, `20261006_2_org_roles_rpc` appliquées en prod le 2026-10-06.
+**Proposition** (CLAUDE.md, section « Rôles & Permissions », après « Droits app-level ») :
+- **Profils maison** : `majordhome.org_roles` (libellé + `base_role` ∈ team_leader|commercial|technicien, code immuable) et `member_org_roles` (au plus un par membre). **Le modèle est le rôle vu par tout le code en dur** (`user_effective_role`, `effectiveRole` front, edges `requiredRole`, rôle planning) ; `member_set_org_role` réaligne les champs `core` sur le modèle. Seule la grille distingue le profil : `role_can` consulte `role_permissions(org, code maison)` avant la chaîne modèle → défaut ; `resolvePermission(…, orgRoleCode)` reproduit la chaîne côté front (`useAuth().orgRole`, `useCanAccess().can`). `role_permissions.role` = standard OU code maison de la même org (trigger). Profil désactivé ⇒ `user_org_role_code` NULL ⇒ verdict du modèle. Changer de modèle = recréer (jamais d'UPDATE de `base_role`). Mesure : `permissions-coherence.mjs` section 4 ; tests `scripts/org-roles.test.mjs`, `scripts/permissions-resolve.test.mjs`. Non livré : « réinitialiser au modèle » (aucune RPC de suppression de surcharge).
+---
+
+## [2026-10-06 18:00] Module Climatisation — catalogue Solipac, moteur de dimensionnement, page /clim
+**Statut** : PENDING
+**Commit** : (non commité en fin de session)
+**Contexte** : Import du tarif Solipac (60 articles Hitachi airHome / Airzone / liaisons) dans `supplier_products`, moteur pur `src/lib/clim/` testé sur le tarif réel, page `/clim` qui crée le devis d'un lead, réglages `settings.clim`. Le site Mayer copie le moteur (brief dans son dépôt).
+**Proposition** : nouvelle section CLAUDE.md « Module Climatisation (dimensionnement → devis) » :
+- **Catalogue Solipac** = `scripts/clim/import-tarif-solipac.mjs` ← `scripts/clim/data/solipac-2026-10.json` (fournisseur « SOLIPAC », `category='climatisation'`, `specs.canonical` porte type / kW / sorties / diamètres). Règles Eric 2026-10-06 : prix « par 3 / lot de 3 » = prix unitaire ; `purchase_price_ht` = net + DEEE ; **`selling_price_ht` saisi à la main dans Settings → Fournisseurs, jamais écrit par l'import** (nouvel article à 0 = « À CHIFFRER » sur le devis). CET 1,5 % = frais de commande, hors article.
+- **Moteur PUR `src/lib/clim/`** (`config.js` + `dimensionnement.js`, `ENGINE_VERSION`), point d'entrée `dimensionner(releve, produits, cfg)`, testé `node --test scripts/clim/dimensionnement.test.mjs` (dans `audit:quality`) sur le tarif réel. **Copié tel quel par le site Mayer** (`C:\Dev\Landing Page - Mayer`, brief `docs/superpowers/specs/2026-10-06-simulateur-clim-design.md`) : toute modif de règle = ici + test + `ENGINE_VERSION`, puis recopie. Côté site, catalogue VIDE (besoins en kW, jamais de marque ni de prix).
+- Règles chiffrées et « provisoires » dans `settings.clim` (Settings → Socle → Climatisation), jamais en dur. Le chauffage n'est pas calculé (module Thermique).
+- Page `/clim` (`resource=devis`, module CRM) ; `?lead=<id>` → `CreateDevisModal` avec `initialLines` / `initialFamily` (section ÉQUIPEMENT = unités / groupe, ACCESSOIRES = liaisons). Lien « Dimensionner une climatisation » dans la section devis du lead.
+- Gotcha : le jeton `SUPABASE_ACCESS_TOKEN` de `.env.local` était périmé (401) → import appliqué via le connecteur MCP `execute_sql` (un DO block de 22 Ko passe en un appel).
+---

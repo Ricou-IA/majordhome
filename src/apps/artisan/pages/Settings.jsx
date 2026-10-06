@@ -20,6 +20,7 @@ import {
   ClipboardCheck,
   Flame,
   Phone,
+  Snowflake,
   HelpCircle,
 } from 'lucide-react';
 
@@ -30,7 +31,7 @@ import {
 // Le registre est un module pur : il nomme ses icônes, la page les résout.
 // ⚠️ Toute icône citée dans modules.js doit être listée ici, sinon la tuile
 // affiche un « ? » (HelpCircle) — vécu sur Facturation Pennylane, 2026-09-21.
-const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail, MessageSquare, Sun, Thermometer, Receipt, BookOpen, ClipboardCheck, Flame, Phone };
+const ICONS = { Building2, Users, Shield, Wrench, Truck, Calculator, Route, Mail, MessageSquare, Sun, Thermometer, Receipt, BookOpen, ClipboardCheck, Flame, Phone, Snowflake };
 
 export default function Settings() {
   const { organization, effectiveRole, orgRole, isOrgAdmin } = useAuth();

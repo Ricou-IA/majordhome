@@ -34,6 +34,7 @@ import {
   ShoppingCart,
   Thermometer,
   ClipboardCheck,
+  Snowflake,
 } from 'lucide-react';
 
 // =============================================================================
@@ -58,6 +59,8 @@ const navigation = [
   { name: 'Meta Ads',    href: '/meta-ads',    icon: Megaphone,     resource: 'meta_ads' },
   { name: 'Solaire',     href: '/solaire',     icon: Sun,           resource: 'pv_calculator', module: 'solaire' },
   { name: 'Thermique',   href: '/thermique',   icon: Thermometer,   resource: 'thermal_study', module: 'thermique' },
+  // Dimensionnement clim : aide à la vente du socle, ouverte à qui voit les devis.
+  { name: 'Climatisation', href: '/clim',      icon: Snowflake,     resource: 'devis' },
   // Tâches récurrentes : libellé = vocabulaire de l'org (« Maintenance », « Traçabilité »…).
   { name: 'Maintenance', href: '/maintenance', icon: ClipboardCheck, resource: 'maintenance', module: 'maintenance' },
 ];

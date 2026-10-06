@@ -18,20 +18,26 @@ import { X, Loader2 } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { toast } from 'sonner';
 
-export default function CreateDevisModal({ lead, onClose, onCreated }) {
+/**
+ * @param {object} p
+ * @param {object} p.lead
+ * @param {Array<object>} [p.initialLines] lignes pré-remplies (ex. dimensionnement clim /clim) — sections comprises
+ * @param {string} [p.initialFamily] famille d'installation pré-sélectionnée (QUOTE_TEMPLATE_FAMILIES)
+ */
+export default function CreateDevisModal({ lead, onClose, onCreated, initialLines = null, initialFamily = '' }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
   const { createQuote, isCreating } = useDevisMutations(lead?.id);
   const { saveMetre } = useFumMetreMutations(orgId);
 
-  const [lines, setLines] = useState([]);
+  const [lines, setLines] = useState(() => (Array.isArray(initialLines) ? initialLines : []));
   // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
   const [metre, setMetre] = useState(null);
   const [form, setForm] = useState({ subject: '', validityDays: '30', conditions: '', notesInternes: '', globalDiscountPercent: '0' });
 
   // Templates
   const [templates, setTemplates] = useState([]);
-  const [selectedFamily, setSelectedFamily] = useState('');
+  const [selectedFamily, setSelectedFamily] = useState(initialFamily || '');
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
 
   useEffect(() => {

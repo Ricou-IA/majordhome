@@ -34,6 +34,8 @@ export const MODULES = [
       // socle, pas Communication.
       { key: 'emails', title: 'Emails', description: 'Expéditeur, adresse de réponse, domaine d\'envoi', icon: 'Mail', href: '/settings/emails', adminOnly: true, horsCrm: true },
       { key: 'plan-comptable', title: 'Plan comptable', description: 'Les comptes de vente Pennylane utilisables dans Majord\'home', icon: 'BookOpen', href: '/settings/plan-comptable', adminOnly: true },
+      // Aide à la vente du socle (devis clim) : règles du dimensionnement, moteur src/lib/clim/.
+      { key: 'clim', title: 'Climatisation', description: 'Règles de dimensionnement : W/m², expositions, vitrage, multi-split, liaisons', icon: 'Snowflake', href: '/settings/clim', adminOnly: true },
     ],
   },
   {
@@ -170,7 +172,7 @@ export function accueilSansCrm(settings) {
 const ROUTES_PAR_MODULE = {
   socle: [
     'settings', 'settings/team', 'settings/permissions', 'settings/organization', 'settings/suppliers',
-    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'profile',
+    'settings/equipements', 'settings/emails', 'settings/pennylane', 'settings/plan-comptable', 'settings/clim', 'profile',
   ],
   entretiens: [
     'contrats', 'entretiens', 'certificat/:interventionId', 'clients/:clientId/contrat/signer',

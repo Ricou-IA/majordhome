@@ -77,6 +77,10 @@ const SolaireAutoconso = lazy(() => import('@apps/solaire/pages/AutoconsoSimulat
 const MaintenancePage = lazy(() => import('@apps/maintenance/pages/Maintenance'));
 const MaintenanceSettings = lazy(() => import('./pages/settings/MaintenanceSettings'));
 
+// Climatisation (dimensionnement)
+const ClimDimensionnement = lazy(() => import('@apps/clim/pages/Dimensionnement'));
+const ClimSettings = lazy(() => import('./pages/settings/ClimSettings'));
+
 // Thermique (étude de déperditions)
 const ThermiqueWizard = lazy(() => import('@apps/thermique/pages/ThermiqueWizard'));
 const ThermiqueHistorique = lazy(() => import('@apps/thermique/pages/ThermiqueHistorique'));
@@ -369,6 +373,26 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <FumisterieSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/clim',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <ClimSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'clim',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="devis">
+          <ClimDimensionnement />
         </RouteGuard>
       </SuspenseWrapper>
     ),
