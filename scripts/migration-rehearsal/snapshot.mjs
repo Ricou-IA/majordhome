@@ -63,6 +63,8 @@ const TABLES = [
   // (la purge se vérifie sur les vraies lignes), tasks pour ses policies role_can.
   { schema: 'majordhome', table: 'app_role_permissions', columns: null },
   { schema: 'majordhome', table: 'role_permissions', columns: null },
+  { schema: 'majordhome', table: 'org_roles', columns: null }, // 20261006_1 : profils maison
+  { schema: 'majordhome', table: 'member_org_roles', columns: null },
   { schema: 'majordhome', table: 'tasks', columns: null, data: false },
   { schema: 'majordhome', table: 'journees_secteur', columns: null, data: false }, // 20261004_3 : auto_rdv_poser (journée figée, étiquette déduite)
 ];
@@ -102,6 +104,14 @@ const FUNCTIONS = [
   'public.team_member_sync_role_for_user(uuid, uuid)',
   'majordhome.planning_role_for(text, text, text)',
   'public.org_upsert_role_permission(uuid, text, text, text, boolean)',
+  // 20261006_1..2 en prod : objets des profils maison
+  'majordhome.role_permissions_check_role()',
+  'majordhome.user_org_role_code(uuid)',
+  'majordhome.org_roles_require_admin(uuid)',
+  'public.org_role_create(uuid, text, text)',
+  'public.org_role_update(uuid, text, boolean)',
+  'public.org_role_delete(uuid)',
+  'public.member_set_org_role(uuid, uuid, uuid)',
   // 20260930_16..18 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
   'majordhome.chantier_ensure_for_quote()', // trigger de prod sur lead_pennylane_quotes (20260930_16) : sans elle le schéma ne charge plus
@@ -109,7 +119,7 @@ const FUNCTIONS = [
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
-const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits', 'majordhome.contracts', 'majordhome.lead_pennylane_quotes'];
+const TRIGGER_TABLES = ['majordhome.equipments', 'majordhome.maintenance_visits', 'majordhome.contracts', 'majordhome.lead_pennylane_quotes', 'majordhome.role_permissions'];
 
 const VIEWS = [
   'public.profiles', // cible des sous-requêtes « nom de l'auteur » des vues majordhome_* (interactions prospects…)
@@ -131,6 +141,8 @@ const VIEWS = [
   // 20260930_16 : cibles du CREATE OR REPLACE
   'public.majordhome_lead_pennylane_quotes',
   'public.majordhome_appointments',
+  'public.majordhome_org_roles', // 20261006_1 : profils maison
+  'public.majordhome_member_org_roles',
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
@@ -142,6 +154,7 @@ const POLICY_TABLES = [
   'leads', 'contracts', 'quotes', 'tasks',
   // 20260930_14 : purge des surcharges (lecture org / écriture org_admin)
   'role_permissions', 'app_role_permissions',
+  'org_roles', 'member_org_roles', // 20261006_1
 ];
 
 function lireEnv(fichier) {

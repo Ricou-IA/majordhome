@@ -982,9 +982,9 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Pré-requis** : accord explicite d'Eric pour appliquer en prod (ce plan ne le présume pas).
 
-- [ ] **Step 1 : Appliquer les deux migrations** via le MCP Supabase `apply_migration` (projet `ejqqqwudmizqisdkxohw`), noms `20261006_1_org_roles` puis `20261006_2_org_roles_rpc`, contenu = les fichiers tels que commités.
+- [x] **Step 1 : Appliquer les deux migrations** via le MCP Supabase `apply_migration` (projet `ejqqqwudmizqisdkxohw`), noms `20261006_1_org_roles` puis `20261006_2_org_roles_rpc`, contenu = les fichiers tels que commités.
 
-- [ ] **Step 2 : Vérifier l'effet réel (jamais en relisant le SQL)**
+- [x] **Step 2 : Vérifier l'effet réel (jamais en relisant le SQL)**
 
 Via `execute_sql` :
 
@@ -1002,9 +1002,9 @@ Expected : `anon_*` = false, `auth_insert_org_roles` = false, `service_select` =
 
 Puis : `node scripts/permissions-coherence.mjs --env C:/Dev/Frontend-Majordhome/.env.local` → sortie 0, `0 profil(s) maison`.
 
-- [ ] **Step 3 : Contrôle de non-régression à l'écran** — se connecter (Eric) : Droits d'accès et Gestion de l'équipe s'affichent comme avant ; aucune ligne d'erreur `role_permissions` dans les `postgres_logs`.
+- [x] **Step 3 : Contrôle de non-régression à l'écran** — se connecter (Eric) : Droits d'accès et Gestion de l'équipe s'affichent comme avant ; aucune ligne d'erreur `role_permissions` dans les `postgres_logs`.
 
-- [ ] **Step 4 : Mettre à jour le harnais et commiter**
+- [x] **Step 4 : Mettre à jour le harnais et commiter**
 
 ```bash
 git add scripts/migration-rehearsal/snapshot.mjs
