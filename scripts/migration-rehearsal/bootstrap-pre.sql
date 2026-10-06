@@ -19,6 +19,7 @@ GRANT USAGE ON SCHEMA public, core, majordhome TO anon, authenticated, service_r
 -- sont appelés qualifiés (extensions.crypt) par les RPC du module Maintenance.
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public; -- comme en prod (public.unaccent, 1.1) : org_role_create (20261006_2)
 GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
 
 -- Stub Supabase : auth.uid() lit la claim `sub` posée par les tests via
