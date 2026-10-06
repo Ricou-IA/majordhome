@@ -7,7 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Loader2, RotateCcw, Snowflake, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { useAllProducts } from '@hooks/useSuppliers';
+import { useProductsByCategory } from '@hooks/useSuppliers';
 import { useLead } from '@hooks/useLeads';
 import { buildDefaultSections } from '@services/devis.service';
 import { buildClimConfig } from '@/lib/clim/config.js';
@@ -48,8 +48,9 @@ function DimensionnementInner({ cfg }) {
   const [searchParams] = useSearchParams();
   const leadId = searchParams.get('lead');
   const { lead } = useLead(leadId);
-  const { products, isLoading: chargementCatalogue } = useAllProducts(orgId);
-  const produitsClim = useMemo(() => (products || []).filter((p) => p.category === 'climatisation'), [products]);
+  // Lecture filtrée côté base : la liste « tous les produits » est plafonnée à 1 000 lignes par PostgREST
+  // et Solipac n'y apparaissait jamais derrière les 24 000 articles de fumisterie.
+  const { products: produitsClim, isLoading: chargementCatalogue } = useProductsByCategory(orgId, 'climatisation');
 
   const [releve, setReleve] = useState(() => loadDraft(userId) || releveInitial(cfg.gamme_defaut));
   useEffect(() => { saveDraft(userId, releve); }, [userId, releve]);

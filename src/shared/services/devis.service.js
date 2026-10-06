@@ -50,6 +50,33 @@ export const FAMILY_DEFAULT_SECTIONS = {
   'Autre': ['PRESTATIONS', 'MAIN D\'ŒUVRE'],
 };
 
+// Catégorie produit (PRODUCT_CATEGORIES de suppliers.service) portée par la famille d'installation,
+// pour les sections dont le nom n'est pas lui-même une catégorie (« ÉQUIPEMENT », « ACCESSOIRES »…).
+export const FAMILY_PRODUCT_CATEGORY = {
+  'Poêle à Granulé': 'poele',
+  'Poêle à Bois': 'poele',
+  'Climatisation': 'climatisation',
+  'Chauffage/PAC': 'chauffage',
+};
+
+const normaliserCategorie = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const CATEGORIES_PRODUIT = new Set(['poele', 'climatisation', 'chauffage', 'fumisterie']);
+
+/**
+ * Catégorie produit à proposer au picker pour une section d'un devis : le nom de la section s'il est
+ * une catégorie (« POÊLE », « FUMISTERIE »), sinon celle de la famille (« ÉQUIPEMENT » d'un devis
+ * Climatisation ⇒ climatisation), sinon null (tous les fournisseurs). Avant ce helper, le « + » d'une
+ * section ÉQUIPEMENT cherchait un fournisseur de catégorie « equipement » : picker vide en silence.
+ * @param {string} sectionName
+ * @param {string} [family]
+ * @returns {string|null}
+ */
+export function productCategoryForSection(sectionName, family) {
+  const n = normaliserCategorie(sectionName);
+  if (CATEGORIES_PRODUIT.has(n)) return n;
+  return FAMILY_PRODUCT_CATEGORY[family] || null;
+}
+
 export function buildDefaultSections(family) {
   const sections = FAMILY_DEFAULT_SECTIONS[family];
   if (!sections) return [];

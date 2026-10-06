@@ -16,14 +16,14 @@ avertissements de sur ou sous-dimensionnement. Le chauffage principal n'est PAS 
 | Règle | Valeur par défaut | Source |
 |---|---|---|
 | Base froid, 2,50 m sous plafond | 100 W/m² | travaux.com, espace-aubade |
-| Isolation : RE2020/BBC · RT2012 · standard rénové · ancien · non isolé | 70 · 80 · 100 · 125 · 150 W/m² | fourchettes 65-80 / 75-100 / 100 / 125 / 150 des mêmes sources |
+| Isolation : RE2020/BBC · RT2012 · standard rénové · ancien · non isolé | 70 · 80 · 100 · 115 · 130 W/m² | fourchettes 65-80 / 75-100 / 100 / 120-130 des mêmes sources ; les 120-130 visent « ancienne peu isolée OU très exposée », l'exposition étant comptée à part on prend 115 / 130 (calibrage 2026-10-06 : salon 60 m² de 1985 plein sud = 7,6 kW, guides 7,5 kW) |
 | Hauteur sous plafond | au prorata de 2,50 m (3 m = ×1,2) | travaux.com |
-| Exposition de la pièce | nord −10 %, est 0, ouest +5 %, sud +15 % | travaux.com (sud/nord), ouest provisoire |
+| Exposition de la pièce | nord −10 %, est 0, ouest +5 %, sud +10 % | guides : sud / ouest +10 à 15 %, bas de fourchette car les baies sont comptées à part ; nord −10 % |
 | Vitrage non protégé | 150 W/m² de vitrage plein sud ; 130 ouest, 90 est, 30 nord ; ×0,5 si volets/stores | travaux.com (150 W/m² baie sud-ouest), déclinaison provisoire |
 | Occupants | +100 W par personne au-delà de 2 | travaux.com |
 | Appareils | W déclarés (bureau 150, cuisine 500…) | travaux.com |
 | Sous toiture (dernier étage, combles aménagés) | +10 % | provisoire |
-| Zone climatique de l'org (Tarn, été chaud) | +5 % | provisoire, réglable |
+| Zone climatique de l'org | 0 % | les W/m² des guides valent déjà pour un été chaud ; réglable pour un cas hors norme |
 | Contrôle croisé volume | 100 BTU/m³ + 1 000 BTU par paroi vitrée, ÷ 3 415 | hellowatt |
 | Choix d'unité | plus petite unité ≥ besoin × 0,95 ; alerte si > besoin × 1,30 | espace-aubade (cycles courts) |
 | Multi-split | Σ kW des unités intérieures ≤ 130 % du nominal froid du groupe, sorties min/max de la brochure Hitachi | brochure airHome Multi Pro, ratio provisoire |

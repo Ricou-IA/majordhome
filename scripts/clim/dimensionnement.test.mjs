@@ -31,7 +31,7 @@ const piece = (nom, surface_m2, extra = {}) => ({ nom, surface_m2, hauteur_m: 2.
 const cfg = buildClimConfig(null);
 
 test('ENGINE_VERSION et config par défaut', () => {
-  assert.match(ENGINE_VERSION, /^clim-\d{4}\.\d{2}$/);
+  assert.match(ENGINE_VERSION, /^clim-\d{4}\.\d{2}(\.\d+)?$/);
   assert.equal(cfg.base_w_m2, 100);
   assert.deepEqual(buildClimConfig({ clim: { zone_majoration: 0.1, multi: { ratio_max_ui_ge: 1.2 } } }).multi, { ratio_max_ui_ge: 1.2 });
   assert.equal(buildClimConfig({ clim: { liaison_paliers: 'n importe quoi' } }).liaison_paliers.length, 3);
@@ -58,19 +58,27 @@ test('validerReleve refuse un relevé incomplet, sans 0 silencieux', () => {
 test('besoinPiece : 20 m² standard à 2,50 m = 2 000 W, puis chaque facteur', () => {
   assert.equal(besoinPiece(piece('A', 20), logement, cfg).besoin_w, 2000);
   assert.equal(besoinPiece(piece('A', 20, { hauteur_m: 3 }), logement, cfg).besoin_w, 2400);
-  assert.equal(besoinPiece(piece('A', 20, { exposition: 'sud' }), logement, cfg).besoin_w, 2300);
+  assert.equal(besoinPiece(piece('A', 20, { exposition: 'sud' }), logement, cfg).besoin_w, 2200);
   assert.equal(besoinPiece(piece('A', 20, { exposition: 'nord' }), logement, cfg).besoin_w, 1800);
   assert.equal(besoinPiece(piece('A', 20, { sous_toiture: true }), logement, cfg).besoin_w, 2200);
   assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'bbc', zone_majoration: 0 }, cfg).besoin_w, 1400);
-  assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'non_isole', zone_majoration: 0 }, cfg).besoin_w, 3000);
-  // Zone de l'org par défaut (+5 %) quand le logement ne précise rien
-  assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'standard' }, cfg).besoin_w, 2100);
+  assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'ancien', zone_majoration: 0 }, cfg).besoin_w, 2300);
+  assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'non_isole', zone_majoration: 0 }, cfg).besoin_w, 2600);
+  // Zone de l'org : 0 par défaut (les W/m² des guides valent pour un été chaud), +5 % si le logement le précise
+  assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'standard' }, cfg).besoin_w, 2000);
+  assert.equal(besoinPiece(piece('A', 20), { classe_isolation: 'standard', zone_majoration: 0.05 }, cfg).besoin_w, 2100);
   // Vitrage 4 m² plein sud non protégé = +600 W ; protégé = +300 W
-  assert.equal(besoinPiece(piece('A', 20, { exposition: 'sud', vitrage_m2: 4 }), logement, cfg).besoin_w, 2900);
-  assert.equal(besoinPiece(piece('A', 20, { exposition: 'sud', vitrage_m2: 4, protection_solaire: true }), logement, cfg).besoin_w, 2600);
+  assert.equal(besoinPiece(piece('A', 20, { exposition: 'sud', vitrage_m2: 4 }), logement, cfg).besoin_w, 2800);
+  assert.equal(besoinPiece(piece('A', 20, { exposition: 'sud', vitrage_m2: 4, protection_solaire: true }), logement, cfg).besoin_w, 2500);
   // Occupants : 4 personnes = +200 W ; appareils déclarés ajoutés tels quels
   assert.equal(besoinPiece(piece('A', 20, { occupants: 4 }), logement, cfg).besoin_w, 2200);
   assert.equal(besoinPiece(piece('A', 20, { appareils_w: 350 }), logement, cfg).besoin_w, 2350);
+});
+
+test('besoinPiece : calibrage terrain — salon 60 m² de 1985 plein sud, volets = 7 590 W (guides : 7,5 kW)', () => {
+  const r = besoinPiece(piece('Salon', 60, { exposition: 'sud', protection_solaire: true }), { classe_isolation: 'ancien' }, cfg);
+  assert.equal(r.besoin_w, 7590);
+  assert.equal(choisirUnite(r.besoin_w, catalogueDepuisProduits(PRODUITS).packs_mono.filter((p) => p.gamme === 'airHome 600'), cfg).unite.kw_froid, 5);
 });
 
 test('besoinPiece : contrôle croisé volume (hellowatt) — 50 m³ et 3 parois vitrées = 8 000 BTU ≈ 2,34 kW', () => {
@@ -154,7 +162,7 @@ test('dimensionner : maison 3 pièces sur le tarif réel — mono ET multi, liai
   const releve = {
     logement: { classe_isolation: 'standard', zone_majoration: 0, gamme: 'airHome 400' },
     pieces: [
-      piece('Salon', 30, { exposition: 'sud', vitrage_m2: 6, occupants: 4, longueur_liaison_m: 6 }), // 3450 + 900 + 200 = 4550 W
+      piece('Salon', 30, { exposition: 'sud', vitrage_m2: 6, occupants: 4, longueur_liaison_m: 6 }), // 3300 + 900 + 200 = 4400 W
       piece('Chambre 1', 12, { exposition: 'est', longueur_liaison_m: 10 }),                            // 1200 W
       piece('Chambre 2', 14, { exposition: 'ouest', sous_toiture: true, longueur_liaison_m: 12 }),      // 14×100×1,05×1,1 = 1617 → 1620 W
     ],
@@ -162,7 +170,7 @@ test('dimensionner : maison 3 pièces sur le tarif réel — mono ET multi, liai
   const r = dimensionner(releve, PRODUITS, cfg);
   assert.equal(r.ok, true);
   assert.equal(r.engine_version, ENGINE_VERSION);
-  assert.deepEqual(r.pieces.map((p) => p.besoin_w), [4550, 1200, 1620]);
+  assert.deepEqual(r.pieces.map((p) => p.besoin_w), [4400, 1200, 1620]);
   assert.deepEqual(r.pieces.map((p) => p.mono.unite.reference), ['XRAK-DJ50RHAE', 'XRAK-DJ18RHAE', 'XRAK-DJ18RHAE']);
   assert.deepEqual(r.pieces.map((p) => p.multi.unite.reference), ['RAK-DJ50RHAE', 'RAK-DJ15QHAE', 'RAK-DJ18RHAE']);
   // Multi : 5 + 1,5 + 2 = 8,5 kW → 6,8 × 1,3 = 8,84 ≥ 8,5, 3 sorties : RAM-G68N3HCE
@@ -190,7 +198,7 @@ test('dimensionner : une seule pièce ⇒ pas de multi ; gamme inconnue ⇒ repl
   assert.equal(r.mode_recommande, 'mono');
   assert.equal(r.gamme, cfg.gamme_defaut); // repli sur la gamme par défaut de l'org, pas la première du catalogue
   assert.ok(r.alertes.some((a) => a.code === 'gamme_inconnue'));
-  // 15 m² RT2012 (+5 % zone) = 1 260 W → pack 2,0 kW airHome 400, surdimensionné (+59 %)
+  // 15 m² RT2012 = 1 200 W → pack 2,0 kW airHome 400, surdimensionné (+67 %)
   assert.equal(r.pieces[0].mono.unite.reference, 'XRAK-DJ18RHAE');
   assert.ok(r.alertes.some((a) => a.code === 'surdimensionne' && a.piece === 'Bureau'));
 });

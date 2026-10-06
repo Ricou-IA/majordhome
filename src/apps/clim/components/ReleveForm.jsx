@@ -4,21 +4,19 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { FormField, inputClass, selectClass } from '@apps/artisan/components/FormFields';
 import { CLASSES_ISOLATION, EXPOSITIONS, classeDepuisAnnee } from '@/lib/clim/dimensionnement.js';
-import { nouvellePiece } from '../lib/releveState';
+import { nouvellePiece, APPAREILS, appareilsWatts } from '../lib/releveState';
 
-const APPAREILS = [
-  { value: '0', label: 'Aucun' },
-  { value: '150', label: 'Bureau (ordinateur, écran) · 150 W' },
-  { value: '300', label: 'Télévision + box · 300 W' },
-  { value: '500', label: 'Cuisine ouverte · 500 W' },
-  { value: '1000', label: 'Cuisine avec four / plaques · 1 000 W' },
-];
+const fmtW = (w) => `${w.toLocaleString('fr-FR')} W`;
 
 export default function ReleveForm({ releve, gammes, onChange }) {
   const setLogement = (patch) => onChange({ ...releve, logement: { ...releve.logement, ...patch } });
   const setPiece = (id, patch) => onChange({ ...releve, pieces: releve.pieces.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
   const ajouter = () => onChange({ ...releve, pieces: [...releve.pieces, nouvellePiece(`Pièce ${releve.pieces.length + 1}`)] });
   const retirer = (id) => onChange({ ...releve, pieces: releve.pieces.filter((p) => p.id !== id) });
+  const cocherAppareil = (p, code, coche) => {
+    const actuels = Array.isArray(p.appareils) ? p.appareils : [];
+    setPiece(p.id, { appareils: coche ? [...actuels, code] : actuels.filter((c) => c !== code) });
+  };
 
   const onAnnee = (v) => {
     const classe = classeDepuisAnnee(v);
@@ -74,19 +72,24 @@ export default function ReleveForm({ releve, gammes, onChange }) {
             <FormField label="Occupants">
               <input type="number" min={0} max={20} value={p.occupants} onChange={(e) => setPiece(p.id, { occupants: e.target.value })} className={inputClass} />
             </FormField>
-            <FormField label="Appareils" className="col-span-2 sm:col-span-2">
-              <select value={APPAREILS.some((a) => a.value === p.appareils_w) ? p.appareils_w : 'autre'} onChange={(e) => setPiece(p.id, { appareils_w: e.target.value === 'autre' ? '' : e.target.value })} className={selectClass}>
-                {APPAREILS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                <option value="autre">Autre (saisir les watts)</option>
-              </select>
-              {!APPAREILS.some((a) => a.value === p.appareils_w) && (
-                <input type="number" min={0} max={5000} value={p.appareils_w} onChange={(e) => setPiece(p.id, { appareils_w: e.target.value })} placeholder="W" className={`${inputClass} mt-1`} aria-label="Appareils en watts" />
-              )}
-            </FormField>
             <FormField label="Liaison (m)">
               <input type="number" min={0} max={75} step="0.5" value={p.longueur_liaison_m} onChange={(e) => setPiece(p.id, { longueur_liaison_m: e.target.value })} className={inputClass} />
             </FormField>
           </div>
+          <FormField label={`Appareils dans la pièce · ${fmtW(appareilsWatts(p))}`}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5 text-sm">
+              {APPAREILS.map((a) => (
+                <label key={a.code} className="flex items-center gap-2">
+                  <input type="checkbox" checked={(p.appareils || []).includes(a.code)} onChange={(e) => cocherAppareil(p, a.code, e.target.checked)} />
+                  <span>{a.label} <span className="text-secondary-400">· {fmtW(a.w)}</span></span>
+                </label>
+              ))}
+              <label className="flex items-center gap-2 col-span-2 sm:col-span-3">
+                <span className="shrink-0">Autre</span>
+                <input type="number" min={0} max={5000} step={50} value={p.appareils_autre_w ?? ''} onChange={(e) => setPiece(p.id, { appareils_autre_w: e.target.value })} placeholder="W" className={`${inputClass} max-w-[8rem]`} aria-label="Autres appareils en watts" />
+              </label>
+            </div>
+          </FormField>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" checked={p.protection_solaire} onChange={(e) => setPiece(p.id, { protection_solaire: e.target.checked })} /> Volets ou stores extérieurs</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={p.sous_toiture} onChange={(e) => setPiece(p.id, { sous_toiture: e.target.checked })} /> Sous toiture (dernier étage, combles)</label>

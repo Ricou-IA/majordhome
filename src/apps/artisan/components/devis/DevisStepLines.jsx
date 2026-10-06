@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { TVA_RATES, computeLineTotals } from '@services/devis.service';
+import { TVA_RATES, computeLineTotals, productCategoryForSection } from '@services/devis.service';
 import DevisProductPicker from './DevisProductPicker';
 import MetreFumisterie from './metre/MetreFumisterie';
 import { formatEuro } from '@/lib/utils';
@@ -280,8 +280,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
 
   // Ajouter des produits après la section (avant la section suivante)
   const handleAddProductsToSection = useCallback((sectionGlobalIndex, sectionName) => {
-    setPickerForSection({ index: sectionGlobalIndex, category: sectionName });
-  }, []);
+    setPickerForSection({ index: sectionGlobalIndex, category: productCategoryForSection(sectionName, family) });
+  }, [family]);
 
   const handlePickerAddLines = useCallback((newLines, _sectionTitle) => {
     if (!pickerForSection) return;

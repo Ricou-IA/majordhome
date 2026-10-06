@@ -5,6 +5,30 @@ import { DEFAULTS_CLIM } from '@/lib/clim/config.js';
 
 export const draftKey = (userId) => `clim-draft:${userId}`;
 
+/** Appareils à cocher dans une pièce : les watts cochés s'additionnent (+ un champ « Autre » libre). */
+export const APPAREILS = Object.freeze([
+  Object.freeze({ code: 'bureau', label: 'Bureau (ordinateur, écran)', w: 150 }),
+  Object.freeze({ code: 'tv', label: 'Télévision + box', w: 300 }),
+  Object.freeze({ code: 'cuisine', label: 'Cuisine ouverte', w: 500 }),
+  Object.freeze({ code: 'four', label: 'Four / plaques', w: 1000 }),
+  Object.freeze({ code: 'frigo', label: 'Réfrigérateur / congélateur', w: 100 }),
+  Object.freeze({ code: 'seche', label: 'Sèche-linge / lave-linge', w: 400 }),
+]);
+
+/**
+ * Watts d'appareils d'une pièce : somme des cases cochées + « Autre ». Un brouillon antérieur
+ * (champ `appareils_w` seul) est lu comme « Autre ».
+ * @param {{ appareils?: string[], appareils_autre_w?: string|number, appareils_w?: string|number }} piece
+ * @returns {number}
+ */
+export function appareilsWatts(piece) {
+  const coches = Array.isArray(piece.appareils) ? piece.appareils : [];
+  const somme = APPAREILS.filter((a) => coches.includes(a.code)).reduce((s, a) => s + a.w, 0);
+  const autre = piece.appareils_autre_w ?? (Array.isArray(piece.appareils) ? '' : piece.appareils_w);
+  const n = Number(autre);
+  return somme + (autre !== '' && autre != null && Number.isFinite(n) && n > 0 ? n : 0);
+}
+
 let compteur = 0;
 const idPiece = () => `p${Date.now().toString(36)}${(compteur++).toString(36)}`;
 
@@ -12,7 +36,7 @@ const idPiece = () => `p${Date.now().toString(36)}${(compteur++).toString(36)}`;
 export function nouvellePiece(nom = '') {
   return {
     id: idPiece(), nom, surface_m2: '', hauteur_m: '2.5', exposition: 'sud', vitrage_m2: '', protection_solaire: false,
-    occupants: '2', appareils_w: '0', sous_toiture: false, longueur_liaison_m: String(DEFAULTS_CLIM.longueur_liaison_defaut_m),
+    occupants: '2', appareils: [], appareils_autre_w: '', sous_toiture: false, longueur_liaison_m: String(DEFAULTS_CLIM.longueur_liaison_defaut_m),
   };
 }
 
@@ -34,7 +58,7 @@ export function releveVersMoteur(releve) {
     pieces: releve.pieces.map((p) => ({
       nom: p.nom?.trim() || undefined, surface_m2: n(p.surface_m2), hauteur_m: n(p.hauteur_m), exposition: p.exposition,
       vitrage_m2: n(p.vitrage_m2) ?? 0, protection_solaire: !!p.protection_solaire, occupants: n(p.occupants) ?? 0,
-      appareils_w: n(p.appareils_w) ?? 0, sous_toiture: !!p.sous_toiture, longueur_liaison_m: n(p.longueur_liaison_m),
+      appareils_w: appareilsWatts(p), sous_toiture: !!p.sous_toiture, longueur_liaison_m: n(p.longueur_liaison_m),
     })),
   };
 }

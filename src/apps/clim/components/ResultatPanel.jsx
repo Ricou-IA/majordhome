@@ -47,7 +47,7 @@ export default function ResultatPanel({ resultat, mode, onMode, onCreerDevis, pe
               const u = mode === 'multi' && multiPossible ? p.multi.unite : p.mono.unite;
               return (
                 <tr key={p.nom} className="border-t border-secondary-100">
-                  <td className="py-1.5">{p.nom}<span className="text-xs text-secondary-400"> · {p.detail.surface_m2} m²</span></td>
+                  <td className="py-1.5">{p.nom}<span className="text-xs text-secondary-400"> · {p.detail.surface_m2} m² · {Math.round(p.besoin_w / p.detail.surface_m2)} W/m²</span></td>
                   <td className="text-right font-semibold text-secondary-900">{kw(p.besoin_w)}</td>
                   <td className="text-right text-secondary-500">{kwN(p.controle.kw)}</td>
                   <td className="text-right">{u ? kwN(u.kw_froid) : <span className="text-amber-700">aucune</span>}</td>

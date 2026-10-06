@@ -258,6 +258,7 @@ export const supplierKeys = {
   productDetail: (orgId, productId) => [...supplierKeys.all(orgId), 'product', productId],
   productVariants: (orgId, parentId) => [...supplierKeys.all(orgId), 'variants', parentId],
   allProducts: (orgId) => [...supplierKeys.all(orgId), 'all-products'],
+  productsByCategory: (orgId, category) => [...supplierKeys.all(orgId), 'products-by-category', category],
   searchProducts: (orgId, query) => [...supplierKeys.all(orgId), 'search-products', query],
   productDocuments: (orgId, productId) => [...supplierKeys.all(orgId), 'product-documents', productId],
   productDocumentsByIds: (orgId, ids) => [...supplierKeys.all(orgId), 'product-documents-batch', ...(ids || [])],

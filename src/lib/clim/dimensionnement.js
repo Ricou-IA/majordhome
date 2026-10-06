@@ -7,7 +7,7 @@
 // Testé par `node --test scripts/clim/dimensionnement.test.mjs` sur le tarif Solipac réel.
 import { DEFAULTS_CLIM } from './config.js';
 
-export const ENGINE_VERSION = 'clim-2026.10';
+export const ENGINE_VERSION = 'clim-2026.10.1'; // .1 : recalibrage ancien 115 / sud +10 % / zone 0 (salon 60 m² = 7,6 kW)
 
 /** Classes d'isolation (clés de `cfg.w_m2_par_isolation`), de la plus performante à la moins. */
 export const CLASSES_ISOLATION = Object.freeze([

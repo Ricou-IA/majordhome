@@ -185,6 +185,24 @@ export function useAllProducts(orgId) {
 }
 
 /**
+ * Produits actifs d'une catégorie (tous fournisseurs) — lecture filtrée côté base, donc jamais
+ * tronquée par le plafond de 1 000 lignes qui frappe useAllProducts sur une grosse org.
+ */
+export function useProductsByCategory(orgId, category) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: supplierKeys.productsByCategory(orgId, category),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getProductsByCategory(orgId, category);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!category,
+    staleTime: 60_000,
+  });
+  return { products: data || [], isLoading, error };
+}
+
+/**
  * Recherche produits (debounced côté composant)
  */
 export function useProductSearch(orgId, query) {
