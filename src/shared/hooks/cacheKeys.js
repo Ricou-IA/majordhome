@@ -218,6 +218,13 @@ export const permissionKeys = {
   members: (orgId) => [...permissionKeys.all(orgId), 'members'],
 };
 
+// Profils maison (org_roles / member_org_roles) — 20261006_1
+export const orgRoleKeys = {
+  all: (orgId) => ['orgRoles', orgId],
+  list: (orgId) => [...orgRoleKeys.all(orgId), 'list'],
+  members: (orgId) => [...orgRoleKeys.all(orgId), 'members'],
+};
+
 // --- Entretien SAV ---
 export const entretienSavKeys = {
   all: (orgId) => ['entretien-sav', orgId],
