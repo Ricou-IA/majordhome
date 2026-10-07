@@ -181,7 +181,6 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
     const isRefused = (q) => REFUSED_QUOTE_STATUSES.includes(q.quote_status);
     return [...quotes.filter(q => !isRefused(q)), ...quotes.filter(isRefused)];
   }, [linkedQuotes, card?.column_key]);
-  const partialRefusedCount = card?.column_key === 'devis_envoye' ? (card?.refused_count || 0) : 0;
 
   if (!lead) return null;
 
@@ -316,20 +315,11 @@ export function LeadCard({ lead, onClick, commercialsMap, onMoveToLongTerm, card
               {daysInStatus}j
             </span>
           )}
-          {hasDevis && partialRefusedCount > 0 && (
-            <span
-              className="ml-auto inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-gray-200 text-gray-600 whitespace-nowrap"
-              title={`${partialRefusedCount} devis refusé${partialRefusedCount > 1 ? 's' : ''} sur ce lead`}
-            >
-              <XCircle className="w-3 h-3" />
-              {partialRefusedCount} refusé{partialRefusedCount > 1 ? 's' : ''}
-            </span>
-          )}
           {hasDevis && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-              className={`${partialRefusedCount > 0 ? '' : 'ml-auto '}inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors`}
+              className="ml-auto inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium transition-colors"
               style={{
                 backgroundColor: card?.column_key === 'gagne' ? '#d97706'
                   : card?.column_key === 'perdu' ? '#94a3b8'
