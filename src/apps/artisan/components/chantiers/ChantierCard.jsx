@@ -65,8 +65,8 @@ export function ChantierCard({ chantier, onClick, commercialsMap }) {
   const isDone = ['realise', 'facture'].includes(chantier.chantier_status);
   const chipDate = formatShortDate(getChantierCardDate(chantier));
   const needsReplan = chantier.chantier_status === 'planification' && !hasActiveRdv;
-  // Pose provisoire : RDV posé avant réception des appros → puce hachurée ambre, la carte
-  // reste dans sa colonne (règle 2026-10-01, cf. installOrder.poseProvisoire).
+  // Pose provisoire : RDV posé avant réception des appros → puce hachurée ambre. La carte
+  // est en Planification comme toute pose datée (règle 2026-10-07, cf. installOrder.poseProvisoire).
   const provisoire = hasActiveRdv && poseProvisoire(chantier);
   const commercial = commercialsMap?.[chantier.assigned_user_id];
 

@@ -200,7 +200,9 @@ export function approsRecues(equipmentStatus, materialsStatus) {
 /**
  * Une pose posée au planning est PROVISOIRE tant que les appros du chantier ne
  * sont pas closes (règle Eric, 2026-10-01 : on programme souvent avant de
- * commander ; le planning hachure le bloc, la carte reste dans sa colonne).
+ * commander ; le planning hachure le bloc, la carte porte une puce hachurée).
+ * Provisoire ne retient pas la carte : depuis le 2026-10-07, tout RDV
+ * d'installation posé place le chantier en Planification.
  * Un chantier réceptionné ou facturé n'est jamais provisoire.
  * @param {{chantier_status?: string|null, equipment_order_status?: string|null, materials_order_status?: string|null}|null} chantier
  * @returns {boolean}

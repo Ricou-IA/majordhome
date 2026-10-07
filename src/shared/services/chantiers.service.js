@@ -150,9 +150,9 @@ export const chantiersService = {
   /**
    * Appros (équipement / matériaux) + transition automatique du chantier.
    * Appros closes (`approsRecues`, N/A = réponse qualifiée) depuis « Commande à
-   * faire » → « À planifier », ou directement « Planification » si une pose
-   * provisoire est déjà posée (`hasActiveRdv`) : la carte ne bouge qu'une fois
-   * les appros reçues, le RDV seul ne la déplace pas (règle 2026-10-01).
+   * faire » → « À planifier », ou directement « Planification » si un RDV
+   * d'installation existe (`hasActiveRdv`, filet : depuis le 2026-10-07 le RDV
+   * seul y place déjà la carte via `syncCardStateOnCreate`).
    * Retour : `{ data, error, autoTransitioned, newChantierStatus }`.
    */
   async updateOrderStatus(orgId, chantierId, { equipmentOrderStatus, materialsOrderStatus, currentChantierStatus, hasActiveRdv = false }) {

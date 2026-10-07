@@ -16,7 +16,6 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
-import { poseProvisoire } from '@/lib/installOrder';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
 import { logger } from '@lib/logger';
@@ -150,19 +149,19 @@ async function syncCardStateOnCreate(appt) {
     return;
   }
 
-  // Installation -> chantier « planification » si en amont (clé = chantier, plus le lead),
-  // SEULEMENT si les appros sont closes : une pose posée avant réception des commandes
-  // est provisoire (`poseProvisoire`, hachurée au planning) et laisse la carte dans sa
-  // colonne ; c'est la réception des appros qui la fera avancer (updateOrderStatus).
+  // Installation -> chantier « planification » si en amont (clé = chantier, plus le lead).
+  // Une date posée suffit, appros reçues ou non (Eric, 2026-10-07 : « tous les chantiers
+  // qui ont une date planifiée en Planification, sinon c'est illisible ») ; la pose
+  // provisoire (`poseProvisoire`) ne garde que sa puce / son bloc hachurés.
   if (appt.appointment_type === 'installation') {
     if (!appt.chantier_id) return;
     const { data: chantier, error: readError } = await supabase
       .from('majordhome_chantiers')
-      .select('id, org_id, chantier_status, equipment_order_status, materials_order_status')
+      .select('id, org_id, chantier_status')
       .eq('id', appt.chantier_id).maybeSingle();
     if (readError) { console.error('[appointments] syncCreate install read error:', readError); return; }
     const order = CHANTIER_ORDER[chantier?.chantier_status] ?? 0;
-    if (chantier && order < CHANTIER_ORDER.planification && !poseProvisoire(chantier)) {
+    if (chantier && order < CHANTIER_ORDER.planification) {
       // planification_date = date de passage en planification (même sémantique que
       // chantiersService.updateChantierStatus ; affichée « Planif. » sur la carte chantier)
       const now = new Date();
