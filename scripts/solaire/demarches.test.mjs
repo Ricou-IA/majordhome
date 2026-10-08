@@ -94,3 +94,85 @@ test('calculerPlanning : ABF = 2 mois d’instruction ; CACSI = 2 mois Enedis, l
   assert.equal(p.reponse_enedis, '2027-02-15');
   assert.equal(p.pose_au_plus_tot, '2027-02-15');
 });
+
+// ── Task 3 : référentiel + règles ──────────────────────────────────────────
+import { ETAPES } from '../../src/apps/solaire/lib/demarches/referentiel.js';
+import {
+  delaiInstruction, demarcheEnedis, typeConsuel, rachat, alertesSituation, construireEtapes,
+} from '../../src/apps/solaire/lib/demarches/regles.js';
+
+const BASE = {
+  commune_insee: '81099', commune_nom: 'Gaillac', puissance_kwc: 6, batterie: false,
+  perimetre_abf: 'non', installateur_rge: true, mode_valorisation: 'autoconso_surplus',
+  copropriete_ou_lotissement: 'aucun', compteur_linky: true, date_depart: '2026-10-08',
+  prise_en_charge: { raccordement_enedis: 'refacture', consuel: 'refacture' },
+};
+
+test('référentiel : 10 étapes (9 + accord d’AG), codes uniques', () => {
+  assert.equal(ETAPES.length, 10);
+  assert.equal(new Set(ETAPES.map((e) => e.code)).size, 10);
+  assert.equal(ETAPES[0].code, 'ACCORD_AG');
+  assert.equal(ETAPES.at(-1).code, 'CONTRAT_CLOTURE');
+});
+
+test('delaiInstruction : non → 1 mois, oui → 2 mois + prescriptions, inconnu → 2 mois + à vérifier', () => {
+  assert.equal(delaiInstruction(BASE).cle, 'instruction_dp');
+  const oui = delaiInstruction({ ...BASE, perimetre_abf: 'oui' });
+  assert.equal(oui.cle, 'instruction_dp_abf');
+  assert.ok(oui.alertes.some((a) => a.code === 'abf_prescriptions' && a.niveau === 'info'));
+  const inc = delaiInstruction({ ...BASE, perimetre_abf: 'inconnu' });
+  assert.equal(inc.cle, 'instruction_dp_abf');
+  assert.ok(inc.alertes.some((a) => a.code === 'abf_a_verifier' && a.niveau === 'avertissement'));
+});
+
+test('demarcheEnedis et typeConsuel', () => {
+  assert.deepEqual(demarcheEnedis(BASE), { type: 'surplus', delaiCle: 'enedis_surplus' });
+  assert.deepEqual(demarcheEnedis({ ...BASE, mode_valorisation: 'autoconso_totale' }), { type: 'cacsi', delaiCle: 'enedis_cacsi' });
+  assert.equal(typeConsuel(BASE), 'bleu');
+  assert.equal(typeConsuel({ ...BASE, batterie: true }), 'violet');
+});
+
+test('rachat : surplus + RGE → éligible avec tarif ≤ 9 kWc ; totale → non applicable ; non RGE → bloquant', () => {
+  const r = rachat(BASE, DEMARCHES_DEFAULTS, '2026-11-15');
+  assert.equal(r.applicable, true);
+  assert.equal(r.eligible, true);
+  assert.equal(r.tarif.valeur, 1.1);
+  assert.equal(r.tarif.unite, 'c€/kWh');
+  assert.equal(r.alertes.length, 0);
+  assert.equal(rachat({ ...BASE, mode_valorisation: 'autoconso_totale' }, DEMARCHES_DEFAULTS, '2026-11-15').applicable, false);
+  const nonRge = rachat({ ...BASE, installateur_rge: false }, DEMARCHES_DEFAULTS, '2026-11-15');
+  assert.equal(nonRge.eligible, false);
+  assert.ok(nonRge.alertes.some((a) => a.code === 'oa_non_eligible' && a.niveau === 'bloquant'));
+});
+
+test('rachat : > 9 kWc sans tarif → parametre_manquant, tarif null', () => {
+  const r = rachat({ ...BASE, puissance_kwc: 12 }, DEMARCHES_DEFAULTS, '2026-11-15');
+  assert.equal(r.tarif, null);
+  assert.ok(r.alertes.some((a) => a.code === 'parametre_manquant' && a.cle === 'tarif_oa_surplus_gt_9kwc'));
+});
+
+test('alertesSituation : copropriété, lotissement, compteur non Linky', () => {
+  assert.equal(alertesSituation(BASE).length, 0);
+  assert.ok(alertesSituation({ ...BASE, copropriete_ou_lotissement: 'copropriete' }).some((a) => a.code === 'copropriete_ag' && a.niveau === 'avertissement'));
+  assert.ok(alertesSituation({ ...BASE, copropriete_ou_lotissement: 'lotissement' }).some((a) => a.code === 'lotissement_reglement' && a.niveau === 'info'));
+  assert.ok(alertesSituation({ ...BASE, compteur_linky: false }).some((a) => a.code === 'compteur_non_linky'));
+  assert.equal(alertesSituation({ ...BASE, mode_valorisation: 'autoconso_totale', compteur_linky: false }).length, 0);
+});
+
+test('construireEtapes : textes variantes selon le mode, accord d’AG seulement en copropriété', () => {
+  const ctx = { instructionCle: 'instruction_dp', enedisCle: 'enedis_surplus', societe: 'Soleil SAS' };
+  const etapes = construireEtapes(BASE, DEMARCHES_DEFAULTS, ctx);
+  assert.equal(etapes.filter((e) => e.applicable).length, 9);
+  const depot = etapes.find((e) => e.code === 'DEPOT_DP');
+  assert.ok(depot.installateur.includes('Soleil SAS'));
+  assert.ok(depot.client.includes('mandat'));
+  assert.ok(etapes.find((e) => e.code === 'RACCORDEMENT_ENEDIS').installateur.includes('obligation d’achat'));
+  assert.ok(etapes.find((e) => e.code === 'CONTRAT_CLOTURE').client.includes('contrat de rachat'));
+  assert.equal(etapes.find((e) => e.code === 'INSTRUCTION_DP').delai.libelle, '1 mois');
+  const totale = construireEtapes({ ...BASE, mode_valorisation: 'autoconso_totale' }, DEMARCHES_DEFAULTS, { ...ctx, enedisCle: 'enedis_cacsi' });
+  assert.ok(totale.find((e) => e.code === 'RACCORDEMENT_ENEDIS').installateur.includes('CACSI'));
+  assert.ok(!totale.find((e) => e.code === 'CONTRAT_CLOTURE').client.includes('contrat de rachat'));
+  const copro = construireEtapes({ ...BASE, copropriete_ou_lotissement: 'copropriete' }, DEMARCHES_DEFAULTS, ctx);
+  assert.equal(copro.filter((e) => e.applicable).length, 10);
+  assert.equal(copro[0].code, 'ACCORD_AG');
+});
