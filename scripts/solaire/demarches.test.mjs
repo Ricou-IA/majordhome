@@ -224,3 +224,97 @@ test('calculerFrais : surplus sans Linky → montant Enedis inconnu ; prise en c
   assert.equal(enedis.prise_en_charge, 'inclus');
   assert.equal(f.lignes.find((l) => l.code === 'consuel').prise_en_charge, 'refacture');
 });
+
+// ── Task 5 : point d'entrée + critères d'acceptation ───────────────────────
+import { ENGINE_VERSION, normaliserInputs, calculerDemarches } from '../../src/apps/solaire/lib/demarches/index.js';
+
+const OPTS = { aujourdhui: '2026-10-08', societe: 'Soleil SAS' };
+
+test('normaliserInputs : défauts (surplus, aucun, Linky, date du jour) et perimetre_abf dérivable', () => {
+  const n = normaliserInputs({ puissance_kwc: 6 }, { aujourdhui: '2026-10-08' });
+  assert.equal(n.mode_valorisation, 'autoconso_surplus');
+  assert.equal(n.copropriete_ou_lotissement, 'aucun');
+  assert.equal(n.compteur_linky, true);
+  assert.equal(n.batterie, false);
+  assert.equal(n.perimetre_abf, 'inconnu');
+  assert.equal(n.date_depart, '2026-10-08');
+  assert.equal(normaliserInputs({ abf: { secteur_protege: true } }, { aujourdhui: '2026-10-08' }).perimetre_abf, 'oui');
+  assert.equal(normaliserInputs({ abf: { secteur_protege: false } }, { aujourdhui: '2026-10-08' }).perimetre_abf, 'non');
+  assert.equal(normaliserInputs({ perimetre_abf: 'non', abf: null }, { aujourdhui: '2026-10-08' }).perimetre_abf, 'non');
+});
+
+test('critère 1 : toiture, sans ABF, surplus, sans batterie → 9 étapes, 1 mois, Consuel bleu, rachat affiché', () => {
+  const r = calculerDemarches(BASE, DEMARCHES_DEFAULTS, OPTS);
+  assert.equal(r.engine_version, ENGINE_VERSION);
+  assert.equal(r.calcule_le, '2026-10-08');
+  assert.equal(r.etapes.filter((e) => e.applicable).length, 9);
+  assert.equal(r.etapes.find((e) => e.code === 'INSTRUCTION_DP').delai.libelle, '1 mois');
+  assert.equal(r.consuel, 'bleu');
+  assert.equal(r.rachat.applicable, true);
+  assert.equal(r.rachat.tarif.valeur, 1.1);
+  assert.equal(r.planning.pose_au_plus_tot, '2027-02-15');
+  assert.ok(!r.alertes.some((a) => a.code === 'abf_a_verifier'));
+  assert.ok(!('prime_autoconsommation' in r.parametres_utilises));
+});
+
+test('critère 2 : perimetre_abf inconnu → 2 mois + alerte', () => {
+  const r = calculerDemarches({ ...BASE, perimetre_abf: 'inconnu' }, DEMARCHES_DEFAULTS, OPTS);
+  assert.equal(r.etapes.find((e) => e.code === 'INSTRUCTION_DP').delai.libelle, '2 mois');
+  assert.ok(r.alertes.some((a) => a.code === 'abf_a_verifier'));
+  assert.equal(r.planning.accord_dp, '2026-12-15');
+});
+
+test('critère 5 : batterie → Consuel violet, montant à renseigner', () => {
+  const r = calculerDemarches({ ...BASE, batterie: true }, DEMARCHES_DEFAULTS, OPTS);
+  assert.equal(r.consuel, 'violet');
+  assert.equal(r.frais.lignes.find((l) => l.code === 'consuel').montant_ttc, null);
+  assert.ok(r.alertes.some((a) => a.code === 'parametre_manquant' && a.cle === 'tarif_consuel_violet'));
+});
+
+test('autoconsommation totale → CACSI, pas de rachat, pas de RIB, 2 mois Enedis', () => {
+  const r = calculerDemarches({ ...BASE, mode_valorisation: 'autoconso_totale' }, DEMARCHES_DEFAULTS, OPTS);
+  assert.equal(r.rachat.applicable, false);
+  assert.ok(!r.pieces.find((p) => p.code === 'rib').applicable);
+  assert.equal(r.etapes.find((e) => e.code === 'RACCORDEMENT_ENEDIS').delai.libelle, '2 mois');
+  assert.equal(r.frais.lignes.find((l) => l.code === 'raccordement_enedis').montant_ttc, 0);
+});
+
+test('copropriété → 10 étapes applicables, accord d’AG en tête, pièces et alerte', () => {
+  const r = calculerDemarches({ ...BASE, copropriete_ou_lotissement: 'copropriete' }, DEMARCHES_DEFAULTS, OPTS);
+  assert.equal(r.etapes.filter((e) => e.applicable).length, 10);
+  assert.equal(r.etapes[0].code, 'ACCORD_AG');
+  assert.ok(r.pieces.find((p) => p.code === 'accord_ag').applicable);
+  assert.ok(r.alertes.some((a) => a.code === 'copropriete_ag'));
+});
+
+test('non RGE + surplus → alerte bloquante', () => {
+  const r = calculerDemarches({ ...BASE, installateur_rge: false }, DEMARCHES_DEFAULTS, OPTS);
+  assert.ok(r.alertes.some((a) => a.code === 'oa_non_eligible' && a.niveau === 'bloquant'));
+  assert.equal(r.rachat.eligible, false);
+});
+
+test('critère 6 : un paramètre modifié change le résultat sans autre intervention', () => {
+  const params = buildDemarchesParams({ pv: { demarches: {
+    delais: { instruction_dp: { mois: 2 } },
+    tarifs: { frais_raccordement_enedis: [{ date_effet: '2026-10-28', valeur: 61 }] },
+  } } });
+  const r = calculerDemarches(BASE, params, OPTS);
+  assert.equal(r.planning.accord_dp, '2026-12-15');
+  assert.equal(r.frais.lignes.find((l) => l.code === 'raccordement_enedis').montant_ttc, 61);
+  assert.ok(!r.alertes.some((a) => a.code === 'parametre_perime'));
+});
+
+test('traçabilité : parametres_utilises liste les tarifs résolus avec leur date d’effet', () => {
+  const r = calculerDemarches(BASE, DEMARCHES_DEFAULTS, OPTS);
+  assert.deepEqual(Object.keys(r.parametres_utilises).sort(), ['frais_raccordement_enedis', 'tarif_consuel_bleu', 'tarif_oa_surplus_lte_9kwc']);
+  assert.equal(r.parametres_utilises.tarif_consuel_bleu.date_effet, '2026-01-01');
+});
+
+test('chaque alerte porte code, niveau et message ; chaque étape applicable porte un texte entreprise', () => {
+  const r = calculerDemarches({ ...BASE, perimetre_abf: 'inconnu', batterie: true, copropriete_ou_lotissement: 'copropriete' }, DEMARCHES_DEFAULTS, OPTS);
+  assert.ok(r.alertes.length >= 3);
+  for (const a of r.alertes) {
+    assert.ok(a.code && ['info', 'avertissement', 'bloquant'].includes(a.niveau) && a.message.length > 10);
+  }
+  for (const e of r.etapes.filter((x) => x.applicable)) assert.ok(e.installateur.length > 10);
+});
