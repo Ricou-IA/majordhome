@@ -59,7 +59,7 @@ export const pvDossierService = {
     }, 'pvDossier.upsertForSimulation');
   },
 
-  /** Écrit un bloc jsonb (cadastre/roof_geometry/abf/material/declarant/documents). status EXCLU. */
+  /** Écrit un bloc jsonb (cadastre/roof_geometry/abf/material/declarant/consent/documents/demarches). status EXCLU. */
   async patchBlock({ orgId, id, patch }) {
     return withErrorHandling(async () => {
       const { status, ...safe } = patch ?? {}; // garde-fou : status ne passe jamais par la vue
