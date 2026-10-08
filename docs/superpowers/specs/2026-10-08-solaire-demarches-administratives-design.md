@@ -98,9 +98,12 @@ Les nouveaux champs sont saisis dans la section Démarches de l'étape Résultat
     duree_totale_mois: 7.5,
     hypotheses: ['Dépôt de la DP 7 jours après le départ', 'Instruction 2 mois (ABF)', …],
   },
-  pieces: [{ code, libelle, obligatoire, condition, statut: 'a_demander' }],   // statut remis par l'UI
-  frais: [{ code, libelle, montant_ttc, montant_connu, prise_en_charge, parametre: { cle, date_effet } }],
-  alertes: [{ code, niveau: 'info' | 'avertissement' | 'bloquant', message }],
+  pieces: [{ code, libelle, applicable, condition }],   // statut (a_demander | recue | non_applicable) porté par l'UI dans pieces_statut
+  frais: { lignes: [{ code, libelle, montant_ttc, montant_connu, prise_en_charge, parametre: { cle, date_effet, unite } }], total_ttc, total_connu },
+  consuel: 'bleu' | 'violet',
+  enedis: 'cacsi' | 'surplus',
+  rachat: { applicable, eligible, tarif: { cle, valeur, unite, date_effet } | null },
+  alertes: [{ code, niveau: 'info' | 'avertissement' | 'bloquant', message, cle? }],
   parametres_utilises: { frais_raccordement_enedis: { valeur, date_effet }, … },   // traçabilité
 }
 ```
@@ -123,19 +126,20 @@ demarches: {
     mise_en_service:    { jours: 42 },    // 6 semaines après Consuel
   },
   tarifs: {
-    // liste triée par date_effet ; valeur en vigueur = dernière entrée dont date_effet ≤ date cible
-    frais_raccordement_enedis: [{ date_effet: '2026-01-01', valeur_ttc: 50.10, valide_jusqu_au: '2026-10-27', note: 'nouveau barème au 28/10/2026 à saisir' }],
-    tarif_consuel_bleu:        [{ date_effet: '2026-01-01', valeur_ttc: 195.20 }],
+    // EntreeDatee = { date_effet, valeur, valide_jusqu_au?, note?, source? } ; unité par clé dans TARIFS_META
+    // valeur en vigueur = dernière entrée dont date_effet ≤ date cible
+    frais_raccordement_enedis: [{ date_effet: '2026-01-01', valeur: 50.10, valide_jusqu_au: '2026-10-27', note: 'Nouveau barème au 28/10/2026 à saisir' }],
+    tarif_consuel_bleu:        [{ date_effet: '2026-01-01', valeur: 195.20, source: 'Consuel 2026' }],
     tarif_consuel_violet:      [],                                     // à renseigner → alerte parametre_manquant
-    tarif_oa_surplus_lte_9kwc: [{ date_effet: '2026-06-05', valeur_c_eur_kwh: 1.1, source: 'Arrêté du 01/06/2026' }],
+    tarif_oa_surplus_lte_9kwc: [{ date_effet: '2026-06-05', valeur: 1.1, source: 'Arrêté du 01/06/2026' }],
     tarif_oa_surplus_gt_9kwc:  [],
-    prime_autoconsommation:    [{ date_effet: '2026-06-05', valeur_ttc: 0, note: 'supprimée pour toute demande complète déposée à partir du 05/06/2026' }],
+    prime_autoconsommation:    [{ date_effet: '2026-06-05', valeur: 0, note: 'Supprimée pour toute demande complète déposée à partir du 05/06/2026' }],
   },
   prise_en_charge_defaut: { raccordement_enedis: 'refacture', consuel: 'refacture' },
 }
 ```
 
-`valeurA(liste, dateCible)` renvoie `{ valeur, date_effet, perimee }` ; `perimee = true` si `valide_jusqu_au < dateCible` → alerte `parametre_perime`. Liste vide → `null` → alerte `parametre_manquant`, montant affiché « à renseigner », jamais 0.
+`valeurA(liste, dateCible)` renvoie `{ valeur, date_effet, valide_jusqu_au, note, perimee }` ; `perimee = true` si `valide_jusqu_au < dateCible` → alerte `parametre_perime`. Liste vide → `null` → alerte `parametre_manquant`, montant affiché « à renseigner », jamais 0. `validerDemarches(d)` (même module) valide le bloc tel qu'édité dans Settings.
 
 Gotcha connu : `org_update_settings` merge le JSONB au niveau 1 → `DemarchesTab` sauve via `save({ pv: formComplet })` comme les autres onglets de `SolaireSettings` (`buildPvConfig` fait le deepMerge des défauts ; les listes datées **remplacent**, elles ne fusionnent pas).
 
