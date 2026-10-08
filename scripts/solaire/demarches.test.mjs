@@ -176,3 +176,51 @@ test('construireEtapes : textes variantes selon le mode, accord d’AG seulement
   assert.equal(copro.filter((e) => e.applicable).length, 10);
   assert.equal(copro[0].code, 'ACCORD_AG');
 });
+
+// ── Task 4 : pièces + frais ────────────────────────────────────────────────
+import { listerPieces } from '../../src/apps/solaire/lib/demarches/pieces.js';
+import { calculerFrais } from '../../src/apps/solaire/lib/demarches/frais.js';
+
+test('listerPieces : base toujours applicable, RIB seulement en surplus, règlements selon la situation', () => {
+  const codes = (inputs) => listerPieces(inputs).filter((p) => p.applicable).map((p) => p.code);
+  assert.deepEqual(codes(BASE), ['factures_12_mois', 'numero_pdl', 'justificatif_propriete', 'piece_identite_declarant', 'mandat_signe', 'rib']);
+  assert.ok(!codes({ ...BASE, mode_valorisation: 'autoconso_totale' }).includes('rib'));
+  assert.ok(codes({ ...BASE, copropriete_ou_lotissement: 'copropriete' }).includes('reglement_copropriete'));
+  assert.ok(codes({ ...BASE, copropriete_ou_lotissement: 'copropriete' }).includes('accord_ag'));
+  assert.ok(codes({ ...BASE, copropriete_ou_lotissement: 'lotissement' }).includes('reglement_lotissement'));
+  assert.equal(listerPieces(BASE).length, 9); // toutes listées, applicable ou non
+});
+
+test('calculerFrais : surplus + Linky → Enedis au tarif en vigueur, Consuel bleu, DP gratuite, total connu', () => {
+  const f = calculerFrais(BASE, DEMARCHES_DEFAULTS, { depot_enedis: '2026-11-15', attestation_consuel: '2027-03-10' });
+  const enedis = f.lignes.find((l) => l.code === 'raccordement_enedis');
+  assert.equal(enedis.montant_ttc, 50.1);
+  assert.equal(enedis.prise_en_charge, 'refacture');
+  assert.equal(enedis.parametre.cle, 'frais_raccordement_enedis');
+  assert.equal(f.lignes.find((l) => l.code === 'consuel').montant_ttc, 195.2);
+  assert.equal(f.lignes.find((l) => l.code === 'dp').montant_ttc, 0);
+  assert.equal(f.total_ttc, 245.3);
+  assert.equal(f.total_connu, true);
+  assert.ok(f.alertes.some((a) => a.code === 'parametre_perime' && a.cle === 'frais_raccordement_enedis')); // valide jusqu'au 27/10/2026
+});
+
+test('calculerFrais : totale → CACSI gratuite ; batterie → violet manquant → montant null, total inconnu', () => {
+  const totale = calculerFrais({ ...BASE, mode_valorisation: 'autoconso_totale' }, DEMARCHES_DEFAULTS, { depot_enedis: '2026-10-15', attestation_consuel: '2026-12-01' });
+  assert.equal(totale.lignes.find((l) => l.code === 'raccordement_enedis').montant_ttc, 0);
+  const bat = calculerFrais({ ...BASE, batterie: true }, DEMARCHES_DEFAULTS, { depot_enedis: '2026-10-15', attestation_consuel: '2026-12-01' });
+  const consuel = bat.lignes.find((l) => l.code === 'consuel');
+  assert.equal(consuel.montant_ttc, null);
+  assert.equal(consuel.montant_connu, false);
+  assert.ok(consuel.libelle.includes('violet'));
+  assert.equal(bat.total_connu, false);
+  assert.equal(bat.total_ttc, null);
+  assert.ok(bat.alertes.some((a) => a.code === 'parametre_manquant' && a.cle === 'tarif_consuel_violet'));
+});
+
+test('calculerFrais : surplus sans Linky → montant Enedis inconnu ; prise en charge par projet respectée', () => {
+  const f = calculerFrais({ ...BASE, compteur_linky: false, prise_en_charge: { raccordement_enedis: 'inclus', consuel: 'refacture' } }, DEMARCHES_DEFAULTS, { depot_enedis: '2026-10-15', attestation_consuel: '2026-12-01' });
+  const enedis = f.lignes.find((l) => l.code === 'raccordement_enedis');
+  assert.equal(enedis.montant_connu, false);
+  assert.equal(enedis.prise_en_charge, 'inclus');
+  assert.equal(f.lignes.find((l) => l.code === 'consuel').prise_en_charge, 'refacture');
+});
