@@ -30,7 +30,11 @@ function dateFr(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   return `${d} ${MOIS[m - 1]} ${y}`;
 }
-const eurPdf = (n) => `${Math.round(n * 100) / 100}`.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' €';
+/** 50.1 → « 50,10 € » (2 décimales, espace simple pour les milliers, PDF-safe). */
+const eurPdf = (n) => {
+  const [ent, dec] = n.toFixed(2).split('.');
+  return `${ent.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${dec} €`;
+};
 
 const s = StyleSheet.create({
   alerte: { flexDirection: 'row', borderRadius: 3, paddingVertical: 3, paddingHorizontal: 5, marginBottom: 2.5, borderLeftWidth: 2 },
@@ -47,8 +51,8 @@ const s = StyleSheet.create({
   pieceTxt: { flex: 1, fontSize: 6.8 },
   fraisRow: { flexDirection: 'row', paddingVertical: 2, borderBottom: `0.5px solid ${C.grisClair}` },
   fraisLbl: { flex: 1, fontSize: 6.8 },
-  fraisMontant: { width: 58, fontSize: 6.8, fontFamily: 'Helvetica-Bold', textAlign: 'right' },
-  fraisPec: { width: 110, fontSize: 6.2, color: C.grisTxt, textAlign: 'right' },
+  fraisMontant: { width: 50, fontSize: 6.8, fontFamily: 'Helvetica-Bold', textAlign: 'right' },
+  fraisPec: { width: 84, fontSize: 6, color: C.grisTxt, textAlign: 'right' },
   bon: { fontSize: 6.8, lineHeight: 1.4, marginBottom: 2 },
   bonStrong: { fontFamily: 'Helvetica-Bold' },
   small: { fontSize: 6.3, color: C.grisTxt, marginTop: 3 },

@@ -145,7 +145,7 @@ Gotcha connu : `org_update_settings` merge le JSONB au niveau 1 → `DemarchesTa
 
 ### 5.4 Nouveaux réglages d'identité (mandat)
 
-`settings.signatory = { name, role, signature_path }` édité dans Settings → Organisation → Identité (champ « Signataire des mandats », upload PNG dans le bucket `product-documents`, path `${orgId}/branding/signature-mandat.png`, URL signée à la génération). Exposé par `buildCompanyInfo` sous `company.signatory`. Sans signataire configuré, le mandat se génère avec la zone de signature entreprise vide et une alerte `signataire_manquant` (Enedis exige les deux signatures).
+Trois clés plates `settings.signatory_name`, `signatory_role`, `signatory_signature_path` (convention des champs de l'onglet Identité, sauvegarde par `FIELDS`), éditées dans Settings → Organisation → Identité (section « Signataire des mandats », upload PNG via `SignatureUpload` dans le bucket `product-documents`, path `${orgId}/branding/signature-mandat.png`, URL signée à la génération). Exposées par `buildCompanyInfo` sous `signatoryName`, `signatoryRole`, `signatorySignaturePath`. Sans signataire configuré, le mandat se génère avec la zone de signature entreprise vide et une alerte `signataire_manquant` (Enedis exige les deux signatures).
 
 ### 5.5 Persistance par projet — `pv_dossiers.demarches jsonb`
 
@@ -215,12 +215,12 @@ Codes : `abf_a_verifier`, `abf_prescriptions`, `copropriete_ag`, `lotissement_re
 - `mandatModel.js` (pur) construit les blocs depuis `{ declarant, site, cadastre, projet, company, consent, devis }` ; `MandatPDF.jsx` les rend (react-pdf, 2 pages, logo org en tête comme l'autorise Enedis). Signature client = image `consent.signature_path` (re-fetchée, fail-loud comme le CERFA) ; signature entreprise = `company.signatory.signature_path`.
 - `devis` = `{ numero, date }` saisi dans la section Démarches (libre tant que les devis natifs ne sont pas là ; pré-rempli depuis le devis Pennylane rattaché au lead si disponible).
 - Les textes de `consentItems.js` restent le **résumé à l'écran** avant signature ; une phrase renvoie au mandat complet (« le mandat complet vous est remis avec le dossier »). Un seul geste de signature couvre CERFA + mandat. Les dossiers déjà signés avant cette livraison peuvent générer le mandat : le consentement existant contient déjà les deux autorisations.
-- Généré dans la même chaîne que le CERFA (`DossierDrawer`), stocké `${orgId}/solaire/dossiers/${dossierId}/mandat.pdf`, assemblé après le CERFA.
+- Généré dans la même chaîne que le CERFA (`DossierDrawer`, pièce non bloquante `tryPiece`), stocké `${orgId}/solaire/dossiers/${dossierId}/mandat-representation.pdf`, assemblé après le CERFA (`CERFA → mandat → notice → DPC1 → DPC2`). Puissance et mode = `pv_dossiers.demarches.inputs` (repli `sim.results.selectedKwc`, mode surplus) : un dossier généré avant tout calcul Démarches porte quand même un mandat cohérent.
 
 ## 8. UI
 
 ### 8.1 Étape Résultats — section « Démarches administratives »
-Sous la carte « Dossier réglementaire ». Composants `components/demarches/` :
+Chapitre **pleine largeur** en fin d'étape (après le tableau annuel) : le synoptique à 3 colonnes ne tient pas dans la colonne d'actions. Les entrées dérivées sont assemblées par `lib/demarchesInputs.js` (pur, testé). Composants `components/demarches/` :
 - `DemarchesSection.jsx` (orchestrateur : lit le dossier, calcule ou relit le résultat figé, bouton « Recalculer » si `engine_version` ou entrées changent) ;
 - `DemarchesInputs.jsx` (mode de valorisation, copropriété/lotissement, Linky, date de départ, devis de référence, prise en charge des frais) ;
 - `ParcoursSynoptique.jsx` (étapes en 3 colonnes : Étape / Ce que vous faites / Ce que nous faisons, jaune `#FFF6D6` bord `#F5C542` et bleu `#E3F0FD` bord `#2196F3`, avec icône et libellé) ;

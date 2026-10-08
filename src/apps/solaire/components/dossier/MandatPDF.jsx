@@ -10,19 +10,22 @@ import { buildLegalFooter } from '@lib/orgBranding';
 import { C, CompanyHeader, sharedStyles } from '../etude/pdfShared';
 
 const s = StyleSheet.create({
-  page: { ...sharedStyles.page, fontSize: 8.2, lineHeight: 1.4 },
-  titre: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: C.bleuF, marginTop: 2 },
-  sousTitre: { fontSize: 8.5, color: C.grisTxt, marginBottom: 10 },
+  // Pas de lineHeight global : l'en-tête société (pdfShared) a ses propres interlignes.
+  page: { ...sharedStyles.page, fontSize: 8.2 },
+  titre: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: C.bleuF, marginTop: 2, marginBottom: 6, lineHeight: 1.2 },
+  sousTitre: { fontSize: 8.5, color: C.grisTxt, marginBottom: 10, lineHeight: 1.35 },
   h: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.bleuF, marginTop: 9, marginBottom: 3 },
-  p: { marginBottom: 3.5, textAlign: 'justify' },
-  partie: { marginBottom: 4 },
+  // ⚠️ react-pdf : un lineHeight sans unité se résout sur le fontSize DU MÊME style (sinon
+  // taille par défaut 18 pt → interligne doublé) : fontSize répété partout où lineHeight est posé.
+  p: { fontSize: 8.2, lineHeight: 1.4, marginBottom: 3.5, textAlign: 'justify' },
+  partie: { fontSize: 8.2, lineHeight: 1.4, marginBottom: 4 },
   strong: { fontFamily: 'Helvetica-Bold' },
   siteRow: { flexDirection: 'row', marginBottom: 1.5 },
-  siteLbl: { width: 120, color: C.grisTxt },
-  siteVal: { flex: 1 },
+  siteLbl: { width: 120, color: C.grisTxt, fontSize: 8.2, lineHeight: 1.4 },
+  siteVal: { flex: 1, fontSize: 8.2, lineHeight: 1.4 },
   caseRow: { flexDirection: 'row', marginBottom: 3 },
-  caseBox: { width: 16, fontFamily: 'Helvetica-Bold', color: C.bleuM },
-  caseTxt: { flex: 1, textAlign: 'justify' },
+  caseBox: { width: 16, fontFamily: 'Helvetica-Bold', color: C.bleuM, fontSize: 8.2, lineHeight: 1.4 },
+  caseTxt: { flex: 1, textAlign: 'justify', fontSize: 8.2, lineHeight: 1.4 },
   sigRow: { flexDirection: 'row', gap: 16, marginTop: 14 },
   sigCol: { flex: 1, border: `0.75px solid ${C.grisBar}`, borderRadius: 3, padding: 8, minHeight: 110 },
   sigTitle: { fontFamily: 'Helvetica-Bold', marginBottom: 2 },
@@ -69,7 +72,8 @@ function Signature({ titre, sig, png }) {
   );
 }
 
-function MandatDocument({ model, company, signatureMandantPng, signatureMandatairePng }) {
+/** Exporté pour le harnais de rendu hors navigateur (scripts) — l'app passe par generateMandatPdfBlob. */
+export function MandatDocument({ model, company, signatureMandantPng, signatureMandatairePng }) {
   const legal = buildLegalFooter(company);
   const PageFooter = () => (
     <>

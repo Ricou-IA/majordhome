@@ -52,8 +52,9 @@ export const TARIFS_META = {
   frais_raccordement_enedis: { libelle: 'Frais de raccordement Enedis (surplus, Linky)', unite: '€ TTC' },
   tarif_consuel_bleu:        { libelle: 'Attestation Consuel — visa bleu', unite: '€ TTC' },
   tarif_consuel_violet:      { libelle: 'Attestation Consuel — visa violet (batterie)', unite: '€ TTC' },
-  tarif_oa_surplus_lte_9kwc: { libelle: 'Tarif de rachat du surplus ≤ 9 kWc', unite: 'c€/kWh' },
-  tarif_oa_surplus_gt_9kwc:  { libelle: 'Tarif de rachat du surplus > 9 kWc', unite: 'c€/kWh' },
+  // Libellés PDF-safe (Helvetica : pas de ≤ ≥ →) — ils remontent dans les alertes imprimées.
+  tarif_oa_surplus_lte_9kwc: { libelle: 'Tarif de rachat du surplus jusqu’à 9 kWc', unite: 'c€/kWh' },
+  tarif_oa_surplus_gt_9kwc:  { libelle: 'Tarif de rachat du surplus au-delà de 9 kWc', unite: 'c€/kWh' },
   prime_autoconsommation:    { libelle: 'Prime à l’autoconsommation (non affichée)', unite: '€' },
 };
 

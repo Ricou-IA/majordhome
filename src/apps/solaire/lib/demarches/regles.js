@@ -14,7 +14,7 @@ import { valeurA, TARIFS_META } from './parametres.js';
 export function alerteParametre(cle, resolu) {
   const libelle = TARIFS_META[cle]?.libelle ?? cle;
   if (!resolu) {
-    return { code: 'parametre_manquant', niveau: 'avertissement', cle, message: `Paramètre à renseigner : ${libelle} (Settings → Solaire → Démarches).` };
+    return { code: 'parametre_manquant', niveau: 'avertissement', cle, message: `Paramètre à renseigner : ${libelle} (Paramètres > Solaire > Démarches).` };
   }
   if (resolu.perimee) {
     return { code: 'parametre_perime', niveau: 'avertissement', cle, message: `${libelle} : la valeur en vigueur (${resolu.date_effet}) n’est valide que jusqu’au ${resolu.valide_jusqu_au}. À mettre à jour.` };

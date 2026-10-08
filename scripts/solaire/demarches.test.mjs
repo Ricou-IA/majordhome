@@ -334,3 +334,10 @@ test('validerDemarches : défauts valides ; date d’effet vide, doublon ou pris
   const pec = { ...DEMARCHES_DEFAULTS, prise_en_charge_defaut: { raccordement_enedis: 'gratuit', consuel: 'refacture' } };
   assert.equal(validerDemarches(pec), false);
 });
+
+// ── glyphes PDF (Helvetica) ────────────────────────────────────────────────
+test('aucun glyphe hors Helvetica dans les textes du résultat (étapes, alertes, libellés)', () => {
+  const r = calculerDemarches({ ...BASE, perimetre_abf: 'inconnu', batterie: true, puissance_kwc: 12, copropriete_ou_lotissement: 'copropriete', compteur_linky: false }, DEMARCHES_DEFAULTS, OPTS);
+  const texte = JSON.stringify({ etapes: r.etapes, alertes: r.alertes, frais: r.frais, planning: r.planning.hypotheses, pieces: r.pieces, meta: [DELAIS_META, TARIFS_META] });
+  assert.ok(!/[≤≥→←▲▼−☑☐]/.test(texte), 'glyphe non supporté par Helvetica');
+});
