@@ -1,6 +1,7 @@
 // src/apps/solaire/lib/pvConfig.js
 // Défauts du calculateur PV. Surchargés par core.organizations.settings.pv
 // (édités via /settings/solaire). PUR : aucun import React/Supabase.
+import { DEMARCHES_DEFAULTS } from './demarches/parametres.js';
 
 export const PV_DEFAULTS = {
   default_price_kwh: 0.20,      // €/kWh TTC — ⚠️ à ajuster au TRV en vigueur
@@ -26,6 +27,7 @@ export const PV_DEFAULTS = {
     default_km: 20000,
     default_kwh_100km: 20,
   },
+  demarches: DEMARCHES_DEFAULTS, // module Démarches administratives (délais + tarifs datés)
 };
 
 function isPlainObject(v) {
