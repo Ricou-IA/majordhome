@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
+import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import RgeCertificationsInput from './components/RgeCertificationsInput';
+import SignatureUpload from './components/SignatureUpload';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -29,6 +31,10 @@ const FIELDS = [
   'tva_intra',
   'insurance',
   'rge_certifications',
+  // Signataire des mandats (dossier PV : mandat de représentation mairie + Enedis)
+  'signatory_name',
+  'signatory_role',
+  'signatory_signature_path',
 ];
 
 // Formatage SIRET : groupes de 3 chiffres + 5 derniers
@@ -62,6 +68,8 @@ function validate(form) {
     errors.tva_intra = 'Format attendu : FR + 2 chiffres + 9 chiffres';
   }
   if (form.insurance && form.insurance.length > 200) errors.insurance = 'Maximum 200 caractères';
+  if (form.signatory_name && form.signatory_name.length > 80) errors.signatory_name = 'Maximum 80 caractères';
+  if (form.signatory_role && form.signatory_role.length > 60) errors.signatory_role = 'Maximum 60 caractères';
   return errors;
 }
 
@@ -74,6 +82,7 @@ function pickIdentityFields(settings) {
 }
 
 export default function IdentityTab() {
+  const { organization } = useAuth();
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const [form, setForm] = useState(() => pickIdentityFields({}));
   const [initial, setInitial] = useState(() => pickIdentityFields({}));
@@ -225,6 +234,45 @@ export default function IdentityTab() {
           value={form.rge_certifications}
           onChange={(newList) => setForm({ ...form, rge_certifications: newList })}
         />
+      </section>
+
+      {/* Section Signataire des mandats (mandat de représentation du dossier PV — Enedis exige les deux signatures) */}
+      <section>
+        <h3 className={SECTION_TITLE}>Signataire des mandats</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className={LABEL_CLASS}>Nom et prénom</label>
+            <input
+              type="text"
+              value={form.signatory_name}
+              onChange={(e) => setForm({ ...form, signatory_name: e.target.value })}
+              maxLength={80}
+              placeholder="Ex: Jean Martin"
+              className={INPUT_CLASS}
+            />
+            {errors.signatory_name && <p className={ERROR_CLASS}>{errors.signatory_name}</p>}
+          </div>
+          <div>
+            <label className={LABEL_CLASS}>Fonction</label>
+            <input
+              type="text"
+              value={form.signatory_role}
+              onChange={(e) => setForm({ ...form, signatory_role: e.target.value })}
+              maxLength={60}
+              placeholder="Ex: Président"
+              className={INPUT_CLASS}
+            />
+            {errors.signatory_role && <p className={ERROR_CLASS}>{errors.signatory_role}</p>}
+          </div>
+        </div>
+        <div className="mt-4">
+          <label className={LABEL_CLASS}>Signature</label>
+          <SignatureUpload
+            orgId={organization?.id}
+            path={form.signatory_signature_path}
+            onChange={(path) => setForm({ ...form, signatory_signature_path: path })}
+          />
+        </div>
       </section>
 
       {/* Actions */}

@@ -34,6 +34,9 @@ const NEUTRAL_DEFAULTS = {
   logoUrl: '',                         // pas de logo placeholder = pas d'<img>
   accentColor: '#64748b',              // slate-500 (neutre)
   rgeCertifications: [],
+  signatoryName: '',                   // signataire des mandats (Organisation → Identité)
+  signatoryRole: '',
+  signatorySignaturePath: '',          // Storage product-documents `${orgId}/branding/signature-mandat.png`
 };
 
 /**
@@ -67,6 +70,9 @@ export function buildCompanyInfo(settings) {
     logoUrl: s.logo_url || NEUTRAL_DEFAULTS.logoUrl,
     accentColor: s.accent_color || NEUTRAL_DEFAULTS.accentColor,
     rgeCertifications: Array.isArray(s.rge_certifications) ? s.rge_certifications : NEUTRAL_DEFAULTS.rgeCertifications,
+    signatoryName: s.signatory_name || NEUTRAL_DEFAULTS.signatoryName,
+    signatoryRole: s.signatory_role || NEUTRAL_DEFAULTS.signatoryRole,
+    signatorySignaturePath: s.signatory_signature_path || NEUTRAL_DEFAULTS.signatorySignaturePath,
   };
 }
 
