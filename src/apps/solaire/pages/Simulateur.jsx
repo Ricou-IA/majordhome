@@ -8,7 +8,7 @@ import { History, RotateCcw, Loader2, Check } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { usePvSimulation, usePvSimulationMutations } from '@hooks/usePvSimulations';
-import { usePvDossierMutations } from '@hooks/usePvDossier';
+import { usePvDossier, usePvDossierMutations } from '@hooks/usePvDossier';
 import { logger } from '@lib/logger';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { formatDateFR } from '@lib/utils';
@@ -65,6 +65,8 @@ function SimulateurInner({ config, settings }) {
   // Simulation dont le dossier réglementaire est ouvrable depuis les Résultats (après save
   // OU rechargement ?sim=) — le wizard ne connaît sinon pas d'id de simulation.
   const [savedDossierSim, setSavedDossierSim] = useState(null);
+  // Dossier PV de la simulation enregistrée (section Démarches + pages Démarches de l'étude PDF).
+  const { data: dossier } = usePvDossier(savedDossierSim?.id ?? null);
   const [dossierOpen, setDossierOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -260,6 +262,8 @@ function SimulateurInner({ config, settings }) {
         annexLabels: annexes.map((d) => d.label),
         roofMap,
         material: state.material,
+        // Pages Démarches : résultat FIGÉ du dossier (jamais recalculé pour le PDF), absent = pas de pages.
+        demarches: dossier?.demarches?.resultat ?? null,
       });
       const finalBlob = await attachAnnexes(studyBlob, annexes);
       downloadBlob(finalBlob, buildEtudeFilename(clientName));
@@ -384,6 +388,7 @@ function SimulateurInner({ config, settings }) {
           isGeneratingPdf={isGeneratingPdf}
           defaultClientName={savedSim?.client_name ?? ''}
           dossierSim={savedDossierSim}
+          dossier={dossier ?? null}
           onOpenDossier={() => setDossierOpen(true)}
         />
       )}

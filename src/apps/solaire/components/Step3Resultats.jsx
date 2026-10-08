@@ -14,12 +14,13 @@ import FinancingModule from './FinancingModule';
 import TableauAnnuel from './TableauAnnuel';
 import SaveSimulationModal from './SaveSimulationModal';
 import AutoconsoOptimizationSection from './AutoconsoOptimizationSection';
+import DemarchesSection from './demarches/DemarchesSection';
 import { consoProfileHourly, pvgisExample } from '../data';
 
 export default function Step3Resultats({
   state, config, pvgisLoading, pvgisError, onRetryPvgis, onSelectKwc, onFinancing, onMaterial, onOptim,
   onBack, onSave, isSaving, onGeneratePdf, isGeneratingPdf, defaultClientName,
-  dossierSim, onOpenDossier,
+  dossierSim, dossier, onOpenDossier,
 }) {
   const { conso, ev, roof, pvgis, selectedKwc, financing } = state;
   // Fallback pour les brouillons/simulations antérieurs à la config matériel.
@@ -267,6 +268,9 @@ export default function Step3Resultats({
           Renseigner le coût de l&apos;installation (et un taux/durée valides) pour générer le tableau annuel.
         </div>
       )}
+
+      {/* Démarches administratives — chapitre pleine largeur (synoptique 3 colonnes), résultat figé dans le dossier PV */}
+      <DemarchesSection state={state} dossier={dossier} dossierSim={dossierSim} activeKwc={model.activeKwc} />
 
       <SaveSimulationModal
         open={showSaveModal}
