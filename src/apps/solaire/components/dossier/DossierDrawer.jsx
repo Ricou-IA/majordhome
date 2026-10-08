@@ -20,7 +20,8 @@ import { formatDateFR, formatDateShortFR } from '@lib/utils';
 import { logger } from '@lib/logger';
 import { buildPvConfig } from '../../lib/pvConfig';
 import { downloadBlob } from '../../lib/etudeExport';
-import { buildConsentItems } from '../../lib/consentItems';
+import { buildConsentItems, CONSENT_FOOTNOTE } from '../../lib/consentItems';
+import { buildMandatModel } from '../../lib/demarches/mandatModel';
 import { buildCerfaFields } from '../../lib/cerfa16702';
 import { fillCerfa16702 } from '../../lib/fillCerfa';
 import { buildNoticeModel, parseAddressFR, healAddress } from '../../lib/dossierDocs';
@@ -28,6 +29,7 @@ import { docPath, docsGeneratedAt, DOSSIER_PIECES } from '../../lib/dossierDocum
 import { assembleDossierBlob } from '../../lib/assembleDossier';
 import { PV_DOSSIER_STATUS_LABELS } from '../../lib/pvDossierStatus';
 import { generateNoticePdfBlob } from './NoticePDF';
+import { generateMandatPdfBlob } from './MandatPDF';
 import { generatePlanSituationBlob } from './PlanSituationPDF';
 import { generatePlanMasseBlob } from './PlanMassePDF';
 import ValidateDossierModal from './ValidateDossierModal';
@@ -203,9 +205,35 @@ export default function DossierDrawer({ open, onClose, simulation }) {
       }
       const noticeBlob = await generateNoticePdfBlob({ model: noticeModel, company, dateLabel });
 
+      // Mandat de représentation (mairie + Enedis) : même signature client que le CERFA, signature
+      // de l'org depuis Organisation → Identité (absente → mandat édité sans elle, signalé, jamais bloquant).
+      const mandatBlob = await tryPiece('mandat de représentation', async () => {
+        const demIn = fresh.demarches?.inputs ?? {};
+        const puissance = demIn.puissance_kwc ?? sim.results?.selectedKwc ?? sim.inputs?.selectedKwc ?? null;
+        const model = buildMandatModel({
+          declarant, adresseDeclarant: adresse,
+          site: { adresse: [adresse?.numero, adresse?.voie].filter(Boolean).join(' '), code_postal: adresse?.code_postal, commune: adresse?.localite },
+          cadastre: fresh.cadastre,
+          projet: { puissance_kwc: puissance, mode_valorisation: demIn.mode_valorisation ?? 'autoconso_surplus' },
+          company, consent: cons, devis: demIn.devis ?? {}, dateLabel,
+        });
+        if (model.alertes.length) {
+          toast.warning(`Mandat : ${model.alertes.map((a) => a.message).join(' ')}`);
+        }
+        let signatureOrgPng = null;
+        if (company.signatorySignaturePath) {
+          const { url, error: orgSigErr } = await storageService.getSignedUrl(DOCS_BUCKET, company.signatorySignaturePath);
+          const r = url && !orgSigErr ? await fetch(url) : null;
+          if (r?.ok) signatureOrgPng = new Uint8Array(await r.arrayBuffer());
+          else toast.warning('Signature de l’entreprise illisible : mandat édité sans elle.');
+        }
+        return generateMandatPdfBlob({ model, company, signatureMandantPng: signaturePngBytes, signatureMandatairePng: signatureOrgPng });
+      });
+
       // Assemblage final (ordre réglementaire) — une pièce illisible est ignorée mais surfacée.
       const assembled = await tryPiece('dossier assemblé', () => assembleDossierBlob([
         { label: 'CERFA', blob: cerfaBlob },
+        { label: 'mandat', blob: mandatBlob },
         { label: 'notice', blob: noticeBlob },
         { label: 'plan de situation', blob: planSituationBlob },
         { label: 'plan de masse', blob: planMasseBlob },
@@ -223,6 +251,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
         documents[key] = { path, generated_at: stamp, kind };
       };
       await uploadPiece('cerfa', 'cerfa-dp.pdf', cerfaBlob);
+      await uploadPiece('mandat', 'mandat-representation.pdf', mandatBlob);
       await uploadPiece('notice', 'notice-descriptive.pdf', noticeBlob);
       await uploadPiece('plan_situation', 'plan-situation-dpc1.pdf', planSituationBlob);
       await uploadPiece('plan_masse', 'plan-masse-dpc2.pdf', planMasseBlob);
@@ -499,6 +528,7 @@ export default function DossierDrawer({ open, onClose, simulation }) {
         initialConsent={consent}
         signataireDefaut={dossier?.declarant ? `${dossier.declarant.prenom} ${dossier.declarant.nom}` : (simulation.client_name || '')}
         lieuDefaut={parseAddressFR(simulation.client_address ?? '').localite}
+        footnote={CONSENT_FOOTNOTE}
         onSubmit={saveConsent}
       />
     </div>

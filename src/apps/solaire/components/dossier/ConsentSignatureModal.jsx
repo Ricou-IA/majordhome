@@ -8,7 +8,7 @@ import { FormField, inputClass } from '@apps/artisan/components/FormFields';
 import { CertificatSignaturePad } from '@apps/artisan/components/certificat/CertificatSignaturePad';
 
 export default function ConsentSignatureModal({
-  open, onClose, onSubmit, isSubmitting, consentItems, initialConsent, signataireDefaut, lieuDefaut,
+  open, onClose, onSubmit, isSubmitting, consentItems, initialConsent, signataireDefaut, lieuDefaut, footnote = null,
 }) {
   const [accepted, setAccepted] = useState({});
   const [signataireNom, setSignataireNom] = useState('');
@@ -76,6 +76,7 @@ export default function ConsentSignatureModal({
               </span>
             </label>
           ))}
+          {footnote && <p className="text-xs text-secondary-500 px-1">{footnote}</p>}
         </div>
 
         <FormField label="Lieu">

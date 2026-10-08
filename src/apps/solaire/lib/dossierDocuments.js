@@ -8,6 +8,7 @@
 /** Libellés d'affichage des pièces connues (ordre = ordre réglementaire d'assemblage). */
 export const DOSSIER_PIECES = [
   { key: 'cerfa', label: 'CERFA 16702' },
+  { key: 'mandat', label: 'Mandat de représentation' },
   { key: 'notice', label: 'Notice descriptive' },
   { key: 'plan_situation', label: 'Plan de situation (DPC1)' },
   { key: 'plan_masse', label: 'Plan de masse (DPC2)' },
