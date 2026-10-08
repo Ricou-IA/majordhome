@@ -318,3 +318,19 @@ test('chaque alerte porte code, niveau et message ; chaque étape applicable por
   }
   for (const e of r.etapes.filter((x) => x.applicable)) assert.ok(e.installateur.length > 10);
 });
+
+// ── validation du bloc Settings ────────────────────────────────────────────
+import { validerDemarches } from '../../src/apps/solaire/lib/demarches/parametres.js';
+
+test('validerDemarches : défauts valides ; date d’effet vide, doublon ou prise en charge inconnue → invalide', () => {
+  assert.equal(validerDemarches(DEMARCHES_DEFAULTS), true);
+  assert.equal(validerDemarches(undefined), false);
+  const videDate = { ...DEMARCHES_DEFAULTS, tarifs: { ...DEMARCHES_DEFAULTS.tarifs, tarif_consuel_violet: [{ date_effet: '', valeur: 250 }] } };
+  assert.equal(validerDemarches(videDate), false);
+  const doublon = { ...DEMARCHES_DEFAULTS, tarifs: { ...DEMARCHES_DEFAULTS.tarifs, tarif_consuel_bleu: [{ date_effet: '2026-01-01', valeur: 1 }, { date_effet: '2026-01-01', valeur: 2 }] } };
+  assert.equal(validerDemarches(doublon), false);
+  const delaiVide = { ...DEMARCHES_DEFAULTS, delais: { ...DEMARCHES_DEFAULTS.delais, consuel: { jours: '' } } };
+  assert.equal(validerDemarches(delaiVide), false);
+  const pec = { ...DEMARCHES_DEFAULTS, prise_en_charge_defaut: { raccordement_enedis: 'gratuit', consuel: 'refacture' } };
+  assert.equal(validerDemarches(pec), false);
+});

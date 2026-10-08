@@ -63,7 +63,7 @@ export const MODULES = [
     label: 'Solaire',
     description: 'Simulateur photovoltaïque et dossiers PV.',
     tiles: [
-      { key: 'solaire', title: 'Calculateur photovoltaïque', description: 'Paramètres de calcul, grille de coûts, véhicule électrique, bibliothèque', icon: 'Sun', href: '/settings/solaire', adminOnly: true },
+      { key: 'solaire', title: 'Calculateur photovoltaïque', description: 'Paramètres de calcul, grille de coûts, véhicule électrique, bibliothèque, démarches administratives', icon: 'Sun', href: '/settings/solaire', adminOnly: true },
     ],
   },
   {

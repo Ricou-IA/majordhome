@@ -78,6 +78,35 @@ export function valeurA(liste, dateIso) {
   };
 }
 
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const isIsoDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/**
+ * Validation du bloc `demarches` tel qu'édité dans Settings (délais numériques ≥ 0,
+ * entrées datées complètes, dates d'effet uniques par tarif, prise en charge connue).
+ * @param {object} d
+ * @returns {boolean}
+ */
+export function validerDemarches(d) {
+  if (!d) return false;
+  for (const cle of Object.keys(DELAIS_META)) {
+    const v = d.delais?.[cle];
+    const n = DELAIS_META[cle].unite === 'mois' ? v?.mois : v?.jours;
+    if (!isNum(n) || n < 0) return false;
+  }
+  for (const cle of Object.keys(TARIFS_META)) {
+    const liste = d.tarifs?.[cle] ?? [];
+    if (!Array.isArray(liste)) return false;
+    for (const e of liste) {
+      if (!isIsoDate(e.date_effet) || !isNum(e.valeur) || e.valeur < 0) return false;
+      if (e.valide_jusqu_au && !isIsoDate(e.valide_jusqu_au)) return false;
+    }
+    if (new Set(liste.map((e) => e.date_effet)).size !== liste.length) return false;
+  }
+  const pec = d.prise_en_charge_defaut ?? {};
+  return ['refacture', 'inclus'].includes(pec.raccordement_enedis) && ['refacture', 'inclus'].includes(pec.consuel);
+}
+
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }

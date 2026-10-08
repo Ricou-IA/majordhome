@@ -12,16 +12,19 @@ import { TECH_DOCS_BUCKET } from '@apps/solaire/lib/etudeExport';
 import { storageService } from '@services/storage.service';
 import {
   Calculator, Grid3x3, Car, ChevronLeft, Plus, X, Loader2,
-  FileText, Upload, ExternalLink, Trash2,
+  FileText, Upload, ExternalLink, Trash2, ClipboardList,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, SectionTitle, inputClass, selectClass } from '../../components/FormFields';
+import DemarchesTab from './solaire/DemarchesTab';
+import { validerDemarches } from '@apps/solaire/lib/demarches/parametres';
 
 const TABS = [
   { key: 'calcul', label: 'Paramètres calcul', icon: Calculator },
   { key: 'grille', label: 'Grille de coûts', icon: Grid3x3 },
   { key: 'vehicule', label: 'Véhicule électrique', icon: Car },
   { key: 'bibliotheque', label: 'Bibliothèque technique', icon: FileText },
+  { key: 'demarches', label: 'Démarches', icon: ClipboardList },
 ];
 
 const KWC_OPTIONS = Array.from({ length: 17 }, (_, i) => 1 + i * 0.5); // 1 → 9 kWc, pas 0,5
@@ -396,7 +399,8 @@ function validatePvForm(form) {
   const grid = form.cost_grid ?? [];
   const kwcs = grid.map((r) => r.kwc);
   if (new Set(kwcs).size !== kwcs.length) return false;
-  return grid.every((r) => isNum(r.kwc) && r.kwc >= 1 && r.kwc <= 9 && isNum(r.prix_ttc) && r.prix_ttc > 0);
+  if (!grid.every((r) => isNum(r.kwc) && r.kwc >= 1 && r.kwc <= 9 && isNum(r.prix_ttc) && r.prix_ttc > 0)) return false;
+  return validerDemarches(form.demarches);
 }
 
 export default function SolaireSettings() {
@@ -425,7 +429,19 @@ export default function SolaireSettings() {
 
   const handleSave = async () => {
     try {
-      const cleaned = { ...form, cost_grid: [...(form.cost_grid ?? [])].sort((a, b) => a.kwc - b.kwc) };
+      // Listes datées : triées par date d'effet, clés vides retirées (note/valide_jusqu_au optionnels)
+      const tarifs = Object.fromEntries(
+        Object.entries(form.demarches?.tarifs ?? {}).map(([cle, liste]) => [
+          cle,
+          [...liste].sort((a, b) => a.date_effet.localeCompare(b.date_effet))
+            .map((e) => Object.fromEntries(Object.entries(e).filter(([, v]) => v !== undefined && v !== ''))),
+        ]),
+      );
+      const cleaned = {
+        ...form,
+        cost_grid: [...(form.cost_grid ?? [])].sort((a, b) => a.kwc - b.kwc),
+        demarches: { ...form.demarches, tarifs },
+      };
       await save({ pv: cleaned });
       setForm(cleaned);
       toast.success('Paramètres solaire enregistrés');
@@ -447,7 +463,7 @@ export default function SolaireSettings() {
           </button>
           <h1 className="text-2xl font-bold text-secondary-900">Solaire</h1>
           <p className="text-secondary-600">
-            Paramètres du calculateur photovoltaïque et grille de coûts.
+            Paramètres du calculateur photovoltaïque, grille de coûts et démarches administratives.
           </p>
         </div>
         <button
@@ -489,6 +505,7 @@ export default function SolaireSettings() {
             {activeTab === 'grille' && <GrilleTab form={form} patch={patch} />}
             {activeTab === 'vehicule' && <VehiculeTab form={form} patch={patch} />}
             {activeTab === 'bibliotheque' && <BibliothequeTab form={form} patch={patch} orgId={organization?.id} />}
+            {activeTab === 'demarches' && <DemarchesTab form={form} patch={patch} />}
           </div>
         </div>
       )}
