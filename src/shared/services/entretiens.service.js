@@ -760,6 +760,35 @@ export const entretiensService = {
     }
   },
 
+  /**
+   * Effacer une visite saisie par erreur (la ligne de l'année repasse « En attente »).
+   * RPC `maintenance_visit_clear` : une visite réalisée de l'année en cours remet aussi la
+   * carte Kanban à sa place (Planifié si un RDV lui est lié, sinon À planifier) ; refus si la
+   * carte est facturée ou porte un certificat signé (la visite vient du terrain).
+   * Un DELETE direct ne suffirait pas : le trigger `sync_intervention_from_visit` ne joue pas
+   * sur DELETE, la carte resterait Réalisé sans visite (incident 2026-09-11).
+   */
+  async clearVisit(visitId) {
+    const MESSAGES = {
+      visite_facturee: "Cet entretien est facturé : la visite ne peut pas être effacée depuis la fiche.",
+      certificat_signe: "Un certificat signé est rattaché à cet entretien : la visite vient du terrain et ne s'efface pas d'ici.",
+      not_authorized: "Vous n'avez pas le droit de modifier les visites de ce contrat.",
+      visit_not_found: 'Cette visite a déjà été effacée.',
+    };
+    try {
+      const { data, error } = await supabase.rpc('maintenance_visit_clear', { p_visit_id: visitId });
+      if (error) {
+        logger.error('[entretiensService] clearVisit error:', error);
+        const message = MESSAGES[error.message] || error.message || "Erreur lors de l'effacement de la visite";
+        return { data: null, error: new Error(message) };
+      }
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[entretiensService] clearVisit exception:', error);
+      return { data: null, error };
+    }
+  },
+
   // ==========================================================================
   // CONTRAT PDF — Génération via N8N
   // ==========================================================================

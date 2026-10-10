@@ -421,6 +421,20 @@ export function useContractMutations() {
     },
   });
 
+  // Miroir de recordVisit : mêmes caches à rafraîchir (la carte Kanban peut avoir bougé).
+  const clearVisitMutation = useMutation({
+    mutationFn: ({ visitId }) => unwrapResult(entretiensService.clearVisit(visitId)),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...contractKeys.all(orgId), 'visits', variables.contractId] });
+      queryClient.invalidateQueries({ queryKey: contractKeys.detail(orgId, variables.contractId) });
+      queryClient.invalidateQueries({ queryKey: contractKeys.stats(orgId, variables.year) });
+      queryClient.invalidateQueries({ queryKey: interventionKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: clientKeys.all(orgId) });
+    },
+  });
+
   return {
     updateContract: useCallback(
       (contractId, updates) => updateMutation.mutateAsync({ contractId, updates }),
@@ -431,9 +445,11 @@ export function useContractMutations() {
       (visitId, status, notes) => updateVisitMutation.mutateAsync({ visitId, status, notes }),
       [updateVisitMutation]
     ),
+    clearVisit: clearVisitMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
     isRecordingVisit: recordVisitMutation.isPending,
     isUpdatingVisit: updateVisitMutation.isPending,
+    isClearingVisit: clearVisitMutation.isPending,
   };
 }
 

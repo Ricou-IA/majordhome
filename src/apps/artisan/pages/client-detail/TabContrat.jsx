@@ -5,8 +5,9 @@ import {
   FileText, Loader2, Save, Plus, X, Settings, Zap,
   ClipboardList, CalendarCheck, CalendarX2,
   Flame, Wind, Thermometer, Fan, Wrench,
-  CheckCircle2, XCircle, Ban,
+  CheckCircle2, XCircle, Ban, Trash2,
 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 import { useClientContract, useContractEquipments, useContractVisits, useContractMutations } from '@hooks/useContracts';
 import { clientKeys } from '@hooks/useClients';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
@@ -103,9 +104,10 @@ const ContractEquipmentsSection = ({ contractId }) => {
 const ContractVisitsSection = ({ contract, orgId, userId }) => {
   const queryClient = useQueryClient();
   const { visits, isLoading, refresh: refreshVisits } = useContractVisits(contract.id);
-  const { recordVisit, isRecordingVisit } = useContractMutations();
+  const { recordVisit, isRecordingVisit, clearVisit, isClearingVisit } = useContractMutations();
   const [editingYear, setEditingYear] = useState(null);
   const [visitForm, setVisitForm] = useState({ date: '', notes: '', status: 'completed' });
+  const [clearingVisit, setClearingVisit] = useState(null); // visite à effacer (confirmation ouverte)
 
   const currentYear = new Date().getFullYear();
   const startYear = contract.start_date
@@ -156,6 +158,32 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
     } catch (err) {
       console.error('[ContractVisits] recordVisit error:', err);
       toast.error(err?.message || "Erreur lors de l'enregistrement");
+    }
+  };
+
+  // Saisie par erreur (date ou refus) : la ligne repasse « En attente ». La RPC remet aussi la
+  // carte Kanban à sa place si la visite l'avait basculée en Réalisé (cf. entretiensService.clearVisit).
+  const handleClearVisit = async () => {
+    const visit = clearingVisit;
+    if (!visit) return;
+    try {
+      const result = await clearVisit({ visitId: visit.id, contractId: contract.id, year: visit.visit_year });
+      const revertedTo = result?.card_reverted_to;
+      toast.success(
+        revertedTo
+          ? `Visite ${visit.visit_year} effacée — la carte entretien est remise ${revertedTo === 'planifie' ? 'en « Planifié »' : 'en « À planifier »'}`
+          : `Visite ${visit.visit_year} effacée`
+      );
+      setClearingVisit(null);
+      setEditingYear(null);
+      setVisitForm({ date: '', notes: '', status: 'completed' });
+      refreshVisits();
+      if (contract.client_id) {
+        queryClient.invalidateQueries({ queryKey: clientKeys.detail(contract.client_id) });
+      }
+    } catch (err) {
+      logger.error('[ContractVisits] clearVisit error:', err);
+      toast.error(err?.message || "Erreur lors de l'effacement");
     }
   };
 
@@ -312,6 +340,18 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
                       >
                         Annuler
                       </button>
+                      {visit && (
+                        <button
+                          type="button"
+                          onClick={() => setClearingVisit(visit)}
+                          disabled={isClearingVisit}
+                          title="Saisie par erreur : la ligne repasse « En attente »"
+                          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Effacer la saisie
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -320,6 +360,21 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!clearingVisit}
+        onOpenChange={(open) => { if (!open) setClearingVisit(null); }}
+        title={`Effacer la visite ${clearingVisit?.visit_year ?? ''}`}
+        description={
+          clearingVisit?.status === 'completed' && clearingVisit?.visit_year === currentYear
+            ? "La ligne repasse « En attente » et la carte entretien du Kanban est remise à sa place (Planifié si un RDV est posé, sinon À planifier). Refusé si l'entretien est facturé ou porte un certificat signé."
+            : 'La ligne repasse « En attente ». Rien d\'autre n\'est touché.'
+        }
+        confirmLabel="Effacer"
+        variant="destructive"
+        onConfirm={handleClearVisit}
+        loading={isClearingVisit}
+      />
     </div>
   );
 };
