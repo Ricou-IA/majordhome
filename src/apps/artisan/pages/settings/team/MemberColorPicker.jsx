@@ -26,16 +26,27 @@ export function MemberColorPicker({ color, onPick, disabled = false, owners }) {
   const current = normalizeHex(color);
   const [libre, setLibre] = useState(current || '');
   const [erreur, setErreur] = useState(null);
+  // Nuanceur natif : il émet une valeur à chaque glissement ; on n'enregistre
+  // qu'une fois le geste terminé (700 ms sans changement), jamais à chaque pixel.
+  const [nuance, setNuance] = useState(null);
 
   useEffect(() => { setLibre(current || ''); setErreur(null); }, [current]);
 
-  const appliquerLibre = () => {
-    const hex = normalizeHex(libre);
+  const appliquer = (valeur) => {
+    const hex = normalizeHex(valeur);
     if (!hex) { setErreur('Code attendu : #RRGGBB (ex. #1D4ED8).'); return; }
     if (isReservedColor(hex)) { setErreur('Le violet est réservé aux rendez-vous facturés sur le calendrier.'); return; }
     setErreur(null);
     if (hex !== current) onPick(hex);
   };
+  const appliquerLibre = () => appliquer(libre);
+
+  useEffect(() => {
+    if (!nuance) return undefined;
+    const t = setTimeout(() => { setNuance(null); appliquer(nuance); }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nuance]);
 
   const owner = current ? owners?.get(current) : null;
 
@@ -44,7 +55,7 @@ export function MemberColorPicker({ color, onPick, disabled = false, owners }) {
       <div className="flex items-center gap-3">
         <span
           className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 text-xs font-semibold"
-          style={{ backgroundColor: current || FALLBACK_COLOR, color: isLightColor(current || FALLBACK_COLOR) ? '#0F172A' : '#FFFFFF' }}
+          style={{ backgroundColor: normalizeHex(nuance) || current || FALLBACK_COLOR, color: isLightColor(normalizeHex(nuance) || current || FALLBACK_COLOR) ? '#0F172A' : '#FFFFFF' }}
           aria-hidden="true"
         >
           Aa
@@ -92,8 +103,22 @@ export function MemberColorPicker({ color, onPick, disabled = false, owners }) {
 
       <div className="flex items-start gap-2">
         <div className="flex-1">
-          <label className="block text-xs text-secondary-500 mb-1" htmlFor="member-color-hex">Autre couleur (code hexadécimal)</label>
+          <label className="block text-xs text-secondary-500 mb-1" htmlFor="member-color-hex">Autre couleur : nuanceur ou code hexadécimal</label>
           <div className="flex items-center gap-2">
+            <label
+              className="relative inline-flex h-8 w-8 shrink-0 cursor-pointer rounded-full border border-secondary-300 overflow-hidden"
+              style={{ background: 'conic-gradient(#EF4444, #F59E0B, #22C55E, #06B6D4, #3B82F6, #EC4899, #EF4444)' }}
+              title="Ouvrir le nuanceur"
+            >
+              <input
+                type="color"
+                value={normalizeHex(nuance ?? libre) || current || '#3B82F6'}
+                disabled={disabled}
+                onChange={(e) => { const v = e.target.value.toUpperCase(); setLibre(v); setNuance(v); setErreur(null); }}
+                aria-label="Nuanceur de couleur"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              />
+            </label>
             <input
               id="member-color-hex"
               type="text"
