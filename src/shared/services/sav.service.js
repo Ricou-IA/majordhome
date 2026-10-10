@@ -167,19 +167,60 @@ export function getKanbanColumnConfig(columnValue) {
  * « Réalisé sans visite » en silence (DUBREUIL CTR-00036, 2026-09-10).
  * @returns {Promise<{ error: any }>}
  */
-async function maybeCompleteParent(parentId) {
+async function maybeCompleteParent(parentId, { visitDate } = {}) {
   const { data: parentRow } = await supabase
     .from('majordhome_entretien_sav')
-    .select('id, org_id, workflow_status')
+    .select('id, org_id, workflow_status, client_id, contract_id, effective_contract_id, scheduled_date, technician_id, technician_name, created_by')
     .eq('id', parentId)
     .maybeSingle();
 
   if (!parentRow || !parentRow.org_id) return { error: null };
-  // Ne pas re-déclencher si parent déjà clôturé
-  if (parentRow.workflow_status === 'realise' || parentRow.workflow_status === 'facture') return { error: null };
+  // Parent déjà clôturé (reprise d'un certificat, ou clôture précédente dont la visite a été
+  // REFUSÉE — GUILLOU CTR-00127, 2026-10-07 : le parent était passé « Réalisé » mais la
+  // visite datée du RDV (09/10, futur) avait été rejetée par le garde-fou DB ; au second
+  // passage on sautait tout et la carte restait « Réalisé sans visite ») : on ne redéclenche
+  // pas la clôture, mais la visite de l'année DOIT exister.
+  if (parentRow.workflow_status === 'realise' || parentRow.workflow_status === 'facture') {
+    return ensureRootVisit({ ...parentRow, contract_id: parentRow.effective_contract_id || parentRow.contract_id }, parentRow.org_id, { visitDate });
+  }
 
-  const { error } = await savService.completeParentEntretien(parentId, parentRow.org_id);
+  const { error } = await savService.completeParentEntretien(parentId, parentRow.org_id, undefined, { visitDate });
   return { error: error || null };
+}
+
+/**
+ * Date de visite acceptable par la base : le garde-fou `maintenance_visits` refuse une date
+ * future (migration 20260928_1). La date du certificat prime ; sans elle, la date du RDV,
+ * bornée à aujourd'hui.
+ * @param {string|null|undefined} d
+ * @returns {string} YYYY-MM-DD
+ */
+function visitDateBornee(d) {
+  const today = new Date().toISOString().split('T')[0];
+  if (!d) return today;
+  const iso = String(d).slice(0, 10);
+  return iso > today ? today : iso;
+}
+
+/**
+ * Garantit la visite « completed » de l'année courante sur une racine déjà close.
+ * @param {{ id: string, contract_id?: string|null, client_id?: string|null, scheduled_date?: string|null }} root
+ * @param {string} orgId - org core
+ * @returns {Promise<{ error: any }>}
+ */
+async function ensureRootVisit(root, orgId, { visitDate } = {}) {
+  const contractId = await resolveRootContractId(root, orgId);
+  if (!contractId) return { error: new Error('la carte n’est liée à aucun contrat actif') };
+  const { data: existing, error: readError } = await supabase
+    .from('majordhome_maintenance_visits')
+    .select('id')
+    .eq('contract_id', contractId)
+    .eq('visit_year', new Date().getFullYear())
+    .eq('status', 'completed')
+    .maybeSingle();
+  if (readError) return { error: readError };
+  if (existing?.id) return { error: null };
+  return recordRootVisit({ ...root, contract_id: contractId }, orgId, { visitDate: visitDateBornee(visitDate || root.scheduled_date) });
 }
 
 /**
@@ -940,15 +981,16 @@ export const savService = {
       if (error) throw error;
 
       if (data?.parent_id) {
-        const { error: parentError } = await maybeCompleteParent(data.parent_id);
+        // La date du certificat (visitDate) suit jusqu'à la visite du parent : la date du RDV
+        // peut être postérieure à l'intervention réelle, et la base refuse une visite future.
+        const { error: parentError } = await maybeCompleteParent(data.parent_id, { visitDate });
         if (parentError) throw new Error(`visite non enregistrée : ${parentError.message || parentError}`);
       } else if (data?.intervention_type === 'entretien') {
         const orgId = await getCoreOrgIdForRoot(data.id);
         const contractId = await resolveRootContractId(data, orgId);
         if (!contractId) throw new Error('visite non enregistrée : la carte n’est liée à aucun contrat actif');
-        const today = new Date().toISOString().split('T')[0];
         const { error: visitError } = await recordRootVisit({ ...data, contract_id: contractId }, orgId, {
-          visitDate: visitDate || data.scheduled_date || today,
+          visitDate: visitDateBornee(visitDate || data.scheduled_date),
         });
         // La carte est déjà « Réalisé » : on remonte l'échec au lieu de l'avaler,
         // c'est exactement l'état « réalisé sans date » qu'on veut voir.
@@ -1014,7 +1056,7 @@ export const savService = {
    * @param {string} [reportNotes] - Notes internes
    * @returns {Promise<{ data: { allDone: boolean }|null, error: Error|null }>}
    */
-  async completeParentEntretien(parentId, orgId, reportNotes) {
+  async completeParentEntretien(parentId, orgId, reportNotes, { visitDate: certificatDate } = {}) {
     return withErrorHandling(async () => {
       // 1) Vérifier tous les enfants
       const { data: children, error: childErr } = await supabase
@@ -1036,8 +1078,10 @@ export const savService = {
         .eq('id', parentId)
         .single();
 
-      const today = new Date().toISOString().split('T')[0];
-      const visitDate = parent?.scheduled_date || today;
+      // Date réelle de l'intervention (certificat) avant la date du RDV ; jamais dans le futur
+      // (garde-fou DB 20260928_1 — vécu GUILLOU 2026-10-07 : RDV le 09/10, certificat le 07/10,
+      // visite refusée et jamais reposée).
+      const visitDate = visitDateBornee(certificatDate || parent?.scheduled_date);
 
       // 3) Transition parent → realise
       const { error: parentErr } = await supabase

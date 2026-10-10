@@ -44,6 +44,10 @@ import {
 import { appointmentsService } from '@services/appointments.service';
 import { autoRdvService } from '@services/autoRdv.service';
 import { clientsService } from '@services/clients.service';
+import { equipmentsService } from '@services/equipments.service';
+import { contractsService } from '@services/contracts.service';
+import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { libelleEquipement } from '@/lib/equipmentReferential';
 import { EntretienPartsSection } from './EntretienPartsSection';
 import { useEntretienSAVMutations } from '@hooks/useEntretienSAV';
 import { useTeamMembers } from '@hooks/useAppointments';
@@ -138,21 +142,26 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       });
   }, [contractId]);
 
-  // Charger les équipements du contrat
-  const [contractEquipments, setContractEquipments] = useState([]);
+  // Équipements du client (marque, modèle) et ceux sous contrat (recette Eric 2026-10-10 :
+  // « indiquer la marque et le modèle ; sous contrat d'une couleur, hors contrat d'une autre »).
+  // Sans `contract_equipments` (contrat legacy) on ne peut pas distinguer : chips neutres.
+  const [equipementsClient, setEquipementsClient] = useState([]);
+  const [idsSousContrat, setIdsSousContrat] = useState(null);
+  const { index: referentiel } = useEquipmentReferential();
   useEffect(() => {
-    if (!contractId) return;
-
-    supabase
-      .from('majordhome_contract_pricing_items')
-      .select('quantity, equipment_type_label')
-      .eq('contract_id', contractId)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setContractEquipments(data);
-        }
-      });
-  }, [contractId]);
+    if (!item?.client_id) return;
+    let actif = true;
+    Promise.all([
+      equipmentsService.getClientEquipments(item.client_id),
+      contractId ? contractsService.getContractEquipments(contractId) : Promise.resolve({ data: [] }),
+    ]).then(([client, contrat]) => {
+      if (!actif) return;
+      setEquipementsClient(client?.data || []);
+      const liens = contrat?.data || [];
+      setIdsSousContrat(liens.length ? new Set(liens.map((eq) => eq.id)) : null);
+    });
+    return () => { actif = false; };
+  }, [item?.client_id, contractId]);
 
   // --- Dirty check : savoir si quelque chose a changé ---
   // (déclaré AVANT early return — règle React Hooks : ordre stable)
@@ -608,17 +617,31 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                 {/* Pièces de rechange : détail + toggle « Offert » (team_leader+) */}
                 <EntretienPartsSection item={item} orgId={item.org_id} />
 
-                {/* Équipements du contrat */}
-                {contractEquipments.length > 0 && (
+                {/* Équipements du client : type · marque modèle ; vert = sous contrat, ambre = hors contrat */}
+                {equipementsClient.length > 0 && (
                   <div className="flex items-start gap-2 text-sm text-gray-500">
                     <Wrench className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <div className="flex flex-wrap gap-1.5">
-                      {contractEquipments.map((eq, i) => (
-                        <span key={i} className="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-medium">
-                          {eq.equipment_type_label || 'Équipement'}
-                          {eq.quantity > 1 && ` ×${eq.quantity}`}
-                        </span>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {equipementsClient.map((eq) => {
+                        const sousContrat = idsSousContrat ? idsSousContrat.has(eq.id) : null;
+                        const marqueModele = [eq.brand, eq.model].filter(Boolean).join(' ');
+                        const classe = sousContrat === null
+                          ? 'bg-gray-100 text-gray-700'
+                          : sousContrat ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200';
+                        return (
+                          <span
+                            key={eq.id}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classe}`}
+                            title={sousContrat === null ? undefined : sousContrat ? 'Sous contrat' : 'Hors contrat'}
+                          >
+                            {libelleEquipement(eq, referentiel)}
+                            {marqueModele && <span className="font-normal">&nbsp;· {marqueModele}</span>}
+                          </span>
+                        );
+                      })}
+                      {idsSousContrat && (
+                        <span className="text-[10px] text-gray-400">vert = sous contrat · ambre = hors contrat</span>
+                      )}
                     </div>
                   </div>
                 )}
