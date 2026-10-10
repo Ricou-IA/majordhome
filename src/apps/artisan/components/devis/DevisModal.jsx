@@ -315,6 +315,14 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             {quote.accepted_at && <span>Accepté le {formatDateFR(quote.accepted_at)}</span>}
           </div>
 
+          {/* Commentaire visible par le client */}
+          {quote.commentaire && (
+            <div>
+              <h3 className="text-xs font-semibold text-secondary-400 uppercase mb-1">Commentaire (visible par le client)</h3>
+              <p className="text-sm text-secondary-700 whitespace-pre-line">{quote.commentaire}</p>
+            </div>
+          )}
+
           {/* Conditions */}
           {quote.conditions && (
             <div>

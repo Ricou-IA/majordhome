@@ -117,6 +117,15 @@ export default function ApercuDevis({ model: m, zoneActive, onZoneClick }) {
         ))}
       </Zone>
 
+      <Zone {...props('commentaire', 'mt-4')}>
+        {m.commentaire.lignes.length ? (
+          <>
+            <div className="text-[9px] font-bold uppercase text-secondary-400 mb-1">{m.commentaire.titre}</div>
+            {m.commentaire.lignes.map((l, i) => <div key={i} className="text-[10px] text-secondary-700 leading-relaxed">{l}</div>)}
+          </>
+        ) : <span className="text-secondary-300 italic">Commentaire du devis (saisi sur chaque devis, vide ici)</span>}
+      </Zone>
+
       <Zone {...props('validite', 'mt-4 italic text-secondary-500')}>{m.validite.texte}</Zone>
 
       <Zone {...props('conditions', 'mt-4 bg-secondary-50 rounded p-3')}>

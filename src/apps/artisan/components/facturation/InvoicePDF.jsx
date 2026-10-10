@@ -110,6 +110,13 @@ export function InvoiceDocument({ model, company }) {
           </View>
         </View>
 
+        {model.clientNoteLines.length ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={[sharedStyles.sectionTitle, { color: accent }]}>Information</Text>
+            {model.clientNoteLines.map((l, i) => <Text key={i} style={s.para}>{l}</Text>)}
+          </View>
+        ) : null}
+
         <View style={{ marginTop: 14 }}>
           <Text style={[sharedStyles.sectionTitle, { color: accent }]}>Règlement</Text>
           {model.payment.map((p, i) => <Text key={i} style={s.para}>{p}</Text>)}

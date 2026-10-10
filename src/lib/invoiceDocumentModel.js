@@ -207,6 +207,8 @@ export function buildInvoiceDraft({ model, orgId, context = 'contrat', client, c
     total_ttc: totalTtc,
     vat_breakdown: [...byRate.values()].sort((a, b) => a.rate - b.rate),
     discount: model?.discount || null,
+    // Information client imprimée (bloc « Information » du PDF), figée à l'émission (spec 2026-10-10)
+    client_note: (typeof model?.clientNote === 'string' && model.clientNote.trim()) ? model.clientNote.trim() : null,
   };
   return { invoice, lines };
 }
@@ -261,6 +263,8 @@ export function buildInvoicePdfModel({ invoice, lines, company, invoicing }) {
     dates: { invoice: fmtDateFr(invoice.invoice_date), due: fmtDateFr(invoice.due_at) },
     customer,
     subject: invoice.subject || null,
+    // Un avoir ne reprend pas l'information client de la facture annulée.
+    clientNoteLines: isCreditNote ? [] : String(invoice.client_note || '').split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean),
     rows,
     vatRows,
     totals: { ht: fmtEur(invoice.total_ht), tva: fmtEur(invoice.total_tva), ttc: fmtEur(invoice.total_ttc) },

@@ -21,6 +21,7 @@ export default function DevisConditions({ form, setField, lines, devisConfig }) 
   const resume = [
     `remise ${form.globalDiscountPercent || 0} %`,
     `validité ${form.validityDays || cfg.document.validite_jours} j`,
+    form.commentaire ? 'commentaire client' : null,
     form.conditions ? 'conditions personnalisées' : 'conditions par défaut',
     form.notesInternes ? 'notes internes' : null,
   ].filter(Boolean).join(' · ');
@@ -45,6 +46,9 @@ export default function DevisConditions({ form, setField, lines, devisConfig }) 
             </FormField>
           </div>
           <DevisTvaSummary totals={totals} globalDiscountPercent={form.globalDiscountPercent} />
+          <FormField label="Commentaire sur le devis (visible par le client)">
+            <TextArea value={form.commentaire} onChange={(v) => setField('commentaire', v)} rows={3} placeholder="Imprimé sous le tableau du devis : accès, délai, précision sur la pose… Vide = rien." />
+          </FormField>
           <FormField label="Conditions de vente">
             <TextArea value={form.conditions} onChange={(v) => setField('conditions', v)} rows={5} placeholder={DEFAULT_CONDITIONS} />
             {!form.conditions && (

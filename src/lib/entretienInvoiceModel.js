@@ -479,6 +479,9 @@ export function toPennylaneInvoicePayload(model, { customerId, draft, externalRe
       return line;
     }),
   };
+  // Information client (ex. anomalie constatée à l'entretien) : texte libre imprimé sur le PDF
+  // Pennylane (spec 2026-10-10). Absente du payload si vide.
+  if (typeof model.clientNote === 'string' && model.clientNote.trim()) payload.pdf_invoice_free_text = model.clientNote.trim();
   if (draft) payload.draft = true;
   return payload;
 }

@@ -280,7 +280,7 @@ export const devisService = {
   // CRÉATION
   // ==========================================================================
 
-  async createQuote({ orgId, leadId, clientId, subject, validityDays = 30, conditions, notesInternes, globalDiscountPercent = 0, lines = [], createdBy }) {
+  async createQuote({ orgId, leadId, clientId, subject, validityDays = 30, conditions, notesInternes, commentaire, globalDiscountPercent = 0, lines = [], createdBy }) {
     try {
       if (!orgId) throw new Error('[devisService] orgId requis');
 
@@ -298,6 +298,7 @@ export const devisService = {
           validity_days: validityDays,
           conditions: conditions || null,
           notes_internes: notesInternes || null,
+          commentaire: commentaire || null, // visible par le client sur le PDF (≠ conditions, ≠ notes internes)
           global_discount_percent: globalDiscountPercent,
           total_ht: totals.total_ht,
           total_tva: totals.total_tva,
@@ -360,6 +361,7 @@ export const devisService = {
       if (updates.validityDays !== undefined) updateData.validity_days = parseInt(updates.validityDays) || 30;
       if (updates.conditions !== undefined) updateData.conditions = updates.conditions || null;
       if (updates.notesInternes !== undefined) updateData.notes_internes = updates.notesInternes || null;
+      if (updates.commentaire !== undefined) updateData.commentaire = updates.commentaire || null;
       if (updates.globalDiscountPercent !== undefined) updateData.global_discount_percent = parseFloat(updates.globalDiscountPercent) || 0;
       if (updates.totalHt !== undefined) updateData.total_ht = parseFloat(updates.totalHt) || 0;
       if (updates.totalTva !== undefined) updateData.total_tva = parseFloat(updates.totalTva) || 0;
@@ -598,6 +600,7 @@ export const devisService = {
           global_discount_percent: original.global_discount_percent,
           conditions: original.conditions,
           notes_internes: original.notes_internes,
+          commentaire: original.commentaire,
           total_ht: original.total_ht,
           total_tva: original.total_tva,
           total_ttc: original.total_ttc,

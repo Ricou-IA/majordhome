@@ -323,3 +323,20 @@ test('invoiceErrorMessage : detail de l\'edge ajouté entre parenthèses, borné
   assert.equal(invoiceErrorMessage(new Error('pennylane_import_failed')), INVOICE_RPC_MESSAGES.pennylane_import_failed);
   assert.equal(invoiceErrorMessage(Object.assign(new Error('pennylane_import_failed'), { detail: '   ' })), INVOICE_RPC_MESSAGES.pennylane_import_failed);
 });
+
+test('buildInvoiceDraft + buildInvoicePdfModel : information client — client_note figée, lignes du bloc « Information », jamais sur un avoir (spec 2026-10-10)', () => {
+  const { invoice } = buildInvoiceDraft({ model: { ...MODEL, clientNote: ' Constaté lors de l’entretien : creuset déformé.\n\nUn devis vous sera adressé. ' }, orgId: 'org-1', client: CLIENT, dueDays: 30 });
+  assert.equal(invoice.client_note, 'Constaté lors de l’entretien : creuset déformé.\n\nUn devis vous sera adressé.');
+  const { invoice: sans } = buildInvoiceDraft({ model: { ...MODEL, clientNote: '   ' }, orgId: 'org-1', client: CLIENT, dueDays: 30 });
+  assert.equal(sans.client_note, null);
+  const { invoice: absent } = buildInvoiceDraft({ model: MODEL, orgId: 'org-1', client: CLIENT, dueDays: 30 });
+  assert.equal(absent.client_note, null);
+
+  const base = { number: 'F-2026-00001', year: 2026, status: 'issued', kind: 'invoice', customer: {}, total_ht: 0, total_tva: 0, total_ttc: 0, vat_breakdown: [], invoice_date: '2026-10-10', due_at: '2026-11-09' };
+  const pdf = buildInvoicePdfModel({ invoice: { ...base, client_note: invoice.client_note }, lines: [], company: buildCompanyInfo(null), invoicing: invoicingSettings(null) });
+  assert.deepEqual(pdf.clientNoteLines, ['Constaté lors de l’entretien : creuset déformé.', 'Un devis vous sera adressé.']);
+  const vide = buildInvoicePdfModel({ invoice: base, lines: [], company: buildCompanyInfo(null), invoicing: invoicingSettings(null) });
+  assert.deepEqual(vide.clientNoteLines, []);
+  const avoir = buildInvoicePdfModel({ invoice: { ...base, kind: 'credit_note', client_note: 'Ne doit pas sortir' }, lines: [], company: buildCompanyInfo(null), invoicing: invoicingSettings(null) });
+  assert.deepEqual(avoir.clientNoteLines, []);
+});

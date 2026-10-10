@@ -584,3 +584,13 @@ test('M8 : virgule décimale tolérée sur la quantité (saisie FR)', () => {
   assert.equal(withComma.errors.length, 0);
   assert.equal(withComma.lines[0].quantity, 2.5);
 });
+
+test('charge utile Pennylane : information client → pdf_invoice_free_text, absente si vide (spec 2026-10-10)', () => {
+  const m = buildEntretienInvoice(dalous({ contract: { contract_number: 'CTR-1', amount: 225 }, pricing: pricingFor([EQ_POELE]) }));
+  const avec = toPennylaneInvoicePayload({ ...m, clientNote: '  Constaté lors de l’entretien : creuset déformé. Un devis vous sera adressé.  ' }, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.equal(avec.pdf_invoice_free_text, 'Constaté lors de l’entretien : creuset déformé. Un devis vous sera adressé.');
+  const sans = toPennylaneInvoicePayload({ ...m, clientNote: '   ' }, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.equal('pdf_invoice_free_text' in sans, false);
+  const nul = toPennylaneInvoicePayload(m, { customerId: 1, draft: true, externalReference: 'iv-1' });
+  assert.equal('pdf_invoice_free_text' in nul, false);
+});

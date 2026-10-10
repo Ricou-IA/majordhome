@@ -38,7 +38,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const [lines, setLines] = useState(() => (Array.isArray(initialLines) ? initialLines : []));
   // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
   const [metre, setMetre] = useState(null);
-  const [form, setForm] = useState({ subject: '', validityDays: '30', conditions: '', notesInternes: '', globalDiscountPercent: '0' });
+  const [form, setForm] = useState({ subject: '', validityDays: '30', conditions: '', commentaire: '', notesInternes: '', globalDiscountPercent: '0' });
   useEffect(() => { setForm((prev) => ({ ...prev, validityDays: String(devisConfig.document.validite_jours) })); }, [devisConfig.document.validite_jours]);
 
   // Templates
@@ -104,6 +104,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         subject: form.subject || null,
         validityDays: parseInt(form.validityDays) || 30,
         conditions: form.conditions || null,
+        commentaire: form.commentaire || null,
         notesInternes: form.notesInternes || null,
         globalDiscountPercent: parseFloat(form.globalDiscountPercent) || 0,
         lines,

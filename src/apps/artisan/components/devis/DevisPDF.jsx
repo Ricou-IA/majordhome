@@ -143,6 +143,13 @@ function DevisDocument({ model: m }) {
           ))}
         </View>
 
+        {m.commentaire.lignes.length ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={s.blocTitle}>{m.commentaire.titre}</Text>
+            {m.commentaire.lignes.map((l, i) => <Text key={i} style={s.paragraphe}>{l}</Text>)}
+          </View>
+        ) : null}
+
         <Text style={s.validityText}>{m.validite.texte}</Text>
 
         {m.conditions.lignes.length ? (

@@ -39,6 +39,8 @@ import InvoiceEmailOptions from '@/apps/artisan/components/facturation/InvoiceEm
 import { computeContractLines } from '@/lib/contractPricing';
 import { buildEntretienInvoice, toPennylaneInvoicePayload, lineEditsFromModel, applyLineEdits } from '@/lib/entretienInvoiceModel';
 import { formatEuro, formatDateForInput, formatDateShortFR, downloadBlob } from '@/lib/utils';
+import { anomaliesDeCarte, noteClientDepuisAnomalies } from '@/lib/certificatAnomalies';
+import { FormField, TextArea } from '../FormFields';
 
 /**
  * @param {object} p
@@ -138,6 +140,19 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     [model, edits, ledgerCatalog],
   );
 
+  // Information client imprimée sur la facture : pré-remplie depuis l'anomalie relevée sur le
+  // certificat (spec 2026-10-10), modifiable, vide = rien d'imprimé. Portée par `model.clientNote`
+  // dans les deux modes (hub : `invoices.client_note` ; Pennylane : texte libre du PDF).
+  const [clientNote, setClientNote] = useState('');
+  const noteParDefaut = useMemo(() => noteClientDepuisAnomalies(anomaliesDeCarte(item)), [item]);
+  // Réinitialisée à l'ouverture ou au changement de carte, jamais au fil de la saisie.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `noteParDefaut` ne doit pas écraser une saisie en cours
+  useEffect(() => { setClientNote(noteParDefaut); }, [open, item.id]);
+  const modelFinal = useMemo(
+    () => (effectiveModel ? { ...effectiveModel, clientNote: clientNote.trim() || null } : null),
+    [effectiveModel, clientNote],
+  );
+
   // Envoi de la facture par e-mail (module Communication) : proposé comme une SUITE de la
   // création, jamais un blocage — cf. `sendEmailAfterCreation` plus bas.
   const emailAvailability = useMemo(
@@ -185,7 +200,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
     if (isHub) {
       try {
         const draft = buildInvoiceDraft({
-          model: effectiveModel,
+          model: modelFinal,
           orgId,
           context: 'contrat',
           client: {
@@ -246,7 +261,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
         // taken », 2026-09-22) : intervention + suffixe d'essai. L'idempotence, elle, est
         // portée par le mapping pennylane_sync relu avant tout POST, pas par ce champ.
         buildPayload: (customerId) =>
-          toPennylaneInvoicePayload(effectiveModel, { customerId, draft: isDraft, externalReference: `${item.id}-${Date.now().toString(36)}` }),
+          toPennylaneInvoicePayload(modelFinal, { customerId, draft: isDraft, externalReference: `${item.id}-${Date.now().toString(36)}` }),
       });
       const ref = created.invoiceNumber || (created.draft ? 'brouillon' : `#${created.invoiceId}`);
       toast.success(
@@ -396,6 +411,15 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
               <div><span className="text-gray-500">Échéance :</span> {formatDateShortFR(effectiveModel.deadline)} ({invoiceSettings.deadlineDays} j)</div>
               {activeZone && <div><span className="text-gray-500">Zone tarifaire :</span> {activeZone.label || activeZone.code || activeZone.name}</div>}
             </div>
+
+            <FormField label="Information client (imprimée sur la facture)">
+              <TextArea
+                value={clientNote}
+                onChange={setClientNote}
+                rows={2}
+                placeholder="Rien n’est imprimé si vide — pré-rempli avec l’anomalie relevée sur le certificat"
+              />
+            </FormField>
 
             <InvoiceEmailOptions
               availability={emailAvailability}

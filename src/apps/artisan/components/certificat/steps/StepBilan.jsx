@@ -8,6 +8,7 @@
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { FormField, TextArea, SelectInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
+import { ACTIONS_CORRECTIVES } from '@/lib/certificatAnomalies';
 
 const BILAN_OPTIONS = [
   {
@@ -36,11 +37,8 @@ const BILAN_OPTIONS = [
   },
 ];
 
-const ACTION_CORRECTIVE_OPTIONS = [
-  { value: 'sur_place',      label: 'Corrigée sur place' },
-  { value: 'devis',          label: 'Devis à établir' },
-  { value: 'arret_urgence',  label: 'Arrêt d\'urgence' },
-];
+// Source unique des actions correctives (carte, fiche, SAV, facture) : src/lib/certificatAnomalies.js
+const ACTION_CORRECTIVE_OPTIONS = ACTIONS_CORRECTIVES;
 
 export function StepBilan({ formData, onChange }) {
   const showAnomalie = formData.bilan_conformite === 'anomalie' || formData.bilan_conformite === 'arret_urgence';

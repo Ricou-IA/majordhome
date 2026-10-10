@@ -509,7 +509,7 @@ export const savService = {
    * Créer un SAV (demande de réparation)
    * projectId est obligatoire (NOT NULL + RLS via projects.org_id)
    */
-  async createSAV({ orgId, clientId, contractId, projectId, savDescription, savOrigin, createdBy }) {
+  async createSAV({ orgId, clientId, contractId, projectId, savDescription, savOrigin, createdBy, sourceCertificatId = null, equipmentId = null }) {
     if (!orgId || !clientId || !projectId) {
       throw new Error('[sav] orgId, clientId et projectId requis');
     }
@@ -521,11 +521,15 @@ export const savService = {
           project_id: projectId,
           client_id: clientId,
           contract_id: contractId || null,
+          equipment_id: equipmentId || null,
           intervention_type: 'sav',
           workflow_status: 'demande',
           scheduled_date: null,
           sav_description: savDescription || null,
           sav_origin: savOrigin || 'appel_client',
+          // Demande ouverte depuis un certificat « Devis à établir » : index unique en base,
+          // un second INSERT pour le même certificat renvoie 23505 (spec 2026-10-10).
+          source_certificat_id: sourceCertificatId || null,
           status: 'scheduled',
           created_by: createdBy || null,
         })

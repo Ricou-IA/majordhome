@@ -103,6 +103,7 @@ test('buildDevisDocumentModel : zones complètes, formats, défauts de condition
   assert.equal(m.totaux.lignes.at(-1).valeur, '2 802,50 €');
   assert.equal(m.validite.texte, "Ce devis est valable jusqu'au 5 novembre 2026.");
   assert.equal(m.conditions.lignes.length, 4); // conditions par défaut de la config quand le devis n'en porte pas
+  assert.deepEqual(m.commentaire.lignes, []); // pas de commentaire sur ce devis ⇒ zone vide (rien d'imprimé)
   assert.equal(m.paiement.visible, false);
   assert.equal(m.signature.libelle, 'Bon pour accord');
   assert.ok(m.pied_de_page.texte.includes('Chauffage Test'));
@@ -119,7 +120,7 @@ test('buildDevisDocumentModel : options d\'affichage, paiement, remise, conditio
     paiement: { afficher: true, etablissement: 'Crédit Mutuel' },
     affichage: { logo: false, references: false, prix_unitaires: false, tva_par_ligne: false, detail_lignes: false },
   } });
-  const m = buildDevisDocumentModel({ quote: { ...quote, global_discount_percent: 10, conditions: 'Mes conditions' }, lines, totals: { ...totals, discount_amount: 265 }, company, config, invoicing: { iban: 'FR76 1234', bic: 'CMCIFR2A' } });
+  const m = buildDevisDocumentModel({ quote: { ...quote, global_discount_percent: 10, conditions: 'Mes conditions', commentaire: 'Accès par le portail.\n\nLivraison sous 3 semaines.' }, lines, totals: { ...totals, discount_amount: 265 }, company, config, invoicing: { iban: 'FR76 1234', bic: 'CMCIFR2A' } });
   assert.deepEqual(m.intro.lignes, ['Merci de votre confiance.', 'Voici notre proposition.']);
   assert.deepEqual(m.acompte.lignes, ['Acompte de 30 % à la commande.']);
   assert.equal(m.logo.url, null);
@@ -128,6 +129,7 @@ test('buildDevisDocumentModel : options d\'affichage, paiement, remise, conditio
   assert.equal(m.tableau.chapitres[0].sous_total, '2 500,00 €');
   assert.ok(m.totaux.lignes.some((l) => l.libelle === 'Remise (10 %)' && l.valeur === '-265,00 €'));
   assert.deepEqual(m.conditions.lignes, ['Mes conditions']);
+  assert.deepEqual(m.commentaire.lignes, ['Accès par le portail.', 'Livraison sous 3 semaines.']); // commentaire du devis, visible par le client
   assert.deepEqual(m.mention_speciale.lignes, ['Éligible MaPrimeRénov’']);
   assert.equal(m.paiement.visible, true);
   assert.equal(m.paiement.etablissement, 'Crédit Mutuel');

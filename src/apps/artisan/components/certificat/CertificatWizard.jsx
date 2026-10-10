@@ -17,9 +17,12 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCertificatMutations } from '@hooks/useCertificats';
 import { useTeamMembers } from '@hooks/useAppointments';
+import { entretienSavKeys } from '@hooks/cacheKeys';
 import { savService } from '@services/sav.service';
+import { doitCreerSav, descriptionSavDepuisCertificat } from '@/lib/certificatAnomalies';
 import { useAuth } from '@contexts/AuthContext';
 import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
@@ -91,6 +94,7 @@ export function CertificatWizard({
   const canSelectTechnician = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
   const { members: teamMembers = [] } = useTeamMembers(canSelectTechnician ? organization?.id : null);
   const { saveDraft, signCertificat, uploadPdf, updatePdfInfo, getSignedUrl, isSaving, isSigning } = useCertificatMutations();
+  const queryClient = useQueryClient();
   const saveTimeoutRef = useRef(null);
   // Référentiel de l'org : la valeur enregistrée (equipement_type) est le CODE de
   // catégorie ; le gabarit (profil) et la TVA par défaut viennent de la catégorie.
@@ -315,6 +319,41 @@ export function CertificatWizard({
   // Appelée par handleSign (enchaînement automatique, `signature` = valeurs qui
   // ne sont pas encore dans le state) et par le bouton « Valider et générer le
   // certificat PDF » (reprise d'un certificat signé sans PDF, ou réessai).
+  /**
+   * Bilan « Devis à établir » ⇒ une demande SAV (colonne « Demande »), au plus une par certificat
+   * (index unique `interventions.source_certificat_id` : un 23505 = déjà ouverte, silencieux).
+   * Toute autre erreur se dit en avertissement, sans interrompre la finalisation.
+   */
+  const ouvrirDemandeSav = async (certId, data) => {
+    if (!certId || !doitCreerSav(data)) return;
+    const projectId = intervention?.project_id || client?.project_id || null;
+    if (!client?.id || !projectId) {
+      toast.warning('« Devis à établir » noté, mais la demande SAV n’a pas pu être créée : client ou projet inconnu.');
+      return;
+    }
+    const { error } = await savService.createSAV({
+      orgId,
+      clientId: client.id,
+      contractId: contract?.id || intervention?.contract_id || null,
+      projectId,
+      savDescription: descriptionSavDepuisCertificat(data, {
+        equipementLabel: referentiel.categoriesByCode.get(data.equipement_type)?.label || '',
+      }),
+      savOrigin: 'entretien',
+      createdBy: userId,
+      sourceCertificatId: certId,
+      equipmentId: equipment?.id || data.equipment_id || null,
+    });
+    if (error) {
+      if (error.code === '23505') return; // reprise ou re-signature : la demande existe déjà
+      console.error('[CertificatWizard] createSAV error:', error);
+      toast.warning(`Certificat signé, mais la demande SAV n’a pas été créée : ${error.message || 'erreur inconnue'}`, { duration: 12000 });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(organization?.id) });
+    toast.success('Demande SAV créée dans le Kanban Entretien (devis à établir)');
+  };
+
   const finaliser = async ({ certId = certificatId, signature = null } = {}) => {
     setIsGeneratingPdf(true);
     setPdfError(null);
@@ -355,6 +394,10 @@ export function CertificatWizard({
         toast.error(msg);
         return; // le bouton « Valider et générer » reste affiché pour réessayer
       }
+
+      // 1bis. « Devis à établir » ⇒ demande SAV dans le Kanban Entretien, pour Philippe
+      //       (spec 2026-10-10). Jamais bloquant : le certificat et le « Réalisé » sont posés.
+      await ouvrirDemandeSav(currentCertId, data);
 
       // 2. Sync équipement (best effort) puis PDF
       await syncEquipmentBack();
