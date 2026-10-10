@@ -15,8 +15,23 @@ import { toleranceDe } from './tournee/arrets.js';
 
 export const COMMERCIAL_TYPES = ['rdv_agency', 'rdv_technical', 'rdv_closing'];
 export const TECHNICIAN_TYPES = ['installation', 'maintenance', 'service'];
-// RDV R1 (visite technique, RDV commercial) : pas de pose sans numéro du client.
-export const PHONE_REQUIRED_TYPES = ['rdv_technical', 'rdv_agency'];
+// RDV R1 (visite technique sur place ou en agence).
+export const VT_R1_TYPES = ['rdv_technical', 'rdv_agency'];
+// Pas de pose d'un R1 sans numéro du client.
+export const PHONE_REQUIRED_TYPES = VT_R1_TYPES;
+// Une visite technique se pose en bloc d'une heure, comme un entretien prend la durée
+// du barème (Eric, 2026-10-10 : « quand on pose une VT, on pose des RDV de 1 h »).
+// Un clic dans l'assistant pose le bloc entier ; le RDV reste ajustable ensuite.
+export const VT_DURATION_MINUTES = 60;
+
+/**
+ * Durée imposée à la pose selon le type de RDV.
+ * @param {string} appointmentType
+ * @returns {number|null} minutes, ou null = étirement libre dans l'assistant
+ */
+export function dureeImposee(appointmentType) {
+  return VT_R1_TYPES.includes(appointmentType) ? VT_DURATION_MINUTES : null;
+}
 
 // Violet foncé — RDV facturé (override). Réservé : aucune personne ne doit l'avoir.
 export const INVOICED_EVENT_COLOR = '#6D28D9';

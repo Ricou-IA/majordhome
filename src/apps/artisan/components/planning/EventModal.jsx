@@ -21,7 +21,7 @@ import { CertificatsSection } from '@/apps/artisan/components/entretiens/Certifi
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, FREE_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards, useLeadCommercials, leadKeys } from '@hooks/useLeads';
-import { resolveCommercialMemberId, PHONE_REQUIRED_TYPES } from '@/lib/planningEvents';
+import { resolveCommercialMemberId, PHONE_REQUIRED_TYPES, dureeImposee } from '@/lib/planningEvents';
 import { leadsService, BOUCLABLE_STATUS_IDS } from '@services/leads.service';
 import { resolveCardForAppointment } from '@services/appointmentActivation.service';
 import { appointmentKeys, interventionKeys, entretienSavKeys, kanbanCardKeys, chantierKeys } from '@hooks/cacheKeys';
@@ -1274,8 +1274,9 @@ export function EventModal({
                   members={assistantMembers}
                   appointmentTypeLabel={typeConfig.label}
                   appointmentTypeValue={formData.appointment_type}
-                  defaultDuration={dureeContratClient || Number(formData.duration_minutes) || 60}
-                  fixedDuration={formData.appointment_type === 'maintenance' ? dureeContratClient : null}
+                  defaultDuration={dureeContratClient || dureeImposee(formData.appointment_type) || Number(formData.duration_minutes) || 60}
+                  // Bloc entier au clic : entretien = durée du contrat, VT = 1 h (dureeImposee).
+                  fixedDuration={formData.appointment_type === 'maintenance' ? dureeContratClient : dureeImposee(formData.appointment_type)}
                   initialDate={(rescheduleMode || continuationMode)
                     ? (formData.scheduled_date || null)
                     // Création depuis un créneau du calendrier : l'assistant s'ouvre sur ce jour.

@@ -45,6 +45,7 @@ import { entretienSavKeys } from '@hooks/cacheKeys';
 import { logger } from '@lib/logger';
 import { formatDateForInput } from '@/lib/utils';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
+import { dureeImposee } from '@/lib/planningEvents';
 import { geocodeAndAssignLead } from '@services/geocoding.service';
 
 // Sous-composants extraits
@@ -1095,6 +1096,9 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
               commercials={commercials}
               appointmentTypeLabel="Visite technique"
               appointmentTypeValue="rdv_technical"
+              // Une VT se pose en bloc de 1 h au clic (Eric, 2026-10-10), comme depuis le planning.
+              defaultDuration={dureeImposee('rdv_technical')}
+              fixedDuration={dureeImposee('rdv_technical')}
               lead={lead || form}
               orgId={orgId}
               onConfirm={handleConfirmScheduling}

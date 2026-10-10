@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   appointmentKind, buildPersonColorMaps, resolveAppointmentColor,
   buildTeamList, matchesKindFilter, matchesMemberFilter, expandAppointmentBlocks,
-  resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR,
+  resolveCommercialMemberId, INVOICED_EVENT_COLOR, FALLBACK_PERSON_COLOR, dureeImposee, VT_DURATION_MINUTES,
 } from '../src/lib/planningEvents.js';
 
 // Fixtures inspirées des vraies données Mayer (Philippe = tech + commercial).
@@ -158,4 +158,18 @@ test('resolveCommercialMemberId: legacy — vrai technicien en technicianIds -> 
 
 test('resolveCommercialMemberId: rien -> null', () => {
   assert.equal(resolveCommercialMemberId({ assignedCommercialId: null, technicianIds: [], members: commercialMembers }), null);
+});
+
+test('dureeImposee: une VT (sur place ou agence) se pose en bloc de 1 h', () => {
+  assert.equal(dureeImposee('rdv_technical'), VT_DURATION_MINUTES);
+  assert.equal(dureeImposee('rdv_agency'), VT_DURATION_MINUTES);
+  assert.equal(VT_DURATION_MINUTES, 60);
+});
+
+test('dureeImposee: les autres types restent à étirement libre (entretien = barème côté modale)', () => {
+  assert.equal(dureeImposee('maintenance'), null);
+  assert.equal(dureeImposee('rdv_closing'), null);
+  assert.equal(dureeImposee('installation'), null);
+  assert.equal(dureeImposee('other'), null);
+  assert.equal(dureeImposee(undefined), null);
 });

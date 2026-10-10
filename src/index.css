@@ -250,9 +250,18 @@
 }
 
 /* Visite technique dont le devis Pennylane est rattaché au lead (demande Philippe) :
-   encadré noir en bordure intérieure — distinct du contour extérieur de la recherche. */
+   encadré noir en bordure intérieure — distinct du contour extérieur de la recherche.
+   Anneau en box-shadow inset, PAS en border : le bloc timegrid est positionné en absolu
+   (top/bottom/left/right 0), une vraie bordure de 3 px lui retirait 6 px de hauteur
+   utile et la ligne du nom du client disparaissait sur les créneaux de 30 min
+   (vécu 2026-10-10, GARY / LEMONON). Un liseré clair de 2 px sépare le cadre du bord
+   du bloc : deux RDV accolés (DUTHIL 16 h → ROUJA 17 h) ne se lisent plus comme un seul
+   bloc encadré. Le dernier shadow conserve le liseré 1 px de FullCalendar. */
 .fc .mdh-quoted {
-  border: 3px solid #111827 !important;
+  box-shadow:
+    inset 0 0 0 2px var(--fc-page-bg-color, #fff),
+    inset 0 0 0 5px #111827,
+    0 0 0 1px var(--fc-page-bg-color, #fff) !important;
 }
 
 /* Recherche client du planning : RDV du client surlignés */

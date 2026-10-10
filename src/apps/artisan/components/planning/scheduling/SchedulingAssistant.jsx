@@ -29,6 +29,11 @@ import { useTeamDayAvailability } from '@hooks/useAppointments';
 import { findMemberConflicts } from '@/lib/scheduleConflicts';
 import { fusionnerCreneau, basculerJournee, etatCommande } from '@/lib/installOrder';
 import { formatDateForInput } from '@/lib/utils';
+import { dureeImposee } from '@/lib/planningEvents';
+
+/** 60 → « 1 h00 », 90 → « 1 h30 » (même forme que l'ancienne note « Bloc contrat »). */
+const formatDureeHeures = (minutes) =>
+  `${Math.floor(minutes / 60)} h${String(minutes % 60).padStart(2, '0')}`;
 
 // ============================================================================
 // HELPERS
@@ -94,8 +99,9 @@ export function SchedulingAssistant({
   fixedAssigneeId = null,
   appointmentTypeLabel = 'Visite technique',
   // NB: le type de RDV (appointment_type) est appliqué par le CALLER via le
-  // contexte partagé de createAppointmentBatch — pas par l'assistant. Les callers
-  // peuvent passer `appointmentTypeValue` sans effet ici (forward-compat).
+  // contexte partagé de createAppointmentBatch — pas par l'assistant. Ici il ne
+  // sert qu'à formuler la note de durée imposée (VT = 1 h, entretien = barème).
+  appointmentTypeValue = null,
   defaultDuration = 30,
   fixedDuration = null,
   defaultSubjectPrefix,
@@ -388,7 +394,9 @@ export function SchedulingAssistant({
       />
       {fixedDuration ? (
         <p className="text-xs text-secondary-500 mt-1">
-          Bloc contrat : {Math.floor(fixedDuration / 60)} h{String(fixedDuration % 60).padStart(2, '0')} au barème — un clic pose le rendez-vous entier.
+          {dureeImposee(appointmentTypeValue)
+            ? `${appointmentTypeLabel} : ${formatDureeHeures(fixedDuration)} — un clic pose le rendez-vous entier.`
+            : `Bloc contrat : ${formatDureeHeures(fixedDuration)} au barème — un clic pose le rendez-vous entier.`}
         </p>
       ) : null}
 
