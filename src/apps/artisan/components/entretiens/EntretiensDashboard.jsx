@@ -170,7 +170,7 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId, onO
       )}
 
       {/* Parc sous contrat : familles d'intervention × types, composition des contrats */}
-      {coreOrgId && <ParcSousContrat coreOrgId={coreOrgId} />}
+      {coreOrgId && <ParcSousContrat coreOrgId={coreOrgId} onOpenContract={onOpenContract} />}
 
       {/* Section Pipeline SAV */}
       {savStats && (

@@ -155,6 +155,182 @@ export function agregerParc(lignes, index) {
   };
 }
 
+// ============================================================================
+// ARBRE Famille → Type → Marque → Modèle → Contrat
+// ============================================================================
+
+export const LABEL_SANS_MARQUE = 'Marque non renseignée';
+export const LABEL_SANS_MODELE = 'Modèle non renseigné';
+export const NIVEAUX = ['famille', 'type', 'marque', 'modele', 'contrat'];
+
+const normaliser = (s) => String(s ?? '').trim();
+const cleTexte = (s) => normaliser(s).toLowerCase();
+
+/**
+ * @typedef {{ key: string, niveau: 'famille'|'type'|'marque'|'modele'|'contrat', label: string, aQualifier: boolean,
+ *             equipements: number, contrats: number, part: number, enfants: NoeudParc[],
+ *             contrat?: { id: string, numero: string|null, clientId: string|null, clientNom: string, clientVille: string|null } }} NoeudParc
+ */
+
+/**
+ * Construit l'arbre du parc. Une feuille = un contrat sous un chemin
+ * (famille, type, marque, modèle) ; un contrat à deux poêles identiques y
+ * compte 2 équipements, et compte UNE fois dans `contrats` de chaque ancêtre.
+ * Les lignes sans équipement (contrat vide) ne produisent pas de feuille.
+ *
+ * @param {Array<LigneParc & { contract_number?: string, client_id?: string, client_name?: string, client_city?: string, brand?: string, model?: string }>} lignes
+ * @param {ReturnType<import('./equipmentReferential.js').indexReferentiel>} index
+ * @returns {{ racines: NoeudParc[], equipements: number, contrats: number }}
+ */
+export function construireArbreParc(lignes, index) {
+  const rangCat = rangs(index.categories || []);
+  const rangType = rangs(index.equipmentTypes || []);
+  const ordreRef = (rangMap) => (a, b) => {
+    if (a.cle === SANS) return 1;
+    if (b.cle === SANS) return -1;
+    return (rangMap.get(a.cle) ?? Number.MAX_SAFE_INTEGER) - (rangMap.get(b.cle) ?? Number.MAX_SAFE_INTEGER);
+  };
+  const ordreVolume = (a, b) => {
+    if (a.cle === SANS) return 1;
+    if (b.cle === SANS) return -1;
+    return b.equipements - a.equipements || a.label.localeCompare(b.label, 'fr');
+  };
+  const ordreClient = (a, b) => a.label.localeCompare(b.label, 'fr');
+
+  // Nœud interne : { cle, label, aQualifier, equipements, contrats:Set, enfants:Map }
+  const creer = (cle, label, aQualifier) => ({ cle, label, aQualifier, equipements: 0, contrats: new Set(), enfants: new Map() });
+  const racine = creer('racine', '', false);
+  const vus = new Set();
+  let totalEquip = 0;
+
+  for (const l of lignes || []) {
+    if (!l?.contract_id || !l.equipment_id) continue;
+    const dedup = `${l.contract_id}|${l.equipment_id}`;
+    if (vus.has(dedup)) continue;
+    vus.add(dedup);
+    totalEquip += 1;
+    racine.contrats.add(l.contract_id);
+
+    const catKey = l.category_id || SANS;
+    const typeKey = l.equipment_type_id || SANS;
+    const marque = normaliser(l.brand);
+    const modele = normaliser(l.model);
+    const typeLabel = typeKey === SANS ? LABEL_SANS_TYPE : (index.labelType(typeKey) ?? LABEL_SANS_TYPE);
+    const chemin = [
+      [catKey, catKey === SANS ? LABEL_SANS_CATEGORIE : index.labelCategorie(catKey), catKey === SANS],
+      [typeKey, typeLabel, typeKey === SANS || typeLabel === LABEL_SANS_TYPE],
+      [marque ? cleTexte(marque) : SANS, marque || LABEL_SANS_MARQUE, !marque],
+      [modele ? cleTexte(modele) : SANS, modele || LABEL_SANS_MODELE, !modele],
+      [l.contract_id, normaliser(l.client_name) || 'Client inconnu', !l.client_name],
+    ];
+
+    let noeud = racine;
+    for (const [cle, label, aQualifier] of chemin) {
+      if (!noeud.enfants.has(cle)) noeud.enfants.set(cle, creer(cle, label, aQualifier));
+      noeud = noeud.enfants.get(cle);
+      noeud.equipements += 1;
+      noeud.contrats.add(l.contract_id);
+      if (cle === l.contract_id && !noeud.contrat) {
+        noeud.contrat = {
+          id: l.contract_id,
+          numero: l.contract_number ?? null,
+          clientId: l.client_id ?? null,
+          clientNom: label,
+          clientVille: normaliser(l.client_city) || null,
+        };
+      }
+    }
+  }
+
+  const part = (n) => (totalEquip > 0 ? n / totalEquip : 0);
+  const tris = [ordreRef(rangCat), ordreRef(rangType), ordreVolume, ordreVolume, ordreClient];
+  const geler = (n, profondeur, prefixe) => {
+    const enfants = [...n.enfants.values()].sort(tris[profondeur]);
+    return enfants.map((e) => {
+      const key = `${prefixe}/${e.cle}`;
+      const out = {
+        key,
+        niveau: NIVEAUX[profondeur],
+        label: e.label,
+        aQualifier: e.aQualifier,
+        equipements: e.equipements,
+        contrats: e.contrats.size,
+        part: part(e.equipements),
+        enfants: profondeur + 1 < NIVEAUX.length ? geler(e, profondeur + 1, key) : [],
+      };
+      if (e.contrat) out.contrat = e.contrat;
+      return out;
+    });
+  };
+
+  return { racines: geler(racine, 0, ''), equipements: totalEquip, contrats: racine.contrats.size };
+}
+
+const sansAccents = (s) => cleTexte(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/**
+ * Filtre l'arbre sur un terme (client, ville, n° de contrat, marque, modèle,
+ * type, famille). Un nœud qui correspond garde toute sa descendance ; sinon il
+ * ne garde que ses descendants qui correspondent. Les compteurs sont
+ * RECALCULÉS sur ce qui reste (un chiffre d'avant filtre serait un mensonge).
+ *
+ * @param {NoeudParc[]} racines
+ * @param {string} terme
+ * @returns {{ racines: NoeudParc[], aOuvrir: Set<string>, equipements: number, contrats: number }}
+ */
+export function filtrerArbre(racines, terme) {
+  const t = sansAccents(terme);
+  const contratsTotal = new Set();
+  let equipTotal = 0;
+  if (!t) {
+    for (const r of racines) { equipTotal += r.equipements; }
+    const compterContrats = (n) => { if (n.contrat) contratsTotal.add(n.contrat.id); n.enfants.forEach(compterContrats); };
+    racines.forEach(compterContrats);
+    return { racines, aOuvrir: new Set(), equipements: equipTotal, contrats: contratsTotal.size };
+  }
+
+  const aOuvrir = new Set();
+  const correspond = (n) => {
+    if (sansAccents(n.label).includes(t)) return true;
+    const c = n.contrat;
+    return !!c && (sansAccents(c.numero).includes(t) || sansAccents(c.clientVille).includes(t));
+  };
+  const copierTout = (n) => ({ ...n, enfants: n.enfants.map(copierTout) });
+  const recalculer = (n) => {
+    if (n.niveau === 'contrat') return { equipements: n.equipements, contrats: new Set([n.contrat?.id ?? n.key]) };
+    let equipements = 0;
+    const contrats = new Set();
+    for (const e of n.enfants) {
+      const r = recalculer(e);
+      e.equipements = r.equipements;
+      e.contrats = r.contrats.size;
+      equipements += r.equipements;
+      r.contrats.forEach((id) => contrats.add(id));
+    }
+    n.equipements = equipements;
+    n.contrats = contrats.size;
+    return { equipements, contrats };
+  };
+  const elaguer = (n) => {
+    if (correspond(n)) return copierTout(n);
+    const enfants = n.enfants.map(elaguer).filter(Boolean);
+    if (enfants.length === 0) return null;
+    aOuvrir.add(n.key);
+    return { ...n, enfants };
+  };
+
+  const resultat = racines.map(elaguer).filter(Boolean);
+  for (const r of resultat) {
+    const c = recalculer(r);
+    equipTotal += c.equipements;
+    c.contrats.forEach((id) => contratsTotal.add(id));
+  }
+  const total = equipTotal;
+  const reparter = (n) => { n.part = total > 0 ? n.equipements / total : 0; n.enfants.forEach(reparter); };
+  resultat.forEach(reparter);
+  return { racines: resultat, aOuvrir, equipements: equipTotal, contrats: contratsTotal.size };
+}
+
 /**
  * Pourcentage entier lisible d'une part (0,004 → « < 1 % », 0,563 → « 56 % »).
  * @param {number} part

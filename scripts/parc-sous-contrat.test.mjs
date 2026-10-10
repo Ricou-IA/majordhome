@@ -108,3 +108,86 @@ test('trancheEquipements / formatPart', () => {
   assert.equal(formatPart(0.563), '56 %');
   assert.equal(formatPart(1), '100 %');
 });
+
+// ---------------------------------------------------------------------------
+// Arbre Famille → Type → Marque → Modèle → Contrat
+// ---------------------------------------------------------------------------
+import { construireArbreParc, filtrerArbre, LABEL_SANS_MARQUE, LABEL_SANS_MODELE } from '../src/lib/parcSousContrat.js';
+
+const feuille = (contract_id, equipment_id, equipment_type_id, category_id, extra = {}) => ({
+  contract_id, equipment_id, equipment_type_id, category_id,
+  contract_number: `CTR-${contract_id}`, client_id: `cl-${contract_id}`, client_name: `Client ${contract_id}`, client_city: 'Gaillac',
+  ...extra,
+});
+
+test('construireArbreParc — 5 niveaux, marques regroupées sans tenir compte de la casse, contrat compté une fois', () => {
+  const { racines, equipements, contrats } = construireArbreParc([
+    feuille('c1', 'e1', 't-gran', 'cat-poele', { brand: 'Rika', model: 'Domo' }),
+    feuille('c1', 'e2', 't-gran', 'cat-poele', { brand: 'RIKA ', model: 'Domo' }), // même marque, autre casse
+    feuille('c2', 'e3', 't-gran', 'cat-poele', { brand: 'MCZ', model: '' }),
+    feuille('c3', 'e4', 't-pac', 'cat-pac', { brand: null, model: null, client_city: 'Albi' }),
+    feuille('c4', null, null, null), // contrat sans équipement : pas de feuille
+  ], index);
+
+  assert.equal(equipements, 4);
+  assert.equal(contrats, 3);
+  assert.deepEqual(racines.map((r) => [r.niveau, r.label, r.equipements, r.contrats]), [
+    ['famille', 'Poêle', 3, 2], ['famille', 'PAC Air/Air', 1, 1],
+  ]);
+  const gran = racines[0].enfants[0];
+  assert.equal(gran.niveau, 'type');
+  assert.equal(gran.label, 'Poêle à granulés');
+  assert.deepEqual(gran.enfants.map((m) => [m.niveau, m.label, m.equipements, m.contrats]), [
+    ['marque', 'Rika', 2, 1], ['marque', 'MCZ', 1, 1],
+  ]);
+  const domo = gran.enfants[0].enfants[0];
+  assert.equal(domo.niveau, 'modele');
+  assert.equal(domo.label, 'Domo');
+  assert.equal(domo.enfants.length, 1, 'c1 : une seule feuille malgré ses 2 poêles identiques');
+  assert.deepEqual(domo.enfants[0].contrat, { id: 'c1', numero: 'CTR-c1', clientId: 'cl-c1', clientNom: 'Client c1', clientVille: 'Gaillac' });
+  assert.equal(domo.enfants[0].equipements, 2);
+  assert.equal(domo.enfants[0].niveau, 'contrat');
+  assert.equal(domo.enfants[0].enfants.length, 0);
+
+  const mcz = gran.enfants[1];
+  assert.equal(mcz.enfants[0].label, LABEL_SANS_MODELE);
+  assert.equal(mcz.enfants[0].aQualifier, true);
+  const pac = racines[1].enfants[0].enfants[0];
+  assert.equal(pac.label, LABEL_SANS_MARQUE);
+  assert.equal(pac.aQualifier, true);
+  assert.ok(racines.every((r) => r.key.startsWith('/')), 'clés hiérarchiques uniques');
+});
+
+test('filtrerArbre — garde la branche des correspondances, recalcule les compteurs, dit quoi ouvrir', () => {
+  const { racines } = construireArbreParc([
+    feuille('c1', 'e1', 't-gran', 'cat-poele', { brand: 'Rika', model: 'Domo' }),
+    feuille('c2', 'e3', 't-gran', 'cat-poele', { brand: 'MCZ', model: 'Ego', client_name: 'Durand Émile' }),
+    feuille('c3', 'e4', 't-pac', 'cat-pac', { brand: 'Daikin', model: 'Perfera' }),
+  ], index);
+
+  const r = filtrerArbre(racines, 'durand');
+  assert.equal(r.equipements, 1);
+  assert.equal(r.contrats, 1);
+  assert.equal(r.racines.length, 1);
+  assert.deepEqual([r.racines[0].label, r.racines[0].equipements, r.racines[0].contrats], ['Poêle', 1, 1]);
+  const marques = r.racines[0].enfants[0].enfants;
+  assert.deepEqual(marques.map((m) => m.label), ['MCZ']);
+  assert.ok(r.aOuvrir.has(r.racines[0].key));
+  assert.ok(r.aOuvrir.has(marques[0].key), 'la marque est un ancêtre de la correspondance');
+  assert.equal(r.racines[0].part, 1);
+
+  // Terme accentué / casse : « DURAND É » trouve « Durand Émile »
+  assert.equal(filtrerArbre(racines, 'DURAND É').contrats, 1);
+  // Un nœud qui correspond garde toute sa descendance (ici la marque)
+  const parMarque = filtrerArbre(racines, 'rika');
+  assert.equal(parMarque.racines[0].enfants[0].enfants[0].enfants[0].enfants[0].contrat.id, 'c1');
+  // Numéro de contrat et ville sont cherchables
+  assert.equal(filtrerArbre(racines, 'ctr-c3').contrats, 1);
+  // Rien ne correspond → arbre vide, zéro, et rien à ouvrir
+  const vide = filtrerArbre(racines, 'zzz');
+  assert.deepEqual([vide.racines.length, vide.equipements, vide.contrats, vide.aOuvrir.size], [0, 0, 0, 0]);
+  // Sans terme → arbre intact
+  const tout = filtrerArbre(racines, '  ');
+  assert.equal(tout.racines, racines);
+  assert.deepEqual([tout.equipements, tout.contrats], [3, 3]);
+});

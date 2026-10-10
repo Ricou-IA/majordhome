@@ -466,7 +466,7 @@ export const entretiensService = {
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
           .from('majordhome_contract_parc')
-          .select('contract_id, equipment_id, equipment_type_id, category_id')
+          .select('contract_id, contract_number, client_id, client_name, client_city, equipment_id, equipment_type_id, category_id, brand, model')
           .eq('org_id', orgId)
           .eq('contract_status', 'active')
           .order('contract_id')
