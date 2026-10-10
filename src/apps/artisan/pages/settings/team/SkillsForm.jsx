@@ -1,10 +1,11 @@
-// src/apps/artisan/pages/settings/team/SkillsPanel.jsx
+// src/apps/artisan/pages/settings/team/SkillsForm.jsx
 // ============================================================================
 // Grille de compétences d'un technicien, cochée comme des droits :
 // lignes = types d'équipement actifs de l'org groupés par catégorie,
 // colonnes = rôles (Entretien / Pose). Coché = compétent ; rien coché pour un
 // rôle = jamais proposé (plus de « vide = polyvalent »).
 //
+// Corps d'onglet de la modale membre (MemberModal) — pas de coquille modale ici.
 // Chaque coche envoie l'ENSEMBLE recalculé (membre × rôle) à la RPC
 // team_member_set_skills : atomique, un type hors org fait tout échouer. Le
 // cache n'est jamais mis à jour de façon optimiste — après succès on relit ;
@@ -14,7 +15,7 @@
 // Spec : docs/superpowers/specs/2026-09-12-referentiel-equipements-tarifs-competences-design.md §6.2
 // ============================================================================
 import { useMemo, useState } from 'react';
-import { X, Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
@@ -37,9 +38,9 @@ function messageErreur(err) {
 }
 
 /**
- * @param {{ teamMember: { id: string, display_name: string }, onClose: () => void, canEdit: boolean }} props
+ * @param {{ teamMember: { id: string, display_name: string }, canEdit: boolean }} props
  */
-export function SkillsPanel({ teamMember, onClose, canEdit }) {
+export function SkillsForm({ teamMember, canEdit }) {
   const { organization } = useAuth();
   const orgId = organization?.id;
   const { equipmentTypes, index, isLoading: refLoading } = useEquipmentReferential();
@@ -85,86 +86,66 @@ export function SkillsPanel({ teamMember, onClose, canEdit }) {
   const rienEntretien = !loading && competences.entretien.size === 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Compétences de ${teamMember.display_name}`}
-      >
-        <div className="flex items-start justify-between px-6 pt-6 pb-3 border-b border-secondary-200">
-          <div>
-            <h2 className="text-lg font-semibold text-secondary-900">Compétences — {teamMember.display_name}</h2>
-            <p className="text-sm text-secondary-500">
-              Coché = compétent. Rien coché pour un rôle = jamais proposé.
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer">
-            <X className="w-5 h-5 text-secondary-500" />
-          </button>
-        </div>
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-secondary-500">Coché = compétent. Rien coché pour un rôle = jamais proposé.</p>
 
-        {rienEntretien && (
-          <div className="mx-6 mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>Aucune compétence Entretien cochée : ce technicien n&apos;est jamais proposé en tournée.</span>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          {loading ? (
-            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
-          ) : totalTypes === 0 ? (
-            <p className="text-sm text-secondary-500 text-center py-8">
-              Aucun type d&apos;équipement actif — créez-les dans Paramètres → Tarification.
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-secondary-500 border-b border-secondary-200">
-                  <th className="py-2 pr-3 font-medium">Type d&apos;équipement</th>
-                  {SKILL_ROLES.map((role) => (
-                    <th key={role} className="py-2 px-2 font-medium text-center w-32">
-                      <div>{SKILL_ROLE_LABELS[role]}</div>
-                      <div className="text-xs font-normal text-secondary-400">{competences[role].size}/{totalTypes}</div>
-                      {canEdit && (
-                        <button
-                          type="button"
-                          onClick={() => toggleTout(role)}
-                          disabled={!!savingRole}
-                          className="text-xs text-primary-600 hover:underline disabled:opacity-50"
-                        >
-                          {competences[role].size === totalTypes ? 'tout décocher' : 'tout cocher'}
-                        </button>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {groupes.map((groupe) => (
-                  <GroupeRows
-                    key={groupe.category?.id ?? 'sans-categorie'}
-                    groupe={groupe}
-                    competences={competences}
-                    canEdit={canEdit}
-                    savingRole={savingRole}
-                    onToggleType={toggleType}
-                    onToggleGroupe={toggleGroupe}
-                  />
-                ))}
-              </tbody>
-            </table>
-          )}
+      {rienEntretien && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>Aucune compétence Entretien cochée : ce technicien n&apos;est jamais proposé en tournée.</span>
         </div>
+      )}
 
-        <div className="px-6 py-3 border-t border-secondary-200 text-xs text-secondary-500 space-y-0.5">
-          {SKILL_ROLES.map((role) => (
-            <p key={role}><span className="font-medium text-secondary-700">{SKILL_ROLE_LABELS[role]}</span> — {ROLE_HINTS[role]}</p>
-          ))}
-          {!canEdit && <p className="text-secondary-400">Lecture seule : seul un administrateur modifie les compétences.</p>}
-        </div>
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
+      ) : totalTypes === 0 ? (
+        <p className="text-sm text-secondary-500 text-center py-8">
+          Aucun type d&apos;équipement actif — créez-les dans Paramètres → Équipements.
+        </p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-secondary-500 border-b border-secondary-200">
+              <th className="py-2 pr-3 font-medium">Type d&apos;équipement</th>
+              {SKILL_ROLES.map((role) => (
+                <th key={role} className="py-2 px-2 font-medium text-center w-32">
+                  <div>{SKILL_ROLE_LABELS[role]}</div>
+                  <div className="text-xs font-normal text-secondary-400">{competences[role].size}/{totalTypes}</div>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => toggleTout(role)}
+                      disabled={!!savingRole}
+                      className="text-xs text-primary-600 hover:underline disabled:opacity-50"
+                    >
+                      {competences[role].size === totalTypes ? 'tout décocher' : 'tout cocher'}
+                    </button>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {groupes.map((groupe) => (
+              <GroupeRows
+                key={groupe.category?.id ?? 'sans-categorie'}
+                groupe={groupe}
+                competences={competences}
+                canEdit={canEdit}
+                savingRole={savingRole}
+                onToggleType={toggleType}
+                onToggleGroupe={toggleGroupe}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="pt-3 border-t border-secondary-200 text-xs text-secondary-500 space-y-0.5">
+        {SKILL_ROLES.map((role) => (
+          <p key={role}><span className="font-medium text-secondary-700">{SKILL_ROLE_LABELS[role]}</span> — {ROLE_HINTS[role]}</p>
+        ))}
+        {!canEdit && <p className="text-secondary-400">Lecture seule : seul un administrateur modifie les compétences.</p>}
       </div>
     </div>
   );
@@ -212,4 +193,4 @@ function GroupeRows({ groupe, competences, canEdit, savingRole, onToggleType, on
   );
 }
 
-export default SkillsPanel;
+export default SkillsForm;

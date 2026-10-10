@@ -4,10 +4,14 @@
  * Page de gestion de l'équipe (org_admin uniquement).
  *
  * Source unique : core.organization_members + profiles
+ * Synthèse en lecture seule (une ligne par membre, cliquable) ; toute l'édition
+ * vit dans la modale `team/MemberModal.jsx` (rôle, commercial, couleur,
+ * planification, budget, horaires, compétences). Les handlers (RPC + toasts)
+ * restent ici, la modale ne fait que les appeler.
  * Changement de rôle avec confirmation (ConfirmDialog).
  * Invitation de nouveaux membres via Edge Function create-user.
  *
- * @version 3.0.0 - Sprint 7 — Droits & Accès (invite + confirm)
+ * @version 4.0.0 — synthèse + modale par membre (2026-10-10)
  * ============================================================================
  */
 
@@ -17,7 +21,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useOrgMembers } from '@hooks/usePermissions';
 import { useLeadCommercials, useSetLeadCommercial } from '@hooks/useLeads';
 import { useOrgRoles } from '@hooks/useOrgRoles';
-import { buildRoleOptions, parseRoleChoice, roleChoiceValue, memberRoleDisplay } from '@/lib/orgRoles';
+import { buildRoleOptions, parseRoleChoice, memberRoleDisplay } from '@/lib/orgRoles';
 import { useTeamMembers, useSetTeamMemberColor, useSetTeamMemberRouting, useEnsureTeamMember } from '@hooks/useAppointments';
 import { logger } from '@lib/logger';
 import {
@@ -36,41 +40,24 @@ import {
   X,
   Eye,
   EyeOff,
-  ChevronDown,
   AlertTriangle,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { FormField, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
-import { SkillsPanel } from './team/SkillsPanel';
-import { AvailabilityPanel } from './team/AvailabilityPanel';
 import { resumeHoraires } from '@/lib/workingHours';
+import { pickFreeColor, normalizeHex } from '@/lib/planningPalette';
 import { useTeamSkills } from '@hooks/useTeamSkills';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
+import { MemberModal, MemberAvatar } from './team/MemberModal';
+import {
+  getRoleColor, PLANIFICATION_OPTIONS, PLANIFICATION_HELP, planificationDe, formatBudget, DAILY_WORK_MINUTES_HELP,
+} from './team/memberPresentation';
 
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-const getRoleColor = (role) => {
-  switch (role) {
-    case 'org_admin':   return 'bg-purple-100 text-purple-700';
-    case 'team_leader': return 'bg-blue-100 text-blue-700';
-    case 'commercial':  return 'bg-amber-100 text-amber-700';
-    case 'technicien':  return 'bg-green-100 text-green-700';
-    default:            return 'bg-secondary-100 text-secondary-700';
-  }
-};
-
-const getInitials = (name) => {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
 
 // Erreurs RPC `team_member_set_routing_settings` traduites en français — jamais le
 // message Postgres brut à l'écran. 22023 = confirmé (p_daily_work_minutes hors
@@ -83,132 +70,6 @@ const ROUTING_SETTINGS_ERROR_MESSAGES = {
 
 const routingSettingsErrorMessage = (error, fallback) =>
   ROUTING_SETTINGS_ERROR_MESSAGES[error?.code] || fallback;
-
-// Palette planning : couleurs distinctes et lisibles. Le violet #6D28D9 est
-// volontairement EXCLU (réservé aux RDV facturés sur le calendrier).
-const PLANNING_COLORS = [
-  '#EF4444', '#F97316', '#F59E0B', '#10B981', '#0D9488',
-  '#06B6D4', '#3B82F6', '#6366F1', '#DB2777', '#64748B',
-];
-
-// =============================================================================
-// COMPOSANT — MemberColorPicker
-// =============================================================================
-
-function MemberColorPicker({ color, onPick, disabled }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        disabled={disabled}
-        className="flex items-center gap-2 px-2 py-1 rounded-lg border border-secondary-300 hover:bg-secondary-50 transition-colors disabled:opacity-50"
-        title="Changer la couleur planning"
-      >
-        <span className="w-4 h-4 rounded-full border border-black/10" style={{ backgroundColor: color || '#94A3B8' }} />
-        <ChevronDown className={`w-3 h-3 text-secondary-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-secondary-200 rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1.5">
-            {PLANNING_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => { onPick(c); setOpen(false); }}
-                className={`w-6 h-6 rounded-full border-2 transition ${color === c ? 'border-secondary-900' : 'border-transparent hover:border-secondary-300'}`}
-                style={{ backgroundColor: c }}
-                title={c}
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// =============================================================================
-// COMPOSANT — DailyBudgetInput (budget journalier, édition inline)
-// =============================================================================
-
-const DAILY_WORK_MINUTES_HELP =
-  "Trajets + interventions, pause exclue. Distinct des horaires ci-contre, qui bornent seulement les heures de placement.";
-
-function DailyBudgetInput({ value, onSave, disabled }) {
-  const [draft, setDraft] = useState(String(value ?? 480));
-
-  useEffect(() => {
-    setDraft(String(value ?? 480));
-  }, [value]);
-
-  const commit = () => {
-    const n = parseInt(draft, 10);
-    if (!Number.isFinite(n) || n <= 0) {
-      setDraft(String(value ?? 480)); // valeur invalide → revert silencieux (pas de champ requis ici)
-      return;
-    }
-    if (n !== value) onSave(n);
-  };
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        min="60"
-        max="1440"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-        }}
-        disabled={disabled}
-        title={DAILY_WORK_MINUTES_HELP}
-        className="w-20 px-2 py-1 text-sm border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
-      />
-      <span className="text-xs text-secondary-400">min</span>
-    </div>
-  );
-}
-
-// =============================================================================
-// COMPOSANT — PlanificationSelect (qui planifie ce membre : la machine ou la main)
-// =============================================================================
-//
-// Porte `team_members.include_in_routing`. L'ancien interrupteur sans libellé
-// n'était lisible qu'au survol : Eric ne savait pas où indiquer qu'un
-// technicien est un sous-traitant ponctuel (2026-09-29). Le vocabulaire est
-// celui de l'usage, pas celui du moteur.
-
-const PLANIFICATION_OPTIONS = [
-  { value: 'machine', label: 'Par la machine' },
-  { value: 'main', label: 'À la main (sous-traitant ponctuel)' },
-];
-
-const PLANIFICATION_HELP = {
-  machine: 'Salarié : proposé par les tournées et l’auto-RDV.',
-  main: 'Jamais proposé par la machine ; assignable dans le Planning (installations).',
-};
-
-const planificationDe = (includeInRouting) => ((includeInRouting ?? true) ? 'machine' : 'main');
-
-function PlanificationSelect({ includeInRouting, onChange, disabled }) {
-  const value = planificationDe(includeInRouting);
-  return (
-    <div className="min-w-[14rem]">
-      <SelectInput
-        value={value}
-        onChange={(next) => next && next !== value && onChange(next === 'machine')}
-        options={PLANIFICATION_OPTIONS}
-        disabled={disabled}
-      />
-      <p className="mt-1 text-xs text-secondary-400">{PLANIFICATION_HELP[value]}</p>
-    </div>
-  );
-}
 
 // =============================================================================
 // COMPOSANT — InviteModal
@@ -355,215 +216,110 @@ function InviteModal({ open, onClose, onInvite, isInviting, roleOptions }) {
 }
 
 // =============================================================================
-// COMPOSANT — MemberRow
+// COMPOSANT — MemberRow (synthèse, lecture seule, cliquable)
 // =============================================================================
 
-function MemberRow({
-  member,
-  teamMember,
-  orgRole,
-  roleOptions,
-  canEditColor,
-  isCurrentUser,
-  isUpdating,
-  isUpdatingRole,
-  onRoleChangeRequest,
-  isCommercial,
-  onCommercialChange,
-  isCommercialSaving,
-  onColorChange,
-  isColorSaving,
-  onDailyBudgetChange,
-  onIncludeInRoutingChange,
-  onOpenSkills,
-  onOpenAvailability,
-  skillsSummary,
-  isRoutingSaving,
-}) {
+function MemberRow({ member, teamMember, orgRole, isCurrentUser, isCommercial, skillsSummary, onOpen }) {
   const effectiveRole = computeEffectiveRole(member.profile, { role: member.role });
   // Profil maison : libellé propre, sous-ligne « d'après <modèle> » ; le badge garde la couleur du modèle.
   const roleDisplay = memberRoleDisplay(effectiveRole, orgRole, ROLE_LABELS);
-  const currentChoice = orgRole ? roleChoiceValue({ id: orgRole.org_role_id }) : effectiveRole;
+  const name = member.profile?.full_name || member.profile?.email || 'Utilisateur';
+  const planification = teamMember ? planificationDe(teamMember.include_in_routing) : null;
+  const jamaisPropose = skillsSummary && skillsSummary.entretien === 0;
+
+  const open = () => onOpen(member.user_id);
 
   return (
-    <tr className="border-b border-secondary-100 last:border-0">
-      {/* Membre */}
-      <td className="py-4 px-4">
+    <tr
+      className="group border-b border-secondary-100 last:border-0 hover:bg-secondary-50/70 cursor-pointer transition-colors"
+      onClick={open}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+      tabIndex={0}
+      role="button"
+      aria-label={`Ouvrir la fiche de ${name}`}
+    >
+      {/* Membre : avatar de SA couleur planning */}
+      <td className="py-3.5 px-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center">
-            <span className="text-sm font-medium text-white">
-              {getInitials(member.profile?.full_name)}
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-secondary-900">
-              {member.profile?.full_name || member.profile?.email || 'Utilisateur'}
-              {isCurrentUser && (
-                <span className="ml-2 text-xs text-secondary-400">(vous)</span>
-              )}
+          <MemberAvatar name={member.profile?.full_name} color={teamMember?.calendar_color} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-secondary-900 truncate">
+              {name}
+              {isCurrentUser && <span className="ml-2 text-xs font-normal text-secondary-400">(vous)</span>}
             </p>
-            <p className="text-xs text-secondary-500">
-              {member.profile?.email || ''}
-            </p>
+            <p className="text-xs text-secondary-500 truncate">{member.profile?.email || ''}</p>
           </div>
         </div>
       </td>
 
-      {/* Rôle actuel */}
-      <td className="py-4 px-4">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${getRoleColor(effectiveRole)}`}>
-          <Shield className="w-3 h-3" />
-          {roleDisplay.label}
-        </span>
-        {roleDisplay.sub && (
-          <span className="block mt-1 text-[11px] text-secondary-400">{roleDisplay.sub}</span>
-        )}
+      {/* Rôle + tag commercial */}
+      <td className="py-3.5 px-4">
+        <div className="flex flex-col items-start gap-1">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${getRoleColor(effectiveRole)}`}>
+            <Shield className="w-3 h-3" />
+            {roleDisplay.label}
+          </span>
+          {roleDisplay.sub && <span className="text-[11px] text-secondary-400">{roleDisplay.sub}</span>}
+          {isCommercial && (
+            <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full bg-secondary-100 text-secondary-700" title="Figure dans la liste « Commercial assigné » des leads">
+              Assignable aux leads
+            </span>
+          )}
+        </div>
       </td>
 
-      {/* Changement de rôle */}
-      <td className="py-4 px-4">
-        {isCurrentUser ? (
-          <span className="text-xs text-secondary-400 italic">
-            Vous ne pouvez pas changer votre propre rôle
-          </span>
+      {/* Planification + budget */}
+      <td className="py-3.5 px-4">
+        {!teamMember ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-secondary-400"><Loader2 className="w-3.5 h-3.5 animate-spin" /> ressource planning…</span>
         ) : (
-          <div className="flex items-center gap-2">
-            <select
-              value={currentChoice}
-              onChange={(e) => onRoleChangeRequest(member, currentChoice, e.target.value)}
-              disabled={isUpdating || isUpdatingRole}
-              className="text-sm border border-secondary-300 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
-            >
-              {roleOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {isUpdating && (
-              <Loader2 className="w-4 h-4 text-primary-600 animate-spin" />
-            )}
+          <div className="text-sm text-secondary-800">
+            <p title={PLANIFICATION_HELP[planification]}>
+              {PLANIFICATION_OPTIONS.find((o) => o.value === planification).label}
+            </p>
+            <p className="text-xs text-secondary-500" title={DAILY_WORK_MINUTES_HELP}>
+              Budget {formatBudget(teamMember.daily_work_minutes)} / jour
+            </p>
           </div>
         )}
       </td>
 
-      {/* Commercial : présent dans la liste « Commercial assigné » des leads */}
-      <td className="py-4 px-4">
-        <input
-          type="checkbox"
-          checked={isCommercial}
-          onChange={(e) => onCommercialChange(member, e.target.checked)}
-          disabled={!canEditColor || isCommercialSaving}
-          aria-label={`${member.profile?.full_name || 'Ce membre'} assignable aux leads`}
-          className="h-4 w-4 rounded border-secondary-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
-        />
-      </td>
-
-      {/* Couleur planning */}
-      <td className="py-4 px-4">
-        {!teamMember ? (
-          // Ressource planning en cours de création (auto) côté org_admin
-          canEditColor
-            ? <Loader2 className="w-4 h-4 text-secondary-300 animate-spin" />
-            : <span className="text-xs text-secondary-400">—</span>
-        ) : canEditColor ? (
-          <MemberColorPicker
-            color={teamMember.calendar_color}
-            onPick={(c) => onColorChange(teamMember.id, c)}
-            disabled={isColorSaving}
-          />
+      {/* Horaires */}
+      <td className="py-3.5 px-4">
+        {teamMember ? (
+          <span className="text-sm text-secondary-700">{resumeHoraires(teamMember.default_availability)}</span>
         ) : (
-          <span
-            className="inline-block w-4 h-4 rounded-full border border-black/10"
-            style={{ backgroundColor: teamMember.calendar_color || '#94A3B8' }}
-            title={teamMember.calendar_color || ''}
-          />
-        )}
-      </td>
-
-      {/* Budget journalier (tournées) */}
-      <td className="py-4 px-4">
-        {!teamMember ? (
           <span className="text-xs text-secondary-400">—</span>
-        ) : canEditColor ? (
-          <DailyBudgetInput
-            value={teamMember.daily_work_minutes}
-            onSave={(minutes) => onDailyBudgetChange(teamMember.id, minutes)}
-            disabled={isRoutingSaving}
-          />
-        ) : (
-          <span className="text-sm text-secondary-700" title={DAILY_WORK_MINUTES_HELP}>
-            {teamMember.daily_work_minutes ?? 480} min
-          </span>
         )}
       </td>
 
-      {/* Planification : par la machine (salarié) ou à la main (sous-traitant ponctuel) */}
-      <td className="py-4 px-4">
-        {!teamMember ? (
-          <span className="text-xs text-secondary-400">—</span>
-        ) : canEditColor ? (
-          <PlanificationSelect
-            includeInRouting={teamMember.include_in_routing}
-            onChange={(next) => onIncludeInRoutingChange(teamMember.id, next)}
-            disabled={isRoutingSaving}
-          />
-        ) : (
-          <span
-            className="text-xs text-secondary-500"
-            title={PLANIFICATION_HELP[planificationDe(teamMember.include_in_routing)]}
-          >
-            {PLANIFICATION_OPTIONS.find((o) => o.value === planificationDe(teamMember.include_in_routing)).label}
-          </span>
-        )}
-      </td>
-
-      {/* Horaires de travail (default_availability) — bornent tournées, agent téléphonique, planning */}
-      <td className="py-4 px-4">
-        {!teamMember ? (
-          <span className="text-xs text-secondary-400">—</span>
-        ) : (
-          <div className="flex flex-col items-start gap-1">
-            <button
-              type="button"
-              onClick={() => onOpenAvailability(teamMember)}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-secondary-300 text-secondary-700 hover:border-primary-400 hover:text-primary-700"
-            >
-              Horaires
-            </button>
-            <span className="text-xs text-secondary-500">{resumeHoraires(teamMember.default_availability)}</span>
-          </div>
-        )}
-      </td>
-
-      {/* Compétences (types d'équipement × rôle, cochées comme des droits) — filtre dur des tournées */}
-      <td className="py-4 px-4">
+      {/* Compétences (techniciens) */}
+      <td className="py-3.5 px-4">
         {!teamMember || teamMember.role !== 'technician' ? (
           <span className="text-xs text-secondary-400" title="Seuls les techniciens ont une grille de compétences">—</span>
+        ) : jamaisPropose ? (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-medium text-red-600"
+            title="Aucune compétence Entretien cochée : jamais proposé en tournée"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" /> Jamais proposé en tournée
+          </span>
+        ) : skillsSummary ? (
+          <span className="text-sm text-secondary-700 whitespace-nowrap">
+            Entretien {skillsSummary.entretien}/{skillsSummary.total}
+            <span className="text-secondary-400"> · </span>
+            Pose {skillsSummary.pose}/{skillsSummary.total}
+          </span>
         ) : (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onOpenSkills(teamMember)}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-secondary-300 text-secondary-700 hover:border-primary-400 hover:text-primary-700"
-            >
-              Compétences
-            </button>
-            {skillsSummary && (
-              <span className="text-xs text-secondary-500 whitespace-nowrap">
-                Entretien {skillsSummary.entretien}/{skillsSummary.total} · Pose {skillsSummary.pose}/{skillsSummary.total}
-              </span>
-            )}
-            {skillsSummary && skillsSummary.entretien === 0 && (
-              <span
-                className="inline-flex items-center gap-1 text-xs text-red-600"
-                title="Aucune compétence Entretien cochée : jamais proposé en tournée"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" /> jamais proposé
-              </span>
-            )}
-          </div>
+          <span className="text-xs text-secondary-400">…</span>
         )}
+      </td>
+
+      {/* Action */}
+      <td className="py-3.5 px-4 text-right">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-secondary-200 text-secondary-600 group-hover:border-primary-400 group-hover:text-primary-700 transition-colors">
+          <Pencil className="w-3.5 h-3.5" /> Modifier
+        </span>
       </td>
     </tr>
   );
@@ -605,15 +361,16 @@ export default function TeamManagement() {
     [commercials],
   );
   const [savingCommercialId, setSavingCommercialId] = useState(null);
-  // Compétences (type × rôle) des techniciens : compteurs sur la ligne, grille dans SkillsPanel.
+  // Compétences (type × rôle) des techniciens : compteurs sur la ligne, grille dans la modale.
   const technicianIds = useMemo(
     () => (teamMembers || []).filter((t) => t.role === 'technician').map((t) => t.id),
     [teamMembers],
   );
   const { skillsByMember } = useTeamSkills(orgId, technicianIds);
   const { equipmentTypes: activeTypes } = useEquipmentReferential();
-  const [skillsFor, setSkillsFor] = useState(null);
-  const [availabilityFor, setAvailabilityFor] = useState(null);
+  // Membre ouvert dans la modale : on garde l'id et on relit les données vivantes
+  // à chaque rendu, pour que la modale reflète ce qu'elle vient d'enregistrer.
+  const [editingUserId, setEditingUserId] = useState(null);
   const tmByUser = useMemo(() => {
     const map = new Map();
     (teamMembers || []).forEach((t) => { if (t.user_id) map.set(t.user_id, t); });
@@ -643,15 +400,13 @@ export default function TeamManagement() {
     if (missing.length === 0) return;
 
     const used = new Set(
-      (teamMembers || []).map((t) => (t.calendar_color || '').toUpperCase())
+      (teamMembers || []).map((t) => normalizeHex(t.calendar_color)).filter(Boolean)
     );
 
     (async () => {
       for (const m of missing) {
         ensuredRef.current.add(m.user_id);
-        const color =
-          PLANNING_COLORS.find((c) => !used.has(c)) ||
-          PLANNING_COLORS[used.size % PLANNING_COLORS.length];
+        const color = pickFreeColor(used);
         used.add(color);
 
         try {
@@ -838,6 +593,32 @@ export default function TeamManagement() {
   };
 
   // ===========================================================================
+  // DÉRIVÉS POUR LA MODALE
+  // ===========================================================================
+
+  const skillsSummaryFor = (tm) => (tm && tm.role === 'technician' && skillsByMember.has(tm.id)
+    ? {
+      entretien: skillsByMember.get(tm.id).entretien.size,
+      pose: skillsByMember.get(tm.id).pose.size,
+      total: activeTypes.length,
+    }
+    : null);
+
+  // Données vivantes du membre ouvert (null si la liste a changé sous nos pieds).
+  const editingMember = editingUserId ? members.find((m) => m.user_id === editingUserId) : null;
+  const editingTeamMember = editingMember ? tmByUser.get(editingMember.user_id) : undefined;
+  // Couleurs déjà portées par les AUTRES membres (hex normalisé → nom).
+  const colorOwners = useMemo(() => {
+    const map = new Map();
+    (teamMembers || []).forEach((t) => {
+      if (t.user_id === editingUserId) return;
+      const hex = normalizeHex(t.calendar_color);
+      if (hex && !map.has(hex)) map.set(hex, t.display_name);
+    });
+    return map;
+  }, [teamMembers, editingUserId]);
+
+  // ===========================================================================
   // RENDER
   // ===========================================================================
 
@@ -858,7 +639,7 @@ export default function TeamManagement() {
               Gestion de l&apos;équipe
             </h1>
             <p className="text-sm text-secondary-600 mt-1">
-              Gérez les membres et leurs rôles dans l&apos;organisation
+              Gérez les membres et leurs rôles dans l&apos;organisation. Cliquez sur un membre pour le modifier.
             </p>
           </div>
         </div>
@@ -896,27 +677,12 @@ export default function TeamManagement() {
               <tr className="border-b border-secondary-200">
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Membre
+                  <span className="block text-xs font-normal text-secondary-400">La pastille porte sa couleur planning</span>
                 </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
-                  Rôle actuel
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
-                  Changer le rôle
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
-                  Commercial
-                  <span className="block text-xs font-normal text-secondary-400">Assignable aux leads</span>
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
-                  Couleur planning
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
-                  Budget journalier
-                  <span className="block text-xs font-normal text-secondary-400">Tournées, trajets + interventions</span>
-                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">Rôle</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Planification
-                  <span className="block text-xs font-normal text-secondary-400">Qui pose ses rendez-vous</span>
+                  <span className="block text-xs font-normal text-secondary-400">Qui pose ses rendez-vous · budget</span>
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Horaires
@@ -924,8 +690,9 @@ export default function TeamManagement() {
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-secondary-600">
                   Compétences
-                  <span className="block text-xs font-normal text-secondary-400">Types d&apos;équipement, par rôle — coché = compétent</span>
+                  <span className="block text-xs font-normal text-secondary-400">Entretien · Pose, sur les types actifs</span>
                 </th>
+                <th className="py-3 px-4"><span className="sr-only">Action</span></th>
               </tr>
             </thead>
             <tbody>
@@ -937,29 +704,10 @@ export default function TeamManagement() {
                     member={member}
                     teamMember={tm}
                     orgRole={memberOrgRoleByUser.get(member.user_id) || null}
-                    roleOptions={roleOptions}
-                    canEditColor={isOrgAdmin}
                     isCurrentUser={member.user_id === user?.id}
-                    isUpdating={updatingUserId === member.user_id}
-                    isUpdatingRole={isUpdatingRole}
-                    onRoleChangeRequest={handleRoleChangeRequest}
                     isCommercial={commercialUserIds.has(member.user_id)}
-                    onCommercialChange={handleCommercialChange}
-                    isCommercialSaving={savingCommercialId === member.user_id}
-                    onColorChange={handleColorChange}
-                    isColorSaving={!!tm && savingColorId === tm.id}
-                    onDailyBudgetChange={handleDailyBudgetChange}
-                    onIncludeInRoutingChange={handleIncludeInRoutingChange}
-                    onOpenSkills={setSkillsFor}
-                    onOpenAvailability={setAvailabilityFor}
-                    skillsSummary={tm && tm.role === 'technician' && skillsByMember.has(tm.id)
-                      ? {
-                        entretien: skillsByMember.get(tm.id).entretien.size,
-                        pose: skillsByMember.get(tm.id).pose.size,
-                        total: activeTypes.length,
-                      }
-                      : null}
-                    isRoutingSaving={!!tm && savingRoutingId === tm.id}
+                    skillsSummary={skillsSummaryFor(tm)}
+                    onOpen={setEditingUserId}
                   />
                 );
               })}
@@ -1004,7 +752,31 @@ export default function TeamManagement() {
         roleOptions={roleOptions}
       />
 
-      {/* Confirm Role Change Dialog */}
+      {/* Fiche membre (édition) */}
+      {editingMember && (
+        <MemberModal
+          member={editingMember}
+          teamMember={editingTeamMember}
+          orgRole={memberOrgRoleByUser.get(editingMember.user_id) || null}
+          roleOptions={roleOptions}
+          canEdit={isOrgAdmin}
+          isCurrentUser={editingMember.user_id === user?.id}
+          isUpdatingRole={isUpdatingRole || updatingUserId === editingMember.user_id}
+          onRoleChangeRequest={handleRoleChangeRequest}
+          isCommercial={commercialUserIds.has(editingMember.user_id)}
+          onCommercialChange={handleCommercialChange}
+          isCommercialSaving={savingCommercialId === editingMember.user_id}
+          onColorChange={handleColorChange}
+          isColorSaving={!!editingTeamMember && savingColorId === editingTeamMember.id}
+          onDailyBudgetChange={handleDailyBudgetChange}
+          onIncludeInRoutingChange={handleIncludeInRoutingChange}
+          isRoutingSaving={!!editingTeamMember && savingRoutingId === editingTeamMember.id}
+          colorOwners={colorOwners}
+          onClose={() => setEditingUserId(null)}
+        />
+      )}
+
+      {/* Confirm Role Change Dialog — s'affiche au-dessus de la fiche membre */}
       <ConfirmDialog
         open={!!roleChangeConfirm}
         onOpenChange={(open) => { if (!open) setRoleChangeConfirm(null); }}
@@ -1019,24 +791,6 @@ export default function TeamManagement() {
         onConfirm={handleRoleChangeConfirm}
         loading={updatingUserId === roleChangeConfirm?.member?.user_id}
       />
-
-      {/* Horaires de travail d'un membre */}
-      {availabilityFor && (
-        <AvailabilityPanel
-          teamMember={availabilityFor}
-          canEdit={isOrgAdmin}
-          onClose={() => setAvailabilityFor(null)}
-        />
-      )}
-
-      {/* Grille de compétences (types × rôles) d'un technicien */}
-      {skillsFor && (
-        <SkillsPanel
-          teamMember={skillsFor}
-          canEdit={isOrgAdmin}
-          onClose={() => setSkillsFor(null)}
-        />
-      )}
     </div>
   );
 }
