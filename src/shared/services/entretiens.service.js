@@ -450,6 +450,38 @@ export const entretiensService = {
     }
   },
 
+  /**
+   * Parc sous contrat (Dashboard) : lignes brutes de la vue
+   * `majordhome_contract_parc` pour les contrats ACTIFS de l'org — 1 ligne par
+   * (contrat, équipement lié), `equipment_id` NULL pour un contrat sans
+   * équipement. L'agrégation est faite par `agregerParc` (src/lib/parcSousContrat.js).
+   * Pagination explicite : PostgREST plafonne une réponse à 1000 lignes, le
+   * parc dépassera ce seuil (objectif 800 contrats).
+   */
+  async getParcSousContrat(orgId) {
+    try {
+      if (!orgId) throw new Error('[entretiensService] orgId requis');
+      const PAGE = 1000;
+      const rows = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from('majordhome_contract_parc')
+          .select('contract_id, equipment_id, equipment_type_id, category_id')
+          .eq('org_id', orgId)
+          .eq('contract_status', 'active')
+          .order('contract_id')
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      return { data: rows, error: null };
+    } catch (error) {
+      logger.error('[entretiensService] getParcSousContrat error:', error);
+      return { data: null, error };
+    }
+  },
+
   // ==========================================================================
   // SECTEURS (vue groupée par code postal)
   // ==========================================================================

@@ -61,6 +61,7 @@ export const contractKeys = {
   byClient: (orgId, clientId) => [...contractKeys.all(orgId), 'byClient', clientId],
   equipments: (orgId, contractId) => [...contractKeys.all(orgId), 'equipments', contractId],
   stats: (orgId, year) => [...contractKeys.all(orgId), 'stats', year],
+  parc: (orgId) => [...contractKeys.all(orgId), 'parc'],
 };
 
 // --- Leads ---

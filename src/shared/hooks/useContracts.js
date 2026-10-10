@@ -294,6 +294,30 @@ export function useContractStats(orgId, year) {
 }
 
 // ============================================================================
+// HOOK - useParcSousContrat (dashboard Entretiens : familles × types)
+// ============================================================================
+
+/**
+ * Lignes brutes du parc sous contrat (contrats actifs). L'agrégation se fait
+ * dans le composant avec l'index du référentiel (`agregerParc`), pour que le
+ * libellé d'un type suive le référentiel sans refetch.
+ */
+export function useParcSousContrat(orgId) {
+  const { data: lignes, isLoading, error } = useQuery({
+    queryKey: contractKeys.parc(orgId),
+    queryFn: async () => {
+      const { data, error } = await entretiensService.getParcSousContrat(orgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  return { lignes, isLoading, error };
+}
+
+// ============================================================================
 // HOOK - useContractSectors (vue secteurs Entretiens)
 // ============================================================================
 

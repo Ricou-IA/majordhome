@@ -9,7 +9,6 @@ test('equipmentKind — bûche : bois par code tarifaire', () => {
 
 test('equipmentKind — flamme : granulés par code tarifaire', () => {
   assert.equal(equipmentKind({ type_code: 'poele_granules_elec', category: 'poele' }), 'flamme');
-  assert.equal(equipmentKind({ type_code: 'poele_granules_sans_elec', category: 'poele' }), 'flamme');
   assert.equal(equipmentKind({ type_code: 'chaudiere_granules', category: 'chaudiere_bois' }), 'flamme');
 });
 

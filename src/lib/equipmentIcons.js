@@ -36,7 +36,6 @@ const KIND_BY_TYPE_CODE = {
   poele_bois_insert: 'buche',
   chaudiere_bois: 'buche',
   poele_granules_elec: 'flamme',
-  poele_granules_sans_elec: 'flamme',
   chaudiere_granules: 'flamme',
   pac_air_air: 'flocon',
   pac_air_eau: 'flocon',

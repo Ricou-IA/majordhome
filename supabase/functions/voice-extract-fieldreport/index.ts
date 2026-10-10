@@ -54,8 +54,7 @@ const EQUIPMENT_TYPE_CODES = `
 - prestation_diverses     : Prestation diverse / autre travaux
 - TRAV_ELEC               : Travaux électricité
 - poele_bois_insert       : Poêle à bois ou insert
-- poele_granules_elec     : Poêle à granulés (électronique, pilotage)
-- poele_granules_sans_elec: Poêle à granulés (sans électronique)
+- poele_granules_elec     : Poêle à granulés (avec ou sans électronique)
 - poele_hydro             : Poêle hydro (raccordé chauffage central)
 `;
 

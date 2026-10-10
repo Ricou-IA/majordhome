@@ -25,6 +25,7 @@ import { AutoRdvMois } from '@/apps/artisan/components/tournees/AutoRdvMois';
 import { JourneesAArbitrer } from '@/apps/artisan/components/tournees/JourneesAArbitrer';
 import { AlertesTournees } from '@/apps/artisan/components/tournees/AlertesTournees';
 import { lienJourneePlanning } from '@/apps/artisan/components/tournees/tourneesPanelUtils';
+import { ParcSousContrat } from './ParcSousContrat';
 
 // ============================================================================
 // SOUS-COMPOSANT : Info Card (non cliquable)
@@ -167,6 +168,9 @@ export function EntretiensDashboard({ stats, savStats, isLoading, coreOrgId, onO
           </div>
         </div>
       )}
+
+      {/* Parc sous contrat : familles d'intervention × types, composition des contrats */}
+      {coreOrgId && <ParcSousContrat coreOrgId={coreOrgId} />}
 
       {/* Section Pipeline SAV */}
       {savStats && (
