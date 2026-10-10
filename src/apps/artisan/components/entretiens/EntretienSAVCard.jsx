@@ -279,6 +279,17 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                 Entretien à faire
               </span>
             )}
+            {/* Anomalie relevée sur un certificat : une icône seulement, le détail en infobulle
+                (recette Eric 2026-10-10 : « pas tout le commentaire, ça fait trop chargé ») */}
+            {anomalies.length > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700"
+                title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}${a.savId ? ' · SAV créé' : ''}`).join('\n')}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {anomalies.length > 1 ? anomalies.length : null}
+              </span>
+            )}
             {type === 'sav' && item.sav_origin === 'entretien' && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700" title="Demande ouverte à la suite d'un entretien (certificat)">
                 Suite d&apos;entretien
@@ -304,28 +315,6 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
           {item.contract_number && (
             <div className="text-[10px] text-gray-400">
               {item.contract_number}
-            </div>
-          )}
-
-          {/* Anomalie constatée sur un certificat : visible sans ouvrir la fiche (Eric, 2026-10-10) */}
-          {anomalies.length > 0 && (
-            <div
-              className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5"
-              title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}`).join('\n')}
-            >
-              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                Anomalie{anomalies.length > 1 ? `s (${anomalies.length})` : ''}
-                {anomalies[0].actionLabel && (
-                  <span className="ml-auto normal-case tracking-normal font-medium">{anomalies[0].actionLabel}</span>
-                )}
-              </div>
-              <p className="text-xs text-amber-900 line-clamp-2 mt-0.5">
-                {anomalies.map((a) => a.detail || a.bilanLabel).join(' · ')}
-              </p>
-              {anomalies.some((a) => a.savId) && (
-                <div className="text-[10px] text-amber-700 mt-0.5">Demande SAV créée</div>
-              )}
             </div>
           )}
 

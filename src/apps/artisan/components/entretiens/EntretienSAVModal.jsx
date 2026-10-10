@@ -27,7 +27,6 @@ import {
   ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle,
 } from 'lucide-react';
 import { anomaliesDeCarte } from '@/lib/certificatAnomalies';
-import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -719,27 +718,15 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                     <AlertTriangle className="w-4 h-4" />
                     Anomalie constatée
                   </h3>
-                  <p className="text-xs text-gray-400">Relevée par le technicien sur le certificat d&apos;entretien. Se corrige dans le certificat.</p>
+                  {/* Lecture seule : le bouton « Voir certificat » vit dans la section Certificats (recette Eric 2026-10-10, pas de doublon) */}
+                  <p className="text-xs text-gray-400">Relevée par le technicien sur le certificat d&apos;entretien (section Certificats ci-dessous). Se corrige dans le certificat.</p>
                   {anomalies.map((a) => (
                     <div key={a.certificatId} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          {a.equipement && <div className="text-xs font-medium text-amber-800">{a.equipement}</div>}
-                          <div className="text-sm text-amber-900 whitespace-pre-line">{a.detail || a.bilanLabel}</div>
-                          <div className="text-xs text-amber-700 mt-0.5">
-                            {[a.bilanLabel, a.actionLabel].filter(Boolean).join(' · ')}
-                            {a.savId ? ' · Demande SAV créée' : ''}
-                          </div>
-                        </div>
-                        {a.interventionId && (
-                          <CertificatLink
-                            interventionId={a.interventionId}
-                            isRealise
-                            label="Voir certificat"
-                            onClick={onClose}
-                            className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
-                          />
-                        )}
+                      {a.equipement && <div className="text-xs font-medium text-amber-800">{a.equipement}</div>}
+                      <div className="text-sm text-amber-900 whitespace-pre-line">{a.detail || a.bilanLabel}</div>
+                      <div className="text-xs text-amber-700 mt-0.5">
+                        {[a.bilanLabel, a.actionLabel].filter(Boolean).join(' · ')}
+                        {a.savId ? ' · Demande SAV créée' : ''}
                       </div>
                     </div>
                   ))}
