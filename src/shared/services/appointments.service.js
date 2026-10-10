@@ -215,6 +215,31 @@ async function recomputeEntretienWorkflow(interventionId) {
 }
 
 /**
+ * Date de la carte entretien / SAV = date du premier RDV actif qui lui est lié (une carte à
+ * plusieurs RDV garde la plus proche). Cartes clôturées intouchées. À appeler après tout
+ * changement de date d'un RDV lié.
+ */
+async function syncInterventionScheduledDate(interventionId) {
+  if (!interventionId) return;
+  const { data: rows, error: readError } = await supabase
+    .from('majordhome_appointments')
+    .select('scheduled_date')
+    .eq('intervention_id', interventionId)
+    .not('status', 'in', '(cancelled,no_show)')
+    .order('scheduled_date', { ascending: true })
+    .limit(1);
+  if (readError) { console.error('[appointments] syncInterventionScheduledDate read error:', readError); return; }
+  const nextDate = rows?.[0]?.scheduled_date;
+  if (!nextDate) return; // plus de RDV actif : le reflux « À planifier » (recompute) efface la date côté DB
+  const { error } = await supabase
+    .from('majordhome_interventions')
+    .update({ scheduled_date: nextDate, updated_at: new Date().toISOString() })
+    .eq('id', interventionId)
+    .not('workflow_status', 'in', '(realise,facture)');
+  if (error) console.error('[appointments] syncInterventionScheduledDate error:', error);
+}
+
+/**
  * Suppression / annulation de RDV : recalcule l'état de la carte entretien liée
  * (retour en « À planifier » si c'était le dernier RDV actif). Pipeline/chantier :
  * no-op (le marqueur « à replanifier » est dérivé de has_active_rdv=false dans les vues).
@@ -493,6 +518,13 @@ export const appointmentsService = {
         leadsService
           .updateLead(appointment.lead_id, { appointment_date: updates.scheduled_date })
           .catch((err) => console.error('[appointments] sync lead.appointment_date error:', err));
+      }
+
+      // Même cascade pour la carte entretien / SAV : sa `scheduled_date` suit le RDV. Sans ça un
+      // RDV avancé à la souris laissait la carte à l'ancienne date, et la visite d'entretien
+      // (datée de la carte) partait dans le futur (GUILLOU CTR-00127, 2026-10-07).
+      if ('scheduled_date' in updates && appointment?.intervention_id) {
+        await syncInterventionScheduledDate(appointment.intervention_id);
       }
 
       // Reflux carte entretien si le statut du RDV a changé (annulation / réactivation)
