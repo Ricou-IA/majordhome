@@ -200,6 +200,44 @@
 }
 
 /* =============================================================================
+   TÉLÉPHONE (html[data-device-class="phone"], posé par deviceViewport.js)
+   Le téléphone garde son viewport natif : ce sont ces règles, pas un dézoom,
+   qui l'adaptent. La tablette est rendue en 1024 px et n'est pas concernée.
+   ============================================================================= */
+
+/* iOS zoome la page au focus d'un champ sous 16 px : on relève tous les champs
+   à 16 px minimum (text-sm = 14 px → 16 px), sans toucher au bureau. */
+html[data-device-class="phone"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-device-class="phone"] select,
+html[data-device-class="phone"] textarea {
+  font-size: max(16px, 1em);
+}
+
+/* Densité du calendrier : axe horaire étroit, en-têtes et blocs compacts. */
+html[data-device-class="phone"] .fc .fc-timegrid-slot-label-cushion,
+html[data-device-class="phone"] .fc .fc-timegrid-axis-cushion {
+  font-size: 11px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+html[data-device-class="phone"] .fc .fc-col-header-cell {
+  font-size: 11px;
+}
+html[data-device-class="phone"] .fc .fc-event {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+/* Les animations d'apparition sont décoratives : coupées si l'OS le demande. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-slide-down {
+    animation: none;
+  }
+}
+
+/* =============================================================================
    FULLCALENDAR OVERRIDES
    ============================================================================= */
 

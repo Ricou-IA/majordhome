@@ -1119,8 +1119,9 @@ export function EventModal({
       {/* Overlay transparent — laisse passer les clics sur le calendrier */}
       <div className="fixed inset-0 z-40 pointer-events-none" />
 
-      {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant) */}
-      <div className="fixed inset-y-4 right-4 w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+      {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
+          Sous `sm` (téléphone) le panneau occupe l'écran : avec `right-4 w-full` il débordait à gauche. */}
+      <div className="fixed inset-2 sm:inset-y-4 sm:left-auto sm:right-4 w-auto sm:w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
         {/* ---- Header ---- */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 min-w-0">

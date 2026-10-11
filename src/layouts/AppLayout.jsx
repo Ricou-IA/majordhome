@@ -195,7 +195,7 @@ export default function AppLayout() {
             to={item.href}
             onClick={() => setSidebarOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-primary-600 text-white'
                   : 'text-secondary-300 hover:bg-secondary-800 hover:text-white'
@@ -244,9 +244,14 @@ export default function AppLayout() {
         />
       )}
 
-      {/* Sidebar Mobile */}
+      {/* Sidebar Mobile — tiroir, jamais plus large que 85 % de l'écran pour
+          laisser l'overlay tapable (fermeture au doigt) */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:hidden ${
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        aria-hidden={!sidebarOpen}
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform transition-transform duration-300 ease-out lg:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -262,11 +267,13 @@ export default function AppLayout() {
       <div className="lg:pl-64">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-white border-b border-secondary-200">
-          <div className="flex items-center justify-between h-16 px-4 sm:px-6">
+          <div className="flex items-center justify-between h-14 lg:h-16 px-3 sm:px-6">
             {/* Menu burger mobile */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 -ml-2 rounded-lg text-secondary-500 hover:bg-secondary-100 lg:hidden"
+              aria-label="Ouvrir le menu"
+              aria-expanded={sidebarOpen}
+              className="h-11 w-11 -ml-1 flex items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100 lg:hidden"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -278,9 +285,10 @@ export default function AppLayout() {
             {can('tasks', 'create') && crmActif(orgSettings) && (
               <button
                 onClick={() => setShowTaskCreate(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 mr-3 text-sm font-medium text-white
+                className="flex items-center justify-center gap-1.5 h-10 w-10 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 mr-2 sm:mr-3 text-sm font-medium text-white
                   bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                 title="Nouvelle tâche"
+                aria-label="Nouvelle tâche"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Nouvelle tâche</span>
@@ -291,7 +299,10 @@ export default function AppLayout() {
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary-100 transition-colors"
+                aria-label="Menu utilisateur"
+                aria-expanded={userMenuOpen}
+                aria-haspopup="menu"
+                className="flex items-center gap-3 min-h-[44px] p-2 rounded-lg hover:bg-secondary-100 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
                   <span className="text-sm font-medium text-white">
@@ -360,8 +371,8 @@ export default function AppLayout() {
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="p-4 sm:p-6 lg:p-8">
+        {/* Page Content — marge basse étendue à la zone de sécurité iOS (barre d'accueil) */}
+        <main className="p-4 sm:p-6 lg:p-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-6 lg:pb-8">
           <Outlet />
         </main>
       </div>

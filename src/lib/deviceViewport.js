@@ -11,9 +11,9 @@
  * ce qui « dézoome » et fait basculer l'UI en vue bureau (sidebar + colonnes).
  *
  * Le PC (non tactile) est exclu du dézoom → affichage ordinateur strictement
- * identique. Les téléphones (aucun dans le parc aujourd'hui) sont prévus comme
- * branche d'extension dans `getDeviceClass()` — point unique à toucher le jour
- * venu.
+ * identique. Le TÉLÉPHONE (2026-10-11) garde le viewport natif : c'est lui qui
+ * déclenche les breakpoints Tailwind mobiles. Avant cette branche, un téléphone
+ * était classé tablette → rendu à 38 % d'échelle, rien de tapable.
  */
 
 /**
@@ -25,7 +25,36 @@
  */
 export const TABLET_VIEWPORT_WIDTH = 1024;
 
-const DEFAULT_VIEWPORT = 'width=device-width, initial-scale=1.0';
+/**
+ * Bord court maximal d'un téléphone (px CSS logiques). Les téléphones annoncent
+ * 360-430 px ; les tablettes 8" peuvent descendre vers 600 mais pas sous 480.
+ * Le marqueur `Mobi` de l'user-agent (présent sur Android téléphone et iPhone,
+ * absent sur tablette Android et iPad) tranche avant ce seuil.
+ */
+export const PHONE_MAX_SHORT_EDGE = 480;
+
+// viewport-fit=cover : les zones de sécurité iOS (encoche, barre d'accueil)
+// deviennent lisibles via env(safe-area-inset-*) dans le CSS.
+const DEFAULT_VIEWPORT = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
+
+/**
+ * Catégorie d'appareil — fonction PURE (testée dans scripts/device-viewport.test.mjs).
+ *
+ * @param {object} mesures
+ * @param {boolean} mesures.touch - pointeur grossier ou points tactiles
+ * @param {number} mesures.shortEdge - bord court de l'écran (px logiques)
+ * @param {number} mesures.longEdge - bord long de l'écran (px logiques)
+ * @param {string} [mesures.userAgent]
+ * @returns {'desktop' | 'tablet' | 'phone'}
+ */
+export function classifyDevice({ touch, shortEdge, longEdge, userAgent = '' }) {
+  if (!touch) return 'desktop'; // PC : jamais touché
+  if (/Mobi/i.test(userAgent) || shortEdge < PHONE_MAX_SHORT_EDGE) return 'phone';
+  // Grand écran tactile (grande tablette, PC tactile) : atteint déjà le mode
+  // bureau tout seul → inutile de dézoomer.
+  if (longEdge >= TABLET_VIEWPORT_WIDTH) return 'desktop';
+  return 'tablet';
+}
 
 /** Détecte un appareil à pointeur grossier (tactile). */
 function isTouchDevice() {
@@ -46,23 +75,16 @@ function getScreenEdges() {
 }
 
 /**
- * Catégorie d'appareil — POINT UNIQUE d'extension.
- *
- * Aujourd'hui : pas de téléphones dans le parc → tout appareil tactile et
- * « petit » est une tablette. Le jour où des téléphones arrivent, décommenter
- * la branche `phone` ci-dessous (et lui donner sa règle dans
- * `applyDeviceViewport`) — rien d'autre à reprendre ailleurs.
- *
+ * Catégorie de l'appareil courant, mesurée dans le navigateur.
  * @returns {'desktop' | 'tablet' | 'phone'}
  */
 export function getDeviceClass() {
-  if (!isTouchDevice()) return 'desktop'; // PC : jamais touché
-  const { longEdge } = getScreenEdges();
-  // Grand écran tactile (grande tablette, PC tactile) : atteint déjà le mode
-  // bureau tout seul → inutile de dézoomer.
-  if (longEdge >= 1024) return 'desktop';
-  // (futur) if (shortEdge < 480) return 'phone';
-  return 'tablet';
+  if (typeof window === 'undefined') return 'desktop';
+  return classifyDevice({
+    touch: isTouchDevice(),
+    ...getScreenEdges(),
+    userAgent: navigator.userAgent || '',
+  });
 }
 
 /**
@@ -75,8 +97,8 @@ export function applyDeviceViewport() {
   if (!meta) return;
 
   const deviceClass = getDeviceClass();
-  // Hook d'observabilité (inspectable dans le DOM) + cible CSS future :
-  // `html[data-device-class="tablet"] { ... }`
+  // Hook d'observabilité (inspectable dans le DOM) + cible CSS :
+  // `html[data-device-class="phone"] { ... }` (index.css) et useDeviceClass().
   document.documentElement.dataset.deviceClass = deviceClass;
 
   // Sans `initial-scale`, le navigateur ajuste seul l'échelle pour faire tenir

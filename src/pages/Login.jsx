@@ -78,11 +78,14 @@ export default function Login() {
   // ===========================================================================
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-12">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
+    // 100dvh : hauteur réelle du viewport mobile (barre d'adresse comprise), le
+    // formulaire tient sur un écran sans défilement. Sur téléphone (< md) la
+    // carte devient la page elle-même : pas de panneau de marque, logo compact.
+    <div className="min-h-[100dvh] flex items-center justify-center bg-gray-100 px-0 py-0 md:px-4 md:py-12">
+      <div className="w-full min-h-[100dvh] md:min-h-0 max-w-4xl bg-white md:rounded-2xl md:shadow-xl overflow-hidden flex flex-col md:flex-row">
 
-        {/* Partie gauche — Branding */}
-        <div className="relative md:w-1/2 bg-gray-50 flex flex-col items-center justify-center p-8 md:p-12 overflow-hidden">
+        {/* Partie gauche — Branding (bureau et tablette) */}
+        <div className="relative hidden md:flex md:w-1/2 bg-gray-50 flex-col items-center justify-center p-12 overflow-hidden">
           <div
             className="absolute inset-0 opacity-[0.04]"
             style={{
@@ -97,7 +100,7 @@ export default function Login() {
             <img
               src={logoMayer}
               alt="Mayer Energie"
-              className="w-[200px] md:w-[260px] h-auto mb-6"
+              className="w-[260px] h-auto mb-6"
             />
             <p className="text-lg font-semibold text-gray-700">
               Votre confort,
@@ -109,9 +112,16 @@ export default function Login() {
         </div>
 
         {/* Partie droite — Formulaire */}
-        <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="md:w-1/2 flex-1 px-6 py-8 md:p-12 flex flex-col justify-center pb-[max(2rem,env(safe-area-inset-bottom))]">
+          {/* Logo compact (téléphone uniquement) */}
+          <img
+            src={logoMayer}
+            alt="Mayer Energie"
+            className="md:hidden w-[160px] h-auto mb-8 self-center"
+          />
+
+          <div className="mb-6 md:mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 md:mb-2">
               Bienvenue
             </h1>
             <p className="text-gray-500">
@@ -121,7 +131,7 @@ export default function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5" noValidate>
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -135,8 +145,13 @@ export default function Login() {
                 onChange={handleChange}
                 required
                 autoComplete="email"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
                 placeholder="votre@email.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                // text-base (16 px) : sous 16 px, iOS zoome la page au focus et
+                // le formulaire sort de l'écran.
+                className="w-full h-12 px-4 border border-gray-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
               />
             </div>
 
@@ -155,12 +170,14 @@ export default function Login() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className="w-full h-12 px-4 pr-12 border border-gray-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  aria-pressed={showPassword}
+                  className="absolute right-0 top-0 h-12 w-12 flex items-center justify-center rounded-r-lg text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -172,7 +189,7 @@ export default function Login() {
             <div className="text-right">
               <Link
                 to="/forgot-password"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                className="inline-block py-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
               >
                 Mot de passe oublié ?
               </Link>
@@ -180,7 +197,7 @@ export default function Login() {
 
             {/* Erreur */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div role="alert" className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                 <p className="text-sm text-red-700">{error}</p>
               </div>
@@ -190,7 +207,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              className="w-full h-12 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white font-semibold px-6 rounded-lg transition-colors"
             >
               {loading ? (
                 <>
@@ -204,7 +221,7 @@ export default function Login() {
           </form>
 
           {/* Footer */}
-          <div className="mt-8 text-center">
+          <div className="mt-6 md:mt-8 text-center">
             <p className="text-sm text-gray-500">
               {isClientLogin ? (
                 <>

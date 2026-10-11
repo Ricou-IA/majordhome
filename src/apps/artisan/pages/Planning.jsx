@@ -37,6 +37,7 @@ import { useAppointments, useTeamMembers } from '@hooks/useAppointments';
 import { useEtatsJournees } from '@hooks/useTournees';
 import { useClientEquipmentLabels } from '@hooks/useClients';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useDeviceClass } from '@hooks/useDeviceClass';
 import { isoWeekNumber } from '@/lib/planningPrintModel';
 import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/planningPrintExport';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
@@ -103,26 +104,30 @@ function CalendarToolbar({
     { value: 'dayGridMonth', label: 'Mois' },
   ];
 
+  // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions ;
+  // Imprimer disparaît (PDF hebdo d'une personne, geste de bureau).
   return (
-    <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
       {/* Navigation dates */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={goToday}
-          className="px-3 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="h-10 sm:h-auto px-3 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
           Aujourd&apos;hui
         </button>
         <div className="flex items-center">
           <button
             onClick={goPrev}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Période précédente"
+            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
             onClick={goNext}
-            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Période suivante"
+            className="h-10 w-10 sm:h-auto sm:w-auto flex items-center justify-center sm:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -135,13 +140,13 @@ function CalendarToolbar({
             S{weekNumber}
           </span>
         )}
-        <h2 className="text-lg font-semibold text-gray-900 min-w-[200px]">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 sm:min-w-[200px] first-letter:uppercase">
           {title}
         </h2>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Sélecteur de vue */}
         <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
           {views.map(v => (
@@ -162,8 +167,9 @@ function CalendarToolbar({
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           title="Rafraîchir"
+          aria-label="Rafraîchir le planning"
         >
           <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
@@ -171,7 +177,7 @@ function CalendarToolbar({
         <button
           onClick={onPrint}
           disabled={!!printHint || isPrinting}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={printHint || 'Imprimer le planning de la semaine (PDF)'}
         >
           {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
@@ -181,10 +187,11 @@ function CalendarToolbar({
         {onAddEvent && (
           <button
             onClick={onAddEvent}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 h-10 px-3 sm:px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            Nouveau RDV
+            <span className="hidden sm:inline">Nouveau RDV</span>
+            <span className="sm:hidden">RDV</span>
           </button>
         )}
       </div>
@@ -241,6 +248,9 @@ function CalendarFilters({ filters, setFilters, teamList }) {
       appointmentType: null,
     }));
 
+  // Sous `sm` (téléphone) : les chips équipe défilent sur une ligne au lieu
+  // d'empiler six lignes de boutons ; les tolérances (bandes de souplesse) sont
+  // une lecture de bureau.
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {/* Toggles bucket */}
@@ -248,18 +258,20 @@ function CalendarFilters({ filters, setFilters, teamList }) {
         <KindToggle active={kinds.intervention} onClick={() => toggleKind('intervention')} icon={Wrench} label="Intervention" />
         <KindToggle active={kinds.commercial} onClick={() => toggleKind('commercial')} icon={Briefcase} label="Commercial" />
         {/* Bandes de tolérance des RDV adaptables (souplesse) — sur demande */}
-        <KindToggle
-          active={!!filters.showTolerance}
-          onClick={() => setFilters(f => ({ ...f, showTolerance: !f.showTolerance }))}
-          icon={MoveHorizontal}
-          label="Tolérances"
-        />
+        <span className="hidden sm:inline-flex">
+          <KindToggle
+            active={!!filters.showTolerance}
+            onClick={() => setFilters(f => ({ ...f, showTolerance: !f.showTolerance }))}
+            icon={MoveHorizontal}
+            label="Tolérances"
+          />
+        </span>
       </div>
 
-      <span className="w-px h-6 bg-gray-200" />
+      <span className="hidden sm:block w-px h-6 bg-gray-200" />
 
       {/* Chips équipe (1 par personne) */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar w-full sm:w-auto sm:flex-wrap -mx-1 px-1 py-0.5">
         {teamList.map(h => {
           const isSel = selectedKeys.includes(h.profileKey);
           return (
@@ -267,7 +279,8 @@ function CalendarFilters({ filters, setFilters, teamList }) {
               key={h.profileKey}
               onClick={() => toggleMember(h.profileKey)}
               title={h.displayName}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-sm transition-colors ${
+              aria-pressed={isSel}
+              className={`inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 sm:py-1 rounded-full border text-sm transition-colors ${
                 isSel
                   ? 'border-gray-400 bg-gray-100 text-gray-900'
                   : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
@@ -280,7 +293,7 @@ function CalendarFilters({ filters, setFilters, teamList }) {
         })}
       </div>
 
-      <span className="w-px h-6 bg-gray-200" />
+      <span className="hidden sm:block w-px h-6 bg-gray-200" />
 
       {/* Filtre type */}
       <div className="relative">
@@ -392,9 +405,12 @@ export default function Planning() {
   const orgId = organization?.id;
   const calendarRef = useRef(null);
   const canCreateAppointment = can('planning', 'create');
+  // Sur appareil tenu en main (tablette, téléphone) : la journée, pas la semaine.
+  const { isMobileDevice } = useDeviceClass();
+  const vueInitiale = isMobileDevice ? 'timeGridDay' : 'timeGridWeek';
 
   // État local
-  const [currentView, setCurrentView] = useState('timeGridWeek');
+  const [currentView, setCurrentView] = useState(vueInitiale);
   const [calendarTitle, setCalendarTitle] = useState('');
   const [calendarWeek, setCalendarWeek] = useState(null);
   const [dateRange, setDateRange] = useState(() => getDateRange(null));
@@ -494,6 +510,19 @@ export default function Planning() {
   const { members } = useTeamMembers(orgId);
   const { labelsByClientId } = useClientEquipmentLabels();
   const { settings: orgSettings } = useOrgSettings();
+
+  // Sur appareil tenu en main : ouvrir sur SON planning (profileKey = user.id,
+  // clé d'unification de teamList). Appliqué une seule fois, dès que l'équipe
+  // est connue ; un admin sans ressource planning garde la vue globale, et
+  // « Effacer » reste possible : c'est un défaut, pas un verrou.
+  const defautPersonneApplique = useRef(false);
+  useEffect(() => {
+    if (defautPersonneApplique.current || !isMobileDevice || !user?.id || teamList.length === 0) return;
+    defautPersonneApplique.current = true;
+    if (teamList.some((h) => h.profileKey === user.id)) {
+      setFilters((f) => ({ ...f, memberProfileKeys: [user.id] }));
+    }
+  }, [isMobileDevice, user?.id, teamList, setFilters]);
 
   // ==========================================================================
   // IMPRESSION — planning hebdo d'UNE personne (vue Semaine + 1 chip équipe)
@@ -739,14 +768,14 @@ export default function Planning() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header — le sous-titre ne dit rien que la page ne montre : masqué sur téléphone */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Planning</h1>
-        <p className="text-gray-500">Gérez vos rendez-vous et interventions</p>
+        <p className="hidden sm:block text-gray-500">Gérez vos rendez-vous et interventions</p>
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 space-y-3">
         <CalendarToolbar
           calendarRef={calendarRef}
           currentView={currentView}
@@ -786,7 +815,7 @@ export default function Planning() {
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
+            initialView={vueInitiale}
             initialDate={dateInitiale}
             locale="fr"
             headerToolbar={false}
