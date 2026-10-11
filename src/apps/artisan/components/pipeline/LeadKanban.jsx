@@ -439,11 +439,20 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
         const lead = leadsById.get(card.lead_id);
         if (!lead) return null; // carte pour un lead hors du filtre courant
         // Lead MT-LT : visible seulement une fois classé par Pennylane (Gagné / Perdu)
-        if (lead.is_long_term_project && !TERMINAL_COLUMN_KEYS.has(card.column_key)) return null;
+        // Carte sans devis Pennylane : la vue la place d'après leads.status_id. On
+        // relit ce statut sur le lead LOCAL (mis à jour en optimiste au drag / à la
+        // validation des modales) pour que la carte change de colonne tout de suite,
+        // sans attendre le rechargement de la vue — sinon elle restait dans son
+        // ancienne colonne jusqu'au F5 (2026-10-11). Une carte portée par des devis
+        // PL garde la colonne de la vue : c'est Pennylane qui la place.
+        const columnKey = (Number(card.devis_count) || 0) === 0
+          ? statusIdToColumnKey.get(lead.status_id) ?? card.column_key
+          : card.column_key;
+        if (lead.is_long_term_project && !TERMINAL_COLUMN_KEYS.has(columnKey)) return null;
         leadsWithCard.add(lead.id);
         return {
           id: card.card_key,          // clé React unique (card_key est unique par carte)
-          column_key: card.column_key, // utilisé par groupBy
+          column_key: columnKey,       // utilisé par groupBy
           lead,                        // objet lead complet pour LeadCard + DnD
           card,                        // objet carte pour le chip multi-devis
         };

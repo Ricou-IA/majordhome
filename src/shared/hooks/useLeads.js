@@ -322,8 +322,12 @@ export function useLeadMutations() {
   const { organization } = useAuth();
   const orgId = organization?.id;
 
+  // Le board du pipeline place ses cartes depuis majordhome_kanban_cards (famille
+  // kanbanCardKeys), pas depuis la liste des leads : sans cette invalidation, un
+  // changement de statut validé restait invisible jusqu'au F5 (2026-10-11).
   const invalidateLeads = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+    queryClient.invalidateQueries({ queryKey: kanbanCardKeys.all(orgId) });
   }, [queryClient, orgId]);
 
   // Créer un lead
