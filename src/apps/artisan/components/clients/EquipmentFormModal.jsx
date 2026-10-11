@@ -38,6 +38,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
+import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { useSuppliers, useSupplierProducts } from '@hooks/useSuppliers';
 import { useDebounce } from '@hooks/useDebounce';
 
@@ -202,7 +203,7 @@ export function EquipmentFormModal({
       />
 
       {/* Panneau slide-over droit */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className={`fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-xl flex flex-col animate-in slide-in-from-right duration-300 ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -391,7 +392,7 @@ export function EquipmentFormModal({
         </form>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 ${MODAL_FOOTER_PHONE}`}>
           <button
             type="button"
             onClick={onClose}

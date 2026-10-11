@@ -56,6 +56,12 @@ export function ConfirmDialog({
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
             'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
             'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
+            // Téléphone (< sm) : feuille ancrée en bas, pleine largeur, zone de sécurité iOS.
+            // Un plein écran pour deux lignes de texte laisserait une page vide ; la feuille met
+            // les boutons sous le pouce. Bureau et tablette (rendue en 1024 px) inchangés.
+            'max-sm:left-0 max-sm:top-auto max-sm:bottom-0 max-sm:translate-x-0 max-sm:translate-y-0',
+            'max-sm:max-w-none max-sm:max-h-[90dvh] max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-0',
+            'max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
           )}
         >
           <AlertDialogPrimitive.Title className="text-lg font-semibold text-gray-900">
@@ -72,14 +78,15 @@ export function ConfirmDialog({
 
           <div className="mt-6 flex items-center justify-end gap-3">
             <AlertDialogPrimitive.Cancel
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 max-sm:flex-1 max-sm:py-3"
               disabled={loading}
             >
               {cancelLabel}
             </AlertDialogPrimitive.Cancel>
             <AlertDialogPrimitive.Action
               className={cn(
-                'px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2',
+                'px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2',
+                'max-sm:flex-1 max-sm:py-3',
                 confirmButtonClass,
               )}
               disabled={loading || confirmDisabled}

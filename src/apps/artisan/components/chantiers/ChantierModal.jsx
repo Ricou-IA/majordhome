@@ -41,6 +41,7 @@ import { ChantierInterventionSection } from './ChantierInterventionSection';
 import { GroupChantiersDialog } from './GroupChantiersDialog';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
 import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
+import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 
 export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, canEditAll = true }) {
   const { organization, user } = useAuth();
@@ -329,7 +330,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[calc(100vh-4rem)] flex flex-col">
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[calc(100vh-4rem)] flex flex-col ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -594,7 +595,7 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
           });
 
           return (
-            <div className="px-5 py-3 border-t bg-gray-50 rounded-b-xl flex items-center gap-2 flex-wrap">
+            <div className={`px-5 py-3 border-t bg-gray-50 rounded-b-xl flex items-center gap-2 flex-wrap ${MODAL_FOOTER_PHONE}`}>
               {/* Retour arrière à gauche */}
               {backTransitions.map((targetStatus) => {
                 const config = getChantierStatusConfig(targetStatus);

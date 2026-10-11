@@ -56,6 +56,7 @@ import { useTeamMembers } from '@hooks/useAppointments';
 import { useDureeContrat } from '@hooks/useTournees';
 import { FormField, TextArea } from '@apps/artisan/components/FormFields';
 import { SchedulingAssistant } from '@apps/artisan/components/planning/scheduling/SchedulingAssistant';
+import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { CertificatsSection } from './CertificatsSection';
@@ -490,7 +491,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Contenu */}
-      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-2xl' : 'max-w-lg'}`}>
+      <div className={`relative bg-white rounded-xl shadow-2xl w-full max-h-[calc(100vh-4rem)] flex flex-col ${showScheduling ? 'max-w-2xl' : 'max-w-lg'} ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-3 min-w-0">
@@ -788,7 +789,7 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
 
         {/* Footer : Enregistrer + transitions (masqué en mode planification) */}
         {!showScheduling && (
-          <div className="px-5 py-3 border-t bg-gray-50 rounded-b-xl space-y-2">
+          <div className={`px-5 py-3 border-t bg-gray-50 rounded-b-xl space-y-2 ${MODAL_FOOTER_PHONE}`}>
             {/* Bouton Enregistrer */}
             {canEditSAV && (
               <div className="flex items-center justify-center">

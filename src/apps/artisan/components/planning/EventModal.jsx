@@ -34,6 +34,7 @@ import { construireReglages } from '@/lib/tournee/reglages.js';
 import { toast } from 'sonner';
 import { formatDateForInput, computeEndTime, computeDuration } from '@/lib/utils';
 import { hasPhoneNumber } from '@/lib/phoneUtils';
+import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { CancelConfirmation, DeleteConfirmation } from './EventConfirmations';
 import { SchedulingAssistant } from './scheduling/SchedulingAssistant';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
@@ -1120,8 +1121,8 @@ export function EventModal({
       <div className="fixed inset-0 z-40 pointer-events-none" />
 
       {/* Panel modale — taille uniforme pour tous les types de RDV (largeur de la grille assistant).
-          Sous `sm` (téléphone) le panneau occupe l'écran : avec `right-4 w-full` il débordait à gauche. */}
-      <div className="fixed inset-2 sm:inset-y-4 sm:left-auto sm:right-4 w-auto sm:w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+          Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
+      <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         {/* ---- Header ---- */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 min-w-0">
@@ -1345,7 +1346,7 @@ export function EventModal({
 
         {/* ---- Footer ---- */}
         {!confirmAction && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className={`flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 ${MODAL_FOOTER_PHONE}`}>
             {/* Actions danger (mode edit seulement, hors re-planification) */}
             <div className="flex items-center gap-2">
               {editIdle && !isCancelled && (

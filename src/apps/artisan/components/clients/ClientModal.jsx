@@ -25,6 +25,7 @@ import { useClient } from '@hooks/useClients';
 import { usePennylaneSyncClient } from '@hooks/usePennylane';
 import { clientsService } from '@services/clients.service';
 import { geocodeAndUpdateByProjectId, setClientLocation } from '@services/geocoding.service';
+import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
 import { TabContrat } from '../../pages/client-detail/TabContrat';
 
@@ -276,7 +277,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
       <div className="fixed inset-0 bg-black/50 z-40" onClick={handleClose} />
 
       {/* Modale */}
-      <div className="fixed inset-4 md:inset-8 lg:inset-16 bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+      <div className={`fixed inset-4 md:inset-8 lg:inset-16 bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -370,7 +371,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className={`flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 ${MODAL_FOOTER_PHONE}`}>
           <div>
             {errors.general && (
               <p className="text-sm text-red-600 flex items-center gap-1">
