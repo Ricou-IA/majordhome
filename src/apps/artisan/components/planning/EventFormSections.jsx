@@ -13,7 +13,7 @@
 import {
   Clock, User, UserCircle, Tag, FileText, Wrench,
   Search, ExternalLink, Link2, X, Loader2,
-  Phone, MapPin, CalendarClock, CalendarPlus, MoveHorizontal, AlertTriangle,
+  Phone, CalendarClock, CalendarPlus, MoveHorizontal, AlertTriangle,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
 import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
@@ -25,6 +25,7 @@ import {
 } from '@services/appointments.service';
 import { TechnicianSelect } from './TechnicianSelect';
 import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
+import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
 
 const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
@@ -325,12 +326,13 @@ export const SectionClient = ({
             {formatPhoneNumber(contactPhone)}
           </a>
         )}
-        {contactAddress && (
-          <div className="flex items-start gap-1.5 text-sm text-gray-600">
-            <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            <span>{contactAddress}</span>
-          </div>
-        )}
+        {/* Adresse = itinéraire (Google Maps au tap, Waze en bouton) ; coordonnées
+            de la fiche client liée quand elle est géocodée. */}
+        <AdresseItineraire
+          adresse={contactAddress}
+          lat={showClientChip ? selectedClient.latitude : null}
+          lng={showClientChip ? selectedClient.longitude : null}
+        />
       </div>
     )}
 

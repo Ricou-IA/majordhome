@@ -24,6 +24,8 @@ import {
 } from '@services/chantiers.service';
 import { useChantierMutations } from '@hooks/useChantiers';
 import { useCanAccess } from '@hooks/usePermissions';
+import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
+import { formaterAdresse } from '@/lib/itineraire';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useTeamMembers, useChantierAppointments } from '@hooks/useAppointments';
 import { appointmentsService } from '@services/appointments.service';
@@ -367,14 +369,11 @@ export function ChantierModal({ chantier, onClose, onUpdated, effectiveRole, can
               <div className="flex items-start gap-2 text-sm text-gray-500">
                 <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <div>
-                    {[
-                      chantier.address,
-                      [chantier.postal_code, chantier.city].filter(Boolean).join(' '),
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </div>
+                  <AdresseItineraire
+                    sansIcone
+                    adresse={formaterAdresse({ address: chantier.address, postalCode: chantier.postal_code, city: chantier.city })}
+                    className="text-sm text-gray-500"
+                  />
                   {isLoadingDriving && (
                     <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />

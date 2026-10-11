@@ -23,7 +23,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X, Loader2, ArrowLeft, ArrowRight, Save,
-  User, MapPin, Phone, ClipboardCheck, Wrench, Mail, FileText,
+  User, Phone, ClipboardCheck, Wrench, Mail, FileText,
   ExternalLink, Calendar, Check, UserPlus, Archive, Link2, AlertTriangle,
 } from 'lucide-react';
 import { anomaliesDeCarte } from '@/lib/certificatAnomalies';
@@ -35,6 +35,8 @@ import { formatEuro, formatDateShortFR } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { PlannedOrderFields } from '@apps/artisan/components/planning/scheduling/PlannedOrderFields';
+import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
+import { formaterAdresse } from '@/lib/itineraire';
 import {
   savService,
   getStatusConfig,
@@ -585,10 +587,12 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                   )}
                 </div>
                 {(item.client_postal_code || item.client_city) && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span>{[item.client_address, item.client_postal_code, item.client_city].filter(Boolean).join(', ')}</span>
-                  </div>
+                  <AdresseItineraire
+                    adresse={formaterAdresse({ address: item.client_address, postalCode: item.client_postal_code, city: item.client_city })}
+                    lat={item.client_latitude}
+                    lng={item.client_longitude}
+                    className="text-sm text-gray-500 [&>svg]:text-gray-400 [&>svg]:h-4 [&>svg]:w-4"
+                  />
                 )}
                 {item.client_phone && (
                   <div className="flex items-center gap-2 text-sm text-gray-500">

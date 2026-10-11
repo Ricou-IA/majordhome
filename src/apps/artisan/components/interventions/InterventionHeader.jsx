@@ -9,7 +9,6 @@
  */
 
 import {
-  MapPin,
   Phone,
   Calendar,
   Clock,
@@ -21,6 +20,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
+import { formaterAdresse } from '@/lib/itineraire';
 import {
   getInterventionTypeConfig,
   getInterventionStatusConfig,
@@ -115,14 +116,12 @@ export function InterventionHeader({
             {client.display_name}
           </h3>
           {client.address && (
-            <p className="text-sm text-gray-600 flex items-start gap-2">
-              <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-gray-400" />
-              <span>
-                {client.address}
-                {client.postal_code && `, ${client.postal_code}`}
-                {client.city && ` ${client.city}`}
-              </span>
-            </p>
+            <AdresseItineraire
+              adresse={formaterAdresse({ address: client.address, postalCode: client.postal_code, city: client.city })}
+              lat={client.latitude}
+              lng={client.longitude}
+              className="text-sm text-gray-600 [&>svg]:text-gray-400 [&>svg]:h-4 [&>svg]:w-4"
+            />
           )}
           {client.phone && (
             <a
