@@ -1,6 +1,7 @@
 // supabase/functions/pennylane-sync-quote-status/index.ts
-// Cron 15 min : sync devis attachés (status + pdf_url) + sync identité PL→MDH
-// (clients + leads) + auto-attach nouveaux devis PL pour bridges existants.
+// Cron 15 min : synchro identité client MDH ⇄ PL par deltas (journal PL, rejeu des
+// pushes en attente — cf. _shared/pennylaneCustomerSync.ts) + sync devis attachés
+// (status + pdf_url) + identité PL → leads + auto-attach nouveaux devis PL.
 //
 // Spec : docs/superpowers/specs/2026-05-25-pipeline-multidevis-design.md §9
 // Bridge canonique (2026-05-27) : une fois un devis attaché à un lead, PL
@@ -17,6 +18,7 @@ import {
   sanitizeError,
   buildCorsHeaders,
 } from "../_shared/auth.ts";
+import { runCustomerIdentitySync } from "../_shared/pennylaneCustomerSync.ts";
 
 // ---------------------------------------------------------------------------
 // Types Pennylane (subset)
@@ -219,6 +221,7 @@ Deno.serve(async (req) => {
 
     const summary = {
       processed_orgs: 0,
+      customer_identity: [] as unknown[],
       quote_status_updates: 0,
       customer_field_updates: 0,
       lead_field_updates: 0,
@@ -229,11 +232,23 @@ Deno.serve(async (req) => {
     };
 
     for (const org of plOrgs) {
+      // Synchro identité client par deltas — indépendante des devis : elle tourne même
+      // sans devis rattaché ou miroir périmé, et son échec n'empêche pas la suite.
+      try {
+        const identity = await runCustomerIdentitySync(supabase, PENNYLANE_API_TOKEN, org.id);
+        summary.customer_identity.push({ org: org.id, ...identity });
+        summary.customer_field_updates += identity.clients_updated;
+        for (const e of identity.errors) summary.errors.push(`org ${org.id} identité : ${e}`);
+      } catch (idErr) {
+        const msg = sanitizeError(idErr, "Customer identity sync failed");
+        console.warn(`[pennylane-sync] org ${org.id} identité : ${msg}`);
+        summary.errors.push(`org ${org.id} identité : ${msg}`);
+      }
+
       try {
         const result = await syncOrgQuotes(supabase, org.id, PENNYLANE_API_TOKEN);
         summary.processed_orgs++;
         summary.quote_status_updates += result.quote_status_updates;
-        summary.customer_field_updates += result.customer_field_updates;
         summary.lead_field_updates += result.lead_field_updates;
         summary.auto_attached_quotes += result.auto_attached_quotes;
         summary.ejections += result.ejections;
@@ -281,7 +296,6 @@ async function syncOrgQuotes(
   if (attachedQuotes.length === 0) {
     return {
       quote_status_updates: 0,
-      customer_field_updates: 0,
       lead_field_updates: 0,
       auto_attached_quotes: 0,
       ejections: 0,
@@ -322,7 +336,6 @@ async function syncOrgQuotes(
     );
     return {
       quote_status_updates: 0,
-      customer_field_updates: 0,
       lead_field_updates: 0,
       auto_attached_quotes: 0,
       ejections: 0,
@@ -368,9 +381,9 @@ async function syncOrgQuotes(
     );
   }
 
-  // 4. Sync identite PL -> MDH (clients + leads, mode OVERWRITE) — depuis le
-  //    cache clients, alimenté par le sweep. Zéro appel Pennylane.
-  const { customer_field_updates, lead_field_updates } =
+  // 4. Identite PL -> leads (OVERWRITE, PL canonical post-attache) — depuis le
+  //    cache clients. Zéro appel Pennylane. Les clients : runCustomerIdentitySync.
+  const { lead_field_updates } =
     await syncIdentityFromPennylane(supabase, orgId, attachedQuotes);
 
   // 5. Auto-attach nouveaux devis PL pour bridges existants (bridge canonique)
@@ -381,7 +394,6 @@ async function syncOrgQuotes(
 
   return {
     quote_status_updates,
-    customer_field_updates,
     lead_field_updates,
     auto_attached_quotes,
     ejections: ejections_ref.v,
@@ -562,18 +574,24 @@ async function verifyMissingQuotes(
 }
 
 // ---------------------------------------------------------------------------
-// syncIdentityFromPennylane — etape 4 : sync identite PL -> MDH
-// Pour chaque customer unique : fetch /customers/{id} et update :
-//   - client(s) MDH lies via pennylane_sync (OVERWRITE-when-PL-has-value)
-//   - lead(s) bridges via lead_pennylane_quotes (OVERWRITE direct, PL canonical)
+// syncIdentityFromPennylane — etape 4 : identite PL -> LEADS uniquement
+// Lead(s) bridges via lead_pennylane_quotes : OVERWRITE depuis le cache (PL canonical
+// post-attache, contact du lead en lecture seule).
+//
+// Les CLIENTS ne sont plus ecrits ici (2026-10-11). Cette etape reimposait toutes
+// les 15 min la fiche du cache sur le client MDH ; or le cache n'etait jamais
+// rafraichi : toute correction faite dans MDH etait ecrasee par une photo perimee
+// (HELLARD CLI-03715). La fiche client est desormais synchronisee par DELTAS dans
+// les deux sens (runCustomerIdentitySync, appele avant syncOrgQuotes) ; ce meme
+// mecanisme tient le cache a jour (journal PL + push MDH), donc les leads lus ici
+// suivent les modifications faites d'un cote comme de l'autre.
 // ---------------------------------------------------------------------------
 
 async function syncIdentityFromPennylane(
   supabase: ReturnType<typeof getAdminClient>,
   orgId: string,
   attachedQuotes: AttachedQuote[],
-): Promise<{ customer_field_updates: number; lead_field_updates: number }> {
-  let customer_field_updates = 0;
+): Promise<{ lead_field_updates: number }> {
   let lead_field_updates = 0;
 
   // Bridge map : customer_id -> Set<lead_id>
@@ -630,37 +648,6 @@ async function syncIdentityFromPennylane(
       }
       if (Object.keys(updatePayload).length === 0) continue;
 
-      // 4a. Sync client MDH (si mapping pennylane_sync existe)
-      const { data: syncRow, error: syncErr } = await supabase
-        .from("majordhome_pennylane_sync")
-        .select("local_id")
-        .eq("org_id", orgId)
-        .eq("entity_type", "client")
-        .eq("pennylane_id", customerId)
-        .maybeSingle();
-
-      if (syncErr) {
-        console.warn(
-          `[pennylane-sync] sync lookup error for customer ${customerId}:`,
-          sanitizeError(syncErr, 'sync lookup error'),
-        );
-      } else if (syncRow?.local_id) {
-        const { error: clientUpdErr } = await supabase.rpc('pennylane_sync_update_client_fields', {
-          p_client_id: syncRow.local_id,
-          p_org_id: orgId,
-          p_fields: updatePayload,
-        });
-
-        if (clientUpdErr) {
-          console.warn(
-            `[pennylane-sync] client update failed (pl_customer ${customerId}):`,
-            sanitizeError(clientUpdErr, 'client update failed'),
-          );
-        } else {
-          customer_field_updates++;
-        }
-      }
-
       // 4b. Sync lead(s) bridges a ce customer (PL canonical post-attach)
       for (const leadId of leadIds) {
         const { error: leadUpdErr } = await supabase.rpc('pennylane_sync_overwrite_lead_fields', {
@@ -695,7 +682,7 @@ async function syncIdentityFromPennylane(
     );
   }
 
-  return { customer_field_updates, lead_field_updates };
+  return { lead_field_updates };
 }
 
 // ---------------------------------------------------------------------------

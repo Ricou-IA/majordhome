@@ -17,6 +17,7 @@ import {
   sanitizeError,
   buildCorsHeaders,
 } from "../_shared/auth.ts";
+import { identityFromPlCustomer } from "../_shared/pennylaneIdentity.js";
 
 const PENNYLANE_BASE_URL = "https://app.pennylane.com/api/external/v2";
 
@@ -306,17 +307,20 @@ async function sweepOrg(
         const c = f.customer;
         const name = formatCustomerName(c);
         if (!name) continue; // rien d'exploitable : ne pas polluer le cache
+        // V2 : adresse dans `billing_address`, e-mails dans `emails[]` — PAS au root
+        // (l'ancienne lecture `c.address` / `c.email` laissait ces champs vides).
+        const id = identityFromPlCustomer(c as Record<string, unknown>);
         payloads.push({
           pennylane_id: Number(c.id ?? f.id),
           name,
-          first_name: c.first_name ?? null,
-          last_name: c.last_name ?? null,
+          first_name: id.first_name,
+          last_name: id.last_name,
           customer_type: c.customer_type ?? null,
-          email: c.billing_email ?? c.email ?? null,
-          phone: c.phone ?? null,
-          address: c.address ?? null,
-          postal_code: c.postal_code ?? null,
-          city: c.city ?? null,
+          email: id.email,
+          phone: id.phone,
+          address: id.address,
+          postal_code: id.postal_code,
+          city: id.city,
           external_reference: c.reference ?? c.external_reference ?? null,
           raw_payload: c,
         });

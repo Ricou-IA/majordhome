@@ -39,7 +39,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'team_members', columns: null },
   { schema: 'majordhome', table: 'commercials', columns: null }, // 20261005_1 : commercial_set_for_user (liste « Commercial assigné »)
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived'] }, // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name'] }, // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -67,6 +67,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'member_org_roles', columns: null },
   { schema: 'majordhome', table: 'tasks', columns: null, data: false },
   { schema: 'majordhome', table: 'journees_secteur', columns: null, data: false }, // 20261004_3 : auto_rdv_poser (journée figée, étiquette déduite)
+  { schema: 'majordhome', table: 'pennylane_sync', columns: null }, // 20261011_1 : synchro identité client MDH ⇄ PL (saisies en attente)
+  { schema: 'majordhome', table: 'pennylane_customer_lookup', columns: null }, // 20261011_1 : base de diff (identity_baseline_at)
 ];
 
 const FUNCTIONS = [
@@ -117,7 +119,8 @@ const FUNCTIONS = [
   // 20260930_16..18 : entité chantier
   'majordhome.lead_pennylane_quotes_invariant_winning()',
   'majordhome.chantier_ensure_for_quote()', // trigger de prod sur lead_pennylane_quotes (20260930_16) : sans elle le schéma ne charge plus
-  'public.lead_merge(uuid, uuid)', // recréée sans ses 16 tables satellites : plpgsql ne résout les tables qu'à l'exécution
+  'public.lead_merge(uuid, uuid)',
+  'public.pennylane_sync_update_client_fields(uuid, uuid, jsonb)', // 20261011_1 : écriture PL → client par le journal // recréée sans ses 16 tables satellites : plpgsql ne résout les tables qu'à l'exécution
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).

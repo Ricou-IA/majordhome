@@ -12,8 +12,10 @@
  *   - Pagination : { items, has_more, next_cursor } avec params limit + cursor
  *   - Page size : param `limit` (PAS `page_size` — ignoré)
  *   - Cursor : param `cursor` (PAS `page_after` — retourne la même page)
- *   - Writes clients : POST /customers OK, PUT/PATCH /customers/{id} = 404
- *     → les updates passent par V1 (nécessite scope customer_invoices)
+ *   - Writes clients : POST /customers OK, PUT/PATCH /customers/{id} = 404.
+ *     La modification passe par PUT /individual_customers/{id} ou /company_customers/{id}
+ *     (PUT PARTIEL vérifié par sonde le 2026-10-11) — côté serveur uniquement, edge
+ *     `pennylane-customer-push` (cf. pushClientIdentity ci-dessous).
  *   - Code comptable client : ledger_account.id sur le customer,
  *     puis GET /ledger_accounts/{id} → .number (ex: "411100078")
  * ============================================================================
@@ -271,8 +273,8 @@ async function syncClient(client, orgId) {
   const existing = await getSyncRecord(orgId, 'client', client.id);
 
   if (existing) {
-    // Déjà mappé — on ne peut pas update via V2 (404 sur PUT/PATCH)
-    // On met juste à jour le sync record
+    // Déjà mappé — la mise à jour des champs passe par pushClientIdentity (save de la
+    // fiche, colonnes modifiées seulement). Ici on rafraîchit juste le sync record.
     await upsertSyncRecord({
       ...existing,
       last_synced_at: new Date().toISOString(),
@@ -1875,6 +1877,39 @@ async function importPennylaneCustomerToMdh(orgId, plCustomer, userId) {
 }
 
 // ============================================================================
+// IDENTITÉ CLIENT MDH → PL (synchro bidirectionnelle par deltas, 2026-10-11)
+// ============================================================================
+
+/**
+ * Pousse dans Pennylane les colonnes modifiées d'une fiche client pontée. Le corps ne porte
+ * que des NOMS de colonnes : l'edge relit les valeurs dans la fiche MDH (filtrée org).
+ * Échec ⇒ throw avec le message Pennylane ; la saisie est gardée « en attente » côté serveur
+ * et rejouée par le cron 15 min (pennylane-sync-quote-status).
+ *
+ * @param {string} orgId
+ * @param {string} clientId
+ * @param {string[]} columns — colonnes MDH modifiées (changedPushableColumns)
+ * @param {string} editedAt — date ISO de la saisie (arbitre d'un conflit avec Pennylane)
+ * @returns {Promise<{ status: 'pushed'|'nothing'|'not_mapped', fields?: string[] }>}
+ */
+async function pushClientIdentity(orgId, clientId, columns, editedAt) {
+  const { data, error } = await supabase.functions.invoke('pennylane-customer-push', {
+    body: { org_id: orgId, client_id: clientId, columns, edited_at: editedAt },
+  });
+  if (error) {
+    let message = error.message;
+    try {
+      const payload = await error.context?.json?.();
+      if (payload?.error) message = payload.error;
+    } catch {
+      // corps illisible : message générique
+    }
+    throw new Error(message);
+  }
+  return data;
+}
+
+// ============================================================================
 // EXPORT
 // ============================================================================
 
@@ -1887,6 +1922,7 @@ export const pennylaneService = {
   getOrCreateCustomer: (client, orgId) => withErrorHandling(() => getOrCreateCustomer(client, orgId), 'pennylane.getOrCreateCustomer'),
   fetchCustomerById: (customerId, orgId = null) => withErrorHandling(() => fetchCustomerById(customerId, orgId), 'pennylane.fetchCustomerById'),
   fetchLedgerAccountNumber: (ledgerAccountId) => withErrorHandling(() => fetchLedgerAccountNumber(ledgerAccountId), 'pennylane.fetchLedgerAccountNumber'),
+  pushClientIdentity: (orgId, clientId, columns, editedAt) => withErrorHandling(() => pushClientIdentity(orgId, clientId, columns, editedAt), 'pennylane.pushClientIdentity'),
 
   // Extractors (utiles aux callers qui ont déjà un payload customer en main)
   extractCustomerEmail,

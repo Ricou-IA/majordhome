@@ -164,3 +164,8 @@ verify_jwt = false
 
 [functions.auto-rdv-cron]
 verify_jwt = false
+
+# pennylane-customer-push : push MDH → Pennylane des colonnes modifiées d'une fiche
+# client (useClient). JWT user + requireOrgMembership (org PL activée). 2026-10-11.
+[functions.pennylane-customer-push]
+verify_jwt = true

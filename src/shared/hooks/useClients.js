@@ -20,6 +20,10 @@ import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@ho
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { pennylaneService } from '@services/pennylane.service';
+import { changedPushableColumns } from '../../../supabase/functions/_shared/pennylaneIdentity.js';
+import { toast } from 'sonner';
 
 // Re-export for backward compatibility
 export { clientKeys } from '@hooks/cacheKeys';
@@ -105,6 +109,8 @@ export function useClient(clientId) {
   const queryClient = useQueryClient();
   const { organization } = useAuth();
   const orgId = organization?.id;
+  const { settings } = useOrgSettings();
+  const pennylaneEnabled = settings?.pennylane?.enabled === true;
 
   const {
     data: queryData,
@@ -120,9 +126,18 @@ export function useClient(clientId) {
   });
 
   // Mutation de mise à jour
+  // Synchro Pennylane (2026-10-11, bidirectionnelle par deltas) : après l'enregistrement, les
+  // seules colonnes d'identité MODIFIÉES partent dans Pennylane (client ponté uniquement — sinon
+  // l'edge répond not_mapped). La fiche MDH reste enregistrée quoi qu'il arrive ; un échec est
+  // signalé et la saisie rejouée par le cron 15 min. Le contrat de la mutation est inchangé :
+  // elle résout sur l'enregistrement MDH, le push suit sans bloquer.
   const updateMutation = useMutation({
+    onMutate: () => ({
+      before: queryClient.getQueryData(clientKeys.detail(orgId, clientId))?.data ?? null,
+      editedAt: new Date().toISOString(),
+    }),
     mutationFn: (updates) => unwrapResult(clientsService.updateClient(clientId, updates)),
-    onSuccess: (updated) => {
+    onSuccess: (updated, _updates, context) => {
       if (updated) {
         queryClient.setQueryData(clientKeys.detail(orgId, clientId), (old) => ({
           ...old,
@@ -130,6 +145,18 @@ export function useClient(clientId) {
         }));
         queryClient.invalidateQueries({ queryKey: clientKeys.lists(orgId) });
       }
+      if (!pennylaneEnabled || !updated || !context?.before) return;
+      const columns = changedPushableColumns(context.before, updated);
+      if (columns.length === 0) return;
+      pennylaneService
+        .pushClientIdentity(orgId, clientId, columns, context.editedAt)
+        .then(({ error }) => {
+          if (error) {
+            toast.warning('Fiche enregistrée — Pennylane non mis à jour', {
+              description: `${error.message} Nouvel essai automatique dans les 15 min.`,
+            });
+          }
+        });
     },
   });
 
