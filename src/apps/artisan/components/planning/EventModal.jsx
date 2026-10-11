@@ -1124,7 +1124,7 @@ export function EventModal({
           Sous `sm` (téléphone) le gabarit partagé MODAL_PANEL_PHONE le passe en plein écran. */}
       <div className={`fixed sm:inset-y-4 sm:left-auto sm:right-4 sm:w-full max-w-2xl bg-white rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${MODAL_PANEL_PHONE}`}>
         {/* ---- Header ---- */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
@@ -1150,7 +1150,7 @@ export function EventModal({
         </div>
 
         {/* ---- Contenu scrollable ---- */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Confirmation annulation */}
           {confirmAction === 'cancel' && (
             <CancelConfirmation
@@ -1346,7 +1346,9 @@ export function EventModal({
 
         {/* ---- Footer ---- */}
         {!confirmAction && (
-          <div className={`flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 ${MODAL_FOOTER_PHONE}`}>
+          /* Sous `sm`, quatre boutons ne tiennent pas sur 390 px : retour de ligne (sinon le panneau
+             en overflow-hidden rogne le bouton principal), groupe principal gardé à droite. */
+          <div className={`flex items-center justify-between max-sm:flex-wrap max-sm:gap-y-2 px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0 ${MODAL_FOOTER_PHONE}`}>
             {/* Actions danger (mode edit seulement, hors re-planification) */}
             <div className="flex items-center gap-2">
               {editIdle && !isCancelled && (
@@ -1372,7 +1374,7 @@ export function EventModal({
             </div>
 
             {/* Actions principales */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 max-sm:ml-auto">
               {(rescheduleMode || continuationMode) ? (
                 <button
                   onClick={() => {
