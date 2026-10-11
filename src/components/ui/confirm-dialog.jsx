@@ -62,6 +62,11 @@ export function ConfirmDialog({
             'max-sm:left-0 max-sm:top-auto max-sm:bottom-0 max-sm:translate-x-0 max-sm:translate-y-0',
             'max-sm:max-w-none max-sm:max-h-[90dvh] max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-0',
             'max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
+            // …et la feuille glisse depuis le bas, pas depuis le haut-gauche du bureau.
+            // (`bottom-8` écrase le `top-[48%]` du bureau : même variable, émise après ; ne pas
+            // ajouter `slide-*-top-0`, Tailwind l'émettrait APRÈS `bottom-8` et annulerait le glissement.)
+            'max-sm:data-[state=closed]:slide-out-to-left-0 max-sm:data-[state=closed]:slide-out-to-bottom-8',
+            'max-sm:data-[state=open]:slide-in-from-left-0 max-sm:data-[state=open]:slide-in-from-bottom-8',
           )}
         >
           <AlertDialogPrimitive.Title className="text-lg font-semibold text-gray-900">

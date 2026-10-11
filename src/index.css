@@ -263,7 +263,9 @@ html[data-device-class="phone"] .fc .fc-event {
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
   .animate-slide-up,
-  .animate-slide-down {
+  .animate-slide-down,
+  .animate-in,
+  .animate-out {
     animation: none;
   }
 }
