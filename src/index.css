@@ -228,6 +228,37 @@ html[data-device-class="phone"] .fc .fc-event {
   padding-right: 0.25rem;
 }
 
+/* Gabarit « contenu » (couche 3, 2026-10-11) : sous 640 px sur téléphone, les
+   formulaires et tableaux pensés pour le bureau s'adaptent sans retoucher les
+   ~80 grilles et 28 tableaux page par page. Portrait seulement (max-width) :
+   en paysage le téléphone atteint `sm`/`md`, Tailwind reprend la main. Une
+   page qui veut vraiment deux colonnes sur téléphone le dit avec `max-sm:`. */
+@media (max-width: 639px) {
+  /* Grilles 2 à 4 colonnes → une colonne (un champ par ligne). Les barres
+     d'onglets (TabsList en grid-cols-4) restent sur une ligne. */
+  html[data-device-class="phone"] .grid-cols-2:not([role="tablist"]),
+  html[data-device-class="phone"] .grid-cols-3:not([role="tablist"]),
+  html[data-device-class="phone"] .grid-cols-4:not([role="tablist"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Tableaux : défilement horizontal dans leur bloc au lieu de déborder de la page. */
+  html[data-device-class="phone"] table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Largeurs fixes en px (w-[520px], min-w-[600px]) : jamais plus que l'écran.
+     Les cibles tactiles min-w-[44px] ne bougent pas (min-width prime sur max-width). */
+  html[data-device-class="phone"] [class*=" w-["],
+  html[data-device-class="phone"] [class^="w-["],
+  html[data-device-class="phone"] [class*="min-w-["] {
+    max-width: 100%;
+  }
+}
+
 /* Les animations d'apparition sont décoratives : coupées si l'OS le demande. */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
