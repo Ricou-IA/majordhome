@@ -6,6 +6,15 @@
  * Multi-devis (2026-09-16) : la sélection de l'explorateur arrive en `quotes[]`
  * (variantes d'un même client, à rattacher d'un coup). `quote` (singulier) reste
  * accepté pour l'usage unitaire depuis une carte.
+ *
+ * Recherche (2026-10-12, incident ROZIÈRES) : RPC `lead_search_for_attach`
+ * (SECURITY INVOKER, `unaccent`) et non plus un `ILIKE` PostgREST — Pennylane
+ * envoie « FRANCOIS ROZIERES » sans accent, la carte est stockée « FRANÇOIS
+ * ROZIÈRES » : un ILIKE ne la trouvait pas et la modale affirmait à tort qu'aucun
+ * lead n'existait. La RPC tokenise la saisie côté base (chaque mot, sans accent ni
+ * casse), classe par nombre de mots matchés, et place EN TÊTE le lead du client
+ * Majord'home ponté au client Pennylane du devis (`pennylane_sync`) — l'axe
+ * déterministe, le même que le cron `upsert_pennylane_lead`.
  */
 
 import { useState } from 'react';
@@ -16,34 +25,9 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@contexts/AuthContext';
 import { useAttachQuotesAndSend } from '@hooks/usePennylane';
 import { useDebounce } from '@hooks/useDebounce';
-import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { pennylaneService } from '@services/pennylane.service';
 import { toAttachPayload } from '@/lib/quotesExplorer';
 import { formatEuro } from '@/lib/utils';
-
-/**
- * Découpe la saisie en tokens cherchables.
- *
- * POURQUOI tokeniser (ne pas « simplifier » en une clause unique) : les noms
- * sont stockés en DEUX colonnes séparées et majuscules (`first_name`="JEAN",
- * `last_name`="DUPONT"), alors que la recherche est pré-remplie avec le nom
- * COMPLET venu de Pennylane ("Jean Dupont"). Un `ilike.%Jean Dupont%` ne
- * matche donc AUCUNE des deux colonnes → 0 résultat à l'ouverture, ce qui
- * laisse croire à tort qu'aucun lead n'existe.
- *
- * Volontairement large : sur une liste bornée à 20 lignes que l'humain relit
- * avant de cliquer, rappeler trop coûte bien moins cher que ne rien rappeler.
- *
- * L'escape P0.26 s'applique par TOKEN (et non à la chaîne entière) : sinon on
- * réintroduit l'injection de filtre PostgREST que le helper existe pour couvrir.
- * Tokens < 2 caractères ignorés (particules, initiales) — sinon on ramène la
- * moitié de la base.
- */
-function buildSearchTokens(raw) {
-  return String(raw || '')
-    .split(/\s+/)
-    .flatMap((t) => escapePostgrestSearchTerm(t).split(' '))
-    .filter((t) => t.length >= 2);
-}
 
 /** Bouton monté une fois le lead choisi → leadId stable pour le hook. */
 function AttachButton({ orgId, leadId, quotes, onDone }) {
@@ -81,30 +65,42 @@ export function AttachQuoteToLeadModal({ quote = null, quotes = null, onClose, o
   const first = list[0] || {};
   const n = list.length;
   const totalHt = list.reduce((s, q) => s + (Number(q.amount_ht) || 0), 0);
+  const customerId = first.customer_id || null;
 
   const [query, setQuery] = useState(first.customer_name || '');
   const [selected, setSelected] = useState(null);
   const debounced = useDebounce(query, 300);
-  const tokens = buildSearchTokens(debounced);
+  const term = debounced.trim();
+  const hasTerm = term.length >= 2;
+
+  // Client Majord'home ponté au client Pennylane du devis (null si jamais ponté).
+  // `undefined` = résolution en cours : on attend avant de chercher, sinon la
+  // première liste s'affiche sans le lead du client et se réordonne sous la souris.
+  const { data: bridgedClientId, isFetched: bridgeResolved } = useQuery({
+    queryKey: ['devis-attach-bridge-client', orgId, customerId],
+    queryFn: async () => {
+      const { data, error } = await pennylaneService.getClientIdForCustomer(orgId, customerId);
+      if (error) throw error;
+      return data || null;
+    },
+    enabled: !!orgId && !!customerId,
+  });
+  const clientId = customerId ? (bridgedClientId ?? null) : null;
+  const canSearch = !!orgId && (!customerId || bridgeResolved) && (hasTerm || !!clientId);
 
   const { data: leads = [], isFetching } = useQuery({
-    queryKey: ['devis-attach-lead-search', orgId, debounced],
+    queryKey: ['devis-attach-lead-search', orgId, term, clientId],
     queryFn: async () => {
-      // Chaque token est testé sur les deux colonnes de nom.
-      const orClause = tokens
-        .flatMap((t) => [`first_name.ilike.%${t}%`, `last_name.ilike.%${t}%`])
-        .join(',');
-      const { data, error } = await supabase
-        .from('majordhome_leads')
-        .select('id, first_name, last_name, city, status_label, order_amount_ht')
-        .eq('org_id', orgId)
-        .eq('is_deleted', false)
-        .or(orClause)
-        .limit(20);
+      const { data, error } = await supabase.rpc('lead_search_for_attach', {
+        p_org_id: orgId,
+        p_term: hasTerm ? term : null,
+        p_client_id: clientId,
+        p_limit: 20,
+      });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!orgId && debounced.trim().length >= 2 && tokens.length > 0,
+    enabled: canSearch,
   });
 
   if (n === 0) return null;
@@ -148,9 +144,9 @@ export function AttachQuoteToLeadModal({ quote = null, quotes = null, onClose, o
 
         <div className="flex-1 overflow-y-auto p-2">
           {isFetching && <p className="text-sm text-gray-400 p-3">Recherche...</p>}
-          {/* Gaté sur `tokens` : ne jamais annoncer « aucun lead » quand aucune
-              requête n'a été lancée (même défaut que celui qu'on corrige ici). */}
-          {!isFetching && tokens.length > 0 && leads.length === 0 && (
+          {/* Gaté sur `canSearch` : ne jamais annoncer « aucun lead » quand aucune
+              requête n'a été lancée. */}
+          {!isFetching && canSearch && leads.length === 0 && (
             <p className="text-sm text-gray-400 p-3">
               Aucun lead trouvé. Utilise « Créer le lead » depuis la carte.
             </p>
@@ -167,7 +163,17 @@ export function AttachQuoteToLeadModal({ quote = null, quotes = null, onClose, o
                   isSel ? 'bg-primary-50 border border-primary-200' : 'hover:bg-secondary-50 border border-transparent'
                 }`}
               >
-                <p className="text-sm font-medium text-secondary-900">{name || 'Sans nom'}</p>
+                <p className="text-sm font-medium text-secondary-900 flex items-center gap-2">
+                  <span>{name || 'Sans nom'}</span>
+                  {lead.client_match && (
+                    <span
+                      className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[11px] font-medium"
+                      title="Lead du client Majord'home déjà ponté à ce client Pennylane"
+                    >
+                      Client Pennylane
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-secondary-500">
                   {[lead.city, lead.status_label].filter(Boolean).join(' · ')}
                 </p>
