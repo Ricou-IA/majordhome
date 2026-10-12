@@ -51,6 +51,17 @@ test('normalizeNameKey — exige nom ET prénom', () => {
   assert.equal(normalizeNameKey(null, null), null);
 });
 
+test('normalizeNameKey — insensible aux accents, comme unaccent côté RPC (incident ROZIÈRES 2026-10-12)', () => {
+  // Carte stockée AVEC accents, saisie clavier / Pennylane SANS : même clé.
+  assert.deepEqual(normalizeNameKey('FRANÇOIS', 'ROZIÈRES'), { first: 'FRANCOIS', last: 'ROZIERES' });
+  assert.deepEqual(normalizeNameKey('Francois', 'Rozieres'), normalizeNameKey('François', 'Rozières'));
+  // Ligatures : Postgres unaccent ramène Œ → OE, Æ → AE ; la confirmation JS doit suivre.
+  assert.deepEqual(normalizeNameKey('Jean', 'Lœuillet'), { first: 'JEAN', last: 'LOEUILLET' });
+  assert.deepEqual(normalizeNameKey('Ægir', 'Dupont'), { first: 'AEGIR', last: 'DUPONT' });
+  // Espaces internes multiples réduits (saisie « JEAN  PIERRE »).
+  assert.deepEqual(normalizeNameKey(' Jean  Pierre ', 'Durand'), { first: 'JEAN PIERRE', last: 'DURAND' });
+});
+
 // ============================================================================
 // buildDuplicateProbe
 // ============================================================================

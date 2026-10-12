@@ -48,6 +48,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'contract_pricing_items', columns: ['id', 'contract_id', 'equipment_type_id', 'zone_id', 'equipment_id', 'quantity', 'base_price', 'unit_price', 'line_total', 'created_at'], data: false },
   { schema: 'majordhome', table: 'interventions', columns: null, data: false },
   { schema: 'majordhome', table: 'certificats', columns: null }, // 20261010_1 : anomalies agrégées par majordhome_entretien_sav, FK interventions.source_certificat_id ; 20261012_1 : toutes les colonnes (vue majordhome_certificats regénérée)
+  { schema: 'majordhome', table: 'sources', columns: null }, // 20261012_4 : lead_search (source_name) ; petite table, données incluses
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine

@@ -871,6 +871,11 @@ export const leadsService = {
 
   // ============================================================================
   // Recherche legere de leads (pour EventModal / recherche unifiee)
+  // RPC `lead_search` (20261012_4) : insensible aux accents (unaccent), prénom /
+  // nom / email / téléphone (avec ou sans espaces) / ville, tous les mots saisis
+  // requis, filtre statuts optionnel. Un ILIKE PostgREST ne trouvait pas la carte
+  // « ROZIÈRES » depuis « rozieres » (incident 2026-10-12). SECURITY INVOKER :
+  // la RLS de leads s'applique, filtre org_id côté RPC.
   // ============================================================================
   async searchLeads(orgId, query, limit = 10, statusIds = null) {
     if (!orgId || !query || query.length < 2) {
@@ -878,21 +883,14 @@ export const leadsService = {
     }
 
     return withErrorHandling(async () => {
-      // P0.26 : escape pour eviter injection PostgREST.
-      const safe = escapePostgrestSearchTerm(query);
-      if (!safe) return [];
-      const term = `%${safe}%`;
-      let q = supabase
-        .from('majordhome_leads')
-        .select('id, first_name, last_name, email, phone, city, postal_code, address, client_id, status_label, source_name, status_color')
-        .eq('org_id', orgId)
-        .eq('is_deleted', false)
-        .or(`first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},phone.ilike.${term},city.ilike.${term}`);
-      // Filtre statut optionnel (RDV Bouclage R2 : cartes bouclables uniquement).
-      if (statusIds?.length) q = q.in('status_id', statusIds);
-      const { data, error } = await q
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const { data, error } = await supabase.rpc('lead_search', {
+        p_org_id: orgId,
+        p_term: query,
+        // Filtre statut optionnel (RDV Bouclage R2 : cartes bouclables uniquement).
+        // NULL = pas de filtre ; un tableau vide ne ramènerait rien.
+        p_status_ids: statusIds?.length ? statusIds : null,
+        p_limit: limit,
+      });
 
       if (error) throw error;
 
@@ -936,9 +934,10 @@ export const leadsService = {
 
   // ==========================================================================
   // Filet anti-doublon à la création (kanban « Nouveau lead » + walk-in Planning)
-  // Requête large sur 3 axes (téléphone avec/sans espaces, email, nom+prénom),
+  // Requête large sur 4 axes — client, téléphone avec/sans espaces, email en
+  // PostgREST ; nom+prénom via la RPC `lead_search` (insensible aux accents) —
   // puis CONFIRMATION par le module pur leadDuplicateMatch (élimine les faux
-  // positifs du ILIKE, annote matchReasons pour le dialogue).
+  // positifs de la requête large, annote matchReasons pour le dialogue).
   // ==========================================================================
   async findPotentialDuplicates({ orgId, phone, email, firstName, lastName, clientId }) {
     if (!orgId) return { data: [], error: null };
@@ -965,25 +964,40 @@ export const leadsService = {
         const term = escapePostgrestSearchTerm(probe.emailKey);
         if (term) orClauses.push(`email.ilike.${term}`);
       }
-      if (probe.nameKey) {
-        const first = escapePostgrestSearchTerm(probe.nameKey.first);
-        const last = escapePostgrestSearchTerm(probe.nameKey.last);
-        if (first && last) orClauses.push(`and(last_name.ilike.${last},first_name.ilike.${first})`);
-      }
-      if (!orClauses.length) return [];
+      // Axe nom : RPC `lead_search` (20261012_4), insensible aux accents — un ILIKE
+      // PostgREST laissait passer « Rozieres » saisi sans accent face à la carte
+      // « ROZIÈRES » (incident 2026-10-12). Tous les mots (prénom + nom) sont requis
+      // côté RPC ; matchLeadDuplicates confirme ensuite l'égalité exacte sans accent.
+      const nameSearch = probe.nameKey
+        ? supabase.rpc('lead_search', {
+          p_org_id: orgId,
+          p_term: `${probe.nameKey.first} ${probe.nameKey.last}`,
+          p_status_ids: null,
+          p_limit: 8,
+        })
+        : Promise.resolve({ data: [], error: null });
+      const contactSearch = orClauses.length
+        ? supabase
+          .from('majordhome_leads')
+          .select('id, first_name, last_name, email, phone, city, client_id, status_label, status_color, source_name, created_at')
+          .eq('org_id', orgId)
+          .eq('is_deleted', false)
+          .or(orClauses.join(','))
+          .order('created_at', { ascending: false })
+          .limit(8)
+        : Promise.resolve({ data: [], error: null });
 
-      const { data, error } = await supabase
-        .from('majordhome_leads')
-        .select('id, first_name, last_name, email, phone, city, client_id, status_label, status_color, source_name, created_at')
-        .eq('org_id', orgId)
-        .eq('is_deleted', false)
-        .or(orClauses.join(','))
-        .order('created_at', { ascending: false })
-        .limit(8);
+      const [byName, byContact] = await Promise.all([nameSearch, contactSearch]);
+      if (byName.error) throw byName.error;
+      if (byContact.error) throw byContact.error;
 
-      if (error) throw error;
+      // Fusion dédoublonnée (un lead peut matcher sur les deux axes), plus récent d'abord.
+      const seen = new Set();
+      const candidates = [...(byContact.data || []), ...(byName.data || [])]
+        .filter(l => !seen.has(l.id) && seen.add(l.id))
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-      return matchLeadDuplicates(data || [], probe).map(l => ({
+      return matchLeadDuplicates(candidates, probe).map(l => ({
         ...l,
         display_name: `${l.last_name || ''} ${l.first_name || ''}`.trim(),
       }));

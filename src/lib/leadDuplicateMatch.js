@@ -38,16 +38,36 @@ export function normalizeEmailKey(email) {
 }
 
 /**
- * Normalise nom+prénom en clé comparable. Les DEUX sont requis : un nom de
- * famille seul matcherait tous les homonymes (père/fils, fratries) — le filet
- * doit rester un filet, pas un chalut.
+ * Efface accents et ligatures d'un nom, comme `unaccent` côté Postgres (la
+ * requête large de l'axe nom passe par la RPC `lead_search`, qui compare sans
+ * accent : la confirmation JS doit suivre, sinon « ROZIERES » saisi sans accent
+ * trouverait la carte « ROZIÈRES » en base pour la rejeter ici — incident
+ * 2026-10-12). NFD sépare les diacritiques combinants ; Œ/Æ ne se décomposent
+ * pas et sont traités à part.
+ * @param {string} s
+ * @returns {string}
+ */
+function stripAccents(s) {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/Œ/g, 'OE').replace(/œ/g, 'oe')
+    .replace(/Æ/g, 'AE').replace(/æ/g, 'ae');
+}
+
+/**
+ * Normalise nom+prénom en clé comparable (majuscules, sans accent, espaces
+ * internes réduits). Les DEUX sont requis : un nom de famille seul matcherait
+ * tous les homonymes (père/fils, fratries) — le filet doit rester un filet,
+ * pas un chalut.
  * @param {string|null} firstName
  * @param {string|null} lastName
  * @returns {{first: string, last: string}|null}
  */
 export function normalizeNameKey(firstName, lastName) {
-  const first = String(firstName || '').trim().toUpperCase();
-  const last = String(lastName || '').trim().toUpperCase();
+  const norm = (v) => stripAccents(String(v || '')).trim().replace(/\s+/g, ' ').toUpperCase();
+  const first = norm(firstName);
+  const last = norm(lastName);
   return first && last ? { first, last } : null;
 }
 
