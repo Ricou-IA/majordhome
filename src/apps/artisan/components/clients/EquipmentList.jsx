@@ -15,6 +15,7 @@
  */
 
 import { useState } from 'react';
+import { PlaqueThumb } from '@apps/artisan/components/shared/PlaqueThumb';
 import {
   Wrench,
   Flame,
@@ -265,6 +266,8 @@ const EquipmentCard = ({
 
           {/* Actions + Badge */}
           <div className="flex items-center gap-2">
+            {/* Plaque signalétique : recopiée du certificat d'entretien ou prise depuis la fiche */}
+            <PlaqueThumb path={equipment.nameplate_photo_path} label={`Plaque signalétique — ${libelleEquipement(equipment, referentiel)}`} />
             {hasContract && (
               <ContractStatusBadge status={isLinkedToContract ? 'active' : 'none'} />
             )}

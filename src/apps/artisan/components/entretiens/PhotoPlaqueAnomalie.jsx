@@ -10,31 +10,17 @@
  * ============================================================================
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Camera, ExternalLink, Loader2, X } from 'lucide-react';
-import { certificatsService } from '@services/certificats.service';
+import { useCertificatsSignedUrl } from '@hooks/useCertificatsSignedUrl';
 
 /**
  * @param {{ anomalie: { photoPlaquePath: string|null, photoPlaqueAbsence: string, equipement?: string } }} props
  */
 export function PhotoPlaqueAnomalie({ anomalie }) {
   const path = anomalie?.photoPlaquePath || null;
-  const [url, setUrl] = useState(null);
-  const [state, setState] = useState(path ? 'loading' : 'none');
+  const { url, state } = useCertificatsSignedUrl(path);
   const [pleinEcran, setPleinEcran] = useState(false);
-
-  useEffect(() => {
-    let actif = true;
-    if (!path) { setUrl(null); setState('none'); return undefined; }
-    setState('loading');
-    certificatsService.getSignedUrl(path).then(({ data, error }) => {
-      if (!actif) return;
-      if (error || !data) { setState('error'); return; }
-      setUrl(data);
-      setState('ok');
-    });
-    return () => { actif = false; };
-  }, [path]);
 
   if (!path) {
     return (

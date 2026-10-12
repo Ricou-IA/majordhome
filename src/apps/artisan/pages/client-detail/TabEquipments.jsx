@@ -6,6 +6,8 @@ import { useClientEquipments, usePricingEquipmentTypes, clientKeys } from '@hook
 import { useClientContract, useContractEquipments, contractKeys } from '@hooks/useContracts';
 import { useProductDocumentsByProductIds } from '@hooks/useSuppliers';
 import { contractsService } from '@services/contracts.service';
+import { equipmentsService } from '@services/equipments.service';
+import { reduireImage } from '@/lib/imageResize';
 import { EquipmentList } from '@/apps/artisan/components/clients/EquipmentList';
 import { EquipmentFormModal } from '@/apps/artisan/components/clients/EquipmentFormModal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -15,6 +17,7 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
   const orgId = organization?.id;
   const [showModal, setShowModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
+  const [isUploadingNameplate, setIsUploadingNameplate] = useState(false);
   const [prefillEquipment, setPrefillEquipment] = useState(null);
   const [deletingEquipment, setDeletingEquipment] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -134,6 +137,46 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
     } catch (error) {
       console.error('[TabEquipments] Erreur ajout équipement:', error);
       toast.error('Erreur lors de l\'ajout de l\'équipement');
+    }
+  };
+
+  // Photo de la plaque signalétique depuis la fiche équipement (réduite à 1600 px, bucket certificats).
+  // Le service renvoie { error } sans throw : on le lit, sinon un refus Storage passerait pour un succès.
+  const handleNameplateUpload = async (file) => {
+    if (!editingEquipment?.id || !orgId) return;
+    setIsUploadingNameplate(true);
+    try {
+      const blob = await reduireImage(file);
+      const { data, error } = await equipmentsService.uploadNameplatePhoto(orgId, clientId, editingEquipment.id, blob);
+      if (error) throw error;
+      await updateEquipment(editingEquipment.id, { nameplatePhotoPath: data.storagePath });
+      setEditingEquipment((prev) => (prev ? { ...prev, nameplate_photo_path: data.storagePath } : prev));
+      invalidateAll();
+      toast.success('Photo de la plaque enregistrée');
+    } catch (error) {
+      console.error('[TabEquipments] photo plaque:', error);
+      toast.error(`Photo non enregistrée : ${error?.message || 'erreur inconnue'}`);
+      throw error;
+    } finally {
+      setIsUploadingNameplate(false);
+    }
+  };
+
+  const handleNameplateDelete = async (storagePath) => {
+    if (!editingEquipment?.id) return;
+    setIsUploadingNameplate(true);
+    try {
+      const { error } = await equipmentsService.deleteNameplatePhoto(storagePath);
+      if (error) throw error;
+      await updateEquipment(editingEquipment.id, { nameplatePhotoPath: null });
+      setEditingEquipment((prev) => (prev ? { ...prev, nameplate_photo_path: null } : prev));
+      invalidateAll();
+    } catch (error) {
+      console.error('[TabEquipments] suppression photo plaque:', error);
+      toast.error(`Photo non supprimée : ${error?.message || 'erreur inconnue'}`);
+      throw error;
+    } finally {
+      setIsUploadingNameplate(false);
     }
   };
 
@@ -257,6 +300,9 @@ export const TabEquipments = ({ clientId, prefillDraft = null, onPrefillConsumed
         isSubmitting={editingEquipment ? isUpdating : isAdding}
         orgId={orgId}
         equipment={editingEquipment || prefillEquipment}
+        onNameplateUpload={editingEquipment ? handleNameplateUpload : null}
+        onNameplateDelete={editingEquipment ? handleNameplateDelete : null}
+        isUploadingNameplate={isUploadingNameplate}
       />
       <ConfirmDialog
         open={!!deletingEquipment}

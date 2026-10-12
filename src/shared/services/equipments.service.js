@@ -154,6 +154,7 @@ export const equipmentsService = {
       if (updates.supplierProductId !== undefined) updateData.supplier_product_id = updates.supplierProductId || null;
       if (updates.unitCount !== undefined) updateData.unit_count = updates.unitCount ? parseInt(updates.unitCount) : 1;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
+      if (updates.nameplatePhotoPath !== undefined) updateData.nameplate_photo_path = updates.nameplatePhotoPath || null;
       if (updates.status !== undefined) updateData.status = updates.status;
 
       const { data, error } = await supabase
@@ -168,6 +169,47 @@ export const equipmentsService = {
     }, 'equipments.updateEquipment');
   },
 
+  /**
+   * Photo de la plaque signalétique prise depuis la fiche équipement — même bucket que
+   * les certificats (préfixe org_id exigé par la policy) : {org_id}/{client_id}/equipements/{equipment_id}-plaque.jpg.
+   * Upsert : reprendre la photo remplace. La colonne est posée par updateEquipment({ nameplatePhotoPath }).
+   * @returns {{ data: { storagePath }|null, error }}
+   */
+  async uploadNameplatePhoto(orgId, clientId, equipmentId, blob) {
+    if (!orgId || !clientId || !equipmentId || !blob) {
+      return { data: null, error: { message: 'orgId, clientId, equipmentId et blob requis' } };
+    }
+    try {
+      const storagePath = `${orgId}/${clientId}/equipements/${equipmentId}-plaque.jpg`;
+      const { error } = await supabase.storage
+        .from('certificats')
+        .upload(storagePath, blob, { cacheControl: '3600', upsert: true, contentType: 'image/jpeg' });
+      if (error) {
+        console.error('[equipments] uploadNameplatePhoto error:', error);
+        return { data: null, error };
+      }
+      return { data: { storagePath }, error: null };
+    } catch (err) {
+      console.error('[equipments] uploadNameplatePhoto error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /** Supprime le fichier d'une photo de plaque (la colonne est effacée par updateEquipment). */
+  async deleteNameplatePhoto(storagePath) {
+    if (!storagePath) return { data: null, error: null };
+    try {
+      const { error } = await supabase.storage.from('certificats').remove([storagePath]);
+      if (error) {
+        console.error('[equipments] deleteNameplatePhoto error:', error);
+        return { data: null, error };
+      }
+      return { data: true, error: null };
+    } catch (err) {
+      console.error('[equipments] deleteNameplatePhoto error:', err);
+      return { data: null, error: err };
+    }
+  },
   /**
    * Supprime un équipement
    */

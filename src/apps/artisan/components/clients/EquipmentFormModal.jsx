@@ -35,7 +35,9 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Wrench, Pencil, Loader2 } from 'lucide-react';
+import { X, Wrench, Pencil, Loader2, Camera } from 'lucide-react';
+import { PhotoCapture } from '@apps/artisan/components/interventions/PhotoCapture';
+import { useCertificatsSignedUrl } from '@hooks/useCertificatsSignedUrl';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
@@ -86,8 +88,13 @@ export function EquipmentFormModal({
   isSubmitting = false,
   equipment = null, // null = ajout, objet = édition
   orgId = null,
+  // Photo de la plaque signalétique (édition seulement : le chemin porte l'id de l'équipement)
+  onNameplateUpload = null,
+  onNameplateDelete = null,
+  isUploadingNameplate = false,
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
+  const { url: nameplateUrl } = useCertificatsSignedUrl(equipment?.nameplate_photo_path);
   const { suppliers, isLoading: suppliersLoading } = useSuppliers(orgId);
   const { equipmentTypes, index: referentiel, isLoading: typesLoading } = useEquipmentReferential();
 
@@ -341,6 +348,28 @@ export function EquipmentFormModal({
               placeholder="Ex: SN-2024-0001"
               className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
             />
+          </div>
+
+          {/* Plaque signalétique : photo prise ici, ou recopiée du dernier certificat qui l'a photographiée */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Camera className="w-4 h-4 text-gray-400" />
+              Plaque signalétique
+            </label>
+            {isEditMode && onNameplateUpload ? (
+              <PhotoCapture
+                label=""
+                currentUrl={nameplateUrl}
+                currentPath={equipment?.nameplate_photo_path || null}
+                onUpload={onNameplateUpload}
+                onDelete={onNameplateDelete}
+                isUploading={isUploadingNameplate}
+              />
+            ) : (
+              <p className="text-xs text-gray-400">
+                {isEditMode ? 'Photo non modifiable ici.' : 'Disponible une fois l’équipement ajouté (ou prise automatiquement lors d’un entretien avec anomalie).'}
+              </p>
+            )}
           </div>
 
           {/* Année */}
