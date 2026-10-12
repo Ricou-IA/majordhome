@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { motifAbsencePhoto } from '@/lib/certificatAnomalies';
 import { logger } from '@/lib/logger';
 
 // ============================================================================
@@ -83,6 +84,10 @@ export const certificatsService = {
         bilan_conformite: formData.bilan_conformite || 'conforme',
         anomalies_detail: formData.anomalies_detail || null,
         action_corrective: formData.action_corrective || null,
+        // Photo de la plaque signalétique (2026-10-12) : chemin posé par uploadPhotoPlaque ;
+        // shunt = motif non NULL (coché sans texte ⇒ « Non précisé »).
+        photo_plaque_path: formData.photo_plaque_path || null,
+        photo_plaque_absence: formData.photo_plaque_absence == null ? null : motifAbsencePhoto(formData.photo_plaque_absence),
         recommandations: formData.recommandations || null,
         prochaine_intervention: formData.prochaine_intervention
           ? (formData.prochaine_intervention.length === 7 ? `${formData.prochaine_intervention}-01` : formData.prochaine_intervention)
@@ -215,7 +220,76 @@ export const certificatsService = {
   },
 
   /**
-   * Génère une URL signée pour le PDF (validité 1 an).
+   * Photo de la plaque signalétique — même bucket que le PDF, à côté de lui :
+   * {org_id}/{client_id}/{year}/{certificat_id}-plaque.jpg (upsert : reprendre la photo remplace).
+   * @returns {{ data: { storagePath }|null, error }}
+   */
+  async uploadPhotoPlaque(orgId, clientId, certificatId, blob) {
+    if (!orgId || !clientId || !certificatId || !blob) {
+      return { data: null, error: { message: 'orgId, clientId, certificatId et blob requis' } };
+    }
+    try {
+      const year = new Date().getFullYear();
+      const storagePath = `${orgId}/${clientId}/${year}/${certificatId}-plaque.jpg`;
+      const { error } = await supabase.storage
+        .from('certificats')
+        .upload(storagePath, blob, { cacheControl: '3600', upsert: true, contentType: 'image/jpeg' });
+      if (error) {
+        console.error('[certificats] uploadPhotoPlaque error:', error);
+        return { data: null, error };
+      }
+      return { data: { storagePath }, error: null };
+    } catch (err) {
+      console.error('[certificats] uploadPhotoPlaque error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Enregistre (ou efface) la photo de plaque sur le certificat. Poser une photo lève le shunt.
+   * @param {string} certificatId
+   * @param {{ photoPlaquePath: string|null }} params
+   */
+  async setPhotoPlaque(certificatId, { photoPlaquePath }) {
+    if (!certificatId) return { data: null, error: { message: 'certificatId requis' } };
+    try {
+      const patch = { photo_plaque_path: photoPlaquePath || null };
+      if (photoPlaquePath) patch.photo_plaque_absence = null;
+      const { data, error } = await supabase
+        .from('majordhome_certificats')
+        .update(patch)
+        .eq('id', certificatId)
+        .select('id, intervention_id, photo_plaque_path, photo_plaque_absence')
+        .single();
+      if (error) {
+        console.error('[certificats] setPhotoPlaque error:', error);
+        return { data: null, error };
+      }
+      return { data, error: null };
+    } catch (err) {
+      console.error('[certificats] setPhotoPlaque error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /** Supprime le fichier de la photo de plaque (le certificat est mis à jour par setPhotoPlaque). */
+  async deletePhotoPlaque(storagePath) {
+    if (!storagePath) return { data: null, error: null };
+    try {
+      const { error } = await supabase.storage.from('certificats').remove([storagePath]);
+      if (error) {
+        console.error('[certificats] deletePhotoPlaque error:', error);
+        return { data: null, error };
+      }
+      return { data: true, error: null };
+    } catch (err) {
+      console.error('[certificats] deletePhotoPlaque error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Génère une URL signée pour le PDF ou la photo de plaque (validité 1 an).
    */
   async getSignedUrl(storagePath) {
     if (!storagePath) return { data: null, error: null };

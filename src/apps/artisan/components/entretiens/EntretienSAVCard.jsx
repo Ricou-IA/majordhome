@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail, Link2, AlertTriangle } from 'lucide-react';
+import { MapPin, Wrench, ClipboardCheck, Euro, MessageSquare, Loader2, Check, Archive, Phone, PhoneForwarded, Receipt, RefreshCw, Undo2, Mail, Link2, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatEuro } from '@/lib/utils';
@@ -284,10 +284,12 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
             {anomalies.length > 0 && (
               <span
                 className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700"
-                title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}${a.savId ? ' · SAV créé' : ''}`).join('\n')}
+                title={anomalies.map((a) => `${a.equipement ? `${a.equipement} : ` : ''}${a.detail || a.bilanLabel}${a.actionLabel ? ` · ${a.actionLabel}` : ''}${a.savId ? ' · SAV créé' : ''}${a.photoPlaquePath ? ' · photo de plaque' : (a.photoPlaqueAbsence ? ` · pas de photo de plaque (${a.photoPlaqueAbsence})` : '')}`).join('\n')}
               >
                 <AlertTriangle className="w-3 h-3" />
                 {anomalies.length > 1 ? anomalies.length : null}
+                {/* La photo de la plaque suit la carte : un appareil photo dès qu'un certificat en porte une */}
+                {anomalies.some((a) => a.photoPlaquePath) && <Camera className="w-3 h-3" />}
               </span>
             )}
             {type === 'sav' && item.sav_origin === 'entretien' && (

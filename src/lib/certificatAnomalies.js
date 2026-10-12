@@ -83,6 +83,9 @@ export function anomaliesDeCarte(item) {
       actionLabel: libelleAction(a.action),
       date: a.date || null,
       savId: a.sav_id || null,
+      // Photo de la plaque signalétique (2026-10-12) : suit la carte SAV par le lien certificat.
+      photoPlaquePath: a.photo_plaque_path || null,
+      photoPlaqueAbsence: texte(a.photo_plaque_absence),
     }))
     .sort((x, y) => String(x.date || '').localeCompare(String(y.date || '')));
 }
@@ -95,6 +98,39 @@ export function anomaliesDeCarte(item) {
 export function doitCreerSav(cert) {
   if (!cert) return false;
   return cert.action_corrective === 'devis' && BILANS_NON_CONFORMES.has(cert.bilan_conformite);
+}
+
+/** La photo de la plaque signalétique est proposée dès que le bilan n'est pas conforme. */
+export function photoPlaqueProposee(cert) {
+  return !!cert && BILANS_NON_CONFORMES.has(cert.bilan_conformite);
+}
+
+/**
+ * La photo est exigée (shunt possible) quand une demande SAV va s'ouvrir : c'est elle que le
+ * chiffreur du devis ouvrira pour identifier marque / modèle / numéro de série.
+ */
+export function photoPlaqueRequise(cert) {
+  return doitCreerSav(cert);
+}
+
+export const MOTIF_ABSENCE_PHOTO_DEFAUT = 'Non précisé';
+
+/** Motif d'absence saisi par le technicien, nettoyé ; vide ou non textuel ⇒ « Non précisé ». */
+export function motifAbsencePhoto(saisie) {
+  return texte(saisie) || MOTIF_ABSENCE_PHOTO_DEFAUT;
+}
+
+/**
+ * Raison qui empêche de quitter l'étape Bilan, ou null. Une photo OU un motif d'absence
+ * (shunt coché, motif éventuellement vide) lève le blocage.
+ * @param {{ bilan_conformite?: string, action_corrective?: string, photo_plaque_path?: string|null, photo_plaque_absence?: string|null }|null} cert
+ * @returns {string|null}
+ */
+export function blocagePhotoPlaque(cert) {
+  if (!photoPlaqueRequise(cert)) return null;
+  if (cert.photo_plaque_path) return null;
+  if (cert.photo_plaque_absence !== null && cert.photo_plaque_absence !== undefined) return null;
+  return 'Photo de la plaque signalétique requise pour le devis — ou cochez « Impossible de photographier la plaque ».';
 }
 
 /**

@@ -107,8 +107,30 @@ export function useCertificatMutations() {
     },
   });
 
+  // Photo de la plaque signalétique (2026-10-12) — résout avec { storagePath } / le certificat patché.
+  const uploadPhotoPlaqueMutation = useMutation({
+    mutationFn: ({ orgId, clientId, certificatId, blob }) =>
+      unwrapResult(certificatsService.uploadPhotoPlaque(orgId, clientId, certificatId, blob)),
+  });
+  const setPhotoPlaqueMutation = useMutation({
+    mutationFn: ({ certificatId, photoPlaquePath }) =>
+      unwrapResult(certificatsService.setPhotoPlaque(certificatId, { photoPlaquePath })),
+    onSuccess: (certificat) => {
+      if (certificat?.intervention_id) {
+        invalidate(certificat.intervention_id);
+      }
+    },
+  });
+  const deletePhotoPlaqueMutation = useMutation({
+    mutationFn: ({ storagePath }) => unwrapResult(certificatsService.deletePhotoPlaque(storagePath)),
+  });
+
   return {
     saveDraft: draftMutation.mutateAsync,
+    uploadPhotoPlaque: uploadPhotoPlaqueMutation.mutateAsync,
+    setPhotoPlaque: setPhotoPlaqueMutation.mutateAsync,
+    deletePhotoPlaque: deletePhotoPlaqueMutation.mutateAsync,
+    isUploadingPhotoPlaque: uploadPhotoPlaqueMutation.isPending || setPhotoPlaqueMutation.isPending || deletePhotoPlaqueMutation.isPending,
 
     signCertificat: useCallback(
       (certificatId, signatureBase64, signataireNom) =>

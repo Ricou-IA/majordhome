@@ -1,14 +1,16 @@
 /**
  * StepBilan.jsx - Étape 8 du wizard certificat
  * ============================================================================
- * Bilan de conformité + taux de TVA applicable.
+ * Bilan de conformité + photo de la plaque signalétique quand l'installation
+ * n'est pas conforme (exigée, shunt possible, quand un devis — donc un SAV — suit).
  * ============================================================================
  */
 
-import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
-import { FormField, TextArea, SelectInput } from '@apps/artisan/components/FormFields';
+import { CheckCircle, AlertTriangle, XCircle, Camera } from 'lucide-react';
+import { FormField, TextArea, TextInput, SelectInput } from '@apps/artisan/components/FormFields';
 import { SectionTitle } from '@apps/artisan/components/FormFields';
-import { ACTIONS_CORRECTIVES } from '@/lib/certificatAnomalies';
+import { PhotoCapture } from '@apps/artisan/components/interventions/PhotoCapture';
+import { ACTIONS_CORRECTIVES, photoPlaqueProposee, photoPlaqueRequise } from '@/lib/certificatAnomalies';
 
 const BILAN_OPTIONS = [
   {
@@ -40,8 +42,20 @@ const BILAN_OPTIONS = [
 // Source unique des actions correctives (carte, fiche, SAV, facture) : src/lib/certificatAnomalies.js
 const ACTION_CORRECTIVE_OPTIONS = ACTIONS_CORRECTIVES;
 
-export function StepBilan({ formData, onChange }) {
+export function StepBilan({
+  formData,
+  onChange,
+  photoPlaqueUrl = null,
+  onPhotoPlaqueUpload,
+  onPhotoPlaqueDelete,
+  isUploadingPhotoPlaque = false,
+}) {
   const showAnomalie = formData.bilan_conformite === 'anomalie' || formData.bilan_conformite === 'arret_urgence';
+  const photoProposee = photoPlaqueProposee(formData);
+  const photoRequise = photoPlaqueRequise(formData);
+  const aPhoto = !!formData.photo_plaque_path;
+  // Shunt coché = motif non null (vide tant que le technicien n'a rien écrit ⇒ « Non précisé » à l'enregistrement)
+  const shunt = formData.photo_plaque_absence !== null && formData.photo_plaque_absence !== undefined;
 
   return (
     <div className="space-y-6">
@@ -89,6 +103,51 @@ export function StepBilan({ formData, onChange }) {
               placeholder="Sélectionner..."
             />
           </FormField>
+
+          {/* Photo de la plaque signalétique : suit la carte SAV (marque / modèle / n° de série pour le devis) */}
+          {photoProposee && (
+            <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-3">
+              <div className="flex items-start gap-2">
+                <Camera className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
+                <p className="text-xs text-gray-600">
+                  {photoRequise
+                    ? 'Un devis va suivre : la photo de la plaque est jointe à la demande SAV pour identifier l’appareil.'
+                    : 'Facultative ici ; utile si un devis est établi plus tard.'}
+                </p>
+              </div>
+              <PhotoCapture
+                label={`Photo de la plaque signalétique${photoRequise ? ' *' : ''}`}
+                currentUrl={photoPlaqueUrl}
+                currentPath={formData.photo_plaque_path || null}
+                onUpload={onPhotoPlaqueUpload}
+                onDelete={onPhotoPlaqueDelete}
+                isUploading={isUploadingPhotoPlaque}
+              />
+
+              {photoRequise && !aPhoto && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 min-h-[44px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 rounded border-gray-300"
+                      checked={shunt}
+                      onChange={(e) => onChange('photo_plaque_absence', e.target.checked ? '' : null)}
+                    />
+                    Impossible de photographier la plaque
+                  </label>
+                  {shunt && (
+                    <FormField label="Motif (facultatif)">
+                      <TextInput
+                        value={formData.photo_plaque_absence || ''}
+                        onChange={(val) => onChange('photo_plaque_absence', val)}
+                        placeholder="Plaque illisible, inaccessible…"
+                      />
+                    </FormField>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

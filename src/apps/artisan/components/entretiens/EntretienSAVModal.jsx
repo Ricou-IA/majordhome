@@ -60,6 +60,7 @@ import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { SAVPartsSection } from './SAVPartsSection';
 import { SAVDevisSection } from './SAVDevisSection';
 import { CertificatsSection } from './CertificatsSection';
+import { PhotoPlaqueAnomalie } from './PhotoPlaqueAnomalie';
 
 // ============================================================================
 // CONSTANTES
@@ -756,6 +757,12 @@ export function EntretienSAVModal({ item, onClose, onUpdated }) {
                         {[a.bilanLabel, a.actionLabel].filter(Boolean).join(' · ')}
                         {a.savId ? ' · Demande SAV créée' : ''}
                       </div>
+                      {/* La photo de la plaque suit la carte (lue sur le certificat) */}
+                      {(a.photoPlaquePath || a.action === 'devis') && (
+                        <div className="mt-2">
+                          <PhotoPlaqueAnomalie anomalie={a} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

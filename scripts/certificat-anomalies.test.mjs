@@ -9,6 +9,10 @@ import {
   doitCreerSav,
   descriptionSavDepuisCertificat,
   noteClientDepuisAnomalies,
+  photoPlaqueProposee,
+  photoPlaqueRequise,
+  blocagePhotoPlaque,
+  motifAbsencePhoto,
 } from '../src/lib/certificatAnomalies.js';
 
 const guillou = {
@@ -94,4 +98,44 @@ test('noteClientDepuisAnomalies : vide sans anomalie ; une ligne par anomalie av
   ].join('\n'));
   // Pas d'espace fine insécable ni de glyphe hors Helvetica dans le texte imprimé
   assert.equal(deux.includes(String.fromCharCode(0x202f)) || deux.includes(String.fromCharCode(0xa0)), false);
+});
+
+test('photo de la plaque : proposée dès un bilan non conforme, exigée seulement quand un SAV s’ouvre (devis)', () => {
+  assert.equal(photoPlaqueProposee({ bilan_conformite: 'anomalie' }), true);
+  assert.equal(photoPlaqueProposee({ bilan_conformite: 'arret_urgence' }), true);
+  assert.equal(photoPlaqueProposee({ bilan_conformite: 'conforme' }), false);
+  assert.equal(photoPlaqueProposee(null), false);
+  assert.equal(photoPlaqueRequise({ bilan_conformite: 'anomalie', action_corrective: 'devis' }), true);
+  assert.equal(photoPlaqueRequise({ bilan_conformite: 'anomalie', action_corrective: 'sur_place' }), false);
+  assert.equal(photoPlaqueRequise({ bilan_conformite: 'conforme', action_corrective: 'devis' }), false);
+});
+
+test('blocagePhotoPlaque : bloque sans photo ni motif quand elle est requise ; photo OU shunt débloque', () => {
+  const requis = { bilan_conformite: 'anomalie', action_corrective: 'devis' };
+  assert.equal(typeof blocagePhotoPlaque(requis), 'string');
+  assert.equal(blocagePhotoPlaque({ ...requis, photo_plaque_path: 'org/cli/2026/c1-plaque.jpg' }), null);
+  assert.equal(blocagePhotoPlaque({ ...requis, photo_plaque_absence: 'Plaque illisible' }), null);
+  assert.equal(blocagePhotoPlaque({ ...requis, photo_plaque_absence: '   ' }), null, 'shunt coché sans motif = motif par défaut');
+  assert.equal(blocagePhotoPlaque({ bilan_conformite: 'anomalie', action_corrective: 'sur_place' }), null);
+  assert.equal(blocagePhotoPlaque({ bilan_conformite: 'conforme' }), null);
+  assert.equal(blocagePhotoPlaque(null), null);
+});
+
+test('motifAbsencePhoto : saisie nettoyée, défaut « Non précisé »', () => {
+  assert.equal(motifAbsencePhoto('  Plaque  illisible '), 'Plaque illisible');
+  assert.equal(motifAbsencePhoto(''), 'Non précisé');
+  assert.equal(motifAbsencePhoto(null), 'Non précisé');
+  assert.equal(motifAbsencePhoto(true), 'Non précisé');
+});
+
+test('anomaliesDeCarte : la photo de plaque suit la carte (chemin ou motif d’absence)', () => {
+  const [avec] = anomaliesDeCarte({ anomalies: [{ ...guillou, photo_plaque_path: 'org/cli/2026/c1-plaque.jpg', photo_plaque_absence: null }] });
+  assert.equal(avec.photoPlaquePath, 'org/cli/2026/c1-plaque.jpg');
+  assert.equal(avec.photoPlaqueAbsence, '');
+  const [sans] = anomaliesDeCarte({ anomalies: [{ ...guillou, photo_plaque_absence: 'Plaque inaccessible' }] });
+  assert.equal(sans.photoPlaquePath, null);
+  assert.equal(sans.photoPlaqueAbsence, 'Plaque inaccessible');
+  const [ancien] = anomaliesDeCarte({ anomalies: [guillou] });
+  assert.equal(ancien.photoPlaquePath, null);
+  assert.equal(ancien.photoPlaqueAbsence, '');
 });

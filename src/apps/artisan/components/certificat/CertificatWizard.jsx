@@ -22,7 +22,8 @@ import { useCertificatMutations } from '@hooks/useCertificats';
 import { useTeamMembers } from '@hooks/useAppointments';
 import { entretienSavKeys } from '@hooks/cacheKeys';
 import { savService } from '@services/sav.service';
-import { doitCreerSav, descriptionSavDepuisCertificat } from '@/lib/certificatAnomalies';
+import { doitCreerSav, descriptionSavDepuisCertificat, blocagePhotoPlaque } from '@/lib/certificatAnomalies';
+import { reduireImage } from '@/lib/imageResize';
 import { useAuth } from '@contexts/AuthContext';
 import { clientsService } from '@services/clients.service';
 import { StepIndicator } from './StepIndicator';
@@ -93,7 +94,10 @@ export function CertificatWizard({
   const { profile, effectiveRole, organization } = useAuth();
   const canSelectTechnician = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
   const { members: teamMembers = [] } = useTeamMembers(canSelectTechnician ? organization?.id : null);
-  const { saveDraft, signCertificat, uploadPdf, updatePdfInfo, getSignedUrl, isSaving, isSigning } = useCertificatMutations();
+  const {
+    saveDraft, signCertificat, uploadPdf, updatePdfInfo, getSignedUrl, isSaving, isSigning,
+    uploadPhotoPlaque, setPhotoPlaque, deletePhotoPlaque, isUploadingPhotoPlaque,
+  } = useCertificatMutations();
   const queryClient = useQueryClient();
   const saveTimeoutRef = useRef(null);
   // Référentiel de l'org : la valeur enregistrée (equipement_type) est le CODE de
@@ -159,6 +163,15 @@ export function CertificatWizard({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(existingCertificat?.pdf_url || null);
   const [pdfError, setPdfError] = useState(null);
+  // Photo de la plaque signalétique (étape Bilan) : URL signée pour l'aperçu, le chemin vit dans formData
+  const [photoPlaqueUrl, setPhotoPlaqueUrl] = useState(null);
+  useEffect(() => {
+    const path = existingCertificat?.photo_plaque_path;
+    if (!path) return;
+    let actif = true;
+    getSignedUrl(path).then((res) => { if (actif) setPhotoPlaqueUrl(res?.data || null); });
+    return () => { actif = false; };
+  }, [existingCertificat?.photo_plaque_path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-remplir technicien depuis le planning ──
   useEffect(() => {
@@ -225,6 +238,44 @@ export function CertificatWizard({
     return saved?.id || certificatId;
   }, [formData, intervention, client, equipment, contract, orgId, userId, saveDraft, certificatId, pdfUrl, profil]);
 
+  // ── Photo de la plaque signalétique ──
+  // Envoyée tout de suite (réduite à 1600 px), rattachée au brouillon : s'il n'existe pas encore
+  // en base, on l'enregistre d'abord (même garde que la finalisation). Un refus se dit et se
+  // propage : PhotoCapture retire alors son aperçu local.
+  const handlePhotoPlaqueUpload = async (file) => {
+    const certId = certificatId || await doSave();
+    if (!certId) {
+      toast.error('Brouillon non enregistré : la photo ne peut pas être rattachée au certificat.');
+      throw new Error('certificat_absent');
+    }
+    try {
+      const blob = await reduireImage(file);
+      const { storagePath } = await uploadPhotoPlaque({ orgId, clientId: client.id, certificatId: certId, blob });
+      await setPhotoPlaque({ certificatId: certId, photoPlaquePath: storagePath });
+      setFormData((prev) => ({ ...prev, photo_plaque_path: storagePath, photo_plaque_absence: null }));
+      const urlResult = await getSignedUrl(storagePath);
+      setPhotoPlaqueUrl(urlResult?.data || null);
+    } catch (err) {
+      console.error('[CertificatWizard] photo plaque:', err);
+      toast.error(`Photo non enregistrée : ${err?.message || 'erreur inconnue'}`);
+      throw err;
+    }
+  };
+
+  const handlePhotoPlaqueDelete = async (storagePath) => {
+    if (!certificatId) return;
+    try {
+      await deletePhotoPlaque({ storagePath });
+      await setPhotoPlaque({ certificatId, photoPlaquePath: null });
+      setFormData((prev) => ({ ...prev, photo_plaque_path: null }));
+      setPhotoPlaqueUrl(null);
+    } catch (err) {
+      console.error('[CertificatWizard] suppression photo plaque:', err);
+      toast.error(`Photo non supprimée : ${err?.message || 'erreur inconnue'}`);
+      throw err;
+    }
+  };
+
   // Auto-save quand on change d'étape (debounce 500ms)
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -239,6 +290,11 @@ export function CertificatWizard({
 
   // ── Navigation ──
   const goNext = () => {
+    // Bilan « Devis à établir » : la photo de plaque est exigée, sauf shunt explicite
+    if (steps[currentStep]?.id === 'bilan') {
+      const raison = blocagePhotoPlaque(formData);
+      if (raison) { toast.error(raison); return; }
+    }
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
@@ -511,6 +567,10 @@ export function CertificatWizard({
             clientEquipments={clientEquipments}
             technicians={teamMembers}
             canSelectTechnician={canSelectTechnician}
+            photoPlaqueUrl={photoPlaqueUrl}
+            onPhotoPlaqueUpload={handlePhotoPlaqueUpload}
+            onPhotoPlaqueDelete={handlePhotoPlaqueDelete}
+            isUploadingPhotoPlaque={isUploadingPhotoPlaque}
           />
         ) : null}
       </div>

@@ -47,7 +47,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'contract_equipments', columns: null, data: false },
   { schema: 'majordhome', table: 'contract_pricing_items', columns: ['id', 'contract_id', 'equipment_type_id', 'zone_id', 'equipment_id', 'quantity', 'base_price', 'unit_price', 'line_total', 'created_at'], data: false },
   { schema: 'majordhome', table: 'interventions', columns: null, data: false },
-  { schema: 'majordhome', table: 'certificats', columns: ['id', 'org_id', 'client_id', 'contract_id', 'equipment_id', 'intervention_id', 'equipement_type', 'equipement_marque', 'equipement_modele', 'type_document', 'tva_taux', 'pieces_remplacees', 'bilan_conformite', 'anomalies_detail', 'action_corrective', 'statut', 'date_intervention', 'created_at'] }, // 20261010_1 : anomalies agrégées par majordhome_entretien_sav, FK interventions.source_certificat_id
+  { schema: 'majordhome', table: 'certificats', columns: null }, // 20261010_1 : anomalies agrégées par majordhome_entretien_sav, FK interventions.source_certificat_id ; 20261012_1 : toutes les colonnes (vue majordhome_certificats regénérée)
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine
@@ -143,6 +143,7 @@ const VIEWS = [
   'public.majordhome_chantiers',
   'public.majordhome_chantiers_write',
   'public.majordhome_entretien_sav',
+  'public.majordhome_certificats', // 20261012_1 : photo_plaque_path / photo_plaque_absence (colonnes en fin)
   'public.majordhome_quotes', // 20261010_1 : commentaire (vue JOIN, colonne en fin)
   'public.majordhome_quotes_write',
   'public.majordhome_invoices', // 20261010_1 : client_note (i.* ⇒ DROP + CREATE)
