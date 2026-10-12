@@ -165,6 +165,12 @@ verify_jwt = false
 [functions.auto-rdv-cron]
 verify_jwt = false
 
+# create-user : invitation d'un membre par un org_admin (JWT user + check profil
+# dans le corps). Absente de ce fichier jusqu'au 2026-09-30 alors que déployée
+# via MCP le 2026-09-21 — valeur relevée en prod.
+[functions.create-user]
+verify_jwt = true
+
 # pennylane-customer-push : push MDH → Pennylane des colonnes modifiées d'une fiche
 # client (useClient). JWT user + requireOrgMembership (org PL activée). 2026-10-11.
 [functions.pennylane-customer-push]

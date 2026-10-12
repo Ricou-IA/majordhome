@@ -9,7 +9,7 @@
  */
 
 import { supabase } from '@lib/supabaseClient';
-import { withErrorHandling } from '@lib/serviceHelpers';
+import { withErrorHandling, edgeFunctionErrorMessage } from '@lib/serviceHelpers';
 
 // =============================================================================
 // SERVICE
@@ -137,7 +137,8 @@ export const permissionsService = {
           orgId, appRole: mapping.app_role, businessRole: mapping.business_role,
         },
       });
-      if (error) throw error;
+      // Non-2xx → le message de l'edge est dans error.context, pas dans error.message
+      if (error) throw new Error(await edgeFunctionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
       return data;
     }, 'permissions.inviteMember');

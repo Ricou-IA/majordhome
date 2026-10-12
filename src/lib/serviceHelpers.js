@@ -38,6 +38,30 @@ export async function withErrorHandling(fn, context = '') {
 }
 
 /**
+ * Message d'erreur exploitable d'un `supabase.functions.invoke` en échec.
+ *
+ * Sur une réponse non-2xx, supabase-js renvoie un FunctionsHttpError au message
+ * générique (« Edge Function returned a non-2xx status code ») et range la
+ * réponse dans `error.context` : le vrai message de l'edge (`{ error }`) est là.
+ * Sans ce déballage, l'utilisateur voit un toast opaque et la cause réelle
+ * (ex. « Compte existant introuvable : … ») n'est lisible que dans les logs prod.
+ *
+ * @param {Error & { context?: Response }} error - erreur renvoyée par functions.invoke
+ * @returns {Promise<string>}
+ */
+export async function edgeFunctionErrorMessage(error) {
+  try {
+    if (error?.context && typeof error.context.json === 'function') {
+      const body = await error.context.json();
+      if (body?.error) return body.error;
+    }
+  } catch {
+    /* corps illisible → message générique */
+  }
+  return error?.message || 'Erreur inattendue';
+}
+
+/**
  * Wrapper pour les méthodes qui retournent aussi un count (pagination).
  *
  * @param {Function} fn - Fonction async retournant { data, count }

@@ -15,6 +15,8 @@
 //    à chaque étape, réponse 500 explicite sinon ;
 //  - idempotent : un email déjà inscrit (compte orphelin d'un essai raté) est
 //    réutilisé et complété, jamais bloquant — le mot de passe existant est conservé ;
+//    l'id est retrouvé par la RPC auth_user_id_by_email (service_role), jamais par
+//    auth.admin.listUsers() qui répond 500 sur l'instance partagée (2026-09-30) ;
 //  - l'adhésion est créée par le trigger core.sync_profile_org_membership à
 //    l'insertion du profil, puis alignée ici sur le rôle demandé.
 // ============================================================================
@@ -113,17 +115,21 @@ serve(async (req) => {
     if (createError) {
       const alreadyExists = /already|exists|registered/i.test(createError.message);
       if (!alreadyExists) return errorResponse(createError.message, 400);
-      const { data: listed, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      if (listError) return errorResponse(`Compte existant introuvable : ${listError.message}`, 500);
-      const existing = listed.users.find((u) => (u.email || "").toLowerCase() === cleanEmail);
-      if (!existing) return errorResponse(createError.message, 400);
+      // Résolution par RPC (auth.users en direct), PAS auth.admin.listUsers() :
+      // sur l'instance partagée, GoTrue plante en 500 (« Scan error on column
+      // confirmation_token: converting NULL to string ») à cause de comptes
+      // d'apps voisines créés par SQL avec des jetons NULL (vécu 2026-09-30).
+      const { data: existingId, error: lookupError } = await supabaseAdmin
+        .rpc("auth_user_id_by_email", { p_email: cleanEmail });
+      if (lookupError) return errorResponse(`Compte existant introuvable : ${lookupError.message}`, 500);
+      if (!existingId) return errorResponse(createError.message, 400);
       // Un membre déjà rattaché à une org n'est pas « ré-invité » : on refuse plutôt que d'écraser.
       const { data: existingProfile } = await supabaseAdmin
-        .schema("core").from("profiles").select("org_id").eq("id", existing.id).maybeSingle();
+        .schema("core").from("profiles").select("org_id").eq("id", existingId).maybeSingle();
       if (existingProfile?.org_id && orgId && existingProfile.org_id !== orgId) {
         return errorResponse("Cet email appartient déjà à un membre d'une autre organisation", 409);
       }
-      newUserId = existing.id;
+      newUserId = existingId as string;
       reusedExistingAuthUser = true;
     } else {
       newUserId = authData.user.id;
