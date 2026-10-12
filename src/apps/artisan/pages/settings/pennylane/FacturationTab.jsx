@@ -24,7 +24,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench } from 'lucide-react';
 import { toast } from 'sonner';
-import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart } from '@hooks/useOrgSettings';
+import { useOrgSettings, pennylaneInvoiceSettings, pennylaneChart, pennylanePipelineMinAmountHt } from '@hooks/useOrgSettings';
 import { useLedgerAccounts } from '@hooks/usePennylane';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
@@ -71,6 +71,7 @@ function pickForm(settings) {
   }
   return {
     enabled: Boolean(settings?.pennylane?.enabled),
+    pipeline_min_amount_ht: String(pennylanePipelineMinAmountHt(settings)),
     deadline_days: String(inv.deadlineDays),
     mode: inv.mode,
     ledger_by_category: byCategory,
@@ -115,6 +116,10 @@ function validate(form) {
   const errors = {};
   const n = Number(form.deadline_days);
   if (!Number.isInteger(n) || n < 0 || n > 120) errors.deadline_days = 'Entre 0 et 120 jours';
+  const seuil = Number(String(form.pipeline_min_amount_ht ?? '').replace(',', '.'));
+  if (form.pipeline_min_amount_ht === '' || !Number.isFinite(seuil) || seuil < 0) {
+    errors.pipeline_min_amount_ht = 'Montant HT positif ou 0 (aucun filtre)';
+  }
   const templateErrors = {};
   for (const [catId, t] of Object.entries(form.templates_by_category || {})) {
     const label = (t.offered_label || '').trim();
@@ -215,6 +220,9 @@ export default function FacturationTab() {
       const pennylane = {
         ...(settings?.pennylane || {}),
         enabled: form.enabled,
+        // Seuil pipeline (€ HT) : lu par pennylanePipelineMinAmountHt() côté front et
+        // par majordhome.pl_pipeline_min_amount_ht() côté base (cron 15 min).
+        pipeline_min_amount_ht: Number(String(form.pipeline_min_amount_ht).replace(',', '.')),
         invoice: {
           ...invoiceRest,
           deadline_days: Number(form.deadline_days),
@@ -253,6 +261,25 @@ export default function FacturationTab() {
             </span>
           </span>
         </label>
+        <div className={`grid sm:grid-cols-2 gap-4 mt-4 ${form.enabled ? '' : 'opacity-50 pointer-events-none'}`}>
+          <div>
+            <label className={LABEL_CLASS}>Seuil pipeline (€ HT)</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.pipeline_min_amount_ht}
+              onChange={(e) => setForm({ ...form, pipeline_min_amount_ht: e.target.value })}
+              className={INPUT_CLASS}
+            />
+            {errors.pipeline_min_amount_ht && <p className={ERROR_CLASS}>{errors.pipeline_min_amount_ht}</p>}
+            <p className={HINT_CLASS}>
+              À partir de ce montant, un devis Pennylane est rattaché tout seul à la carte active du client
+              (pipeline, puis chantier s&apos;il est accepté). En dessous, rien n&apos;est fait : le devis reste
+              « Non rattaché » dans l&apos;explorateur, à rattacher ou écarter à la main. 0 = tout est rattaché.
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className={form.enabled ? '' : 'opacity-50 pointer-events-none'}>

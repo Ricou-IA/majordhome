@@ -33,7 +33,7 @@ import {
   useAttachQuotesAndSend,
 } from '@hooks/usePennylane';
 import { formatEuro, formatDateShortFR } from '@/lib/utils';
-import { PIPELINE_MIN_AMOUNT_HT } from '@lib/constants';
+import { useOrgSettings, pennylanePipelineMinAmountHt } from '@hooks/useOrgSettings';
 
 // ============================================================================
 // Statuts Pennylane (palette deutan-friendly — pas de rouge/vert)
@@ -190,12 +190,16 @@ export function QuoteCandidatesModal({
     isLoading: loadingCandidates,
   } = useCandidateQuotesForLead(leadId, { enabled: isOpen });
 
-  // Filtre seuil pipeline (cf PIPELINE_MIN_AMOUNT_HT) — devis déjà attachés préservés.
+  // Seuil pipeline = réglage d'org (Settings → Facturation Pennylane, 2026-10-12).
+  const { settings: orgSettings } = useOrgSettings();
+  const minAmountHt = pennylanePipelineMinAmountHt(orgSettings);
+
+  // Filtre seuil pipeline — devis déjà attachés préservés.
   const candidates = useMemo(
     () => rawCandidates.filter(c =>
-      c.alreadyAttached || Number(c.quote?.amount_ht ?? 0) >= PIPELINE_MIN_AMOUNT_HT
+      c.alreadyAttached || Number(c.quote?.amount_ht ?? 0) >= minAmountHt
     ),
-    [rawCandidates],
+    [rawCandidates, minAmountHt],
   );
 
   const {
@@ -239,10 +243,10 @@ export function QuoteCandidatesModal({
   const normalizedQuery = useMemo(() => normalizeForSearch(searchQuery), [searchQuery]);
 
   const explorationQuotes = useMemo(() => {
-    // Filtre seuil pipeline (exclut SAV/entretien <1000€)
+    // Filtre seuil pipeline (réglage d'org : sous le seuil = rattachement manuel dans /devis)
     const baseList = unlinkedQuotes
       .filter(q => !candidateIds.has(q.id))
-      .filter(q => Number(q.amount_ht ?? 0) >= PIPELINE_MIN_AMOUNT_HT);
+      .filter(q => Number(q.amount_ht ?? 0) >= minAmountHt);
     if (!normalizedQuery) return baseList;
     return baseList.filter(q => {
       const haystack = normalizeForSearch(
@@ -252,7 +256,7 @@ export function QuoteCandidatesModal({
       );
       return haystack.includes(normalizedQuery);
     });
-  }, [unlinkedQuotes, candidateIds, normalizedQuery]);
+  }, [unlinkedQuotes, candidateIds, normalizedQuery, minAmountHt]);
 
   // Map id → quote pour reconstituer le payload au submit
   const quotesById = useMemo(() => {

@@ -26,6 +26,7 @@ import {
   jsonResponse,
   requireSharedSecret,
 } from "../_shared/auth.ts";
+import { getPipelineMinAmountHt } from "../_shared/pennylanePipeline.ts";
 
 const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
 const PENNYLANE_BASE_URL =
@@ -34,9 +35,8 @@ const PENNYLANE_BASE_URL =
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
-// 2026-08-05 : descendu de 1000 a 500 (demande equipe — le SAV est sous 500).
-// Aligne sur PIPELINE_MIN_AMOUNT_HT (QuoteCandidatesModal, pennylane-sync-quote-status).
-const LEAD_THRESHOLD_HT = 500;
+// Seuil pipeline = réglage d'org `settings.pennylane.pipeline_min_amount_ht`
+// (20261012_5), lu à chaque exécution par getPipelineMinAmountHt.
 
 const plHeaders = {
   Authorization: `Bearer ${PENNYLANE_API_TOKEN}`,
@@ -144,6 +144,9 @@ Deno.serve(async (req: Request) => {
   const log: string[] = [];
 
   try {
+    const leadThresholdHt = await getPipelineMinAmountHt(supabase, ORG_ID);
+    log.push(`Seuil pipeline: ${leadThresholdHt} EUR HT (reglage d'org)`);
+
     const plCustomers = await fetchAllPlCustomers();
     log.push(`PL customers fetched: ${plCustomers.length}`);
 
@@ -184,7 +187,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const { amount: maxQuoteHT, label: quoteLabel } = pickMaxQuote(customerQuotes);
-      if (maxQuoteHT < LEAD_THRESHOLD_HT) {
+      if (maxQuoteHT < leadThresholdHt) {
         skippedBelowThreshold++;
         continue;
       }

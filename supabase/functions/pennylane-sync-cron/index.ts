@@ -26,6 +26,7 @@ import {
   jsonResponse,
   requireSharedSecret,
 } from "../_shared/auth.ts";
+import { getPipelineMinAmountHt } from "../_shared/pennylanePipeline.ts";
 
 const PENNYLANE_API_TOKEN = Deno.env.get("PENNYLANE_API_TOKEN") || "";
 const PENNYLANE_BASE_URL =
@@ -35,10 +36,9 @@ const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 
 const ORG_ID = "3c68193e-783b-4aa9-bc0d-fb2ce21e99b1";
 // Seuil au-dessus duquel on tente le rapprochement avec un lead ACTIF via
-// upsert_pennylane_lead (qui ne crée plus rien depuis le 2026-09-16).
-// 2026-08-05 : descendue de 1000 a 500 (demande equipe — le SAV est sous 500).
-// Alignee sur PIPELINE_MIN_AMOUNT_HT (src/lib/constants.js + copies Deno).
-const LEAD_THRESHOLD_HT = 500;
+// upsert_pennylane_lead (qui ne crée plus rien depuis le 2026-09-16) : réglage
+// d'org `settings.pennylane.pipeline_min_amount_ht` (20261012_5), lu à chaque
+// exécution par getPipelineMinAmountHt — plus de constante copiée.
 const STATUS_DEVIS_ENVOYE = "47937391-5ffa-4804-9b5d-72f3fec6f4fe";
 
 const plHeaders = {
@@ -259,6 +259,9 @@ Deno.serve(async (req: Request) => {
   const log: string[] = [];
 
   try {
+    const leadThresholdHt = await getPipelineMinAmountHt(supabase, ORG_ID);
+    log.push(`Seuil pipeline: ${leadThresholdHt} EUR HT (reglage d'org)`);
+
     // 1. Récupérer tous les pl_id déjà mappés (+ le client MDH de chacun)
     const { data: existingSyncs, error: syncsError } = await supabase
       .from("majordhome_pennylane_sync")
@@ -420,7 +423,7 @@ Deno.serve(async (req: Request) => {
         const customerQuotes = quotesByCustomer.get(plCustomer.id) || [];
         const { amount: maxQuoteHT, label: quoteLabel } = pickMaxQuote(customerQuotes);
 
-        if (maxQuoteHT >= LEAD_THRESHOLD_HT) {
+        if (maxQuoteHT >= leadThresholdHt) {
           // 1) RPC création/maj du lead avec le devis principal
           const { data: leadResult, error: leadRpcError } = await supabase.rpc(
             "upsert_pennylane_lead",
@@ -488,7 +491,7 @@ Deno.serve(async (req: Request) => {
           }
         } else {
           log.push(
-            `[no-lead] ${displayName} — max devis ${maxQuoteHT}€ HT < seuil ${LEAD_THRESHOLD_HT}€`
+            `[no-lead] ${displayName} — max devis ${maxQuoteHT}€ HT < seuil ${leadThresholdHt}€`
           );
         }
       } catch (err) {

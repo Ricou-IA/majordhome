@@ -4,6 +4,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { orgSettingsService } from '@services/orgSettings.service';
 import { orgSettingsKeys } from './cacheKeys';
 import { invoiceTemplatesFromSettings } from '@/lib/entretienInvoiceModel';
+import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
 
 /**
  * Hook React Query pour les settings de l'org courante.
@@ -69,6 +70,24 @@ export function useOrgSettings() {
 export function usePennylaneEnabled() {
   const { settings } = useOrgSettings();
   return Boolean(settings?.pennylane?.enabled);
+}
+
+/**
+ * Seuil pipeline (€ HT) : sous ce montant un devis Pennylane n'est PAS rattaché
+ * automatiquement à une carte (rattachement manuel dans /devis) et sort du sélecteur
+ * de rattachement. Réglage d'org `settings.pennylane.pipeline_min_amount_ht`
+ * (Settings → Facturation Pennylane, décision Eric 2026-10-12), défaut
+ * `PIPELINE_MIN_AMOUNT_HT`. Même lecture côté base : `majordhome.pl_pipeline_min_amount_ht`
+ * (migration 20261012_5), consommée par le cron 15 min — une seule valeur, deux lecteurs.
+ * Fonction pure (pas de hook) : appelable depuis un modèle ou un test.
+ * @param {object} settings
+ * @returns {number}
+ */
+export function pennylanePipelineMinAmountHt(settings) {
+  const raw = settings?.pennylane?.pipeline_min_amount_ht;
+  if (raw === null || raw === undefined || raw === '') return PIPELINE_MIN_AMOUNT_HT;
+  const n = Number(String(raw).replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? n : PIPELINE_MIN_AMOUNT_HT;
 }
 
 export const PENNYLANE_INVOICE_DEFAULTS = Object.freeze({ deadlineDays: 30, mode: 'draft' });

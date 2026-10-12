@@ -22,7 +22,7 @@ import { useDebounce } from '@hooks/useDebounce';
 import { useAuth } from '@contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { cleanPhone } from '@/lib/phoneUtils';
-import { PIPELINE_MIN_AMOUNT_HT } from '@/lib/constants';
+import { useOrgSettings, pennylanePipelineMinAmountHt } from '@hooks/useOrgSettings';
 import { buildExplorerRows, filterExplorerRows, EXPLORER_VIEWS } from '@/lib/quotesExplorer';
 
 // Re-export for backward compatibility
@@ -515,6 +515,9 @@ export function useUnlinkedQuotes({ sinceDays = 60, limit = 100, enabled = true 
 export function useQuotesExplorer({ enabled = true } = {}) {
   const { organization } = useAuth();
   const orgId = organization?.id;
+  // Seuil pipeline = réglage d'org (Settings → Facturation Pennylane, 2026-10-12).
+  const { settings: orgSettings } = useOrgSettings();
+  const minAmountHt = pennylanePipelineMinAmountHt(orgSettings);
 
   const query = useQuery({
     queryKey: pennylaneKeys.quotesExplorer(orgId),
@@ -535,10 +538,10 @@ export function useQuotesExplorer({ enabled = true } = {}) {
       quotes: query.data?.rows || [],
       linkByQuoteId: query.data?.linkByQuoteId || new Map(),
       dismissedIds: query.data?.dismissedIds || new Set(),
-      minAmountHt: PIPELINE_MIN_AMOUNT_HT,
+      minAmountHt,
       sinceDays: Number.POSITIVE_INFINITY,
     }),
-    [query.data],
+    [query.data, minAmountHt],
   );
 
   return {

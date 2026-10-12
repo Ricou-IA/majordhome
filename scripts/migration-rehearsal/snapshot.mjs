@@ -54,7 +54,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine
   { schema: 'majordhome', table: 'appointment_technicians', columns: null, data: false },
-  { schema: 'majordhome', table: 'pennylane_quotes', columns: ['org_id', 'pennylane_quote_id', 'quote_number', 'label', 'status', 'quote_date', 'pdf_url', 'pdf_invoice_subject'], data: false }, // 20260930_16 : libellé du chantier
+  { schema: 'majordhome', table: 'pennylane_quotes', columns: null, data: false }, // 20260930_16 : libellé du chantier ; 20261012_5 : toutes les colonnes (candidats du rattachement automatique)
+  { schema: 'majordhome', table: 'pennylane_quote_dismissals', columns: null, data: false }, // 20261012_5 : un devis écarté n'est jamais rattaché automatiquement
   { schema: 'majordhome', table: 'chantiers', columns: null, data: false }, // 20261001_2 : realized_date (entité en prod depuis 20260930_16)
   { schema: 'majordhome', table: 'chantier_line_receptions', columns: null, data: false }, // 20260930_16 : chantier_id → majordhome.chantiers
   { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_17 : activités chantier_*
@@ -123,6 +124,10 @@ const FUNCTIONS = [
   'majordhome.chantier_ensure_for_quote()', // trigger de prod sur lead_pennylane_quotes (20260930_16) : sans elle le schéma ne charge plus
   'public.lead_merge(uuid, uuid)',
   'public.pennylane_sync_update_client_fields(uuid, uuid, jsonb)', // 20261011_1 : écriture PL → client par le journal // recréée sans ses 16 tables satellites : plpgsql ne résout les tables qu'à l'exécution
+  // 20261012_5 : rattachement automatique des devis (seuil = réglage d'org)
+  'public.upsert_pennylane_lead(uuid, uuid, text, text, text, text, text, text, text, text, numeric, text)',
+  'public.pennylane_sync_auto_attach_quote(uuid, uuid, bigint, bigint, numeric, text, date, text, text)',
+  'public.pennylane_sync_update_quote_fields(uuid, text, text, numeric, text, date, numeric)',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).

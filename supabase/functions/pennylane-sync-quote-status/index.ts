@@ -38,10 +38,9 @@ interface AttachedQuote {
   assigned_at: string;
 }
 
-// Seuil pipeline commercial. ⚠️ COPIE de src/lib/constants.js — Deno ne peut pas
-// importer le code frontend. Toute modification du seuil doit toucher LES DEUX.
-// 2026-08-05 : descendu de 1000 à 500 (demande equipe — le SAV est sous 500).
-const PIPELINE_MIN_AMOUNT_HT = 500;
+// Seuil pipeline = réglage d'org `settings.pennylane.pipeline_min_amount_ht`
+// (20261012_5). Plus de copie ici : pennylane_sync_auto_attach_pending et
+// pennylane_sync_update_quote_fields lisent majordhome.pl_pipeline_min_amount_ht().
 
 // ---------------------------------------------------------------------------
 // Miroir local — source de LECTURE (refonte 2026-08-11)
@@ -281,6 +280,12 @@ async function syncOrgQuotes(
   const ejections_ref = { v: 0 };
   let winning_quotes_set = 0;
 
+  // 0. Rattachement automatique des devis en attente (RPC, 20261012_5) — AVANT
+  //    le retour anticipé ci-dessous : une org sans aucun devis rattaché doit
+  //    pouvoir attacher sa première carte. Candidats, seuil d'org, écartés et
+  //    éjectés : tout est tranché en SQL.
+  const auto_attached_quotes = await autoAttachPendingQuotes(supabase, orgId);
+
   // 1. Recuperer tous les devis actifs (non ejectes) de cette org
   const attachedQuotes = await fetchAllPages<AttachedQuote>((from, to) =>
     supabase
@@ -297,7 +302,7 @@ async function syncOrgQuotes(
     return {
       quote_status_updates: 0,
       lead_field_updates: 0,
-      auto_attached_quotes: 0,
+      auto_attached_quotes,
       ejections: 0,
       winning_quotes_set: 0,
       skipped_stale_mirror: false,
@@ -337,7 +342,7 @@ async function syncOrgQuotes(
     return {
       quote_status_updates: 0,
       lead_field_updates: 0,
-      auto_attached_quotes: 0,
+      auto_attached_quotes, // l'étape 0 a déjà écrit : on le dit
       ejections: 0,
       winning_quotes_set: 0,
       skipped_stale_mirror: true,
@@ -386,11 +391,7 @@ async function syncOrgQuotes(
   const { lead_field_updates } =
     await syncIdentityFromPennylane(supabase, orgId, attachedQuotes);
 
-  // 5. Auto-attach nouveaux devis PL pour bridges existants (bridge canonique)
-  //    — depuis le miroir. Zéro appel Pennylane.
-  const auto_attached_quotes = await autoAttachNewQuotes(
-    supabase, orgId, attachedQuotes, mirrorRows,
-  );
+  // 5. Rattachement automatique : fait en étape 0 (autoAttachPendingQuotes).
 
   return {
     quote_status_updates,
@@ -467,7 +468,6 @@ async function syncAttachedQuoteFields(
         p_amount_ht: plAmountHt,
         p_label: plLabel,
         p_quote_date: plQuoteDate,
-        p_pipeline_min_ht: PIPELINE_MIN_AMOUNT_HT,
       },
     );
 
@@ -686,104 +686,45 @@ async function syncIdentityFromPennylane(
 }
 
 // ---------------------------------------------------------------------------
-// autoAttachNewQuotes — etape 5 : auto-attach nouveaux devis PL pour bridges
-// existants. Pour chaque customer ayant deja un bridge (>=1 devis attache),
-// attache les devis du miroir qui ne sont pas encore en base.
+// autoAttachPendingQuotes — étape 0 : rattachement automatique des devis en
+// attente, en SQL (RPC pennylane_sync_auto_attach_pending, 20261012_5).
 //
-// Respecte le seuil pipeline PIPELINE_MIN_AMOUNT_HT (SAV/entretien exclus).
-// Respecte les ejections manuelles (RPC pennylane_sync_auto_attach_quote
-// no-op si quote_pl_id existe en base, meme ejected).
-//
-// Bridge lead_id : on prend la rangee la plus recemment assignee pour chaque
-// customer (assigned_at DESC).
+// Avant : seuls les devis SUIVANTS d'un client déjà ponté par un devis rattaché
+// étaient traités ; le PREMIER devis ne l'était jamais (ROZIÈRES, 2026-10-12),
+// le seuil était une constante copiée et les devis écartés n'étaient pas
+// respectés. La RPC choisit les candidats (miroir, ≥ seuil d'org, ni rattaché,
+// ni éjecté, ni écarté), résout la carte (pont par devis rattaché, sinon client
+// ponté / contact Pennylane → carte active) et écrit via
+// pennylane_sync_auto_attach_quote. Sans carte active : rien (no_lead), le
+// devis reste « Non rattaché » dans /devis et sera réexaminé au passage suivant.
 // ---------------------------------------------------------------------------
 
-async function autoAttachNewQuotes(
+async function autoAttachPendingQuotes(
   supabase: ReturnType<typeof getAdminClient>,
   orgId: string,
-  attachedQuotes: AttachedQuote[],
-  mirrorRows: MirrorQuote[],
 ): Promise<number> {
-  let attached = 0;
-
-  // Set des quote_pl_id deja attaches (pour diff rapide)
-  const attachedPlIds = new Set<number>(
-    attachedQuotes.map((aq) => aq.pennylane_quote_id),
-  );
-
-  // Bridge map : customer_id -> lead_id le plus recemment assigne
-  const bridgeMap = new Map<number, { lead_id: string; assigned_at: string }>();
-  for (const aq of attachedQuotes) {
-    if (!aq.pennylane_customer_id) continue;
-    const existing = bridgeMap.get(aq.pennylane_customer_id);
-    if (!existing || aq.assigned_at > existing.assigned_at) {
-      bridgeMap.set(aq.pennylane_customer_id, {
-        lead_id: aq.lead_id,
-        assigned_at: aq.assigned_at,
-      });
-    }
+  const { data, error } = await supabase.rpc("pennylane_sync_auto_attach_pending", {
+    p_org_id: orgId,
+    p_dry_run: false,
+  });
+  if (error) {
+    // Pas de throw : statuts et identité ne doivent pas tomber avec le
+    // rattachement. Bruyant quand même, et compté 0.
+    console.warn(
+      `[pennylane-sync] auto-attach RPC failed:`,
+      sanitizeError(error, "auto-attach failed"),
+    );
+    return 0;
   }
-
-  // Le miroir contient déjà tous les devis de l'org : un seul parcours en
-  // mémoire remplace une requête Pennylane par client. Un devis est candidat
-  // s'il appartient à un client déjà bridgé et n'est pas déjà attaché.
-  //
-  // Limite assumée : `draft` étant hors périmètre du sweep, un brouillon n'est
-  // pas auto-attaché tant qu'il n'est pas envoyé. C'est le comportement voulu —
-  // un brouillon n'a rien à faire dans le pipeline commercial.
-  for (const q of mirrorRows) {
-    const customerId = q.customer_id;
-    if (!customerId) continue;
-
-    const bridge = bridgeMap.get(customerId);
-    if (!bridge) continue;                                  // client sans bridge
-    if (attachedPlIds.has(q.pennylane_quote_id)) continue;  // deja attache
-
-    const amountHt = Number(q.amount_ht ?? 0);
-    if (amountHt < PIPELINE_MIN_AMOUNT_HT) continue; // SAV/entretien hors pipeline
-
-    const label = q.quote_number || q.label || `Q-${q.pennylane_quote_id}`;
-    const quoteDate = q.quote_date || new Date().toISOString().slice(0, 10);
-
-    try {
-      const { data: result, error: attachErr } = await supabase.rpc(
-        'pennylane_sync_auto_attach_quote',
-        {
-          p_org_id: orgId,
-          p_lead_id: bridge.lead_id,
-          p_quote_pl_id: q.pennylane_quote_id,
-          p_customer_id: customerId,
-          p_amount_ht: amountHt,
-          p_label: label,
-          p_quote_date: quoteDate,
-          p_status: q.status ?? null,
-          p_pdf_url: q.pdf_url ?? null,
-        },
-      );
-
-      if (attachErr) {
-        console.warn(
-          `[pennylane-sync] auto-attach failed for quote ${q.pennylane_quote_id}:`,
-          sanitizeError(attachErr, 'auto-attach failed'),
-        );
-        continue;
-      }
-
-      const wasAttached = (result as { attached?: boolean } | null)?.attached === true;
-      if (wasAttached) {
-        attached++;
-        console.log(
-          `[pennylane-sync] auto-attached quote ${q.pennylane_quote_id} ` +
-            `(${label}, ${amountHt}€) to lead ${bridge.lead_id}`,
-        );
-      }
-    } catch (e) {
-      console.warn(
-        `[pennylane-sync] auto-attach exception for quote ${q.pennylane_quote_id}:`,
-        sanitizeError(e, 'auto-attach exception'),
-      );
-    }
+  const res = (data ?? {}) as {
+    attached?: number; examined?: number; no_lead?: number; min_amount_ht?: number; details?: unknown[];
+  };
+  if ((res.attached ?? 0) > 0 || (res.no_lead ?? 0) > 0) {
+    console.log(
+      `[pennylane-sync] auto-attach: ${res.attached ?? 0} rattaché(s), ${res.no_lead ?? 0} sans carte ` +
+        `(seuil ${res.min_amount_ht} € HT, ${res.examined ?? 0} examiné(s))`,
+      JSON.stringify(res.details ?? []).slice(0, 2000),
+    );
   }
-
-  return attached;
+  return res.attached ?? 0;
 }
