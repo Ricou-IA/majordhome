@@ -1,7 +1,8 @@
 /**
  * MoveToLongTermModal.jsx - Majord'home Artisan
  * ============================================================================
- * Modale légère pour basculer un lead "Devis envoyé" en Projet MT-LT.
+ * Modale légère pour basculer un lead du funnel actif (Nouveau → Devis envoyé)
+ * en Projet MT-LT.
  * Demande uniquement des notes contextuelles libres (pas d'horizon, pas de date pivot).
  *
  * @version 1.0.0
@@ -76,7 +77,7 @@ export function MoveToLongTermModal({
 
         <p className="text-sm text-gray-600 mb-3">
           Le lead sortira du pipeline et apparaîtra dans l&apos;onglet <strong>Suivi MT-LT</strong>.
-          Vous pourrez ajouter des interactions et le ramener en Gagné à tout moment.
+          Vous pourrez ajouter des interactions et le réactiver à tout moment.
         </p>
 
         <div className="space-y-2">

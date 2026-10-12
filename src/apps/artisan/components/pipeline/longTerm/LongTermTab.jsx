@@ -335,7 +335,7 @@ export function LongTermTab() {
           </h3>
           <p className="mt-1 text-sm text-gray-500">
             {enrichedLeads.length === 0
-              ? 'Cliquez sur "MT-LT" depuis une carte "Devis envoyé" pour commencer à suivre un projet long-terme.'
+              ? 'Cliquez sur le sablier d\'une carte du pipeline (Nouveau, Contacté, RDV planifié ou Devis envoyé) pour commencer à suivre un projet long-terme.'
               : 'Modifiez les filtres pour voir d\'autres projets.'}
           </p>
         </div>
