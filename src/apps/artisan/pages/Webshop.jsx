@@ -41,6 +41,7 @@ import {
 } from '@services/webshop.service';
 import InscriptionsTab from '@/apps/artisan/components/webshop/InscriptionsTab';
 import TourneesTab from '@/apps/artisan/components/webshop/tournees/TourneesTab';
+import OrderDeleteButton from '@/apps/artisan/components/webshop/OrderDeleteButton';
 
 // ============================================================================
 // HELPERS
@@ -73,6 +74,7 @@ function OrderRow({ order, onUpdate }) {
   const [carrier, setCarrier] = useState(order.carrier || '');
   const [tracking, setTracking] = useState(order.tracking_number || '');
   const [notes, setNotes] = useState(order.internal_notes || '');
+  const [instructions, setInstructions] = useState(order.delivery_instructions || '');
 
   const statusMeta = getStatusMeta(order.status);
 
@@ -94,6 +96,7 @@ function OrderRow({ order, onUpdate }) {
       carrier: carrier || null,
       tracking_number: tracking || null,
       internal_notes: notes || null,
+      delivery_instructions: instructions.trim() || null,
     });
     setSaving(false);
     if (error) {
@@ -255,6 +258,13 @@ function OrderRow({ order, onUpdate }) {
               />
             </div>
             <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="Consigne transporteur — imprimée sur la feuille de route (accès, horaires, appeler avant…)"
+              rows={2}
+              className="w-full text-sm border border-amber-200 bg-amber-50/40 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Notes internes (fournisseur contacté, particularités…)"
@@ -267,8 +277,11 @@ function OrderRow({ order, onUpdate }) {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 rounded-lg transition-colors"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              Enregistrer le suivi
+              Enregistrer
             </button>
+            <div className="pt-2 flex justify-end">
+              <OrderDeleteButton order={order} onDeleted={onUpdate} />
+            </div>
           </div>
         </div>
       )}

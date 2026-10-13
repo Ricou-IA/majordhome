@@ -34,6 +34,7 @@ const s = StyleSheet.create({
   muted: { fontSize: 8.5, color: C.grisTxt },
   body: { fontSize: 9 },
   comment: { fontSize: 8.5, fontFamily: 'Helvetica-Oblique', color: C.slate, marginTop: 2 },
+  instructions: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.ambreTxt, backgroundColor: C.ambrePale, padding: 3, borderRadius: 2, marginTop: 3 },
   pallets: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginTop: 4 },
   h2: { fontSize: 11, fontFamily: 'Helvetica-Bold', marginTop: 10, marginBottom: 4 },
   signature: { marginTop: 40, borderTop: `0.7px solid ${C.grisBar}`, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
@@ -63,6 +64,7 @@ function Stop({ stop, accent }) {
           <Text style={s.muted}>Commande {o.orderNumber}</Text>
           {o.lines.map((l, i) => <Text key={i} style={s.body}>• {t(l.name)} × {l.qty}</Text>)}
           {o.comment ? <Text style={s.comment}>Client : {t(o.comment)}</Text> : null}
+          {o.instructions ? <Text style={s.instructions}>Consigne : {t(o.instructions)}</Text> : null}
         </View>
       ))}
       <Text style={s.pallets}>{plural(stop.pallets, 'emplacement')} palette</Text>
@@ -108,6 +110,7 @@ export function RouteSheetDocument({ sheet, company }) {
           <Text style={s.h2}>Produits livrés</Text>
           {o.lines.map((l, i) => <Text key={i} style={s.body}>• {t(l.name)} × {l.qty}</Text>)}
           {o.comment ? <Text style={[s.comment, { marginTop: 8 }]}>Commentaire client : {t(o.comment)}</Text> : null}
+          {o.instructions ? <Text style={[s.instructions, { marginTop: 6 }]}>Consigne de livraison : {t(o.instructions)}</Text> : null}
           <View style={s.signature}>
             <Text style={s.body}>Signature du client :</Text>
             <Text style={s.body}>Signature du chauffeur :</Text>

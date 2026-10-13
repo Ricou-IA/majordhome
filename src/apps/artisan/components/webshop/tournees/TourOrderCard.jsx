@@ -3,8 +3,8 @@
  * palettes, produits, commentaire de livraison, alertes ; action Déplacer / Planifier.
  */
 
-import { Phone, MapPin, MessageSquare, AlertTriangle, ArrowRightLeft } from 'lucide-react';
-import { orderAddress } from '@/lib/webshop/tournees';
+import { Phone, MapPin, MessageSquare, AlertTriangle, ArrowRightLeft, ClipboardList } from 'lucide-react';
+import { orderAddress, formatPhoneFR } from '@/lib/webshop/tournees';
 
 export default function TourOrderCard({ order, items, canManage, onMove }) {
   const lines = (items || []).filter((i) => i.order_id === order.id);
@@ -18,7 +18,7 @@ export default function TourOrderCard({ order, items, canManage, onMove }) {
           </p>
           {order.phone && (
             <a href={`tel:${order.phone}`} className="mt-0.5 text-sm text-secondary-600 hover:text-primary-600 flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5" /> {order.phone}
+              <Phone className="w-3.5 h-3.5" /> {formatPhoneFR(order.phone)}
             </a>
           )}
           <p className="mt-0.5 text-sm text-secondary-600 flex items-start gap-1.5">
@@ -56,6 +56,12 @@ export default function TourOrderCard({ order, items, canManage, onMove }) {
       {order.comments && (
         <p className="mt-2 text-sm text-secondary-700 bg-secondary-50 rounded px-2 py-1 flex items-start gap-1.5">
           <MessageSquare className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-secondary-400" /> {order.comments}
+        </p>
+      )}
+
+      {order.delivery_instructions && (
+        <p className="mt-2 text-sm font-medium text-amber-900 bg-amber-50 rounded px-2 py-1 flex items-start gap-1.5">
+          <ClipboardList className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> Consigne : {order.delivery_instructions}
         </p>
       )}
 

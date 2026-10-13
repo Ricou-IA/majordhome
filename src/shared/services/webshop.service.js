@@ -126,6 +126,20 @@ export const webshopService = {
     }, 'webshop.updateOrder');
   },
 
+  /**
+   * Suppression définitive (org_admin, RPC webshop_order_hard_delete) : lignes en
+   * cascade, place de la tournée libérée par trigger.
+   * @param {string} orderId
+   */
+  async deleteOrder(orderId) {
+    return withErrorHandling(async () => {
+      if (!orderId) throw new Error('[webshopService] orderId requis');
+      const { data, error } = await supabase.rpc('webshop_order_hard_delete', { p_order_id: orderId });
+      if (error) throw error;
+      return data;
+    }, 'webshop.deleteOrder');
+  },
+
   // ==========================================================================
   // PRODUITS / TARIFS
   // ==========================================================================

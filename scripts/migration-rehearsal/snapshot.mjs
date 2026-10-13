@@ -75,7 +75,9 @@ const TABLES = [
   // 20261013_2 : tournées de livraison palettes (webshop) — petites tables, données incluses
   { schema: 'majordhome', table: 'webshop_sectors', columns: null },
   { schema: 'majordhome', table: 'webshop_delivery_slots', columns: null },
+  { schema: 'majordhome', table: 'webshop_products', columns: null, data: false }, // 20261013_3 : JOIN de la vue majordhome_webshop_orders
   { schema: 'majordhome', table: 'webshop_orders', columns: null },
+  { schema: 'majordhome', table: 'webshop_order_items', columns: null }, // 20261013_3 : cascade de webshop_order_hard_delete
 ];
 
 const FUNCTIONS = [
@@ -132,6 +134,7 @@ const FUNCTIONS = [
   'public.upsert_pennylane_lead(uuid, uuid, text, text, text, text, text, text, text, text, numeric, text)',
   'public.pennylane_sync_auto_attach_quote(uuid, uuid, bigint, bigint, numeric, text, date, text, text)',
   'public.pennylane_sync_update_quote_fields(uuid, text, text, numeric, text, date, numeric)',
+  'majordhome.webshop_slot_recount(uuid)', // 20261013_2 (en prod) : appelée par le trigger de 20261013_3
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
@@ -164,6 +167,8 @@ const VIEWS = [
   'public.majordhome_org_roles', // 20261006_1 : profils maison
   'public.majordhome_member_org_roles',
   'public.majordhome_webshop_delivery_slots', // 20261013_2 : colonnes de suivi en fin
+  'public.majordhome_webshop_orders', // 20261013_3 : delivery_instructions en fin
+  'public.majordhome_webshop_orders_write',
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du

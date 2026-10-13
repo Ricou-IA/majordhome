@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  slotStatusLabel, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, depotFor, tourneeErrorMessage,
+  slotStatusLabel, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, depotFor, formatPhoneFR, tourneeErrorMessage,
 } from '../src/lib/webshop/tournees.js';
 
 test('slotStatusLabel précise le motif de fermeture', () => {
@@ -51,7 +51,7 @@ test('moveTargets : une adresse déjà desservie ne compte pas d\'arrêt en plus
 
 test('buildRouteSheet : un arrêt par adresse, commandes non payées ou annulées exclues, lignes palette seules', () => {
   const orders = [
-    { id: 'a', order_number: 'WEB-1', first_name: 'Ana', last_name: 'B', phone: '06', created_at: '2026-10-01', paid_at: 'x', status: 'nouvelle', pallet_slots: 1, normalized_address: 'k1', geocoded_address: { label: '1 rue A 31000 T' }, lat: 43.5, lon: 1.4, comments: 'Portail bleu' },
+    { id: 'a', order_number: 'WEB-1', first_name: 'Ana', last_name: 'B', phone: '06', created_at: '2026-10-01', paid_at: 'x', status: 'nouvelle', pallet_slots: 1, normalized_address: 'k1', geocoded_address: { label: '1 rue A 31000 T' }, lat: 43.5, lon: 1.4, comments: 'Portail bleu', delivery_instructions: 'Appeler avant' },
     { id: 'b', order_number: 'WEB-2', first_name: 'Bob', last_name: 'C', phone: '07', created_at: '2026-10-02', paid_at: 'x', status: 'nouvelle', pallet_slots: 2, normalized_address: 'k2', address: '2 rue B', postal_code: '31320', city: 'R', lat: null, lon: null },
     { id: 'c', order_number: 'WEB-3', first_name: 'Ana', last_name: 'B', phone: '06', created_at: '2026-10-03', paid_at: 'x', status: 'nouvelle', pallet_slots: 1, normalized_address: 'k1' },
     { id: 'd', order_number: 'WEB-4', created_at: '2026-10-04', paid_at: null, status: 'en_attente_paiement', pallet_slots: 1, normalized_address: 'k3' },
@@ -73,12 +73,23 @@ test('buildRouteSheet : un arrêt par adresse, commandes non payées ou annulée
   assert.deepEqual(sheet.stops[0].orders.map((o) => o.orderNumber), ['WEB-1', 'WEB-3']);
   assert.deepEqual(sheet.stops[0].orders[0].lines, [{ name: 'Pellets', qty: 1 }]);
   assert.equal(sheet.stops[0].orders[0].comment, 'Portail bleu');
+  assert.equal(sheet.stops[0].orders[0].instructions, 'Appeler avant');
+  assert.equal(sheet.stops[1].orders[0].instructions, null);
   assert.equal(sheet.stops[1].address, '2 rue B 31320 R');
   assert.equal(sheet.pallets, 4);
   assert.equal(sheet.overKm, true);
   assert.equal(sheet.filename, 'feuille-de-route-2026-11-02-MUR.pdf');
   assert.equal(sheet.itineraryUrl,
     'https://www.google.com/maps/dir/?api=1&origin=Castanet-Tolosan&destination=Castanet-Tolosan&waypoints=43.5%2C1.4%7C2%20rue%20B%2031320%20R&travelmode=driving');
+});
+
+test('formatPhoneFR : paires lisibles, international ramené au national, inconnu intact', () => {
+  assert.equal(formatPhoneFR('+33686269809'), '06 86 26 98 09');
+  assert.equal(formatPhoneFR('0033 5 63 33 33 14'), '05 63 33 33 14');
+  assert.equal(formatPhoneFR('0563333314'), '05 63 33 33 14');
+  assert.equal(formatPhoneFR('06.86.26.98.09'), '06 86 26 98 09');
+  assert.equal(formatPhoneFR('+44 20 7946 0958'), '+44 20 7946 0958');
+  assert.equal(formatPhoneFR(null), null);
 });
 
 test('depotFor : code inconnu → le code, jamais un dépôt inventé', () => {

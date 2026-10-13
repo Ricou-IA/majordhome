@@ -113,6 +113,19 @@ export function dateLongFR(iso) {
     .format(new Date(`${iso}T00:00:00Z`));
 }
 
+/**
+ * Téléphone lisible : « 06 86 26 98 09 ». Un numéro français (+33 / 0033 / 0X…) est remis
+ * au format national par paires ; tout autre numéro reste tel que saisi.
+ */
+export function formatPhoneFR(phone) {
+  if (!phone) return phone ?? null;
+  let d = String(phone).replace(/[^\d+]/g, '');
+  if (d.startsWith('+33')) d = `0${d.slice(3)}`;
+  else if (d.startsWith('0033')) d = `0${d.slice(4)}`;
+  if (/^0\d{9}$/.test(d)) return d.replace(/(\d{2})(?=\d)/g, '$1 ');
+  return String(phone).trim();
+}
+
 /** Adresse affichée d'une commande : libellé BAN, sinon adresse saisie. */
 export function orderAddress(order) {
   return order?.geocoded_address?.label || [order?.address, order?.postal_code, order?.city].filter(Boolean).join(' ');
@@ -140,7 +153,7 @@ export function buildRouteSheet({ slot, sector, orders, items }) {
       stop = {
         order: stops.length + 1,
         name: `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim(),
-        phone: o.phone ?? null,
+        phone: formatPhoneFR(o.phone),
         address: orderAddress(o),
         lat: o.lat ?? null,
         lon: o.lon ?? null,
@@ -154,9 +167,10 @@ export function buildRouteSheet({ slot, sector, orders, items }) {
     stop.orders.push({
       orderNumber: o.order_number,
       name: `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim(),
-      phone: o.phone ?? null,
+      phone: formatPhoneFR(o.phone),
       email: o.email ?? null,
       comment: o.comments || null,
+      instructions: o.delivery_instructions || null,
       lines: (items || []).filter((i) => i.order_id === o.id && i.shipping_kind === 'pallet')
         .map((i) => ({ name: i.product_name, qty: Number(i.qty) })),
     });
