@@ -37,8 +37,10 @@ import {
   WEBSHOP_CHANNELS,
   WEBSHOP_ORDER_TYPES,
   getStatusMeta,
+  orderLinesSummary,
 } from '@services/webshop.service';
 import InscriptionsTab from '@/apps/artisan/components/webshop/InscriptionsTab';
+import TourneesTab from '@/apps/artisan/components/webshop/tournees/TourneesTab';
 
 // ============================================================================
 // HELPERS
@@ -123,8 +125,8 @@ function OrderRow({ order, onUpdate }) {
           </p>
         </div>
         <div className="col-span-3">
-          <p className="text-sm text-secondary-700">
-            {order.product_name || order.product_slug} × {order.quantity}
+          <p className="text-sm text-secondary-700 truncate" title={orderLinesSummary(order)}>
+            {orderLinesSummary(order)}
           </p>
           <div className="flex gap-1 mt-0.5 flex-wrap">
             <MetaBadge list={WEBSHOP_CHANNELS} value={order.channel} />
@@ -141,7 +143,8 @@ function OrderRow({ order, onUpdate }) {
             onChange={(e) => handleStatusChange(e.target.value)}
             className={`w-full text-xs font-medium rounded-lg border px-2 py-1.5 cursor-pointer ${statusMeta.color}`}
           >
-            {WEBSHOP_ORDER_STATUSES.map((s) => (
+            {/* « En attente de paiement » n'est pas un choix manuel : seul le paiement en sort. */}
+            {WEBSHOP_ORDER_STATUSES.filter((s) => s.value !== 'en_attente_paiement' || s.value === order.status).map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
@@ -210,10 +213,21 @@ function OrderRow({ order, onUpdate }) {
           {/* Montants */}
           <div className="space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-secondary-400">Montants</p>
-            <p className="text-sm text-secondary-600">
-              {order.quantity} × {euros(order.unit_price_ttc)} ={' '}
-              <span className="font-bold text-secondary-900">{euros(order.total_ttc)} TTC</span>
-            </p>
+            {order.items?.length > 0 ? (
+              <>
+                {order.items.map((i, idx) => (
+                  <p key={idx} className="text-sm text-secondary-600">
+                    {i.product_name} : {i.qty} × {euros(i.unit_price_ttc_cents / 100)}
+                  </p>
+                ))}
+                <p className="text-sm font-bold text-secondary-900">Total : {euros(order.total_ttc)} TTC</p>
+              </>
+            ) : (
+              <p className="text-sm text-secondary-600">
+                {order.quantity} × {euros(order.unit_price_ttc)} ={' '}
+                <span className="font-bold text-secondary-900">{euros(order.total_ttc)} TTC</span>
+              </p>
+            )}
             <p className="text-xs text-secondary-500">
               Expédiée : {formatDate(order.shipped_at)} · Livrée : {formatDate(order.delivered_at)}
             </p>
@@ -560,6 +574,16 @@ export default function Webshop() {
           Produits &amp; tarifs
         </button>
         <button
+          onClick={() => setTab('tournees')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            tab === 'tournees'
+              ? 'border-primary-600 text-primary-700'
+              : 'border-transparent text-secondary-500 hover:text-secondary-700'
+          }`}
+        >
+          Tournées
+        </button>
+        <button
           onClick={() => setTab('inscriptions')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'inscriptions'
@@ -571,7 +595,10 @@ export default function Webshop() {
         </button>
       </div>
 
-      {tab === 'orders' ? <OrdersTab /> : tab === 'products' ? <ProductsTab /> : <InscriptionsTab />}
+      {tab === 'orders' ? <OrdersTab />
+        : tab === 'products' ? <ProductsTab />
+          : tab === 'tournees' ? <TourneesTab />
+            : <InscriptionsTab />}
     </div>
   );
 }

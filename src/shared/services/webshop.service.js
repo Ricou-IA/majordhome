@@ -25,6 +25,8 @@ import { withErrorHandling } from '@lib/serviceHelpers';
 
 /** Statuts du cycle drop shipping (CHECK majordhome.webshop_orders.status) */
 export const WEBSHOP_ORDER_STATUSES = [
+  // Posé par le checkout du site ; le webhook Stripe passe la commande en « Nouvelle » au paiement.
+  { value: 'en_attente_paiement', label: 'En attente de paiement', color: 'bg-slate-100 text-slate-600 border-slate-200' },
   { value: 'nouvelle', label: 'Nouvelle', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   { value: 'confirmee', label: 'Confirmée', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   { value: 'transmise_fournisseur', label: 'Transmise fournisseur', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -44,7 +46,15 @@ export const WEBSHOP_ORDER_TYPES = [
 ];
 
 export function getStatusMeta(value) {
-  return WEBSHOP_ORDER_STATUSES.find((s) => s.value === value) || WEBSHOP_ORDER_STATUSES[0];
+  // Statut inconnu : affiché tel quel, jamais déguisé en un autre statut.
+  return WEBSHOP_ORDER_STATUSES.find((s) => s.value === value)
+    || { value, label: value || '—', color: 'bg-gray-100 text-gray-600 border-gray-200' };
+}
+
+/** Résumé des lignes d'une commande : « Pellets ×2, Serviteur ×1 », ou l'ancien produit unique. */
+export function orderLinesSummary(order) {
+  if (order?.items?.length) return order.items.map((i) => `${i.product_name} × ${i.qty}`).join(', ');
+  return `${order?.product_name || order?.product_slug || 'Produit'} × ${order?.quantity ?? 1}`;
 }
 
 // ============================================================================
@@ -57,7 +67,8 @@ export const webshopService = {
   // ==========================================================================
 
   /**
-   * Liste des commandes (vue enrichie : product_name, lead_name).
+   * Liste des commandes (vue enrichie : product_name, lead_name) + leurs lignes
+   * (`webshop_order_items`, commandes boutique à N produits) fusionnées en `order.items`.
    * @param {object} [filters]
    * @param {string} [filters.status] - filtre statut exact
    * @param {string} [filters.channel] - 'particulier' | 'pro'
@@ -74,7 +85,15 @@ export const webshopService = {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      const orders = data || [];
+      if (orders.length === 0) return orders;
+
+      const { data: items, error: itemsError } = await supabase
+        .from('majordhome_webshop_order_items')
+        .select('order_id, product_name, qty, unit_price_ttc_cents, line_total_ttc_cents')
+        .in('order_id', orders.map((o) => o.id));
+      if (itemsError) throw itemsError;
+      return orders.map((o) => ({ ...o, items: (items || []).filter((i) => i.order_id === o.id) }));
     }, 'webshop.getOrders');
   },
 

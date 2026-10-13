@@ -72,6 +72,10 @@ const TABLES = [
   { schema: 'majordhome', table: 'journees_secteur', columns: null, data: false }, // 20261004_3 : auto_rdv_poser (journée figée, étiquette déduite)
   { schema: 'majordhome', table: 'pennylane_sync', columns: null }, // 20261011_1 : synchro identité client MDH ⇄ PL (saisies en attente)
   { schema: 'majordhome', table: 'pennylane_customer_lookup', columns: null }, // 20261011_1 : base de diff (identity_baseline_at)
+  // 20261013_2 : tournées de livraison palettes (webshop) — petites tables, données incluses
+  { schema: 'majordhome', table: 'webshop_sectors', columns: null },
+  { schema: 'majordhome', table: 'webshop_delivery_slots', columns: null },
+  { schema: 'majordhome', table: 'webshop_orders', columns: null },
 ];
 
 const FUNCTIONS = [
@@ -159,6 +163,7 @@ const VIEWS = [
   'public.majordhome_appointments',
   'public.majordhome_org_roles', // 20261006_1 : profils maison
   'public.majordhome_member_org_roles',
+  'public.majordhome_webshop_delivery_slots', // 20261013_2 : colonnes de suivi en fin
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
@@ -171,6 +176,7 @@ const POLICY_TABLES = [
   // 20260930_14 : purge des surcharges (lecture org / écriture org_admin)
   'role_permissions', 'app_role_permissions',
   'org_roles', 'member_org_roles', // 20261006_1
+  'webshop_delivery_slots', 'webshop_orders', // 20261013_2
 ];
 
 function lireEnv(fichier) {

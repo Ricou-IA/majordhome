@@ -459,3 +459,13 @@ export const tourneeKeys = {
   // Invitations auto-RDV d'un mois (majordhome_auto_rdv_invitations), `mois` = YYYY-MM-01.
   invitations: (orgId, mois) => [...tourneeKeys.all(orgId), 'invitations', mois],
 };
+
+// --- Webshop : tournées de livraison palettes (onglet Webshop → Tournées) ---
+export const webshopTourKeys = {
+  all: (orgId) => ['webshopTours', orgId],
+  sectors: (orgId) => [...webshopTourKeys.all(orgId), 'sectors'],
+  slots: (orgId, from, to) => [...webshopTourKeys.all(orgId), 'slots', from, to],
+  slotOrders: (orgId, slotId) => [...webshopTourKeys.all(orgId), 'slotOrders', slotId],
+  unplanned: (orgId) => [...webshopTourKeys.all(orgId), 'unplanned'],
+  sendResult: (orgId, slotId) => [...webshopTourKeys.all(orgId), 'sendResult', slotId],
+};
