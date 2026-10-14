@@ -2,7 +2,8 @@
  * JourneeEtatChips.jsx — puces d'état de journée sous l'en-tête d'un jour du Planning
  * ============================================================================
  * Une puce par technicien planifié par la machine : Vide · Ouverte · Pleine ·
- * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté). Source
+ * Figée · À arbitrer, avec le secteur (déduit des RDV ou étiqueté) — et « À la
+ * main » pour un technicien hors tournées (feuille de route seule). Source
  * unique de l'état : src/lib/tournee/etat.js, via useEtatsJournees.
  * Répond à « je ne sais pas quand une journée est complète et si le cron l'a
  * organisée » (Eric, 2026-09-29). Le clic ouvre la journée dans le panneau de
@@ -20,6 +21,8 @@ const STYLES = {
   pleine: 'bg-amber-50 text-amber-700 border-amber-200',
   figee: 'bg-violet-50 text-violet-700 border-violet-200',
   a_arbitrer: 'bg-red-50 text-red-700 border-red-200',
+  // Technicien hors tournées : la machine ne juge pas sa journée (Planning.jsx).
+  manuelle: 'bg-sky-50 text-sky-700 border-sky-200',
 };
 
 function formatFige(iso) {
@@ -30,13 +33,18 @@ function formatFige(iso) {
 
 /** Libellé affiché : « Congés » quand la journée ne porte que des congés, sinon l'état du moteur. */
 function libelle(item) {
-  return item.enConges ? 'Congés' : LIBELLES_ETAT[item.etat];
+  if (item.enConges) return 'Congés';
+  return item.etat === 'manuelle' ? 'À la main' : LIBELLES_ETAT[item.etat];
 }
 
 /** Aide au survol : ce que la puce ne dit pas (secteur, figeage, reste utile estimé). */
 function titre(item) {
   const parts = [`${item.technicienNom} — ${libelle(item)}`];
   if (item.enConges) return parts.join('\n');
+  if (item.etat === 'manuelle') {
+    parts.push(`Planifiée à la main (hors tournées) · ${item.nbRdvs} RDV`, 'Clic : feuille de route');
+    return parts.join('\n');
+  }
   if (item.etiquette) parts.push(`Secteur ${item.etiquette}${item.origine === 'deduite' ? ' (déduit des RDV posés)' : ''}`);
   if (item.figeeAt) {
     parts.push(`Figée le ${formatFige(item.figeeAt)} par ${item.figeePar === 'cron' ? 'le cron' : 'un membre de l’équipe'}`);

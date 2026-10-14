@@ -58,6 +58,7 @@ import { JourneeTimeline } from './JourneeTimeline';
 import { useJourneePose } from './useJourneePose';
 import { useAjustementsJournee } from './useAjustementsJournee';
 import { useConsolidationJournee } from './useConsolidationJournee';
+import { FeuilleDeRouteSection } from '../planning/FeuilleDeRouteSection';
 import { FigerJourneeDialog } from './FigerJourneeDialog';
 import { RAISON_LABELS, minutesEnHHMM, formatDuree } from './tourneesPanelUtils';
 
@@ -151,6 +152,13 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
       pressenti: p.candidat.id === survole,
     }));
   }, [recalcul, recalculSurvol, survole]);
+
+  // Feuille de route (interventions + itinéraire) de la journée telle qu'en base.
+  const personneFeuille = useMemo(
+    () => ({ displayName: journee?.technicienNom, color: journee?.couleur }),
+    [journee?.technicienNom, journee?.couleur],
+  );
+  const membresFeuille = useMemo(() => (journee ? [journee.technicienId] : []), [journee]);
 
   if (!journee) return null;
 
@@ -251,6 +259,9 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <FeuilleDeRouteSection date={journee.date} memberIds={membresFeuille} person={personneFeuille} />
+          </div>
           {candidatsError ? (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-4">
               Erreur de chargement des contrats dus : {candidatsError?.message || 'échec inconnu'}

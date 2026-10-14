@@ -40,6 +40,9 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useDeviceClass } from '@hooks/useDeviceClass';
 import { isoWeekNumber } from '@/lib/planningPrintModel';
 import { telechargerPlanningHebdo } from '@/apps/artisan/components/planning/planningPrintExport';
+import { telechargerFeuilleDeRoute } from '@/apps/artisan/components/planning/feuilleDeRouteExport';
+import { FeuilleDeRoutePanel } from '@/apps/artisan/components/planning/FeuilleDeRoutePanel';
+import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { EventModal } from '@/apps/artisan/components/planning/EventModal';
 import { PlanningClientSearch } from '@/apps/artisan/components/planning/PlanningClientSearch';
@@ -92,6 +95,7 @@ function CalendarToolbar({
   isLoading,
   onPrint,
   printHint,
+  printLabel,
   isPrinting,
 }) {
   const goToday = () => calendarRef.current?.getApi().today();
@@ -105,7 +109,7 @@ function CalendarToolbar({
   ];
 
   // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions ;
-  // Imprimer disparaît (PDF hebdo d'une personne, geste de bureau).
+  // Imprimer disparaît (PDF d'une personne, geste de bureau).
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
       {/* Navigation dates */}
@@ -178,7 +182,7 @@ function CalendarToolbar({
           onClick={onPrint}
           disabled={!!printHint || isPrinting}
           className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={printHint || 'Imprimer le planning de la semaine (PDF)'}
+          title={printHint || printLabel}
         >
           {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
           Imprimer
@@ -440,7 +444,13 @@ export default function Planning() {
     return date && technicienId ? { date, technicienId } : null;
   });
   const [dateInitiale] = useState(() => searchParams.get('journee') || undefined);
+  // Technicien hors tournées (puce « À la main ») : pas de remplissage, sa feuille de route seule.
+  const [feuilleOuverte, setFeuilleOuverte] = useState(null);
   const ouvrirJournee = useCallback((item) => {
+    if (item.etat === 'manuelle') {
+      setFeuilleOuverte(item);
+      return;
+    }
     setJourneeOuverte({ date: item.date, technicienId: item.technicienId });
   }, []);
   const fermerJournee = useCallback(() => {
@@ -473,17 +483,6 @@ export default function Planning() {
     toast.info('Cette journée n’est pas planifiée par la machine (jour passé, non travaillé, ou technicien planifié à la main).');
     fermerJournee();
   }, [journeeOuverte, journeeSelectionnee, etatsError, etatsLoading, journeesHorizon, dateRange.endDate, fermerJournee]);
-  const dayHeaderContent = useCallback((arg) => {
-    const date = arg.date.toLocaleDateString('fr-CA');
-    return (
-      <div className="flex flex-col items-start">
-        <span>{arg.text}</span>
-        {arg.view.type !== 'dayGridMonth' && (
-          <JourneeEtatChips date={date} etats={etatsJournees} onOpen={ouvrirJournee} />
-        )}
-      </div>
-    );
-  }, [etatsJournees, ouvrirJournee]);
 
   // Hooks données
   const {
@@ -525,20 +524,114 @@ export default function Planning() {
   }, [isMobileDevice, user?.id, teamList, setFilters]);
 
   // ==========================================================================
-  // IMPRESSION — planning hebdo d'UNE personne (vue Semaine + 1 chip équipe)
+  // PUCES D'EN-TÊTE — état de journée des personnes affichées
+  // ==========================================================================
+
+  // Ids (team_members / commercials) des personnes filtrées ; null = toute l'équipe.
+  const recordIdsFiltres = useMemo(() => {
+    const keys = filters.memberProfileKeys || [];
+    if (keys.length === 0) return null;
+    const set = new Set(keys);
+    return new Set(teamList.filter((h) => set.has(h.profileKey)).flatMap((h) => h.recordIds));
+  }, [filters.memberProfileKeys, teamList]);
+
+  // Puces du moteur restreintes au filtre équipe, + une puce « À la main » par
+  // technicien HORS tournées (`include_in_routing = false`) qui a des RDV ce
+  // jour-là : la machine ne le planifie pas, mais sa journée existe et sa
+  // feuille de route aussi. Sans elle, il n'avait aucune puce (Mohammed, 2026-10-14).
+  const etatsAffiches = useMemo(() => {
+    const map = new Map();
+    for (const [cle, item] of etatsJournees) {
+      if (!recordIdsFiltres || recordIdsFiltres.has(item.technicienId)) map.set(cle, item);
+    }
+    const horsTournees = new Map((members || [])
+      .filter((m) => m.role === 'technician' && m.include_in_routing !== true)
+      .map((m) => [m.id, m]));
+    if (horsTournees.size === 0) return map;
+    const parJournee = new Map();
+    for (const e of events) {
+      const a = e.extendedProps;
+      if (!a?.scheduled_date || a.band) continue;
+      for (const techId of a.technician_ids || []) {
+        const m = horsTournees.get(techId);
+        if (!m || (recordIdsFiltres && !recordIdsFiltres.has(techId))) continue;
+        const cle = `${a.scheduled_date}|${techId}`;
+        if (map.has(cle)) continue;
+        if (!parJournee.has(cle)) parJournee.set(cle, { date: a.scheduled_date, member: m, rdvs: new Map() });
+        parJournee.get(cle).rdvs.set(a.id, a.appointment_type);
+      }
+    }
+    for (const [cle, { date, member, rdvs }] of parJournee) {
+      map.set(cle, {
+        date,
+        technicienId: member.id,
+        technicienNom: String(member.display_name || '').trim(),
+        couleur: member.calendar_color,
+        etat: 'manuelle',
+        nbRdvs: rdvs.size,
+        enConges: [...rdvs.values()].every((t) => t === 'leave'),
+      });
+    }
+    return map;
+  }, [etatsJournees, recordIdsFiltres, members, events]);
+
+  const dayHeaderContent = useCallback((arg) => {
+    const date = arg.date.toLocaleDateString('fr-CA');
+    return (
+      <div className="flex flex-col items-start">
+        <span>{arg.text}</span>
+        {arg.view.type !== 'dayGridMonth' && (
+          <JourneeEtatChips date={date} etats={etatsAffiches} onOpen={ouvrirJournee} />
+        )}
+      </div>
+    );
+  }, [etatsAffiches, ouvrirJournee]);
+
+  // ==========================================================================
+  // IMPRESSION — UNE personne (1 chip équipe) : planning hebdo en vue Semaine,
+  // feuille de route (interventions + itinéraire) en vue Jour
   // ==========================================================================
 
   const printPerson = filters.memberProfileKeys?.length === 1
     ? teamList.find((h) => h.profileKey === filters.memberProfileKeys[0])
     : null;
-  const printHint = currentView !== 'timeGridWeek'
-    ? 'Passez en vue Semaine pour imprimer'
+  const isDayView = currentView === 'timeGridDay';
+  const printHint = currentView !== 'timeGridWeek' && !isDayView
+    ? 'Passez en vue Semaine ou Jour pour imprimer'
     : !printPerson
       ? 'Sélectionnez une seule personne dans les filtres équipe'
       : null;
+  const printLabel = isDayView
+    ? 'Imprimer la feuille de route du jour (PDF)'
+    : 'Imprimer le planning de la semaine (PDF)';
+
+  // Même modèle que le panneau journée : l'impression ne recalcule rien.
+  const feuilleImpression = useFeuilleDeRoute({
+    orgId,
+    date: isDayView && printPerson ? dateRange.startDate : null,
+    memberIds: printPerson?.recordIds || [],
+    person: printPerson,
+  });
 
   const handlePrint = useCallback(async () => {
     if (!printPerson || !dateRange.startDate) return;
+    if (isDayView) {
+      if (!feuilleImpression.feuille || feuilleImpression.isLoading) {
+        toast.info('Feuille de route en cours de calcul, réessayez dans un instant.');
+        return;
+      }
+      setIsPrinting(true);
+      try {
+        await telechargerFeuilleDeRoute({
+          feuille: feuilleImpression.feuille, carteUrl: feuilleImpression.carteUrl, settings: orgSettings,
+        });
+      } catch (err) {
+        toast.error(`Impression impossible : ${err?.message || 'erreur inconnue'}`);
+      } finally {
+        setIsPrinting(false);
+      }
+      return;
+    }
     setIsPrinting(true);
     try {
       // events = blocs calendrier déjà filtrés sur la personne ; le modèle
@@ -555,7 +648,7 @@ export default function Planning() {
     } finally {
       setIsPrinting(false);
     }
-  }, [printPerson, dateRange.startDate, events, labelsByClientId, orgSettings]);
+  }, [printPerson, dateRange.startDate, isDayView, feuilleImpression, events, labelsByClientId, orgSettings]);
 
   // ==========================================================================
   // HANDLERS FULLCALENDAR
@@ -787,6 +880,7 @@ export default function Planning() {
           isLoading={isLoading}
           onPrint={handlePrint}
           printHint={printHint}
+          printLabel={printLabel}
           isPrinting={isPrinting}
         />
         <CalendarFilters
@@ -891,6 +985,11 @@ export default function Planning() {
           etat={etatsJournees.get(`${journeeSelectionnee.date}|${journeeSelectionnee.technicienId}`)}
           onClose={fermerJournee}
         />
+      )}
+
+      {/* Feuille de route d'un technicien hors tournées — clic sur sa puce « À la main » */}
+      {feuilleOuverte && (
+        <FeuilleDeRoutePanel journee={feuilleOuverte} onClose={() => setFeuilleOuverte(null)} />
       )}
 
       {/* Modale Chantier — clic sur slot chantier (Phase 0) */}

@@ -90,7 +90,8 @@ function formatAddress(a) {
   return [a.address, line2].filter(Boolean).join(', ') || null;
 }
 
-function formatItem(a, { typeLabels, equipmentLabelsByClient, personColor }) {
+/** Carte d'un RDV imprimable — partagée avec la feuille de route du jour (`feuilleDeRoute.js`). */
+export function formatItem(a, { typeLabels, equipmentLabelsByClient, personColor }) {
   const typeLabel = typeLabels?.[a.appointment_type] || a.appointment_type || '';
   const clientName = [a.client_name, a.client_first_name].filter(Boolean).join(' ') || null;
   const start = formatTime(a.scheduled_start);

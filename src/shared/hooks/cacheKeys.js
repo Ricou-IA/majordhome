@@ -102,6 +102,9 @@ export const appointmentKeys = {
   teamMembers: (orgId) => ['team-members', orgId],
   technicians: (orgId, appointmentIds) => [...appointmentKeys.all(orgId), 'technicians', appointmentIds],
   dayAvailability: (orgId, date) => [...appointmentKeys.all(orgId), 'day-availability', date],
+  // Feuille de route : RDV du jour avec coordonnées, puis trajets d'un itinéraire
+  dayRoute: (orgId, date) => [...appointmentKeys.all(orgId), 'day-route', date],
+  routeLegs: (orgId, itineraryKey) => [...appointmentKeys.all(orgId), 'route-legs', itineraryKey],
   chantier: (orgId, chantierId) => [...appointmentKeys.all(orgId), 'chantier', chantierId],
   // Appros des chantiers des RDV d'installation affichés (pose provisoire hachurée)
   chantierOrders: (orgId, chantierIds) => [...appointmentKeys.all(orgId), 'chantier-orders', chantierIds],
