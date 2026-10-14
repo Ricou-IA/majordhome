@@ -32,6 +32,7 @@ import {
 import { construireMatrice } from '@/lib/tournee/matrice.js';
 import { classerParCreneaux } from '@/lib/tournee/creneaux.js';
 import { construireArretsExistants } from '@/lib/tournee/arrets.js';
+import { pointsDeJournee } from '@/lib/tournee/extremites.js';
 import { chargerJournees } from '@/lib/tournee/loaders.js';
 import { construireReglages } from '@/lib/tournee/reglages.js';
 
@@ -252,7 +253,9 @@ export const tourneesService = {
     try {
       const mdhOrgId = await getMajordhomeOrgId(coreOrgId);
       const reglages = construireReglages(settings);
-      const { data, error } = await chargerJournees({ client: supabase, coreOrgId, mdhOrgId, joursApres, reglages, logger });
+      const { data, error } = await chargerJournees({
+        client: supabase, coreOrgId, mdhOrgId, joursApres, reglages, siege: getOrgHeadquarters(settings), logger,
+      });
       return { data, error };
     } catch (error) {
       logger.error('[tournees] getJourneesHorizon', error);
@@ -305,12 +308,15 @@ export const tourneesService = {
       // C2 — un rendez-vous déjà pris est un ENGAGEMENT, pas une préférence :
       // helper partagé avec RemplirJourneePanel.jsx (même dérivation, une
       // seule fois) qui verrouille sa fenêtre sur son heure réelle.
-      const arretsExistants = construireArretsExistants(journee.rdvs, depot);
+      // Départ / retour de CETTE journée (réglage du technicien, exception du jour) ;
+      // le siège n'est plus qu'un repli.
+      const { depart, retour, depotKey, retourKey } = pointsDeJournee(journee, depot);
+      const arretsExistants = construireArretsExistants(journee.rdvs, depart);
 
       const centre = barycentre([
         ...(journee.rdvs || []).filter((r) => r.lat != null),
-        depot,
-      ]) || depot;
+        depart,
+      ]) || depart;
 
       const moisCible = Number(journee.date.slice(5, 7));
       const proches = filtreProximite(candidats, centre, reglages.rayon_filtre_km);
@@ -362,7 +368,7 @@ export const tourneesService = {
       // undefined) — dépot garantit noyau non vide, notes peut être [].
       // Les arrêts sans coordonnées (key null) bloquent bien leur créneau dans le
       // séquencement, mais n'ont rien à envoyer à Mapbox : on les écarte ici.
-      const noyau = [depot, ...arretsExistants
+      const noyau = [depart, ...(retourKey !== depotKey ? [retour] : []), ...arretsExistants
         .filter((a) => a.key)
         .map((a) => {
           const [lat, lng] = a.key.split(',').map(Number);
@@ -383,7 +389,8 @@ export const tourneesService = {
       const trajet = construireMatrice(paires);
 
       const ctx = {
-        depotKey: cleCoord(depot),
+        depotKey,
+        retourKey,
         trajet,
         amplitude: journee.amplitude,
         budgetMinutes: journee.budgetMinutes + (reglages.depassement_journee_minutes ?? 0),

@@ -23,7 +23,7 @@ import { formatSmsDate, formatSmsHour, capitaliserPrenom } from '@/lib/smsCampai
 import { sequencerTournee } from '@/lib/tournee/sequence.js';
 import { construireArretsPourConsolidation, minutesVersHeure, arrondirHeureFigee } from '@/lib/tournee/arrets.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
-import { cleCoord } from '@/lib/tournee/geo.js';
+import { pointsDeJournee } from '@/lib/tournee/extremites.js';
 import { souplesseEffective } from '@/lib/souplesse';
 
 /**
@@ -47,13 +47,15 @@ export function useConsolidationJournee({ journee, depot, reglages, paires, core
   /** Aperçu : ordre + heures définitives, ou la raison pour laquelle la journée ne tient pas. */
   const apercu = useMemo(() => {
     if (!ouvert || !depot || rdvs.length === 0) return null;
-    const arrets = construireArretsPourConsolidation(rdvs, depot, {
+    const { depart, depotKey, retourKey } = pointsDeJournee(journee, depot);
+    const arrets = construireArretsPourConsolidation(rdvs, depart, {
       souplesse: true, // cette consolidation ÉCRIT les heures : elle a droit aux tolérances
       flexDefaut, amplitude: journee.amplitude, demiJournee: reglages?.demi_journee,
     });
     const trajet = construireMatrice(paires instanceof Map ? paires : new Map(), { repli: trajetLocal });
     const seq = sequencerTournee({
-      depotKey: cleCoord(depot),
+      depotKey,
+      retourKey,
       arrets,
       trajet,
       amplitude: journee.amplitude,

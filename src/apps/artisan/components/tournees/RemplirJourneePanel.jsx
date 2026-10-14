@@ -49,6 +49,7 @@ import { usePropositions, useContratsDus } from '@hooks/useTournees';
 import { construireReglages } from '@services/tournees.service';
 import { getOrgHeadquarters } from '@lib/territoire-config';
 import { construireArretsExistants } from '@/lib/tournee/arrets.js';
+import { pointsDeJournee } from '@/lib/tournee/extremites.js';
 import { LIBELLES_ETAT } from '@/lib/tournee/etat.js';
 import { formatDateFR } from '@/lib/utils';
 import { Button } from '@components/ui/button';
@@ -114,7 +115,7 @@ export function RemplirJourneePanel({ journee, etat, onClose }) {
   // existants" restent identiques par construction, fenêtre comprise, plutôt
   // que par discipline de copier-coller.
   const arretsExistants = useMemo(
-    () => construireArretsExistants(journeeAjustee?.rdvs, depot),
+    () => construireArretsExistants(journeeAjustee?.rdvs, pointsDeJournee(journeeAjustee, depot).depart),
     [journeeAjustee, depot],
   );
 

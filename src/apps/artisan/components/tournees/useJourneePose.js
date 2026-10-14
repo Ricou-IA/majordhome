@@ -45,7 +45,7 @@ import { logger } from '@lib/logger';
 import {
   placerPlusieurs, placerCandidat, finDeJournee, chargeExistante,
 } from '@/lib/tournee/creneaux.js';
-import { cleCoord } from '@/lib/tournee/geo.js';
+import { pointsDeJournee } from '@/lib/tournee/extremites.js';
 import { construireMatrice, trajetLocal } from '@/lib/tournee/matrice.js';
 import { RAISON_LABELS, minutesEnHHMM, messageErreur } from './tourneesPanelUtils';
 import { ecrireAjustements } from './useAjustementsJournee';
@@ -103,7 +103,9 @@ export function useJourneePose({
   /** Contexte commun aux deux calculs (aperçu local et trajets réels). */
   const contexte = useCallback((trajet) => ({
     trajet,
-    depotKey: cleCoord(depot),
+    // Départ / retour de la journée (réglage du technicien, exception du jour), siège en repli.
+    depotKey: pointsDeJournee(journee, depot).depotKey,
+    retourKey: pointsDeJournee(journee, depot).retourKey,
     amplitude: journee.amplitude,
     budgetMinutes: journee.budgetMinutes + (reglages?.depassement_journee_minutes ?? 0),
     toleranceRetourMinutes: reglages?.tolerance_retour_depot_minutes ?? 0,
@@ -202,8 +204,10 @@ export function useJourneePose({
   }, [recalculSurvol, recalcul, selectedIds, placementsSolo]);
 
   const calculerHorairesReels = useCallback(async () => {
+    const { depart, retour, depotKey, retourKey } = pointsDeJournee(journee, depot);
     const noyau = [
-      depot,
+      depart,
+      ...(retourKey !== depotKey ? [retour] : []),
       // Un arrêt sans coordonnées (key null) bloque son créneau côté séquencement
       // mais n'a rien à envoyer à Mapbox : écarté ici seulement.
       ...arretsExistants.filter((a) => a.key).map((a) => {
@@ -243,7 +247,7 @@ export function useJourneePose({
       logger.error('[useJourneePose] calculerHorairesReels', err);
       return { ...recalcul, estime: true };
     }
-  }, [coreOrgId, depot, arretsExistants, selectionnees, contexte, recalcul]);
+  }, [coreOrgId, depot, journee, arretsExistants, selectionnees, contexte, recalcul]);
 
   // Seuls les candidats RÉELLEMENT placés sont posés. Un candidat refusé au
   // moment du calcul réel (le trou s'est refermé depuis la proposition) ne doit
