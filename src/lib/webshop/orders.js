@@ -110,6 +110,11 @@ export function statusPatch(order, to, now = new Date()) {
   return patch;
 }
 
+/** Réactiver une commande annulée : jamais payée → retour en attente de paiement, motif effacé. */
+export function reactivationPatch(order) {
+  return { status: order.paid_at ? 'nouvelle' : 'en_attente_paiement', cancel_reason: null };
+}
+
 function fold(s) {
   return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }

@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { TextInput, TextArea, FormField, SelectInput } from '@apps/artisan/components/FormFields';
 import {
   ORDER_BOARD_COLUMNS, ORDER_STATUS_LABELS, orderLines, orderTotalCents, formatCents, statusPatch,
+  reactivationPatch,
 } from '@/lib/webshop/orders';
 import OrderDeleteButton from '../OrderDeleteButton';
 
@@ -35,6 +36,7 @@ export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }
   const [saving, setSaving] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [reactivateOpen, setReactivateOpen] = useState(false);
   const lines = orderLines(order);
   const followUpDirty = carrier !== (order.carrier ?? '')
     || tracking !== (order.tracking_number ?? '')
@@ -72,6 +74,12 @@ export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }
     }
   };
 
+  const confirmReactivate = async () => {
+    const patch = reactivationPatch(order);
+    const ok = await run(patch, `Commande réactivée (« ${ORDER_STATUS_LABELS[patch.status]} »)`);
+    if (ok) setReactivateOpen(false);
+  };
+
   const isCancelled = order.status === 'annulee';
   const isPending = order.status === 'en_attente_paiement';
   const vat = order.vat_breakdown && typeof order.vat_breakdown === 'object' ? Object.entries(order.vat_breakdown) : [];
@@ -104,7 +112,7 @@ export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }
               </div>
             )}
             {isCancelled && (
-              <button type="button" disabled={saving} onClick={() => changeStatus('nouvelle')} className="text-sm text-primary-600 hover:underline">Réactiver</button>
+              <button type="button" disabled={saving} onClick={() => setReactivateOpen(true)} className="text-sm text-primary-600 hover:underline">Réactiver</button>
             )}
             {!isCancelled && (
               <button type="button" disabled={saving} onClick={() => setCancelOpen(true)} className="ml-auto text-sm text-red-600 hover:underline">Annuler la commande</button>
@@ -212,6 +220,19 @@ export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }
           <TextInput value={cancelReason} onChange={setCancelReason} placeholder="Ex. rupture fournisseur, demande du client" />
         </FormField>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={reactivateOpen}
+        onOpenChange={setReactivateOpen}
+        title={`Réactiver ${order.order_number} ?`}
+        description={order.paid_at
+          ? 'La commande a été payée : elle repart en « Nouvelle ».'
+          : 'Aucun paiement reçu : elle repart en « En attente de paiement », pas dans le tableau.'}
+        confirmLabel="Réactiver"
+        variant="default"
+        loading={saving}
+        onConfirm={confirmReactivate}
+      />
     </div>
   );
 }

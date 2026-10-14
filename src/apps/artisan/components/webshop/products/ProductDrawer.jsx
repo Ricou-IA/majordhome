@@ -4,7 +4,7 @@
  * Photos : envoyées immédiatement ; à l'enregistrement on supprime les fichiers de NOTRE préfixe
  * retirés du produit ; à l'abandon, ceux envoyés pendant la session.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { X, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -24,6 +24,7 @@ export default function ProductDrawer({ product, products, categories, orgId, si
   const [form, setForm] = useState(initial);
   const [showErrors, setShowErrors] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const uploadedRef = useRef(new Set());
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
   const errors = validateProductForm(form);
@@ -33,14 +34,19 @@ export default function ProductDrawer({ product, products, categories, orgId, si
   const pageUrl = product?.is_active && product?.shipping_kind ? productPageUrl(product.slug, siteUrl) : null;
   const hasPose = Boolean(initial.install_price_ttc || initial.pro_install_price_ttc);
 
+  // Abandon : toute photo envoyée pendant la session et absente de l'état initial est supprimée
+  // (y compris une photo envoyée puis retirée, que form.images ne porte plus).
   const discardUploads = async () => {
-    const paths = imagesToDelete(form.images, initial.images, orgId);
+    const paths = imagesToDelete([...uploadedRef.current], initial.images, orgId);
     if (paths.length) await webshopProductsService.deleteImages(paths);
   };
 
   const requestClose = () => {
     if (isDirty && canEdit) setConfirmClose(true);
-    else onClose();
+    else {
+      discardUploads();
+      onClose();
+    }
   };
 
   const handleSave = async () => {
@@ -59,7 +65,7 @@ export default function ProductDrawer({ product, products, categories, orgId, si
         await updateProduct({ id: product.id, patch: payload });
         toast.success(payload.is_active ? 'Produit enregistré — à jour sur le site' : 'Produit enregistré (masqué sur le site)');
       }
-      const orphans = imagesToDelete(initial.images, form.images, orgId);
+      const orphans = imagesToDelete([...initial.images, ...uploadedRef.current], form.images, orgId);
       if (orphans.length) {
         const { error } = await webshopProductsService.deleteImages(orphans);
         if (error) toast.warning('Photos retirées du produit mais pas supprimées du stockage');
@@ -112,7 +118,7 @@ export default function ProductDrawer({ product, products, categories, orgId, si
             </div>
           </Block>
           <Block title="Photos" hint={`${form.images.length} photo(s)`}>
-            <ProductImagesField images={form.images} onChange={(v) => set('images', v)} orgId={orgId} productId={productId} siteUrl={siteUrl} disabled={!canEdit} />
+            <ProductImagesField images={form.images} onChange={(v) => set('images', v)} onUploaded={(url) => uploadedRef.current.add(url)} orgId={orgId} productId={productId} siteUrl={siteUrl} disabled={!canEdit} />
           </Block>
           <Block title="Caractéristiques" hint={`${form.specs.length}`}>
             <SpecsField rows={form.specs} onChange={(v) => set('specs', v)} disabled={!canEdit} error={shownErrors.specs} />

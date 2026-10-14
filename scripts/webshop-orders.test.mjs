@@ -81,3 +81,10 @@ test('matchesOrderSearch : numéro, nom, ville, email, insensible aux accents', 
   assert.equal(matchesOrderSearch(NEW_MODEL, 'zzz'), false);
   assert.equal(matchesOrderSearch(NEW_MODEL, ''), true);
 });
+
+// ── Relecture finale ──────────────────────────────────────────────────────
+import { reactivationPatch } from '../src/lib/webshop/orders.js';
+test('reactivationPatch : une commande jamais payée retourne en attente de paiement, motif effacé', () => {
+  assert.deepEqual(reactivationPatch({ status: 'annulee', paid_at: null, cancel_reason: 'x' }), { status: 'en_attente_paiement', cancel_reason: null });
+  assert.deepEqual(reactivationPatch({ status: 'annulee', paid_at: '2026-10-01T10:00:00Z', cancel_reason: 'x' }), { status: 'nouvelle', cancel_reason: null });
+});

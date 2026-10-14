@@ -8,7 +8,7 @@ import { ImagePlus, ChevronLeft, ChevronRight, Star, X, Loader2, ImageOff } from
 import { webshopProductsService } from '@services/webshopProducts.service';
 import { checkImageFile, resolveImageUrl } from '@/lib/webshop/catalog';
 
-export default function ProductImagesField({ images, onChange, orgId, productId, siteUrl, disabled }) {
+export default function ProductImagesField({ images, onChange, onUploaded, orgId, productId, siteUrl, disabled }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(0);
   const [dragOver, setDragOver] = useState(false);
@@ -27,7 +27,10 @@ export default function ProductImagesField({ images, onChange, orgId, productId,
     for (const f of accepted) {
       const { data, error } = await webshopProductsService.uploadImage(orgId, productId, f);
       if (error) toast.error(`${f.name} : envoi impossible (${error.message})`);
-      else urls.push(data);
+      else {
+        urls.push(data);
+        onUploaded?.(data);
+      }
       setUploading((n) => n - 1);
     }
     if (urls.length) onChange([...images, ...urls]);

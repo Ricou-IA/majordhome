@@ -166,10 +166,14 @@ export function ownStoragePath(url, orgId) {
   return path.startsWith(`${orgId}/`) ? path : null;
 }
 
-/** Fichiers à supprimer du bucket : présents avant, absents après, et sous notre préfixe. */
+/**
+ * Fichiers à supprimer du bucket : présents dans `before`, absents de `after`, sous notre préfixe,
+ * sans doublon. Enregistrement : before = initial ∪ envoyées pendant la session ; abandon :
+ * before = envoyées, after = initial.
+ */
 export function imagesToDelete(before, after, orgId) {
   const kept = new Set(after ?? []);
-  return (before ?? [])
+  return [...new Set(before ?? [])]
     .filter((u) => !kept.has(u))
     .map((u) => ownStoragePath(u, orgId))
     .filter(Boolean);
@@ -182,7 +186,10 @@ export function checkImageFile(file) {
   return null;
 }
 
-/** Copie d'un produit : masquée, sans photos, slug unique dérivé. */
+/**
+ * Copie d'un produit : masquée, sans photos, slug unique dérivé. Ni référence fournisseur ni EAN :
+ * l'import Dixneuf du site rapproche par `supplier_ref`, deux lignes identiques le tromperaient.
+ */
 export function duplicatePayload(product, orgId, takenSlugs, displayOrder) {
   const {
     id: _id, slug, created_at: _c, updated_at: _u, org_id: _o, images: _i, ...rest
@@ -193,6 +200,8 @@ export function duplicatePayload(product, orgId, takenSlugs, displayOrder) {
     name: `${product.name} (copie)`,
     slug: uniqueSlug(`${slug || slugify(product.name)}-copie`, takenSlugs),
     images: [],
+    supplier_ref: null,
+    ean: null,
     is_active: false,
     is_featured: false,
     display_order: displayOrder,

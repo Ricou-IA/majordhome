@@ -150,3 +150,18 @@ test('productPageUrl', () => {
   assert.equal(productPageUrl('a-b', ''), null);
   assert.equal(productPageUrl('', 'https://x.fr'), null);
 });
+
+// ── Relecture finale ──────────────────────────────────────────────────────
+test('imagesToDelete : photo envoyée puis retirée dans la session (union avant ∪ envoyées), sans doublon', () => {
+  const UP = OWN.replace('a.webp', 'up.webp');
+  // Enregistrement : (avant ∪ envoyées) − après
+  assert.deepEqual(imagesToDelete([OWN, UP, OWN], [OWN], ORG), [`${ORG}/products/p1/up.webp`]);
+  // Abandon : envoyées − état initial
+  assert.deepEqual(imagesToDelete([UP, UP], [OWN], ORG), [`${ORG}/products/p1/up.webp`]);
+});
+test('duplicatePayload : la copie ne reprend ni la référence fournisseur ni l’EAN (import Dixneuf indexé par supplier_ref)', () => {
+  const d = duplicatePayload({ ...PRODUCT, ean: '3700000000000' }, ORG, [], 1);
+  assert.equal(d.supplier_ref, null);
+  assert.equal(d.ean, null);
+  assert.equal(d.supplier, 'dixneuf');
+});
