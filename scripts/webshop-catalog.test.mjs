@@ -82,7 +82,12 @@ test('validateProductForm : obligatoires, nombres FR, négatifs, palette, specs 
   assert.ok(validateProductForm({ ...productToForm(PRODUCT), price_ttc: '-1' }).price_ttc);
   assert.ok(validateProductForm({ ...productToForm(PRODUCT), stock_qty: '2,5' }).stock_qty);
   assert.ok(validateProductForm({ ...productToForm(PRODUCT), shipping_kind: 'pallet', pallet_slots: '' }).pallet_slots);
-  assert.ok(validateProductForm({ ...productToForm(PRODUCT), shipping_kind: '' }).shipping_kind);
+  assert.ok(validateProductForm({ ...productToForm(PRODUCT), shipping_kind: 'drone' }).shipping_kind);
+  // Hors boutique (borne vendue par sa page dédiée) : shipping_kind vide est valide et part en null
+  const borne = { ...productToForm(PRODUCT), shipping_kind: '' };
+  assert.deepEqual(validateProductForm(borne), {});
+  assert.equal(formToPayload(borne).shipping_kind, null);
+  assert.equal(productToForm({ ...PRODUCT, shipping_kind: null }).shipping_kind, '');
   assert.ok(validateProductForm({ ...productToForm(PRODUCT), vat_rate: '7' }).vat_rate);
   const dup = { ...productToForm(PRODUCT), specs: [{ label: 'Poids', value: 'a' }, { label: 'poids ', value: 'b' }] };
   assert.ok(validateProductForm(dup).specs);

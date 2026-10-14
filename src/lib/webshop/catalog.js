@@ -5,9 +5,12 @@
  */
 
 export const VAT_RATES = [5.5, 10, 20];
+// '' = hors boutique : le site n'affiche dans /boutique que les produits avec un mode d'expédition
+// (la borne V2C, vendue par sa page dédiée, n'en a pas).
 export const SHIPPING_KINDS = [
   { value: 'parcel', label: 'Colis (expédié)' },
   { value: 'pallet', label: 'Palette (livrée)' },
+  { value: '', label: 'Hors boutique (page dédiée)' },
 ];
 export const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -92,7 +95,7 @@ export function validateProductForm(form) {
   if (price === null) errors.price_ttc = 'Le prix est obligatoire';
   else if (Number.isNaN(price) || price < 0) errors.price_ttc = 'Prix invalide';
   if (!VAT_RATES.includes(Number(form.vat_rate))) errors.vat_rate = 'TVA invalide';
-  if (!SHIPPING_KINDS.some((k) => k.value === form.shipping_kind)) errors.shipping_kind = 'Choisir colis ou palette';
+  if (!SHIPPING_KINDS.some((k) => k.value === (form.shipping_kind ?? ''))) errors.shipping_kind = 'Mode d’expédition inconnu';
   for (const f of ['install_price_ttc', 'pro_install_price_ttc', 'purchase_price_ht', 'weight_kg']) {
     const v = parseDecimal(form[f]);
     if (v !== null && (Number.isNaN(v) || v < 0)) errors[f] = 'Nombre invalide';
