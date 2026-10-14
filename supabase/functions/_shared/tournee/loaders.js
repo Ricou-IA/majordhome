@@ -14,6 +14,7 @@
 // ============================================================================
 import { dureeContrat, construireFallbacks } from './duree.js';
 import { competencesVides, SKILL_ROLES } from './competences.js';
+import { resoudreExtremites } from './extremites.js';
 
 const hhmmEnMinutes = (s) => {
   const [h, m] = String(s || '08:00').split(':').map(Number);
@@ -37,6 +38,8 @@ const hhmmEnMinutes = (s) => {
  * @property {number} chargeMinutes  somme des `duration_minutes` (barème pour les entretiens), TOUS les RDV
  * @property {boolean} estAmorcee  au moins un RDV de type 'maintenance' ce jour-là
  * @property {{ entretien: string[], pose: string[] }} competences  types cochés par rôle (majordhome_team_member_skills)
+ * @property {object|null} depart  point de départ résolu (extremites.js) : exception du jour > réglage du technicien > siège
+ * @property {object|null} retour  point de retour résolu, même priorité
  */
 
 /**
@@ -75,11 +78,12 @@ export function budgetDuJour(dailyWorkMinutes, amplitude, reglages = null) {
  * @param {number} [p.joursApres=45]
  * @param {Date} [p.maintenant=new Date()]
  * @param {object|null} [p.reglages]  construireReglages(settings) — gain multi-équipements (R1)
+ * @param {{ lat: number, lng: number, label?: string }|null} [p.siege]  getOrgHeadquarters(settings) — départ / retour par défaut
  * @param {{ error: Function }} [p.logger=console]
  * @returns {Promise<{ data: Journee[], techniciens: Array<{ id, nom, competences: { entretien: string[], pose: string[] }, couleur }>, error: Error|null }>}
  */
 export async function chargerJournees({
-  client, coreOrgId, mdhOrgId, joursApres = 45, maintenant = new Date(), reglages = null, logger: log = console,
+  client, coreOrgId, mdhOrgId, joursApres = 45, maintenant = new Date(), reglages = null, siege = null, logger: log = console,
 }) {
   try {
   const orgId = mdhOrgId;
@@ -93,7 +97,7 @@ export async function chargerJournees({
     // (appointments.service.js) le filtre : sans lui, un technicien parti
     // continue de recevoir des propositions de tournée.
     client.from('majordhome_team_members')
-      .select('id, display_name, calendar_color, default_availability, daily_work_minutes, include_in_routing')
+      .select('id, display_name, calendar_color, default_availability, daily_work_minutes, include_in_routing, depart_point, retour_point')
       .eq('org_id', orgId).eq('role', 'technician').eq('include_in_routing', true).eq('is_active', true),
     client.from('majordhome_appointments')
       // ⚠️ `lead_id` est INDISPENSABLE ici : la résolution de coordonnées ci-dessous
@@ -121,6 +125,16 @@ export async function chargerJournees({
     if (!SKILL_ROLES.includes(s.role)) continue;
     competencesPar.get(s.team_member_id)?.[s.role].push(s.equipment_type_id);
   }
+
+  // Exceptions du jour (« Départ / Retour : Agence ») posées depuis la feuille de
+  // route. Aucune ligne = la journée suit le réglage du technicien.
+  const { data: exceptions, error: exErr } = membreIds.length
+    ? await client.from('majordhome_team_member_day_endpoints')
+        .select('team_member_id, date, depart, retour')
+        .eq('org_id', orgId).gte('date', iso(debut)).lte('date', iso(fin))
+    : { data: [], error: null };
+  if (exErr) return { data: [], techniciens: [], error: exErr };
+  const exceptionPar = new Map((exceptions || []).map((e) => [`${e.team_member_id}|${e.date}`, e]));
 
   // Amendement 1 — les RDV existants DOIVENT porter leurs coordonnées :
   // sans elles, `arretsExistants` (proposerPourJournee) est TOUJOURS vide
@@ -214,6 +228,7 @@ export async function chargerJournees({
         chargeMinutes: duJour.reduce((s, r) => s + (r.duration_minutes || 60), 0),
         estAmorcee: duJour.some((r) => r.appointment_type === 'maintenance'),
         competences: competencesPar.get(m.id),
+        ...resoudreExtremites({ siege, membre: m, exception: exceptionPar.get(`${m.id}|${date}`) ?? null }),
       });
     }
   }

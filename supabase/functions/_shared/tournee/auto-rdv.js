@@ -23,6 +23,7 @@ import { deduireSecteur } from './etat.js';
 import { construireArretsPourConsolidation, minutesVersHeure } from './arrets.js';
 import { sequencerTournee } from './sequence.js';
 import { cleCoord } from './geo.js';
+import { pointsDeJournee } from './extremites.js';
 
 const STATUTS_EXCLUS = new Set(['cancelled', 'no_show']);
 
@@ -183,14 +184,16 @@ function minutesDe(hhmm) {
 
 /**
  * Contexte de séquencement d'une journée depuis les réglages de l'org.
- * @param {object} journee  `{ amplitude, budgetMinutes }`
+ * @param {object} journee  `{ amplitude, budgetMinutes, depart?, retour? }`
  * @param {object} reglages
- * @param {{ lat: number, lng: number }} depot
+ * @param {{ lat: number, lng: number }} depot  siège — repli quand la journée ne porte pas ses points
  * @param {Function} trajet
  */
 function contexteSequencement(journee, reglages, depot, trajet) {
+  const { depotKey, retourKey } = pointsDeJournee(journee, depot);
   return {
-    depotKey: cleCoord(depot) ?? '',
+    depotKey,
+    retourKey,
     trajet,
     amplitude: journee.amplitude,
     budgetMinutes: (journee.budgetMinutes || 0) + (reglages.depassement_journee_minutes ?? 0),
@@ -219,7 +222,7 @@ export function placerParSequencement({ journee, contrat, demi, depot, reglages,
   const duree = contrat.dureeMinutes || 0;
   const rdvs = (journee.rdvs || []).filter((r) => !STATUTS_EXCLUS.has(r.status));
   const flexDefaut = reglages.souplesse_defaut_minutes ?? 0;
-  const arrets = construireArretsPourConsolidation(rdvs, depot, {
+  const arrets = construireArretsPourConsolidation(rdvs, pointsDeJournee(journee, depot).depart, {
     souplesse: true, flexDefaut, amplitude: journee.amplitude, demiJournee: reglages.demi_journee,
   });
   // Le contrat COMMENCE dans la demi-journée (engagement de début, Eric 2026-09-30 :

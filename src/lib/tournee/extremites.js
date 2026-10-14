@@ -60,7 +60,7 @@ export function resoudreExtremites({ siege, membre = null, exception = null }) {
 /**
  * Points effectifs d'une journée du moteur (`journee.depart/retour` posés par
  * chargerJournees), siège en repli.
- * @param {{ depart?: any, retour?: any }|null} journee
+ * @param {Record<string, any>|null} journee  journée du moteur (`depart`/`retour` posés par chargerJournees)
  * @param {{ lat: number, lng: number }|null} depot
  * @returns {{ depart: any, retour: any, depotKey: string, retourKey: string }}
  */

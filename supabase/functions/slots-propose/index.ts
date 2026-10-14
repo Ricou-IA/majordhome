@@ -32,6 +32,7 @@ import { proposerPourContrat, journeesCandidates } from "../_shared/tournee/prop
 import { construireMatrice, trajetLocal } from "../_shared/tournee/matrice.js";
 import { construireArretsExistants } from "../_shared/tournee/arrets.js";
 import { construireReglages } from "../_shared/tournee/reglages.js";
+import { pointsDeJournee } from "../_shared/tournee/extremites.js";
 
 // Rôle de compétence appliqué par cet outil : une tournée d'entretien. La pose
 // (installations) aura son propre outil — jamais un défaut implicite du moteur.
@@ -104,7 +105,7 @@ Deno.serve(async (req) => {
 
     const horizon = Math.max(reglages.horizon_ferme_jours, reglages.horizon_ouverture_jours ?? 45);
     const { data: journees, techniciens, error: jErr } = await chargerJournees({ reglages,
-      client: admin, coreOrgId: orgId, mdhOrgId: mdhOrg.id, joursApres: horizon, logger: console,
+      client: admin, coreOrgId: orgId, mdhOrgId: mdhOrg.id, joursApres: horizon, siege: depot, logger: console,
     });
     if (jErr) return jsonResponse({ error: sanitizeError(jErr, "journées illisibles") }, 500, req);
     if (!techniciens.length) return jsonResponse({ error: "aucun_technicien" }, 422, req);
@@ -138,8 +139,11 @@ Deno.serve(async (req) => {
       const resultats = await Promise.all(lot.map((j: (typeof journees)[number]) => {
         // `rdvs` est typé `object[]` par la JSDoc du loader ; la forme réelle est celle
         // attendue par construireArretsExistants (id, lat, lng, duration_minutes, scheduled_start).
-        const arrets = construireArretsExistants(j.rdvs as Parameters<typeof construireArretsExistants>[0], depot);
-        const noyau = [depot, ...arrets.flatMap((a) => {
+        // Départ / retour de la journée (réglage du technicien, exception du jour), siège en repli :
+        // les deux bouts entrent dans la matrice (dédoublonnés quand ils sont au même endroit).
+        const { depart, retour, depotKey, retourKey } = pointsDeJournee(j, depot);
+        const arrets = construireArretsExistants(j.rdvs as Parameters<typeof construireArretsExistants>[0], depart);
+        const noyau = [depart, ...(retourKey !== depotKey ? [retour] : []), ...arrets.flatMap((a) => {
           if (!a.key) return []; // arrêt sans position : bloque son créneau, rien à envoyer à Mapbox
           const [lat, lng] = a.key.split(",").map(Number);
           return [{ lat, lng }];

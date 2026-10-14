@@ -27,6 +27,7 @@
 import { placerCandidat, chargeExistante } from './creneaux.js';
 import { construireArretsExistants } from './arrets.js';
 import { cleCoord } from './geo.js';
+import { pointsDeJournee } from './extremites.js';
 import { REGLAGES_DEFAUT } from './reglages.js';
 import { estRoleValide } from './competences.js';
 
@@ -136,7 +137,7 @@ function fenetreDuJour(fenetre, j, { aujourdhui, maintenantMinutes, margeMinutes
  * @param {Array<{ id: string, nom: string, competences: { entretien: string[], pose: string[] } }>} p.techniciens
  * @param {'entretien'|'pose'} p.role  rôle de compétence appliqué (obligatoire)
  * @param {Map<string, string[]>|Record<string, string[]>} [p.typesParCategorie]  types par catégorie (défaut : contrat.typesParCategorie)
- * @param {{ lat: number, lng: number }} p.depot
+ * @param {{ lat: number, lng: number }} p.depot  siège — repli quand la journée ne porte pas `depart`/`retour`
  * @param {object} p.reglages  construireReglages(settings) — horizon_ferme_jours,
  *   horizon_ouverture_jours, pause_minutes, pause_fenetre
  * @param {{ technicianId?: string, dateFrom?: string, dateTo?: string,
@@ -171,7 +172,6 @@ export function proposerPourContrat({
   const nomPar = new Map((techniciens || []).map((t) => [t.id, t.nom]));
 
   const candidat = { id: contrat.id, key: cleCoord(contrat), dureeMinutes: contrat.dureeMinutes || 0 };
-  const depotKey = cleCoord(depot);
   const pause = {
     minutes: reglages.pause_minutes,
     fenetre: [reglages.pause_fenetre[0] * 60, reglages.pause_fenetre[1] * 60],
@@ -194,15 +194,17 @@ export function proposerPourContrat({
 
     // Souplesse : chaque arrêt porte sa tolérance (figé / ±15 / ±30 / demi-journée,
     // défaut d'org) — c'est ce qui autorise placerCandidat à glisser UN voisin.
-    const arrets = construireArretsExistants(j.rdvs, depot, {
+    // Départ / retour de CETTE journée (réglage du technicien, exception du jour, siège).
+    const { depart, depotKey, retourKey } = pointsDeJournee(j, depot);
+    const arrets = construireArretsExistants(j.rdvs, depart, {
       souplesse: true, // l'appelant (scheduleEntretien) sait écrire les décalages
       flexDefaut: reglages.souplesse_defaut_minutes ?? 0,
       amplitude: j.amplitude,
       demiJournee: reglages.demi_journee,
     });
-    const chargeDeja = chargeExistante(arrets, { trajet, depotKey });
+    const chargeDeja = chargeExistante(arrets, { trajet, depotKey, retourKey });
     const place = placerCandidat({
-      arrets, candidat, trajet, depotKey, amplitude: j.amplitude,
+      arrets, candidat, trajet, depotKey, retourKey, amplitude: j.amplitude,
       fenetreArrivee: fenetreDuJour(fenetreArrivee, j, { aujourdhui, maintenantMinutes, margeMinutes: margeAujourdhuiMinutes }),
       // Le budget affiché est daily_work_minutes ; le moteur tolère le
       // dépassement réglé (finir 30 min plus tard certains jours est normal).
@@ -233,7 +235,7 @@ export function proposerPourContrat({
     // jusqu'au RDV suivant (retour compris) ou jusqu'à la fin de journée (retour
     // dépôt compris). Le détour net reste dans le score, pas à l'affichage.
     const keyAvant = place.avantId ? (arretParId.get(place.avantId)?.key ?? depotKey) : depotKey;
-    const keyApres = place.apresId ? (arretParId.get(place.apresId)?.key ?? depotKey) : depotKey;
+    const keyApres = place.apresId ? (arretParId.get(place.apresId)?.key ?? retourKey) : retourKey;
     const trajetAllerMinutes = trajet(keyAvant, candidat.key);
     const trajetRetourMinutes = trajet(candidat.key, keyApres);
     // Le suivant a pu être décalé pour faire rentrer le candidat : le reste

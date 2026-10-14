@@ -15,13 +15,14 @@
 // ============================================================================
 import { diagnostiquerJournee, sequencerTournee } from './sequence.js';
 import { construireArretsPourConsolidation, TYPES_ADAPTABLES } from './arrets.js';
-import { cleCoord } from './geo.js';
+import { pointsDeJournee } from './extremites.js';
 
 /**
  * @param {object} p
  * @param {Array<object>} p.arrets   construireArretsPourConsolidation(...)
  * @param {Function} p.trajet        (keyA, keyB) → minutes
  * @param {string} p.depotKey
+ * @param {string} [p.retourKey]  défaut : depotKey
  * @param {number} p.budgetMinutes         budget de la journée (loaders.js::budgetDuJour)
  * @param {number} [p.depassementMinutes=0]  réglage depassement_journee_minutes
  * @param {number} p.resteUtileMinMinutes   réglage reste_utile_min_minutes
@@ -29,7 +30,7 @@ import { cleCoord } from './geo.js';
  *   travailMinutes: number, trajetsMinutes: number, budgetTolereMinutes: number }}
  */
 export function evaluerRemplissage({
-  arrets, trajet, depotKey, budgetMinutes, depassementMinutes = 0, resteUtileMinMinutes,
+  arrets, trajet, depotKey, retourKey = depotKey, budgetMinutes, depassementMinutes = 0, resteUtileMinMinutes,
 }) {
   const budgetTolereMinutes = budgetMinutes + depassementMinutes;
   if (!arrets || arrets.length === 0) {
@@ -38,7 +39,7 @@ export function evaluerRemplissage({
       travailMinutes: 0, trajetsMinutes: 0, budgetTolereMinutes,
     };
   }
-  const d = diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes: budgetTolereMinutes, pause: { minutes: 0 } });
+  const d = diagnostiquerJournee(arrets, { depotKey, retourKey, trajet, budgetMinutes: budgetTolereMinutes, pause: { minutes: 0 } });
   const chargeMinutes = d.chargeMinutes;
   const resteUtileMinutes = budgetTolereMinutes - chargeMinutes;
   return {
@@ -66,7 +67,7 @@ export function rdvAdaptable(rdv, flexDefaut) {
  *
  * @param {object} p
  * @param {{ date: string, rdvs: Array<object>, amplitude: {debut:number, fin:number}, budgetMinutes: number }} p.journee
- * @param {{ lat: number, lng: number }} p.depot
+ * @param {{ lat: number, lng: number }} p.depot  siège — repli quand la journée ne porte pas `depart`/`retour`
  * @param {object} p.reglages   construireReglages(settings)
  * @param {Function} p.trajet   (keyA, keyB) → minutes
  * @returns {{ verdict: 'sans_adaptable'|'non_pleine'|'figeable'|'a_arbitrer', adaptables: number,
@@ -80,13 +81,13 @@ export function verdictJournee({ journee, depot, reglages, trajet }) {
   const rdvs = (journee.rdvs || []).filter((r) => r.status !== 'cancelled');
   const adaptables = rdvs.filter((r) => rdvAdaptable(r, flexDefaut)).length;
   if (rdvs.length === 0) return { verdict: 'sans_adaptable', adaptables, remplissage: null, sequence: null };
-  const arrets = construireArretsPourConsolidation(rdvs, depot, {
+  const { depart, depotKey, retourKey } = pointsDeJournee(journee, depot);
+  const arrets = construireArretsPourConsolidation(rdvs, depart, {
     souplesse: true, flexDefaut, amplitude: journee.amplitude, demiJournee: reglages.demi_journee,
   });
-  const depotKey = cleCoord(depot) ?? '';
   const depassementMinutes = reglages.depassement_journee_minutes ?? 0;
   const remplissage = evaluerRemplissage({
-    arrets, trajet, depotKey, budgetMinutes: journee.budgetMinutes, depassementMinutes,
+    arrets, trajet, depotKey, retourKey, budgetMinutes: journee.budgetMinutes, depassementMinutes,
     resteUtileMinMinutes: reglages.reste_utile_min_minutes ?? 75,
   });
   // Rien d'adaptable : rien à ordonnancer ni à figer, le verdict ne change pas.
@@ -96,7 +97,7 @@ export function verdictJournee({ journee, depot, reglages, trajet }) {
   if (!remplissage.pleine) return { verdict: 'non_pleine', adaptables, remplissage, sequence: null };
   const sequence = sequencerTournee({
     toleranceRetourMinutes: reglages.tolerance_retour_depot_minutes ?? 0,
-    depotKey, arrets, trajet, amplitude: journee.amplitude,
+    depotKey, retourKey, arrets, trajet, amplitude: journee.amplitude,
     budgetMinutes: journee.budgetMinutes + depassementMinutes,
     pause: { minutes: reglages.pause_minutes ?? 0, fenetre: [(reglages.pause_fenetre?.[0] ?? 12) * 60, (reglages.pause_fenetre?.[1] ?? 14) * 60] },
     figesSontDesFaits: true,

@@ -43,7 +43,7 @@ import { construireMatrice, trajetLocal } from "../_shared/tournee/matrice.js";
 import { construireArretsPourConsolidation, minutesVersHeure, arrondirHeureFigee, TYPES_ADAPTABLES } from "../_shared/tournee/arrets.js";
 import { verdictJournee } from "../_shared/tournee/plein.js";
 import { construireReglages } from "../_shared/tournee/reglages.js";
-import { cleCoord } from "../_shared/tournee/geo.js";
+import { pointsDeJournee } from "../_shared/tournee/extremites.js";
 
 const MDH_CRON_SECRET = Deno.env.get("MDH_CRON_SECRET") || "";
 const CAMPAIGN = "heure_de_passage";
@@ -189,7 +189,7 @@ Deno.serve(async (req: Request) => {
       const reglages = construireReglages(settings);
       const horizon = Math.max(reglages.horizon_ferme_jours, reglages.horizon_ouverture_jours ?? 45);
       const { data: journees, error: jErr } = await chargerJournees({
-        client: admin, coreOrgId: org.id, mdhOrgId: mdhOrg.id, joursApres: horizon, reglages, logger: console,
+        client: admin, coreOrgId: org.id, mdhOrgId: mdhOrg.id, joursApres: horizon, reglages, siege: depot, logger: console,
       });
       if (jErr) {
         report.error = sanitizeError(jErr, "journées illisibles");
@@ -197,9 +197,8 @@ Deno.serve(async (req: Request) => {
       }
       const charger = creerChargeurMatrice({ client: admin, coreOrgId: org.id, token, logger: console });
       const flexDefaut = reglages.souplesse_defaut_minutes ?? 0;
-      const depotKey = cleCoord(depot) ?? "";
 
-      for (const j of journees as Array<{ date: string; technicienId: string; technicienNom: string; rdvs: Rdv[]; amplitude: { debut: number; fin: number }; budgetMinutes: number }>) {
+      for (const j of journees as Array<{ date: string; technicienId: string; technicienNom: string; rdvs: Rdv[]; amplitude: { debut: number; fin: number }; budgetMinutes: number; depart: unknown; retour: unknown }>) {
         if (j.date <= aujourdhui) continue; // aujourd'hui : le geste reste humain
         if (onlyDate && j.date !== onlyDate) continue;
         const rdvs = j.rdvs; // TOUS les RDV du jour chargent la journée (une pose aussi)
@@ -208,11 +207,14 @@ Deno.serve(async (req: Request) => {
         const jr: JourneeReport = { date: j.date, technicien: j.technicienNom, technicien_id: j.technicienId, rdvs: rdvs.length, adaptables: adaptables.length, verdict: "non_pleine" };
         report.journees.push(jr);
         try {
+          // Départ / retour de la journée (réglage du technicien, exception du jour), siège en repli :
+          // les deux bouts entrent dans la matrice (dédoublonnés quand ils sont au même endroit).
+          const { depart, retour, depotKey, retourKey } = pointsDeJournee(j, depot);
           const arrets = construireArretsPourConsolidation(
-            rdvs as Parameters<typeof construireArretsPourConsolidation>[0], depot,
+            rdvs as Parameters<typeof construireArretsPourConsolidation>[0], depart,
             { souplesse: true, flexDefaut, amplitude: j.amplitude, demiJournee: reglages.demi_journee },
           );
-          const journeeMoteur = { date: j.date, rdvs, amplitude: j.amplitude, budgetMinutes: j.budgetMinutes };
+          const journeeMoteur = { date: j.date, rdvs, amplitude: j.amplitude, budgetMinutes: j.budgetMinutes, depart: j.depart, retour: j.retour };
 
           // Pré-filtre gratuit : si même à vol d'oiseau la journée est loin d'être
           // pleine, inutile d'appeler Mapbox (une matrice par journée, chaque heure).
@@ -224,7 +226,7 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
-          const noyau = [depot, ...arrets.flatMap((a) => {
+          const noyau = [depart, ...(retourKey !== depotKey ? [retour] : []), ...arrets.flatMap((a) => {
             if (!a.key) return [];
             const [lat, lng] = a.key.split(",").map(Number);
             return [{ lat, lng }];

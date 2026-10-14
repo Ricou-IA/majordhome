@@ -27,6 +27,7 @@ import { construireReglages } from "./tournee/reglages.js";
 import { construireArretsExistants } from "./tournee/arrets.js";
 import { techniciensEligibles } from "./tournee/proposer-contrat.js";
 import { cleCoord } from "./tournee/geo.js";
+import { pointsDeJournee } from "./tournee/extremites.js";
 import { secteurMajoritaire, normaliserSecteur } from "./tournee/secteurs.js";
 import { bornesMois, bornesHorizon, demiJournees } from "./tournee/auto-rdv.js";
 
@@ -116,7 +117,7 @@ export async function charger(
   const [contratRes, journeesRes, etiquettesRes, dernierRes] = await Promise.all([
     chargerContrat({ client: admin, coreOrgId, contractId, reglages }),
     chargerJournees({
-      client: admin, coreOrgId, mdhOrgId: mdhOrg.id, reglages, logger: console,
+      client: admin, coreOrgId, mdhOrgId: mdhOrg.id, reglages, siege: depot, logger: console,
       ...(jour
         ? { maintenant: new Date(`${jour}T12:00:00Z`), joursApres: 0 }
         : { joursApres: Math.max(0, joursEntre(aujourdhui, bornes.fin)) }),
@@ -193,10 +194,13 @@ export async function rdvDejaPris(ctx: Contexte): Promise<{ date: string; demi: 
   };
 }
 
-/** Dépôt + arrêts localisés d'une journée (le « noyau » du chargeur de matrice). */
+/** Départ / retour + arrêts localisés d'une journée (le « noyau » du chargeur de matrice). */
 function noyauDe(ctx: Contexte, j: Contexte["journees"][number]): Array<{ lat: number; lng: number }> {
-  const arrets = construireArretsExistants(j.rdvs as Parameters<typeof construireArretsExistants>[0], ctx.depot);
-  return [ctx.depot, ...arrets.flatMap((a) => {
+  // Départ / retour de la journée (réglage du technicien, exception du jour), siège en repli :
+  // les deux bouts entrent dans la matrice (dédoublonnés quand ils sont au même endroit).
+  const { depart, retour, depotKey, retourKey } = pointsDeJournee(j, ctx.depot);
+  const arrets = construireArretsExistants(j.rdvs as Parameters<typeof construireArretsExistants>[0], depart);
+  return [depart, ...(retourKey !== depotKey ? [retour] : []), ...arrets.flatMap((a) => {
     if (!a.key) return [];
     const [lat, lng] = a.key.split(",").map(Number);
     return [{ lat, lng }];
