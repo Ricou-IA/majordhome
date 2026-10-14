@@ -75,7 +75,7 @@ export function arretsPlaces(arrets) {
  * déplacé par insertion : le cas simple, lisible, annonçable au client.
  * @returns {{ dispoDepuis: number, dispoJusqua: number, places: Array, decalage: object }|null}
  */
-function tenterDecalage({ places, iv, manque, trajet, depotKey, amplitude }) {
+function tenterDecalage({ places, iv, manque, trajet, depotKey, retourKey = depotKey, amplitude }) {
   const i = iv.indexApres;
   const apres = places[i];
   const avant = places[i - 1];
@@ -86,7 +86,7 @@ function tenterDecalage({ places, iv, manque, trajet, depotKey, amplitude }) {
     const suivant = places[i + 1];
     const butee = suivant
       ? suivant.debutMinutes - trajetOu(trajet, apres.key, suivant.key)
-      : amplitude.fin - trajetOu(trajet, apres.key, depotKey);
+      : amplitude.fin - trajetOu(trajet, apres.key, retourKey);
     if (nouveauDebut + apres.dureeMinutes <= butee) {
       const deplace = { ...apres, debutMinutes: nouveauDebut, finMinutes: nouveauDebut + apres.dureeMinutes };
       const nouvellesPlaces = places.map((p) => (p.id === apres.id ? deplace : p));
@@ -122,9 +122,12 @@ function tenterDecalage({ places, iv, manque, trajet, depotKey, amplitude }) {
 
 /**
  * Charge déjà consommée : durées de TOUS les arrêts (placés ou non) + trajets
- * de la chaîne des arrêts placés, dépôt compris aux deux bouts.
+ * de la chaîne des arrêts placés, départ et retour compris aux deux bouts.
+ * @param {Array} arrets
+ * @param {{ trajet: Function, depotKey: string, retourKey?: string }} ctx  `retourKey` défaut = depotKey
+ * @returns {number}
  */
-export function chargeExistante(arrets, { trajet, depotKey }) {
+export function chargeExistante(arrets, { trajet, depotKey, retourKey = depotKey }) {
   const places = arretsPlaces(arrets);
   let total = (arrets || []).reduce((s, a) => s + (a.dureeMinutes || 0), 0);
   if (places.length === 0) return total;
@@ -133,7 +136,7 @@ export function chargeExistante(arrets, { trajet, depotKey }) {
   for (let i = 1; i < places.length; i += 1) {
     total += trajetOu(trajet, places[i - 1].key, places[i].key);
   }
-  total += trajetOu(trajet, places[places.length - 1].key, depotKey);
+  total += trajetOu(trajet, places[places.length - 1].key, retourKey);
   return total;
 }
 
@@ -142,7 +145,7 @@ export function chargeExistante(arrets, { trajet, depotKey }) {
  * immédiats (ou le dépôt aux extrémités).
  * @returns {Array<{indexApres: number, keyAvant, dispoDepuis: number, keyApres, dispoJusqua: number}>}
  */
-function intervalles(places, { depotKey, amplitude }) {
+function intervalles(places, { depotKey, retourKey = depotKey, amplitude }) {
   const liste = [];
   for (let i = 0; i <= places.length; i += 1) {
     const avant = places[i - 1];
@@ -151,7 +154,7 @@ function intervalles(places, { depotKey, amplitude }) {
       indexApres: i,
       keyAvant: avant ? avant.key : depotKey,
       dispoDepuis: avant ? avant.finMinutes : amplitude.debut,
-      keyApres: apres ? apres.key : depotKey,
+      keyApres: apres ? apres.key : retourKey,
       dispoJusqua: apres ? apres.debutMinutes : amplitude.fin,
       apresId: apres ? apres.id : null,
       avantId: avant ? avant.id : null,
@@ -190,7 +193,8 @@ function pausePossible(places, pause) {
  * @param {Array} params.arrets        arrêts existants (cf. construireArretsExistants)
  * @param {{id, key, dureeMinutes}} params.candidat
  * @param {Function} params.trajet     (fromKey, toKey) => minutes
- * @param {string} params.depotKey
+ * @param {string} params.depotKey   clé du point de DÉPART de la journée
+ * @param {string} [params.retourKey] clé du point de RETOUR (défaut : depotKey)
  * @param {{debut: number, fin: number}} params.amplitude
  * @param {number} params.budgetMinutes
  * @param {{minutes: number, fenetre: [number, number]}} [params.pause]
@@ -224,7 +228,7 @@ function pausePossible(places, pause) {
  *   ne mesurent pas la même chose, et rien ne le disait.
  */
 export function placerCandidat({
-  arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, fenetreArrivee, trajetMaxMinutes,
+  arrets, candidat, trajet, depotKey, retourKey = depotKey, amplitude, budgetMinutes, pause, chargeDeja, fenetreArrivee, trajetMaxMinutes,
   toleranceRetourMinutes = 0,
 }) {
   const echec = (raison) => ({
@@ -245,7 +249,7 @@ export function placerCandidat({
   if (!candidat?.key) return echec('position');
 
   const places = arretsPlaces(arrets);
-  const charge = chargeDeja ?? chargeExistante(arrets, { trajet, depotKey });
+  const charge = chargeDeja ?? chargeExistante(arrets, { trajet, depotKey, retourKey });
   const duree = candidat.dureeMinutes || 0;
   const pauseAvant = pausePossible(places, pause);
 
@@ -363,13 +367,13 @@ export function placerCandidat({
     return { placeIci, manque: (auPlusTot + duree + retour) - dispoJusqua };
   };
 
-  for (const iv of intervalles(places, { depotKey, amplitude })) {
+  for (const iv of intervalles(places, { depotKey, retourKey, amplitude })) {
     const { placeIci, manque } = evaluerIntervalle(iv, {
       dispoDepuis: iv.dispoDepuis, dispoJusqua: iv.dispoJusqua, placesCourantes: places, decalages: [],
     });
     if (placeIci || manque <= 0) continue;
     // Souplesse : un voisin adaptable peut-il glisser de `manque` minutes ?
-    const ajuste = tenterDecalage({ places, iv, manque, trajet, depotKey, amplitude });
+    const ajuste = tenterDecalage({ places, iv, manque, trajet, depotKey, retourKey, amplitude });
     if (!ajuste) continue;
     evaluerIntervalle(iv, {
       dispoDepuis: ajuste.dispoDepuis, dispoJusqua: ajuste.dispoJusqua,
@@ -399,16 +403,16 @@ export function placerCandidat({
  */
 export function classerParCreneaux(arrets, candidats, ctx, { scoreParId = {} } = {}) {
   const {
-    trajet, depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes = 0,
+    trajet, depotKey, retourKey = depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes = 0,
   } = ctx;
-  const chargeDeja = chargeExistante(arrets, { trajet, depotKey });
+  const chargeDeja = chargeExistante(arrets, { trajet, depotKey, retourKey });
 
   const classement = [];
   const raisonsRejet = {};
 
   for (const candidat of candidats || []) {
     const place = placerCandidat({
-      arrets, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, chargeDeja, toleranceRetourMinutes,
+      arrets, candidat, trajet, depotKey, retourKey, amplitude, budgetMinutes, pause, chargeDeja, toleranceRetourMinutes,
     });
     if (!place.faisable) {
       raisonsRejet[place.raison] = (raisonsRejet[place.raison] || 0) + 1;
@@ -457,7 +461,7 @@ export function classerParCreneaux(arrets, candidats, ctx, { scoreParId = {} } =
  */
 export function placerPlusieurs(arrets, candidats, ctx) {
   const {
-    trajet, depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes = 0,
+    trajet, depotKey, retourKey = depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes = 0,
   } = ctx;
 
   let courants = [...(arrets || [])];
@@ -466,7 +470,7 @@ export function placerPlusieurs(arrets, candidats, ctx) {
 
   for (const candidat of candidats || []) {
     const placement = placerCandidat({
-      arrets: courants, candidat, trajet, depotKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes,
+      arrets: courants, candidat, trajet, depotKey, retourKey, amplitude, budgetMinutes, pause, toleranceRetourMinutes,
     });
     if (!placement.faisable || placement.decalages?.length) {
       // idem classerParCreneaux : un décalage de voisin n'est pas propagé ici.
@@ -488,12 +492,15 @@ export function placerPlusieurs(arrets, candidats, ctx) {
 }
 
 /**
- * Heure de fin de journée (retour au dépôt) pour un jeu d'arrêts placés.
+ * Heure de fin de journée (arrivée au point de retour) pour un jeu d'arrêts placés.
  * `null` si la journée est vide — il n'y a pas de « fin » à annoncer.
+ * @param {Array} arrets
+ * @param {{ trajet: Function, depotKey: string, retourKey?: string }} ctx  `retourKey` défaut = depotKey
+ * @returns {number|null}
  */
-export function finDeJournee(arrets, { trajet, depotKey }) {
+export function finDeJournee(arrets, { trajet, depotKey, retourKey = depotKey }) {
   const places = arretsPlaces(arrets);
   if (places.length === 0) return null;
   const dernier = places[places.length - 1];
-  return dernier.finMinutes + trajetOu(trajet, dernier.key, depotKey);
+  return dernier.finMinutes + trajetOu(trajet, dernier.key, retourKey);
 }

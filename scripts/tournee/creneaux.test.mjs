@@ -529,3 +529,21 @@ test('tolérance du retour au dépôt : le client finit dans l amplitude, le ret
   const trop = placerCandidat({ arrets, candidat: candidat('x', 90), ...ctx(uniforme(45), { budgetMinutes: 2000, toleranceRetourMinutes: 60 }) });
   assert.equal(trop.faisable, false);
 });
+
+// --- Départ / retour par technicien (spec 2026-10-14) -------------------------
+test('chargeExistante et finDeJournee : le dernier tronçon va vers retourKey', () => {
+  const t = (a, b) => (a === b ? 0 : ({ 'D|A': 10, 'A|R': 40, 'A|D': 5 })[`${a}|${b}`] ?? 99);
+  const arrets = [{ id: 'a', key: 'A', dureeMinutes: 60, fenetre: { debut: 540, fin: 540 } }];
+  assert.equal(chargeExistante(arrets, { trajet: t, depotKey: 'D', retourKey: 'R' }), 60 + 10 + 40);
+  assert.equal(chargeExistante(arrets, { trajet: t, depotKey: 'D' }), 60 + 10 + 5);
+  assert.equal(finDeJournee(arrets, { trajet: t, depotKey: 'D', retourKey: 'R' }), 600 + 40);
+});
+
+test('placerCandidat : le dernier intervalle mesure le retour vers retourKey', () => {
+  // Candidat proche du départ, très loin du point de retour : la journée déborde.
+  const t = (a, b) => (a === b ? 0 : ({ 'D|C': 5, 'C|R': 600, 'C|D': 5 })[`${a}|${b}`] ?? 99);
+  const base = { arrets: [], candidat: { id: 'c', key: 'C', dureeMinutes: 60 }, trajet: t,
+    depotKey: 'D', amplitude: { debut: 480, fin: 1080 }, budgetMinutes: 600 };
+  assert.equal(placerCandidat(base).faisable, true);
+  assert.equal(placerCandidat({ ...base, retourKey: 'R' }).faisable, false);
+});

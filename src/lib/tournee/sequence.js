@@ -43,7 +43,7 @@ function* permutations(items) {
  * Déroule une journée dans un ordre donné et retourne son coût, ou `null` si
  * une contrainte est violée (avec la raison).
  */
-function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits = false, toleranceRetourMinutes = 0 }) {
+function simuler(ordre, { depotKey, retourKey = depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits = false, toleranceRetourMinutes = 0 }) {
   let t = amplitude.debut;
   let charge = 0;
 
@@ -112,7 +112,7 @@ function simuler(ordre, { depotKey, trajet, amplitude, budgetMinutes, pause, fig
   // « dans les faits ils accélèrent pour rentrer », Eric 2026-09-30).
   const finChezLeClient = t;
   if (ordre.length > 0) {
-    const retour = trajet(position, depotKey);
+    const retour = trajet(position, retourKey);
     t += retour;
     charge += retour;
   }
@@ -193,7 +193,7 @@ function plusProcheVoisin(arrets, depotKey, trajet) {
  *   depasseBudget: boolean,
  *   conflits: Array<{ id, depuisId, trajetMinutes: number, disponibleMinutes: number }> }}
  */
-export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, pause, amplitude }) {
+export function diagnostiquerJournee(arrets, { depotKey, retourKey = depotKey, trajet, budgetMinutes, pause, amplitude }) {
   const heure = (a) => a.prevu ?? a.fenetre?.debut ?? 0;
   const ordre = [...arrets].sort((a, b) => heure(a) - heure(b));
   let trajets = 0;
@@ -221,7 +221,7 @@ export function diagnostiquerJournee(arrets, { depotKey, trajet, budgetMinutes, 
     position = a.key;
     precedent = a;
   }
-  if (ordre.length > 0) trajets += trajet(position, depotKey);
+  if (ordre.length > 0) trajets += trajet(position, retourKey);
   const chargeMinutes = trajets + travail;
   return {
     ordre: ordre.map((a) => a.id),
@@ -260,7 +260,8 @@ function estMeilleur(sim, ordre, meilleurActuel) {
  * l'amplitude. Exact jusqu'à MAX_ARRETS_EXACT arrêts, heuristique au-delà.
  *
  * @param {object} p
- * @param {string} p.depotKey
+ * @param {string} p.depotKey  clé du point de DÉPART de la journée
+ * @param {string} [p.retourKey]  clé du point de RETOUR (défaut : depotKey)
  * @param {Array<{ id: string, key: string|null, dureeMinutes: number, fenetre?: {debut:number, fin:number}, prevu?: number }>} [p.arrets]
  * @param {(a: string|null, b: string|null) => number} p.trajet
  * @param {{ debut: number, fin: number }} p.amplitude
@@ -275,6 +276,7 @@ function estMeilleur(sim, ordre, meilleurActuel) {
  */
 export function sequencerTournee({
   depotKey,
+  retourKey = depotKey,
   arrets = [],
   trajet,
   amplitude,
@@ -283,7 +285,7 @@ export function sequencerTournee({
   figesSontDesFaits = false,
   toleranceRetourMinutes = 0,
 }) {
-  const ctx = { depotKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits, toleranceRetourMinutes };
+  const ctx = { depotKey, retourKey, trajet, amplitude, budgetMinutes, pause, figesSontDesFaits, toleranceRetourMinutes };
 
   if (arrets.length === 0) {
     return {

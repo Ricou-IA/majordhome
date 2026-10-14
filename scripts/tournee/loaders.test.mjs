@@ -228,3 +228,40 @@ test('R1 (bloc contrat) : un Entretien à contrat porte la durée barème × gai
   assert.equal(par.libre.duration_minutes, 45, 'sans contrat : durée saisie');
   assert.equal(j.chargeMinutes, 216 + 120 + 45);
 });
+
+// --- Départ / retour par technicien (spec 2026-10-14) -------------------------
+test('chargerJournees : chaque journée porte départ / retour résolus (réglage, exception du jour, siège)', async () => {
+  const dispo = { monday: { active: true, start: '08:00', end: '18:00' }, tuesday: { active: true, start: '08:00', end: '18:00' } };
+  const maison = { label: 'Domicile', address: '1 rue X 31620 Bouloc', lat: 43.78, lng: 1.41 };
+  const client = fauxClient({
+    majordhome_team_members: [
+      { id: 't1', display_name: 'Mohammed', default_availability: dispo, daily_work_minutes: 480, depart_point: maison, retour_point: maison },
+      { id: 't2', display_name: 'Antoine', default_availability: dispo, daily_work_minutes: 480 },
+    ],
+    majordhome_team_member_skills: [],
+    majordhome_team_member_day_endpoints: [{ team_member_id: 't1', date: '2026-09-15', depart: null, retour: 'agence' }],
+    majordhome_appointments: [],
+  });
+  const siege = { lat: 43.9, lng: 1.9, label: 'Gaillac' };
+  const { data, error } = await chargerJournees({
+    client, coreOrgId: 'core', mdhOrgId: 'mdh', joursApres: 1, maintenant: LUNDI, siege, logger: silencieux,
+  });
+  assert.equal(error, null);
+  const de = (tech, date) => data.find((j) => j.technicienId === tech && j.date === date);
+  assert.equal(de('t1', '2026-09-14').depart.source, 'perso');
+  assert.equal(de('t1', '2026-09-14').retour.source, 'perso');
+  assert.equal(de('t1', '2026-09-15').depart.source, 'perso');
+  assert.equal(de('t1', '2026-09-15').retour.source, 'agence');   // exception du jour
+  assert.equal(de('t2', '2026-09-14').depart.label, 'Gaillac');    // pas de réglage → siège
+  assert.ok(client.lues.includes('majordhome_team_member_day_endpoints'));
+});
+
+test('chargerJournees : sans siège ni point, départ / retour null (l appelant garde son repli)', async () => {
+  const client = fauxClient({
+    majordhome_team_members: [{ id: 't1', display_name: 'A', default_availability: { monday: { active: true, start: '08:00', end: '18:00' } } }],
+    majordhome_appointments: [],
+  });
+  const { data } = await chargerJournees({ client, coreOrgId: 'core', mdhOrgId: 'mdh', joursApres: 0, maintenant: LUNDI, logger: silencieux });
+  assert.equal(data[0].depart, null);
+  assert.equal(data[0].retour, null);
+});

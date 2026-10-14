@@ -78,3 +78,16 @@ test('verdictJournee : sans adaptable → rien ; pleine et tenable → figeable 
   assert.equal(w.verdict, 'a_arbitrer');
   assert.equal(w.sequence.diagnostic.depasseBudget, true);
 });
+
+// --- Départ / retour par technicien (spec 2026-10-14) -------------------------
+test('verdictJournee part de journee.depart et rentre à journee.retour, pas au siège', () => {
+  const journee = { date: '2026-10-20', amplitude: AMP, budgetMinutes: 480,
+    depart: { lat: 43.0, lng: 1.0 }, retour: { lat: 44.0, lng: 2.0 },
+    rdvs: [{ id: 'r', lat: 43.5, lng: 1.5, duration_minutes: 60, scheduled_start: '09:00', appointment_type: 'maintenance' }] };
+  const vus = [];
+  const t = (a, b) => { vus.push(`${a}|${b}`); return 10; };
+  verdictJournee({ journee, depot: { lat: 45, lng: 3 }, reglages: { reste_utile_min_minutes: 75 }, trajet: t });
+  assert.ok(vus.includes('43.000,1.000|43.500,1.500'), 'aller depuis journee.depart');
+  assert.ok(vus.includes('43.500,1.500|44.000,2.000'), 'retour vers journee.retour');
+  assert.ok(!vus.some((k) => k.includes('45.000,3.000')), 'siège ignoré quand la journée porte ses points');
+});

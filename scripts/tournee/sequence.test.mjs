@@ -359,3 +359,19 @@ test('retour au dépôt : le dernier client finit dans l amplitude, le retour pe
   assert.equal(trop.faisable, false);
   assert.equal(trop.raison, 'amplitude');
 });
+
+// --- Départ / retour par technicien (spec 2026-10-14) -------------------------
+test('retour vers retourKey distinct du départ : le dernier trajet va au point de retour', () => {
+  const t = (a, b) => (a === b ? 0 : ({ 'D|A': 10, 'A|R': 50, 'A|D': 5 })[`${a}|${b}`] ?? 99);
+  const r = sequencerTournee({ depotKey: 'D', retourKey: 'R', arrets: [{ id: 'a', key: 'A', dureeMinutes: 60 }],
+    trajet: t, amplitude: { debut: 480, fin: 1080 }, budgetMinutes: 600 });
+  assert.equal(r.chargeMinutes, 10 + 60 + 50);
+  assert.equal(r.finMinutes, 480 + 10 + 60 + 50);
+});
+
+test('sans retourKey : le retour reste le départ (comportement inchangé)', () => {
+  const t = (a, b) => (a === b ? 0 : ({ 'D|A': 10, 'A|D': 5 })[`${a}|${b}`] ?? 99);
+  const r = sequencerTournee({ depotKey: 'D', arrets: [{ id: 'a', key: 'A', dureeMinutes: 60 }],
+    trajet: t, amplitude: { debut: 480, fin: 1080 }, budgetMinutes: 600 });
+  assert.equal(r.chargeMinutes, 75);
+});

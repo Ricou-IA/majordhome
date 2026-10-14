@@ -326,3 +326,18 @@ test('trajet max entre clients : rien de raisonnable → nouvellesJournees, moti
   assert.equal(r.raisonsRejet.trajet, 1);
   assert.deepEqual(r.nouvellesJournees.map((j) => j.date), ['2026-10-14']);
 });
+
+// --- Départ / retour par technicien (spec 2026-10-14) -------------------------
+test('chaque journée part de SON point de départ et rentre à SON point de retour', () => {
+  const j = { ...journee('2026-09-17', 'antoine', [rdv('b', '08:00', 43.900, 1.900)]),
+    depart: { lat: 43.600, lng: 2.240 }, retour: { lat: 43.700, lng: 2.000 } };
+  const vus = [];
+  const t = (a, b) => { vus.push(`${a}|${b}`); return a === b ? 0 : 10; };
+  const { creneaux } = proposerPourContrat({
+    contrat: CONTRAT, journees: [j], techniciens: [ANTOINE], depot: DEPOT, reglages: REGLAGES,
+    trajet: t, aujourdhui: AUJOURDHUI, role: ROLE,
+  });
+  assert.equal(creneaux.length, 1);
+  assert.ok(vus.some((k) => k.startsWith('43.600,2.240|')), 'trajets depuis le départ de la journée');
+  assert.ok(vus.some((k) => k.endsWith('|43.700,2.000')), 'retour vers le point de retour de la journée');
+});
