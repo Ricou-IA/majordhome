@@ -75,7 +75,9 @@ const TABLES = [
   // 20261013_2 : tournées de livraison palettes (webshop) — petites tables, données incluses
   { schema: 'majordhome', table: 'webshop_sectors', columns: null },
   { schema: 'majordhome', table: 'webshop_delivery_slots', columns: null },
-  { schema: 'majordhome', table: 'webshop_products', columns: null, data: false }, // 20261013_3 : JOIN de la vue majordhome_webshop_orders
+  { schema: 'majordhome', table: 'webshop_products', columns: null }, // 20261013_3 : JOIN de la vue ; 20261014_1 : données pour l'assert droits
+  { schema: 'majordhome', table: 'webshop_categories', columns: null }, // 20261014_1 : policies lecture membre / écriture admin
+  { schema: 'majordhome', table: 'webshop_pickup_points', columns: null, data: false }, // 20261014_1 : JOIN de la vue majordhome_webshop_orders
   { schema: 'majordhome', table: 'webshop_orders', columns: null },
   { schema: 'majordhome', table: 'webshop_order_items', columns: null }, // 20261013_3 : cascade de webshop_order_hard_delete
 ];
@@ -169,6 +171,7 @@ const VIEWS = [
   'public.majordhome_webshop_delivery_slots', // 20261013_2 : colonnes de suivi en fin
   'public.majordhome_webshop_orders', // 20261013_3 : delivery_instructions en fin
   'public.majordhome_webshop_orders_write',
+  'public.majordhome_webshop_products', // 20261014_1 : vue d'écriture du catalogue (assert droits)
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
@@ -182,6 +185,7 @@ const POLICY_TABLES = [
   'role_permissions', 'app_role_permissions',
   'org_roles', 'member_org_roles', // 20261006_1
   'webshop_delivery_slots', 'webshop_orders', // 20261013_2
+  'webshop_products', 'webshop_categories', // 20261014_1
 ];
 
 function lireEnv(fichier) {
