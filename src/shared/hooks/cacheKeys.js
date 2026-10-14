@@ -469,3 +469,11 @@ export const webshopTourKeys = {
   unplanned: (orgId) => [...webshopTourKeys.all(orgId), 'unplanned'],
   sendResult: (orgId, slotId) => [...webshopTourKeys.all(orgId), 'sendResult', slotId],
 };
+
+// --- Webshop : catalogue boutique + commandes (onglets Webshop → Produits / Commandes) ---
+export const webshopKeys = {
+  all: (orgId) => ['webshop', orgId],
+  products: (orgId) => [...webshopKeys.all(orgId), 'products'],
+  categories: (orgId) => [...webshopKeys.all(orgId), 'categories'],
+  orders: (orgId) => [...webshopKeys.all(orgId), 'orders'],
+};
