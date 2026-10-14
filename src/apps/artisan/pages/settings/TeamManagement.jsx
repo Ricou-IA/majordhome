@@ -577,6 +577,25 @@ export default function TeamManagement() {
   };
 
   /**
+   * Point de départ / retour d'un membre (team_member.depart_point / retour_point) —
+   * même RPC combinée, patch partiel. `patch` : `{ departPoint }`, `{ resetDepart: true }`,
+   * `{ retourPoint }` ou `{ resetRetour: true }` (reset = retour à l'agence).
+   */
+  const handleEndpointsChange = async (teamMemberId, patch) => {
+    setSavingRoutingId(teamMemberId);
+    try {
+      await setRoutingSettings({ teamMemberId, ...patch });
+      toast.success('Départ / retour mis à jour');
+    } catch (err) {
+      toast.error(err?.code === '42501'
+        ? ROUTING_SETTINGS_ERROR_MESSAGES['42501']
+        : "Erreur lors de l'enregistrement du point de départ / retour");
+    } finally {
+      setSavingRoutingId(null);
+    }
+  };
+
+  /**
    * Inclut/exclut un membre de l'optimisation des tournées (team_member.include_in_routing).
    * Même RPC combinée, patch partiel (seul ce champ est envoyé).
    */
@@ -770,6 +789,7 @@ export default function TeamManagement() {
           isColorSaving={!!editingTeamMember && savingColorId === editingTeamMember.id}
           onDailyBudgetChange={handleDailyBudgetChange}
           onIncludeInRoutingChange={handleIncludeInRoutingChange}
+          onEndpointsChange={handleEndpointsChange}
           isRoutingSaving={!!editingTeamMember && savingRoutingId === editingTeamMember.id}
           colorOwners={colorOwners}
           onClose={() => setEditingUserId(null)}

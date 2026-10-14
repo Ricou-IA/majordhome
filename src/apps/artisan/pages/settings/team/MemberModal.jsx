@@ -20,6 +20,7 @@ import { FALLBACK_COLOR, isLightColor } from '@/lib/planningPalette';
 import { MemberColorPicker } from './MemberColorPicker';
 import { AvailabilityForm } from './AvailabilityForm';
 import { SkillsForm } from './SkillsForm';
+import { EndpointsForm } from './EndpointsForm';
 import {
   getRoleColor, getInitials, PLANIFICATION_OPTIONS, PLANIFICATION_HELP, planificationDe,
   DAILY_WORK_MINUTES_HELP, formatBudget,
@@ -115,6 +116,7 @@ function PlanningPending() {
  * @param {boolean} props.isColorSaving
  * @param {Function} props.onDailyBudgetChange (teamMemberId, minutes)
  * @param {Function} props.onIncludeInRoutingChange (teamMemberId, include)
+ * @param {Function} props.onEndpointsChange (teamMemberId, patch) — départ / retour
  * @param {boolean} props.isRoutingSaving
  * @param {Map<string,string>} props.colorOwners hex → nom (autres membres)
  * @param {Function} props.onClose
@@ -122,7 +124,7 @@ function PlanningPending() {
 export function MemberModal({
   member, teamMember, orgRole, roleOptions, canEdit, isCurrentUser, isUpdatingRole,
   onRoleChangeRequest, isCommercial, onCommercialChange, isCommercialSaving,
-  onColorChange, isColorSaving, onDailyBudgetChange, onIncludeInRoutingChange, isRoutingSaving,
+  onColorChange, isColorSaving, onDailyBudgetChange, onIncludeInRoutingChange, onEndpointsChange, isRoutingSaving,
   colorOwners, onClose,
 }) {
   const name = member.profile?.full_name || member.profile?.email || 'Utilisateur';
@@ -263,6 +265,20 @@ export function MemberModal({
                   />
                 ) : (
                   <p className="text-sm text-secondary-700">{teamMember.daily_work_minutes ?? 480} min ({formatBudget(teamMember.daily_work_minutes)})</p>
+                )}
+              </Section>
+
+              <Section
+                title="Départ / Retour"
+                help="D’où la personne part et où elle rentre chaque jour (feuille de route, tournées). Par défaut : l’agence. Pour imposer l’agence un jour donné, utiliser la feuille de route de la journée."
+              >
+                {!teamMember ? <PlanningPending /> : (
+                  <EndpointsForm
+                    teamMember={teamMember}
+                    canEdit={canEdit}
+                    onSave={(patch) => onEndpointsChange(teamMember.id, patch)}
+                    isSaving={isRoutingSaving}
+                  />
                 )}
               </Section>
             </TabsContent>

@@ -16,7 +16,7 @@ import { appointmentsService } from '@services/appointments.service';
 import { auditService } from '@services/audit.service';
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId, unwrapResult } from '@/lib/serviceHelpers';
-import { appointmentKeys, leadKeys } from '@hooks/cacheKeys';
+import { appointmentKeys, leadKeys, tourneeKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
@@ -486,9 +486,11 @@ export function useSetTeamMemberRouting(orgId) {
   const teamMembersKey = appointmentKeys.teamMembers(orgId);
 
   const mutation = useMutation({
-    mutationFn: ({ teamMemberId, dailyWorkMinutes, includeInRouting }) =>
-      unwrapResult(appointmentsService.setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting })),
+    mutationFn: ({ teamMemberId, ...reglages }) =>
+      unwrapResult(appointmentsService.setTeamMemberRoutingSettings(teamMemberId, reglages)),
     onSuccess: (row, variables) => {
+      // Les journées du moteur portent départ / retour et budget : on les relit.
+      queryClient.invalidateQueries({ queryKey: tourneeKeys.all(orgId) });
       if (!row) {
         // Filet : pas de ligne retournée alors qu'il n'y a pas d'erreur (ne devrait pas arriver)
         queryClient.invalidateQueries({ queryKey: teamMembersKey });
@@ -504,6 +506,8 @@ export function useSetTeamMemberRouting(orgId) {
                 ...tm,
                 daily_work_minutes: row.daily_work_minutes,
                 include_in_routing: row.include_in_routing,
+                depart_point: row.depart_point ?? null,
+                retour_point: row.retour_point ?? null,
               }
               : tm
           ),

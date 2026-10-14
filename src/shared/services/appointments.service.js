@@ -755,8 +755,13 @@ export const appointmentsService = {
    * `p_daily_work_minutes` hors [60, 1440] lève une erreur Postgres 22023, remontée
    * telle quelle dans `error` (le caller UI la traduit en message compréhensible,
    * jamais affichée brute).
+   *
+   * Départ / retour (2026-10-14) : `departPoint` / `retourPoint` = `{ label, address, lat, lng }`
+   * (omis = inchangé) ; `resetDepart` / `resetRetour` = revenir à l'agence (NULL en base).
    */
-  async setTeamMemberRoutingSettings(teamMemberId, { dailyWorkMinutes, includeInRouting } = {}) {
+  async setTeamMemberRoutingSettings(teamMemberId, {
+    dailyWorkMinutes, includeInRouting, departPoint, retourPoint, resetDepart = false, resetRetour = false,
+  } = {}) {
     try {
       // Les compétences ne passent plus ici : team_member_skills (type × rôle),
       // via teamSkills.service.js. `p_specialties` est omis (DEFAULT NULL = inchangé)
@@ -765,6 +770,10 @@ export const appointmentsService = {
         p_team_member_id: teamMemberId,
         p_daily_work_minutes: dailyWorkMinutes ?? null,
         p_include_in_routing: includeInRouting ?? null,
+        p_depart_point: departPoint ?? null,
+        p_retour_point: retourPoint ?? null,
+        p_reset_depart: !!resetDepart,
+        p_reset_retour: !!resetRetour,
       });
       if (error) {
         logger.error('[appointments] setTeamMemberRoutingSettings error:', error);
