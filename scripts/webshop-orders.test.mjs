@@ -1,0 +1,83 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  ORDER_BOARD_COLUMNS, ORDER_SIDE_STATUSES, canMoveTo, toCents, orderLines, linesSummary,
+  orderTotalCents, orderBadges, statusPatch, matchesOrderSearch, formatCents,
+} from '../src/lib/webshop/orders.js';
+
+const NEW_MODEL = {
+  id: 'o1', order_number: 'WEB-2026-0010', status: 'nouvelle', channel: 'particulier', order_type: 'vente_directe',
+  first_name: 'Jean', last_name: 'Dupont', city: 'Gaillac', email: 'j@d.fr', total_ttc: null, total_ttc_cents: 81800,
+  pallet_delivery_mode: 'delivery', parcel_delivery_mode: null, delivery_date: '2026-10-20',
+  needs_manual_planning: false, delivery_slot_changed: true, shipped_at: null, delivered_at: null,
+  items: [
+    { product_name: 'Pellets Premium', qty: 2, unit_price_ttc_cents: 34900, line_total_ttc_cents: 69800, shipping_kind: 'pallet' },
+    { product_name: 'Serviteur Arcadia', qty: 1, unit_price_ttc_cents: 11900, line_total_ttc_cents: 11900, shipping_kind: 'parcel' },
+    { product_name: 'Range-bûches', qty: 1, unit_price_ttc_cents: 24990, line_total_ttc_cents: 24990, shipping_kind: 'parcel' },
+  ],
+};
+const LEGACY = {
+  id: 'o2', order_number: 'WEB-2026-0001', status: 'annulee', channel: 'pro', order_type: 'vente_installation',
+  first_name: 'test', last_name: 'test', city: 'Toulouse', product_name: 'Borne V2C Trydan', product_id: 'p9',
+  quantity: 1, unit_price_ttc: 1290, total_ttc: 1290, total_ttc_cents: null, items: [], needs_manual_planning: true,
+};
+
+test('colonnes : 5 au tableau, 2 repliées', () => {
+  assert.deepEqual(ORDER_BOARD_COLUMNS.map((c) => c.id), ['nouvelle', 'confirmee', 'transmise_fournisseur', 'expediee', 'livree']);
+  assert.deepEqual(ORDER_SIDE_STATUSES, ['en_attente_paiement', 'annulee']);
+});
+test('canMoveTo : seulement entre colonnes du tableau, pas sur place', () => {
+  assert.equal(canMoveTo('nouvelle', 'expediee'), true);
+  assert.equal(canMoveTo('livree', 'confirmee'), true);
+  assert.equal(canMoveTo('nouvelle', 'nouvelle'), false);
+  assert.equal(canMoveTo('en_attente_paiement', 'nouvelle'), false);
+  assert.equal(canMoveTo('nouvelle', 'annulee'), false);
+  assert.equal(canMoveTo('nouvelle', undefined), false);
+});
+test('toCents / formatCents', () => {
+  assert.equal(toCents(249.9), 24990);
+  assert.equal(toCents(null), null);
+  assert.equal(formatCents(129050).replace(/\s/g, ' '), '1 290,50 €');
+  assert.equal(formatCents(11900).replace(/\s/g, ' '), '119 €');
+});
+test('orderLines : nouveau modèle', () => {
+  const l = orderLines(NEW_MODEL);
+  assert.equal(l.length, 3);
+  assert.deepEqual(l[0], { name: 'Pellets Premium', qty: 2, unitCents: 34900, totalCents: 69800, shippingKind: 'pallet' });
+});
+test('orderLines : repli ancien modèle (sans lignes)', () => {
+  assert.deepEqual(orderLines(LEGACY), [{ name: 'Borne V2C Trydan', qty: 1, unitCents: 129000, totalCents: 129000, shippingKind: null }]);
+  assert.deepEqual(orderLines({ items: [] }), []);
+});
+test('linesSummary : tronqué au-delà de max', () => {
+  assert.equal(linesSummary(orderLines(NEW_MODEL)), 'Pellets Premium ×2, Serviteur Arcadia ×1 +1');
+  assert.equal(linesSummary(orderLines(LEGACY)), 'Borne V2C Trydan ×1');
+  assert.equal(linesSummary([]), '');
+});
+test('orderTotalCents : centimes en priorité, sinon total_ttc', () => {
+  assert.equal(orderTotalCents(NEW_MODEL), 81800);
+  assert.equal(orderTotalCents(LEGACY), 129000);
+  assert.equal(orderTotalCents({}), 0);
+});
+test('orderBadges', () => {
+  const keys = (o) => orderBadges(o, orderLines(o)).map((b) => b.key);
+  assert.deepEqual(keys(NEW_MODEL), ['pallet', 'parcel', 'slot_changed']);
+  assert.equal(orderBadges(NEW_MODEL, orderLines(NEW_MODEL))[0].label, 'Palette · 20/10');
+  assert.deepEqual(keys(LEGACY), ['pro', 'install', 'manual_planning']);
+  assert.deepEqual(keys({ ...NEW_MODEL, pallet_delivery_mode: 'pickup', delivery_slot_changed: false }), ['pallet', 'parcel', 'pickup']);
+});
+test('statusPatch : dates posées une seule fois', () => {
+  const now = new Date('2026-10-13T10:00:00Z');
+  assert.deepEqual(statusPatch(NEW_MODEL, 'expediee', now), { status: 'expediee', shipped_at: now.toISOString() });
+  assert.deepEqual(statusPatch({ ...NEW_MODEL, shipped_at: 'x' }, 'expediee', now), { status: 'expediee' });
+  assert.deepEqual(statusPatch(NEW_MODEL, 'livree', now), { status: 'livree', delivered_at: now.toISOString() });
+  assert.deepEqual(statusPatch(NEW_MODEL, 'confirmee', now), { status: 'confirmee' });
+});
+test('matchesOrderSearch : numéro, nom, ville, email, insensible aux accents', () => {
+  assert.equal(matchesOrderSearch(NEW_MODEL, '0010'), true);
+  assert.equal(matchesOrderSearch(NEW_MODEL, 'dupont'), true);
+  assert.equal(matchesOrderSearch({ ...NEW_MODEL, city: 'Lisle-sur-Tarn' }, 'lisle'), true);
+  assert.equal(matchesOrderSearch({ ...NEW_MODEL, last_name: 'Géraud' }, 'geraud'), true);
+  assert.equal(matchesOrderSearch(NEW_MODEL, 'zzz'), false);
+  assert.equal(matchesOrderSearch(NEW_MODEL, ''), true);
+});
