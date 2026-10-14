@@ -4,6 +4,10 @@
  * Affichage seul : tout vient de `useFeuilleDeRoute` (modèle partagé avec le
  * PDF). Monté dans le panneau de remplissage (techniciens en tournée) et dans
  * `FeuilleDeRoutePanel` (techniciens planifiés à la main).
+ *
+ * Départ / Arrivée : un responsable peut imposer l'agence pour CE jour quand le
+ * technicien part / rentre d'ailleurs (exception enregistrée, lue aussi par le
+ * moteur de tournées).
  * ============================================================================
  */
 
@@ -14,7 +18,60 @@ import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
 import { formatDureeRoute, formatKm } from '@/lib/feuilleDeRoute';
+import { resoudreExtremites } from '@/lib/tournee/extremites.js';
 import { telechargerFeuilleDeRoute } from './feuilleDeRouteExport';
+
+const LIBELLE_COTE = { depart: 'Départ', retour: 'Arrivée' };
+
+/**
+ * Ligne « Départ · … » / « Arrivée · … ». Avec un point personnel et le droit de
+ * choisir : deux boutons Agence / Domicile ; sinon le libellé seul.
+ */
+function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange, disabled }) {
+  // Libellé du point personnel seul (sans siège) — null s'il n'y en a pas.
+  const perso = resoudreExtremites({ siege: null, membre })[cote];
+  const libelle = point?.label || 'Agence';
+  if (!peutChoisir || !perso) {
+    return (
+      <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+        <Home className="h-3.5 w-3.5" /> {LIBELLE_COTE[cote]} · {libelle}
+      </li>
+    );
+  }
+  const actif = point?.source === 'agence' ? 'agence' : 'perso';
+  const choisir = (choix) => {
+    if (choix === actif) return;
+    // 'perso' = le réglage du technicien : on retire l'exception plutôt que de la stocker.
+    onChange({
+      depart: exception?.depart === 'agence' ? 'agence' : null,
+      retour: exception?.retour === 'agence' ? 'agence' : null,
+      [cote]: choix === 'agence' ? 'agence' : null,
+    });
+  };
+  const bouton = (choix, texte) => (
+    <button
+      type="button"
+      onClick={() => choisir(choix)}
+      disabled={disabled}
+      aria-pressed={actif === choix}
+      className={`px-2 py-0.5 rounded-md border text-xs disabled:opacity-50 ${actif === choix
+        ? 'bg-white border-gray-300 text-gray-900 font-medium shadow-sm'
+        : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+    >
+      {texte}
+    </button>
+  );
+  return (
+    <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600 flex-wrap">
+      <Home className="h-3.5 w-3.5" /> {LIBELLE_COTE[cote]}
+      <span className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5">
+        {bouton('perso', perso.label)}
+        {bouton('agence', 'Agence')}
+      </span>
+      {disabled && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+    </li>
+  );
+}
 
 function Troncon({ troncon, label, estime }) {
   if (!troncon) return null;
@@ -33,9 +90,23 @@ function Troncon({ troncon, label, estime }) {
 export function FeuilleDeRouteSection({ date, memberIds, person }) {
   const { organization } = useAuth();
   const { settings } = useOrgSettings();
-  const { feuille, lienMaps, carteUrl, sansDepot, isLoading, error } = useFeuilleDeRoute({
+  const {
+    feuille, lienMaps, carteUrl, sansDepot, isLoading, error,
+    depart, retour, membre, exception, setException, isSavingException, peutChoisir,
+  } = useFeuilleDeRoute({
     orgId: organization?.id, date, memberIds, person,
   });
+
+  const changerExtremites = async (next) => {
+    try {
+      await setException(next);
+    } catch (err) {
+      toast.error(`Point de départ / retour non enregistré : ${err?.message || 'erreur inconnue'}`);
+    }
+  };
+  const choixProps = {
+    membre, exception, peutChoisir, onChange: changerExtremites, disabled: isSavingException,
+  };
   const [isPrinting, setIsPrinting] = useState(false);
   const [carteKo, setCarteKo] = useState(false);
 
@@ -132,11 +203,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
 
       {n > 0 && (
         <ol className="text-sm">
-          {feuille.totaux && (
-            <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-              <Home className="h-3.5 w-3.5" /> Départ · {feuille.depotLabel}
-            </li>
-          )}
+          <ExtremiteChoix cote="depart" point={depart} {...choixProps} />
           {feuille.items.map((it) => (
             <li key={it.id}>
               {it.localise
@@ -169,13 +236,9 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
             </li>
           ))}
           {feuille.retour && (
-            <>
-              <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} /></li>
-              <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-                <Home className="h-3.5 w-3.5" /> Arrivée · {feuille.depotLabel}
-              </li>
-            </>
+            <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} /></li>
           )}
+          <ExtremiteChoix cote="retour" point={retour} {...choixProps} />
         </ol>
       )}
     </div>

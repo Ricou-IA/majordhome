@@ -2,7 +2,8 @@
  * feuilleDeRoute.js — Feuille de route d'une journée de technicien (module PUR).
  * ============================================================================
  * La liste des interventions du jour dans l'ordre horaire et l'itinéraire
- * dépôt → arrêts → dépôt, avec le trajet avant chaque arrêt et les totaux.
+ * départ → arrêts → retour (points du technicien, cf. tournee/extremites.js ;
+ * l'agence par défaut), avec le trajet avant chaque arrêt et les totaux.
  * Source unique de l'écran (panneau journée du Planning) ET du PDF imprimé en
  * vue Jour : le PDF ne recalcule rien, il lit `buildFeuilleDeRoute`.
  *
@@ -65,19 +66,24 @@ export function arretsDeLaJournee(rdvs = [], memberIds = []) {
 }
 
 /**
- * Points de l'itinéraire : dépôt, arrêts localisés, dépôt.
- * @param {{ lat: number, lng: number }|null} depot
+ * Points de l'itinéraire : départ, arrêts localisés, retour.
+ * @param {{ lat: number, lng: number }|null} depart
  * @param {Array} arrets  sortie de `arretsDeLaJournee`, avec `lat`/`lng` éventuels
- * @returns {Array<{ lat: number, lng: number, rdvId: string|null }>} vide si pas de dépôt ou aucun arrêt localisé
+ * @param {{ lat: number, lng: number }|null} [retour]  défaut : le départ
+ * @returns {Array<{ lat: number, lng: number, rdvId: string|null }>} vide si pas de départ ou aucun arrêt localisé
  */
-export function pointsItineraire(depot, arrets = []) {
-  if (!depot || !coordValide(depot.lat, depot.lng)) return [];
+export function pointsItineraire(depart, arrets = [], retour = depart) {
+  if (!depart || !coordValide(depart.lat, depart.lng)) return [];
   const stops = arrets
     .filter((a) => coordValide(a.lat, a.lng))
     .map((a) => ({ lat: Number(a.lat), lng: Number(a.lng), rdvId: a.id }));
   if (stops.length === 0) return [];
-  const d = { lat: Number(depot.lat), lng: Number(depot.lng), rdvId: null };
-  return [d, ...stops, d];
+  const fin = retour && coordValide(retour.lat, retour.lng) ? retour : depart;
+  return [
+    { lat: Number(depart.lat), lng: Number(depart.lng), rdvId: null },
+    ...stops,
+    { lat: Number(fin.lat), lng: Number(fin.lng), rdvId: null },
+  ];
 }
 
 /** Clé stable d'un itinéraire (cache des trajets). */
@@ -125,13 +131,15 @@ export function estimerTroncons(points = []) {
 }
 
 /**
- * Itinéraire Google Maps multi-arrêts dépôt → arrêts → dépôt (ouvre l'app sur mobile).
+ * Itinéraire Google Maps multi-arrêts départ → arrêts → retour (ouvre l'app sur mobile).
  * Les arrêts localisés sont visés par coordonnées, les autres par adresse.
  * @returns {string|null}
  */
-export function lienGoogleMapsTournee(depot, arrets = []) {
-  if (!depot || !coordValide(depot.lat, depot.lng) || arrets.length === 0) return null;
-  const origin = encodeURIComponent(`${depot.lat},${depot.lng}`);
+export function lienGoogleMapsTournee(depart, arrets = [], retour = depart) {
+  if (!depart || !coordValide(depart.lat, depart.lng) || arrets.length === 0) return null;
+  const origin = encodeURIComponent(`${depart.lat},${depart.lng}`);
+  const fin = retour && coordValide(retour.lat, retour.lng) ? retour : depart;
+  const destination = encodeURIComponent(`${fin.lat},${fin.lng}`);
   const waypoints = arrets
     .map((a) => (coordValide(a.lat, a.lng)
       ? `${a.lat},${a.lng}`
@@ -140,11 +148,12 @@ export function lienGoogleMapsTournee(depot, arrets = []) {
     .map(encodeURIComponent)
     .join('%7C');
   if (!waypoints) return null;
-  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${origin}&waypoints=${waypoints}&travelmode=driving`;
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
 }
 
 /**
- * Carte statique Mapbox : tracé (si connu) + repère numéroté par arrêt + dépôt.
+ * Carte statique Mapbox : tracé (si connu) + repère numéroté par arrêt + départ
+ * (et retour quand il est ailleurs).
  * Même image à l'écran et dans le PDF.
  * @returns {string|null}
  */
@@ -153,10 +162,13 @@ export function urlCarteStatique({ points = [], geometry = null, token = '', wid
   const hex = (c) => c.replace('#', '');
   const overlays = [];
   if (geometry) overlays.push(`path-4+${hex(ARRET_COLOR)}-0.75(${encodeURIComponent(geometry)})`);
-  const [depot, ...rest] = points;
-  overlays.push(`pin-s-home+${hex(DEPOT_COLOR)}(${depot.lng.toFixed(5)},${depot.lat.toFixed(5)})`);
+  const [depart, ...rest] = points;
+  const retour = rest[rest.length - 1];
+  const pin = (p) => `${p.lng.toFixed(5)},${p.lat.toFixed(5)}`;
+  overlays.push(`pin-s-home+${hex(DEPOT_COLOR)}(${pin(depart)})`);
+  if (retour && pin(retour) !== pin(depart)) overlays.push(`pin-s-home+${hex(DEPOT_COLOR)}(${pin(retour)})`);
   rest.slice(0, -1).forEach((p, i) => {
-    overlays.push(`pin-s-${i + 1}+${hex(ARRET_COLOR)}(${p.lng.toFixed(5)},${p.lat.toFixed(5)})`);
+    overlays.push(`pin-s-${i + 1}+${hex(ARRET_COLOR)}(${pin(p)})`);
   });
   return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlays.join(',')}`
     + `/auto/${width}x${height}@2x?padding=40&access_token=${token}`;
@@ -194,7 +206,9 @@ function slug(s) {
  * @param {object} p
  * @param {string} p.date                 'YYYY-MM-DD'
  * @param {object} p.person               { displayName, color }
- * @param {object|null} p.depot           { lat, lng, label }
+ * @param {object|null} [p.depart]        { lat, lng, label } — point de départ (extremites.js)
+ * @param {object|null} [p.retour]        { lat, lng, label } — point de retour (défaut : départ)
+ * @param {object|null} [p.depot]         compat : départ = retour = depot
  * @param {Array}  p.arrets               sortie de `arretsDeLaJournee` (avec lat/lng)
  * @param {Array|null} p.troncons         un par paire de `pointsItineraire` (null = pas d'itinéraire)
  * @param {boolean} [p.estime]            trajets estimés à vol d'oiseau
@@ -203,7 +217,7 @@ function slug(s) {
  * @param {Date}   [p.now]
  */
 export function buildFeuilleDeRoute({
-  date, person, depot = null, arrets = [], troncons = null, estime = false,
+  date, person, depot = null, depart = depot, retour: pointRetour = depart, arrets = [], troncons = null, estime = false,
   typeLabels = {}, equipmentLabelsByClient = new Map(), now = new Date(),
 } = {}) {
   const ctx = { typeLabels, equipmentLabelsByClient, personColor: person?.color };
@@ -230,7 +244,9 @@ export function buildFeuilleDeRoute({
     personColor: person?.color || null,
     date,
     dateLabel: capitalize(LONG_FMT.format(parseISODate(date))),
-    depotLabel: depot?.label || 'Dépôt',
+    departLabel: depart?.label || 'Agence',
+    retourLabel: (pointRetour || depart)?.label || 'Agence',
+    depotLabel: depart?.label || 'Agence',
     items,
     nbNonLocalises: items.filter((i) => !i.localise).length,
     retour,

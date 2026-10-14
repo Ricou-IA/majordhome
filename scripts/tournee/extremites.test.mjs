@@ -43,3 +43,8 @@ test('pointsDeJournee : retour = départ par défaut, siège en repli', () => {
   assert.notEqual(q.depotKey, q.retourKey);
   assert.equal(pointsDeJournee(null, null).depotKey, '');
 });
+
+test('libellé perso : commune extraite d une adresse Mapbox (« …, 31620 Bouloc, France »)', () => {
+  const r = resoudreExtremites({ siege, membre: { depart_point: { ...maison, address: '1 Rue X, 31620 Bouloc, France' } } });
+  assert.equal(r.depart.label, 'Domicile (Bouloc)');
+});

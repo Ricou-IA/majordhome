@@ -112,6 +112,12 @@ export const appointmentKeys = {
   audit: (orgId, id) => [...appointmentKeys.all(orgId), 'audit', id],
 };
 
+// --- Départ / retour d'une journée de technicien (exception du jour) ---
+export const dayEndpointKeys = {
+  all: (orgId) => ['day-endpoints', orgId],
+  byDay: (orgId, teamMemberId, date) => [...dayEndpointKeys.all(orgId), teamMemberId, date],
+};
+
 // --- Interventions ---
 export const interventionKeys = {
   all: (orgId) => ['interventions', orgId],

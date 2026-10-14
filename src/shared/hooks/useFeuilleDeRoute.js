@@ -4,6 +4,9 @@
  * Orchestration unique écran ↔ impression : RDV du jour → arrêts de la
  * personne → itinéraire → trajets → `buildFeuilleDeRoute`. Le panneau journée
  * et l'impression en vue Jour lisent ce même modèle.
+ *
+ * Départ / retour : `resoudreExtremites` (tournee/extremites.js), la même règle
+ * que le moteur — exception du jour > réglage du technicien > agence.
  * ============================================================================
  */
 
@@ -12,6 +15,10 @@ import { useQuery } from '@tanstack/react-query';
 import { appointmentKeys } from '@hooks/cacheKeys';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useClientEquipmentLabels } from '@hooks/useClients';
+import { useTeamMembers } from '@hooks/useAppointments';
+import { useDayEndpoint } from '@hooks/useDayEndpoint';
+import { useAuth } from '@contexts/AuthContext';
+import { resoudreExtremites } from '@/lib/tournee/extremites.js';
 import { feuilleDeRouteService } from '@services/feuilleDeRoute.service';
 import { APPOINTMENT_TYPES } from '@services/appointments.service';
 import { getOrgHeadquarters } from '@lib/territoire-config';
@@ -29,13 +36,31 @@ const TYPE_LABELS = Object.fromEntries(APPOINTMENT_TYPES.map((t) => [t.value, t.
  * @param {string|null} p.date    'YYYY-MM-DD' ; null = désactivé
  * @param {string[]} p.memberIds  ids de la personne (team_members.id / commercials.id)
  * @param {{ displayName: string, color?: string }} p.person
- * @returns {{ feuille: object|null, lienMaps: string|null, carteUrl: string|null, isLoading: boolean, error: Error|null }}
+ * @returns {{ feuille: object|null, lienMaps: string|null, carteUrl: string|null, isLoading: boolean, error: Error|null,
+ *   depart: object|null, retour: object|null, membre: object|null, exception: object|null,
+ *   setException: Function, isSavingException: boolean, peutChoisir: boolean }}
+ *   `peutChoisir` : l'utilisateur peut poser l'exception du jour (team_leader+) et la personne a une ressource planning.
  */
 export function useFeuilleDeRoute({ orgId, date, memberIds = [], person }) {
   const { settings } = useOrgSettings();
   const { labelsByClientId } = useClientEquipmentLabels();
-  const depot = useMemo(() => getOrgHeadquarters(settings), [settings]);
+  const { isTeamLeaderOrAbove } = useAuth();
+  const { members } = useTeamMembers(orgId);
+  const siege = useMemo(() => getOrgHeadquarters(settings), [settings]);
   const enabled = !!orgId && !!date && memberIds.length > 0;
+
+  // La ressource planning de la personne (un commercial sans ressource reste à l'agence).
+  const membre = useMemo(
+    () => (members || []).find((tm) => memberIds.includes(tm.id)) || null,
+    [members, memberIds],
+  );
+  const { exception, setException, isSaving: isSavingException } = useDayEndpoint({
+    orgId, teamMemberId: membre?.id || null, date,
+  });
+  const { depart, retour } = useMemo(
+    () => resoudreExtremites({ siege, membre, exception }),
+    [siege, membre, exception],
+  );
 
   const rdvsQuery = useQuery({
     queryKey: appointmentKeys.dayRoute(orgId, date),
@@ -53,7 +78,7 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person }) {
     () => arretsDeLaJournee(rdvsQuery.data || [], idsKey ? idsKey.split(',') : []),
     [rdvsQuery.data, idsKey],
   );
-  const points = useMemo(() => pointsItineraire(depot, arrets), [depot, arrets]);
+  const points = useMemo(() => pointsItineraire(depart, arrets, retour), [depart, arrets, retour]);
   const itineraryKey = cleItineraire(points);
 
   const legsQuery = useQuery({
@@ -68,20 +93,28 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person }) {
     return buildFeuilleDeRoute({
       date,
       person,
-      depot,
+      depart,
+      retour,
       arrets,
       troncons: legsQuery.data?.troncons || null,
       estime: legsQuery.data?.estime,
       typeLabels: TYPE_LABELS,
       equipmentLabelsByClient: labelsByClientId,
     });
-  }, [enabled, rdvsQuery.data, date, person, depot, arrets, legsQuery.data, labelsByClientId]);
+  }, [enabled, rdvsQuery.data, date, person, depart, retour, arrets, legsQuery.data, labelsByClientId]);
 
   return {
     feuille,
-    lienMaps: lienGoogleMapsTournee(depot, arrets),
+    lienMaps: lienGoogleMapsTournee(depart, arrets, retour),
     carteUrl: urlCarteStatique({ points, geometry: legsQuery.data?.geometry || null, token: MAPBOX_CONFIG.accessToken }),
-    sansDepot: !depot,
+    sansDepot: !depart,
+    depart,
+    retour,
+    membre,
+    exception,
+    setException,
+    isSavingException,
+    peutChoisir: !!isTeamLeaderOrAbove && !!membre,
     isLoading: rdvsQuery.isLoading || (points.length >= 2 && legsQuery.isLoading),
     error: rdvsQuery.error || null,
   };

@@ -19,7 +19,8 @@ export function pointValide(p) {
 }
 
 function communeDe(address) {
-  const m = /\b\d{5}\s+(.+)$/.exec(String(address || '').trim());
+  // « 1 Rue X, 31620 Bouloc, France » (Mapbox) → « Bouloc » : on s'arrête à la virgule.
+  const m = /\b\d{5}\s+([^,]+)/.exec(String(address || ''));
   return m ? m[1].trim() : null;
 }
 

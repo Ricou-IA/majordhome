@@ -4,7 +4,7 @@
  * FeuilleDeRoutePDF.jsx — Feuille de route d'une journée (A4 portrait)
  * ============================================================================
  * Ce que le technicien emporte : la carte du tracé, les arrêts dans l'ordre
- * avec le trajet avant chacun, le retour au dépôt et les totaux.
+ * avec le trajet avant chacun, le retour (point du technicien, agence par défaut) et les totaux.
  *
  * Le document n'effectue AUCUN calcul : tout vient de `buildFeuilleDeRoute`
  * (src/lib/feuilleDeRoute.js), le même modèle que le panneau du Planning.
@@ -126,10 +126,10 @@ export function FeuilleDeRouteDocument({ model, company, carte }) {
 
         {n === 0 ? <Text style={s.empty}>Aucune intervention ce jour-là.</Text> : (
           <>
-            <Text style={s.depot}>Départ : {model.depotLabel}</Text>
+            <Text style={s.depot}>Départ : {model.departLabel}</Text>
             {model.items.map((it) => <Stop key={it.id} item={it} accent={accent} estime={model.estime} />)}
             <Leg troncon={model.retour} label="Retour" estime={model.estime} />
-            {model.retour ? <Text style={s.depot}>Arrivée : {model.depotLabel}</Text> : null}
+            {model.retour ? <Text style={s.depot}>Arrivée : {model.retourLabel}</Text> : null}
           </>
         )}
 

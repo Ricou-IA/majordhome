@@ -114,3 +114,35 @@ test('formats : durée et km PDF-safe', () => {
   assert.equal(formatDureeRoute(120), '2 h');
   assert.equal(formatKm(12.34), '12,3 km');
 });
+
+// --- Départ / retour par technicien (spec 2026-10-14) -------------------------
+const maison = { lat: 43.78, lng: 1.41, label: 'Domicile (Bouloc)' };
+
+test('pointsItineraire : part du départ, finit au retour ; sans retour, revient au départ', () => {
+  const pts = pointsItineraire(maison, [rdv()], depot);
+  assert.deepEqual([pts[0].lat, pts[pts.length - 1].lat], [43.78, 43.9]);
+  const boucle = pointsItineraire(maison, [rdv()]);
+  assert.equal(boucle[boucle.length - 1].lat, 43.78);
+});
+
+test('lienGoogleMapsTournee : origine = départ, destination = retour', () => {
+  const url = lienGoogleMapsTournee(maison, [rdv()], depot);
+  assert.ok(url.includes(`origin=${encodeURIComponent('43.78,1.41')}`));
+  assert.ok(url.includes(`destination=${encodeURIComponent('43.9,1.9')}`));
+});
+
+test('urlCarteStatique : deux maisons quand le retour est ailleurs, une seule sinon', () => {
+  const deux = urlCarteStatique({ points: pointsItineraire(maison, [rdv()], depot), token: 'tk' });
+  assert.equal((deux.match(/pin-s-home/g) || []).length, 2);
+  const une = urlCarteStatique({ points: pointsItineraire(maison, [rdv()]), token: 'tk' });
+  assert.equal((une.match(/pin-s-home/g) || []).length, 1);
+});
+
+test('buildFeuilleDeRoute : libellés de départ et d arrivée, compat depot seul', () => {
+  const m = buildFeuilleDeRoute({ date: '2026-10-26', person: { displayName: 'M' }, depart: maison, retour: depot, arrets: [rdv()] });
+  assert.equal(m.departLabel, 'Domicile (Bouloc)');
+  assert.equal(m.retourLabel, 'Siège Gaillac');
+  const c = buildFeuilleDeRoute({ date: '2026-10-26', person: { displayName: 'M' }, depot, arrets: [rdv()] });
+  assert.equal(c.departLabel, 'Siège Gaillac');
+  assert.equal(c.retourLabel, 'Siège Gaillac');
+});
