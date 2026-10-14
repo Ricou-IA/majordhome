@@ -12,9 +12,14 @@ import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
-import { webshopService } from '@services/webshop.service';
 
-export default function OrderDeleteButton({ order, onDeleted }) {
+/**
+ * @param {object} props
+ * @param {object} props.order
+ * @param {(orderId: string) => Promise<unknown>} props.onDelete - deleteOrder de useWebshopOrders (rejette sur refus)
+ * @param {() => void} [props.onDeleted]
+ */
+export default function OrderDeleteButton({ order, onDelete, onDeleted }) {
   const { isOrgAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -22,19 +27,21 @@ export default function OrderDeleteButton({ order, onDeleted }) {
 
   const handleDelete = async () => {
     setDeleting(true);
-    const { error } = await webshopService.deleteOrder(order.id);
-    setDeleting(false);
-    if (error) {
+    try {
+      await onDelete(order.id);
+    } catch (error) {
       toast.error(error.message === 'org_admin_required' ? 'Réservé aux administrateurs' : `Suppression impossible : ${error.message}`);
       return;
+    } finally {
+      setDeleting(false);
     }
     toast.success(`Commande ${order.order_number} supprimée`);
     setOpen(false);
     onDeleted?.();
   };
 
-  // La vue lue par Commandes ne porte pas paid_at : le statut suffit (seul le paiement sort de « en attente »).
-  const paid = !['en_attente_paiement', 'annulee'].includes(order.status);
+  // paid_at exposé par la vue depuis 20261014_1 ; repli sur le statut (seul le paiement sort de « en attente »).
+  const paid = Boolean(order.paid_at) || !['en_attente_paiement', 'annulee'].includes(order.status);
 
   return (
     <>
