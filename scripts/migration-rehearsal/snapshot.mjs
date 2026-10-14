@@ -90,7 +90,7 @@ const FUNCTIONS = [
   'majordhome.equipment_unlinked_purge_children()', // trigger equipments posé par 20260922_2, en prod depuis le 2026-09-22
   'majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
   'public.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)',
-  'public.team_member_set_routing_settings(uuid, integer, boolean, text[])',
+  'public.team_member_set_routing_settings(uuid, integer, boolean, text[], jsonb, jsonb, boolean, boolean)', // 20261014_2
   'public.invoice_create_draft(jsonb, jsonb)', // 20261010_1 : client_note dans l'INSERT
   'majordhome.invoices_guard_immutable()', // 20261010_1 : client_note figée à l'émission
   // 20260922_1 (commande personnes × jours) : vues chantiers / entretien_sav + RPC de patch lead

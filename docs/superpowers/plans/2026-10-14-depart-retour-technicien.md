@@ -214,7 +214,7 @@ BEGIN
   RETURN QUERY
   INSERT INTO majordhome.team_member_day_endpoints AS e (org_id, team_member_id, date, depart, retour, created_by)
   VALUES (v_org_id, p_team_member_id, p_date, p_depart, p_retour, v_user_id)
-  ON CONFLICT (team_member_id, date) DO UPDATE
+  ON CONFLICT ON CONSTRAINT team_member_day_endpoints_uniq DO UPDATE
      SET depart = EXCLUDED.depart, retour = EXCLUDED.retour, updated_at = now()
   RETURNING e.team_member_id, e.date, e.depart, e.retour;
 END;
