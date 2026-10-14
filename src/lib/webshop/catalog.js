@@ -24,7 +24,7 @@ const RATE_FIELDS = ['vat_rate', 'install_vat_rate'];
 /** @param {string} name */
 export function slugify(name) {
   return String(name ?? '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')

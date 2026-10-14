@@ -28,7 +28,7 @@ test('uniqueSlug : suffixe -2, -3 si pris', () => {
 test('parseDecimal : virgule, espaces, vide, invalide', () => {
   assert.equal(parseDecimal('249,9'), 249.9);
   assert.equal(parseDecimal('1 290'), 1290);
-  assert.equal(parseDecimal('1 290,50'), 1290.5);
+  assert.equal(parseDecimal('1\u202f290,50'), 1290.5);
   assert.equal(parseDecimal(''), null);
   assert.equal(parseDecimal('  '), null);
   assert.ok(Number.isNaN(parseDecimal('abc')));

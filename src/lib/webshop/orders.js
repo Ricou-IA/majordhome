@@ -111,7 +111,7 @@ export function statusPatch(order, to, now = new Date()) {
 }
 
 function fold(s) {
-  return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 export function matchesOrderSearch(order, query) {
