@@ -11,7 +11,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA majordhome TO authenticated, service_role;
 
 -- Les RPC existantes gardent leur posture prod : anon révoqué.
-REVOKE EXECUTE ON FUNCTION public.team_member_set_routing_settings(uuid, integer, boolean, text[]) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.team_member_set_routing_settings(uuid, integer, boolean, text[]) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.team_member_set_routing_settings(uuid, integer, boolean, text[], jsonb, jsonb, boolean, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.team_member_set_routing_settings(uuid, integer, boolean, text[], jsonb, jsonb, boolean, boolean) TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text) FROM PUBLIC, anon, authenticated;

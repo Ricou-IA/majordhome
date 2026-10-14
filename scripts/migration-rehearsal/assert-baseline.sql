@@ -24,7 +24,7 @@ BEGIN
       ('majordhome.equipments_sync_category()'),
       ('majordhome.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)'),
       ('public.process_web_entretien(uuid, text, text, text, text, text, text, text, text, jsonb, numeric, numeric, integer, numeric, text, jsonb, text)'),
-      ('public.team_member_set_routing_settings(uuid, integer, boolean, text[])'),
+      ('public.team_member_set_routing_settings(uuid, integer, boolean, text[], jsonb, jsonb, boolean, boolean)'),
       ('majordhome.project_org_id(uuid)'),
       ('majordhome.quote_status_bucket(text)'),
       ('public.update_majordhome_lead(uuid, jsonb)'),
