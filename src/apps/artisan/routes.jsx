@@ -86,6 +86,10 @@ const DevisSettings = lazy(() => import('./pages/settings/DevisSettings'));
 const ThermiqueWizard = lazy(() => import('@apps/thermique/pages/ThermiqueWizard'));
 const ThermiqueHistorique = lazy(() => import('@apps/thermique/pages/ThermiqueHistorique'));
 
+// Chantier Gaillac — module PROVISOIRE (retrait : CLAUDE.md → Modules provisoires)
+import { CHANTIER_GAILLAC_ACTIF } from '@apps/chantier-gaillac/config';
+const ChantierGaillac = lazy(() => import('@apps/chantier-gaillac/pages/ChantierGaillac'));
+
 // =============================================================================
 // LOADING COMPONENT
 // =============================================================================
@@ -615,6 +619,17 @@ export const artisanRoutes = [
       </SuspenseWrapper>
     ),
   },
+  // Chantier Gaillac (provisoire) : la page vérifie elle-même l'org (chantierGaillacVisible)
+  ...(CHANTIER_GAILLAC_ACTIF
+    ? [{
+      path: 'chantier-gaillac',
+      element: (
+        <SuspenseWrapper>
+          <ChantierGaillac />
+        </SuspenseWrapper>
+      ),
+    }]
+    : []),
   {
     path: 'thermique/historique',
     element: (

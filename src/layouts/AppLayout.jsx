@@ -35,7 +35,9 @@ import {
   Thermometer,
   ClipboardCheck,
   Snowflake,
+  ClipboardList,
 } from 'lucide-react';
+import { chantierGaillacVisible } from '@apps/chantier-gaillac/config';
 
 // =============================================================================
 // CONFIGURATION NAVIGATION
@@ -63,6 +65,8 @@ const navigation = [
   { name: 'Climatisation', href: '/clim',      icon: Snowflake,     resource: 'devis' },
   // Tâches récurrentes : libellé = vocabulaire de l'org (« Maintenance », « Traçabilité »…).
   { name: 'Maintenance', href: '/maintenance', icon: ClipboardCheck, resource: 'maintenance', module: 'maintenance' },
+  // Module PROVISOIRE : visible des membres Mayer tant que CHANTIER_GAILLAC_ACTIF (hors registre de droits)
+  { name: 'Chantier Gaillac', href: '/chantier-gaillac', icon: ClipboardList, visible: chantierGaillacVisible },
 ];
 
 /**
@@ -188,7 +192,9 @@ export default function AppLayout() {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {navigation
-          .filter((item) => itemVisiblePourOrg(item, orgSettings) && can(item.resource, 'view'))
+          .filter((item) => (item.visible
+            ? item.visible(organization)
+            : itemVisiblePourOrg(item, orgSettings) && can(item.resource, 'view')))
           .map((item) => (
           <NavLink
             key={item.name}

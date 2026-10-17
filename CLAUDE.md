@@ -650,6 +650,16 @@ Dashboard de suivi ROI des campagnes Meta (publicité). Gotchas Meta API (double
 - **RPC `public.meta_ads_backfill_lead_attribution(...)`** (service_role only, merge-only `jsonb_strip_nulls`) — rétro-peuple `external_data` (campaign_id/adset_id/ad_id) via un workflow N8N de re-fetch Meta par lead. Colonnes générées `leads.meta_campaign_id/adset_id/ad_id` dérivées de `external_data->>` (NULL tant que pas backfillé — les leads live N8N n'embarquent pas les fields campagne par défaut).
 - **Règle d'agrégation (à généraliser)** : toute vue/RPC qui compte les « leads gagnés » doit être **Pennylane-aware** (statut `is_won` OU devis PL gagnant), sinon sous-comptage au moment où le cron tourne. À appliquer à tout futur KPI/dashboard pipeline.
 
+## Modules provisoires – Chantier Gaillac
+
+Suivi terrain des préconisations P2 Ville de Gaillac (sous-traitance Veolia, devis D-2026-09452 / D-2026-09411) : chaque technicien coche ses tâches et commente, l'admin programme les demi-journées. **Provisoire : à retirer en fin de chantier.**
+
+- **Code** : tout dans `src/apps/chantier-gaillac/` (page, composants, service, hooks à cache keys locales, modèle pur `lib/chantierGaillacModel.js` + test `node --test src/apps/chantier-gaillac/lib/chantierGaillacModel.test.mjs`). Seuls points de contact : route dans `src/apps/artisan/routes.jsx`, entrée de menu dans `src/layouts/AppLayout.jsx` (prédicat `visible`).
+- **Interrupteur** : `CHANTIER_GAILLAC_ACTIF` dans `src/apps/chantier-gaillac/config.js` (+ org Mayer codée en dur, exception assumée).
+- **Base** (migration `20261017_1_chantier_gaillac.sql`, répétée par `scripts/migration-rehearsal/assert-chantier-gaillac.sql`) : tables `majordhome.chantier_gaillac_taches` / `_planning`, vues `public.majordhome_chantier_gaillac_*` (miroirs updatables), fonctions `majordhome.cg_is_member` / `cg_is_admin` / `cg_taches_before_update`. Exception assumée au modèle `role_can` : tout membre Mayer lit et coche ; le trigger n'autorise à un non-admin que `fait` et `commentaire_terrain` (`fait_le` / `fait_par` posés par la base) ; dates de planning = `org_admin` seul.
+- **Durée d'un groupe** = somme des `duree_min` + 20 min par passage (site × code de planning).
+- **Retrait** : (1) `CHANTIER_GAILLAC_ACTIF = false` et déployer ; (2) exporter le compte rendu Veolia — `SELECT numero, site, action, technicien_id, planning_code, fait, fait_le, commentaire_terrain FROM majordhome.chantier_gaillac_taches ORDER BY ordre` en CSV ; (3) exécuter le bloc « NETTOYAGE » en bas de la migration via une nouvelle migration versionnée ; (4) supprimer le dossier du module, la route, l'entrée de menu (et le prédicat `visible` s'il ne sert plus), `assert-chantier-gaillac.sql` et cette section.
+
 ## Plan de Développement
 | Sprint | Titre | Statut |
 |--------|-------|--------|
