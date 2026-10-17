@@ -31,6 +31,9 @@ const MaintenanceBorne = lazy(() => import('@apps/maintenance/pages/Borne'));
 // Pages utilitaires
 import NotFound from '@pages/NotFound';
 const PriseRdv = lazy(() => import('@pages/PriseRdv'));
+// Chantier Gaillac — module PROVISOIRE : lien externe en lecture seule
+import { CHANTIER_GAILLAC_ACTIF } from '@apps/chantier-gaillac/config';
+const ChantierGaillacPartage = lazy(() => import('@apps/chantier-gaillac/pages/ChantierGaillacPartage'));
 import Unauthorized from '@pages/Unauthorized';
 import JoinOrganization from '@pages/JoinOrganization';
 import AuthCallback from '@pages/AuthCallback';
@@ -77,6 +80,18 @@ export default function App() {
         path="/auth/callback"
         element={<AuthCallback />}
       />
+
+      {/* Chantier Gaillac (provisoire) : suivi en lecture seule pour un tiers (lien secret, sans compte) */}
+      {CHANTIER_GAILLAC_ACTIF && (
+        <Route
+          path="/gaillac/:token"
+          element={(
+            <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+              <ChantierGaillacPartage />
+            </Suspense>
+          )}
+        />
+      )}
 
       {/* Prise de rendez-vous d'entretien par le client (lien signé, sans compte) */}
       <Route

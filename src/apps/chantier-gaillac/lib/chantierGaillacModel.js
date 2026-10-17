@@ -15,6 +15,8 @@ export const HORS_PERIMETRE = 'hors_perimetre';
 export const HORS_PERIMETRE_KEY = '__hors_perimetre__';
 export const HORS_PERIMETRE_LABEL = 'Hors périmètre Mayer Énergie';
 export const GROUP_MODES = ['planning', 'site', 'theme'];
+/** État de filtres de la page (forme lue telle quelle par filterTaches). */
+export const DEFAULT_FILTERS = { group: 'planning', techId: '', planningCode: '', hideDone: false, q: '' };
 
 const THEME_ORDER = [
   'Signalétique', 'Peinture gaz RAL 1023', 'Antirouille', 'Contrôles chauffage', 'Plomberie / ECS',

@@ -5,9 +5,15 @@ import {
 } from '../lib/chantierGaillacModel';
 import TextWithRefs from './TextWithRefs';
 
-/** Grille partagée par l'en-tête de tableau et les lignes, à partir de `xl` (une tablette reste en cartes : viewport forcé à 1024 px). */
+/**
+ * Grilles partagées par l'en-tête de tableau et les lignes, à partir de `xl`
+ * (une tablette reste en cartes : viewport forcé à 1024 px).
+ * Lecture seule (lien externe) : ni durée, ni achat, ni observations, ni commentaire.
+ */
 export const ROW_GRID =
   'xl:grid xl:grid-cols-[84px_52px_minmax(140px,1.1fr)_minmax(200px,2fr)_96px_72px_64px_84px_128px_minmax(130px,1.1fr)_minmax(170px,1.3fr)] xl:items-start xl:gap-x-3';
+export const ROW_GRID_READONLY =
+  'xl:grid xl:grid-cols-[96px_52px_minmax(160px,1.2fr)_minmax(260px,2.4fr)_140px_96px_128px] xl:items-start xl:gap-x-3';
 
 const chip = 'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold';
 
@@ -15,7 +21,7 @@ function formatValidation(t, nameOf) {
   if (!t.fait_le) return '';
   const d = new Date(t.fait_le);
   const quand = `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-  const qui = nameOf(t.fait_par);
+  const qui = nameOf ? nameOf(t.fait_par) : '';
   return `Fait le ${quand}${qui ? ` par ${qui}` : ''}`;
 }
 
@@ -44,11 +50,52 @@ function CommentField({ tache, onSave }) {
   );
 }
 
+/** Case « Fait » cochable (suivi interne). */
+function FaitToggle({ tache: t, onToggle }) {
+  const fait = !!t.fait;
+  return (
+    <label className="flex min-h-[44px] min-w-[44px] cursor-pointer flex-col items-center justify-center gap-0.5">
+      <input
+        type="checkbox"
+        checked={fait}
+        onChange={(e) => onToggle(t, e.target.checked)}
+        className="peer sr-only"
+        aria-label={`Tâche ${t.numero} ${fait ? 'faite' : 'à faire'}`}
+      />
+      <span
+        aria-hidden
+        className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F5C542] ${
+          fait ? 'border-[#1565C0] bg-[#1565C0] text-white' : 'border-slate-400 bg-white text-transparent'
+        }`}
+      >
+        <Check className="h-6 w-6" strokeWidth={3} />
+      </span>
+      <span className={`text-xs font-semibold ${fait ? 'text-[#0D47A1]' : 'text-slate-500'}`}>
+        {fait ? 'Fait' : 'À faire'}
+      </span>
+    </label>
+  );
+}
+
+/** Statut affiché, non modifiable (lien externe). */
+function FaitBadge({ fait }) {
+  return fait ? (
+    <span className={`${chip} border-[#1565C0] bg-[#1565C0] text-white`}>
+      <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Fait
+    </span>
+  ) : (
+    <span className={`${chip} border-slate-300 bg-white text-slate-600`}>À faire</span>
+  );
+}
+
 /**
  * Ligne de tâche : carte sous `xl`, ligne de tableau à partir de `xl`.
- * Seuls la case « Fait » et le commentaire sont éditables (le reste est verrouillé en base).
+ * Interne : seuls la case « Fait » et le commentaire sont éditables (le reste est verrouillé en base).
+ * readOnly : aucun contrôle, colonnes internes masquées (données absentes du lien externe).
  */
-export default function TaskRow({ tache: t, planning, planningIndex, byNumero, techName, nameOf, onToggle, onComment }) {
+export default function TaskRow({
+  tache: t, planning, planningIndex, byNumero, techName, nameOf, onToggle, onComment, readOnly = false,
+}) {
   const hp = isHorsPerimetre(t);
   const releve = isReleve(t);
   const fait = !!t.fait;
@@ -64,7 +111,7 @@ export default function TaskRow({ tache: t, planning, planningIndex, byNumero, t
     <span className={`${chip} border-[#1565C0] font-mono text-[#0D47A1]`}>Code {t.planning_code}</span>
   );
 
-  const achatChip = hp ? null : t.achat_requis ? (
+  const achatChip = hp || readOnly ? null : t.achat_requis ? (
     <span className={`${chip} border-[#F5C542] bg-[#FFF4D1] text-[#6B4E00]`}>
       <ShoppingCart className="h-3 w-3" aria-hidden /> Achat
     </span>
@@ -74,52 +121,33 @@ export default function TaskRow({ tache: t, planning, planningIndex, byNumero, t
     </span>
   );
 
+  const securiteChip = isSecurite(t) && (
+    <span className={`${chip} border-[#F5C542] bg-[#F5C542] text-[#3A2A00]`}>
+      <ShieldAlert className="h-3 w-3" aria-hidden /> Sécurité
+    </span>
+  );
+
   return (
     <li
-      className={`grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 rounded-xl border p-3 xl:rounded-none xl:border-0 xl:border-b xl:px-3 xl:py-2.5 ${ROW_GRID} ${
-        fait ? 'border-[#90CAF9] bg-[#EAF2FD]' : 'border-slate-200 bg-white'
-      } ${hp ? 'italic text-slate-500' : 'text-slate-900'}`}
+      className={`grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1.5 rounded-xl border p-3 xl:rounded-none xl:border-0 xl:border-b xl:px-3 xl:py-2.5 ${
+        readOnly ? ROW_GRID_READONLY : ROW_GRID
+      } ${fait ? 'border-[#90CAF9] bg-[#EAF2FD]' : 'border-slate-200 bg-white'} ${hp ? 'italic text-slate-500' : 'text-slate-900'}`}
     >
-      {/* Case « Fait » */}
+      {/* Statut */}
       <div className="row-span-3 xl:row-span-1">
-        {!hp && (
-          <label className="flex min-h-[44px] min-w-[44px] cursor-pointer flex-col items-center justify-center gap-0.5">
-            <input
-              type="checkbox"
-              checked={fait}
-              onChange={(e) => onToggle(t, e.target.checked)}
-              className="peer sr-only"
-              aria-label={`Tâche ${t.numero} ${fait ? 'faite' : 'à faire'}`}
-            />
-            <span
-              aria-hidden
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F5C542] ${
-                fait ? 'border-[#1565C0] bg-[#1565C0] text-white' : 'border-slate-400 bg-white text-transparent'
-              }`}
-            >
-              <Check className="h-6 w-6" strokeWidth={3} />
-            </span>
-            <span className={`text-xs font-semibold ${fait ? 'text-[#0D47A1]' : 'text-slate-500'}`}>
-              {fait ? 'Fait' : 'À faire'}
-            </span>
-          </label>
-        )}
+        {!hp && (readOnly ? <FaitBadge fait={fait} /> : <FaitToggle tache={t} onToggle={onToggle} />)}
       </div>
 
       {/* N° (+ durée à droite sur carte) */}
       <div className="col-start-2 row-start-1 flex flex-wrap items-center gap-1.5 xl:col-auto xl:row-auto">
         <span className="font-mono text-sm text-slate-500 xl:text-slate-900">{t.numero}</span>
         <span className="flex flex-wrap gap-1 xl:hidden">
-          {isSecurite(t) && (
-            <span className={`${chip} border-[#F5C542] bg-[#F5C542] text-[#3A2A00]`}>
-              <ShieldAlert className="h-3 w-3" aria-hidden /> Sécurité
-            </span>
-          )}
+          {securiteChip}
           {achatChip}
         </span>
       </div>
       <div className="col-start-3 row-start-1 text-right font-mono text-sm tabular-nums xl:hidden">
-        {hp ? '–' : formatDuree(t.duree_min)}
+        {readOnly || hp ? '' : formatDuree(t.duree_min)}
       </div>
 
       {/* Site + adresse (desktop) */}
@@ -134,13 +162,7 @@ export default function TaskRow({ tache: t, planning, planningIndex, byNumero, t
 
       {/* Action */}
       <div className={`col-span-2 col-start-2 text-base font-semibold xl:col-span-1 xl:col-auto xl:text-sm xl:font-normal ${releve ? 'pl-4 xl:pl-5' : ''}`}>
-        <span className="hidden flex-wrap gap-1 xl:mb-1 xl:flex">
-          {isSecurite(t) && (
-            <span className={`${chip} border-[#F5C542] bg-[#F5C542] text-[#3A2A00]`}>
-              <ShieldAlert className="h-3 w-3" aria-hidden /> Sécurité
-            </span>
-          )}
-        </span>
+        {securiteChip && <span className="hidden xl:mb-1 xl:flex">{securiteChip}</span>}
         {releve && (
           <span className={`${chip} mb-1 mr-1 border-[#1565C0] text-[#0D47A1]`}>
             <CornerDownRight className="h-3 w-3" aria-hidden /> Relevé
@@ -171,8 +193,12 @@ export default function TaskRow({ tache: t, planning, planningIndex, byNumero, t
       {/* Thème / technicien / durée / achat / planning (desktop) */}
       <div className="hidden text-xs text-slate-600 xl:block">{t.theme}</div>
       <div className="hidden text-sm xl:block">{techName || '–'}</div>
-      <div className="hidden text-right font-mono text-sm tabular-nums xl:block">{hp ? '–' : formatDuree(t.duree_min)}</div>
-      <div className="hidden xl:block">{achatChip}</div>
+      {!readOnly && (
+        <>
+          <div className="hidden text-right font-mono text-sm tabular-nums xl:block">{hp ? '–' : formatDuree(t.duree_min)}</div>
+          <div className="hidden xl:block">{achatChip}</div>
+        </>
+      )}
       <div className="hidden xl:block">{planChip}</div>
 
       {/* Méta (carte) */}
@@ -182,15 +208,19 @@ export default function TaskRow({ tache: t, planning, planningIndex, byNumero, t
         {techName && <span>· {techName}</span>}
       </div>
 
-      {/* Observations */}
-      <div className={`col-span-2 col-start-2 text-sm text-slate-600 xl:col-span-1 xl:col-auto ${t.observations ? '' : 'hidden xl:block'}`}>
-        <TextWithRefs text={t.observations} byNumero={byNumero} planningIndex={planningIndex} />
-      </div>
+      {!readOnly && (
+        <>
+          {/* Observations */}
+          <div className={`col-span-2 col-start-2 text-sm text-slate-600 xl:col-span-1 xl:col-auto ${t.observations ? '' : 'hidden xl:block'}`}>
+            <TextWithRefs text={t.observations} byNumero={byNumero} planningIndex={planningIndex} />
+          </div>
 
-      {/* Commentaire terrain */}
-      <div className="col-span-2 col-start-2 xl:col-span-1 xl:col-auto">
-        {!hp && <CommentField tache={t} onSave={(texte) => onComment(t, texte)} />}
-      </div>
+          {/* Commentaire terrain */}
+          <div className="col-span-2 col-start-2 xl:col-span-1 xl:col-auto">
+            {!hp && <CommentField tache={t} onSave={(texte) => onComment(t, texte)} />}
+          </div>
+        </>
+      )}
     </li>
   );
 }

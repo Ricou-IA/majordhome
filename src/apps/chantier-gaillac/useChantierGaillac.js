@@ -16,7 +16,37 @@ export const chantierGaillacKeys = {
   taches: (orgId) => ['chantier-gaillac', orgId, 'taches'],
   planning: (orgId) => ['chantier-gaillac', orgId, 'planning'],
   team: (orgId) => ['chantier-gaillac', orgId, 'team'],
+  partageLien: (orgId) => ['chantier-gaillac', orgId, 'partage-lien'],
+  // Lien externe : pas d'org (visiteur anonyme), la clé est le token lui-même
+  partage: (token) => ['chantier-gaillac-partage', token],
 };
+
+/** Lecture externe par lien secret (aucune authentification). */
+export function useChantierGaillacPartage(token) {
+  return useQuery({
+    queryKey: chantierGaillacKeys.partage(token),
+    queryFn: () => unwrapResult(chantierGaillacService.fetchPartage(token)),
+    enabled: !!token,
+    retry: false,
+    ...LIVE,
+  });
+}
+
+/** Admin : lien de partage actif + génération / révocation. */
+export function useChantierGaillacPartageAdmin(orgId, enabled) {
+  const qc = useQueryClient();
+  const key = chantierGaillacKeys.partageLien(orgId);
+  const lien = useQuery({
+    queryKey: key,
+    queryFn: () => unwrapResult(chantierGaillacService.gererPartage('lire')),
+    enabled: !!orgId && enabled,
+  });
+  const gerer = useMutation({
+    mutationFn: (action) => unwrapResult(chantierGaillacService.gererPartage(action)),
+    onSuccess: (token) => qc.setQueryData(key, token),
+  });
+  return { token: lien.data || null, isLoading: lien.isLoading, error: lien.error, gerer };
+}
 
 const LIVE = { refetchInterval: 60_000, refetchOnWindowFocus: true, staleTime: 15_000 };
 

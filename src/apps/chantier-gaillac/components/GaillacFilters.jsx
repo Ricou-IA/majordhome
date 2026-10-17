@@ -28,7 +28,7 @@ function Segmented({ label, options, value, onChange }) {
 }
 
 /** Barre de filtres : regroupement, technicien, code, masquer validées, recherche. */
-export default function GaillacFilters({ filters, onChange, techniciens, options }) {
+export default function GaillacFilters({ filters, onChange, techniciens, options, readOnly = false }) {
   const set = (patch) => onChange({ ...filters, ...patch });
   const techOptions = [{ value: '', label: 'Tous' }, ...techniciens.map((t) => ({ value: t.id, label: t.first_name || t.display_name }))];
 
@@ -52,7 +52,7 @@ export default function GaillacFilters({ filters, onChange, techniciens, options
           {options.map((o) => (
             <option key={o.code} value={o.code}>
               {o.date ? `${formatDateCourte(o.date)} · ` : ''}{o.label}
-              {o.code === HORS_PERIMETRE_KEY ? '' : ` (${formatDuree(o.totalMin)})`}
+              {o.code === HORS_PERIMETRE_KEY || readOnly ? '' : ` (${formatDuree(o.totalMin)})`}
             </option>
           ))}
         </select>

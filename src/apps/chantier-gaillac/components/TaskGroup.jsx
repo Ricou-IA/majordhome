@@ -25,7 +25,9 @@ function DatePrevueInput({ planning, onSave }) {
 }
 
 /** Groupe de tâches : en-tête (libellé, date, compteurs, durée accès compris) + lignes. */
-export default function TaskGroup({ group, planningIndex, byNumero, isAdmin, techNameOf, nameOf, onToggle, onComment, onDatePrevue }) {
+export default function TaskGroup({
+  group, planningIndex, byNumero, isAdmin, techNameOf, nameOf, onToggle, onComment, onDatePrevue, readOnly = false,
+}) {
   const p = group.planning;
   return (
     <section aria-label={group.label} className="space-y-2 xl:space-y-0">
@@ -40,7 +42,7 @@ export default function TaskGroup({ group, planningIndex, byNumero, isAdmin, tec
           {p && isAdmin && <DatePrevueInput planning={p} onSave={onDatePrevue} />}
           <span className="font-mono text-sm tabular-nums text-slate-700">
             {group.count} ligne{group.count > 1 ? 's' : ''} · {group.done} validée{group.done > 1 ? 's' : ''}
-            {group.isHorsPerimetre ? '' : ` · ${formatDuree(group.totalMin)} accès compris`}
+            {group.isHorsPerimetre || readOnly ? '' : ` · ${formatDuree(group.totalMin)} accès compris`}
           </span>
         </div>
       </header>
@@ -56,6 +58,7 @@ export default function TaskGroup({ group, planningIndex, byNumero, isAdmin, tec
             nameOf={nameOf}
             onToggle={onToggle}
             onComment={onComment}
+            readOnly={readOnly}
           />
         ))}
       </ul>

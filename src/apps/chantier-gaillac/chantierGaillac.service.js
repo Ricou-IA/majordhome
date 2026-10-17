@@ -88,6 +88,27 @@ export const chantierGaillacService = {
     }, 'chantierGaillac.setCommentaire');
   },
 
+  /**
+   * Lien externe (sans compte) : lecture filtrée par la RPC `chantier_gaillac_partage_lire`
+   * — ni durée, ni achat, ni observations, ni commentaire. Token invalide / révoqué ⇒ erreur.
+   */
+  async fetchPartage(token) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('chantier_gaillac_partage_lire', { p_token: token });
+      if (error) throw error;
+      return data;
+    }, 'chantierGaillac.fetchPartage');
+  },
+
+  /** Admin : 'lire' | 'generer' | 'revoquer' le lien de partage → token actif ou null. */
+  async gererPartage(action) {
+    return withErrorHandling(async () => {
+      const { data, error } = await supabase.rpc('chantier_gaillac_partage_gerer', { p_action: action });
+      if (error) throw error;
+      return data || null;
+    }, 'chantierGaillac.gererPartage');
+  },
+
   /** Admin : date prévue d'un code (null pour la retirer). RLS : refus silencieux ⇒ 0 ligne ⇒ erreur. */
   async setDatePrevue(mdhOrgId, code, date) {
     return withErrorHandling(async () => {
