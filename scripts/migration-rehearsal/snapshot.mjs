@@ -74,7 +74,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'pennylane_customer_lookup', columns: null }, // 20261011_1 : base de diff (identity_baseline_at)
   // 20261013_2 : tournées de livraison palettes (webshop) — petites tables, données incluses
   { schema: 'majordhome', table: 'webshop_sectors', columns: null },
-  { schema: 'majordhome', table: 'webshop_sector_postcodes', columns: null, data: false }, // 20261017_1 : webshop_resolve_sector (consommé par le site)
+  { schema: 'majordhome', table: 'webshop_sector_postcodes', columns: null }, // 20261017_1 : webshop_resolve_sector (consommé par le site) ; 20261017_2 : données (postcode_taken)
+  { schema: 'majordhome', table: 'webshop_shipping_rates', columns: null }, // 20261017_2 : RPC d'édition de la grille colis
   { schema: 'majordhome', table: 'webshop_delivery_slots', columns: null },
   { schema: 'majordhome', table: 'webshop_products', columns: null }, // 20261013_3 : JOIN de la vue ; 20261014_1 : données pour l'assert droits
   { schema: 'majordhome', table: 'webshop_categories', columns: null }, // 20261014_1 : policies lecture membre / écriture admin
