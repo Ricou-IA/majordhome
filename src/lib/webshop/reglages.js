@@ -61,8 +61,29 @@ export const WEBSHOP_REGLAGES_DEFAUT = deepFreeze({
   },
 });
 
-/** Taux de TVA acceptés (en %). */
-const TVA_VALIDES = [0, 5.5, 10, 20];
+/**
+ * Bornes des réglages numériques (entiers, inclusives) et taux de TVA admis (en %) : source unique
+ * de la coercition ci-dessous ET de la validation de l'écran Settings, qui REFUSE une saisie hors
+ * bornes au lieu de la remplacer. `palette.max_emplacements_panier` est en plus plafonné par
+ * `palette.capacite_emplacements`.
+ */
+export const BORNES = deepFreeze({
+  palette: {
+    heure_envoi: { min: 0, max: 23 },
+    delai_fermeture_jours: { min: 0, max: 14 },
+    horizon_semaines: { min: 1, max: 26 },
+    capacite_emplacements: { min: 1, max: 40 },
+    prix_emplacement_defaut_cents: { min: 0, max: 10_000_000 },
+    max_emplacements_panier: { min: 1, max: 40 },
+  },
+  colis: {
+    max_qty_ligne: { min: 1, max: 100 },
+  },
+  tva_pct: [0, 5.5, 10, 20],
+});
+
+const TVA_VALIDES = BORNES.tva_pct;
+const BP = BORNES.palette;
 
 /** @param {any} v @returns {boolean} */
 function estObjet(v) {
@@ -173,7 +194,9 @@ export function buildWebshopConfig(settings) {
   const c = estObjet(w.colis) ? w.colis : {};
   const cp = estObjet(c.prestataire) ? c.prestataire : {};
 
-  const capacite = entierBorne(p.capacite_emplacements, 1, 40, D.palette.capacite_emplacements);
+  /** @param {any} v @param {{ min: number, max: number }} b @param {number} defaut */
+  const borne = (v, b, defaut) => entierBorne(v, b.min, b.max, defaut);
+  const capacite = borne(p.capacite_emplacements, BP.capacite_emplacements, D.palette.capacite_emplacements);
 
   return {
     site_url: texte(w.site_url, D.site_url),
@@ -186,15 +209,16 @@ export function buildWebshopConfig(settings) {
         note: texte(pt.note, D.palette.transporteur.note),
       },
       envoi_auto: booleen(p.envoi_auto, D.palette.envoi_auto),
-      heure_envoi: entierBorne(p.heure_envoi, 0, 23, D.palette.heure_envoi),
-      delai_fermeture_jours: entierBorne(p.delai_fermeture_jours, 0, 14, D.palette.delai_fermeture_jours),
-      horizon_semaines: entierBorne(p.horizon_semaines, 1, 26, D.palette.horizon_semaines),
+      heure_envoi: borne(p.heure_envoi, BP.heure_envoi, D.palette.heure_envoi),
+      delai_fermeture_jours: borne(p.delai_fermeture_jours, BP.delai_fermeture_jours, D.palette.delai_fermeture_jours),
+      horizon_semaines: borne(p.horizon_semaines, BP.horizon_semaines, D.palette.horizon_semaines),
       ancre_cycle: dateIso(p.ancre_cycle, D.palette.ancre_cycle),
       capacite_emplacements: capacite,
-      prix_emplacement_defaut_cents: entierBorne(p.prix_emplacement_defaut_cents, 0, 10_000_000, D.palette.prix_emplacement_defaut_cents),
+      prix_emplacement_defaut_cents: borne(p.prix_emplacement_defaut_cents, BP.prix_emplacement_defaut_cents, D.palette.prix_emplacement_defaut_cents),
       tva_pct: parmi(p.tva_pct, TVA_VALIDES, D.palette.tva_pct),
       max_emplacements_panier: entierBorne(
-        p.max_emplacements_panier, 1, capacite, Math.min(D.palette.max_emplacements_panier, capacite),
+        p.max_emplacements_panier, BP.max_emplacements_panier.min, Math.min(BP.max_emplacements_panier.max, capacite),
+        Math.min(D.palette.max_emplacements_panier, capacite),
       ),
     },
     colis: {
@@ -205,7 +229,7 @@ export function buildWebshopConfig(settings) {
         note: texte(cp.note, D.colis.prestataire.note),
       },
       tva_pct: parmi(c.tva_pct, TVA_VALIDES, D.colis.tva_pct),
-      max_qty_ligne: entierBorne(c.max_qty_ligne, 1, 100, D.colis.max_qty_ligne),
+      max_qty_ligne: borne(c.max_qty_ligne, BORNES.colis.max_qty_ligne, D.colis.max_qty_ligne),
     },
   };
 }

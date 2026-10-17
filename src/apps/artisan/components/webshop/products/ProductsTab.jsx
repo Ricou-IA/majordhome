@@ -1,7 +1,8 @@
 /** ProductsTab — catalogue boutique : recherche, filtre catégorie, liste, drawer. */
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Loader2, Search, Lock } from 'lucide-react';
+import { Plus, Loader2, Search, Lock, Globe } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useWebshopCatalog } from '@hooks/useWebshop';
@@ -9,7 +10,6 @@ import { duplicatePayload, nextDisplayOrder } from '@/lib/webshop/catalog';
 import { inputClass, selectClass } from '@apps/artisan/components/FormFields';
 import ProductList from './ProductList';
 import ProductDrawer from './ProductDrawer';
-import SiteUrlSetting from './SiteUrlSetting';
 
 function fold(s) {
   return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -59,7 +59,16 @@ export default function ProductsTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SiteUrlSetting canEdit={isOrgAdmin} />
+        {/* Adresse du site : réglée dans Paramètres → Webshop → Général. */}
+        <div className="flex items-center gap-2 text-sm">
+          <Globe className="w-4 h-4 text-secondary-400 shrink-0" />
+          {siteUrl ? (
+            <a href={siteUrl} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">{siteUrl}</a>
+          ) : (
+            <span className="text-secondary-500">Adresse du site non renseignée</span>
+          )}
+          {isOrgAdmin && <Link to="/settings/webshop" className="text-xs text-secondary-500 hover:text-primary-600 underline">Paramètres</Link>}
+        </div>
         {isOrgAdmin ? (
           <button type="button" onClick={() => setDrawer({ product: null })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700">
             <Plus className="w-4 h-4" /> Nouveau produit

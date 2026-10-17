@@ -486,3 +486,12 @@ export const webshopKeys = {
   categories: (orgId) => [...webshopKeys.all(orgId), 'categories'],
   orders: (orgId) => [...webshopKeys.all(orgId), 'orders'],
 };
+
+// --- Webshop : paramétrage des listes de livraison (Settings → Webshop) ---
+export const webshopSettingsKeys = {
+  all: (orgId) => ['webshopSettings', orgId],
+  sectors: (orgId) => [...webshopSettingsKeys.all(orgId), 'sectors'],
+  sectorPostcodes: (orgId, sectorId) => [...webshopSettingsKeys.all(orgId), 'sectorPostcodes', sectorId],
+  shippingRates: (orgId) => [...webshopSettingsKeys.all(orgId), 'shippingRates'],
+  pickupPoints: (orgId) => [...webshopSettingsKeys.all(orgId), 'pickupPoints'],
+};

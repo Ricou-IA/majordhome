@@ -81,6 +81,7 @@ const MaintenanceSettings = lazy(() => import('./pages/settings/MaintenanceSetti
 const ClimDimensionnement = lazy(() => import('@apps/clim/pages/Dimensionnement'));
 const ClimSettings = lazy(() => import('./pages/settings/ClimSettings'));
 const DevisSettings = lazy(() => import('./pages/settings/DevisSettings'));
+const WebshopSettings = lazy(() => import('./pages/settings/WebshopSettings'));
 
 // Thermique (étude de déperditions)
 const ThermiqueWizard = lazy(() => import('@apps/thermique/pages/ThermiqueWizard'));
@@ -388,6 +389,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <ClimSettings />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/webshop',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <WebshopSettings />
         </RouteGuard>
       </SuspenseWrapper>
     ),
