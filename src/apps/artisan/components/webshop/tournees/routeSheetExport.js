@@ -9,6 +9,7 @@
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { downloadBlob } from '@lib/utils';
 import { buildRouteSheet } from '@/lib/webshop/tournees';
+import { buildWebshopConfig } from '@/lib/webshop/reglages';
 
 /**
  * @param {object} p
@@ -20,7 +21,7 @@ import { buildRouteSheet } from '@/lib/webshop/tournees';
  * @returns {Promise<number>}  nombre d'arrêts imprimés
  */
 export async function telechargerFeuilleDeRoute({ slot, sector, orders, items, settings }) {
-  const sheet = buildRouteSheet({ slot, sector, orders, items });
+  const sheet = buildRouteSheet({ slot, sector, orders, items, cfg: buildWebshopConfig(settings) });
   // Import dynamique : @react-pdf/renderer ne pèse que si on imprime.
   const { generateRouteSheetPdfBlob } = await import('./RouteSheetPDF');
   const blob = await generateRouteSheetPdfBlob({ sheet, company: buildCompanyInfo(settings) });

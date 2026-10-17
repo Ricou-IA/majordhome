@@ -2,12 +2,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  slotStatusLabel, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, depotFor, formatPhoneFR, tourneeErrorMessage,
+  slotStatusLabel, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
 } from '../src/lib/webshop/tournees.js';
+import { buildWebshopConfig, depotParCode } from '../src/lib/webshop/reglages.js';
+
+const cfgDefaut = buildWebshopConfig({});
 
 test('slotStatusLabel précise le motif de fermeture', () => {
   assert.equal(slotStatusLabel({ status: 'open' }), 'Ouverte');
-  assert.equal(slotStatusLabel({ status: 'closed', close_reason: 'j_minus_2' }), 'Fermée — J-2');
+  assert.equal(slotStatusLabel({ status: 'closed', close_reason: 'j_minus_2' }), 'Fermée — délai de fermeture');
   assert.equal(slotStatusLabel({ status: 'cancelled', close_reason: 'manual' }), 'Annulée');
 });
 
@@ -64,7 +67,7 @@ test('buildRouteSheet : un arrêt par adresse, commandes non payées ou annulée
   ];
   const sheet = buildRouteSheet({
     slot: { delivery_date: '2026-11-02', km_estimated: 400 }, sector: { code: 'MUR', label: 'Muret', max_km: 350, depot: 'castanet' },
-    orders, items,
+    orders, items, cfg: cfgDefaut,
   });
   assert.equal(sheet.dateLabel, 'lundi 2 novembre 2026');
   assert.equal(sheet.depot, 'Dépôt Castanet-Tolosan');
@@ -92,8 +95,25 @@ test('formatPhoneFR : paires lisibles, international ramené au national, inconn
   assert.equal(formatPhoneFR(null), null);
 });
 
-test('depotFor : code inconnu → le code, jamais un dépôt inventé', () => {
-  assert.deepEqual(depotFor('albi'), { label: 'Dépôt albi', address: 'albi' });
+test('depotParCode : code inconnu → le code, jamais un dépôt inventé', () => {
+  assert.deepEqual(depotParCode(cfgDefaut, 'albi'), { code: 'albi', libelle: 'Dépôt albi', adresse: 'albi' });
+});
+
+test('buildRouteSheet : le dépôt réglé (adresse, libellé) pilote le départ et l\'itinéraire', () => {
+  const cfg = buildWebshopConfig({ webshop: { depots: [{ code: 'castanet', libelle: 'Dépôt Nord', adresse: '1 rue X, 31320 Castanet' }] } });
+  assert.equal(depotParCode(cfg, 'castanet').adresse, '1 rue X, 31320 Castanet');
+  const sheet = buildRouteSheet({ slot: { delivery_date: '2026-11-02' }, sector: { code: 'MUR', depot: 'castanet' }, orders: [], items: [], cfg });
+  assert.equal(sheet.depot, 'Dépôt Nord');
+  assert.ok(sheet.itineraryUrl.includes(`origin=${encodeURIComponent('1 rue X, 31320 Castanet')}`));
+});
+
+test('sendPendingLabel : texte selon envoi auto, délai, heure et destinataires réglés', () => {
+  const cfg = buildWebshopConfig({ webshop: { palette: { delai_fermeture_jours: 3, heure_envoi: 17, envoi_auto: true, transporteur: { emails: ['a@x.fr', 'b@x.fr'] } } } });
+  assert.equal(sendPendingLabel(cfg, 'open'), 'Feuille pas encore envoyée — partira à la fermeture (J-3, 17 h) vers a@x.fr, b@x.fr');
+  assert.match(sendPendingLabel(cfgDefaut, 'open'), /\(J-2, 18 h\) vers aucun transporteur paramétré$/);
+  assert.match(sendPendingLabel(cfg, 'closed'), /^Feuille pas encore envoyée — partira à 17 h vers a@x\.fr, b@x\.fr$/);
+  const off = buildWebshopConfig({ webshop: { palette: { envoi_auto: false } } });
+  assert.equal(sendPendingLabel(off, 'open'), 'Envoi automatique désactivé — utiliser "Envoyer au transporteur"');
 });
 
 test('itineraryUrl sans arrêt : pas de waypoints', () => {

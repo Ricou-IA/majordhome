@@ -16,6 +16,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useWebshopSlotOrders, useWebshopTourMutations } from '@hooks/useWebshopTournees';
 import { dateLongFR, isCountedOrder, slotStatusLabel, tourneeErrorMessage, todayParis, addDaysIso } from '@/lib/webshop/tournees';
+import { buildWebshopConfig } from '@/lib/webshop/reglages';
 import { SlotStatusBadge, FillGauge } from './tourneesUi';
 import TourOrderCard from './TourOrderCard';
 import SendStatus from './SendStatus';
@@ -25,6 +26,7 @@ import { telechargerFeuilleDeRoute } from './routeSheetExport';
 export default function TourneeDrawer({ slot, sector, onClose }) {
   const { isTeamLeaderOrAbove } = useAuth();
   const { settings } = useOrgSettings();
+  const cfg = buildWebshopConfig(settings);
   const { data, isLoading } = useWebshopSlotOrders(slot.id);
   const { setStatus, cancel, sendRouteSheet } = useWebshopTourMutations();
   const [confirm, setConfirm] = useState(null); // 'send' | 'close' | 'cancel'
@@ -167,7 +169,7 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
         open={confirm === 'close'}
         onOpenChange={(v) => !v && closeConfirm()}
         title="Fermer la tournée à la réservation ?"
-        description="Plus aucun client ne pourra la choisir. ⚠️ Le cron de 17 h envoie la feuille de route de toute tournée fermée : elle partira au transporteur ce soir."
+        description={`Plus aucun client ne pourra la choisir. ${cfg.palette.envoi_auto ? `⚠️ L'envoi automatique de ${cfg.palette.heure_envoi} h envoie la feuille de route de toute tournée fermée : elle partira au transporteur ce soir.` : 'L\'envoi automatique est désactivé : pensez à l\'envoyer au transporteur.'}`}
         confirmLabel="Fermer"
         variant="default"
         loading={setStatus.isPending}

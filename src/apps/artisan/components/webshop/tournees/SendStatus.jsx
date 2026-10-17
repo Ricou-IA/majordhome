@@ -3,7 +3,7 @@
  *
  * - envoi manuel en cours (pg_net asynchrone) : suivi toutes les 3 s jusqu'à la réponse du site ;
  * - envoi manuel en échec : code HTTP + erreur de CETTE tournée, en ambre (jamais avalé) ;
- * - sinon : « Envoyée le … » (cron de 17 h ou envoi manuel) ou « Pas encore envoyée ».
+ * - sinon : « Envoyée le … » (envoi automatique ou manuel) ou « Pas encore envoyée » (texte tiré des réglages).
  */
 
 import { useEffect, useRef } from 'react';
@@ -11,10 +11,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useWebshopSendResult, webshopTourKeys } from '@hooks/useWebshopTournees';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { buildWebshopConfig } from '@/lib/webshop/reglages';
+import { sendPendingLabel } from '@/lib/webshop/tournees';
 import { formatDateTime } from './tourneesUi';
 
 export default function SendStatus({ slot }) {
   const { organization } = useAuth();
+  const { settings } = useOrgSettings();
   const queryClient = useQueryClient();
   const { data: result } = useWebshopSendResult(slot.id, { enabled: !!slot.route_sheet_request_id });
 
@@ -61,8 +65,7 @@ export default function SendStatus({ slot }) {
   }
   return (
     <p className="text-sm text-secondary-500 flex items-center gap-1.5">
-      <Clock className="w-4 h-4" /> Feuille pas encore envoyée
-      {slot.status === 'open' ? ' — partira à la fermeture (J-2, cron de 17 h)' : ' — partira au cron de 17 h'}
+      <Clock className="w-4 h-4" /> {sendPendingLabel(buildWebshopConfig(settings), slot.status)}
     </p>
   );
 }

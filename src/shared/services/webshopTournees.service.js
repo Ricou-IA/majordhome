@@ -3,7 +3,7 @@
  * ============================================================================
  * Tournées de livraison palettes de la boutique (onglet Webshop → Tournées).
  *
- * Le moteur (créneaux, réservation au paiement, fermeture J-2, feuille de route
+ * Le moteur (créneaux, réservation au paiement, fermeture au délai réglé, feuille de route
  * envoyée par le cron de 17 h) vit côté site. Ici :
  *   - lectures : vues majordhome_webshop_sectors / _delivery_slots /
  *     _orders_write (seule vue qui porte les colonnes livraison) / _order_items ;

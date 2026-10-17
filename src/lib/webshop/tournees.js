@@ -15,6 +15,8 @@
  * ============================================================================
  */
 
+import { depotParCode } from './reglages.js';
+
 /** Statuts de majordhome.webshop_delivery_slots (CHECK). */
 export const SLOT_STATUS = {
   open: { label: 'Ouverte', tone: 'blue' },
@@ -26,11 +28,11 @@ export const SLOT_STATUS = {
 export const CLOSE_REASONS = {
   capacity: 'pleine (emplacements)',
   stops: 'pleine (arrêts)',
-  j_minus_2: 'J-2',
+  j_minus_2: 'délai de fermeture',
   manual: 'à la main',
 };
 
-/** Ligne d'état lisible : « Fermée — J-2 ». */
+/** Ligne d'état lisible : « Fermée — délai de fermeture ». */
 export function slotStatusLabel(slot) {
   const base = SLOT_STATUS[slot?.status]?.label ?? slot?.status ?? '—';
   if (slot?.status === 'closed' && slot.close_reason) return `${base} — ${CLOSE_REASONS[slot.close_reason] ?? slot.close_reason}`;
@@ -94,16 +96,19 @@ export function itineraryUrl(depotAddress, stops) {
 }
 
 /**
- * Dépôts des secteurs (`webshop_sectors.depot` est un code). Reprend les défauts du site
- * (`DEPOT_ADDRESS` = « Castanet-Tolosan », libellé `DEPOT_LABEL`) : la base ne porte pas
- * encore d'adresse de dépôt. Code inconnu → le code lui-même, jamais un dépôt inventé.
+ * Texte « feuille pas encore envoyée » d'une tournée, tiré des réglages (`cfg` =
+ * `buildWebshopConfig(settings)`) : envoi auto, délai de fermeture, heure (Paris), destinataires.
+ * @param {import('./reglages.js').WebshopConfig} cfg
+ * @param {string} slotStatus statut de la tournée (`open` : l'envoi suit la fermeture)
  */
-export const DEPOTS = {
-  castanet: { label: 'Dépôt Castanet-Tolosan', address: 'Castanet-Tolosan' },
-};
-
-export function depotFor(code) {
-  return DEPOTS[code] ?? { label: `Dépôt ${code ?? '—'}`, address: code ?? '' };
+export function sendPendingLabel(cfg, slotStatus) {
+  const p = cfg.palette;
+  if (!p.envoi_auto) return 'Envoi automatique désactivé — utiliser "Envoyer au transporteur"';
+  const vers = p.transporteur.emails.length ? p.transporteur.emails.join(', ') : 'aucun transporteur paramétré';
+  const quand = slotStatus === 'open'
+    ? `à la fermeture (J-${p.delai_fermeture_jours}, ${p.heure_envoi} h)`
+    : `à ${p.heure_envoi} h`;
+  return `Feuille pas encore envoyée — partira ${quand} vers ${vers}`;
 }
 
 /** « lundi 2 novembre 2026 » (date ISO lue en UTC : pas de décalage de fuseau). */
@@ -138,10 +143,11 @@ export function orderAddress(order) {
  * @param {object} p.sector        secteur ({ code, label, max_km })
  * @param {Array}  p.orders        commandes de la tournée (toutes : filtrées ici)
  * @param {Array}  p.items         lignes webshop_order_items de ces commandes
- * Le dépôt (départ / retour) vient de `sector.depot` via `depotFor`.
+ * @param {import('./reglages.js').WebshopConfig} p.cfg  `buildWebshopConfig(settings)`
+ * Le dépôt (départ / retour) vient de `sector.depot` via `depotParCode(cfg, …)`.
  */
-export function buildRouteSheet({ slot, sector, orders, items }) {
-  const depot = depotFor(sector?.depot);
+export function buildRouteSheet({ slot, sector, orders, items, cfg }) {
+  const depot = depotParCode(cfg, sector?.depot);
   const counted = (orders || []).filter(isCountedOrder)
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   const stops = [];
@@ -180,13 +186,13 @@ export function buildRouteSheet({ slot, sector, orders, items }) {
     date: slot?.delivery_date,
     dateLabel: dateLongFR(slot?.delivery_date),
     sector: { code: sector?.code ?? '', label: sector?.label ?? '' },
-    depot: depot.label,
+    depot: depot.libelle,
     pallets: stops.reduce((s, a) => s + a.pallets, 0),
     stops,
     kmEstimated: km,
     maxKm: sector?.max_km ?? null,
     overKm: km !== null && sector?.max_km ? km > sector.max_km : false,
-    itineraryUrl: itineraryUrl(depot.address, stops),
+    itineraryUrl: itineraryUrl(depot.adresse, stops),
     filename: `feuille-de-route-${slot?.delivery_date}-${sector?.code ?? 'secteur'}.pdf`,
   };
 }

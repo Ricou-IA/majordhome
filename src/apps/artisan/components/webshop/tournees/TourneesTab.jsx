@@ -6,7 +6,7 @@
  * - liste des tournées (à venir sur 120 jours / 30 derniers jours), filtrable par secteur,
  *   avec état, remplissage (emplacements, arrêts) et feuille de route envoyée ou non ;
  * - clic sur une tournée → panneau de détail et gestes (TourneeDrawer).
- * Le moteur (créneaux, réservation, J-2, cron de 17 h) vit côté site : cet écran le pilote.
+ * Le moteur (créneaux, réservation, délai de fermeture, envoi automatique) vit côté site : cet écran le pilote.
  * ============================================================================
  */
 
