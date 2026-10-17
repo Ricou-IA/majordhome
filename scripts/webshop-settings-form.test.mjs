@@ -14,7 +14,29 @@ test('formulaire par défaut : aucune erreur, aller-retour identique au défaut'
   const f = formDefaut();
   assert.deepEqual(validerSaisie(f), {});
   const w = webshopAEnregistrer(f, {});
-  assert.deepEqual({ ...w }, { ...WEBSHOP_REGLAGES_DEFAUT, depots: WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => ({ ...d })) });
+  assert.deepEqual({ ...w }, { ...WEBSHOP_REGLAGES_DEFAUT, depots: [] });
+  // relu par buildWebshopConfig : le défaut s'applique
+  assert.deepEqual(buildWebshopConfig({ webshop: w }), buildWebshopConfig(null));
+});
+
+test('dépôts du formulaire = settings.webshop.depots BRUT : liste vide ou absente reste vide', () => {
+  const cfgDe = (webshop) => formDepuisConfig(buildWebshopConfig({ webshop }), webshop);
+  assert.deepEqual(cfgDe({ depots: [] }).depots, []);
+  assert.deepEqual(cfgDe({}).depots, []);
+  assert.deepEqual(formDepuisConfig(buildWebshopConfig(null)).depots, []);
+  const g = { code: 'gaillac', libelle: 'Dépôt Gaillac', adresse: 'Gaillac' };
+  assert.deepEqual(cfgDe({ depots: [g] }).depots, [g]);
+  // aller-retour : une liste vide enregistrée revient vide (l'avertissement se réaffiche)
+  const w = webshopAEnregistrer({ ...cfgDe({ depots: [] }) }, { depots: [] });
+  assert.deepEqual(cfgDe(w).depots, []);
+});
+
+test('secteurs inconnus (chargement / erreur) : enregistrement refusé ; sans ctx : pas de contrôle', () => {
+  const f = { ...formDefaut(), depots: [{ code: 'castanet', libelle: 'C', adresse: 'A' }] };
+  assert.match(validerSaisie(f, { depotsUtilises: undefined }).depots, /secteurs non chargés/);
+  assert.match(validerSaisie(f, { depotsUtilises: null }).depots, /secteurs non chargés/);
+  assert.deepEqual(validerSaisie(f, { depotsUtilises: ['castanet'] }), {});
+  assert.deepEqual(validerSaisie(f), {});
 });
 
 test('hors bornes : erreur sous le champ, jamais remplacé par le défaut', () => {
@@ -57,7 +79,7 @@ test('e-mails : saisie libre séparée, faute signalée', () => {
 });
 
 test('dépôts : ligne incomplète, doublon, dépôt utilisé par un secteur', () => {
-  const base = formDefaut();
+  const base = { ...formDefaut(), depots: WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => ({ ...d })) };
   assert.ok(validerSaisie({ ...base, depots: [{ code: 'x', libelle: '', adresse: 'a' }] }).depots);
   assert.match(validerSaisie({ ...base, depots: [base.depots[0], base.depots[0]] }).depots, /double/);
   const autre = [{ code: 'gaillac', libelle: 'Dépôt Gaillac', adresse: 'Gaillac' }];

@@ -64,16 +64,32 @@ export function normaliserSiteUrl(url) {
 // ---------------------------------------------------------------------------
 
 /**
- * Formulaire (valeurs en chaînes, comme saisies) depuis une configuration complète.
- * @param {import('./reglages.js').WebshopConfig} cfg
+ * Dépôts tels qu'enregistrés (chaînes), SANS repli sur le dépôt par défaut.
+ * @param {any} webshopBrut @returns {Array<{ code: string, libelle: string, adresse: string }>}
  */
-export function formDepuisConfig(cfg) {
+function depotsBruts(webshopBrut) {
+  const liste = webshopBrut && Array.isArray(webshopBrut.depots) ? webshopBrut.depots : [];
+  const txt = (v) => (typeof v === 'string' ? v : '');
+  return liste
+    .filter((d) => d && typeof d === 'object' && !Array.isArray(d))
+    .map((d) => ({ code: txt(d.code), libelle: txt(d.libelle), adresse: txt(d.adresse) }));
+}
+
+/**
+ * Formulaire (valeurs en chaînes, comme saisies) depuis une configuration complète.
+ * Les dépôts viennent de `settings.webshop.depots` BRUT, pas de `cfg` (qui réinjecte le dépôt par
+ * défaut) : une liste vide ou absente reste vide à l'écran et l'avertissement « le dépôt par
+ * défaut s'applique » se réaffiche après rechargement.
+ * @param {import('./reglages.js').WebshopConfig} cfg
+ * @param {any} [webshopBrut] `settings.webshop` tel qu'en base
+ */
+export function formDepuisConfig(cfg, webshopBrut) {
   const p = cfg.palette;
   const c = cfg.colis;
   return {
     site_url: cfg.site_url,
     emails_interne: emailsVersTexte(cfg.emails.interne),
-    depots: cfg.depots.map((d) => ({ ...d })),
+    depots: depotsBruts(webshopBrut),
     transporteur_nom: p.transporteur.nom,
     transporteur_emails: emailsVersTexte(p.transporteur.emails),
     transporteur_note: p.transporteur.note,
@@ -151,10 +167,13 @@ function brutDepuisForm(form) {
 /**
  * Erreurs de la saisie brute, par champ de l'écran. Vide = enregistrable.
  * @param {ReturnType<typeof formDepuisConfig>} form
- * @param {{ depotsUtilises?: string[] }} [ctx] codes de dépôt portés par des secteurs existants
+ * @param {{ depotsUtilises: string[]|undefined }} [ctx] À fournir par l'écran qui ÉDITE les dépôts :
+ *   codes portés par les secteurs existants. `depotsUtilises` non tableau (secteurs en chargement
+ *   ou en erreur) = état inconnu → enregistrement REFUSÉ (jamais de garde tolérante). Sans `ctx`
+ *   (onglets qui ne modifient pas les dépôts), ce contrôle ne s'applique pas.
  * @returns {Record<string, string>}
  */
-export function validerSaisie(form, { depotsUtilises = [] } = {}) {
+export function validerSaisie(form, ctx) {
   /** @type {Record<string, string>} */
   const erreurs = {};
   const brut = brutDepuisForm(form);
@@ -202,7 +221,11 @@ export function validerSaisie(form, { depotsUtilises = [] } = {}) {
   // Liste vide : le dépôt par défaut de reglages.js s'applique, c'est lui qui doit couvrir les secteurs.
   const effectifs = brut.depots.length ? brut.depots : WEBSHOP_REGLAGES_DEFAUT.depots;
   const codes = new Set(effectifs.map((dep) => dep.code));
-  const retires = [...new Set(depotsUtilises)].filter((code) => code && !codes.has(code));
+  if (ctx && !Array.isArray(ctx.depotsUtilises)) {
+    fautes.push('secteurs non chargés : impossible de vérifier les dépôts utilisés, enregistrement bloqué');
+  }
+  const utilises = ctx && Array.isArray(ctx.depotsUtilises) ? ctx.depotsUtilises : [];
+  const retires = [...new Set(utilises)].filter((code) => code && !codes.has(code));
   if (retires.length) fautes.push(`dépôt utilisé par un secteur, impossible de le retirer : ${retires.join(', ')}`);
   if (fautes.length) erreurs.depots = fautes.join(' ; ');
 

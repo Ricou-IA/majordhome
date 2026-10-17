@@ -10,7 +10,6 @@ import { useWebshopReglagesForm } from './useWebshopReglagesForm';
 import { Avertissement, BarreEnregistrer, CARD, Champ, Chargement, INPUT, SECTION_TITLE } from './common';
 
 const D = WEBSHOP_REGLAGES_DEFAUT.palette;
-const AUCUNE_LISTE = [];
 
 /** Phrase « à qui part la feuille de route » d'après la configuration ENREGISTRÉE. */
 function ResumeEnvoi({ cfg }) {
@@ -36,12 +35,13 @@ function NombreChamp({ r, champ, label, aide, unite }) {
   );
 }
 
-function DepotsEditor({ r }) {
+function DepotsEditor({ r, etatSecteurs }) {
   const depots = r.form.depots;
   const maj = (i, champ, v) => r.set('depots', depots.map((d, j) => (j === i ? { ...d, [champ]: v } : d)));
   return (
     <section className={CARD}>
       <h2 className={SECTION_TITLE}>Dépôts</h2>
+      {etatSecteurs && <p className="mb-3 text-xs text-red-600">{etatSecteurs}</p>}
       <p className="text-xs text-secondary-500 mb-3">
         Point de départ des tournées. Un secteur désigne son dépôt par le code ; un code utilisé par un secteur ne peut pas être retiré.
         Par défaut : {WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => `${d.libelle} (${d.code})`).join(', ')}.
@@ -70,9 +70,16 @@ function DepotsEditor({ r }) {
 }
 
 export default function PaletteTab() {
-  const { data: secteurs } = useWebshopSettingsSectors();
-  const depotsUtilises = useMemo(() => (secteurs ? secteurs.map((s) => s.depot) : AUCUNE_LISTE), [secteurs]);
+  const { data: secteurs, isSuccess, isLoading: secteursEnCours, error: secteursErreur } = useWebshopSettingsSectors();
+  // Secteurs inconnus (chargement ou erreur) = undefined → validerSaisie refuse l'enregistrement.
+  const depotsUtilises = useMemo(
+    () => (isSuccess && Array.isArray(secteurs) ? secteurs.map((s) => s.depot) : undefined),
+    [isSuccess, secteurs],
+  );
   const r = useWebshopReglagesForm({ depotsUtilises });
+  const etatSecteurs = secteursErreur
+    ? `Secteurs illisibles (${secteursErreur.message}) : enregistrement impossible tant que les dépôts utilisés ne sont pas vérifiés.`
+    : secteursEnCours ? 'Chargement des secteurs…' : null;
   const { form, set, erreurs } = r;
   if (r.isLoading) return <Chargement />;
   const bp = BORNES.palette;
@@ -99,7 +106,7 @@ export default function PaletteTab() {
         </div>
       </section>
 
-      <DepotsEditor r={r} />
+      <DepotsEditor r={r} etatSecteurs={etatSecteurs} />
 
       <section className={CARD}>
         <h2 className={SECTION_TITLE}>Règles des tournées</h2>

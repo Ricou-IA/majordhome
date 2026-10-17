@@ -9,17 +9,22 @@ import { buildWebshopConfig } from '@/lib/webshop/reglages';
 import { formDepuisConfig, validerSaisie, webshopAEnregistrer } from '@/lib/webshop/settingsForm';
 
 /**
- * @param {{ depotsUtilises?: string[] }} [ctx]
+ * @param {{ depotsUtilises: string[]|undefined }} [ctx] seulement pour l'onglet qui édite les
+ *   dépôts ; `depotsUtilises` undefined (secteurs non chargés) bloque l'enregistrement.
  */
-export function useWebshopReglagesForm(ctx = {}) {
+export function useWebshopReglagesForm(ctx) {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const cfg = useMemo(() => buildWebshopConfig(settings), [settings]);
-  const initial = useMemo(() => formDepuisConfig(cfg), [cfg]);
+  const initial = useMemo(() => formDepuisConfig(cfg, settings?.webshop), [cfg, settings]);
   const [form, setForm] = useState(initial);
   useEffect(() => setForm(initial), [initial]);
 
-  const depotsUtilises = ctx.depotsUtilises;
-  const erreurs = useMemo(() => validerSaisie(form, { depotsUtilises }), [form, depotsUtilises]);
+  const avecCtx = ctx !== undefined;
+  const depotsUtilises = ctx?.depotsUtilises;
+  const erreurs = useMemo(
+    () => validerSaisie(form, avecCtx ? { depotsUtilises } : undefined),
+    [form, avecCtx, depotsUtilises],
+  );
   const nbErreurs = Object.keys(erreurs).length;
   const isDirty = JSON.stringify(form) !== JSON.stringify(initial);
 
