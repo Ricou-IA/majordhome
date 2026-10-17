@@ -12,7 +12,8 @@
 -- 2026-10-17 — le site Mayer en appelle cinq) : J-2 → délai de l'org, capacité 10 → réglage,
 -- horizon 12 → réglage si NULL, ancre fixe → réglage, URL du site → réglage `site_url`.
 -- close_reason reste 'j_minus_2' (valeur du CHECK ; libellé front corrigé ailleurs).
--- Cron webshop-tours-daily : horaire ; chaque org part à SON heure d'envoi (heure de Paris).
+-- Cron webshop-tours-daily : horaire ; chaque org est fermée (J-n) puis envoyée à SON heure
+-- d'envoi (heure de Paris) — jamais avant : défaut 18 h = comportement historique.
 -- Répétée sur scripts/migration-rehearsal/ (assert-webshop-reglages.sql + assert-webshop-tournees.sql).
 -- ============================================================================
 
@@ -270,17 +271,29 @@ REVOKE EXECUTE ON FUNCTION public.webshop_generate_slots(uuid, integer, date) FR
 GRANT EXECUTE ON FUNCTION public.webshop_generate_slots(uuid, integer, date) TO service_role;
 
 -- ---------- 7. Fermeture J-n : chaque org selon SON délai --------------------
+-- Interne : ferme les créneaux ouverts d'UNE org dont la date est <= p_today + son délai.
+CREATE OR REPLACE FUNCTION majordhome.webshop_close_due_slots_org(p_org_id uuid, p_today date)
+RETURNS SETOF uuid
+LANGUAGE sql SECURITY DEFINER
+SET search_path TO 'majordhome', 'public', 'pg_temp'
+AS $function$
+  UPDATE majordhome.webshop_delivery_slots s
+     SET status = 'closed', closed_at = now(), close_reason = 'j_minus_2', updated_at = now()
+   WHERE s.org_id = p_org_id AND s.status = 'open'
+     AND s.delivery_date <= p_today + (majordhome.webshop_reglages(p_org_id) -> 'palette' ->> 'delai_fermeture_jours')::integer
+  RETURNING s.id;
+$function$;
+REVOKE EXECUTE ON FUNCTION majordhome.webshop_close_due_slots_org(uuid, date) FROM PUBLIC, anon, authenticated;
+
+-- Publique (usage manuel, appel ?fermer=1 du site) : toutes les orgs, chacune selon son délai,
+-- sans condition d'heure. Le cron horaire, lui, passe par webshop_run_daily_tours_at.
 CREATE OR REPLACE FUNCTION public.webshop_close_due_slots(p_today date DEFAULT CURRENT_DATE)
 RETURNS SETOF uuid
 LANGUAGE sql SECURITY DEFINER
 SET search_path TO 'public', 'majordhome', 'pg_temp'
 AS $function$
-  UPDATE majordhome.webshop_delivery_slots s
-     SET status = 'closed', closed_at = now(), close_reason = 'j_minus_2', updated_at = now()
-    FROM (SELECT o.org_id, (majordhome.webshop_reglages(o.org_id) -> 'palette' ->> 'delai_fermeture_jours')::integer AS delai
-            FROM (SELECT DISTINCT org_id FROM majordhome.webshop_delivery_slots WHERE status = 'open') o) r
-   WHERE s.org_id = r.org_id AND s.status = 'open' AND s.delivery_date <= p_today + r.delai
-  RETURNING s.id;
+  SELECT majordhome.webshop_close_due_slots_org(o.org_id, p_today)
+    FROM (SELECT DISTINCT org_id FROM majordhome.webshop_delivery_slots WHERE status = 'open') o;
 $function$;
 REVOKE EXECUTE ON FUNCTION public.webshop_close_due_slots(date) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.webshop_close_due_slots(date) TO service_role;
@@ -531,35 +544,50 @@ END $function$;
 REVOKE EXECUTE ON FUNCTION public.webshop_slot_send_now(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.webshop_slot_send_now(uuid) TO authenticated;
 
--- ---------- 12. Clôture horaire : fermeture J-n puis envoi aux orgs à l'heure --
--- 1) webshop_close_due_slots : toutes les orgs, chacune selon son délai (idempotent : le cron
---    tourne chaque heure). 2) Pour chaque org ayant un secteur actif ET dont c'est l'heure
---    d'envoi (heure de Paris) : POST <site_url>/api/boutique/cron/tournees, org_id dans le body.
+-- ---------- 12. Clôture horaire : chaque org à SON heure d'envoi ------------
+-- Cœur testable : l'instant est un paramètre (le cron passe now()). Pour chaque org qui a un
+-- créneau ouvert ou un secteur actif, et dont l'heure de Paris = heure_envoi :
+--   1) fermeture J-n de CETTE org (même si envoi_auto est faux : on ferme toujours à l'heure
+--      dite, comme le cron quotidien historique de 18 h / 19 h) ;
+--   2) si envoi_auto et secteur actif : POST <site_url>/api/boutique/cron/tournees, org_id dans le body.
 -- Sans secret Vault ou sans site_url : WARNING + mention dans le texte retourné, jamais
 -- d'exception (elle annulerait la fermeture).
-CREATE OR REPLACE FUNCTION public.webshop_run_daily_tours(p_today date DEFAULT NULL::date)
+CREATE OR REPLACE FUNCTION majordhome.webshop_run_daily_tours_at(p_at timestamptz, p_today date DEFAULT NULL::date)
 RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path TO 'public', 'majordhome', 'pg_temp'
+SET search_path TO 'majordhome', 'public', 'pg_temp'
 AS $function$
 DECLARE
-  v_today   date := COALESCE(p_today, (now() AT TIME ZONE 'Europe/Paris')::date);
-  v_closed  integer;
-  v_secret  text;
-  v_request bigint;
-  v_org     uuid;
-  v_url     text;
-  v_lignes  text[] := '{}';
+  v_today    date := COALESCE(p_today, (p_at AT TIME ZONE 'Europe/Paris')::date);
+  v_heure    integer := extract(hour FROM p_at AT TIME ZONE 'Europe/Paris')::integer;
+  v_closed   integer := 0;
+  v_n        integer;
+  v_secret   text;
+  v_request  bigint;
+  v_org      uuid;
+  v_reglages jsonb;
+  v_url      text;
+  v_lignes   text[] := '{}';
 BEGIN
-  SELECT count(*) INTO v_closed FROM public.webshop_close_due_slots(v_today);
-
   SELECT decrypted_secret INTO v_secret
     FROM vault.decrypted_secrets WHERE name = 'webshop_cron_secret' LIMIT 1;
 
-  FOR v_org IN SELECT DISTINCT org_id FROM majordhome.webshop_sectors WHERE is_active ORDER BY org_id LOOP
-    IF majordhome.webshop_should_send(v_org, now()) IS NOT TRUE THEN CONTINUE; END IF;
+  FOR v_org IN
+    SELECT org_id FROM majordhome.webshop_sectors WHERE is_active
+    UNION
+    SELECT org_id FROM majordhome.webshop_delivery_slots WHERE status = 'open'
+    ORDER BY 1
+  LOOP
+    v_reglages := majordhome.webshop_reglages(v_org);
+    IF (v_heure = (v_reglages -> 'palette' ->> 'heure_envoi')::integer) IS NOT TRUE THEN CONTINUE; END IF;
 
-    v_url := rtrim(majordhome.webshop_reglages(v_org) ->> 'site_url', '/');
+    SELECT count(*) INTO v_n FROM majordhome.webshop_close_due_slots_org(v_org, v_today);
+    v_closed := v_closed + v_n;
+
+    IF ((v_reglages -> 'palette' ->> 'envoi_auto')::boolean) IS NOT TRUE THEN CONTINUE; END IF;
+    IF NOT EXISTS (SELECT 1 FROM majordhome.webshop_sectors WHERE org_id = v_org AND is_active) THEN CONTINUE; END IF;
+
+    v_url := rtrim(v_reglages ->> 'site_url', '/');
     IF COALESCE(v_url, '') = '' THEN
       RAISE WARNING '[webshop_run_daily_tours] org % : site_url absent (Settings → Webshop), feuilles de route non déclenchées', v_org;
       v_lignes := v_lignes || format('org=%s http=non (site_url absent)', v_org);
@@ -581,8 +609,19 @@ BEGIN
   END LOOP;
 
   RETURN format('fermes=%s', v_closed)
-      || CASE WHEN cardinality(v_lignes) = 0 THEN ', http=non (aucune org à son heure d''envoi)'
+      || CASE WHEN cardinality(v_lignes) = 0 THEN ', http=non (aucun envoi dû à cette heure)'
               ELSE ', ' || array_to_string(v_lignes, ', ') END;
+END $function$;
+REVOKE EXECUTE ON FUNCTION majordhome.webshop_run_daily_tours_at(timestamptz, date) FROM PUBLIC, anon, authenticated;
+
+-- Signature publique inchangée : appelée chaque heure par le cron.
+CREATE OR REPLACE FUNCTION public.webshop_run_daily_tours(p_today date DEFAULT NULL::date)
+RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'majordhome', 'pg_temp'
+AS $function$
+BEGIN
+  RETURN majordhome.webshop_run_daily_tours_at(now(), p_today);
 END $function$;
 REVOKE EXECUTE ON FUNCTION public.webshop_run_daily_tours(date) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.webshop_run_daily_tours(date) TO service_role;

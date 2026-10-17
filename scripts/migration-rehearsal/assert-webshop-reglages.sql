@@ -14,6 +14,8 @@ BEGIN
     'majordhome.webshop_reglage_date(jsonb, text)',
     'majordhome.webshop_jsonb_fusion(jsonb, jsonb)',
     'majordhome.webshop_slot_recount(uuid)',
+    'majordhome.webshop_close_due_slots_org(uuid, date)',
+    'majordhome.webshop_run_daily_tours_at(timestamptz, date)',
     'public.webshop_cycle_week(date, date)',
     'public.webshop_close_due_slots(date)',
     'public.webshop_generate_slots(uuid, integer, date)',
@@ -33,6 +35,11 @@ BEGIN
     IF has_function_privilege('authenticated', f, 'EXECUTE') THEN RAISE EXCEPTION '% exécutable par authenticated', f; END IF;
     IF NOT has_function_privilege('service_role', f, 'EXECUTE') THEN RAISE EXCEPTION '% non exécutable par service_role', f; END IF;
   END LOOP;
+  -- Internes : aucun rôle API (appelées par les fonctions SECURITY DEFINER seulement)
+  IF has_function_privilege('authenticated', 'majordhome.webshop_close_due_slots_org(uuid, date)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'majordhome.webshop_run_daily_tours_at(timestamptz, date)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'fonction interne exécutable par authenticated';
+  END IF;
   IF NOT has_function_privilege('authenticated', 'public.webshop_slot_send_now(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'send_now non exécutable par authenticated';
   END IF;
@@ -72,7 +79,6 @@ DECLARE
   v_sect_m uuid; v_sect_a uuid; v_sect_b uuid;
   v_s3 uuid; v_s4 uuid; v_s5 uuid; v_a2 uuid; v_a3 uuid;
   v_tl uuid; v_slot uuid; v_res text; v_n int; v_dates text;
-  v_heure int := extract(hour FROM now() AT TIME ZONE 'Europe/Paris')::int;
 BEGIN
   SELECT id INTO v_autre FROM core.organizations WHERE id <> v_mayer ORDER BY id LIMIT 1;
   IF v_autre IS NULL THEN RAISE EXCEPTION 'fixture : aucune autre org'; END IF;
@@ -163,16 +169,17 @@ BEGIN
   EXCEPTION WHEN others THEN IF SQLERRM <> 'site_url_missing' THEN RAISE EXCEPTION '(6) attendu site_url_missing, reçu %', SQLERRM; END IF; END;
   RESET ROLE;
 
-  -- (7) Cron horaire : n'envoie qu'aux orgs à l'heure, URL du réglage (sans « / » final), org_id dans le body
+  -- (7) Cron horaire (instant figé via webshop_run_daily_tours_at) : n'envoie qu'aux orgs à leur
+  --     heure, URL du réglage (sans « / » final), org_id dans le body. 2030-03-04 17:00 UTC = 18 h Paris (CET).
   UPDATE core.organizations SET settings = jsonb_set(settings, '{webshop}',
-    jsonb_build_object('site_url', 'https://exemple.test/', 'palette', jsonb_build_object('envoi_auto', true, 'heure_envoi', v_heure))) WHERE id = v_mayer;
+    jsonb_build_object('site_url', 'https://exemple.test/', 'palette', jsonb_build_object('envoi_auto', true, 'heure_envoi', 18))) WHERE id = v_mayer;
   UPDATE core.organizations SET settings = jsonb_set(settings, '{webshop}',
-    jsonb_build_object('site_url', 'https://autre.test', 'palette', jsonb_build_object('envoi_auto', true, 'heure_envoi', (v_heure + 1) % 24))) WHERE id = v_autre;
+    jsonb_build_object('site_url', 'https://autre.test', 'palette', jsonb_build_object('envoi_auto', true, 'heure_envoi', 10))) WHERE id = v_autre;
   DELETE FROM vault.decrypted_secrets WHERE name = 'webshop_cron_secret';
-  v_res := public.webshop_run_daily_tours(v_d);
+  v_res := majordhome.webshop_run_daily_tours_at('2030-03-04 17:00+00');
   IF v_res NOT LIKE '%secret%' OR EXISTS (SELECT 1 FROM net.rehearsal_calls) THEN RAISE EXCEPTION '(7a) sans secret : %', v_res; END IF;
   INSERT INTO vault.decrypted_secrets VALUES ('webshop_cron_secret', 'rehearsal-secret');
-  v_res := public.webshop_run_daily_tours(v_d);
+  v_res := majordhome.webshop_run_daily_tours_at('2030-03-04 17:00+00');
   IF (SELECT count(*) FROM net.rehearsal_calls) <> 1 THEN RAISE EXCEPTION '(7b) % appel(s) : %', (SELECT count(*) FROM net.rehearsal_calls), v_res; END IF;
   IF NOT EXISTS (SELECT 1 FROM net.rehearsal_calls WHERE url = 'https://exemple.test/api/boutique/cron/tournees'
                    AND body->>'org_id' = v_mayer::text AND body->>'today' = v_d::text
@@ -180,8 +187,30 @@ BEGIN
     RAISE EXCEPTION '(7b) appel incorrect : %', (SELECT json_agg(c) FROM net.rehearsal_calls c);
   END IF;
   UPDATE core.organizations SET settings = jsonb_set(settings, '{webshop,site_url}', '""') WHERE id = v_mayer;
-  v_res := public.webshop_run_daily_tours(v_d);
+  v_res := majordhome.webshop_run_daily_tours_at('2030-03-04 17:00+00');
   IF v_res NOT LIKE '%site_url%' OR (SELECT count(*) FROM net.rehearsal_calls) <> 1 THEN RAISE EXCEPTION '(7c) sans site_url : %', v_res; END IF;
+
+  -- (8) Fermeture J-n à l'heure d'envoi de l'org seulement (envoi_auto vrai ou faux) :
+  --     Mayer réglée à 18 h, autre org à 10 h, envoi_auto faux pour les deux ; créneau ouvert à J+1 chacune.
+  UPDATE core.organizations SET settings = jsonb_set(settings, '{webshop,palette}',
+    '{"envoi_auto":false,"heure_envoi":18,"delai_fermeture_jours":2}') WHERE id = v_mayer;
+  UPDATE core.organizations SET settings = jsonb_set(settings, '{webshop,palette}',
+    '{"envoi_auto":false,"heure_envoi":10,"delai_fermeture_jours":2}') WHERE id = v_autre;
+  INSERT INTO majordhome.webshop_delivery_slots (org_id, sector_id, delivery_date, capacity_stops) VALUES (v_mayer, v_sect_m, v_d + 1, 5) RETURNING id INTO v_s3;
+  INSERT INTO majordhome.webshop_delivery_slots (org_id, sector_id, delivery_date, capacity_stops) VALUES (v_autre, v_sect_a, v_d + 1, 5) RETURNING id INTO v_a2;
+  v_n := (SELECT count(*) FROM net.rehearsal_calls);
+  v_res := majordhome.webshop_run_daily_tours_at('2030-03-04 09:00+00'); -- 10 h Paris
+  IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_s3) <> 'open' THEN
+    RAISE EXCEPTION '(8a) 10 h Paris : créneau Mayer (réglée à 18 h) fermé — %', v_res;
+  END IF;
+  IF (SELECT status || '/' || close_reason FROM majordhome.webshop_delivery_slots WHERE id = v_a2) IS DISTINCT FROM 'closed/j_minus_2' THEN
+    RAISE EXCEPTION '(8a) 10 h Paris : créneau de l''org réglée à 10 h non fermé — %', v_res;
+  END IF;
+  v_res := majordhome.webshop_run_daily_tours_at('2030-03-04 17:00+00'); -- 18 h Paris
+  IF (SELECT status || '/' || close_reason FROM majordhome.webshop_delivery_slots WHERE id = v_s3) IS DISTINCT FROM 'closed/j_minus_2' THEN
+    RAISE EXCEPTION '(8b) 18 h Paris : créneau Mayer non fermé — %', v_res;
+  END IF;
+  IF (SELECT count(*) FROM net.rehearsal_calls) <> v_n THEN RAISE EXCEPTION '(8) envoi_auto faux : appel émis'; END IF;
 
   RAISE NOTICE 'assert-webshop-reglages B (réglages lus) : OK';
 END $$;
