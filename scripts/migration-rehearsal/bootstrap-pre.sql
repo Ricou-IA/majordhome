@@ -53,3 +53,16 @@ CREATE TABLE IF NOT EXISTS storage.objects (
 CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[]
 LANGUAGE sql IMMUTABLE AS $$ SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Stub pg_cron (20261017_1) : cron.schedule(nom, …) met à jour le job de même nom, comme
+-- l'extension ; les assertions lisent cron.job. Rien n'est jamais exécuté.
+CREATE SCHEMA IF NOT EXISTS cron;
+CREATE TABLE IF NOT EXISTS cron.job (
+  jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text NOT NULL, command text NOT NULL, active boolean NOT NULL DEFAULT true
+);
+CREATE OR REPLACE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint
+LANGUAGE sql AS $$
+  INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command)
+  ON CONFLICT (jobname) DO UPDATE SET schedule = EXCLUDED.schedule, command = EXCLUDED.command
+  RETURNING jobid;
+$$;

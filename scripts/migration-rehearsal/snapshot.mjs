@@ -74,6 +74,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'pennylane_customer_lookup', columns: null }, // 20261011_1 : base de diff (identity_baseline_at)
   // 20261013_2 : tournées de livraison palettes (webshop) — petites tables, données incluses
   { schema: 'majordhome', table: 'webshop_sectors', columns: null },
+  { schema: 'majordhome', table: 'webshop_sector_postcodes', columns: null, data: false }, // 20261017_1 : webshop_resolve_sector (consommé par le site)
   { schema: 'majordhome', table: 'webshop_delivery_slots', columns: null },
   { schema: 'majordhome', table: 'webshop_products', columns: null }, // 20261013_3 : JOIN de la vue ; 20261014_1 : données pour l'assert droits
   { schema: 'majordhome', table: 'webshop_categories', columns: null }, // 20261014_1 : policies lecture membre / écriture admin
@@ -137,6 +138,22 @@ const FUNCTIONS = [
   'public.pennylane_sync_auto_attach_quote(uuid, uuid, bigint, bigint, numeric, text, date, text, text)',
   'public.pennylane_sync_update_quote_fields(uuid, text, text, numeric, text, date, numeric)',
   'majordhome.webshop_slot_recount(uuid)', // 20261013_2 (en prod) : appelée par le trigger de 20261013_3
+  // 20261017_1 : réglages webshop lus par la base — définitions LIVE des fonctions remplacées
+  'public.webshop_easter_sunday(integer)',
+  'public.webshop_is_french_holiday(date)',
+  'public.webshop_cycle_week(date)',
+  'public.webshop_insert_slots(uuid, jsonb)',
+  'public.webshop_generate_slots(uuid, integer, date)',
+  'public.webshop_close_due_slots(date)',
+  'public.webshop_resolve_sector(uuid, text, text)',
+  'public.webshop_apply_paid_order(uuid)',
+  'public.webshop_run_daily_tours(date)',
+  'majordhome.webshop_slot_guard(uuid)',
+  'public.webshop_slot_set_status(uuid, text, text)',
+  'public.webshop_slot_cancel(uuid, text)',
+  'public.webshop_order_move_slot(uuid, uuid)',
+  'public.webshop_slot_send_now(uuid)',
+  'public.webshop_slot_send_result(uuid)',
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
