@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   totalMinutes, formatDuree, filterTaches, groupTaches, planningOptions,
-  defaultPlanningCode, techSummary, isSecurite, HORS_PERIMETRE_KEY,
+  defaultPlanningCode, techSummary, isSecurite, splitReferences, HORS_PERIMETRE_KEY,
 } from './chantierGaillacModel.js';
 
 const SQL = readFileSync(new URL('../../../../supabase/migrations/20261017_1_chantier_gaillac.sql', import.meta.url), 'utf8');
@@ -146,6 +146,31 @@ test('synthèse technicien', () => {
   assert.deepEqual(s.dates, ['2026-10-21']);
   assert.equal(s.done, 0);
   assert.ok(s.total > 0 && s.restantMin > 0);
+});
+
+test('références de tâches dans le texte', () => {
+  const nums = TACHES.map((t) => t.numero);
+  const refs = (text) => splitReferences(text, nums).filter((s) => s.type === 'ref').map((s) => s.numeros);
+  const byNum = Object.fromEntries(TACHES.map((t) => [t.numero, t]));
+  assert.deepEqual(refs(byNum.R1.action), [['36', '37', '38', '39']]);
+  assert.deepEqual(refs(byNum.R2.action), [['40']]);
+  assert.deepEqual(refs(byNum.R3.action), [['7'], ['5', '6']]);
+  assert.deepEqual(refs(byNum.R13.action), [['77', '79', '80', '80b']]);
+  assert.deepEqual(refs(byNum['7'].observations), [['R3']]);
+  // Parenthèses qui ne sont pas des références
+  assert.deepEqual(refs(byNum['56'].action), []); // (5 RDC, 6 R+1)
+  assert.deepEqual(refs(byNum['46b'].action), []); // (maxi 35 kg)
+  assert.deepEqual(refs(byNum['2'].action), []); // (RAL 1023)
+  // Le texte est restitué à l'identique
+  for (const t of TACHES) {
+    for (const field of [t.action, t.observations]) {
+      if (field) assert.equal(splitReferences(field, nums).map((s) => s.value).join(''), field);
+    }
+  }
+  // Toute référence de relevé pointe vers une tâche existante
+  for (const t of TACHES.filter((x) => x.type_ligne === 'releve')) {
+    assert.ok(refs(t.action).flat().length > 0, `${t.numero} sans référence`);
+  }
 });
 
 test('badge sécurité sur 23 et 41 uniquement', () => {

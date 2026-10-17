@@ -80,6 +80,8 @@ export default function ChantierGaillac() {
   }, [storageKey]);
 
   const planningIndex = useMemo(() => indexPlanning(data.planning), [data.planning]);
+  // Toutes les tâches (non filtrées) : les références « (36 à 39) » doivent rester consultables
+  const byNumero = useMemo(() => new Map(data.taches.map((t) => [t.numero, t])), [data.taches]);
   const options = useMemo(
     () => planningOptions(data.planning, data.taches, filters.techId),
     [data.planning, data.taches, filters.techId],
@@ -182,6 +184,7 @@ export default function ChantierGaillac() {
                     key={g.key}
                     group={g}
                     planningIndex={planningIndex}
+                    byNumero={byNumero}
                     isAdmin={isOrgAdmin}
                     techNameOf={techNameOf}
                     nameOf={nameOf}

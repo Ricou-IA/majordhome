@@ -3,6 +3,7 @@ import { Check, MapPin, ShieldAlert, ShoppingCart, Package, CornerDownRight, Cal
 import {
   formatDuree, formatDateCourte, isSecurite, isReleve, isHorsPerimetre, mapsUrl,
 } from '../lib/chantierGaillacModel';
+import TextWithRefs from './TextWithRefs';
 
 /** Grille partagée par l'en-tête de tableau et les lignes, à partir de `xl` (une tablette reste en cartes : viewport forcé à 1024 px). */
 export const ROW_GRID =
@@ -47,7 +48,7 @@ function CommentField({ tache, onSave }) {
  * Ligne de tâche : carte sous `xl`, ligne de tableau à partir de `xl`.
  * Seuls la case « Fait » et le commentaire sont éditables (le reste est verrouillé en base).
  */
-export default function TaskRow({ tache: t, planning, techName, nameOf, onToggle, onComment }) {
+export default function TaskRow({ tache: t, planning, planningIndex, byNumero, techName, nameOf, onToggle, onComment }) {
   const hp = isHorsPerimetre(t);
   const releve = isReleve(t);
   const fait = !!t.fait;
@@ -145,7 +146,12 @@ export default function TaskRow({ tache: t, planning, techName, nameOf, onToggle
             <CornerDownRight className="h-3 w-3" aria-hidden /> Relevé
           </span>
         )}
-        <span className={fait ? 'line-through decoration-slate-400' : ''}>{t.action}</span>
+        <TextWithRefs
+          text={t.action}
+          byNumero={byNumero}
+          planningIndex={planningIndex}
+          className={fait ? 'line-through decoration-slate-400' : ''}
+        />
         {validation && <p className="mt-0.5 text-xs font-normal not-italic text-[#0D47A1]">✓ {validation}</p>}
       </div>
 
@@ -178,7 +184,7 @@ export default function TaskRow({ tache: t, planning, techName, nameOf, onToggle
 
       {/* Observations */}
       <div className={`col-span-2 col-start-2 text-sm text-slate-600 xl:col-span-1 xl:col-auto ${t.observations ? '' : 'hidden xl:block'}`}>
-        {t.observations}
+        <TextWithRefs text={t.observations} byNumero={byNumero} planningIndex={planningIndex} />
       </div>
 
       {/* Commentaire terrain */}

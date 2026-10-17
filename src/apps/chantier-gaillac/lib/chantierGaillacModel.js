@@ -225,6 +225,48 @@ export function techSummary(taches, planning, technicienId) {
   };
 }
 
+/**
+ * Découpe un texte en segments, en isolant les références à d'autres tâches entre parenthèses :
+ * « (36 à 39) », « (40) », « (5, 6) », « (77, 79, 80, 80b) », « (R3) ».
+ * Une parenthèse n'est une référence que si CHAQUE élément est un n° existant ou une plage
+ * « a à b » : « (5 RDC, 6 R+1) », « (maxi 35 kg) », « (RAL 1023) » restent du texte.
+ * @param {string|null} text
+ * @param {string[]} numeros  n° existants, dans l'ordre de la liste Veolia
+ * @returns {Array<{ type: 'text', value: string } | { type: 'ref', value: string, numeros: string[] }>}
+ */
+export function splitReferences(text, numeros) {
+  if (!text) return [];
+  const known = new Set(numeros.map((n) => String(n).toLowerCase()));
+  const segments = [];
+  let last = 0;
+  for (const m of text.matchAll(/\(([^()]+)\)/g)) {
+    const refs = [];
+    const ok = m[1].split(',').map((s) => s.trim()).every((item) => {
+      const range = item.match(/^(\d+)\s*à\s*(\d+)$/);
+      if (range) {
+        const [lo, hi] = [Number(range[1]), Number(range[2])];
+        const inRange = numeros.filter((n) => {
+          const v = parseInt(n, 10);
+          return /^\d/.test(n) && v >= lo && v <= hi;
+        });
+        refs.push(...inRange);
+        return inRange.length > 0;
+      }
+      if (known.has(item.toLowerCase())) {
+        refs.push(numeros.find((n) => String(n).toLowerCase() === item.toLowerCase()));
+        return true;
+      }
+      return false;
+    });
+    if (!ok || !refs.length) continue;
+    if (m.index > last) segments.push({ type: 'text', value: text.slice(last, m.index) });
+    segments.push({ type: 'ref', value: m[0], numeros: [...new Set(refs)] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segments.push({ type: 'text', value: text.slice(last) });
+  return segments;
+}
+
 /** « 2026-10-21 » → « 21/10 ». */
 export function formatDateCourte(iso) {
   if (!iso) return '';

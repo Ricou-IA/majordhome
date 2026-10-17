@@ -25,7 +25,7 @@ function DatePrevueInput({ planning, onSave }) {
 }
 
 /** Groupe de tâches : en-tête (libellé, date, compteurs, durée accès compris) + lignes. */
-export default function TaskGroup({ group, planningIndex, isAdmin, techNameOf, nameOf, onToggle, onComment, onDatePrevue }) {
+export default function TaskGroup({ group, planningIndex, byNumero, isAdmin, techNameOf, nameOf, onToggle, onComment, onDatePrevue }) {
   const p = group.planning;
   return (
     <section aria-label={group.label} className="space-y-2 xl:space-y-0">
@@ -50,6 +50,8 @@ export default function TaskGroup({ group, planningIndex, isAdmin, techNameOf, n
             key={t.id}
             tache={t}
             planning={planningIndex.get(t.planning_code)}
+            planningIndex={planningIndex}
+            byNumero={byNumero}
             techName={techNameOf(t.technicien_id)}
             nameOf={nameOf}
             onToggle={onToggle}
