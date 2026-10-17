@@ -69,7 +69,8 @@ export function indexPlanning(planning) {
 /**
  * Filtre la liste.
  * @param {Array<object>} taches
- * @param {{ technicienId?: string, planningCode?: string, hideDone?: boolean, q?: string }} f
+ * @param {{ techId?: string, planningCode?: string, hideDone?: boolean, q?: string }} f
+ *   même forme que l'état de filtres de la page (passé tel quel)
  * @returns {Array<object>}
  */
 export function filterTaches(taches, f = {}) {
@@ -77,7 +78,7 @@ export function filterTaches(taches, f = {}) {
   // Un n° exact (« R1 ») l'emporte sur la recherche texte (« (R13) » dans une observation)
   const numeroExact = q && taches.some((t) => String(t.numero).toLowerCase() === q);
   return taches.filter((t) => {
-    if (f.technicienId && t.technicien_id !== f.technicienId) return false;
+    if (f.techId && t.technicien_id !== f.techId) return false;
     if (f.planningCode) {
       if (f.planningCode === HORS_PERIMETRE_KEY) {
         if (!isHorsPerimetre(t)) return false;

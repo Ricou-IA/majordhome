@@ -108,7 +108,12 @@ test('groupe site : un site visité sur deux codes compte deux accès', () => {
 });
 
 test('filtres : technicien, code, recherche n° exact et texte, masquer validées', () => {
-  assert.ok(filterTaches(TACHES, { technicienId: A }).every((t) => t.technicien_id === A));
+  assert.ok(filterTaches(TACHES, { techId: A }).every((t) => t.technicien_id === A));
+  // État de filtres de la page passé tel quel (régression : la clé était ignorée)
+  const ui = { group: 'planning', techId: L, planningCode: '', hideDone: false, q: '' };
+  const ludo = filterTaches(TACHES, ui);
+  assert.ok(ludo.length > 0 && ludo.every((t) => t.technicien_id === L));
+  assert.ok(!ludo.some((t) => t.planning_code === 'MER21'));
   assert.equal(filterTaches(TACHES, { q: '31b' }).length, 1);
   assert.equal(filterTaches(TACHES, { q: 'R1' }).length, 1); // n° exact, pas R10..R13
   assert.ok(filterTaches(TACHES, { q: 'wago' }).some((t) => t.numero === '41'));

@@ -6,7 +6,7 @@ import {
 
 /** Grille partagée par l'en-tête de tableau et les lignes, à partir de `xl` (une tablette reste en cartes : viewport forcé à 1024 px). */
 export const ROW_GRID =
-  'xl:grid xl:grid-cols-[84px_52px_minmax(140px,1.1fr)_minmax(200px,2fr)_104px_72px_64px_84px_92px_minmax(130px,1.1fr)_minmax(170px,1.3fr)] xl:items-start xl:gap-x-3';
+  'xl:grid xl:grid-cols-[84px_52px_minmax(140px,1.1fr)_minmax(200px,2fr)_96px_72px_64px_84px_128px_minmax(130px,1.1fr)_minmax(170px,1.3fr)] xl:items-start xl:gap-x-3';
 
 const chip = 'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold';
 
