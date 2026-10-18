@@ -4,7 +4,8 @@
 import { useMemo } from 'react';
 import { Plus, Send, Trash2 } from 'lucide-react';
 import { WEBSHOP_REGLAGES_DEFAUT, BORNES } from '@/lib/webshop/reglages';
-import { centsVersEuros } from '@/lib/webshop/settingsForm';
+import { centsVersEuros, codeDepotDepuisLibelle, depotsParDefautPourEdition } from '@/lib/webshop/settingsForm';
+import AddressSearch from '../organization/components/AddressSearch';
 import { useWebshopSettingsSectors } from '@hooks/useWebshopSettings';
 import { useWebshopReglagesForm } from './useWebshopReglagesForm';
 import { Avertissement, BarreEnregistrer, CARD, Champ, Chargement, INPUT, SECTION_TITLE } from './common';
@@ -35,34 +36,58 @@ function NombreChamp({ r, champ, label, aide, unite }) {
   );
 }
 
-function DepotsEditor({ r, etatSecteurs }) {
+/**
+ * Dépôts : libellé + adresse cherchée (BAN/Mapbox). Le code technique n'est jamais saisi : il est
+ * dérivé du libellé pour un nouveau dépôt (`_nouveau`, retiré à l'enregistrement) et figé ensuite,
+ * car les secteurs le référencent. Un dépôt utilisé par un secteur ne peut pas être retiré.
+ */
+function DepotsEditor({ r, etatSecteurs, depotsUtilises }) {
   const depots = r.form.depots;
-  const maj = (i, champ, v) => r.set('depots', depots.map((d, j) => (j === i ? { ...d, [champ]: v } : d)));
+  const maj = (i, patch) => r.set('depots', depots.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+  const majLibelle = (i, d, libelle) => maj(i, d._nouveau ? { libelle, code: codeDepotDepuisLibelle(libelle) } : { libelle });
+  const utilises = new Set(depotsUtilises ?? []);
   return (
     <section className={CARD}>
       <h2 className={SECTION_TITLE}>Dépôts</h2>
       {etatSecteurs && <p className="mb-3 text-xs text-red-600">{etatSecteurs}</p>}
       <p className="text-xs text-secondary-500 mb-3">
-        Point de départ des tournées. Un secteur désigne son dépôt par le code ; un code utilisé par un secteur ne peut pas être retiré.
-        Par défaut : {WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => `${d.libelle} (${d.code})`).join(', ')}.
+        Point de départ et de retour des tournées. Un dépôt utilisé par un secteur ne peut pas être retiré.
       </p>
       {depots.length === 0 && (
-        <div className="mb-3"><Avertissement>Aucun dépôt saisi : le dépôt par défaut (Castanet-Tolosan) s’applique</Avertissement></div>
+        <div className="mb-3 space-y-2">
+          <Avertissement>Aucun dépôt saisi : le dépôt par défaut (Castanet-Tolosan, adresse approximative) s’applique</Avertissement>
+          <button type="button" onClick={() => r.set('depots', depotsParDefautPourEdition())} className="text-sm text-primary-600 hover:text-primary-800">
+            Préciser l’adresse du dépôt de Castanet
+          </button>
+        </div>
       )}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {depots.map((d, i) => (
-          <div key={i} className="grid grid-cols-1 sm:grid-cols-[8rem_1fr_1.5fr_auto] gap-2 items-start">
-            <input value={d.code} onChange={(e) => maj(i, 'code', e.target.value)} placeholder="code" className={INPUT} aria-label="Code du dépôt" />
-            <input value={d.libelle} onChange={(e) => maj(i, 'libelle', e.target.value)} placeholder="Libellé" className={INPUT} aria-label="Libellé du dépôt" />
-            <input value={d.adresse} onChange={(e) => maj(i, 'adresse', e.target.value)} placeholder="Adresse de départ" className={INPUT} aria-label="Adresse du dépôt" />
-            <button type="button" onClick={() => r.set('depots', depots.filter((_, j) => j !== i))} className="p-2 text-secondary-400 hover:text-red-600" aria-label="Retirer ce dépôt">
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1.6fr_auto] gap-2 items-start">
+            <div>
+              <input value={d.libelle} onChange={(e) => majLibelle(i, d, e.target.value)} placeholder="Nom du dépôt" className={INPUT} aria-label="Nom du dépôt" />
+              {d.code && <p className="mt-1 text-[11px] text-secondary-400">Code : {d.code}</p>}
+            </div>
+            <div>
+              <AddressSearch
+                initialValue={d.adresse}
+                onSelect={(res) => maj(i, { adresse: res.label })}
+                placeholder="Rechercher l’adresse de départ…"
+              />
+              {d.adresse && <p className="mt-1 text-[11px] text-secondary-500">Adresse retenue : {d.adresse}</p>}
+            </div>
+            {utilises.has(d.code) ? (
+              <span className="p-2 text-[11px] text-secondary-400" title="Utilisé par un secteur">utilisé</span>
+            ) : (
+              <button type="button" onClick={() => r.set('depots', depots.filter((_, j) => j !== i))} className="p-2 text-secondary-400 hover:text-red-600" aria-label="Retirer ce dépôt">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         ))}
       </div>
       {r.erreurs.depots && <p className="mt-2 text-xs text-red-600">{r.erreurs.depots}</p>}
-      <button type="button" onClick={() => r.set('depots', [...depots, { code: '', libelle: '', adresse: '' }])} className="mt-3 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800">
+      <button type="button" onClick={() => r.set('depots', [...depots, { code: '', libelle: '', adresse: '', _nouveau: true }])} className="mt-3 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800">
         <Plus className="w-4 h-4" /> Ajouter un dépôt
       </button>
     </section>
@@ -106,7 +131,7 @@ export default function PaletteTab() {
         </div>
       </section>
 
-      <DepotsEditor r={r} etatSecteurs={etatSecteurs} />
+      <DepotsEditor r={r} etatSecteurs={etatSecteurs} depotsUtilises={depotsUtilises} />
 
       <section className={CARD}>
         <h2 className={SECTION_TITLE}>Règles des tournées</h2>

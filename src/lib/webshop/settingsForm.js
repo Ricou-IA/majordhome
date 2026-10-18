@@ -76,6 +76,24 @@ function depotsBruts(webshopBrut) {
 }
 
 /**
+ * Code technique d'un nouveau dépôt, dérivé de son libellé (les secteurs le référencent) :
+ * minuscules, sans accents, mots séparés par des tirets. Libellé sans lettre ni chiffre → ''.
+ * @param {string} libelle @returns {string}
+ */
+export function codeDepotDepuisLibelle(libelle) {
+  return String(libelle ?? '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Lignes éditables reprenant les dépôts par défaut (même code : les secteurs y pointent déjà). */
+export function depotsParDefautPourEdition() {
+  return WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => ({ code: d.code, libelle: d.libelle, adresse: d.adresse }));
+}
+
+/**
  * Formulaire (valeurs en chaînes, comme saisies) depuis une configuration complète.
  * Les dépôts viennent de `settings.webshop.depots` BRUT, pas de `cfg` (qui réinjecte le dépôt par
  * défaut) : une liste vide ou absente reste vide à l'écran et l'avertissement « le dépôt par

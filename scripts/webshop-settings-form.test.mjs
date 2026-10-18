@@ -6,6 +6,7 @@ import {
   formDepuisConfig, validerSaisie, webshopAEnregistrer, eurosVersCents, centsVersEuros, texteVersEmails,
   messageErreurWebshop, basculerPassage, normaliserRecurrence, parserPostcodes, postcodesVersTexte,
   formSecteur, validerSecteur, payloadSecteur, trancheEnConflit, validerTarif, validerPoint,
+  codeDepotDepuisLibelle, depotsParDefautPourEdition,
 } from '../src/lib/webshop/settingsForm.js';
 
 const formDefaut = () => formDepuisConfig(buildWebshopConfig(null));
@@ -166,4 +167,18 @@ test('tarifs colis : chevauchement [min, max[ refusé, contigu accepté', () => 
 test('point de retrait : slug à la création seulement', () => {
   assert.ok(validerPoint({ slug: 'Gaillac', name: 'n', address: 'a', accepts: 'both' }).slug);
   assert.deepEqual(validerPoint({ id: 'x', slug: '', name: 'n', address: 'a', accepts: 'pallet' }), {});
+});
+
+test('code de dépôt dérivé du libellé (minuscules, sans accents, tirets)', () => {
+  assert.equal(codeDepotDepuisLibelle('Castanet'), 'castanet');
+  assert.equal(codeDepotDepuisLibelle('  Dépôt Gaillac – Nord '), 'depot-gaillac-nord');
+  assert.equal(codeDepotDepuisLibelle("L'Isle-Jourdain"), 'l-isle-jourdain');
+  assert.equal(codeDepotDepuisLibelle(''), '');
+  assert.equal(codeDepotDepuisLibelle('!!!'), '');
+});
+
+test('personnaliser le dépôt par défaut garde son code (les secteurs y pointent)', () => {
+  const lignes = depotsParDefautPourEdition();
+  assert.deepEqual(lignes, WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => ({ ...d })));
+  assert.notEqual(lignes[0], WEBSHOP_REGLAGES_DEFAUT.depots[0]);
 });
