@@ -190,6 +190,11 @@ const VIEWS = [
   'public.majordhome_webshop_orders', // 20261013_3 : delivery_instructions en fin
   'public.majordhome_webshop_orders_write',
   'public.majordhome_webshop_products', // 20261014_1 : vue d'écriture du catalogue (assert droits)
+  // 20261018_1 : miroirs SELECT * (security_invoker) par lesquels un membre écrivait en direct
+  'public.majordhome_webshop_sectors',
+  'public.majordhome_webshop_sector_postcodes',
+  'public.majordhome_webshop_shipping_rates',
+  'public.majordhome_webshop_pickup_points',
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du
@@ -204,6 +209,8 @@ const POLICY_TABLES = [
   'org_roles', 'member_org_roles', // 20261006_1
   'webshop_delivery_slots', 'webshop_orders', // 20261013_2
   'webshop_products', 'webshop_categories', // 20261014_1
+  // 20261018_1 : écritures directes retirées (policy FOR ALL membres → SELECT membres)
+  'webshop_sectors', 'webshop_sector_postcodes', 'webshop_shipping_rates', 'webshop_pickup_points',
 ];
 
 function lireEnv(fichier) {

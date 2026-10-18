@@ -239,7 +239,7 @@ BEGIN
   RETURN v_cur.id;
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_sector_upsert(uuid, jsonb) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.webshop_sector_upsert(uuid, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.webshop_sector_upsert(uuid, jsonb) TO authenticated;
 
 -- ============================================================================
 -- 3. Codes postaux d'un secteur : remplacement atomique
@@ -309,7 +309,7 @@ BEGIN
   RETURN v_n;
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_sector_set_postcodes(uuid, jsonb) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.webshop_sector_set_postcodes(uuid, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.webshop_sector_set_postcodes(uuid, jsonb) TO authenticated;
 
 -- ============================================================================
 -- 4. Régénération des créneaux à venir sans commande
@@ -354,7 +354,7 @@ BEGIN
   RETURN jsonb_build_object('supprimes', v_supprimes, 'crees', v_crees);
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_regenerate_future_slots(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.webshop_regenerate_future_slots(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.webshop_regenerate_future_slots(uuid) TO authenticated;
 
 -- ============================================================================
 -- 5. Tarifs colis (grille au poids)
@@ -420,7 +420,7 @@ BEGIN
   RETURN v_cur.id;
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_shipping_rate_upsert(uuid, jsonb) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.webshop_shipping_rate_upsert(uuid, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.webshop_shipping_rate_upsert(uuid, jsonb) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.webshop_shipping_rate_delete(p_rate_id uuid)
 RETURNS void
@@ -438,7 +438,7 @@ BEGIN
   DELETE FROM majordhome.webshop_shipping_rates WHERE id = p_rate_id AND org_id = v_org;
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_shipping_rate_delete(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.webshop_shipping_rate_delete(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.webshop_shipping_rate_delete(uuid) TO authenticated;
 
 -- ============================================================================
 -- 6. Points de retrait (pas de suppression : désactivation par is_active)
@@ -520,4 +520,4 @@ BEGIN
   RETURN v_cur.id;
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_pickup_point_upsert(uuid, jsonb) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.webshop_pickup_point_upsert(uuid, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.webshop_pickup_point_upsert(uuid, jsonb) TO authenticated;

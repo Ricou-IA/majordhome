@@ -408,7 +408,7 @@ END $function$;
 REVOKE EXECUTE ON FUNCTION public.webshop_apply_paid_order(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.webshop_apply_paid_order(uuid) TO service_role;
 
--- ---------- 9. Recalcul du remplissage : réouverture tant que J+n de l'org ---
+-- ---------- 9. Recalcul du remplissage : réouverture au-delà de J+n de l'org (strict) ---
 CREATE OR REPLACE FUNCTION majordhome.webshop_slot_recount(p_slot_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -442,12 +442,12 @@ BEGIN
      SET status = 'open', closed_at = NULL, close_reason = NULL, updated_at = now()
    WHERE id = p_slot_id AND status = 'closed' AND close_reason IN ('capacity', 'stops')
      AND route_sheet_sent_at IS NULL
-     AND delivery_date >= v_today + v_delai
+     AND delivery_date > v_today + v_delai   -- même borne que la fermeture (<= today + délai = fermé)
      AND used_slots < capacity_slots AND used_stops < capacity_stops;
 END $function$;
 REVOKE EXECUTE ON FUNCTION majordhome.webshop_slot_recount(uuid) FROM PUBLIC, anon, authenticated;
 
--- ---------- 10. Fermer / rouvrir : réouverture tant que J+n de l'org ---------
+-- ---------- 10. Fermer / rouvrir : réouverture au-delà de J+n de l'org (strict) ---
 CREATE OR REPLACE FUNCTION public.webshop_slot_set_status(p_slot_id uuid, p_status text, p_note text DEFAULT NULL::text)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -470,7 +470,8 @@ BEGIN
      WHERE id = p_slot_id;
   ELSIF p_status = 'open' THEN
     IF v_slot.status NOT IN ('closed', 'cancelled') THEN RAISE EXCEPTION 'slot_not_reopenable' USING ERRCODE = '22023', DETAIL = v_slot.status; END IF;
-    IF v_slot.delivery_date < v_today + v_delai THEN RAISE EXCEPTION 'slot_too_late' USING ERRCODE = '22023', DETAIL = v_slot.delivery_date::text; END IF;
+    -- Même borne que la fermeture : un créneau à today + délai est dans la fenêtre fermée.
+    IF v_slot.delivery_date <= v_today + v_delai THEN RAISE EXCEPTION 'slot_too_late' USING ERRCODE = '22023', DETAIL = v_slot.delivery_date::text; END IF;
     IF v_slot.used_slots >= v_slot.capacity_slots OR v_slot.used_stops >= v_slot.capacity_stops THEN
       RAISE EXCEPTION 'slot_full' USING ERRCODE = '22023';
     END IF;
@@ -584,7 +585,9 @@ BEGIN
     SELECT count(*) INTO v_n FROM majordhome.webshop_close_due_slots_org(v_org, v_today);
     v_closed := v_closed + v_n;
 
-    IF ((v_reglages -> 'palette' ->> 'envoi_auto')::boolean) IS NOT TRUE THEN CONTINUE; END IF;
+    -- Décision d'envoi : source unique webshop_should_send (envoi_auto ET heure). La fermeture
+    -- ci-dessus ne dépend que de l'heure.
+    IF majordhome.webshop_should_send(v_org, p_at) IS NOT TRUE THEN CONTINUE; END IF;
     IF NOT EXISTS (SELECT 1 FROM majordhome.webshop_sectors WHERE org_id = v_org AND is_active) THEN CONTINUE; END IF;
 
     v_url := rtrim(v_reglages ->> 'site_url', '/');

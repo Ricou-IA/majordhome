@@ -212,6 +212,40 @@ BEGIN
   END IF;
   IF (SELECT count(*) FROM net.rehearsal_calls) <> v_n THEN RAISE EXCEPTION '(8) envoi_auto faux : appel émis'; END IF;
 
+  -- (9) Réouverture alignée sur la fermeture (<= today + délai = fermé) : un créneau à today + délai
+  --     ne se rouvre ni au recomptage ni à la main ; à today + délai + 1, si. Mayer : délai 2 (cf. 8).
+  DECLARE
+    v_today date := (now() AT TIME ZONE 'Europe/Paris')::date;
+    v_sect9 uuid; v_j uuid; v_j1 uuid; v_m uuid; v_m1 uuid;
+  BEGIN
+    INSERT INTO majordhome.webshop_sectors (org_id, code, label, max_stops, recurrence, is_active)
+      VALUES (v_mayer, 'rehearsal_9', 'Répétition 9', 5, '[]', false) RETURNING id INTO v_sect9;
+    INSERT INTO majordhome.webshop_delivery_slots (org_id, sector_id, delivery_date, capacity_stops, status, close_reason, closed_at)
+      VALUES (v_mayer, v_sect9, v_today + 2, 5, 'closed', 'capacity', now()) RETURNING id INTO v_j;
+    INSERT INTO majordhome.webshop_delivery_slots (org_id, sector_id, delivery_date, capacity_stops, status, close_reason, closed_at)
+      VALUES (v_mayer, v_sect9, v_today + 3, 5, 'closed', 'capacity', now()) RETURNING id INTO v_j1;
+    PERFORM majordhome.webshop_slot_recount(v_j);
+    PERFORM majordhome.webshop_slot_recount(v_j1);
+    IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_j) <> 'closed' THEN
+      RAISE EXCEPTION '(9a) recomptage : créneau à today + délai rouvert';
+    END IF;
+    IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_j1) <> 'open' THEN
+      RAISE EXCEPTION '(9a) recomptage : créneau à today + délai + 1 non rouvert (témoin)';
+    END IF;
+
+    INSERT INTO majordhome.webshop_delivery_slots (org_id, sector_id, delivery_date, capacity_stops, status, close_reason, closed_at)
+      VALUES (v_mayer, v_sect9, v_today + 2 + 7, 5, 'closed', 'manual', now()) RETURNING id INTO v_m1;
+    UPDATE majordhome.webshop_delivery_slots SET close_reason = 'manual' WHERE id = v_j RETURNING id INTO v_m;
+    PERFORM set_config('request.jwt.claim.sub', v_tl::text, true);
+    SET LOCAL ROLE authenticated;
+    BEGIN PERFORM public.webshop_slot_set_status(v_m, 'open'); RAISE EXCEPTION 'KO: réouverture à today + délai acceptée';
+    EXCEPTION WHEN others THEN IF SQLERRM <> 'slot_too_late' THEN RAISE EXCEPTION '(9b) attendu slot_too_late, reçu %', SQLERRM; END IF; END;
+    PERFORM public.webshop_slot_set_status(v_m1, 'open');
+    RESET ROLE;
+    IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_m) <> 'closed' THEN RAISE EXCEPTION '(9b) créneau à today + délai rouvert'; END IF;
+    IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_m1) <> 'open' THEN RAISE EXCEPTION '(9b) témoin non rouvert'; END IF;
+  END;
+
   RAISE NOTICE 'assert-webshop-reglages B (réglages lus) : OK';
 END $$;
 ROLLBACK;
