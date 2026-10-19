@@ -4,10 +4,13 @@
 --
 --   1. majordhome.webshop_order_actions : une ligne par action (e-mail client, ordre colis)
 --      déclenchée pour une commande, un envoi (colis | palette) et un événement. Statut
---      sent | failed | skipped. Index unique partiel : une action `sent` pour
---      (commande, envoi, événement, action) ne repart JAMAIS (aller-retour de carte, double
---      clic, tournée marquée deux fois). Écrit UNIQUEMENT par l'edge (service_role) via
---      webshop_order_action_record ; lu par les membres de l'org via la vue publique.
+--      pending | sent | failed | skipped. Une action `sent` pour (commande, envoi, événement,
+--      action) ne repart JAMAIS (aller-retour de carte, double clic, tournée marquée deux fois) :
+--      l'edge RÉSERVE la clé avant d'envoyer (webshop_order_action_reserve → ligne `pending`,
+--      NULL si déjà envoyée ou envoi en cours), puis FINALISE (webshop_order_action_record).
+--      Index unique partiel sur `sent` + `pending` : deux appels concurrents ne peuvent pas
+--      réserver la même clé. Écrit UNIQUEMENT par l'edge (service_role) ; lu par les membres
+--      de l'org via la vue publique.
 --   2. webshop_delivery_slots.departed_at / delivered_at + RPC webshop_slot_mark_event
 --      (team_leader+, garde webshop_slot_guard) : « tournée partie » / « tournée livrée ».
 --      Pas de nouveau statut : livrée ⇒ status = 'shipped'.
@@ -27,7 +30,7 @@ CREATE TABLE IF NOT EXISTS majordhome.webshop_order_actions (
                                                    'tournee_partie', 'tournee_livree')),
   action        text NOT NULL CHECK (action IN ('email_client', 'ordre_colis')),
   gabarit       text,
-  status        text NOT NULL CHECK (status IN ('sent', 'failed', 'skipped')),
+  status        text NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
   error_code    text,
   error_message text,
   recipient     text,
@@ -36,9 +39,10 @@ CREATE TABLE IF NOT EXISTS majordhome.webshop_order_actions (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- Une seule ligne `sent` OU `pending` par clé : garantit UN envoi même en concurrence.
 CREATE UNIQUE INDEX IF NOT EXISTS webshop_order_actions_sent_once
   ON majordhome.webshop_order_actions (order_id, envoi, evenement, action)
-  WHERE status = 'sent';
+  WHERE status IN ('sent', 'pending');
 CREATE INDEX IF NOT EXISTS webshop_order_actions_org_idx ON majordhome.webshop_order_actions (org_id);
 
 ALTER TABLE majordhome.webshop_order_actions ENABLE ROW LEVEL SECURITY;
@@ -59,15 +63,17 @@ REVOKE ALL ON public.majordhome_webshop_order_actions FROM PUBLIC, anon;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.majordhome_webshop_order_actions FROM authenticated;
 GRANT SELECT ON public.majordhome_webshop_order_actions TO authenticated, service_role;
 
--- Enregistre le résultat d'une action. service_role only (prend org_id dans le payload).
+-- Réserve une action AVANT envoi. service_role only (prend org_id dans le payload).
 --   - commande inconnue → order_not_found ; org ≠ org de la commande → org_mismatch ;
 --     tournée d'une autre org → slot_org_mismatch ;
---   - une ligne `sent` existe pour la clé → already_sent (rien n'est écrit) ;
---   - une ligne `failed` / `skipped` existe pour la clé → elle est mise à jour (rejeu) ;
---   - sinon insertion. Retourne l'id de la ligne.
-CREATE OR REPLACE FUNCTION public.webshop_order_action_record(
+--   - une ligne `sent` existe pour la clé → NULL (déjà envoyée : ne pas envoyer) ;
+--   - une ligne `pending` de moins de 10 min existe → NULL (envoi en cours ailleurs) ;
+--   - sinon la ligne failed / skipped / pending périmée de même clé est reprise (une seule
+--     ligne par clé), ou une ligne est insérée ; elle passe `pending` et son id est renvoyé.
+-- Sous le verrou de la commande ; l'index unique (sent | pending) est le filet en concurrence.
+CREATE OR REPLACE FUNCTION public.webshop_order_action_reserve(
   p_org_id uuid, p_order_id uuid, p_envoi text, p_evenement text, p_action text, p_gabarit text,
-  p_status text, p_error_code text, p_error_message text, p_recipient text, p_slot_id uuid)
+  p_slot_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -77,7 +83,6 @@ DECLARE
   v_order_org uuid;
   v_id uuid;
 BEGIN
-  -- Verrou sur la commande : deux enregistrements concurrents de la même commande se suivent.
   SELECT org_id INTO v_order_org FROM majordhome.webshop_orders WHERE id = p_order_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'order_not_found' USING ERRCODE = 'P0002'; END IF;
   IF (v_order_org = p_org_id) IS NOT TRUE THEN RAISE EXCEPTION 'org_mismatch' USING ERRCODE = '42501'; END IF;
@@ -88,53 +93,59 @@ BEGIN
 
   IF EXISTS (SELECT 1 FROM majordhome.webshop_order_actions
               WHERE order_id = p_order_id AND envoi = p_envoi AND evenement = p_evenement
-                AND action = p_action AND status = 'sent') THEN
-    RAISE EXCEPTION 'already_sent' USING ERRCODE = '23505';
+                AND action = p_action
+                AND (status = 'sent' OR (status = 'pending' AND updated_at > now() - interval '10 minutes'))) THEN
+    RETURN NULL;
   END IF;
 
   SELECT id INTO v_id FROM majordhome.webshop_order_actions
    WHERE order_id = p_order_id AND envoi = p_envoi AND evenement = p_evenement
-     AND action = p_action AND status IN ('failed', 'skipped')
+     AND action = p_action AND status IN ('failed', 'skipped', 'pending')
    ORDER BY updated_at DESC
    LIMIT 1;
 
   IF v_id IS NOT NULL THEN
     UPDATE majordhome.webshop_order_actions
-       SET gabarit = p_gabarit, status = p_status, error_code = p_error_code,
-           error_message = p_error_message, recipient = p_recipient, slot_id = p_slot_id,
-           updated_at = now()
+       SET status = 'pending', gabarit = p_gabarit, slot_id = p_slot_id,
+           error_code = NULL, error_message = NULL, updated_at = now()
      WHERE id = v_id;
   ELSE
-    INSERT INTO majordhome.webshop_order_actions
-      (org_id, order_id, envoi, evenement, action, gabarit, status, error_code, error_message, recipient, slot_id)
-    VALUES
-      (p_org_id, p_order_id, p_envoi, p_evenement, p_action, p_gabarit, p_status, p_error_code, p_error_message, p_recipient, p_slot_id)
+    INSERT INTO majordhome.webshop_order_actions (org_id, order_id, envoi, evenement, action, gabarit, status, slot_id)
+    VALUES (p_org_id, p_order_id, p_envoi, p_evenement, p_action, p_gabarit, 'pending', p_slot_id)
     RETURNING id INTO v_id;
   END IF;
   RETURN v_id;
 EXCEPTION WHEN unique_violation THEN
-  RAISE EXCEPTION 'already_sent' USING ERRCODE = '23505';
+  RETURN NULL; -- réservée entre-temps par un appel concurrent
 END $$;
-REVOKE EXECUTE ON FUNCTION public.webshop_order_action_record(uuid, uuid, text, text, text, text, text, text, text, text, uuid)
+REVOKE EXECUTE ON FUNCTION public.webshop_order_action_reserve(uuid, uuid, text, text, text, text, uuid)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.webshop_order_action_record(uuid, uuid, text, text, text, text, text, text, text, text, uuid)
+GRANT EXECUTE ON FUNCTION public.webshop_order_action_reserve(uuid, uuid, text, text, text, text, uuid)
   TO service_role;
 
--- Vrai si l'action a déjà été envoyée pour (commande, envoi, événement, action). service_role only.
-CREATE OR REPLACE FUNCTION public.webshop_order_action_already_sent(
-  p_order_id uuid, p_envoi text, p_evenement text, p_action text)
-RETURNS boolean
-LANGUAGE sql
-STABLE
+-- Finalise une réservation : pending → sent | failed | skipped. service_role only.
+-- Ligne absente ou non `pending` → not_reserved ; statut hors liste → invalid_status.
+CREATE OR REPLACE FUNCTION public.webshop_order_action_record(
+  p_action_id uuid, p_status text, p_error_code text, p_error_message text, p_recipient text)
+RETURNS void
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'majordhome', 'public', 'pg_temp'
 AS $$
-  SELECT EXISTS (SELECT 1 FROM majordhome.webshop_order_actions
-                  WHERE order_id = p_order_id AND envoi = p_envoi AND evenement = p_evenement
-                    AND action = p_action AND status = 'sent');
-$$;
-REVOKE EXECUTE ON FUNCTION public.webshop_order_action_already_sent(uuid, text, text, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.webshop_order_action_already_sent(uuid, text, text, text) TO service_role;
+BEGIN
+  IF (p_status IN ('sent', 'failed', 'skipped')) IS NOT TRUE THEN
+    RAISE EXCEPTION 'invalid_status' USING ERRCODE = '22023', DETAIL = p_status;
+  END IF;
+  UPDATE majordhome.webshop_order_actions
+     SET status = p_status, error_code = p_error_code, error_message = p_error_message,
+         recipient = p_recipient, updated_at = now()
+   WHERE id = p_action_id AND status = 'pending';
+  IF NOT FOUND THEN RAISE EXCEPTION 'not_reserved' USING ERRCODE = '55000'; END IF;
+END $$;
+REVOKE EXECUTE ON FUNCTION public.webshop_order_action_record(uuid, text, text, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.webshop_order_action_record(uuid, text, text, text, text)
+  TO service_role;
 
 -- ---------- 2. Événements de tournée -----------------------------------------
 ALTER TABLE majordhome.webshop_delivery_slots
@@ -150,7 +161,7 @@ SELECT id, org_id, sector_id, delivery_date, status, capacity_slots, capacity_st
   FROM majordhome.webshop_delivery_slots;
 
 -- « partie » : tournée fermée (closed) ⇒ departed_at posé ; « livree » : tournée partie ⇒
--- delivered_at + status 'shipped'. Idempotent : un événement déjà posé renvoie first_time = false
+-- delivered_at + status 'shipped' (exige closed | shipped, sinon slot_not_closed). Idempotent : un événement déjà posé renvoie first_time = false
 -- sans rien vérifier d'autre (une « partie » rejouée après la livraison n'échoue pas).
 -- Tournée annulée : refusée. Les actions client (e-mails palette) sont l'affaire de l'edge.
 CREATE OR REPLACE FUNCTION public.webshop_slot_mark_event(p_slot_id uuid, p_event text)
@@ -180,6 +191,10 @@ BEGIN
       END IF;
       IF v_slot.status = 'cancelled' THEN
         RAISE EXCEPTION 'slot_cancelled' USING ERRCODE = '22023';
+      END IF;
+      -- Partie puis rouverte : on ne passe pas d'`open` à `shipped`.
+      IF v_slot.status NOT IN ('closed', 'shipped') THEN
+        RAISE EXCEPTION 'slot_not_closed' USING ERRCODE = '22023', DETAIL = v_slot.status;
       END IF;
       UPDATE majordhome.webshop_delivery_slots
          SET delivered_at = now(), status = 'shipped', updated_at = now()

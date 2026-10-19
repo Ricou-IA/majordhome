@@ -32,8 +32,12 @@ BEGIN
     RAISE EXCEPTION 'vue journal sans security_invoker';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'majordhome' AND tablename = 'webshop_order_actions'
-                  AND indexdef LIKE 'CREATE UNIQUE INDEX%(order_id, envoi, evenement, action)%WHERE (status = ''sent''::text)%') THEN
-    RAISE EXCEPTION 'index unique partiel « sent » absent';
+                  AND indexdef LIKE 'CREATE UNIQUE INDEX%(order_id, envoi, evenement, action)%WHERE%''sent''::text, ''pending''::text%') THEN
+    RAISE EXCEPTION 'index unique partiel « sent | pending » absent';
+  END IF;
+  IF to_regprocedure('public.webshop_order_action_already_sent(uuid, text, text, text)') IS NOT NULL
+     OR to_regprocedure('public.webshop_order_action_record(uuid, uuid, text, text, text, text, text, text, text, text, uuid)') IS NOT NULL THEN
+    RAISE EXCEPTION 'ancienne RPC du journal encore présente';
   END IF;
 
   -- Vue des tournées : 2 colonnes en fin, toujours un miroir simple (insérable) en security_invoker
@@ -55,14 +59,14 @@ BEGIN
   END IF;
 
   FOREACH f IN ARRAY ARRAY[
-    'public.webshop_order_action_record(uuid, uuid, text, text, text, text, text, text, text, text, uuid)',
-    'public.webshop_order_action_already_sent(uuid, text, text, text)',
+    'public.webshop_order_action_reserve(uuid, uuid, text, text, text, text, uuid)',
+    'public.webshop_order_action_record(uuid, text, text, text, text)',
     'public.webshop_slot_mark_event(uuid, text)'] LOOP
     IF has_function_privilege('anon', f, 'EXECUTE') THEN RAISE EXCEPTION '% exécutable par anon', f; END IF;
   END LOOP;
   FOREACH f IN ARRAY ARRAY[
-    'public.webshop_order_action_record(uuid, uuid, text, text, text, text, text, text, text, text, uuid)',
-    'public.webshop_order_action_already_sent(uuid, text, text, text)'] LOOP
+    'public.webshop_order_action_reserve(uuid, uuid, text, text, text, text, uuid)',
+    'public.webshop_order_action_record(uuid, text, text, text, text)'] LOOP
     IF has_function_privilege('authenticated', f, 'EXECUTE') THEN RAISE EXCEPTION '% exécutable par authenticated', f; END IF;
     IF NOT has_function_privilege('service_role', f, 'EXECUTE') THEN RAISE EXCEPTION '% non exécutable par service_role', f; END IF;
   END LOOP;
@@ -83,7 +87,7 @@ DECLARE
   v_other_org uuid;
   v_tl uuid; v_member uuid; v_outsider uuid;
   v_order uuid; v_slot uuid; v_open_slot uuid;
-  v_id1 uuid; v_id2 uuid; v_id3 uuid; v_n int; v_b boolean; v_res jsonb; v_row record;
+  v_id1 uuid; v_id2 uuid; v_id3 uuid; v_n int; v_res jsonb; v_row record;
 BEGIN
   SELECT id INTO v_order FROM majordhome.webshop_orders WHERE org_id = v_mayer ORDER BY order_number LIMIT 1;
   SELECT id INTO v_other_org FROM core.organizations WHERE id <> v_mayer LIMIT 1;
@@ -97,71 +101,94 @@ BEGIN
     RAISE EXCEPTION 'fixture incomplète (commande %, autre org %, tl %, membre %, tournées % / %)', v_order, v_other_org, v_tl, v_member, v_slot, v_open_slot;
   END IF;
 
-  -- ── B. Journal des actions ──────────────────────────────────────────────────
-  -- (1) authenticated (même team_leader) ne peut pas écrire dans le journal
+  -- ── B. Journal des actions (réserver → envoyer → finaliser) ─────────────────
+  -- (1) authenticated (même team_leader) ne peut ni réserver ni finaliser
   PERFORM set_config('request.jwt.claim.sub', v_tl::text, true);
   SET LOCAL ROLE authenticated;
   BEGIN
-    PERFORM public.webshop_order_action_record(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', 'sent', NULL, NULL, 'x@y.fr', NULL);
-    RAISE EXCEPTION 'KO: record accepté pour authenticated';
+    PERFORM public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', NULL);
+    RAISE EXCEPTION 'KO: reserve accepté pour authenticated';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN
-    PERFORM public.webshop_order_action_already_sent(v_order, 'colis', 'expediee', 'email_client');
-    RAISE EXCEPTION 'KO: already_sent accepté pour authenticated';
+    PERFORM public.webshop_order_action_record(gen_random_uuid(), 'sent', NULL, NULL, 'x@y.fr');
+    RAISE EXCEPTION 'KO: record accepté pour authenticated';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
 
   SET LOCAL ROLE service_role;
   -- (2) mauvaise org → org_mismatch ; commande inconnue → order_not_found
   BEGIN
-    PERFORM public.webshop_order_action_record(v_other_org, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', 'sent', NULL, NULL, 'x@y.fr', NULL);
+    PERFORM public.webshop_order_action_reserve(v_other_org, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', NULL);
     RAISE EXCEPTION 'KO: mauvaise org acceptée';
   EXCEPTION WHEN others THEN IF SQLERRM <> 'org_mismatch' THEN RAISE EXCEPTION '(2a) attendu org_mismatch, reçu %', SQLERRM; END IF; END;
   BEGIN
-    PERFORM public.webshop_order_action_record(v_mayer, gen_random_uuid(), 'colis', 'expediee', 'email_client', NULL, 'sent', NULL, NULL, NULL, NULL);
+    PERFORM public.webshop_order_action_reserve(v_mayer, gen_random_uuid(), 'colis', 'expediee', 'email_client', NULL, NULL);
     RAISE EXCEPTION 'KO: commande inconnue acceptée';
   EXCEPTION WHEN others THEN IF SQLERRM <> 'order_not_found' THEN RAISE EXCEPTION '(2b) attendu order_not_found, reçu %', SQLERRM; END IF; END;
 
-  -- (3) failed puis rejeu sent = UNE seule ligne, mise à jour
-  v_id1 := public.webshop_order_action_record(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', 'failed', 'template_missing', 'Gabarit absent', 'x@y.fr', NULL);
-  IF public.webshop_order_action_already_sent(v_order, 'colis', 'expediee', 'email_client') THEN RAISE EXCEPTION '(3) already_sent vrai après un failed'; END IF;
-  v_id2 := public.webshop_order_action_record(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', 'sent', NULL, NULL, 'x@y.fr', NULL);
-  IF v_id2 <> v_id1 THEN RAISE EXCEPTION '(3) le rejeu a inséré une nouvelle ligne'; END IF;
+  -- (3) deux reserve successifs sur la même clé : le second renvoie NULL (envoi en cours)
+  v_id1 := public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', NULL);
+  IF v_id1 IS NULL THEN RAISE EXCEPTION '(3) 1re réservation refusée'; END IF;
+  IF public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', NULL) IS NOT NULL THEN
+    RAISE EXCEPTION '(3) 2e réservation accordée pendant un envoi en cours';
+  END IF;
+
+  -- (4) failed puis nouvelle réservation = même ligne ; sent ensuite ; puis reserve → NULL
+  PERFORM public.webshop_order_action_record(v_id1, 'failed', 'template_missing', 'Gabarit absent', 'x@y.fr');
+  v_id2 := public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', NULL);
+  IF v_id2 IS DISTINCT FROM v_id1 THEN RAISE EXCEPTION '(4) le rejeu n''a pas repris la ligne failed (% / %)', v_id1, v_id2; END IF;
+  PERFORM public.webshop_order_action_record(v_id2, 'sent', NULL, NULL, 'x@y.fr');
+  IF public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', NULL) IS NOT NULL THEN
+    RAISE EXCEPTION '(4) réservation accordée après un sent';
+  END IF;
   RESET ROLE;
   SELECT count(*) INTO v_n FROM majordhome.webshop_order_actions WHERE order_id = v_order;
-  IF v_n <> 1 THEN RAISE EXCEPTION '(3) % ligne(s) au lieu de 1', v_n; END IF;
-  SELECT status, error_code, error_message INTO v_row FROM majordhome.webshop_order_actions WHERE id = v_id1;
-  IF v_row.status <> 'sent' OR v_row.error_code IS NOT NULL OR v_row.error_message IS NOT NULL THEN
-    RAISE EXCEPTION '(3) ligne rejouée incorrecte : %', row_to_json(v_row);
+  IF v_n <> 1 THEN RAISE EXCEPTION '(4) % ligne(s) au lieu de 1', v_n; END IF;
+  SELECT status, error_code, error_message, recipient INTO v_row FROM majordhome.webshop_order_actions WHERE id = v_id1;
+  IF v_row.status <> 'sent' OR v_row.error_code IS NOT NULL OR v_row.error_message IS NOT NULL OR v_row.recipient <> 'x@y.fr' THEN
+    RAISE EXCEPTION '(4) ligne finalisée incorrecte : %', row_to_json(v_row);
   END IF;
+
+  -- (5) record sur une ligne non pending (sent) ou inconnue → not_reserved
   SET LOCAL ROLE service_role;
-  IF NOT public.webshop_order_action_already_sent(v_order, 'colis', 'expediee', 'email_client') THEN RAISE EXCEPTION '(3) already_sent faux après un sent'; END IF;
-
-  -- (4) un 2ᵉ sent (ou un failed) sur la même clé → already_sent
   BEGIN
-    PERFORM public.webshop_order_action_record(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', 'sent', NULL, NULL, 'x@y.fr', NULL);
-    RAISE EXCEPTION 'KO: 2ᵉ sent accepté';
-  EXCEPTION WHEN others THEN IF SQLERRM <> 'already_sent' THEN RAISE EXCEPTION '(4a) attendu already_sent, reçu %', SQLERRM; END IF; END;
+    PERFORM public.webshop_order_action_record(v_id1, 'failed', 'x', NULL, NULL);
+    RAISE EXCEPTION 'KO: record sur ligne sent accepté';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'not_reserved' THEN RAISE EXCEPTION '(5a) attendu not_reserved, reçu %', SQLERRM; END IF; END;
   BEGIN
-    PERFORM public.webshop_order_action_record(v_mayer, v_order, 'colis', 'expediee', 'email_client', 'webshop_expedition_colis', 'failed', 'x', NULL, 'x@y.fr', NULL);
-    RAISE EXCEPTION 'KO: failed après sent accepté';
-  EXCEPTION WHEN others THEN IF SQLERRM <> 'already_sent' THEN RAISE EXCEPTION '(4b) attendu already_sent, reçu %', SQLERRM; END IF; END;
+    PERFORM public.webshop_order_action_record(gen_random_uuid(), 'sent', NULL, NULL, NULL);
+    RAISE EXCEPTION 'KO: record sur ligne inconnue accepté';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'not_reserved' THEN RAISE EXCEPTION '(5b) attendu not_reserved, reçu %', SQLERRM; END IF; END;
 
-  -- (5) autre clé (envoi, événement ou action) = nouvelle ligne ; skipped puis skipped = même ligne
-  v_id3 := public.webshop_order_action_record(v_mayer, v_order, 'palette', 'tournee_partie', 'email_client', 'webshop_expedition_palette', 'skipped', 'no_email', NULL, NULL, v_slot);
-  IF v_id3 = v_id1 THEN RAISE EXCEPTION '(5) clé distincte confondue'; END IF;
-  IF public.webshop_order_action_record(v_mayer, v_order, 'palette', 'tournee_partie', 'email_client', 'webshop_expedition_palette', 'skipped', 'no_email', NULL, NULL, v_slot) <> v_id3 THEN
-    RAISE EXCEPTION '(5) skipped rejoué a inséré une ligne';
+  -- (6) finaliser en pending → invalid_status ; pending de plus de 10 min = repris ;
+  --     skipped puis nouvelle réservation = même ligne
+  v_id3 := public.webshop_order_action_reserve(v_mayer, v_order, 'palette', 'tournee_partie', 'email_client', 'webshop_expedition_palette', v_slot);
+  IF v_id3 IS NULL OR v_id3 = v_id1 THEN RAISE EXCEPTION '(6) clé distincte non réservée ou confondue'; END IF;
+  BEGIN
+    PERFORM public.webshop_order_action_record(v_id3, 'pending', NULL, NULL, NULL);
+    RAISE EXCEPTION 'KO: finalisation en pending acceptée';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'invalid_status' THEN RAISE EXCEPTION '(6a) attendu invalid_status, reçu %', SQLERRM; END IF; END;
+  RESET ROLE;
+  UPDATE majordhome.webshop_order_actions SET updated_at = now() - interval '11 minutes' WHERE id = v_id3;
+  SET LOCAL ROLE service_role;
+  IF public.webshop_order_action_reserve(v_mayer, v_order, 'palette', 'tournee_partie', 'email_client', 'webshop_expedition_palette', v_slot) IS DISTINCT FROM v_id3 THEN
+    RAISE EXCEPTION '(6) pending périmé non repris';
   END IF;
-  PERFORM public.webshop_order_action_record(v_mayer, v_order, 'colis', 'expediee', 'ordre_colis', NULL, 'failed', 'prestataire_missing', NULL, NULL, NULL);
-  -- (6) valeurs hors liste refusées par les CHECK
+  PERFORM public.webshop_order_action_record(v_id3, 'skipped', 'no_email', NULL, NULL);
+  IF public.webshop_order_action_reserve(v_mayer, v_order, 'palette', 'tournee_partie', 'email_client', 'webshop_expedition_palette', v_slot) IS DISTINCT FROM v_id3 THEN
+    RAISE EXCEPTION '(6) skipped non repris';
+  END IF;
+  PERFORM public.webshop_order_action_record(v_id3, 'skipped', 'no_email', NULL, NULL);
+  v_id2 := public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'expediee', 'ordre_colis', NULL, NULL);
+  PERFORM public.webshop_order_action_record(v_id2, 'failed', 'prestataire_missing', NULL, NULL);
+  -- (6b) valeurs hors liste refusées par les CHECK
   BEGIN
-    PERFORM public.webshop_order_action_record(v_mayer, v_order, 'colis', 'annulee', 'email_client', NULL, 'sent', NULL, NULL, NULL, NULL);
+    PERFORM public.webshop_order_action_reserve(v_mayer, v_order, 'colis', 'annulee', 'email_client', NULL, NULL);
     RAISE EXCEPTION 'KO: événement hors liste accepté';
   EXCEPTION WHEN check_violation THEN NULL; END;
   RESET ROLE;
   SELECT count(*) INTO v_n FROM majordhome.webshop_order_actions WHERE order_id = v_order;
-  IF v_n <> 3 THEN RAISE EXCEPTION '(5) % ligne(s) au lieu de 3', v_n; END IF;
+  IF v_n <> 3 THEN RAISE EXCEPTION '(6) % ligne(s) au lieu de 3', v_n; END IF;
 
   -- (7) lecture par la vue : membre de l'org oui, étranger non
   PERFORM set_config('request.jwt.claim.sub', v_member::text, true);
@@ -235,6 +262,19 @@ BEGIN
   BEGIN PERFORM public.webshop_slot_mark_event(v_open_slot, 'partie'); RAISE EXCEPTION 'KO: partie sur tournée annulée';
   EXCEPTION WHEN others THEN IF SQLERRM <> 'slot_not_closed' THEN RAISE EXCEPTION '(13) reçu %', SQLERRM; END IF; END;
   RESET ROLE;
+  -- (14) partie puis annulée : livrée → slot_cancelled
+  UPDATE majordhome.webshop_delivery_slots SET departed_at = now() WHERE id = v_open_slot;
+  SET LOCAL ROLE authenticated;
+  BEGIN PERFORM public.webshop_slot_mark_event(v_open_slot, 'livree'); RAISE EXCEPTION 'KO: livrée sur tournée annulée';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'slot_cancelled' THEN RAISE EXCEPTION '(14) reçu %', SQLERRM; END IF; END;
+  RESET ROLE;
+  -- (15) partie puis rouverte (open) : livrée → slot_not_closed (jamais open → shipped)
+  UPDATE majordhome.webshop_delivery_slots SET status = 'open' WHERE id = v_open_slot;
+  SET LOCAL ROLE authenticated;
+  BEGIN PERFORM public.webshop_slot_mark_event(v_open_slot, 'livree'); RAISE EXCEPTION 'KO: livrée sur tournée rouverte';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'slot_not_closed' THEN RAISE EXCEPTION '(15) reçu %', SQLERRM; END IF; END;
+  RESET ROLE;
+  IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_open_slot) <> 'open' THEN RAISE EXCEPTION '(15) statut modifié'; END IF;
   RAISE NOTICE 'assert-webshop-process C (événements de tournée) : OK';
 END $$;
 ROLLBACK;
