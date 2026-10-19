@@ -125,6 +125,8 @@ export interface ResendAttachment {
 export interface ResendPayload {
   from: string;
   to: string[];
+  /** Copie visible (ex. ordre colis : e-mails internes de l'org). Ignorée si vide. */
+  cc?: string[];
   replyTo?: string;
   subject: string;
   html: string;
@@ -146,6 +148,7 @@ export async function sendResendEmail(apiKey: string, payload: ResendPayload): P
     subject: payload.subject,
     html: payload.html,
   };
+  if (payload.cc?.length) body.cc = payload.cc;
   if (payload.replyTo) body.reply_to = payload.replyTo;
   if (payload.attachments?.length) body.attachments = payload.attachments;
 

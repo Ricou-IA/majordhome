@@ -175,3 +175,9 @@ verify_jwt = true
 # client (useClient). JWT user + requireOrgMembership (org PL activée). 2026-10-11.
 [functions.pennylane-customer-push]
 verify_jwt = true
+
+# webshop-process : transitions de commande, événements de tournée, rejeu des actions
+# (e-mails client par envoi, ordre colis). JWT user + requireOrgMembership + webshop_can_process.
+# 2026-10-19.
+[functions.webshop-process]
+verify_jwt = true

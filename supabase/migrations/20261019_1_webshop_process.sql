@@ -14,6 +14,8 @@
 --   2. webshop_delivery_slots.departed_at / delivered_at + RPC webshop_slot_mark_event
 --      (team_leader+, garde webshop_slot_guard) : « tournée partie » / « tournée livrée ».
 --      Pas de nouveau statut : livrée ⇒ status = 'shipped'.
+--   2 bis. public.webshop_can_process(org) (INVOKER, authenticated) : droit de l'edge
+--      webshop-process = majordhome.role_can(org, 'pipeline', 'edit').
 --   3. Défauts SQL régénérés (clé `process`).
 -- Org des tables webshop = org CORE.
 -- Répétée sur scripts/migration-rehearsal/ (assert-webshop-process.sql).
@@ -209,6 +211,21 @@ BEGIN
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_slot_mark_event(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.webshop_slot_mark_event(uuid, text) TO authenticated;
+
+-- ---------- 2 bis. Droit de l'edge webshop-process ---------------------------
+-- Même verdict que le front (route /webshop = pipeline.edit) : appelée par l'edge AVEC le JWT de
+-- l'utilisateur (le schéma majordhome n'est pas exposé). INVOKER : role_can lit auth.uid() de
+-- l'appelant ; non-membre / sans utilisateur → false. Garde positive : IS TRUE.
+CREATE OR REPLACE FUNCTION public.webshop_can_process(p_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY INVOKER
+SET search_path TO 'majordhome', 'public'
+AS $$
+  SELECT majordhome.role_can(p_org_id, 'pipeline', 'edit') IS TRUE;
+$$;
+REVOKE EXECUTE ON FUNCTION public.webshop_can_process(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.webshop_can_process(uuid) TO authenticated;
 
 -- ---------- 3. Défauts (GÉNÉRÉ — ne pas éditer à la main) -------------------
 -- GÉNÉRÉ par scripts/gen-webshop-reglages-sql.mjs depuis src/lib/webshop/reglages.js — ne pas éditer à la main.

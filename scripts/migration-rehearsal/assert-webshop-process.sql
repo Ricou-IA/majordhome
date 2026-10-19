@@ -278,3 +278,47 @@ BEGIN
   RAISE NOTICE 'assert-webshop-process C (événements de tournée) : OK';
 END $$;
 ROLLBACK;
+
+-- ── D. Droit de l'edge webshop-process : webshop_can_process = role_can(org,'pipeline','edit') ──
+BEGIN;
+DO $$
+DECLARE
+  v_mayer uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_admin uuid; v_outsider uuid; v_ok boolean;
+  f text := 'public.webshop_can_process(uuid)';
+BEGIN
+  IF to_regprocedure(f) IS NULL THEN RAISE EXCEPTION 'webshop_can_process absente'; END IF;
+  IF has_function_privilege('anon', f, 'EXECUTE') THEN RAISE EXCEPTION 'webshop_can_process exécutable par anon'; END IF;
+  IF NOT has_function_privilege('authenticated', f, 'EXECUTE') THEN RAISE EXCEPTION 'webshop_can_process non exécutable par authenticated'; END IF;
+  IF (SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure(f)) THEN RAISE EXCEPTION 'webshop_can_process doit être SECURITY INVOKER'; END IF;
+
+  SELECT user_id INTO v_admin FROM core.organization_members WHERE org_id = v_mayer AND role = 'org_admin' AND user_id IS NOT NULL LIMIT 1;
+  SELECT user_id INTO v_outsider FROM core.organization_members WHERE org_id <> v_mayer AND user_id IS NOT NULL
+     AND user_id NOT IN (SELECT user_id FROM core.organization_members WHERE org_id = v_mayer AND user_id IS NOT NULL) LIMIT 1;
+  IF v_admin IS NULL OR v_outsider IS NULL THEN RAISE EXCEPTION 'fixture incomplète (admin %, étranger %)', v_admin, v_outsider; END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  SET LOCAL ROLE authenticated;
+  v_ok := public.webshop_can_process(v_mayer);
+  RESET ROLE;
+  IF v_ok IS NOT TRUE THEN RAISE EXCEPTION '(D1) org_admin refusé : %', v_ok; END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', v_outsider::text, true);
+  SET LOCAL ROLE authenticated;
+  v_ok := public.webshop_can_process(v_mayer);
+  RESET ROLE;
+  IF v_ok IS DISTINCT FROM false THEN RAISE EXCEPTION '(D2) étranger à l''org : % (attendu false)', v_ok; END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  SET LOCAL ROLE authenticated;
+  v_ok := public.webshop_can_process(v_mayer);
+  RESET ROLE;
+  IF v_ok IS DISTINCT FROM false THEN RAISE EXCEPTION '(D3) sans utilisateur : % (attendu false)', v_ok; END IF;
+
+  SET LOCAL ROLE anon;
+  BEGIN PERFORM public.webshop_can_process(v_mayer); RAISE EXCEPTION 'KO: anon exécute webshop_can_process';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RESET ROLE;
+  RAISE NOTICE 'assert-webshop-process D (droit de l''edge) : OK';
+END $$;
+ROLLBACK;
