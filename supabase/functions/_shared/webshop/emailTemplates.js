@@ -278,3 +278,17 @@ export function blocsConfirmation({ order, lines = null, slot = null, pickupPoin
 
   return { livraisonHtml: parts.join('\n'), mentionsHtml: mentions.join('\n') };
 }
+
+/**
+ * Garde légale de la confirmation : les mentions CGV / rétractation ne dépendent pas du gabarit de l'org.
+ * Corps sans `{{LEGAL_INFO}}` (variable retirée, gabarit antérieur) → le bloc est ajouté en fin de corps
+ * (`ajoutees: true`, à signaler par l'appelant). `{{LEGAL_INFO}}` est déjà fait de paragraphes : pas de `<p>`
+ * englobant (paragraphes imbriqués invalides).
+ * @param {string | null | undefined} htmlBody
+ * @returns {{ html: string, ajoutees: boolean }}
+ */
+export function garantirMentionsLegales(htmlBody) {
+  const html = String(htmlBody ?? '');
+  if (html.includes('{{LEGAL_INFO}}')) return { html, ajoutees: false };
+  return { html: html ? `${html}\n{{LEGAL_INFO}}` : '{{LEGAL_INFO}}', ajoutees: true };
+}

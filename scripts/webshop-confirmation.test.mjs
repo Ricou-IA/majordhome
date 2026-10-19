@@ -126,3 +126,12 @@ test('variablesCommande : la confirmation envoyée par le Process porte aussi se
   assert.match(v['{{DELIVERY_INFO}}'], /Vos accessoires<\/strong> seront expédiés à : 1 rue, 81600 Gaillac/);
   assert.match(v['{{LEGAL_INFO}}'], /mayer-energie\.fr\/boutique\/cgv/);
 });
+
+test('garantirMentionsLegales : {{LEGAL_INFO}} ajouté en fin si absent, intact sinon', async () => {
+  const { garantirMentionsLegales } = await import('../src/lib/webshop/emailTemplates.js');
+  assert.deepEqual(garantirMentionsLegales('<p>a</p>\n{{LEGAL_INFO}}\n<p>b</p>'), { html: '<p>a</p>\n{{LEGAL_INFO}}\n<p>b</p>', ajoutees: false });
+  const r = garantirMentionsLegales('<p>Perso</p>');
+  assert.equal(r.ajoutees, true);
+  assert.equal(r.html, '<p>Perso</p>\n{{LEGAL_INFO}}');
+  assert.equal(garantirMentionsLegales(null).html, '{{LEGAL_INFO}}');
+});

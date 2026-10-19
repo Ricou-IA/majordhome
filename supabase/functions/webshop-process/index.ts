@@ -59,6 +59,7 @@ import type { OrgBranding } from "../_shared/mail.ts";
 import { canMoveTo, orderLines, statusPatch } from "../_shared/webshop/orders.js";
 import { actionsPourTournee, actionsPourTransition, variablesCommande } from "../_shared/webshop/process.js";
 import { buildWebshopConfig, depotParCode } from "../_shared/webshop/reglages.js";
+import { garantirMentionsLegales } from "../_shared/webshop/emailTemplates.js";
 import {
   destinatairesAction,
   estRetour,
@@ -294,8 +295,17 @@ async function executerAction(
         // Liens CGV / charte de {{LEGAL_INFO}} (confirmation réglée sur une transition).
         siteUrl: typeof ctx.cfg.site_url === "string" ? ctx.cfg.site_url : "",
       });
+      // Confirmation : mentions CGV / rétractation garanties même si le gabarit de l'org a perdu {{LEGAL_INFO}}.
+      let gabarit = template ?? null;
+      if (gabarit && spec.gabarit === "webshop_confirmation") {
+        const garde = garantirMentionsLegales(gabarit.html_body);
+        if (garde.ajoutees) {
+          console.warn(`[webshop-process] gabarit webshop_confirmation sans {{LEGAL_INFO}} (org ${ctx.orgId}, commande ${oc.order.id}) : mentions légales ajoutées en fin d'e-mail`);
+          gabarit = { ...gabarit, html_body: garde.html };
+        }
+      }
       outcome = await issueAction(
-        { action: spec.action, template: template ?? null, to, cc, branding: ctx.branding, varsHtml },
+        { action: spec.action, template: gabarit, to, cc, branding: ctx.branding, varsHtml },
         (p) => sendResendEmail(RESEND_API_KEY, p),
       );
     }
