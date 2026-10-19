@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  slotStatusLabel, clientsAPrevenir, resumeTourneeEvent, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
+  slotStatusLabel, clientsAPrevenir, resumeTourneeEvent, peutMarquerPartie, peutMarquerLivree, peutRouvrir, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
 } from '../src/lib/webshop/tournees.js';
 import { buildWebshopConfig, depotParCode } from '../src/lib/webshop/reglages.js';
 
@@ -186,4 +186,20 @@ test('resumeTourneeEvent : bilan e-mails + cartes, warning dès qu\'un e-mail n\
   assert.match(erreurCarte.message, /1 carte non déplacée/);
 
   assert.deepEqual(resumeTourneeEvent('partie', { slot: {}, orders: [] }), { tone: 'success', message: 'Tournée partie — aucun client à prévenir' });
+});
+
+test('peutMarquerPartie / peutMarquerLivree / peutRouvrir : une tournée partie ne se rouvre plus', () => {
+  const fermee = { status: 'closed', delivery_date: '2026-11-10', used_slots: 1, capacity_slots: 5, used_stops: 1, capacity_stops: 5 };
+  assert.equal(peutMarquerPartie(fermee), true);
+  assert.equal(peutMarquerPartie({ ...fermee, status: 'open' }), false);
+  assert.equal(peutMarquerPartie({ ...fermee, departed_at: 'x' }), false);
+  assert.equal(peutMarquerLivree(fermee), false);
+  assert.equal(peutMarquerLivree({ ...fermee, departed_at: 'x' }), true);
+  assert.equal(peutMarquerLivree({ ...fermee, status: 'shipped', departed_at: 'x' }), true);
+  assert.equal(peutMarquerLivree({ ...fermee, status: 'open', departed_at: 'x' }), false); // rouverte : la garde SQL refuserait
+  assert.equal(peutMarquerLivree({ ...fermee, status: 'cancelled', departed_at: 'x' }), false);
+  assert.equal(peutMarquerLivree({ ...fermee, departed_at: 'x', delivered_at: 'y' }), false);
+  assert.equal(peutRouvrir(fermee, '2026-11-01'), true);
+  assert.equal(peutRouvrir({ ...fermee, departed_at: 'x' }, '2026-11-01'), false);
+  assert.equal(peutRouvrir(fermee, '2026-11-09'), false);
 });

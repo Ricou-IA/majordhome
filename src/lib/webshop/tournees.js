@@ -32,6 +32,24 @@ export const CLOSE_REASONS = {
   manual: 'à la main',
 };
 
+/** « Marquer partie » : tournée fermée, pas encore partie. */
+export function peutMarquerPartie(slot) {
+  return slot?.status === 'closed' && !slot.departed_at;
+}
+
+/** « Marquer livrée » : partie, pas livrée, et statut accepté par la garde SQL (closed | shipped). */
+export function peutMarquerLivree(slot) {
+  return !!slot?.departed_at && !slot.delivered_at && ['closed', 'shipped'].includes(slot.status);
+}
+
+/** « Rouvrir » : jamais une tournée déjà partie ; au moins J+2 et de la place. */
+export function peutRouvrir(slot, today) {
+  return (slot?.status === 'closed' || slot?.status === 'cancelled')
+    && !slot.departed_at
+    && slot.delivery_date >= addDaysIso(today, 2)
+    && slot.used_slots < slot.capacity_slots && slot.used_stops < slot.capacity_stops;
+}
+
 /** « 2 novembre 2026 » : jour de l'horodatage à Paris. */
 function dateParisFR(ts) {
   const d = new Date(ts);

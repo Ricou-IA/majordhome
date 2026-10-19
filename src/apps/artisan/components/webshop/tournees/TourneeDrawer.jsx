@@ -15,7 +15,7 @@ import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useWebshopSlotOrders, useWebshopTourMutations } from '@hooks/useWebshopTournees';
-import { dateLongFR, isCountedOrder, clientsAPrevenir, resumeTourneeEvent, slotStatusLabel, tourneeErrorMessage, todayParis, addDaysIso } from '@/lib/webshop/tournees';
+import { dateLongFR, isCountedOrder, clientsAPrevenir, resumeTourneeEvent, peutMarquerPartie, peutMarquerLivree, peutRouvrir, slotStatusLabel, tourneeErrorMessage, todayParis } from '@/lib/webshop/tournees';
 import { buildWebshopConfig } from '@/lib/webshop/reglages';
 import { SlotStatusBadge, FillGauge } from './tourneesUi';
 import TourOrderCard from './TourOrderCard';
@@ -23,13 +23,13 @@ import SendStatus from './SendStatus';
 import MoveOrderDialog from './MoveOrderDialog';
 import { telechargerFeuilleDeRoute } from './routeSheetExport';
 
-/** Texte de confirmation : combien de clients seront prévenus (jamais plus que ce qui partira). */
+/** Texte de confirmation : combien de commandes préviennent leur client (jamais plus que ce qui partira). */
 function evenementDescription(event, { total, sansEmail }, gabarit) {
   const carte = event === 'livree' ? 'passeront en « Livrée »' : 'passeront en « Expédiée »';
   const cartes = `Les commandes 100 % palette ${carte} ; les commandes mixtes ne sont pas déplacées.`;
   if (!gabarit) return `Aucun e-mail client n'est réglé pour cet événement (Réglages webshop → Process) : personne ne sera prévenu. ${cartes}`;
   if (total === 0) return `Aucun client à prévenir sur cette tournée. ${cartes}`;
-  const n = `${total} client${total > 1 ? 's' : ''} seront prévenus`;
+  const n = `${total} commande${total > 1 ? 's' : ''} : les clients seront prévenus`;
   const sans = sansEmail > 0 ? ` (dont ${sansEmail} sans e-mail : ${sansEmail > 1 ? 'ils ne recevront rien' : 'il ne recevra rien'})` : '';
   return `${n} par e-mail${sans}. ${cartes} Un e-mail déjà envoyé ne repart jamais.`;
 }
@@ -50,12 +50,10 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
   const items = data?.items || [];
   // Une tournée passée se consulte, elle ne se pilote plus.
   const active = (slot.status === 'open' || slot.status === 'closed') && slot.delivery_date >= todayParis();
-  const canReopen = (slot.status === 'closed' || slot.status === 'cancelled')
-    && slot.delivery_date >= addDaysIso(todayParis(), 2)
-    && slot.used_slots < slot.capacity_slots && slot.used_stops < slot.capacity_stops;
+  const canReopen = peutRouvrir(slot, todayParis());
 
-  const canMarkDeparted = slot.status === 'closed' && !slot.departed_at;
-  const canMarkDelivered = !!slot.departed_at && !slot.delivered_at && slot.status !== 'cancelled';
+  const canMarkDeparted = peutMarquerPartie(slot);
+  const canMarkDelivered = peutMarquerLivree(slot);
   const eventEvent = confirm === 'livree' ? 'livree' : 'partie';
   const clients = clientsAPrevenir({ orders: data?.orders, items });
   const gabaritEvent = cfg.process?.tournee?.[eventEvent]?.email_client;
@@ -243,6 +241,7 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
         confirmLabel={eventEvent === 'livree' ? 'Marquer livrée' : 'Marquer partie'}
         variant="default"
         loading={markEvent.isPending}
+        confirmDisabled={isLoading || !data}
         onConfirm={() => runEvent(eventEvent)}
       />
 
