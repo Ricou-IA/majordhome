@@ -91,7 +91,7 @@ test('reactivationPatch : une commande jamais payée retourne en attente de paie
 
 // ── Étape 2 : journal des envois (Task 4) ─────────────────────────────────
 import {
-  libelleErreurAction, libelleErreurProcess, libelleEvenementAction, resumeTransition, peutRejouer,
+  libelleErreurAction, libelleErreurProcess, libelleEvenementAction, resumeTransition, peutRejouer, issueAction,
 } from '../src/lib/webshop/orders.js';
 
 const ACTION = (over = {}) => ({
@@ -158,4 +158,49 @@ test('peutRejouer : failed et skipped (hors already_sent), jamais sent ni pendin
   assert.equal(peutRejouer(ACTION({ status: 'sent' })), false);
   assert.equal(peutRejouer(ACTION({ status: 'pending' })), false);
   assert.equal(peutRejouer(ACTION({ id: null, status: 'skipped', error_code: 'already_sent' })), false);
+});
+
+// ── Correction 1 : pagination du journal, action pending bloquée ───────────
+import { fetchAllPages } from '../src/lib/postgrestUtils.js';
+import { actionBloquee } from '../src/lib/webshop/orders.js';
+
+function fakePages(total, { failAt = null } = {}) {
+  const calls = [];
+  const rows = Array.from({ length: total }, (_, i) => ({ i }));
+  const fetchPage = async (from, to) => {
+    calls.push([from, to]);
+    if (failAt !== null && from >= failAt) return { data: null, error: new Error('boom') };
+    return { data: rows.slice(from, to + 1), error: null };
+  };
+  return { fetchPage, calls };
+}
+
+test('fetchAllPages : pagine jusqu\'à épuisement (au-delà du plafond de 1000 lignes)', async () => {
+  const { fetchPage, calls } = fakePages(2500);
+  const out = await fetchAllPages(fetchPage, 1000);
+  assert.equal(out.length, 2500);
+  assert.deepEqual(calls, [[0, 999], [1000, 1999], [2000, 2999]]);
+});
+test('fetchAllPages : page pile pleine → on demande la suivante (vide) avant de conclure', async () => {
+  const { fetchPage, calls } = fakePages(1000);
+  assert.equal((await fetchAllPages(fetchPage, 1000)).length, 1000);
+  assert.deepEqual(calls, [[0, 999], [1000, 1999]]);
+  const vide = fakePages(0);
+  assert.deepEqual(await fetchAllPages(vide.fetchPage, 1000), []);
+});
+test('fetchAllPages : page suivante en échec après une page pleine → erreur explicite, jamais un résultat tronqué', async () => {
+  const { fetchPage } = fakePages(2500, { failAt: 1000 });
+  await assert.rejects(() => fetchAllPages(fetchPage, 1000), /page 2.*1000 lignes déjà lues/);
+});
+test('actionBloquee / peutRejouer : pending de plus de 10 min = bloquée et rejouable', () => {
+  const now = new Date('2026-10-19T10:00:00Z');
+  const vieux = ACTION({ status: 'pending', updated_at: '2026-10-19T09:49:00Z' });
+  const recent = ACTION({ status: 'pending', updated_at: '2026-10-19T09:55:00Z' });
+  assert.equal(actionBloquee(vieux, now), true);
+  assert.equal(actionBloquee(recent, now), false);
+  assert.equal(actionBloquee(ACTION({ status: 'failed', updated_at: '2026-10-19T09:00:00Z' }), now), false);
+  assert.equal(peutRejouer(vieux, now), true);
+  assert.equal(peutRejouer(recent, now), false);
+  assert.equal(issueAction(vieux, now), 'envoi bloqué');
+  assert.equal(issueAction(recent, now), 'en cours');
 });

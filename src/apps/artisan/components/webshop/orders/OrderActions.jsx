@@ -6,7 +6,7 @@
 import { toast } from 'sonner';
 import { Loader2, RotateCcw, Send } from 'lucide-react';
 import {
-  libelleAction, libelleEvenementAction, issueAction, peutRejouer, libelleErreurAction,
+  libelleAction, libelleEvenementAction, issueAction, peutRejouer, libelleErreurAction, actionBloquee,
 } from '@/lib/webshop/orders';
 
 const STATUS_TONES = {
@@ -63,8 +63,8 @@ export default function OrderActions({ actions, isLoading, error, onRetry, retry
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_TONES[a.status] ?? STATUS_TONES.pending}`}>
-                {issueAction({ status: a.status, error_code: null })}
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${actionBloquee(a) ? STATUS_TONES.failed : (STATUS_TONES[a.status] ?? STATUS_TONES.pending)}`}>
+                {issueAction({ status: a.status, error_code: null, updated_at: a.updated_at })}
               </span>
               {peutRejouer(a) && (
                 <button

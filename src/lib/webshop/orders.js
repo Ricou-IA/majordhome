@@ -180,14 +180,32 @@ export function libelleAction(action) {
   return ACTION_LABELS[action] ?? action;
 }
 
+/** Même seuil que `webshop_order_action_reserve` (pending périmée reprise après 10 min). */
+export const PENDING_STALE_MINUTES = 10;
+
+/**
+ * Action `pending` dont la dernière mise à jour date de plus de 10 min : envoi bloqué
+ * (record jamais arrivé), la base la laisse reprendre → rejouable.
+ * @param {{ status: string, updated_at?: string | null }} a
+ * @param {Date} [now]
+ * @returns {boolean}
+ */
+export function actionBloquee(a, now = new Date()) {
+  if (a?.status !== 'pending' || !a.updated_at) return false;
+  const t = new Date(a.updated_at).getTime();
+  return Number.isFinite(t) && now.getTime() - t > PENDING_STALE_MINUTES * 60 * 1000;
+}
+
 /**
  * Issue d'une action en mots (« envoyé », « en échec (gabarit manquant) »…).
- * @param {{ status: string, error_code?: string | null }} a
+ * @param {{ status: string, error_code?: string | null, updated_at?: string | null }} a
+ * @param {Date} [now]
  * @returns {string}
  */
-export function issueAction(a) {
+export function issueAction(a, now = new Date()) {
   if (a.status === 'sent') return 'envoyé';
   if (a.status === 'skipped' && a.error_code === 'already_sent') return 'déjà envoyé';
+  if (actionBloquee(a, now)) return 'envoi bloqué';
   if (a.status === 'pending') return 'en cours';
   const raison = libelleErreurAction(a.error_code);
   const base = a.status === 'failed' ? 'en échec' : 'non envoyé';
@@ -210,13 +228,15 @@ export function resumeTransition(to, actions) {
 }
 
 /**
- * Une ligne du journal se rejoue si elle n'est pas partie : failed, ou skipped autre que « déjà envoyé ».
- * @param {{ id?: string | null, status: string, error_code?: string | null }} a
+ * Une ligne du journal se rejoue si elle n'est pas partie : failed, skipped autre que
+ * « déjà envoyé », ou pending bloquée (> 10 min).
+ * @param {{ id?: string | null, status: string, error_code?: string | null, updated_at?: string | null }} a
+ * @param {Date} [now]
  * @returns {boolean}
  */
-export function peutRejouer(a) {
+export function peutRejouer(a, now = new Date()) {
   if (!a?.id) return false;
-  return a.status === 'failed' || (a.status === 'skipped' && a.error_code !== 'already_sent');
+  return a.status === 'failed' || (a.status === 'skipped' && a.error_code !== 'already_sent') || actionBloquee(a, now);
 }
 
 /** Patch d'un changement de statut : shipped_at / delivered_at posés une seule fois. */

@@ -3,7 +3,7 @@
  * Les tournées (onglet Tournées) ont leurs propres hooks : useWebshopTournees.js.
  */
 import { useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { unwrapResult } from '@lib/serviceHelpers';
 import { webshopKeys, webshopTourKeys } from '@/shared/hooks/cacheKeys';
@@ -133,6 +133,7 @@ export function useWebshopOrderActions(orderIds) {
     queryKey: webshopKeys.actions(orgId, ids),
     queryFn: () => unwrapResult(webshopProcessService.getActions(orgId, ids)),
     enabled: !!orgId && ids.length > 0,
+    placeholderData: keepPreviousData, // pas de pastilles qui clignotent quand la liste d'ids change
   });
 
   const byOrder = useMemo(() => {

@@ -41,3 +41,33 @@ export function escapePostgrestSearchTerm(term) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Lit toutes les lignes d'une requête PostgREST, page par page, jusqu'à épuisement.
+ * Le plafond serveur (`max-rows`, 1000 par défaut) porte sur les LIGNES : sans pagination,
+ * un résultat plus long est tronqué en silence. Une page incomplète termine la lecture ;
+ * une page pile pleine déclenche la suivante. Toute page en échec lève une erreur explicite
+ * (jamais un résultat partiel rendu comme complet). La requête doit avoir un ordre stable.
+ *
+ * @param {(from: number, to: number) => Promise<{ data: any[] | null, error: any }>} fetchPage
+ *   construit et exécute la requête avec `.range(from, to)`
+ * @param {number} [pageSize=1000]
+ * @param {number} [maxPages=1000] garde-fou anti-boucle
+ * @returns {Promise<any[]>}
+ */
+export async function fetchAllPages(fetchPage, pageSize = 1000, maxPages = 1000) {
+  const rows = [];
+  for (let page = 0; page < maxPages; page += 1) {
+    const from = page * pageSize;
+    const { data, error } = await fetchPage(from, from + pageSize - 1);
+    if (error) {
+      const err = new Error(`Lecture paginée interrompue à la page ${page + 1} (${rows.length} lignes déjà lues) : ${error.message ?? error}`);
+      err.cause = error;
+      throw err;
+    }
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < pageSize) return rows;
+  }
+  throw new Error(`Lecture paginée : plus de ${maxPages} pages, abandon`);
+}

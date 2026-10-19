@@ -8,6 +8,7 @@
  */
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
+import { fetchAllPages } from '@lib/postgrestUtils';
 import { libelleErreurProcess } from '@/lib/webshop/orders';
 
 const CHUNK = 200;
@@ -69,14 +70,16 @@ export const webshopProcessService = {
       const ids = Array.isArray(orderIds) ? orderIds : [];
       const rows = [];
       for (let i = 0; i < ids.length; i += CHUNK) {
-        const { data, error } = await supabase
+        const tranche = ids.slice(i, i + CHUNK);
+        // Le plafond PostgREST porte sur les LIGNES : paginer, sinon une action failed manquerait en silence.
+        rows.push(...await fetchAllPages((from, to) => supabase
           .from('majordhome_webshop_order_actions')
           .select(ACTION_COLUMNS)
           .eq('org_id', orgId)
-          .in('order_id', ids.slice(i, i + CHUNK))
-          .order('updated_at', { ascending: false });
-        if (error) throw error;
-        rows.push(...(data || []));
+          .in('order_id', tranche)
+          .order('updated_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)));
       }
       return rows;
     }, 'webshopProcess.getActions');
