@@ -147,3 +147,43 @@ export async function issueAction(
   }
   return { ...base, status: "sent", subject, attempted: true, provider_id: r.id };
 }
+
+/**
+ * Ordre imposé d'une requête qui pose un statut : TOUTES les lectures (`lire`, peut lever : rien
+ * n'est alors écrit), puis l'écriture (`ecrire` → null = rien d'écrit, on n'agit pas), puis les
+ * actions (`agir`, qui ne doit pas lever). Une lecture en échec après l'écriture laisserait un
+ * statut posé sans action réservée : e-mail perdu sans trace ni rejeu.
+ */
+export async function lireEcrireAgir<C, W, R>(etapes: {
+  lire: () => Promise<C>;
+  ecrire: (c: C) => Promise<W | null>;
+  agir: (c: C, w: W) => Promise<R>;
+}): Promise<{ ecrit: W; resultat: R } | null> {
+  const c = await etapes.lire();
+  const ecrit = await etapes.ecrire(c);
+  if (ecrit === null || ecrit === undefined) return null;
+  return { ecrit, resultat: await etapes.agir(c, ecrit) };
+}
+
+/**
+ * Finalise une action réservée (`webshop_order_action_record`). Une erreur autre que
+ * `not_reserved` (ou une exception) est réessayée UNE fois : sinon la ligne resterait `pending`,
+ * serait reprise après 10 min et l'e-mail repartirait. `not_reserved` = réservation reprise par
+ * un autre appel : non réessayé. Ne throw jamais.
+ */
+export async function finaliserAction(
+  record: () => Promise<{ error: { message: string } | null }>,
+): Promise<{ ok: boolean; tentatives: number; erreur: string | null }> {
+  let erreur: string | null = null;
+  for (let tentative = 1; tentative <= 2; tentative++) {
+    try {
+      const { error } = await record();
+      if (!error) return { ok: true, tentatives: tentative, erreur: null };
+      erreur = error.message;
+    } catch (err) {
+      erreur = err instanceof Error ? err.message : String(err);
+    }
+    if (erreur === "not_reserved") return { ok: false, tentatives: tentative, erreur };
+  }
+  return { ok: false, tentatives: 2, erreur };
+}

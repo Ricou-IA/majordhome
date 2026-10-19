@@ -1,7 +1,15 @@
 // Tests de la logique pure de l'edge webshop-process.
 // deno test supabase/functions/webshop-process/logic.test.ts
 import { assertEquals, assertStringIncludes, assert } from "jsr:@std/assert@1";
-import { construireEmail, destinatairesAction, estRetour, issueAction, texteDepuisHtml } from "./logic.ts";
+import {
+  construireEmail,
+  destinatairesAction,
+  estRetour,
+  finaliserAction,
+  issueAction,
+  lireEcrireAgir,
+  texteDepuisHtml,
+} from "./logic.ts";
 import { orgBranding } from "../_shared/mail.ts";
 import type { ResendPayload, ResendResult } from "../_shared/mail.ts";
 
@@ -161,4 +169,74 @@ Deno.test("estRetour : un pas en arrière sur le board ne déclenche pas d'actio
   assertEquals(estRetour("expediee", "confirmee"), true);
   assertEquals(estRetour("confirmee", "expediee"), false);
   assertEquals(estRetour("nouvelle", "confirmee"), false);
+});
+
+Deno.test("lireEcrireAgir : une lecture en échec n'écrit rien et n'agit pas", async () => {
+  const journal: string[] = [];
+  let erreur: unknown = null;
+  try {
+    await lireEcrireAgir({
+      lire: () => { journal.push("lire"); return Promise.reject(new Error("lecture 500")); },
+      ecrire: () => { journal.push("ecrire"); return Promise.resolve("ok"); },
+      agir: () => { journal.push("agir"); return Promise.resolve([]); },
+    });
+  } catch (e) {
+    erreur = e;
+  }
+  assert(erreur instanceof Error && erreur.message === "lecture 500");
+  assertEquals(journal, ["lire"]);
+});
+
+Deno.test("lireEcrireAgir : ordre lire → écrire → agir, contexte transmis", async () => {
+  const journal: string[] = [];
+  const r = await lireEcrireAgir({
+    lire: () => { journal.push("lire"); return Promise.resolve({ n: 2 }); },
+    ecrire: (c) => { journal.push(`ecrire ${c.n}`); return Promise.resolve("ligne"); },
+    agir: (c, w) => { journal.push(`agir ${c.n} ${w}`); return Promise.resolve(["a1"]); },
+  });
+  assertEquals(journal, ["lire", "ecrire 2", "agir 2 ligne"]);
+  assertEquals(r, { ecrit: "ligne", resultat: ["a1"] });
+});
+
+Deno.test("lireEcrireAgir : écriture refusée (null) → on n'agit pas", async () => {
+  const journal: string[] = [];
+  const r = await lireEcrireAgir({
+    lire: () => Promise.resolve(1),
+    ecrire: () => Promise.resolve(null),
+    agir: () => { journal.push("agir"); return Promise.resolve([]); },
+  });
+  assertEquals(r, null);
+  assertEquals(journal, []);
+});
+
+Deno.test("finaliserAction : succès du premier coup", async () => {
+  let n = 0;
+  const r = await finaliserAction(() => { n++; return Promise.resolve({ error: null }); });
+  assertEquals(r, { ok: true, tentatives: 1, erreur: null });
+  assertEquals(n, 1);
+});
+
+Deno.test("finaliserAction : erreur transitoire → un seul nouvel essai", async () => {
+  let n = 0;
+  const r = await finaliserAction(() => {
+    n++;
+    return Promise.resolve({ error: n === 1 ? { message: "connection reset" } : null });
+  });
+  assertEquals(r, { ok: true, tentatives: 2, erreur: null });
+});
+
+Deno.test("finaliserAction : deux échecs (ou exception) → abandon après 2 essais", async () => {
+  let n = 0;
+  const r = await finaliserAction(() => { n++; return Promise.reject(new Error("timeout")); });
+  assertEquals(r.ok, false);
+  assertEquals(r.tentatives, 2);
+  assertEquals(r.erreur, "timeout");
+  assertEquals(n, 2);
+});
+
+Deno.test("finaliserAction : not_reserved n'est pas réessayé", async () => {
+  let n = 0;
+  const r = await finaliserAction(() => { n++; return Promise.resolve({ error: { message: "not_reserved" } }); });
+  assertEquals(r, { ok: false, tentatives: 1, erreur: "not_reserved" });
+  assertEquals(n, 1);
 });

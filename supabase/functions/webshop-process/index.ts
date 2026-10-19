@@ -59,7 +59,15 @@ import type { OrgBranding } from "../_shared/mail.ts";
 import { canMoveTo, orderLines, statusPatch } from "../_shared/webshop/orders.js";
 import { actionsPourTournee, actionsPourTransition, variablesCommande } from "../_shared/webshop/process.js";
 import { buildWebshopConfig, depotParCode } from "../_shared/webshop/reglages.js";
-import { destinatairesAction, estRetour, issueAction, type ActionKind, type ActionStatus } from "./logic.ts";
+import {
+  destinatairesAction,
+  estRetour,
+  finaliserAction,
+  issueAction,
+  lireEcrireAgir,
+  type ActionKind,
+  type ActionStatus,
+} from "./logic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -256,7 +264,7 @@ async function executerAction(
     });
     if (resErr) {
       console.error("[webshop-process] reserve", resErr);
-      return { ...report, error_code: "reserve_failed", error_message: resErr.message };
+      return { ...report, error_code: "reserve_failed", error_message: sanitizeError(resErr.message, "réservation impossible") };
     }
     if (!id) return { ...report, status: "skipped", error_code: "already_sent", error_message: "Déjà envoyée ou envoi en cours" };
     report.id = id as string;
@@ -271,7 +279,7 @@ async function executerAction(
       .maybeSingle();
     if (tmplErr) {
       outcome = {
-        status: "failed", error_code: "template_read_failed", error_message: tmplErr.message,
+        status: "failed", error_code: "template_read_failed", error_message: sanitizeError(tmplErr.message, "lecture du gabarit"),
         recipient: null, provider_id: null, subject: null, attempted: false,
       };
     } else {
@@ -305,13 +313,21 @@ async function executerAction(
       if (logWarning) console.error("[webshop-process] mailing_logs", logWarning);
     }
 
-    const { error: recErr } = await admin.rpc("webshop_order_action_record", {
-      p_action_id: id, p_status: outcome.status, p_error_code: outcome.error_code,
-      p_error_message: outcome.error_message, p_recipient: outcome.recipient,
+    // Une erreur (hors not_reserved) est réessayée une fois : une ligne laissée `pending` serait
+    // reprise après 10 min et l'e-mail repartirait. not_reserved = réservation reprise ailleurs.
+    const fin = await finaliserAction(async () => {
+      const { error } = await admin.rpc("webshop_order_action_record", {
+        p_action_id: id, p_status: outcome.status, p_error_code: outcome.error_code,
+        p_error_message: outcome.error_message, p_recipient: outcome.recipient,
+      });
+      return { error };
     });
-    if (recErr) {
-      // not_reserved : réservation reprise par un autre appel (> 10 min) — non fatal.
-      console.error(`[webshop-process] record ${recErr.message === "not_reserved" ? "(not_reserved, non fatal)" : ""}`, recErr);
+    if (!fin.ok) {
+      console.error(
+        `[webshop-process] record abandonné après ${fin.tentatives} essai(s)`
+          + `${fin.erreur === "not_reserved" ? " (not_reserved, non fatal)" : ""} — action ${id}, statut ${outcome.status}`,
+        fin.erreur,
+      );
     }
     return {
       ...report, status: outcome.status, error_code: outcome.error_code,
@@ -334,18 +350,27 @@ async function transition(req: Request, admin: SupabaseClient, body: AnyRecord):
 
   const to = body.to as string;
   if (!canMoveTo(order.status, to)) throw new HttpError(409, "invalid_transition", `${order.status} → ${to}`);
-  const ecrite = await poserStatut(admin, orgId, order, to);
-  if (!ecrite) throw new HttpError(409, "invalid_transition", "statut modifié entre-temps");
 
-  const ctx = await chargerOrg(admin, orgId);
-  const actions: ActionReport[] = [];
-  if (!estRetour(order.status, to)) {
-    const [oc] = await chargerCommandes(admin, ctx, [order]);
-    for (const spec of actionsPourTransition(ctx.cfg as never, order, oc.lines as never, to) as ActionSpec[]) {
-      actions.push(await executerAction(admin, ctx, oc, spec, null));
-    }
-  }
-  return jsonResponse({ order: ecrite, actions }, 200, req);
+  // Toutes les lectures AVANT d'écrire le statut : une fois écrit, il ne reste que des
+  // executerAction (qui ne lèvent pas). Sinon un 500 laisserait un statut sans action réservée.
+  const r = await lireEcrireAgir({
+    lire: async () => {
+      const ctx = await chargerOrg(admin, orgId);
+      const [oc] = await chargerCommandes(admin, ctx, [order]);
+      const specs = estRetour(order.status, to)
+        ? []
+        : actionsPourTransition(ctx.cfg as never, order, oc.lines as never, to) as ActionSpec[];
+      return { ctx, oc, specs };
+    },
+    ecrire: () => poserStatut(admin, orgId, order, to),
+    agir: async ({ ctx, oc, specs }) => {
+      const actions: ActionReport[] = [];
+      for (const spec of specs) actions.push(await executerAction(admin, ctx, oc, spec, null));
+      return actions;
+    },
+  });
+  if (!r) throw new HttpError(409, "invalid_transition", "statut modifié entre-temps");
+  return jsonResponse({ order: r.ecrit, actions: r.resultat }, 200, req);
 }
 
 async function tournee(req: Request, admin: SupabaseClient, body: AnyRecord): Promise<Response> {
@@ -357,52 +382,67 @@ async function tournee(req: Request, admin: SupabaseClient, body: AnyRecord): Pr
   const refus = await exigerAdhesion(req, orgId);
   if (refus) return refus;
 
-  const { data: mark, error: markErr } = await userClient(req).rpc("webshop_slot_mark_event", {
-    p_slot_id: slot.id, p_event: event,
-  });
-  if (markErr) {
-    const m = markErr.message;
-    if (SLOT_ERRORS.has(m)) throw new HttpError(409, m);
-    if (m === "slot_not_found") throw new HttpError(404, "not_found", "slot");
-    if (m === "team_leader_required" || m === "unauthenticated") throw new HttpError(403, "forbidden", m);
-    if (m === "invalid_event") throw new HttpError(400, "invalid_event");
-    throw new HttpError(500, "internal_error", sanitizeError(markErr, "événement de tournée"));
-  }
+  type Resultat = { order_id: string; statut_applique: string | null; statut_erreur?: string; actions: ActionReport[] };
 
-  const ctx = await chargerOrg(admin, orgId);
-  const { data: orders, error: ordErr } = await admin
-    .from("majordhome_webshop_orders")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("delivery_slot_id", slot.id)
-    .order("created_at", { ascending: true });
-  if (ordErr) throw new HttpError(500, "internal_error", sanitizeError(ordErr, "lecture commandes"));
-
-  const resultats: Array<{ order_id: string; statut_applique: string | null; statut_erreur?: string; actions: ActionReport[] }> = [];
-  for (const oc of await chargerCommandes(admin, ctx, orders ?? [])) {
-    const { actions: specs, statutCible } = actionsPourTournee(ctx.cfg as never, oc.order, oc.lines as never, event) as {
-      actions: ActionSpec[];
-      statutCible: string | null;
-    };
-    if (specs.length === 0 && !statutCible) continue;
-
-    // Statut posé AVANT les e-mails : un e-mail en échec ne bloque jamais la carte.
-    let statutApplique: string | null = null;
-    let statutErreur: string | undefined;
-    if (statutCible) {
-      try {
-        const ecrite = await poserStatut(admin, orgId, oc.order, statutCible);
-        if (ecrite) statutApplique = statutCible;
-        else statutErreur = "statut modifié entre-temps";
-      } catch (err) {
-        statutErreur = err instanceof HttpError ? (err.detail ?? err.code) : sanitizeError(err, "statut");
+  // Lectures (org, réglages, commandes du créneau, lignes) AVANT le marquage : elles n'en
+  // dépendent pas (le marquage ne touche aucune commande). Une fois marqué, il ne reste que
+  // poserStatut sous try/catch et executerAction (qui ne lève pas).
+  const r = await lireEcrireAgir({
+    lire: async () => {
+      const ctx = await chargerOrg(admin, orgId);
+      const { data: orders, error: ordErr } = await admin
+        .from("majordhome_webshop_orders")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("delivery_slot_id", slot.id)
+        .order("created_at", { ascending: true });
+      if (ordErr) throw new HttpError(500, "internal_error", sanitizeError(ordErr, "lecture commandes"));
+      const plan = (await chargerCommandes(admin, ctx, orders ?? [])).map((oc) => ({
+        oc,
+        ...(actionsPourTournee(ctx.cfg as never, oc.order, oc.lines as never, event) as {
+          actions: ActionSpec[];
+          statutCible: string | null;
+        }),
+      })).filter((x) => x.actions.length > 0 || x.statutCible);
+      return { ctx, plan };
+    },
+    ecrire: async () => {
+      const { data: mark, error: markErr } = await userClient(req).rpc("webshop_slot_mark_event", {
+        p_slot_id: slot.id, p_event: event,
+      });
+      if (markErr) {
+        const m = markErr.message;
+        if (SLOT_ERRORS.has(m)) throw new HttpError(409, m);
+        if (m === "slot_not_found") throw new HttpError(404, "not_found", "slot");
+        if (m === "team_leader_required" || m === "unauthenticated") throw new HttpError(403, "forbidden", m);
+        if (m === "invalid_event") throw new HttpError(400, "invalid_event");
+        throw new HttpError(500, "internal_error", sanitizeError(markErr, "événement de tournée"));
       }
-    }
-    const actions: ActionReport[] = [];
-    for (const spec of specs) actions.push(await executerAction(admin, ctx, oc, spec, slot));
-    resultats.push({ order_id: oc.order.id, statut_applique: statutApplique, ...(statutErreur ? { statut_erreur: statutErreur } : {}), actions });
-  }
-  return jsonResponse({ slot: mark, orders: resultats }, 200, req);
+      return (mark ?? { slot_id: slot.id, event, first_time: null }) as AnyRecord;
+    },
+    agir: async ({ ctx, plan }) => {
+      const resultats: Resultat[] = [];
+      for (const { oc, actions: specs, statutCible } of plan) {
+        // Statut posé AVANT les e-mails : un e-mail en échec ne bloque jamais la carte.
+        let statutApplique: string | null = null;
+        let statutErreur: string | undefined;
+        if (statutCible) {
+          try {
+            const ecrite = await poserStatut(admin, orgId, oc.order, statutCible);
+            if (ecrite) statutApplique = statutCible;
+            else statutErreur = "statut modifié entre-temps";
+          } catch (err) {
+            statutErreur = err instanceof HttpError ? (err.detail ?? err.code) : sanitizeError(err, "statut");
+          }
+        }
+        const actions: ActionReport[] = [];
+        for (const spec of specs) actions.push(await executerAction(admin, ctx, oc, spec, slot));
+        resultats.push({ order_id: oc.order.id, statut_applique: statutApplique, ...(statutErreur ? { statut_erreur: statutErreur } : {}), actions });
+      }
+      return resultats;
+    },
+  });
+  return jsonResponse({ slot: r?.ecrit ?? null, orders: r?.resultat ?? [] }, 200, req);
 }
 
 async function rejouer(req: Request, admin: SupabaseClient, body: AnyRecord): Promise<Response> {
