@@ -197,6 +197,10 @@ export function actionBloquee(a, now = new Date()) {
   return Number.isFinite(t) && now.getTime() - t > PENDING_STALE_MINUTES * 60 * 1000;
 }
 
+/** Avertissement avant de rejouer une action « envoi bloqué » : l'e-mail a pu partir sans être enregistré. */
+export const AVERTISSEMENT_REJEU_BLOQUE = 'Cet envoi est peut-être déjà parti (vérifiable dans l’historique des e-mails) : '
+  + 'l’envoi a commencé mais son résultat n’a jamais été enregistré. Rejouer peut l’envoyer une 2ᵉ fois.';
+
 /**
  * Issue d'une action en mots (« envoyé », « en échec (gabarit manquant) »…).
  * @param {{ status: string, error_code?: string | null, updated_at?: string | null }} a

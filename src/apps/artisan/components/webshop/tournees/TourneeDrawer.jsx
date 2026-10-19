@@ -10,12 +10,12 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { X, Send, Download, Lock, LockOpen, Ban, Loader2, Package, Truck, PackageCheck } from 'lucide-react';
+import { X, Send, Download, Lock, LockOpen, Ban, Loader2, Package, Truck, PackageCheck, RotateCcw } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useWebshopSlotOrders, useWebshopTourMutations } from '@hooks/useWebshopTournees';
-import { dateLongFR, isCountedOrder, clientsAPrevenir, resumeTourneeEvent, peutMarquerPartie, peutMarquerLivree, peutRouvrir, slotStatusLabel, tourneeErrorMessage, todayParis } from '@/lib/webshop/tournees';
+import { dateLongFR, isCountedOrder, clientsAPrevenir, resumeTourneeEvent, peutMarquerPartie, peutMarquerLivree, peutRouvrir, envoiARelancer, slotStatusLabel, tourneeErrorMessage, todayParis } from '@/lib/webshop/tournees';
 import { buildWebshopConfig } from '@/lib/webshop/reglages';
 import { SlotStatusBadge, FillGauge } from './tourneesUi';
 import TourOrderCard from './TourOrderCard';
@@ -34,13 +34,21 @@ function evenementDescription(event, { total, sansEmail }, gabarit) {
   return `${n} par e-mail${sans}. ${cartes} Un e-mail déjà envoyé ne repart jamais.`;
 }
 
+/** Texte de confirmation de la relance (tournée marquée, envois peut-être interrompus). */
+function relanceDescription(event) {
+  const quoi = event === 'livree' ? '« tournée livrée »' : '« tournée partie »';
+  return `Rejoue les envois ${quoi} aux clients de cette tournée, au cas où ils auraient été interrompus. `
+    + 'Les e-mails déjà partis ne repartent pas : seuls les clients pas encore prévenus (ou en échec) le seront. '
+    + 'Les commandes 100 % palette qui n’ont pas encore avancé passent à l’étape suivante.';
+}
+
 export default function TourneeDrawer({ slot, sector, onClose }) {
   const { isTeamLeaderOrAbove } = useAuth();
   const { settings } = useOrgSettings();
   const cfg = buildWebshopConfig(settings);
   const { data, isLoading } = useWebshopSlotOrders(slot.id);
   const { setStatus, cancel, sendRouteSheet, markEvent } = useWebshopTourMutations();
-  const [confirm, setConfirm] = useState(null); // 'send' | 'close' | 'cancel' | 'partie' | 'livree'
+  const [confirm, setConfirm] = useState(null); // 'send' | 'close' | 'cancel' | 'partie' | 'livree' | 'relance'
   const [note, setNote] = useState('');
   const [moving, setMoving] = useState(null);
   const [downloading, setDownloading] = useState(false);
@@ -54,6 +62,7 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
 
   const canMarkDeparted = peutMarquerPartie(slot);
   const canMarkDelivered = peutMarquerLivree(slot);
+  const relance = envoiARelancer(slot);
   const eventEvent = confirm === 'livree' ? 'livree' : 'partie';
   const clients = clientsAPrevenir({ orders: data?.orders, items });
   const gabaritEvent = cfg.process?.tournee?.[eventEvent]?.email_client;
@@ -146,6 +155,13 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
               <button type="button" disabled={busy} onClick={() => setConfirm('livree')}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 rounded-lg">
                 <PackageCheck className="w-4 h-4" /> Marquer livrée
+              </button>
+            )}
+            {isTeamLeaderOrAbove && relance && (
+              <button type="button" disabled={busy} onClick={() => setConfirm('relance')}
+                title="Si les clients n'ont pas tous été prévenus (envoi interrompu)"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 hover:bg-secondary-50 disabled:opacity-40 rounded-lg">
+                <RotateCcw className="w-4 h-4" /> Relancer les envois ({relance === 'livree' ? 'livrée' : 'partie'})
               </button>
             )}
             {isTeamLeaderOrAbove && canReopen && (
@@ -243,6 +259,18 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
         loading={markEvent.isPending}
         confirmDisabled={isLoading || !data}
         onConfirm={() => runEvent(eventEvent)}
+      />
+
+      <ConfirmDialog
+        open={confirm === 'relance' && !!relance}
+        onOpenChange={(v) => !v && closeConfirm()}
+        title="Relancer les envois aux clients ?"
+        description={relanceDescription(relance)}
+        confirmLabel="Relancer"
+        variant="default"
+        loading={markEvent.isPending}
+        confirmDisabled={isLoading || !data}
+        onConfirm={() => runEvent(relance)}
       />
 
       <MoveOrderDialog order={moving} open={!!moving} onOpenChange={(v) => !v && setMoving(null)} />

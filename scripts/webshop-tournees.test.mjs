@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  slotStatusLabel, clientsAPrevenir, resumeTourneeEvent, peutMarquerPartie, peutMarquerLivree, peutRouvrir, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
+  slotStatusLabel, clientsAPrevenir, resumeTourneeEvent, peutMarquerPartie, peutMarquerLivree, peutRouvrir, envoiARelancer, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
 } from '../src/lib/webshop/tournees.js';
 import { buildWebshopConfig, depotParCode } from '../src/lib/webshop/reglages.js';
 
@@ -202,4 +202,19 @@ test('peutMarquerPartie / peutMarquerLivree / peutRouvrir : une tournée partie 
   assert.equal(peutRouvrir(fermee, '2026-11-01'), true);
   assert.equal(peutRouvrir({ ...fermee, departed_at: 'x' }, '2026-11-01'), false);
   assert.equal(peutRouvrir(fermee, '2026-11-09'), false);
+});
+
+test('envoiARelancer : tournée partie (ou livrée) interrompue → même événement ; jamais avant le départ ni annulée', () => {
+  const fermee = { status: 'closed', delivery_date: '2026-11-10' };
+  assert.equal(envoiARelancer(fermee), null, 'pas encore partie : « Marquer partie » suffit');
+  assert.equal(envoiARelancer(null), null);
+  assert.equal(envoiARelancer({ ...fermee, departed_at: 'x' }), 'partie');
+  // Livrée : on relance « livrée », jamais « partie » (un « en route » après la livraison serait faux).
+  assert.equal(envoiARelancer({ ...fermee, status: 'shipped', departed_at: 'x', delivered_at: 'y' }), 'livree');
+  assert.equal(envoiARelancer({ ...fermee, status: 'cancelled', departed_at: 'x' }), null);
+});
+
+test('tourneeErrorMessage : slot_departed en français', () => {
+  assert.match(tourneeErrorMessage({ message: 'slot_departed' }), /partie/);
+  assert.doesNotMatch(tourneeErrorMessage({ message: 'slot_departed' }), /^Erreur :/);
 });

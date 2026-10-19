@@ -154,7 +154,7 @@ test('variablesCommande : client, adresse, date FR, montants, branding, ordre co
   // Retrait : l'adresse de livraison nomme le point.
   const vr = variablesCommande({ order: order({ parcel_delivery_mode: 'pickup', pickup_point_name: 'Relais <A>' }), lines: [colis], envoi: 'colis' });
   assert.equal(vr['{{PICKUP_POINT}}'], 'Relais &lt;A&gt;');
-  assert.equal(vr['{{DELIVERY_ADDRESS}}'], 'Retrait : Relais &lt;A&gt;');
+  assert.equal(vr['{{DELIVERY_ADDRESS}}'], 'Relais &lt;A&gt;', 'jamais « Retrait : » dans l adresse');
 });
 
 test('variablesCommande : chaque placeholder déclaré a une valeur (sauf feuille de route, rendue par le site)', () => {
@@ -190,4 +190,57 @@ test('gabarits par défaut : complets, transactionnels, placeholders déclarés'
 test('les clés de gabarit des réglages viennent de la même source', async () => {
   const reglages = await import('../src/lib/webshop/reglages.js');
   assert.equal(reglages.WEBSHOP_EMAIL_KEYS, WEBSHOP_EMAIL_KEYS);
+});
+
+test('colis en retrait : aucune action colis (ni ordre au prestataire, ni e-mail « colis en route »)', () => {
+  const cfg = buildWebshopConfig({ webshop: { process: { transitions: {
+    confirmee: { email_client: 'webshop_confirmation', ordre_colis: true },
+    transmise_fournisseur: { email_client: null, ordre_colis: true },
+    expediee: { email_client: 'webshop_expedition_colis', ordre_colis: true },
+    livree: { email_client: 'webshop_livraison_colis', ordre_colis: false },
+  } } } });
+  const retrait = order({ parcel_delivery_mode: 'pickup', pickup_point_name: 'Dépôt' });
+  for (const to of ['confirmee', 'transmise_fournisseur', 'expediee', 'livree']) {
+    assert.deepEqual(actionsPourTransition(cfg, retrait, [colis], to), [], to);
+    assert.deepEqual(actionsPourTransition(cfg, retrait, [colis, palette], to), [], `${to} mixte`);
+  }
+  // Témoin : même réglage, colis livré → l'ordre colis part.
+  assert.equal(actionsPourTransition(cfg, order({ parcel_delivery_mode: 'delivery' }), [colis], 'expediee').length, 2);
+  // Retrait des PALETTES seulement : les colis livrés gardent leurs actions.
+  assert.equal(actionsPourTransition(cfg, order({ pallet_delivery_mode: 'pickup', parcel_delivery_mode: 'delivery' }), [colis, palette], 'expediee').length, 2);
+});
+
+test('{{DELIVERY_LINE}} : ligne entière, vide si rien à dire, jamais « Livraison : Retrait : »', () => {
+  const adr = { address: '1 rue X', postal_code: '81600', city: 'Gaillac' };
+  assert.equal(variablesCommande({ order: order(adr), lines: [colis], envoi: 'colis' })['{{DELIVERY_LINE}}'],
+    '<p>Livraison : 1 rue X, 81600 Gaillac</p>');
+  assert.equal(variablesCommande({ order: order({ ...adr, pallet_delivery_mode: 'pickup', pickup_point_name: 'Relais <A>' }), lines: [palette], envoi: 'palette' })['{{DELIVERY_LINE}}'],
+    '<p>Retrait : Relais &lt;A&gt;</p>');
+  assert.equal(variablesCommande({ order: order({ pallet_delivery_mode: 'pickup' }), lines: [palette], envoi: 'palette' })['{{DELIVERY_LINE}}'], '');
+  assert.equal(variablesCommande({ order: order(), lines: [colis], envoi: 'colis' })['{{DELIVERY_LINE}}'], '');
+  // Proposée aux seuls e-mails du process (rendus par l'edge) ; la confirmation, rendue par le site, ne la remplit pas.
+  assert.ok(WEBSHOP_EMAIL_PLACEHOLDERS.webshop_expedition_palette.includes('{{DELIVERY_LINE}}'));
+  assert.ok(!WEBSHOP_EMAIL_PLACEHOLDERS.webshop_confirmation.includes('{{DELIVERY_LINE}}'));
+});
+
+test('gabarits par défaut : libellés justes (palette « en route », pas de « Livraison : » orphelin)', () => {
+  const pal = WEBSHOP_EMAIL_DEFAULTS.webshop_expedition_palette;
+  assert.doesNotMatch(pal.subject + pal.html_body, /aujourd/i);
+  assert.match(pal.subject, /en route/);
+  for (const key of WEBSHOP_EMAIL_KEYS) {
+    const t = WEBSHOP_EMAIL_DEFAULTS[key];
+    assert.doesNotMatch(t.html_body, /Livraison : \{\{/, `${key} : « Livraison : » devant une variable qui peut être vide`);
+  }
+  assert.ok(WEBSHOP_EMAIL_DEFAULTS.webshop_expedition_colis.html_body.includes('{{DELIVERY_LINE}}'));
+  assert.ok(pal.html_body.includes('{{DELIVERY_LINE}}'));
+});
+
+test('feuille de route par défaut : arrêts, dépôt, km et emplacements (objet compris)', () => {
+  const t = WEBSHOP_EMAIL_DEFAULTS.webshop_feuille_route;
+  for (const ph of ['{{ARRETS}}', '{{DEPOT}}', '{{KM_ESTIMES}}', '{{NB_EMPLACEMENTS}}']) {
+    assert.ok(WEBSHOP_EMAIL_PLACEHOLDERS.webshop_feuille_route.includes(ph), `${ph} non déclaré`);
+    assert.ok(t.html_body.includes(ph), `${ph} absent du corps`);
+  }
+  assert.ok(t.subject.includes('{{NB_EMPLACEMENTS}}'));
+  assert.ok(t.subject.includes('{{NB_ARRETS}}'));
 });

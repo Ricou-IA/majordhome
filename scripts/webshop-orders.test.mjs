@@ -204,3 +204,11 @@ test('actionBloquee / peutRejouer : pending de plus de 10 min = bloquée et rejo
   assert.equal(issueAction(vieux, now), 'envoi bloqué');
   assert.equal(issueAction(recent, now), 'en cours');
 });
+
+import { AVERTISSEMENT_REJEU_BLOQUE } from '../src/lib/webshop/orders.js';
+
+test('rejeu d’un envoi bloqué : avertissement du double envoi possible', () => {
+  assert.match(AVERTISSEMENT_REJEU_BLOQUE, /peut-être déjà parti/);
+  assert.match(AVERTISSEMENT_REJEU_BLOQUE, /historique des e-mails/);
+  assert.match(AVERTISSEMENT_REJEU_BLOQUE, /2ᵉ fois/);
+});

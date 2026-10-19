@@ -45,16 +45,20 @@ export function envoisDeCommande(lines) {
 
 /**
  * Actions de l'envoi COLIS déclenchées par le passage de la commande au statut `to`.
- * `[]` si la commande n'a pas de ligne colis ou si la transition n'a pas de réglage.
- * L'ordre colis utilise toujours le gabarit `webshop_ordre_colis`.
+ * `[]` si la commande n'a pas de ligne colis, si la transition n'a pas de réglage, ou si les
+ * colis sont RETIRÉS (`parcel_delivery_mode = 'pickup'`) : jamais d'ordre payant au prestataire
+ * pour un retrait, jamais d'e-mail « votre colis est en route » (décision 2026-10-19 ; un
+ * e-mail « prêt au retrait » viendra plus tard). L'ordre colis utilise toujours le gabarit
+ * `webshop_ordre_colis`.
  * @param {{ process?: any } | null | undefined} cfg configuration issue de `buildWebshopConfig`
- * @param {any} order commande (non lue aujourd'hui, gardée pour la signature commune)
+ * @param {any} order commande (`parcel_delivery_mode` lu)
  * @param {LigneCommande[]} lines
  * @param {string} to statut cible
  * @returns {ActionTransition[]}
  */
 export function actionsPourTransition(cfg, order, lines, to) {
   if (envoisDeCommande(lines).colis.length === 0) return [];
+  if (order?.parcel_delivery_mode === 'pickup') return [];
   const reglage = cfg?.process?.transitions?.[to];
   if (!reglage) return [];
   /** @type {ActionTransition[]} */
@@ -141,7 +145,9 @@ function poidsFR(kg) {
  * `{{ITEMS}}` et `{{PARCELS_TABLE}}` sont du HTML construit ici, contenu échappé). Seules les
  * lignes de l'`envoi` sont citées ; sans `envoi`, toutes les lignes de la commande.
  * `{{DELIVERY_DATE}}` : date du créneau (`slot.date`) ou `order.delivery_date`, envoi palette
- * seulement (un colis n'a pas de date connue). Retrait : `{{DELIVERY_ADDRESS}}` = « Retrait : <point> ».
+ * seulement (un colis n'a pas de date connue). `{{DELIVERY_ADDRESS}}` = adresse, ou nom du point de
+ * retrait (sans préfixe). `{{DELIVERY_LINE}}` = la ligne entière (« Livraison : … » / « Retrait : … »),
+ * vide quand il n'y a rien à dire — jamais de libellé orphelin dans le gabarit.
  * Poids inconnu sur une ligne → « non renseigné » (jamais 0 kg).
  * @param {{
  *   order: any, lines: LigneCommande[], envoi?: Envoi | null,
@@ -190,8 +196,11 @@ export function variablesCommande({ order, lines, envoi = null, company = null, 
     '{{ORDER_NUMBER}}': esc(o.order_number),
     '{{ITEMS}}': items,
     '{{DELIVERY_DATE}}': envoi === 'colis' ? '' : esc(dateFR(slot?.date ?? o.delivery_date)),
-    // Point de retrait inconnu : vide, jamais un « Retrait : » orphelin.
-    '{{DELIVERY_ADDRESS}}': retrait ? (pointRetrait ? `Retrait : ${esc(pointRetrait)}` : '') : esc(adresse),
+    '{{DELIVERY_ADDRESS}}': esc(retrait ? pointRetrait : adresse),
+    // Ligne entière : vide si rien à dire (point inconnu, adresse absente).
+    '{{DELIVERY_LINE}}': retrait
+      ? (pointRetrait ? `<p>Retrait : ${esc(pointRetrait)}</p>` : '')
+      : (adresse ? `<p>Livraison : ${esc(adresse)}</p>` : ''),
     '{{PICKUP_POINT}}': esc(pointRetrait),
     '{{BRAND_NAME}}': esc(company?.name),
     '{{ORG_EMAIL}}': esc(company?.email),

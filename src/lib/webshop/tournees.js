@@ -42,6 +42,20 @@ export function peutMarquerLivree(slot) {
   return !!slot?.departed_at && !slot.delivered_at && ['closed', 'shipped'].includes(slot.status);
 }
 
+/**
+ * « Relancer les envois » : la tournée est marquée partie (ou livrée) mais l'edge a pu s'arrêter
+ * avant de prévenir les clients — le bouton « Marquer … » a alors disparu. Renvoie l'événement à
+ * rejouer (même appel que « Marquer … » : l'edge est ré-entrante, une action `sent` ne repart
+ * jamais), ou null. Livrée → `livree` seulement (un « en route » après livraison serait faux).
+ * Tournée annulée : rien.
+ * @param {{ status?: string, departed_at?: string | null, delivered_at?: string | null } | null | undefined} slot
+ * @returns {'partie' | 'livree' | null}
+ */
+export function envoiARelancer(slot) {
+  if (!slot?.departed_at || slot.status === 'cancelled') return null;
+  return slot.delivered_at ? 'livree' : 'partie';
+}
+
 /** « Rouvrir » : jamais une tournée déjà partie ; au moins J+2 et de la place. */
 export function peutRouvrir(slot, today) {
   return (slot?.status === 'closed' || slot?.status === 'cancelled')
@@ -275,6 +289,7 @@ const ERROR_MESSAGES = {
   slot_not_found: 'Tournée introuvable.',
   slot_not_open: 'La tournée n\'est pas ouverte.',
   slot_not_reopenable: 'Cette tournée ne peut pas être rouverte.',
+  slot_departed: 'Tournée déjà partie : elle ne peut plus être rouverte.',
   slot_too_late: 'Trop tard pour rouvrir : la tournée a lieu dans moins de 2 jours.',
   slot_full: 'Tournée pleine : impossible de la rouvrir.',
   slot_not_cancellable: 'Cette tournée ne peut pas être annulée.',

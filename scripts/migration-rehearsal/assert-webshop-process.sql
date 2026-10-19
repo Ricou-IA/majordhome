@@ -2,6 +2,7 @@
 -- Prérequis du run : fixture-webshop-tournees, 20261013_2, 20261017_1, 20261017_2, 20261018_1
 -- puis 20261019_1.
 -- A : structure / droits. B : journal des actions (service_role). C : événements de tournée.
+-- D : droit de l'edge. E : une tournée partie ne se rouvre jamais (recompte, set_status).
 -- B et C tournent dans une transaction annulée.
 
 -- ── A. Structure ─────────────────────────────────────────────────────────────
@@ -320,5 +321,58 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RESET ROLE;
   RAISE NOTICE 'assert-webshop-process D (droit de l''edge) : OK';
+END $$;
+ROLLBACK;
+
+-- ── E. Une tournée partie ne se rouvre jamais (recompte, set_status) ─────────────
+BEGIN;
+DO $$
+DECLARE
+  v_mayer uuid := '3c68193e-783b-4aa9-bc0d-fb2ce21e99b1';
+  v_tl uuid; v_slot uuid; v_status text;
+BEGIN
+  SELECT user_id INTO v_tl FROM core.organization_members WHERE org_id = v_mayer AND role IN ('org_admin','team_leader') AND user_id IS NOT NULL LIMIT 1;
+  -- La tournée la plus lointaine : au-delà du délai de fermeture, donc rouvrable avant 20261019_1.
+  SELECT id INTO v_slot FROM majordhome.webshop_delivery_slots WHERE org_id = v_mayer AND status = 'open' ORDER BY delivery_date DESC LIMIT 1;
+  IF v_tl IS NULL OR v_slot IS NULL THEN RAISE EXCEPTION 'fixture incomplète (tl %, tournée %)', v_tl, v_slot; END IF;
+
+  -- (E1) témoin : fermée « pleine » non partie, place revenue → le recompte la rouvre
+  UPDATE majordhome.webshop_delivery_slots
+     SET status = 'closed', closed_at = now(), close_reason = 'capacity', route_sheet_sent_at = NULL, departed_at = NULL
+   WHERE id = v_slot;
+  PERFORM majordhome.webshop_slot_recount(v_slot);
+  SELECT status INTO v_status FROM majordhome.webshop_delivery_slots WHERE id = v_slot;
+  IF v_status <> 'open' THEN RAISE EXCEPTION '(E1) témoin : tournée non partie pas rouverte (%)', v_status; END IF;
+
+  -- (E2) même état mais partie : le recompte ne la rouvre pas
+  UPDATE majordhome.webshop_delivery_slots
+     SET status = 'closed', closed_at = now(), close_reason = 'capacity', route_sheet_sent_at = NULL, departed_at = now()
+   WHERE id = v_slot;
+  PERFORM majordhome.webshop_slot_recount(v_slot);
+  SELECT status INTO v_status FROM majordhome.webshop_delivery_slots WHERE id = v_slot;
+  IF v_status <> 'closed' THEN RAISE EXCEPTION '(E2) tournée partie rouverte par le recompte (%)', v_status; END IF;
+
+  -- (E3) set_status('open') sur une tournée partie (fermée puis livrée) → slot_departed
+  PERFORM set_config('request.jwt.claim.sub', v_tl::text, true);
+  SET LOCAL ROLE authenticated;
+  BEGIN PERFORM public.webshop_slot_set_status(v_slot, 'open', NULL); RAISE EXCEPTION 'KO: tournée partie rouverte';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'slot_departed' THEN RAISE EXCEPTION '(E3a) reçu %', SQLERRM; END IF; END;
+  RESET ROLE;
+  UPDATE majordhome.webshop_delivery_slots SET status = 'shipped', delivered_at = now() WHERE id = v_slot;
+  SET LOCAL ROLE authenticated;
+  BEGIN PERFORM public.webshop_slot_set_status(v_slot, 'open', NULL); RAISE EXCEPTION 'KO: tournée livrée rouverte';
+  EXCEPTION WHEN others THEN IF SQLERRM <> 'slot_departed' THEN RAISE EXCEPTION '(E3b) reçu %', SQLERRM; END IF; END;
+  RESET ROLE;
+  IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_slot) <> 'shipped' THEN RAISE EXCEPTION '(E3) statut modifié'; END IF;
+
+  -- (E4) témoin : fermée à la main, non partie → set_status('open') passe toujours
+  UPDATE majordhome.webshop_delivery_slots
+     SET status = 'closed', close_reason = 'manual', departed_at = NULL, delivered_at = NULL
+   WHERE id = v_slot;
+  SET LOCAL ROLE authenticated;
+  PERFORM public.webshop_slot_set_status(v_slot, 'open', NULL);
+  RESET ROLE;
+  IF (SELECT status FROM majordhome.webshop_delivery_slots WHERE id = v_slot) <> 'open' THEN RAISE EXCEPTION '(E4) témoin non rouvert'; END IF;
+  RAISE NOTICE 'assert-webshop-process E (tournée partie jamais rouverte) : OK';
 END $$;
 ROLLBACK;

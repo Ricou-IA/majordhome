@@ -13,7 +13,8 @@
 --      de l'org via la vue publique.
 --   2. webshop_delivery_slots.departed_at / delivered_at + RPC webshop_slot_mark_event
 --      (team_leader+, garde webshop_slot_guard) : « tournée partie » / « tournée livrée ».
---      Pas de nouveau statut : livrée ⇒ status = 'shipped'.
+--      Pas de nouveau statut : livrée ⇒ status = 'shipped'. Une tournée partie ne se rouvre
+--      jamais : webshop_slot_recount et webshop_slot_set_status redéfinis (slot_departed).
 --   2 bis. public.webshop_can_process(org) (INVOKER, authenticated) : droit de l'edge
 --      webshop-process = majordhome.role_can(org, 'pipeline', 'edit').
 --   3. Défauts SQL régénérés (clé `process`).
@@ -211,6 +212,92 @@ BEGIN
 END $$;
 REVOKE EXECUTE ON FUNCTION public.webshop_slot_mark_event(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.webshop_slot_mark_event(uuid, text) TO authenticated;
+
+-- ---------- 2 (suite). Une tournée partie ne se rouvre jamais ----------------
+-- Redéfinitions à signature identique de 20261017_1 (définition la plus récente), seule
+-- différence : `departed_at`. Le recompte ne remet plus en `open` une tournée partie, et
+-- set_status('open') la refuse (`slot_departed`) — sinon des clients pourraient réserver
+-- sur un camion déjà parti.
+CREATE OR REPLACE FUNCTION majordhome.webshop_slot_recount(p_slot_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'majordhome', 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_today date := (now() AT TIME ZONE 'Europe/Paris')::date;
+  v_delai integer;
+BEGIN
+  SELECT (majordhome.webshop_reglages(s.org_id) -> 'palette' ->> 'delai_fermeture_jours')::integer INTO v_delai
+    FROM majordhome.webshop_delivery_slots s WHERE s.id = p_slot_id;
+
+  UPDATE majordhome.webshop_delivery_slots s
+     SET used_slots = x.sl, used_stops = x.st, updated_at = now()
+    FROM (
+      SELECT COALESCE(sum(o.pallet_slots), 0)::int AS sl,
+             count(DISTINCT COALESCE(o.normalized_address, lower(o.address), o.id::text))::int AS st
+        FROM majordhome.webshop_orders o
+       WHERE o.delivery_slot_id = p_slot_id AND o.paid_at IS NOT NULL AND o.status <> 'annulee'
+    ) x
+   WHERE s.id = p_slot_id;
+
+  UPDATE majordhome.webshop_delivery_slots
+     SET status = 'closed', closed_at = now(), updated_at = now(),
+         close_reason = CASE WHEN used_slots >= capacity_slots THEN 'capacity' ELSE 'stops' END
+   WHERE id = p_slot_id AND status = 'open'
+     AND (used_slots >= capacity_slots OR used_stops >= capacity_stops);
+
+  UPDATE majordhome.webshop_delivery_slots
+     SET status = 'open', closed_at = NULL, close_reason = NULL, updated_at = now()
+   WHERE id = p_slot_id AND status = 'closed' AND close_reason IN ('capacity', 'stops')
+     AND route_sheet_sent_at IS NULL
+     AND departed_at IS NULL                  -- une tournée partie ne se rouvre jamais
+     AND delivery_date > v_today + v_delai   -- même borne que la fermeture (<= today + délai = fermé)
+     AND used_slots < capacity_slots AND used_stops < capacity_stops;
+END $function$;
+REVOKE EXECUTE ON FUNCTION majordhome.webshop_slot_recount(uuid) FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.webshop_slot_set_status(p_slot_id uuid, p_status text, p_note text DEFAULT NULL::text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'majordhome', 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_slot majordhome.webshop_delivery_slots;
+  v_today date := (now() AT TIME ZONE 'Europe/Paris')::date;
+  v_delai integer;
+BEGIN
+  v_slot := majordhome.webshop_slot_guard(p_slot_id);
+  v_delai := (majordhome.webshop_reglages(v_slot.org_id) -> 'palette' ->> 'delai_fermeture_jours')::integer;
+
+  IF p_status = 'closed' THEN
+    IF v_slot.status <> 'open' THEN RAISE EXCEPTION 'slot_not_open' USING ERRCODE = '22023', DETAIL = v_slot.status; END IF;
+    UPDATE majordhome.webshop_delivery_slots
+       SET status = 'closed', closed_at = now(), close_reason = 'manual',
+           status_note = NULLIF(btrim(p_note), ''), updated_at = now()
+     WHERE id = p_slot_id;
+  ELSIF p_status = 'open' THEN
+    -- Garde positive : seule une tournée jamais partie se rouvre.
+    IF (v_slot.departed_at IS NULL) IS NOT TRUE THEN RAISE EXCEPTION 'slot_departed' USING ERRCODE = '22023'; END IF;
+    IF v_slot.status NOT IN ('closed', 'cancelled') THEN RAISE EXCEPTION 'slot_not_reopenable' USING ERRCODE = '22023', DETAIL = v_slot.status; END IF;
+    -- Même borne que la fermeture : un créneau à today + délai est dans la fenêtre fermée.
+    IF v_slot.delivery_date <= v_today + v_delai THEN RAISE EXCEPTION 'slot_too_late' USING ERRCODE = '22023', DETAIL = v_slot.delivery_date::text; END IF;
+    IF v_slot.used_slots >= v_slot.capacity_slots OR v_slot.used_stops >= v_slot.capacity_stops THEN
+      RAISE EXCEPTION 'slot_full' USING ERRCODE = '22023';
+    END IF;
+    UPDATE majordhome.webshop_delivery_slots
+       SET status = 'open', closed_at = NULL, close_reason = NULL, status_note = NULL,
+           route_sheet_sent_at = NULL, updated_at = now()
+     WHERE id = p_slot_id;
+  ELSE
+    RAISE EXCEPTION 'invalid_status' USING ERRCODE = '22023', DETAIL = p_status;
+  END IF;
+
+  RETURN jsonb_build_object('slot_id', p_slot_id, 'status', p_status);
+END $function$;
+REVOKE EXECUTE ON FUNCTION public.webshop_slot_set_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.webshop_slot_set_status(uuid, text, text) TO authenticated;
 
 -- ---------- 2 bis. Droit de l'edge webshop-process ---------------------------
 -- Même verdict que le front (route /webshop = pipeline.edit) : appelée par l'edge AVEC le JWT de

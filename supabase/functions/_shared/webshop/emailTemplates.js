@@ -23,6 +23,9 @@ export { WEBSHOP_EMAIL_KEYS };
  */
 
 const COMMUNS = ['{{CLIENT_NAME}}', '{{ORDER_NUMBER}}', '{{ITEMS}}', '{{DELIVERY_DATE}}', '{{DELIVERY_ADDRESS}}', '{{PICKUP_POINT}}'];
+// E-mails du process (rendus par l'edge, `variablesCommande`) : + la ligne « Livraison : … » / « Retrait : … »
+// entière, vide quand il n'y a rien à dire (jamais de libellé orphelin dans un gabarit).
+const PROCESS = [...COMMUNS, '{{DELIVERY_LINE}}'];
 const BRANDING = ['{{BRAND_NAME}}', '{{ORG_EMAIL}}', '{{ORG_PHONE}}'];
 
 /**
@@ -31,12 +34,15 @@ const BRANDING = ['{{BRAND_NAME}}', '{{ORG_EMAIL}}', '{{ORG_PHONE}}'];
  */
 export const WEBSHOP_EMAIL_PLACEHOLDERS = Object.freeze({
   webshop_confirmation: Object.freeze([...COMMUNS, '{{DELIVERY_INFO}}', '{{LEGAL_INFO}}', ...BRANDING]),
-  webshop_expedition_colis: Object.freeze([...COMMUNS, ...BRANDING]),
-  webshop_livraison_colis: Object.freeze([...COMMUNS, ...BRANDING]),
-  webshop_expedition_palette: Object.freeze([...COMMUNS, ...BRANDING]),
-  webshop_livraison_palette: Object.freeze([...COMMUNS, ...BRANDING]),
+  webshop_expedition_colis: Object.freeze([...PROCESS, ...BRANDING]),
+  webshop_livraison_colis: Object.freeze([...PROCESS, ...BRANDING]),
+  webshop_expedition_palette: Object.freeze([...PROCESS, ...BRANDING]),
+  webshop_livraison_palette: Object.freeze([...PROCESS, ...BRANDING]),
+  // Feuille de route : rendue par le site Mayer (lib/boutique/livraison/emails-tournee.ts).
+  // {{ARRETS}} = liste des arrêts (HTML) ; {{KM_ESTIMES}} = paragraphe, vide si inconnu.
   webshop_feuille_route: Object.freeze([
-    '{{TOURNEE_DATE}}', '{{SECTEUR}}', '{{NB_ARRETS}}', '{{ITINERAIRE_URL}}', '{{ALERTES}}', ...BRANDING,
+    '{{TOURNEE_DATE}}', '{{SECTEUR}}', '{{DEPOT}}', '{{NB_ARRETS}}', '{{NB_EMPLACEMENTS}}', '{{ARRETS}}',
+    '{{KM_ESTIMES}}', '{{ITINERAIRE_URL}}', '{{ALERTES}}', ...BRANDING,
   ]),
   webshop_ordre_colis: Object.freeze([
     ...COMMUNS, ...BRANDING,
@@ -82,7 +88,7 @@ export const WEBSHOP_EMAIL_DEFAULTS = Object.freeze({
       '<p>Bonjour {{CLIENT_NAME}},</p>',
       '<p>Bonne nouvelle : les articles suivants de votre commande <strong>{{ORDER_NUMBER}}</strong> viennent d’être expédiés par colis.</p>',
       '{{ITEMS}}',
-      '<p>Livraison : {{DELIVERY_ADDRESS}}</p>',
+      '{{DELIVERY_LINE}}',
       CONTACT,
       SIGNATURE,
     ]),
@@ -99,12 +105,12 @@ export const WEBSHOP_EMAIL_DEFAULTS = Object.freeze({
     ]),
   webshop_expedition_palette: gabarit('webshop_expedition_palette', 'client',
     'Boutique — livraison palette en route (client)',
-    'Votre livraison arrive aujourd’hui — commande {{ORDER_NUMBER}}',
+    'Votre livraison est en route — commande {{ORDER_NUMBER}}',
     [
       '<p>Bonjour {{CLIENT_NAME}},</p>',
-      '<p>Notre camion est parti : votre livraison de la commande <strong>{{ORDER_NUMBER}}</strong> est prévue le {{DELIVERY_DATE}}.</p>',
+      '<p>Notre camion est parti : votre livraison de la commande <strong>{{ORDER_NUMBER}}</strong> est en route.</p>',
       '{{ITEMS}}',
-      '<p>Livraison : {{DELIVERY_ADDRESS}}</p>',
+      '{{DELIVERY_LINE}}',
       '<p>Merci de prévoir un accès dégagé pour le déchargement.</p>',
       CONTACT,
       SIGNATURE,
@@ -122,11 +128,14 @@ export const WEBSHOP_EMAIL_DEFAULTS = Object.freeze({
     ]),
   webshop_feuille_route: gabarit('webshop_feuille_route', 'transporteur',
     'Boutique — feuille de route (transporteur)',
-    'Feuille de route du {{TOURNEE_DATE}} — {{SECTEUR}} — {{NB_ARRETS}} arrêt(s)',
+    'Feuille de route du {{TOURNEE_DATE}} — {{SECTEUR}} ({{NB_ARRETS}} arrêt(s), {{NB_EMPLACEMENTS}} emplacement(s))',
     [
       '<p>Bonjour,</p>',
-      '<p>Voici la tournée du <strong>{{TOURNEE_DATE}}</strong> — secteur {{SECTEUR}}, {{NB_ARRETS}} arrêt(s).</p>',
+      '<p>Voici la tournée du <strong>{{TOURNEE_DATE}}</strong> — secteur {{SECTEUR}}.</p>',
+      '<p>Départ : {{DEPOT}}. {{NB_ARRETS}} arrêt(s), {{NB_EMPLACEMENTS}} emplacement(s) palette.</p>',
+      '{{KM_ESTIMES}}',
       '{{ALERTES}}',
+      '{{ARRETS}}',
       '<p><a href="{{ITINERAIRE_URL}}">Ouvrir l’itinéraire dans Google Maps</a></p>',
       '<p>La feuille de route détaillée et les bons de livraison sont en pièce jointe (PDF).</p>',
       '<p>Merci,<br>{{BRAND_NAME}} — {{ORG_PHONE}}</p>',

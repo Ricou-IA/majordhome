@@ -1,12 +1,16 @@
 /**
  * OrderActions — journal des envois d'une commande (e-mails client, ordre colis) + « Rejouer ».
  * Lecture : vue majordhome_webshop_order_actions (une ligne par envoi × événement × action).
- * Rejeu : edge webshop-process (`retry`) ; une action `sent` ne repart jamais.
+ * Rejeu : edge webshop-process (`retry`) ; une action `sent` ne repart jamais. Une action
+ * « envoi bloqué » (pending > 10 min) a pu partir sans être enregistrée : confirmation d'abord.
  */
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, RotateCcw, Send } from 'lucide-react';
+import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import {
   libelleAction, libelleEvenementAction, issueAction, peutRejouer, libelleErreurAction, actionBloquee,
+  AVERTISSEMENT_REJEU_BLOQUE,
 } from '@/lib/webshop/orders';
 
 const STATUS_TONES = {
@@ -23,6 +27,8 @@ const fmtDateTime = (iso) => (iso
   : '');
 
 export default function OrderActions({ actions, isLoading, error, onRetry, retryingId }) {
+  const [bloquee, setBloquee] = useState(null); // action « envoi bloqué » en attente de confirmation
+
   const handleRetry = async (a) => {
     try {
       const res = await onRetry(a.id);
@@ -46,7 +52,7 @@ export default function OrderActions({ actions, isLoading, error, onRetry, retry
       )}
       <ul className="space-y-2">
         {actions.map((a) => (
-          <li key={a.id} className="flex items-start justify-between gap-3 text-sm">
+          <li key={a.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 text-sm">
             <div className="min-w-0">
               <p className="text-secondary-800">
                 {cap(libelleAction(a.action))}
@@ -70,7 +76,7 @@ export default function OrderActions({ actions, isLoading, error, onRetry, retry
                 <button
                   type="button"
                   disabled={retryingId === a.id}
-                  onClick={() => handleRetry(a)}
+                  onClick={() => (actionBloquee(a) ? setBloquee(a) : handleRetry(a))}
                   className="inline-flex items-center gap-1 text-xs text-primary-600 hover:underline disabled:opacity-50"
                 >
                   {retryingId === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
@@ -78,9 +84,23 @@ export default function OrderActions({ actions, isLoading, error, onRetry, retry
                 </button>
               )}
             </div>
+            {actionBloquee(a) && peutRejouer(a) && (
+              <p className="basis-full text-xs text-amber-800">{AVERTISSEMENT_REJEU_BLOQUE}</p>
+            )}
           </li>
         ))}
       </ul>
+
+      <ConfirmDialog
+        open={!!bloquee}
+        onOpenChange={(v) => !v && setBloquee(null)}
+        title="Rejouer un envoi bloqué ?"
+        description={AVERTISSEMENT_REJEU_BLOQUE}
+        confirmLabel="Rejouer quand même"
+        variant="default"
+        loading={!!bloquee && retryingId === bloquee.id}
+        onConfirm={async () => { const a = bloquee; setBloquee(null); await handleRetry(a); }}
+      />
     </section>
   );
 }
