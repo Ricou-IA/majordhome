@@ -16,7 +16,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@lib/serviceHelpers';
 
-const SLOT_COLS = 'id, org_id, sector_id, delivery_date, status, capacity_slots, capacity_stops, used_slots, used_stops, closed_at, close_reason, route_sheet_sent_at, km_estimated, status_note, route_sheet_request_id, route_sheet_requested_at';
+const SLOT_COLS = 'id, org_id, sector_id, delivery_date, status, capacity_slots, capacity_stops, used_slots, used_stops, closed_at, close_reason, route_sheet_sent_at, km_estimated, status_note, route_sheet_request_id, route_sheet_requested_at, departed_at, delivered_at';
 const ORDER_COLS = 'id, org_id, order_number, status, first_name, last_name, phone, email, address, postal_code, city, comments, internal_notes, delivery_instructions, geocoded_address, normalized_address, lat, lon, pallet_slots, pallet_delivery_mode, sector_id, requested_slot_id, delivery_slot_id, delivery_slot_changed, needs_manual_planning, paid_at, created_at, total_ttc_cents';
 const ITEM_COLS = 'order_id, product_name, qty, shipping_kind, pallet_slots';
 

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  slotStatusLabel, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
+  slotStatusLabel, clientsAPrevenir, resumeTourneeEvent, addDaysIso, todayParis, stopKey, moveTargets, buildRouteSheet, itineraryUrl, formatPhoneFR, tourneeErrorMessage, sendPendingLabel,
 } from '../src/lib/webshop/tournees.js';
 import { buildWebshopConfig, depotParCode } from '../src/lib/webshop/reglages.js';
 
@@ -123,4 +123,67 @@ test('itineraryUrl sans arrêt : pas de waypoints', () => {
 test('tourneeErrorMessage traduit les codes, garde l\'inconnu', () => {
   assert.match(tourneeErrorMessage({ message: 'capacity_exceeded' }), /emplacements/);
   assert.equal(tourneeErrorMessage({ message: 'boom' }), 'Erreur : boom');
+});
+
+test('slotStatusLabel : « Partie le … » / « Livrée le … » (jour Paris), la livraison prime', () => {
+  assert.equal(slotStatusLabel({ status: 'closed', close_reason: 'manual', departed_at: '2026-11-02T06:30:00Z' }), 'Partie le 2 novembre 2026');
+  // 23 h UTC le 2 = 00 h à Paris le 3
+  assert.equal(slotStatusLabel({ status: 'closed', departed_at: '2026-11-02T23:30:00Z' }), 'Partie le 3 novembre 2026');
+  assert.equal(slotStatusLabel({ status: 'closed', departed_at: '2026-11-02T06:30:00Z', delivered_at: '2026-11-02T15:00:00Z' }), 'Livrée le 2 novembre 2026');
+  assert.equal(slotStatusLabel({ status: 'closed', close_reason: 'manual', departed_at: null, delivered_at: null }), 'Fermée — à la main');
+});
+
+test('clientsAPrevenir : commandes payées non annulées avec ligne palette, sans e-mail à part', () => {
+  const orders = [
+    { id: 'a', paid_at: 'x', status: 'nouvelle', email: 'a@x.fr' },
+    { id: 'b', paid_at: 'x', status: 'nouvelle', email: '' },
+    { id: 'c', paid_at: 'x', status: 'annulee', email: 'c@x.fr' },
+    { id: 'd', paid_at: null, status: 'en_attente_paiement', email: 'd@x.fr' },
+    { id: 'e', paid_at: 'x', status: 'nouvelle', email: 'e@x.fr' }, // colis seul
+    { id: 'f', paid_at: 'x', status: 'nouvelle', email: 'f@x.fr' },
+  ];
+  const items = [
+    { order_id: 'a', shipping_kind: 'pallet' }, { order_id: 'b', shipping_kind: 'pallet' },
+    { order_id: 'c', shipping_kind: 'pallet' }, { order_id: 'd', shipping_kind: 'pallet' },
+    { order_id: 'e', shipping_kind: 'parcel' }, { order_id: 'f', shipping_kind: 'parcel' }, { order_id: 'f', shipping_kind: 'pallet' },
+  ];
+  assert.deepEqual(clientsAPrevenir({ orders, items }), { total: 3, sansEmail: 1 });
+  assert.deepEqual(clientsAPrevenir({ orders: [], items: [] }), { total: 0, sansEmail: 0 });
+  assert.deepEqual(clientsAPrevenir({ orders: null, items: null }), { total: 0, sansEmail: 0 });
+});
+
+const ACT = (o = {}) => ({ action: 'email_client', status: 'sent', error_code: null, ...o });
+test('resumeTourneeEvent : bilan e-mails + cartes, warning dès qu\'un e-mail n\'est pas parti', () => {
+  const ok = resumeTourneeEvent('partie', {
+    slot: { first_time: true },
+    orders: [
+      { order_id: 'a', statut_applique: 'expediee', actions: [ACT()] },
+      { order_id: 'b', statut_applique: null, actions: [ACT()] },
+    ],
+  });
+  assert.deepEqual(ok, { tone: 'success', message: 'Tournée partie — 2 e-mails envoyés, 1 carte déplacée' });
+
+  const ko = resumeTourneeEvent('livree', {
+    slot: { first_time: true },
+    orders: [
+      { order_id: 'a', statut_applique: 'livree', actions: [ACT({ status: 'failed', error_code: 'template_missing' })] },
+      { order_id: 'b', statut_applique: 'livree', actions: [ACT()] },
+    ],
+  });
+  assert.equal(ko.tone, 'warning');
+  assert.equal(ko.message, 'Tournée livrée — 1 e-mail envoyé, 1 en échec, 2 cartes déplacées');
+
+  const sansEmail = resumeTourneeEvent('partie', { slot: {}, orders: [{ order_id: 'a', statut_applique: null, actions: [ACT({ status: 'skipped', error_code: 'no_email' })] }] });
+  assert.equal(sansEmail.tone, 'warning');
+  assert.match(sansEmail.message, /1 en échec/);
+
+  const dejaFait = resumeTourneeEvent('partie', { slot: { first_time: false }, orders: [{ order_id: 'a', statut_applique: null, actions: [ACT({ id: null, status: 'skipped', error_code: 'already_sent' })] }] });
+  assert.equal(dejaFait.tone, 'success');
+  assert.match(dejaFait.message, /1 déjà envoyé/);
+
+  const erreurCarte = resumeTourneeEvent('partie', { slot: {}, orders: [{ order_id: 'a', statut_applique: null, statut_erreur: 'invalid_transition', actions: [] }] });
+  assert.equal(erreurCarte.tone, 'warning');
+  assert.match(erreurCarte.message, /1 carte non déplacée/);
+
+  assert.deepEqual(resumeTourneeEvent('partie', { slot: {}, orders: [] }), { tone: 'success', message: 'Tournée partie — aucun client à prévenir' });
 });

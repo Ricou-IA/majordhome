@@ -10,12 +10,12 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { X, Send, Download, Lock, LockOpen, Ban, Loader2, Package } from 'lucide-react';
+import { X, Send, Download, Lock, LockOpen, Ban, Loader2, Package, Truck, PackageCheck } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { useWebshopSlotOrders, useWebshopTourMutations } from '@hooks/useWebshopTournees';
-import { dateLongFR, isCountedOrder, slotStatusLabel, tourneeErrorMessage, todayParis, addDaysIso } from '@/lib/webshop/tournees';
+import { dateLongFR, isCountedOrder, clientsAPrevenir, resumeTourneeEvent, slotStatusLabel, tourneeErrorMessage, todayParis, addDaysIso } from '@/lib/webshop/tournees';
 import { buildWebshopConfig } from '@/lib/webshop/reglages';
 import { SlotStatusBadge, FillGauge } from './tourneesUi';
 import TourOrderCard from './TourOrderCard';
@@ -23,13 +23,24 @@ import SendStatus from './SendStatus';
 import MoveOrderDialog from './MoveOrderDialog';
 import { telechargerFeuilleDeRoute } from './routeSheetExport';
 
+/** Texte de confirmation : combien de clients seront prévenus (jamais plus que ce qui partira). */
+function evenementDescription(event, { total, sansEmail }, gabarit) {
+  const carte = event === 'livree' ? 'passeront en « Livrée »' : 'passeront en « Expédiée »';
+  const cartes = `Les commandes 100 % palette ${carte} ; les commandes mixtes ne sont pas déplacées.`;
+  if (!gabarit) return `Aucun e-mail client n'est réglé pour cet événement (Réglages webshop → Process) : personne ne sera prévenu. ${cartes}`;
+  if (total === 0) return `Aucun client à prévenir sur cette tournée. ${cartes}`;
+  const n = `${total} client${total > 1 ? 's' : ''} seront prévenus`;
+  const sans = sansEmail > 0 ? ` (dont ${sansEmail} sans e-mail : ${sansEmail > 1 ? 'ils ne recevront rien' : 'il ne recevra rien'})` : '';
+  return `${n} par e-mail${sans}. ${cartes} Un e-mail déjà envoyé ne repart jamais.`;
+}
+
 export default function TourneeDrawer({ slot, sector, onClose }) {
   const { isTeamLeaderOrAbove } = useAuth();
   const { settings } = useOrgSettings();
   const cfg = buildWebshopConfig(settings);
   const { data, isLoading } = useWebshopSlotOrders(slot.id);
-  const { setStatus, cancel, sendRouteSheet } = useWebshopTourMutations();
-  const [confirm, setConfirm] = useState(null); // 'send' | 'close' | 'cancel'
+  const { setStatus, cancel, sendRouteSheet, markEvent } = useWebshopTourMutations();
+  const [confirm, setConfirm] = useState(null); // 'send' | 'close' | 'cancel' | 'partie' | 'livree'
   const [note, setNote] = useState('');
   const [moving, setMoving] = useState(null);
   const [downloading, setDownloading] = useState(false);
@@ -43,12 +54,30 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
     && slot.delivery_date >= addDaysIso(todayParis(), 2)
     && slot.used_slots < slot.capacity_slots && slot.used_stops < slot.capacity_stops;
 
+  const canMarkDeparted = slot.status === 'closed' && !slot.departed_at;
+  const canMarkDelivered = !!slot.departed_at && !slot.delivered_at && slot.status !== 'cancelled';
+  const eventEvent = confirm === 'livree' ? 'livree' : 'partie';
+  const clients = clientsAPrevenir({ orders: data?.orders, items });
+  const gabaritEvent = cfg.process?.tournee?.[eventEvent]?.email_client;
+
   const closeConfirm = () => { setConfirm(null); setNote(''); };
 
   const run = async (fn, success) => {
     try {
       const res = await fn();
       toast.success(typeof success === 'function' ? success(res) : success);
+      closeConfirm();
+    } catch (err) {
+      toast.error(tourneeErrorMessage(err));
+    }
+  };
+
+  // Bilan de l'événement : warning dès qu'un e-mail n'est pas parti, jamais un succès dans ce cas.
+  const runEvent = async (event) => {
+    try {
+      const res = await markEvent.mutateAsync({ slotId: slot.id, event });
+      const { tone, message } = resumeTourneeEvent(event, res);
+      if (tone === 'warning') toast.warning(message); else toast.success(message);
       closeConfirm();
     } catch (err) {
       toast.error(tourneeErrorMessage(err));
@@ -66,7 +95,7 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
     }
   };
 
-  const busy = setStatus.isPending || cancel.isPending || sendRouteSheet.isPending;
+  const busy = setStatus.isPending || cancel.isPending || sendRouteSheet.isPending || markEvent.isPending;
 
   return (
     <>
@@ -107,6 +136,18 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
               <button type="button" disabled={busy} onClick={() => setConfirm('close')}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 hover:bg-secondary-50 rounded-lg">
                 <Lock className="w-4 h-4" /> Fermer
+              </button>
+            )}
+            {isTeamLeaderOrAbove && canMarkDeparted && (
+              <button type="button" disabled={busy} onClick={() => setConfirm('partie')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 rounded-lg">
+                <Truck className="w-4 h-4" /> Marquer partie
+              </button>
+            )}
+            {isTeamLeaderOrAbove && canMarkDelivered && (
+              <button type="button" disabled={busy} onClick={() => setConfirm('livree')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 rounded-lg">
+                <PackageCheck className="w-4 h-4" /> Marquer livrée
               </button>
             )}
             {isTeamLeaderOrAbove && canReopen && (
@@ -193,6 +234,17 @@ export default function TourneeDrawer({ slot, sector, onClose }) {
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Motif (obligatoire) : jour férié, transporteur indisponible…"
           className="mt-3 w-full text-sm border border-secondary-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500" />
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirm === 'partie' || confirm === 'livree'}
+        onOpenChange={(v) => !v && closeConfirm()}
+        title={eventEvent === 'livree' ? 'Marquer la tournée comme livrée ?' : 'Marquer la tournée comme partie ?'}
+        description={evenementDescription(eventEvent, clients, gabaritEvent)}
+        confirmLabel={eventEvent === 'livree' ? 'Marquer livrée' : 'Marquer partie'}
+        variant="default"
+        loading={markEvent.isPending}
+        onConfirm={() => runEvent(eventEvent)}
+      />
 
       <MoveOrderDialog order={moving} open={!!moving} onOpenChange={(v) => !v && setMoving(null)} />
     </>

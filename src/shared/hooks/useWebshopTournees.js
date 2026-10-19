@@ -12,7 +12,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { unwrapResult } from '@lib/serviceHelpers';
 import { webshopTourneesService } from '@services/webshopTournees.service';
-import { webshopTourKeys } from '@hooks/cacheKeys';
+import { webshopProcessService } from '@services/webshopProcess.service';
+import { webshopTourKeys, webshopKeys } from '@hooks/cacheKeys';
 
 export { webshopTourKeys };
 
@@ -94,5 +95,17 @@ export function useWebshopTourMutations() {
     onSettled: invalidate,
   });
 
-  return { setStatus, cancel, moveOrder, sendRouteSheet };
+  // Tournée partie / livrée : l'edge pose les cartes et envoie les e-mails palette. Résout avec
+  // `{ slot, orders }` ; rejette sur refus (slot_not_closed, forbidden…). Invalide tournées,
+  // commandes de la tournée, liste des commandes et journal des envois.
+  const markEvent = useMutation({
+    mutationFn: ({ slotId, event }) => unwrapResult(webshopProcessService.tourneeEvent(slotId, event)),
+    onSettled: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: webshopKeys.orders(orgId) });
+      queryClient.invalidateQueries({ queryKey: webshopKeys.actions(orgId) });
+    },
+  });
+
+  return { setStatus, cancel, moveOrder, sendRouteSheet, markEvent };
 }

@@ -32,8 +32,61 @@ export const CLOSE_REASONS = {
   manual: 'à la main',
 };
 
-/** Ligne d'état lisible : « Fermée — délai de fermeture ». */
+/** « 2 novembre 2026 » : jour de l'horodatage à Paris. */
+function dateParisFR(ts) {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+}
+
+/**
+ * Clients que l'événement de tournée prévient : commandes payées, non annulées, avec au moins
+ * une ligne palette (même règle que l'edge : `actionsPourTournee`). `sansEmail` = parmi elles,
+ * celles dont l'e-mail ne partira pas (client sans adresse). Aucune requête : données du tiroir.
+ * @param {{ orders?: Array<any> | null, items?: Array<any> | null }} p
+ * @returns {{ total: number, sansEmail: number }}
+ */
+export function clientsAPrevenir({ orders, items }) {
+  const avecPalette = new Set((items || []).filter((i) => i?.shipping_kind === 'pallet').map((i) => i.order_id));
+  const cibles = (orders || []).filter((o) => isCountedOrder(o) && avecPalette.has(o.id));
+  return { total: cibles.length, sansEmail: cibles.filter((o) => !String(o.email ?? '').trim()).length };
+}
+
+const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
+
+/**
+ * Bilan d'un événement de tournée (réponse de l'edge) : e-mails envoyés / en échec, cartes
+ * déplacées. Jamais `success` si un e-mail n'est pas parti (hors « déjà envoyé ») ou si une
+ * carte n'a pas pu être déplacée.
+ * @param {'partie' | 'livree'} event
+ * @param {{ orders?: Array<{ statut_applique?: string | null, statut_erreur?: string | null, actions?: Array<{ status: string, error_code?: string | null }> }> } | null} report
+ * @returns {{ tone: 'success' | 'warning', message: string }}
+ */
+export function resumeTourneeEvent(event, report) {
+  const head = event === 'livree' ? 'Tournée livrée' : 'Tournée partie';
+  const orders = Array.isArray(report?.orders) ? report.orders : [];
+  const actions = orders.flatMap((o) => o.actions || []);
+  const envoyes = actions.filter((a) => a.status === 'sent').length;
+  const deja = actions.filter((a) => a.status === 'skipped' && a.error_code === 'already_sent').length;
+  const echecs = actions.length - envoyes - deja;
+  const deplacees = orders.filter((o) => o.statut_applique).length;
+  const nonDeplacees = orders.filter((o) => o.statut_erreur).length;
+  const parts = [];
+  if (envoyes) parts.push(pluriel(envoyes, 'e-mail envoyé', 'e-mails envoyés'));
+  if (deja) parts.push(`${deja} déjà envoyé${deja > 1 ? 's' : ''}`);
+  if (echecs) parts.push(`${echecs} en échec`);
+  if (deplacees) parts.push(pluriel(deplacees, 'carte déplacée', 'cartes déplacées'));
+  if (nonDeplacees) parts.push(pluriel(nonDeplacees, 'carte non déplacée', 'cartes non déplacées'));
+  return {
+    tone: echecs > 0 || nonDeplacees > 0 ? 'warning' : 'success',
+    message: parts.length ? `${head} — ${parts.join(', ')}` : `${head} — aucun client à prévenir`,
+  };
+}
+
+/** Ligne d'état lisible : « Fermée — délai de fermeture », « Partie le … », « Livrée le … » (la livraison prime). */
 export function slotStatusLabel(slot) {
+  if (slot?.delivered_at) return `Livrée le ${dateParisFR(slot.delivered_at)}`;
+  if (slot?.departed_at) return `Partie le ${dateParisFR(slot.departed_at)}`;
   const base = SLOT_STATUS[slot?.status]?.label ?? slot?.status ?? '—';
   if (slot?.status === 'closed' && slot.close_reason) return `${base} — ${CLOSE_REASONS[slot.close_reason] ?? slot.close_reason}`;
   return base;
