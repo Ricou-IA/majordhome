@@ -4,7 +4,8 @@
  * Bloc A — Geste d'« activation » de prise de RDV.
  *
  * Résout la carte (work item) à laquelle rattacher un RDV, déterminée par son TYPE :
- *   - maintenance / service -> intervention entretien/SAV (matérialise si absente)
+ *   - maintenance / service -> intervention entretien/SAV (matérialise si absente ;
+ *     entretien = contrat actif obligatoire, refus `contrat_requis_entretien` sinon)
  *   - rdv_technical / rdv_agency (Visite Technique) -> lead pipeline (réutilise la carte
  *     « en sommeil » du client en dédup, jamais de doublon ; pas de formulaire prospect)
  *   - installation -> rien ici (la carte chantier pré-existe, rattachée en passthrough
@@ -62,12 +63,17 @@ export async function resolveCardForAppointment({
   // 3. Entretien / SAV -> intervention (matérialise si absente)
   if (type === 'maintenance' || type === 'service') {
     if (!clientId) return { error: 'client_requis_entretien' };
-    const { data: contract } = await supabase
+    const { data: contract, error: contractError } = await supabase
       .from('majordhome_contracts')
       .select('id')
       .eq('client_id', clientId)
       .eq('status', 'active')
       .maybeSingle();
+    if (contractError) return { error: contractError };
+    // Pas d'entretien sans contrat (Eric, 2026-10-04 : le suivi N+1 passe toujours par
+    // un contrat). Sans cette garde, un RDV retypé « Entretien » fabriquait une carte
+    // sans contrat qui retombait en « À planifier » à la suppression du RDV (FREITAS).
+    if (type === 'maintenance' && !contract?.id) return { error: 'contrat_requis_entretien' };
     const interventionType = type === 'service' ? 'sav' : 'entretien';
     const { interventionId: iid, error } = await ensureEntretienCard({
       clientId,

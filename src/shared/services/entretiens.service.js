@@ -199,6 +199,32 @@ export async function ensureEntretienCard({
 }
 
 // ============================================================================
+// HELPER EXPORTÉ — Retrait d'une carte entretien sans contrat devenue vide
+// ============================================================================
+
+/**
+ * Une carte entretien SANS contrat qui perd son dernier RDV n'a aucune raison de
+ * retomber en « À planifier » (pas d'entretien sans contrat) : la RPC
+ * `entretien_card_release_orphan` la supprime si elle est vide (aucun RDV actif,
+ * certificat, facture, SMS, demande de service ; enfants vierges). Toute autre carte
+ * est laissée intacte et l'appelant applique le reflux habituel.
+ *
+ * @param {string} interventionId
+ * @returns {Promise<boolean>} true si la carte n'existe plus (retirée ou introuvable)
+ */
+export async function releaseOrphanEntretienCard(interventionId) {
+  if (!interventionId) return false;
+  const { data, error } = await supabase.rpc('entretien_card_release_orphan', {
+    p_intervention_id: interventionId,
+  });
+  if (error) {
+    logger.error('[entretiensService] releaseOrphanEntretienCard error:', error);
+    return false;
+  }
+  return data?.released === true || data?.reason === 'not_found';
+}
+
+// ============================================================================
 // HELPER EXPORTÉ — Contrats déjà rattachés à une carte d'entretien active
 // ============================================================================
 

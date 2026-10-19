@@ -677,13 +677,14 @@ export function EventModal({
       interventionId: fallbackInterventionId,
     });
     if (resolved.error) {
-      if (resolved.error !== 'client_sans_projet') {
+      const expected = ['client_sans_projet', 'contrat_requis_entretien'].includes(resolved.error);
+      if (!expected) {
         console.error('[EventModal] activation error:', resolved.error);
       }
       return {
         leadId: null,
         interventionId: null,
-        error: resolved.error === 'client_sans_projet' ? 'client_sans_projet' : 'activation',
+        error: expected ? resolved.error : 'activation',
       };
     }
     return {
@@ -703,6 +704,8 @@ export function EventModal({
     if (!error) return false;
     if (error === 'client_sans_projet') {
       toast.error("Ce client n'a pas de fiche projet — impossible de créer l'entretien.");
+    } else if (error === 'contrat_requis_entretien') {
+      toast.error("Ce client n'a pas de contrat d'entretien actif : créez d'abord le contrat, ou choisissez un autre type de RDV (SAV, Autre…).");
     } else if (error === 'bouclage_requiert_carte') {
       toast.error('Sélectionnez la carte du pipeline à boucler.');
     } else if (error === 'prospect') {

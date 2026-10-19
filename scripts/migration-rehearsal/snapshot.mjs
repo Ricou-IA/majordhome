@@ -61,6 +61,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'lead_activities', columns: null, data: false }, // 20260930_17 : activités chantier_*
   { schema: 'majordhome', table: 'sms_logs', columns: ['id', 'intervention_id', 'campaign_name', 'sent_at'], data: false },
   { schema: 'majordhome', table: 'invoices', columns: null, data: false }, // lue par la vue majordhome_entretien_sav (20260923_3) ; toutes les colonnes : la vue majordhome_invoices (i.*) est photographiée depuis 20261010_1
+  { schema: 'majordhome', table: 'service_requests', columns: ['id', 'intervention_id'], data: false }, // 20261019_2 : garde du retrait d'une carte entretien sans contrat
   { schema: 'majordhome', table: 'maintenance_visits', columns: null, data: false }, // 20260928_1 : garde-fou date de visite (triggers ci-dessous)
   // 20260930_12..15 (droits app-level phases 4-6) : défauts app + surcharges par org AVEC données
   // (la purge se vérifie sur les vraies lignes), tasks pour ses policies role_can.

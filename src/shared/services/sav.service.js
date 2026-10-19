@@ -16,7 +16,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { isMobileFR } from '@/lib/phoneUtils';
-import { entretiensService } from './entretiens.service';
+import { entretiensService, releaseOrphanEntretienCard } from './entretiens.service';
 import { logger } from '@lib/logger';
 import { statutVisiteAnnee } from '@/lib/entretienVisitStatus';
 import { minutesVersHeure as minutesVersHHMM, minutesDepuisMinuit } from '@/lib/tournee/arrets.js';
@@ -737,6 +737,12 @@ export const savService = {
 
       // Explicite même si le dernier deleteAppointment a déjà fait refluer la carte :
       // couvre la carte « Planifié » sans RDV (legacy) — le trigger fait le reste.
+      // Carte entretien sans contrat : retirée (déjà par le dernier deleteAppointment, ou
+      // ici pour la legacy sans RDV) — sinon updateWorkflowStatus échouerait sur une
+      // ligne absente, ou ferait réapparaître un attendu sans contrat.
+      if (!card.contract_id && await releaseOrphanEntretienCard(card.id)) {
+        return { deleted, error: null };
+      }
       const { error: statusError } = await savService.updateWorkflowStatus(card.id, 'a_planifier');
       return { deleted, error: statusError || null };
     } catch (error) {

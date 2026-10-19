@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
+import { releaseOrphanEntretienCard } from '@services/entretiens.service';
 import { logger } from '@lib/logger';
 
 // Buckets de type — source unique dans le module pur (re-export pour les callers
@@ -204,6 +205,10 @@ async function recomputeEntretienWorkflow(interventionId) {
     .eq('intervention_id', interventionId)
     .not('status', 'in', '(cancelled,no_show)');
   const nextStatus = count && count > 0 ? 'planifie' : 'a_planifier';
+  // Carte entretien SANS contrat qui perd son dernier RDV (retypage, suppression) :
+  // retirée plutôt que renvoyée en « À planifier » — un changement de RDV ne crée
+  // jamais d'attendu (FREITAS, 2026-10-04). Carte avec contrat ou non vide : reflux.
+  if (nextStatus === 'a_planifier' && await releaseOrphanEntretienCard(interventionId)) return;
   // Retour en « À planifier » : scheduled_date et enfants certificat vierges sont
   // effacés en base par le trigger trg_intervention_unschedule (migration 20260918_1).
   const { error } = await supabase
