@@ -3,18 +3,18 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { KanbanBoard } from '@apps/artisan/components/shared/KanbanBoard';
-import { useWebshopOrders } from '@hooks/useWebshop';
+import { useWebshopOrders, useWebshopOrderActions } from '@hooks/useWebshop';
 import { selectClass } from '@apps/artisan/components/FormFields';
 import {
-  ORDER_BOARD_COLUMNS, ORDER_SIDE_STATUSES, ORDER_STATUS_LABELS, canMoveTo, statusPatch,
-  matchesOrderSearch, orderTotalCents,
+  ORDER_BOARD_COLUMNS, ORDER_SIDE_STATUSES, canMoveTo, matchesOrderSearch, orderTotalCents,
+  resumeTransition,
 } from '@/lib/webshop/orders';
 import OrderCard from './OrderCard';
 import OrderDrawer from './OrderDrawer';
 import SideColumn from './SideColumn';
 
 export default function OrdersTab() {
-  const { orders, isLoading, error, refetch, updateOrder, deleteOrder } = useWebshopOrders();
+  const { orders, isLoading, error, refetch, updateOrder, deleteOrder, transitionOrder } = useWebshopOrders();
   const [channel, setChannel] = useState('');
   const [orderType, setOrderType] = useState('');
   const [openId, setOpenId] = useState(null);
@@ -25,17 +25,28 @@ export default function OrdersTab() {
   );
   const boardOrders = useMemo(() => visible.filter((o) => !ORDER_SIDE_STATUSES.includes(o.status)), [visible]);
   const openOrder = orders.find((o) => o.id === openId) ?? null;
+  const visibleIds = useMemo(() => visible.map((o) => o.id), [visible]);
+  const actionsState = useWebshopOrderActions(visibleIds);
+  const actionsOf = (id) => actionsState.actionsByOrder.get(id) ?? [];
+
+  // Toast d'une transition : jamais « succès » si un envoi a échoué (cf. resumeTransition).
+  const transition = async (order, to) => {
+    try {
+      const res = await transitionOrder({ id: order.id, to });
+      const { tone, message } = resumeTransition(to, res?.actions);
+      (tone === 'success' ? toast.success : toast.warning)(`${order.order_number} · ${message}`);
+      return true;
+    } catch (err) {
+      toast.error(`Changement refusé : ${err.message}`);
+      return false;
+    }
+  };
 
   const handleDragEnd = async (result) => {
     const order = orders.find((o) => o.id === result.draggableId);
     const to = result.destination?.droppableId;
     if (!order || !canMoveTo(order.status, to)) return;
-    try {
-      await updateOrder({ id: order.id, patch: statusPatch(order, to) });
-      toast.success(`${order.order_number} → ${ORDER_STATUS_LABELS[to]}`);
-    } catch (err) {
-      toast.error(`Changement refusé : ${err.message}`);
-    }
+    await transition(order, to);
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-secondary-400" /></div>;
@@ -47,7 +58,7 @@ export default function OrdersTab() {
         items={boardOrders}
         columns={ORDER_BOARD_COLUMNS}
         groupBy="status"
-        renderCard={(o) => <OrderCard order={o} />}
+        renderCard={(o) => <OrderCard order={o} actions={actionsOf(o.id)} />}
         onCardClick={(o) => setOpenId(o.id)}
         onDragEnd={handleDragEnd}
         searchFilter={matchesOrderSearch}
@@ -75,7 +86,7 @@ export default function OrdersTab() {
         )}
       />
       {ORDER_SIDE_STATUSES.map((s) => (
-        <SideColumn key={s} status={s} orders={visible.filter((o) => o.status === s)} onOpen={(o) => setOpenId(o.id)} />
+        <SideColumn key={s} status={s} orders={visible.filter((o) => o.status === s)} actionsOf={actionsOf} onOpen={(o) => setOpenId(o.id)} />
       ))}
       {openOrder && (
         <OrderDrawer
@@ -84,6 +95,12 @@ export default function OrdersTab() {
           onClose={() => setOpenId(null)}
           updateOrder={updateOrder}
           deleteOrder={deleteOrder}
+          onTransition={(to) => transition(openOrder, to)}
+          actions={actionsOf(openOrder.id)}
+          actionsLoading={actionsState.isLoading}
+          actionsError={actionsState.error}
+          onRetry={actionsState.retryAction}
+          retryingId={actionsState.retryingId}
         />
       )}
     </div>

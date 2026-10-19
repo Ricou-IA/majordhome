@@ -485,6 +485,8 @@ export const webshopKeys = {
   products: (orgId) => [...webshopKeys.all(orgId), 'products'],
   categories: (orgId) => [...webshopKeys.all(orgId), 'categories'],
   orders: (orgId) => [...webshopKeys.all(orgId), 'orders'],
+  // Journal des envois (vue majordhome_webshop_order_actions) ; sans orderIds = préfixe d'invalidation.
+  actions: (orgId, orderIds) => [...webshopKeys.all(orgId), 'actions', ...(orderIds ? [orderIds] : [])],
 };
 
 // --- Webshop : paramétrage des listes de livraison (Settings → Webshop) ---

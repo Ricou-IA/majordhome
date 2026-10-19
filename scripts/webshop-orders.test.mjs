@@ -88,3 +88,74 @@ test('reactivationPatch : une commande jamais payée retourne en attente de paie
   assert.deepEqual(reactivationPatch({ status: 'annulee', paid_at: null, cancel_reason: 'x' }), { status: 'en_attente_paiement', cancel_reason: null });
   assert.deepEqual(reactivationPatch({ status: 'annulee', paid_at: '2026-10-01T10:00:00Z', cancel_reason: 'x' }), { status: 'nouvelle', cancel_reason: null });
 });
+
+// ── Étape 2 : journal des envois (Task 4) ─────────────────────────────────
+import {
+  libelleErreurAction, libelleErreurProcess, libelleEvenementAction, resumeTransition, peutRejouer,
+} from '../src/lib/webshop/orders.js';
+
+const ACTION = (over = {}) => ({
+  id: 'a1', order_id: 'o1', action: 'email_client', envoi: 'colis', evenement: 'expediee',
+  gabarit: 'webshop_expedition_colis', status: 'sent', error_code: null, error_message: null, recipient: 'j@d.fr', ...over,
+});
+
+test('orderBadges : une action failed → pastille « Envoi échoué » en dernier', () => {
+  const lines = orderLines(NEW_MODEL);
+  const withFailed = orderBadges(NEW_MODEL, lines, [ACTION(), ACTION({ id: 'a2', status: 'failed', error_code: 'template_missing' })]);
+  assert.deepEqual(withFailed.at(-1), { key: 'action_failed', label: 'Envoi échoué', tone: 'warning' });
+  assert.deepEqual(orderBadges(NEW_MODEL, lines, [ACTION(), ACTION({ status: 'skipped', error_code: 'no_email' })]).map((b) => b.key), ['pallet', 'parcel', 'slot_changed']);
+  assert.deepEqual(orderBadges(NEW_MODEL, lines).map((b) => b.key), ['pallet', 'parcel', 'slot_changed']);
+  assert.deepEqual(orderBadges(NEW_MODEL, lines, null).map((b) => b.key), ['pallet', 'parcel', 'slot_changed']);
+});
+test('libelleErreurAction : codes de l\'edge en français, code inconnu → code brut', () => {
+  assert.equal(libelleErreurAction('template_missing'), 'gabarit manquant');
+  assert.equal(libelleErreurAction('prestataire_missing'), 'aucun prestataire colis renseigné');
+  assert.equal(libelleErreurAction('no_email'), 'client sans e-mail');
+  assert.equal(libelleErreurAction('no_from_email'), 'adresse d\'expédition non configurée');
+  assert.equal(libelleErreurAction('resend_failed'), 'refusé par le service d\'envoi');
+  assert.equal(libelleErreurAction('already_sent'), 'déjà envoyé');
+  assert.equal(libelleErreurAction('reserve_failed'), 'réservation de l\'envoi impossible');
+  assert.equal(libelleErreurAction('template_read_failed'), 'lecture du gabarit impossible');
+  assert.equal(libelleErreurAction('internal_error'), 'erreur interne');
+  assert.equal(libelleErreurAction('zzz_inconnu'), 'zzz_inconnu');
+  assert.equal(libelleErreurAction(null), '');
+});
+test('libelleErreurProcess : erreurs de requête, repli sur les codes d\'action puis code brut', () => {
+  assert.equal(libelleErreurProcess('invalid_transition'), 'changement de colonne refusé (statut modifié entre-temps ?)');
+  assert.equal(libelleErreurProcess('forbidden'), 'droit insuffisant');
+  assert.equal(libelleErreurProcess('not_found'), 'introuvable');
+  assert.equal(libelleErreurProcess('already_sent'), 'déjà envoyé');
+  assert.equal(libelleErreurProcess('boom'), 'boom');
+});
+test('libelleEvenementAction : statuts et événements de tournée', () => {
+  assert.equal(libelleEvenementAction('expediee'), 'Expédiée');
+  assert.equal(libelleEvenementAction('tournee_partie'), 'Tournée partie');
+  assert.equal(libelleEvenementAction('tournee_livree'), 'Tournée livrée');
+  assert.equal(libelleEvenementAction('xx'), 'xx');
+});
+test('resumeTransition : succès seulement si rien n\'a échoué', () => {
+  assert.deepEqual(resumeTransition('expediee', []), { tone: 'success', message: 'Commande Expédiée' });
+  assert.deepEqual(resumeTransition('expediee', [ACTION()]), { tone: 'success', message: 'Commande Expédiée — e-mail client envoyé' });
+  assert.deepEqual(
+    resumeTransition('expediee', [ACTION({ status: 'failed', error_code: 'template_missing' })]),
+    { tone: 'warning', message: 'Commande Expédiée — e-mail client en échec (gabarit manquant)' },
+  );
+  assert.deepEqual(
+    resumeTransition('transmise_fournisseur', [
+      ACTION({ action: 'ordre_colis', status: 'failed', error_code: 'prestataire_missing' }),
+      ACTION({ status: 'skipped', error_code: 'no_email' }),
+    ]),
+    { tone: 'warning', message: 'Commande Transmise fournisseur — ordre colis en échec (aucun prestataire colis renseigné), e-mail client non envoyé (client sans e-mail)' },
+  );
+  assert.deepEqual(
+    resumeTransition('expediee', [ACTION({ id: null, status: 'skipped', error_code: 'already_sent' })]),
+    { tone: 'success', message: 'Commande Expédiée — e-mail client déjà envoyé' },
+  );
+});
+test('peutRejouer : failed et skipped (hors already_sent), jamais sent ni pending', () => {
+  assert.equal(peutRejouer(ACTION({ status: 'failed' })), true);
+  assert.equal(peutRejouer(ACTION({ status: 'skipped', error_code: 'no_email' })), true);
+  assert.equal(peutRejouer(ACTION({ status: 'sent' })), false);
+  assert.equal(peutRejouer(ACTION({ status: 'pending' })), false);
+  assert.equal(peutRejouer(ACTION({ id: null, status: 'skipped', error_code: 'already_sent' })), false);
+});

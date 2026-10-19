@@ -8,9 +8,9 @@ const TONES = {
   warning: 'bg-amber-100 text-amber-800',
 };
 
-export default function OrderCard({ order }) {
+export default function OrderCard({ order, actions }) {
   const lines = orderLines(order);
-  const badges = orderBadges(order, lines);
+  const badges = orderBadges(order, lines, actions);
   const created = new Date(order.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   const client = [order.first_name, order.last_name].filter(Boolean).join(' ') || order.company_name || '—';
   return (

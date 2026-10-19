@@ -2,12 +2,14 @@
  * useWebshop.js — hooks React Query du module Webshop (catalogue + commandes).
  * Les tournées (onglet Tournées) ont leurs propres hooks : useWebshopTournees.js.
  */
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@contexts/AuthContext';
 import { unwrapResult } from '@lib/serviceHelpers';
 import { webshopKeys, webshopTourKeys } from '@/shared/hooks/cacheKeys';
 import { webshopProductsService } from '@services/webshopProducts.service';
 import { webshopOrdersService } from '@services/webshopOrders.service';
+import { webshopProcessService } from '@services/webshopProcess.service';
 
 export function useWebshopCatalog() {
   const { organization } = useAuth();
@@ -86,6 +88,25 @@ export function useWebshopOrders() {
     onSettled: invalidateAll,
   });
 
+  // Changement de colonne : TOUJOURS par l'edge webshop-process (statut + envois tracés).
+  // Résout avec `{ order, actions }` ; rejette sur refus (invalid_transition, forbidden…).
+  const transitionMutation = useMutation({
+    mutationFn: ({ id, to }) => unwrapResult(webshopProcessService.transition(id, to)),
+    onMutate: async ({ id, to }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData(key);
+      qc.setQueryData(key, (old) => (old ?? []).map((o) => (o.id === id ? { ...o, status: to } : o)));
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+    },
+    onSettled: () => {
+      invalidateAll();
+      qc.invalidateQueries({ queryKey: webshopKeys.actions(orgId) });
+    },
+  });
+
   return {
     orgId,
     orders: query.data ?? [],
@@ -94,5 +115,49 @@ export function useWebshopOrders() {
     refetch: query.refetch,
     updateOrder: updateMutation.mutateAsync,
     deleteOrder: deleteMutation.mutateAsync,
+    transitionOrder: transitionMutation.mutateAsync,
+  };
+}
+
+/**
+ * Journal des envois des commandes affichées + rejeu d'une action.
+ * @param {string[]} orderIds
+ */
+export function useWebshopOrderActions(orderIds) {
+  const { organization } = useAuth();
+  const orgId = organization?.id;
+  const qc = useQueryClient();
+  const ids = useMemo(() => [...(orderIds ?? [])].sort(), [orderIds]);
+
+  const query = useQuery({
+    queryKey: webshopKeys.actions(orgId, ids),
+    queryFn: () => unwrapResult(webshopProcessService.getActions(orgId, ids)),
+    enabled: !!orgId && ids.length > 0,
+  });
+
+  const byOrder = useMemo(() => {
+    const map = new Map();
+    for (const a of query.data ?? []) {
+      if (!map.has(a.order_id)) map.set(a.order_id, []);
+      map.get(a.order_id).push(a);
+    }
+    return map;
+  }, [query.data]);
+
+  // Résout avec `{ action }` (ActionReport) ; rejette sur already_sent / template_missing…
+  const retryMutation = useMutation({
+    mutationFn: (actionId) => unwrapResult(webshopProcessService.retry(actionId)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: webshopKeys.actions(orgId) });
+      qc.invalidateQueries({ queryKey: webshopKeys.orders(orgId) });
+    },
+  });
+
+  return {
+    actionsByOrder: byOrder,
+    isLoading: query.isLoading,
+    error: query.error,
+    retryAction: retryMutation.mutateAsync,
+    retryingId: retryMutation.isPending ? retryMutation.variables : null,
   };
 }

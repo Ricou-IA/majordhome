@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { ORDER_STATUS_LABELS } from '@/lib/webshop/orders';
 import OrderCard from './OrderCard';
 
-export default function SideColumn({ status, orders, onOpen }) {
+export default function SideColumn({ status, orders, actionsOf, onOpen }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-secondary-200 rounded-xl bg-secondary-50">
@@ -19,7 +19,7 @@ export default function SideColumn({ status, orders, onOpen }) {
           {orders.length === 0 && <p className="text-xs text-secondary-400">Aucune commande.</p>}
           {orders.map((o) => (
             <div key={o.id} className="cursor-pointer" onClick={() => onOpen(o)}>
-              <OrderCard order={o} />
+              <OrderCard order={o} actions={actionsOf?.(o.id)} />
             </div>
           ))}
         </div>

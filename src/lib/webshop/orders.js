@@ -83,8 +83,14 @@ function shortDate(iso) {
   return d && m ? `${d}/${m}` : '';
 }
 
-/** Pastilles de carte, ordre stable : livraison → canal → alertes. */
-export function orderBadges(order, lines) {
+/**
+ * Pastilles de carte, ordre stable : livraison → canal → alertes → envoi échoué.
+ * @param {any} order
+ * @param {Array<{ shippingKind: string | null }>} lines
+ * @param {Array<{ status: string }> | null} [actions] journal des envois de CETTE commande
+ * @returns {Array<{ key: string, label: string, tone: string }>}
+ */
+export function orderBadges(order, lines, actions) {
   const badges = [];
   const hasPallet = lines.some((l) => l.shippingKind === 'pallet') || Boolean(order.pallet_delivery_mode);
   const hasParcel = lines.some((l) => l.shippingKind === 'parcel');
@@ -99,7 +105,118 @@ export function orderBadges(order, lines) {
   if (order.order_type === 'vente_installation') badges.push({ key: 'install', label: 'Installation', tone: 'info' });
   if (order.needs_manual_planning) badges.push({ key: 'manual_planning', label: 'Planification manuelle', tone: 'warning' });
   if (order.delivery_slot_changed) badges.push({ key: 'slot_changed', label: 'Créneau modifié', tone: 'warning' });
+  if (Array.isArray(actions) && actions.some((a) => a?.status === 'failed')) {
+    badges.push({ key: 'action_failed', label: 'Envoi échoué', tone: 'warning' });
+  }
   return badges;
+}
+
+/** @type {Record<string, string>} codes d'action renvoyés par l'edge webshop-process */
+const ACTION_ERROR_LABELS = {
+  template_missing: 'gabarit manquant',
+  prestataire_missing: 'aucun prestataire colis renseigné',
+  no_email: 'client sans e-mail',
+  no_from_email: 'adresse d\'expédition non configurée',
+  resend_failed: 'refusé par le service d\'envoi',
+  already_sent: 'déjà envoyé',
+  reserve_failed: 'réservation de l\'envoi impossible',
+  template_read_failed: 'lecture du gabarit impossible',
+  internal_error: 'erreur interne',
+};
+
+/** @type {Record<string, string>} erreurs de requête de l'edge webshop-process */
+const PROCESS_ERROR_LABELS = {
+  invalid_transition: 'changement de colonne refusé (statut modifié entre-temps ?)',
+  forbidden: 'droit insuffisant',
+  not_found: 'introuvable',
+  bad_request: 'requête invalide',
+  invalid_event: 'événement de tournée invalide',
+  slot_not_closed: 'tournée non clôturée',
+  slot_not_departed: 'tournée pas encore partie',
+  slot_cancelled: 'tournée annulée',
+};
+
+/**
+ * Libellé FR d'un code d'action du journal ; code inconnu → code brut (jamais avalé).
+ * @param {string | null | undefined} code
+ * @returns {string}
+ */
+export function libelleErreurAction(code) {
+  if (!code) return '';
+  return ACTION_ERROR_LABELS[code] ?? code;
+}
+
+/**
+ * Libellé FR d'une erreur de requête de l'edge (repli sur les codes d'action, puis code brut).
+ * @param {string | null | undefined} code
+ * @returns {string}
+ */
+export function libelleErreurProcess(code) {
+  if (!code) return '';
+  return PROCESS_ERROR_LABELS[code] ?? libelleErreurAction(code);
+}
+
+/** @type {Record<string, string>} */
+const EVENT_LABELS = { tournee_partie: 'Tournée partie', tournee_livree: 'Tournée livrée' };
+
+/**
+ * Libellé d'un `evenement` du journal (statut cible ou événement de tournée).
+ * @param {string} evenement
+ * @returns {string}
+ */
+export function libelleEvenementAction(evenement) {
+  return ORDER_STATUS_LABELS[evenement] ?? EVENT_LABELS[evenement] ?? evenement;
+}
+
+/** @type {Record<string, string>} */
+const ACTION_LABELS = { email_client: 'e-mail client', ordre_colis: 'ordre colis' };
+
+/**
+ * Libellé d'une action du journal (« e-mail client », « ordre colis »).
+ * @param {string} action
+ * @returns {string}
+ */
+export function libelleAction(action) {
+  return ACTION_LABELS[action] ?? action;
+}
+
+/**
+ * Issue d'une action en mots (« envoyé », « en échec (gabarit manquant) »…).
+ * @param {{ status: string, error_code?: string | null }} a
+ * @returns {string}
+ */
+export function issueAction(a) {
+  if (a.status === 'sent') return 'envoyé';
+  if (a.status === 'skipped' && a.error_code === 'already_sent') return 'déjà envoyé';
+  if (a.status === 'pending') return 'en cours';
+  const raison = libelleErreurAction(a.error_code);
+  const base = a.status === 'failed' ? 'en échec' : 'non envoyé';
+  return raison ? `${base} (${raison})` : base;
+}
+
+/**
+ * Toast d'une transition : « Commande Expédiée — e-mail client envoyé ».
+ * Jamais `success` si une action a échoué ou n'est pas partie (hors « déjà envoyé »).
+ * @param {string} to statut posé
+ * @param {Array<{ action: string, status: string, error_code?: string | null }> | null} actions
+ * @returns {{ tone: 'success' | 'warning', message: string }}
+ */
+export function resumeTransition(to, actions) {
+  const list = Array.isArray(actions) ? actions : [];
+  const head = `Commande ${ORDER_STATUS_LABELS[to] ?? to}`;
+  const parts = list.map((a) => `${libelleAction(a.action)} ${issueAction(a)}`);
+  const ok = list.every((a) => a.status === 'sent' || (a.status === 'skipped' && a.error_code === 'already_sent'));
+  return { tone: ok ? 'success' : 'warning', message: parts.length ? `${head} — ${parts.join(', ')}` : head };
+}
+
+/**
+ * Une ligne du journal se rejoue si elle n'est pas partie : failed, ou skipped autre que « déjà envoyé ».
+ * @param {{ id?: string | null, status: string, error_code?: string | null }} a
+ * @returns {boolean}
+ */
+export function peutRejouer(a) {
+  if (!a?.id) return false;
+  return a.status === 'failed' || (a.status === 'skipped' && a.error_code !== 'already_sent');
 }
 
 /** Patch d'un changement de statut : shipped_at / delivered_at posés une seule fois. */

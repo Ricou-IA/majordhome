@@ -9,10 +9,11 @@ import { X, Phone, Mail, MapPin, Building2, Loader2, Truck, CreditCard } from 'l
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { TextInput, TextArea, FormField, SelectInput } from '@apps/artisan/components/FormFields';
 import {
-  ORDER_BOARD_COLUMNS, ORDER_STATUS_LABELS, orderLines, orderTotalCents, formatCents, statusPatch,
+  ORDER_BOARD_COLUMNS, ORDER_STATUS_LABELS, orderLines, orderTotalCents, formatCents,
   reactivationPatch,
 } from '@/lib/webshop/orders';
 import OrderDeleteButton from '../OrderDeleteButton';
+import OrderActions from './OrderActions';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—');
 const DELIVERY_LABELS = { delivery: 'Livraison', pickup: 'Retrait' };
@@ -28,7 +29,9 @@ function Section({ title, icon: Icon, children }) {
   );
 }
 
-export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }) {
+export default function OrderDrawer({
+  order, onClose, updateOrder, deleteOrder, onTransition, actions, actionsLoading, actionsError, onRetry, retryingId,
+}) {
   const [carrier, setCarrier] = useState(order.carrier ?? '');
   const [tracking, setTracking] = useState(order.tracking_number ?? '');
   const [instructions, setInstructions] = useState(order.delivery_instructions ?? '');
@@ -64,7 +67,15 @@ export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }
     internal_notes: notes.trim() || null,
   }, 'Suivi enregistré');
 
-  const changeStatus = (to) => run(statusPatch(order, to), `Commande « ${ORDER_STATUS_LABELS[to]} »`);
+  // Changement de colonne : par l'edge webshop-process (toast résumant les envois côté OrdersTab).
+  const changeStatus = async (to) => {
+    setSaving(true);
+    try {
+      await onTransition(to);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const confirmCancel = async () => {
     const ok = await run({ status: 'annulee', cancel_reason: cancelReason.trim() }, 'Commande annulée');
@@ -178,6 +189,14 @@ export default function OrderDrawer({ order, onClose, updateOrder, deleteOrder }
             <p>Paiement : {order.paid_at ? `reçu le ${fmtDate(order.paid_at)}` : isPending ? 'en attente' : '—'}</p>
             <p className="text-xs text-secondary-400">Expédiée : {fmtDate(order.shipped_at)} · Livrée : {fmtDate(order.delivered_at)}</p>
           </Section>
+
+          <OrderActions
+            actions={actions ?? []}
+            isLoading={actionsLoading}
+            error={actionsError}
+            onRetry={onRetry}
+            retryingId={retryingId}
+          />
 
           <Section title="Suivi" icon={Truck}>
             <div className="grid grid-cols-2 gap-2">
