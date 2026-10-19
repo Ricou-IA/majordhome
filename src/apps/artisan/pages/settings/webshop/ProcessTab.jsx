@@ -17,6 +17,7 @@ const LIBELLE_TOURNEE = { partie: 'Tournée partie', livree: 'Tournée livrée' 
 const CLIENT = gabaritsClient();
 
 const libelleGabarit = (key) => WEBSHOP_EMAIL_DEFAULTS[key]?.label ?? key;
+const estClient = (key) => CLIENT.some((g) => g.key === key);
 
 /** @param {{ value: string, onChange: (v: string) => void }} p */
 function SelectGabarit({ value, onChange }) {
@@ -24,7 +25,9 @@ function SelectGabarit({ value, onChange }) {
     <select value={value} onChange={(e) => onChange(e.target.value)} className={INPUT}>
       <option value="">Aucun</option>
       {CLIENT.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
-      {value && !CLIENT.some((g) => g.key === value) && <option value={value}>{libelleGabarit(value)}</option>}
+      {value && !estClient(value) && (
+        <option value={value}>{libelleGabarit(value)} (gabarit non client : à remplacer)</option>
+      )}
     </select>
   );
 }
@@ -39,6 +42,11 @@ export default function ProcessTab({ onAllerEmails }) {
   const process = processDepuisForm(form);
   const manquants = gabaritsManquants(process, gabarits.cles);
   const sansPrestataire = ordreColisSansPrestataire(process, r.cfg.colis.prestataire.emails);
+  // Valeur enregistrée hors gabarits client (ex. réglage posé à la main) : signalée, jamais retirée en silence.
+  const nonClient = [
+    ...Object.values(form.transitions).map((t) => t.email_client),
+    ...Object.values(form.tournee).map((t) => t.email_client),
+  ].filter((k) => k && !estClient(k));
 
   const setTransition = (k, champ, v) => setForm((f) => ({
     ...f, transitions: { ...f.transitions, [k]: { ...f.transitions[k], [champ]: v } },
@@ -57,9 +65,15 @@ export default function ProcessTab({ onAllerEmails }) {
         <p className="text-xs text-secondary-500">Vérification des gabarits d’e-mail…</p>
       ) : manquants.length > 0 && (
         <Avertissement>
-          Gabarit(s) utilisé(s) par le Process mais pas encore créé(s) : {manquants.map(libelleGabarit).join(', ')}.
+          Gabarit(s) utilisé(s) par le Process mais absent(s) ou archivé(s) : {manquants.map(libelleGabarit).join(', ')}.
           L’envoi correspondant échouera (« gabarit absent ») tant qu’il n’est pas créé.{' '}
           <button type="button" onClick={onAllerEmails} className="underline font-medium">Créer dans l’onglet E-mails</button>
+        </Avertissement>
+      )}
+      {nonClient.length > 0 && (
+        <Avertissement>
+          E-mail au client réglé sur un gabarit qui n’est pas destiné au client : {[...new Set(nonClient)].map(libelleGabarit).join(', ')}.
+          Choisissez un gabarit client ou « Aucun ».
         </Avertissement>
       )}
       {sansPrestataire && (

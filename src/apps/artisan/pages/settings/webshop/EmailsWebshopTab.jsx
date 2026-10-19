@@ -8,7 +8,7 @@ import { gabaritsManquants } from '@/lib/webshop/settingsForm';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import GabaritTransactionnel from '../communication/GabaritTransactionnel';
 import { useGabaritsExistants } from './useWebshopReglagesForm';
-import { Avertissement, CARD, SECTION_TITLE } from './common';
+import { Avertissement, CARD, Chargement, SECTION_TITLE } from './common';
 
 const DESTINATAIRE = { client: 'client', transporteur: 'transporteur', prestataire: 'prestataire colis' };
 
@@ -21,7 +21,7 @@ export default function EmailsWebshopTab() {
     <div className="space-y-6 max-w-3xl">
       {manquants && manquants.length > 0 && (
         <Avertissement>
-          Le Process enregistré utilise des gabarits pas encore créés :{' '}
+          Le Process enregistré utilise des gabarits absents ou archivés :{' '}
           {manquants.map((k) => WEBSHOP_EMAIL_DEFAULTS[k]?.label ?? k).join(', ')}.
         </Avertissement>
       )}
@@ -30,7 +30,12 @@ export default function EmailsWebshopTab() {
         <p className="text-xs text-secondary-500 mb-2">
           Créés avec un texte par défaut, puis modifiables dans Mailing → Éditeur. Envoyés quel que soit le module Communication (e-mails de vente).
         </p>
-        {WEBSHOP_EMAIL_KEYS.map((key) => {
+        {/* État inconnu (pas d'org, chargement, erreur) : jamais de bouton « Créer » à tort. */}
+        {gabarits.error ? (
+          <Avertissement>Impossible de vérifier les gabarits existants ({gabarits.error.message}). Réessayez plus tard.</Avertissement>
+        ) : gabarits.cles === undefined ? (
+          <Chargement>Vérification des gabarits…</Chargement>
+        ) : WEBSHOP_EMAIL_KEYS.map((key) => {
           // `destinataire` n'est pas une colonne de mail_campaigns : on ne l'insère pas.
           const { destinataire, ...gabarit } = WEBSHOP_EMAIL_DEFAULTS[key];
           const court = gabarit.label.replace(/^Boutique — /, '').replace(/ \([^)]*\)$/, '');
