@@ -142,6 +142,17 @@ const FUNCTIONS = [
   // 20261017_1 : réglages webshop lus par la base — définitions LIVE des fonctions remplacées
   'public.webshop_easter_sunday(integer)',
   'public.webshop_is_french_holiday(date)',
+  // 20261017_1 en prod depuis le 2026-10-18 : webshop_cycle_week(date) appelle la variante à ancre
+  // (fonction SQL, corps validé au chargement) ; réglages lus par la base, cités par les RPC.
+  'majordhome.webshop_reglages_defaut()',
+  'majordhome.webshop_reglage_entier(jsonb, integer, integer, integer)',
+  'majordhome.webshop_reglage_date(jsonb, text)',
+  'majordhome.webshop_jsonb_fusion(jsonb, jsonb)',
+  'majordhome.webshop_reglages(uuid)',
+  'majordhome.webshop_should_send(uuid, timestamptz)',
+  'majordhome.webshop_close_due_slots_org(uuid, date)',
+  'majordhome.webshop_run_daily_tours_at(timestamptz, date)',
+  'public.webshop_cycle_week(date, date)',
   'public.webshop_cycle_week(date)',
   'public.webshop_insert_slots(uuid, jsonb)',
   'public.webshop_generate_slots(uuid, integer, date)',

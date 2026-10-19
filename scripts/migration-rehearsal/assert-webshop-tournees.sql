@@ -4,9 +4,10 @@
 
 DO $$
 BEGIN
-  IF (SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='majordhome_webshop_delivery_slots'
-       ORDER BY ordinal_position DESC LIMIT 1) <> 'route_sheet_requested_at' THEN
-    RAISE EXCEPTION 'majordhome_webshop_delivery_slots : route_sheet_requested_at pas en dernière colonne';
+  -- Position fixe (19ᵉ, ajoutée en fin par 20261013_2) : 20261019_1 ajoute departed_at / delivered_at après.
+  IF (SELECT ordinal_position FROM information_schema.columns WHERE table_schema='public' AND table_name='majordhome_webshop_delivery_slots'
+       AND column_name = 'route_sheet_requested_at') IS DISTINCT FROM 19 THEN
+    RAISE EXCEPTION 'majordhome_webshop_delivery_slots : route_sheet_requested_at n''est plus la 19ᵉ colonne';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname='majordhome_webshop_delivery_slots' AND 'security_invoker=true' = ANY(reloptions)) THEN
     RAISE EXCEPTION 'vue slots sans security_invoker';
