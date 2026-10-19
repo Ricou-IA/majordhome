@@ -1,0 +1,375 @@
+// ⚠️ COPIE GÉNÉRÉE par scripts/sync-tournee-engine.mjs depuis src/lib/webshop/reglages.js — ne pas éditer.
+// src/lib/webshop/reglages.js
+// Réglages de livraison / process du webshop — module PUR (aucun import). Valeurs org :
+// core.organizations.settings.webshop (Settings → Socle → Webshop). ⚠ org_update_settings merge
+// niveau 1 → toujours sauver l'objet `webshop` COMPLET.
+// Copié tel quel par le site Mayer (`lib/boutique/reglages.js`) : ne rien importer ici.
+
+/**
+ * @typedef {{ code: string, libelle: string, adresse: string }} Depot
+ * @typedef {{
+ *   site_url: string,
+ *   emails: { interne: string[] },
+ *   depots: Depot[],
+ *   palette: {
+ *     transporteur: { nom: string, emails: string[], note: string },
+ *     envoi_auto: boolean, heure_envoi: number,
+ *     delai_fermeture_jours: number, horizon_semaines: number, ancre_cycle: string,
+ *     capacite_emplacements: number, prix_emplacement_defaut_cents: number,
+ *     tva_pct: number, max_emplacements_panier: number,
+ *   },
+ *   colis: {
+ *     prestataire: { nom: string, mode: string, emails: string[], note: string },
+ *     tva_pct: number, max_qty_ligne: number,
+ *   },
+ *   process: WebshopProcess,
+ * }} WebshopConfig
+ * @typedef {{ email_client: string | null, ordre_colis: boolean }} ReglageTransition
+ * @typedef {{ email_client: string | null }} ReglageTournee
+ * @typedef {{
+ *   transitions: { confirmee: ReglageTransition, transmise_fournisseur: ReglageTransition,
+ *     expediee: ReglageTransition, livree: ReglageTransition },
+ *   tournee: { partie: ReglageTournee, livree: ReglageTournee },
+ * }} WebshopProcess
+ */
+
+/**
+ * Clés des gabarits d'e-mail du webshop (`mail_campaigns.key`, transactionnels). Source unique :
+ * `emailTemplates.js` les ré-exporte. Une clé hors liste dans les réglages est ramenée à `null`.
+ * @type {ReadonlyArray<string>}
+ */
+export const WEBSHOP_EMAIL_KEYS = Object.freeze([
+  'webshop_confirmation',
+  'webshop_expedition_colis',
+  'webshop_livraison_colis',
+  'webshop_expedition_palette',
+  'webshop_livraison_palette',
+  'webshop_feuille_route',
+  'webshop_ordre_colis',
+]);
+
+/**
+ * Transitions de commande couvertes par le Process (envoi colis). L'annulation est hors périmètre.
+ * @type {ReadonlyArray<'confirmee' | 'transmise_fournisseur' | 'expediee' | 'livree'>}
+ */
+export const WEBSHOP_PROCESS_TRANSITIONS = Object.freeze(['confirmee', 'transmise_fournisseur', 'expediee', 'livree']);
+
+/**
+ * Événements de tournée couverts par le Process (envoi palette).
+ * @type {ReadonlyArray<'partie' | 'livree'>}
+ */
+export const WEBSHOP_PROCESS_EVENEMENTS_TOURNEE = Object.freeze(['partie', 'livree']);
+
+/** @param {any} o @returns {any} */
+function deepFreeze(o) {
+  if (o && typeof o === 'object' && !Object.isFrozen(o)) {
+    Object.freeze(o);
+    for (const k of Object.keys(o)) deepFreeze(o[k]);
+  }
+  return o;
+}
+
+/**
+ * Défauts = comportement historique du webshop (fermeture J-2, 12 semaines, camion de 10, etc.).
+ * Profondément figé : pour obtenir un objet modifiable, passer par `buildWebshopConfig`.
+ * @type {Readonly<WebshopConfig>}
+ */
+export const WEBSHOP_REGLAGES_DEFAUT = deepFreeze({
+  site_url: '',
+  emails: { interne: [] },
+  depots: [{ code: 'castanet', libelle: 'Dépôt Castanet-Tolosan', adresse: 'Castanet-Tolosan' }],
+  palette: {
+    transporteur: { nom: '', emails: [], note: '' },
+    envoi_auto: true,
+    heure_envoi: 18,
+    delai_fermeture_jours: 2,
+    horizon_semaines: 12,
+    ancre_cycle: '2026-01-05',
+    capacite_emplacements: 10,
+    prix_emplacement_defaut_cents: 5500,
+    tva_pct: 10,
+    max_emplacements_panier: 10,
+  },
+  colis: {
+    prestataire: { nom: '', mode: 'email', emails: [], note: '' },
+    tva_pct: 20,
+    max_qty_ligne: 20,
+  },
+  // Process (étape 2) : le client est prévenu PAR ENVOI. Colis = transitions de la commande ;
+  // palette = événements de tournée. Ordre colis : aucune transition par défaut (choix d'Eric).
+  process: {
+    transitions: {
+      confirmee: { email_client: null, ordre_colis: false },
+      transmise_fournisseur: { email_client: null, ordre_colis: false },
+      expediee: { email_client: 'webshop_expedition_colis', ordre_colis: false },
+      livree: { email_client: 'webshop_livraison_colis', ordre_colis: false },
+    },
+    tournee: {
+      partie: { email_client: 'webshop_expedition_palette' },
+      livree: { email_client: 'webshop_livraison_palette' },
+    },
+  },
+});
+
+/**
+ * Bornes des réglages numériques (entiers, inclusives) et taux de TVA admis (en %) : source unique
+ * de la coercition ci-dessous ET de la validation de l'écran Settings, qui REFUSE une saisie hors
+ * bornes au lieu de la remplacer. `palette.max_emplacements_panier` est en plus plafonné par
+ * `palette.capacite_emplacements`.
+ */
+export const BORNES = deepFreeze({
+  palette: {
+    heure_envoi: { min: 0, max: 23 },
+    delai_fermeture_jours: { min: 0, max: 14 },
+    horizon_semaines: { min: 1, max: 26 },
+    capacite_emplacements: { min: 1, max: 40 },
+    prix_emplacement_defaut_cents: { min: 0, max: 10_000_000 },
+    max_emplacements_panier: { min: 1, max: 40 },
+  },
+  colis: {
+    max_qty_ligne: { min: 1, max: 100 },
+  },
+  tva_pct: [0, 5.5, 10, 20],
+});
+
+const TVA_VALIDES = BORNES.tva_pct;
+const BP = BORNES.palette;
+
+/** @param {any} v @returns {boolean} */
+function estObjet(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Nombre fini à partir d'un nombre ou d'une chaîne non vide ; sinon NaN (null, '', booléens refusés).
+ * @param {any} v @returns {number}
+ */
+function enNombre(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.trim() !== '') return Number(v);
+  return NaN;
+}
+
+/**
+ * Entier dans [min, max], sinon `defaut`.
+ * @param {any} v @param {number} min @param {number} max @param {number} defaut @returns {number}
+ */
+function entierBorne(v, min, max, defaut) {
+  const n = enNombre(v);
+  return Number.isInteger(n) && n >= min && n <= max ? n : defaut;
+}
+
+/**
+ * Nombre appartenant à `valides`, sinon `defaut`.
+ * @param {any} v @param {number[]} valides @param {number} defaut @returns {number}
+ */
+function parmi(v, valides, defaut) {
+  const n = enNombre(v);
+  return valides.includes(n) ? n : defaut;
+}
+
+/**
+ * Chaîne trimée ; non-chaîne → défaut.
+ * @param {any} v @param {string} defaut @returns {string}
+ */
+function texte(v, defaut) {
+  return typeof v === 'string' ? v.trim() : defaut;
+}
+
+/**
+ * Booléen (accepte 'true' / 'false'), sinon défaut.
+ * @param {any} v @param {boolean} defaut @returns {boolean}
+ */
+function booleen(v, defaut) {
+  if (typeof v === 'boolean') return v;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return defaut;
+}
+
+/**
+ * Date ISO `YYYY-MM-DD` réellement existante, sinon défaut.
+ * @param {any} v @param {string} defaut @returns {string}
+ */
+function dateIso(v, defaut) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return defaut;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : defaut;
+}
+
+/**
+ * Liste d'e-mails : non-chaînes et vides écartés, trim + minuscules. Le format n'est PAS contrôlé ici
+ * (c'est le rôle de `validerWebshopReglages`, pour que l'écran puisse signaler la faute).
+ * @param {any} v @returns {string[]}
+ */
+function listeEmails(v) {
+  if (!Array.isArray(v)) return [];
+  return v.filter((e) => typeof e === 'string').map((e) => e.trim().toLowerCase()).filter(Boolean);
+}
+
+/**
+ * Liste des dépôts : entrées sans `code` écartées ; libellé / adresse par repli ; vide → défaut.
+ * @param {any} v @returns {Depot[]}
+ */
+function listeDepots(v) {
+  const out = [];
+  if (Array.isArray(v)) {
+    for (const d of v) {
+      if (!estObjet(d)) continue;
+      const code = texte(d.code, '');
+      if (!code) continue;
+      out.push({
+        code,
+        libelle: texte(d.libelle, '') || `Dépôt ${code}`,
+        adresse: texte(d.adresse, '') || code,
+      });
+    }
+  }
+  return out.length ? out : WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => ({ ...d }));
+}
+
+/**
+ * Clé de gabarit : absente (undefined) → défaut ; connue de `WEBSHOP_EMAIL_KEYS` → conservée ;
+ * toute autre valeur (null, inconnue, non-chaîne) → `null` (aucun e-mail).
+ * @param {any} v @param {string | null} defaut @returns {string | null}
+ */
+function cleGabarit(v, defaut) {
+  if (v === undefined) return defaut;
+  return typeof v === 'string' && WEBSHOP_EMAIL_KEYS.includes(v) ? v : null;
+}
+
+/**
+ * Réglages du Process : seules les transitions / événements connus sont lus ; `ordre_colis`
+ * non booléen → `false` ; gabarit inconnu → `null`.
+ * @param {any} v @returns {WebshopProcess}
+ */
+function lireProcess(v) {
+  const D = WEBSHOP_REGLAGES_DEFAUT.process;
+  const p = estObjet(v) ? v : {};
+  const tr = estObjet(p.transitions) ? p.transitions : {};
+  const to = estObjet(p.tournee) ? p.tournee : {};
+  /** @type {any} */
+  const transitions = {};
+  for (const k of WEBSHOP_PROCESS_TRANSITIONS) {
+    const r = estObjet(tr[k]) ? tr[k] : {};
+    const d = D.transitions[k];
+    transitions[k] = {
+      email_client: cleGabarit(r.email_client, d.email_client),
+      ordre_colis: r.ordre_colis === undefined ? d.ordre_colis : r.ordre_colis === true,
+    };
+  }
+  /** @type {any} */
+  const tournee = {};
+  for (const k of WEBSHOP_PROCESS_EVENEMENTS_TOURNEE) {
+    const r = estObjet(to[k]) ? to[k] : {};
+    tournee[k] = { email_client: cleGabarit(r.email_client, D.tournee[k].email_client) };
+  }
+  return { transitions, tournee };
+}
+
+/**
+ * Construit la configuration webshop d'une org : fusion profonde défaut ← `settings.webshop`,
+ * chaque valeur coercée au type du défaut, hors bornes → défaut. Renvoie TOUJOURS un objet neuf
+ * (modifiable par l'écran), jamais le défaut figé.
+ * @param {any} settings `core.organizations.settings` (ou null)
+ * @returns {WebshopConfig}
+ */
+export function buildWebshopConfig(settings) {
+  const D = WEBSHOP_REGLAGES_DEFAUT;
+  const w = estObjet(settings?.webshop) ? settings.webshop : {};
+  const emails = estObjet(w.emails) ? w.emails : {};
+  const p = estObjet(w.palette) ? w.palette : {};
+  const pt = estObjet(p.transporteur) ? p.transporteur : {};
+  const c = estObjet(w.colis) ? w.colis : {};
+  const cp = estObjet(c.prestataire) ? c.prestataire : {};
+
+  /** @param {any} v @param {{ min: number, max: number }} b @param {number} defaut */
+  const borne = (v, b, defaut) => entierBorne(v, b.min, b.max, defaut);
+  const capacite = borne(p.capacite_emplacements, BP.capacite_emplacements, D.palette.capacite_emplacements);
+
+  return {
+    site_url: texte(w.site_url, D.site_url),
+    emails: { interne: listeEmails(emails.interne) },
+    depots: listeDepots(w.depots),
+    palette: {
+      transporteur: {
+        nom: texte(pt.nom, D.palette.transporteur.nom),
+        emails: listeEmails(pt.emails),
+        note: texte(pt.note, D.palette.transporteur.note),
+      },
+      envoi_auto: booleen(p.envoi_auto, D.palette.envoi_auto),
+      heure_envoi: borne(p.heure_envoi, BP.heure_envoi, D.palette.heure_envoi),
+      delai_fermeture_jours: borne(p.delai_fermeture_jours, BP.delai_fermeture_jours, D.palette.delai_fermeture_jours),
+      horizon_semaines: borne(p.horizon_semaines, BP.horizon_semaines, D.palette.horizon_semaines),
+      ancre_cycle: dateIso(p.ancre_cycle, D.palette.ancre_cycle),
+      capacite_emplacements: capacite,
+      prix_emplacement_defaut_cents: borne(p.prix_emplacement_defaut_cents, BP.prix_emplacement_defaut_cents, D.palette.prix_emplacement_defaut_cents),
+      tva_pct: parmi(p.tva_pct, TVA_VALIDES, D.palette.tva_pct),
+      max_emplacements_panier: entierBorne(
+        p.max_emplacements_panier, BP.max_emplacements_panier.min, Math.min(BP.max_emplacements_panier.max, capacite),
+        Math.min(D.palette.max_emplacements_panier, capacite),
+      ),
+    },
+    colis: {
+      prestataire: {
+        nom: texte(cp.nom, D.colis.prestataire.nom),
+        mode: texte(cp.mode, D.colis.prestataire.mode) || D.colis.prestataire.mode,
+        emails: listeEmails(cp.emails),
+        note: texte(cp.note, D.colis.prestataire.note),
+      },
+      tva_pct: parmi(c.tva_pct, TVA_VALIDES, D.colis.tva_pct),
+      max_qty_ligne: borne(c.max_qty_ligne, BORNES.colis.max_qty_ligne, D.colis.max_qty_ligne),
+    },
+    process: lireProcess(w.process),
+  };
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Erreurs bloquantes pour l'écran Settings : e-mail mal formé, `site_url` non https, codes de dépôt
+ * en double. Un `site_url` vide est toléré (l'envoi automatique échoue alors en `site_url_missing`).
+ * @param {WebshopConfig} cfg configuration issue de `buildWebshopConfig`
+ * @returns {Array<{ champ: string, message: string }>}
+ */
+export function validerWebshopReglages(cfg) {
+  /** @type {Array<{ champ: string, message: string }>} */
+  const erreurs = [];
+  const listes = [
+    ['emails.interne', cfg?.emails?.interne],
+    ['palette.transporteur.emails', cfg?.palette?.transporteur?.emails],
+    ['colis.prestataire.emails', cfg?.colis?.prestataire?.emails],
+  ];
+  for (const [champ, liste] of listes) {
+    const mauvais = (Array.isArray(liste) ? liste : []).filter((e) => !EMAIL_RE.test(e));
+    if (mauvais.length) erreurs.push({ champ, message: `Adresse e-mail invalide : ${mauvais.join(', ')}` });
+  }
+
+  const url = cfg?.site_url;
+  if (typeof url === 'string' && url !== '' && !/^https:\/\/\S+$/.test(url)) {
+    erreurs.push({ champ: 'site_url', message: "L'adresse du site doit commencer par https://" });
+  }
+
+  const vus = new Set();
+  const doublons = new Set();
+  for (const d of Array.isArray(cfg?.depots) ? cfg.depots : []) {
+    if (vus.has(d.code)) doublons.add(d.code);
+    vus.add(d.code);
+  }
+  if (doublons.size) {
+    erreurs.push({ champ: 'depots', message: `Code de dépôt en double : ${[...doublons].join(', ')}` });
+  }
+  return erreurs;
+}
+
+/**
+ * Dépôt par code. Code inconnu → dépôt de repli construit depuis le code (jamais un dépôt inventé
+ * ailleurs : le libellé et l'adresse restent le code lui-même).
+ * @param {WebshopConfig} cfg
+ * @param {string} code
+ * @returns {Depot}
+ */
+export function depotParCode(cfg, code) {
+  const d = (Array.isArray(cfg?.depots) ? cfg.depots : []).find((x) => x.code === code);
+  return d ? { ...d } : { code, libelle: `Dépôt ${code}`, adresse: code };
+}

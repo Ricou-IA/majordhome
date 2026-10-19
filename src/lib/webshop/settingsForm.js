@@ -266,7 +266,10 @@ export function webshopAEnregistrer(form, webshopActuel) {
   const brut = brutDepuisForm(form);
   const cfg = buildWebshopConfig({ webshop: brut });
   const autres = webshopActuel && typeof webshopActuel === 'object' && !Array.isArray(webshopActuel) ? webshopActuel : {};
-  return { ...autres, ...cfg, depots: brut.depots };
+  // `process` n'est pas édité par ce formulaire : la valeur en base reste telle quelle (sinon les
+  // défauts de buildWebshopConfig écraseraient le réglage du Process à chaque enregistrement).
+  const { process: _process, ...cfgSansProcess } = cfg;
+  return { ...autres, ...cfgSansProcess, depots: brut.depots };
 }
 
 // ---------------------------------------------------------------------------

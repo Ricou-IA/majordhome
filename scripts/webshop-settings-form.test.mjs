@@ -15,7 +15,9 @@ test('formulaire par défaut : aucune erreur, aller-retour identique au défaut'
   const f = formDefaut();
   assert.deepEqual(validerSaisie(f), {});
   const w = webshopAEnregistrer(f, {});
-  assert.deepEqual({ ...w }, { ...WEBSHOP_REGLAGES_DEFAUT, depots: [] });
+  // `process` n'est pas édité par ce formulaire : rien n'est écrit (le défaut s'applique à la lecture).
+  const { process: _p, ...sansProcess } = WEBSHOP_REGLAGES_DEFAUT;
+  assert.deepEqual({ ...w }, { ...sansProcess, depots: [] });
   // relu par buildWebshopConfig : le défaut s'applique
   assert.deepEqual(buildWebshopConfig({ webshop: w }), buildWebshopConfig(null));
 });
@@ -95,6 +97,12 @@ test('clés inconnues de settings.webshop conservées', () => {
   const w = webshopAEnregistrer(formDefaut(), { process: { x: 1 }, site_url: 'https://old.fr' });
   assert.deepEqual(w.process, { x: 1 });
   assert.equal(w.site_url, '');
+});
+
+test('process réglé en base : jamais écrasé par l’enregistrement de ce formulaire', () => {
+  const stocke = { transitions: { transmise_fournisseur: { ordre_colis: true } } };
+  const w = webshopAEnregistrer(formDefaut(), { process: stocke });
+  assert.deepEqual(w.process, stocke);
 });
 
 test('messages d’erreur des RPC', () => {

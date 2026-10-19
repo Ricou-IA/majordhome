@@ -21,8 +21,43 @@
  *     prestataire: { nom: string, mode: string, emails: string[], note: string },
  *     tva_pct: number, max_qty_ligne: number,
  *   },
+ *   process: WebshopProcess,
  * }} WebshopConfig
+ * @typedef {{ email_client: string | null, ordre_colis: boolean }} ReglageTransition
+ * @typedef {{ email_client: string | null }} ReglageTournee
+ * @typedef {{
+ *   transitions: { confirmee: ReglageTransition, transmise_fournisseur: ReglageTransition,
+ *     expediee: ReglageTransition, livree: ReglageTransition },
+ *   tournee: { partie: ReglageTournee, livree: ReglageTournee },
+ * }} WebshopProcess
  */
+
+/**
+ * Clés des gabarits d'e-mail du webshop (`mail_campaigns.key`, transactionnels). Source unique :
+ * `emailTemplates.js` les ré-exporte. Une clé hors liste dans les réglages est ramenée à `null`.
+ * @type {ReadonlyArray<string>}
+ */
+export const WEBSHOP_EMAIL_KEYS = Object.freeze([
+  'webshop_confirmation',
+  'webshop_expedition_colis',
+  'webshop_livraison_colis',
+  'webshop_expedition_palette',
+  'webshop_livraison_palette',
+  'webshop_feuille_route',
+  'webshop_ordre_colis',
+]);
+
+/**
+ * Transitions de commande couvertes par le Process (envoi colis). L'annulation est hors périmètre.
+ * @type {ReadonlyArray<'confirmee' | 'transmise_fournisseur' | 'expediee' | 'livree'>}
+ */
+export const WEBSHOP_PROCESS_TRANSITIONS = Object.freeze(['confirmee', 'transmise_fournisseur', 'expediee', 'livree']);
+
+/**
+ * Événements de tournée couverts par le Process (envoi palette).
+ * @type {ReadonlyArray<'partie' | 'livree'>}
+ */
+export const WEBSHOP_PROCESS_EVENEMENTS_TOURNEE = Object.freeze(['partie', 'livree']);
 
 /** @param {any} o @returns {any} */
 function deepFreeze(o) {
@@ -58,6 +93,20 @@ export const WEBSHOP_REGLAGES_DEFAUT = deepFreeze({
     prestataire: { nom: '', mode: 'email', emails: [], note: '' },
     tva_pct: 20,
     max_qty_ligne: 20,
+  },
+  // Process (étape 2) : le client est prévenu PAR ENVOI. Colis = transitions de la commande ;
+  // palette = événements de tournée. Ordre colis : aucune transition par défaut (choix d'Eric).
+  process: {
+    transitions: {
+      confirmee: { email_client: null, ordre_colis: false },
+      transmise_fournisseur: { email_client: null, ordre_colis: false },
+      expediee: { email_client: 'webshop_expedition_colis', ordre_colis: false },
+      livree: { email_client: 'webshop_livraison_colis', ordre_colis: false },
+    },
+    tournee: {
+      partie: { email_client: 'webshop_expedition_palette' },
+      livree: { email_client: 'webshop_livraison_palette' },
+    },
   },
 });
 
@@ -179,6 +228,45 @@ function listeDepots(v) {
 }
 
 /**
+ * Clé de gabarit : absente (undefined) → défaut ; connue de `WEBSHOP_EMAIL_KEYS` → conservée ;
+ * toute autre valeur (null, inconnue, non-chaîne) → `null` (aucun e-mail).
+ * @param {any} v @param {string | null} defaut @returns {string | null}
+ */
+function cleGabarit(v, defaut) {
+  if (v === undefined) return defaut;
+  return typeof v === 'string' && WEBSHOP_EMAIL_KEYS.includes(v) ? v : null;
+}
+
+/**
+ * Réglages du Process : seules les transitions / événements connus sont lus ; `ordre_colis`
+ * non booléen → `false` ; gabarit inconnu → `null`.
+ * @param {any} v @returns {WebshopProcess}
+ */
+function lireProcess(v) {
+  const D = WEBSHOP_REGLAGES_DEFAUT.process;
+  const p = estObjet(v) ? v : {};
+  const tr = estObjet(p.transitions) ? p.transitions : {};
+  const to = estObjet(p.tournee) ? p.tournee : {};
+  /** @type {any} */
+  const transitions = {};
+  for (const k of WEBSHOP_PROCESS_TRANSITIONS) {
+    const r = estObjet(tr[k]) ? tr[k] : {};
+    const d = D.transitions[k];
+    transitions[k] = {
+      email_client: cleGabarit(r.email_client, d.email_client),
+      ordre_colis: r.ordre_colis === undefined ? d.ordre_colis : r.ordre_colis === true,
+    };
+  }
+  /** @type {any} */
+  const tournee = {};
+  for (const k of WEBSHOP_PROCESS_EVENEMENTS_TOURNEE) {
+    const r = estObjet(to[k]) ? to[k] : {};
+    tournee[k] = { email_client: cleGabarit(r.email_client, D.tournee[k].email_client) };
+  }
+  return { transitions, tournee };
+}
+
+/**
  * Construit la configuration webshop d'une org : fusion profonde défaut ← `settings.webshop`,
  * chaque valeur coercée au type du défaut, hors bornes → défaut. Renvoie TOUJOURS un objet neuf
  * (modifiable par l'écran), jamais le défaut figé.
@@ -231,6 +319,7 @@ export function buildWebshopConfig(settings) {
       tva_pct: parmi(c.tva_pct, TVA_VALIDES, D.colis.tva_pct),
       max_qty_ligne: borne(c.max_qty_ligne, BORNES.colis.max_qty_ligne, D.colis.max_qty_ligne),
     },
+    process: lireProcess(w.process),
   };
 }
 

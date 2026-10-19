@@ -182,3 +182,52 @@ test('depotParCode', () => {
   assert.equal(cfg.depots.length, 1);
   assert.equal(depotParCode(null, 'xyz').adresse, 'xyz');
 });
+
+test('process : défaut intact (colis par transition, palette par tournée, aucun ordre colis)', () => {
+  const p = buildWebshopConfig(null).process;
+  assert.deepEqual(p, {
+    transitions: {
+      confirmee: { email_client: null, ordre_colis: false },
+      transmise_fournisseur: { email_client: null, ordre_colis: false },
+      expediee: { email_client: 'webshop_expedition_colis', ordre_colis: false },
+      livree: { email_client: 'webshop_livraison_colis', ordre_colis: false },
+    },
+    tournee: {
+      partie: { email_client: 'webshop_expedition_palette' },
+      livree: { email_client: 'webshop_livraison_palette' },
+    },
+  });
+  assert.ok(Object.isFrozen(WEBSHOP_REGLAGES_DEFAUT.process.transitions.expediee));
+});
+
+test('process : gabarit inconnu → null, gabarit connu conservé, absent → défaut', () => {
+  const p = buildWebshopConfig({ webshop: { process: {
+    transitions: {
+      expediee: { email_client: 'texte_en_dur' },
+      confirmee: { email_client: 'webshop_confirmation' },
+      livree: { email_client: null },
+    },
+    tournee: { partie: { email_client: 42 } },
+  } } }).process;
+  assert.equal(p.transitions.expediee.email_client, null);
+  assert.equal(p.transitions.confirmee.email_client, 'webshop_confirmation');
+  assert.equal(p.transitions.livree.email_client, null);
+  assert.equal(p.transitions.transmise_fournisseur.email_client, null);
+  assert.equal(p.tournee.partie.email_client, null);
+  assert.equal(p.tournee.livree.email_client, 'webshop_livraison_palette');
+});
+
+test('process : ordre_colis non booléen → false', () => {
+  const t = (v) => buildWebshopConfig({ webshop: { process: { transitions: { transmise_fournisseur: { ordre_colis: v } } } } })
+    .process.transitions.transmise_fournisseur.ordre_colis;
+  assert.equal(t('oui'), false);
+  assert.equal(t(1), false);
+  assert.equal(t(true), true);
+  assert.equal(t(undefined), false);
+});
+
+test('process : transition hors périmètre ignorée, process aberrant → défaut', () => {
+  const p = buildWebshopConfig({ webshop: { process: { transitions: { annulee: { email_client: 'webshop_confirmation' } } } } }).process;
+  assert.equal(p.transitions.annulee, undefined);
+  assert.deepEqual(buildWebshopConfig({ webshop: { process: 'oups' } }).process, WEBSHOP_REGLAGES_DEFAUT.process);
+});

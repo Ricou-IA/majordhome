@@ -21,6 +21,13 @@ test('chaque copie _shared/tournee est à jour (sinon : npm run sync:tournee-eng
   }
 });
 
+test('les modules webshop du process sont copiés pour Deno (_shared/webshop)', () => {
+  const cibles = FICHIERS.map(({ cible }) => cible.replace(/\\/g, '/'));
+  for (const n of ['orders', 'reglages', 'process', 'emailTemplates']) {
+    assert.ok(cibles.some((c) => c.endsWith(`supabase/functions/_shared/webshop/${n}.js`)), `${n}.js non copié`);
+  }
+});
+
 test('aucune copie n importe un alias Vite (@…) : elles doivent tourner sous Deno', () => {
   for (const { cible } of FICHIERS) {
     if (!existsSync(cible)) continue;

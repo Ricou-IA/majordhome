@@ -30,11 +30,20 @@ const PARTAGES = ['smsCampaigns', 'phoneUtils', 'modules', 'autoRdvEmailTemplate
 // Copiés dans _shared/maintenance/ : digestModel importe './echeances.js' (même dossier).
 const MAINTENANCE = ['echeances', 'digestModel', 'vocabulaire'];
 
+// Webshop (process de l'étape 2 : actions par envoi, gabarits d'e-mail) → edge des transitions.
+// Copiés dans _shared/webshop/ : process.js et emailTemplates.js importent './orders.js' et
+// './reglages.js' (même dossier, imports relatifs conservés tels quels).
+const WEBSHOP = ['orders', 'reglages', 'process', 'emailTemplates'];
+
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),
   ...MAINTENANCE.map((n) => ({
     source: path.join(racine, 'src', 'lib', 'maintenance', `${n}.js`),
     cible: path.join(racine, 'supabase', 'functions', '_shared', 'maintenance', `${n}.js`),
+  })),
+  ...WEBSHOP.map((n) => ({
+    source: path.join(racine, 'src', 'lib', 'webshop', `${n}.js`),
+    cible: path.join(racine, 'supabase', 'functions', '_shared', 'webshop', `${n}.js`),
   })),
   { source: path.join(racine, 'src', 'lib', 'sectorClustering.js'), cible: path.join(DST, 'sectorClustering.js') },
   ...PARTAGES.map((n) => ({
