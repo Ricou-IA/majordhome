@@ -6,7 +6,12 @@
 // une erreur sous son champ et bloque l'enregistrement ; elle n'est jamais remplacée en silence
 // par le défaut (ce que ferait la coercition de `buildWebshopConfig`). Bornes = `BORNES` de
 // reglages.js, jamais recopiées ici.
-import { BORNES, WEBSHOP_REGLAGES_DEFAUT, buildWebshopConfig, validerWebshopReglages } from './reglages.js';
+import {
+  BORNES, WEBSHOP_REGLAGES_DEFAUT, WEBSHOP_PROCESS_TRANSITIONS, WEBSHOP_PROCESS_EVENEMENTS_TOURNEE,
+  buildWebshopConfig, validerWebshopReglages,
+} from './reglages.js';
+import { GABARIT_ORDRE_COLIS } from './process.js';
+import { WEBSHOP_EMAIL_DEFAULTS } from './emailTemplates.js';
 
 // ---------------------------------------------------------------------------
 // Conversions
@@ -270,6 +275,105 @@ export function webshopAEnregistrer(form, webshopActuel) {
   // défauts de buildWebshopConfig écraseraient le réglage du Process à chaque enregistrement).
   const { process: _process, ...cfgSansProcess } = cfg;
   return { ...autres, ...cfgSansProcess, depots: brut.depots };
+}
+
+// ---------------------------------------------------------------------------
+// Onglet Process (étape 2) : formulaire séparé, enregistré seul
+// ---------------------------------------------------------------------------
+// L'onglet Process n'écrit QUE `process`, posé sur `settings.webshop` tel qu'en base ; les autres
+// onglets (`webshopAEnregistrer`) recopient le `process` stocké sans y toucher. Aucun onglet
+// n'écrase donc ce qu'un autre a enregistré. À l'écran, « Aucun » = '' ; en base = null.
+
+/**
+ * @param {import('./reglages.js').WebshopProcess} process (sortie de buildWebshopConfig)
+ * @returns {{ transitions: Record<string, { email_client: string, ordre_colis: boolean }>, tournee: Record<string, { email_client: string }> }}
+ */
+export function processVersForm(process) {
+  /** @type {any} */
+  const transitions = {};
+  for (const k of WEBSHOP_PROCESS_TRANSITIONS) {
+    const t = process.transitions[k];
+    transitions[k] = { email_client: t.email_client ?? '', ordre_colis: t.ordre_colis === true };
+  }
+  /** @type {any} */
+  const tournee = {};
+  for (const k of WEBSHOP_PROCESS_EVENEMENTS_TOURNEE) {
+    tournee[k] = { email_client: process.tournee[k].email_client ?? '' };
+  }
+  return { transitions, tournee };
+}
+
+/**
+ * Formulaire → `process` à enregistrer : '' → null, puis coercition de reglages.js (gabarit inconnu
+ * → null, ordre_colis booléen strict).
+ * @param {ReturnType<typeof processVersForm>} fp
+ * @returns {import('./reglages.js').WebshopProcess}
+ */
+export function processDepuisForm(fp) {
+  /** @type {any} */
+  const transitions = {};
+  for (const k of WEBSHOP_PROCESS_TRANSITIONS) {
+    const t = fp.transitions[k];
+    transitions[k] = { email_client: t.email_client || null, ordre_colis: t.ordre_colis === true };
+  }
+  /** @type {any} */
+  const tournee = {};
+  for (const k of WEBSHOP_PROCESS_EVENEMENTS_TOURNEE) {
+    tournee[k] = { email_client: fp.tournee[k].email_client || null };
+  }
+  return buildWebshopConfig({ webshop: { process: { transitions, tournee } } }).process;
+}
+
+/**
+ * Objet `webshop` COMPLET à enregistrer depuis l'onglet Process : `settings.webshop` tel qu'en base
+ * (toutes ses clés conservées) + `process`.
+ * @param {ReturnType<typeof processVersForm>} fp
+ * @param {any} webshopActuel
+ */
+export function webshopAvecProcess(fp, webshopActuel) {
+  const autres = webshopActuel && typeof webshopActuel === 'object' && !Array.isArray(webshopActuel) ? webshopActuel : {};
+  return { ...autres, process: processDepuisForm(fp) };
+}
+
+/** Gabarits proposables comme « e-mail au client » (destinataire client). */
+export function gabaritsClient() {
+  return Object.values(WEBSHOP_EMAIL_DEFAULTS).filter((g) => g.destinataire === 'client');
+}
+
+/**
+ * Clés de gabarit dont le Process a besoin (e-mails client + ordre colis s'il est coché quelque part).
+ * @param {import('./reglages.js').WebshopProcess} process @returns {string[]}
+ */
+export function gabaritsReferences(process) {
+  const cles = new Set();
+  for (const t of Object.values(process.transitions)) {
+    if (t.email_client) cles.add(t.email_client);
+    if (t.ordre_colis) cles.add(GABARIT_ORDRE_COLIS);
+  }
+  for (const e of Object.values(process.tournee)) if (e.email_client) cles.add(e.email_client);
+  return [...cles];
+}
+
+/**
+ * Gabarits référencés absents de `mail_campaigns`. `clesExistantes` non tableau (chargement ou
+ * erreur) = état INCONNU → null : l'écran affiche « vérification… », jamais « à créer » à tort.
+ * @param {import('./reglages.js').WebshopProcess} process @param {string[]|null|undefined} clesExistantes
+ * @returns {string[]|null}
+ */
+export function gabaritsManquants(process, clesExistantes) {
+  if (!Array.isArray(clesExistantes)) return null;
+  const existe = new Set(clesExistantes);
+  return gabaritsReferences(process).filter((k) => !existe.has(k));
+}
+
+/**
+ * Ordre d'enlèvement coché sans aucun e-mail de prestataire colis (onglet Colis) : l'edge
+ * tracerait `prestataire_missing`.
+ * @param {import('./reglages.js').WebshopProcess} process @param {string[]} emailsPrestataire
+ */
+export function ordreColisSansPrestataire(process, emailsPrestataire) {
+  const coche = Object.values(process.transitions).some((t) => t.ordre_colis);
+  return coche && !(Array.isArray(emailsPrestataire) && emailsPrestataire.length > 0);
 }
 
 // ---------------------------------------------------------------------------

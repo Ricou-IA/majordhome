@@ -99,10 +99,6 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/tournee/populations.js',
   'src/lib/maintenance/digestModel.js', // consommé par l'edge maintenance-digest via sa copie _shared/maintenance (sync-tournee-engine), jamais importé depuis src/
   'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/
-  // Webshop étape 2 : consommés par l'edge des transitions via leurs copies _shared/webshop ;
-  // emailTemplates.js sera aussi importé par l'onglet Process de Settings (à retirer alors d'ici).
-  'src/lib/webshop/process.js',
-  'src/lib/webshop/emailTemplates.js',
 ]);
 
 const allFiles = walk(SRC);

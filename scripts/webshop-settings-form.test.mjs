@@ -7,6 +7,8 @@ import {
   messageErreurWebshop, basculerPassage, normaliserRecurrence, parserPostcodes, postcodesVersTexte,
   formSecteur, validerSecteur, payloadSecteur, trancheEnConflit, validerTarif, validerPoint,
   codeDepotDepuisLibelle, depotsParDefautPourEdition,
+  processVersForm, processDepuisForm, webshopAvecProcess, gabaritsClient, gabaritsReferences, gabaritsManquants,
+  ordreColisSansPrestataire,
 } from '../src/lib/webshop/settingsForm.js';
 
 const formDefaut = () => formDepuisConfig(buildWebshopConfig(null));
@@ -189,4 +191,83 @@ test('personnaliser le dépôt par défaut garde son code (les secteurs y pointe
   const lignes = depotsParDefautPourEdition();
   assert.deepEqual(lignes, WEBSHOP_REGLAGES_DEFAUT.depots.map((d) => ({ ...d })));
   assert.notEqual(lignes[0], WEBSHOP_REGLAGES_DEFAUT.depots[0]);
+});
+
+// ---------------------------------------------------------------------------
+// Onglet Process (étape 2)
+// ---------------------------------------------------------------------------
+
+test('process : aller-retour form ↔ webshop identique au défaut', () => {
+  const D = WEBSHOP_REGLAGES_DEFAUT.process;
+  const fp = processVersForm(buildWebshopConfig(null).process);
+  assert.equal(fp.transitions.confirmee.email_client, '');
+  assert.equal(fp.transitions.expediee.email_client, 'webshop_expedition_colis');
+  assert.equal(fp.tournee.partie.email_client, 'webshop_expedition_palette');
+  assert.deepEqual(processDepuisForm(fp), D);
+  const w = webshopAvecProcess(fp, {});
+  assert.deepEqual(buildWebshopConfig({ webshop: w }).process, D);
+});
+
+test('process : gabarit « Aucun » → null ; ordre colis coché conservé', () => {
+  const fp = processVersForm(buildWebshopConfig(null).process);
+  fp.transitions.expediee.email_client = '';
+  fp.tournee.livree.email_client = '';
+  fp.transitions.transmise_fournisseur.ordre_colis = true;
+  const p = processDepuisForm(fp);
+  assert.equal(p.transitions.expediee.email_client, null);
+  assert.equal(p.tournee.livree.email_client, null);
+  assert.equal(p.transitions.transmise_fournisseur.ordre_colis, true);
+  // relu : null reste null (pas de retour au défaut), et revient « Aucun » à l'écran
+  const relu = buildWebshopConfig({ webshop: webshopAvecProcess(fp, {}) });
+  assert.equal(relu.process.transitions.expediee.email_client, null);
+  assert.equal(processVersForm(relu.process).transitions.expediee.email_client, '');
+});
+
+test('process : enregistrer le Process garde les autres clés ; les autres onglets gardent le Process', () => {
+  const stocke = { site_url: 'https://boutique.fr', colis: { tva_pct: 5.5 }, inconnu: 1 };
+  const fp = processVersForm(buildWebshopConfig(null).process);
+  fp.transitions.livree.email_client = '';
+  const w = webshopAvecProcess(fp, stocke);
+  assert.equal(w.site_url, 'https://boutique.fr');
+  assert.deepEqual(w.colis, { tva_pct: 5.5 });
+  assert.equal(w.inconnu, 1);
+  assert.equal(w.process.transitions.livree.email_client, null);
+  // un autre onglet enregistre ensuite : le Process réglé n'est pas touché
+  const w2 = webshopAEnregistrer(formDepuisConfig(buildWebshopConfig({ webshop: w }), w), w);
+  assert.deepEqual(w2.process, w.process);
+});
+
+test('process : gabarit hors liste client saisi à la main → null (coercition)', () => {
+  const fp = processVersForm(buildWebshopConfig(null).process);
+  fp.transitions.confirmee.email_client = 'inconnu';
+  assert.equal(processDepuisForm(fp).transitions.confirmee.email_client, null);
+});
+
+test('gabarits client : seulement destinataire client', () => {
+  const cles = gabaritsClient().map((g) => g.key);
+  assert.ok(cles.includes('webshop_expedition_colis'));
+  assert.ok(!cles.includes('webshop_ordre_colis'));
+  assert.ok(!cles.includes('webshop_feuille_route'));
+});
+
+test('gabarits référencés / manquants : ordre colis inclus, état inconnu → null', () => {
+  const p = processDepuisForm(processVersForm(buildWebshopConfig(null).process));
+  assert.deepEqual(gabaritsReferences(p).sort(), [
+    'webshop_expedition_colis', 'webshop_expedition_palette', 'webshop_livraison_colis', 'webshop_livraison_palette',
+  ]);
+  p.transitions.transmise_fournisseur.ordre_colis = true;
+  assert.ok(gabaritsReferences(p).includes('webshop_ordre_colis'));
+  assert.equal(gabaritsManquants(p, undefined), null);
+  assert.equal(gabaritsManquants(p, null), null);
+  assert.deepEqual(gabaritsManquants(p, ['webshop_expedition_colis', 'webshop_livraison_colis', 'webshop_expedition_palette']).sort(),
+    ['webshop_livraison_palette', 'webshop_ordre_colis']);
+  assert.deepEqual(gabaritsManquants(p, gabaritsReferences(p)), []);
+});
+
+test('ordre colis sans e-mail de prestataire : avertissement', () => {
+  const p = processDepuisForm(processVersForm(buildWebshopConfig(null).process));
+  assert.equal(ordreColisSansPrestataire(p, []), false);
+  p.transitions.expediee.ordre_colis = true;
+  assert.equal(ordreColisSansPrestataire(p, []), true);
+  assert.equal(ordreColisSansPrestataire(p, ['colis@presta.fr']), false);
 });
