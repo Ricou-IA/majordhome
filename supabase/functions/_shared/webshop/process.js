@@ -6,11 +6,12 @@
 // ENVOI : colis = transitions de la commande (réglées dans settings.webshop.process),
 // palette = événements de tournée « partie » / « livrée ». Chaque e-mail ne parle
 // que des lignes de son envoi.
-// Aucun import hors ./orders.js et ./reglages.js. Copié pour Deno
+// Aucun import hors ./orders.js, ./reglages.js et ./emailTemplates.js. Copié pour Deno
 // (_shared/webshop/) par scripts/sync-tournee-engine.mjs — ne pas éditer la copie.
 // Testé : node --test scripts/webshop-process.test.mjs
 // ============================================================================
 import { canMoveTo, formatCents, ORDER_BOARD_COLUMNS } from './orders.js';
+import { blocsConfirmation } from './emailTemplates.js';
 
 /**
  * Ligne de commande telle que produite par `orderLines` (orders.js). `weightKg` est optionnel
@@ -148,10 +149,11 @@ function poidsFR(kg) {
  *   company?: { name?: string, email?: string, phone?: string } | null,
  *   slot?: { date?: string } | null,
  *   depot?: { libelle?: string, adresse?: string } | null,
+ *   siteUrl?: string | null,
  * }} p
  * @returns {Record<string, string>}
  */
-export function variablesCommande({ order, lines, envoi = null, company = null, slot = null, depot = null }) {
+export function variablesCommande({ order, lines, envoi = null, company = null, slot = null, depot = null, siteUrl = '' }) {
   const o = order ?? {};
   const toutes = Array.isArray(lines) ? lines : [];
   const parEnvoi = envoisDeCommande(toutes);
@@ -179,12 +181,18 @@ export function variablesCommande({ order, lines, envoi = null, company = null, 
     '</table>',
   ].join('');
 
+  const blocs = blocsConfirmation({
+    order: o, lines: toutes, slot: slot?.date ? slot : (o.delivery_date ? { date: o.delivery_date } : null),
+    pickupPoint: o.pickup_point_name ? { name: o.pickup_point_name } : null, siteUrl,
+  });
+
   return {
     '{{CLIENT_NAME}}': esc(nom),
     '{{ORDER_NUMBER}}': esc(o.order_number),
     '{{ITEMS}}': items,
     '{{DELIVERY_DATE}}': envoi === 'colis' ? '' : esc(dateFR(slot?.date ?? o.delivery_date)),
-    '{{DELIVERY_ADDRESS}}': retrait ? `Retrait : ${esc(pointRetrait)}` : esc(adresse),
+    // Point de retrait inconnu : vide, jamais un « Retrait : » orphelin.
+    '{{DELIVERY_ADDRESS}}': retrait ? (pointRetrait ? `Retrait : ${esc(pointRetrait)}` : '') : esc(adresse),
     '{{PICKUP_POINT}}': esc(pointRetrait),
     '{{BRAND_NAME}}': esc(company?.name),
     '{{ORG_EMAIL}}': esc(company?.email),
@@ -196,5 +204,8 @@ export function variablesCommande({ order, lines, envoi = null, company = null, 
     '{{DECLARED_VALUE}}': esc(formatCents(valeur)),
     '{{CLIENT_PHONE}}': esc(o.phone),
     '{{CLIENT_EMAIL}}': esc(o.email),
+    // Confirmation (gabarit webshop_confirmation) : la commande entière, quel que soit l'envoi.
+    '{{DELIVERY_INFO}}': blocs.livraisonHtml,
+    '{{LEGAL_INFO}}': blocs.mentionsHtml,
   };
 }

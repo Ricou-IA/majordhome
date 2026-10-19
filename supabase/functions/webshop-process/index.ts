@@ -291,6 +291,8 @@ async function executerAction(
         company: { name: ctx.branding.brandName, email: ctx.branding.fromEmail, phone: ctx.branding.phone },
         slot: slot ? { date: slot.delivery_date } : null,
         depot: oc.depot,
+        // Liens CGV / charte de {{LEGAL_INFO}} (confirmation réglée sur une transition).
+        siteUrl: typeof ctx.cfg.site_url === "string" ? ctx.cfg.site_url : "",
       });
       outcome = await issueAction(
         { action: spec.action, template: template ?? null, to, cc, branding: ctx.branding, varsHtml },
