@@ -18,9 +18,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
-import { releaseOrphanEntretienCard } from '@services/entretiens.service';
-import { approsRecues } from '@/lib/installOrder';
-import { logger } from '@lib/logger';
+import { releaseOrphanEntretienCard } from '@services/entretiens.service';import { logger } from '@lib/logger';
 
 // Buckets de type — source unique dans le module pur (re-export pour les callers
 // existants : EventModal, EventFormSections).
@@ -247,9 +245,9 @@ async function syncInterventionScheduledDate(interventionId) {
 
 /**
  * Chantier qui perd son dernier RDV d'installation actif (annulé / supprimé) :
- * sort de « Planification » — miroir de `syncCardStateOnCreate`. Retour en
- * « À planifier » si les appros sont closes, sinon en « Commande à faire » (là
- * où il était avant la pose, cf. `chantiersService.updateOrderStatus`).
+ * sort de « Planification » — miroir de `syncCardStateOnCreate`. Toujours vers
+ * « À planifier », appros reçues ou non (Eric, 2026-10-20 : un RDV annulé = une
+ * pose à refaire, la carte doit se voir là où on planifie).
  * N'agit QUE depuis « Planification » : un chantier réceptionné reste réceptionné.
  */
 async function recomputeChantierAfterUnschedule(chantierId) {
@@ -264,16 +262,13 @@ async function recomputeChantierAfterUnschedule(chantierId) {
   if (count > 0) return;
   const { data: chantier, error: readError } = await supabase
     .from('majordhome_chantiers')
-    .select('id, org_id, chantier_status, equipment_order_status, materials_order_status')
+    .select('id, org_id, chantier_status')
     .eq('id', chantierId).maybeSingle();
   if (readError) { console.error('[appointments] recomputeChantier read error:', readError); return; }
   if (chantier?.chantier_status !== 'planification') return;
-  const nextStatus = approsRecues(chantier.equipment_order_status, chantier.materials_order_status)
-    ? 'commande_recue'
-    : 'commande_a_faire';
   const { data: patched, error } = await supabase
     .from('majordhome_chantiers_write')
-    .update({ chantier_status: nextStatus, planification_date: null, updated_at: new Date().toISOString() })
+    .update({ chantier_status: 'commande_recue', planification_date: null, updated_at: new Date().toISOString() })
     .eq('id', chantier.id).eq('org_id', chantier.org_id)
     .select('id').maybeSingle();
   if (error || !patched) console.error('[appointments] recomputeChantier error:', error || 'aucune ligne (RLS ?)');
