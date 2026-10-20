@@ -16,7 +16,7 @@ import { appointmentsService } from '@services/appointments.service';
 import { auditService } from '@services/audit.service';
 import { supabase } from '@/lib/supabaseClient';
 import { getMajordhomeOrgId, unwrapResult } from '@/lib/serviceHelpers';
-import { appointmentKeys, leadKeys, tourneeKeys } from '@hooks/cacheKeys';
+import { appointmentKeys, leadKeys, tourneeKeys, chantierKeys, entretienSavKeys } from '@hooks/cacheKeys';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { construireReglages } from '@/lib/tournee/reglages.js';
@@ -288,8 +288,13 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
   const cancelMutation = useMutation({
     mutationFn: ({ appointmentId, reason }) =>
       unwrapResult(appointmentsService.cancelAppointment(appointmentId, reason)),
+    // Annuler / supprimer refait refluer la carte liée (entretien → À planifier,
+    // chantier hors Planification) : les kanbans doivent le voir sans rechargement.
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
     },
   });
 
@@ -299,6 +304,8 @@ export function useAppointments({ orgId, startDate, endDate } = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.all(orgId) });
       queryClient.invalidateQueries({ queryKey: leadKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: chantierKeys.all(orgId) });
+      queryClient.invalidateQueries({ queryKey: entretienSavKeys.all(orgId) });
     },
   });
 

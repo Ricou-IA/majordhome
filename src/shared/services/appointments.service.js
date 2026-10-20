@@ -19,6 +19,7 @@ import { getMajordhomeOrgId } from '@/lib/serviceHelpers';
 import { googleCalendarService } from '@services/googleCalendar.service';
 import { leadsService } from '@services/leads.service';
 import { releaseOrphanEntretienCard } from '@services/entretiens.service';
+import { approsRecues } from '@/lib/installOrder';
 import { logger } from '@lib/logger';
 
 // Buckets de type — source unique dans le module pur (re-export pour les callers
@@ -245,14 +246,53 @@ async function syncInterventionScheduledDate(interventionId) {
 }
 
 /**
- * Suppression / annulation de RDV : recalcule l'état de la carte entretien liée
- * (retour en « À planifier » si c'était le dernier RDV actif). Pipeline/chantier :
- * no-op (le marqueur « à replanifier » est dérivé de has_active_rdv=false dans les vues).
- * À appeler APRÈS la suppression / le changement de statut.
+ * Chantier qui perd son dernier RDV d'installation actif (annulé / supprimé) :
+ * sort de « Planification » — miroir de `syncCardStateOnCreate`. Retour en
+ * « À planifier » si les appros sont closes, sinon en « Commande à faire » (là
+ * où il était avant la pose, cf. `chantiersService.updateOrderStatus`).
+ * N'agit QUE depuis « Planification » : un chantier réceptionné reste réceptionné.
+ */
+async function recomputeChantierAfterUnschedule(chantierId) {
+  if (!chantierId) return;
+  const { count, error: countError } = await supabase
+    .from('majordhome_appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('chantier_id', chantierId)
+    .eq('appointment_type', 'installation')
+    .not('status', 'in', '(cancelled,no_show)');
+  if (countError) { console.error('[appointments] recomputeChantier count error:', countError); return; }
+  if (count > 0) return;
+  const { data: chantier, error: readError } = await supabase
+    .from('majordhome_chantiers')
+    .select('id, org_id, chantier_status, equipment_order_status, materials_order_status')
+    .eq('id', chantierId).maybeSingle();
+  if (readError) { console.error('[appointments] recomputeChantier read error:', readError); return; }
+  if (chantier?.chantier_status !== 'planification') return;
+  const nextStatus = approsRecues(chantier.equipment_order_status, chantier.materials_order_status)
+    ? 'commande_recue'
+    : 'commande_a_faire';
+  const { data: patched, error } = await supabase
+    .from('majordhome_chantiers_write')
+    .update({ chantier_status: nextStatus, planification_date: null, updated_at: new Date().toISOString() })
+    .eq('id', chantier.id).eq('org_id', chantier.org_id)
+    .select('id').maybeSingle();
+  if (error || !patched) console.error('[appointments] recomputeChantier error:', error || 'aucune ligne (RLS ?)');
+}
+
+/**
+ * Suppression / annulation de RDV : recalcule l'état de la carte liée — entretien
+ * (retour en « À planifier » si c'était le dernier RDV actif) ou chantier (sortie de
+ * « Planification »). Pipeline : no-op. À appeler APRÈS la suppression / le
+ * changement de statut.
  */
 async function syncCardStateOnDelete(appt) {
-  if (!appt?.intervention_id) return;
-  await recomputeEntretienWorkflow(appt.intervention_id);
+  if (appt?.intervention_id) {
+    await recomputeEntretienWorkflow(appt.intervention_id);
+    return;
+  }
+  if (appt?.appointment_type === 'installation') {
+    await recomputeChantierAfterUnschedule(appt.chantier_id);
+  }
 }
 
 // ============================================================================
@@ -532,9 +572,16 @@ export const appointmentsService = {
         await syncInterventionScheduledDate(appointment.intervention_id);
       }
 
-      // Reflux carte entretien si le statut du RDV a changé (annulation / réactivation)
-      if ('status' in updates && appointment?.intervention_id) {
-        await recomputeEntretienWorkflow(appointment.intervention_id);
+      // Reflux de la carte liée si le statut du RDV a changé : annulation → entretien
+      // en « À planifier » / chantier hors « Planification » ; réactivation → avancée.
+      if ('status' in updates) {
+        if (['cancelled', 'no_show'].includes(appointment?.status)) {
+          await syncCardStateOnDelete(appointment);
+        } else if (appointment?.intervention_id) {
+          await recomputeEntretienWorkflow(appointment.intervention_id);
+        } else if (appointment?.appointment_type === 'installation') {
+          await syncCardStateOnCreate(appointment);
+        }
       }
 
       // Changement de cible (re-typage) : reflux de l'ancienne carte entretien si le
