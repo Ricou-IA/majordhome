@@ -21,6 +21,7 @@ import { CertificatsSection } from '@/apps/artisan/components/entretiens/Certifi
 import { getAppointmentTypeConfig, COMMERCIAL_TYPES, APPOINTMENT_TYPES, FREE_TYPES, appointmentsService } from '@services/appointments.service';
 import { useClientSearch } from '@hooks/useClients';
 import { useLeadSearch, useRecentPipelineCards, useLeadCommercials, leadKeys } from '@hooks/useLeads';
+import { useLinkedPennylaneQuotes } from '@hooks/usePennylane';
 import { resolveCommercialMemberId, PHONE_REQUIRED_TYPES, dureeImposee } from '@/lib/planningEvents';
 import { leadsService, BOUCLABLE_STATUS_IDS } from '@services/leads.service';
 import { resolveCardForAppointment } from '@services/appointmentActivation.service';
@@ -166,6 +167,20 @@ export function EventModal({
 
   const isEdit = mode === 'edit';
   const isCancelled = appointment?.status === 'cancelled';
+
+  // Installation = un chantier : lien vers le(s) devis Pennylane de la carte.
+  // Filtré par chantier quand le RDV en porte un (un lead peut avoir plusieurs
+  // chantiers) ; devis validés d'abord, sinon tout ce qui est rattaché.
+  const installLeadId = isEdit && appointment?.appointment_type === 'installation'
+    ? appointment?.lead_id || null
+    : null;
+  const { linkedQuotes: installQuotesAll } = useLinkedPennylaneQuotes(installLeadId, {
+    chantierId: appointment?.chantier_id || null,
+  });
+  const installQuotes = useMemo(() => {
+    const validated = installQuotesAll.filter((q) => q.is_validated);
+    return validated.length > 0 ? validated : installQuotesAll;
+  }, [installQuotesAll]);
 
   // --------------------------------------------------------------------------
   // Assistant créneaux (Bloc B) — pilotage par type (CRÉATION ; l'édition garde le picker classique)
@@ -1246,6 +1261,7 @@ export function EventModal({
                   browseLeads={recentPipelineCards}
                   selectedClient={selectedClientView}
                   selectedLead={selectedLead}
+                  quotes={installQuotes}
                   navigate={navigate}
                   handleUnlinkClient={handleUnlinkClient}
                   handleUnlinkLead={handleUnlinkLead}

@@ -16,7 +16,7 @@ import {
   Phone, CalendarClock, CalendarPlus, MoveHorizontal, AlertTriangle,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput, TextArea } from '@/apps/artisan/components/FormFields';
-import { formatDateFR, formatPhoneNumber } from '@/lib/utils';
+import { formatDateFR, formatPhoneNumber, formatEuro } from '@/lib/utils';
 import {
   APPOINTMENT_TYPES,
   COMMERCIAL_TYPES,
@@ -226,6 +226,8 @@ export const SectionClient = ({
   isCancelled,
   selectedClient,
   selectedLead,
+  // quotes : devis Pennylane de la carte (RDV d'installation = chantier), liens PDF.
+  quotes = [],
   navigate,
   handleUnlinkClient,
   handleUnlinkLead,
@@ -333,6 +335,38 @@ export const SectionClient = ({
           lat={showClientChip ? selectedClient.latitude : null}
           lng={showClientChip ? selectedClient.longitude : null}
         />
+        {/* Devis du chantier : PDF Pennylane (jamais d'URL app.pennylane.com construite). */}
+        {quotes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            {quotes.map((q) => {
+              const label = q.quote_number_pl || q.quote_label || `#${q.pennylane_quote_id}`;
+              const amount = q.quote_amount_ht != null ? ` · ${formatEuro(Number(q.quote_amount_ht))} HT` : '';
+              return q.pdf_url ? (
+                <a
+                  key={q.id}
+                  href={q.pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Ouvrir le devis (PDF Pennylane)"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 hover:bg-white/60 transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Devis {label}{amount}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <span
+                  key={q.id}
+                  title="PDF pas encore synchronisé depuis Pennylane"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-white text-xs text-gray-500"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Devis {label}{amount}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     )}
 
