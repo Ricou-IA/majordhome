@@ -266,15 +266,28 @@ Deno.serve(async (req: Request) => {
     const leadThresholdHt = await getPipelineMinAmountHt(supabase, ORG_ID);
     log.push(`Seuil pipeline: ${leadThresholdHt} EUR HT (reglage d'org)`);
 
-    // 1. Récupérer tous les pl_id déjà mappés (+ le client MDH de chacun)
-    const { data: existingSyncs, error: syncsError } = await supabase
-      .from("majordhome_pennylane_sync")
-      .select("pennylane_id, local_id")
-      .eq("entity_type", "client")
-      .eq("org_id", ORG_ID);
-    if (syncsError) {
-      // Sans la liste des mappings, TOUT client PL passerait pour « nouveau ».
-      throw new Error(`[sync-error] lecture pennylane_sync: ${syncsError.message}`);
+    // 1. Récupérer tous les pl_id déjà mappés (+ le client MDH de chacun).
+    //    PAGINÉ : PostgREST plafonne une réponse à 1000 lignes. Sans pagination,
+    //    les mappings au-delà étaient invisibles, leurs customers repassaient
+    //    pour « nouveaux » à chaque heure et une fiche était recréée à chaque
+    //    passage quand rien ne permettait de la retrouver (EMILIE RIEUMES,
+    //    2026-10-21 : 1092 mappings, 4 fiches en 4 heures).
+    const existingSyncs: { pennylane_id: number; local_id: string }[] = [];
+    const SYNC_PAGE = 1000;
+    for (let from = 0; ; from += SYNC_PAGE) {
+      const { data: page, error: syncsError } = await supabase
+        .from("majordhome_pennylane_sync")
+        .select("pennylane_id, local_id")
+        .eq("entity_type", "client")
+        .eq("org_id", ORG_ID)
+        .order("local_id", { ascending: true })
+        .range(from, from + SYNC_PAGE - 1);
+      if (syncsError) {
+        // Sans la liste des mappings, TOUT client PL passerait pour « nouveau ».
+        throw new Error(`[sync-error] lecture pennylane_sync: ${syncsError.message}`);
+      }
+      existingSyncs.push(...(page || []));
+      if (!page || page.length < SYNC_PAGE) break;
     }
 
     const mappedPlIds = new Set(
