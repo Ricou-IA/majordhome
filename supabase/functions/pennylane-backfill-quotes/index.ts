@@ -154,16 +154,28 @@ Deno.serve(async (req: Request) => {
     const quotesByCustomer = buildQuotesByCustomerMap(allQuotes);
     log.push(`PL quotes fetched: ${allQuotes.length}`);
 
-    // Map pennylane_id → mdh_client_id (uniquement les déjà mappés)
-    const { data: syncRows } = await supabase
-      .from("majordhome_pennylane_sync")
-      .select("pennylane_id, local_id")
-      .eq("entity_type", "client")
-      .eq("org_id", ORG_ID);
-
+    // Map pennylane_id → mdh_client_id (uniquement les déjà mappés).
+    // PAGINÉ : PostgREST plafonne une réponse à 1000 lignes (1092 mappings
+    // Mayer le 2026-10-21) — sans pagination, les customers au-delà étaient
+    // ignorés en silence. Une erreur de lecture arrête le job (sinon il
+    // tournerait sur une liste partielle en annonçant un succès).
     const mdhClientByPlId = new Map<number, string>();
-    for (const s of (syncRows as any[]) || []) {
-      mdhClientByPlId.set(s.pennylane_id, s.local_id);
+    const SYNC_PAGE = 1000;
+    for (let from = 0; ; from += SYNC_PAGE) {
+      const { data: page, error: syncsError } = await supabase
+        .from("majordhome_pennylane_sync")
+        .select("pennylane_id, local_id")
+        .eq("entity_type", "client")
+        .eq("org_id", ORG_ID)
+        .order("local_id", { ascending: true })
+        .range(from, from + SYNC_PAGE - 1);
+      if (syncsError) {
+        throw new Error(`[sync-error] lecture pennylane_sync: ${syncsError.message}`);
+      }
+      for (const s of (page as any[]) || []) {
+        mdhClientByPlId.set(s.pennylane_id, s.local_id);
+      }
+      if (!page || page.length < SYNC_PAGE) break;
     }
     log.push(`Mapped customers: ${mdhClientByPlId.size}`);
 
