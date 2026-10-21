@@ -16,6 +16,7 @@ import { clientsService } from '@services/clients.service';
 import { equipmentsService } from '@services/equipments.service';
 import { buildKindsByClient, buildEquipmentLabelsByClient } from '@/lib/equipmentIcons';
 import { unwrapResult } from '@/lib/serviceHelpers';
+import { buildClientDuplicateProbe } from '@/lib/clientDuplicateMatch';
 import { clientKeys, contractKeys, appointmentKeys, interventionKeys } from '@hooks/cacheKeys';
 import { usePaginatedList } from '@hooks/usePaginatedList';
 import { useDebounce } from '@hooks/useDebounce';
@@ -484,25 +485,34 @@ export function useClientSearch(orgId, { debounceMs = 300, minChars = 2 } = {}) 
 }
 
 // ============================================================================
-// HOOK - useDuplicateCheck (détection doublons)
+// HOOK - useDuplicateCheck (filet anti-doublon en direct pendant la saisie)
 // ============================================================================
 
-export function useDuplicateCheck(orgId, lastName, postalCode) {
-  const debouncedLastName = useDebounce(lastName || '', 500);
-  const debouncedPostalCode = useDebounce(postalCode || '', 500);
+/**
+ * @param {string} orgId
+ * @param {{phone?: string, email?: string, firstName?: string, lastName?: string, postalCode?: string}} fields
+ * @returns {{ duplicates: Array, isChecking: boolean }} candidats annotés (matchReasons, isStrong)
+ */
+export function useDuplicateCheck(orgId, fields) {
+  const { phone = '', email = '', firstName = '', lastName = '', postalCode = '' } = fields || {};
+  const debounced = useDebounce(JSON.stringify([phone, email, firstName, lastName, postalCode]), 500);
+  const [dPhone, dEmail, dFirst, dLast, dPostal] = JSON.parse(debounced);
+  const probe = buildClientDuplicateProbe({ phone: dPhone, email: dEmail, firstName: dFirst, lastName: dLast, postalCode: dPostal });
 
   const { data: duplicates, isLoading } = useQuery({
-    queryKey: clientKeys.duplicates(orgId, debouncedLastName, debouncedPostalCode),
+    queryKey: clientKeys.duplicates(orgId, debounced),
     queryFn: async () => {
-      const { data, error } = await clientsService.checkDuplicates(orgId, debouncedLastName, debouncedPostalCode);
+      const { data, error } = await clientsService.findPotentialDuplicates({
+        orgId, phone: dPhone, email: dEmail, firstName: dFirst, lastName: dLast, postalCode: dPostal,
+      });
       if (error) throw error;
       return data;
     },
-    enabled: !!orgId && debouncedLastName.length >= 2,
+    enabled: !!orgId && !!probe,
     staleTime: 15_000,
   });
 
-  return { duplicates: duplicates || [], isChecking: isLoading };
+  return { duplicates: probe ? duplicates || [] : [], isChecking: !!probe && isLoading };
 }
 
 // ============================================================================

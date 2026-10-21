@@ -67,6 +67,7 @@ import { QuoteCandidatesModal } from './QuoteCandidatesModal';
 import { MarkWonQuoteModal } from './MarkWonQuoteModal';
 import { LinkedQuotesPanel } from './LinkedQuotesPanel';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
+import { DuplicateClientDialog } from '../shared/DuplicateClientPanel';
 import { usePennylaneEnabled } from '@hooks/useOrgSettings';
 import { useLinkedPennylaneQuotes, usePennylaneClientSearch, useImportPennylaneCustomer } from '@hooks/usePennylane';
 import CreateDevisModal from '../devis/CreateDevisModal';
@@ -100,6 +101,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const [isRequalifying, setIsRequalifying] = useState(false);
   // Filet anti-doublon à la création : candidats actifs partageant téléphone/email/nom
   const [duplicateCandidates, setDuplicateCandidates] = useState(null);
+  // Filet anti-doublon CLIENT à la requalification (fiche client créée pour le contrat)
+  const [clientDuplicateCandidates, setClientDuplicateCandidates] = useState([]);
 
   // Données
   const { lead, isLoading: loadingLead } = useLead(isEditing ? leadId : null);
@@ -902,12 +905,29 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
 
   // Requalifier lead → Entretien : crée client + contrat pending + carte Kanban
   // Entretien « À planifier », puis soft-delete du lead
-  const handleRequalifyEntretien = useCallback(async () => {
+  // existingClientId : fiche choisie dans le filet anti-doublon client ;
+  // skipDuplicateCheck : « Créer quand même ».
+  const handleRequalifyEntretien = useCallback(async ({ existingClientId = null, skipDuplicateCheck = false } = {}) => {
     if (isRequalifying || !orgId || !lead) return;
     setIsRequalifying(true);
     try {
-      let clientId = lead.client_id;
+      let clientId = lead.client_id || existingClientId;
       let projectId = null;
+
+      if (!clientId && !skipDuplicateCheck) {
+        const { data: duplicates, error: dupError } = await clientsService.findPotentialDuplicates({
+          orgId,
+          phone: form.phone, email: form.email,
+          firstName: form.first_name, lastName: form.last_name || form.company_name,
+          postalCode: form.postal_code,
+        });
+        if (dupError) {
+          toast.warning('Vérification des doublons clients indisponible — contrôlez la liste des clients');
+        } else if (duplicates?.length) {
+          setClientDuplicateCandidates(duplicates);
+          return;
+        }
+      }
 
       if (!clientId) {
         const { data: newClient, error: clientError } = await clientsService.createClient({
@@ -937,6 +957,12 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           .eq('id', clientId)
           .maybeSingle();
         projectId = clientRow?.project_id || null;
+
+        // Fiche existante choisie dans le filet : y rattacher le lead (traçabilité).
+        if (existingClientId && !lead.client_id) {
+          const { error: linkError } = await leadsService.updateLead(lead.id, { client_id: clientId });
+          if (linkError) logger.warn('[LeadModal] requalify: lien lead→client existant non posé:', linkError);
+        }
       }
 
       if (!projectId) throw new Error('Projet client introuvable — requalification impossible');
@@ -1217,7 +1243,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 handleConvert={handleConvert}
                 isConverting={isConverting}
                 currentStatus={currentStatus}
-                onRequalifyEntretien={handleRequalifyEntretien}
+                onRequalifyEntretien={() => handleRequalifyEntretien()}
                 isRequalifying={isRequalifying}
               />
             </>
@@ -1429,6 +1455,22 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
           </p>
         </div>
       </ConfirmDialog>
+
+      {/* Filet anti-doublon CLIENT à la requalification : rattacher la fiche existante ou en créer une */}
+      <DuplicateClientDialog
+        open={clientDuplicateCandidates.length > 0}
+        candidates={clientDuplicateCandidates}
+        chooseLabel="Utiliser cette fiche"
+        onChoose={(existing) => {
+          setClientDuplicateCandidates([]);
+          handleRequalifyEntretien({ existingClientId: existing.id });
+        }}
+        onCreateAnyway={() => {
+          setClientDuplicateCandidates([]);
+          handleRequalifyEntretien({ skipDuplicateCheck: true });
+        }}
+        onCancel={() => setClientDuplicateCandidates([])}
+      />
 
       {/* Filet anti-doublon à la création : ouvrir la carte existante ou créer quand même */}
       <DuplicateLeadDialog

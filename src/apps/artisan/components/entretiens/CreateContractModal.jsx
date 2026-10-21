@@ -104,8 +104,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
   });
   const { duplicates, isChecking: checkingDuplicates } = useDuplicateCheck(
     orgId,
-    clientMode === 'create' ? newClientData.lastName : '',
-    clientMode === 'create' ? newClientData.postalCode : ''
+    clientMode === 'create' ? newClientData : null,
   );
   const { createContractWithClient, isCreating } = useCreateContractWithClient();
 
@@ -210,7 +209,7 @@ export function CreateContractModal({ isOpen, onClose, onSuccess, preSelectedCli
 
   const handleClientDataChange = useCallback((field, value) => {
     setNewClientData((prev) => ({ ...prev, [field]: value }));
-    if (field === 'lastName' || field === 'postalCode') {
+    if (['lastName', 'firstName', 'postalCode', 'phone', 'email'].includes(field)) {
       setDuplicateAcknowledged(false);
     }
   }, []);

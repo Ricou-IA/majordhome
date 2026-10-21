@@ -28,6 +28,7 @@ import { geocodeAndUpdateByProjectId, setClientLocation } from '@services/geocod
 import { MODAL_PANEL_PHONE, MODAL_FOOTER_PHONE } from '@/lib/modalClasses';
 import { TabInfo, TabEquipments, TabHistory, CategoryBadge } from './ClientModalTabs';
 import { TabContrat } from '../../pages/client-detail/TabContrat';
+import { DuplicateClientDialog } from '../shared/DuplicateClientPanel';
 
 // ============================================================================
 // CONSTANTES
@@ -82,6 +83,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
+  const [duplicateCandidates, setDuplicateCandidates] = useState([]);
 
   const originalDataRef = useRef({});
   const contentRef = useRef(null);
@@ -169,7 +171,8 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
   }, [formData]);
 
   // Sauvegarde
-  const handleSave = async () => {
+  // skipDuplicateCheck : « Créer quand même » depuis le filet anti-doublon.
+  const handleSave = async ({ skipDuplicateCheck = false } = {}) => {
     if (!validate()) return;
     setSaving(true);
     setSaveSuccess(false);
@@ -177,6 +180,22 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
     try {
       if (isCreateMode) {
         if (!orgId) throw new Error('Organisation non disponible');
+
+        // Filet anti-doublon (ERNY 2026-09-22 : fiche recréée à l'identique).
+        if (!skipDuplicateCheck) {
+          const { data: duplicates, error: dupError } = await clientsService.findPotentialDuplicates({
+            orgId,
+            phone: formData.phone, phoneSecondary: formData.phoneSecondary, email: formData.email,
+            firstName: formData.firstName, lastName: formData.lastName, postalCode: formData.postalCode,
+          });
+          if (dupError) {
+            toast.warning('Vérification des doublons indisponible — contrôlez la liste des clients');
+          } else if (duplicates?.length) {
+            setDuplicateCandidates(duplicates);
+            return;
+          }
+        }
+        setDuplicateCandidates([]);
         const { data: newClient, error } = await clientsService.createClient({
           orgId,
           firstName: formData.firstName, lastName: formData.lastName,
@@ -399,7 +418,7 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
             </button>
             {!isLocked && activeTab === 'info' && (
               <button
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 disabled={saving}
                 className={`inline-flex items-center gap-2 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
                   isCreateMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
@@ -421,6 +440,19 @@ export function ClientModal({ clientId, isOpen, onClose, onSaved, onCreated }) {
           </div>
         </div>
       </div>
+
+      <DuplicateClientDialog
+        open={duplicateCandidates.length > 0}
+        candidates={duplicateCandidates}
+        chooseLabel="Ouvrir cette fiche"
+        onChoose={async (existing) => {
+          setDuplicateCandidates([]);
+          await onCreated?.(existing);
+          onClose();
+        }}
+        onCreateAnyway={() => handleSave({ skipDuplicateCheck: true })}
+        onCancel={() => setDuplicateCandidates([])}
+      />
     </>
   );
 }

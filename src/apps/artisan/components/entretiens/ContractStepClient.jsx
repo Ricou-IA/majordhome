@@ -9,13 +9,13 @@
 import {
   Search,
   UserPlus,
-  AlertTriangle,
   AlertCircle,
   Check,
   User,
   Loader2,
 } from 'lucide-react';
 import { FormField, TextInput, SelectInput } from '../FormFields';
+import { DuplicateClientPanel } from '../shared/DuplicateClientPanel';
 
 // ============================================================================
 // CONSTANTES
@@ -71,27 +71,6 @@ const SearchResultCard = ({ client, onSelect, selected = false }) => {
     </button>
   );
 };
-
-const DuplicateCard = ({ client, onChoose }) => (
-  <div className="flex items-center justify-between gap-3 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
-    <div className="min-w-0">
-      <p className="text-sm font-medium text-amber-900 truncate">
-        {client.display_name || `${client.last_name || ''} ${client.first_name || ''}`.trim()}
-      </p>
-      <p className="text-xs text-amber-700 truncate">
-        {[client.postal_code, client.city].filter(Boolean).join(' ')}
-        {client.has_active_contract && ' · Contrat actif'}
-      </p>
-    </div>
-    <button
-      type="button"
-      onClick={() => onChoose(client)}
-      className="text-xs font-medium text-amber-800 hover:text-amber-900 underline flex-shrink-0"
-    >
-      Choisir
-    </button>
-  </div>
-);
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -282,26 +261,12 @@ export function Step1Client({
 
           {/* Détection doublons */}
           {duplicates.length > 0 && !duplicateAcknowledged && (
-            <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-                <p className="text-sm font-medium text-amber-800">
-                  {duplicates.length === 1 ? 'Client similaire détecté' : `${duplicates.length} clients similaires détectés`}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                {duplicates.map((dup) => (
-                  <DuplicateCard key={dup.id} client={dup} onChoose={onChooseDuplicate} />
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={onAcknowledgeDuplicates}
-                className="mt-2 text-xs font-medium text-amber-700 hover:text-amber-900 underline"
-              >
-                Ignorer et créer un nouveau client
-              </button>
-            </div>
+            <DuplicateClientPanel
+              candidates={duplicates}
+              chooseLabel="Choisir"
+              onChoose={onChooseDuplicate}
+              onCreateAnyway={onAcknowledgeDuplicates}
+            />
           )}
 
           {checkingDuplicates && newClientData.lastName.length >= 2 && (

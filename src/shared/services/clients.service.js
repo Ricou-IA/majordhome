@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling, withErrorHandlingCount } from '@/lib/serviceHelpers';
 import { cleanPhone, formatPhoneForSearch } from '@/lib/phoneUtils';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { buildClientDuplicateProbe, matchClientDuplicates, phoneSearchPatterns } from '@/lib/clientDuplicateMatch';
 import { equipmentsService } from '@services/equipments.service';
 
 // ============================================================================
@@ -852,35 +853,45 @@ export const clientsService = {
   // ==========================================================================
 
   /**
-   * Détection de doublons par nom + code postal
-   * Utilisé lors de la création d'un nouveau client pour éviter les doublons
-   * @param {string} orgId - UUID de l'organisation
-   * @param {string} lastName - Nom de famille à chercher (case-insensitive)
-   * @param {string} [postalCode] - Code postal (optionnel, affine la recherche)
-   * @returns {{ data: Array, error: null|Error }}
+   * Filet anti-doublon à la création d'une fiche client : téléphone (principal
+   * ou secondaire), email, nom + prénom, nom dans le même code postal.
+   * Requête LARGE (ILIKE) puis CONFIRMATION par le module pur clientDuplicateMatch
+   * (élimine les faux positifs, annote matchReasons + isStrong pour l'UI).
+   * @param {{orgId: string, phone?: string, phoneSecondary?: string, email?: string, firstName?: string, lastName?: string, postalCode?: string}} input
+   * @returns {{ data: Array, error: null|Error }} candidats confirmés, forts d'abord
    */
-  async checkDuplicates(orgId, lastName, postalCode) {
-    return withErrorHandling(async () => {
-      if (!orgId || !lastName || lastName.trim().length < 2) {
-        return [];
-      }
+  async findPotentialDuplicates({ orgId, phone, phoneSecondary, email, firstName, lastName, postalCode } = {}) {
+    const probe = buildClientDuplicateProbe({ phone, phoneSecondary, email, firstName, lastName, postalCode });
+    if (!orgId || !probe) return { data: [], error: null };
 
-      let query = supabase
+    return withErrorHandling(async () => {
+      // P0.26 : chaque terme interpolé dans .or() passe par escapePostgrestSearchTerm.
+      const orClauses = [];
+      probe.phoneKeys.flatMap(phoneSearchPatterns).forEach((pattern) => {
+        const term = escapePostgrestSearchTerm(pattern);
+        if (term) orClauses.push(`phone.ilike.%${term}%`, `phone_secondary.ilike.%${term}%`);
+      });
+      if (probe.emailKey) {
+        const term = escapePostgrestSearchTerm(probe.emailKey);
+        if (term) orClauses.push(`email.ilike.${term}`);
+      }
+      if (lastName && (probe.nameKey || probe.postalCode)) {
+        const term = escapePostgrestSearchTerm(String(lastName).trim());
+        if (term) orClauses.push(`last_name.ilike.${term}`);
+      }
+      if (!orClauses.length) return [];
+
+      const { data, error } = await supabase
         .from('majordhome_clients')
-        .select('id, display_name, first_name, last_name, email, phone, postal_code, city, has_active_contract, client_number')
+        .select('id, display_name, first_name, last_name, email, phone, phone_secondary, address, postal_code, city, has_active_contract, client_number, created_at')
         .eq('org_id', orgId)
         .eq('is_archived', false)
-        .ilike('last_name', lastName.trim());
-
-      if (postalCode && postalCode.trim().length >= 2) {
-        query = query.eq('postal_code', postalCode.trim());
-      }
-
-      const { data, error } = await query.limit(5);
+        .or(orClauses.join(','))
+        .limit(20);
 
       if (error) throw error;
-      return data || [];
-    }, 'clients.checkDuplicates');
+      return matchClientDuplicates(data || [], probe);
+    }, 'clients.findPotentialDuplicates');
   },
 
   // ==========================================================================

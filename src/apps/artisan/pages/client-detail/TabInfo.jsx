@@ -89,6 +89,11 @@ function LinkClientSearch({ clientId, orgId, onLink, isLinking }) {
   // Callback après création d'un nouveau client via la modale
   const handleClientCreated = async (newClient) => {
     if (!newClient?.id) return;
+    // Le filet anti-doublon peut renvoyer la fiche courante elle-même.
+    if (newClient.id === clientId) {
+      toast.error('Ce client est la fiche en cours : impossible de le lier à lui-même');
+      return;
+    }
     try {
       if (linkAs === 'proprietaire') {
         await onLink({ tenantId: clientId, ownerId: newClient.id });

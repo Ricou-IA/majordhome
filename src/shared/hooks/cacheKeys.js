@@ -49,7 +49,7 @@ export const clientKeys = {
   equipmentKinds: (orgId) => [...clientKeys.all(orgId), 'equipment-kinds'],
   brands: (orgId) => [...clientKeys.all(orgId), 'brands'],
   pricingTypes: (orgId) => [...clientKeys.all(orgId), 'pricing-types'],
-  duplicates: (orgId, name, postal) => [...clientKeys.all(orgId), 'duplicates', name, postal],
+  duplicates: (orgId, probe) => [...clientKeys.all(orgId), 'duplicates', probe],
   linked: (orgId, clientId) => [...clientKeys.all(orgId), 'linked', clientId],
 };
 
