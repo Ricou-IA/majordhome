@@ -39,7 +39,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'team_members', columns: null },
   { schema: 'majordhome', table: 'commercials', columns: null }, // 20261005_1 : commercial_set_for_user (liste « Commercial assigné »)
   // auth_user_id : cité par les policies portail client (client_portal_select_own_*) des tables contracts/equipments/interventions
-  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name'] }, // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
+  { schema: 'majordhome', table: 'clients', columns: ['id', 'org_id', 'project_id', 'email', 'first_name', 'last_name', 'display_name', 'phone', 'phone_secondary', 'sms_optin', 'address', 'postal_code', 'city', 'lead_source', 'is_web_draft', 'auth_user_id', 'created_at', 'updated_at', 'client_number', 'pennylane_account_number', 'is_archived', 'address_complement', 'company_name', 'client_category'] }, // client_category : 20261021_1 (find_or_create_client crée la fiche) // address_complement / company_name : 20261011_1 (push identité PL) // 20260930_16 : lus par la vue majordhome_lead_pennylane_quotes ; is_archived : 20261004_1 (agent_verifier_client_candidats)
   { schema: 'majordhome', table: 'equipments', columns: null },
   // contracts / interventions / leads : toutes les colonnes (DDL seul), les vues
   // majordhome_entretien_sav / majordhome_chantiers (20260922_1) en citent des dizaines.
@@ -51,6 +51,8 @@ const TABLES = [
   { schema: 'majordhome', table: 'statuses', columns: null }, // 20261012_3 : lead_search_for_attach (status_label) ; petite table, données incluses
   { schema: 'majordhome', table: 'sources', columns: null }, // 20261012_4 : lead_search (source_name) ; petite table, données incluses
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
+  { schema: 'majordhome', table: 'client_creation_audit', columns: null, data: false }, // 20261021_1 : find_or_create_client trace ses décisions (dont « ambiguous »)
+  { schema: 'majordhome', table: 'dedup_candidates', columns: null, data: false }, // 20261021_1 : find_or_create_client y signale un e-mail partagé
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
   { schema: 'majordhome', table: 'appointments', columns: null, data: false }, // toutes les colonnes : auto_rdv_poser en écrit une vingtaine
   { schema: 'majordhome', table: 'appointment_technicians', columns: null, data: false },
@@ -167,6 +169,7 @@ const FUNCTIONS = [
   'public.webshop_order_move_slot(uuid, uuid)',
   'public.webshop_slot_send_now(uuid)',
   'public.webshop_slot_send_result(uuid)',
+  'public.find_or_create_client(uuid, text, text, text, text, text, text, text, text, text, text, text, text)', // 20261021_1 : remplacée (rapprochement fort)
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).

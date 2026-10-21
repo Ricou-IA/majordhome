@@ -4,7 +4,11 @@
 //
 // Détecte les nouveaux clients Pennylane (sans mapping pennylane_sync)
 // et crée automatiquement :
-//   1. Le client dans majordhome.clients (+ code 411)
+//   1. Le client dans majordhome.clients (+ code 411) — SAUF si une fiche
+//      existe déjà : même téléphone (9 derniers chiffres) ou même e-mail, noms
+//      compatibles ⇒ rattachée ; candidat fort mais incertain ⇒ rien n'est
+//      créé, le customer reste non mappé (`ambiguous`, tracé dans
+//      client_creation_audit) — 20261021_1, après 11 doublons fabriqués ici.
 //   2. SI le client a un devis >= 500€ HT ET qu'un lead ACTIF correspond
 //      (email / téléphone / client_id) : passe ce lead en "Devis envoyé" et y
 //      attache les devis. Sinon (action `no_lead`) : ne crée RIEN — le devis
@@ -308,6 +312,7 @@ Deno.serve(async (req: Request) => {
     let leadsCreated = 0;
     let leadsUpdated = 0;
     let plDuplicatesSkipped = 0;
+    let ambiguousSkipped = 0;
     let syncErrors = 0;
     const duplicates: DuplicateRow[] = [];
 
@@ -341,6 +346,8 @@ Deno.serve(async (req: Request) => {
             p_client_category: isCompany ? "entreprise" : "particulier",
             p_pennylane_account_number: pl411,
             p_source: "cron_pennylane",
+            // Un flux serveur ne fabrique pas de doublon : dans le doute, rien.
+            p_refuse_ambiguous: true,
           }
         );
 
@@ -351,8 +358,16 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const clientId: string = (rpcResult as any).client_id;
         const rpcAction: string = (rpcResult as any).action;
+        if (rpcAction === "ambiguous") {
+          ambiguousSkipped++;
+          const candidates = ((rpcResult as any).candidate_client_ids || []).join(", ");
+          log.push(
+            `[ambiguous] ${displayName} pl=${plCustomer.id} → aucune fiche créée ni rattachée (${(rpcResult as any).match_type} : ${candidates})`
+          );
+          continue;
+        }
+        const clientId: string = (rpcResult as any).client_id;
         const fuzzyId: string | null = (rpcResult as any).fuzzy_candidate_id;
 
         if (rpcAction === "matched_strict" || rpcAction === "matched_via_lead") {
@@ -515,6 +530,7 @@ Deno.serve(async (req: Request) => {
       leads_created: leadsCreated,
       leads_updated: leadsUpdated,
       pl_duplicates_skipped: plDuplicatesSkipped,
+      ambiguous_skipped: ambiguousSkipped,
       sync_errors: syncErrors,
       log,
     });
