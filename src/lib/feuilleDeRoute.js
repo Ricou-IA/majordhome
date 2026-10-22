@@ -120,6 +120,35 @@ export function lireDirections(json, nbPoints) {
   };
 }
 
+/**
+ * Polyline encodée (précision 5, `geometries=polyline` de Directions) → coordonnées
+ * GeoJSON `[lng, lat]` pour tracer la route sur une carte interactive.
+ * @param {string|null} encoded
+ * @returns {Array<[number, number]>} vide si absente / illisible
+ */
+export function decoderPolyline(encoded) {
+  if (typeof encoded !== 'string' || encoded === '') return [];
+  const coords = [];
+  let i = 0; let lat = 0; let lng = 0;
+  const lire = () => {
+    let result = 0; let shift = 0; let b;
+    do {
+      if (i >= encoded.length) return null;
+      b = encoded.charCodeAt(i++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    return (result & 1) ? ~(result >> 1) : (result >> 1);
+  };
+  while (i < encoded.length) {
+    const dLat = lire(); const dLng = lire();
+    if (dLat === null || dLng === null) return [];
+    lat += dLat; lng += dLng;
+    coords.push([lng / 1e5, lat / 1e5]);
+  }
+  return coords;
+}
+
 /** Tronçons estimés à vol d'oiseau (repli Mapbox indisponible). */
 export function estimerTroncons(points = []) {
   const out = [];

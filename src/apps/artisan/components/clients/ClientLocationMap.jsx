@@ -10,16 +10,28 @@
  *  2. sinon (adresse modifiée, ou jamais géocodée) : estimation BAN en direct
  *     de l'adresse saisie, puis repli sur la commune — toujours signalée
  *     comme estimée, rien n'est écrit en base.
+ *
+ * Route siège → client : 1 appel Mapbox Directions (même service que la feuille
+ * de route), en cache 24 h par couple de coordonnées — rien en base (conditions
+ * Mapbox sur le stockage + départ variable). Repli vol d'oiseau signalé.
  * ============================================================================
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Loader2 } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@/lib/mapbox';
 import { haversineKm } from '@/lib/sectorClustering';
 import { geocodeAddress, geocodeCommune } from '@services/geocoding.service';
+import { feuilleDeRouteService } from '@services/feuilleDeRoute.service';
+import { appointmentKeys } from '@hooks/cacheKeys';
+import { useAuth } from '@contexts/AuthContext';
+import { cleItineraire, decoderPolyline, formatDureeRoute, formatKm } from '@/lib/feuilleDeRoute';
+
+const JOUR_MS = 24 * 60 * 60 * 1000;
+const ROUTE_COLOR = '#2563eb';
 
 const CLIENT_COLOR = '#2563eb'; // bleu
 const SIEGE_COLOR = '#475569'; // ardoise — palette deutan, jamais rouge/vert
@@ -91,7 +103,24 @@ const LEGENDE_SOURCE = {
  */
 export function ClientLocationMap({ saved, savedAddress, address, postalCode, city, siege, mapHeight = 'h-[300px]' }) {
   const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  // Carte dont le style est chargé (instance) : déclenche le tracé de la route.
+  const [carteChargee, setCarteChargee] = useState(null);
+  const { organization } = useAuth();
   const { point, source, isLoading } = useClientPoint({ saved, savedAddress, address, postalCode, city });
+
+  const points = point && siege
+    ? [{ lat: Number(siege.lat), lng: Number(siege.lng) }, { lat: point.lat, lng: point.lng }]
+    : [];
+  const routeQuery = useQuery({
+    queryKey: appointmentKeys.routeLegs(organization?.id, cleItineraire(points)),
+    queryFn: async () => (await feuilleDeRouteService.calculerTroncons(points)).data,
+    enabled: !!organization?.id && points.length === 2,
+    staleTime: JOUR_MS,
+    gcTime: JOUR_MS,
+  });
+  const route = routeQuery.data || null;
+  const geometry = route?.geometry || null;
 
   useEffect(() => {
     if (!containerRef.current || !MAPBOX_CONFIG.accessToken) return undefined;
@@ -118,8 +147,28 @@ export function ClientLocationMap({ saved, savedAddress, address, postalCode, ci
       bounds.extend([point.lng, point.lat]);
     }
     if (point && siege) map.fitBounds(bounds, { padding: 48, maxZoom: 13, duration: 0 });
-    return () => map.remove();
+    mapRef.current = map;
+    map.once('load', () => setCarteChargee(map));
+    return () => { mapRef.current = null; map.remove(); };
   }, [point?.lat, point?.lng, siege?.lat, siege?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tracé de la route, posé quand la carte est chargée ET la réponse arrivée (ordre libre).
+  useEffect(() => {
+    const map = carteChargee;
+    const coords = decoderPolyline(geometry);
+    if (!map || map !== mapRef.current || coords.length < 2) return undefined;
+    if (!map.getSource('route')) {
+      map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
+      map.addLayer({
+        id: 'route', type: 'line', source: 'route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': ROUTE_COLOR, 'line-width': 4, 'line-opacity': 0.7 },
+      });
+    }
+    return () => {
+      if (mapRef.current === map && map.getLayer('route')) { map.removeLayer('route'); map.removeSource('route'); }
+    };
+  }, [carteChargee, geometry]);
 
   if (!MAPBOX_CONFIG.accessToken) {
     return <p className="text-xs text-secondary-500">Carte indisponible (jeton Mapbox absent).</p>;
@@ -153,7 +202,16 @@ export function ClientLocationMap({ saved, savedAddress, address, postalCode, ci
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: SIEGE_COLOR }} /> {siege.label}
           </span>
         )}
-        {km !== null && <span>{km} km à vol d’oiseau</span>}
+        {route?.troncons?.[0] && !route.estime ? (
+          <span className="font-medium text-secondary-800">
+            {formatDureeRoute(route.troncons[0].minutes)} · {formatKm(route.troncons[0].km)} par la route
+          </span>
+        ) : km !== null && (
+          <span>
+            {km} km à vol d’oiseau
+            {route?.estime && <span className="text-amber-700"> (calcul routier indisponible)</span>}
+          </span>
+        )}
       </div>
       {legende && <p className="text-xs text-amber-700">{legende}</p>}
       {!siege && (

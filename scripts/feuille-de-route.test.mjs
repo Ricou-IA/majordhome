@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   arretsDeLaJournee, pointsItineraire, urlDirections, lireDirections, estimerTroncons,
   lienGoogleMapsTournee, urlCarteStatique, buildFeuilleDeRoute, formatDureeRoute, formatKm,
+  decoderPolyline,
 } from '../src/lib/feuilleDeRoute.js';
 
 const MOH = 'tm-moh';
@@ -145,4 +146,12 @@ test('buildFeuilleDeRoute : libellés de départ et d arrivée, compat depot seu
   const c = buildFeuilleDeRoute({ date: '2026-10-26', person: { displayName: 'M' }, depot, arrets: [rdv()] });
   assert.equal(c.departLabel, 'Siège Gaillac');
   assert.equal(c.retourLabel, 'Siège Gaillac');
+});
+
+test('decoderPolyline : exemple de référence Google, [lng, lat], vide si illisible', () => {
+  // Exemple de la documentation Google (Encoded Polyline Algorithm Format).
+  assert.deepEqual(decoderPolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@'), [[-120.2, 38.5], [-120.95, 40.7], [-126.453, 43.252]]);
+  assert.deepEqual(decoderPolyline(''), []);
+  assert.deepEqual(decoderPolyline(null), []);
+  assert.deepEqual(decoderPolyline('_p~iF'), []);
 });
