@@ -354,7 +354,7 @@ export const SectionClient = ({
             } : null}
             {...mapAddress}
             siege={siege}
-            mapHeight="min-h-[220px]"
+            mapHeight="h-[220px]"
           />
         )}
         {/* Devis du chantier : PDF Pennylane (jamais d'URL app.pennylane.com construite). */}

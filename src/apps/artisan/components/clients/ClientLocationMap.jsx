@@ -87,9 +87,9 @@ const LEGENDE_SOURCE = {
  * @param {string} props.postalCode
  * @param {string} props.city
  * @param {{lat:number,lng:number,label:string}|null} props.siege  getOrgHeadquarters(settings)
- * @param {string} [props.mapHeight]  classe de hauteur minimale de la carte
+ * @param {string} [props.mapHeight]  classe de hauteur EXPLICITE de la carte (Mapbox a besoin d'une hauteur définie)
  */
-export function ClientLocationMap({ saved, savedAddress, address, postalCode, city, siege, mapHeight = 'min-h-[280px]' }) {
+export function ClientLocationMap({ saved, savedAddress, address, postalCode, city, siege, mapHeight = 'h-[300px]' }) {
   const containerRef = useRef(null);
   const { point, source, isLoading } = useClientPoint({ saved, savedAddress, address, postalCode, city });
 
@@ -130,8 +130,9 @@ export function ClientLocationMap({ saved, savedAddress, address, postalCode, ci
 
   return (
     <div className="flex h-full flex-col gap-2">
-      <div className={`relative ${mapHeight} flex-1 overflow-hidden rounded-lg border border-secondary-200 bg-secondary-50`}>
-        <div ref={containerRef} className="absolute inset-0" />
+      <div className={`relative ${mapHeight} overflow-hidden rounded-lg border border-secondary-200 bg-secondary-50`}>
+        {/* Pas d'`absolute` ici : la classe .mapboxgl-map force position:relative → hauteur nulle. */}
+        <div ref={containerRef} className="h-full w-full" />
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-secondary-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Localisation…
