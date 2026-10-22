@@ -30,7 +30,14 @@ function LigneExtremite({ ligne, point, departPoint, canEdit, onSave, disabled }
     if (perso) onSave({ [ligne.patchReset]: true });
   };
   const choisirAdresse = (res) => {
-    onSave({ [ligne.patchPoint]: { label: (libelle || 'Domicile').trim(), address: res.label, lat: res.lat, lng: res.lng } });
+    // Une ville seule (« Bouloc, Haute-Garonne, France ») n'a pas de code postal à
+    // afficher : on met la commune dans le libellé par défaut (« Domicile (Bouloc) »).
+    const base = (libelle || 'Domicile').trim();
+    const premier = String(res.label || '').split(',')[0].trim();
+    const ville = premier && !/\d/.test(premier) && base === 'Domicile' ? premier : null;
+    const label = ville ? `${base} (${ville})` : base;
+    setLibelle(label);
+    onSave({ [ligne.patchPoint]: { label, address: res.label, lat: res.lat, lng: res.lng } });
   };
   const enregistrerLibelle = () => {
     const l = (libelle || '').trim() || 'Domicile';
@@ -95,7 +102,8 @@ function LigneExtremite({ ligne, point, departPoint, canEdit, onSave, disabled }
           <AddressSearch
             initialValue={point?.address || ''}
             onSelect={choisirAdresse}
-            placeholder="Rechercher l’adresse…"
+            placeholder="Ville ou adresse…"
+            types="place,locality,postcode,address"
             disabled={disabled}
           />
         </div>

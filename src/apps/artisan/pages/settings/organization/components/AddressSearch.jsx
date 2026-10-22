@@ -11,12 +11,16 @@ import { MAPBOX_CONFIG } from '@lib/mapbox';
  * @param {Function} props.onSelect - (result) => void
  * @param {string} [props.placeholder]
  * @param {boolean} [props.disabled]
+ * @param {string} [props.types] - filtre Mapbox (ex. 'place,locality,postcode,address' : une ville suffit)
+ * @param {boolean} [props.autoFocus]
  */
 export default function AddressSearch({
   initialValue = '',
   onSelect,
   placeholder = '🔍 Rechercher une adresse...',
   disabled = false,
+  types = null,
+  autoFocus = false,
 }) {
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState([]);
@@ -24,9 +28,13 @@ export default function AddressSearch({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [error, setError] = useState(null);
   const debounceTimer = useRef(null);
+  // Dernier libellé réellement choisi : un texte tapé sans choisir une proposition
+  // n'est PAS enregistré — on le dit au lieu de le laisser croire.
+  const [chosen, setChosen] = useState(initialValue);
 
   useEffect(() => {
     setQuery(initialValue);
+    setChosen(initialValue);
   }, [initialValue]);
 
   useEffect(() => {
@@ -41,7 +49,7 @@ export default function AddressSearch({
       try {
         const token = MAPBOX_CONFIG.accessToken;
         if (!token) throw new Error('VITE_MAPBOX_TOKEN non configuré');
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=fr&language=fr&access_token=${token}&limit=5`;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=fr&language=fr&access_token=${token}&limit=5${types ? `&types=${encodeURIComponent(types)}` : ''}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -54,7 +62,7 @@ export default function AddressSearch({
       }
     }, 300);
     return () => clearTimeout(debounceTimer.current);
-  }, [query]);
+  }, [query, types]);
 
   const handleSelect = (feature) => {
     const [lng, lat] = feature.center;
@@ -70,6 +78,7 @@ export default function AddressSearch({
       }
     }
     setQuery(feature.place_name);
+    setChosen(feature.place_name);
     setShowSuggestions(false);
     onSelect({
       lat,
@@ -92,6 +101,14 @@ export default function AddressSearch({
           }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          onKeyDown={(e) => {
+            // Entrée = la première proposition (« Bouloc » ↵ suffit).
+            if (e.key === 'Enter' && suggestions.length > 0) {
+              e.preventDefault();
+              handleSelect(suggestions[0]);
+            }
+          }}
+          autoFocus={autoFocus}
           disabled={disabled}
           placeholder={placeholder}
           className="w-full pl-10 pr-10 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-secondary-50"
@@ -103,6 +120,10 @@ export default function AddressSearch({
 
       {error && (
         <p className="mt-1 text-xs text-red-600">⚠️ {error} — utilise la saisie manuelle ci-dessous.</p>
+      )}
+
+      {!error && !showSuggestions && query.trim() !== '' && query !== chosen && (
+        <p className="mt-1 text-xs text-amber-700">Choisissez une proposition de la liste : rien n&apos;est enregistré tant que ce n&apos;est pas fait.</p>
       )}
 
       {showSuggestions && suggestions.length > 0 && (

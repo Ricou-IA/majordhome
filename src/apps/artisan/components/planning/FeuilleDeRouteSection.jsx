@@ -8,33 +8,90 @@
  * Départ / Arrivée : un responsable peut imposer l'agence pour CE jour quand le
  * technicien part / rentre d'ailleurs (exception enregistrée, lue aussi par le
  * moteur de tournées).
+ * Simulation : tout le monde peut essayer un autre départ / arrivée (une ville
+ * suffit) pour voir les trajets en direct — local, jamais enregistré.
  * ============================================================================
  */
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Car, Loader2, MapPin, Navigation, Printer, Home } from 'lucide-react';
+import { AlertTriangle, Car, Crosshair, Loader2, MapPin, Navigation, Printer, Home, X } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useFeuilleDeRoute } from '@hooks/useFeuilleDeRoute';
 import { formatDureeRoute, formatKm } from '@/lib/feuilleDeRoute';
 import { resoudreExtremites } from '@/lib/tournee/extremites.js';
+import AddressSearch from '@apps/artisan/pages/settings/organization/components/AddressSearch';
 import { telechargerFeuilleDeRoute } from './feuilleDeRouteExport';
 
 const LIBELLE_COTE = { depart: 'Départ', retour: 'Arrivée' };
+
+/** Résultat AddressSearch → point simulé (« Bouloc, Haute-Garonne, France » → « Bouloc »). */
+function pointSimule(res) {
+  const premier = String(res.label || '').split(',')[0].trim();
+  return { lat: res.lat, lng: res.lng, label: premier || 'Point simulé', address: res.label, source: 'simulation' };
+}
+
+/** « Simuler » : recherche ville / adresse en ligne, ou le point simulé avec sa croix. */
+function Simulation({ cote, simule, onSimuler }) {
+  const [ouvert, setOuvert] = useState(false);
+  if (simule) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-amber-900">{simule.label}</span>
+        <span className="font-normal text-amber-700">simulation</span>
+        <button
+          type="button"
+          onClick={() => onSimuler(cote, null)}
+          className="text-gray-400 hover:text-gray-700"
+          aria-label={`Annuler la simulation (${LIBELLE_COTE[cote]})`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </span>
+    );
+  }
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        className="inline-flex items-center gap-0.5 font-normal text-gray-400 hover:text-primary-700"
+      >
+        <Crosshair className="h-3.5 w-3.5" /> Simuler
+      </button>
+    );
+  }
+  return (
+    <span className="flex w-full items-center gap-1.5 pl-5">
+      <span className="flex-1">
+        <AddressSearch
+          onSelect={(res) => { setOuvert(false); onSimuler(cote, pointSimule(res)); }}
+          placeholder="Ville ou adresse…"
+          types="place,locality,postcode,address"
+          autoFocus
+        />
+      </span>
+      <button type="button" onClick={() => setOuvert(false)} className="text-gray-400 hover:text-gray-700" aria-label="Fermer">
+        <X className="h-4 w-4" />
+      </button>
+    </span>
+  );
+}
 
 /**
  * Ligne « Départ · … » / « Arrivée · … ». Avec un point personnel et le droit de
  * choisir : deux boutons Agence / Domicile ; sinon le libellé seul.
  */
-function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange, disabled }) {
+function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange, disabled, simule, onSimuler }) {
   // Libellé du point personnel seul (sans siège) — null s'il n'y en a pas.
   const perso = resoudreExtremites({ siege: null, membre })[cote];
   const libelle = point?.label || 'Agence';
-  if (!peutChoisir || !perso) {
+  const simulation = <Simulation cote={cote} simule={simule} onSimuler={onSimuler} />;
+  if (simule || !peutChoisir || !perso) {
     return (
-      <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-        <Home className="h-3.5 w-3.5" /> {LIBELLE_COTE[cote]} · {libelle}
+      <li className="flex items-center gap-1.5 text-xs font-medium text-gray-600 flex-wrap">
+        <Home className="h-3.5 w-3.5" /> {LIBELLE_COTE[cote]} · {!simule && <>{libelle} </>}{simulation}
       </li>
     );
   }
@@ -69,6 +126,7 @@ function ExtremiteChoix({ cote, point, membre, exception, peutChoisir, onChange,
         {bouton('agence', 'Agence')}
       </span>
       {disabled && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {simulation}
     </li>
   );
 }
@@ -90,11 +148,24 @@ function Troncon({ troncon, label, estime }) {
 export function FeuilleDeRouteSection({ date, memberIds, person }) {
   const { organization } = useAuth();
   const { settings } = useOrgSettings();
+  // Simulation propre à CETTE journée de CETTE personne : changer de jour l'efface.
+  const cleJour = `${date}|${memberIds.join(',')}`;
+  const [simu, setSimu] = useState({ cle: cleJour, depart: null, retour: null });
+  const simulation = simu.cle === cleJour && (simu.depart || simu.retour) ? simu : null;
+  const simuler = (cote, point) => {
+    setSimu((prev) => {
+      const base = prev.cle === cleJour ? prev : { depart: null, retour: null };
+      const next = { cle: cleJour, depart: base.depart, retour: base.retour, [cote]: point };
+      // Simuler le départ entraîne l'arrivée tant qu'elle n'a pas sa propre simulation.
+      if (cote === 'depart' && (!base.retour || base.retour === base.depart)) next.retour = point;
+      return next;
+    });
+  };
   const {
     feuille, lienMaps, carteUrl, sansDepot, isLoading, error,
     depart, retour, membre, exception, setException, isSavingException, peutChoisir,
   } = useFeuilleDeRoute({
-    orgId: organization?.id, date, memberIds, person,
+    orgId: organization?.id, date, memberIds, person, simulation,
   });
 
   const changerExtremites = async (next) => {
@@ -105,7 +176,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
     }
   };
   const choixProps = {
-    membre, exception, peutChoisir, onChange: changerExtremites, disabled: isSavingException,
+    membre, exception, peutChoisir, onChange: changerExtremites, disabled: isSavingException, onSimuler: simuler,
   };
   const [isPrinting, setIsPrinting] = useState(false);
   const [carteKo, setCarteKo] = useState(false);
@@ -179,6 +250,22 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
           Configurez le siège dans <strong>Réglages → Organisation → Territoire</strong> pour calculer l&apos;itinéraire.
         </p>
       )}
+      {simulation && n > 0 && (
+        <p className="flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+          <Crosshair className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+          <span className="flex-1">
+            Simulation : trajets recalculés depuis le point choisi. Rien n&apos;est enregistré — la vraie journée
+            et les tournées gardent le réglage du technicien.
+          </span>
+          <button
+            type="button"
+            onClick={() => setSimu({ cle: cleJour, depart: null, retour: null })}
+            className="font-medium underline hover:text-amber-950"
+          >
+            Annuler
+          </button>
+        </p>
+      )}
       {feuille.estime && (
         <p className="flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
           <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
@@ -203,7 +290,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
 
       {n > 0 && (
         <ol className="text-sm">
-          <ExtremiteChoix cote="depart" point={depart} {...choixProps} />
+          <ExtremiteChoix cote="depart" point={depart} simule={simulation?.depart} {...choixProps} />
           {feuille.items.map((it) => (
             <li key={it.id}>
               {it.localise
@@ -238,7 +325,7 @@ export function FeuilleDeRouteSection({ date, memberIds, person }) {
           {feuille.retour && (
             <li><Troncon troncon={feuille.retour} label="Retour" estime={feuille.estime} /></li>
           )}
-          <ExtremiteChoix cote="retour" point={retour} {...choixProps} />
+          <ExtremiteChoix cote="retour" point={retour} simule={simulation?.retour} {...choixProps} />
         </ol>
       )}
     </div>

@@ -7,6 +7,8 @@
  *
  * Départ / retour : `resoudreExtremites` (tournee/extremites.js), la même règle
  * que le moteur — exception du jour > réglage du technicien > agence.
+ * `simulation` (local, jamais enregistré) passe devant pour voir en direct les
+ * trajets depuis un autre point ; le moteur de tournées ne le voit pas.
  * ============================================================================
  */
 
@@ -36,12 +38,13 @@ const TYPE_LABELS = Object.fromEntries(APPOINTMENT_TYPES.map((t) => [t.value, t.
  * @param {string|null} p.date    'YYYY-MM-DD' ; null = désactivé
  * @param {string[]} p.memberIds  ids de la personne (team_members.id / commercials.id)
  * @param {{ displayName: string, color?: string }} p.person
+ * @param {{ depart?: object|null, retour?: object|null }|null} [p.simulation]  points simulés `{ lat, lng, label }`
  * @returns {{ feuille: object|null, lienMaps: string|null, carteUrl: string|null, isLoading: boolean, error: Error|null,
  *   depart: object|null, retour: object|null, membre: object|null, exception: object|null,
  *   setException: Function, isSavingException: boolean, peutChoisir: boolean }}
  *   `peutChoisir` : l'utilisateur peut poser l'exception du jour (team_leader+) et la personne a une ressource planning.
  */
-export function useFeuilleDeRoute({ orgId, date, memberIds = [], person }) {
+export function useFeuilleDeRoute({ orgId, date, memberIds = [], person, simulation = null }) {
   const { settings } = useOrgSettings();
   const { labelsByClientId } = useClientEquipmentLabels();
   const { isTeamLeaderOrAbove } = useAuth();
@@ -57,10 +60,12 @@ export function useFeuilleDeRoute({ orgId, date, memberIds = [], person }) {
   const { exception, setException, isSaving: isSavingException } = useDayEndpoint({
     orgId, teamMemberId: membre?.id || null, date,
   });
-  const { depart, retour } = useMemo(
+  const reels = useMemo(
     () => resoudreExtremites({ siege, membre, exception }),
     [siege, membre, exception],
   );
+  const depart = simulation?.depart || reels.depart;
+  const retour = simulation?.retour || reels.retour;
 
   const rdvsQuery = useQuery({
     queryKey: appointmentKeys.dayRoute(orgId, date),
