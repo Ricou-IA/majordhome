@@ -468,7 +468,7 @@ export default function ClientDetail() {
 
       {/* Contenu des onglets */}
       <div className="bg-white rounded-lg border border-secondary-200 shadow-card p-6">
-        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} onInvestigate={() => setShowInvestigation(true)} />}
+        {activeTab === 'info' && <TabInfo formData={formData} setFormData={setFormData} isLocked={isLocked} clientId={id} orgId={organization?.id} onInvestigate={() => setShowInvestigation(true)} savedLocation={{ lat: client?.latitude, lng: client?.longitude }} savedAddress={{ address: client?.address || '', postalCode: client?.postal_code || '', city: client?.city || '' }} />}
         {activeTab === 'contract' && <TabContrat clientId={id} orgId={organization?.id} userId={user?.id} client={client} />}
         {activeTab === 'devis-pl' && client.pennylane_account_number && <TabDevisPL clientId={id} orgId={organization?.id} />}
         {activeTab === 'devis-pl' && !client.pennylane_account_number && (

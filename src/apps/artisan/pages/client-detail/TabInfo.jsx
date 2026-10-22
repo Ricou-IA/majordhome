@@ -7,6 +7,9 @@ import { FormField, TextInput, PhoneInput, SelectInput, TextArea } from '@/apps/
 import { CLIENT_CATEGORIES, LEAD_SOURCES, HOUSING_TYPES } from '@services/clients.service';
 import { useLinkedClients, useClientSearch } from '@hooks/useClients';
 import { ClientModal } from '@/apps/artisan/components/clients/ClientModal';
+import { ClientLocationMap } from '@/apps/artisan/components/clients/ClientLocationMap';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { getOrgHeadquarters } from '@lib/territoire-config';
 
 // ============================================================================
 // SOUS-COMPOSANT — Carte client lié
@@ -292,8 +295,10 @@ function LinkedClientsSection({ clientId, orgId, isLocked }) {
 // COMPOSANT PRINCIPAL — TabInfo
 // ============================================================================
 
-export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate }) => {
+export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onInvestigate, savedLocation, savedAddress }) => {
   const u = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
+  const { settings } = useOrgSettings();
+  const siege = getOrgHeadquarters(settings);
 
   return (
     <div className="space-y-8">
@@ -369,6 +374,7 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
           <MapPin className="w-4 h-4 text-secondary-500" />
           Adresse
         </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <FormField label="Adresse">
             <TextInput value={formData.address} onChange={(v) => u('address', v)} placeholder="12 rue des Lilas" disabled={isLocked} />
@@ -387,6 +393,15 @@ export const TabInfo = ({ formData, setFormData, isLocked, clientId, orgId, onIn
           <FormField label="Instructions d'accès">
             <TextInput value={formData.accessInstructions} onChange={(v) => u('accessInstructions', v)} placeholder="Digicode, portail, code clé..." disabled={isLocked} />
           </FormField>
+        </div>
+        <ClientLocationMap
+          saved={savedLocation}
+          savedAddress={savedAddress}
+          address={formData.address || ''}
+          postalCode={formData.postalCode || ''}
+          city={formData.city || ''}
+          siege={siege}
+        />
         </div>
       </section>
 

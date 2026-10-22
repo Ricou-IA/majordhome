@@ -26,6 +26,9 @@ import {
 import { TechnicianSelect } from './TechnicianSelect';
 import { SouplesseSelect } from '@/apps/artisan/components/shared/SouplesseSelect';
 import { AdresseItineraire } from '@/apps/artisan/components/shared/AdresseItineraire';
+import { ClientLocationMap } from '@/apps/artisan/components/clients/ClientLocationMap';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { getOrgHeadquarters } from '@lib/territoire-config';
 
 const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
@@ -271,6 +274,14 @@ export const SectionClient = ({
       formData.client_city || (showClientChip ? selectedClient.city : ''),
     ].filter(Boolean).join(' '),
   ].filter(Boolean).join(', ');
+  const { settings } = useOrgSettings();
+  const siege = getOrgHeadquarters(settings);
+  // Adresse affichée, éclatée pour la carte (photo du RDV, fiche liée en repli).
+  const mapAddress = {
+    address: formData.client_address || (showClientChip ? selectedClient.address : '') || '',
+    postalCode: formData.client_postal_code || (showClientChip ? selectedClient.postal_code : '') || '',
+    city: formData.client_city || (showClientChip ? selectedClient.city : '') || '',
+  };
   const showContactCard = showClientChip || !!selectedLead
     || (showContactDetails && (contactName !== 'Sans nom' || contactPhone || contactAddress));
 
@@ -335,6 +346,17 @@ export const SectionClient = ({
           lat={showClientChip ? selectedClient.latitude : null}
           lng={showClientChip ? selectedClient.longitude : null}
         />
+        {contactAddress && (
+          <ClientLocationMap
+            saved={showClientChip ? { lat: selectedClient.latitude, lng: selectedClient.longitude } : null}
+            savedAddress={showClientChip ? {
+              address: selectedClient.address || '', postalCode: selectedClient.postal_code || '', city: selectedClient.city || '',
+            } : null}
+            {...mapAddress}
+            siege={siege}
+            mapHeight="min-h-[220px]"
+          />
+        )}
         {/* Devis du chantier : PDF Pennylane (jamais d'URL app.pennylane.com construite). */}
         {quotes.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
