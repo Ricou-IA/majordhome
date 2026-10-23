@@ -17,6 +17,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
 import {
   Plus,
   ChevronLeft,
@@ -77,6 +78,23 @@ function getDateRange(dateInfo) {
   };
 }
 
+const VUES_BUREAU = [
+  { value: 'timeGridDay', label: 'Jour' },
+  { value: 'timeGridWeek', label: 'Semaine' },
+  { value: 'dayGridMonth', label: 'Mois' },
+];
+
+// Téléphone (~360 px) : une grille horaire à 5 colonnes, ou plusieurs
+// techniciens côte à côte dans la journée, donnent des blocs de 50 px
+// illisibles. Jour et Semaine deviennent des LISTES pleine largeur (un RDV par
+// ligne) ; la grille horaire reste accessible (« Heures ») pour poser au doigt.
+const VUES_TELEPHONE = [
+  { value: 'listDay', label: 'Jour' },
+  { value: 'listWeek', label: 'Semaine' },
+  { value: 'timeGridDay', label: 'Heures' },
+  { value: 'dayGridMonth', label: 'Mois' },
+];
+
 // ============================================================================
 // SOUS-COMPOSANTS
 // ============================================================================
@@ -97,16 +115,13 @@ function CalendarToolbar({
   printHint,
   printLabel,
   isPrinting,
+  isPhone,
 }) {
   const goToday = () => calendarRef.current?.getApi().today();
   const goPrev = () => calendarRef.current?.getApi().prev();
   const goNext = () => calendarRef.current?.getApi().next();
 
-  const views = [
-    { value: 'timeGridDay', label: 'Jour' },
-    { value: 'timeGridWeek', label: 'Semaine' },
-    { value: 'dayGridMonth', label: 'Mois' },
-  ];
+  const views = isPhone ? VUES_TELEPHONE : VUES_BUREAU;
 
   // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions ;
   // Imprimer disparaît (PDF d'une personne, geste de bureau).
@@ -383,7 +398,8 @@ function PlanningEventContent({ eventInfo }) {
         {provisoire && (
           <span className="mr-0.5 opacity-90" title="Pose provisoire : appros du chantier non reçues">⏳</span>
         )}
-        {eventInfo.timeText && (
+        {/* Vues liste : l'heure a déjà sa colonne */}
+        {eventInfo.timeText && !eventInfo.view.type.startsWith('list') && (
           <span className="mr-1">{eventInfo.timeText}</span>
         )}
         {typeLabel}
@@ -410,8 +426,9 @@ export default function Planning() {
   const calendarRef = useRef(null);
   const canCreateAppointment = can('planning', 'create');
   // Sur appareil tenu en main (tablette, téléphone) : la journée, pas la semaine.
-  const { isMobileDevice } = useDeviceClass();
-  const vueInitiale = isMobileDevice ? 'timeGridDay' : 'timeGridWeek';
+  // Téléphone : la journée en liste (cf. VUES_TELEPHONE).
+  const { isMobileDevice, isPhone } = useDeviceClass();
+  const vueInitiale = isPhone ? 'listDay' : isMobileDevice ? 'timeGridDay' : 'timeGridWeek';
 
   // État local
   const [currentView, setCurrentView] = useState(vueInitiale);
@@ -662,7 +679,7 @@ export default function Planning() {
     // Numéro de semaine ISO — pertinent uniquement sur les vues à 1 semaine
     const viewType = dateInfo.view.type;
     setCalendarWeek(
-      viewType === 'timeGridWeek' || viewType === 'timeGridDay'
+      ['timeGridWeek', 'timeGridDay', 'listWeek', 'listDay'].includes(viewType)
         ? isoWeekNumber(dateInfo.start)
         : null
     );
@@ -882,6 +899,7 @@ export default function Planning() {
           printHint={printHint}
           printLabel={printLabel}
           isPrinting={isPrinting}
+          isPhone={isPhone}
         />
         <CalendarFilters
           filters={filters}
@@ -908,7 +926,7 @@ export default function Planning() {
         <div className="fc-wrapper">
           <FullCalendar
             ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
             initialView={vueInitiale}
             initialDate={dateInitiale}
             locale="fr"
@@ -944,6 +962,9 @@ export default function Planning() {
             // RDV concurrents (2 techniciens) côte à côte sans se recouvrir
             slotEventOverlap={false}
             dayHeaderFormat={{ weekday: 'short', day: 'numeric', month: 'short' }}
+            // Vues liste (téléphone) : « lundi 26 octobre » sur toute la largeur
+            listDayFormat={{ weekday: 'long', day: 'numeric', month: 'long' }}
+            listDaySideFormat={false}
             dayHeaderContent={dayHeaderContent}
             allDaySlot={false}
             expandRows={true}
