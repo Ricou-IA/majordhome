@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { storageService } from '@services/storage.service';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
+import { allegerReleve } from '@/lib/catalogue/releve.js';
 
 // ============================================================================
 // CONSTANTES
@@ -208,13 +209,16 @@ export const suppliersService = {
     }
   },
 
-  /** Import d'un relevé JSON (scripts/catalogue/dump-<fournisseur>.browser.js). Même réponse que syncCatalog. */
-  async importCatalogReleve(orgId, supplierId, releve) {
+  /**
+   * Import d'un relevé JSON (scripts/catalogue/dump-<fournisseur>.browser.js). Même réponse que syncCatalog.
+   * Le relevé est allégé aux champs lus par l'adaptateur (`allegerReleve`) : un brut pèse 1,5 à 3 Mo.
+   */
+  async importCatalogReleve(orgId, supplierId, releve, connector) {
     try {
       if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
       if (!releve || !Array.isArray(releve.items)) throw new Error('Fichier de relevé invalide (items manquants)');
       const { data, error } = await supabase.functions.invoke('supplier-catalog-sync', {
-        body: { action: 'import', org_id: orgId, supplier_id: supplierId, releve },
+        body: { action: 'import', org_id: orgId, supplier_id: supplierId, releve: allegerReleve(connector, releve) },
       });
       if (error) throw error;
       return { data, error: null };

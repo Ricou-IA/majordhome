@@ -31,6 +31,12 @@ test('échec : chaque code a un libellé français et le libellé commence par �
   assert.match(libelleResultat({ ok: false, code: 'code_inconnu_xyz', at }), /code_inconnu_xyz/);
 });
 
+test('une erreur non métier de l\'edge (réseau, réponse illisible) a son code et son libellé', () => {
+  assert.ok(CODES_ERREUR.includes('erreur_inattendue'));
+  assert.match(libelleCodeErreur('erreur_inattendue'), /inattendue|réessayer/i);
+  assert.ok(CODES_ERREUR.includes('releve_instable'));
+});
+
 test('jamais relevé', () => {
   assert.equal(libelleResultat(null), 'Jamais relevé');
   assert.equal(libelleResultat(undefined), 'Jamais relevé');

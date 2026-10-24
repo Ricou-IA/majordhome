@@ -60,7 +60,10 @@ async function ecrireReleve(admin: Admin, supplier: Supplier, connector: Connect
     res = adaptateur(releve, { version: versionDe(connector, (releve as { fetched_at?: string })?.fetched_at ?? null) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new SyncError(msg.startsWith("releve_incomplet") ? "releve_incomplet" : "releve_invalide", msg);
+    const code = msg.startsWith("releve_incomplet") ? "releve_incomplet"
+      : msg.startsWith("reference_en_double") ? "releve_instable"
+      : "releve_invalide";
+    throw new SyncError(code, msg);
   }
   if (!res.retenus) throw new SyncError("releve_invalide", "aucun article retenu");
   const { data, error } = await admin.rpc("supplier_catalog_upsert", {
@@ -103,7 +106,12 @@ async function traiter(admin: Admin, supplier: Supplier, action: "sync" | "impor
       await marquerEchec(admin, supplier, e.code, e.detail);
       return { ok: false, code: e.code, detail: e.detail };
     }
-    throw e;
+    // Erreur non métier (réseau, TLS, bug) : le fournisseur porte l'échec et, en mode cron, les suivants
+    // sont quand même traités. Rien n'a été écrit dans le catalogue (l'écriture est atomique dans la RPC).
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[supplier-catalog-sync] erreur inattendue", supplier.id, msg);
+    await marquerEchec(admin, supplier, "erreur_inattendue", msg);
+    return { ok: false, code: "erreur_inattendue", detail: msg.slice(0, 300) };
   }
 }
 

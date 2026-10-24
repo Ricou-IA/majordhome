@@ -97,12 +97,27 @@ BEGIN
   IF (v_res->>'desactives')::int <> 1 OR (v_res->>'total')::int <> 1 THEN RAISE EXCEPTION 'désactivation : %', v_res; END IF;
   SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-122388';
   IF v_p.id IS NULL OR v_p.is_active THEN RAISE EXCEPTION 'article absent supprimé ou toujours actif'; END IF;
-  -- … et réactivé s'il revient
+  -- … la désactivation est marquée comme venant du relevé, et l'article est réactivé s'il revient
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-122388';
+  IF (v_p.specs->>'desactive_par_releve')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'désactivation par le relevé non marquée : %', v_p.specs; END IF;
   SET LOCAL ROLE service_role;
   v_res := public.supplier_catalog_upsert(v_mayer, v_sup, 'test_5', v_rows);
   RESET ROLE;
-  SELECT is_active INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-122388';
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-122388';
   IF NOT v_p.is_active OR (v_res->>'total')::int <> 2 THEN RAISE EXCEPTION 'article revenu non réactivé'; END IF;
+  IF v_p.specs ? 'desactive_par_releve' THEN RAISE EXCEPTION 'marque de désactivation non effacée à la réactivation'; END IF;
+
+  -- (d2) un article désactivé À LA MAIN (bouton Supprimer du catalogue) reste inactif au relevé suivant
+  UPDATE majordhome.supplier_products SET is_active = false WHERE supplier_id = v_sup AND reference = '37-122388';
+  SET LOCAL ROLE service_role;
+  v_res := public.supplier_catalog_upsert(v_mayer, v_sup, 'test_6', v_rows);
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-122388';
+  IF v_p.is_active THEN RAISE EXCEPTION 'un article supprimé à la main a été ressuscité par le relevé'; END IF;
+  IF v_p.purchase_price_ht <> 103.67 THEN RAISE EXCEPTION 'prix d''achat d''un article inactif non suivi'; END IF;
+  IF (v_res->>'total')::int <> 1 OR (v_res->>'ignores_inactifs')::int <> 1 THEN RAISE EXCEPTION 'compteurs après suppression manuelle : %', v_res; END IF;
+  -- remise en service pour la suite
+  UPDATE majordhome.supplier_products SET is_active = true WHERE supplier_id = v_sup AND reference = '37-122388';
 
   -- (e) relevé vide refusé ; fournisseur hors org refusé
   SET LOCAL ROLE service_role;

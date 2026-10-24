@@ -142,7 +142,7 @@ export function useSupplierConnector(orgId, supplier) {
     onSuccess: invalidateCatalogue,
   });
   const importMutation = useMutation({
-    mutationFn: (releve) => unwrapResult(suppliersService.importCatalogReleve(orgId, supplierId, releve)),
+    mutationFn: (releve) => unwrapResult(suppliersService.importCatalogReleve(orgId, supplierId, releve, supplier?.connector)),
     onSuccess: invalidateCatalogue,
   });
 

@@ -1,7 +1,20 @@
 // Tests de la logique pure du client BayWa (connexion SuiteCommerce + pagination de l'API catalogue).
 // deno test supabase/functions/supplier-catalog-sync/baywaClient.test.ts
 import { assertEquals, assertStringIncludes, assert } from "jsr:@std/assert@1";
-import { parseLoginResponse, buildItemsUrl, itemDepuisApi, fusionnerCookies, enteteCookie } from "./baywaClient.ts";
+import { parseLoginResponse, buildItemsUrl, itemDepuisApi, fusionnerCookies, enteteCookie, parseItemsBody, BaywaError } from "./baywaClient.ts";
+import { assertThrows } from "jsr:@std/assert@1";
+
+Deno.test("parseItemsBody : page HTML ou JSON illisible = erreur typée, jamais une exception brute", () => {
+  const e1 = assertThrows(() => parseItemsBody(200, "text/html", "<html>Access Denied</html>", 0), BaywaError);
+  assertEquals(e1.code, "acces_bloque");
+  const e2 = assertThrows(() => parseItemsBody(200, "application/json", "{pas du json", 100), BaywaError);
+  assertEquals(e2.code, "releve_incomplet");
+  const e3 = assertThrows(() => parseItemsBody(500, "application/json", "{}", 200), BaywaError);
+  assertEquals(e3.code, "releve_incomplet");
+  const ok = parseItemsBody(200, "application/json;charset=UTF-8", JSON.stringify({ total: 2, items: [{ itemid: "a" }] }), 0);
+  assertEquals(ok.total, 2);
+  assertEquals(ok.items.length, 1);
+});
 
 Deno.test("parseLoginResponse : 403 ou HTML = accès bloqué (Akamai / protection anti-robot)", () => {
   assertEquals(parseLoginResponse(403, "text/html", "<html>Access Denied</html>"), "acces_bloque");

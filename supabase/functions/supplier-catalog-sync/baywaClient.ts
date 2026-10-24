@@ -123,6 +123,22 @@ export async function connecterBaywa(creds: { email: string; password: string })
   return jar;
 }
 
+/**
+ * Interprète une page de l'API catalogue : HTML = accès bloqué ; statut non 2xx ou JSON illisible = relevé
+ * incomplet (rien ne sera écrit). Jamais d'exception brute.
+ */
+export function parseItemsBody(status: number, contentType: string | null, body: string, offset: number): { total: number; items: Array<Record<string, unknown>> } {
+  const ct = (contentType || "").toLowerCase();
+  if (status === 403 || ct.includes("text/html") || /^\s*<(!doctype|html)/i.test(body)) {
+    throw new BaywaError("acces_bloque", `catalogue : HTTP ${status} offset ${offset}`);
+  }
+  if (status < 200 || status >= 300) throw new BaywaError("releve_incomplet", `catalogue : HTTP ${status} offset ${offset}`);
+  let j: { total?: number; items?: Array<Record<string, unknown>> };
+  try { j = JSON.parse(body); } catch { throw new BaywaError("releve_incomplet", `catalogue : réponse illisible offset ${offset}`); }
+  if (!j || typeof j !== "object") throw new BaywaError("releve_incomplet", `catalogue : réponse vide offset ${offset}`);
+  return { total: Number(j.total) || 0, items: Array.isArray(j.items) ? j.items : [] };
+}
+
 /** Pagine l'API catalogue avec la session. Lève BaywaError(acces_bloque | releve_incomplet). */
 export async function releverCatalogueBaywa(jar: Map<string, string>): Promise<ReleveBaywa> {
   const items: Array<Record<string, unknown>> = [];
@@ -132,12 +148,9 @@ export async function releverCatalogueBaywa(jar: Map<string, string>): Promise<R
       headers: { "User-Agent": UA, Accept: "application/json", Cookie: enteteCookie(jar), "X-SC-Touchpoint": "shopping" },
     });
     fusionnerCookies(jar, setCookiesDe(res));
-    const ct = res.headers.get("content-type") || "";
-    if (res.status === 403 || ct.includes("text/html")) throw new BaywaError("acces_bloque", `catalogue : HTTP ${res.status} offset ${offset}`);
-    if (!res.ok) throw new BaywaError("releve_incomplet", `catalogue : HTTP ${res.status} offset ${offset}`);
-    const j = await res.json() as { total?: number; items?: Array<Record<string, unknown>> };
-    total = Number(j.total) || 0;
-    const page = Array.isArray(j.items) ? j.items : [];
+    const j = parseItemsBody(res.status, res.headers.get("content-type"), await res.text(), offset);
+    total = j.total;
+    const page = j.items;
     for (const it of page) items.push(itemDepuisApi(it));
     if (page.length < PAGE || items.length >= total) break;
   }

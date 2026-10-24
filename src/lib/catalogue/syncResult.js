@@ -6,7 +6,8 @@
 
 /** Codes d'échec émis par l'edge supplier-catalog-sync. */
 export const CODES_ERREUR = Object.freeze([
-  'identifiants_absents', 'connexion_refusee', 'acces_bloque', 'releve_incomplet', 'releve_invalide', 'connector_inconnu', 'ecriture_refusee',
+  'identifiants_absents', 'connexion_refusee', 'acces_bloque', 'releve_incomplet', 'releve_instable', 'releve_invalide',
+  'connector_inconnu', 'ecriture_refusee', 'erreur_inattendue',
 ]);
 
 const LIBELLES = Object.freeze({
@@ -17,6 +18,8 @@ const LIBELLES = Object.freeze({
   releve_invalide: 'le fichier de relevé n\'est pas reconnu ou ne contient aucun article du périmètre',
   connector_inconnu: 'ce fournisseur n\'a pas de connexion automatique : importez un relevé',
   ecriture_refusee: 'la base a refusé l\'écriture du catalogue',
+  releve_instable: 'le catalogue du fournisseur a changé pendant le relevé (référence en double), rien n\'a été écrit : réessayer',
+  erreur_inattendue: 'erreur inattendue pendant le relevé (réseau ou réponse illisible), rien n\'a été écrit : réessayer plus tard',
 });
 
 /**
