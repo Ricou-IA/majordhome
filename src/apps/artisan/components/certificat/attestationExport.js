@@ -37,12 +37,31 @@ async function fetchAsDataUrl(url) {
  * @param {object} p.company  buildCompanyInfo(settings)
  * @param {Array<{ code: string, label: string, certificate_profile?: string }>} p.categories
  * @param {string} p.invoiceDate  `YYYY-MM-DD`
- * @returns {Promise<{ generated: { certificatId: string, path: string }[], skipped: { certificatId: string, message: string }[], warnings: string[] }>}
+ * @returns {Promise<{ generated: { certificatId: string, path: string }[], skipped: { certificatId: string|null, message: string }[], warnings: string[] }>}
  */
 export async function genererAttestationsIntervention({ orgId, interventionId, client, company, categories = [], invoiceDate }) {
   const result = { generated: [], skipped: [], warnings: [] };
   const { data: certificats, error } = await certificatsService.listForInterventionTree(orgId, interventionId);
   if (error) throw new Error(`Certificats illisibles : ${error.message}`);
+
+  // Équipement sans certificat rempli (intervention enfant sans certificat) : l'attestation part
+  // du certificat signé, il n'y en a donc pas pour lui — à dire, pas à taire (vécu VERMONT
+  // 2026-10-24 : carte « Réalisé » dont le certificat du poêle n'avait jamais été rempli).
+  const { data: children, error: childErr } = await certificatsService.listChildInterventions(interventionId);
+  if (childErr) throw new Error(`Interventions illisibles : ${childErr.message}`);
+  const withCert = new Set((certificats || []).map((c) => c.intervention_id));
+  const sansCertificat = (children || []).filter((c) => c.equipment_id && !withCert.has(c.id)).length;
+  if (sansCertificat > 0) {
+    result.skipped.push({
+      certificatId: null,
+      message: sansCertificat > 1
+        ? `${sansCertificat} équipements sans certificat rempli : remplissez-les pour obtenir leur attestation`
+        : 'Un équipement n’a pas de certificat rempli : remplissez-le pour obtenir son attestation',
+    });
+  }
+  if (!certificats?.length && sansCertificat === 0) {
+    result.skipped.push({ certificatId: null, message: 'Aucun certificat rempli sur cet entretien' });
+  }
 
   const byCode = new Map(categories.map((c) => [c.code, c]));
   let assets = null;

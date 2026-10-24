@@ -244,6 +244,25 @@ export const certificatsService = {
   },
 
   /**
+   * Interventions enfants (1 par équipement) d'une carte, avec leur équipement — pour repérer
+   * un équipement dont le certificat n'a jamais été rempli.
+   * @param {string} interventionId
+   */
+  async listChildInterventions(interventionId) {
+    try {
+      const { data, error } = await supabase
+        .from('majordhome_interventions')
+        .select('id, equipment_id')
+        .eq('parent_id', interventionId);
+      if (error) return { data: null, error };
+      return { data: data || [], error: null };
+    } catch (err) {
+      logger.error('[certificats] listChildInterventions error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
    * Chemin de l'attestation d'une intervention si elle a été générée (null sinon).
    * @param {string} interventionId
    * @returns {Promise<{ data: string|null, error: object|null }>}
