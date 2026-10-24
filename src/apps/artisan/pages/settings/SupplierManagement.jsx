@@ -505,7 +505,7 @@ async function downloadTemplate() {
 // CATALOGUE PRODUITS D'UN FOURNISSEUR
 // =============================================================================
 
-function ProductCatalog({ supplier, orgId, onBack }) {
+function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('main');  // 'main' | 'accessory' | 'consumable'
@@ -622,11 +622,23 @@ function ProductCatalog({ supplier, orgId, onBack }) {
         <button onClick={onBack} className="p-2 hover:bg-secondary-100 rounded-lg">
           <ArrowLeft className="w-5 h-5 text-secondary-600" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h2 className="text-lg font-semibold text-secondary-900">{supplier.name}</h2>
-          <p className="text-sm text-secondary-500">{totalCount} produit{totalCount !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-secondary-500 truncate">
+            {[
+              `${totalCount} produit${totalCount !== 1 ? 's' : ''}`,
+              supplier.contact_name,
+              supplier.contact_phone,
+              supplier.contact_email,
+              supplier.city,
+            ].filter(Boolean).join(' · ')}
+          </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={onEditSupplier} className="btn-secondary btn-sm" title="Nom, contact, adresse, notes, connexion catalogue">
+            <Pencil className="w-4 h-4 mr-1" />
+            Fiche fournisseur
+          </button>
           {/* Import Excel */}
           <input
             ref={fileInputRef}
@@ -921,8 +933,19 @@ export default function SupplierManagement() {
     }
   };
 
-  // Si un fournisseur est sélectionné → afficher son catalogue
+  const modal = showModal && (
+    <SupplierFormModal
+      supplier={editSupplier}
+      onClose={() => { setShowModal(false); setEditSupplier(null); }}
+      onSave={handleSave}
+      isSaving={isCreating || isUpdating}
+    />
+  );
+
+  // Si un fournisseur est sélectionné → afficher son catalogue. La fiche se relit dans la liste (cache React Query)
+  // pour refléter une modification faite depuis le bouton « Fiche fournisseur » sans quitter le catalogue.
   if (selectedSupplier) {
+    const supplierCourant = suppliers.find((s) => s.id === selectedSupplier.id) || selectedSupplier;
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2 text-sm text-secondary-500">
@@ -930,11 +953,17 @@ export default function SupplierManagement() {
           <span>/</span>
           <button onClick={() => setSelectedSupplier(null)} className="hover:text-secondary-700">Fournisseurs</button>
           <span>/</span>
-          <span className="text-secondary-900">{selectedSupplier.name}</span>
+          <span className="text-secondary-900">{supplierCourant.name}</span>
         </div>
         <div className="card">
-          <ProductCatalog supplier={selectedSupplier} orgId={orgId} onBack={() => setSelectedSupplier(null)} />
+          <ProductCatalog
+            supplier={supplierCourant}
+            orgId={orgId}
+            onBack={() => setSelectedSupplier(null)}
+            onEditSupplier={() => { setEditSupplier(supplierCourant); setShowModal(true); }}
+          />
         </div>
+        {modal}
       </div>
     );
   }
@@ -1011,14 +1040,7 @@ export default function SupplierManagement() {
         </div>
       )}
 
-      {showModal && (
-        <SupplierFormModal
-          supplier={editSupplier}
-          onClose={() => { setShowModal(false); setEditSupplier(null); }}
-          onSave={handleSave}
-          isSaving={isCreating || isUpdating}
-        />
-      )}
+      {modal}
     </div>
   );
 }
