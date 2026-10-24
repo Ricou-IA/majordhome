@@ -8,10 +8,14 @@
  */
 
 import * as poeleSchema from './poele.schema';
+import * as batterieSchema from './batterie.schema';
+import * as photovoltaiqueSchema from './photovoltaique.schema';
 
 // Registre : catégorie → module de schéma
 export const CATEGORY_SCHEMAS = {
   poele: poeleSchema,
+  batterie: batterieSchema,            // 2026-10-24 : clés posées par les relevés fournisseurs
+  photovoltaique: photovoltaiqueSchema, // idem (modules, onduleurs, fixation, bornes)
   // À venir : vmc, pac, clim, chauffe_eau, electricite
 };
 

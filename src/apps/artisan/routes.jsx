@@ -24,6 +24,7 @@ const GeoGrid = lazy(() => import('./pages/GeoGrid'));
 const TeamManagement = lazy(() => import('./pages/settings/TeamManagement'));
 const PermissionsEditor = lazy(() => import('./pages/settings/PermissionsEditor'));
 const SupplierManagement = lazy(() => import('./pages/settings/SupplierManagement'));
+const CatalogMatchesPage = lazy(() => import('./pages/settings/suppliers/CatalogMatchesPage'));
 const PricingSettings = lazy(() => import('./pages/settings/PricingSettings'));
 const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'));
 const SolaireSettings = lazy(() => import('./pages/settings/SolaireSettings'));
@@ -319,6 +320,16 @@ export const artisanRoutes = [
       <SuspenseWrapper>
         <RouteGuard resource="settings">
           <SupplierManagement />
+        </RouteGuard>
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: 'settings/suppliers/rapprochements',
+    element: (
+      <SuspenseWrapper>
+        <RouteGuard resource="settings">
+          <CatalogMatchesPage />
         </RouteGuard>
       </SuspenseWrapper>
     ),

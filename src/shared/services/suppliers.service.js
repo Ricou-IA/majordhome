@@ -98,7 +98,7 @@ export const suppliersService = {
   // FOURNISSEURS — ÉCRITURE
   // ==========================================================================
 
-  async createSupplier({ orgId, name, contactName, contactEmail, contactPhone, address, postalCode, city, siret, notes, connector }) {
+  async createSupplier({ orgId, name, contactName, contactEmail, contactPhone, address, postalCode, city, siret, notes, connector, siteUrl, connectorConfig }) {
     try {
       if (!orgId || !name) throw new Error('[suppliersService] orgId et name requis');
 
@@ -116,6 +116,8 @@ export const suppliersService = {
           siret: siret || null,
           notes: notes || null,
           connector: connector || null,
+          site_url: siteUrl?.trim() || null,
+          connector_config: connectorConfig && typeof connectorConfig === 'object' ? connectorConfig : {},
         })
         .select()
         .single();
@@ -143,6 +145,10 @@ export const suppliersService = {
       if (updates.siret !== undefined) updateData.siret = updates.siret || null;
       if (updates.notes !== undefined) updateData.notes = updates.notes || null;
       if (updates.connector !== undefined) updateData.connector = updates.connector || null;
+      if (updates.siteUrl !== undefined) updateData.site_url = updates.siteUrl?.trim() || null;
+      if (updates.connectorConfig !== undefined) updateData.connector_config = updates.connectorConfig && typeof updates.connectorConfig === 'object' ? updates.connectorConfig : {};
+      if (updates.categoryMapping !== undefined) updateData.category_mapping = updates.categoryMapping && typeof updates.categoryMapping === 'object' ? updates.categoryMapping : {};
+      if (updates.autoSync !== undefined) updateData.auto_sync = updates.autoSync === true;
       updateData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
@@ -236,6 +242,149 @@ export const suppliersService = {
     }
   },
 
+  /** Retire les identifiants du compte fournisseur du Vault — org_admin seul (vérifié en base). */
+  async deleteConnectorCredentials(orgId, supplierId) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      const { error } = await supabase.rpc('org_secret_delete', { p_org_id: orgId, p_key: this.connectorSecretKey(supplierId) });
+      if (error) throw error;
+      return { data: true, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] deleteConnectorCredentials:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Applique les surcharges de `category_mapping` du fournisseur à ses articles relevés (bouton explicite, org_admin). */
+  async applyCategoryMapping(supplierId) {
+    try {
+      if (!supplierId) throw new Error('[suppliersService] supplierId requis');
+      const { data, error } = await supabase.rpc('supplier_catalog_apply_mapping', { p_supplier_id: supplierId });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] applyCategoryMapping:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Marques distinctes des produits actifs d'un fournisseur (filtre Marque). */
+  async getDistinctBrands(supplierId) {
+    try {
+      if (!supplierId) return { data: [], error: null };
+      const { data, error } = await supabase.rpc('get_distinct_brands', { p_supplier_id: supplierId });
+      if (error) throw error;
+      return { data: (data || []).map((r) => r.brand), error: null };
+    } catch (error) {
+      logger.error('[suppliersService] getDistinctBrands:', error);
+      return { data: [], error };
+    }
+  },
+
+  /** Fiche technique relevée → rangée dans Documents par l'edge (action `document`). Réponse { ok, resultat | code }. */
+  async fetchProductDocument(orgId, supplierId, productId) {
+    try {
+      if (!orgId || !supplierId || !productId) throw new Error('[suppliersService] orgId, supplierId et productId requis');
+      const { data, error } = await supabase.functions.invoke('supplier-catalog-sync', {
+        body: { action: 'document', org_id: orgId, supplier_id: supplierId, product_id: productId },
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] fetchProductDocument:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Relance la proposition de rapprochements de l'org (edge, action `matches`). */
+  async proposeMatches(orgId, supplierId) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      const { data, error } = await supabase.functions.invoke('supplier-catalog-sync', {
+        body: { action: 'matches', org_id: orgId, supplier_id: supplierId },
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] proposeMatches:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Normalisation des modèles par l'IA (edge catalog-normalize), un lot d'articles sans clé. */
+  async normalizeCatalog(orgId, supplierId, limit = 50) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      const { data, error } = await supabase.functions.invoke('catalog-normalize', {
+        body: { org_id: orgId, supplier_id: supplierId, limit },
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] normalizeCatalog:', error);
+      return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
+  // ARTICLES COMMUNS (vue majordhome_catalog_matches, RPC de décision)
+  // ==========================================================================
+
+  /** Rapprochements de l'org, filtrés par statut (propose | confirme | refuse ; null = tous). */
+  async getMatches(orgId, statut = null) {
+    try {
+      if (!orgId) return { data: [], error: null };
+      let query = supabase.from('majordhome_catalog_matches').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(1000);
+      if (statut) query = query.eq('statut', statut);
+      const { data, error } = await query;
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      logger.error('[suppliersService] getMatches:', error);
+      return { data: [], error };
+    }
+  },
+
+  /** Rapprochements (propose ou confirme) où figure un produit. */
+  async getProductMatches(orgId, productId) {
+    try {
+      if (!orgId || !productId) return { data: [], error: null };
+      const { data, error } = await supabase.from('majordhome_catalog_matches').select('*').eq('org_id', orgId)
+        .neq('statut', 'refuse').or(`product_a_id.eq.${productId},product_b_id.eq.${productId}`);
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      logger.error('[suppliersService] getProductMatches:', error);
+      return { data: [], error };
+    }
+  },
+
+  /** Confirme ou refuse des rapprochements en lot (org_admin). */
+  async setMatchStatus(matchIds, statut) {
+    try {
+      if (!Array.isArray(matchIds) || !matchIds.length) return { data: 0, error: null };
+      const { data, error } = await supabase.rpc('catalog_match_set_status', { p_match_ids: matchIds, p_statut: statut });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] setMatchStatus:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Rapprochement manuel de deux produits de fournisseurs différents (org_admin). */
+  async createMatch(productA, productB) {
+    try {
+      if (!productA || !productB) throw new Error('[suppliersService] deux produits requis');
+      const { data, error } = await supabase.rpc('catalog_match_create', { p_product_a: productA, p_product_b: productB });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] createMatch:', error);
+      return { data: null, error };
+    }
+  },
+
   async deactivateSupplier(supplierId) {
     try {
       if (!supplierId) throw new Error('[suppliersService] supplierId requis');
@@ -259,7 +408,7 @@ export const suppliersService = {
   // PRODUITS — LECTURE
   // ==========================================================================
 
-  async getProducts(supplierId, { search = '', kind = null, limit = 50, offset = 0 } = {}) {
+  async getProducts(supplierId, { search = '', kind = null, brand = null, gamme = null, limit = 50, offset = 0 } = {}) {
     try {
       if (!supplierId) throw new Error('[suppliersService] supplierId requis');
 
@@ -268,11 +417,13 @@ export const suppliersService = {
         .select('*', { count: 'exact' })
         .eq('supplier_id', supplierId)
         .eq('is_active', true)
-        .order('category')
+        .order('brand', { nullsFirst: false })
         .order('name')
         .range(offset, offset + limit - 1);
 
       if (kind) query = query.eq('product_kind', kind);
+      if (brand) query = query.eq('brand', brand);
+      if (gamme) query = query.eq('gamme', gamme);
 
       if (search) {
         // P0.26 : escape pour eviter injection PostgREST.

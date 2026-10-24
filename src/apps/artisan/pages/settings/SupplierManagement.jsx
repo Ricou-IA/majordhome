@@ -6,9 +6,9 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@contexts/AuthContext';
-import { useSuppliers, useSupplierMutations, useSupplierProducts, useProductMutations } from '@hooks/useSuppliers';
+import { useSuppliers, useSupplierMutations, useSupplierProducts, useProductMutations, useSupplierBrands, useSupplierGammes, useCatalogMatches } from '@hooks/useSuppliers';
 import { PRODUCT_CATEGORIES } from '@services/suppliers.service';
 import { suppliersService } from '@services/suppliers.service';
 import { TVA_RATES } from '@services/devis.service';
@@ -39,12 +39,14 @@ import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
 // MODAL FOURNISSEUR
 // =============================================================================
 
-// Connexion catalogue (suppliers.connector) : baywa = relevé automatique (identifiants Vault, cron nocturne),
-// domos = relevé manuel importé (site derrière Cloudflare). Panneau dans le catalogue : CatalogConnectorPanel.
+// Connexion catalogue (suppliers.connector = plateforme de la boutique) : le relevé se fait avec les identifiants
+// Vault de l'org et l'adresse du site (site_url). SuiteCommerce demande deux réglages de site (sca_path, site_id,
+// pré-remplis BayWa). Panneau dans le catalogue : CatalogConnectorPanel.
 const CONNECTOR_OPTIONS = [
-  { value: 'baywa', label: 'BayWa r.e. — relevé automatique' },
-  { value: 'domos', label: 'Domos Industries — relevé manuel (import)' },
+  { value: 'suitecommerce', label: 'NetSuite SuiteCommerce (compatible BayWa)' },
+  { value: 'woocommerce', label: 'WooCommerce (Domos…)' },
 ];
+const SUITECOMMERCE_DEFAUTS = { sca_path: '/sca-lux-2019-2', site_id: '6376560' };
 
 function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
   const [form, setForm] = useState({
@@ -58,6 +60,9 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
     siret: supplier?.siret || '',
     notes: supplier?.notes || '',
     connector: supplier?.connector || '',
+    siteUrl: supplier?.site_url || '',
+    scaPath: supplier?.connector_config?.sca_path || SUITECOMMERCE_DEFAUTS.sca_path,
+    siteId: supplier?.connector_config?.site_id || SUITECOMMERCE_DEFAUTS.site_id,
   });
 
   const setField = useCallback((field, value) => {
@@ -70,7 +75,12 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
       toast.error('Le nom du fournisseur est requis');
       return;
     }
-    onSave(form);
+    if (form.connector && !/^https?:\/\/\S+$/.test(form.siteUrl.trim())) {
+      toast.error('Une boutique connectée demande l\'adresse de son site (https://…)');
+      return;
+    }
+    const { scaPath, siteId, ...reste } = form;
+    onSave({ ...reste, connectorConfig: form.connector === 'suitecommerce' ? { sca_path: scaPath.trim(), site_id: siteId.trim() } : {} });
   };
 
   return (
@@ -121,14 +131,30 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
             </FormField>
 
             <SectionTitle>Connexion catalogue</SectionTitle>
-            <FormField label="Relevé du catalogue">
+            <FormField label="Site du fournisseur (boutique en ligne)">
+              <TextInput value={form.siteUrl} onChange={(v) => setField('siteUrl', v)} placeholder="https://…" />
+            </FormField>
+            <FormField label="Type de boutique">
               <SelectInput
                 value={form.connector}
                 onChange={(v) => setField('connector', v || '')}
-                placeholder="Aucune (saisie ou import Excel)"
+                placeholder="Aucun (saisie ou import Excel)"
                 options={CONNECTOR_OPTIONS}
               />
             </FormField>
+            {form.connector === 'suitecommerce' && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Chemin SCA du site">
+                  <TextInput value={form.scaPath} onChange={(v) => setField('scaPath', v)} placeholder="/sca-lux-2019-2" />
+                </FormField>
+                <FormField label="Identifiant de site (c=)">
+                  <TextInput value={form.siteId} onChange={(v) => setField('siteId', v)} placeholder="6376560" />
+                </FormField>
+              </div>
+            )}
+            {form.connector && (
+              <p className="text-xs text-secondary-400">Les identifiants du compte, le relevé et la correspondance des rayons se règlent ensuite dans le catalogue du fournisseur (panneau « Connexion catalogue »).</p>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button type="button" onClick={onClose} className="btn-secondary">
@@ -483,10 +509,21 @@ function ProductCatalog({ supplier, orgId, onBack }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('main');  // 'main' | 'accessory' | 'consumable'
+  const [brandFilter, setBrandFilter] = useState('');
+  const [gammeFilter, setGammeFilter] = useState('');
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
-  const { products, totalCount, isLoading, refetch } = useSupplierProducts(supplier.id, { search: debouncedSearch, kind: kindFilter, page, pageSize });
+  const { products, totalCount, isLoading, refetch } = useSupplierProducts(supplier.id, { search: debouncedSearch, kind: kindFilter, brand: brandFilter || null, gamme: gammeFilter || null, page, pageSize });
+  const { brands } = useSupplierBrands(orgId, supplier.id);
+  const { gammes } = useSupplierGammes(orgId, supplier.id);
+  // Articles communs confirmés avec un autre fournisseur : pastille « ×N » sur la ligne
+  const { matches: matchesConfirmes } = useCatalogMatches(orgId, 'confirme');
+  const nbCommuns = useMemo(() => {
+    const m = new Map();
+    for (const x of matchesConfirmes) { m.set(x.product_a_id, (m.get(x.product_a_id) || 0) + 1); m.set(x.product_b_id, (m.get(x.product_b_id) || 0) + 1); }
+    return m;
+  }, [matchesConfirmes]);
   // Compteurs par type (rapide : COUNT séparé)
   const { totalCount: mainCount } = useSupplierProducts(supplier.id, { kind: 'main', pageSize: 1 });
   const { totalCount: accessoryCount } = useSupplierProducts(supplier.id, { kind: 'accessory', pageSize: 1 });
@@ -668,6 +705,28 @@ function ProductCatalog({ supplier, orgId, onBack }) {
         )}
       </div>
 
+      {/* Filtres Marque / Gamme (900 articles BayWa : indispensables) */}
+      {(brands.length > 1 || gammes.length > 1) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {brands.length > 1 && (
+            <select value={brandFilter} onChange={(e) => { setBrandFilter(e.target.value); setPage(0); }} className="border border-secondary-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
+              <option value="">Toutes les marques ({brands.length})</option>
+              {brands.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          )}
+          {gammes.length > 1 && (
+            <select value={gammeFilter} onChange={(e) => { setGammeFilter(e.target.value); setPage(0); }} className="border border-secondary-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
+              <option value="">Toutes les gammes ({gammes.length})</option>
+              {gammes.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          )}
+          {(brandFilter || gammeFilter) && (
+            <button type="button" onClick={() => { setBrandFilter(''); setGammeFilter(''); setPage(0); }} className="text-xs text-secondary-500 hover:text-secondary-800 underline">Effacer les filtres</button>
+          )}
+          <span className="ml-auto text-xs text-secondary-400">Tri : marque puis libellé</span>
+        </div>
+      )}
+
       {/* Table */}
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -717,6 +776,11 @@ function ProductCatalog({ supplier, orgId, onBack }) {
                       <div className="min-w-0">
                         <div className="font-medium text-secondary-900 flex items-center gap-1.5 flex-wrap">
                           <span>{product.name}</span>
+                          {nbCommuns.get(product.id) && (
+                            <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-primary-50 text-primary-700 rounded" title="Même article connu chez un autre fournisseur (voir la fiche, « Aussi chez »)">
+                              ×{nbCommuns.get(product.id) + 1}
+                            </span>
+                          )}
                           {product.brand && (
                             <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-secondary-100 text-secondary-600 rounded">
                               {product.brand}

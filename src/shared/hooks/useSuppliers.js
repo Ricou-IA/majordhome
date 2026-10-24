@@ -133,29 +133,140 @@ export function useSupplierConnector(orgId, supplier) {
     queryClient.invalidateQueries({ queryKey: supplierKeys.productsByCategories(orgId) });
   }, [queryClient, orgId, supplierId]);
 
+  const invalidateMatches = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [...supplierKeys.all(orgId), 'matches'] });
+    queryClient.invalidateQueries({ queryKey: [...supplierKeys.all(orgId), 'product-matches'] });
+  }, [queryClient, orgId]);
+
   const saveMutation = useMutation({
     mutationFn: (creds) => unwrapResult(suppliersService.setConnectorCredentials(orgId, supplierId, creds)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: supplierKeys.connector(orgId, supplierId) }),
   });
+  const deleteCredentialsMutation = useMutation({
+    mutationFn: () => unwrapResult(suppliersService.deleteConnectorCredentials(orgId, supplierId)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: supplierKeys.connector(orgId, supplierId) }),
+  });
   const syncMutation = useMutation({
     mutationFn: () => unwrapResult(suppliersService.syncCatalog(orgId, supplierId)),
-    onSuccess: invalidateCatalogue,
+    onSuccess: () => { invalidateCatalogue(); invalidateMatches(); },
   });
   const importMutation = useMutation({
     mutationFn: (releve) => unwrapResult(suppliersService.importCatalogReleve(orgId, supplierId, releve, supplier?.connector)),
+    onSuccess: () => { invalidateCatalogue(); invalidateMatches(); },
+  });
+  const applyMappingMutation = useMutation({
+    mutationFn: () => unwrapResult(suppliersService.applyCategoryMapping(supplierId)),
     onSuccess: invalidateCatalogue,
+  });
+  const normalizeMutation = useMutation({
+    mutationFn: (limit) => unwrapResult(suppliersService.normalizeCatalog(orgId, supplierId, limit)),
+    onSuccess: () => { invalidateCatalogue(); invalidateMatches(); },
+  });
+  const proposeMutation = useMutation({
+    mutationFn: () => unwrapResult(suppliersService.proposeMatches(orgId, supplierId)),
+    onSuccess: invalidateMatches,
   });
 
   return {
     status: statusQuery.data ?? null,
     isLoadingStatus: statusQuery.isLoading,
     saveCredentials: saveMutation.mutateAsync,
+    deleteCredentials: deleteCredentialsMutation.mutateAsync,
     sync: syncMutation.mutateAsync,
     importReleve: importMutation.mutateAsync,
+    applyMapping: applyMappingMutation.mutateAsync,
+    normalize: normalizeMutation.mutateAsync,
+    proposeMatches: proposeMutation.mutateAsync,
     isSaving: saveMutation.isPending,
     isSyncing: syncMutation.isPending,
     isImporting: importMutation.isPending,
+    isApplyingMapping: applyMappingMutation.isPending,
+    isNormalizing: normalizeMutation.isPending,
+    isProposing: proposeMutation.isPending,
   };
+}
+
+/** Gammes distinctes d'un fournisseur, toutes catégories (filtre Gamme de la liste produits). */
+export function useSupplierGammes(orgId, supplierId) {
+  const { data, isLoading } = useQuery({
+    queryKey: [...supplierKeys.all(orgId), 'gammes', supplierId],
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getDistinctGammes(supplierId, []);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!supplierId,
+    staleTime: 60_000,
+  });
+  return { gammes: data || [], isLoading };
+}
+
+/** Marques distinctes d'un fournisseur (filtre Marque de la liste produits). */
+export function useSupplierBrands(orgId, supplierId) {
+  const { data, isLoading } = useQuery({
+    queryKey: supplierKeys.brands(orgId, supplierId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getDistinctBrands(supplierId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!supplierId,
+    staleTime: 60_000,
+  });
+  return { brands: data || [], isLoading };
+}
+
+/**
+ * Rapprochements entre fournisseurs de l'org (page « Rapprochements à confirmer », pastilles de la liste).
+ * `statut` : propose | confirme | refuse | null (tous). Décisions en lot via `setStatus(ids, statut)`.
+ */
+export function useCatalogMatches(orgId, statut = null) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: supplierKeys.matches(orgId, statut),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getMatches(orgId, statut);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId,
+    staleTime: 30_000,
+  });
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [...supplierKeys.all(orgId), 'matches'] });
+    queryClient.invalidateQueries({ queryKey: [...supplierKeys.all(orgId), 'product-matches'] });
+  }, [queryClient, orgId]);
+  const setStatusMutation = useMutation({
+    mutationFn: ({ ids, statut: s }) => unwrapResult(suppliersService.setMatchStatus(ids, s)),
+    onSuccess: invalidate,
+  });
+  const createMutation = useMutation({
+    mutationFn: ({ productA, productB }) => unwrapResult(suppliersService.createMatch(productA, productB)),
+    onSuccess: invalidate,
+  });
+  return {
+    matches: query.data || [],
+    isLoading: query.isLoading,
+    refetch: query.refetch,
+    setStatus: (ids, s) => setStatusMutation.mutateAsync({ ids, statut: s }),
+    createMatch: (productA, productB) => createMutation.mutateAsync({ productA, productB }),
+    isDeciding: setStatusMutation.isPending || createMutation.isPending,
+  };
+}
+
+/** Rapprochements (propose ou confirme) d'un produit — bloc « Aussi chez » du drawer et badge du picker. */
+export function useProductMatches(orgId, productId) {
+  const { data, isLoading } = useQuery({
+    queryKey: supplierKeys.productMatches(orgId, productId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getProductMatches(orgId, productId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!productId,
+    staleTime: 60_000,
+  });
+  return { matches: data || [], isLoading };
 }
 
 // ============================================================================
@@ -166,7 +277,7 @@ export function useSupplierConnector(orgId, supplier) {
  * Produits d'un fournisseur (paginé côté serveur)
  * kind : 'main' | 'accessory' | 'consumable' (null = tous)
  */
-export function useSupplierProducts(supplierId, { search = '', kind = null, page = 0, pageSize = 50 } = {}) {
+export function useSupplierProducts(supplierId, { search = '', kind = null, brand = null, gamme = null, page = 0, pageSize = 50 } = {}) {
   const offset = page * pageSize;
   const { organization } = useAuth();
   const orgId = organization?.id;
@@ -177,9 +288,9 @@ export function useSupplierProducts(supplierId, { search = '', kind = null, page
     error,
     refetch,
   } = useQuery({
-    queryKey: [...supplierKeys.products(orgId, supplierId), search, kind, page, pageSize],
+    queryKey: [...supplierKeys.products(orgId, supplierId), search, kind, brand, gamme, page, pageSize],
     queryFn: async () => {
-      const result = await suppliersService.getProducts(supplierId, { search, kind, limit: pageSize, offset });
+      const result = await suppliersService.getProducts(supplierId, { search, kind, brand, gamme, limit: pageSize, offset });
       if (result.error) throw result.error;
       return { products: result.data, count: result.count };
     },

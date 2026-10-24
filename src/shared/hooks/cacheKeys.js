@@ -270,6 +270,11 @@ export const supplierKeys = {
   productVariants: (orgId, parentId) => [...supplierKeys.all(orgId), 'variants', parentId],
   // Connexion catalogue d'un fournisseur (statut des identifiants Vault — jamais la valeur)
   connector: (orgId, supplierId) => [...supplierKeys.all(orgId), 'connector', supplierId],
+  // Marques distinctes d'un fournisseur (filtre Marque de la liste produits)
+  brands: (orgId, supplierId) => [...supplierKeys.all(orgId), 'brands', supplierId],
+  // Rapprochements entre fournisseurs (articles communs) : par statut, ou ceux d'un produit
+  matches: (orgId, statut) => [...supplierKeys.all(orgId), 'matches', statut ?? 'tous'],
+  productMatches: (orgId, productId) => [...supplierKeys.all(orgId), 'product-matches', productId],
   // Famille « catalogue par catégorie » (page /clim Dimensionnement, etc.) : toute mutation
   // produit (CRUD, image, variante) l'invalide en bloc — une catégorie ne sait pas quel
   // fournisseur vient de bouger.
