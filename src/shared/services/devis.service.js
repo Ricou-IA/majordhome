@@ -9,7 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { DEFAULT_FAMILLES, buildDevisConfig, sectionsParDefaut, categoriePourSection } from '@/lib/devisConfig.js';
+import { DEFAULT_FAMILLES, buildDevisConfig, sectionsParDefaut, categoriesPourSection } from '@/lib/devisConfig.js';
 import { logger } from '@lib/logger';
 
 // ============================================================================
@@ -52,14 +52,14 @@ export function buildDefaultSections(family, config) {
 }
 
 /**
- * Catégorie produit du picker pour une section d'un devis (voir categoriePourSection de devisConfig).
+ * Catégories produit du picker pour une section d'un devis (voir categoriesPourSection de devisConfig).
  * @param {string} sectionName
  * @param {string} [family]
  * @param {object} [config]  buildDevisConfig(settings)
- * @returns {string|null}
+ * @returns {string[]} vide = tous les fournisseurs
  */
-export function productCategoryForSection(sectionName, family, config) {
-  return categoriePourSection(config || buildDevisConfig(null), sectionName, family);
+export function productCategoriesForSection(sectionName, family, config) {
+  return categoriesPourSection(config || buildDevisConfig(null), sectionName, family);
 }
 
 export const LINE_TYPES = [

@@ -10,19 +10,26 @@ export const DEFAULT_CONDITIONS = `- Devis valable pour la durée indiquée ci-d
 - Garantie matériel selon les conditions du fabricant.`;
 
 /** Catégories produit du picker (valeurs de PRODUCT_CATEGORIES de suppliers.service) ; null = tous les fournisseurs. */
-export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie', 'batterie']);
+export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie', 'batterie', 'photovoltaique']);
 
-/** Familles d'installation par défaut (ex-QUOTE_TEMPLATE_FAMILIES + FAMILY_DEFAULT_SECTIONS). */
+/**
+ * Familles d'installation par défaut (ex-QUOTE_TEMPLATE_FAMILIES + FAMILY_DEFAULT_SECTIONS).
+ * `categories` = catégories produit où le « + » d'un chapitre pioche (vide = tous les fournisseurs). Une famille
+ * peut en avoir plusieurs (2026-10-24) : un devis Photovoltaïque pioche aussi des batteries, et inversement.
+ * Les réglages enregistrés avant cette date portent `categorie` (texte) : normalisé en `categories` à la lecture.
+ */
 export const DEFAULT_FAMILLES = Object.freeze([
-  Object.freeze({ key: 'poele_granules', label: 'Poêle à Granulé', actif: true, categorie: 'poele', sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'poele_bois', label: 'Poêle à Bois', actif: true, categorie: 'poele', sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'climatisation', label: 'Climatisation', actif: true, categorie: 'climatisation', sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'chauffage_pac', label: 'Chauffage/PAC', actif: true, categorie: 'chauffage', sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'poele_granules', label: 'Poêle à Granulé', actif: true, categories: Object.freeze(['poele']), sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'poele_bois', label: 'Poêle à Bois', actif: true, categories: Object.freeze(['poele']), sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'climatisation', label: 'Climatisation', actif: true, categories: Object.freeze(['climatisation']), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'chauffage_pac', label: 'Chauffage/PAC', actif: true, categories: Object.freeze(['chauffage']), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
   // Batterie de stockage (2026-10-24) : MATÉRIEL = ligne fourre-tout (câblage), MAIN D'ŒUVRE = pose et mise en service.
-  Object.freeze({ key: 'batterie', label: 'Batterie', actif: true, categorie: 'batterie', sections: Object.freeze(['ÉQUIPEMENT', 'MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'electricite', label: 'Electricité', actif: true, categorie: null, sections: Object.freeze(['MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'vmc', label: 'VMC', actif: true, categorie: null, sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'autre', label: 'Autre', actif: true, categorie: null, sections: Object.freeze(['PRESTATIONS', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'batterie', label: 'Batterie', actif: true, categories: Object.freeze(['batterie', 'photovoltaique']), sections: Object.freeze(['ÉQUIPEMENT', 'MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
+  // Photovoltaïque (2026-10-24) : chapitres dictés par Eric, « on corrigera après dans Majord'home ».
+  Object.freeze({ key: 'photovoltaique', label: 'Photovoltaïque', actif: true, categories: Object.freeze(['photovoltaique', 'batterie']), sections: Object.freeze(['PANNEAUX', 'ONDULEUR ET MONITORING', 'FIXATION', 'COFFRETS ET CÂBLAGE', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'electricite', label: 'Electricité', actif: true, categories: Object.freeze([]), sections: Object.freeze(['MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'vmc', label: 'VMC', actif: true, categories: Object.freeze([]), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
+  Object.freeze({ key: 'autre', label: 'Autre', actif: true, categories: Object.freeze([]), sections: Object.freeze(['PRESTATIONS', 'MAIN D\'ŒUVRE']) }),
 ]);
 
 export const DEFAULTS_DEVIS = Object.freeze({
@@ -67,15 +74,21 @@ function normaliserFamille(f, i) {
   const key = texte(f.key, '').trim() || slugFamille(label) || `famille_${i + 1}`;
   if (!label) return null;
   const sections = Array.isArray(f.sections) ? f.sections.map((s) => String(s ?? '').trim()).filter(Boolean) : [];
-  const categorie = CATEGORIES_PRODUIT.includes(f.categorie) ? f.categorie : null;
-  return { key, label, actif: bool(f.actif, true), categorie, sections };
+  return { key, label, actif: bool(f.actif, true), categories: normaliserCategories(f), sections };
+}
+
+/** `categories` d'une famille saisie : tableau filtré sur les catégories connues ; `categorie` (texte, legacy) accepté. */
+function normaliserCategories(f) {
+  const brutes = Array.isArray(f.categories) ? f.categories : (f.categorie != null ? [f.categorie] : []);
+  const vues = new Set();
+  return brutes.filter((c) => CATEGORIES_PRODUIT.includes(c) && !vues.has(c) && vues.add(c));
 }
 
 /**
  * Config Devis effective d'une org : défauts + surcharge `settings.devis`. Une liste de familles vide ou
  * malformée retombe sur les défauts ; les objets de niveau 2 sont fusionnés clé par clé.
  * @param {{ devis?: object } | null | undefined} settings
- * @returns {{ familles: Array<{ key: string, label: string, actif: boolean, categorie: string|null, sections: string[] }>,
+ * @returns {{ familles: Array<{ key: string, label: string, actif: boolean, categories: string[], sections: string[] }>,
  *   document: typeof DEFAULTS_DEVIS.document, paiement: typeof DEFAULTS_DEVIS.paiement, affichage: typeof DEFAULTS_DEVIS.affichage }}
  */
 export function buildDevisConfig(settings) {
@@ -132,16 +145,16 @@ export function sectionsParDefaut(config, keyOuLabel) {
 const normaliserCategorie = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
- * Catégorie produit du picker pour une section : le nom de la section s'il est une catégorie (« POÊLE »,
- * « FUMISTERIE »), sinon celle de la famille (« ÉQUIPEMENT » d'un devis Climatisation ⇒ climatisation),
- * sinon null (tous les fournisseurs). Avant ce helper, « ÉQUIPEMENT » cherchait un fournisseur de
+ * Catégories produit du picker pour une section : le nom de la section s'il est une catégorie (« POÊLE »,
+ * « FUMISTERIE »), sinon celles de la famille (« PANNEAUX » d'un devis Photovoltaïque ⇒ photovoltaique +
+ * batterie), sinon vide (tous les fournisseurs). Avant ce helper, « ÉQUIPEMENT » cherchait un fournisseur de
  * catégorie « equipement » : picker vide en silence.
- * @returns {string|null}
+ * @returns {string[]}
  */
-export function categoriePourSection(config, sectionName, keyOuLabel) {
+export function categoriesPourSection(config, sectionName, keyOuLabel) {
   const n = normaliserCategorie(sectionName);
-  if (CATEGORIES_PRODUIT.includes(n)) return n;
-  return familleDe(config, keyOuLabel)?.categorie || null;
+  if (CATEGORIES_PRODUIT.includes(n)) return [n];
+  return familleDe(config, keyOuLabel)?.categories?.slice() || [];
 }
 
 /**
@@ -160,7 +173,8 @@ export function validerDevisConfig(config) {
     if (f?.key && keys.has(f.key)) erreurs.push(`${nom} : clé en double`);
     if (f?.key) keys.add(f.key);
     if (!Array.isArray(f?.sections) || f.sections.filter((s) => String(s).trim()).length === 0) erreurs.push(`${nom} : au moins un chapitre`);
-    if (f?.categorie != null && !CATEGORIES_PRODUIT.includes(f.categorie)) erreurs.push(`${nom} : catégorie produit inconnue`);
+    const cats = Array.isArray(f?.categories) ? f.categories : (f?.categorie != null ? [f.categorie] : []);
+    if (cats.some((c) => !CATEGORIES_PRODUIT.includes(c))) erreurs.push(`${nom} : catégorie produit inconnue`);
   });
   const v = Number(config?.document?.validite_jours);
   if (!Number.isInteger(v) || v < 1 || v > 365) erreurs.push('validité entre 1 et 365 jours');

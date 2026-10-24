@@ -16,8 +16,11 @@ import {
   Loader2, Search, Minus, Plus, ShoppingCart,
 } from 'lucide-react';
 
-export default function DevisProductPicker({ orgId, category, onAddLines, onClose }) {
+/** `categories` : catégories produit de la famille / section (vide = tous les fournisseurs). */
+export default function DevisProductPicker({ orgId, categories = [], onAddLines, onClose }) {
   const { suppliers: allSuppliers } = useSuppliers(orgId);
+  // Clé stable pour les effets (un tableau neuf à chaque rendu relancerait les requêtes).
+  const categoriesKey = categories.join(',');
 
   // État du parcours
   const [step, setStep] = useState('supplier'); // supplier | gamme | diametre | products
@@ -35,16 +38,16 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
 
   // Charger les fournisseurs filtrés par catégorie
   useEffect(() => {
-    if (category && orgId) {
+    if (categoriesKey && orgId) {
       setLoadingSuppliers(true);
-      suppliersService.getSuppliersByCategory(orgId, category).then(({ data }) => {
+      suppliersService.getSuppliersByCategories(orgId, categoriesKey.split(',')).then(({ data }) => {
         setFilteredSuppliers(data || []);
         setLoadingSuppliers(false);
       });
     } else {
       setFilteredSuppliers(allSuppliers);
     }
-  }, [category, orgId, allSuppliers]);
+  }, [categoriesKey, orgId, allSuppliers]);
 
   const suppliers = filteredSuppliers;
 
@@ -52,11 +55,11 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
   const loadGammes = useCallback(async (supplier) => {
     setSelectedSupplier(supplier);
     setLoading(true);
-    const { data } = await suppliersService.getDistinctGammes(supplier.id, category);
+    const { data } = await suppliersService.getDistinctGammes(supplier.id, categories);
     setGammes(data || []);
     setLoading(false);
     setStep('gamme');
-  }, [category]);
+  }, [categoriesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Charger produits filtrés
   const loadProducts = useCallback(async (gamme, diametre) => {
@@ -64,19 +67,19 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
     setLoading(true);
     const { data } = await suppliersService.getFilteredProducts(
       selectedSupplier.id,
-      { gamme: gamme || selectedGamme, diametre: diametre, category }
+      { gamme: gamme || selectedGamme, diametre: diametre, categories }
     );
     setProducts(data || []);
     setQuantities({});
     setLoading(false);
     setStep('products');
-  }, [selectedSupplier, selectedGamme, category]);
+  }, [selectedSupplier, selectedGamme, categoriesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Charger diamètres quand gamme sélectionnée
   const loadDiametres = useCallback(async (gamme) => {
     setSelectedGamme(gamme);
     setLoading(true);
-    const { data } = await suppliersService.getDistinctDiametres(selectedSupplier.id, gamme, category);
+    const { data } = await suppliersService.getDistinctDiametres(selectedSupplier.id, gamme, categories);
     setDiametres(data || []);
     setLoading(false);
     // Si pas de diamètres, aller directement aux produits
@@ -85,7 +88,7 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
     } else {
       setStep('diametre');
     }
-  }, [selectedSupplier, category, loadProducts]);
+  }, [selectedSupplier, categoriesKey, loadProducts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Gestion quantités
   const setQty = (productId, qty) => {
@@ -195,8 +198,8 @@ export default function DevisProductPicker({ orgId, category, onAddLines, onClos
           ) : step === 'supplier' ? (
             /* ── Étape 1 : Choix fournisseur ── */
             <div className="space-y-2">
-              {category && (
-                <p className="text-xs text-secondary-400 mb-1">Catégorie : <span className="font-medium">{category}</span></p>
+              {categories.length > 0 && (
+                <p className="text-xs text-secondary-400 mb-1">Catégorie{categories.length > 1 ? 's' : ''} : <span className="font-medium">{categories.join(', ')}</span></p>
               )}
               <p className="text-sm text-secondary-500 mb-3">Choisissez un fournisseur</p>
               {suppliers.length === 0 && (

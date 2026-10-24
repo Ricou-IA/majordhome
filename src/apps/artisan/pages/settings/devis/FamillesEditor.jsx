@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2, ArrowUp, ArrowDown } from 'luc
 import { CATEGORIES_PRODUIT, slugFamille } from '@/lib/devisConfig.js';
 
 const INPUT = 'w-full px-2.5 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
-const CATEGORIE_LABELS = { poele: 'Poêle', climatisation: 'Climatisation', chauffage: 'Chauffage', fumisterie: 'Fumisterie', batterie: 'Batterie' };
+const CATEGORIE_LABELS = { poele: 'Poêle', climatisation: 'Climatisation', chauffage: 'Chauffage', fumisterie: 'Fumisterie', batterie: 'Batterie', photovoltaique: 'Photovoltaïque' };
 
 function deplacer(arr, i, delta) {
   const j = i + delta;
@@ -21,7 +21,7 @@ export default function FamillesEditor({ familles, onChange }) {
   const set = (i, patch) => onChange(familles.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   const ajouter = () => {
     const n = familles.length + 1;
-    onChange([...familles, { key: `famille_${Date.now().toString(36)}`, label: `Nouvelle famille ${n}`, actif: true, categorie: null, sections: ['PRESTATIONS', 'MAIN D\'ŒUVRE'] }]);
+    onChange([...familles, { key: `famille_${Date.now().toString(36)}`, label: `Nouvelle famille ${n}`, actif: true, categories: [], sections: ['PRESTATIONS', 'MAIN D\'ŒUVRE'] }]);
     setOuverte(familles.length);
   };
   const retirer = (i) => { onChange(familles.filter((_, j) => j !== i)); setOuverte(null); };
@@ -36,7 +36,7 @@ export default function FamillesEditor({ familles, onChange }) {
               <button type="button" onClick={() => setOuverte(open ? null : i)} className="flex items-center gap-2 flex-1 text-left text-sm font-medium text-secondary-800" aria-expanded={open}>
                 {open ? <ChevronDown className="w-4 h-4 text-secondary-400" /> : <ChevronRight className="w-4 h-4 text-secondary-400" />}
                 <span>{f.label || <em className="text-secondary-400">sans nom</em>}</span>
-                <span className="text-xs text-secondary-400 font-normal">· {f.sections.length} chapitre{f.sections.length > 1 ? 's' : ''}{f.categorie ? ` · ${CATEGORIE_LABELS[f.categorie]}` : ''}{f.actif ? '' : ' · masquée'}</span>
+                <span className="text-xs text-secondary-400 font-normal">· {f.sections.length} chapitre{f.sections.length > 1 ? 's' : ''}{f.categories?.length ? ` · ${f.categories.map((c) => CATEGORIE_LABELS[c] || c).join(' + ')}` : ''}{f.actif ? '' : ' · masquée'}</span>
               </button>
               <button type="button" onClick={() => onChange(deplacer(familles, i, -1))} disabled={i === 0} className="p-1 text-secondary-400 hover:text-secondary-700 disabled:opacity-30" aria-label="Monter"><ArrowUp className="w-3.5 h-3.5" /></button>
               <button type="button" onClick={() => onChange(deplacer(familles, i, 1))} disabled={i === familles.length - 1} className="p-1 text-secondary-400 hover:text-secondary-700 disabled:opacity-30" aria-label="Descendre"><ArrowDown className="w-3.5 h-3.5" /></button>
@@ -47,12 +47,19 @@ export default function FamillesEditor({ familles, onChange }) {
                   <label className="block text-xs text-secondary-600">Libellé
                     <input value={f.label} onChange={(e) => set(i, { label: e.target.value, key: f.key.startsWith('famille_') && /^famille_[a-z0-9]+$/.test(f.key) ? (slugFamille(e.target.value) || f.key) : f.key })} className={`${INPUT} mt-1`} />
                   </label>
-                  <label className="block text-xs text-secondary-600">Catégorie produit du « + »
-                    <select value={f.categorie || ''} onChange={(e) => set(i, { categorie: e.target.value || null })} className={`${INPUT} mt-1`}>
-                      <option value="">Tous les fournisseurs</option>
-                      {CATEGORIES_PRODUIT.map((c) => <option key={c} value={c}>{CATEGORIE_LABELS[c]}</option>)}
-                    </select>
-                  </label>
+                  <div className="block text-xs text-secondary-600">Catégories produit du « + » <span className="text-secondary-400">(aucune = tous les fournisseurs)</span>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                      {CATEGORIES_PRODUIT.map((c) => {
+                        const coche = (f.categories || []).includes(c);
+                        return (
+                          <label key={c} className="flex items-center gap-1 text-sm text-secondary-700">
+                            <input type="checkbox" checked={coche} onChange={(e) => set(i, { categories: e.target.checked ? [...(f.categories || []), c] : (f.categories || []).filter((x) => x !== c) })} />
+                            {CATEGORIE_LABELS[c]}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-secondary-600 mb-1">Chapitres du devis, dans l’ordre</div>

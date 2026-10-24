@@ -24,7 +24,14 @@ export const PRODUCT_CATEGORIES = [
   { value: 'chauffage', label: 'Chauffage' },
   { value: 'fumisterie', label: 'Fumisterie' },
   { value: 'batterie', label: 'Batterie' },
+  { value: 'photovoltaique', label: 'Photovoltaïque' },
 ];
+
+/** Tableau de catégories normalisées (vide = pas de filtre). Accepte un texte seul (appelants legacy). */
+function normalizeCategories(categories) {
+  const list = Array.isArray(categories) ? categories : (categories ? [categories] : []);
+  return list.map(normalizeCategory).filter(Boolean);
+}
 
 export const PRODUCT_UNITS = [
   { value: 'pièce', label: 'Pièce' },
@@ -396,11 +403,34 @@ export const suppliersService = {
     }
   },
 
-  async getDistinctGammes(supplierId, category) {
+  /**
+   * Fournisseurs ayant au moins un produit actif dans l'UNE des catégories (famille de devis multi-catégories,
+   * 2026-10-24). Tableau vide ⇒ tous les fournisseurs actifs de l'org.
+   * @param {string} orgId
+   * @param {string[]} categories
+   */
+  async getSuppliersByCategories(orgId, categories) {
+    try {
+      if (!orgId) return { data: [], error: null };
+      const cats = normalizeCategories(categories);
+      if (!cats.length) return this.getSuppliers(orgId);
+      const { data, error } = await supabase
+        .rpc('get_suppliers_by_categories', { p_org_id: orgId, p_categories: cats });
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      logger.error('[suppliersService] getSuppliersByCategories:', error);
+      return { data: [], error };
+    }
+  },
+
+  /** Gammes distinctes d'un fournisseur, filtrées sur une ou plusieurs catégories (texte ou tableau ; vide = toutes). */
+  async getDistinctGammes(supplierId, categories) {
     try {
       if (!supplierId) return { data: [], error: null };
+      const cats = normalizeCategories(categories);
       const params = { p_supplier_id: supplierId };
-      if (category) params.p_category = normalizeCategory(category);
+      if (cats.length) params.p_categories = cats;
       const { data, error } = await supabase.rpc('get_distinct_gammes', params);
 
       if (error) throw error;
@@ -411,11 +441,12 @@ export const suppliersService = {
     }
   },
 
-  async getDistinctDiametres(supplierId, gamme, category) {
+  async getDistinctDiametres(supplierId, gamme, categories) {
     try {
       if (!supplierId) return { data: [], error: null };
+      const cats = normalizeCategories(categories);
       const params = { p_supplier_id: supplierId, p_gamme: gamme || null };
-      if (category) params.p_category = normalizeCategory(category);
+      if (cats.length) params.p_categories = cats;
       const { data, error } = await supabase.rpc('get_distinct_diametres', params);
 
       if (error) throw error;
@@ -426,7 +457,7 @@ export const suppliersService = {
     }
   },
 
-  async getFilteredProducts(supplierId, { gamme, diametre, category } = {}) {
+  async getFilteredProducts(supplierId, { gamme, diametre, categories } = {}) {
     try {
       if (!supplierId) return { data: [], error: null };
       let query = supabase
@@ -438,7 +469,8 @@ export const suppliersService = {
 
       if (gamme) query = query.eq('gamme', gamme);
       if (diametre) query = query.eq('diametre', diametre);
-      if (category) query = query.ilike('category', normalizeCategory(category));
+      const cats = normalizeCategories(categories);
+      if (cats.length) query = query.in('category', cats);
       query = query.limit(500);
 
       const { data, error } = await query;

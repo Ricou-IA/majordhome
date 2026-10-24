@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { TVA_RATES, computeLineTotals, productCategoryForSection } from '@services/devis.service';
+import { TVA_RATES, computeLineTotals, productCategoriesForSection } from '@services/devis.service';
 import DevisProductPicker from './DevisProductPicker';
 import MetreFumisterie from './metre/MetreFumisterie';
 import { formatEuro } from '@/lib/utils';
@@ -231,7 +231,7 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, category }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
-  const pickerCategory = pickerForSection?.category || null;
+  const pickerCategories = pickerForSection?.categories || [];
 
   const updateLine = useCallback((index, updatedLine) => {
     setLines((prev) => prev.map((l, i) => (i === index ? updatedLine : l)));
@@ -294,7 +294,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
 
   // Ajouter des produits après la section (avant la section suivante)
   const handleAddProductsToSection = useCallback((sectionGlobalIndex, sectionName) => {
-    setPickerForSection({ index: sectionGlobalIndex, category: productCategoryForSection(sectionName, family, devisConfig) });
+    setPickerForSection({ index: sectionGlobalIndex, categories: productCategoriesForSection(sectionName, family, devisConfig) });
   }, [family, devisConfig]);
 
   const handlePickerAddLines = useCallback((newLines, _sectionTitle) => {
@@ -456,7 +456,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
       {pickerForSection && (
         <DevisProductPicker
           orgId={orgId}
-          category={pickerCategory}
+          categories={pickerCategories}
           onAddLines={handlePickerAddLines}
           onClose={() => setPickerForSection(null)}
         />

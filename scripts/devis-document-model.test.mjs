@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULTS_DEVIS, DEFAULT_FAMILLES, DEFAULT_CONDITIONS, buildDevisConfig, famillesActives, familleDe, sectionsParDefaut,
-  categoriePourSection, validerDevisConfig, slugFamille,
+  categoriesPourSection, validerDevisConfig, slugFamille,
 } from '../src/lib/devisConfig.js';
 import { buildDevisDocumentModel, exempleDevis, chapitres, fmtDateLongue, fmtQte, fmtTaux, ZONES } from '../src/lib/devisDocumentModel.js';
 
@@ -36,7 +36,7 @@ test('buildDevisConfig : surcharge org, familles invalides ignorées, clés déd
     affichage: { references: false },
   } });
   assert.equal(c.familles.length, 1);
-  assert.deepEqual(c.familles[0], { key: 'pompe_a_chaleur', label: 'Pompe à chaleur', actif: true, categorie: 'chauffage', sections: ['PAC', 'POSE'] });
+  assert.deepEqual(c.familles[0], { key: 'pompe_a_chaleur', label: 'Pompe à chaleur', actif: true, categories: ['chauffage'], sections: ['PAC', 'POSE'] });
   assert.equal(c.document.titre, 'DEVIS');
   assert.equal(c.document.validite_jours, 30);
   assert.equal(c.document.intro, 'Bonjour');
@@ -45,16 +45,16 @@ test('buildDevisConfig : surcharge org, familles invalides ignorées, clés déd
   assert.equal(slugFamille('Poêle à Granulé'), 'poele_a_granule');
 });
 
-test('familleDe / famillesActives / categoriePourSection', () => {
+test('familleDe / famillesActives / categoriesPourSection', () => {
   const c = buildDevisConfig({ devis: { familles: [{ key: 'clim', label: 'Climatisation', categorie: 'climatisation', sections: ['ÉQUIPEMENT'] }, { key: 'vieux', label: 'Ancien', actif: false, sections: ['X'] }] } });
   assert.equal(familleDe(c, 'clim').label, 'Climatisation');
   assert.equal(familleDe(c, 'Climatisation').key, 'clim');
   assert.equal(familleDe(c, 'inconnue'), null);
   assert.deepEqual(famillesActives(c).map((f) => f.key), ['clim']);
-  assert.equal(categoriePourSection(c, 'ÉQUIPEMENT', 'Climatisation'), 'climatisation');
-  assert.equal(categoriePourSection(c, 'FUMISTERIE', 'Climatisation'), 'fumisterie');
-  assert.equal(categoriePourSection(c, 'POÊLE', null), 'poele');
-  assert.equal(categoriePourSection(buildDevisConfig(null), 'MATÉRIEL', 'Electricité'), null);
+  assert.deepEqual(categoriesPourSection(c, 'ÉQUIPEMENT', 'Climatisation'), ['climatisation']);
+  assert.deepEqual(categoriesPourSection(c, 'FUMISTERIE', 'Climatisation'), ['fumisterie']);
+  assert.deepEqual(categoriesPourSection(c, 'POÊLE', null), ['poele']);
+  assert.deepEqual(categoriesPourSection(buildDevisConfig(null), 'MATÉRIEL', 'Electricité'), []);
 });
 
 test('validerDevisConfig nomme chaque défaut', () => {
