@@ -84,11 +84,12 @@ const VUES_BUREAU = [
   { value: 'dayGridMonth', label: 'Mois' },
 ];
 
-// Téléphone (~360 px) : une grille horaire à 5 colonnes, ou plusieurs
-// techniciens côte à côte dans la journée, donnent des blocs de 50 px
-// illisibles. Jour et Semaine deviennent des LISTES pleine largeur (un RDV par
-// ligne) ; la grille horaire reste accessible (« Heures ») pour poser au doigt.
-const VUES_TELEPHONE = [
+// Appareil tenu en main (téléphone, tablette) : une grille horaire à 5
+// colonnes, ou plusieurs techniciens côte à côte dans la journée, donnent des
+// blocs illisibles. Jour et Semaine deviennent des LISTES pleine largeur (un
+// RDV par ligne) ; la grille horaire reste accessible (« Heures ») pour poser
+// au doigt. Validé par Eric sur téléphone le 2026-10-24, étendu à la tablette.
+const VUES_MOBILE = [
   { value: 'listDay', label: 'Jour' },
   { value: 'listWeek', label: 'Semaine' },
   { value: 'timeGridDay', label: 'Heures' },
@@ -115,13 +116,13 @@ function CalendarToolbar({
   printHint,
   printLabel,
   isPrinting,
-  isPhone,
+  isMobileDevice,
 }) {
   const goToday = () => calendarRef.current?.getApi().today();
   const goPrev = () => calendarRef.current?.getApi().prev();
   const goNext = () => calendarRef.current?.getApi().next();
 
-  const views = isPhone ? VUES_TELEPHONE : VUES_BUREAU;
+  const views = isMobileDevice ? VUES_MOBILE : VUES_BUREAU;
 
   // Sous `sm` (téléphone) : titre sur sa ligne, puis navigation et actions ;
   // Imprimer disparaît (PDF d'une personne, geste de bureau).
@@ -426,9 +427,9 @@ export default function Planning() {
   const calendarRef = useRef(null);
   const canCreateAppointment = can('planning', 'create');
   // Sur appareil tenu en main (tablette, téléphone) : la journée, pas la semaine.
-  // Téléphone : la journée en liste (cf. VUES_TELEPHONE).
-  const { isMobileDevice, isPhone } = useDeviceClass();
-  const vueInitiale = isPhone ? 'listDay' : isMobileDevice ? 'timeGridDay' : 'timeGridWeek';
+  // Téléphone / tablette : la journée en liste (cf. VUES_MOBILE).
+  const { isMobileDevice } = useDeviceClass();
+  const vueInitiale = isMobileDevice ? 'listDay' : 'timeGridWeek';
 
   // État local
   const [currentView, setCurrentView] = useState(vueInitiale);
@@ -612,8 +613,10 @@ export default function Planning() {
   const printPerson = filters.memberProfileKeys?.length === 1
     ? teamList.find((h) => h.profileKey === filters.memberProfileKeys[0])
     : null;
-  const isDayView = currentView === 'timeGridDay';
-  const printHint = currentView !== 'timeGridWeek' && !isDayView
+  // Les vues liste (appareils mobiles) impriment comme leur équivalent grille.
+  const isDayView = currentView === 'timeGridDay' || currentView === 'listDay';
+  const isWeekView = currentView === 'timeGridWeek' || currentView === 'listWeek';
+  const printHint = !isWeekView && !isDayView
     ? 'Passez en vue Semaine ou Jour pour imprimer'
     : !printPerson
       ? 'Sélectionnez une seule personne dans les filtres équipe'
@@ -899,7 +902,7 @@ export default function Planning() {
           printHint={printHint}
           printLabel={printLabel}
           isPrinting={isPrinting}
-          isPhone={isPhone}
+          isMobileDevice={isMobileDevice}
         />
         <CalendarFilters
           filters={filters}

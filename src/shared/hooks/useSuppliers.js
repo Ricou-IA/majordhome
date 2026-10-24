@@ -104,6 +104,60 @@ export function useSupplierMutations(orgId) {
   };
 }
 
+/**
+ * Connexion catalogue d'un fournisseur (Settings → Fournisseurs) : statut des identifiants Vault (jamais la
+ * valeur), enregistrement des identifiants, relevé automatique (BayWa) et import d'un relevé JSON.
+ * `sync` / `importReleve` résolvent avec la réponse de l'edge : { ok:true, resultat } ou { ok:false, code } —
+ * un refus métier n'est PAS une exception, l'appelant lit `ok`. Un relevé réussi invalide la liste des
+ * fournisseurs (catalog_sync_*), les produits du fournisseur et le catalogue par catégorie (picker devis).
+ */
+export function useSupplierConnector(orgId, supplier) {
+  const queryClient = useQueryClient();
+  const supplierId = supplier?.id;
+
+  const statusQuery = useQuery({
+    queryKey: supplierKeys.connector(orgId, supplierId),
+    queryFn: async () => {
+      const { data, error } = await suppliersService.getConnectorStatus(orgId, supplierId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!supplierId && supplier?.connector === 'baywa',
+    staleTime: 60_000,
+  });
+
+  const invalidateCatalogue = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: supplierKeys.list(orgId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.detail(orgId, supplierId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.products(orgId, supplierId) });
+    queryClient.invalidateQueries({ queryKey: supplierKeys.productsByCategories(orgId) });
+  }, [queryClient, orgId, supplierId]);
+
+  const saveMutation = useMutation({
+    mutationFn: (creds) => unwrapResult(suppliersService.setConnectorCredentials(orgId, supplierId, creds)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: supplierKeys.connector(orgId, supplierId) }),
+  });
+  const syncMutation = useMutation({
+    mutationFn: () => unwrapResult(suppliersService.syncCatalog(orgId, supplierId)),
+    onSuccess: invalidateCatalogue,
+  });
+  const importMutation = useMutation({
+    mutationFn: (releve) => unwrapResult(suppliersService.importCatalogReleve(orgId, supplierId, releve)),
+    onSuccess: invalidateCatalogue,
+  });
+
+  return {
+    status: statusQuery.data ?? null,
+    isLoadingStatus: statusQuery.isLoading,
+    saveCredentials: saveMutation.mutateAsync,
+    sync: syncMutation.mutateAsync,
+    importReleve: importMutation.mutateAsync,
+    isSaving: saveMutation.isPending,
+    isSyncing: syncMutation.isPending,
+    isImporting: importMutation.isPending,
+  };
+}
+
 // ============================================================================
 // PRODUITS
 // ============================================================================

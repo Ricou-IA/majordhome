@@ -231,19 +231,31 @@ html[data-device-class="phone"] .fc .fc-event {
 html[data-device-class="phone"] .fc .fc-timegrid-slot {
   height: 2.5rem;
 }
-/* Vues liste (Jour / Semaine sur téléphone) : un RDV par ligne, texte lisible
-   et renvoyé à la ligne plutôt que tronqué (la cellule ne s'élargit pas). */
-html[data-device-class="phone"] .fc .fc-list-event td {
+/* Vues liste (Jour / Semaine sur téléphone ET tablette) : un RDV par ligne,
+   texte lisible et renvoyé à la ligne plutôt que tronqué. La tablette est rendue
+   en 1024 px puis réduite à l'écran : police un cran au-dessus pour compenser. */
+html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-event td {
   padding: 0.5rem 0.5rem;
   font-size: 13px;
 }
-html[data-device-class="phone"] .fc .fc-list-event-title .truncate {
+html[data-device-class="tablet"] .fc .fc-list-event td {
+  padding: 0.75rem;
+  font-size: 15px;
+}
+html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-event-title .truncate {
   white-space: normal;
   overflow: visible;
 }
-html[data-device-class="phone"] .fc .fc-list-day-cushion {
+/* Le contenu du RDV porte `text-xs` (taillé pour la grille) : en liste il suit la cellule. */
+html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-event-title .text-xs {
+  font-size: inherit;
+}
+html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-day-cushion {
   font-size: 13px;
   text-transform: capitalize;
+}
+html[data-device-class="tablet"] .fc .fc-list-day-cushion {
+  font-size: 15px;
 }
 
 /* Gabarit « contenu » (couche 3, 2026-10-11) : sous 640 px sur téléphone, les

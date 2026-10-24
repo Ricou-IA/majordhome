@@ -33,10 +33,18 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ProductDocumentsPanel } from './ProductDocumentsPanel';
 import ProductDetailDrawer from './ProductDetailDrawer';
+import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
 
 // =============================================================================
 // MODAL FOURNISSEUR
 // =============================================================================
+
+// Connexion catalogue (suppliers.connector) : baywa = relevé automatique (identifiants Vault, cron nocturne),
+// domos = relevé manuel importé (site derrière Cloudflare). Panneau dans le catalogue : CatalogConnectorPanel.
+const CONNECTOR_OPTIONS = [
+  { value: 'baywa', label: 'BayWa r.e. — relevé automatique' },
+  { value: 'domos', label: 'Domos Industries — relevé manuel (import)' },
+];
 
 function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
   const [form, setForm] = useState({
@@ -49,6 +57,7 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
     city: supplier?.city || '',
     siret: supplier?.siret || '',
     notes: supplier?.notes || '',
+    connector: supplier?.connector || '',
   });
 
   const setField = useCallback((field, value) => {
@@ -109,6 +118,16 @@ function SupplierFormModal({ supplier, onClose, onSave, isSaving }) {
 
             <FormField label="Notes">
               <TextArea value={form.notes} onChange={(v) => setField('notes', v)} rows={2} />
+            </FormField>
+
+            <SectionTitle>Connexion catalogue</SectionTitle>
+            <FormField label="Relevé du catalogue">
+              <SelectInput
+                value={form.connector}
+                onChange={(v) => setField('connector', v || '')}
+                placeholder="Aucune (saisie ou import Excel)"
+                options={CONNECTOR_OPTIONS}
+              />
             </FormField>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
@@ -593,6 +612,8 @@ function ProductCatalog({ supplier, orgId, onBack }) {
           </button>
         </div>
       </div>
+
+      {supplier.connector && <CatalogConnectorPanel supplier={supplier} orgId={orgId} />}
 
       {/* Import info + template download */}
       <div className="flex items-center justify-between bg-secondary-50 rounded px-3 py-2">

@@ -11,6 +11,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { storageService } from '@services/storage.service';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { logger } from '@lib/logger';
 
 // ============================================================================
 // CONSTANTES
@@ -88,7 +89,7 @@ export const suppliersService = {
   // FOURNISSEURS — ÉCRITURE
   // ==========================================================================
 
-  async createSupplier({ orgId, name, contactName, contactEmail, contactPhone, address, postalCode, city, siret, notes }) {
+  async createSupplier({ orgId, name, contactName, contactEmail, contactPhone, address, postalCode, city, siret, notes, connector }) {
     try {
       if (!orgId || !name) throw new Error('[suppliersService] orgId et name requis');
 
@@ -105,6 +106,7 @@ export const suppliersService = {
           city: city || null,
           siret: siret || null,
           notes: notes || null,
+          connector: connector || null,
         })
         .select()
         .single();
@@ -131,6 +133,7 @@ export const suppliersService = {
       if (updates.city !== undefined) updateData.city = updates.city || null;
       if (updates.siret !== undefined) updateData.siret = updates.siret || null;
       if (updates.notes !== undefined) updateData.notes = updates.notes || null;
+      if (updates.connector !== undefined) updateData.connector = updates.connector || null;
       updateData.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
@@ -144,6 +147,79 @@ export const suppliersService = {
       return { data, error: null };
     } catch (error) {
       console.error('[suppliersService] updateSupplier:', error);
+      return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
+  // CONNEXION CATALOGUE (relevé BayWa automatique / import d'un relevé Domos)
+  // Identifiants dans le Vault via org_secret_* (org_admin) ; relevé par l'edge supplier-catalog-sync,
+  // écrivain unique = RPC supplier_catalog_upsert. Spec 2026-10-24-module-batterie-catalogue-baywa-design § 7.
+  // ==========================================================================
+
+  /** Clé Vault des identifiants d'un fournisseur (org:<org>:supplier:<id>:credentials côté base). */
+  connectorSecretKey(supplierId) {
+    return `supplier:${supplierId}:credentials`;
+  },
+
+  /** Enregistre (ou remplace) les identifiants du compte fournisseur — org_admin seul (vérifié en base). */
+  async setConnectorCredentials(orgId, supplierId, { email, password }) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      if (!email?.trim() || !password) throw new Error('E-mail et mot de passe requis');
+      const { error } = await supabase.rpc('org_secret_set', {
+        p_org_id: orgId,
+        p_key: this.connectorSecretKey(supplierId),
+        p_value: JSON.stringify({ email: email.trim(), password }),
+      });
+      if (error) throw error;
+      return { data: true, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] setConnectorCredentials:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Existence et date des identifiants (jamais la valeur) — tout membre de l'org. */
+  async getConnectorStatus(orgId, supplierId) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      const { data, error } = await supabase.rpc('org_secret_status', { p_org_id: orgId, p_key: this.connectorSecretKey(supplierId) });
+      if (error) throw error;
+      return { data: { exists: data?.exists === true, updatedAt: data?.updated_at || null }, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] getConnectorStatus:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Relevé automatique (BayWa) : l'edge se connecte avec les identifiants Vault. Réponse { ok, resultat } ou { ok:false, code }. */
+  async syncCatalog(orgId, supplierId) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      const { data, error } = await supabase.functions.invoke('supplier-catalog-sync', {
+        body: { action: 'sync', org_id: orgId, supplier_id: supplierId },
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] syncCatalog:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Import d'un relevé JSON (scripts/catalogue/dump-<fournisseur>.browser.js). Même réponse que syncCatalog. */
+  async importCatalogReleve(orgId, supplierId, releve) {
+    try {
+      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      if (!releve || !Array.isArray(releve.items)) throw new Error('Fichier de relevé invalide (items manquants)');
+      const { data, error } = await supabase.functions.invoke('supplier-catalog-sync', {
+        body: { action: 'import', org_id: orgId, supplier_id: supplierId, releve },
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[suppliersService] importCatalogReleve:', error);
       return { data: null, error };
     }
   },
