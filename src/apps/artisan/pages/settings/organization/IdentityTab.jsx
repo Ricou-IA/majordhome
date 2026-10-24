@@ -4,6 +4,9 @@ import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import RgeCertificationsInput from './components/RgeCertificationsInput';
 import SignatureUpload from './components/SignatureUpload';
+import CompanyDocumentsSection, { COMPANY_DOCUMENTS_BUCKET } from './components/CompanyDocumentsSection';
+import { storageService } from '@services/storage.service';
+import { normalizeCompanyDocuments, removedDocumentPaths } from '@/lib/companyDocuments';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -35,6 +38,8 @@ const FIELDS = [
   'signatory_name',
   'signatory_role',
   'signatory_signature_path',
+  // Documents de l'entreprise (certifications, attestation fluides, attestation d'assurance)
+  'company_documents',
 ];
 
 // Formatage SIRET : groupes de 3 chiffres + 5 derniers
@@ -78,6 +83,7 @@ function pickIdentityFields(settings) {
   FIELDS.forEach((f) => {
     out[f] = settings[f] ?? (f === 'rge_certifications' ? [] : '');
   });
+  out.company_documents = normalizeCompanyDocuments(settings.company_documents);
   return out;
 }
 
@@ -105,13 +111,24 @@ export default function IdentityTab() {
     try {
       await save(form);
       toast.success('Identité enregistrée');
+      // Documents retirés ou remplacés : purge du Storage une fois l'enregistrement acquis.
+      const removed = removedDocumentPaths(initial.company_documents, form.company_documents);
+      if (removed.length) {
+        const { error } = await storageService.deleteFiles(COMPANY_DOCUMENTS_BUCKET, removed);
+        if (error) toast.warning(`Ancien(s) fichier(s) non supprimé(s) du stockage : ${error.message}`);
+      }
       setInitial(form);
     } catch (err) {
       toast.error(err.message || 'Erreur lors de l\'enregistrement');
     }
   };
 
-  const handleReset = () => setForm(initial);
+  const handleReset = () => {
+    // Fichiers déposés puis abandonnés : jamais référencés, on les retire du Storage.
+    const abandoned = removedDocumentPaths(form.company_documents, initial.company_documents);
+    if (abandoned.length) storageService.deleteFiles(COMPANY_DOCUMENTS_BUCKET, abandoned);
+    setForm(initial);
+  };
 
   if (isLoading) {
     return <div className="card text-sm text-secondary-500">Chargement…</div>;
@@ -273,6 +290,16 @@ export default function IdentityTab() {
             onChange={(path) => setForm({ ...form, signatory_signature_path: path })}
           />
         </div>
+      </section>
+
+      {/* Section Documents de l'entreprise */}
+      <section>
+        <h3 className={SECTION_TITLE}>Documents de l’entreprise</h3>
+        <CompanyDocumentsSection
+          orgId={organization?.id}
+          value={form.company_documents}
+          onChange={(docs) => setForm({ ...form, company_documents: docs })}
+        />
       </section>
 
       {/* Actions */}
