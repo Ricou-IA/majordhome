@@ -247,7 +247,7 @@ html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-
   overflow: visible;
 }
 /* Le contenu du RDV porte `text-xs` (taillé pour la grille) : en liste il suit la cellule. */
-html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-event-title .text-xs {
+html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-event-title [class~="text-xs"] {
   font-size: inherit;
 }
 html:is([data-device-class="phone"], [data-device-class="tablet"]) .fc .fc-list-day-cushion {
