@@ -169,7 +169,7 @@ const FUNCTIONS = [
   'public.webshop_order_move_slot(uuid, uuid)',
   'public.webshop_slot_send_now(uuid)',
   'public.webshop_slot_send_result(uuid)',
-  'public.find_or_create_client(uuid, text, text, text, text, text, text, text, text, text, text, text, text)', // 20261021_1 : remplacée (rapprochement fort)
+  'public.find_or_create_client(uuid, text, text, text, text, text, text, text, text, text, text, text, text, boolean)', // 20261021_1 : remplacée (rapprochement fort) ; signature prod relue le 2026-10-24 (14ᵉ paramètre boolean)
 ];
 
 // Triggers utilisateur à reproduire (ceux qui interagissent avec la migration).
@@ -195,6 +195,8 @@ const VIEWS = [
   'public.majordhome_certificats', // 20261012_1 : photo_plaque_path / photo_plaque_absence (colonnes en fin)
   'public.majordhome_quotes', // 20261010_1 : commentaire (vue JOIN, colonne en fin)
   'public.majordhome_quotes_write',
+  'public.majordhome_suppliers', // 20261024_2 : connector / catalog_sync_* en fin (miroirs updatable)
+  'public.majordhome_suppliers_write',
   'public.majordhome_invoices', // 20261010_1 : client_note (i.* ⇒ DROP + CREATE)
   // 20260930_16 : cibles du CREATE OR REPLACE
   'public.majordhome_lead_pennylane_quotes',

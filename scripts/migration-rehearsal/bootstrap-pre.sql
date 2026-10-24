@@ -41,6 +41,34 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
 
+-- Stub Vault (supabase_vault) : mêmes signatures que la prod (create_secret / update_secret / decrypted_secrets),
+-- secret stocké en clair — on ne teste que les RPC org_secret_* (20261024_2), pas le chiffrement.
+CREATE SCHEMA IF NOT EXISTS vault;
+CREATE TABLE IF NOT EXISTS vault.secrets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text UNIQUE,
+  description text NOT NULL DEFAULT '',
+  secret text NOT NULL,
+  key_id uuid,
+  nonce bytea,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE OR REPLACE VIEW vault.decrypted_secrets AS
+  SELECT id, name, description, secret, secret AS decrypted_secret, key_id, nonce, created_at, updated_at FROM vault.secrets;
+CREATE OR REPLACE FUNCTION vault.create_secret(new_secret text, new_name text DEFAULT NULL, new_description text DEFAULT '', new_key_id uuid DEFAULT NULL)
+RETURNS uuid LANGUAGE sql AS $$
+  INSERT INTO vault.secrets (name, description, secret, key_id) VALUES (new_name, new_description, new_secret, new_key_id) RETURNING id
+$$;
+CREATE OR REPLACE FUNCTION vault.update_secret(secret_id uuid, new_secret text DEFAULT NULL, new_name text DEFAULT NULL, new_description text DEFAULT NULL, new_key_id uuid DEFAULT NULL)
+RETURNS void LANGUAGE sql AS $$
+  UPDATE vault.secrets SET secret = COALESCE(new_secret, secret), name = COALESCE(new_name, name),
+    description = COALESCE(new_description, description), updated_at = now() WHERE id = secret_id
+$$;
+REVOKE ALL ON SCHEMA vault FROM PUBLIC;
+GRANT USAGE ON SCHEMA vault TO service_role;
+GRANT SELECT ON vault.decrypted_secrets TO service_role;
+
 -- Stub Storage (les migrations posent bucket + policies ; en répétition on ne teste que la syntaxe)
 CREATE SCHEMA IF NOT EXISTS storage;
 CREATE TABLE IF NOT EXISTS storage.buckets (
