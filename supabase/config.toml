@@ -190,3 +190,8 @@ verify_jwt = true
 # ({ mode: "cron" }, pg_cron quotidien 20261024_3). 2026-10-24.
 [functions.supplier-catalog-sync]
 verify_jwt = false
+
+# lead-welcome-email : e-mail d'accueil des leads Meta Ads (gabarit accueil_lead_meta), pg_cron toutes
+# les 5 min (20261024_4), MDH_CRON_SECRET. Rien ne part sans settings.lead_welcome_email.enabled. 2026-10-24.
+[functions.lead-welcome-email]
+verify_jwt = false

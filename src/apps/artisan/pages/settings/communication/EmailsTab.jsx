@@ -19,6 +19,7 @@ import { moduleActif } from '@/lib/modules';
 import { DEFAULT_INVOICE_EMAIL, INVOICE_EMAIL_TEMPLATE_KEY, INVOICE_EMAIL_PLACEHOLDERS } from '@/lib/invoiceEmailTemplate';
 import ResendDomainSection from './ResendDomainSection';
 import GabaritTransactionnel from './GabaritTransactionnel';
+import AccueilLeadMetaSection from './AccueilLeadMetaSection';
 import {
   DEFAULT_AUTO_RDV_EMAIL, DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL, AUTO_RDV_PLACEHOLDERS, AUTO_RDV_CONFIRMATION_PLACEHOLDERS,
 } from '@/lib/autoRdvEmailTemplates';
@@ -197,6 +198,7 @@ export default function EmailsTab() {
               orgId={orgId} gabarit={DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL} placeholders={AUTO_RDV_CONFIRMATION_PLACEHOLDERS}
               titre="Prise de rendez-vous : confirmation"
             />
+            <AccueilLeadMetaSection orgId={orgId} />
           </section>
         )}
 
