@@ -94,7 +94,8 @@ BEGIN
   -- (e) vue : écart de prix et noms de fournisseurs
   SELECT count(*) INTO v_n FROM public.majordhome_catalog_matches v WHERE v.supplier_a_name LIKE 'TEST MATCH%' AND v.supplier_b_name LIKE 'TEST MATCH%' AND v.ecart_pct IS NOT NULL;
   IF v_n < 2 THEN RAISE EXCEPTION 'vue incomplète : %', v_n; END IF;
-  SELECT ecart_pct INTO v_n FROM public.majordhome_catalog_matches WHERE product_a_id = least(v_luna_a, v_luna_b);
+  -- le signe dépend de l'ordre des UUID (a = le plus petit) : on contrôle la valeur absolue (5,6 % ou 5,9 %)
+  SELECT round(abs(ecart_pct)) INTO v_n FROM public.majordhome_catalog_matches WHERE product_a_id = least(v_luna_a, v_luna_b);
   IF v_n NOT BETWEEN 5 AND 7 THEN RAISE EXCEPTION 'écart LUNA inattendu : %', v_n; END IF;
 
   RAISE NOTICE 'assert-catalog-matches : OK';
