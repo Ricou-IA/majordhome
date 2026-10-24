@@ -226,3 +226,12 @@
 - `suppliers.connector` (`baywa` | `domos` | NULL) + `catalog_sync_at` / `catalog_sync_result` en fin des vues `majordhome_suppliers(_write)` ; libellés dans `src/lib/catalogue/syncResult.js`.
 - Section MATÉRIEL d'un devis : ligne libre ET catalogue (`DevisStepLines`).
 ---
+
+## [2026-10-24 12:10] Tarif fournisseur PDF → catalogue + fiches techniques (ECOSTAL, bornes V2C)
+**Statut** : PENDING
+**Commit** : (import Ecostal 2026-10-24)
+**Contexte** : premier fournisseur sans boutique relevable (Ecostal, bornes de recharge V2C) : le tarif est un PDF transcrit à la main en JSON, importé par la RPC écrivain unique, et les fiches techniques PDF sont déposées par script sur chaque produit (premiers `product_documents` jamais créés en prod). Nouvelle catégorie produit `borne_recharge` dans `PRODUCT_CATEGORIES`, pas encore dans `CATEGORIES_PRODUIT` du devis (famille « Borne de recharge » à créer).
+**Proposition** (à ajouter dans la section « Catalogue fournisseur » proposée ci-dessus) :
+- **Tarif PDF (pas de boutique à relever) = JSON transcrit + test pinné + RPC écrivain unique** : `scripts/catalogue/data/<fournisseur>-<AAAA-MM>.json` → `import-tarif-<fournisseur>.mjs` (module pur `<fournisseur>-tarif.js`, test dans `audit:quality` pinnant le nombre de références et la somme des prix) → SQL rejouable → `supplier_catalog_upsert` via `apply-sql.mjs`. Le « prix de vente » d'un tarif grossiste est notre **prix d'achat** ; `selling_price_ht` reste à 0 tant qu'on ne connaît pas le prix public. Précédent : ECOSTAL (`ecostal-2026-04.json`, 37 refs V2C, catégorie `borne_recharge`).
+- **Fiches techniques par script = `scripts/catalogue/attach-fiches.mjs`** (section `fiches` du JSON : fichier → préfixes de référence) : UN objet Storage par produit (`product-documents/${org}/${productId}/${uuid}.pdf`, comme l'écran Documents — la suppression depuis l'app efface l'objet, un fichier partagé casserait les autres produits), idempotent par nom. Storage via service_role (`DST_KEY`), lignes `product_documents` via l'API Management (service_role n'a pas d'INSERT sur `majordhome.*`).
+---

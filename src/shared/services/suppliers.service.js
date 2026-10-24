@@ -25,6 +25,7 @@ export const PRODUCT_CATEGORIES = [
   { value: 'fumisterie', label: 'Fumisterie' },
   { value: 'batterie', label: 'Batterie' },
   { value: 'photovoltaique', label: 'Photovoltaïque' },
+  { value: 'borne_recharge', label: 'Borne de recharge' },
 ];
 
 /** Tableau de catégories normalisées (vide = pas de filtre). Accepte un texte seul (appelants legacy). */
