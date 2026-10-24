@@ -63,7 +63,7 @@ export default function SignatureUpload({ orgId, path, onChange }) {
             <Trash2 className="w-4 h-4" /> Supprimer
           </button>
         )}
-        <p className="text-xs text-secondary-500">Fond blanc ou transparent, 500 Ko maximum. Apposée sur les mandats générés.</p>
+        <p className="text-xs text-secondary-500">Fond blanc ou transparent, 500 Ko maximum. Apposée sur les mandats et les attestations d’entretien.</p>
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 import { MapPin } from 'lucide-react';
 import { FRENCH_DEPARTMENTS } from '@lib/departments';
+import { INPUT_CLASS } from './layout';
 
 /**
  * Sélecteur de département français (95 + DOM-TOM).
- * Bouton "📍 Détecter depuis siège" si onDetectFromHq fourni.
+ * Bouton « Détecter depuis le siège » si onDetectFromHq fourni.
  *
  * @param {Object} props
  * @param {string} props.value - code département actuel (ex '81')
@@ -23,12 +24,12 @@ export default function DepartmentSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="flex-1 px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-secondary-50"
+        className={`${INPUT_CLASS} flex-1`}
       >
-        <option value="">— Sélectionne un département —</option>
+        <option value="">Choisir un département</option>
         {FRENCH_DEPARTMENTS.map((d) => (
           <option key={d.code} value={d.code}>
-            {d.code} — {d.name}
+            {d.code} · {d.name}
           </option>
         ))}
       </select>
@@ -37,10 +38,10 @@ export default function DepartmentSelect({
           type="button"
           onClick={onDetectFromHq}
           disabled={disabled}
-          className="flex items-center gap-1 px-3 py-2 text-xs text-primary-600 border border-primary-300 rounded-md hover:bg-primary-50 disabled:opacity-50 flex-shrink-0"
+          className="btn-secondary text-sm flex items-center gap-1.5 flex-shrink-0 disabled:opacity-50"
         >
-          <MapPin className="w-3 h-3" />
-          Détecter depuis siège
+          <MapPin className="w-4 h-4" />
+          Détecter depuis le siège
         </button>
       )}
     </div>

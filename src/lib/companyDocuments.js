@@ -8,15 +8,15 @@
 /** @type {{ key: string, label: string, hint: string, multiple: boolean, fields: { intitule: string, numero: string, organisme: string } }[]} */
 export const COMPANY_DOCUMENT_KINDS = [
   {
-    key: 'certifications', label: 'Certifications', hint: 'Un certificat par qualification (QualiBois, QualiPAC, QualiPV…)', multiple: true,
+    key: 'certifications', label: 'Certifications', hint: 'Un fichier par qualification (QualiBois, QualiPAC, QualiPV…). Intitulé, numéro et validité sont lus automatiquement.', multiple: true,
     fields: { intitule: 'Qualification', numero: 'N° de qualification', organisme: 'Organisme' },
   },
   {
-    key: 'attestation_fluides', label: 'Attestation de capacité fluides', hint: 'Manipulation des fluides frigorigènes', multiple: false,
+    key: 'attestation_fluides', label: 'Attestation de capacité fluides', hint: 'Requise pour manipuler les fluides frigorigènes (PAC, climatisation).', multiple: false,
     fields: { intitule: 'Attestation', numero: "N° d'attestation", organisme: 'Organisme agréé' },
   },
   {
-    key: 'attestation_assurance', label: "Attestation d'assurance", hint: 'Décennale et RC professionnelle', multiple: false,
+    key: 'attestation_assurance', label: "Attestation d'assurance", hint: 'Décennale et responsabilité civile professionnelle, à renouveler chaque année.', multiple: false,
     fields: { intitule: 'Garanties', numero: 'N° de police', organisme: 'Assureur' },
   },
 ];

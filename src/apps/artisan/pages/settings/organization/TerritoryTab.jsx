@@ -1,15 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+// Settings → Organisation → Territoire : siège sur la carte (départ des trajets), antennes
+// commerciales, visibilité locale (fiche Google Business, département principal pour GeoGrid).
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ExternalLink, Plus, X } from 'lucide-react';
-import { useOrgSettings } from '@hooks/useOrgSettings';
+import { ChevronDown, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { MAPBOX_CONFIG } from '@lib/mapbox';
 import CenterEditor from './components/CenterEditor';
 import DepartmentSelect from './components/DepartmentSelect';
-
-const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
-const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
-const ERROR_CLASS = 'mt-1 text-xs text-red-600';
-const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
+import { useSettingsForm } from './components/useSettingsForm';
+import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
 
 const PLACE_ID_FINDER_URL = 'https://developers.google.com/maps/documentation/places/web-service/place-id?hl=fr#find-id';
 
@@ -73,58 +71,47 @@ function validate(state) {
   const errors = {};
   if (!state.headquarters.label?.trim()) errors.hq_label = 'Nom du siège obligatoire';
   if (!Number.isFinite(state.headquarters.lat) || !Number.isFinite(state.headquarters.lng)) {
-    errors.hq_coords = 'Coordonnées du siège obligatoires (recherche adresse ou saisie manuelle)';
+    errors.hq_coords = 'Position du siège obligatoire : recherchez l’adresse ou saisissez les coordonnées';
   }
   state.branches.forEach((b, idx) => {
-    if (!b.label?.trim()) errors[`branch_label_${idx}`] = "Nom de l'antenne obligatoire";
+    if (!b.label?.trim()) errors[`branch_label_${idx}`] = 'Nom de l’antenne obligatoire';
     if (!Number.isFinite(b.lat) || !Number.isFinite(b.lng)) {
-      errors[`branch_coords_${idx}`] = "Coordonnées de l'antenne obligatoires";
+      errors[`branch_coords_${idx}`] = 'Position de l’antenne obligatoire';
     }
   });
   return errors;
 }
 
 export default function TerritoryTab() {
-  const { settings, save, isSaving, isLoading } = useOrgSettings();
-  const [state, setState] = useState(() => deserialize({}));
-  const [initial, setInitial] = useState(() => deserialize({}));
+  const { form: state, setForm: setState, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(deserialize);
   const [editingBranchIdx, setEditingBranchIdx] = useState(null);
 
-  useEffect(() => {
-    const d = deserialize(settings);
-    setState(d);
-    setInitial(d);
-  }, [settings]);
-
   const errors = useMemo(() => validate(state), [state]);
-  const isDirty = useMemo(() => JSON.stringify(state) !== JSON.stringify(initial), [state, initial]);
   const isValid = Object.keys(errors).length === 0;
+  const patch = (p) => setState((s) => ({ ...s, ...p }));
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Corrige les erreurs avant d\'enregistrer.');
+      toast.error('Corrigez les erreurs avant d’enregistrer.');
       return;
     }
     try {
-      const patch = {
+      await save({
         territoire_centers: serializeTerritoireCenters(state.headquarters, state.branches),
         google_place_id: state.google_place_id || null,
         geogrid_target_department: state.geogrid_target_department || null,
-      };
-      await save(patch);
+      });
       toast.success('Territoire enregistré');
       setInitial(state);
     } catch (err) {
-      toast.error(err.message || 'Erreur lors de l\'enregistrement');
+      toast.error(err.message || 'Erreur lors de l’enregistrement');
     }
   };
-
-  const handleReset = () => setState(initial);
 
   const handleDetectDepartment = async () => {
     const { lat, lng } = state.headquarters;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      toast.error('Configure d\'abord les coordonnées du siège');
+      toast.error('Renseignez d’abord la position du siège');
       return;
     }
     try {
@@ -135,7 +122,7 @@ export default function TerritoryTab() {
       const region = data.features?.[0];
       const code = region?.properties?.short_code?.replace('FR-', '') || null;
       if (code) {
-        setState({ ...state, geogrid_target_department: code });
+        patch({ geogrid_target_department: code });
         toast.success(`Département détecté : ${code}`);
       } else {
         toast.error('Impossible de détecter le département');
@@ -146,180 +133,134 @@ export default function TerritoryTab() {
   };
 
   const addBranch = () => {
-    setState({ ...state, branches: [...state.branches, defaultBranch()] });
     setEditingBranchIdx(state.branches.length);
+    setState((s) => ({ ...s, branches: [...s.branches, defaultBranch()] }));
   };
 
   const updateBranch = (idx, updated) => {
-    const newBranches = [...state.branches];
-    newBranches[idx] = updated;
-    setState({ ...state, branches: newBranches });
+    setState((s) => ({ ...s, branches: s.branches.map((b, i) => (i === idx ? updated : b)) }));
   };
 
   const removeBranch = (idx) => {
-    setState({ ...state, branches: state.branches.filter((_, i) => i !== idx) });
+    setState((s) => ({ ...s, branches: s.branches.filter((_, i) => i !== idx) }));
     if (editingBranchIdx === idx) setEditingBranchIdx(null);
   };
 
-  if (isLoading) {
-    return <div className="card text-sm text-secondary-500">Chargement…</div>;
-  }
+  if (isLoading) return <SettingsLoading />;
 
   return (
-    <div className="card space-y-8">
-      {/* Section 1 : Siège */}
-      <section className="bg-secondary-50 -m-4 p-4 rounded-lg">
-        <h3 className={SECTION_TITLE}>
-          1. Siège social
-          <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full normal-case font-medium">
-            Obligatoire
-          </span>
-        </h3>
-        <CenterEditor
-          value={state.headquarters}
-          onChange={(hq) => setState({ ...state, headquarters: hq })}
-        />
-        {errors.hq_label && <p className={ERROR_CLASS}>{errors.hq_label}</p>}
-        {errors.hq_coords && <p className={ERROR_CLASS}>{errors.hq_coords}</p>}
-      </section>
+    <>
+      <SettingsSurface>
+        <SettingsSection
+          title="Siège sur la carte"
+          description="Point de départ des trajets et des tournées, centre de la carte du territoire."
+        >
+          <CenterEditor value={state.headquarters} onChange={(hq) => patch({ headquarters: hq })} />
+          {(errors.hq_label || errors.hq_coords) && (
+            <p className="text-xs text-red-700">{errors.hq_label || errors.hq_coords}</p>
+          )}
+        </SettingsSection>
 
-      {/* Section 2 : Référence Google */}
-      <section>
-        <h3 className={SECTION_TITLE}>
-          2. Référence Google Business
-          <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full normal-case font-medium">
-            Recommandé
-          </span>
-        </h3>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={state.google_place_id}
-            onChange={(e) => setState({ ...state, google_place_id: e.target.value })}
-            placeholder="ChIJ..."
-            className={`${INPUT_CLASS} font-mono text-xs`}
-          />
-          <a
-            href={PLACE_ID_FINDER_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0 px-3 py-2 bg-blue-50 text-blue-700 text-xs font-medium rounded-md hover:bg-blue-100 inline-flex items-center gap-1"
-          >
-            Trouver <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-        <p className={HINT_CLASS}>
-          ℹ️ Identifiant unique de ta fiche Google Business. Sert au <strong>suivi de positionnement local</strong> (module GeoGrid).
-          Clique &quot;Trouver&quot; et cherche <strong>ton entreprise</strong> (pas l&apos;adresse postale).
-        </p>
-      </section>
-
-      {/* Section 3 : Département principal */}
-      <section>
-        <h3 className={SECTION_TITLE}>
-          3. Département principal
-          <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full normal-case font-medium">
-            Recommandé
-          </span>
-        </h3>
-        <DepartmentSelect
-          value={state.geogrid_target_department}
-          onChange={(code) => setState({ ...state, geogrid_target_department: code })}
-          onDetectFromHq={handleDetectDepartment}
-        />
-        <p className={HINT_CLASS}>
-          ℹ️ Zone de visibilité prioritaire. Sert au <strong>suivi SEO local</strong> (scans des communes du département).
-          Détecté automatiquement depuis le siège, modifiable.
-        </p>
-      </section>
-
-      {/* Section 4 : Antennes */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className={`${SECTION_TITLE} mb-0`}>
-            4. Antennes commerciales
-            <span className="ml-2 text-secondary-400 normal-case font-normal">(Optionnel)</span>
-          </h3>
-          <button
-            type="button"
-            onClick={addBranch}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary-50 text-primary-700 rounded-md hover:bg-primary-100"
-          >
-            <Plus className="w-3 h-3" /> Ajouter une antenne
+        <SettingsSection
+          title="Antennes commerciales"
+          optional
+          description="Pour un commercial basé ailleurs qu’au siège : ses trajets partent de son antenne."
+        >
+          {state.branches.length > 0 && (
+            <ul className="rounded-lg border border-secondary-200 divide-y divide-secondary-100">
+              {state.branches.map((b, idx) => {
+                const isEditing = editingBranchIdx === idx;
+                const branchErr = errors[`branch_label_${idx}`] || errors[`branch_coords_${idx}`];
+                return (
+                  <li key={idx}>
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                      <span className="text-xl" aria-hidden="true">{b.emoji || '📍'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingBranchIdx(isEditing ? null : idx)}
+                        aria-expanded={isEditing}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <span className="block text-sm font-medium text-secondary-900 truncate">
+                          {b.label || <span className="text-secondary-400">Antenne sans nom</span>}
+                        </span>
+                        <span className="block text-xs text-secondary-500 tabular-nums">
+                          {Number.isFinite(b.lat) && Number.isFinite(b.lng)
+                            ? `${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}`
+                            : 'Position non renseignée'}
+                        </span>
+                        {branchErr && <span className="block mt-0.5 text-xs text-red-700">{branchErr}</span>}
+                      </button>
+                      <ChevronDown className={`w-4 h-4 text-secondary-400 transition-transform ${isEditing ? 'rotate-180' : ''}`} />
+                      <button
+                        type="button"
+                        onClick={() => removeBranch(idx)}
+                        className="p-1.5 text-secondary-400 hover:text-secondary-800 rounded"
+                        aria-label="Supprimer l’antenne"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {isEditing && (
+                      <div className="border-t border-secondary-100 bg-secondary-50/50 px-3 py-4">
+                        <CenterEditor value={b} onChange={(u) => updateBranch(idx, u)} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <button type="button" onClick={addBranch} className="btn-secondary text-sm inline-flex items-center gap-1.5">
+            <Plus className="w-4 h-4" /> Ajouter une antenne
           </button>
-        </div>
+        </SettingsSection>
 
-        {state.branches.length === 0 ? (
-          <div className="text-center text-secondary-400 text-sm py-6 border border-dashed border-secondary-200 rounded-md">
-            Ajoute une antenne si tu as un commercial basé ailleurs qu&apos;au siège.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {state.branches.map((b, idx) => {
-              const isEditing = editingBranchIdx === idx;
-              const branchErr = errors[`branch_label_${idx}`] || errors[`branch_coords_${idx}`];
-              return (
-                <div key={idx} className="border border-secondary-200 rounded-md">
-                  <div className="flex items-center gap-2 p-3">
-                    <span className="text-xl">{b.emoji || '📍'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-secondary-900 truncate">
-                        {b.label || <span className="text-secondary-400 italic">Antenne sans nom</span>}
-                      </div>
-                      <div className="text-xs text-secondary-500">
-                        {Number.isFinite(b.lat) && Number.isFinite(b.lng)
-                          ? `${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}`
-                          : 'Pas de coordonnées'}
-                      </div>
-                      {branchErr && <p className="mt-1 text-xs text-red-600">{branchErr}</p>}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditingBranchIdx(isEditing ? null : idx)}
-                      className="px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 rounded"
-                    >
-                      {isEditing ? 'Fermer' : 'Éditer'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeBranch(idx)}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded"
-                      aria-label="Supprimer l'antenne"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {isEditing && (
-                    <div className="border-t border-secondary-200 p-3">
-                      <CenterEditor value={b} onChange={(u) => updateBranch(idx, u)} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+        <SettingsSection
+          title="Visibilité locale"
+          optional
+          description="Utilisés par le suivi de positionnement Google (GeoGrid) : votre fiche et la zone à surveiller."
+        >
+          <Field
+            label="Identifiant de la fiche Google Business"
+            hint="Cherchez votre entreprise (pas l’adresse postale) dans l’outil Google, puis copiez l’identifiant ChIJ…"
+          >
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={state.google_place_id}
+                onChange={(e) => patch({ google_place_id: e.target.value })}
+                placeholder="ChIJ…"
+                className={`${INPUT_CLASS} font-mono`}
+              />
+              <a
+                href={PLACE_ID_FINDER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary text-sm flex-shrink-0 inline-flex items-center gap-1.5"
+              >
+                Trouver <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </Field>
+          <Field label="Département principal" hint="Les communes de ce département sont scannées par le suivi local.">
+            <DepartmentSelect
+              value={state.geogrid_target_department}
+              onChange={(code) => patch({ geogrid_target_department: code })}
+              onDetectFromHq={handleDetectDepartment}
+            />
+          </Field>
+        </SettingsSection>
+      </SettingsSurface>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={!isDirty || isSaving}
-          className="px-4 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md disabled:opacity-50"
-        >
-          Annuler
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!isDirty || !isValid || isSaving}
-          className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-        >
-          {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </div>
+      <SaveBar
+        isDirty={isDirty}
+        isValid={isValid}
+        isSaving={isSaving}
+        errorCount={Object.keys(errors).length}
+        onSave={handleSave}
+        onReset={() => setState(initial)}
+      />
+    </>
   );
 }

@@ -1,17 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+// Settings → Organisation → Identité : nom, mentions légales, signataire.
+// Les qualifications et les documents de l'entreprise ont leur onglet (DocumentsTab).
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
-import { useOrgSettings } from '@hooks/useOrgSettings';
-import RgeCertificationsInput from './components/RgeCertificationsInput';
 import SignatureUpload from './components/SignatureUpload';
-import CompanyDocumentsSection, { COMPANY_DOCUMENTS_BUCKET } from './components/CompanyDocumentsSection';
-import { storageService } from '@services/storage.service';
-import { normalizeCompanyDocuments, removedDocumentPaths, qualificationsFromDocuments } from '@/lib/companyDocuments';
-
-const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
-const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
-const LABEL_CLASS = 'block text-xs font-medium text-secondary-600 mb-1';
-const ERROR_CLASS = 'mt-1 text-xs text-red-600';
+import { useSettingsForm } from './components/useSettingsForm';
+import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
 
 const LEGAL_FORMS = [
   'SAS',
@@ -33,13 +27,10 @@ const FIELDS = [
   'rcs',
   'tva_intra',
   'insurance',
-  'rge_certifications',
-  // Signataire des mandats (dossier PV : mandat de représentation mairie + Enedis)
+  // Signataire : mandats du dossier PV (mairie + Enedis) et attestations d'entretien
   'signatory_name',
   'signatory_role',
   'signatory_signature_path',
-  // Documents de l'entreprise (certifications, attestation fluides, attestation d'assurance)
-  'company_documents',
 ];
 
 // Formatage SIRET : groupes de 3 chiffres + 5 derniers
@@ -67,7 +58,7 @@ function validate(form) {
   if (form.brand_name && form.brand_name.length > 80) errors.brand_name = 'Maximum 80 caractères';
   if (form.legal_name && form.legal_name.length > 120) errors.legal_name = 'Maximum 120 caractères';
   if (form.siret && !/^\d{3}\s?\d{3}\s?\d{3}\s?\d{5}$/.test(form.siret)) {
-    errors.siret = 'Format attendu : 14 chiffres (ex: 100 288 224 00015)';
+    errors.siret = 'Format attendu : 14 chiffres (ex. 100 288 224 00015)';
   }
   if (form.tva_intra && !/^FR\s?\d{2}\s?\d{9}$/.test(form.tva_intra)) {
     errors.tva_intra = 'Format attendu : FR + 2 chiffres + 9 chiffres';
@@ -81,263 +72,168 @@ function validate(form) {
 function pickIdentityFields(settings) {
   const out = {};
   FIELDS.forEach((f) => {
-    out[f] = settings[f] ?? (f === 'rge_certifications' ? [] : '');
+    out[f] = settings[f] ?? '';
   });
-  out.company_documents = normalizeCompanyDocuments(settings.company_documents);
   return out;
 }
 
 export default function IdentityTab() {
   const { organization } = useAuth();
-  const { settings, save, isSaving, isLoading } = useOrgSettings();
-  const [form, setForm] = useState(() => pickIdentityFields({}));
-  const [initial, setInitial] = useState(() => pickIdentityFields({}));
-
-  useEffect(() => {
-    const picked = pickIdentityFields(settings);
-    setForm(picked);
-    setInitial(picked);
-  }, [settings]);
+  const { form, setForm, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(pickIdentityFields);
 
   const errors = useMemo(() => validate(form), [form]);
-  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
   const isValid = Object.keys(errors).length === 0;
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Corrige les erreurs avant d\'enregistrer.');
+      toast.error('Corrigez les erreurs avant d’enregistrer.');
       return;
     }
     try {
       await save(form);
       toast.success('Identité enregistrée');
-      // Documents retirés ou remplacés : purge du Storage une fois l'enregistrement acquis.
-      const removed = removedDocumentPaths(initial.company_documents, form.company_documents);
-      if (removed.length) {
-        const { error } = await storageService.deleteFiles(COMPANY_DOCUMENTS_BUCKET, removed);
-        if (error) toast.warning(`Ancien(s) fichier(s) non supprimé(s) du stockage : ${error.message}`);
-      }
       setInitial(form);
     } catch (err) {
-      toast.error(err.message || 'Erreur lors de l\'enregistrement');
+      toast.error(err.message || 'Erreur lors de l’enregistrement');
     }
   };
 
-  const handleReset = () => {
-    // Fichiers déposés puis abandonnés : jamais référencés, on les retire du Storage.
-    const abandoned = removedDocumentPaths(form.company_documents, initial.company_documents);
-    if (abandoned.length) storageService.deleteFiles(COMPANY_DOCUMENTS_BUCKET, abandoned);
-    setForm(initial);
-  };
-
-  if (isLoading) {
-    return <div className="card text-sm text-secondary-500">Chargement…</div>;
-  }
+  if (isLoading) return <SettingsLoading />;
 
   return (
-    <div className="card space-y-8">
-      {/* Section Branding */}
-      <section>
-        <h3 className={SECTION_TITLE}>Branding</h3>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className={LABEL_CLASS}>Nom commercial *</label>
-            <input
-              type="text"
-              value={form.brand_name}
-              onChange={(e) => setForm({ ...form, brand_name: e.target.value })}
-              maxLength={80}
-              placeholder="Ex: Cimaj"
-              className={INPUT_CLASS}
-            />
-            {errors.brand_name && <p className={ERROR_CLASS}>{errors.brand_name}</p>}
+    <>
+      <SettingsSurface>
+        <SettingsSection title="Entreprise" description="Le nom affiché sur vos documents, vos e-mails et l’espace client.">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Nom commercial" required error={errors.brand_name}>
+              <input
+                type="text"
+                value={form.brand_name}
+                onChange={(e) => set('brand_name', e.target.value)}
+                maxLength={80}
+                placeholder="Ex. Cimaj"
+                className={INPUT_CLASS}
+              />
+            </Field>
+            <Field label="Raison sociale" hint="Reprend le nom commercial si vide." error={errors.legal_name}>
+              <input
+                type="text"
+                value={form.legal_name}
+                onChange={(e) => set('legal_name', e.target.value)}
+                maxLength={120}
+                className={INPUT_CLASS}
+              />
+            </Field>
           </div>
-          <div>
-            <label className={LABEL_CLASS}>Raison sociale</label>
-            <input
-              type="text"
-              value={form.legal_name}
-              onChange={(e) => setForm({ ...form, legal_name: e.target.value })}
-              maxLength={120}
-              placeholder="Auto-rempli avec le nom commercial si vide"
-              className={INPUT_CLASS}
-            />
-            {errors.legal_name && <p className={ERROR_CLASS}>{errors.legal_name}</p>}
-          </div>
-        </div>
-      </section>
+        </SettingsSection>
 
-      {/* Section Mention légale */}
-      <section>
-        <h3 className={SECTION_TITLE}>Mention légale</h3>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div>
-            <label className={LABEL_CLASS}>Forme juridique</label>
-            <select
-              value={form.legal_form}
-              onChange={(e) => setForm({ ...form, legal_form: e.target.value })}
-              className={INPUT_CLASS}
-            >
-              <option value="">—</option>
-              {LEGAL_FORMS.map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>Capital social (€)</label>
-            <input
-              type="text"
-              value={form.capital}
-              onChange={(e) => setForm({ ...form, capital: e.target.value })}
-              placeholder="Ex: 6 000"
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>SIRET</label>
-            <input
-              type="text"
-              value={form.siret}
-              onChange={(e) => setForm({ ...form, siret: formatSiret(e.target.value) })}
-              placeholder="Ex: 100 288 224 00015"
-              className={INPUT_CLASS}
-            />
-            {errors.siret && <p className={ERROR_CLASS}>{errors.siret}</p>}
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4 mt-4">
-          <div>
-            <label className={LABEL_CLASS}>RCS</label>
-            <input
-              type="text"
-              value={form.rcs}
-              onChange={(e) => setForm({ ...form, rcs: e.target.value })}
-              maxLength={80}
-              placeholder="Ex: 100 288 224 R.C.S. Albi"
-              className={INPUT_CLASS}
-            />
-          </div>
-          <div>
-            <label className={LABEL_CLASS}>N° TVA intracommunautaire</label>
-            <input
-              type="text"
-              value={form.tva_intra}
-              onChange={(e) => setForm({ ...form, tva_intra: formatTva(e.target.value) })}
-              placeholder="Ex: FR 06 449776916"
-              className={INPUT_CLASS}
-            />
-            {errors.tva_intra && <p className={ERROR_CLASS}>{errors.tva_intra}</p>}
-          </div>
-        </div>
-        <div className="mt-4">
-          <label className={LABEL_CLASS}>Mention assurance</label>
-          <textarea
-            value={form.insurance}
-            onChange={(e) => setForm({ ...form, insurance: e.target.value })}
-            maxLength={200}
-            rows={2}
-            placeholder="Ex: Couvert par une assurance responsabilité civile professionnelle"
-            className={INPUT_CLASS}
-          />
-          {errors.insurance && <p className={ERROR_CLASS}>{errors.insurance}</p>}
-        </div>
-      </section>
-
-      {/* Section Qualifications */}
-      <section>
-        <h3 className={SECTION_TITLE}>Qualifications RGE</h3>
-        {form.company_documents.certifications.length > 0 ? (
-          // Dès qu'un certificat est déposé, la liste est lue sur les certificats (buildCompanyInfo
-          // → resolveRgeCertifications) : la saisie manuelle n'est plus la source.
-          <div className="text-sm">
-            {qualificationsFromDocuments(form.company_documents).length > 0 ? (
-              <ul className="flex flex-wrap gap-2">
-                {qualificationsFromDocuments(form.company_documents).map((q) => (
-                  <li key={q} className="px-2 py-1 rounded-md bg-secondary-100 text-secondary-800 text-xs">{q}</li>
+        <SettingsSection title="Mentions légales" description="Imprimées en pied de page des devis, factures, certificats et attestations.">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Forme juridique">
+              <select value={form.legal_form} onChange={(e) => set('legal_form', e.target.value)} className={INPUT_CLASS}>
+                <option value="">Non renseignée</option>
+                {LEGAL_FORMS.map((f) => (
+                  <option key={f} value={f}>{f}</option>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-amber-800">Aucune qualification valide : complétez l’intitulé des certificats ci-dessous, ou vérifiez leurs dates de validité.</p>
-            )}
-            <p className="mt-2 text-xs text-secondary-500">Lues sur les certificats déposés dans « Documents de l’entreprise » (certificats expirés exclus). Elles figurent sur vos documents (certificats, factures, études).</p>
+              </select>
+            </Field>
+            <Field label="Capital social (€)">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.capital}
+                onChange={(e) => set('capital', e.target.value)}
+                placeholder="Ex. 6 000"
+                className={INPUT_CLASS}
+              />
+            </Field>
+            <Field label="SIRET" error={errors.siret}>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.siret}
+                onChange={(e) => set('siret', formatSiret(e.target.value))}
+                placeholder="100 288 224 00015"
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </Field>
+            <Field label="N° TVA intracommunautaire" error={errors.tva_intra}>
+              <input
+                type="text"
+                value={form.tva_intra}
+                onChange={(e) => set('tva_intra', formatTva(e.target.value))}
+                placeholder="FR 06 449776916"
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </Field>
+            <Field label="RCS" className="sm:col-span-2">
+              <input
+                type="text"
+                value={form.rcs}
+                onChange={(e) => set('rcs', e.target.value)}
+                maxLength={80}
+                placeholder="Ex. 100 288 224 R.C.S. Albi"
+                className={INPUT_CLASS}
+              />
+            </Field>
           </div>
-        ) : (
-          <RgeCertificationsInput
-            value={form.rge_certifications}
-            onChange={(newList) => setForm({ ...form, rge_certifications: newList })}
-          />
-        )}
-      </section>
-
-      {/* Section Signataire des mandats (mandat de représentation du dossier PV — Enedis exige les deux signatures) */}
-      <section>
-        <h3 className={SECTION_TITLE}>Signataire des mandats</h3>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className={LABEL_CLASS}>Nom et prénom</label>
-            <input
-              type="text"
-              value={form.signatory_name}
-              onChange={(e) => setForm({ ...form, signatory_name: e.target.value })}
-              maxLength={80}
-              placeholder="Ex: Jean Martin"
+          <Field label="Mention assurance" error={errors.insurance}>
+            <textarea
+              value={form.insurance}
+              onChange={(e) => set('insurance', e.target.value)}
+              maxLength={200}
+              rows={2}
+              placeholder="Ex. Couvert par une assurance responsabilité civile professionnelle"
               className={INPUT_CLASS}
             />
-            {errors.signatory_name && <p className={ERROR_CLASS}>{errors.signatory_name}</p>}
+          </Field>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Signataire"
+          description="La personne qui signe au nom de l’entreprise : mandats des dossiers solaires et attestations d’entretien."
+        >
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Nom et prénom" error={errors.signatory_name}>
+              <input
+                type="text"
+                value={form.signatory_name}
+                onChange={(e) => set('signatory_name', e.target.value)}
+                maxLength={80}
+                placeholder="Ex. Jean Martin"
+                className={INPUT_CLASS}
+              />
+            </Field>
+            <Field label="Fonction" error={errors.signatory_role}>
+              <input
+                type="text"
+                value={form.signatory_role}
+                onChange={(e) => set('signatory_role', e.target.value)}
+                maxLength={60}
+                placeholder="Ex. Président"
+                className={INPUT_CLASS}
+              />
+            </Field>
           </div>
-          <div>
-            <label className={LABEL_CLASS}>Fonction</label>
-            <input
-              type="text"
-              value={form.signatory_role}
-              onChange={(e) => setForm({ ...form, signatory_role: e.target.value })}
-              maxLength={60}
-              placeholder="Ex: Président"
-              className={INPUT_CLASS}
+          <Field label="Signature">
+            <SignatureUpload
+              orgId={organization?.id}
+              path={form.signatory_signature_path}
+              onChange={(path) => set('signatory_signature_path', path)}
             />
-            {errors.signatory_role && <p className={ERROR_CLASS}>{errors.signatory_role}</p>}
-          </div>
-        </div>
-        <div className="mt-4">
-          <label className={LABEL_CLASS}>Signature</label>
-          <SignatureUpload
-            orgId={organization?.id}
-            path={form.signatory_signature_path}
-            onChange={(path) => setForm({ ...form, signatory_signature_path: path })}
-          />
-        </div>
-      </section>
+          </Field>
+        </SettingsSection>
+      </SettingsSurface>
 
-      {/* Section Documents de l'entreprise */}
-      <section>
-        <h3 className={SECTION_TITLE}>Documents de l’entreprise</h3>
-        <CompanyDocumentsSection
-          orgId={organization?.id}
-          value={form.company_documents}
-          onChange={(fn) => setForm((f) => ({ ...f, company_documents: fn(f.company_documents) }))}
-        />
-      </section>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={!isDirty || isSaving}
-          className="px-4 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md disabled:opacity-50"
-        >
-          Annuler
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!isDirty || !isValid || isSaving}
-          className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-        >
-          {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </div>
+      <SaveBar
+        isDirty={isDirty}
+        isValid={isValid}
+        isSaving={isSaving}
+        errorCount={Object.keys(errors).length}
+        onSave={handleSave}
+        onReset={() => setForm(initial)}
+      />
+    </>
   );
 }

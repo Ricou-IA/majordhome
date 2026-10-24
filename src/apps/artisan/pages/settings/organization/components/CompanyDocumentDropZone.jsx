@@ -1,4 +1,4 @@
-// src/apps/artisan/pages/settings/organization/components/CompanyDocumentsSection.jsx
+// src/apps/artisan/pages/settings/organization/components/CompanyDocumentDropZone.jsx
 // Documents de l'entreprise (certifications, attestation fluides, attestation d'assurance) :
 // zones de dépôt org-scopées dans le bucket product-documents. Chaque dépôt est lu par l'IA
 // (edge company-document-extract) : intitulé / numéro / organisme / fin de validité pré-remplis,
@@ -12,7 +12,7 @@ import { Upload, Trash2, Loader2, FileText, ExternalLink, Sparkles, RotateCw } f
 import { storageService } from '@services/storage.service';
 import { companyDocumentsService } from '@services/companyDocuments.service';
 import {
-  COMPANY_DOCUMENT_KINDS, COMPANY_DOCUMENT_MIME_TYPES, COMPANY_DOCUMENT_MAX_BYTES,
+  COMPANY_DOCUMENT_MIME_TYPES, COMPANY_DOCUMENT_MAX_BYTES,
   buildCompanyDocumentPath, expiryStatus, applyExtraction,
 } from '@/lib/companyDocuments';
 
@@ -59,7 +59,7 @@ function DocumentRow({ kind, doc, reading, onOpen, onRemove, onPatch, onRetry })
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
-      <div className="grid sm:grid-cols-4 gap-2">
+      <div className="grid sm:grid-cols-2 gap-2">
         {['intitule', 'numero', 'organisme'].map((field) => (
           <label key={field} className="text-xs text-secondary-500">
             {kind.fields[field]}
@@ -88,7 +88,7 @@ function DocumentRow({ kind, doc, reading, onOpen, onRemove, onPatch, onRetry })
   );
 }
 
-function DropZone({ kind, orgId, docs, onChange }) {
+export function CompanyDocumentDropZone({ kind, orgId, docs, onChange }) {
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
@@ -136,10 +136,8 @@ function DropZone({ kind, orgId, docs, onChange }) {
 
   return (
     <div>
-      <p className="text-sm font-medium text-secondary-800">{kind.label}</p>
-      <p className="text-xs text-secondary-500 mb-2">{kind.hint}</p>
       {docs.length > 0 && (
-        <ul className="divide-y divide-secondary-100 mb-2">
+        <ul className="divide-y divide-secondary-100 mb-3 rounded-lg border border-secondary-200 px-3">
           {docs.map((doc) => (
             <DocumentRow
               key={doc.path}
@@ -180,25 +178,6 @@ function DropZone({ kind, orgId, docs, onChange }) {
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Remplacer
         </button>
       )}
-    </div>
-  );
-}
-
-/**
- * @param {{ orgId: string, value: Record<string, object[]>, onChange: (updater: (prev: Record<string, object[]>) => Record<string, object[]>) => void }} props
- */
-export default function CompanyDocumentsSection({ orgId, value, onChange }) {
-  return (
-    <div className="space-y-6">
-      {COMPANY_DOCUMENT_KINDS.map((kind) => (
-        <DropZone
-          key={kind.key}
-          kind={kind}
-          orgId={orgId}
-          docs={value[kind.key] || []}
-          onChange={(fn) => onChange((prev) => ({ ...prev, [kind.key]: fn(prev[kind.key] || []) }))}
-        />
-      ))}
     </div>
   );
 }

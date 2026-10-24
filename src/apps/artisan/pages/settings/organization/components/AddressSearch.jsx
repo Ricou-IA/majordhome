@@ -119,7 +119,7 @@ export default function AddressSearch({
       </div>
 
       {error && (
-        <p className="mt-1 text-xs text-red-600">⚠️ {error} — utilise la saisie manuelle ci-dessous.</p>
+        <p className="mt-1 text-xs text-red-700">{error}. Saisissez les coordonnées à la main.</p>
       )}
 
       {!error && !showSuggestions && query.trim() !== '' && query !== chosen && (

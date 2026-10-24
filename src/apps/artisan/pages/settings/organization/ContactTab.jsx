@@ -1,14 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import { useOrgSettings } from '@hooks/useOrgSettings';
-
-const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
-const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
-const LABEL_CLASS = 'block text-xs font-medium text-secondary-600 mb-1';
-const ERROR_CLASS = 'mt-1 text-xs text-red-600';
-const HINT_CLASS = 'mt-1 text-xs text-secondary-500';
-
+// Settings → Organisation → Coordonnées : adresse du siège, téléphone, site web.
 // Emails (from_email, reply_to, domaine d'envoi) : Settings → Communication → Emails (communication/EmailsTab.jsx).
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Globe, Phone } from 'lucide-react';
+import { useSettingsForm } from './components/useSettingsForm';
+import { Field, INPUT_CLASS, SaveBar, SettingsLoading, SettingsSection, SettingsSurface } from './components/layout';
+
 const FIELDS = ['address', 'postal_code', 'city', 'phone', 'website_url'];
 
 function formatPhoneFR(raw) {
@@ -37,9 +35,9 @@ function validate(form) {
   if (!form.city?.trim()) errors.city = 'Obligatoire';
   if (form.city && form.city.length > 80) errors.city = 'Maximum 80 caractères';
   if (!form.phone?.trim()) errors.phone = 'Obligatoire';
-  if (form.phone && form.phone.replace(/\D/g, '').length !== 10) errors.phone = 'Téléphone FR à 10 chiffres';
+  if (form.phone && form.phone.replace(/\D/g, '').length !== 10) errors.phone = 'Téléphone français à 10 chiffres';
   if (form.website_url && !URL_RE.test(autoPrefixHttps(form.website_url))) {
-    errors.website_url = 'URL invalide (ex: https://cimaj.fr ou cimaj.fr)';
+    errors.website_url = 'Adresse invalide (ex. https://cimaj.fr ou cimaj.fr)';
   }
   return errors;
 }
@@ -53,140 +51,112 @@ function pickFields(settings) {
 }
 
 export default function ContactTab() {
-  const { settings, save, isSaving, isLoading } = useOrgSettings();
-  const [form, setForm] = useState(() => pickFields({}));
-  const [initial, setInitial] = useState(() => pickFields({}));
-
-  useEffect(() => {
-    const picked = pickFields(settings);
-    setForm(picked);
-    setInitial(picked);
-  }, [settings]);
+  const { form, setForm, initial, setInitial, isDirty, save, isSaving, isLoading } = useSettingsForm(pickFields);
 
   const errors = useMemo(() => validate(form), [form]);
-  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
   const isValid = Object.keys(errors).length === 0;
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
   const handleSave = async () => {
     if (!isValid) {
-      toast.error('Corrige les erreurs avant d\'enregistrer.');
+      toast.error('Corrigez les erreurs avant d’enregistrer.');
       return;
     }
     try {
-      // Auto-prefix https sur website_url juste avant save
       const payload = { ...form, website_url: autoPrefixHttps(form.website_url) };
       await save(payload);
       toast.success('Coordonnées enregistrées');
       setInitial(payload);
+      setForm(payload);
     } catch (err) {
-      toast.error(err.message || 'Erreur lors de l\'enregistrement');
+      toast.error(err.message || 'Erreur lors de l’enregistrement');
     }
   };
 
-  const handleReset = () => setForm(initial);
-
-  if (isLoading) {
-    return <div className="card text-sm text-secondary-500">Chargement…</div>;
-  }
+  if (isLoading) return <SettingsLoading />;
 
   return (
-    <div className="card space-y-8">
-      {/* Section Siège social */}
-      <section>
-        <h3 className={SECTION_TITLE}>Siège social</h3>
-        <div>
-          <label className={LABEL_CLASS}>Adresse *</label>
-          <input
-            type="text"
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
-            maxLength={200}
-            placeholder="Ex: 26 Rue des Pyrénées"
-            className={INPUT_CLASS}
-          />
-          {errors.address && <p className={ERROR_CLASS}>{errors.address}</p>}
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4 mt-4">
-          <div>
-            <label className={LABEL_CLASS}>Code postal *</label>
+    <>
+      <SettingsSurface>
+        <SettingsSection title="Siège social" description="Adresse imprimée sur vos documents. Le point de départ des trajets se règle dans l’onglet Territoire.">
+          <Field label="Adresse" required error={errors.address}>
             <input
               type="text"
-              value={form.postal_code}
-              onChange={(e) => setForm({ ...form, postal_code: e.target.value.replace(/\D/g, '').slice(0, 5) })}
-              placeholder="81600"
+              value={form.address}
+              onChange={(e) => set('address', e.target.value)}
+              maxLength={200}
+              placeholder="Ex. 26 rue des Pyrénées"
+              autoComplete="street-address"
               className={INPUT_CLASS}
             />
-            {errors.postal_code && <p className={ERROR_CLASS}>{errors.postal_code}</p>}
+          </Field>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Field label="Code postal" required error={errors.postal_code}>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.postal_code}
+                onChange={(e) => set('postal_code', e.target.value.replace(/\D/g, '').slice(0, 5))}
+                placeholder="81600"
+                autoComplete="postal-code"
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </Field>
+            <Field label="Ville" required error={errors.city} className="sm:col-span-2">
+              <input
+                type="text"
+                value={form.city}
+                onChange={(e) => set('city', e.target.value)}
+                maxLength={80}
+                placeholder="Gaillac"
+                autoComplete="address-level2"
+                className={INPUT_CLASS}
+              />
+            </Field>
           </div>
-          <div>
-            <label className={LABEL_CLASS}>Ville *</label>
-            <input
-              type="text"
-              value={form.city}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
-              maxLength={80}
-              placeholder="Gaillac"
-              className={INPUT_CLASS}
-            />
-            {errors.city && <p className={ERROR_CLASS}>{errors.city}</p>}
-          </div>
-        </div>
-      </section>
+        </SettingsSection>
 
-      {/* Section Contact */}
-      <section>
-        <h3 className={SECTION_TITLE}>Contact</h3>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className={LABEL_CLASS}>Téléphone *</label>
-            <input
-              type="text"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: formatPhoneFR(e.target.value) })}
-              placeholder="05 63 33 23 14"
-              className={INPUT_CLASS}
-            />
-            {errors.phone && <p className={ERROR_CLASS}>{errors.phone}</p>}
-          </div>
-        </div>
-        <p className={HINT_CLASS}>Les emails (expéditeur, réponse, domaine d&apos;envoi) se règlent dans Paramètres → Communication → Emails.</p>
-      </section>
-
-      {/* Section Présence web */}
-      <section>
-        <h3 className={SECTION_TITLE}>Présence web</h3>
-        <div>
-          <label className={LABEL_CLASS}>Site web</label>
-          <input
-            type="url"
-            value={form.website_url}
-            onChange={(e) => setForm({ ...form, website_url: e.target.value })}
-            placeholder="https://www.cimaj.fr"
-            className={INPUT_CLASS}
-          />
-          {errors.website_url && <p className={ERROR_CLASS}>{errors.website_url}</p>}
-        </div>
-      </section>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-2 pt-4 border-t border-secondary-200">
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={!isDirty || isSaving}
-          className="px-4 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md disabled:opacity-50"
+        <SettingsSection
+          title="Contact"
+          description={<>Affichés sur vos documents et vos e-mails. Les adresses d’envoi se règlent dans <Link to="/settings/emails" className="text-primary-700 hover:underline">Communication → Emails</Link>.</>}
         >
-          Annuler
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!isDirty || !isValid || isSaving}
-          className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-        >
-          {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Téléphone" required error={errors.phone}>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => set('phone', formatPhoneFR(e.target.value))}
+                  placeholder="05 63 33 23 14"
+                  className={`${INPUT_CLASS} pl-9 tabular-nums`}
+                />
+              </div>
+            </Field>
+            <Field label="Site web" error={errors.website_url}>
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
+                <input
+                  type="url"
+                  value={form.website_url}
+                  onChange={(e) => set('website_url', e.target.value)}
+                  placeholder="www.cimaj.fr"
+                  className={`${INPUT_CLASS} pl-9`}
+                />
+              </div>
+            </Field>
+          </div>
+        </SettingsSection>
+      </SettingsSurface>
+
+      <SaveBar
+        isDirty={isDirty}
+        isValid={isValid}
+        isSaving={isSaving}
+        errorCount={Object.keys(errors).length}
+        onSave={handleSave}
+        onReset={() => setForm(initial)}
+      />
+    </>
   );
 }
