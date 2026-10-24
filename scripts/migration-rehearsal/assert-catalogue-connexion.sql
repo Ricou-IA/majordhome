@@ -1,4 +1,4 @@
--- assert-catalogue-connexion.sql — vérifie 20261024_2_catalogue_connexion_fournisseur.sql (+ 20261024_5, 20261025_2 : signature à 5 paramètres) sur le cluster de répétition.
+-- assert-catalogue-connexion.sql — vérifie 20261024_2_catalogue_connexion_fournisseur.sql (+ 20261024_5, 20261025_2 : signature à 5 paramètres, 20261025_4 : p_meta.desactiver_absents) sur le cluster de répétition.
 -- Couvre : privilèges (supplier_catalog_upsert / org_secret_read = service_role seul), règles de l'upsert
 -- (name et selling_price_ht à l'INSERT seulement, défaut Tesla ré-appliqué si 0, désactivation des absents,
 -- relevé vide refusé, fournisseur d'une autre org refusé), colonnes de connexion dans les vues, secrets Vault
@@ -118,6 +118,22 @@ BEGIN
   IF (v_res->>'total')::int <> 1 OR (v_res->>'ignores_inactifs')::int <> 1 THEN RAISE EXCEPTION 'compteurs après suppression manuelle : %', v_res; END IF;
   -- remise en service pour la suite
   UPDATE majordhome.supplier_products SET is_active = true WHERE supplier_id = v_sup AND reference = '37-122388';
+
+  -- (d3) relevé de FACTURES (20261025_4) : p_meta.desactiver_absents = false ⇒ un article absent reste actif
+  SET LOCAL ROLE service_role;
+  v_res := public.supplier_catalog_upsert(v_mayer, v_sup, 'test_7', jsonb_build_array(v_rows -> 0), '{"desactiver_absents": false}'::jsonb);
+  RESET ROLE;
+  IF (v_res->>'desactives')::int <> 0 OR (v_res->>'total')::int <> 2 OR (v_res->>'desactiver_absents')::boolean IS NOT FALSE THEN RAISE EXCEPTION 'désactivation débrayée : %', v_res; END IF;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-122388';
+  IF NOT v_p.is_active OR v_p.specs ? 'desactive_par_releve' THEN RAISE EXCEPTION 'article absent d''un relevé de factures désactivé'; END IF;
+  -- … et le défaut (sans p_meta) désactive toujours
+  SET LOCAL ROLE service_role;
+  v_res := public.supplier_catalog_upsert(v_mayer, v_sup, 'test_8', jsonb_build_array(v_rows -> 0));
+  RESET ROLE;
+  IF (v_res->>'desactives')::int <> 1 OR (v_res->>'desactiver_absents')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'désactivation par défaut perdue : %', v_res; END IF;
+  SET LOCAL ROLE service_role;
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_sup, 'test_9', v_rows);
+  RESET ROLE;
 
   -- (e) relevé vide refusé ; fournisseur hors org refusé
   SET LOCAL ROLE service_role;

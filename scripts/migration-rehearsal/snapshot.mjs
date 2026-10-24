@@ -89,6 +89,13 @@ const TABLES = [
 ];
 
 const FUNCTIONS = [
+  // 20261024_2 / 20261025_2 / 20261025_4 : catalogue fournisseur (écrivain unique) et secrets Vault par org — relus
+  // de la prod pour répéter une migration qui ne fait que les remplacer (assert-catalogue-connexion.sql).
+  'public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb)',
+  'public.org_secret_set(uuid, text, text)',
+  'public.org_secret_delete(uuid, text)',
+  'public.org_secret_status(uuid, text)',
+  'public.org_secret_read(uuid, text)',
   'majordhome.handle_updated_at()',
   'majordhome.calculate_next_maintenance()',
   'majordhome.update_client_on_equipment_change()',
@@ -344,10 +351,25 @@ async function main() {
   for (const s of seqs) ddl.push(`CREATE SEQUENCE IF NOT EXISTS ${s};`);
   ddl.push(...tablesDdl);
 
-  // 2. Fonctions
+  // 2. Fonctions (+ privilèges EXECUTE tels qu'en prod : sans ce rejeu, une fonction relue garde le défaut
+  //    « EXECUTE à PUBLIC » du cluster et une assertion de charte échoue à tort — vécu sur org_secret_read, 2026-10-24)
+  const ROLES_ACL = new Set(['anon', 'authenticated', 'service_role', 'postgres', 'baikal_reader']);
   for (const f of FUNCTIONS) {
     const def = await one(`select pg_get_functiondef('${f}'::regprocedure) as x`);
-    if (def) ddl.push(`${def};`);
+    if (!def) continue;
+    ddl.push(`${def};`);
+    const acl = await one(`select array_to_json(proacl) as x from pg_proc where oid = '${f}'::regprocedure`);
+    if (!Array.isArray(acl)) continue; // proacl NULL = défaut PostgreSQL (EXECUTE à PUBLIC), rien à rejouer
+    // Les ALTER DEFAULT PRIVILEGES du bootstrap ont déjà accordé EXECUTE aux rôles applicatifs à la création : on
+    // repart de zéro (PUBLIC et rôles) avant de rejouer les GRANT effectifs de la prod.
+    ddl.push(`REVOKE ALL ON FUNCTION ${f} FROM PUBLIC, anon, authenticated, service_role, baikal_reader;`);
+    for (const item of acl) {
+      const m = String(item).match(/^(.*?)=([^/]*)\//);
+      if (!m || !m[2].includes('X')) continue;
+      const grantee = m[1] === '' ? 'PUBLIC' : m[1].replace(/^"|"$/g, '');
+      if (grantee !== 'PUBLIC' && !ROLES_ACL.has(grantee)) continue;
+      ddl.push(`GRANT EXECUTE ON FUNCTION ${f} TO ${grantee === 'PUBLIC' ? 'PUBLIC' : qid(grantee)};`);
+    }
   }
 
   // 3. Triggers

@@ -1,0 +1,23 @@
+{
+  "_commentaire": "Relevé TEREVA scanné sans couche texte dans Pennylane (SKM_C250i26041307560.pdf) : transcrit à la lecture le 2026-10-24, même forme que la sortie de parserFactureTereva. Les totaux du pied servent de contrôle (scripts/catalogue/factures-transcrites.test.mjs).",
+  "fournisseur": "TEREVA",
+  "format": "transcription",
+  "type": "facture",
+  "numero": "26010192217",
+  "date": "2026-03-31",
+  "pennylane_id": 4811838053,
+  "lignes": [
+    { "code": "1269512", "designation": "TELEMETRE LASER GLM 40", "complement": "PORTEE 40 METRES", "ref_fabricant": "0601072900", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 72.26, "montant_ht": 72.26, "promo": true, "eco": 0.14, "tva_taux": 20, "bl": { "numero": "APM488", "date": "2026-03-13", "commande": "PHILIPPE" }, "page": 1 },
+    { "code": "2994643", "designation": "POMPE DE RELEVAGE SI-83 PACK 2", "complement": "700 L/H + TUYAU 5M + BAC 2L · P/CLIM ET CHAUD GAZ CONDENS. · ADAPTATEUR MULTI-DIAMETRE", "ref_fabricant": "SI83CE42UN23", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 76.02, "montant_ht": 76.02, "promo": false, "eco": 0.6, "tva_taux": 20, "bl": { "numero": "ASL168", "date": "2026-03-19", "commande": "VEOLIA" }, "page": 1 },
+    { "code": "3988926", "designation": "SERTISSEUSE M2X COMPLETE", "complement": "AVEC PINCE MERE · + 2 BAT 2AH CAS + 1 CHARGEUR", "ref_fabricant": "253551", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 1070.32, "montant_ht": 1070.32, "promo": false, "eco": null, "tva_taux": 20, "bl": { "numero": "AUB055", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "1250006", "designation": "HOUSSE 5 INSERTS PROFIL V", "complement": "COMPO V 12-14-16-18-22", "ref_fabricant": "990034", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 359.24, "montant_ht": 359.24, "promo": false, "eco": null, "tva_taux": 20, "bl": { "numero": "AUB055", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "9314133", "designation": "MACHOIRE INSERT PROFIL V D28", "complement": "POUR ACOME LA PAIRE", "ref_fabricant": "252965", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 85.13, "montant_ht": 85.13, "promo": false, "eco": null, "tva_taux": 20, "bl": { "numero": "AUB055", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "1465946", "designation": "INSERTS POUR MODELES I10 /", "complement": "M20+ / M21+ - U 32", "ref_fabricant": null, "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 85.13, "montant_ht": 85.13, "promo": false, "eco": null, "tva_taux": 20, "bl": { "numero": "AUB055", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "4496839", "designation": "KIT 8 OUTILS 18V+LAMPE OFFERTE", "complement": null, "ref_fabricant": "DCL182-XJ+DCK853P4-QW", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 1699.9, "montant_ht": 1699.9, "promo": true, "eco": 3.91, "tva_taux": 20, "bl": { "numero": "AUB055A", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "2201866", "designation": "KIT PREMIUM DCK853P4-QW", "complement": "8 OUTILS XR 18V 5AH LION", "ref_fabricant": "DCK853P4-QW", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 0, "montant_ht": 0, "promo": true, "eco": null, "tva_taux": 20, "bl": { "numero": "AUB055A", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "4255127", "designation": "LAMPE DE TRAVAIL USB-C", "complement": null, "ref_fabricant": null, "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 0, "montant_ht": 0, "promo": true, "eco": null, "tva_taux": 20, "bl": { "numero": "AUB055A", "date": "2026-03-24", "commande": "OUTILLAGE" }, "page": 1 },
+    { "code": "4317061", "designation": "DETECTEUR MURAL GMS 120-27", "complement": null, "ref_fabricant": "0601081700", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 90.9, "montant_ht": 90.9, "promo": true, "eco": 0.14, "tva_taux": 20, "bl": { "numero": "AUL553", "date": "2026-03-25", "commande": null }, "page": 2 }
+  ],
+  "totaux": { "marchandises_ht": 3538.9, "frais": { "PPE": 49, "F.G.": 9.9, "DEEE": 4.79 }, "total_ht": 3602.59, "ttc": 4323.11 },
+  "anomalies": []
+}

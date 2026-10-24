@@ -1,0 +1,16 @@
+{
+  "_commentaire": "Relevé TEREVA scanné sans couche texte dans Pennylane (SKM_C250i26061210091.pdf) : transcrit à la lecture le 2026-10-24, même forme que la sortie de parserFactureTereva. Les pellets sont à 10 % de TVA (code 1) : Pennylane, qui suppose 20 % partout, affiche un HT de 179,38 au lieu de 184,00.",
+  "fournisseur": "TEREVA",
+  "format": "transcription",
+  "type": "facture",
+  "numero": "26010315935",
+  "date": "2026-05-31",
+  "pennylane_id": 23165362151424,
+  "lignes": [
+    { "code": "3615792", "designation": "PANTALON T601 NOIR T48", "complement": "65%POLYESTER 35% COTON · EN14404", "ref_fabricant": "PW3", "quantite": 2, "unite": "pièce", "uf": "1", "prix_unitaire_net": 34.98, "montant_ht": 69.96, "promo": false, "eco": null, "tva_taux": 20, "bl": { "numero": "BBC825A", "date": "2026-04-14", "commande": "STOCK FAISAN" }, "page": 1 },
+    { "code": "4000425", "designation": "SAC DE PELLETS 15 KG WBG15", "complement": "SAC DE 15,00 KILO(S)", "ref_fabricant": "WBG15", "quantite": 10, "unite": "pièce", "uf": "1", "prix_unitaire_net": 5.54, "montant_ht": 55.4, "promo": false, "eco": null, "tva_taux": 10, "bl": { "numero": "BJZ819", "date": "2026-05-07", "commande": "SAC" }, "page": 1 },
+    { "code": "4280109", "designation": "BACHE 25X1M AUTO-ADH RESPIRANT", "complement": null, "ref_fabricant": "144311M", "quantite": 1, "unite": "pièce", "uf": "1", "prix_unitaire_net": 48.68, "montant_ht": 48.68, "promo": false, "eco": 0.06, "tva_taux": 20, "bl": { "numero": "BNV860", "date": "2026-05-21", "commande": "ROULEAU" }, "page": 1 }
+  ],
+  "totaux": { "marchandises_ht": 174.04, "frais": { "F.G.": 9.9, "EcoP": 0.06 }, "total_ht": 184, "ttc": 215.26 },
+  "anomalies": []
+}
