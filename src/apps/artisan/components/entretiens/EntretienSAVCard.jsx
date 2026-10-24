@@ -30,6 +30,7 @@ import { generateInvoicePdfBlob } from '../facturation/InvoicePDF';
 import CancelInvoiceDialog from '../facturation/CancelInvoiceDialog';
 import SendInvoiceEmailDialog from '../facturation/SendInvoiceEmailDialog';
 import FacturerEntretienDialog from './FacturerEntretienDialog';
+import GenererAttestationButton from './GenererAttestationButton';
 
 // ============================================================================
 // CONSTANTES VISUELLES
@@ -406,6 +407,11 @@ export function EntretienSAVCard({ item, onClick, onRefresh, orgId, invitation =
                     </div>
                   )}
                 </>
+              )}
+              {/* Attestation d'entretien et de ramonage : (re)générable sur toute carte facturée
+                  (rattrapage des entretiens facturés avant elle, ou du marquage manuel). */}
+              {isTeamLeaderOrAbove && type === 'entretien' && (item.invoice_id || item.invoiced_at) && (
+                <GenererAttestationButton item={item} orgId={orgId} />
               )}
               {isTeamLeaderOrAbove && canSendInvoiceEmail && (
                 <>
