@@ -109,6 +109,29 @@ export const catalogItemsService = {
     }
   },
 
+  /**
+   * Téléverse une photo d'article (bucket public `product-images`, chemin `${orgId}/articles/${itemId}/…`) et la pose
+   * sur l'article. Résout avec l'URL publique.
+   */
+  async uploadItemImage({ orgId, itemId, file }) {
+    try {
+      if (!orgId || !itemId || !file) throw new Error('[catalogItemsService] orgId, itemId et file requis');
+      const ext = (file.name || 'image').split('.').pop().toLowerCase();
+      const path = `${orgId}/articles/${itemId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('product-images').upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) throw new Error('URL publique indisponible');
+      const { error } = await this.updateItem(orgId, itemId, { imageUrl: publicUrl });
+      if (error) throw error;
+      return { data: publicUrl, error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] uploadItemImage:', error);
+      return { data: null, error };
+    }
+  },
+
   /** Marques distinctes des articles actifs de l'org (filtre). */
   async getDistinctBrands(orgId) {
     try {

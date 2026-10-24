@@ -155,9 +155,14 @@ export function useCatalogItemMutations(orgId) {
     mutationFn: () => unwrapResult(catalogItemsService.propose(orgId)),
     onSuccess: invalidate,
   });
+  const uploadImage = useMutation({
+    mutationFn: ({ itemId, file }) => unwrapResult(catalogItemsService.uploadItemImage({ orgId, itemId, file })),
+    onSuccess: invalidate,
+  });
 
   return {
     updateItem: (itemId, updates) => update.mutateAsync({ itemId, updates }),
+    uploadImage: (itemId, file) => uploadImage.mutateAsync({ itemId, file }),
     merge: (survivorId, absorbedId) => merge.mutateAsync({ survivorId, absorbedId }),
     attach: (productId, itemId) => attach.mutateAsync({ productId, itemId }),
     detach: (productId) => detach.mutateAsync({ productId }),

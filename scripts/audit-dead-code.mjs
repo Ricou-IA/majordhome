@@ -105,8 +105,6 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/catalogue/woocommerce.js',
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
-  // Articles Majord'home (tranche A, tâche 3) : consommé par la page Articles et la fiche article (tâche 4) — à retirer avec elle.
-  'src/shared/hooks/useCatalogItems.js',
 ]);
 
 const allFiles = walk(SRC);

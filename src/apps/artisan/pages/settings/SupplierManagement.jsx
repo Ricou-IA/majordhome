@@ -976,6 +976,11 @@ export default function SupplierManagement() {
         </button>
       </div>
 
+      {/* La base du devis : articles Majord'home (un par ligne fournisseur, fusionnés quand communs) */}
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Link to="/settings/suppliers/articles" className="text-primary-700 hover:underline">Articles Majord&apos;home →</Link>
+      </div>
+
       {/* Liste */}
       {isLoading ? (
         <div className="flex justify-center py-12">
