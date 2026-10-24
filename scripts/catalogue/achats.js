@@ -9,7 +9,8 @@
 //   - prix d'achat = prix unitaire net (remise déduite, éco-participation exclue) de la ligne la plus récente
 //     (date de facture, puis date de BL, puis ordre dans la facture) à prix NON NUL ; un article seulement vu à
 //     0 € (offert dans un pack) est gardé à 0 et marqué `offert_dans_pack` ;
-//   - libellé, unité, TVA = ceux de la ligne la plus récente ; prix de vente jamais posé (0 = « à renseigner ») ;
+//   - libellé, unité, TVA = ceux de la ligne la plus récente ; prix de vente par défaut = prix public s'il existe,
+//     sinon 0 (« à renseigner ») — appliqué par la RPC seulement si le prix de vente est encore à 0 ;
 //   - prix public (`tarif_public`) = « Prix de base » du relevé quand le fournisseur l'imprime (Soditelem), avec le
 //     taux de remise effectif (Eric 2026-10-24) ; Tereva ne l'imprime pas → null, le drawer reste vide.
 // Module PUR, testé scripts/catalogue/achats.test.mjs.
@@ -95,7 +96,9 @@ export function catalogueDepuisAchats(documents, { version, historique_max = 24 
       // prix public = « Prix de base » imprimé par le fournisseur (Soditelem), remise = taux effectif base → net
       tarif_public: reference.prix_base > 0 ? Math.round(reference.prix_base * 100) / 100 : null,
       taux_remise: reference.prix_base > 0 ? Math.round((1 - reference.prix_unitaire_net / reference.prix_base) * 10000) / 100 : null,
-      selling_price_ht_defaut: 0,
+      // vente par défaut = prix public quand le fournisseur l'imprime (Eric 2026-10-24, comme MODINOX) ; la RPC ne
+      // l'applique qu'à l'INSERT ou tant que le prix de vente est encore à 0 — une saisie du drawer survit.
+      selling_price_ht_defaut: reference.prix_base > 0 ? Math.round(reference.prix_base * 100) / 100 : 0,
       default_tva_rate: recente.tva_taux ?? 20,
       unit: recente.unite || 'pièce',
       category: null,

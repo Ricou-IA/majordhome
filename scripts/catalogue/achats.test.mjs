@@ -35,7 +35,7 @@ test('dernier prix net payé par référence, historique, avoirs ignorés, ligne
   const cab = lignes.find((l) => l.reference === 'CAB1');
   assert.equal(cab.purchase_price_ht, 1.3728); // BL du 26/08, le plus récent de la facture d'août
   assert.equal(cab.name, 'U 1000 R2V 3G2,5 C50');
-  assert.equal(cab.selling_price_ht_defaut, 0);
+  assert.equal(cab.selling_price_ht_defaut, 2.47); // vente par défaut = prix public (Eric 2026-10-24)
   assert.equal(cab.category, null);
   assert.equal(cab.product_kind, 'main');
   assert.equal(cab.specs.source_version, 'achats_test_2026-08');
@@ -58,6 +58,7 @@ test('dernier prix net payé par référence, historique, avoirs ignorés, ligne
   assert.equal(kit.specs.canonical.ref_fabricant, 'DCK853P4-QW');
   assert.equal(kit.specs.canonical.eco_participation_unitaire, 3.91);
   assert.equal(kit.tarif_public, null); // Tereva n'imprime pas de prix de base
+  assert.equal(kit.selling_price_ht_defaut, 0); // sans prix public, la vente reste « à renseigner »
   assert.equal(kit.taux_remise, null);
 
   const lampe = lignes.find((l) => l.reference === 'LAMPE');
