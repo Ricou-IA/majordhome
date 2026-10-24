@@ -620,6 +620,12 @@ export const suppliersService = {
         .single();
 
       if (error) throw error;
+      // Une ligne saisie à la main doit être proposable au devis : son article Majord'home est créé dans la foulée
+      // (les relevés le font via l'upsert ; ici il n'y a pas de relevé). Une ligne sans prix n'en reçoit pas (spec § 9).
+      if (data?.id && Number(data.purchase_price_ht) > 0) {
+        const { error: errItem } = await supabase.rpc('catalog_item_create_for_product', { p_product_id: data.id });
+        if (errItem) logger.warn('[suppliersService] createProduct : article Majord\'home non créé (bouton « Créer l\'article » du drawer) :', errItem.message);
+      }
       return { data, error: null };
     } catch (error) {
       console.error('[suppliersService] createProduct:', error);

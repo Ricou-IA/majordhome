@@ -1,7 +1,8 @@
 // src/lib/catalogue/ageDePrix.js
 // Âge et fraîcheur d'un prix d'achat fournisseur (supplier_products.purchase_price_at) — module PUR, testé
-// (scripts/catalogue/age-de-prix.test.mjs). Spec articles Majord'home § 5.4 : un prix de moins de 30 jours est
-// « frais » ; au-delà il reste affiché avec son âge mais n'est jamais proposé d'office au devis.
+// (scripts/catalogue/age-de-prix.test.mjs). Spec articles Majord'home § 9 : l'âge du prix est INDICATIF (fiche
+// article, à vérifier avant commande) ; il ne décide de rien au devis, dont la marge prend le prix d'achat le plus
+// bas en base. « Frais » = moins de 30 jours.
 
 /** Âge au-delà duquel un prix n'est plus proposé d'office (jours). */
 export const SEUIL_FRAICHEUR_JOURS = 30;

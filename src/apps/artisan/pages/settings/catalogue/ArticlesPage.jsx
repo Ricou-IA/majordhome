@@ -54,7 +54,7 @@ export default function ArticlesPage() {
   const ouvrir = (id) => setSearchParams(id ? { item: id } : {});
 
   return (
-    <SettingsPage title="Articles Majord'home" description="La base du devis : un article par ligne fournisseur, fusionnés quand ils sont communs. L'offre retenue au devis est la moins chère parmi les prix frais.">
+    <SettingsPage title="Articles Majord'home" description="La base du devis : un article par ligne fournisseur, fusionnés quand ils sont communs. Au devis, la marge est estimée sur le prix d'achat le plus bas en base ; l'âge du prix est indicatif.">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Link to="/settings/suppliers" className="text-primary-700 hover:underline">← Fournisseurs</Link>
       </div>

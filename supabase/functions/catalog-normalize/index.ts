@@ -98,9 +98,11 @@ Deno.serve(async (req) => {
     if (errM) console.error("[catalog-normalize] catalog_item_proposals_propose", errM.message);
 
     // restants = encore jamais soumis ; sans_cle_apres_ia = soumis mais restés sous le seuil (à saisir à la main)
+    // la normalisation a réussi même si la relance des fusions échoue : on le dit (matches_error), on ne l'avale pas
     return jsonResponse({
       ok: true, traites, poses, restants: Math.max(0, (restantsAvant || 0) - traites),
       sans_cle_apres_ia: (dejaTentes || 0) + (traites - poses), tokens, matches: matches ?? null,
+      matches_error: errM ? errM.message : null,
     }, 200, req);
   } catch (e) {
     console.error("[catalog-normalize]", e);

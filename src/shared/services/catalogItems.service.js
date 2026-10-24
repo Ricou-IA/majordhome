@@ -12,10 +12,9 @@
 import { supabase } from '@/lib/supabaseClient';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
+import { SEUIL_FRAICHEUR_JOURS } from '@/lib/catalogue/ageDePrix.js';
 
-/** Âge au-delà duquel un prix d'achat n'est plus « frais » (spec § 5.4). */
-export const SEUIL_FRAICHEUR_JOURS = 30;
-
+/** Filtre « sans offre fraîche » de la page Articles (indicatif : l'âge du prix ne décide de rien au devis, spec § 9). */
 function dateSeuilFraicheur(now = new Date()) {
   return new Date(now.getTime() - SEUIL_FRAICHEUR_JOURS * 86400000).toISOString();
 }
@@ -259,6 +258,19 @@ export const catalogItemsService = {
       return { data: true, error: null };
     } catch (error) {
       logger.error('[catalogItemsService] attach:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Crée l'article d'une ligne fournisseur qui n'en a pas (saisie manuelle, variante) — org_admin. Résout avec l'id. */
+  async createForProduct(productId) {
+    try {
+      if (!productId) throw new Error('[catalogItemsService] ligne requise');
+      const { data, error } = await supabase.rpc('catalog_item_create_for_product', { p_product_id: productId });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] createForProduct:', error);
       return { data: null, error };
     }
   },

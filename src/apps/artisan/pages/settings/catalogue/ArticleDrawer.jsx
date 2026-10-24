@@ -191,7 +191,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
                 )}
               </div>
               <ArticleOffersTable offers={offers} canEdit={canEdit} onDetach={handleDetach} detaching={isLinking} />
-              <p className="text-[11px] text-secondary-400">Au devis, l&apos;offre retenue d&apos;office est la moins chère parmi les prix de moins de 30 jours et en stock ; les autres restent au choix.</p>
+              <p className="text-[11px] text-secondary-400">Au devis, la marge est estimée sur le prix d&apos;achat le plus bas de ces offres (le fournisseur se choisit à la commande) ; l&apos;âge du prix est indicatif.</p>
             </section>
 
             {/* Caractéristiques */}

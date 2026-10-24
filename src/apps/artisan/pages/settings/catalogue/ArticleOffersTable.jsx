@@ -47,7 +47,7 @@ export default function ArticleOffersTable({ offers, canEdit, onDetach, detachin
                 <td className="py-1.5 pr-3 text-secondary-600 font-mono text-xs" title={o.name}>{o.reference}</td>
                 <td className="py-1.5 pr-3 text-right text-secondary-900 whitespace-nowrap">{o.purchase_price_ht > 0 ? formatEuro(o.purchase_price_ht) : '—'}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap">
-                  <span className={`inline-flex items-center gap-1 text-xs ${frais ? 'text-green-700' : 'text-amber-700'}`} title={frais ? 'Prix de moins de 30 jours' : 'Prix de plus de 30 jours : jamais proposé d’office'}>
+                  <span className={`inline-flex items-center gap-1 text-xs ${frais ? 'text-green-700' : 'text-amber-700'}`} title={frais ? 'Prix de moins de 30 jours' : 'Prix de plus de 30 jours : à vérifier avant commande (indicatif, ne change rien au devis)'}>
                     <span className={`w-1.5 h-1.5 rounded-full ${frais ? 'bg-green-500' : 'bg-amber-500'}`} />
                     {libelleAge(o.purchase_price_at)}
                   </span>

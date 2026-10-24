@@ -149,6 +149,10 @@ export function useCatalogItemMutations(orgId) {
     mutationFn: ({ productId }) => unwrapResult(catalogItemsService.detach(productId)),
     onSuccess: invalidate,
   });
+  const createForProduct = useMutation({
+    mutationFn: ({ productId }) => unwrapResult(catalogItemsService.createForProduct(productId)),
+    onSuccess: invalidate,
+  });
   const decide = useMutation({
     mutationFn: ({ ids, statut }) => unwrapResult(catalogItemsService.decideProposals(ids, statut)),
     onSuccess: invalidate,
@@ -175,11 +179,12 @@ export function useCatalogItemMutations(orgId) {
     merge: (survivorId, absorbedId) => merge.mutateAsync({ survivorId, absorbedId }),
     attach: (productId, itemId) => attach.mutateAsync({ productId, itemId }),
     detach: (productId) => detach.mutateAsync({ productId }),
+    createForProduct: (productId) => createForProduct.mutateAsync({ productId }),
     decide: (ids, statut) => decide.mutateAsync({ ids, statut }),
     propose: () => propose.mutateAsync(),
     isSaving: update.isPending,
     isMerging: merge.isPending || decide.isPending,
-    isLinking: attach.isPending || detach.isPending,
+    isLinking: attach.isPending || detach.isPending || createForProduct.isPending,
     isProposing: propose.isPending,
   };
 }

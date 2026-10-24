@@ -230,8 +230,12 @@ Deno.serve(async (req) => {
     const auth = await requireOrgMembership(req, { orgId, requiredRole: "org_admin" });
     if (!auth.ok) return auth.response;
 
-    // `matches` est un geste de l'org (page Harmoniser les bases), pas d'un fournisseur
-    if (action === "matches") return jsonResponse({ ok: true, resultat: await proposerMatches(admin, orgId) }, 200, req);
+    // `matches` est un geste de l'org (page Harmoniser les bases), pas d'un fournisseur — un échec de la RPC est un échec
+    if (action === "matches") {
+      const resultat = await proposerMatches(admin, orgId);
+      if (!resultat) return jsonResponse({ error: "propose_failed" }, 500, req);
+      return jsonResponse({ ok: true, resultat }, 200, req);
+    }
 
     const supplier = await chargerSupplier(admin, orgId, supplierId);
     if (!supplier) return jsonResponse({ error: "supplier_not_found" }, 404, req);

@@ -139,6 +139,77 @@ BEGIN
     RAISE EXCEPTION 'une proposition en attente cite un article absorbé';
   END IF;
 
+  -- (2b) relecture I1 : décider EN UN APPEL deux propositions qui partagent un article → la seconde est sautée, pas d'exception
+  --      (refixture : A5' / A6' chez A, B5' chez B, même clé)
+  SET LOCAL ROLE service_role;
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_a, 'a2', v_rows_a || '[{"reference":"A15","name":"Fronius Symo 10","brand":"Fronius","gamme":"Onduleurs","product_kind":"main","purchase_price_ht":1800,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"photovoltaique","image_url":null,"image_source_url":null,"model_key":"SYMO10","specs":{"canonical":{"categories_site":["Inverters"]},"source_version":"a2"}},{"reference":"A16","name":"Fronius Symo 10 (bis)","brand":"Fronius","gamme":"Onduleurs","product_kind":"main","purchase_price_ht":1790,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"photovoltaique","image_url":null,"image_source_url":null,"model_key":"SYMO10","specs":{"canonical":{"categories_site":["Inverters"]},"source_version":"a2"}}]'::jsonb);
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_b, 'b2', v_rows_b || '[{"reference":"B15","name":"SYMO 10 Fronius","brand":"FRONIUS","gamme":"Onduleur central","product_kind":"main","purchase_price_ht":1850,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"photovoltaique","image_url":null,"image_source_url":null,"model_key":"SYMO10","specs":{"canonical":{"categories_site":["onduleur-central"]},"source_version":"b2"}}]'::jsonb);
+  v_res := public.catalog_item_proposals_propose(v_mayer);
+  RESET ROLE;
+  SELECT array_agg(pr.id) INTO v_ids FROM majordhome.catalog_item_proposals pr
+  WHERE pr.statut = 'propose' AND pr.org_id = v_mayer
+    AND (pr.item_a_id IN (SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_b AND reference = 'B15')
+         OR pr.item_b_id IN (SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_b AND reference = 'B15'));
+  IF coalesce(array_length(v_ids, 1), 0) <> 2 THEN RAISE EXCEPTION 'fixture I1 : % propositions SYMO', coalesce(array_length(v_ids, 1), 0); END IF;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_n := public.catalog_item_proposals_decide(v_ids, 'fusionne');
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  IF v_n <> 1 THEN RAISE EXCEPTION 'tout fusionner : % décision(s) au lieu de 1 (la seconde paire cite un absorbé)', v_n; END IF;
+  SELECT count(*) INTO v_n FROM majordhome.catalog_item_proposals WHERE id = ANY (v_ids) AND statut = 'fusionne';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'tout fusionner : % journalisée(s)', v_n; END IF;
+  IF EXISTS (SELECT 1 FROM majordhome.catalog_item_proposals pr JOIN majordhome.catalog_items i ON i.id IN (pr.item_a_id, pr.item_b_id) WHERE pr.statut = 'propose' AND i.merged_into IS NOT NULL) THEN
+    RAISE EXCEPTION 'proposition en attente sur un absorbé après tout fusionner';
+  END IF;
+
+  -- (2c) relecture I2 : fusion manuelle « garder le second » → la proposition passe en fusionne (pas supprimée)
+  --      (paire dédiée A17 / A18 chez A, B17 chez B : ambiguë, donc proposée)
+  SET LOCAL ROLE service_role;
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_a, 'a3', v_rows_a || '[{"reference":"A17","name":"Taurus 5","brand":"Taurus","gamme":"Onduleurs","product_kind":"main","purchase_price_ht":500,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"photovoltaique","image_url":null,"image_source_url":null,"model_key":"TAURUS5","specs":{"canonical":{"categories_site":["Inverters"]},"source_version":"a3"}},{"reference":"A18","name":"Taurus 5 (bis)","brand":"Taurus","gamme":"Onduleurs","product_kind":"main","purchase_price_ht":510,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"photovoltaique","image_url":null,"image_source_url":null,"model_key":"TAURUS5","specs":{"canonical":{"categories_site":["Inverters"]},"source_version":"a3"}}]'::jsonb);
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_b, 'b3', v_rows_b || '[{"reference":"B17","name":"TAURUS 5","brand":"TAURUS","gamme":"Onduleur central","product_kind":"main","purchase_price_ht":520,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"photovoltaique","image_url":null,"image_source_url":null,"model_key":"TAURUS5","specs":{"canonical":{"categories_site":["onduleur-central"]},"source_version":"b3"}}]'::jsonb);
+  PERFORM public.catalog_item_proposals_propose(v_mayer);
+  RESET ROLE;
+  SELECT pr.id, pr.item_a_id, pr.item_b_id INTO v_p FROM majordhome.catalog_item_proposals pr
+  WHERE pr.statut = 'propose'
+    AND least(pr.item_a_id, pr.item_b_id) = least((SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_a AND reference = 'A17'), (SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_b AND reference = 'B17'))
+    AND greatest(pr.item_a_id, pr.item_b_id) = greatest((SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_a AND reference = 'A17'), (SELECT catalog_item_id FROM majordhome.supplier_products WHERE supplier_id = v_b AND reference = 'B17'));
+  IF v_p.id IS NULL THEN RAISE EXCEPTION 'fixture I2 : proposition A17/B17 absente'; END IF;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM public.catalog_item_merge(v_p.item_b_id, v_p.item_a_id);
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  SELECT statut, decided_by INTO v_i FROM majordhome.catalog_item_proposals WHERE id = v_p.id;
+  IF v_i.statut IS DISTINCT FROM 'fusionne' OR v_i.decided_by IS DISTINCT FROM v_admin THEN RAISE EXCEPTION 'fusion manuelle non journalisée : %', v_i.statut; END IF;
+  SELECT merged_into INTO v_i FROM majordhome.catalog_items WHERE id = v_p.item_a_id;
+  IF v_i.merged_into IS DISTINCT FROM v_p.item_b_id THEN RAISE EXCEPTION 'garder le second : mauvais survivant'; END IF;
+  -- fusion manuelle SANS proposition préalable : une trace « manuel » est écrite
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, category, origin) VALUES (v_mayer, 'TEST HARMO MANUEL X', 'X', 'batterie', 'manuel') RETURNING id INTO v_item_a8;
+  INSERT INTO majordhome.catalog_items (org_id, name, brand, category, origin) VALUES (v_mayer, 'TEST HARMO MANUEL Y', 'X', 'batterie', 'manuel') RETURNING id INTO v_item_b8;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM public.catalog_item_merge(v_item_a8, v_item_b8);
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  SELECT count(*) INTO v_n FROM majordhome.catalog_item_proposals WHERE item_a_id = least(v_item_a8, v_item_b8) AND item_b_id = greatest(v_item_a8, v_item_b8) AND statut = 'fusionne' AND source = 'manuel';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'fusion manuelle sans proposition : pas de trace'; END IF;
+
+  -- (2d) relecture C1 : une ligne créée à la main (sans relevé) reçoit un article par catalog_item_create_for_product
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, purchase_price_ht, category) VALUES (v_a, v_mayer, 'MAN-1', 'Produit saisi à la main', 'Dinak', 450, 'fumisterie') RETURNING id INTO v_nouveau;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_survivant := public.catalog_item_create_for_product(v_nouveau);
+  ok := false;
+  BEGIN PERFORM public.catalog_item_create_for_product(v_nouveau); EXCEPTION WHEN SQLSTATE '22023' THEN ok := true; END;
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  IF NOT ok THEN RAISE EXCEPTION 'create_for_product accepté deux fois'; END IF;
+  SELECT * INTO v_i FROM majordhome.supplier_products WHERE id = v_nouveau;
+  IF v_i.catalog_item_id IS DISTINCT FROM v_survivant OR v_i.catalog_item_link_source <> 'manuel' THEN RAISE EXCEPTION 'create_for_product : ligne non rattachée'; END IF;
+  SELECT * INTO v_i FROM public.majordhome_catalog_items_list WHERE id = v_survivant;
+  IF v_i.name <> 'Produit saisi à la main' OR v_i.offres_actives <> 1 OR v_i.origin <> 'manuel' THEN RAISE EXCEPTION 'create_for_product : article % % %', v_i.name, v_i.offres_actives, v_i.origin; END IF;
+
   -- (3) refus mémorisé
   SELECT id INTO v_prop FROM majordhome.catalog_item_proposals WHERE item_a_id = least(v_item_a3, v_item_b3) AND item_b_id = greatest(v_item_a3, v_item_b3);
   SET LOCAL ROLE authenticated;

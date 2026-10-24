@@ -93,6 +93,7 @@ export default function HarmonisationPage() {
       if (r?.ok) {
         const m = r.matches || {};
         toast.success(`Modèles IA : ${r.poses} clé${r.poses > 1 ? 's' : ''} posée${r.poses > 1 ? 's' : ''} sur ${r.traites} lignes · ${r.restants} encore à soumettre, ${r.sans_cle_apres_ia ?? 0} sans clé après IA${m.fusionnes != null ? ` · fusions : ${m.fusionnes} d'office, ${m.proposes} à confirmer` : ''}`);
+        if (r.matches_error) toast.warning(`Clés posées, mais les fusions n'ont pas été relancées (${r.matches_error}) : cliquez « Proposer les fusions ».`);
       } else toast.error(`Échec : ${r?.error || 'normalisation'}`);
     } catch (err) { toast.error(err?.message || 'Normalisation refusée'); }
   };
