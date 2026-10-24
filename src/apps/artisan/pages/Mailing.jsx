@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Mail, Send, Sparkles, Filter, BarChart3 } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import SendTab from '@apps/artisan/components/mailing/SendTab';
@@ -8,7 +9,9 @@ import StatsTab from '@apps/artisan/components/mailing/StatsTab';
 
 export default function Mailing() {
   const { isOrgAdmin } = useAuth();
-  const [tab, setTab] = useState('send');
+  // ?tab=editor : ouverture directe de l'éditeur (lien « Modifier le texte » de Réglages → Emails).
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => (searchParams.get('tab') === 'editor' ? 'editor' : 'send'));
 
   return (
     <div className="space-y-6">

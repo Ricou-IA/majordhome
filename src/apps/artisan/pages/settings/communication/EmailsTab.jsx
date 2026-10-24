@@ -8,21 +8,15 @@
 // (merge JSONB niveau 1 : on n'envoie que ces deux clés).
 // ============================================================================
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOrgSettings } from '@hooks/useOrgSettings';
 import { useAuth } from '@contexts/AuthContext';
-import { mailCampaignsService } from '@services/mailCampaigns.service';
-import { mailCampaignKeys } from '@hooks/cacheKeys';
 import { moduleActif } from '@/lib/modules';
-import { DEFAULT_INVOICE_EMAIL, INVOICE_EMAIL_TEMPLATE_KEY, INVOICE_EMAIL_PLACEHOLDERS } from '@/lib/invoiceEmailTemplate';
+import { DEFAULT_INVOICE_EMAIL } from '@/lib/invoiceEmailTemplate';
 import ResendDomainSection from './ResendDomainSection';
-import GabaritTransactionnel from './GabaritTransactionnel';
+import EmailAutoLigne from './EmailAutoLigne';
 import AccueilLeadMetaSection from './AccueilLeadMetaSection';
-import {
-  DEFAULT_AUTO_RDV_EMAIL, DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL, AUTO_RDV_PLACEHOLDERS, AUTO_RDV_CONFIRMATION_PLACEHOLDERS,
-} from '@/lib/autoRdvEmailTemplates';
+import { DEFAULT_AUTO_RDV_EMAIL, DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL } from '@/lib/autoRdvEmailTemplates';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -51,49 +45,10 @@ export default function EmailsTab() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
   const { organization } = useAuth();
   const orgId = organization?.id;
-  const queryClient = useQueryClient();
   const [form, setForm] = useState(() => pickFields({}));
   const [initial, setInitial] = useState(() => pickFields({}));
-  const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   const communicationActive = moduleActif(settings, 'communication');
-
-  const { data: invoiceTemplate, isLoading: loadingTemplate } = useQuery({
-    queryKey: mailCampaignKeys.byKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY),
-    queryFn: async () => {
-      const { data, error } = await mailCampaignsService.getByKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgId && communicationActive,
-  });
-
-  // M5 — un gabarit ARCHIVÉ (existant mais `is_archived=true`) doit proposer une restauration,
-  // jamais le bouton de création : la contrainte unique `(org_id, key)` refuserait le create.
-  const { data: archivedTemplate, isLoading: loadingArchived } = useQuery({
-    queryKey: mailCampaignKeys.archivedByKey(orgId, INVOICE_EMAIL_TEMPLATE_KEY),
-    queryFn: async () => {
-      const { data, error } = await mailCampaignsService.list(orgId, { includeArchived: true });
-      if (error) throw error;
-      return (data || []).find((c) => c.key === INVOICE_EMAIL_TEMPLATE_KEY && c.is_archived) || null;
-    },
-    enabled: !!orgId && communicationActive && !loadingTemplate && !invoiceTemplate,
-  });
-
-  const handleCreateInvoiceTemplate = async () => {
-    if (!orgId || creatingTemplate) return;
-    setCreatingTemplate(true);
-    try {
-      const { error } = await mailCampaignsService.create({ org_id: orgId, ...DEFAULT_INVOICE_EMAIL });
-      if (error) throw error;
-      toast.success('Gabarit « Facture d’entretien » créé');
-      queryClient.invalidateQueries({ queryKey: mailCampaignKeys.all(orgId) });
-    } catch (err) {
-      toast.error(err.message || 'Création du gabarit échouée');
-    } finally {
-      setCreatingTemplate(false);
-    }
-  };
 
   useEffect(() => {
     const picked = pickFields(settings);
@@ -158,45 +113,21 @@ export default function EmailsTab() {
 
         {communicationActive && (
           <section>
-            <h3 className={SECTION_TITLE}>Gabarits transactionnels</h3>
-            <div className="border border-secondary-200 rounded-md p-3 text-sm flex items-center justify-between gap-4">
-              <div>
-                <p className="text-secondary-900 font-medium">Facture d&apos;entretien (envoi au client)</p>
-                {invoiceTemplate && (
-                  <p className="mt-1 text-xs text-secondary-500">
-                    Variables : {INVOICE_EMAIL_PLACEHOLDERS.map((v) => <code key={v} className="mr-1">{v}</code>)}
-                  </p>
-                )}
-              </div>
-              {loadingTemplate || (!invoiceTemplate && loadingArchived) ? (
-                <span className="text-xs text-secondary-500">Chargement…</span>
-              ) : invoiceTemplate ? (
-                <Link to="/mailing" className="text-sm text-primary-600 hover:underline whitespace-nowrap">
-                  Modifier dans Mailing → Éditeur
-                </Link>
-              ) : archivedTemplate ? (
-                <Link to="/mailing" className="text-sm text-amber-700 hover:underline whitespace-nowrap">
-                  Gabarit archivé : restaurez-le dans Mailing → Éditeur
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCreateInvoiceTemplate}
-                  disabled={creatingTemplate}
-                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
-                >
-                  {creatingTemplate ? 'Création…' : 'Créer le gabarit par défaut'}
-                </button>
-              )}
-            </div>
-            {/* Prise de rendez-vous par le client (auto-RDV) : invitation du 1er du mois + confirmation */}
-            <GabaritTransactionnel
-              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_EMAIL} placeholders={AUTO_RDV_PLACEHOLDERS}
-              titre="Prise de rendez-vous : invitation mensuelle"
+            <h3 className={SECTION_TITLE}>E-mails envoyés automatiquement</h3>
+            <EmailAutoLigne
+              orgId={orgId} gabarit={DEFAULT_INVOICE_EMAIL}
+              titre="Envoyer la facture d’entretien au client"
+              description="Utilisé quand vous envoyez une facture d’entretien par e-mail depuis la carte."
             />
-            <GabaritTransactionnel
-              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL} placeholders={AUTO_RDV_CONFIRMATION_PLACEHOLDERS}
-              titre="Prise de rendez-vous : confirmation"
+            <EmailAutoLigne
+              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_EMAIL}
+              titre="Inviter le client à choisir son rendez-vous d’entretien"
+              description="Envoyé chaque mois aux clients dont l’entretien arrive, si la prise de rendez-vous en ligne est activée (Réglages → Tournées)."
+            />
+            <EmailAutoLigne
+              orgId={orgId} gabarit={DEFAULT_AUTO_RDV_CONFIRMATION_EMAIL}
+              titre="Confirmer le rendez-vous choisi en ligne"
+              description="Envoyé quand le client a choisi sa demi-journée."
             />
             <AccueilLeadMetaSection orgId={orgId} />
           </section>

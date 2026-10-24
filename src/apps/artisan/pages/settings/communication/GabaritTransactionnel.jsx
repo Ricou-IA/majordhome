@@ -5,7 +5,7 @@
  * vit dans `majordhome_mail_campaigns` (is_transactional = true). Absent → bouton
  * « Créer le gabarit par défaut » ; présent → lien vers Mailing → Éditeur ;
  * archivé → invite à le restaurer (la contrainte unique `(org_id, key)` refuserait
- * une création). Utilisé par les gabarits de l'auto-RDV.
+ * une création). Utilisé par Réglages → Webshop ; Réglages → Emails est passé à EmailAutoLigne (2026-10-24).
  * ============================================================================
  */
 

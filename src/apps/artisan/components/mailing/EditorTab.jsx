@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Edit, Copy, Archive, Loader2, Mail, Users, Clock, Play, Check, Zap, Target, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { useAuth } from '@contexts/AuthContext';
@@ -56,6 +57,18 @@ export default function EditorTab() {
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+
+  // Ouverture directe depuis Réglages → Emails (« Modifier le texte ») : /mailing?tab=editor&edit=<clé>.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editKey = searchParams.get('edit');
+  useEffect(() => {
+    if (!editKey || isLoading) return;
+    const cible = campaigns.find((c) => c.key === editKey);
+    if (cible) { setEditing(cible); setWizardOpen(true); }
+    const next = new URLSearchParams(searchParams);
+    next.delete('edit');
+    setSearchParams(next, { replace: true });
+  }, [editKey, isLoading, campaigns, searchParams, setSearchParams]);
 
   const openCreate = () => { setEditing(null); setWizardOpen(true); };
   const openEdit = (campaign) => { setEditing(campaign); setWizardOpen(true); };
