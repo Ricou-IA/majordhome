@@ -8,10 +8,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-import { useSuppliers, useCatalogMatches } from '@hooks/useSuppliers';
+import { useSuppliers } from '@hooks/useSuppliers';
 import { suppliersService } from '@services/suppliers.service';
 import { formatEuro } from '@/lib/utils';
-import { autreCote, formatPrixHt } from '@/lib/catalogue/matchesModel.js';
 import {
   Package, ChevronRight, ChevronLeft, X,
   Loader2, Search, Minus, Plus, ShoppingCart,
@@ -22,16 +21,6 @@ export default function DevisProductPicker({ orgId, categories = [], onAddLines,
   const { suppliers: allSuppliers } = useSuppliers(orgId);
   // Clé stable pour les effets (un tableau neuf à chaque rendu relancerait les requêtes).
   const categoriesKey = categories.join(',');
-  // Articles communs confirmés : signale un prix d'achat plus bas ailleurs (sans changer le choix).
-  const { matches: matchesConfirmes } = useCatalogMatches(orgId, 'confirme');
-  const moinsCherAilleurs = (product) => {
-    let meilleur = null;
-    for (const m of matchesConfirmes) {
-      const c = autreCote(m, product.id);
-      if (c && c.purchase != null && product.purchase_price_ht > 0 && c.purchase < product.purchase_price_ht && (!meilleur || c.purchase < meilleur.purchase)) meilleur = c;
-    }
-    return meilleur;
-  };
 
   // État du parcours
   const [step, setStep] = useState('supplier'); // supplier | gamme | diametre | products
@@ -122,6 +111,7 @@ export default function DevisProductPicker({ orgId, categories = [], onAddLines,
       .filter((p) => quantities[p.id] > 0)
       .map((p) => ({
         line_type: 'product',
+        catalog_item_id: p.catalog_item_id || null,
         supplier_product_id: p.id,
         supplier_id: p.supplier_id,
         supplier_name: selectedSupplier.name,
@@ -334,11 +324,6 @@ export default function DevisProductPicker({ orgId, categories = [], onAddLines,
                           <p className="text-xs text-secondary-400 truncate">
                             {[product.reference, product.diametre ? `Ø${product.diametre}` : null].filter(Boolean).join(' · ')}
                           </p>
-                          {(() => { const c = moinsCherAilleurs(product); return c ? (
-                            <p className="text-xs text-amber-700 truncate" title="Même article, prix d'achat plus bas chez un autre fournisseur">
-                              Moins cher chez {c.supplierName} : {formatPrixHt(c.purchase)} d&apos;achat
-                            </p>
-                          ) : null; })()}
                         </div>
 
                         {/* Prix */}

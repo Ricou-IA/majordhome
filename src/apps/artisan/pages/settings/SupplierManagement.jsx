@@ -6,9 +6,9 @@
  * ============================================================================
  */
 
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@contexts/AuthContext';
-import { useSuppliers, useSupplierMutations, useSupplierProducts, useProductMutations, useSupplierBrands, useSupplierGammes, useCatalogMatches } from '@hooks/useSuppliers';
+import { useSuppliers, useSupplierMutations, useSupplierProducts, useProductMutations, useSupplierBrands, useSupplierGammes } from '@hooks/useSuppliers';
 import { PRODUCT_CATEGORIES } from '@services/suppliers.service';
 import { suppliersService } from '@services/suppliers.service';
 import { TVA_RATES } from '@services/devis.service';
@@ -517,13 +517,6 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
   const { products, totalCount, isLoading, refetch } = useSupplierProducts(supplier.id, { search: debouncedSearch, kind: kindFilter, brand: brandFilter || null, gamme: gammeFilter || null, page, pageSize });
   const { brands } = useSupplierBrands(orgId, supplier.id);
   const { gammes } = useSupplierGammes(orgId, supplier.id);
-  // Articles communs confirmés avec un autre fournisseur : pastille « ×N » sur la ligne
-  const { matches: matchesConfirmes } = useCatalogMatches(orgId, 'confirme');
-  const nbCommuns = useMemo(() => {
-    const m = new Map();
-    for (const x of matchesConfirmes) { m.set(x.product_a_id, (m.get(x.product_a_id) || 0) + 1); m.set(x.product_b_id, (m.get(x.product_b_id) || 0) + 1); }
-    return m;
-  }, [matchesConfirmes]);
   // Compteurs par type (rapide : COUNT séparé)
   const { totalCount: mainCount } = useSupplierProducts(supplier.id, { kind: 'main', pageSize: 1 });
   const { totalCount: accessoryCount } = useSupplierProducts(supplier.id, { kind: 'accessory', pageSize: 1 });
@@ -788,11 +781,6 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
                       <div className="min-w-0">
                         <div className="font-medium text-secondary-900 flex items-center gap-1.5 flex-wrap">
                           <span>{product.name}</span>
-                          {nbCommuns.get(product.id) && (
-                            <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-primary-50 text-primary-700 rounded" title="Même article connu chez un autre fournisseur (voir la fiche, « Aussi chez »)">
-                              ×{nbCommuns.get(product.id) + 1}
-                            </span>
-                          )}
                           {product.brand && (
                             <span className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium bg-secondary-100 text-secondary-600 rounded">
                               {product.brand}

@@ -6,11 +6,10 @@
 //   - deux lignes d'état : dernier relevé réussi, dernière erreur ;
 //   - tableau de correspondance des catégories du site (→ Batterie / Photovoltaïque / Borne de recharge / Exclure)
 //     avec « Appliquer la correspondance » (jamais appliqué pendant le relevé) ;
-//   - « Normaliser les modèles (IA) », « Rapprocher », lien vers la page Rapprochements, « Supprimer les identifiants ».
+//   - « Normaliser les modèles (IA) » (ce fournisseur ; l’org entière depuis Harmoniser les bases), « Supprimer les identifiants ».
 // Visible org_admin seul. Spec : 2026-10-24-catalogue-photovoltaique-connexion-generique-design.md § 3.1, § 6, § 7.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { KeyRound, RefreshCw, Upload, Loader2, CheckCircle2, AlertTriangle, Sparkles, Link2, Trash2, Save } from 'lucide-react';
+import { KeyRound, RefreshCw, Upload, Loader2, CheckCircle2, AlertTriangle, Sparkles, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers, useSupplierConnector, useSupplierMutations } from '@hooks/useSuppliers';
@@ -65,8 +64,8 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
   const frais = suppliers.find((s) => s.id === supplier?.id) || supplier;
   const { updateSupplier, isUpdating } = useSupplierMutations(orgId);
   const {
-    status, isLoadingStatus, saveCredentials, deleteCredentials, sync, importReleve, applyMapping, normalize, proposeMatches,
-    isSaving, isSyncing, isImporting, isApplyingMapping, isNormalizing, isProposing,
+    status, isLoadingStatus, saveCredentials, deleteCredentials, sync, importReleve, applyMapping, normalize,
+    isSaving, isSyncing, isImporting, isApplyingMapping, isNormalizing,
   } = useSupplierConnector(orgId, frais);
   const [replacing, setReplacing] = useState(false);
   const [mapping, setMapping] = useState({});
@@ -84,7 +83,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
   if (!isOrgAdmin || !frais?.connector) return null;
   const result = frais.catalog_sync_result;
   const erreur = frais.catalog_sync_error;
-  const busy = isSyncing || isImporting || isApplyingMapping || isNormalizing || isProposing;
+  const busy = isSyncing || isImporting || isApplyingMapping || isNormalizing;
 
   const annoncer = (data, verbe) => {
     if (data?.ok) {
@@ -133,13 +132,6 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
       if (r?.ok) toast.success(`Modèles IA : ${r.poses} clé${r.poses > 1 ? 's' : ''} posée${r.poses > 1 ? 's' : ''} sur ${r.traites} articles · ${r.restants} encore à soumettre, ${r.sans_cle_apres_ia ?? 0} sans clé après IA (à saisir à la main)`);
       else toast.error(`Échec : ${r?.error || 'normalisation'}`);
     } catch (err) { toast.error(err?.message || 'Normalisation refusée'); }
-  };
-  const handlePropose = async () => {
-    try {
-      const r = await proposeMatches();
-      const m = r?.resultat || {};
-      toast.success(`Rapprochements : ${m.confirmes ?? 0} confirmés d'office, ${m.proposes ?? 0} à confirmer`);
-    } catch (err) { toast.error(err?.message || 'Rapprochement refusé'); }
   };
 
   return (
@@ -231,10 +223,6 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
         <button type="button" onClick={handleNormalize} disabled={busy} className="btn-secondary btn-sm">
           {isNormalizing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />} Normaliser les modèles (IA)
         </button>
-        <button type="button" onClick={handlePropose} disabled={busy} className="btn-secondary btn-sm">
-          {isProposing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Link2 className="w-3.5 h-3.5 mr-1" />} Rapprocher
-        </button>
-        <Link to="/settings/suppliers/rapprochements" className="text-xs text-primary-700 hover:underline">Rapprochements à confirmer →</Link>
         <span className="ml-auto text-[11px] text-secondary-400">Relevé manuel : coller <code className="font-mono">{plateforme?.script}</code> dans la console du navigateur connecté, puis importer le fichier.</span>
       </div>
     </div>

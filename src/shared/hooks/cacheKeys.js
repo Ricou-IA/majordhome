@@ -272,9 +272,6 @@ export const supplierKeys = {
   connector: (orgId, supplierId) => [...supplierKeys.all(orgId), 'connector', supplierId],
   // Marques distinctes d'un fournisseur (filtre Marque de la liste produits)
   brands: (orgId, supplierId) => [...supplierKeys.all(orgId), 'brands', supplierId],
-  // Rapprochements entre fournisseurs (articles communs) : par statut, ou ceux d'un produit
-  matches: (orgId, statut) => [...supplierKeys.all(orgId), 'matches', statut ?? 'tous'],
-  productMatches: (orgId, productId) => [...supplierKeys.all(orgId), 'product-matches', productId],
   // Famille « catalogue par catégorie » (page /clim Dimensionnement, etc.) : toute mutation
   // produit (CRUD, image, variante) l'invalide en bloc — une catégorie ne sait pas quel
   // fournisseur vient de bouger.
@@ -283,6 +280,20 @@ export const supplierKeys = {
   searchProducts: (orgId, query) => [...supplierKeys.all(orgId), 'search-products', query],
   productDocuments: (orgId, productId) => [...supplierKeys.all(orgId), 'product-documents', productId],
   productDocumentsByIds: (orgId, ids) => [...supplierKeys.all(orgId), 'product-documents-batch', ...(ids || [])],
+};
+
+// --- Articles Majord'home (base du devis, matrice fournisseurs, harmonisation) ---
+// Toute mutation d'article invalide aussi supplierKeys.all(orgId) (les lignes fournisseur changent d'article).
+export const catalogItemKeys = {
+  all: (orgId) => ['catalog-items', orgId],
+  lists: (orgId) => [...catalogItemKeys.all(orgId), 'list'],
+  list: (orgId, filtres) => [...catalogItemKeys.lists(orgId), filtres || {}],
+  detail: (orgId, id) => [...catalogItemKeys.all(orgId), 'detail', id],
+  offers: (orgId, idsKey) => [...catalogItemKeys.all(orgId), 'offers', idsKey],
+  proposals: (orgId, statut) => [...catalogItemKeys.all(orgId), 'proposals', statut ?? 'tous'],
+  stats: (orgId) => [...catalogItemKeys.all(orgId), 'stats'],
+  brands: (orgId) => [...catalogItemKeys.all(orgId), 'brands'],
+  gammes: (orgId, categoriesKey) => [...catalogItemKeys.all(orgId), 'gammes', categoriesKey || ''],
 };
 
 // --- GeoGrid ---

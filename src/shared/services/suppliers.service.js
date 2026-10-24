@@ -296,91 +296,20 @@ export const suppliersService = {
     }
   },
 
-  /** Relance la proposition de rapprochements de l'org (edge, action `matches`). */
-  async proposeMatches(orgId, supplierId) {
+  /**
+   * Normalisation des modèles par l'IA (edge catalog-normalize), un lot de lignes sans clé.
+   * `supplierId` null = toutes les lignes de l'org (page Harmoniser les bases).
+   */
+  async normalizeCatalog(orgId, supplierId = null, limit = 50) {
     try {
-      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
-      const { data, error } = await supabase.functions.invoke('supplier-catalog-sync', {
-        body: { action: 'matches', org_id: orgId, supplier_id: supplierId },
-      });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      logger.error('[suppliersService] proposeMatches:', error);
-      return { data: null, error };
-    }
-  },
-
-  /** Normalisation des modèles par l'IA (edge catalog-normalize), un lot d'articles sans clé. */
-  async normalizeCatalog(orgId, supplierId, limit = 50) {
-    try {
-      if (!orgId || !supplierId) throw new Error('[suppliersService] orgId et supplierId requis');
+      if (!orgId) throw new Error('[suppliersService] orgId requis');
       const { data, error } = await supabase.functions.invoke('catalog-normalize', {
-        body: { org_id: orgId, supplier_id: supplierId, limit },
+        body: { org_id: orgId, ...(supplierId ? { supplier_id: supplierId } : {}), limit },
       });
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
       logger.error('[suppliersService] normalizeCatalog:', error);
-      return { data: null, error };
-    }
-  },
-
-  // ==========================================================================
-  // ARTICLES COMMUNS (vue majordhome_catalog_matches, RPC de décision)
-  // ==========================================================================
-
-  /** Rapprochements de l'org, filtrés par statut (propose | confirme | refuse ; null = tous). */
-  async getMatches(orgId, statut = null) {
-    try {
-      if (!orgId) return { data: [], error: null };
-      let query = supabase.from('majordhome_catalog_matches').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(1000);
-      if (statut) query = query.eq('statut', statut);
-      const { data, error } = await query;
-      if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      logger.error('[suppliersService] getMatches:', error);
-      return { data: [], error };
-    }
-  },
-
-  /** Rapprochements (propose ou confirme) où figure un produit. */
-  async getProductMatches(orgId, productId) {
-    try {
-      if (!orgId || !productId) return { data: [], error: null };
-      const { data, error } = await supabase.from('majordhome_catalog_matches').select('*').eq('org_id', orgId)
-        .neq('statut', 'refuse').or(`product_a_id.eq.${productId},product_b_id.eq.${productId}`);
-      if (error) throw error;
-      return { data: data || [], error: null };
-    } catch (error) {
-      logger.error('[suppliersService] getProductMatches:', error);
-      return { data: [], error };
-    }
-  },
-
-  /** Confirme ou refuse des rapprochements en lot (org_admin). */
-  async setMatchStatus(matchIds, statut) {
-    try {
-      if (!Array.isArray(matchIds) || !matchIds.length) return { data: 0, error: null };
-      const { data, error } = await supabase.rpc('catalog_match_set_status', { p_match_ids: matchIds, p_statut: statut });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      logger.error('[suppliersService] setMatchStatus:', error);
-      return { data: null, error };
-    }
-  },
-
-  /** Rapprochement manuel de deux produits de fournisseurs différents (org_admin). */
-  async createMatch(productA, productB) {
-    try {
-      if (!productA || !productB) throw new Error('[suppliersService] deux produits requis');
-      const { data, error } = await supabase.rpc('catalog_match_create', { p_product_a: productA, p_product_b: productB });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      logger.error('[suppliersService] createMatch:', error);
       return { data: null, error };
     }
   },

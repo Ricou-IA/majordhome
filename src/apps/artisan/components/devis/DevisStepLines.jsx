@@ -342,6 +342,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
       const result = [...prev];
       result.splice(insertAt, 0, {
         line_type: 'labor',
+        catalog_item_id: null,
         supplier_product_id: null,
         supplier_id: null,
         supplier_name: null,
@@ -370,6 +371,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
       result.splice(insertAt, 0, {
         line_type: 'product',
         is_freeform: true,
+        catalog_item_id: null,
         supplier_product_id: null,
         supplier_id: null,
         supplier_name: null,

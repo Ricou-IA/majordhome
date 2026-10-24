@@ -34,7 +34,6 @@ import ProductVariantsSection from './product-detail/ProductVariantsSection';
 import ProductCompatibilitySection from './product-detail/ProductCompatibilitySection';
 import { ProductDocumentsInline } from './ProductDocumentsPanel';
 import ProductReleveBlock from './product-detail/ProductReleveBlock';
-import ProductMatchesBlock from './product-detail/ProductMatchesBlock';
 import { useQueryClient } from '@tanstack/react-query';
 import { supplierKeys } from '@hooks/cacheKeys';
 
@@ -353,9 +352,6 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                   Si coché, ce produit et ses caractéristiques techniques seront accessibles au client depuis son espace (portail — sprint 8).
                 </p>
               </section>
-
-              {/* Articles communs entre fournisseurs (rapprochements) */}
-              <ProductMatchesBlock product={product} orgId={orgId} />
             </TabsContent>
 
             {/* --------- Tab Caractéristiques --------- */}
