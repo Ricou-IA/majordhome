@@ -6,10 +6,11 @@
 //   - deux lignes d'état : dernier relevé réussi, dernière erreur ;
 //   - tableau de correspondance des catégories du site (→ Batterie / Photovoltaïque / Borne de recharge / Exclure)
 //     avec « Appliquer la correspondance » (jamais appliqué pendant le relevé) ;
-//   - « Normaliser les modèles (IA) » (ce fournisseur ; l’org entière depuis Harmoniser les bases), « Supprimer les identifiants ».
+//   - « Supprimer les identifiants ». Clés modèle (IA) et fusions : page Harmoniser les bases (org entière).
 // Visible org_admin seul. Spec : 2026-10-24-catalogue-photovoltaique-connexion-generique-design.md § 3.1, § 6, § 7.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyRound, RefreshCw, Upload, Loader2, CheckCircle2, AlertTriangle, Sparkles, Trash2, Save } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { KeyRound, RefreshCw, Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers, useSupplierConnector, useSupplierMutations } from '@hooks/useSuppliers';
@@ -64,8 +65,8 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
   const frais = suppliers.find((s) => s.id === supplier?.id) || supplier;
   const { updateSupplier, isUpdating } = useSupplierMutations(orgId);
   const {
-    status, isLoadingStatus, saveCredentials, deleteCredentials, sync, importReleve, applyMapping, normalize,
-    isSaving, isSyncing, isImporting, isApplyingMapping, isNormalizing,
+    status, isLoadingStatus, saveCredentials, deleteCredentials, sync, importReleve, applyMapping,
+    isSaving, isSyncing, isImporting, isApplyingMapping,
   } = useSupplierConnector(orgId, frais);
   const [replacing, setReplacing] = useState(false);
   const [mapping, setMapping] = useState({});
@@ -83,7 +84,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
   if (!isOrgAdmin || !frais?.connector) return null;
   const result = frais.catalog_sync_result;
   const erreur = frais.catalog_sync_error;
-  const busy = isSyncing || isImporting || isApplyingMapping || isNormalizing;
+  const busy = isSyncing || isImporting || isApplyingMapping;
 
   const annoncer = (data, verbe) => {
     if (data?.ok) {
@@ -125,13 +126,6 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
       const manuels = r?.ignores_manuels ? `, ${r.ignores_manuels} corrigé${r.ignores_manuels > 1 ? 's' : ''} à la main non touché${r.ignores_manuels > 1 ? 's' : ''}` : '';
       toast.success(`Correspondance appliquée : ${r?.reclasses ?? 0} reclassés, ${r?.exclus ?? 0} exclus, ${r?.reactives ?? 0} réactivés${manuels}`);
     } catch (err) { toast.error(err?.message || 'Application refusée'); }
-  };
-  const handleNormalize = async () => {
-    try {
-      const r = await normalize(100);
-      if (r?.ok) toast.success(`Modèles IA : ${r.poses} clé${r.poses > 1 ? 's' : ''} posée${r.poses > 1 ? 's' : ''} sur ${r.traites} articles · ${r.restants} encore à soumettre, ${r.sans_cle_apres_ia ?? 0} sans clé après IA (à saisir à la main)`);
-      else toast.error(`Échec : ${r?.error || 'normalisation'}`);
-    } catch (err) { toast.error(err?.message || 'Normalisation refusée'); }
   };
 
   return (
@@ -220,9 +214,7 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
       )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button type="button" onClick={handleNormalize} disabled={busy} className="btn-secondary btn-sm">
-          {isNormalizing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />} Normaliser les modèles (IA)
-        </button>
+        <span className="text-[11px] text-secondary-400">Clés modèle (IA) et fusions d&apos;articles : page <Link to="/settings/suppliers/harmoniser" className="text-primary-700 hover:underline">Harmoniser les bases</Link>.</span>
         <span className="ml-auto text-[11px] text-secondary-400">Relevé manuel : coller <code className="font-mono">{plateforme?.script}</code> dans la console du navigateur connecté, puis importer le fichier.</span>
       </div>
     </div>

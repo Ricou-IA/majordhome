@@ -10,6 +10,7 @@
 import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogItemsService } from '@services/catalogItems.service';
+import { suppliersService } from '@services/suppliers.service';
 import { unwrapResult } from '@/lib/serviceHelpers';
 import { catalogItemKeys, supplierKeys } from '@hooks/cacheKeys';
 
@@ -159,8 +160,15 @@ export function useCatalogItemMutations(orgId) {
     mutationFn: ({ itemId, file }) => unwrapResult(catalogItemsService.uploadItemImage({ orgId, itemId, file })),
     onSuccess: invalidate,
   });
+  // Clés modèle par l'IA sur toutes les lignes de l'org sans clé (edge catalog-normalize, supplier_id absent)
+  const normalize = useMutation({
+    mutationFn: (limit) => unwrapResult(suppliersService.normalizeCatalog(orgId, null, limit)),
+    onSuccess: invalidate,
+  });
 
   return {
+    normalize: (limit = 100) => normalize.mutateAsync(limit),
+    isNormalizing: normalize.isPending,
     updateItem: (itemId, updates) => update.mutateAsync({ itemId, updates }),
     uploadImage: (itemId, file) => uploadImage.mutateAsync({ itemId, file }),
     merge: (survivorId, absorbedId) => merge.mutateAsync({ survivorId, absorbedId }),

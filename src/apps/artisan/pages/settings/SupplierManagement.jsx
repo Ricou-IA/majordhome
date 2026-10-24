@@ -979,6 +979,7 @@ export default function SupplierManagement() {
       {/* La base du devis : articles Majord'home (un par ligne fournisseur, fusionnés quand communs) */}
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <Link to="/settings/suppliers/articles" className="text-primary-700 hover:underline">Articles Majord&apos;home →</Link>
+        <Link to="/settings/suppliers/harmoniser" className="text-primary-700 hover:underline">Harmoniser les bases →</Link>
       </div>
 
       {/* Liste */}

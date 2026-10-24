@@ -5,12 +5,12 @@
 // verify_jwt:false. Deux portes :
 //   - { mode: "cron" } sous MDH_CRON_SECRET (pg_cron, 20261024_3) : tous les fournisseurs actifs `auto_sync = true`
 //     de toutes les orgs, chacun avec les identifiants Vault de son org et la plateforme de sa ligne ;
-//   - { action, org_id, supplier_id, … } sous JWT user, org_admin de l'org (requireOrgMembership) :
+//   - { action, org_id, supplier_id (sauf matches), … } sous JWT user, org_admin de l’org (requireOrgMembership) :
 //       sync      : connexion serveur au site (plateforme suitecommerce | woocommerce) + relevé + écriture ;
 //       import    : { releve } fichier JSON produit par scripts/catalogue/dump-<plateforme>.browser.js ;
 //       document  : { product_id } télécharge la fiche technique (specs.canonical.fiche_technique_fr) dans
 //                   Storage `product-documents` et crée la ligne product_documents « Fiche technique » ;
-//       matches   : relance catalog_matches_propose(org) (aussi exécuté après tout relevé réussi).
+//       matches   : relance catalog_item_proposals_propose(org) — fusions d’articles Majord’home (aussi après tout relevé réussi).
 // Transformation relevé → lignes = adaptateur PUR _shared/catalogue/<plateforme>.js (copie de src/lib/catalogue,
 // même code que le script Node), avec la correspondance des catégories `category_mapping` du fournisseur.
 // Écrivain UNIQUE : la RPC public.supplier_catalog_upsert (service_role), qui pose catalog_sync_at /
@@ -67,9 +67,10 @@ async function marquerEchec(admin: Admin, supplier: Supplier, code: string, deta
   if (error) console.error("[supplier-catalog-sync] marquerEchec", error.message);
 }
 
+/** Articles Majord'home : propositions de fusion de l'org (fusion d'office si la clé est franche). */
 async function proposerMatches(admin: Admin, orgId: string): Promise<Record<string, unknown> | null> {
-  const { data, error } = await admin.rpc("catalog_matches_propose", { p_org_id: orgId });
-  if (error) { console.error("[supplier-catalog-sync] catalog_matches_propose", error.message); return null; }
+  const { data, error } = await admin.rpc("catalog_item_proposals_propose", { p_org_id: orgId });
+  if (error) { console.error("[supplier-catalog-sync] catalog_item_proposals_propose", error.message); return null; }
   return data as Record<string, unknown>;
 }
 
@@ -223,10 +224,14 @@ Deno.serve(async (req) => {
     const orgId = typeof body.org_id === "string" ? body.org_id : "";
     const supplierId = typeof body.supplier_id === "string" ? body.supplier_id : "";
     const action = (["sync", "import", "document", "matches"] as const).find((a) => a === body.action) ?? null;
-    if (!orgId || !supplierId || !action) return jsonResponse({ error: "org_id, supplier_id et action (sync | import | document | matches) requis" }, 400, req);
+    if (!orgId || !action) return jsonResponse({ error: "org_id et action (sync | import | document | matches) requis" }, 400, req);
+    if (action !== "matches" && !supplierId) return jsonResponse({ error: "supplier_id requis" }, 400, req);
 
     const auth = await requireOrgMembership(req, { orgId, requiredRole: "org_admin" });
     if (!auth.ok) return auth.response;
+
+    // `matches` est un geste de l'org (page Harmoniser les bases), pas d'un fournisseur
+    if (action === "matches") return jsonResponse({ ok: true, resultat: await proposerMatches(admin, orgId) }, 200, req);
 
     const supplier = await chargerSupplier(admin, orgId, supplierId);
     if (!supplier) return jsonResponse({ error: "supplier_not_found" }, 404, req);

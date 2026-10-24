@@ -2,8 +2,8 @@
 // ============================================================================
 // catalog-normalize — modèle fabricant par l'IA, en lot (spec tranche 2 § 7, niveau 2)
 // ============================================================================
-// verify_jwt:true + requireOrgMembership(org_admin). Body { org_id, supplier_id, limit? (≤ 200) }.
-// Sélectionne les articles actifs du fournisseur SANS clé modèle (model_key IS NULL, source ≠ manuel), les soumet à
+// verify_jwt:true + requireOrgMembership(org_admin). Body { org_id, supplier_id? (absent = toute l'org), limit? (≤ 200) }.
+// Sélectionne les lignes actives SANS clé modèle (model_key IS NULL, source ≠ manuel), les soumet à
 // Claude par lots de 50 (nom, marque, gamme, specs utiles — jamais la description longue), lit { brand, model,
 // confiance } et, pour confiance ≥ 0,9, pose model_key = normaliserModele(model), model_key_source = 'ia' et
 // specs.canonical.modele_ia / modele_ia_confiance (fusion, rien d'autre n'est touché). Les modèles sous le seuil
@@ -35,27 +35,30 @@ Deno.serve(async (req) => {
   const orgId = typeof body.org_id === "string" ? body.org_id : "";
   const supplierId = typeof body.supplier_id === "string" ? body.supplier_id : "";
   const limit = Math.min(LIMITE_MAX, Math.max(1, Number(body.limit) || TAILLE_LOT));
-  if (!orgId || !supplierId) return jsonResponse({ error: "org_id et supplier_id requis" }, 400, req);
+  if (!orgId) return jsonResponse({ error: "org_id requis" }, 400, req);
 
   const auth = await requireOrgMembership(req, { orgId, requiredRole: "org_admin" });
   if (!auth.ok) return auth.response;
   const admin = auth.supabase;
 
   try {
+    // supplier_id optionnel : sans lui, toutes les lignes de l'org (page « Harmoniser les bases »).
+    // deno-lint-ignore no-explicit-any
+    const perimetre = (q: any) => (supplierId ? q.eq("supplier_id", supplierId) : q);
     // Jamais deux fois le même article : ceux déjà soumis (modele_ia_confiance posée) sont écartés, sinon un lot
     // sous le seuil de confiance serait resoumis à chaque clic sans jamais avancer.
-    const { data: produits, error } = await admin.from("majordhome_supplier_products")
+    const { data: produits, error } = await perimetre(admin.from("majordhome_supplier_products")
       .select("id, reference, name, brand, gamme, specs, model_key_source")
-      .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true)
+      .eq("org_id", orgId).eq("is_active", true))
       .is("model_key", null).or("model_key_source.is.null,model_key_source.neq.manuel")
       .is("specs->canonical->modele_ia_confiance", null)
       .order("name").limit(limit);
     if (error) return jsonResponse({ error: error.message }, 500, req);
-    const { count: restantsAvant } = await admin.from("majordhome_supplier_products").select("id", { count: "exact", head: true })
-      .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true).is("model_key", null)
+    const { count: restantsAvant } = await perimetre(admin.from("majordhome_supplier_products").select("id", { count: "exact", head: true })
+      .eq("org_id", orgId).eq("is_active", true)).is("model_key", null)
       .is("specs->canonical->modele_ia_confiance", null);
-    const { count: dejaTentes } = await admin.from("majordhome_supplier_products").select("id", { count: "exact", head: true })
-      .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true).is("model_key", null)
+    const { count: dejaTentes } = await perimetre(admin.from("majordhome_supplier_products").select("id", { count: "exact", head: true })
+      .eq("org_id", orgId).eq("is_active", true)).is("model_key", null)
       .not("specs->canonical->modele_ia_confiance", "is", null);
 
     const liste = (produits || []) as Produit[];
@@ -90,8 +93,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data: matches, error: errM } = await admin.rpc("catalog_matches_propose", { p_org_id: orgId });
-    if (errM) console.error("[catalog-normalize] catalog_matches_propose", errM.message);
+    // Articles Majord'home : une clé posée par l'IA peut révéler un article commun → propositions de fusion
+    const { data: matches, error: errM } = await admin.rpc("catalog_item_proposals_propose", { p_org_id: orgId });
+    if (errM) console.error("[catalog-normalize] catalog_item_proposals_propose", errM.message);
 
     // restants = encore jamais soumis ; sans_cle_apres_ia = soumis mais restés sous le seuil (à saisir à la main)
     return jsonResponse({
