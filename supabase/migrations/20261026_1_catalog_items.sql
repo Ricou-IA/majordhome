@@ -187,8 +187,11 @@ DECLARE
 BEGIN
   IF p_org_id IS NULL THEN RAISE EXCEPTION 'org_required' USING ERRCODE = '22023'; END IF;
 
+  -- Recadrage d'Eric (spec § 9) : une ligne sans prix d'achat ou offerte dans un pack n'a rien à faire dans la base devis.
   FOR r IN SELECT p.* FROM majordhome.supplier_products p
            WHERE p.org_id = p_org_id AND p.is_active AND p.catalog_item_id IS NULL
+             AND COALESCE(p.purchase_price_ht, 0) > 0
+             AND (p.specs -> 'canonical' ->> 'offert_dans_pack')::boolean IS NOT TRUE
            ORDER BY p.created_at, p.id
            LIMIT COALESCE(p_limit, 2147483647)
   LOOP

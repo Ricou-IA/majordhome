@@ -166,6 +166,16 @@ BEGIN
   RESET ROLE;
   IF (v_res->>'crees')::int <> 0 OR (v_res->>'rattaches')::int <> 0 THEN RAISE EXCEPTION 'ensure non idempotent : %', v_res; END IF;
 
+  -- (8b) recadrage § 9 : une ligne à prix nul ou offerte dans un pack ne fait pas d'article
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, purchase_price_ht, category) VALUES (v_a, v_mayer, 'ZERO-1', 'Coude offert', 0, 'fumisterie');
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, purchase_price_ht, category, specs) VALUES (v_a, v_mayer, 'PACK-1', 'UI offerte dans le pack', 120, 'climatisation', '{"canonical": {"offert_dans_pack": true}}'::jsonb);
+  SET LOCAL ROLE service_role;
+  v_res := public.catalog_items_ensure(v_mayer);
+  RESET ROLE;
+  IF (v_res->>'crees')::int <> 0 OR (v_res->>'rattaches')::int <> 0 THEN RAISE EXCEPTION 'ligne à 0 € ou offerte devenue article : %', v_res; END IF;
+  SELECT count(*) INTO v_n FROM majordhome.supplier_products WHERE supplier_id = v_a AND reference IN ('ZERO-1', 'PACK-1') AND catalog_item_id IS NOT NULL;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'ligne sans prix rattachée à un article'; END IF;
+
   -- (9) doublon legacy (même fournisseur, même référence, sans source_version) → un seul article
   INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, purchase_price_ht, category) VALUES (v_a, v_mayer, 'DUP-1', 'Doublon legacy', 10, 'fumisterie');
   INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, purchase_price_ht, category) VALUES (v_a, v_mayer, 'DUP-1', 'Doublon legacy bis', 12, 'fumisterie');

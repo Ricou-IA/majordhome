@@ -246,7 +246,14 @@ git commit -m "feat(catalogue): page Harmoniser les bases (propositions de fusio
 
 ## Tranche B — le devis
 
-### Task 7 : Règle « chez qui on achète » — module pur
+> **Recadrage d'Eric (spec § 9, 2026-10-24 soir)** : le devis ne choisit pas de fournisseur et la marge prend le prix
+> d'achat le plus bas des offres. **Task 7 (meilleureOffre) est annulée**, Task 8 pose `purchase_price_ht =
+> meilleur_prix_achat` et aucun champ fournisseur, Task 9 ne garde que la lecture seule des champs humains du drawer
+> fournisseur (plus de menu Fournisseur sur la ligne). Review Focus 3 et 4 tombent avec Task 7 ; Review Focus 1, 2 et
+> 5 restent couverts. Task 1 (amendement du même soir) : `catalog_items_ensure` ignore les lignes à prix nul ou
+> offertes dans un pack.
+
+### Task 7 : Règle « chez qui on achète » — module pur — **ANNULÉE (spec § 9)**
 
 **Files:**
 - Create: `src/lib/catalogue/meilleureOffre.js`

@@ -273,6 +273,31 @@ Assistant IA de devis ; choix du matériel équivalent ; commande fournisseur ; 
 référentiel global inter-org ; prix de vente automatique ; relevé Soditelem / Tereva autrement que par factures ;
 convergence des moteurs fumisterie / clim sur l'article Majord'home.
 
+## 9. Recadrage d'Eric (2026-10-24, soir) — « pas d'usine à gaz »
+
+Mots d'Eric : « C'est bien d'avoir les articles sur plusieurs fournisseurs pour avoir les réfs et faire les bons de
+commande plus tard facilement. Dans les faits il n'y a pas grand intérêt à chercher au moment du devis le meilleur
+fournisseur, par contre on va choisir une marque comme discriminant. Pour la marge du devis, on acte de prendre le
+prix le moins cher en base (pas de prise de tête de moyenne), la marge devis est là pour donner une estimation. »
+
+Ce qui change par rapport aux § 5.4 et 5.5 :
+- **Le devis ne choisit pas de fournisseur.** La ligne de devis porte `catalog_item_id` et reprend libellé, unité,
+  TVA et prix de vente de l'article ; `supplier_product_id` / `supplier_id` / `reference` restent NULL pour une ligne
+  posée depuis un article (les moteurs fumisterie / clim qui posent une ligne fournisseur ne changent pas). Pas de menu
+  « Fournisseur » sur la ligne, pas de badge « fournisseur à choisir », pas de module `meilleureOffre`.
+- **Prix d'achat de la ligne (marge) = le prix d'achat le plus bas des offres actives de l'article**
+  (`majordhome_catalog_items_list.meilleur_prix_achat`), sans règle de fraîcheur ni moyenne. L'âge du prix reste
+  affiché à titre d'information dans la fiche article (`ageDePrix.js`), il ne décide de rien.
+- **La marque est le discriminant** : l'article garde sa marque (un article = une marque + un modèle, les
+  rattachements par « fonction » toutes marques confondues ne sont pas automatisés) ; le picker filtre par catégorie,
+  marque et gamme.
+- **Pas d'article pour une ligne sans prix** : `catalog_items_ensure` ignore les lignes à prix d'achat nul ou
+  offertes dans un pack (`specs.canonical.offert_dans_pack`), qui n'ont rien à faire dans la base devis. Les petites
+  fournitures restent des articles tant qu'Eric ne les désactive pas (il les chiffre au forfait) ; une désactivation en
+  lot viendra si le besoin se confirme, pas avant.
+- La matrice (fiche article, offres avec référence et prix par fournisseur, rattacher / détacher, fusions proposées)
+  et l'édition org_admin seul sont inchangées.
+
 ## 8. Décision d'Eric après relecture
 
 **Édition d'un article Majord'home = org_admin seul** (Eric, 2026-10-24 : « admin seul »). Pas de nouvelle
