@@ -464,18 +464,8 @@ SET purchase_price_at = COALESCE(
       updated_at)
 WHERE purchase_price_at IS NULL;
 
--- un article pour chaque ligne active, dans chaque org qui a un catalogue fournisseur
-DO $$
-DECLARE v_org uuid; v_res jsonb;
-BEGIN
-  FOR v_org IN SELECT DISTINCT org_id FROM majordhome.supplier_products WHERE org_id IS NOT NULL LOOP
-    v_res := public.catalog_items_ensure(v_org);
-    RAISE NOTICE 'catalog_items_ensure(%) : %', v_org, v_res;
-  END LOOP;
-END $$;
-
--- les lignes de devis existantes citent l'article de leur ligne fournisseur
-UPDATE majordhome.quote_lines ql
-SET catalog_item_id = p.catalog_item_id
-FROM majordhome.supplier_products p
-WHERE p.id = ql.supplier_product_id AND ql.catalog_item_id IS NULL AND p.catalog_item_id IS NOT NULL;
+-- Les articles eux-mêmes (un par ligne active, ~26 000 lignes chez Mayer) ne sont PAS créés ici : la boucle dépasse
+-- le délai d'exécution d'une requête de l'API de management (2 min, vécu le 2026-10-24, rien d'écrit). Le backfill
+-- se fait PAR LOTS, après cette migration, par scripts/catalogue/backfill-catalog-items.mjs (appels répétés de
+-- catalog_items_ensure(org, 2000) jusqu'à épuisement, puis quote_lines.catalog_item_id depuis la ligne fournisseur).
+-- Le relevé nocturne appelle ensure sans limite : lancer le backfill AVANT le prochain cron (04:00 UTC).
