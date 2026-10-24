@@ -10,6 +10,19 @@ test('les catégories photovoltaique et borne_recharge font partie des catégori
   assert.ok(CATEGORIES_PRODUIT.includes('borne_recharge'), 'catégorie posée par le fournisseur ECOSTAL (autre session, 2026-10-24)');
 });
 
+test('famille Borne de recharge par défaut : catégorie borne_recharge seule, trois chapitres, après Photovoltaïque', () => {
+  const i = DEFAULT_FAMILLES.findIndex((f) => f.key === 'borne_recharge');
+  assert.ok(i >= 0, 'famille borne_recharge absente');
+  const f = DEFAULT_FAMILLES[i];
+  assert.equal(f.label, 'Borne de recharge');
+  assert.equal(f.actif, true);
+  assert.deepEqual([...f.categories], ['borne_recharge']);
+  assert.deepEqual([...f.sections], ['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']);
+  assert.equal(DEFAULT_FAMILLES[i - 1].key, 'photovoltaique');
+  const config = buildDevisConfig({});
+  assert.deepEqual(categoriesPourSection(config, 'ÉQUIPEMENT', 'borne_recharge'), ['borne_recharge']);
+});
+
 test('famille Photovoltaïque par défaut : deux catégories (photovoltaique + batterie), cinq chapitres, après Batterie', () => {
   const i = DEFAULT_FAMILLES.findIndex((f) => f.key === 'photovoltaique');
   assert.ok(i >= 0, 'famille photovoltaique absente');

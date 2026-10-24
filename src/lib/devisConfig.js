@@ -27,6 +27,8 @@ export const DEFAULT_FAMILLES = Object.freeze([
   Object.freeze({ key: 'batterie', label: 'Batterie', actif: true, categories: Object.freeze(['batterie', 'photovoltaique']), sections: Object.freeze(['ÉQUIPEMENT', 'MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
   // Photovoltaïque (2026-10-24) : chapitres dictés par Eric, « on corrigera après dans Majord'home ».
   Object.freeze({ key: 'photovoltaique', label: 'Photovoltaïque', actif: true, categories: Object.freeze(['photovoltaique', 'batterie']), sections: Object.freeze(['PANNEAUX', 'ONDULEUR ET MONITORING', 'FIXATION', 'COFFRETS ET CÂBLAGE', 'MAIN D\'ŒUVRE']) }),
+  // Borne de recharge (2026-10-24, catalogue ECOSTAL / V2C) : même découpage que Climatisation.
+  Object.freeze({ key: 'borne_recharge', label: 'Borne de recharge', actif: true, categories: Object.freeze(['borne_recharge']), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'electricite', label: 'Electricité', actif: true, categories: Object.freeze([]), sections: Object.freeze(['MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'vmc', label: 'VMC', actif: true, categories: Object.freeze([]), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'autre', label: 'Autre', actif: true, categories: Object.freeze([]), sections: Object.freeze(['PRESTATIONS', 'MAIN D\'ŒUVRE']) }),
