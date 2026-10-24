@@ -63,12 +63,13 @@ export function useCatalogItemOffers(orgId, itemIds = []) {
   return { offers: query.data || [], isLoading: query.isLoading };
 }
 
-/** Marques distinctes des articles de l'org. */
-export function useCatalogBrands(orgId) {
+/** Marques distinctes des articles de l'org, pour des catégories (vide = toutes). */
+export function useCatalogBrands(orgId, categories = []) {
+  const key = (categories || []).join(',');
   const { data, isLoading } = useQuery({
-    queryKey: catalogItemKeys.brands(orgId),
+    queryKey: [...catalogItemKeys.brands(orgId), key],
     queryFn: async () => {
-      const { data, error } = await catalogItemsService.getDistinctBrands(orgId);
+      const { data, error } = await catalogItemsService.getDistinctBrands(orgId, key ? key.split(',') : []);
       if (error) throw error;
       return data;
     },

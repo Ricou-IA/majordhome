@@ -132,12 +132,14 @@ export const catalogItemsService = {
     }
   },
 
-  /** Marques distinctes des articles actifs de l'org (filtre). */
-  async getDistinctBrands(orgId) {
+  /** Marques distinctes des articles actifs de l'org, limitées à des catégories (vide = toutes). */
+  async getDistinctBrands(orgId, categories = []) {
     try {
       if (!orgId) return { data: [], error: null };
-      const { data, error } = await supabase.from('majordhome_catalog_items_list').select('brand').eq('org_id', orgId)
+      let q = supabase.from('majordhome_catalog_items_list').select('brand').eq('org_id', orgId)
         .eq('is_active', true).is('merged_into', null).not('brand', 'is', null).limit(5000);
+      if (categories?.length) q = q.in('category', categories);
+      const { data, error } = await q;
       if (error) throw error;
       const marques = [...new Set((data || []).map((r) => r.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
       return { data: marques, error: null };
