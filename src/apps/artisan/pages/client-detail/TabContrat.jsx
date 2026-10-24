@@ -129,6 +129,14 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
 
   const handleRecordVisit = async (year) => {
     const isRefusal = visitForm.status === 'cancelled';
+    // Campagne en cours : le passage se valide par le certificat signé sur la carte Entretien.
+    // Une date saisie ici bascule (ou crée) une carte « Réalisé » sans certificat — vécu
+    // VERMONT 2026-10-19 : date de prise de RDV saisie comme date de passage, RDV en novembre,
+    // carte fantôme facturée. Seul le refus reste saisissable pour l'année en cours.
+    if (!isRefusal && year === currentYear) {
+      toast.error(`Le passage ${currentYear} se valide par le certificat d’entretien, depuis la carte Entretien.`);
+      return;
+    }
     if (!isRefusal && !visitForm.date) {
       toast.error('La date de passage est requise');
       return;
@@ -192,7 +200,7 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
     setVisitForm({
       date: existing?.visit_date || new Date().toISOString().split('T')[0],
       notes: existing?.notes || '',
-      status: existing?.status || 'completed',
+      status: year === currentYear ? 'cancelled' : (existing?.status || 'completed'),
     });
     setEditingYear(year);
   };
@@ -272,12 +280,18 @@ const ContractVisitsSection = ({ contract, orgId, userId }) => {
 
                 {isEditingThis && (
                   <div className="ml-12 mt-1 p-3 bg-primary-50 border border-primary-200 rounded-lg space-y-3">
+                    {year === currentYear && (
+                      <p className="text-xs text-secondary-600">
+                        Le passage {currentYear} se valide par le certificat d’entretien, depuis la carte Entretien : seul un refus du client se saisit ici.
+                      </p>
+                    )}
                     <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
+                      <label className={`flex items-center gap-2 ${year === currentYear ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                         <input
                           type="radio"
                           name={`visit-status-${year}`}
                           checked={visitForm.status === 'completed'}
+                          disabled={year === currentYear}
                           onChange={() => setVisitForm((p) => ({ ...p, status: 'completed' }))}
                           className="w-4 h-4 text-green-600 border-secondary-300 focus:ring-green-500"
                         />
