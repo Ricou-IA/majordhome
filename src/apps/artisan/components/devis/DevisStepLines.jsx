@@ -117,8 +117,10 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 
   // Section MAIN D'ŒUVRE → seulement bouton main d'œuvre
   const isLaborSection = /main\s*d[''\u2019]?\s*[oœ]/i.test(section.designation);
-  // Section AUTRE / PRESTATIONS → saisie libre
-  const isFreeformSection = /^(autre|prestations?)$/i.test(section.designation.trim());
+  // Section AUTRE / PRESTATIONS → saisie libre ; MATÉRIEL (famille Batterie : ligne fourre-tout câblage) → saisie
+  // libre ET catalogue (un coffret ou un câble BayWa peut s'y piocher)
+  const isFreeformSection = /^(autre|prestations?|mat[ée]riel)$/i.test(section.designation.trim());
+  const isFreeformAndCatalog = /^mat[ée]riel$/i.test(section.designation.trim());
   // Section FUMISTERIE → métré assisté en plus du picker
   const isFumisterie = /fumisterie/i.test(section.designation);
 
@@ -187,14 +189,26 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
             <Plus className="w-3.5 h-3.5" />
           </button>
         ) : isFreeformSection ? (
-          <button
-            type="button"
-            onClick={() => onAddFreeform(sectionIndex)}
-            className="flex items-center justify-center w-6 h-6 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 transition-colors"
-            title="Ajouter une ligne libre"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => onAddFreeform(sectionIndex)}
+              className="flex items-center justify-center w-6 h-6 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 transition-colors"
+              title="Ajouter une ligne libre"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            {isFreeformAndCatalog && (
+              <button
+                type="button"
+                onClick={() => onAddProducts(sectionIndex, section.designation)}
+                className="flex items-center justify-center w-6 h-6 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-full border border-primary-200 transition-colors"
+                title="Ajouter des produits du catalogue"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </>
         ) : (
           <button
             type="button"

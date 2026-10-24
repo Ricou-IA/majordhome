@@ -10,7 +10,7 @@ export const DEFAULT_CONDITIONS = `- Devis valable pour la durée indiquée ci-d
 - Garantie matériel selon les conditions du fabricant.`;
 
 /** Catégories produit du picker (valeurs de PRODUCT_CATEGORIES de suppliers.service) ; null = tous les fournisseurs. */
-export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie']);
+export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie', 'batterie']);
 
 /** Familles d'installation par défaut (ex-QUOTE_TEMPLATE_FAMILIES + FAMILY_DEFAULT_SECTIONS). */
 export const DEFAULT_FAMILLES = Object.freeze([
@@ -18,6 +18,8 @@ export const DEFAULT_FAMILLES = Object.freeze([
   Object.freeze({ key: 'poele_bois', label: 'Poêle à Bois', actif: true, categorie: 'poele', sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'climatisation', label: 'Climatisation', actif: true, categorie: 'climatisation', sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'chauffage_pac', label: 'Chauffage/PAC', actif: true, categorie: 'chauffage', sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
+  // Batterie de stockage (2026-10-24) : MATÉRIEL = ligne fourre-tout (câblage), MAIN D'ŒUVRE = pose et mise en service.
+  Object.freeze({ key: 'batterie', label: 'Batterie', actif: true, categorie: 'batterie', sections: Object.freeze(['ÉQUIPEMENT', 'MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'electricite', label: 'Electricité', actif: true, categorie: null, sections: Object.freeze(['MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'vmc', label: 'VMC', actif: true, categorie: null, sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
   Object.freeze({ key: 'autre', label: 'Autre', actif: true, categorie: null, sections: Object.freeze(['PRESTATIONS', 'MAIN D\'ŒUVRE']) }),

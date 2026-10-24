@@ -21,6 +21,7 @@ export const PRODUCT_CATEGORIES = [
   { value: 'climatisation', label: 'Climatisation' },
   { value: 'chauffage', label: 'Chauffage' },
   { value: 'fumisterie', label: 'Fumisterie' },
+  { value: 'batterie', label: 'Batterie' },
 ];
 
 export const PRODUCT_UNITS = [
