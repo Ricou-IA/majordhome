@@ -195,6 +195,8 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
   const setField = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
+  // Libellé, catégorie, gamme, prix de vente : portés par l'article Majord'home dès que la ligne y est rattachée
+  const verrouArticle = !!product?.catalog_item_id;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -219,6 +221,12 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {verrouArticle && (
+              <p className="text-xs text-secondary-600 bg-primary-50 border border-primary-100 rounded px-3 py-2">
+                Libellé, catégorie, gamme et prix de vente se corrigent sur l&apos;article Majord&apos;home (ce que voit le client), pas sur la ligne fournisseur.{' '}
+                <Link to={`/settings/suppliers/articles?item=${product.catalog_item_id}`} className="text-primary-700 hover:underline">Ouvrir l&apos;article →</Link>
+              </p>
+            )}
             {/* Identification */}
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Catégorie">
@@ -227,6 +235,7 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
                   onChange={(v) => setField('category', v)}
                   options={PRODUCT_CATEGORIES}
                   placeholder="— Choisir —"
+                  disabled={verrouArticle}
                 />
               </FormField>
               <FormField label="Code Famille">
@@ -235,11 +244,11 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
             </div>
 
             <FormField label="Gamme">
-              <TextInput value={form.gamme} onChange={(v) => setField('gamme', v)} />
+              <TextInput value={form.gamme} onChange={(v) => setField('gamme', v)} disabled={verrouArticle} />
             </FormField>
 
             <FormField label="Libellé Article" required>
-              <TextInput value={form.name} onChange={(v) => setField('name', v)} placeholder="Désignation du produit" />
+              <TextInput value={form.name} onChange={(v) => setField('name', v)} placeholder="Désignation du produit" disabled={verrouArticle} />
             </FormField>
 
             <div className="grid grid-cols-2 gap-3">
@@ -291,6 +300,7 @@ function ProductFormModal({ product, onClose, onSave, isSaving }) {
                 step="0.01"
                 min="0"
                 placeholder="0,00"
+                disabled={verrouArticle}
               />
             </FormField>
 

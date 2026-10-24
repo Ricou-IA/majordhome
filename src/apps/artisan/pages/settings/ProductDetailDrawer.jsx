@@ -35,6 +35,7 @@ import ProductCompatibilitySection from './product-detail/ProductCompatibilitySe
 import { ProductDocumentsInline } from './ProductDocumentsPanel';
 import ProductReleveBlock from './product-detail/ProductReleveBlock';
 import ProductArticleBlock from './product-detail/ProductArticleBlock';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supplierKeys } from '@hooks/cacheKeys';
 
@@ -146,6 +147,9 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
   const isAccessory = form.productKind === 'accessory';
   const isConsumable = form.productKind === 'consumable';
   const supportsSpecs = supportsEnrichment(form.category) && !isAccessory && !isConsumable;
+  // Champs humains (libellé, marque, catégorie, gamme, prix de vente) : portés par l'article Majord'home dès que la
+  // ligne y est rattachée — ils se corrigent sur la fiche article, plus ici (spec articles § 5.6 / § 9).
+  const verrouArticle = !!product?.catalog_item_id;
 
   // Auto-reset tab si onglet désactivé
   useEffect(() => {
@@ -245,6 +249,13 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
 
             {/* --------- Tab Identité --------- */}
             <TabsContent value="identity" className="flex-1 overflow-y-auto px-6 py-5 m-0 space-y-5">
+              {verrouArticle && (
+                <p className="text-xs text-secondary-600 bg-primary-50 border border-primary-100 rounded px-3 py-2">
+                  Libellé, marque, catégorie, gamme et prix de vente sont portés par l&apos;article Majord&apos;home (ce que voit le client) :
+                  ils se corrigent sur sa fiche, pas sur la ligne fournisseur.{' '}
+                  <Link to={`/settings/suppliers/articles?item=${product.catalog_item_id}`} className="text-primary-700 hover:underline">Ouvrir l&apos;article →</Link>
+                </p>
+              )}
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-secondary-500">Classification</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -254,6 +265,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                       onChange={(v) => setField('category', v)}
                       options={PRODUCT_CATEGORIES}
                       placeholder="— Choisir —"
+                      disabled={verrouArticle}
                     />
                   </FormField>
                   <FormField label="Marque fabricant">
@@ -261,6 +273,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                       value={form.brand}
                       onChange={(v) => setField('brand', v)}
                       placeholder="Ex: COLOR"
+                      disabled={verrouArticle}
                     />
                   </FormField>
                 </div>
@@ -275,7 +288,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <FormField label="Gamme">
-                    <TextInput value={form.gamme} onChange={(v) => setField('gamme', v)} />
+                    <TextInput value={form.gamme} onChange={(v) => setField('gamme', v)} disabled={verrouArticle} />
                   </FormField>
                   <FormField label="Code Famille">
                     <TextInput value={form.codeFamille} onChange={(v) => setField('codeFamille', v)} />
@@ -286,7 +299,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-secondary-500">Identification</h3>
                 <FormField label="Libellé" required>
-                  <TextInput value={form.name} onChange={(v) => setField('name', v)} placeholder="Désignation" />
+                  <TextInput value={form.name} onChange={(v) => setField('name', v)} placeholder="Désignation" disabled={verrouArticle} />
                 </FormField>
                 <div className="grid grid-cols-2 gap-3">
                   <FormField label="Référence fournisseur">
@@ -311,7 +324,7 @@ export default function ProductDetailDrawer({ productId, supplierId, orgId, onCl
                     <TextInput type="number" step="0.1" value={form.tauxRemise} onChange={(v) => setField('tauxRemise', v)} placeholder="0" />
                   </FormField>
                   <FormField label="Prix de vente HT">
-                    <TextInput type="number" step="0.01" value={form.sellingPriceHt} onChange={(v) => setField('sellingPriceHt', v)} placeholder="0,00" />
+                    <TextInput type="number" step="0.01" value={form.sellingPriceHt} onChange={(v) => setField('sellingPriceHt', v)} placeholder="0,00" disabled={verrouArticle} />
                   </FormField>
                 </div>
                 {computedPurchase !== null && (
