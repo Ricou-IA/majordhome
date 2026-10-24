@@ -49,12 +49,16 @@ test('dernier prix net payé par référence, historique, avoirs ignorés, ligne
   assert.equal(c.derniere_facture, 'F2');
   assert.deepEqual(c.remises_pct, [44.5]);
   assert.equal(c.prix_base, 2.4736);
+  assert.equal(cab.tarif_public, 2.47); // prix public = prix de base de la ligne qui donne le prix
+  assert.equal(cab.taux_remise, 44.5); // taux effectif base → net
   assert.deepEqual(c.historique.map((h) => [h.date, h.bl, h.prix_unitaire_net]), [['2026-08-31', 'BL9', 1.3728], ['2026-08-31', 'BL7', 1.35], ['2026-04-30', 'BL1', 1.2823]]);
 
   const kit = lignes.find((l) => l.reference === 'KIT1');
   assert.equal(kit.specs.canonical.promo, true);
   assert.equal(kit.specs.canonical.ref_fabricant, 'DCK853P4-QW');
   assert.equal(kit.specs.canonical.eco_participation_unitaire, 3.91);
+  assert.equal(kit.tarif_public, null); // Tereva n'imprime pas de prix de base
+  assert.equal(kit.taux_remise, null);
 
   const lampe = lignes.find((l) => l.reference === 'LAMPE');
   assert.equal(lampe.purchase_price_ht, 0);
