@@ -124,7 +124,23 @@ export function applyExtraction(doc, extracted) {
 export function qualificationsFromDocuments(docs, today = new Date()) {
   return (docs?.certifications || [])
     .filter((d) => d.intitule && expiryStatus(d.valid_until, today) !== 'expired')
-    .map((d) => [d.intitule, d.numero].filter(Boolean).join(' '));
+    .map((d) => [publicQualificationLabel(d.intitule), d.numero].filter(Boolean).join(' '));
+}
+
+/**
+ * Intitulé montré aux clients : sans mention de statut (« probatoire », « en cours »…), qui
+ * sème le doute chez un client alors que la qualification est valide (Eric, 2026-10-24).
+ * Le document et le champ saisi gardent le libellé d'origine.
+ * @param {string} intitule
+ * @returns {string}
+ */
+export function publicQualificationLabel(intitule) {
+  return String(intitule || '')
+    .replace(/[([]\s*(probatoire|en cours[^)\]]*)\s*[)\]]/gi, '')
+    .replace(/\s*[-–—,]\s*probatoire\b/gi, '')
+    .replace(/\bprobatoire\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 /**

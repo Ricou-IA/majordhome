@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   COMPANY_DOCUMENT_KINDS, normalizeCompanyDocuments, expiryStatus,
   buildCompanyDocumentPath, removedDocumentPaths, applyExtraction,
-  qualificationsFromDocuments, resolveRgeCertifications,
+  qualificationsFromDocuments, resolveRgeCertifications, publicQualificationLabel,
 } from '../src/lib/companyDocuments.js';
 
 test('normalise un réglage absent en tableaux vides pour chaque nature', () => {
@@ -85,4 +85,16 @@ test('source des qualifications : certificats déposés, sinon saisie manuelle h
     company_documents: { certifications: [{ path: 'x', intitule: 'QualiBois Air', numero: 'QB 84566' }] },
   };
   assert.deepEqual(resolveRgeCertifications(settings), ['QualiBois Air QB 84566']);
+});
+
+test("pas de mention « probatoire » dans le libellé montré aux clients", () => {
+  assert.equal(publicQualificationLabel('Qualibois module Eau (probatoire)'), 'Qualibois module Eau');
+  assert.equal(publicQualificationLabel('QualiPAC module chauffage et ECS (Probatoire)'), 'QualiPAC module chauffage et ECS');
+  assert.equal(publicQualificationLabel('QualiPV - probatoire'), 'QualiPV');
+  assert.equal(publicQualificationLabel('QualiSol [en cours de validité]'), 'QualiSol');
+  assert.equal(publicQualificationLabel('QualiBois Air'), 'QualiBois Air');
+  assert.deepEqual(
+    qualificationsFromDocuments({ certifications: [{ intitule: 'Qualibois module Eau (probatoire)', numero: 'QB/84566', valid_until: null }] }),
+    ['Qualibois module Eau QB/84566'],
+  );
 });

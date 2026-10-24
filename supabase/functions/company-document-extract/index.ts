@@ -37,7 +37,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const KIND_PROMPTS: Record<string, string> = {
   certifications:
     "Ce document est un certificat de qualification d'une entreprise du bâtiment (RGE : QualiBois, QualiPAC, QualiPV, QualiSol, Qualibat, Qualifelec…). " +
-    "intitule = le nom de la qualification telle qu'écrite (ex. « QualiBois Air », « QualiPAC »), sans l'organisme. " +
+    "intitule = le nom de la qualification telle qu'écrite (ex. « QualiBois Air », « QualiPAC module chauffage et ECS »), sans l'organisme et sans mention de statut comme « probatoire ». " +
     "numero = le numéro de qualification ou de certificat (ex. « QB 84566 »). organisme = l'organisme qualificateur (ex. Qualit'EnR, Qualibat).",
   attestation_fluides:
     "Ce document est une attestation de capacité à manipuler les fluides frigorigènes. " +
