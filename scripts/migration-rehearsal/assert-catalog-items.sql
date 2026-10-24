@@ -19,6 +19,7 @@ DECLARE
      "specs":{"canonical":{"mpn":"1707000-30-L","categories_site":["Battery Storage"],"stock_releve":{"qty":3,"at":"2026-10-24T04:00:00Z"}},"source_version":"a1"}},
     {"reference":"A2","name":"Câble Powerwall","brand":"Tesla","gamme":"Accessoires","product_kind":"accessory",
      "purchase_price_ht":30,"selling_price_ht_defaut":0,"default_tva_rate":20,"unit":"pièce","category":"batterie",
+     "tarif_public":100,"taux_remise":60,
      "image_url":null,"image_source_url":null,"model_key":null,
      "specs":{"canonical":{"categories_site":["Battery Storage"]},"source_version":"a1"}},
     {"reference":"A3","name":"Huawei LUNA2000 7 kWh","brand":"Huawei","gamme":"Batterie","product_kind":"main",
@@ -114,10 +115,17 @@ BEGIN
     RAISE EXCEPTION 'offre B1 : % % %', v_p.stock_qty, v_p.en_stock, v_p.purchase_price_at;
   END IF;
 
+  -- prix public et taux de remise = faits fournisseur (import d'achats Soditelem) : posés à l'INSERT…
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_a AND reference = 'A2';
+  IF v_p.tarif_public <> 100 OR v_p.taux_remise <> 60 THEN RAISE EXCEPTION 'tarif_public / taux_remise non posés : % %', v_p.tarif_public, v_p.taux_remise; END IF;
+
   -- (5) Review Focus 1 : A3 absente du relevé suivant → ligne désactivée, article conservé, 0 offre active
   SET LOCAL ROLE service_role;
-  v_res := public.supplier_catalog_upsert(v_mayer, v_a, 'a2', v_rows_a - 2);
+  v_res := public.supplier_catalog_upsert(v_mayer, v_a, 'a2', jsonb_set(v_rows_a - 2, '{1,tarif_public}', '110'));
   RESET ROLE;
+  -- … et rafraîchis à chaque relevé
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_a AND reference = 'A2';
+  IF v_p.tarif_public <> 110 OR v_p.taux_remise <> 60 THEN RAISE EXCEPTION 'tarif_public non rafraîchi : % %', v_p.tarif_public, v_p.taux_remise; END IF;
   IF (v_res->>'desactives')::int <> 1 OR (v_res->'articles'->>'crees')::int <> 0 THEN RAISE EXCEPTION 'relevé a2 : %', v_res; END IF;
   SELECT * INTO v_i FROM public.majordhome_catalog_items_list WHERE id = v_item_a3;
   IF v_i.is_active IS NOT TRUE OR v_i.merged_into IS NOT NULL OR v_i.offres_actives <> 0 OR v_i.offres_total <> 1 THEN

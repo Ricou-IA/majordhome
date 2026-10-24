@@ -284,11 +284,14 @@ BEGIN
              || CASE WHEN r.category IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('categorie_releve', r.category) END AS specs,
            r.image_url, r.image_source_url, r.model_key,
            -- date du prix : fournie par l'appelant (import d'achats : date de la facture), sinon le relevé = maintenant
-           COALESCE(r.purchase_price_at, now()) AS purchase_price_at
+           COALESCE(r.purchase_price_at, now()) AS purchase_price_at,
+           -- prix public et taux de remise = faits fournisseur (« Prix de base » Soditelem), rafraîchis à chaque relevé
+           r.tarif_public, r.taux_remise
     FROM jsonb_to_recordset(p_rows) AS r(
       reference text, name text, brand text, gamme text, product_kind text, purchase_price_ht numeric,
       selling_price_ht_defaut numeric, default_tva_rate numeric, unit text, category text, specs jsonb,
-      image_url text, image_source_url text, model_key text, purchase_price_at timestamptz);
+      image_url text, image_source_url text, model_key text, purchase_price_at timestamptz,
+      tarif_public numeric, taux_remise numeric);
 
   IF EXISTS (SELECT 1 FROM t_imp WHERE reference IS NULL OR reference = '' OR name IS NULL OR name = '' OR purchase_price_ht IS NULL) THEN
     RAISE EXCEPTION 'row_invalid' USING ERRCODE = '22023';
@@ -300,6 +303,8 @@ BEGIN
   UPDATE majordhome.supplier_products p SET
     purchase_price_ht = t.purchase_price_ht,
     purchase_price_at = t.purchase_price_at,
+    tarif_public = COALESCE(t.tarif_public, p.tarif_public),
+    taux_remise = COALESCE(t.taux_remise, p.taux_remise),
     selling_price_ht = CASE WHEN p.selling_price_ht = 0 AND COALESCE(t.selling_price_ht_defaut, 0) > 0
                             THEN t.selling_price_ht_defaut ELSE p.selling_price_ht END,
     default_tva_rate = COALESCE(t.default_tva_rate, p.default_tva_rate),
@@ -330,11 +335,13 @@ BEGIN
 
   INSERT INTO majordhome.supplier_products
     (supplier_id, org_id, reference, name, category, gamme, brand, purchase_price_ht, purchase_price_at, selling_price_ht,
-     default_tva_rate, unit, specs, product_kind, is_active, image_url, image_source_url, model_key, model_key_source)
+     default_tva_rate, unit, specs, product_kind, is_active, image_url, image_source_url, model_key, model_key_source,
+     tarif_public, taux_remise)
   SELECT p_supplier_id, p_org_id, t.reference, t.name, t.category, t.gamme, t.brand, t.purchase_price_ht, t.purchase_price_at,
          COALESCE(t.selling_price_ht_defaut, 0), COALESCE(t.default_tva_rate, 20), COALESCE(t.unit, 'pièce'),
          t.specs, COALESCE(t.product_kind, 'main'), true, t.image_url, t.image_source_url, t.model_key,
-         CASE WHEN t.model_key IS NOT NULL THEN 'cle' ELSE NULL END
+         CASE WHEN t.model_key IS NOT NULL THEN 'cle' ELSE NULL END,
+         t.tarif_public, COALESCE(t.taux_remise, 0)
   FROM t_imp t
   WHERE NOT EXISTS (SELECT 1 FROM majordhome.supplier_products p
                     WHERE p.supplier_id = p_supplier_id AND p.org_id = p_org_id AND p.reference = t.reference);
@@ -368,7 +375,7 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb) TO service_role;
 COMMENT ON FUNCTION public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb) IS
-  'Écrivain unique du catalogue fournisseur depuis un relevé (service_role). name / selling_price_ht / category / product_kind / brand / gamme à l''INSERT seulement ; photo si absente ; clé modèle : manuelle > adaptateur > IA ; purchase_price_at = date fournie sinon maintenant ; specs.categorie_releve ; absents désactivés sauf p_meta.desactiver_absents=false ; suppression manuelle respectée ; articles Majord''home posés en fin (catalog_items_ensure).';
+  'Écrivain unique du catalogue fournisseur depuis un relevé (service_role). name / selling_price_ht / category / product_kind / brand / gamme à l''INSERT seulement ; photo si absente ; clé modèle : manuelle > adaptateur > IA ; purchase_price_at = date fournie sinon maintenant ; tarif_public / taux_remise rafraîchis ; specs.categorie_releve ; absents désactivés sauf p_meta.desactiver_absents=false ; suppression manuelle respectée ; articles Majord''home posés en fin (catalog_items_ensure).';
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- 5b. supplier_catalog_apply_mapping v3 : l'article à une seule ligne suit la ligne reclassée
