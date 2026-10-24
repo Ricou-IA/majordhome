@@ -201,3 +201,8 @@ verify_jwt = false
 # Secret partagé MDH_IMPORT_SECRET (jobs d'import depuis un poste de dev) ou MDH_CRON_SECRET. 2026-10-24.
 [functions.pennylane-supplier-invoices]
 verify_jwt = false
+
+# catalog-normalize : modèle fabricant par l'IA en lot (Claude), pose model_key (source ia) au-dessus de 0,9 de
+# confiance puis relance les rapprochements. JWT user org_admin. 2026-10-24.
+[functions.catalog-normalize]
+verify_jwt = true
