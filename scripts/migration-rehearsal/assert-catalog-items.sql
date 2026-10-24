@@ -46,8 +46,8 @@ BEGIN
   SELECT user_id INTO v_membre FROM core.organization_members WHERE org_id = v_mayer AND role <> 'org_admin' LIMIT 1;
 
   -- (0) droits et structure
-  IF has_function_privilege('authenticated', 'public.catalog_items_ensure(uuid)', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute catalog_items_ensure'; END IF;
-  IF has_function_privilege('anon', 'public.catalog_items_ensure(uuid)', 'EXECUTE') THEN RAISE EXCEPTION 'anon exécute catalog_items_ensure'; END IF;
+  IF has_function_privilege('authenticated', 'public.catalog_items_ensure(uuid, int)', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute catalog_items_ensure'; END IF;
+  IF has_function_privilege('anon', 'public.catalog_items_ensure(uuid, int)', 'EXECUTE') THEN RAISE EXCEPTION 'anon exécute catalog_items_ensure'; END IF;
   IF has_table_privilege('anon', 'majordhome.catalog_items', 'SELECT') THEN RAISE EXCEPTION 'anon lit catalog_items'; END IF;
   IF NOT has_table_privilege('service_role', 'majordhome.catalog_items', 'SELECT') THEN RAISE EXCEPTION 'service_role sans SELECT sur catalog_items'; END IF;
   SELECT count(*) INTO v_n FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public'

@@ -169,7 +169,9 @@ REVOKE ALL ON public.majordhome_catalog_item_offers FROM anon;
 -- ---------------------------------------------------------------------------------------------------------------
 -- 4. Création automatique des articles (service_role)
 -- ---------------------------------------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.catalog_items_ensure(p_org_id uuid) RETURNS jsonb
+-- p_limit : nombre maximal de lignes traitées par appel (NULL = toutes) — permet un backfill par lots depuis un client
+-- HTTP ; l'appel est idempotent, on le répète jusqu'à {crees: 0, rattaches: 0}.
+CREATE OR REPLACE FUNCTION public.catalog_items_ensure(p_org_id uuid, p_limit int DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = majordhome, public
@@ -188,6 +190,7 @@ BEGIN
   FOR r IN SELECT p.* FROM majordhome.supplier_products p
            WHERE p.org_id = p_org_id AND p.is_active AND p.catalog_item_id IS NULL
            ORDER BY p.created_at, p.id
+           LIMIT COALESCE(p_limit, 2147483647)
   LOOP
     v_item := NULL; v_src := NULL;
 
@@ -240,9 +243,9 @@ BEGIN
   RETURN jsonb_build_object('crees', v_crees, 'rattaches', v_ratt);
 END;
 $$;
-REVOKE EXECUTE ON FUNCTION public.catalog_items_ensure(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.catalog_items_ensure(uuid) TO service_role;
-COMMENT ON FUNCTION public.catalog_items_ensure(uuid) IS 'Pose un article Majord''home sur chaque ligne fournisseur active qui n''en a pas : rattachement franc (marque + modèle ou EAN, un seul candidat, même nature, prix du même ordre) sinon création. service_role ; appelée en fin de supplier_catalog_upsert.';
+REVOKE EXECUTE ON FUNCTION public.catalog_items_ensure(uuid, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.catalog_items_ensure(uuid, int) TO service_role;
+COMMENT ON FUNCTION public.catalog_items_ensure(uuid, int) IS 'Pose un article Majord''home sur chaque ligne fournisseur active qui n''en a pas : rattachement franc (marque + modèle ou EAN, un seul candidat, même nature, prix du même ordre) sinon création. service_role ; appelée en fin de supplier_catalog_upsert.';
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- 5a. supplier_catalog_upsert v6 : purchase_price_at + articles en fin de relevé
