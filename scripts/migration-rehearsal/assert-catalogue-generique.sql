@@ -99,6 +99,23 @@ BEGIN
     RAISE EXCEPTION 'clé / photo non posées sur un article relevé : % %', v_p.model_key, v_p.image_url;
   END IF;
 
+  -- (b2) une clé posée par l'IA (source ia) survit au relevé suivant quand l'adaptateur n'en trouve toujours pas
+  UPDATE majordhome.supplier_products SET model_key = 'IAKEY1', model_key_source = 'ia' WHERE supplier_id = v_sup AND reference = '37-000001';
+  SET LOCAL ROLE service_role;
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_sup, 't3b', v_rows);
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-000001';
+  IF v_p.model_key <> 'IAKEY1' OR v_p.model_key_source <> 'ia' THEN RAISE EXCEPTION 'clé IA effacée par le relevé : % %', v_p.model_key, v_p.model_key_source; END IF;
+  -- … mais une clé trouvée par l'adaptateur remplace la clé IA
+  SET LOCAL ROLE service_role;
+  PERFORM public.supplier_catalog_upsert(v_mayer, v_sup, 't3c', jsonb_set(v_rows, '{2,model_key}', '"CLEADAPT"'));
+  RESET ROLE;
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '37-000001';
+  IF v_p.model_key <> 'CLEADAPT' OR v_p.model_key_source <> 'cle' THEN RAISE EXCEPTION 'clé adaptateur non prioritaire sur la clé IA'; END IF;
+  -- la catégorie du relevé est mémorisée à part (specs.categorie_releve), sans toucher la catégorie courante
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '35-119503';
+  IF v_p.specs->>'categorie_releve' <> 'batterie' OR v_p.category <> 'photovoltaique' THEN RAISE EXCEPTION 'categorie_releve absente ou catégorie manuelle touchée : % / %', v_p.specs->>'categorie_releve', v_p.category; END IF;
+
   -- (c) apply_mapping : membre refusé ; admin : E-Mobility → exclure, (sans categorie) → batterie
   SELECT user_id INTO v_admin FROM core.organization_members WHERE org_id = v_mayer AND role = 'org_admin' LIMIT 1;
   SELECT user_id INTO v_membre FROM core.organization_members WHERE org_id = v_mayer AND role <> 'org_admin' LIMIT 1;
@@ -120,6 +137,36 @@ BEGIN
   -- la Powerwall (catégorie corrigée à la main, catégorie du site non surchargée) n'a pas bougé
   SELECT category INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '35-119503';
   IF v_p.category <> 'photovoltaique' THEN RAISE EXCEPTION 'article non couvert reclassé'; END IF;
+  -- (c2) une correction manuelle dans un rayon SURCHARGÉ est respectée aussi (relecture I-4)
+  UPDATE majordhome.suppliers SET category_mapping = '{"Battery Storage": "borne_recharge"}'::jsonb WHERE id = v_sup;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_res := public.supplier_catalog_apply_mapping(v_sup);
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '35-119503';
+  IF v_p.category <> 'photovoltaique' THEN RAISE EXCEPTION 'correction manuelle écrasée par la correspondance : %', v_p.category; END IF;
+  -- (la borne, plus couverte par aucune surcharge, revient au défaut : réactivée — c'est le comportement v1, conservé)
+  IF (v_res->>'ignores_manuels')::int <> 1 OR (v_res->>'reclasses')::int <> 0 OR (v_res->>'reactives')::int <> 1 THEN RAISE EXCEPTION 'compteurs apply_mapping (manuel) : %', v_res; END IF;
+  -- un article NON corrigé du même rayon est bien reclassé, et sa categorie_releve suit
+  UPDATE majordhome.supplier_products SET category = 'batterie' WHERE supplier_id = v_sup AND reference = '35-119503';
+  UPDATE majordhome.supplier_products SET specs = specs || '{"categorie_releve": "batterie"}'::jsonb WHERE supplier_id = v_sup AND reference = '35-119503';
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_res := public.supplier_catalog_apply_mapping(v_sup);
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  SELECT * INTO v_p FROM majordhome.supplier_products WHERE supplier_id = v_sup AND reference = '35-119503';
+  IF v_p.category <> 'borne_recharge' OR v_p.specs->>'categorie_releve' <> 'borne_recharge' THEN RAISE EXCEPTION 'article non corrigé non reclassé : % / %', v_p.category, v_p.specs->>'categorie_releve'; END IF;
+  UPDATE majordhome.supplier_products SET category = 'photovoltaique' WHERE supplier_id = v_sup AND reference = '35-119503';
+  -- état d'avant (c2) : la borne de nouveau exclue
+  UPDATE majordhome.suppliers SET category_mapping = '{"E-Mobility": "exclure", "(sans categorie)": "batterie"}'::jsonb WHERE id = v_sup;
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_res := public.supplier_catalog_apply_mapping(v_sup);
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  IF (v_res->>'exclus')::int <> 1 THEN RAISE EXCEPTION 'borne non ré-exclue : %', v_res; END IF;
   -- retrait de l'exclusion ⇒ réactivée
   UPDATE majordhome.suppliers SET category_mapping = '{"E-Mobility": "borne_recharge"}'::jsonb WHERE id = v_sup;
   SET LOCAL ROLE authenticated;

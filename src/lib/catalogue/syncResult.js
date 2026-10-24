@@ -7,13 +7,18 @@
 /** Codes d'échec émis par l'edge supplier-catalog-sync. */
 export const CODES_ERREUR = Object.freeze([
   'identifiants_absents', 'connexion_refusee', 'acces_bloque', 'releve_incomplet', 'releve_instable', 'releve_invalide',
-  'connector_inconnu', 'ecriture_refusee', 'erreur_inattendue',
+  'connector_inconnu', 'ecriture_refusee', 'erreur_inattendue', 'site_absent',
+  'document_absent', 'document_illisible', 'document_existant',
 ]);
 
 const LIBELLES = Object.freeze({
   identifiants_absents: 'aucun identifiant enregistré pour ce fournisseur',
   connexion_refusee: 'le fournisseur a refusé les identifiants (e-mail ou mot de passe)',
-  acces_bloque: 'BayWa a refusé la connexion serveur (protection anti-robot) : utilisez le relevé depuis votre navigateur',
+  acces_bloque: 'le site du fournisseur a refusé la connexion serveur (protection anti-robot) : utilisez le relevé depuis votre navigateur',
+  site_absent: 'aucune adresse de site renseignée pour ce fournisseur',
+  document_absent: 'le fournisseur ne publie pas de fiche technique pour cet article',
+  document_illisible: 'la fiche technique du fournisseur n\'a pas pu être téléchargée',
+  document_existant: 'la fiche technique est déjà rangée dans les documents de l\'article',
   releve_incomplet: 'le relevé est incomplet, rien n\'a été écrit',
   releve_invalide: 'le fichier de relevé n\'est pas reconnu ou ne contient aucun article du périmètre',
   connector_inconnu: 'ce fournisseur n\'a pas de connexion automatique : importez un relevé',

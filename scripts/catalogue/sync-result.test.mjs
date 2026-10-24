@@ -26,7 +26,7 @@ test('échec : chaque code a un libellé français et le libellé commence par �
     assert.ok(libelleCodeErreur(code).length > 10, code);
     assert.match(libelleResultat({ ok: false, code, at }), /^Échec du relevé du 24\/10\/2026 : /);
   }
-  assert.match(libelleResultat({ ok: false, code: 'acces_bloque', at }), /BayWa a refusé la connexion serveur/);
+  assert.match(libelleResultat({ ok: false, code: 'acces_bloque', at }), /site du fournisseur a refusé la connexion serveur/);
   assert.match(libelleResultat({ ok: false, code: 'identifiants_absents', at }), /identifiant/);
   assert.match(libelleResultat({ ok: false, code: 'code_inconnu_xyz', at }), /code_inconnu_xyz/);
 });
@@ -35,6 +35,15 @@ test('une erreur non métier de l\'edge (réseau, réponse illisible) a son code
   assert.ok(CODES_ERREUR.includes('erreur_inattendue'));
   assert.match(libelleCodeErreur('erreur_inattendue'), /inattendue|réessayer/i);
   assert.ok(CODES_ERREUR.includes('releve_instable'));
+});
+
+test('codes de la connexion générique et des documents : libellés français, sans « BayWa » en dur', () => {
+  for (const code of ['site_absent', 'document_absent', 'document_illisible', 'document_existant']) {
+    assert.ok(CODES_ERREUR.includes(code), code);
+    assert.doesNotMatch(libelleCodeErreur(code), /^erreur /);
+  }
+  assert.doesNotMatch(libelleCodeErreur('acces_bloque'), /BayWa/);
+  assert.match(libelleCodeErreur('acces_bloque'), /fournisseur|site/);
 });
 
 test('jamais relevé', () => {

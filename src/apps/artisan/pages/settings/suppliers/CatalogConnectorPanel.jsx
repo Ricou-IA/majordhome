@@ -123,13 +123,14 @@ export default function CatalogConnectorPanel({ supplier, orgId }) {
     try {
       await updateSupplier(frais.id, { categoryMapping: mapping });
       const r = await applyMapping();
-      toast.success(`Correspondance appliquée : ${r?.reclasses ?? 0} reclassés, ${r?.exclus ?? 0} exclus, ${r?.reactives ?? 0} réactivés`);
+      const manuels = r?.ignores_manuels ? `, ${r.ignores_manuels} corrigé${r.ignores_manuels > 1 ? 's' : ''} à la main non touché${r.ignores_manuels > 1 ? 's' : ''}` : '';
+      toast.success(`Correspondance appliquée : ${r?.reclasses ?? 0} reclassés, ${r?.exclus ?? 0} exclus, ${r?.reactives ?? 0} réactivés${manuels}`);
     } catch (err) { toast.error(err?.message || 'Application refusée'); }
   };
   const handleNormalize = async () => {
     try {
       const r = await normalize(100);
-      if (r?.ok) toast.success(`Modèles IA : ${r.poses} clé${r.poses > 1 ? 's' : ''} posée${r.poses > 1 ? 's' : ''} sur ${r.traites} articles, ${r.restants} sans clé restants`);
+      if (r?.ok) toast.success(`Modèles IA : ${r.poses} clé${r.poses > 1 ? 's' : ''} posée${r.poses > 1 ? 's' : ''} sur ${r.traites} articles · ${r.restants} encore à soumettre, ${r.sans_cle_apres_ia ?? 0} sans clé après IA (à saisir à la main)`);
       else toast.error(`Échec : ${r?.error || 'normalisation'}`);
     } catch (err) { toast.error(err?.message || 'Normalisation refusée'); }
   };

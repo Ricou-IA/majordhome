@@ -7,8 +7,9 @@
 // Claude par lots de 50 (nom, marque, gamme, specs utiles — jamais la description longue), lit { brand, model,
 // confiance } et, pour confiance ≥ 0,9, pose model_key = normaliserModele(model), model_key_source = 'ia' et
 // specs.canonical.modele_ia / modele_ia_confiance (fusion, rien d'autre n'est touché). Les modèles sous le seuil
-// sont conservés dans les specs (modele_ia, confiance) sans poser de clé. Puis catalog_matches_propose(org).
-// Une saisie manuelle (model_key_source = 'manuel') n'est jamais recalculée. Réponse { traites, poses, restants }.
+// sont conservés dans les specs (modele_ia, confiance) sans poser de clé — et l'article n'est jamais resoumis
+// (sélection sur modele_ia_confiance absente). Puis catalog_matches_propose(org). Une saisie manuelle
+// (model_key_source = 'manuel') n'est jamais recalculée. Réponse { traites, poses, restants, sans_cle_apres_ia }.
 // Env : ANTHROPIC_API_KEY, ANTHROPIC_MODEL (défaut claude-sonnet-5-5).
 // ============================================================================
 
@@ -41,17 +42,24 @@ Deno.serve(async (req) => {
   const admin = auth.supabase;
 
   try {
+    // Jamais deux fois le même article : ceux déjà soumis (modele_ia_confiance posée) sont écartés, sinon un lot
+    // sous le seuil de confiance serait resoumis à chaque clic sans jamais avancer.
     const { data: produits, error } = await admin.from("majordhome_supplier_products")
       .select("id, reference, name, brand, gamme, specs, model_key_source")
       .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true)
       .is("model_key", null).or("model_key_source.is.null,model_key_source.neq.manuel")
+      .is("specs->canonical->modele_ia_confiance", null)
       .order("name").limit(limit);
     if (error) return jsonResponse({ error: error.message }, 500, req);
     const { count: restantsAvant } = await admin.from("majordhome_supplier_products").select("id", { count: "exact", head: true })
-      .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true).is("model_key", null);
+      .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true).is("model_key", null)
+      .is("specs->canonical->modele_ia_confiance", null);
+    const { count: dejaTentes } = await admin.from("majordhome_supplier_products").select("id", { count: "exact", head: true })
+      .eq("org_id", orgId).eq("supplier_id", supplierId).eq("is_active", true).is("model_key", null)
+      .not("specs->canonical->modele_ia_confiance", "is", null);
 
     const liste = (produits || []) as Produit[];
-    if (!liste.length) return jsonResponse({ ok: true, traites: 0, poses: 0, restants: 0 }, 200, req);
+    if (!liste.length) return jsonResponse({ ok: true, traites: 0, poses: 0, restants: 0, sans_cle_apres_ia: dejaTentes || 0 }, 200, req);
 
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     let traites = 0;
@@ -61,7 +69,7 @@ Deno.serve(async (req) => {
       const lot = liste.slice(i, i + TAILLE_LOT);
       const parRef = new Map(lot.map((p) => [p.reference, p]));
       const response = await client.messages.create({
-        model: MODEL, max_tokens: 4000, temperature: 0,
+        model: MODEL, max_tokens: 4000,
         messages: [{ role: "user", content: construirePrompt(lot) }],
       });
       tokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
@@ -70,7 +78,6 @@ Deno.serve(async (req) => {
       for (const t of trouves) {
         const p = parParRef(parRef, t.reference);
         if (!p) continue;
-        traites += 1;
         const cle = t.model ? normaliserModele(t.model) : null;
         const poser = !!cle && t.confiance >= SEUIL_CONFIANCE;
         const canonical = { ...((p.specs?.canonical as Record<string, unknown>) || {}), modele_ia: t.model, modele_ia_confiance: t.confiance, ...(t.brand ? { marque_ia: t.brand } : {}) };
@@ -78,6 +85,7 @@ Deno.serve(async (req) => {
         if (poser) { patch.model_key = cle; patch.model_key_source = "ia"; }
         const { error: errUp } = await admin.from("majordhome_supplier_products_write").update(patch).eq("id", p.id).eq("org_id", orgId);
         if (errUp) { console.error("[catalog-normalize] update", p.id, errUp.message); continue; }
+        traites += 1;
         if (poser) poses += 1;
       }
     }
@@ -85,7 +93,11 @@ Deno.serve(async (req) => {
     const { data: matches, error: errM } = await admin.rpc("catalog_matches_propose", { p_org_id: orgId });
     if (errM) console.error("[catalog-normalize] catalog_matches_propose", errM.message);
 
-    return jsonResponse({ ok: true, traites, poses, restants: Math.max(0, (restantsAvant || 0) - poses), tokens, matches: matches ?? null }, 200, req);
+    // restants = encore jamais soumis ; sans_cle_apres_ia = soumis mais restés sous le seuil (à saisir à la main)
+    return jsonResponse({
+      ok: true, traites, poses, restants: Math.max(0, (restantsAvant || 0) - traites),
+      sans_cle_apres_ia: (dejaTentes || 0) + (traites - poses), tokens, matches: matches ?? null,
+    }, 200, req);
   } catch (e) {
     console.error("[catalog-normalize]", e);
     return jsonResponse({ error: sanitizeError(e, "catalog-normalize failed") }, 500, req);

@@ -43,11 +43,20 @@ BEGIN
   INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, purchase_price_ht, category, product_kind) VALUES
     (v_b, v_mayer, 'B6', 'HUAWEI – Onduleur SUN2000-50KTL-M3', 'HUAWEI', 'SUN200050KTLM3', 2449.77, 'photovoltaique', 'main');
 
-  -- (a) proposition : LUNA confirmée, EAN confirmée, SUN2000X ×2 + accessoire/onduleur proposés, marques différentes ignorées
+  -- paire qui correspond À LA FOIS par marque+modèle et par EAN (relecture I-5) : une seule ligne, pas de 23505
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, code_ean, purchase_price_ht, category) VALUES
+    (v_a, v_mayer, 'A7', 'Pytes V5', 'Pytes', 'PYTESV5', '6971234567890', 880, 'batterie');
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, model_key, code_ean, purchase_price_ht, category) VALUES
+    (v_b, v_mayer, 'B7', 'PYTES – V5 Batterie', 'PYTES', 'PYTESV5', '6971234567890', 900, 'batterie');
+
+  -- (a) proposition : LUNA confirmée, EAN confirmée, Pytes (clé + EAN) confirmée une fois, SUN2000X ×2 + accessoire/onduleur proposés, marques différentes ignorées
   SET LOCAL ROLE service_role;
   v_res := public.catalog_matches_propose(v_mayer);
   RESET ROLE;
-  IF (v_res->>'confirmes')::int <> 2 OR (v_res->>'proposes')::int <> 3 THEN RAISE EXCEPTION 'proposition : %', v_res; END IF;
+  IF (v_res->>'confirmes')::int <> 3 OR (v_res->>'proposes')::int <> 3 THEN RAISE EXCEPTION 'proposition : %', v_res; END IF;
+  SELECT count(*) INTO v_n FROM majordhome.catalog_matches m JOIN majordhome.supplier_products a ON a.id = m.product_a_id WHERE a.reference IN ('A7', 'B7');
+  IF v_n <> 1 THEN RAISE EXCEPTION 'paire clé+EAN : % lignes', v_n; END IF;
+  IF has_table_privilege('anon', 'majordhome.catalog_matches', 'SELECT') THEN RAISE EXCEPTION 'anon lit catalog_matches'; END IF;
   IF NOT EXISTS (SELECT 1 FROM majordhome.catalog_matches m JOIN majordhome.supplier_products a ON a.id = m.product_a_id WHERE a.reference IN ('A6', 'B6') AND m.statut = 'propose') THEN
     RAISE EXCEPTION 'accessoire / onduleur confirmé d''office';
   END IF;
