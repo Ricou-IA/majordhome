@@ -243,8 +243,9 @@ d'assertions :
   une date que seuls les relevés écrivent. Le stock se lit dans `specs.canonical.stock_releve` (`{qty}`
   SuiteCommerce, `{en_stock}` WooCommerce) : la vue `catalog_item_offers` expose `stock_qty` (entier ou NULL) et
   `en_stock` (booléen ou NULL), le module `meilleureOffre` ne connaît que ces deux champs.
-- **Un article sans offre active n'est pas proposé au devis.** La vue `majordhome_catalog_items` expose
-  `offres_actives` (nombre de lignes actives rattachées) ; le picker ne liste que `offres_actives > 0` ; la fiche
+- **Un article sans offre active n'est pas proposé au devis.** Une vue de lecture séparée
+  `majordhome_catalog_items_list` expose `offres_actives` (nombre de lignes actives rattachées) — le miroir
+  `majordhome_catalog_items` reste simple pour rester updatable ; le picker ne liste que `offres_actives > 0` ; la fiche
   et la page d'harmonisation les montrent avec un badge « plus au catalogue ». Pas d'état stocké : c'est calculé.
   Les articles sans catégorie (≈ 257 lignes Soditelem / Tereva) n'apparaissent que dans une section sans filtre
   de catégorie, avec le badge « sans catégorie », et la page Articles offre le filtre « sans catégorie » pour les
