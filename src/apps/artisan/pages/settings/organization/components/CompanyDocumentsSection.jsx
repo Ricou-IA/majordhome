@@ -1,46 +1,89 @@
 // src/apps/artisan/pages/settings/organization/components/CompanyDocumentsSection.jsx
 // Documents de l'entreprise (certifications, attestation fluides, attestation d'assurance) :
-// zones de dépôt org-scopées dans le bucket product-documents. La liste est portée par le
-// formulaire parent (settings.company_documents) — le Storage n'est purgé qu'à l'Enregistrement
-// (ou à l'Annulation pour un fichier déposé puis abandonné), cf. IdentityTab.
+// zones de dépôt org-scopées dans le bucket product-documents. Chaque dépôt est lu par l'IA
+// (edge company-document-extract) : intitulé / numéro / organisme / fin de validité pré-remplis,
+// modifiables. La liste est portée par le formulaire parent (settings.company_documents) — le
+// Storage n'est purgé qu'à l'Enregistrement (ou à l'Annulation pour un fichier abandonné),
+// cf. IdentityTab. `onChange` reçoit une fonction (docs précédents → docs suivants) : la lecture
+// IA revient après coup et ne doit pas écraser ce qui a été saisi entre-temps.
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Upload, Trash2, Loader2, FileText, ExternalLink } from 'lucide-react';
+import { Upload, Trash2, Loader2, FileText, ExternalLink, Sparkles, RotateCw } from 'lucide-react';
 import { storageService } from '@services/storage.service';
+import { companyDocumentsService } from '@services/companyDocuments.service';
 import {
   COMPANY_DOCUMENT_KINDS, COMPANY_DOCUMENT_MIME_TYPES, COMPANY_DOCUMENT_MAX_BYTES,
-  buildCompanyDocumentPath, expiryStatus,
+  buildCompanyDocumentPath, expiryStatus, applyExtraction,
 } from '@/lib/companyDocuments';
 
 export const COMPANY_DOCUMENTS_BUCKET = 'product-documents';
+
+const FIELD_CLASS = 'w-full px-2 py-1 border border-secondary-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 const BADGES = {
   soon: { label: 'Expire bientôt', className: 'bg-amber-100 text-amber-800' },
   expired: { label: 'Expiré', className: 'bg-secondary-800 text-white' },
 };
 
-function DocumentRow({ doc, onOpen, onRemove, onDateChange }) {
+function ReadStatus({ status, reading, onRetry }) {
+  if (reading) {
+    return <span className="text-xs text-secondary-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Lecture du document…</span>;
+  }
+  if (status === 'ok') {
+    return <span className="text-xs text-secondary-500 flex items-center gap-1"><Sparkles className="w-3 h-3" /> Lu automatiquement — à vérifier</span>;
+  }
+  const label = status === 'illisible' ? 'Document non reconnu — à compléter' : status === 'echec' ? 'Lecture en échec — à compléter' : 'Jamais lu';
+  return (
+    <span className="text-xs text-amber-800 flex items-center gap-2">
+      {label}
+      <button type="button" onClick={onRetry} className="flex items-center gap-1 text-primary-700 hover:underline">
+        <RotateCw className="w-3 h-3" /> Relire
+      </button>
+    </span>
+  );
+}
+
+function DocumentRow({ kind, doc, reading, onOpen, onRemove, onPatch, onRetry }) {
   const badge = BADGES[expiryStatus(doc.valid_until)];
   return (
-    <li className="flex items-center gap-3 flex-wrap py-2">
-      <button type="button" onClick={() => onOpen(doc.path)} className="flex items-center gap-2 text-sm text-primary-700 hover:underline min-w-0">
-        <FileText className="w-4 h-4 shrink-0" />
-        <span className="truncate max-w-[16rem]">{doc.name}</span>
-        <ExternalLink className="w-3 h-3 shrink-0" />
-      </button>
-      <label className="flex items-center gap-1 text-xs text-secondary-500 ml-auto">
-        Valide jusqu’au
-        <input
-          type="date"
-          value={doc.valid_until || ''}
-          onChange={(e) => onDateChange(e.target.value || null)}
-          className="px-2 py-1 border border-secondary-300 rounded-md text-xs"
-        />
-      </label>
-      {badge && <span className={`text-xs px-2 py-0.5 rounded-full ${badge.className}`}>{badge.label}</span>}
-      <button type="button" onClick={onRemove} title="Retirer" className="text-secondary-400 hover:text-secondary-800">
-        <Trash2 className="w-4 h-4" />
-      </button>
+    <li className="py-3 space-y-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <button type="button" onClick={() => onOpen(doc.path)} className="flex items-center gap-2 text-sm text-primary-700 hover:underline min-w-0">
+          <FileText className="w-4 h-4 shrink-0" />
+          <span className="truncate max-w-[16rem]">{doc.name}</span>
+          <ExternalLink className="w-3 h-3 shrink-0" />
+        </button>
+        <ReadStatus status={doc.read_status} reading={reading} onRetry={onRetry} />
+        {badge && <span className={`text-xs px-2 py-0.5 rounded-full ${badge.className}`}>{badge.label}</span>}
+        <button type="button" onClick={onRemove} title="Retirer" className="ml-auto text-secondary-400 hover:text-secondary-800">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="grid sm:grid-cols-4 gap-2">
+        {['intitule', 'numero', 'organisme'].map((field) => (
+          <label key={field} className="text-xs text-secondary-500">
+            {kind.fields[field]}
+            <input
+              type="text"
+              value={doc[field]}
+              maxLength={120}
+              disabled={reading}
+              onChange={(e) => onPatch({ [field]: e.target.value })}
+              className={FIELD_CLASS}
+            />
+          </label>
+        ))}
+        <label className="text-xs text-secondary-500">
+          Valide jusqu’au
+          <input
+            type="date"
+            value={doc.valid_until || ''}
+            disabled={reading}
+            onChange={(e) => onPatch({ valid_until: e.target.value || null })}
+            className={FIELD_CLASS}
+          />
+        </label>
+      </div>
     </li>
   );
 }
@@ -49,6 +92,17 @@ function DropZone({ kind, orgId, docs, onChange }) {
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
+  const [reading, setReading] = useState(() => new Set());
+
+  const patchDoc = (path, fn) => onChange((prev) => prev.map((d) => (d.path === path ? fn(d) : d)));
+
+  const read = async (path) => {
+    setReading((s) => new Set(s).add(path));
+    const { data, error } = await companyDocumentsService.extract(orgId, kind.key, path);
+    setReading((s) => { const n = new Set(s); n.delete(path); return n; });
+    if (error) toast.error(`Lecture automatique impossible : ${error.message}`);
+    patchDoc(path, (d) => applyExtraction(d, error ? null : data));
+  };
 
   const upload = async (files) => {
     const list = Array.from(files || []);
@@ -62,12 +116,13 @@ function DropZone({ kind, orgId, docs, onChange }) {
       const target = buildCompanyDocumentPath(orgId, kind.key, file.name);
       const { path, error } = await storageService.uploadFile(COMPANY_DOCUMENTS_BUCKET, target, file, { contentType: file.type });
       if (error || !path) { toast.error(`${file.name} : échec de l'upload (${error?.message ?? 'erreur inconnue'})`); continue; }
-      added.push({ path, name: file.name, valid_until: null });
+      added.push({ path, name: file.name, valid_until: null, intitule: '', numero: '', organisme: '', read_status: null });
     }
     setBusy(false);
     if (!added.length) return;
-    onChange(kind.multiple ? [...docs, ...added] : added);
+    onChange((prev) => (kind.multiple ? [...prev, ...added] : added));
     toast.success(`${added.length > 1 ? `${added.length} documents déposés` : 'Document déposé'} — ne pas oublier d’Enregistrer`);
+    added.forEach((d) => read(d.path));
   };
 
   const open = async (path) => {
@@ -77,7 +132,6 @@ function DropZone({ kind, orgId, docs, onChange }) {
     if (win) win.location.href = url; else window.location.href = url;
   };
 
-  const update = (index, patch) => onChange(docs.map((d, i) => (i === index ? { ...d, ...patch } : d)));
   const showZone = kind.multiple || docs.length === 0;
 
   return (
@@ -86,13 +140,16 @@ function DropZone({ kind, orgId, docs, onChange }) {
       <p className="text-xs text-secondary-500 mb-2">{kind.hint}</p>
       {docs.length > 0 && (
         <ul className="divide-y divide-secondary-100 mb-2">
-          {docs.map((doc, i) => (
+          {docs.map((doc) => (
             <DocumentRow
               key={doc.path}
+              kind={kind}
               doc={doc}
+              reading={reading.has(doc.path)}
               onOpen={open}
-              onRemove={() => onChange(docs.filter((_, j) => j !== i))}
-              onDateChange={(valid_until) => update(i, { valid_until })}
+              onRemove={() => onChange((prev) => prev.filter((d) => d.path !== doc.path))}
+              onPatch={(patch) => patchDoc(doc.path, (d) => ({ ...d, ...patch }))}
+              onRetry={() => read(doc.path)}
             />
           ))}
         </ul>
@@ -127,6 +184,9 @@ function DropZone({ kind, orgId, docs, onChange }) {
   );
 }
 
+/**
+ * @param {{ orgId: string, value: Record<string, object[]>, onChange: (updater: (prev: Record<string, object[]>) => Record<string, object[]>) => void }} props
+ */
 export default function CompanyDocumentsSection({ orgId, value, onChange }) {
   return (
     <div className="space-y-6">
@@ -136,7 +196,7 @@ export default function CompanyDocumentsSection({ orgId, value, onChange }) {
           kind={kind}
           orgId={orgId}
           docs={value[kind.key] || []}
-          onChange={(docs) => onChange({ ...value, [kind.key]: docs })}
+          onChange={(fn) => onChange((prev) => ({ ...prev, [kind.key]: fn(prev[kind.key] || []) }))}
         />
       ))}
     </div>

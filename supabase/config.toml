@@ -181,3 +181,6 @@ verify_jwt = true
 # 2026-10-19.
 [functions.webshop-process]
 verify_jwt = true
+
+[functions.company-document-extract]
+verify_jwt = true

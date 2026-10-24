@@ -6,7 +6,7 @@ import RgeCertificationsInput from './components/RgeCertificationsInput';
 import SignatureUpload from './components/SignatureUpload';
 import CompanyDocumentsSection, { COMPANY_DOCUMENTS_BUCKET } from './components/CompanyDocumentsSection';
 import { storageService } from '@services/storage.service';
-import { normalizeCompanyDocuments, removedDocumentPaths } from '@/lib/companyDocuments';
+import { normalizeCompanyDocuments, removedDocumentPaths, qualificationsFromDocuments } from '@/lib/companyDocuments';
 
 const SECTION_TITLE = 'text-xs font-semibold uppercase tracking-wide text-secondary-500 mb-3';
 const INPUT_CLASS = 'w-full px-3 py-2 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -247,10 +247,27 @@ export default function IdentityTab() {
       {/* Section Qualifications */}
       <section>
         <h3 className={SECTION_TITLE}>Qualifications RGE</h3>
-        <RgeCertificationsInput
-          value={form.rge_certifications}
-          onChange={(newList) => setForm({ ...form, rge_certifications: newList })}
-        />
+        {form.company_documents.certifications.length > 0 ? (
+          // Dès qu'un certificat est déposé, la liste est lue sur les certificats (buildCompanyInfo
+          // → resolveRgeCertifications) : la saisie manuelle n'est plus la source.
+          <div className="text-sm">
+            {qualificationsFromDocuments(form.company_documents).length > 0 ? (
+              <ul className="flex flex-wrap gap-2">
+                {qualificationsFromDocuments(form.company_documents).map((q) => (
+                  <li key={q} className="px-2 py-1 rounded-md bg-secondary-100 text-secondary-800 text-xs">{q}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-amber-800">Aucune qualification valide : complétez l’intitulé des certificats ci-dessous, ou vérifiez leurs dates de validité.</p>
+            )}
+            <p className="mt-2 text-xs text-secondary-500">Lues sur les certificats déposés dans « Documents de l’entreprise » (certificats expirés exclus). Elles figurent sur vos documents (certificats, factures, études).</p>
+          </div>
+        ) : (
+          <RgeCertificationsInput
+            value={form.rge_certifications}
+            onChange={(newList) => setForm({ ...form, rge_certifications: newList })}
+          />
+        )}
       </section>
 
       {/* Section Signataire des mandats (mandat de représentation du dossier PV — Enedis exige les deux signatures) */}
@@ -298,7 +315,7 @@ export default function IdentityTab() {
         <CompanyDocumentsSection
           orgId={organization?.id}
           value={form.company_documents}
-          onChange={(docs) => setForm({ ...form, company_documents: docs })}
+          onChange={(fn) => setForm((f) => ({ ...f, company_documents: fn(f.company_documents) }))}
         />
       </section>
 

@@ -10,6 +10,8 @@
  * Cf docs/superpowers/specs/2026-05-22-multitenant-settings-organization-design.md §9.1
  */
 
+import { resolveRgeCertifications } from './companyDocuments.js';
+
 // portal_url est une constante app (singleton) tant qu'on n'a pas de sous-domaines par org.
 const APP_PORTAL_URL = 'https://majordhome.vercel.app';
 
@@ -69,7 +71,8 @@ export function buildCompanyInfo(settings) {
     insurance: s.insurance || NEUTRAL_DEFAULTS.insurance,
     logoUrl: s.logo_url || NEUTRAL_DEFAULTS.logoUrl,
     accentColor: s.accent_color || NEUTRAL_DEFAULTS.accentColor,
-    rgeCertifications: Array.isArray(s.rge_certifications) ? s.rge_certifications : NEUTRAL_DEFAULTS.rgeCertifications,
+    // Certificats déposés (lus par l'IA) dès qu'il y en a, sinon saisie manuelle historique.
+    rgeCertifications: resolveRgeCertifications(s),
     signatoryName: s.signatory_name || NEUTRAL_DEFAULTS.signatoryName,
     signatoryRole: s.signatory_role || NEUTRAL_DEFAULTS.signatoryRole,
     signatorySignaturePath: s.signatory_signature_path || NEUTRAL_DEFAULTS.signatorySignaturePath,
