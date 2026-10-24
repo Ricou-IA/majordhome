@@ -37,7 +37,7 @@ const WEBSHOP = ['orders', 'reglages', 'process', 'emailTemplates'];
 
 // Catalogue fournisseur (adaptateurs relevé → lignes de catalogue) → edge supplier-catalog-sync.
 // Copiés dans _shared/catalogue/ (aucun import entre eux).
-const CATALOGUE = ['baywa', 'domos'];
+const CATALOGUE = ['suitecommerce', 'woocommerce', 'modelKey', 'mapping', 'releve'];
 
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),

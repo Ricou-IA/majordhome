@@ -101,8 +101,10 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/agentTelephonique.js', // consommé par l'edge agent-verifier-client via sa copie _shared/ (sync-tournee-engine), jamais importé depuis src/
   // Adaptateurs de relevé fournisseur : consommés par scripts/catalogue/import-releve.mjs et par l'edge
   // supplier-catalog-sync via leurs copies _shared/catalogue (sync-tournee-engine), jamais importés depuis src/.
-  'src/lib/catalogue/baywa.js',
-  'src/lib/catalogue/domos.js',
+  'src/lib/catalogue/suitecommerce.js',
+  'src/lib/catalogue/woocommerce.js',
+  'src/lib/catalogue/modelKey.js',
+  'src/lib/catalogue/mapping.js',
 ]);
 
 const allFiles = walk(SRC);

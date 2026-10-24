@@ -5,8 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CATEGORIES_PRODUIT, DEFAULT_FAMILLES, buildDevisConfig, categoriesPourSection } from '../src/lib/devisConfig.js';
 
-test('la catégorie photovoltaique fait partie des catégories produit du picker', () => {
+test('les catégories photovoltaique et borne_recharge font partie des catégories produit du picker', () => {
   assert.ok(CATEGORIES_PRODUIT.includes('photovoltaique'));
+  assert.ok(CATEGORIES_PRODUIT.includes('borne_recharge'), 'catégorie posée par le fournisseur ECOSTAL (autre session, 2026-10-24)');
 });
 
 test('famille Photovoltaïque par défaut : deux catégories (photovoltaique + batterie), cinq chapitres, après Batterie', () => {

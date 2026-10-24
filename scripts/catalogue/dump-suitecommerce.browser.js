@@ -1,14 +1,26 @@
-// scripts/catalogue/dump-baywa.browser.js
-// Relevé du catalogue BayWa r.e. — À COLLER DANS LA CONSOLE DU NAVIGATEUR (F12 → Console) sur
-// https://solarshop.baywa-re.fr une fois CONNECTÉ au compte Mayer (sans session, le prix est masqué et le
+// scripts/catalogue/dump-suitecommerce.browser.js
+// Relevé d'un catalogue NetSuite SuiteCommerce (BayWa r.e. : https://solarshop.baywa-re.fr) — À COLLER DANS LA
+// CONSOLE DU NAVIGATEUR (F12 → Console) sur le site du fournisseur, une fois CONNECTÉ au compte Mayer (sans session, le prix est masqué et le
 // relevé est inutile). Pagine l'API JSON de la boutique (100 articles par page, ~10 pages, une vingtaine de
 // secondes) puis télécharge `baywa-AAAA-MM.json`. Déposer ce fichier dans scripts/catalogue/data/ puis :
-//   node scripts/catalogue/import-releve.mjs --fournisseur baywa --fichier scripts/catalogue/data/baywa-AAAA-MM.json
+//   node scripts/catalogue/import-releve.mjs --fournisseur "BAYWA R.E." --fichier scripts/catalogue/data/baywa-AAAA-MM.json
+// Pour un autre site SuiteCommerce : éditer SCA_PATH et SITE_ID (visibles dans les URLs du site : /sca-xxx/… et c=…).
 // Le niveau de prix (`pricelevel`) est celui de la session connectée : un autre compte verrait d'autres prix.
 // Même relevé possible depuis l'app (Settings → Fournisseurs → Actualiser le catalogue) quand les identifiants
 // BayWa sont enregistrés ; ce script est le repli si la connexion serveur est refusée.
+// Première URL d'image d'un article (structure NetSuite imbriquée), ou null.
+const premiereImage = (v) => {
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) { for (const x of v) { const u = premiereImage(x); if (u) return u; } return null; }
+  if (typeof v === 'object') { if (typeof v.url === 'string') return v.url; for (const k of Object.keys(v)) { const u = premiereImage(v[k]); if (u) return u; } }
+  return null;
+};
 (async () => {
-  const base = '/api/items?language=fr&currency=EUR&c=6376560&sitepath=%2Fsca-lux-2019-2%2FsearchApi.ssp&use_pcv=T&fieldset=search&n=4&custitem_frsy_purchasable_component=false&country=FR&q=&limit=100';
+  const SCA_PATH = '/sca-lux-2019-2';
+  const SITE_ID = '6376560';
+  const PREFIXE = 'baywa';
+  const base = `/api/items?language=fr&currency=EUR&c=${SITE_ID}&sitepath=${encodeURIComponent(SCA_PATH + '/searchApi.ssp')}&use_pcv=T&fieldset=search&n=4&custitem_frsy_purchasable_component=false&country=FR&q=&limit=100`;
   const items = [];
   let total = null;
   for (let offset = 0; ; offset += 100) {
@@ -25,7 +37,8 @@
       }
       items.push({
         internalid: it.internalid, itemid: it.itemid, displayname: it.displayname, storedisplayname2: it.storedisplayname2,
-        storedescription: it.storedescription, urlcomponent: it.urlcomponent, itemtype: it.itemtype,
+        urlcomponent: it.urlcomponent, itemtype: it.itemtype,
+        itemimages_detail: premiereImage(it.itemimages_detail),
         price: it.onlinecustomerprice, price_detail: it.onlinecustomerprice_detail, ispurchasable: it.ispurchasable,
         isbackorderable: it.isbackorderable, quantityavailable: it.quantityavailable,
         noprice_visible: it.custitem_frsy_noprice_visible, requiredsalesunit: it.custitem_frsy_requiredsalesunit,
@@ -38,8 +51,8 @@
   if (items.length < total) throw new Error(`Relevé incomplet : ${items.length} / ${total}`);
   const sansPrix = items.filter((i) => typeof i.price !== 'number').length;
   if (sansPrix > items.length / 2) throw new Error(`${sansPrix} articles sans prix : la session n'est pas connectée`);
-  const releve = { source: 'https://solarshop.baywa-re.fr/api/items (session connectée)', fetched_at: new Date().toISOString(), total, items };
-  const nom = `baywa-${releve.fetched_at.slice(0, 7)}.json`;
+  const releve = { source: location.origin + '/api/items (session connectée)', fetched_at: new Date().toISOString(), total, items };
+  const nom = `${PREFIXE}-${releve.fetched_at.slice(0, 7)}.json`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(releve, null, 1)], { type: 'application/json' }));
   a.download = nom;

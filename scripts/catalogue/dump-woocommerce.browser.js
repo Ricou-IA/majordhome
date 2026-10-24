@@ -1,12 +1,14 @@
-// scripts/catalogue/dump-domos.browser.js
-// Relevé du catalogue Domos Industries — À COLLER DANS LA CONSOLE DU NAVIGATEUR (F12 → Console) sur
-// https://webshop.domosindustries.com une fois CONNECTÉ au compte Mayer (l'API refuse les visiteurs : 401
+// scripts/catalogue/dump-woocommerce.browser.js
+// Relevé d'un catalogue WooCommerce (Domos Industries : https://webshop.domosindustries.com) — À COLLER DANS LA
+// CONSOLE DU NAVIGATEUR (F12 → Console) sur le site du fournisseur, une fois CONNECTÉ au compte Mayer (l'API refuse les visiteurs : 401
 // « Authentification requise »). Le site est derrière Cloudflare Turnstile : aucune connexion serveur possible,
 // ce relevé depuis le navigateur est LA voie Domos. Pagine l'API WooCommerce Store (100 articles par page,
 // 8 pages) puis télécharge `domos-AAAA-MM.json`. Déposer ce fichier dans scripts/catalogue/data/ puis :
-//   node scripts/catalogue/import-releve.mjs --fournisseur domos --fichier scripts/catalogue/data/domos-AAAA-MM.json
+//   node scripts/catalogue/import-releve.mjs --fournisseur "DOMOS INDUSTRIES" --fichier scripts/catalogue/data/domos-AAAA-MM.json
+// Pour un autre site WooCommerce : éditer PREFIXE (nom du fichier).
 // ou l'importer depuis l'app (Settings → Fournisseurs → Importer un relevé). Prix HT en centimes (`prices.price`).
 (async () => {
+  const PREFIXE = 'domos';
   const strip = (h) => String(h || '').replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;|&#8211;|&#8217;|&rsquo;|&amp;/g, (m) => ({ '&nbsp;': ' ', '&#8211;': '–', '&#8217;': '’', '&rsquo;': '’', '&amp;': '&' })[m])
     .replace(/\s+/g, ' ').trim();
@@ -37,8 +39,8 @@
   if (items.length < total) throw new Error(`Relevé incomplet : ${items.length} / ${total}`);
   const rc = await fetch('/wp-json/wc/store/v1/products/categories?per_page=100', { credentials: 'include' });
   const categories = rc.ok ? (await rc.json()).map((c) => ({ id: c.id, name: strip(c.name), slug: c.slug, parent: c.parent, count: c.count })) : [];
-  const releve = { source: 'https://webshop.domosindustries.com/wp-json/wc/store/v1/products (session connectée)', fetched_at: new Date().toISOString(), total, items, categories };
-  const nom = `domos-${releve.fetched_at.slice(0, 7)}.json`;
+  const releve = { source: location.origin + '/wp-json/wc/store/v1/products (session connectée)', fetched_at: new Date().toISOString(), total, items, categories };
+  const nom = `${PREFIXE}-${releve.fetched_at.slice(0, 7)}.json`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(releve, null, 1)], { type: 'application/json' }));
   a.download = nom;

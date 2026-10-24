@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2, ArrowUp, ArrowDown } from 'luc
 import { CATEGORIES_PRODUIT, slugFamille } from '@/lib/devisConfig.js';
 
 const INPUT = 'w-full px-2.5 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
-const CATEGORIE_LABELS = { poele: 'Poêle', climatisation: 'Climatisation', chauffage: 'Chauffage', fumisterie: 'Fumisterie', batterie: 'Batterie', photovoltaique: 'Photovoltaïque' };
+const CATEGORIE_LABELS = { poele: 'Poêle', climatisation: 'Climatisation', chauffage: 'Chauffage', fumisterie: 'Fumisterie', batterie: 'Batterie', photovoltaique: 'Photovoltaïque', borne_recharge: 'Borne de recharge' };
 
 function deplacer(arr, i, delta) {
   const j = i + delta;

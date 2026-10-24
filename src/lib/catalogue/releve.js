@@ -5,22 +5,22 @@
 // Module PUR. La règle d'écriture reste côté edge / RPC : ici on ne fait que retirer des champs.
 
 const CHAMPS = Object.freeze({
-  baywa: ['internalid', 'itemid', 'displayname', 'storedisplayname2', 'itemtype', 'price', 'ispurchasable', 'isbackorderable', 'quantityavailable', 'fields', 'docs'],
-  domos: ['id', 'name', 'slug', 'sku', 'permalink', 'type', 'prices', 'is_in_stock', 'is_purchasable', 'categories', 'attributes', 'short_description', 'image'],
+  suitecommerce: ['internalid', 'itemid', 'displayname', 'storedisplayname2', 'urlcomponent', 'itemtype', 'price', 'ispurchasable', 'isbackorderable', 'quantityavailable', 'fields', 'docs', 'itemimages_detail'],
+  woocommerce: ['id', 'name', 'slug', 'sku', 'permalink', 'type', 'prices', 'is_in_stock', 'is_purchasable', 'categories', 'attributes', 'short_description', 'image'],
 });
 
-/** BayWa : clés de `fields` (custitem_webshopjson) lues par l'adaptateur — le reste (certifications, extensions…) est retiré. */
-const FIELDS_BAYWA = Object.freeze([
-  'mpn', 'custitem_manufacturerfacet', 'cseg_itemcategory', 'custitem_itemtitle', 'custitem_usableenergy',
+/** SuiteCommerce : clés de `fields` (custitem_webshopjson) lues par l'adaptateur — le reste (certifications, extensions…) est retiré. */
+const FIELDS_SUITECOMMERCE = Object.freeze([
+  'mpn', 'custitem_manufacturerfacet', 'cseg_itemcategory', 'custitem_itemtitle', 'custitem_usableenergy', 'custitem_itemwatt',
   'custitem_batterytype', 'custitem_batterycelltechnology', 'custitem_productwarrantysc', 'custitem_perfwarrantysc',
   'custitem_pacejetitemlength', 'custitem_pacejetitemwidth', 'custitem_pacejetitemheight', 'weight',
 ]);
 
 /**
  * Relevé réduit aux champs utiles à l'adaptateur du connecteur. Connecteur inconnu ou relevé sans items : renvoyé
- * tel quel.
- * @param {string} connector 'baywa' | 'domos'
- * @param {{ total?: number, fetched_at?: string, source?: string, items?: Array<Record<string, any>> }} releve
+ * tel quel. Les catégories du relevé (WooCommerce) sont conservées : l'adaptateur en tire parents et gammes.
+ * @param {string} connector 'suitecommerce' | 'woocommerce'
+ * @param {{ total?: number, fetched_at?: string, source?: string, items?: Array<Record<string, any>>, categories?: Array<Record<string, any>> }} releve
  * @returns {Record<string, any>}
  */
 export function allegerReleve(connector, releve) {
@@ -29,12 +29,14 @@ export function allegerReleve(connector, releve) {
   const items = releve.items.map((it) => {
     const o = {};
     for (const k of champs) if (it[k] !== undefined) o[k] = it[k];
-    if (connector === 'baywa' && o.fields && typeof o.fields === 'object') {
+    if (connector === 'suitecommerce' && o.fields && typeof o.fields === 'object') {
       const f = {};
-      for (const k of FIELDS_BAYWA) if (o.fields[k] !== undefined) f[k] = o.fields[k];
+      for (const k of FIELDS_SUITECOMMERCE) if (o.fields[k] !== undefined) f[k] = o.fields[k];
       o.fields = f;
     }
     return o;
   });
-  return { source: releve.source, fetched_at: releve.fetched_at, total: releve.total, items };
+  const out = { source: releve.source, fetched_at: releve.fetched_at, total: releve.total, items };
+  if (Array.isArray(releve.categories)) out.categories = releve.categories;
+  return out;
 }
