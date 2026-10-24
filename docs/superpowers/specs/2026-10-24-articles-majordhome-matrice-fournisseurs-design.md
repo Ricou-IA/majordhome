@@ -101,10 +101,8 @@ l'appel de la RPC qui pose les articles manquants. Les doublons legacy de même 
 
 - `majordhome.catalog_items` : `id, org_id, name, brand, model_key, code_ean, category, gamme, product_kind,
   unit, default_tva_rate, selling_price_ht, description, image_url, specs jsonb, is_active, source_product_id,
-  origin ('auto' | 'manuel'), merged_into uuid NULL, created_at, updated_at`. RLS : lecture membre, écriture
-  **par RPC seulement** (org_admin), sauf les champs humains de l'article éditables depuis la fiche article par
-  les rôles qui ont `catalogue.edit` (le builder s'aligne sur la ressource de permission existante des
-  fournisseurs). Index `(org_id, lower(brand), model_key)` et `(org_id, code_ean)` pour le rattachement, pas
+  origin ('auto' | 'manuel'), merged_into uuid NULL, created_at, updated_at`. RLS : lecture membre ; écriture
+  des champs humains via la vue updatable et des liens via RPC, **org_admin seul** dans les deux cas (§ 8). Index `(org_id, lower(brand), model_key)` et `(org_id, code_ean)` pour le rattachement, pas
   d'unicité (deux articles distincts peuvent porter la même clé jusqu'à la fusion).
 - `majordhome.supplier_products` : `catalog_item_id uuid NULL` (FK, ON DELETE SET NULL),
   `catalog_item_link_source text` (`auto | cle | ean | ia | manuel`), `catalog_item_linked_at`. **Rien d'autre
