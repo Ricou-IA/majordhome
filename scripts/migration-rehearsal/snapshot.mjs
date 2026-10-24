@@ -31,6 +31,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'organizations', columns: null },
   { schema: 'majordhome', table: 'suppliers', columns: null, data: false }, // 20260929_1 : FK fum_composant_mapping
   { schema: 'majordhome', table: 'supplier_products', columns: null, data: false }, // 20260929_1 : FK fum_article_attrs + vue majordhome_fum_articles
+  { schema: 'majordhome', table: 'product_documents', columns: null, data: false }, // 20261025_2 : action `document` de l'edge supplier-catalog-sync (fiche technique rangée)
   { schema: 'majordhome', table: 'quotes', columns: null, data: false }, // 20260929_1 : FK fum_metres
   { schema: 'majordhome', table: 'equipment_categories', columns: null }, // M1 (20260913_1) en prod : cible des FK pricing_equipment_types / equipments et de la vue client_equipment_kinds
   { schema: 'majordhome', table: 'pricing_zones', columns: null },
@@ -195,8 +196,12 @@ const VIEWS = [
   'public.majordhome_certificats', // 20261012_1 : photo_plaque_path / photo_plaque_absence (colonnes en fin)
   'public.majordhome_quotes', // 20261010_1 : commentaire (vue JOIN, colonne en fin)
   'public.majordhome_quotes_write',
-  'public.majordhome_suppliers', // 20261024_2 : connector / catalog_sync_* en fin (miroirs updatable)
+  'public.majordhome_suppliers', // 20261024_2 : connector / catalog_sync_* en fin (miroirs updatable) ; 20261025_2 : site_url, mapping, auto_sync…
   'public.majordhome_suppliers_write',
+  'public.majordhome_supplier_products', // 20261025_2 : model_key / model_key_source en fin
+  'public.majordhome_supplier_products_write',
+  'public.majordhome_product_documents', // 20261025_2 : cible de l'action `document`
+  'public.majordhome_product_documents_write',
   'public.majordhome_invoices', // 20261010_1 : client_note (i.* ⇒ DROP + CREATE)
   // 20260930_16 : cibles du CREATE OR REPLACE
   'public.majordhome_lead_pennylane_quotes',

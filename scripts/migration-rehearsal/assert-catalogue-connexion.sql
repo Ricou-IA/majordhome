@@ -1,4 +1,4 @@
--- assert-catalogue-connexion.sql — vérifie 20261024_2_catalogue_connexion_fournisseur.sql sur le cluster de répétition.
+-- assert-catalogue-connexion.sql — vérifie 20261024_2_catalogue_connexion_fournisseur.sql (+ 20261024_5, 20261025_2 : signature à 5 paramètres) sur le cluster de répétition.
 -- Couvre : privilèges (supplier_catalog_upsert / org_secret_read = service_role seul), règles de l'upsert
 -- (name et selling_price_ht à l'INSERT seulement, défaut Tesla ré-appliqué si 0, désactivation des absents,
 -- relevé vide refusé, fournisseur d'une autre org refusé), colonnes de connexion dans les vues, secrets Vault
@@ -23,9 +23,9 @@ DECLARE
   ]'::jsonb;
 BEGIN
   -- (f) privilèges
-  IF has_function_privilege('anon', 'public.supplier_catalog_upsert(uuid, uuid, text, jsonb)', 'EXECUTE') THEN RAISE EXCEPTION 'anon exécute supplier_catalog_upsert'; END IF;
-  IF has_function_privilege('authenticated', 'public.supplier_catalog_upsert(uuid, uuid, text, jsonb)', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute supplier_catalog_upsert'; END IF;
-  IF NOT has_function_privilege('service_role', 'public.supplier_catalog_upsert(uuid, uuid, text, jsonb)', 'EXECUTE') THEN RAISE EXCEPTION 'service_role n''exécute pas supplier_catalog_upsert'; END IF;
+  IF has_function_privilege('anon', 'public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb)', 'EXECUTE') THEN RAISE EXCEPTION 'anon exécute supplier_catalog_upsert'; END IF;
+  IF has_function_privilege('authenticated', 'public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb)', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute supplier_catalog_upsert'; END IF;
+  IF NOT has_function_privilege('service_role', 'public.supplier_catalog_upsert(uuid, uuid, text, jsonb, jsonb)', 'EXECUTE') THEN RAISE EXCEPTION 'service_role n''exécute pas supplier_catalog_upsert'; END IF;
   IF has_function_privilege('anon', 'public.org_secret_read(uuid, text)', 'EXECUTE') THEN RAISE EXCEPTION 'anon exécute org_secret_read'; END IF;
   IF has_function_privilege('authenticated', 'public.org_secret_read(uuid, text)', 'EXECUTE') THEN RAISE EXCEPTION 'authenticated exécute org_secret_read'; END IF;
   IF NOT has_function_privilege('service_role', 'public.org_secret_read(uuid, text)', 'EXECUTE') THEN RAISE EXCEPTION 'service_role ne lit pas org_secret_read'; END IF;
@@ -44,7 +44,7 @@ BEGIN
   IF v_n <> 2 THEN RAISE EXCEPTION 'security_invoker perdu sur une vue fournisseurs'; END IF;
 
   -- fixture
-  INSERT INTO majordhome.suppliers (org_id, name, connector, is_active) VALUES (v_mayer, 'TEST CATALOGUE', 'baywa', true) RETURNING id INTO v_sup;
+  INSERT INTO majordhome.suppliers (org_id, name, connector, is_active) VALUES (v_mayer, 'TEST CATALOGUE', 'suitecommerce', true) RETURNING id INTO v_sup;
 
   -- (a) premier relevé : 2 insérés, libellés et prix du payload
   SET LOCAL ROLE service_role;
