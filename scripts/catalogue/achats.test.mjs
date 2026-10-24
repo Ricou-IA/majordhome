@@ -74,6 +74,7 @@ test('un prix nul récent n’efface pas un prix connu', () => {
   const { lignes, rapport } = catalogueDepuisAchats(docs, { version: 'v' });
   assert.equal(lignes[0].purchase_price_ht, 90);
   assert.equal(lignes[0].specs.canonical.prix_du, '2026-03-31');
+  assert.equal(lignes[0].purchase_price_at, '2026-03-31', 'date du prix = date de la facture de référence (supplier_products.purchase_price_at)');
   assert.equal(lignes[0].specs.canonical.dernier_achat, '2026-06-30');
   assert.equal(rapport.articles_offerts, 0);
 });

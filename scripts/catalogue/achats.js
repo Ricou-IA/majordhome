@@ -88,6 +88,8 @@ export function catalogueDepuisAchats(documents, { version, historique_max = 24 
       gamme: null,
       product_kind: 'main',
       purchase_price_ht: Math.round(reference.prix_unitaire_net * 10000) / 10000,
+      // date du prix (supplier_products.purchase_price_at) = la facture de référence, pas la date du relevé
+      purchase_price_at: reference.date,
       selling_price_ht_defaut: 0,
       default_tva_rate: recente.tva_taux ?? 20,
       unit: recente.unite || 'pièce',
