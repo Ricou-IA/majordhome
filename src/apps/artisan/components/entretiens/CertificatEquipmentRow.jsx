@@ -11,6 +11,7 @@
 
 import { Loader2, Ban, Undo2 } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
+import { AttestationLink } from '@/apps/artisan/components/certificat/AttestationLink';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { libelleEquipement } from '@/lib/equipmentReferential';
 
@@ -105,6 +106,9 @@ export function CertificatEquipmentRow({
             onClick={onCloseModal}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
           />
+        )}
+        {status === 'done' && childIntervention && (
+          <AttestationLink interventionId={childIntervention.id} onClick={onCloseModal} />
         )}
 
         {status === 'neant' && childIntervention && (

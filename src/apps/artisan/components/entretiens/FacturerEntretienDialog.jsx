@@ -20,6 +20,7 @@
  */
 
 import { useMemo, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, XCircle, ExternalLink, Pencil, RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '@components/ui/confirm-dialog';
@@ -41,6 +42,8 @@ import { buildEntretienInvoice, toPennylaneInvoicePayload, lineEditsFromModel, a
 import { formatEuro, formatDateForInput, formatDateShortFR, downloadBlob } from '@/lib/utils';
 import { anomaliesDeCarte, noteClientDepuisAnomalies } from '@/lib/certificatAnomalies';
 import { FormField, TextArea } from '../FormFields';
+import { genererAttestationsIntervention } from '@/apps/artisan/components/certificat/attestationExport';
+import { certificatKeys } from '@/shared/hooks/cacheKeys';
 
 /**
  * @param {object} p
@@ -170,6 +173,38 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
   useEffect(() => { setSendEmail(true); setSelectedCertIds(null); }, [open, item.id]);
   const effectiveCertIds = selectedCertIds ?? new Set(certRows.filter((r) => r.defaultChecked).map((r) => r.id));
   const sendInvoiceEmail = useSendInvoiceEmail(orgId);
+  const queryClient = useQueryClient();
+
+  // Attestation d'entretien et de ramonage (une par certificat éligible), rangée à côté du
+  // certificat. Produite APRÈS la facture et AVANT l'e-mail (qui peut la joindre) ; jamais
+  // bloquante : la facture existe déjà, ce qui n'a pas pu être produit est dit.
+  const genererAttestations = async () => {
+    try {
+      const r = await genererAttestationsIntervention({
+        orgId,
+        interventionId: item.id,
+        client: {
+          name: item.client_name || `${item.client_first_name || ''} ${item.client_last_name || ''}`.trim(),
+          address: item.client_address,
+          postal_code: item.client_postal_code,
+          city: item.client_city,
+        },
+        company,
+        categories: categories || [],
+        invoiceDate: formatDateForInput(new Date()),
+      });
+      if (r.generated.length) {
+        toast.success(r.generated.length > 1
+          ? `${r.generated.length} attestations d’entretien générées, rangées avec les certificats`
+          : 'Attestation d’entretien générée, rangée avec le certificat');
+      }
+      r.skipped.forEach((sk) => toast.warning(`Attestation non générée : ${sk.message}`, { duration: 12000 }));
+      r.warnings.forEach((w) => toast.warning(w, { duration: 12000 }));
+      queryClient.invalidateQueries({ queryKey: certificatKeys.all(orgId) });
+    } catch (err) {
+      toast.error(`Attestation non générée : ${err?.message || 'erreur inconnue'}. La facture est bien créée.`, { duration: 15000 });
+    }
+  };
 
   const sendEmailAfterCreation = async () => {
     if (!emailAvailability.enabled || !sendEmail) return;
@@ -237,6 +272,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
           { action: issued.blob ? { label: 'Télécharger', onClick: () => downloadBlob(issued.blob, `${issued.number}.pdf`) } : undefined },
         );
         if (issued.importWarning) toast.warning(issued.importWarning, { duration: 15000 });
+        await genererAttestations();
         await sendEmailAfterCreation();
         onOpenChange(false);
         onCreated?.();
@@ -275,6 +311,7 @@ export default function FacturerEntretienDialog({ item, orgId, open, onOpenChang
       // Une facture déjà existante (brouillon ou déjà créée) se renvoie depuis la carte,
       // jamais depuis cette modale : `sendEmailAfterCreation` suppose une facture FINALISÉE
       // qui vient d'être créée à l'instant.
+      await genererAttestations();
       if (!created.draft && !created.alreadyExisted) await sendEmailAfterCreation();
       onOpenChange(false);
       onCreated?.();

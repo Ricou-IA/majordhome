@@ -13,6 +13,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { motifAbsencePhoto } from '@/lib/certificatAnomalies';
 import { logger } from '@/lib/logger';
+import { attestationPathFor } from '@/lib/attestationEntretienModel';
 
 // ============================================================================
 // SERVICE
@@ -220,6 +221,52 @@ export const certificatsService = {
   },
 
   /**
+   * Attestation d'entretien et de ramonage — même bucket, à côté du PDF du certificat
+   * (`attestationPathFor(pdf_storage_path)`, upsert : une refacturation régénère la lettre).
+   * @param {string} storagePath
+   * @param {Blob} pdfBlob
+   */
+  async uploadAttestation(storagePath, pdfBlob) {
+    if (!storagePath || !pdfBlob) return { data: null, error: { message: 'storagePath et pdfBlob requis' } };
+    try {
+      const { error } = await supabase.storage
+        .from('certificats')
+        .upload(storagePath, pdfBlob, { cacheControl: '3600', upsert: true, contentType: 'application/pdf' });
+      if (error) {
+        logger.error('[certificats] uploadAttestation error:', error);
+        return { data: null, error };
+      }
+      return { data: { storagePath }, error: null };
+    } catch (err) {
+      logger.error('[certificats] uploadAttestation error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Chemin de l'attestation d'une intervention si elle a été générée (null sinon).
+   * @param {string} interventionId
+   * @returns {Promise<{ data: string|null, error: object|null }>}
+   */
+  async findAttestationPath(interventionId) {
+    try {
+      const { data: cert, error } = await this.getCertificatByIntervention(interventionId);
+      if (error) return { data: null, error };
+      const path = attestationPathFor(cert?.pdf_storage_path);
+      if (!path) return { data: null, error: null };
+      const slash = path.lastIndexOf('/');
+      const { data: files, error: listErr } = await supabase.storage
+        .from('certificats')
+        .list(path.slice(0, slash), { search: path.slice(slash + 1), limit: 1 });
+      if (listErr) return { data: null, error: listErr };
+      return { data: (files || []).some((f) => f.name === path.slice(slash + 1)) ? path : null, error: null };
+    } catch (err) {
+      logger.error('[certificats] findAttestationPath error:', err);
+      return { data: null, error: err };
+    }
+  },
+
+  /**
    * Photo de la plaque signalétique — même bucket que le PDF, à côté de lui :
    * {org_id}/{client_id}/{year}/{certificat_id}-plaque.jpg (upsert : reprendre la photo remplace).
    * @returns {{ data: { storagePath }|null, error }}
@@ -325,7 +372,7 @@ export const certificatsService = {
       const ids = [interventionId, ...(children || []).map((c) => c.id)];
       const { data, error } = await supabase
         .from('majordhome_certificats')
-        .select('id, intervention_id, equipment_id, reference, equipement_type, equipement_marque, equipement_modele, statut, signed_at, pdf_storage_path, pdf_generated_at')
+        .select('id, intervention_id, equipment_id, client_id, reference, equipement_type, equipement_marque, equipement_modele, statut, signed_at, pdf_storage_path, pdf_generated_at, date_intervention, bilan_conformite, donnees_entretien, donnees_ramonage')
         .eq('org_id', orgId)
         .in('intervention_id', ids)
         .order('created_at', { ascending: true });

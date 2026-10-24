@@ -356,6 +356,20 @@ Deno.serve(async (req: Request) => {
         const filename = `Certificat_${sanitizeFilename(String(label))}.pdf`;
         attachments.push({ filename, content: arrayBufferToBase64(buf) });
         attachmentNames.push(filename);
+        // Attestation d'entretien et de ramonage (générée à la facturation, rangée à côté du
+        // certificat) : jointe avec son certificat quand elle existe. Absente = certificat sans
+        // ramonage ou non éligible (conduit obstrué…) : rien à joindre, pas une erreur.
+        const attestationPath = String(cert.pdf_storage_path).replace(/\.pdf$/i, "-attestation.pdf");
+        if (attestationPath !== cert.pdf_storage_path) {
+          const { data: attBlob } = await supabase.storage.from("certificats").download(attestationPath);
+          if (attBlob) {
+            const attBuf = await attBlob.arrayBuffer();
+            totalBytes += attBuf.byteLength;
+            const attFilename = `Attestation_entretien_${sanitizeFilename(String(label))}.pdf`;
+            attachments.push({ filename: attFilename, content: arrayBufferToBase64(attBuf) });
+            attachmentNames.push(attFilename);
+          }
+        }
         const equipLabel = [equipmentLabel, cert.equipement_marque, cert.equipement_modele]
           .filter(Boolean)
           .join(" ");

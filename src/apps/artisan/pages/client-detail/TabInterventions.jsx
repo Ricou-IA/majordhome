@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Plus, Wrench, HardHat, Ban } from 'lucide-react';
 import { CertificatLink } from '@/apps/artisan/components/certificat/CertificatLink';
+import { AttestationLink } from '@/apps/artisan/components/certificat/AttestationLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjectInterventions, useCreateIntervention } from '@hooks/useInterventions';
 import { INTERVENTION_TYPES } from '@services/interventions.service';
@@ -130,6 +131,7 @@ const InterventionCard = ({ intervention, hasChildren = false }) => {
               label={isRealise ? 'Certificat' : 'Remplir'}
             />
           )}
+          {showCertificat && isRealise && <AttestationLink interventionId={intervention.id} label="Attestation" />}
         </div>
       </div>
       {intervention.work_performed && <p className="text-sm text-secondary-600 mt-2 line-clamp-2">{intervention.work_performed}</p>}
