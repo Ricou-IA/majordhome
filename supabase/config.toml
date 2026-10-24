@@ -185,13 +185,19 @@ verify_jwt = true
 [functions.company-document-extract]
 verify_jwt = true
 
-# supplier-catalog-sync : relevé du catalogue d'un fournisseur (BayWa : connexion serveur avec les identifiants
-# Vault de l'org ; import d'un relevé JSON pour Domos / repli). JWT user org_admin (bouton) OU MDH_CRON_SECRET
-# ({ mode: "cron" }, pg_cron quotidien 20261024_3). 2026-10-24.
+# supplier-catalog-sync : relevé du catalogue d'un fournisseur par plateforme (suitecommerce | woocommerce :
+# connexion serveur avec les identifiants Vault de l'org et site_url / connector_config de la ligne suppliers),
+# import d'un relevé JSON, fiche technique rangée dans Documents, rapprochements. JWT user org_admin (bouton)
+# OU MDH_CRON_SECRET ({ mode: "cron" }, pg_cron quotidien 20261024_3, fournisseurs auto_sync). 2026-10-24.
 [functions.supplier-catalog-sync]
 verify_jwt = false
 
 # lead-welcome-email : e-mail d'accueil des leads Meta Ads (gabarit accueil_lead_meta), pg_cron toutes
 # les 5 min (20261024_4), MDH_CRON_SECRET. Rien ne part sans settings.lead_welcome_email.enabled. 2026-10-24.
 [functions.lead-welcome-email]
+verify_jwt = false
+
+# pennylane-supplier-invoices : factures FOURNISSEUR Pennylane d'un fournisseur + lien PDF (30 min), lecture seule.
+# Secret partagé MDH_IMPORT_SECRET (jobs d'import depuis un poste de dev) ou MDH_CRON_SECRET. 2026-10-24.
+[functions.pennylane-supplier-invoices]
 verify_jwt = false
