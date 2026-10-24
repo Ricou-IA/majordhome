@@ -35,6 +35,10 @@ const MAINTENANCE = ['echeances', 'digestModel', 'vocabulaire'];
 // './reglages.js' (même dossier, imports relatifs conservés tels quels).
 const WEBSHOP = ['orders', 'reglages', 'process', 'emailTemplates'];
 
+// Catalogue fournisseur (adaptateurs relevé → lignes de catalogue) → edge supplier-catalog-sync.
+// Copiés dans _shared/catalogue/ (aucun import entre eux).
+const CATALOGUE = ['baywa', 'domos'];
+
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),
   ...MAINTENANCE.map((n) => ({
@@ -44,6 +48,10 @@ export const FICHIERS = [
   ...WEBSHOP.map((n) => ({
     source: path.join(racine, 'src', 'lib', 'webshop', `${n}.js`),
     cible: path.join(racine, 'supabase', 'functions', '_shared', 'webshop', `${n}.js`),
+  })),
+  ...CATALOGUE.map((n) => ({
+    source: path.join(racine, 'src', 'lib', 'catalogue', `${n}.js`),
+    cible: path.join(racine, 'supabase', 'functions', '_shared', 'catalogue', `${n}.js`),
   })),
   { source: path.join(racine, 'src', 'lib', 'sectorClustering.js'), cible: path.join(DST, 'sectorClustering.js') },
   ...PARTAGES.map((n) => ({
