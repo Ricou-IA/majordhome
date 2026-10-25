@@ -8,6 +8,7 @@
  * - Marque d'une ligne de stock choisie dans le devis (prix d'achat de la marque)
  * - Remise par ligne (%) ; glisser-déposer des lignes (poignée, entre chapitres) et des chapitres (devisOrdre.js)
  * - Lignes libres sans article : création de l'article à la ligne ou en lot (org_admin, natures.js)
+ * - « Importer une offre fournisseur » : lignes d'une offre PDF rangées dans les chapitres par nature (ImportOffreDevisModal)
  * - Totaux en temps réel
  * ============================================================================
  */
@@ -22,11 +23,13 @@ import { useAuth } from '@contexts/AuthContext';
 import { useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
 import { deplacerLigne, deplacerChapitre } from '@/lib/devisOrdre.js';
 import { articleDepuisLigne, lignesSansArticle } from '@/lib/catalogue/natures.js';
+import { insererLignesOffre } from '@/lib/catalogue/offreRapprochement.js';
 import DevisProductPicker from './DevisProductPicker';
 import DevisLineRow from './DevisLineRow';
 import MetreFumisterie from './metre/MetreFumisterie';
+import ImportOffreDevisModal from './ImportOffreDevisModal';
 import { formatEuro } from '@/lib/utils';
-import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus } from 'lucide-react';
+import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus, FileUp } from 'lucide-react';
 
 const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
@@ -153,6 +156,7 @@ function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marque
 export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
+  const [importOffre, setImportOffre] = useState(false);
   // TVA du devis DÉRIVÉE à chaque rendu (tvaDuDevis) : les lignes chiffrées font foi (devis repris, devis type chargé) ;
   // le choix mémorisé ne sert que tant que le devis n'a aucune ligne chiffrée ; changer de famille l'oublie.
   const [tvaChoisie, setTvaChoisie] = useState(null);
@@ -325,6 +329,11 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     setLines((prev) => [...prev, { line_type: 'section_title', designation: '', quantity: 0, unit_price_ht: 0, tva_rate: 0 }]);
   }, [setLines]);
 
+  // Offre fournisseur importée : chaque ligne part dans le premier chapitre du type de sa nature (secours : nouveau chapitre)
+  const insererOffre = useCallback((nouvelles, titreSecours) => {
+    setLines((prev) => insererLignesOffre(prev, nouvelles, { typeDe: (titre) => typeChapitre(devisConfig, family, titre), titreSecours }));
+  }, [setLines, devisConfig, family]);
+
   const hasSections = lines.some((l) => l.line_type === 'section_title');
 
   return (
@@ -405,9 +414,16 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
         </div>
       )}
 
-      <button type="button" onClick={addSection} className="btn-secondary btn-sm w-full">
-        <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter un chapitre
-      </button>
+      <div className="flex gap-2">
+        <button type="button" onClick={addSection} className="btn-secondary btn-sm flex-1">
+          <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter un chapitre
+        </button>
+        <button type="button" onClick={() => setImportOffre(true)} className="btn-secondary btn-sm flex-1" title="Reprendre les lignes d'une offre de prix fournisseur (PDF)">
+          <FileUp className="w-3.5 h-3.5 mr-1" /> Importer une offre fournisseur
+        </button>
+      </div>
+
+      {importOffre && <ImportOffreDevisModal orgId={orgId} tva={tvaDevis} onInsert={insererOffre} onClose={() => setImportOffre(false)} />}
 
       {pickerForSection && (
         <DevisProductPicker

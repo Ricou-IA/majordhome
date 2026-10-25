@@ -296,6 +296,8 @@ export const catalogItemKeys = {
   stats: (orgId) => [...catalogItemKeys.all(orgId), 'stats'],
   brands: (orgId) => [...catalogItemKeys.all(orgId), 'brands'],
   gammes: (orgId, categoriesKey) => [...catalogItemKeys.all(orgId), 'gammes', categoriesKey || ''],
+  // Rapprochement d'une offre fournisseur importée (lignes du fournisseur + articles candidats), par jeu de références
+  offre: (orgId, supplierId, refsKey) => [...catalogItemKeys.all(orgId), 'offre', supplierId || '', refsKey],
 };
 
 // --- GeoGrid ---
