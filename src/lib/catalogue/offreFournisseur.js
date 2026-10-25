@@ -13,9 +13,14 @@ import { calculerModelKey } from './modelKey.js';
 /** Natures qu'une ligne d'offre peut porter (supplier_products.product_kind). */
 export const NATURES_OFFRE = Object.freeze(['main', 'accessory', 'consumable']);
 
-const nul = (type) => ({ anyOf: [{ type }, { type: 'null' }] });
+const texteS = { type: 'string' };
+const nombreS = { type: 'number' };
 
-/** Schéma JSON de la réponse de l'IA (structured outputs : tout est requis, une valeur absente vaut null). */
+/**
+ * Schéma JSON de la réponse de l'IA (structured outputs : tout est requis). AUCUN type union : l'API refuse un schéma
+ * à plus de 16 paramètres « valeur ou null » (vécu le 2026-10-25 avec 19 : 400 invalid_request_error). Une valeur
+ * absente du document s'écrit donc "" (texte) ou 0 (nombre) ; lireOffre la ramène à null.
+ */
 export const SCHEMA_OFFRE = Object.freeze({
   type: 'object',
   additionalProperties: false,
@@ -25,11 +30,11 @@ export const SCHEMA_OFFRE = Object.freeze({
       type: 'object',
       additionalProperties: false,
       required: ['nom', 'siret'],
-      properties: { nom: nul('string'), siret: nul('string') },
+      properties: { nom: texteS, siret: texteS },
     },
-    numero: nul('string'),
-    date: nul('string'),
-    validite: nul('string'),
+    numero: texteS,
+    date: texteS,
+    validite: texteS,
     lignes: {
       type: 'array',
       items: {
@@ -38,25 +43,25 @@ export const SCHEMA_OFFRE = Object.freeze({
         required: ['rang', 'code', 'ref_fabricant', 'designation', 'marque', 'quantite', 'unite', 'prix_unitaire_net',
           'prix_brut', 'remise_pct', 'montant_ht', 'eco_participation_unitaire', 'nature'],
         properties: {
-          rang: nul('string'),
-          code: nul('string'),
-          ref_fabricant: nul('string'),
-          designation: { type: 'string' },
-          marque: nul('string'),
-          quantite: nul('number'),
-          unite: nul('string'),
-          prix_unitaire_net: nul('number'),
-          prix_brut: nul('number'),
-          remise_pct: nul('number'),
-          montant_ht: nul('number'),
-          eco_participation_unitaire: nul('number'),
+          rang: texteS,
+          code: texteS,
+          ref_fabricant: texteS,
+          designation: texteS,
+          marque: texteS,
+          quantite: nombreS,
+          unite: texteS,
+          prix_unitaire_net: nombreS,
+          prix_brut: nombreS,
+          remise_pct: nombreS,
+          montant_ht: nombreS,
+          eco_participation_unitaire: nombreS,
           nature: { type: 'string', enum: ['main', 'accessory'] },
         },
       },
     },
-    total_ht: nul('number'),
-    eco_total: nul('number'),
-    remarque: nul('string'),
+    total_ht: nombreS,
+    eco_total: nombreS,
+    remarque: texteS,
   },
 });
 
@@ -68,20 +73,20 @@ export function construirePromptOffre() {
     'sans en oublier ni en inventer. Recopie les nombres tels qu\'imprimés (ne recalcule rien).',
     '',
     'Pour chaque ligne :',
-    '- rang : le numéro de ligne imprimé (« 001 »), sinon null ;',
+    '- rang : le numéro de ligne imprimé (« 001 ») ;',
     '- code : le code article du fournisseur (colonne « Code article », « Réf. »…) ;',
     '- ref_fabricant : la référence du fabricant si elle est imprimée (« Références : ERRA08EV37 » ⇒ ERRA08EV37 ;',
-    '  « Références : Thermance / FILT09779 » ⇒ FILT09779), sinon null ;',
+    '  « Références : Thermance / FILT09779 » ⇒ FILT09779) ;',
     '- designation : le libellé complet sur une seule ligne (rejoindre les retours à la ligne) ;',
     '- marque : la marque imprimée (« Thermance / FILT09779 » ⇒ Thermance), ou évidente d\'après la gamme',
-    '  (Altherma ⇒ Daikin) ; sinon null — n\'invente pas ;',
+    '  (Altherma ⇒ Daikin) ; n\'invente pas ;',
     '- quantite : la quantité commandée ;',
     '- unite : l\'unité du PRIX unitaire telle qu\'imprimée (« Prix pour 1,00 METRE(S) » ⇒ METRE ; « LOT(S) DE 2 PIECE(S) » ⇒',
     '  LOT DE 2 PIECES ; PIECE par défaut si rien n\'est précisé) ;',
     '- prix_unitaire_net : le prix unitaire HT net (remise déduite), HORS éco-participation ;',
-    '- prix_brut et remise_pct : le prix public avant remise et le taux de remise s\'ils sont imprimés, sinon null ;',
+    '- prix_brut et remise_pct : le prix public avant remise et le taux de remise s\'ils sont imprimés ;',
     '- montant_ht : le montant HT de la ligne tel qu\'imprimé ;',
-    '- eco_participation_unitaire : la somme des éco-participations (DEEE, PMCB…) PAR UNITÉ, sinon null ;',
+    '- eco_participation_unitaire : la somme des éco-participations (DEEE, PMCB…) PAR UNITÉ ;',
     '- nature : « main » pour un équipement principal (unité extérieure ou intérieure de pompe à chaleur ou de climatisation,',
     '  chaudière, poêle, ballon d\'eau chaude, batterie, onduleur, panneau), « accessory » pour le reste (accessoire, raccord,',
     '  tuyauterie, vanne, régulation, support, consommable).',
@@ -89,7 +94,7 @@ export function construirePromptOffre() {
     'N\'en fais pas des lignes : sous-totaux, totaux, frais de port, frais de gestion, mentions. Signale-les dans « remarque ».',
     'En tête : fournisseur (nom et SIRET de l\'émetteur de l\'offre, pas du client), numero de l\'offre, date et validite au',
     'format AAAA-MM-JJ. total_ht = le total HT des articles imprimé ; eco_total = le total des éco-participations s\'il est',
-    'imprimé. Une valeur absente du document vaut null.',
+    'imprimé. Une valeur absente du document s\'écrit "" pour un texte et 0 pour un nombre.',
   ].join('\n');
 }
 
@@ -151,9 +156,14 @@ function objetJson(brut) {
   return null;
 }
 
+/** Nombre facultatif : le schéma n'a pas de null, l'IA écrit 0 quand le document ne l'imprime pas. */
+const absentSiZero = (v) => { const n = nombreFr(v); return n ? n : null; };
+
 /**
  * Lecture tolérante de la réponse de l'IA. Ne lève jamais : `{ erreur: 'reponse_illisible' }` sans objet lisible.
- * Une ligne sans libellé est écartée (et comptée) ; les nombres et dates sont normalisés.
+ * Une ligne sans libellé est écartée (et comptée) ; les nombres et dates sont normalisés ; un texte vide et un
+ * nombre facultatif à 0 (prix brut, remise, montant, éco-participation, totaux) valent « absent ». La quantité et le
+ * prix net restent tels quels : à 0, les contrôles le signalent.
  * @param {unknown} brut objet ou texte JSON
  * @returns {{ erreur?: string, fournisseur: { nom: string|null, siret: string|null }, numero: string|null,
  *   date: string|null, validite: string|null, lignes: Array<Record<string, any>>, total_ht: number|null,
@@ -179,17 +189,17 @@ export function lireOffre(brut) {
       quantite: nombreFr(l.quantite),
       unite: texte(l.unite, 40),
       prix_unitaire_net: nombreFr(l.prix_unitaire_net),
-      prix_brut: nombreFr(l.prix_brut),
-      remise_pct: nombreFr(l.remise_pct),
-      montant_ht: nombreFr(l.montant_ht),
-      eco_participation_unitaire: nombreFr(l.eco_participation_unitaire),
+      prix_brut: absentSiZero(l.prix_brut),
+      remise_pct: absentSiZero(l.remise_pct),
+      montant_ht: absentSiZero(l.montant_ht),
+      eco_participation_unitaire: absentSiZero(l.eco_participation_unitaire),
       nature,
     });
   });
   return {
     fournisseur: { nom: texte(f?.nom, 120), siret: texte(f?.siret, 20) },
     numero: texte(o.numero, 60), date: dateIso(o.date), validite: dateIso(o.validite),
-    lignes, total_ht: nombreFr(o.total_ht), eco_total: nombreFr(o.eco_total), remarque: texte(o.remarque, 500), ignorees,
+    lignes, total_ht: absentSiZero(o.total_ht), eco_total: absentSiZero(o.eco_total), remarque: texte(o.remarque, 500), ignorees,
   };
 }
 
@@ -222,7 +232,7 @@ export function controlerOffre(offre) {
   let somme = 0;
   for (const l of lignes) {
     const nom = `Ligne ${l.rang} (${l.designation.slice(0, 40)})`;
-    if (l.prix_unitaire_net == null) alertes.push({ code: 'prix_absent', rang: l.rang, message: `${nom} : prix unitaire illisible.` });
+    if (!(l.prix_unitaire_net > 0)) alertes.push({ code: 'prix_absent', rang: l.rang, message: `${nom} : prix unitaire illisible ou nul.` });
     if (l.quantite == null || !(l.quantite > 0)) alertes.push({ code: 'quantite_absente', rang: l.rang, message: `${nom} : quantité illisible.` });
     if (!l.code && !l.ref_fabricant) alertes.push({ code: 'reference_absente', rang: l.rang, message: `${nom} : aucune référence, l'article ne pourra pas être reconnu.` });
     if (l.montant_ht != null && l.quantite != null && l.prix_unitaire_net != null) {

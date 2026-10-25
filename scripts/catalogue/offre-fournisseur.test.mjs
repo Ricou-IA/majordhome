@@ -11,7 +11,7 @@ import {
   lignesCatalogueDepuisOffre, versionOffre, montantLigne,
 } from '../../src/lib/catalogue/offreFournisseur.js';
 import {
-  fournisseurDeLOffre, rapprocherLigne, choixParDefaut, actionCatalogue, ligneDevisDepuisOffre, insererLignesOffre,
+  fournisseurDeLOffre, rapprocherLigne, choixParDefaut, actionCatalogue, ligneDevisDepuisOffre, insererLignesOffre, planCatalogueDevis,
 } from '../../src/lib/catalogue/offreRapprochement.js';
 
 const brut = JSON.parse(readFileSync(new URL('./data/offres/tereva-0036-2026-10.json', import.meta.url), 'utf8'));
@@ -27,6 +27,9 @@ test('schéma strict : objets fermés, tous les champs requis', () => {
     if (s.type === 'array') verifier(s.items, `${chemin}[]`);
   };
   verifier(SCHEMA_OFFRE, 'offre');
+  // aucun type union : l'API refuse plus de 16 paramètres « valeur ou null » (400 vécu le 2026-10-25 avec 19)
+  const texteSchema = JSON.stringify(SCHEMA_OFFRE);
+  assert.ok(!texteSchema.includes('anyOf') && !texteSchema.includes('"null"') && !/"type":\[/.test(texteSchema));
   assert.match(construirePromptOffre(), /HORS éco-participation/);
 });
 
@@ -86,6 +89,21 @@ test('lecture tolérante : texte avec bloc json, nombres en texte, ligne sans li
   assert.equal(o.lignes[0].nature, 'accessory');
   assert.equal(controlerOffre(o).total_verifie, true);
   assert.equal(lireOffre('pas de json').erreur, 'reponse_illisible');
+});
+
+test('lecture au format strict : "" et 0 valent « absent », quantité et prix nuls signalés', () => {
+  const o = lireOffre({
+    fournisseur: { nom: 'TEREVA', siret: '' }, numero: '0036', date: '2026-10-19', validite: '', total_ht: 0, eco_total: 0, remarque: '',
+    lignes: [
+      { rang: '001', code: '4514850', ref_fabricant: '', designation: 'UE', marque: '', quantite: 1, unite: 'PIECE', prix_unitaire_net: 2093.03, prix_brut: 0, remise_pct: 0, montant_ht: 2093.03, eco_participation_unitaire: 0, nature: 'main' },
+      { rang: '002', code: 'X', ref_fabricant: '', designation: 'Sans prix', marque: '', quantite: 0, unite: '', prix_unitaire_net: 0, prix_brut: 0, remise_pct: 0, montant_ht: 0, eco_participation_unitaire: 0, nature: 'accessory' },
+    ],
+  });
+  assert.deepEqual([o.fournisseur.siret, o.validite, o.total_ht, o.eco_total, o.remarque], [null, null, null, null, null]);
+  const [ue] = o.lignes;
+  assert.deepEqual([ue.ref_fabricant, ue.marque, ue.prix_brut, ue.remise_pct, ue.eco_participation_unitaire], [null, null, null, null, null]);
+  const codes = controlerOffre(o).alertes.map((a) => a.code);
+  assert.ok(codes.includes('prix_absent') && codes.includes('quantite_absente') && codes.includes('total_absent'));
 });
 
 test('unités : mètre, lot, pièce par défaut', () => {
@@ -200,6 +218,27 @@ test('action catalogue : création, mise à jour, identique, prix connu plus ré
   assert.equal(recent.coche, false);
   assert.match(recent.avertissement, /24\/10\/2026/);
   assert.equal(actionCatalogue(l, { purchase_price_ht: 88.9 }, '2026-10-19').action, 'identique');
+});
+
+test('devis → catalogue : le prix d\'achat de l\'offre est enregistré, l\'article choisi gagne l\'offre (retour Eric 2026-10-25)', () => {
+  const rows = [
+    // reconnue chez le fournisseur, prix changé : écrite, pas rattachée (déjà sur son article)
+    { ligne: ligneDe('4409779'), rap: { statut: 'meme_reference', produit: { id: 'p1', purchase_price_ht: 85.53, purchase_price_at: '2026-09-02' }, article: articleFiltre, suggestions: [] }, choix: { type: 'article', itemId: 'art-filtre' }, nature: 'accessory' },
+    // même référence fabricant ailleurs : écrite chez ce fournisseur puis rattachée à l'article choisi
+    { ligne: ligneDe('4514850'), rap: { statut: 'reference_fabricant', produit: null, article: articleUE, suggestions: [] }, choix: { type: 'article', itemId: 'art-ue' }, nature: 'main' },
+    // à créer : écrite, l'article est posé par la base
+    { ligne: ligneDe('4039288'), rap: { statut: 'a_creer', produit: null, article: null, suggestions: [] }, choix: { type: 'creer' }, nature: 'main' },
+    // ligne libre : hors catalogue
+    { ligne: ligneDe('3384677'), rap: { statut: 'a_creer', produit: null, article: null, suggestions: [] }, choix: { type: 'libre' }, nature: 'accessory' },
+    // prix connu plus récent que l'offre : pas remplacé
+    { ligne: ligneDe('074247F'), rap: { statut: 'meme_reference', produit: { id: 'p2', purchase_price_ht: 14.28, purchase_price_at: '2026-10-24' }, article: null, suggestions: [] }, choix: { type: 'creer' }, nature: 'accessory' },
+    // prix identique : rien à écrire
+    { ligne: ligneDe('3518453'), rap: { statut: 'meme_reference', produit: { id: 'p3', purchase_price_ht: 163.5 }, article: null, suggestions: [] }, choix: { type: 'creer' }, nature: 'accessory' },
+  ];
+  const plan = planCatalogueDevis(rows, '2026-10-19');
+  assert.deepEqual(plan.aEcrire.map((e) => e.ligne.code), ['4409779', '4514850', '4039288']);
+  assert.deepEqual(plan.aRattacher, [{ reference: '4514850', itemId: 'art-ue' }]);
+  assert.deepEqual(plan.ignorees.map((i) => [i.ligne.code, i.raison.split(' ')[0]]), [['3384677', 'ligne'], ['074247F', 'prix'], ['3518453', 'prix']]);
 });
 
 test('ligne de devis : prix d\'achat de l\'offre, vente de l\'article, libre sans article', () => {

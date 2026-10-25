@@ -5,9 +5,11 @@
  * pas ses lignes. Le PDF est lu par l'IA (OffreDepot), chaque ligne est rapprochée d'un article (même fournisseur +
  * même référence, sinon même référence fabricant, sinon suggestions) ou proposée en création (org_admin) ; on valide
  * ligne par ligne, puis les lignes partent dans les chapitres selon la nature de l'article (insererLignesOffre).
- * Prix d'achat = prix net de l'offre ; prix de vente = celui de l'article s'il existe, sinon « à chiffrer ».
- * Seule écriture : les articles à créer (edge apply → supplier_catalog_upsert) ; le prix des articles existants n'est
- * pas touché ici (import d'offre de la fiche fournisseur).
+ * Prix d'achat = prix net de l'offre ; prix de vente = celui de la base article s'il existe, sinon « à chiffrer ».
+ * Retour d'Eric (2026-10-25) : « l'offre fournisseur est un prix d'achat, c'est important pour le listing produit ».
+ * L'admin qui valide enregistre donc les prix d'achat au catalogue du fournisseur (planCatalogueDevis → edge apply →
+ * supplier_catalog_upsert) : références créées, prix mis à jour, ligne nouvelle rattachée à l'article choisi ; la
+ * prochaine offre ou le prochain devis retrouvent l'article, son prix d'achat et son prix de vente.
  * ============================================================================
  */
 
@@ -17,7 +19,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useSuppliers } from '@hooks/useSuppliers';
 import { useOffreFournisseurMutations, useOffreRapprochement } from '@hooks/useOffresFournisseur';
-import { fournisseurDeLOffre, choixParDefaut, ligneDevisDepuisOffre } from '@/lib/catalogue/offreRapprochement.js';
+import { useCatalogItemMutations } from '@hooks/useCatalogItems';
+import { fournisseurDeLOffre, choixParDefaut, ligneDevisDepuisOffre, planCatalogueDevis } from '@/lib/catalogue/offreRapprochement.js';
 import { referenceLigne, uniteDepuisOffre } from '@/lib/catalogue/offreFournisseur.js';
 import { formatEuro } from '@/lib/utils';
 import OffreDepot from '../offres/OffreDepot';
@@ -40,7 +43,7 @@ function LigneOffre({ ligne, rap, etat, onChange, peutCreer }) {
   if (rap?.article) options.push({ value: `article:${rap.article.id}`, label: `✓ ${rap.article.name} (${RAISON[rap.statut] || 'reconnu'})` });
   for (const s of rap?.suggestions || []) options.push({ value: `article:${s.article.id}`, label: `≈ ${s.article.name} — ${s.raisons.join(', ') || 'proche'}` });
   if (peutCreer) options.push({ value: 'creer', label: '+ Créer l’article (catalogue du fournisseur)' });
-  options.push({ value: 'libre', label: 'Ligne libre, sans article' });
+  options.push({ value: 'libre', label: 'Ligne libre, sans article (hors catalogue)' });
   const article = etat.choix.type === 'article'
     ? [rap?.article, ...(rap?.suggestions || []).map((s) => s.article)].find((a) => a?.id === etat.choix.itemId)
     : null;
@@ -78,6 +81,7 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
   const { isOrgAdmin } = useAuth();
   const { suppliers = [] } = useSuppliers(orgId);
   const { appliquer, isApplying, articles } = useOffreFournisseurMutations(orgId);
+  const { attach } = useCatalogItemMutations(orgId);
   const [lecture, setLecture] = useState(null);
   const [fournisseurId, setFournisseurId] = useState('');
   const lignes = useMemo(() => lecture?.offre?.lignes || [], [lecture]);
@@ -118,47 +122,63 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
 
   const inclus = etats.filter((e) => e.inclus).length;
   const ecoTotal = lecture?.offre?.eco_total;
+  // ce que la validation enregistrera au catalogue du fournisseur (affiché en pied de fenêtre)
+  const plan = useMemo(() => (peutCreer && rapprochements && etats.length === lignes.length
+    ? planCatalogueDevis(etats.map((e, i) => ({ ...e, ligne: lignes[i], rap: rapprochements[i] })).filter((r) => r.inclus), lecture?.offre?.date ?? null)
+    : { aEcrire: [], aRattacher: [], ignorees: [] }), [peutCreer, rapprochements, etats, lignes, lecture]);
   const bloquee = (lecture?.controle?.alertes || []).some((a) => a.bloquante);
 
   const valider = async () => {
     setEnCours(true);
     try {
       const rows = etats.map((e, i) => ({ ...e, ligne: lignes[i], rap: rapprochements[i] })).filter((r) => r.inclus);
-      // 1. articles à créer : écrits au catalogue du fournisseur (référence + prix de l'offre), article posé par la base
-      const aCreer = rows.filter((r) => r.choix.type === 'creer');
       const produitParRef = new Map();
       const articleParId = new Map();
       for (const r of rows) for (const a of [r.rap?.article, ...(r.rap?.suggestions || []).map((s) => s.article)]) if (a) articleParId.set(a.id, a);
-      if (aCreer.length) {
-        const res = await appliquer(fournisseurId, lecture.offre, aCreer.map((r) => ({
-          ...r.ligne, nature: NATURES_FOURNISSEUR.includes(r.nature) ? r.nature : 'accessory',
+      // 1. prix d'achat de l'offre enregistrés au catalogue du fournisseur (admin) : références créées, prix mis à jour,
+      //    puis la ligne nouvelle chez ce fournisseur rattachée à l'article choisi (planCatalogueDevis)
+      let rattachees = 0;
+      if (peutCreer && plan.aEcrire.length) {
+        const res = await appliquer(fournisseurId, lecture.offre, plan.aEcrire.map((e) => ({
+          ...e.ligne, nature: NATURES_FOURNISSEUR.includes(e.nature) ? e.nature : 'accessory',
         })));
         for (const p of res.produits || []) produitParRef.set(p.reference, p);
-        const ids = [...new Set((res.produits || []).map((p) => p.catalog_item_id).filter(Boolean))];
+        (res.ecartees || []).forEach((e) => toast.warning(`Non enregistré au catalogue : ${e}`));
+        for (const { reference, itemId } of plan.aRattacher) {
+          const p = produitParRef.get(reference);
+          if (!p || p.catalog_item_id === itemId) continue;
+          try {
+            await attach(p.id, itemId);
+            produitParRef.set(reference, { ...p, catalog_item_id: itemId });
+            rattachees += 1;
+          } catch (err) { toast.error(`${reference} : rattachement à l'article refusé (${err?.message || 'erreur'})`); }
+        }
+        const ids = [...new Set([...produitParRef.values()].map((p) => p.catalog_item_id).filter((id) => id && !articleParId.has(id)))];
         for (const a of await articles(ids)) articleParId.set(a.id, a);
-        (res.ecartees || []).forEach((e) => toast.warning(`Non créé : ${e}`));
+        const r = res.resultat || {};
+        toast.info(`Catalogue ${fournisseur.name} : ${r.inseres ?? 0} référence(s) créée(s), ${r.mis_a_jour ?? 0} prix d'achat mis à jour${rattachees ? `, ${rattachees} rattachée(s) à l'article choisi` : ''}`);
       }
-      // 2. lignes du devis
+      // 2. lignes du devis : prix d'achat de l'offre, prix de vente de l'article
       let sansArticle = 0;
       const nouvelles = rows.map((r) => {
         let article = null;
-        let produit = null;
+        let produit = produitParRef.get(referenceLigne(r.ligne)) || null;
         if (r.choix.type === 'article') {
           article = articleParId.get(r.choix.itemId) || null;
-          produit = r.rap?.produit && r.rap.article?.id === r.choix.itemId ? r.rap.produit : null;
+          if (!produit && r.rap?.produit && r.rap.article?.id === r.choix.itemId) produit = r.rap.produit;
         } else if (r.choix.type === 'creer') {
-          produit = produitParRef.get(referenceLigne(r.ligne)) || null;
           article = produit?.catalog_item_id ? (articleParId.get(produit.catalog_item_id) || null) : null;
           if (!article) sansArticle += 1;
+        } else {
+          produit = null;
         }
         return { line: ligneDevisDepuisOffre(r.ligne, { article, produit, fournisseur, tva }), nature: r.nature };
       });
       onInsert(nouvelles, `FOURNITURES ${(fournisseur?.name || lecture.offre.fournisseur?.nom || '').toUpperCase()}`.trim());
       const aChiffrer = nouvelles.filter((n) => !(n.line.unit_price_ht > 0)).length;
       toast.success(`${nouvelles.length} ligne${nouvelles.length > 1 ? 's' : ''} ajoutée${nouvelles.length > 1 ? 's' : ''} au devis`);
-      if (aCreer.length) toast.info(`${aCreer.length - sansArticle} article${aCreer.length - sansArticle > 1 ? 's' : ''} créé${aCreer.length - sansArticle > 1 ? 's' : ''} ou rattaché${aCreer.length - sansArticle > 1 ? 's' : ''} dans la base`);
       if (sansArticle) toast.warning(`${sansArticle} ligne${sansArticle > 1 ? 's' : ''} restée${sansArticle > 1 ? 's' : ''} libre${sansArticle > 1 ? 's' : ''} : article non créé`);
-      if (aChiffrer) toast.warning(`${aChiffrer} ligne${aChiffrer > 1 ? 's' : ''} sans prix de vente : à chiffrer dans le devis`);
+      if (aChiffrer) toast.warning(`${aChiffrer} ligne${aChiffrer > 1 ? 's' : ''} sans prix de vente dans la base article : à chiffrer dans le devis`);
       onClose();
     } catch (err) {
       toast.error(err?.message || 'Import de l\'offre refusé');
@@ -207,7 +227,12 @@ export default function ImportOffreDevisModal({ orgId, tva, onInsert, onClose })
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
           <p className="text-xs text-secondary-500 max-w-xl">
-            {lecture ? <>Prix d&apos;achat = prix net de l&apos;offre{ecoTotal ? ` (éco-participations en sus : ${formatEuro(ecoTotal)} HT, hors marge)` : ''}. Le prix d&apos;achat des articles existants n&apos;est pas modifié ici : importez l&apos;offre depuis la fiche du fournisseur.</> : 'Formats acceptés : PDF, 8 Mo maximum.'}
+            {lecture ? <>
+              Prix d&apos;achat = prix net de l&apos;offre{ecoTotal ? ` (éco-participations en sus : ${formatEuro(ecoTotal)} HT, hors marge)` : ''} ; prix de vente = celui de la base article.{' '}
+              {peutCreer
+                ? `${plan.aEcrire.length} prix d'achat seront enregistrés au catalogue ${fournisseur.name}${plan.ignorees.length ? ` (${plan.ignorees.length} non : ligne libre, prix inchangé ou plus récent)` : ''}.`
+                : 'Les prix d’achat ne sont pas enregistrés au catalogue (fournisseur à choisir, réservé à l’administrateur).'}
+            </> : 'Formats acceptés : PDF, 8 Mo maximum.'}
           </p>
           <div className="flex gap-2">
             {lecture && <button type="button" onClick={() => { setLecture(null); setEtats([]); cleChoix.current = ''; }} className="btn-secondary btn-sm">Autre fichier</button>}
