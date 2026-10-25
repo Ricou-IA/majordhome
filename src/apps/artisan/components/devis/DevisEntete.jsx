@@ -4,13 +4,13 @@
  * Remplace l'ancienne étape « Client » du wizard.
  */
 
-import { AlertTriangle, User, Phone, Mail, MapPin } from 'lucide-react';
+import { AlertTriangle, User, Phone, Mail, MapPin, FileUp } from 'lucide-react';
 import { QUOTE_TEMPLATE_FAMILIES } from '@services/devis.service';
 
 /** `familles` = labels des familles actives de l'org (famillesActives(devisConfig)) ; défauts si absent. */
 import { inputClass } from '../FormFields';
 
-export default function DevisEntete({ lead, form, setField, selectedFamily, onSelectFamily, templates, selectedTemplateId, onSelectTemplate, familles }) {
+export default function DevisEntete({ lead, form, setField, selectedFamily, onSelectFamily, templates, selectedTemplateId, onSelectTemplate, familles, onImportOffre }) {
   const listeFamilles = familles?.length ? familles : QUOTE_TEMPLATE_FAMILIES;
   const clientName = [lead?.first_name, lead?.last_name].filter(Boolean).join(' ') || '—';
   const clientAddress = [lead?.address, lead?.postal_code, lead?.city].filter(Boolean).join(', ');
@@ -29,8 +29,9 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
         )}
       </div>
 
-      {/* Installation + devis type sur une rangée */}
-      <div className="grid gap-3 md:grid-cols-[1fr_16rem] md:items-end">
+      {/* Installation + devis type + import d'une offre fournisseur sur une rangée (l'import est une autre façon de
+          partir d'un contenu tout fait, au même niveau que le devis type — Eric 2026-10-25) */}
+      <div className={`grid gap-3 md:items-end ${onImportOffre ? 'md:grid-cols-[1fr_16rem_auto]' : 'md:grid-cols-[1fr_16rem]'}`}>
         <div>
           <label className="block text-xs font-medium text-secondary-600 mb-1.5">Installation</label>
           <div className="flex flex-wrap gap-2">
@@ -49,6 +50,11 @@ export default function DevisEntete({ lead, form, setField, selectedFamily, onSe
             {familyTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.description ? ` — ${t.description}` : ''}</option>)}
           </select>
         </div>
+        {onImportOffre && (
+          <button type="button" onClick={onImportOffre} className="btn-secondary whitespace-nowrap" title="Reprendre les lignes d'une offre de prix fournisseur (PDF)">
+            <FileUp className="w-4 h-4 mr-1.5" /> Importer une offre fournisseur
+          </button>
+        )}
       </div>
 
       {/* Objet */}

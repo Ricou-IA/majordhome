@@ -36,6 +36,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const { createQuote, isCreating, updateQuote, upsertLines } = useDevisMutations(lead?.id);
   const edition = !!devisAModifier?.quote;
   const [enregistrement, setEnregistrement] = useState(false);
+  const [importOffre, setImportOffre] = useState(false); // fenêtre « Importer une offre fournisseur » (bouton de l'en-tête)
   const { saveMetre } = useFumMetreMutations(orgId);
   // Familles, chapitres, conditions et validité par défaut : Settings → Socle → Devis
   const { settings, isLoading: settingsLoading } = useOrgSettings();
@@ -190,8 +191,8 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <DevisEntete lead={lead} form={form} setField={setField} selectedFamily={selectedFamily} onSelectFamily={handleSelectFamily}
-            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={handleSelectTemplate} familles={famillesActives(devisConfig).map((f) => f.label)} />
-          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} />
+            templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={handleSelectTemplate} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
+          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} />
           {nbLignes > 0 && <DevisConditions form={form} setField={setField} lines={lines} devisConfig={devisConfig} />}
         </div>
 
