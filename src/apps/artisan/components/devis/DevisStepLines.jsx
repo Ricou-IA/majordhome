@@ -1,157 +1,81 @@
 /**
  * DevisStepLines.jsx — Étape 2 du wizard : éditeur de lignes
  * ============================================================================
- * - Sections prédéfinies (depuis la famille) affichées comme blocs cliquables
- * - Clic sur section → ouvre le picker produit, produits insérés dans la section
- * - Ajout ligne main d'œuvre libre dans chaque section
- * - Modification quantité, prix, TVA par ligne
+ * - Chapitres prédéfinis par la famille, chacun typé (équipement, option, stock, main d'œuvre, libre, fumisterie) :
+ *   le « Catalogue » du chapitre propose les articles de cette nature (décisions d'Eric, 2026-10-25)
+ * - « Ligne libre » dans tout chapitre (petite fourniture au forfait, prestation, main d'œuvre ponctuelle)
+ * - TVA du devis : celle de la famille par défaut, changeable d'un geste pour toutes les lignes
+ * - Marque d'une ligne de stock choisie dans le devis (prix d'achat de la marque)
  * - Totaux en temps réel
  * ============================================================================
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { TVA_RATES, computeLineTotals, productCategoriesForSection } from '@services/devis.service';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { computeLineTotals, productCategoriesForSection } from '@services/devis.service';
+import { typeChapitre, tvaFamille, TAUX_TVA } from '@/lib/devisConfig.js';
+import { marquesDesOffres, appliquerMarque } from '@/lib/catalogue/marqueLigne.js';
+import { useCatalogItemOffers } from '@hooks/useCatalogItems';
 import DevisProductPicker from './DevisProductPicker';
+import DevisLineRow from './DevisLineRow';
 import MetreFumisterie from './metre/MetreFumisterie';
 import { formatEuro } from '@/lib/utils';
-import {
-  Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
-  Package, Ruler,
-} from 'lucide-react';
+import { Plus, Package, Ruler, PenLine, BookOpen } from 'lucide-react';
 
-// =============================================================================
-// LIGNE PRODUIT / MAIN D'ŒUVRE
-// =============================================================================
+const TYPE_LABELS = {
+  equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
+};
 
-function LineRow({ line, index, onUpdate, onRemove, onMoveUp, onMoveDown, isFirst, isLast }) {
-  const setLineField = (field, value) => {
-    onUpdate(index, { ...line, [field]: value });
-  };
-
-  const lineTotals = computeLineTotals(line);
-
-  return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 ml-4 border border-secondary-200 rounded-lg">
-      <GripVertical className="w-3.5 h-3.5 text-secondary-300 flex-shrink-0" />
-      {/* Désignation */}
-      <div className="flex-1 min-w-0">
-        {line.is_freeform || line.line_type === 'labor' ? (
-          <input
-            type="text"
-            value={line.designation}
-            onChange={(e) => setLineField('designation', e.target.value)}
-            placeholder="Désignation..."
-            className="w-full bg-transparent border-none outline-none text-sm text-secondary-900 placeholder:text-secondary-300"
-          />
-        ) : (
-          <>
-            <p className="text-sm text-secondary-900 truncate" title={line.designation}>
-              {line.designation || 'Sans désignation'}
-            </p>
-            {line.supplier_name && (
-              <p className="text-[10px] text-secondary-400 truncate -mt-0.5">
-                {line.supplier_name}{line.reference ? ` · ${line.reference}` : ''}
-              </p>
-            )}
-          </>
-        )}
-      </div>
-      {/* Qté */}
-      <input
-        type="number"
-        value={line.quantity}
-        onChange={(e) => setLineField('quantity', e.target.value)}
-        min="0"
-        step="1"
-        className="w-10 px-1 py-1 border border-secondary-200 rounded text-xs text-center flex-shrink-0 bg-secondary-50"
-      />
-      {/* P.U. HT */}
-      <input
-        type="number"
-        value={line.unit_price_ht}
-        onChange={(e) => setLineField('unit_price_ht', e.target.value)}
-        min="0"
-        step="0.01"
-        className="w-16 px-1 py-1 border border-secondary-200 rounded text-xs text-right flex-shrink-0 bg-secondary-50"
-      />
-      {/* TVA (hidden select, juste l'affichage) */}
-      <select
-        value={line.tva_rate}
-        onChange={(e) => setLineField('tva_rate', e.target.value)}
-        className="w-14 px-0.5 py-1 border border-secondary-200 rounded text-xs text-center flex-shrink-0 bg-secondary-50"
-      >
-        {TVA_RATES.map((t) => (
-          <option key={t.value} value={t.value}>{t.value}%</option>
-        ))}
-      </select>
-      {/* Total TTC */}
-      <span className="w-[4.5rem] text-right text-sm font-semibold text-secondary-900 flex-shrink-0 tabular-nums">
-        {formatEuro(lineTotals.total_ttc)}
-      </span>
-      {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0">
-        <button type="button" onClick={() => onMoveUp(index)} disabled={isFirst} className="p-0.5 hover:bg-secondary-100 rounded disabled:opacity-30">
-          <ChevronUp className="w-3 h-3" />
-        </button>
-        <button type="button" onClick={() => onMoveDown(index)} disabled={isLast} className="p-0.5 hover:bg-secondary-100 rounded disabled:opacity-30">
-          <ChevronDown className="w-3 h-3" />
-        </button>
-        <button type="button" onClick={() => onRemove(index)} className="p-0.5 hover:bg-red-50 rounded">
-          <Trash2 className="w-3 h-3 text-red-400" />
-        </button>
-      </div>
-    </div>
-  );
+/** Taux le plus fréquent parmi les lignes chiffrées (devis repris, lignes pré-remplies), sinon null. */
+function tvaDesLignes(lines) {
+  const compte = new Map();
+  for (const l of lines) {
+    if (l.line_type === 'section_title') continue;
+    const t = Number(l.tva_rate);
+    if (TAUX_TVA.includes(t)) compte.set(t, (compte.get(t) || 0) + 1);
+  }
+  let meilleur = null;
+  for (const [t, n] of compte) if (meilleur == null || n > compte.get(meilleur)) meilleur = t;
+  return meilleur;
 }
 
 // =============================================================================
-// BLOC SECTION (titre + lignes enfants + boutons d'ajout)
+// BLOC CHAPITRE (titre + lignes enfants + boutons d'ajout)
 // =============================================================================
 
-function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, onMoveUp, onMoveDown, onAddProducts, onAddLabor, onAddFreeform, onMetre }) {
+function SectionBlock({ sectionIndex, section, type, childLines, onUpdate, onRemove, onMoveUp, onMoveDown, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, onMarque }) {
   const productCount = childLines.length;
-  const sectionTotalTtc = childLines.reduce((sum, { line }) => {
-    const t = computeLineTotals(line);
-    return sum + (t.total_ttc || 0);
-  }, 0);
-
-  // Section MAIN D'ŒUVRE → seulement bouton main d'œuvre
-  const isLaborSection = /main\s*d[''\u2019]?\s*[oœ]/i.test(section.designation);
-  // Section AUTRE / PRESTATIONS → saisie libre ; MATÉRIEL (famille Batterie : ligne fourre-tout câblage) → saisie
-  // libre ET catalogue (un coffret ou un câble BayWa peut s'y piocher)
-  const isFreeformSection = /^(autre|prestations?|mat[ée]riel)$/i.test(section.designation.trim());
-  const isFreeformAndCatalog = /^mat[ée]riel$/i.test(section.designation.trim());
-  // Section FUMISTERIE → métré assisté en plus du picker
-  const isFumisterie = /fumisterie/i.test(section.designation);
+  const sectionTotalTtc = childLines.reduce((sum, { line }) => sum + (computeLineTotals(line).total_ttc || 0), 0);
+  const btn = 'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors';
 
   return (
     <div className="border border-secondary-200 rounded-xl overflow-hidden">
-      {/* Section header */}
+      {/* En-tête du chapitre */}
       <div className="flex items-center justify-between px-4 py-3 bg-secondary-50 border-b border-secondary-200">
-        <input
-          type="text"
-          value={section.designation}
-          onChange={(e) => onUpdate(sectionIndex, { ...section, designation: e.target.value })}
-          className="bg-transparent border-none outline-none text-sm font-semibold text-secondary-700 uppercase tracking-wider"
-          placeholder="TITRE DE SECTION"
-        />
+        <div className="flex items-center gap-2 min-w-0">
+          <input
+            type="text"
+            value={section.designation}
+            onChange={(e) => onUpdate(sectionIndex, { ...section, designation: e.target.value })}
+            className="bg-transparent border-none outline-none text-sm font-semibold text-secondary-700 uppercase tracking-wider min-w-0"
+            placeholder="TITRE DU CHAPITRE"
+          />
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
+        </div>
         <div className="flex items-center gap-3">
           {productCount > 0 && (
             <span className="text-xs text-secondary-500">
-              {productCount} article{productCount > 1 ? 's' : ''} · {formatEuro(sectionTotalTtc)} TTC
+              {productCount} ligne{productCount > 1 ? 's' : ''} · {formatEuro(sectionTotalTtc)} TTC
             </span>
           )}
-          {/* Le métré assisté est l'action principale de la section FUMISTERIE : un vrai bouton, pas un chip près du « + » */}
-          {isFumisterie && onMetre && (
+          {type === 'fumisterie' && onMetre && (
             <button type="button" onClick={() => onMetre(sectionIndex)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-900 bg-primary-400 hover:bg-primary-500 rounded-lg" title="Métré assisté sur coupe cotée"><Ruler className="w-4 h-4" /> Métré assisté</button>
           )}
         </div>
       </div>
 
-      {/* Child lines */}
+      {/* Lignes */}
       {childLines.length > 0 && (
         <div className="p-2 space-y-1">
-          {/* En-têtes colonnes */}
           <div className="flex items-center gap-1.5 px-3 ml-4 text-[10px] font-medium text-secondary-400 uppercase tracking-wider">
             <span className="w-3.5 flex-shrink-0" />
             <span className="flex-1">Désignation</span>
@@ -162,7 +86,7 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
             <span className="w-[52px] flex-shrink-0" />
           </div>
           {childLines.map(({ line, globalIndex }, i) => (
-            <LineRow
+            <DevisLineRow
               key={globalIndex}
               line={line}
               index={globalIndex}
@@ -172,53 +96,26 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
               onMoveDown={onMoveDown}
               isFirst={i === 0}
               isLast={i === childLines.length - 1}
+              marques={line.catalog_item_id ? (marquesParItem.get(line.catalog_item_id) || []) : []}
+              onMarque={(marque) => onMarque(globalIndex, marque)}
             />
           ))}
         </div>
       )}
 
-      {/* Action button inside section */}
-      <div className="flex gap-2 px-4 py-1.5 bg-secondary-50/50 border-t border-secondary-100">
-        {isLaborSection ? (
-          <button
-            type="button"
-            onClick={() => onAddLabor(sectionIndex)}
-            className="flex items-center justify-center w-6 h-6 text-secondary-500 bg-white hover:bg-secondary-100 rounded-full border border-secondary-200 transition-colors"
-            title="Ajouter main d'œuvre"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        ) : isFreeformSection ? (
-          <>
-            <button
-              type="button"
-              onClick={() => onAddFreeform(sectionIndex)}
-              className="flex items-center justify-center w-6 h-6 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-full border border-amber-200 transition-colors"
-              title="Ajouter une ligne libre"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-            {isFreeformAndCatalog && (
-              <button
-                type="button"
-                onClick={() => onAddProducts(sectionIndex, section.designation)}
-                className="flex items-center justify-center w-6 h-6 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-full border border-primary-200 transition-colors"
-                title="Ajouter des produits du catalogue"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onAddProducts(sectionIndex, section.designation)}
-            className="flex items-center justify-center w-6 h-6 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-full border border-primary-200 transition-colors"
-            title="Ajouter des produits"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        )}
+      {/* Ajouts */}
+      <div className="flex flex-wrap gap-2 px-4 py-1.5 bg-secondary-50/50 border-t border-secondary-100">
+        <button type="button" onClick={() => onAddProducts(sectionIndex, section.designation, type)} className={`${btn} text-primary-700 bg-primary-50 hover:bg-primary-100 border-primary-200`} title="Ajouter des articles du catalogue">
+          <BookOpen className="w-3.5 h-3.5" /> Catalogue
+        </button>
+        <button
+          type="button"
+          onClick={() => (type === 'main_oeuvre' ? onAddLabor(sectionIndex) : onAddFreeform(sectionIndex))}
+          className={`${btn} text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200`}
+          title={type === 'main_oeuvre' ? 'Ajouter une ligne de main d’œuvre saisie à la main' : 'Ajouter une ligne saisie à la main (forfait, petite fourniture)'}
+        >
+          <PenLine className="w-3.5 h-3.5" /> Ligne libre
+        </button>
       </div>
     </div>
   );
@@ -229,13 +126,43 @@ function SectionBlock({ sectionIndex, section, childLines, onUpdate, onRemove, o
 // =============================================================================
 
 export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig }) {
-  const [pickerForSection, setPickerForSection] = useState(null); // { index, category }
+  const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
-  const pickerCategories = pickerForSection?.categories || [];
+  // TVA du devis : celle des lignes déjà chiffrées (devis repris, pré-remplissage), sinon celle de la famille
+  const [tvaDevis, setTvaDevis] = useState(() => tvaDesLignes(lines) ?? tvaFamille(devisConfig, family));
+
+  // Changement de famille sur un devis encore vide : la TVA suit la nouvelle famille
+  useEffect(() => {
+    if (tvaDesLignes(lines) == null) setTvaDevis(tvaFamille(devisConfig, family));
+  }, [family, devisConfig]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const changerTvaDevis = useCallback((valeur) => {
+    const t = Number(valeur);
+    setTvaDevis(t);
+    setLines((prev) => prev.map((l) => (l.line_type === 'section_title' ? l : { ...l, tva_rate: t })));
+  }, [setLines]);
+
+  // Offres des articles posés (marques des articles de stock)
+  const itemIdsKey = useMemo(() => [...new Set(lines.map((l) => l.catalog_item_id).filter(Boolean))].sort().join(','), [lines]);
+  const { offers } = useCatalogItemOffers(orgId, itemIdsKey ? itemIdsKey.split(',') : []);
+  const offresParItem = useMemo(() => {
+    const m = new Map();
+    for (const o of offers) { if (!m.has(o.item_id)) m.set(o.item_id, []); m.get(o.item_id).push(o); }
+    return m;
+  }, [offers]);
+  const marquesParItem = useMemo(() => {
+    const m = new Map();
+    for (const [id, os] of offresParItem) m.set(id, marquesDesOffres(os));
+    return m;
+  }, [offresParItem]);
 
   const updateLine = useCallback((index, updatedLine) => {
     setLines((prev) => prev.map((l, i) => (i === index ? updatedLine : l)));
   }, [setLines]);
+
+  const changerMarque = useCallback((index, marque) => {
+    setLines((prev) => prev.map((l, i) => (i === index ? appliquerMarque(l, marque, offresParItem.get(l.catalog_item_id) || []) : l)));
+  }, [setLines, offresParItem]);
 
   const removeLine = useCallback((index) => {
     setLines((prev) => prev.filter((_, i) => i !== index));
@@ -259,56 +186,46 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     });
   }, [setLines]);
 
-  // Structurer les lignes en sections
+  // Structurer les lignes en chapitres
   const sections = useMemo(() => {
     const result = [];
     let currentSection = null;
-
     lines.forEach((line, globalIndex) => {
       if (line.line_type === 'section_title') {
-        currentSection = {
-          sectionIndex: globalIndex,
-          section: line,
-          children: [],
-        };
+        currentSection = { sectionIndex: globalIndex, section: line, children: [] };
         result.push(currentSection);
       } else if (currentSection) {
         currentSection.children.push({ line, globalIndex });
+      } else if (result.length === 0 || result[result.length - 1].section) {
+        currentSection = { sectionIndex: -1, section: null, children: [{ line, globalIndex }] };
+        result.push(currentSection);
       } else {
-        // Ligne orpheline (sans section) → créer une section implicite
-        if (result.length === 0 || result[result.length - 1].section) {
-          currentSection = {
-            sectionIndex: -1,
-            section: null,
-            children: [{ line, globalIndex }],
-          };
-          result.push(currentSection);
-        } else {
-          result[result.length - 1].children.push({ line, globalIndex });
-        }
+        result[result.length - 1].children.push({ line, globalIndex });
       }
     });
-
     return result;
   }, [lines]);
 
-  // Ajouter des produits après la section (avant la section suivante)
-  const handleAddProductsToSection = useCallback((sectionGlobalIndex, sectionName) => {
-    setPickerForSection({ index: sectionGlobalIndex, categories: productCategoriesForSection(sectionName, family, devisConfig) });
+  /** Index d'insertion : après le dernier enfant du chapitre (avant le chapitre suivant). */
+  const insertionApres = (prev, sectionGlobalIndex) => {
+    let insertAt = sectionGlobalIndex + 1;
+    for (let i = sectionGlobalIndex + 1; i < prev.length; i++) {
+      if (prev[i].line_type === 'section_title') break;
+      insertAt = i + 1;
+    }
+    return insertAt;
+  };
+
+  const handleAddProductsToSection = useCallback((sectionGlobalIndex, sectionName, type) => {
+    setPickerForSection({ index: sectionGlobalIndex, categories: productCategoriesForSection(sectionName, family, devisConfig), type });
   }, [family, devisConfig]);
 
-  const handlePickerAddLines = useCallback((newLines, _sectionTitle) => {
+  const handlePickerAddLines = useCallback((newLines) => {
     if (!pickerForSection) return;
     const sectionIdx = pickerForSection.index;
     setLines((prev) => {
-      // Trouver l'index d'insertion : après le dernier enfant de cette section
-      let insertAt = sectionIdx + 1;
-      for (let i = sectionIdx + 1; i < prev.length; i++) {
-        if (prev[i].line_type === 'section_title') break;
-        insertAt = i + 1;
-      }
       const result = [...prev];
-      result.splice(insertAt, 0, ...newLines);
+      result.splice(insertionApres(prev, sectionIdx), 0, ...newLines);
       return result;
     });
   }, [pickerForSection, setLines]);
@@ -318,100 +235,62 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     if (metreForSection == null) return;
     const sectionIdx = metreForSection;
     setLines((prev) => {
-      let insertAt = sectionIdx + 1;
-      for (let i = sectionIdx + 1; i < prev.length; i++) {
-        if (prev[i].line_type === 'section_title') break;
-        insertAt = i + 1;
-      }
       const result = [...prev];
-      result.splice(insertAt, 0, ...lignesDevis);
+      result.splice(insertionApres(prev, sectionIdx), 0, ...lignesDevis);
       return result;
     });
     onMetreValidated?.(metre);
     setMetreForSection(null);
   }, [metreForSection, setLines, onMetreValidated]);
 
-  // Ajouter une ligne main d'œuvre dans une section
+  const ligneVide = (extra) => ({
+    catalog_item_id: null, brand: null, supplier_product_id: null, supplier_id: null, supplier_name: null,
+    designation: '', description: '', reference: '', quantity: 1, purchase_price_ht: null, unit_price_ht: 0, tva_rate: tvaDevis, ...extra,
+  });
+
+  // Ligne de main d'œuvre saisie à la main
   const addLaborToSection = useCallback((sectionGlobalIndex) => {
     setLines((prev) => {
-      let insertAt = sectionGlobalIndex + 1;
-      for (let i = sectionGlobalIndex + 1; i < prev.length; i++) {
-        if (prev[i].line_type === 'section_title') break;
-        insertAt = i + 1;
-      }
       const result = [...prev];
-      result.splice(insertAt, 0, {
-        line_type: 'labor',
-        catalog_item_id: null,
-        supplier_product_id: null,
-        supplier_id: null,
-        supplier_name: null,
-        designation: '',
-        description: '',
-        reference: '',
-        quantity: 1,
-        unit: 'forfait',
-        purchase_price_ht: null,
-        unit_price_ht: 0,
-        tva_rate: 5.5,
-      });
+      result.splice(insertionApres(prev, sectionGlobalIndex), 0, ligneVide({ line_type: 'labor', unit: 'forfait' }));
       return result;
     });
-  }, [setLines]);
+  }, [setLines, tvaDevis]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ajouter une ligne libre (saisie manuelle — section "AUTRE" ou "PRESTATIONS")
+  // Ligne libre (forfait, petite fourniture, prestation)
   const addFreeformToSection = useCallback((sectionGlobalIndex) => {
     setLines((prev) => {
-      let insertAt = sectionGlobalIndex + 1;
-      for (let i = sectionGlobalIndex + 1; i < prev.length; i++) {
-        if (prev[i].line_type === 'section_title') break;
-        insertAt = i + 1;
-      }
       const result = [...prev];
-      result.splice(insertAt, 0, {
-        line_type: 'product',
-        is_freeform: true,
-        catalog_item_id: null,
-        supplier_product_id: null,
-        supplier_id: null,
-        supplier_name: null,
-        designation: '',
-        description: '',
-        reference: '',
-        quantity: 1,
-        unit: 'u',
-        purchase_price_ht: null,
-        unit_price_ht: 0,
-        tva_rate: 5.5,
-      });
+      result.splice(insertionApres(prev, sectionGlobalIndex), 0, ligneVide({ line_type: 'product', is_freeform: true, unit: 'u' }));
       return result;
     });
-  }, [setLines]);
+  }, [setLines, tvaDevis]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ajouter une nouvelle section
   const addSection = useCallback(() => {
-    setLines((prev) => [...prev, {
-      line_type: 'section_title',
-      designation: '',
-      quantity: 0,
-      unit_price_ht: 0,
-      tva_rate: 0,
-    }]);
+    setLines((prev) => [...prev, { line_type: 'section_title', designation: '', quantity: 0, unit_price_ht: 0, tva_rate: 0 }]);
   }, [setLines]);
 
-  // Vérifier si on a des sections
   const hasSections = lines.some((l) => l.line_type === 'section_title');
 
   return (
     <div className="space-y-4">
-      {/* Sections list */}
+      {/* TVA du devis */}
+      {hasSections && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-secondary-700">
+          <label htmlFor="tva-devis" className="font-medium">TVA du devis</label>
+          <select id="tva-devis" value={tvaDevis} onChange={(e) => changerTvaDevis(e.target.value)} className="border border-secondary-300 rounded-lg px-2 py-1 text-sm">
+            {TAUX_TVA.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')} %</option>)}
+          </select>
+          <span className="text-xs text-secondary-400">Taux de la famille par défaut ; le changer l&apos;applique à toutes les lignes (chaque ligne reste modifiable).</span>
+        </div>
+      )}
+
       {hasSections ? (
         <div className="space-y-3">
           {sections.map((sec) => {
             if (!sec.section) {
-              // Lignes orphelines
               return sec.children.map(({ line, globalIndex }, i) => (
-                <LineRow
+                <DevisLineRow
                   key={globalIndex}
                   line={line}
                   index={globalIndex}
@@ -421,6 +300,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                   onMoveDown={moveDown}
                   isFirst={i === 0}
                   isLast={i === sec.children.length - 1}
+                  marques={line.catalog_item_id ? (marquesParItem.get(line.catalog_item_id) || []) : []}
+                  onMarque={(marque) => changerMarque(globalIndex, marque)}
                 />
               ));
             }
@@ -429,6 +310,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                 key={sec.sectionIndex}
                 sectionIndex={sec.sectionIndex}
                 section={sec.section}
+                type={typeChapitre(devisConfig, family, sec.section.designation)}
                 childLines={sec.children}
                 onUpdate={updateLine}
                 onRemove={removeLine}
@@ -438,6 +320,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                 onAddLabor={addLaborToSection}
                 onAddFreeform={addFreeformToSection}
                 onMetre={setMetreForSection}
+                marquesParItem={marquesParItem}
+                onMarque={changerMarque}
               />
             );
           })}
@@ -445,26 +329,25 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
       ) : (
         <div className="text-center py-8 text-secondary-500 text-sm">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          Choisissez une installation ci-dessus pour créer les sections du devis
+          Choisissez une installation ci-dessus pour créer les chapitres du devis
         </div>
       )}
 
-      {/* Add section button */}
       <button type="button" onClick={addSection} className="btn-secondary btn-sm w-full">
-        <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter une section
+        <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter un chapitre
       </button>
 
-      {/* Product picker modal */}
       {pickerForSection && (
         <DevisProductPicker
           orgId={orgId}
-          categories={pickerCategories}
+          categories={pickerForSection.categories || []}
+          typeChapitre={pickerForSection.type}
+          tvaDevis={tvaDevis}
           onAddLines={handlePickerAddLines}
           onClose={() => setPickerForSection(null)}
         />
       )}
 
-      {/* Métré assisté fumisterie (plein écran) */}
       {metreForSection != null && (
         <MetreFumisterie
           orgId={orgId}

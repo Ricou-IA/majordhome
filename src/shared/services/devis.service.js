@@ -319,6 +319,7 @@ export const devisService = {
             sort_order: index,
             line_type: line.line_type || 'product',
             catalog_item_id: line.catalog_item_id || null,
+            brand: line.brand || null,
             supplier_product_id: line.supplier_product_id || null,
             supplier_id: line.supplier_id || null,
             designation: line.designation,
@@ -408,6 +409,7 @@ export const devisService = {
             line_type: line.line_type || 'product',
             // porté par l'état de ligne du front : upsertQuoteLines supprime puis réinsère toutes les lignes
             catalog_item_id: line.catalog_item_id || null,
+            brand: line.brand || null,
             supplier_product_id: line.supplier_product_id || null,
             supplier_id: line.supplier_id || null,
             designation: line.designation,
@@ -621,6 +623,7 @@ export const devisService = {
           sort_order: line.sort_order,
           line_type: line.line_type,
           catalog_item_id: line.catalog_item_id || null,
+          brand: line.brand || null,
           supplier_product_id: line.supplier_product_id,
           supplier_id: line.supplier_id,
           designation: line.designation,

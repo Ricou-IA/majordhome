@@ -16,7 +16,7 @@ import { catalogItemKeys, supplierKeys } from '@hooks/cacheKeys';
 
 export { catalogItemKeys } from '@hooks/cacheKeys';
 
-/** Liste paginée d'articles. `filtres` : { search, categories, brand, gamme, sansCategorie, sansOffreFraiche, avecOffreActive, page, pageSize }. */
+/** Liste paginée d'articles. `filtres` : { search, categories, natures, brand, gamme, sansCategorie, sansOffreFraiche, proposable, page, pageSize }. */
 export function useCatalogItems(orgId, filtres = {}) {
   const query = useQuery({
     queryKey: catalogItemKeys.list(orgId, filtres),
@@ -137,6 +137,10 @@ export function useCatalogItemMutations(orgId) {
     mutationFn: ({ itemId, updates }) => unwrapResult(catalogItemsService.updateItem(orgId, itemId, updates)),
     onSuccess: invalidate,
   });
+  const create = useMutation({
+    mutationFn: (payload) => unwrapResult(catalogItemsService.createItem(orgId, payload)),
+    onSuccess: invalidate,
+  });
   const merge = useMutation({
     mutationFn: ({ survivorId, absorbedId }) => unwrapResult(catalogItemsService.merge(survivorId, absorbedId)),
     onSuccess: invalidate,
@@ -175,6 +179,8 @@ export function useCatalogItemMutations(orgId) {
     normalize: (limit = 100) => normalize.mutateAsync(limit),
     isNormalizing: normalize.isPending,
     updateItem: (itemId, updates) => update.mutateAsync({ itemId, updates }),
+    createItem: (payload) => create.mutateAsync(payload),
+    isCreating: create.isPending,
     uploadImage: (itemId, file) => uploadImage.mutateAsync({ itemId, file }),
     merge: (survivorId, absorbedId) => merge.mutateAsync({ survivorId, absorbedId }),
     attach: (productId, itemId) => attach.mutateAsync({ productId, itemId }),

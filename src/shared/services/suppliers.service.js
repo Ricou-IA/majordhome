@@ -438,6 +438,26 @@ export const suppliersService = {
     }
   },
 
+  /**
+   * Lignes fournisseur actives de l'org dont le libellé, la référence ou la marque contiennent CHAQUE mot de la recherche
+   * (« disjoncteur 16a courbe c »). Regroupement d'un article de stock, suggestions de rattachement.
+   */
+  async searchProductsMots(orgId, query, { limit = 100 } = {}) {
+    try {
+      if (!orgId) throw new Error('[suppliersService] orgId requis');
+      const mots = String(query || '').split(/\s+/).map((m) => escapePostgrestSearchTerm(m)).filter((m) => m && m.length >= 2).slice(0, 8);
+      if (!mots.length) return { data: [], error: null };
+      let q = supabase.from('majordhome_supplier_products').select('*').eq('org_id', orgId).eq('is_active', true);
+      for (const m of mots) q = q.or(`name.ilike.%${m}%,reference.ilike.%${m}%,brand.ilike.%${m}%`);
+      const { data, error } = await q.order('name').limit(limit);
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      logger.error('[suppliersService] searchProductsMots:', error);
+      return { data: [], error };
+    }
+  },
+
   async searchProducts(orgId, query) {
     try {
       if (!orgId) throw new Error('[suppliersService] orgId requis');

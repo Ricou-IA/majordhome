@@ -176,6 +176,9 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
       // Préparer les lignes sans IDs spécifiques
       const templateLines = lines.map((l) => ({
         line_type: l.line_type,
+        // l'article Majord'home et la marque suivent le devis type (sans eux, un devis né du modèle n'est plus relié)
+        catalog_item_id: l.catalog_item_id || null,
+        brand: l.brand || null,
         supplier_product_id: l.supplier_product_id || null,
         supplier_id: l.supplier_id || null,
         supplier_name: l.supplier_name || null,

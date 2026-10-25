@@ -1,86 +1,135 @@
 /**
- * DevisProductPicker.jsx — Ajouter des articles Majord'home à un devis
+ * DevisProductPicker.jsx — Ajouter des articles Majord'home à un chapitre de devis
  * ============================================================================
- * Recherche dans les articles de l'org (base du devis), filtrée par les catégories de la famille / section, par
- * marque (le discriminant, décision d'Eric) et par gamme ; quantités ; validation → lignes de devis.
- * La ligne reprend libellé, unité, TVA et prix de vente de l'article ; son prix d'achat (marge) = le prix d'achat
- * le plus bas des offres fournisseur (`meilleur_prix_achat`), sans choix de fournisseur : les fournisseurs et leurs
- * références vivent dans la fiche article, pour les bons de commande. Spec articles Majord'home § 9.
+ * Le type du chapitre décide de ce qui est proposé (décisions d'Eric, 2026-10-25) :
+ *   Équipement / Option : articles « équipement » ou « accessoire » des catégories de la famille (filtre modifiable) ;
+ *   Matériel stocké     : articles de stock « par type » (marque choisie ensuite dans le devis), toutes familles ;
+ *   Main d'œuvre        : articles internes de main d'œuvre ;
+ *   Libre / Fumisterie  : tout le catalogue (des catégories de la famille / de la fumisterie).
+ * Recherche par mots séparés, sans accents, y compris les références fournisseur ; filtres marque et gamme.
+ * La ligne reprend libellé, unité et prix de vente de l'article, la TVA du devis ; prix d'achat (marge) = le plus bas
+ * des offres. Un admin crée un article manquant sans quitter le devis. Spec articles § 9 + plan 2026-10-25.
  * ============================================================================
  */
 
 import { useMemo, useState } from 'react';
 import { Package, X, Loader2, Search, Minus, Plus, ShoppingCart } from 'lucide-react';
+import { useAuth } from '@contexts/AuthContext';
 import { useDebounce } from '@hooks/useDebounce';
 import { useCatalogItems, useCatalogBrands, useCatalogGammes } from '@hooks/useCatalogItems';
 import { formatEuro } from '@/lib/utils';
+import DevisCreateArticleForm from './DevisCreateArticleForm';
 
 const LIMITE = 100;
 
-/** `categories` : catégories produit de la famille / section (vide = tous les articles, y compris sans catégorie). */
-export default function DevisProductPicker({ orgId, categories = [], onAddLines, onClose }) {
+/** Filtres de nature proposés par type de chapitre ; le premier est le défaut. `categories: false` = ignorer celles de la famille. */
+const FILTRES = {
+  equipement: [
+    { key: 'equipement', label: 'Équipements', natures: ['main'] },
+    { key: 'option', label: 'Options', natures: ['accessory', 'consumable'] },
+    { key: 'tout', label: 'Tout', natures: [] },
+  ],
+  option: [
+    { key: 'option', label: 'Options', natures: ['accessory', 'consumable'] },
+    { key: 'equipement', label: 'Équipements', natures: ['main'] },
+    { key: 'tout', label: 'Tout', natures: [] },
+  ],
+  stock: [
+    { key: 'stock', label: 'Matériel stocké', natures: ['stock'], categories: false },
+    { key: 'catalogue', label: 'Tout le catalogue', natures: [], categories: false },
+  ],
+  main_oeuvre: [{ key: 'main_oeuvre', label: 'Main d’œuvre', natures: ['main_oeuvre'], categories: false }],
+  libre: [{ key: 'tout', label: 'Tout', natures: [] }],
+  fumisterie: [{ key: 'tout', label: 'Tout', natures: [] }],
+};
+const NATURE_PAR_TYPE = { equipement: 'main', option: 'accessory', stock: 'stock', main_oeuvre: 'main_oeuvre' };
+
+/**
+ * @param {{ orgId: string, categories?: string[], typeChapitre?: string, tvaDevis?: number,
+ *   onAddLines: (lines: object[]) => void, onClose: () => void }} p
+ */
+export default function DevisProductPicker({ orgId, categories = [], typeChapitre = 'libre', tvaDevis = 20, onAddLines, onClose }) {
+  const { isOrgAdmin } = useAuth();
+  const filtres = FILTRES[typeChapitre] || FILTRES.libre;
+  const [filtreKey, setFiltreKey] = useState(filtres[0].key);
+  const filtre = filtres.find((f) => f.key === filtreKey) || filtres[0];
+  const ignorerCategories = filtre.categories === false;
+  const cats = useMemo(() => (ignorerCategories ? [] : categories), [ignorerCategories, categories]);
+
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search, 250);
   const [brand, setBrand] = useState('');
   const [gamme, setGamme] = useState('');
   const [quantities, setQuantities] = useState({}); // { itemId: qty }
+  const [creation, setCreation] = useState(false);
 
-  const filtres = useMemo(() => ({
-    search: debounced, categories, brand: brand || null, gamme: gamme || null, avecOffreActive: true, pageSize: LIMITE,
-  }), [debounced, categories, brand, gamme]);
-  const { items, count, isLoading } = useCatalogItems(orgId, filtres);
-  const { brands } = useCatalogBrands(orgId, categories);
-  const { gammes } = useCatalogGammes(orgId, categories);
+  const criteres = useMemo(() => ({
+    search: debounced, categories: cats, natures: filtre.natures, brand: brand || null, gamme: gamme || null, proposable: true, pageSize: LIMITE,
+  }), [debounced, cats, filtre.natures, brand, gamme]);
+  const { items, count, isLoading } = useCatalogItems(orgId, criteres);
+  const { brands } = useCatalogBrands(orgId, cats);
+  const { gammes } = useCatalogGammes(orgId, cats);
 
-  const setQty = (itemId, qty) => {
-    setQuantities((prev) => {
-      const next = { ...prev };
-      if (qty <= 0) delete next[itemId]; else next[itemId] = qty;
-      return next;
-    });
-  };
+  const setQty = (itemId, qty) => setQuantities((prev) => {
+    const next = { ...prev };
+    if (qty <= 0) delete next[itemId]; else next[itemId] = qty;
+    return next;
+  });
   const totalSelected = Object.values(quantities).reduce((s, q) => s + q, 0);
 
+  const versLigne = (it, quantity) => ({
+    line_type: it.product_kind === 'main_oeuvre' ? 'labor' : 'product',
+    catalog_item_id: it.id,
+    brand: null,
+    supplier_product_id: null,
+    supplier_id: null,
+    supplier_name: null,
+    designation: it.name,
+    description: it.description || '',
+    reference: '',
+    quantity,
+    unit: it.unit || 'pièce',
+    // marge estimée : le prix d'achat le plus bas connu chez les fournisseurs de l'article (null sans offre)
+    purchase_price_ht: it.meilleur_prix_achat != null ? Number(it.meilleur_prix_achat) : null,
+    unit_price_ht: Number(it.selling_price_ht) || 0,
+    tva_rate: Number(tvaDevis),
+  });
+
   const handleConfirm = () => {
-    const lines = items
-      .filter((it) => quantities[it.id] > 0)
-      .map((it) => ({
-        line_type: 'product',
-        catalog_item_id: it.id,
-        supplier_product_id: null,
-        supplier_id: null,
-        supplier_name: null,
-        designation: it.name,
-        description: it.description || '',
-        reference: '',
-        quantity: quantities[it.id],
-        unit: it.unit || 'pièce',
-        // marge estimée : le prix d'achat le plus bas connu chez les fournisseurs de l'article
-        purchase_price_ht: it.meilleur_prix_achat != null ? Number(it.meilleur_prix_achat) : null,
-        unit_price_ht: Number(it.selling_price_ht) || 0,
-        tva_rate: Number(it.default_tva_rate) || 20,
-      }));
-    if (lines.length > 0) onAddLines(lines, gamme || null);
+    const lines = items.filter((it) => quantities[it.id] > 0).map((it) => versLigne(it, quantities[it.id]));
+    if (lines.length > 0) onAddLines(lines);
     onClose();
   };
 
+  const stockVide = filtre.key === 'stock' && !isLoading && count === 0 && !debounced && !brand && !gamme;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col m-4">
-        {/* Header */}
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[88vh] flex flex-col m-4">
+        {/* En-tête */}
         <div className="flex items-center justify-between px-5 py-3 border-b">
           <div>
             <h3 className="text-base font-semibold text-secondary-900">Ajouter des articles</h3>
-            {categories.length > 0 && <p className="text-xs text-secondary-400">Catégorie{categories.length > 1 ? 's' : ''} : {categories.join(', ')}</p>}
+            {cats.length > 0 && <p className="text-xs text-secondary-400">Catégorie{cats.length > 1 ? 's' : ''} : {cats.join(', ')}</p>}
           </div>
           <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
         {/* Filtres */}
         <div className="px-5 py-3 border-b space-y-2">
+          {filtres.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              {filtres.map((f) => (
+                <button key={f.key} type="button" onClick={() => { setFiltreKey(f.key); setBrand(''); setGamme(''); }}
+                  className={`px-2.5 py-1 text-xs rounded-full border ${f.key === filtre.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-secondary-600 border-secondary-300 hover:bg-secondary-50'}`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-400" />
-            <input type="text" autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Libellé, marque, modèle…"
+            <input type="text" autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mots du libellé, marque, modèle, référence fournisseur…"
               className="w-full pl-10 pr-4 py-2 border border-secondary-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -99,14 +148,31 @@ export default function DevisProductPicker({ orgId, categories = [], onAddLines,
         </div>
 
         {/* Liste */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+          {creation && (
+            <DevisCreateArticleForm
+              orgId={orgId}
+              defaultKind={NATURE_PAR_TYPE[typeChapitre] || 'main'}
+              defaultCategory={['equipement', 'option'].includes(typeChapitre) ? (categories[0] || null) : null}
+              defaultName={search}
+              onCreated={(item) => { onAddLines([versLigne(item, 1)]); onClose(); }}
+              onCancel={() => setCreation(false)}
+            />
+          )}
           {isLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>
           ) : items.length === 0 ? (
-            <div className="text-center py-8 text-secondary-400">
-              <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">Aucun article pour ces filtres</p>
-              <p className="text-xs mt-1">Les articles naissent des relevés fournisseurs (Paramètres → Fournisseurs → Articles Majord&apos;home).</p>
+            <div className="text-center py-8 text-secondary-400 space-y-2">
+              <Package className="w-8 h-8 mx-auto opacity-40" />
+              {stockVide ? (
+                <>
+                  <p className="text-sm text-secondary-600">Aucun article de matériel stocké pour l&apos;instant.</p>
+                  <p className="text-xs">Regroupez vos achats par type dans Paramètres → Fournisseurs → Articles (« Article de stock depuis mes achats »).</p>
+                  <button type="button" onClick={() => setFiltreKey('catalogue')} className="btn-secondary btn-sm">Chercher dans tout le catalogue</button>
+                </>
+              ) : (
+                <p className="text-sm">Aucun article pour ces critères</p>
+              )}
             </div>
           ) : (
             <div className="space-y-1">
@@ -117,11 +183,12 @@ export default function DevisProductPicker({ orgId, categories = [], onAddLines,
                     {it.image_url ? <img src={it.image_url} alt="" className="w-9 h-9 object-contain rounded border border-secondary-100 bg-white flex-shrink-0" />
                       : <div className="w-9 h-9 rounded bg-secondary-100 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-secondary-900 truncate">{it.name}</p>
-                      <p className="text-xs text-secondary-400 truncate">
+                      <p className="text-sm font-medium text-secondary-900 break-words">{it.name}</p>
+                      <p className="text-xs text-secondary-400 break-words">
                         {[it.brand, it.gamme].filter(Boolean).join(' · ')}
                         {it.fournisseurs?.length ? ` · ${it.fournisseurs.join(', ')}` : ''}
                         {it.meilleur_prix_achat != null ? ` · achat ${formatEuro(it.meilleur_prix_achat)}` : ''}
+                        {it.product_kind === 'stock' && it.offres_actives > 1 ? ' · marque au choix dans le devis' : ''}
                       </p>
                     </div>
                     <span className={`text-sm font-medium w-24 text-right flex-shrink-0 ${Number(it.selling_price_ht) > 0 ? 'text-secondary-700' : 'text-amber-600'}`} title={Number(it.selling_price_ht) > 0 ? 'Prix de vente HT' : 'Prix de vente à saisir sur la ligne'}>
@@ -144,9 +211,14 @@ export default function DevisProductPicker({ orgId, categories = [], onAddLines,
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
-          <span className="text-sm text-secondary-600">{totalSelected > 0 ? `${totalSelected} article${totalSelected > 1 ? 's' : ''} sélectionné${totalSelected > 1 ? 's' : ''}` : 'Aucune sélection'}</span>
+        {/* Pied */}
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t bg-secondary-50 rounded-b-xl">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-secondary-600">{totalSelected > 0 ? `${totalSelected} article${totalSelected > 1 ? 's' : ''} sélectionné${totalSelected > 1 ? 's' : ''}` : 'Aucune sélection'}</span>
+            {isOrgAdmin && !creation && (
+              <button type="button" onClick={() => setCreation(true)} className="text-xs text-primary-700 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> Créer un article</button>
+            )}
+          </div>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="btn-secondary btn-sm">Annuler</button>
             <button type="button" onClick={handleConfirm} disabled={totalSelected === 0} className="btn-primary btn-sm">

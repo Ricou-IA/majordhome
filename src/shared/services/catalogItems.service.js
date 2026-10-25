@@ -19,30 +19,45 @@ function dateSeuilFraicheur(now = new Date()) {
   return new Date(now.getTime() - SEUIL_FRAICHEUR_JOURS * 86400000).toISOString();
 }
 
+/**
+ * Mots d'une recherche, normalisés comme la colonne `recherche` de la vue liste (NFD sans diacritiques, minuscules ;
+ * « œ » n'est décomposé d'aucun côté) puis échappés pour PostgREST. Chaque mot doit apparaître quelque part.
+ * @param {string} search
+ * @returns {string[]}
+ */
+export function motsDeRecherche(search) {
+  return String(search || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .split(/\s+/)
+    .map((m) => escapePostgrestSearchTerm(m))
+    .filter((m) => m && m.length >= 1)
+    .slice(0, 8);
+}
+
 export const catalogItemsService = {
   /**
    * Articles de l'org, paginés. `categories` vide = toutes ; `sansCategorie` = seulement les articles sans catégorie ;
-   * `sansOffreFraiche` = aucune offre active de moins de 30 jours ; `actifsSeulement` (défaut) exclut les désactivés
-   * et les absorbés.
+   * `natures` = valeurs de product_kind (vide = toutes) ; `proposable` = proposable au devis (au moins une offre
+   * active, ou aucune offre jamais : article créé à la main, main d'œuvre) ; `sansOffreFraiche` = aucune offre active
+   * de moins de 30 jours ; `actifsSeulement` (défaut) exclut les désactivés et les absorbés. La recherche porte sur
+   * chaque mot, sans accents, dans le libellé, la marque, la gamme, la clé modèle, l'EAN et les références fournisseur.
    */
   async listItems(orgId, {
-    search = '', categories = [], brand = null, gamme = null, sansCategorie = false, sansOffreFraiche = false,
-    avecOffreActive = false, actifsSeulement = true, page = 0, pageSize = 50,
+    search = '', categories = [], natures = [], brand = null, gamme = null, sansCategorie = false, sansOffreFraiche = false,
+    proposable = false, actifsSeulement = true, page = 0, pageSize = 50,
   } = {}) {
     try {
       if (!orgId) return { data: [], count: 0, error: null };
       let q = supabase.from('majordhome_catalog_items_list').select('*', { count: 'exact' }).eq('org_id', orgId).is('merged_into', null);
       if (actifsSeulement) q = q.eq('is_active', true);
-      if (avecOffreActive) q = q.gt('offres_actives', 0);
+      if (proposable) q = q.or('offres_actives.gt.0,offres_total.eq.0');
+      if (natures?.length) q = q.in('product_kind', natures);
       if (sansCategorie) q = q.is('category', null);
       else if (categories?.length) q = q.in('category', categories);
       if (brand) q = q.eq('brand', brand);
       if (gamme) q = q.eq('gamme', gamme);
       if (sansOffreFraiche) q = q.or(`prix_le_plus_recent.is.null,prix_le_plus_recent.lt.${dateSeuilFraicheur()}`);
-      if (search) {
-        const t = escapePostgrestSearchTerm(search);
-        if (t) q = q.or(`name.ilike.%${t}%,brand.ilike.%${t}%,model_key.ilike.%${t}%,code_ean.ilike.%${t}%,gamme.ilike.%${t}%`);
-      }
+      for (const mot of motsDeRecherche(search)) q = q.ilike('recherche', `%${mot}%`);
       q = q.order('name').range(page * pageSize, page * pageSize + pageSize - 1);
       const { data, count, error } = await q;
       if (error) throw error;
@@ -77,6 +92,33 @@ export const catalogItemsService = {
     } catch (error) {
       logger.error('[catalogItemsService] getOffers:', error);
       return { data: [], error };
+    }
+  },
+
+  /**
+   * Crée un article à la main (org_admin via RLS) : depuis le devis ou la page Articles. `productKind` : main
+   * (équipement), accessory (option), stock, main_oeuvre. Résout avec la ligne de la vue liste.
+   */
+  async createItem(orgId, { name, brand = null, category = null, gamme = null, productKind = 'main', unit = 'pièce', sellingPriceHt = 0, description = null } = {}) {
+    try {
+      if (!orgId) throw new Error('[catalogItemsService] orgId requis');
+      const libelle = String(name || '').trim();
+      if (!libelle) throw new Error('Le libellé est requis');
+      const { data, error } = await supabase.from('majordhome_catalog_items').insert({
+        org_id: orgId, name: libelle, brand: brand?.trim() || null, category: category || null, gamme: gamme?.trim() || null,
+        product_kind: productKind || 'main', unit: unit || 'pièce', selling_price_ht: Number(sellingPriceHt) || 0,
+        description: description?.trim() || null, origin: 'manuel', default_tva_rate: 20,
+      }).select('id').single();
+      if (error) {
+        if (error.code === '42501') throw new Error('Création réservée à l\'administrateur');
+        throw error;
+      }
+      const { data: item, error: errItem } = await this.getItem(orgId, data.id);
+      if (errItem) throw errItem;
+      return { data: item, error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] createItem:', error);
+      return { data: null, error };
     }
   },
 
