@@ -6,6 +6,8 @@
  * - « Ligne libre » dans tout chapitre (petite fourniture au forfait, prestation, main d'œuvre ponctuelle)
  * - TVA du devis : celle de la famille par défaut, changeable d'un geste pour toutes les lignes
  * - Marque d'une ligne de stock choisie dans le devis (prix d'achat de la marque)
+ * - Remise par ligne (%) ; glisser-déposer des lignes (poignée, entre chapitres) et des chapitres (devisOrdre.js)
+ * - Lignes libres sans article : création de l'article à la ligne ou en lot (org_admin, natures.js)
  * - Totaux en temps réel
  * ============================================================================
  */
@@ -14,12 +16,17 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { computeLineTotals, productCategoriesForSection } from '@services/devis.service';
 import { typeChapitre, tvaDuDevis, TAUX_TVA } from '@/lib/devisConfig.js';
 import { marquesDesOffres, appliquerMarque } from '@/lib/catalogue/marqueLigne.js';
-import { useCatalogItemOffers } from '@hooks/useCatalogItems';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { toast } from 'sonner';
+import { useAuth } from '@contexts/AuthContext';
+import { useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
+import { deplacerLigne, deplacerChapitre } from '@/lib/devisOrdre.js';
+import { articleDepuisLigne, lignesSansArticle } from '@/lib/catalogue/natures.js';
 import DevisProductPicker from './DevisProductPicker';
 import DevisLineRow from './DevisLineRow';
 import MetreFumisterie from './metre/MetreFumisterie';
 import { formatEuro } from '@/lib/utils';
-import { Plus, Package, Ruler, PenLine, BookOpen } from 'lucide-react';
+import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus } from 'lucide-react';
 
 const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
@@ -30,16 +37,21 @@ const TYPE_LABELS = {
 // BLOC CHAPITRE (titre + lignes enfants + boutons d'ajout)
 // =============================================================================
 
-function SectionBlock({ sectionIndex, section, type, childLines, onUpdate, onRemove, onMoveUp, onMoveDown, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, onMarque }) {
+function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poigneeChapitre, onUpdate, onRemove, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, onMarque, onCreerArticle, creationIndex }) {
   const productCount = childLines.length;
   const sectionTotalTtc = childLines.reduce((sum, { line }) => sum + (computeLineTotals(line).total_ttc || 0), 0);
   const btn = 'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors';
 
   return (
-    <div className="border border-secondary-200 rounded-xl overflow-hidden">
-      {/* En-tête du chapitre */}
+    <div className="border border-secondary-200 rounded-xl overflow-hidden bg-white">
+      {/* En-tête du chapitre : la poignée déplace le chapitre avec ses lignes */}
       <div className="flex items-center justify-between px-4 py-3 bg-secondary-50 border-b border-secondary-200">
         <div className="flex items-center gap-2 min-w-0">
+          {poigneeChapitre && (
+            <span {...poigneeChapitre} className="flex-shrink-0 cursor-grab active:cursor-grabbing text-secondary-300 hover:text-secondary-500" title="Glisser pour déplacer le chapitre">
+              <GripVertical className="w-4 h-4" />
+            </span>
+          )}
           <input
             type="text"
             value={section.designation}
@@ -61,35 +73,12 @@ function SectionBlock({ sectionIndex, section, type, childLines, onUpdate, onRem
         </div>
       </div>
 
-      {/* Lignes */}
-      {childLines.length > 0 && (
-        <div className="p-2 space-y-1">
-          <div className="flex items-center gap-1.5 px-3 ml-4 text-[10px] font-medium text-secondary-400 uppercase tracking-wider">
-            <span className="w-3.5 flex-shrink-0" />
-            <span className="flex-1">Désignation</span>
-            <span className="w-10 text-center flex-shrink-0">Qté</span>
-            <span className="w-16 text-right flex-shrink-0">P.U. HT</span>
-            <span className="w-14 text-center flex-shrink-0">TVA</span>
-            <span className="w-[4.5rem] text-right flex-shrink-0">Total TTC</span>
-            <span className="w-[52px] flex-shrink-0" />
-          </div>
-          {childLines.map(({ line, globalIndex }, i) => (
-            <DevisLineRow
-              key={globalIndex}
-              line={line}
-              index={globalIndex}
-              onUpdate={onUpdate}
-              onRemove={onRemove}
-              onMoveUp={onMoveUp}
-              onMoveDown={onMoveDown}
-              isFirst={i === 0}
-              isLast={i === childLines.length - 1}
-              marques={line.catalog_item_id ? (marquesParItem.get(line.catalog_item_id) || []) : []}
-              onMarque={(marque) => onMarque(globalIndex, marque)}
-            />
-          ))}
-        </div>
-      )}
+      {/* Lignes : zone de dépôt toujours présente (on peut glisser une ligne dans un chapitre vide) */}
+      <div className="p-2 space-y-1">
+        {childLines.length > 0 && <EnTeteLignes />}
+        <ListeLignes droppableId={`bloc-${blocIndex}`} childLines={childLines} type={type} onUpdate={onUpdate} onRemove={onRemove}
+          marquesParItem={marquesParItem} onMarque={onMarque} onCreerArticle={onCreerArticle} creationIndex={creationIndex} />
+      </div>
 
       {/* Ajouts */}
       <div className="flex flex-wrap gap-2 px-4 py-1.5 bg-secondary-50/50 border-t border-secondary-100">
@@ -106,6 +95,54 @@ function SectionBlock({ sectionIndex, section, type, childLines, onUpdate, onRem
         </button>
       </div>
     </div>
+  );
+}
+
+function EnTeteLignes() {
+  return (
+    <div className="flex items-center gap-1.5 px-3 ml-4 text-[10px] font-medium text-secondary-400 uppercase tracking-wider">
+      <span className="w-3.5 flex-shrink-0" />
+      <span className="flex-1">Désignation</span>
+      <span className="w-10 text-center flex-shrink-0">Qté</span>
+      <span className="w-16 text-right flex-shrink-0">P.U. HT</span>
+      <span className="w-12 text-right flex-shrink-0">Rem. %</span>
+      <span className="w-14 text-center flex-shrink-0">TVA</span>
+      <span className="w-[4.5rem] text-right flex-shrink-0">Total TTC</span>
+      <span className="w-[40px] flex-shrink-0" />
+    </div>
+  );
+}
+
+/** Lignes d'un bloc, déplaçables à la poignée (dans le bloc ou vers un autre bloc). */
+function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marquesParItem, onMarque, onCreerArticle, creationIndex }) {
+  return (
+    <Droppable droppableId={droppableId} type="LIGNE">
+      {(drop, etat) => (
+        <div ref={drop.innerRef} {...drop.droppableProps} className={`space-y-1 rounded-lg ${childLines.length === 0 ? 'min-h-[8px]' : ''} ${etat.isDraggingOver ? 'bg-primary-50/60' : ''}`}>
+          {childLines.map(({ line, globalIndex }, i) => (
+            <Draggable key={`ligne-${globalIndex}`} draggableId={`ligne-${globalIndex}`} index={i}>
+              {(drag) => (
+                <div ref={drag.innerRef} {...drag.draggableProps}>
+                  <DevisLineRow
+                    line={line}
+                    index={globalIndex}
+                    poignee={drag.dragHandleProps}
+                    onUpdate={onUpdate}
+                    onRemove={onRemove}
+                    marques={line.catalog_item_id ? (marquesParItem.get(line.catalog_item_id) || []) : []}
+                    onMarque={(marque) => onMarque(globalIndex, marque)}
+                    onCreerArticle={onCreerArticle && (line.is_freeform || line.line_type === 'labor') && !line.catalog_item_id && String(line.designation || '').trim()
+                      ? () => onCreerArticle(globalIndex, type) : undefined}
+                    creationEnCours={creationIndex === globalIndex}
+                  />
+                </div>
+              )}
+            </Draggable>
+          ))}
+          {drop.placeholder}
+        </div>
+      )}
+    </Droppable>
   );
 }
 
@@ -154,23 +191,55 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     setLines((prev) => prev.filter((_, i) => i !== index));
   }, [setLines]);
 
-  const moveUp = useCallback((index) => {
-    if (index === 0) return;
-    setLines((prev) => {
-      const arr = [...prev];
-      [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]];
-      return arr;
-    });
+  // Glisser-déposer : une ligne (dans son chapitre ou vers un autre) ou un chapitre entier avec ses lignes
+  const onDragEnd = useCallback(({ source, destination, type }) => {
+    if (!destination) return;
+    if (type === 'CHAPITRE') {
+      if (source.index !== destination.index) setLines((prev) => deplacerChapitre(prev, source.index, destination.index));
+      return;
+    }
+    const deBloc = Number(source.droppableId.replace('bloc-', ''));
+    const versBloc = Number(destination.droppableId.replace('bloc-', ''));
+    if (deBloc === versBloc && source.index === destination.index) return;
+    setLines((prev) => deplacerLigne(prev, { deBloc, deRang: source.index, versBloc, versRang: destination.index }));
   }, [setLines]);
 
-  const moveDown = useCallback((index) => {
-    setLines((prev) => {
-      if (index >= prev.length - 1) return prev;
-      const arr = [...prev];
-      [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]];
-      return arr;
-    });
-  }, [setLines]);
+  // Créer l'article de la base depuis une ligne libre (org_admin) : la ligne reste telle quelle et pointe vers l'article
+  const { isOrgAdmin } = useAuth();
+  const { createItem } = useCatalogItemMutations(orgId);
+  const [creationIndex, setCreationIndex] = useState(null);
+  const typeDeLigne = useCallback((index) => {
+    for (let i = index; i >= 0; i--) if (lines[i]?.line_type === 'section_title') return typeChapitre(devisConfig, family, lines[i].designation);
+    return 'libre';
+  }, [lines, devisConfig, family]);
+  const creerUnArticle = useCallback(async (index, type) => {
+    const ligne = lines[index];
+    const titre = [...lines.slice(0, index + 1)].reverse().find((l) => l.line_type === 'section_title')?.designation;
+    const article = articleDepuisLigne(ligne, type, productCategoriesForSection(titre, family, devisConfig)[0] || null);
+    if (!article) return false;
+    const item = await createItem(article);
+    setLines((prev) => prev.map((l) => (l === ligne ? { ...l, catalog_item_id: item.id } : l)));
+    return true;
+  }, [lines, family, devisConfig, createItem, setLines]);
+  const creerArticle = useCallback(async (index, type) => {
+    setCreationIndex(index);
+    try { if (await creerUnArticle(index, type)) toast.success('Article créé dans la base'); }
+    catch (err) { toast.error(err?.message || 'Création refusée'); }
+    finally { setCreationIndex(null); }
+  }, [creerUnArticle]);
+  const aCreer = useMemo(() => (isOrgAdmin ? lignesSansArticle(lines) : []), [isOrgAdmin, lines]);
+  const creerTousLesArticles = useCallback(async () => {
+    let faits = 0;
+    const echecs = [];
+    for (const i of aCreer) {
+      setCreationIndex(i);
+      try { if (await creerUnArticle(i, typeDeLigne(i))) faits += 1; }
+      catch (err) { echecs.push(`${lines[i].designation} : ${err?.message || 'refusé'}`); }
+    }
+    setCreationIndex(null);
+    if (faits) toast.success(`${faits} article${faits > 1 ? 's' : ''} créé${faits > 1 ? 's' : ''} dans la base`);
+    echecs.forEach((e) => toast.error(e));
+  }, [aCreer, creerUnArticle, typeDeLigne, lines]);
 
   // Structurer les lignes en chapitres
   const sections = useMemo(() => {
@@ -271,47 +340,64 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
         </div>
       )}
 
-      {hasSections ? (
-        <div className="space-y-3">
-          {sections.map((sec) => {
-            if (!sec.section) {
-              return sec.children.map(({ line, globalIndex }, i) => (
-                <DevisLineRow
-                  key={globalIndex}
-                  line={line}
-                  index={globalIndex}
-                  onUpdate={updateLine}
-                  onRemove={removeLine}
-                  onMoveUp={moveUp}
-                  onMoveDown={moveDown}
-                  isFirst={i === 0}
-                  isLast={i === sec.children.length - 1}
-                  marques={line.catalog_item_id ? (marquesParItem.get(line.catalog_item_id) || []) : []}
-                  onMarque={(marque) => changerMarque(globalIndex, marque)}
-                />
-              ));
-            }
-            return (
-              <SectionBlock
-                key={sec.sectionIndex}
-                sectionIndex={sec.sectionIndex}
-                section={sec.section}
-                type={typeChapitre(devisConfig, family, sec.section.designation)}
-                childLines={sec.children}
-                onUpdate={updateLine}
-                onRemove={removeLine}
-                onMoveUp={moveUp}
-                onMoveDown={moveDown}
-                onAddProducts={handleAddProductsToSection}
-                onAddLabor={addLaborToSection}
-                onAddFreeform={addFreeformToSection}
-                onMetre={setMetreForSection}
-                marquesParItem={marquesParItem}
-                onMarque={changerMarque}
-              />
-            );
-          })}
+      {aCreer.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-secondary-600 bg-primary-50/60 border border-primary-100 rounded-lg px-3 py-2">
+          <BookmarkPlus className="w-4 h-4 text-primary-600 flex-shrink-0" />
+          <span className="flex-1 min-w-0">
+            {aCreer.length} ligne{aCreer.length > 1 ? 's' : ''} saisie{aCreer.length > 1 ? 's' : ''} à la main {aCreer.length > 1 ? 'ne sont' : 'n’est'} pas dans la base d’articles.
+          </span>
+          <button type="button" onClick={creerTousLesArticles} disabled={creationIndex != null} className="btn-secondary btn-sm">
+            Créer {aCreer.length > 1 ? `les ${aCreer.length} articles` : 'l’article'}
+          </button>
         </div>
+      )}
+
+      {hasSections ? (
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="space-y-3">
+            {/* lignes avant le premier chapitre (bloc sans titre, toujours en tête) */}
+            {sections[0] && !sections[0].section && (
+              <ListeLignes droppableId="bloc-0" childLines={sections[0].children} type="libre" onUpdate={updateLine} onRemove={removeLine}
+                marquesParItem={marquesParItem} onMarque={changerMarque} onCreerArticle={isOrgAdmin ? creerArticle : undefined} creationIndex={creationIndex} />
+            )}
+            <Droppable droppableId="chapitres" type="CHAPITRE">
+              {(drop) => (
+                <div ref={drop.innerRef} {...drop.droppableProps} className="space-y-3">
+                  {sections.filter((sec) => sec.section).map((sec, rang) => {
+                    const blocIndex = sections.indexOf(sec);
+                    return (
+                      <Draggable key={`chap-${sec.sectionIndex}`} draggableId={`chap-${sec.sectionIndex}`} index={rang}>
+                        {(drag) => (
+                          <div ref={drag.innerRef} {...drag.draggableProps}>
+                            <SectionBlock
+                              blocIndex={blocIndex}
+                              sectionIndex={sec.sectionIndex}
+                              section={sec.section}
+                              type={typeChapitre(devisConfig, family, sec.section.designation)}
+                              childLines={sec.children}
+                              poigneeChapitre={drag.dragHandleProps}
+                              onUpdate={updateLine}
+                              onRemove={removeLine}
+                              onAddProducts={handleAddProductsToSection}
+                              onAddLabor={addLaborToSection}
+                              onAddFreeform={addFreeformToSection}
+                              onMetre={setMetreForSection}
+                              marquesParItem={marquesParItem}
+                              onMarque={changerMarque}
+                              onCreerArticle={isOrgAdmin ? creerArticle : undefined}
+                              creationIndex={creationIndex}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {drop.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </div>
+        </DragDropContext>
       ) : (
         <div className="text-center py-8 text-secondary-500 text-sm">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />

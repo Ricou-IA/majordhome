@@ -84,6 +84,7 @@ export default function ApercuDevis({ model: m, zoneActive, onZoneClick }) {
           {col.reference && <div className="flex-[1.5]">Réf.</div>}
           <div className="flex-1 text-center">Qté</div>
           {col.prix_unitaire && <div className="flex-[1.5] text-right">P.U. HT</div>}
+          {col.remise && <div className="flex-1 text-right">Remise</div>}
           {col.tva && <div className="flex-1 text-center">TVA</div>}
           <div className="flex-[1.5] text-right">Total HT</div>
         </div>
@@ -101,6 +102,7 @@ export default function ApercuDevis({ model: m, zoneActive, onZoneClick }) {
                 {col.reference && <div className="flex-[1.5]">{l.reference}</div>}
                 <div className="flex-1 text-center">{l.quantite}</div>
                 {col.prix_unitaire && <div className="flex-[1.5] text-right">{l.prix_unitaire}</div>}
+                {col.remise && <div className="flex-1 text-right">{l.remise}</div>}
                 {col.tva && <div className="flex-1 text-center">{l.tva}</div>}
                 <div className="flex-[1.5] text-right">{l.total}</div>
               </div>

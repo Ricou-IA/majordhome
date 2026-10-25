@@ -38,6 +38,7 @@ const s = StyleSheet.create({
   colRef: { flex: 1.5 },
   colQty: { flex: 1, textAlign: 'center' },
   colPU: { flex: 1.5, textAlign: 'right' },
+  colRemise: { flex: 1, textAlign: 'right' },
   colTVA: { flex: 1, textAlign: 'center' },
   colTotal: { flex: 1.5, textAlign: 'right' },
   totalsBox: { marginTop: 16, marginLeft: 'auto', width: 220 },
@@ -106,6 +107,7 @@ function DevisDocument({ model: m }) {
           {col.reference ? <Text style={s.colRef}>Réf.</Text> : null}
           <Text style={s.colQty}>Qté</Text>
           {col.prix_unitaire ? <Text style={s.colPU}>P.U. HT</Text> : null}
+          {col.remise ? <Text style={s.colRemise}>Remise</Text> : null}
           {col.tva ? <Text style={s.colTVA}>TVA</Text> : null}
           <Text style={s.colTotal}>Total HT</Text>
         </View>
@@ -127,6 +129,7 @@ function DevisDocument({ model: m }) {
                 {col.reference ? <Text style={s.colRef}>{l.reference}</Text> : null}
                 <Text style={s.colQty}>{l.quantite}</Text>
                 {col.prix_unitaire ? <Text style={s.colPU}>{l.prix_unitaire}</Text> : null}
+                {col.remise ? <Text style={s.colRemise}>{l.remise}</Text> : null}
                 {col.tva ? <Text style={s.colTVA}>{l.tva}</Text> : null}
                 <Text style={s.colTotal}>{l.total}</Text>
               </View>

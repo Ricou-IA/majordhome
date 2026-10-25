@@ -169,3 +169,19 @@ test('buildDevisDocumentModel : un chapitre sans ligne n\'apparaît pas dans le 
   const m = buildDevisDocumentModel({ quote, lines: avecVide, totals, company, config: buildDevisConfig({}) });
   assert.deepEqual(m.tableau.chapitres.map((c) => c.titre), ['ÉQUIPEMENT', 'POSE']);
 });
+
+test('buildDevisDocumentModel : colonne remise affichée seulement si une ligne en porte une ; total de ligne après remise', () => {
+  const avecRemise = [
+    { line_type: 'section_title', designation: 'SECU' },
+    { line_type: 'product', designation: 'Disjoncteur', quantity: 2, unit_price_ht: 50, tva_rate: 5.5, discount_percent: 10 },
+    { line_type: 'product', designation: 'Câble', quantity: 1, unit_price_ht: 20, tva_rate: 5.5 },
+  ];
+  const m = buildDevisDocumentModel({ quote, lines: avecRemise, totals, company, config: buildDevisConfig({}) });
+  assert.equal(m.tableau.colonnes.remise, true);
+  assert.equal(m.tableau.chapitres[0].lignes[0].remise, '10 %');
+  assert.equal(m.tableau.chapitres[0].lignes[0].total, '90,00 €');
+  assert.equal(m.tableau.chapitres[0].lignes[1].remise, '');
+  assert.equal(m.tableau.chapitres[0].sous_total, '110,00 €');
+  const sans = buildDevisDocumentModel({ quote, lines, totals, company, config: buildDevisConfig({}) });
+  assert.equal(sans.tableau.colonnes.remise, false);
+});

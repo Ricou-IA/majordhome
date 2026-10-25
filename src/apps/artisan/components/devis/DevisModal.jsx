@@ -298,7 +298,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
                       )}
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0 text-secondary-600">
-                      <span>{line.quantity} × {formatEuro(line.unit_price_ht)}</span>
+                      <span>{line.quantity} × {formatEuro(line.unit_price_ht)}{Number(line.discount_percent) > 0 ? ` − ${String(Number(line.discount_percent)).replace(".", ",")} %` : ""}</span>
                       <span className="font-medium text-secondary-900 w-24 text-right">{formatEuro(line.total_ht)}</span>
                     </div>
                   </div>

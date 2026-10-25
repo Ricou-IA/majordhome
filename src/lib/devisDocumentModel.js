@@ -8,6 +8,7 @@
 import { formatFullAddress } from './orgBranding.js';
 import { fmtEur } from './invoiceDocumentModel.js';
 import { DEFAULTS_DEVIS, buildDevisConfig, famillesActives } from './devisConfig.js';
+import { computeLineTotals, remiseLigne } from './devisCalculs.js';
 
 /**
  * Zones du document et le réglage qui les gouverne (accordéon + champ). `reglage: null` = zone portée
@@ -63,7 +64,8 @@ function piedParDefaut(comp, adresse) {
   const legal = [comp.legalForm, comp.capital ? `capital ${comp.capital} €` : null, comp.rcs].filter(Boolean).join(' — ');
   return [base, legal].filter(Boolean).join(' — ');
 }
-const ligneTotalHt = (l) => (Number.isFinite(Number(l.total_ht)) ? Number(l.total_ht) : round2((Number(l.quantity) || 0) * (Number(l.unit_price_ht) || 0)));
+// total stocké (devis enregistré) sinon recalculé avec la remise de ligne (aperçu, éditeur)
+const ligneTotalHt = (l) => (l.total_ht != null && l.total_ht !== '' && Number.isFinite(Number(l.total_ht)) ? Number(l.total_ht) : computeLineTotals(l).total_ht);
 const lignesTexte = (s) => String(s || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
 
 /** Groupe les lignes du devis en chapitres (une section sans titre en tête si des lignes précèdent le premier titre). */
@@ -98,7 +100,9 @@ export function buildDevisDocumentModel({ quote, lines, totals, company, config,
   const emetteurLignes = [adresse, [comp.phone ? `Tél. ${comp.phone}` : null, comp.email].filter(Boolean).join('  ·  '), comp.siret ? `SIRET : ${comp.siret}` : null, comp.tvaIntra ? `TVA : ${comp.tvaIntra}` : null].filter(Boolean);
   const clientLignes = [q.client_display_name || '', q.client_address || '', [q.client_postal_code, q.client_city].filter(Boolean).join(' '), q.client_phone ? `Tél. ${q.client_phone}` : '', q.client_email || ''].filter(Boolean);
 
-  const colonnes = { reference: cfg.affichage.references, prix_unitaire: cfg.affichage.prix_unitaires, tva: cfg.affichage.tva_par_ligne, detail: cfg.affichage.detail_lignes };
+  // colonne remise : seulement si une ligne en porte une (un devis sans remise garde sa mise en page)
+  const colRemise = cfg.affichage.prix_unitaires && (lines || []).some((l) => l.line_type !== 'section_title' && remiseLigne(l) > 0);
+  const colonnes = { reference: cfg.affichage.references, prix_unitaire: cfg.affichage.prix_unitaires, remise: colRemise, tva: cfg.affichage.tva_par_ligne, detail: cfg.affichage.detail_lignes };
   // un chapitre sans ligne n’est pas imprimé (OPTIONS laissé vide, Eric 2026-10-25)
   const chaps = chapitres(lines).filter((c) => c.lignes.length > 0).map((c) => ({
     titre: c.titre,
@@ -106,6 +110,7 @@ export function buildDevisDocumentModel({ quote, lines, totals, company, config,
     lignes: cfg.affichage.detail_lignes ? c.lignes.map((l) => ({
       designation: l.designation || '', description: l.description || '', reference: cfg.affichage.references ? (l.reference || '') : '',
       quantite: fmtQte(l.quantity), unite: l.unit || '', prix_unitaire: cfg.affichage.prix_unitaires ? fmtEur(l.unit_price_ht) : '',
+      remise: colRemise && remiseLigne(l) > 0 ? `${fmtTaux(remiseLigne(l))}` : '',
       tva: cfg.affichage.tva_par_ligne ? fmtTaux(l.tva_rate) : '', total: fmtEur(ligneTotalHt(l)),
     })) : [],
   }));

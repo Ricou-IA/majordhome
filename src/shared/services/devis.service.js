@@ -69,91 +69,9 @@ export const LINE_TYPES = [
   { value: 'section_title', label: 'Titre de section' },
 ];
 
-// ============================================================================
-// HELPERS CALCUL
-// ============================================================================
-
-/**
- * Calcule les totaux d'une ligne de devis
- */
-export function computeLineTotals(line) {
-  if (line.line_type === 'section_title') {
-    return { total_ht: 0, total_tva: 0, total_ttc: 0 };
-  }
-  const qty = parseFloat(line.quantity) || 0;
-  const unitPrice = parseFloat(line.unit_price_ht) || 0;
-  const tvaRate = parseFloat(line.tva_rate) || 0;
-
-  const totalHt = Math.round(qty * unitPrice * 100) / 100;
-  const totalTva = Math.round(totalHt * tvaRate / 100 * 100) / 100;
-  const totalTtc = Math.round((totalHt + totalTva) * 100) / 100;
-
-  return { total_ht: totalHt, total_tva: totalTva, total_ttc: totalTtc };
-}
-
-/**
- * Marge brute sur les lignes portant un prix d'achat (fournitures), avant remise globale
- * (qui s'applique au total, pas ligne à ligne). Affichée dans le pied de la modale de devis.
- * @param {Array<object>} lines - lignes du devis
- * @returns {{ nb: number, vente: number, achat: number, marge: number, taux: number }}
- */
-export function margeFournitures(lines) {
-  const produits = lines.filter((l) => l.line_type !== 'section_title' && l.purchase_price_ht != null && l.purchase_price_ht !== '');
-  const vente = produits.reduce((s, l) => s + (parseFloat(l.unit_price_ht) || 0) * (parseFloat(l.quantity) || 0), 0);
-  const achat = produits.reduce((s, l) => s + (parseFloat(l.purchase_price_ht) || 0) * (parseFloat(l.quantity) || 0), 0);
-  const marge = vente - achat;
-  return { nb: produits.length, vente, achat, marge, taux: vente > 0 ? (marge / vente) * 100 : 0 };
-}
-
-/**
- * Calcule les totaux globaux du devis avec ventilation TVA
- */
-export function computeQuoteTotals(lines, globalDiscountPercent = 0) {
-  const discount = parseFloat(globalDiscountPercent) || 0;
-
-  // Somme par taux de TVA
-  const tvaBreakdown = {};
-  let subtotalHt = 0;
-
-  for (const line of lines) {
-    if (line.line_type === 'section_title') continue;
-    const { total_ht, total_tva } = computeLineTotals(line);
-    subtotalHt += total_ht;
-
-    const rate = parseFloat(line.tva_rate) || 0;
-    if (!tvaBreakdown[rate]) {
-      tvaBreakdown[rate] = { rate, base_ht: 0, tva_amount: 0 };
-    }
-    tvaBreakdown[rate].base_ht += total_ht;
-    tvaBreakdown[rate].tva_amount += total_tva;
-  }
-
-  // Remise globale
-  const discountAmount = Math.round(subtotalHt * discount / 100 * 100) / 100;
-  const totalHtAfterDiscount = Math.round((subtotalHt - discountAmount) * 100) / 100;
-
-  // Appliquer la remise proportionnellement sur chaque tranche TVA
-  const ratio = subtotalHt > 0 ? totalHtAfterDiscount / subtotalHt : 0;
-  let totalTva = 0;
-  const tvaDetails = Object.values(tvaBreakdown).map((t) => {
-    const adjustedBase = Math.round(t.base_ht * ratio * 100) / 100;
-    const adjustedTva = Math.round(adjustedBase * t.rate / 100 * 100) / 100;
-    totalTva += adjustedTva;
-    return { rate: t.rate, base_ht: adjustedBase, tva_amount: adjustedTva };
-  });
-
-  totalTva = Math.round(totalTva * 100) / 100;
-  const totalTtc = Math.round((totalHtAfterDiscount + totalTva) * 100) / 100;
-
-  return {
-    subtotal_ht: subtotalHt,
-    discount_amount: discountAmount,
-    total_ht: totalHtAfterDiscount,
-    total_tva: totalTva,
-    total_ttc: totalTtc,
-    tva_breakdown: tvaDetails,
-  };
-}
+// Calculs (lignes, totaux, marge) : module pur src/lib/devisCalculs.js, ré-exporté pour les appelants historiques
+import { computeLineTotals, computeQuoteTotals, margeFournitures, remiseLigne } from '@/lib/devisCalculs.js';
+export { computeLineTotals, computeQuoteTotals, margeFournitures, remiseLigne };
 
 // ============================================================================
 // SERVICE PRINCIPAL
@@ -321,6 +239,7 @@ export const devisService = {
             line_type: line.line_type || 'product',
             catalog_item_id: line.catalog_item_id || null,
             brand: line.brand || null,
+            discount_percent: remiseLigne(line),
             supplier_product_id: line.supplier_product_id || null,
             supplier_id: line.supplier_id || null,
             designation: line.designation,
@@ -411,6 +330,7 @@ export const devisService = {
             // porté par l'état de ligne du front : upsertQuoteLines supprime puis réinsère toutes les lignes
             catalog_item_id: line.catalog_item_id || null,
             brand: line.brand || null,
+            discount_percent: remiseLigne(line),
             supplier_product_id: line.supplier_product_id || null,
             supplier_id: line.supplier_id || null,
             designation: line.designation,
@@ -625,6 +545,7 @@ export const devisService = {
           line_type: line.line_type,
           catalog_item_id: line.catalog_item_id || null,
           brand: line.brand || null,
+          discount_percent: remiseLigne(line),
           supplier_product_id: line.supplier_product_id,
           supplier_id: line.supplier_id,
           designation: line.designation,
