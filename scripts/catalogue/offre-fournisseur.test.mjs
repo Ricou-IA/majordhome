@@ -67,6 +67,12 @@ test('contrôles : la somme des lignes + éco-participations retombe sur le tota
   assert.deepEqual(c.alertes.map((a) => a.code), []);
 });
 
+test('contrôles : total vérifié par les éco-participations des lignes quand l\'IA n\'a lu que la DEEE (lecture réelle 2026-10-25)', () => {
+  const c = controlerOffre({ ...offre, eco_total: 34.26 });
+  assert.equal(c.total_verifie, true);
+  assert.deepEqual(c.alertes.map((a) => a.code), []);
+});
+
 test('contrôles : une ligne oubliée ou un montant mal lu se voit', () => {
   const sansLigne = { ...offre, lignes: offre.lignes.slice(1) };
   assert.ok(controlerOffre(sansLigne).alertes.some((a) => a.code === 'total_incoherent'));

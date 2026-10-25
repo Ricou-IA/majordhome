@@ -10,7 +10,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { buildDevisConfig, famillesActives, familleDepuisEquipement } from '@/lib/devisConfig.js';
+import { buildDevisConfig, famillesActives, familleDepuisEquipement, typeChapitre } from '@/lib/devisConfig.js';
+import { reclasserDansSections } from '@/lib/devisOrdre.js';
 import { useDevisMutations } from '@hooks/useDevis';
 import { useFumMetreMutations } from '@hooks/useFumisterie';
 import { devisService, buildDefaultSections, computeQuoteTotals, margeFournitures } from '@services/devis.service';
@@ -20,7 +21,6 @@ import DevisEntete from './DevisEntete';
 import DevisStepLines from './DevisStepLines';
 import DevisConditions from './DevisConditions';
 import { X, Loader2 } from 'lucide-react';
-import { ConfirmDialog } from '@components/ui/confirm-dialog';
 import { toast } from 'sonner';
 
 /**
@@ -98,19 +98,26 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
   const setField = useCallback((field, value) => setForm((prev) => ({ ...prev, [field]: value })), []);
 
-  // Changer d'installation remplace les sections : on ne jette pas des lignes saisies sans prévenir
-  // (modale de l'app, pas le dialogue système).
-  const [familleEnAttente, setFamilleEnAttente] = useState(null);
-  const appliquerFamille = (f) => {
+  // Changer d'installation ne jette plus aucune ligne (retour d'Eric 2026-10-25 : après un import d'offre, on ne pouvait
+  // plus changer d'installation sans tout perdre) : les chapitres de la nouvelle installation remplacent les anciens et
+  // les lignes y sont reclassées (reclasserDansSections). Sans ligne : chapitres par défaut, comme avant.
+  const handleSelectFamily = (f) => {
     const isDeselect = selectedFamily === f;
-    setFamilleEnAttente(null);
+    const ancienne = selectedFamily;
     setSelectedFamily(isDeselect ? '' : f);
     setSelectedTemplateId(null);
-    setMetre(null);
-    setForm((prev) => ({ ...prev, globalDiscountPercent: '0' }));
-    setLines(isDeselect ? [] : buildDefaultSections(f, devisConfig));
+    if (nbLignes === 0) {
+      setMetre(null);
+      setForm((prev) => ({ ...prev, globalDiscountPercent: '0' }));
+      setLines(isDeselect ? [] : buildDefaultSections(f, devisConfig));
+      return;
+    }
+    if (isDeselect) return; // les lignes restent, sous leurs chapitres actuels
+    setLines((prev) => reclasserDansSections(prev, buildDefaultSections(f, devisConfig), {
+      typeAvant: (titre) => typeChapitre(devisConfig, ancienne, titre),
+      typeApres: (titre) => typeChapitre(devisConfig, f, titre),
+    }));
   };
-  const handleSelectFamily = (f) => { if (nbLignes > 0) setFamilleEnAttente(f); else appliquerFamille(f); };
 
   const handleSelectTemplate = (templateId) => {
     const tpl = templates.find((t) => t.id === templateId);
@@ -204,9 +211,6 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
           </div>
         </div>
       </div>
-      <ConfirmDialog open={familleEnAttente != null} onOpenChange={(o) => { if (!o) setFamilleEnAttente(null); }} title="Changer d'installation ?"
-        description={`Les sections seront remplacées et les ${nbLignes} ligne${nbLignes > 1 ? 's' : ''} déjà saisie${nbLignes > 1 ? 's' : ''} seront supprimées.`}
-        confirmLabel="Remplacer" cancelLabel="Garder mes lignes" onConfirm={() => appliquerFamille(familleEnAttente)} />
     </div>
   );
 }
