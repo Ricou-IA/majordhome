@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogItemsService } from '@services/catalogItems.service';
 import { suppliersService } from '@services/suppliers.service';
@@ -61,6 +61,23 @@ export function useCatalogItemOffers(orgId, itemIds = []) {
     staleTime: 30_000,
   });
   return { offers: query.data || [], isLoading: query.isLoading };
+}
+
+/** Article actuel (nom, nombre de lignes) de lignes candidates au rattachement, indexé par id. */
+export function useCatalogItemsResume(orgId, ids = []) {
+  const idsKey = [...new Set(ids.filter(Boolean))].sort().join(',');
+  const { data, error } = useQuery({
+    queryKey: catalogItemKeys.resume(orgId, idsKey),
+    queryFn: async () => {
+      const { data: rows, error: err } = await catalogItemsService.getItemsResume(orgId, idsKey.split(','));
+      if (err) throw err;
+      return rows;
+    },
+    enabled: !!orgId && !!idsKey,
+    staleTime: 30_000,
+  });
+  const articles = useMemo(() => new Map((data || []).map((a) => [a.id, a])), [data]);
+  return { articles, error };
 }
 
 /** Documents d'un article (posés sur l'article + ceux de ses lignes fournisseur, sans doublon) et leurs mutations. */

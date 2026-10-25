@@ -92,3 +92,19 @@ export function suggestions(article, lignes, { max = 8, seuil = 2.5 } = {}) {
     .sort((a, b) => b.score - a.score || String(a.ligne.name).localeCompare(String(b.ligne.name), 'fr'))
     .slice(0, max);
 }
+
+/**
+ * Avertissement affiché sur une ligne candidate au rattachement. Chaque ligne fournisseur a son article (rattachement
+ * automatique) : dire « déjà rattachée » à chaque fois ne dit rien. On ne signale que la ligne qui QUITTE un article
+ * regroupant d'autres lignes (ce groupe perd une offre) ; une ligne seule sur son article se rattache sans mention
+ * (l'article vidé est désactivé par la RPC). Article non chargé ⇒ null (on ne devine pas).
+ * @param {{ catalog_item_id?: string | null }} ligne
+ * @param {Map<string, { name: string, offres_total: number }>} articles article actuel de chaque ligne, par id
+ * @returns {string | null}
+ */
+export function avertissementDepart(ligne, articles) {
+  const a = ligne?.catalog_item_id ? articles.get(ligne.catalog_item_id) : null;
+  const autres = a ? Number(a.offres_total || 0) - 1 : 0;
+  if (!a || autres < 1) return null;
+  return `quittera « ${a.name} » (${autres} autre${autres > 1 ? 's' : ''} ligne${autres > 1 ? 's' : ''})`;
+}

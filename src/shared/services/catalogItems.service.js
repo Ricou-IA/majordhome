@@ -86,6 +86,20 @@ export const catalogItemsService = {
     }
   },
 
+  /** Nom et nombre de lignes de quelques articles (≤ 150 ids, la liste part dans l'URL) : article actuel des lignes candidates. */
+  async getItemsResume(orgId, ids = []) {
+    try {
+      if (!orgId || !ids.length) return { data: [], error: null };
+      const { data, error } = await supabase.from('majordhome_catalog_items_list').select('id, name, offres_total')
+        .eq('org_id', orgId).in('id', ids.slice(0, 150));
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] getItemsResume:', error);
+      return { data: [], error };
+    }
+  },
+
   /** Un article (vue liste, avec ses compteurs) ; null si absent. */
   async getItem(orgId, itemId) {
     try {

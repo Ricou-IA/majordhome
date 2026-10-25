@@ -17,15 +17,7 @@ import ArticleDocuments from './ArticleDocuments';
 import ArticleOffersTable from './ArticleOffersTable';
 import ArticleAttachModal from './ArticleAttachModal';
 import ArticleEnrichModal from './ArticleEnrichModal';
-
-// Natures d'article (2026-10-25) : décident du chapitre de devis où l'article est proposé
-const KINDS = [
-  { value: 'main', label: 'Équipement (chapitre Équipement)' },
-  { value: 'accessory', label: 'Option (chapitre Options)' },
-  { value: 'consumable', label: 'Consommable (chapitre Options)' },
-  { value: 'stock', label: 'Matériel stocké (marque au choix dans le devis)' },
-  { value: 'main_oeuvre', label: 'Main d’œuvre' },
-];
+import { NATURES_FICHE } from '@/lib/catalogue/natures.js';
 
 function formDepuis(item) {
   return {
@@ -154,7 +146,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
                   options={[{ value: '', label: 'Sans catégorie' }, ...PRODUCT_CATEGORIES]} />
               </FormField>
               <FormField label="Nature">
-                <SelectInput value={form.productKind} onChange={(v) => setField('productKind', v)} disabled={!canEdit} options={KINDS} />
+                <SelectInput value={form.productKind} onChange={(v) => setField('productKind', v)} disabled={!canEdit} options={NATURES_FICHE} />
               </FormField>
               <FormField label="Prix de vente HT (€)">
                 <TextInput type="number" value={form.sellingPriceHt} onChange={(v) => setField('sellingPriceHt', v)} disabled={!canEdit} placeholder="0 = à saisir" />

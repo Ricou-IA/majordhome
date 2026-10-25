@@ -4,7 +4,7 @@
 // Run : node --test scripts/catalogue/suggestions.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { jetons, comparerReferences, scorerCandidat, suggestions } from '../../src/lib/catalogue/suggestions.js';
+import { jetons, comparerReferences, scorerCandidat, suggestions, avertissementDepart } from '../../src/lib/catalogue/suggestions.js';
 
 const article = {
   id: 'art-1', name: 'V2C Chargeur Trydan 7,4 kW avec prise T2S (TRY32-1-SO-F)', brand: 'V2C', model_key: 'TRY321SOF',
@@ -60,4 +60,13 @@ test('suggestions : article sans marque ⇒ libellé et référence seuls', () =
     [ligne({ id: 'h', name: 'Disjoncteur 1P+N 16A courbe C Hager', brand: 'Hager', reference: 'MFN716', prix: 9.8 }), ligne({ id: 'c', name: 'Câble R2V 3G2,5', brand: 'Nexans', reference: 'R2V3G25', prix: 1.2 })]);
   assert.equal(s[0].ligne.id, 'h');
   assert.ok(!s.some((x) => x.ligne.id === 'c'));
+});
+
+test("avertissementDepart : seule une ligne qui quitte un article regroupant d'autres lignes est signalée", () => {
+  const articles = new Map([["solo", { name: "Borne seule", offres_total: 1 }], ["groupe", { name: "Borne V2C Trydan 7,4 kW", offres_total: 3 }]]);
+  assert.equal(avertissementDepart({ catalog_item_id: "solo" }, articles), null, "article créé pour cette seule ligne : rien à dire");
+  assert.equal(avertissementDepart({ catalog_item_id: null }, articles), null);
+  assert.equal(avertissementDepart({ catalog_item_id: "groupe" }, articles), "quittera « Borne V2C Trydan 7,4 kW » (2 autres lignes)");
+  assert.equal(avertissementDepart({ catalog_item_id: "groupe2" }, new Map([["groupe2", { name: "X", offres_total: 2 }]])), "quittera « X » (1 autre ligne)");
+  assert.equal(avertissementDepart({ catalog_item_id: "inconnu" }, articles), null, "article non chargé : on ne devine pas");
 });

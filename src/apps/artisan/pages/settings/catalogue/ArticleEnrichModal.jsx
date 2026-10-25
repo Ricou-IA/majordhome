@@ -69,7 +69,8 @@ export default function ArticleEnrichModal({ item, champs, onClose, propose, app
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
+    // écran large : la fenêtre se range à GAUCHE de la fiche article (max-w-3xl = 48rem), sans la masquer (Eric)
+    <div className="fixed inset-y-0 left-0 right-0 xl:right-[48rem] z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col m-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b">
           <div className="min-w-0">
