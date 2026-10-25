@@ -12,7 +12,7 @@ import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@services/suppliers.service';
 import { supportsEnrichment } from '@/shared/specs';
 import { FormField, TextInput, SelectInput, TextArea } from '../../../components/FormFields';
 import ProductSpecsForm from '../product-detail/ProductSpecsForm';
-import { ProductDocumentsInline } from '../ProductDocumentsPanel';
+import ArticleDocuments from './ArticleDocuments';
 import ArticleOffersTable from './ArticleOffersTable';
 import ArticleAttachModal from './ArticleAttachModal';
 
@@ -201,21 +201,15 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
               </section>
             )}
 
-            {/* Documents des lignes rattachées */}
+            {/* Documents de l'article : les siens + ceux de ses lignes fournisseur, une seule liste */}
             <section className="space-y-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary-500">Documents (fiches techniques des lignes fournisseur)</h4>
-              {offers.length === 0 && <p className="text-xs text-secondary-400">Aucune ligne rattachée.</p>}
-              {offers.map((o) => (
-                <details key={o.product_id} className="rounded border border-secondary-200 px-3 py-2">
-                  <summary className="text-sm text-secondary-700 cursor-pointer">{o.supplier_name} · {o.reference}</summary>
-                  <div className="pt-2"><ProductDocumentsInline productId={o.product_id} orgId={orgId} /></div>
-                </details>
-              ))}
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary-500">Documents de l&apos;article</h4>
+              <ArticleDocuments orgId={orgId} itemId={itemId} offers={offers} canEdit={canEdit} />
             </section>
           </div>
         )}
       </div>
-      {attaching && item && <ArticleAttachModal orgId={orgId} item={item} onClose={() => setAttaching(false)} onAttach={handleAttach} attaching={isLinking} />}
+      {attaching && item && <ArticleAttachModal orgId={orgId} item={item} offers={offers} onClose={() => setAttaching(false)} onAttach={handleAttach} attaching={isLinking} />}
     </div>
   );
 }

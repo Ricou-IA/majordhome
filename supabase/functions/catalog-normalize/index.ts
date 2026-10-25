@@ -42,9 +42,14 @@ Deno.serve(async (req) => {
   const admin = auth.supabase;
 
   try {
-    // supplier_id optionnel : sans lui, toutes les lignes de l'org (page « Harmoniser les bases »).
+    // supplier_id optionnel : sans lui, toutes les lignes de l'org (page « Harmoniser les bases »). La fumisterie est
+    // écartée : ~24 000 pièces DINAK / Modinox sans équivalent d'une marque à l'autre, qui noyaient l'IA (100 lignes par
+    // clic, ordre alphabétique) — les bornes Ecostal n'avaient jamais été soumises (constat du 2026-10-25).
     // deno-lint-ignore no-explicit-any
-    const perimetre = (q: any) => (supplierId ? q.eq("supplier_id", supplierId) : q);
+    const perimetre = (q: any) => {
+      const base = q.or("category.is.null,category.neq.fumisterie");
+      return supplierId ? base.eq("supplier_id", supplierId) : base;
+    };
     // Jamais deux fois le même article : ceux déjà soumis (modele_ia_confiance posée) sont écartés, sinon un lot
     // sous le seuil de confiance serait resoumis à chaque clic sans jamais avancer.
     const { data: produits, error } = await perimetre(admin.from("majordhome_supplier_products")

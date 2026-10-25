@@ -63,6 +63,36 @@ export function useCatalogItemOffers(orgId, itemIds = []) {
   return { offers: query.data || [], isLoading: query.isLoading };
 }
 
+/** Documents d'un article (posés sur l'article + ceux de ses lignes fournisseur, sans doublon) et leurs mutations. */
+export function useCatalogItemDocuments(orgId, itemId, productIds = []) {
+  const queryClient = useQueryClient();
+  const idsKey = [...productIds].sort().join(',');
+  const key = catalogItemKeys.documents(orgId, itemId, idsKey);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const { data, error } = await catalogItemsService.getItemDocuments(orgId, itemId, idsKey ? idsKey.split(',') : []);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && !!itemId,
+    staleTime: 30_000,
+  });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: [...catalogItemKeys.all(orgId), 'documents', itemId] });
+  const upload = useMutation({
+    mutationFn: (payload) => unwrapResult(catalogItemsService.uploadItemDocument({ orgId, itemId, ...payload })),
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: (doc) => unwrapResult(catalogItemsService.deleteItemDocument(orgId, doc)),
+    onSuccess: invalidate,
+  });
+  return {
+    documents: query.data || [], isLoading: query.isLoading,
+    upload: upload.mutateAsync, remove: remove.mutateAsync, isUploading: upload.isPending, isRemoving: remove.isPending,
+  };
+}
+
 /** Marques distinctes des articles de l'org, pour des catégories (vide = toutes). */
 export function useCatalogBrands(orgId, categories = []) {
   const key = (categories || []).join(',');

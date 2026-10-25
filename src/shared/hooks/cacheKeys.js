@@ -290,6 +290,7 @@ export const catalogItemKeys = {
   list: (orgId, filtres) => [...catalogItemKeys.lists(orgId), filtres || {}],
   detail: (orgId, id) => [...catalogItemKeys.all(orgId), 'detail', id],
   offers: (orgId, idsKey) => [...catalogItemKeys.all(orgId), 'offers', idsKey],
+  documents: (orgId, itemId, idsKey) => [...catalogItemKeys.all(orgId), 'documents', itemId, idsKey || ''],
   proposals: (orgId, statut) => [...catalogItemKeys.all(orgId), 'proposals', statut ?? 'tous'],
   stats: (orgId) => [...catalogItemKeys.all(orgId), 'stats'],
   brands: (orgId) => [...catalogItemKeys.all(orgId), 'brands'],

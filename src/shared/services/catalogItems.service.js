@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
+import { storageService } from '@services/storage.service';
 import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
 import { SEUIL_FRAICHEUR_JOURS } from '@/lib/catalogue/ageDePrix.js';
@@ -169,6 +170,66 @@ export const catalogItemsService = {
       return { data: publicUrl, error: null };
     } catch (error) {
       logger.error('[catalogItemsService] uploadItemImage:', error);
+      return { data: null, error };
+    }
+  },
+
+  // ==========================================================================
+  // DOCUMENTS DE L'ARTICLE (photo, fiche technique : métadonnées de l'article — décision d'Eric, 2026-10-25)
+  // ==========================================================================
+
+  /**
+   * Documents d'un article : ceux posés sur l'article ET ceux de ses lignes fournisseur, une seule liste sans doublon
+   * (même nom de fichier ⇒ celui de l'article d'abord). Chaque document dit d'où il vient (`origine`).
+   */
+  async getItemDocuments(orgId, itemId, productIds = []) {
+    try {
+      if (!orgId || !itemId) return { data: [], error: null };
+      const filtres = [`catalog_item_id.eq.${itemId}`];
+      if (productIds.length) filtres.push(`supplier_product_id.in.(${productIds.join(',')})`);
+      const { data, error } = await supabase.from('majordhome_product_documents').select('*').eq('org_id', orgId)
+        .or(filtres.join(',')).order('created_at', { ascending: false });
+      if (error) throw error;
+      const tries = [...(data || [])].sort((a, b) => (a.catalog_item_id ? 0 : 1) - (b.catalog_item_id ? 0 : 1));
+      const vus = new Set();
+      const uniques = tries.filter((d) => { const k = String(d.file_name || '').toLowerCase(); if (vus.has(k)) return false; vus.add(k); return true; });
+      return { data: uniques.map((d) => ({ ...d, origine: d.catalog_item_id ? 'article' : 'fournisseur' })), error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] getItemDocuments:', error);
+      return { data: [], error };
+    }
+  },
+
+  /** Ajoute un document à l'article (bucket product-documents, `${orgId}/articles/${itemId}/…`). */
+  async uploadItemDocument({ orgId, itemId, file, documentType = 'Fiche technique', userId = null }) {
+    try {
+      if (!orgId || !itemId || !file) throw new Error('[catalogItemsService] orgId, itemId et file requis');
+      const ext = (file.name || 'document').split('.').pop().toLowerCase();
+      const storagePath = `${orgId}/articles/${itemId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await storageService.uploadFile('product-documents', storagePath, file, { contentType: file.type });
+      if (upErr) throw upErr;
+      const { data, error } = await supabase.from('majordhome_product_documents_write').insert({
+        catalog_item_id: itemId, org_id: orgId, document_type: documentType || 'Fiche technique', file_name: file.name,
+        storage_path: storagePath, file_size: file.size, mime_type: file.type, uploaded_by: userId,
+      }).select().single();
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] uploadItemDocument:', error);
+      return { data: null, error };
+    }
+  },
+
+  /** Retire un document posé sur l'article (ceux des lignes fournisseur se gèrent sur la ligne). */
+  async deleteItemDocument(orgId, doc) {
+    try {
+      if (!orgId || !doc?.id || !doc.catalog_item_id) throw new Error('Seuls les documents de l\'article se retirent ici');
+      const { error } = await supabase.from('majordhome_product_documents_write').delete().eq('id', doc.id).eq('org_id', orgId);
+      if (error) throw error;
+      if (doc.storage_path) await storageService.deleteFile('product-documents', doc.storage_path);
+      return { data: true, error: null };
+    } catch (error) {
+      logger.error('[catalogItemsService] deleteItemDocument:', error);
       return { data: null, error };
     }
   },
