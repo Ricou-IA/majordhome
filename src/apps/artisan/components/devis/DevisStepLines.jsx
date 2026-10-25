@@ -29,7 +29,7 @@ import DevisLineRow from './DevisLineRow';
 import MetreFumisterie from './metre/MetreFumisterie';
 import ImportOffreDevisModal from './ImportOffreDevisModal';
 import { formatEuro } from '@/lib/utils';
-import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus, FileUp } from 'lucide-react';
+import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus } from 'lucide-react';
 
 const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
@@ -153,10 +153,9 @@ function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marque
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig }) {
+export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig, importOffreOuvert = false, onFermerImportOffre }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
-  const [importOffre, setImportOffre] = useState(false);
   // TVA du devis DÉRIVÉE à chaque rendu (tvaDuDevis) : les lignes chiffrées font foi (devis repris, devis type chargé) ;
   // le choix mémorisé ne sert que tant que le devis n'a aucune ligne chiffrée ; changer de famille l'oublie.
   const [tvaChoisie, setTvaChoisie] = useState(null);
@@ -414,16 +413,12 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button type="button" onClick={addSection} className="btn-secondary btn-sm flex-1">
-          <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter un chapitre
-        </button>
-        <button type="button" onClick={() => setImportOffre(true)} className="btn-secondary btn-sm flex-1" title="Reprendre les lignes d'une offre de prix fournisseur (PDF)">
-          <FileUp className="w-3.5 h-3.5 mr-1" /> Importer une offre fournisseur
-        </button>
-      </div>
+      <button type="button" onClick={addSection} className="btn-secondary btn-sm w-full">
+        <Plus className="w-3.5 h-3.5 mr-1" /> Ajouter un chapitre
+      </button>
 
-      {importOffre && <ImportOffreDevisModal orgId={orgId} tva={tvaDevis} onInsert={insererOffre} onClose={() => setImportOffre(false)} />}
+      {/* ouverte depuis l'en-tête du devis (DevisEntete), gérée ici : TVA du devis et chapitres sont connus ici */}
+      {importOffreOuvert && <ImportOffreDevisModal orgId={orgId} tva={tvaDevis} onInsert={insererOffre} onClose={() => onFermerImportOffre?.()} />}
 
       {pickerForSection && (
         <DevisProductPicker
