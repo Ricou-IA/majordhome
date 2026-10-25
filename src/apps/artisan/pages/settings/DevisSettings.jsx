@@ -18,7 +18,7 @@ import ApercuDevis from './devis/ApercuDevis';
 
 /** Config → état du formulaire (les nombres deviennent des chaînes pour la saisie). */
 const depuisConfig = (c) => ({
-  familles: c.familles.map((f) => ({ ...f, sections: [...f.sections] })),
+  familles: c.familles.map((f) => ({ ...f, chapitres: f.chapitres.map((ch) => ({ ...ch })), sections: [...f.sections] })),
   document: { ...c.document, validite_jours: String(c.document.validite_jours) },
   paiement: { ...c.paiement },
   affichage: { ...c.affichage },
@@ -26,7 +26,11 @@ const depuisConfig = (c) => ({
 
 /** Formulaire → objet `devis` à sauver (complet). */
 const versSettings = (form) => ({
-  familles: form.familles.map((f) => ({ ...f, label: f.label.trim(), sections: f.sections.map((s) => s.trim()).filter(Boolean) })),
+  // chapitres typés (+ sections = leurs titres, pour les lecteurs historiques) ; TVA de la famille
+  familles: form.familles.map((f) => {
+    const chapitres = (f.chapitres || []).map((c) => ({ titre: String(c.titre || '').trim(), type: c.type })).filter((c) => c.titre);
+    return { ...f, label: f.label.trim(), tva: Number(f.tva ?? 10), chapitres, sections: chapitres.map((c) => c.titre) };
+  }),
   document: { ...form.document, validite_jours: Number(form.document.validite_jours) },
   paiement: { ...form.paiement },
   affichage: { ...form.affichage },

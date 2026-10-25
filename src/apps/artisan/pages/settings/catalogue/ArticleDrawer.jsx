@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useCatalogItem, useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@services/suppliers.service';
-import { TVA_RATES } from '@services/devis.service';
 import { supportsEnrichment } from '@/shared/specs';
 import { FormField, TextInput, SelectInput, TextArea } from '../../../components/FormFields';
 import ProductSpecsForm from '../product-detail/ProductSpecsForm';
@@ -17,10 +16,13 @@ import { ProductDocumentsInline } from '../ProductDocumentsPanel';
 import ArticleOffersTable from './ArticleOffersTable';
 import ArticleAttachModal from './ArticleAttachModal';
 
+// Natures d'article (2026-10-25) : décident du chapitre de devis où l'article est proposé
 const KINDS = [
-  { value: 'main', label: 'Équipement principal' },
-  { value: 'accessory', label: 'Accessoire' },
-  { value: 'consumable', label: 'Consommable' },
+  { value: 'main', label: 'Équipement (chapitre Équipement)' },
+  { value: 'accessory', label: 'Option (chapitre Options)' },
+  { value: 'consumable', label: 'Consommable (chapitre Options)' },
+  { value: 'stock', label: 'Matériel stocké (marque au choix dans le devis)' },
+  { value: 'main_oeuvre', label: 'Main d’œuvre' },
 ];
 
 function formDepuis(item) {
@@ -31,7 +33,6 @@ function formDepuis(item) {
     gamme: item?.gamme || '',
     productKind: item?.product_kind || 'main',
     unit: item?.unit || 'pièce',
-    defaultTvaRate: String(item?.default_tva_rate ?? 20),
     sellingPriceHt: item?.selling_price_ht != null ? String(item.selling_price_ht) : '',
     description: item?.description || '',
     imageUrl: item?.image_url || '',
@@ -69,7 +70,7 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
     try {
       await updateItem(itemId, {
         name: form.name, brand: form.brand, category: form.category, gamme: form.gamme, productKind: form.productKind,
-        unit: form.unit, defaultTvaRate: form.defaultTvaRate, sellingPriceHt: form.sellingPriceHt, description: form.description,
+        unit: form.unit, sellingPriceHt: form.sellingPriceHt, description: form.description,
         imageUrl: form.imageUrl, specs: { ...(item?.specs || {}), canonical: specs.canonical || {}, extras: specs.extras || [] },
       });
       toast.success('Article enregistré');
@@ -146,10 +147,6 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
               </FormField>
               <FormField label="Prix de vente HT (€)">
                 <TextInput type="number" value={form.sellingPriceHt} onChange={(v) => setField('sellingPriceHt', v)} disabled={!canEdit} placeholder="0 = à saisir" />
-              </FormField>
-              <FormField label="TVA par défaut">
-                <SelectInput value={form.defaultTvaRate} onChange={(v) => setField('defaultTvaRate', v)} disabled={!canEdit}
-                  options={TVA_RATES.map((t) => ({ value: t.value.toString(), label: t.label }))} />
               </FormField>
               <FormField label="Unité">
                 <SelectInput value={form.unit} onChange={(v) => setField('unit', v)} disabled={!canEdit} options={PRODUCT_UNITS} />
