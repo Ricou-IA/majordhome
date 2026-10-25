@@ -357,6 +357,9 @@ async function pushQuote(quote, lines, client, orgId) {
       fetchQuoteSubResource(existingSync.pennylane_id, 'invoice_lines'),
       fetchQuoteSubResource(existingSync.pennylane_id, 'invoice_line_sections'),
     ]);
+    // Un devis Pennylane a toujours au moins une ligne : une liste vide = lecture ratée. Renvoyer quand même
+    // créerait les nouvelles lignes À CÔTÉ des anciennes (devis doublé) — on refuse plutôt.
+    if (!lignesPl.some((l) => l?.id)) throw new Error('Lignes du devis Pennylane illisibles : renvoi annulé, rien n\'a été modifié');
     const maj = buildPennylaneQuoteUpdatePayload(quote, lines, pennylaneCustomerId, {
       lineIds: lignesPl.map((l) => l.id).filter(Boolean),
       sections: sectionsPl.map((sec, i) => ({ rank: sec.rank ?? i + 1, title: sec.title ?? sec.label })),
