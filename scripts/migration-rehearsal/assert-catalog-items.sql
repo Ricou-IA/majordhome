@@ -54,12 +54,10 @@ BEGIN
     AND c.relname IN ('majordhome_catalog_items', 'majordhome_catalog_items_list', 'majordhome_catalog_item_offers')
     AND c.reloptions::text LIKE '%security_invoker=true%';
   IF v_n <> 3 THEN RAISE EXCEPTION 'vues articles sans security_invoker (%/3)', v_n; END IF;
-  FOR v_p IN SELECT table_name, column_name, ordinal_position FROM information_schema.columns
-             WHERE table_schema = 'public' AND table_name IN ('majordhome_quote_lines_write')
-               AND ordinal_position = (SELECT max(ordinal_position) FROM information_schema.columns c2 WHERE c2.table_schema = 'public' AND c2.table_name = columns.table_name)
-  LOOP
-    IF v_p.column_name <> 'catalog_item_id' THEN RAISE EXCEPTION 'catalog_item_id n''est pas la dernière colonne de % (%)', v_p.table_name, v_p.column_name; END IF;
-  END LOOP;
+  -- catalog_item_id présente dans la vue d'écriture des lignes de devis (20261027_1 ajoute brand après elle)
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'majordhome_quote_lines_write' AND column_name = 'catalog_item_id') THEN
+    RAISE EXCEPTION 'catalog_item_id absente de majordhome_quote_lines_write';
+  END IF;
   -- relecture M5 : la matrice et la date du prix ne passent JAMAIS par la vue d'écriture (policy UPDATE = tout membre)
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'majordhome_supplier_products_write' AND column_name IN ('catalog_item_id', 'purchase_price_at')) THEN
     RAISE EXCEPTION 'catalog_item_id / purchase_price_at exposées par majordhome_supplier_products_write';
