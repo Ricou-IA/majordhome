@@ -28,11 +28,11 @@ export default function ArticleAttachModal({ orgId, item, onClose, onAttach, att
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col m-4" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col m-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b">
           <div>
             <h3 className="text-base font-semibold text-secondary-900">Rattacher une ligne fournisseur</h3>
-            <p className="text-xs text-secondary-400 truncate">à « {item.name} »</p>
+            <p className="text-xs text-secondary-400 break-words">à « {item.name} »</p>
           </div>
           <button type="button" onClick={onClose} className="p-1 hover:bg-secondary-100 rounded"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
@@ -49,8 +49,11 @@ export default function ArticleAttachModal({ orgId, item, onClose, onAttach, att
           {!loading && results.map((p) => (
             <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-secondary-100 hover:border-secondary-200">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-secondary-900 truncate">{p.name}</p>
-                <p className="text-xs text-secondary-400 truncate">{[p.supplier_name, p.reference, p.brand].filter(Boolean).join(' · ')}{p.catalog_item_id ? ' · déjà rattachée à un autre article' : ''}</p>
+                <p className="text-sm text-secondary-900 break-words">{p.name}</p>
+                <p className="text-xs text-secondary-400 break-words">
+                  {[p.supplier_name, p.reference, p.brand].filter(Boolean).join(' · ')}
+                  {p.catalog_item_id && <span className="text-amber-700"> · déjà rattachée à un autre article (elle le quittera)</span>}
+                </p>
               </div>
               <span className="text-xs text-secondary-600 whitespace-nowrap">{p.purchase_price_ht > 0 ? formatEuro(p.purchase_price_ht) : '—'}</span>
               <button type="button" onClick={() => onAttach(p.id)} disabled={attaching} className="btn-secondary btn-sm">
