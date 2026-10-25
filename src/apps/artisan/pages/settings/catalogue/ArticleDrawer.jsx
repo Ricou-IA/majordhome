@@ -4,17 +4,19 @@
 // documents = ceux des lignes rattachées, « Rattacher une ligne fournisseur » / « Détacher ».
 // Spec docs/superpowers/specs/2026-10-24-articles-majordhome-matrice-fournisseurs-design.md § 5.6 / § 8.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Save, Loader2, Link2, Image as ImageIcon, Upload } from 'lucide-react';
+import { X, Save, Loader2, Link2, Image as ImageIcon, Upload, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
 import { useCatalogItem, useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from '@services/suppliers.service';
-import { supportsEnrichment } from '@/shared/specs';
+import { supportsEnrichment, getSchemaForCategory } from '@/shared/specs';
+import { champsDuSchema } from '@/lib/catalogue/enrichissement.js';
 import { FormField, TextInput, SelectInput, TextArea } from '../../../components/FormFields';
 import ProductSpecsForm from '../product-detail/ProductSpecsForm';
 import ArticleDocuments from './ArticleDocuments';
 import ArticleOffersTable from './ArticleOffersTable';
 import ArticleAttachModal from './ArticleAttachModal';
+import ArticleEnrichModal from './ArticleEnrichModal';
 
 // Natures d'article (2026-10-25) : décident du chapitre de devis où l'article est proposé
 const KINDS = [
@@ -46,11 +48,12 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
   const { isOrgAdmin } = useAuth();
   const { item, isLoading } = useCatalogItem(orgId, itemId);
   const { offers } = useCatalogItemOffers(orgId, itemId ? [itemId] : []);
-  const { updateItem, uploadImage, attach, detach, isSaving, isLinking } = useCatalogItemMutations(orgId);
+  const { updateItem, uploadImage, attach, detach, isSaving, isLinking, proposeEnrichment, applyEnrichment, isApplyingEnrichment } = useCatalogItemMutations(orgId);
   const [form, setForm] = useState(formDepuis(null));
   const [specs, setSpecs] = useState({ canonical: {}, extras: [] });
   const [dirty, setDirty] = useState(false);
   const [attaching, setAttaching] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -64,6 +67,8 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
   const canEdit = isOrgAdmin;
   const photosOffres = useMemo(() => [...new Set(offers.map((o) => o.image_url).filter(Boolean))], [offers]);
   const offresActives = offers.filter((o) => o.is_active);
+  // champs demandés à l'IA : ceux du formulaire de caractéristiques de la catégorie (sans combustible, comme lui)
+  const champsEnrichissement = useMemo(() => champsDuSchema(getSchemaForCategory(item?.category)?.filterByFuelType?.() || []), [item?.category]);
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Le libellé est requis'); return; }
@@ -114,6 +119,12 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {canEdit && item && (
+              <button type="button" onClick={() => setEnriching(true)} disabled={dirty} className="btn-secondary btn-sm"
+                title={dirty ? 'Enregistrez d’abord vos modifications' : 'Chercher photo, fiche technique et caractéristiques sur le web'}>
+                <Sparkles className="w-4 h-4 mr-1" /> Enrichir
+              </button>
+            )}
             {canEdit && (
               <button type="button" onClick={handleSave} disabled={!dirty || isSaving} className="btn-primary btn-sm">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Enregistrer
@@ -209,6 +220,10 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
           </div>
         )}
       </div>
+      {enriching && item && (
+        <ArticleEnrichModal item={item} champs={champsEnrichissement} onClose={() => setEnriching(false)}
+          propose={proposeEnrichment} apply={applyEnrichment} applying={isApplyingEnrichment} />
+      )}
       {attaching && item && <ArticleAttachModal orgId={orgId} item={item} offers={offers} onClose={() => setAttaching(false)} onAttach={handleAttach} attaching={isLinking} />}
     </div>
   );

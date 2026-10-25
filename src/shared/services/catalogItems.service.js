@@ -20,6 +20,23 @@ function dateSeuilFraicheur(now = new Date()) {
   return new Date(now.getTime() - SEUIL_FRAICHEUR_JOURS * 86400000).toISOString();
 }
 
+/** Appel de l'edge catalog-item-enrich ; le message d'erreur de l'edge (« recherche trop longue »…) remonte tel quel. */
+async function appelEnrichissement(body, etape) {
+  try {
+    if (!body.org_id || !body.item_id) throw new Error('[catalogItemsService] orgId et itemId requis');
+    const { data, error } = await supabase.functions.invoke('catalog-item-enrich', { body });
+    if (error) {
+      let detail = null;
+      try { detail = await error.context?.json?.(); } catch { /* corps illisible */ }
+      throw new Error(detail?.error || error.message);
+    }
+    return { data, error: null };
+  } catch (error) {
+    logger.error(`[catalogItemsService] ${etape}:`, error);
+    return { data: null, error };
+  }
+}
+
 /**
  * Mots d'une recherche, normalisés comme la colonne `recherche` de la vue liste (NFD sans diacritiques, minuscules ;
  * « œ » n'est décomposé d'aucun côté) puis échappés pour PostgREST. Chaque mot doit apparaître quelque part.
@@ -376,6 +393,26 @@ export const catalogItemsService = {
       logger.error('[catalogItemsService] createForProduct:', error);
       return { data: null, error };
     }
+  },
+
+  // ==========================================================================
+  // ENRICHISSEMENT WEB (edge catalog-item-enrich, org_admin — décision d'Eric, 2026-10-25)
+  // ==========================================================================
+
+  /**
+   * Proposition de l'IA (recherche web) : photo, fiche PDF, page source, caractéristiques des `champs` du schéma de la
+   * catégorie. Rien n'est écrit. Résout avec `{ photo_url, photo_refus, fiche_url, fiche_refus, source_url, specs, remarque }`.
+   */
+  async proposeEnrichment(orgId, itemId, champs = []) {
+    return appelEnrichissement({ action: 'propose', org_id: orgId, item_id: itemId, champs }, 'proposeEnrichment');
+  },
+
+  /**
+   * Applique ce que l'admin a coché : `{ photoUrl?, ficheUrl?, specs? }`. Résout avec `{ photo, document,
+   * specs_appliquees, erreurs }` — un élément en échec n'empêche pas les autres, l'échec est dans `erreurs`.
+   */
+  async applyEnrichment(orgId, itemId, { photoUrl = null, ficheUrl = null, specs = {} } = {}) {
+    return appelEnrichissement({ action: 'apply', org_id: orgId, item_id: itemId, photo_url: photoUrl, fiche_url: ficheUrl, specs }, 'applyEnrichment');
   },
 
   /** Détache une ligne fournisseur : elle reçoit son propre article (org_admin). Résout avec l'id du nouvel article. */

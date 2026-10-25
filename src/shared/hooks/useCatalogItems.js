@@ -205,7 +205,20 @@ export function useCatalogItemMutations(orgId) {
     onSuccess: invalidate,
   });
 
+  // Enrichissement web : la proposition n'écrit rien (pas d'invalidation) ; l'application écrit photo, document, specs
+  const proposeEnrichment = useMutation({
+    mutationFn: ({ itemId, champs }) => unwrapResult(catalogItemsService.proposeEnrichment(orgId, itemId, champs)),
+  });
+  const applyEnrichment = useMutation({
+    mutationFn: ({ itemId, selection }) => unwrapResult(catalogItemsService.applyEnrichment(orgId, itemId, selection)),
+    onSuccess: invalidate,
+  });
+
   return {
+    proposeEnrichment: (itemId, champs) => proposeEnrichment.mutateAsync({ itemId, champs }),
+    isProposingEnrichment: proposeEnrichment.isPending,
+    applyEnrichment: (itemId, selection) => applyEnrichment.mutateAsync({ itemId, selection }),
+    isApplyingEnrichment: applyEnrichment.isPending,
     normalize: (limit = 100) => normalize.mutateAsync(limit),
     isNormalizing: normalize.isPending,
     updateItem: (itemId, updates) => update.mutateAsync({ itemId, updates }),

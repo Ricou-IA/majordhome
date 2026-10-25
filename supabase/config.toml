@@ -206,3 +206,8 @@ verify_jwt = false
 # confiance puis relance les rapprochements. JWT user org_admin. 2026-10-24.
 [functions.catalog-normalize]
 verify_jwt = true
+
+# catalog-item-enrich : enrichissement web d'un article (Claude + recherche web) — propose photo, fiche PDF,
+# caractéristiques ; apply télécharge et écrit avec le jeton de l'utilisateur. JWT user org_admin. 2026-10-25.
+[functions.catalog-item-enrich]
+verify_jwt = true
