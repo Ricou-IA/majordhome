@@ -25,7 +25,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
-import { buildPennylaneQuotePayload, TVA_MAPPING, UNIT_MAPPING } from '@/lib/pennylaneQuotePayload.js';
+import { buildPennylaneQuotePayload, buildPennylaneQuoteUpdatePayload, TVA_MAPPING, UNIT_MAPPING } from '@/lib/pennylaneQuotePayload.js';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================
@@ -348,16 +348,23 @@ async function pushQuote(quote, lines, client, orgId) {
   // 2. Vérifier si le devis est déjà synchro
   const existingSync = await getSyncRecord(orgId, 'quote', quote.id);
 
-  // 3. Construire et envoyer
-  const payload = buildPennylaneQuote(quote, lines, pennylaneCustomerId);
-
+  // 3. Construire et envoyer. Renvoi d'un devis modifié : le PUT Pennylane a son propre format (lignes en
+  // create / delete, aucune section) — on relit les lignes et sections existantes pour tout remplacer.
   let result;
+  let sansSection = [];
   if (existingSync) {
-    // Update du devis existant
-    result = await apiCall('PUT', `/quotes/${existingSync.pennylane_id}`, payload);
+    const [lignesPl, sectionsPl] = await Promise.all([
+      fetchQuoteSubResource(existingSync.pennylane_id, 'invoice_lines'),
+      fetchQuoteSubResource(existingSync.pennylane_id, 'invoice_line_sections'),
+    ]);
+    const maj = buildPennylaneQuoteUpdatePayload(quote, lines, pennylaneCustomerId, {
+      lineIds: lignesPl.map((l) => l.id).filter(Boolean),
+      sections: sectionsPl.map((sec, i) => ({ rank: sec.rank ?? i + 1, title: sec.title ?? sec.label })),
+    });
+    sansSection = maj.sansSection;
+    result = await apiCall('PUT', `/quotes/${existingSync.pennylane_id}`, maj.payload);
   } else {
-    // Création
-    result = await apiCall('POST', '/quotes', payload);
+    result = await apiCall('POST', '/quotes', buildPennylaneQuote(quote, lines, pennylaneCustomerId));
   }
 
   // 4. Sauvegarder le mapping
@@ -381,6 +388,8 @@ async function pushQuote(quote, lines, client, orgId) {
     pennylane_number: result.quote_number,
     url: result.public_url || null,
     syncRecord,
+    sansSection,
+    renvoi: !!existingSync,
   };
 }
 

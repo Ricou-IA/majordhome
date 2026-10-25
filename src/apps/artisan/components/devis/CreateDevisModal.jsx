@@ -2,6 +2,9 @@
  * CreateDevisModal.jsx — création d'un devis sur UN SEUL écran (décision Eric 2026-09-29, ex-wizard
  * 3 étapes) : en-tête compact (client, installation, devis type, objet), sections et lignes, bloc
  * repliable « Remise, validité, conditions », pied avec totaux + marge et « Créer le devis ».
+ * Mode ÉDITION (`devisAModifier = { quote, lines }`, depuis la fiche du devis — demande d'Eric 2026-10-25) : même
+ * écran pré-rempli ; « Enregistrer » met à jour le devis et remplace ses lignes. Un devis déjà dans Pennylane se
+ * renvoie ensuite depuis la fiche (« Renvoyer dans Pennylane »).
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -25,21 +28,32 @@ import { toast } from 'sonner';
  * @param {object} p.lead
  * @param {Array<object>} [p.initialLines] lignes pré-remplies (ex. dimensionnement clim /clim) — sections comprises
  * @param {string} [p.initialFamily] famille d'installation pré-sélectionnée (QUOTE_TEMPLATE_FAMILIES)
+ * @param {{ quote: object, lines: object[] }} [p.devisAModifier] devis existant à modifier (mode édition)
  */
-export default function CreateDevisModal({ lead, onClose, onCreated, initialLines = null, initialFamily = '' }) {
+export default function CreateDevisModal({ lead, onClose, onCreated, initialLines = null, initialFamily = '', devisAModifier = null }) {
   const { organization, user } = useAuth();
   const orgId = organization?.id;
-  const { createQuote, isCreating } = useDevisMutations(lead?.id);
+  const { createQuote, isCreating, updateQuote, upsertLines } = useDevisMutations(lead?.id);
+  const edition = !!devisAModifier?.quote;
+  const [enregistrement, setEnregistrement] = useState(false);
   const { saveMetre } = useFumMetreMutations(orgId);
   // Familles, chapitres, conditions et validité par défaut : Settings → Socle → Devis
   const { settings } = useOrgSettings();
   const devisConfig = useMemo(() => buildDevisConfig(settings), [settings]);
 
-  const [lines, setLines] = useState(() => (Array.isArray(initialLines) ? initialLines : []));
+  // en édition : lignes enregistrées ; une ligne produit sans article ni ligne fournisseur redevient « libre » (éditable)
+  const [lines, setLines] = useState(() => (edition
+    ? devisAModifier.lines.map((l) => ({ ...l, is_freeform: l.is_freeform ?? (l.line_type === 'product' && !l.catalog_item_id && !l.supplier_product_id) }))
+    : (Array.isArray(initialLines) ? initialLines : [])));
   // Métré fumisterie validé (relevé + résultat figé), enregistré APRÈS création du devis
   const [metre, setMetre] = useState(null);
-  const [form, setForm] = useState({ subject: '', validityDays: '30', conditions: '', commentaire: '', notesInternes: '', globalDiscountPercent: '0' });
-  useEffect(() => { setForm((prev) => ({ ...prev, validityDays: String(devisConfig.document.validite_jours) })); }, [devisConfig.document.validite_jours]);
+  const [form, setForm] = useState(() => (edition ? {
+    subject: devisAModifier.quote.subject || '', validityDays: String(devisAModifier.quote.validity_days || 30),
+    conditions: devisAModifier.quote.conditions || '', commentaire: devisAModifier.quote.commentaire || '',
+    notesInternes: devisAModifier.quote.notes_internes || '', globalDiscountPercent: String(devisAModifier.quote.global_discount_percent || 0),
+  } : { subject: '', validityDays: '30', conditions: '', commentaire: '', notesInternes: '', globalDiscountPercent: '0' }));
+  // validité par défaut de l'org pour un NOUVEAU devis seulement (un devis modifié garde la sienne)
+  useEffect(() => { if (!edition) setForm((prev) => ({ ...prev, validityDays: String(devisConfig.document.validite_jours) })); }, [devisConfig.document.validite_jours, edition]);
 
   // Templates
   const [templates, setTemplates] = useState([]);
@@ -94,8 +108,33 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     else { clearTemplate(); if (selectedFamily) setLines(buildDefaultSections(selectedFamily, devisConfig)); }
   };
 
+  const handleSaveEdition = async () => {
+    const q = devisAModifier.quote;
+    setEnregistrement(true);
+    try {
+      await updateQuote(q.id, {
+        subject: form.subject || null, validityDays: parseInt(form.validityDays) || 30, conditions: form.conditions || null,
+        commentaire: form.commentaire || null, notesInternes: form.notesInternes || null,
+        globalDiscountPercent: parseFloat(form.globalDiscountPercent) || 0,
+      });
+      await upsertLines(q.id, lines, parseFloat(form.globalDiscountPercent) || 0);
+      if (metre) {
+        try { await saveMetre({ ...metre, quoteId: q.id, createdBy: user?.id }); }
+        catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning('Devis enregistré, mais le relevé de métré n\x27a pas pu être enregistré'); }
+      }
+      toast.success('Devis modifié');
+      if (q.pennylane_quote_id) toast.info('Le devis Pennylane n\x27est pas encore à jour : cliquez « Renvoyer dans Pennylane » sur la fiche du devis');
+      onCreated?.(q);
+      onClose();
+    } catch (err) {
+      logger.error('[CreateDevisModal] édition', err);
+      toast.error(err?.message || 'Erreur lors de l\x27enregistrement du devis');
+    } finally { setEnregistrement(false); }
+  };
+
   const handleCreate = async () => {
     if (nbLignes === 0) { toast.error('Ajoutez au moins une ligne de devis'); return; }
+    if (edition) { await handleSaveEdition(); return; }
     try {
       const created = await createQuote({
         orgId,
@@ -128,7 +167,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col m-4">
         <div className="flex items-center justify-between px-6 py-3 border-b">
-          <h2 className="text-lg font-semibold text-secondary-900">Nouveau devis</h2>
+          <h2 className="text-lg font-semibold text-secondary-900">{edition ? `Modifier le devis ${devisAModifier.quote.quote_number || ''}` : 'Nouveau devis'}</h2>
           <button onClick={onClose} className="p-1 hover:bg-secondary-100 rounded" aria-label="Fermer"><X className="w-5 h-5 text-secondary-500" /></button>
         </div>
 
@@ -149,8 +188,8 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
-            <button type="button" onClick={handleCreate} disabled={isCreating || nbLignes === 0} className="btn-primary">
-              {isCreating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Créer le devis
+            <button type="button" onClick={handleCreate} disabled={isCreating || enregistrement || nbLignes === 0} className="btn-primary">
+              {(isCreating || enregistrement) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}{edition ? 'Enregistrer les modifications' : 'Créer le devis'}
             </button>
           </div>
         </div>

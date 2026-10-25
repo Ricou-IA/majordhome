@@ -222,6 +222,10 @@ export function useDevisMutations(leadId) {
       const pushed = await unwrapResult(pennylaneService.pushQuote(quote, lines, client, orgId));
       if (!pushed?.pennylane_id) throw new Error('Pennylane n\'a pas renvoyé d\'identifiant de devis');
 
+      // Renvoi d'un devis déjà envoyé et rattaché : le devis Pennylane est modifié en place (même numéro) ; le
+      // rattachement au lead existe déjà et le montant se resynchronise depuis Pennylane (miroir, PL fait foi).
+      if (pushed.renvoi && quote.status === 'envoye') return { ...pushed, attached: 0 };
+
       let attached = 0;
       if (quote.lead_id) {
         const res = await unwrapResult(pennylaneService.attachQuotesAndSendLead(orgId, quote.lead_id, [{

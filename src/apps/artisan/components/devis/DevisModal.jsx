@@ -12,6 +12,7 @@ import { useDevisDetail, useDevisLines, useDevisMutations } from '@hooks/useDevi
 import { computeQuoteTotals, devisService, hasUnpricedLines, UNPRICED_LINES_MESSAGE } from '@services/devis.service';
 import DevisStatusBadge from './DevisStatusBadge';
 import DevisTvaSummary from './DevisTvaSummary';
+import CreateDevisModal from './CreateDevisModal';
 import { formatEuro, formatDateFR } from '@/lib/utils';
 import {
   X, CheckCircle, XCircle, Copy, Trash2, Pencil,
@@ -46,6 +47,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const [templateDesc, setTemplateDesc] = useState('');
   const [templateFamily, setTemplateFamily] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [edition, setEdition] = useState(false); // fenêtre de devis en mode édition, ouverte par « Modifier »
 
   if (loadingQuote || loadingLines) {
     return (
@@ -104,7 +106,11 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
   const handlePush = async () => {
     try {
       const res = await pushToPennylane({ quote, lines, client });
-      toast.success(`Devis ${res?.pennylane_number || ''} créé dans Pennylane${res?.attached ? ' et rattaché au lead' : ''}`);
+      toast.success(res?.renvoi
+        ? `Devis ${res?.pennylane_number || ''} mis à jour dans Pennylane`
+        : `Devis ${res?.pennylane_number || ''} créé dans Pennylane${res?.attached ? ' et rattaché au lead' : ''}`);
+      // Pennylane ne permet pas de créer une section sur un devis existant : le dire, jamais l'avaler
+      if (res?.sansSection?.length) toast.info(`Sans section dans Pennylane (chapitre ajouté après le premier envoi) : ${res.sansSection.join(', ')}`);
       onStatusChange?.();
     } catch (err) {
       logger.error('[DevisModal] push Pennylane', err);
@@ -291,8 +297,10 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
           <div>
             <h3 className="text-xs font-semibold text-secondary-400 uppercase mb-2">Lignes</h3>
             <div className="space-y-1">
-              {lines.map((line) => {
+              {lines.map((line, i) => {
                 if (line.line_type === 'section_title') {
+                  // chapitre sans ligne : masqué, comme dans le PDF et l'envoi Pennylane
+                  if (!lines[i + 1] || lines[i + 1].line_type === 'section_title') return null;
                   return (
                     <div key={line.id} className="py-1.5 px-2 bg-secondary-100 rounded text-xs font-semibold text-secondary-600 uppercase tracking-wider">
                       {line.designation}
@@ -429,11 +437,24 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
               </button>
             )}
 
-            {/* Modifier le devis */}
-            {isBrouillon && (
+            {/* Renvoyer un devis modifié : le devis Pennylane est mis à jour en place (même numéro) */}
+            {pennylaneEnabled && quote.pennylane_quote_id && (isBrouillon || isEnvoye) && (
+              <button
+                onClick={handlePush}
+                disabled={isPushing || !client || unpriced}
+                className="btn-secondary btn-sm"
+                title={unpriced ? UNPRICED_LINES_MESSAGE : 'Mettre à jour le devis dans Pennylane avec les lignes actuelles'}
+              >
+                {isPushing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
+                Renvoyer dans Pennylane
+              </button>
+            )}
+
+            {/* Modifier le devis (brouillon ou envoyé ; un devis accepté ou refusé est figé) */}
+            {(isBrouillon || isEnvoye) && (
               <button
                 onClick={() => {
-                  onEdit ? onEdit(quoteId) : toast.info('Édition du devis — à venir');
+                  if (onEdit) onEdit(quoteId); else setEdition(true);
                 }}
                 className="btn-secondary btn-sm"
               >
@@ -454,6 +475,19 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
           </div>
         </div>
       </div>
+
+      {edition && (
+        <CreateDevisModal
+          lead={{
+            id: quote.lead_id || leadId || null, client_id: quote.client_id || null, first_name: quote.client_display_name || '',
+            address: quote.client_address, postal_code: quote.client_postal_code, city: quote.client_city,
+            phone: quote.client_phone, email: quote.client_email,
+          }}
+          devisAModifier={{ quote, lines }}
+          onClose={() => setEdition(false)}
+          onCreated={() => onStatusChange?.()}
+        />
+      )}
 
       <ConfirmDialog
         open={showDeleteConfirm}

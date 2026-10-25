@@ -58,3 +58,28 @@ test('lignes avant tout chapitre : sans section_rank ; devis sans chapitre : pas
   assert.equal('section_rank' in p.invoice_lines[0], false);
   assert.equal(p.invoice_lines[0].unit, 'flat_rate');
 });
+
+test('modification (PUT) : anciennes lignes supprimées, nouvelles créées dans l\'ordre, rangées dans les sections EXISTANTES par titre', async () => {
+  const { buildPennylaneQuoteUpdatePayload } = await import('../src/lib/pennylaneQuotePayload.js');
+  const lignesModifiees = [
+    { line_type: 'section_title', designation: 'ÉQUIPEMENT' },
+    { line_type: 'product', designation: 'Borne Trydan 7,4 kW', quantity: 1, unit: 'pièce', unit_price_ht: 600, tva_rate: 5.5 },
+    { line_type: 'section_title', designation: 'NOUVEAU CHAPITRE' },
+    { line_type: 'product', designation: 'Abri', quantity: 1, unit: 'pièce', unit_price_ht: 90, tva_rate: 5.5 },
+    { line_type: 'section_title', designation: 'Pose et mise en service' },
+    { line_type: 'labor', designation: 'Pose', quantity: 1, unit: 'forfait', unit_price_ht: 225, tva_rate: 5.5, discount_percent: 5 },
+  ];
+  const existant = { lineIds: [11, 12, 13], sections: [{ rank: 1, title: 'ÉQUIPEMENT' }, { rank: 2, label: 'POSE ET MISE EN SERVICE' }] };
+  const { payload, sansSection } = buildPennylaneQuoteUpdatePayload({ ...quote, global_discount_percent: 0 }, lignesModifiees, 42, existant, NOW);
+  assert.deepEqual(payload.invoice_lines.delete, [{ id: 11 }, { id: 12 }, { id: 13 }]);
+  assert.deepEqual(payload.invoice_lines.create.map((l) => [l.label, l.section_rank]), [['Borne Trydan 7,4 kW', 1], ['Abri', undefined], ['Pose', 2]]);
+  assert.equal('section_rank' in payload.invoice_lines.create[1], false);
+  assert.deepEqual(payload.invoice_lines.create[2].discount, { type: 'relative', value: '5.00' });
+  assert.deepEqual(sansSection, ['NOUVEAU CHAPITRE']);
+  assert.equal('invoice_line_sections' in payload, false, 'le PUT n\'accepte pas de sections');
+  assert.deepEqual(payload.discount, { type: 'relative', value: '0.00' }, 'remise globale retirée : explicitement 0');
+  assert.equal(payload.deadline, '2026-11-24');
+  assert.equal(payload.customer_id, 42);
+  const permis = ['date', 'deadline', 'customer_id', 'currency', 'language', 'pdf_invoice_subject', 'discount', 'external_reference', 'invoice_lines'];
+  for (const k of Object.keys(payload)) assert.ok(permis.includes(k), `propriété hors schéma : ${k}`);
+});

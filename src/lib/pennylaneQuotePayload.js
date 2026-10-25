@@ -79,3 +79,58 @@ export function buildPennylaneQuotePayload(quote, lines, customerId, now = new D
   if (remiseGlobale > 0) result.discount = { type: 'relative', value: montant(remiseGlobale) };
   return result;
 }
+
+const cleTitre = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+
+/**
+ * Corps du PUT /quotes/{id} (renvoi d'un devis modifié). Schéma Pennylane : lignes en { create, update, delete },
+ * AUCUN champ de sections (on ne peut ni créer ni renommer une section d'un devis existant). On supprime toutes les
+ * anciennes lignes et on recrée les nouvelles dans l'ordre du devis ; chaque ligne se range dans la section existante
+ * de même titre (casse et accents ignorés). Un chapitre sans section correspondante part sans section : il est
+ * renvoyé dans `sansSection` pour que l'écran le dise. Remise globale toujours envoyée (0 pour la retirer).
+ * @param {{ id: string, subject?: string, validity_days?: number, global_discount_percent?: number }} quote
+ * @param {Array<object>} lines lignes ordonnées, titres de chapitre compris
+ * @param {number} customerId
+ * @param {{ lineIds: number[], sections: Array<{ rank: number, title?: string, label?: string }> }} existant
+ * @param {Date} [now]
+ * @returns {{ payload: Record<string, any>, sansSection: string[] }}
+ */
+export function buildPennylaneQuoteUpdatePayload(quote, lines, customerId, existant, now = new Date()) {
+  const rangs = new Map((existant?.sections || []).map((s) => [cleTitre(s.title ?? s.label), Number(s.rank)]));
+  const sansSection = [];
+  const create = [];
+  let titre = null;
+  for (const line of lines || []) {
+    if (line.line_type === 'section_title') { titre = String(line.designation || '').trim(); continue; }
+    const l = {
+      label: line.designation,
+      quantity: Number(line.quantity) || 1,
+      raw_currency_unit_price: montant(line.unit_price_ht),
+      unit: UNIT_MAPPING[line.unit] || 'piece',
+      vat_rate: TVA_MAPPING[Number(line.tva_rate)] || 'FR_200',
+    };
+    if (line.ledger_account_pl_id) l.ledger_account_id = Number(line.ledger_account_pl_id);
+    if (line.description) l.description = line.description;
+    if (titre != null) {
+      const rang = rangs.get(cleTitre(titre));
+      if (rang) l.section_rank = rang;
+      else if (!sansSection.includes(titre)) sansSection.push(titre);
+    }
+    const remise = Number(line.discount_percent) || 0;
+    if (remise > 0) l.discount = { type: 'relative', value: montant(remise) };
+    create.push(l);
+  }
+  const echeance = new Date(now);
+  echeance.setDate(echeance.getDate() + (Number(quote.validity_days) || 30));
+  return {
+    payload: {
+      customer_id: customerId,
+      deadline: dateIso(echeance),
+      pdf_invoice_subject: quote.subject || 'Devis',
+      external_reference: quote.id,
+      discount: { type: 'relative', value: montant(Number(quote.global_discount_percent) || 0) },
+      invoice_lines: { delete: (existant?.lineIds || []).map((id) => ({ id })), create },
+    },
+    sansSection,
+  };
+}
