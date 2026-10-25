@@ -239,6 +239,36 @@ export function tvaFamille(config, keyOuLabel) {
   return familleDe(config, keyOuLabel)?.tva ?? TVA_DEFAUT;
 }
 
+// Libellé d'équipement concerné (référentiel de l'org) → clé de famille de devis par défaut. Les catégories
+// d'équipement ne recoupent pas les familles (la borne est dans « energie ») : on lit le libellé.
+const FAMILLE_PAR_EQUIPEMENT = Object.freeze([
+  [/chaudi|pac air.?eau|pompe a chaleur|\bpac\b(?!.*air.?air)/, 'chauffage_pac'],
+  [/pac air.?air|gainable|climati|split/, 'climatisation'],
+  [/poele.*(bois|insert)|insert/, 'poele_bois'],
+  [/poele|granul/, 'poele_granules'],
+  [/borne/, 'borne_recharge'],
+  [/photovolta|panneau solaire|panneau pv/, 'photovoltaique'],
+  [/batterie/, 'batterie'],
+  [/\bvmc\b|ventilation/, 'vmc'],
+  [/electri/, 'electricite'],
+]);
+
+/**
+ * Famille de devis présélectionnée depuis l'équipement concerné du lead : LIBELLÉ d'une famille ACTIVE de l'org, ou
+ * null (pas d'équivalent, famille désactivée : on ne devine pas).
+ * @param {object} config buildDevisConfig(settings)
+ * @param {string | null | undefined} libelleEquipement equipment_type_label du lead
+ * @returns {string | null}
+ */
+export function familleDepuisEquipement(config, libelleEquipement) {
+  const l = String(libelleEquipement || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (!l.trim()) return null;
+  const regle = FAMILLE_PAR_EQUIPEMENT.find(([re]) => re.test(l));
+  if (!regle) return null;
+  const famille = famillesActives(config).find((f) => f.key === regle[1]);
+  return famille ? famille.label : null;
+}
+
 /**
  * Taux de TVA d'une ligne à l'écriture : tout taux lisible et positif est gardé, **0 % compris** (autoliquidation) ;
  * illisible ⇒ 20 %. Remplace `parseFloat(x) || 20`, qui changeait un 0 % en 20 % sans rien dire.

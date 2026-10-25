@@ -7,10 +7,10 @@
  * renvoie ensuite depuis la fiche (« Renvoyer dans Pennylane »).
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
+import { buildDevisConfig, famillesActives, familleDepuisEquipement } from '@/lib/devisConfig.js';
 import { useDevisMutations } from '@hooks/useDevis';
 import { useFumMetreMutations } from '@hooks/useFumisterie';
 import { devisService, buildDefaultSections, computeQuoteTotals, margeFournitures } from '@services/devis.service';
@@ -38,7 +38,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const [enregistrement, setEnregistrement] = useState(false);
   const { saveMetre } = useFumMetreMutations(orgId);
   // Familles, chapitres, conditions et validité par défaut : Settings → Socle → Devis
-  const { settings } = useOrgSettings();
+  const { settings, isLoading: settingsLoading } = useOrgSettings();
   const devisConfig = useMemo(() => buildDevisConfig(settings), [settings]);
 
   // en édition : lignes enregistrées ; une ligne produit sans article ni ligne fournisseur redevient « libre » (éditable)
@@ -59,6 +59,16 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const [templates, setTemplates] = useState([]);
   const [selectedFamily, setSelectedFamily] = useState(initialFamily || '');
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+
+  // Installation présélectionnée depuis l'équipement concerné du lead (une seule fois, réglages de l'org chargés),
+  // seulement pour un nouveau devis vide : ni en édition, ni par-dessus des lignes déjà là (clim, devis type).
+  const familleAutoFaite = useRef(false);
+  useEffect(() => {
+    if (familleAutoFaite.current || settingsLoading || edition || initialFamily || lines.length > 0) return;
+    familleAutoFaite.current = true;
+    const f = familleDepuisEquipement(devisConfig, lead?.equipment_type_label);
+    if (f) { setSelectedFamily(f); setLines(buildDefaultSections(f, devisConfig)); }
+  }, [settingsLoading, edition, initialFamily, lines.length, devisConfig, lead?.equipment_type_label]);
 
   useEffect(() => {
     if (!orgId) return;

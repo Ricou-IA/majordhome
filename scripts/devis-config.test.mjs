@@ -197,3 +197,22 @@ test("nouvelleFamille : chapitres typés et TVA posés, la configuration est val
   const v = validerDevisConfig({ familles });
   assert.deepEqual(v.erreurs.filter((e) => e.startsWith("Nouvelle famille 11")), []);
 });
+
+test('familleDepuisEquipement : l\'équipement concerné du lead présélectionne la famille de devis (libellé de famille active)', async () => {
+  const { familleDepuisEquipement } = await import('../src/lib/devisConfig.js');
+  const config = buildDevisConfig({});
+  assert.equal(familleDepuisEquipement(config, 'Borne de Recharge'), 'Borne de recharge');
+  assert.equal(familleDepuisEquipement(config, 'Poêle à granulés'), 'Poêle à Granulé');
+  assert.equal(familleDepuisEquipement(config, 'Poêle à bois ou Insert'), 'Poêle à Bois');
+  assert.equal(familleDepuisEquipement(config, 'Poêle hydro'), 'Poêle à Granulé');
+  assert.equal(familleDepuisEquipement(config, 'PAC Air/Eau'), 'Chauffage/PAC');
+  assert.equal(familleDepuisEquipement(config, 'PAC Air/Air'), 'Climatisation');
+  assert.equal(familleDepuisEquipement(config, 'Gainable'), 'Climatisation');
+  assert.equal(familleDepuisEquipement(config, 'Panneau photovoltaïque'), 'Photovoltaïque');
+  assert.equal(familleDepuisEquipement(config, 'Travaux Électricité'), 'Electricité');
+  assert.equal(familleDepuisEquipement(config, 'Chaudière granulés'), 'Chauffage/PAC');
+  assert.equal(familleDepuisEquipement(config, 'Prestation Diverses'), null, 'pas d\'équivalent : on ne devine pas');
+  assert.equal(familleDepuisEquipement(config, ''), null);
+  const sansBorne = buildDevisConfig({ devis: { familles: [{ key: 'autre', label: 'Autre', actif: true, categories: [], sections: ['A'] }, { key: 'borne_recharge', label: 'Borne', actif: false, categories: [], sections: ['A'] }] } });
+  assert.equal(familleDepuisEquipement(sansBorne, 'Borne de Recharge'), null, 'famille désactivée : pas de présélection');
+});
