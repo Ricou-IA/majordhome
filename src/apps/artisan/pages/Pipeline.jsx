@@ -27,6 +27,7 @@ import { MonthlyTrendsChart } from '@components/pipeline/dashboard/MonthlyTrends
 import { LeadModal } from '@apps/artisan/components/pipeline/LeadModal';
 import { LeadKanban } from '@apps/artisan/components/pipeline/LeadKanban';
 import { LongTermTab } from '@apps/artisan/components/pipeline/longTerm/LongTermTab';
+import NouveauDevisRapideModal from '@apps/artisan/components/devis/NouveauDevisRapideModal';
 
 // ============================================================================
 // HELPERS
@@ -64,6 +65,7 @@ export default function Pipeline() {
   const [autoSchedule, setAutoSchedule] = useState(false);
   const [autoQuote, setAutoQuote] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [nouveauDevis, setNouveauDevis] = useState(false); // « Nouveau devis » : fiche client courte puis devis
 
   // Onglet actif (supporte ?tab=kanban depuis le dashboard)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,6 +136,7 @@ export default function Pipeline() {
 
   const isAdmin = effectiveRole === 'org_admin' || effectiveRole === 'team_leader';
   const canCreateLead = can('pipeline', 'create');
+  const canCreateQuote = canCreateLead && can('devis', 'create');
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -192,7 +195,7 @@ export default function Pipeline() {
 
         {/* ==================== TAB KANBAN ==================== */}
         <TabsContent value="kanban" className="mt-6">
-          <LeadKanban onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} refreshTrigger={refreshKey} />
+          <LeadKanban onLeadClick={handleLeadClick} onNewLead={canCreateLead ? handleNewLead : null} onNewQuote={canCreateQuote ? () => setNouveauDevis(true) : null} refreshTrigger={refreshKey} />
         </TabsContent>
 
         {/* ==================== TAB SUIVI MT-LT ==================== */}
@@ -200,6 +203,10 @@ export default function Pipeline() {
           <LongTermTab />
         </TabsContent>
       </Tabs>
+
+      {nouveauDevis && (
+        <NouveauDevisRapideModal onClose={() => setNouveauDevis(false)} onDone={() => setRefreshKey((k) => k + 1)} />
+      )}
 
       {/* Modale Lead (ouverte depuis le Kanban) */}
       <LeadModal

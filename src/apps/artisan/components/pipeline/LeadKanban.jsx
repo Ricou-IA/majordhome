@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle, Tag } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, CalendarDays, ChevronDown, CheckCircle2, X, UserCircle, Tag, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeadStatuses, useLeadCommercials, useLeadSources, useLeadMutations } from '@hooks/useLeads';
@@ -276,8 +276,9 @@ function SourceFilterDropdown({ value, onChange, sources }) {
  * @param {Object} props
  * @param {Function} props.onLeadClick - Callback clic sur un lead
  * @param {Function} props.onNewLead - Callback nouveau lead
+ * @param {Function} [props.onNewQuote] - Callback « Nouveau devis » (fiche client courte puis devis)
  */
-export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
+export function LeadKanban({ onLeadClick, onNewLead, onNewQuote, refreshTrigger }) {
   const { organization, user, effectiveRole } = useAuth();
   const orgId = organization?.id;
   const userId = user?.id;
@@ -859,6 +860,16 @@ export function LeadKanban({ onLeadClick, onNewLead, refreshTrigger }) {
           >
             <RefreshCw className="h-4 w-4" />
           </button>
+          {onNewQuote && (
+            <button
+              onClick={onNewQuote}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors text-sm min-h-[40px]"
+              title="Saisir le client puis faire son devis"
+            >
+              <FileText className="h-4 w-4" />
+              Nouveau devis
+            </button>
+          )}
           {onNewLead && (
             <button
               onClick={onNewLead}
