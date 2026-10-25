@@ -61,3 +61,44 @@ export function deplacerChapitre(lines, de, vers) {
   chapitres.splice(vers, 0, c);
   return aplatir([...tete, ...chapitres]);
 }
+
+// Chapitres acceptables, dans l'ordre, pour les lignes d'un chapitre d'un type donné quand on change d'installation.
+const SECOURS_TYPE = Object.freeze({
+  equipement: ['equipement', 'libre', 'option'],
+  option: ['option', 'libre', 'equipement'],
+  stock: ['stock', 'option', 'libre'],
+  main_oeuvre: ['main_oeuvre', 'libre'],
+  libre: ['libre', 'option', 'equipement'],
+  fumisterie: ['fumisterie', 'libre', 'option'],
+});
+
+/**
+ * Changer d'installation SANS perdre de ligne (retour d'Eric 2026-10-25 : après un import d'offre, l'installation ne
+ * se changeait plus — la confirmation supprimait tout). Les chapitres de la nouvelle installation remplacent les
+ * anciens ; les lignes de chaque ancien chapitre vont dans le chapitre de même titre, sinon le premier du même type
+ * (puis d'un type de secours), dans leur ordre. Un ancien chapitre sans place est gardé tel quel en fin de devis ;
+ * un ancien chapitre vide disparaît ; les lignes avant le premier chapitre restent en tête.
+ * @param {object[]} lines devis actuel (liste plate)
+ * @param {object[]} sections titres de chapitre de la nouvelle installation (line_type 'section_title')
+ * @param {{ typeAvant: (titre: string) => string, typeApres: (titre: string) => string }} types
+ * @returns {object[]}
+ */
+export function reclasserDansSections(lines, sections, { typeAvant, typeApres }) {
+  const anciens = blocs(lines);
+  const tete = anciens.length && !anciens[0].titre ? anciens[0].lignes : [];
+  const cle = (t) => String(t ?? '').trim().toLowerCase();
+  const nouveaux = (sections || []).map((t) => ({ titre: t, type: typeApres(t.designation), lignes: [] }));
+  const gardes = [];
+  for (const b of anciens) {
+    if (!b.titre || !b.lignes.length) continue;
+    let cible = nouveaux.find((n) => cle(n.titre.designation) === cle(b.titre.designation)) || null;
+    const type = typeAvant(b.titre.designation);
+    for (const t of SECOURS_TYPE[type] || [type]) {
+      if (cible) break;
+      cible = nouveaux.find((n) => n.type === t) || null;
+    }
+    if (cible) cible.lignes.push(...b.lignes);
+    else gardes.push(b);
+  }
+  return [...tete, ...aplatir(nouveaux), ...aplatir(gardes)];
+}

@@ -91,10 +91,12 @@ export function construirePromptOffre() {
     '  chaudière, poêle, ballon d\'eau chaude, batterie, onduleur, panneau), « accessory » pour le reste (accessoire, raccord,',
     '  tuyauterie, vanne, régulation, support, consommable).',
     '',
-    'N\'en fais pas des lignes : sous-totaux, totaux, frais de port, frais de gestion, mentions. Signale-les dans « remarque ».',
+    'N\'en fais pas des lignes : sous-totaux, totaux, frais de port, frais de gestion, mentions. « remarque » : une phrase',
+    'courte sur ce qui n\'est pas une ligne d\'article (frais de port, frais de gestion), sinon "".',
     'En tête : fournisseur (nom et SIRET de l\'émetteur de l\'offre, pas du client), numero de l\'offre, date et validite au',
-    'format AAAA-MM-JJ. total_ht = le total HT des articles imprimé ; eco_total = le total des éco-participations s\'il est',
-    'imprimé. Une valeur absente du document s\'écrit "" pour un texte et 0 pour un nombre.',
+    'format AAAA-MM-JJ. total_ht = le total HT des articles imprimé ; eco_total = la somme de TOUTES les éco-participations',
+    'imprimées (DEEE + PMCB + …, pas seulement la première). Une valeur absente du document s\'écrit "" pour un texte et 0',
+    'pour un nombre.',
   ].join('\n');
 }
 
@@ -247,8 +249,11 @@ export function controlerOffre(offre) {
   let totalVerifie = false;
   if (offre?.total_ht != null && lignes.length) {
     const eco = offre.eco_total ?? 0;
+    // éco-participations relues ligne par ligne : le total imprimé peut les ventiler (DEEE + PMCB) et l'IA n'en
+    // recopier qu'une (vécu le 2026-10-25 : 34,26 € de DEEE lus pour 34,96 € au total)
+    const ecoLignes = arrondi(lignes.reduce((s, l) => s + (l.eco_participation_unitaire ?? 0) * (l.quantite ?? 0), 0));
     const tol = 0.05;
-    totalVerifie = Math.abs(somme - offre.total_ht) <= tol || Math.abs(somme + eco - offre.total_ht) <= tol;
+    totalVerifie = [0, eco, ecoLignes].some((e) => Math.abs(somme + e - offre.total_ht) <= tol);
     if (!totalVerifie) {
       alertes.push({
         code: 'total_incoherent',

@@ -4,7 +4,7 @@
 // Run : node --test scripts/devis-ordre.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { blocs, aplatir, deplacerLigne, deplacerChapitre } from '../src/lib/devisOrdre.js';
+import { blocs, aplatir, deplacerLigne, deplacerChapitre, reclasserDansSections } from '../src/lib/devisOrdre.js';
 
 const T = (d) => ({ line_type: 'section_title', designation: d });
 const L = (d) => ({ line_type: 'product', designation: d });
@@ -41,4 +41,19 @@ test('déplacement hors bornes ou sur place : liste inchangée (même contenu), 
   assert.deepEqual(noms(deplacerLigne(devis, { deBloc: 9, deRang: 0, versBloc: 1, versRang: 0 })), noms(devis));
   assert.deepEqual(noms(deplacerChapitre(devis, 1, 1)), noms(devis));
   assert.deepEqual(noms(deplacerChapitre(devis, 5, 0)), noms(devis));
+});
+
+test('changer d\'installation : aucune ligne perdue, rangées par titre puis par type, chapitre sans place gardé', () => {
+  const avant = { EQUIPEMENT: 'equipement', OPTIONS: 'option', 'POSE ET MISE EN SERVICE': 'main_oeuvre', FUMISTERIE: 'fumisterie' };
+  const apres = { 'POMPE A CHALEUR': 'equipement', ACCESSOIRES: 'option', 'POSE ET MISE EN SERVICE': 'main_oeuvre', 'MATERIEL ELECTRIQUE': 'stock' };
+  const lignes = [L('orpheline'), T('EQUIPEMENT'), L('UE'), L('UI'), T('OPTIONS'), L('filtre'), T('POSE ET MISE EN SERVICE'), L('pose'), T('FUMISTERIE'), L('tubage'), T('VIDE')];
+  const r = reclasserDansSections(lignes, Object.keys(apres).map(T), { typeAvant: (t) => avant[t] || 'equipement', typeApres: (t) => apres[t] });
+  assert.deepEqual(noms(r), ['orpheline', '#POMPE A CHALEUR', 'UE', 'UI', '#ACCESSOIRES', 'filtre', 'tubage', '#POSE ET MISE EN SERVICE', 'pose', '#MATERIEL ELECTRIQUE']);
+  // toutes les lignes sont là
+  assert.equal(r.filter((l) => l.line_type !== 'section_title').length, lignes.filter((l) => l.line_type !== 'section_title').length);
+});
+
+test('changer d\'installation : un chapitre sans type acceptable est gardé en fin de devis', () => {
+  const r = reclasserDansSections([T('MO'), L('pose')], [T('POELE')], { typeAvant: () => 'main_oeuvre', typeApres: () => 'equipement' });
+  assert.deepEqual(noms(r), ['#POELE', '#MO', 'pose']);
 });
