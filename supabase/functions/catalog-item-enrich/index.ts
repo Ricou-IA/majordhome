@@ -21,7 +21,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@1.3.0";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOrgMembership, jsonResponse, buildCorsHeaders, sanitizeError } from "../_shared/auth.ts";
 import {
-  urlPublique, construirePromptEnrichissement, lireProposition, estPdf, nomDeFichier, fusionnerSpecs,
+  urlPublique, adresseIpPrivee, construirePromptEnrichissement, lireProposition, estPdf, nomDeFichier, fusionnerSpecs,
 } from "../_shared/catalogue/enrichissement.js";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
@@ -29,9 +29,10 @@ const MODEL = Deno.env.get("ANTHROPIC_ENRICH_MODEL") || "claude-opus-5-5";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
-const DUREE_IA_MS = 130_000; // sous le plafond d'exécution d'une edge (150 s)
+const DUREE_IA_MS = 115_000; // recherche IA ; le reste de l'échéance sert aux vérifications
+const ECHEANCE_MS = 140_000; // échéance GLOBALE d'une requête, sous le plafond d'exécution d'une edge (150 s)
 const REPRISES_MAX = 4; // pause_turn : la recherche serveur rend la main, on relance
-const PHOTO_MAX = 8 * 1024 * 1024;
+const PHOTO_MAX = 5 * 1024 * 1024; // limite du bucket product-images
 const PDF_MAX = 20 * 1024 * 1024;
 const TYPES_IMAGE: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -72,15 +73,36 @@ function specsPropres(brut: unknown): Record<string, string | number | boolean> 
 }
 
 /**
- * GET d'une URL publique : redirections suivies à la main (chaque saut revérifié), corps lu jusqu'à `max` octets.
- * `apercu` : lit seulement le début (vérification de signature) puis coupe.
+ * Le nom doit résoudre, et UNIQUEMENT vers des adresses publiques (A et AAAA) : un nom quelconque peut pointer vers
+ * 127.0.0.1 ou les métadonnées cloud. Refus si la résolution DNS n'est pas disponible (on ne télécharge pas à l'aveugle).
+ * Limite assumée : fetch résout à nouveau (rebinding DNS non couvert), réduit par la rareté du cas et le type vérifié.
  */
-async function telecharger(url: string, max: number, apercu = false): Promise<{ octets: Uint8Array; type: string; url: string }> {
+async function verifierDns(url: string): Promise<void> {
+  const hote = new URL(url).hostname;
+  // deno-lint-ignore no-explicit-any
+  const resoudre = (Deno as any).resolveDns as ((h: string, t: string) => Promise<string[]>) | undefined;
+  if (typeof resoudre !== "function") throw new Error("vérification DNS indisponible");
+  const adresses: string[] = [];
+  for (const type of ["A", "AAAA"]) {
+    try { adresses.push(...await resoudre(hote, type)); } catch { /* pas d'enregistrement de ce type */ }
+  }
+  if (!adresses.length) throw new Error("nom de domaine introuvable");
+  if (adresses.some((ip) => adresseIpPrivee(ip))) throw new Error("adresse refusée (réseau privé)");
+}
+
+/**
+ * GET d'une URL publique : redirections suivies à la main (chaque saut revérifié : forme ET DNS), corps lu jusqu'à
+ * `max` octets, jamais au-delà de l'`echeance` globale de la requête. `apercu` : lit le début (signature) puis coupe.
+ */
+async function telecharger(url: string, max: number, echeance: number, apercu = false): Promise<{ octets: Uint8Array; type: string; url: string }> {
   let courante = url;
   for (let saut = 0; saut < 5; saut++) {
     if (!urlPublique(courante)) throw new Error("adresse refusée (non publique)");
+    const reste = echeance - Date.now();
+    if (reste < 1_500) throw new Error("temps écoulé, vérification non faite");
+    await verifierDns(courante);
     const ctrl = new AbortController();
-    const minuterie = setTimeout(() => ctrl.abort(), 20_000);
+    const minuterie = setTimeout(() => ctrl.abort(), Math.min(20_000, echeance - Date.now()));
     try {
       const rep = await fetch(courante, {
         redirect: "manual", signal: ctrl.signal,
@@ -120,18 +142,18 @@ async function telecharger(url: string, max: number, apercu = false): Promise<{ 
   throw new Error("trop de redirections");
 }
 
-async function verifierPhoto(url: string | null): Promise<string | null> {
+async function verifierPhoto(url: string | null, echeance: number): Promise<string | null> {
   if (!url) return "aucune photo trouvée";
   try {
-    const r = await telecharger(url, PHOTO_MAX, true);
+    const r = await telecharger(url, PHOTO_MAX, echeance, true);
     return TYPES_IMAGE[r.type] ? null : `le lien ne renvoie pas une image (${r.type || "type inconnu"})`;
   } catch (e) { return (e as Error).message; }
 }
 
-async function verifierFiche(url: string | null): Promise<string | null> {
+async function verifierFiche(url: string | null, echeance: number): Promise<string | null> {
   if (!url) return "aucune fiche technique trouvée";
   try {
-    const r = await telecharger(url, PDF_MAX, true);
+    const r = await telecharger(url, PDF_MAX, echeance, true);
     return estPdf(r.octets) ? null : "le lien ne renvoie pas un PDF";
   } catch (e) { return (e as Error).message; }
 }
@@ -141,6 +163,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, req);
 
+  const echeance = Date.now() + ECHEANCE_MS;
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { body = {}; }
   const orgId = typeof body.org_id === "string" ? body.org_id : "";
@@ -175,7 +198,7 @@ Deno.serve(async (req) => {
 
       const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
       const ctrl = new AbortController();
-      const minuterie = setTimeout(() => ctrl.abort(), DUREE_IA_MS);
+      const minuterie = setTimeout(() => ctrl.abort(), Math.min(DUREE_IA_MS, echeance - Date.now() - 15_000));
       // deno-lint-ignore no-explicit-any
       const messages: any[] = [{ role: "user", content: prompt }];
       // deno-lint-ignore no-explicit-any
@@ -212,7 +235,7 @@ Deno.serve(async (req) => {
       const proposition = lireProposition(texte, champs);
       if (proposition.erreur) return jsonResponse({ error: "réponse de l'IA illisible : réessayez", tokens }, 502, req);
 
-      const [photoRefus, ficheRefus] = await Promise.all([verifierPhoto(proposition.photo_url), verifierFiche(proposition.fiche_url)]);
+      const [photoRefus, ficheRefus] = await Promise.all([verifierPhoto(proposition.photo_url, echeance), verifierFiche(proposition.fiche_url, echeance)]);
       return jsonResponse({
         ok: true, ...proposition, photo_refus: photoRefus, fiche_refus: ficheRefus, modele: final?.model ?? MODEL, tokens,
       }, 200, req);
@@ -229,7 +252,7 @@ Deno.serve(async (req) => {
 
     if (typeof body.photo_url === "string" && body.photo_url) {
       try {
-        const r = await telecharger(body.photo_url, PHOTO_MAX);
+        const r = await telecharger(body.photo_url, PHOTO_MAX, echeance);
         const ext = TYPES_IMAGE[r.type];
         if (!ext) throw new Error(`le lien ne renvoie pas une image (${r.type || "type inconnu"})`);
         const chemin = `${base}/${crypto.randomUUID()}.${ext}`;
@@ -242,7 +265,7 @@ Deno.serve(async (req) => {
 
     if (typeof body.fiche_url === "string" && body.fiche_url) {
       try {
-        const r = await telecharger(body.fiche_url, PDF_MAX);
+        const r = await telecharger(body.fiche_url, PDF_MAX, echeance);
         if (!estPdf(r.octets)) throw new Error("le lien ne renvoie pas un PDF");
         const chemin = `${base}/${crypto.randomUUID()}.pdf`;
         const { error: errUp } = await user.storage.from("product-documents").upload(chemin, r.octets, { contentType: "application/pdf", upsert: false });

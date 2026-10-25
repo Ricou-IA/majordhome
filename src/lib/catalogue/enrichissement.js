@@ -22,10 +22,46 @@ export function urlPublique(url) {
   if (u.port && u.port !== '80' && u.port !== '443') return false;
   const h = u.hostname.toLowerCase();
   if (!h || h.startsWith('[') || h.includes(':')) return false;
+  if (h.endsWith('.')) return false; // « localhost. » contournerait les suffixes ci-dessous
   if (/^[0-9.]+$/.test(h)) return false;
   if (!h.includes('.')) return false;
   if (/(^|\.)(localhost|local|internal|localdomain|lan|home|intranet)$/.test(h)) return false;
+  // services DNS de complaisance : le nom porte l'adresse visée (127.0.0.1.nip.io) ou pointe vers 127.0.0.1
+  if (/(^|\.)(nip\.io|sslip\.io|xip\.io|localtest\.me|lvh\.me|localhost\.run)$/.test(h)) return false;
   return true;
+}
+
+/** IPv4 en entier non signé, sinon null. */
+function ipv4(ip) {
+  const p = String(ip).split('.');
+  if (p.length !== 4 || p.some((x) => !/^\d{1,3}$/.test(x) || Number(x) > 255)) return null;
+  return p.reduce((n, x) => n * 256 + Number(x), 0);
+}
+
+const PLAGES_V4 = [
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
+  ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 4], ['240.0.0.0', 4],
+].map(([base, bits]) => [ipv4(base), bits]);
+
+/**
+ * true si l'adresse résolue ne doit jamais être contactée par l'edge : bouclage, réseaux privés, link-local (métadonnées
+ * cloud), CGNAT, multicast, réservées, IPv6 locales (::1, fc00::/7, fe80::/10) et IPv4 mappées. Illisible ⇒ vrai.
+ * @param {string} ip
+ * @returns {boolean}
+ */
+export function adresseIpPrivee(ip) {
+  const s = String(ip || '').trim().toLowerCase();
+  const n = ipv4(s);
+  if (n != null) return PLAGES_V4.some(([base, bits]) => Math.floor(n / 2 ** (32 - bits)) === Math.floor(base / 2 ** (32 - bits)));
+  if (!s.includes(':') || !/^[0-9a-f:.]+$/.test(s)) return true;
+  const mappee = s.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mappee) return adresseIpPrivee(mappee[1]);
+  if (s === '::' || s === '::1') return true;
+  const premier = parseInt(s.split(':')[0] || '0', 16);
+  if ((premier & 0xfe00) === 0xfc00) return true; // fc00::/7
+  if ((premier & 0xffc0) === 0xfe80) return true; // fe80::/10
+  if ((premier & 0xff00) === 0xff00) return true; // multicast
+  return false;
 }
 
 /**

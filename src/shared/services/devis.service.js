@@ -9,7 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { DEFAULT_FAMILLES, buildDevisConfig, sectionsParDefaut, categoriesPourSection } from '@/lib/devisConfig.js';
+import { DEFAULT_FAMILLES, buildDevisConfig, sectionsParDefaut, categoriesPourSection, tauxTvaLigne } from '@/lib/devisConfig.js';
 import { logger } from '@lib/logger';
 
 // ============================================================================
@@ -28,6 +28,7 @@ export const TVA_RATES = [
   { value: 20, label: '20% (standard)', description: 'Équipement neuf' },
   { value: 10, label: '10% (intermédiaire)', description: 'Pose / main d\'œuvre rénovation' },
   { value: 5.5, label: '5,5% (réduit)', description: 'Matériel rénovation énergétique éligible' },
+  { value: 0, label: '0% (autoliquidation)', description: 'Sous-traitance : TVA due par le donneur d’ordre' },
 ];
 
 // Familles d'installation et chapitres : paramétrés par org dans settings.devis (src/lib/devisConfig.js,
@@ -329,7 +330,7 @@ export const devisService = {
             unit: line.unit || 'pièce',
             purchase_price_ht: line.purchase_price_ht ? parseFloat(line.purchase_price_ht) : null,
             unit_price_ht: parseFloat(line.unit_price_ht) || 0,
-            tva_rate: parseFloat(line.tva_rate) || 20,
+            tva_rate: tauxTvaLigne(line.tva_rate),
             total_ht: lineTotals.total_ht,
             total_tva: lineTotals.total_tva,
             total_ttc: lineTotals.total_ttc,
@@ -419,7 +420,7 @@ export const devisService = {
             unit: line.unit || 'pièce',
             purchase_price_ht: line.purchase_price_ht ? parseFloat(line.purchase_price_ht) : null,
             unit_price_ht: parseFloat(line.unit_price_ht) || 0,
-            tva_rate: parseFloat(line.tva_rate) || 20,
+            tva_rate: tauxTvaLigne(line.tva_rate),
             total_ht: lineTotals.total_ht,
             total_tva: lineTotals.total_tva,
             total_ttc: lineTotals.total_ttc,

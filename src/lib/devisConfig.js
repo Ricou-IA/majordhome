@@ -236,6 +236,59 @@ export function tvaFamille(config, keyOuLabel) {
   return familleDe(config, keyOuLabel)?.tva ?? TVA_DEFAUT;
 }
 
+/**
+ * Taux de TVA d'une ligne à l'écriture : tout taux lisible et positif est gardé, **0 % compris** (autoliquidation) ;
+ * illisible ⇒ 20 %. Remplace `parseFloat(x) || 20`, qui changeait un 0 % en 20 % sans rien dire.
+ * @param {unknown} v
+ * @returns {number}
+ */
+export function tauxTvaLigne(v) {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? n : 20;
+}
+
+/**
+ * Taux le plus fréquent parmi les lignes chiffrées (titres de chapitre exclus), sinon null.
+ * @param {Array<{ line_type?: string, tva_rate?: unknown }>} lines
+ * @returns {number | null}
+ */
+export function tvaDesLignes(lines) {
+  const compte = new Map();
+  for (const l of lines || []) {
+    if (l.line_type === 'section_title') continue;
+    const t = Number(l.tva_rate);
+    if (TAUX_TVA.includes(t)) compte.set(t, (compte.get(t) || 0) + 1);
+  }
+  let meilleur = null;
+  for (const [t, n] of compte) if (meilleur == null || n > compte.get(meilleur)) meilleur = t;
+  return meilleur;
+}
+
+/**
+ * TVA affichée par le devis, dérivée à chaque rendu : le taux majoritaire des lignes chiffrées (devis repris, devis
+ * type chargé — choisir une TVA réécrit toutes les lignes, donc elles font foi), sinon le choix fait sur un devis encore
+ * vide, sinon celui de la famille. Jamais figée au montage.
+ * @param {{ forcee?: number | null, lines: any[], config: any, famille: string }} p
+ * @returns {number}
+ */
+export function tvaDuDevis({ forcee = null, lines, config, famille }) {
+  return tvaDesLignes(lines) ?? forcee ?? tvaFamille(config, famille);
+}
+
+/**
+ * Famille ajoutée dans les Réglages : chapitres TYPÉS et TVA posés d'emblée (une famille sans `chapitres`
+ * était sérialisée sans chapitre et refusée à l'enregistrement).
+ * @param {number} n rang affiché dans le libellé
+ * @returns {{ key: string, label: string, actif: boolean, categories: string[], tva: number, chapitres: Array<{ titre: string, type: string }>, sections: string[] }}
+ */
+export function nouvelleFamille(n) {
+  const chapitres = [{ titre: 'PRESTATIONS', type: 'libre' }, { titre: 'MAIN D\'ŒUVRE', type: 'main_oeuvre' }];
+  return {
+    key: `famille_${Date.now().toString(36)}`, label: `Nouvelle famille ${n}`, actif: true, categories: [], tva: TVA_DEFAUT,
+    chapitres, sections: chapitres.map((c) => c.titre),
+  };
+}
+
 const normaliserCategorie = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**

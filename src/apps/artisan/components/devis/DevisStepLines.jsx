@@ -12,7 +12,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { computeLineTotals, productCategoriesForSection } from '@services/devis.service';
-import { typeChapitre, tvaFamille, TAUX_TVA } from '@/lib/devisConfig.js';
+import { typeChapitre, tvaDuDevis, TAUX_TVA } from '@/lib/devisConfig.js';
 import { marquesDesOffres, appliquerMarque } from '@/lib/catalogue/marqueLigne.js';
 import { useCatalogItemOffers } from '@hooks/useCatalogItems';
 import DevisProductPicker from './DevisProductPicker';
@@ -25,18 +25,6 @@ const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
 };
 
-/** Taux le plus fréquent parmi les lignes chiffrées (devis repris, lignes pré-remplies), sinon null. */
-function tvaDesLignes(lines) {
-  const compte = new Map();
-  for (const l of lines) {
-    if (l.line_type === 'section_title') continue;
-    const t = Number(l.tva_rate);
-    if (TAUX_TVA.includes(t)) compte.set(t, (compte.get(t) || 0) + 1);
-  }
-  let meilleur = null;
-  for (const [t, n] of compte) if (meilleur == null || n > compte.get(meilleur)) meilleur = t;
-  return meilleur;
-}
 
 // =============================================================================
 // BLOC CHAPITRE (titre + lignes enfants + boutons d'ajout)
@@ -128,17 +116,15 @@ function SectionBlock({ sectionIndex, section, type, childLines, onUpdate, onRem
 export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
-  // TVA du devis : celle des lignes déjà chiffrées (devis repris, pré-remplissage), sinon celle de la famille
-  const [tvaDevis, setTvaDevis] = useState(() => tvaDesLignes(lines) ?? tvaFamille(devisConfig, family));
-
-  // Changement de famille sur un devis encore vide : la TVA suit la nouvelle famille
-  useEffect(() => {
-    if (tvaDesLignes(lines) == null) setTvaDevis(tvaFamille(devisConfig, family));
-  }, [family, devisConfig]); // eslint-disable-line react-hooks/exhaustive-deps
+  // TVA du devis DÉRIVÉE à chaque rendu (tvaDuDevis) : les lignes chiffrées font foi (devis repris, devis type chargé) ;
+  // le choix mémorisé ne sert que tant que le devis n'a aucune ligne chiffrée ; changer de famille l'oublie.
+  const [tvaChoisie, setTvaChoisie] = useState(null);
+  useEffect(() => { setTvaChoisie(null); }, [family]);
+  const tvaDevis = tvaDuDevis({ forcee: tvaChoisie, lines, config: devisConfig, famille: family });
 
   const changerTvaDevis = useCallback((valeur) => {
     const t = Number(valeur);
-    setTvaDevis(t);
+    setTvaChoisie(t);
     setLines((prev) => prev.map((l) => (l.line_type === 'section_title' ? l : { ...l, tva_rate: t })));
   }, [setLines]);
 

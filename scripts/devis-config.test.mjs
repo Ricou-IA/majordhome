@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CATEGORIES_PRODUIT, DEFAULT_FAMILLES, buildDevisConfig, categoriesPourSection, TYPES_CHAPITRE, TAUX_TVA, typeChapitreDeduit,
-  typeChapitre, tvaFamille, validerDevisConfig,
+  typeChapitre, tvaFamille, validerDevisConfig, tauxTvaLigne, tvaDesLignes, tvaDuDevis, nouvelleFamille,
 } from '../src/lib/devisConfig.js';
 
 test('les catégories photovoltaique et borne_recharge font partie des catégories produit du picker', () => {
@@ -161,4 +161,39 @@ test('défauts : chaque famille a des chapitres typés alignés sur ses titres e
   assert.deepEqual(poele.chapitres.map((c) => c.type), ['equipement', 'option', 'fumisterie', 'stock', 'main_oeuvre']);
   const pv = DEFAULT_FAMILLES.find((f) => f.key === 'photovoltaique');
   assert.deepEqual(pv.chapitres.map((c) => c.type), ['equipement', 'equipement', 'equipement', 'stock', 'main_oeuvre']);
+});
+
+test("tauxTvaLigne : 0 % reste 0 % (autoliquidation), illisible ⇒ 20 %", () => {
+  assert.equal(tauxTvaLigne(0), 0);
+  assert.equal(tauxTvaLigne("0"), 0);
+  assert.equal(tauxTvaLigne("5.5"), 5.5);
+  assert.equal(tauxTvaLigne(10), 10);
+  assert.equal(tauxTvaLigne(""), 20);
+  assert.equal(tauxTvaLigne(null), 20);
+  assert.equal(tauxTvaLigne("abc"), 20);
+  assert.equal(tauxTvaLigne(-5), 20);
+});
+
+test("tvaDuDevis : taux majoritaire des lignes (0 compris), sinon choix fait sur un devis vide, sinon celui de la famille", () => {
+  const config = buildDevisConfig({});
+  const lignes = [{ line_type: "section_title", tva_rate: 0 }, { tva_rate: 20 }, { tva_rate: 20 }, { tva_rate: 5.5 }];
+  assert.equal(tvaDesLignes(lignes), 20);
+  assert.equal(tvaDesLignes([{ tva_rate: 0 }]), 0);
+  assert.equal(tvaDesLignes([{ line_type: "section_title" }]), null);
+  assert.equal(tvaDuDevis({ forcee: 10, lines: [], config, famille: "poele_granules" }), 10, "choix fait avant la première ligne");
+  assert.equal(tvaDuDevis({ forcee: 5.5, lines: lignes, config, famille: "poele_granules" }), 20, "choix d'avant le devis type : les lignes chargées font foi");
+  assert.equal(tvaDuDevis({ forcee: null, lines: lignes, config, famille: "poele_granules" }), 20, "devis type à 20 % chargé : le sélecteur suit les lignes");
+  assert.equal(tvaDuDevis({ forcee: null, lines: [], config, famille: "poele_granules" }), 5.5);
+});
+
+test("nouvelleFamille : chapitres typés et TVA posés, la configuration est valide sans autre geste", () => {
+  const f = nouvelleFamille(11);
+  assert.equal(f.label, "Nouvelle famille 11");
+  assert.ok(/^famille_/.test(f.key));
+  assert.deepEqual(f.chapitres.map((c) => c.type), ["libre", "main_oeuvre"]);
+  assert.deepEqual(f.sections, f.chapitres.map((c) => c.titre));
+  assert.equal(f.tva, 10);
+  const familles = [...DEFAULT_FAMILLES.map((x) => ({ ...x, chapitres: x.chapitres.map((c) => ({ ...c })) })), f];
+  const v = validerDevisConfig({ familles });
+  assert.deepEqual(v.erreurs.filter((e) => e.startsWith("Nouvelle famille 11")), []);
 });

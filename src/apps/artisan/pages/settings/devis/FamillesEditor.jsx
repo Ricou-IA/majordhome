@@ -3,7 +3,7 @@
 // squelette (titres de chapitre) de chacune. Édition pure d'état : la validation est dans devisConfig.js.
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import { CATEGORIES_PRODUIT, TYPES_CHAPITRE, TAUX_TVA, slugFamille, typeChapitreDeduit } from '@/lib/devisConfig.js';
+import { CATEGORIES_PRODUIT, TYPES_CHAPITRE, TAUX_TVA, slugFamille, typeChapitreDeduit, nouvelleFamille } from '@/lib/devisConfig.js';
 
 const INPUT = 'w-full px-2.5 py-1.5 border border-secondary-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
 const TYPE_LABELS = { equipement: 'Équipement (catégorie de la famille)', option: 'Options (catégorie de la famille)', stock: 'Matériel stocké (toutes familles)', main_oeuvre: 'Main d’œuvre', libre: 'Libre (tout le catalogue)', fumisterie: 'Fumisterie (métré assisté)' };
@@ -26,7 +26,7 @@ export default function FamillesEditor({ familles, onChange }) {
   const setChapitres = (i, chapitres) => set(i, { chapitres, sections: chapitres.map((c) => c.titre) });
   const ajouter = () => {
     const n = familles.length + 1;
-    onChange([...familles, { key: `famille_${Date.now().toString(36)}`, label: `Nouvelle famille ${n}`, actif: true, categories: [], sections: ['PRESTATIONS', 'MAIN D\'ŒUVRE'] }]);
+    onChange([...familles, nouvelleFamille(n)]);
     setOuverte(familles.length);
   };
   const retirer = (i) => { onChange(familles.filter((_, j) => j !== i)); setOuverte(null); };

@@ -11,7 +11,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { storageService } from '@services/storage.service';
-import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { escapeSearchTermKeepingDecimals } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
 import { SEUIL_FRAICHEUR_JOURS } from '@/lib/catalogue/ageDePrix.js';
 
@@ -47,7 +47,7 @@ export function motsDeRecherche(search) {
   return String(search || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .split(/\s+/)
-    .map((m) => escapePostgrestSearchTerm(m))
+    .map((m) => escapeSearchTermKeepingDecimals(m))
     .filter((m) => m && m.length >= 1)
     .slice(0, 8);
 }

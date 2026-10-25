@@ -43,6 +43,22 @@ export function escapePostgrestSearchTerm(term) {
 }
 
 /**
+ * Variante de `escapePostgrestSearchTerm` pour une recherche ILIKE : une décimale (« 7,4 » ou « 7.4 ») devient « 7_4 »
+ * avant l'échappement, qui retirerait la virgule (« 7 4 » ne trouve jamais « 7,4 kW »). `_` est le joker d'un
+ * caractère d'ILIKE et passe l'échappement : « 7_4 » trouve « 7,4 » comme « 7.4 ». Le reste est inchangé.
+ *
+ * @param {string} term
+ * @returns {string}
+ */
+export function escapeSearchTermKeepingDecimals(term) {
+  if (typeof term !== 'string') return '';
+  let t = term;
+  // deux passes : « 1,5,2 » chevauche (le chiffre du milieu sert aux deux décimales)
+  for (let i = 0; i < 2; i += 1) t = t.replace(/(\d)[,.](\d)/g, '$1_$2');
+  return escapePostgrestSearchTerm(t);
+}
+
+/**
  * Lit toutes les lignes d'une requête PostgREST, page par page, jusqu'à épuisement.
  * Le plafond serveur (`max-rows`, 1000 par défaut) porte sur les LIGNES : sans pagination,
  * un résultat plus long est tronqué en silence. Une page incomplète termine la lecture ;

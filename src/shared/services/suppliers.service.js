@@ -10,7 +10,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { storageService } from '@services/storage.service';
-import { escapePostgrestSearchTerm } from '@/lib/postgrestUtils';
+import { escapePostgrestSearchTerm, escapeSearchTermKeepingDecimals } from '@/lib/postgrestUtils';
 import { logger } from '@lib/logger';
 import { allegerReleve } from '@/lib/catalogue/releve.js';
 
@@ -445,7 +445,7 @@ export const suppliersService = {
   async searchProductsMots(orgId, query, { limit = 100 } = {}) {
     try {
       if (!orgId) throw new Error('[suppliersService] orgId requis');
-      const mots = String(query || '').split(/\s+/).map((m) => escapePostgrestSearchTerm(m)).filter((m) => m && m.length >= 2).slice(0, 8);
+      const mots = String(query || '').split(/\s+/).map((m) => escapeSearchTermKeepingDecimals(m)).filter((m) => m && m.length >= 2).slice(0, 8);
       if (!mots.length) return { data: [], error: null };
       let q = supabase.from('majordhome_supplier_products').select('*').eq('org_id', orgId).eq('is_active', true);
       for (const m of mots) q = q.or(`name.ilike.%${m}%,reference.ilike.%${m}%,brand.ilike.%${m}%`);

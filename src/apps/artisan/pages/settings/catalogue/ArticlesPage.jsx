@@ -24,7 +24,7 @@ const CATEGORIE_LABELS = Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.val
 const NATURE_LABELS = { main: 'équipement', accessory: 'option', consumable: 'consommable', stock: 'matériel stocké', main_oeuvre: 'main d’œuvre' };
 
 export default function ArticlesPage() {
-  const { organization } = useAuth();
+  const { organization, isOrgAdmin } = useAuth();
   const orgId = organization?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const itemOuvert = searchParams.get('item');
@@ -64,13 +64,14 @@ export default function ArticlesPage() {
     <SettingsPage title="Articles Majord'home" description="La base du devis : un article par ligne fournisseur, fusionnés quand ils sont communs. Au devis, la marge est estimée sur le prix d'achat le plus bas en base ; l'âge du prix est indicatif.">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Link to="/settings/suppliers" className="text-primary-700 hover:underline">← Fournisseurs</Link>
-        <span className="ml-auto flex flex-wrap gap-2">
+        {/* créer un article = org_admin seul (la base refuse aussi) */}
+        {isOrgAdmin && <span className="ml-auto flex flex-wrap gap-2">
           <button type="button" onClick={() => setCreation('stock')} className="btn-secondary btn-sm"><Layers className="w-3.5 h-3.5 mr-1" /> Article de stock depuis mes achats</button>
           <button type="button" onClick={() => setCreation(creation === 'article' ? null : 'article')} className="btn-primary btn-sm"><Plus className="w-3.5 h-3.5 mr-1" /> Nouvel article</button>
-        </span>
+        </span>}
       </div>
 
-      {creation === 'article' && (
+      {isOrgAdmin && creation === 'article' && (
         <DevisCreateArticleForm orgId={orgId} defaultKind="main_oeuvre" submitLabel="Créer l'article"
           onCreated={(item) => { setCreation(null); ouvrir(item.id); }} onCancel={() => setCreation(null)} />
       )}

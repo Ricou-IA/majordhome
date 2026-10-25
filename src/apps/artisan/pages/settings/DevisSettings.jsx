@@ -9,7 +9,7 @@ import { useOrgSettings } from '@hooks/useOrgSettings';
 import { computeQuoteTotals } from '@services/devis.service';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { downloadBlob } from '@/lib/utils';
-import { buildDevisConfig, validerDevisConfig } from '@/lib/devisConfig.js';
+import { buildDevisConfig, validerDevisConfig, typeChapitreDeduit } from '@/lib/devisConfig.js';
 import { buildDevisDocumentModel, exempleDevis, ZONES } from '@/lib/devisDocumentModel.js';
 import { invoicingSettings } from '@/lib/invoiceDocumentModel.js';
 import SettingsPage from './SettingsPage';
@@ -28,7 +28,9 @@ const depuisConfig = (c) => ({
 const versSettings = (form) => ({
   // chapitres typés (+ sections = leurs titres, pour les lecteurs historiques) ; TVA de la famille
   familles: form.familles.map((f) => {
-    const chapitres = (f.chapitres || []).map((c) => ({ titre: String(c.titre || '').trim(), type: c.type })).filter((c) => c.titre);
+    // une famille sans `chapitres` (ancienne saisie) garde ses titres, types déduits — jamais sérialisée vide
+    const source = f.chapitres || (f.sections || []).map((t) => ({ titre: t, type: typeChapitreDeduit(t) }));
+    const chapitres = source.map((c) => ({ titre: String(c.titre || '').trim(), type: c.type })).filter((c) => c.titre);
     return { ...f, label: f.label.trim(), tva: Number(f.tva ?? 10), chapitres, sections: chapitres.map((c) => c.titre) };
   }),
   document: { ...form.document, validite_jours: Number(form.document.validite_jours) },

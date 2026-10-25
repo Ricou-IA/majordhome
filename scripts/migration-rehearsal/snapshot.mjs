@@ -34,7 +34,9 @@ const TABLES = [
   { schema: 'majordhome', table: 'product_documents', columns: null, data: false }, // 20261025_2 : action `document` de l'edge supplier-catalog-sync (fiche technique rangée)
   { schema: 'majordhome', table: 'quotes', columns: null, data: false }, // 20260929_1 : FK fum_metres
   { schema: 'majordhome', table: 'quote_lines', columns: null, data: false }, // 20261026_1 : articles Majord'home (catalog_item_id, vues quote_lines en fin)
-  { schema: 'majordhome', table: 'catalog_matches', columns: null, data: false }, // 20261026_1 : articles Majord'home (convertie puis droppée par 20261026_2)
+  // catalog_matches : droppée en prod par 20261026_2 (2026-10-24) — retirée de la photo le 2026-10-25 ; la chaîne
+  // 20261025_2 → 20261027_5 étant jouée en prod, la photo part désormais de l'état « articles »
+  { schema: 'majordhome', table: 'catalog_items', columns: null, data: false }, // 20261027_6 : documents d'article (FK product_documents.catalog_item_id)
   { schema: 'majordhome', table: 'equipment_categories', columns: null }, // M1 (20260913_1) en prod : cible des FK pricing_equipment_types / equipments et de la vue client_equipment_kinds
   { schema: 'majordhome', table: 'pricing_zones', columns: null },
   { schema: 'majordhome', table: 'pricing_equipment_types', columns: null },
@@ -97,9 +99,6 @@ const FUNCTIONS = [
   // 20261026_1 : articles Majord'home — apply_mapping v3 remplace la v2, les RPC des rapprochements sont droppées par 20261026_2
   'public.supplier_catalog_apply_mapping(uuid)',
   'public.get_distinct_brands(uuid)',
-  'public.catalog_matches_propose(uuid)',
-  'public.catalog_match_set_status(uuid[], text)',
-  'public.catalog_match_create(uuid, uuid)',
   'public.org_secret_set(uuid, text, text)',
   'public.org_secret_delete(uuid, text)',
   'public.org_secret_status(uuid, text)',
@@ -217,7 +216,6 @@ const VIEWS = [
   'public.majordhome_supplier_products_write',
   'public.majordhome_quote_lines', // 20261026_1 : catalog_item_id en fin (vue JOIN supplier_name)
   'public.majordhome_quote_lines_write',
-  'public.majordhome_catalog_matches', // 20261026_1 : droppée par 20261026_2
   'public.majordhome_product_documents', // 20261025_2 : cible de l'action `document`
   'public.majordhome_product_documents_write',
   'public.majordhome_invoices', // 20261010_1 : client_note (i.* ⇒ DROP + CREATE)
@@ -247,6 +245,7 @@ const POLICY_TABLES = [
   // 20260930_14 : purge des surcharges (lecture org / écriture org_admin)
   'role_permissions', 'app_role_permissions',
   'org_roles', 'member_org_roles', // 20261006_1
+  'product_documents', // 20261027_6 : documents d'article réservés à l'org_admin
   'webshop_delivery_slots', 'webshop_orders', // 20261013_2
   'webshop_products', 'webshop_categories', // 20261014_1
   // 20261018_1 : écritures directes retirées (policy FOR ALL membres → SELECT membres)

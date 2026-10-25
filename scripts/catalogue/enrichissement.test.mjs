@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   urlPublique, champsDuSchema, construirePromptEnrichissement, lireProposition, estPdf, nomDeFichier,
-  fusionnerSpecs, cochesParDefaut,
+  fusionnerSpecs, cochesParDefaut, adresseIpPrivee,
 } from '../../src/lib/catalogue/enrichissement.js';
 
 const SCHEMA = [
@@ -92,4 +92,22 @@ test('fusionnerSpecs : les caractéristiques acceptées remplacent, les autres r
 test('cochesParDefaut : seules les valeurs proposées pour un champ vide sont cochées d\'office', () => {
   const coches = cochesParDefaut({ puissance_kw: 7, mpn: '', wifi: null }, { puissance_kw: 7.4, mpn: 'TRY', wifi: true, energy_class: 'A' });
   assert.deepEqual([...coches].sort(), ['energy_class', 'mpn', 'wifi']);
+});
+
+test("urlPublique : nom à point final et services DNS qui pointent vers une adresse choisie ⇒ refusés", () => {
+  for (const u of ["http://localhost./", "https://exemple.fr./a.pdf", "https://127.0.0.1.nip.io/", "https://169.254.169.254.nip.io/latest",
+    "https://10.0.0.1.sslip.io/", "https://localtest.me/", "https://app.localtest.me/", "https://x.lvh.me/"]) {
+    assert.equal(urlPublique(u), false, u);
+  }
+  assert.equal(urlPublique("https://cdn.v2charge.com/trydan.png"), true);
+});
+
+test("adresseIpPrivee : bouclage, privées, link-local, CGNAT, multicast, IPv6 locales et mappées ⇒ vrai ; publiques ⇒ faux", () => {
+  for (const ip of ["127.0.0.1", "10.2.3.4", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0",
+    "224.0.0.1", "255.255.255.255", "::1", "::", "fe80::1", "fc00::1", "fd12:3456::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "pas une ip"]) {
+    assert.equal(adresseIpPrivee(ip), true, ip);
+  }
+  for (const ip of ["8.8.8.8", "172.32.0.1", "100.128.0.1", "151.101.1.69", "2606:4700::6810:84e5", "::ffff:8.8.8.8"]) {
+    assert.equal(adresseIpPrivee(ip), false, ip);
+  }
 });
