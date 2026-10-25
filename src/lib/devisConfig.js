@@ -197,6 +197,9 @@ export function buildDevisConfig(settings) {
       prix_unitaires: bool(a.prix_unitaires, D.affichage.prix_unitaires), tva_par_ligne: bool(a.tva_par_ligne, D.affichage.tva_par_ligne),
       detail_lignes: bool(a.detail_lignes, D.affichage.detail_lignes),
     },
+    // brochure de l'entreprise jointe à la fin de chaque devis (Réglages → Devis) : { storage_path, file_name } ou null
+    brochure: estObjet(s.brochure) && typeof s.brochure.storage_path === 'string' && s.brochure.storage_path
+      ? { storage_path: s.brochure.storage_path, file_name: texte(s.brochure.file_name, 'Brochure.pdf') } : null,
   };
 }
 

@@ -231,6 +231,34 @@ export const catalogItemsService = {
     }
   },
 
+  /**
+   * Documents de plusieurs articles (posés sur l'article ou sur une de ses lignes fournisseur), chacun portant `item_id`
+   * et `origine` : annexes du PDF de devis (fiches techniques des équipements, devisAnnexes.js). ≤ 50 articles.
+   */
+  async getDocumentsArticles(orgId, itemIds = []) {
+    try {
+      const ids = [...new Set(itemIds.filter(Boolean))].slice(0, 50);
+      if (!orgId || !ids.length) return { data: [], error: null };
+      const { data: lignes, error: errL } = await supabase.from('majordhome_supplier_products').select('id, catalog_item_id')
+        .eq('org_id', orgId).in('catalog_item_id', ids);
+      if (errL) throw errL;
+      const itemDeLigne = new Map((lignes || []).map((l) => [l.id, l.catalog_item_id]));
+      const filtres = [`catalog_item_id.in.(${ids.join(',')})`];
+      if (itemDeLigne.size) filtres.push(`supplier_product_id.in.(${[...itemDeLigne.keys()].join(',')})`);
+      const { data, error } = await supabase.from('majordhome_product_documents').select('*').eq('org_id', orgId).or(filtres.join(','));
+      if (error) throw error;
+      return {
+        data: (data || []).map((d) => ({
+          ...d, item_id: d.catalog_item_id || itemDeLigne.get(d.supplier_product_id) || null, origine: d.catalog_item_id ? 'article' : 'fournisseur',
+        })).filter((d) => d.item_id),
+        error: null,
+      };
+    } catch (error) {
+      logger.error('[catalogItemsService] getDocumentsArticles:', error);
+      return { data: [], error };
+    }
+  },
+
   /** Ajoute un document à l'article (bucket product-documents, `${orgId}/articles/${itemId}/…`). */
   async uploadItemDocument({ orgId, itemId, file, documentType = 'Fiche technique', userId = null }) {
     try {

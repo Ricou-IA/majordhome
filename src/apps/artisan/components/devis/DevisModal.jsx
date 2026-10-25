@@ -148,7 +148,17 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         config: devisConfig, invoicing: invoicingSettings(settings || organization?.settings),
       });
 
-      const blob = await generateDevisPdfBlob(model);
+      // annexes : fiche technique de chaque équipement puis brochure de l'entreprise (devisAnnexes.js)
+      const { annexesDevis, articlesEquipement } = await import('@/lib/devisAnnexes.js');
+      const { typeChapitre } = await import('@/lib/devisConfig.js');
+      const { catalogItemsService } = await import('@services/catalogItems.service');
+      const { joindreAnnexes } = await import('./devisAnnexesExport');
+      const typeDe = (titre) => typeChapitre(devisConfig, null, titre);
+      const { data: documents, error: errDocs } = await catalogItemsService.getDocumentsArticles(orgId, articlesEquipement(lines, typeDe));
+      if (errDocs) toast.info('Fiches techniques introuvables : le devis part sans elles');
+      const annexes = annexesDevis({ lines, typeDe, documents: documents || [], brochure: devisConfig.brochure });
+      const { blob, ignorees } = await joindreAnnexes(await generateDevisPdfBlob(model), annexes);
+      if (ignorees.length) toast.info(`Annexe${ignorees.length > 1 ? 's' : ''} non jointe${ignorees.length > 1 ? 's' : ''} : ${ignorees.join(', ')}`);
       const result = await devisService.uploadQuotePdf(quoteId, blob, orgId);
       if (result?.error) throw result.error;
 

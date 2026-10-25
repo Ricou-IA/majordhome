@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Download, Loader2 } from 'lucide-react';
 import { useOrgSettings } from '@hooks/useOrgSettings';
+import { useAuth } from '@contexts/AuthContext';
 import { computeQuoteTotals } from '@services/devis.service';
 import { buildCompanyInfo } from '@lib/orgBranding';
 import { downloadBlob } from '@/lib/utils';
@@ -15,6 +16,7 @@ import { invoicingSettings } from '@/lib/invoiceDocumentModel.js';
 import SettingsPage from './SettingsPage';
 import ReglagesDevisPanel from './devis/ReglagesDevisPanel';
 import ApercuDevis from './devis/ApercuDevis';
+import BrochureDevis from './devis/BrochureDevis';
 
 /** Config → état du formulaire (les nombres deviennent des chaînes pour la saisie). */
 const depuisConfig = (c) => ({
@@ -22,6 +24,7 @@ const depuisConfig = (c) => ({
   document: { ...c.document, validite_jours: String(c.document.validite_jours) },
   paiement: { ...c.paiement },
   affichage: { ...c.affichage },
+  brochure: c.brochure,
 });
 
 /** Formulaire → objet `devis` à sauver (complet). */
@@ -36,12 +39,14 @@ const versSettings = (form) => ({
   document: { ...form.document, validite_jours: Number(form.document.validite_jours) },
   paiement: { ...form.paiement },
   affichage: { ...form.affichage },
+  brochure: form.brochure ?? null, // déposée à part (BrochureDevis), jamais effacée par l'enregistrement du modèle
 });
 
 const OUVERTS_INITIAUX = { familles: true, emetteur: false, contenu: false, paiement: false, affichage: false };
 
 export default function DevisSettings() {
   const { settings, save, isSaving, isLoading } = useOrgSettings();
+  const { organization } = useAuth(); // id de l'org seulement (dépôt de la brochure) ; les réglages passent par useOrgSettings
   const [form, setForm] = useState(() => depuisConfig(buildDevisConfig(null)));
   const [initial, setInitial] = useState(() => depuisConfig(buildDevisConfig(null)));
   useEffect(() => { const f = depuisConfig(buildDevisConfig(settings)); setForm(f); setInitial(f); }, [settings]);
@@ -87,7 +92,10 @@ export default function DevisSettings() {
     try {
       setPdfEnCours(true);
       const { generateDevisPdfBlob } = await import('@apps/artisan/components/devis/DevisPDF');
-      const blob = await generateDevisPdfBlob(model);
+      const { joindreAnnexes } = await import('@apps/artisan/components/devis/devisAnnexesExport');
+      // l'exemple n'a pas d'équipement réel : seule la brochure est jointe
+      const { blob, ignorees } = await joindreAnnexes(await generateDevisPdfBlob(model), form.brochure ? [{ label: form.brochure.file_name, storage_path: form.brochure.storage_path }] : []);
+      if (ignorees.length) toast.info(`Brochure non jointe : ${ignorees.join(', ')}`);
       downloadBlob(blob, 'devis-exemple.pdf');
     } catch (err) { toast.error(err?.message || 'PDF impossible'); } finally { setPdfEnCours(false); }
   };
@@ -99,6 +107,7 @@ export default function DevisSettings() {
           <div className="space-y-3">
             <ReglagesDevisPanel form={form} onChange={onChange} onFamilles={onFamilles} ouverts={ouverts} onToggle={onToggle}
               zoneActive={zoneActive} onFocusZone={setZoneActive} company={company} invoicing={invoicing} />
+            <BrochureDevis orgId={organization?.id} settings={settings} save={save} brochure={form.brochure} />
             {!validation.ok && (
               <ul className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2 list-disc pl-6">{validation.erreurs.map((e) => <li key={e}>{e}</li>)}</ul>
             )}
