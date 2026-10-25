@@ -203,7 +203,8 @@ Deno.serve(async (req) => {
       const messages: any[] = [{ role: "user", content: prompt }];
       // deno-lint-ignore no-explicit-any
       let final: any = null;
-      let tokens = 0;
+      // consommation détaillée, journalisée à chaque appel (coût = tokens + recherches web, facturées à part)
+      const conso = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, web_search_requests: 0, web_fetch_requests: 0, tours: 0 };
       try {
         for (let i = 0; i <= REPRISES_MAX; i++) {
           // fallbacks "default" : un refus des garde-fous est rejoué côté serveur sur le modèle recommandé
@@ -218,7 +219,14 @@ Deno.serve(async (req) => {
             messages, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
           };
           final = await client.beta.messages.stream(params, { signal: ctrl.signal }).finalMessage();
-          tokens += (final.usage?.input_tokens || 0) + (final.usage?.output_tokens || 0);
+          const u = final.usage || {};
+          conso.input_tokens += u.input_tokens || 0;
+          conso.output_tokens += u.output_tokens || 0;
+          conso.cache_read_input_tokens += u.cache_read_input_tokens || 0;
+          conso.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
+          conso.web_search_requests += u.server_tool_use?.web_search_requests || 0;
+          conso.web_fetch_requests += u.server_tool_use?.web_fetch_requests || 0;
+          conso.tours += 1;
           if (final.stop_reason !== "pause_turn") break;
           messages.push({ role: "assistant", content: final.content });
         }
@@ -228,6 +236,8 @@ Deno.serve(async (req) => {
       } finally {
         clearTimeout(minuterie);
       }
+      const tokens = conso.input_tokens + conso.output_tokens;
+      console.log("[catalog-item-enrich] conso", JSON.stringify({ org: orgId, item: itemId, modele: final?.model ?? MODEL, stop: final?.stop_reason, ...conso }));
       if (final?.stop_reason === "refusal") return jsonResponse({ error: "recherche refusée par les garde-fous du modèle" }, 422, req);
       if (final?.stop_reason === "pause_turn") return jsonResponse({ error: "recherche inachevée : réessayez" }, 504, req);
       // deno-lint-ignore no-explicit-any
@@ -237,7 +247,7 @@ Deno.serve(async (req) => {
 
       const [photoRefus, ficheRefus] = await Promise.all([verifierPhoto(proposition.photo_url, echeance), verifierFiche(proposition.fiche_url, echeance)]);
       return jsonResponse({
-        ok: true, ...proposition, photo_refus: photoRefus, fiche_refus: ficheRefus, modele: final?.model ?? MODEL, tokens,
+        ok: true, ...proposition, photo_refus: photoRefus, fiche_refus: ficheRefus, modele: final?.model ?? MODEL, tokens, conso,
       }, 200, req);
     }
 
