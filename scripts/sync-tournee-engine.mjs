@@ -35,9 +35,10 @@ const MAINTENANCE = ['echeances', 'digestModel', 'vocabulaire'];
 // './reglages.js' (même dossier, imports relatifs conservés tels quels).
 const WEBSHOP = ['orders', 'reglages', 'process', 'emailTemplates'];
 
-// Catalogue fournisseur (adaptateurs relevé → lignes de catalogue) → edge supplier-catalog-sync ; enrichissement → catalog-item-enrich.
-// Copiés dans _shared/catalogue/ (aucun import entre eux).
-const CATALOGUE = ['suitecommerce', 'woocommerce', 'modelKey', 'mapping', 'releve', 'enrichissement'];
+// Catalogue fournisseur (adaptateurs relevé → lignes de catalogue) → edge supplier-catalog-sync ; enrichissement → catalog-item-enrich ;
+// offreFournisseur (offre PDF lue par l'IA) → supplier-offer-import.
+// Copiés dans _shared/catalogue/ (offreFournisseur importe './modelKey.js', même dossier).
+const CATALOGUE = ['suitecommerce', 'woocommerce', 'modelKey', 'mapping', 'releve', 'enrichissement', 'offreFournisseur'];
 
 export const FICHIERS = [
   ...NOMS.map((n) => ({ source: path.join(SRC, `${n}.js`), cible: path.join(DST, `${n}.js`) })),

@@ -28,12 +28,14 @@ import {
   Loader2,
   Upload,
   FileSpreadsheet,
+  FileUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ProductDocumentsPanel } from './ProductDocumentsPanel';
 import ProductDetailDrawer from './ProductDetailDrawer';
 import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
+import ImportOffreCatalogueModal from './suppliers/ImportOffreCatalogueModal';
 
 // =============================================================================
 // MODAL FOURNISSEUR
@@ -536,6 +538,7 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
   const [editProduct, setEditProduct] = useState(null);
   const [detailProductId, setDetailProductId] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [importOffre, setImportOffre] = useState(false);
   const [docsProduct, setDocsProduct] = useState(null);
   const fileInputRef = useRef(null);
   const searchTimerRef = useRef(null);
@@ -658,6 +661,10 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
             {importing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
             Import Excel
           </button>
+          <button onClick={() => setImportOffre(true)} className="btn-secondary btn-sm" title="Créer les références et mettre à jour les prix d'achat depuis une offre de prix PDF">
+            <FileUp className="w-4 h-4 mr-1" />
+            Importer une offre
+          </button>
           <button onClick={() => { setEditProduct(null); setShowModal(true); }} className="btn-primary btn-sm">
             <Plus className="w-4 h-4 mr-1" />
             {kindFilter === 'accessory' ? 'Accessoire' : kindFilter === 'consumable' ? 'Consommable' : 'Produit'}
@@ -666,6 +673,7 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
       </div>
 
       {supplier.connector && <CatalogConnectorPanel supplier={supplier} orgId={orgId} />}
+      {importOffre && <ImportOffreCatalogueModal supplier={supplier} orgId={orgId} onClose={() => { setImportOffre(false); refetch(); }} />}
 
       {/* Import info + template download */}
       <div className="flex items-center justify-between bg-secondary-50 rounded px-3 py-2">

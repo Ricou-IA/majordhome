@@ -211,3 +211,8 @@ verify_jwt = true
 # caractéristiques ; apply télécharge et écrit avec le jeton de l'utilisateur. JWT user org_admin. 2026-10-25.
 [functions.catalog-item-enrich]
 verify_jwt = true
+
+# supplier-offer-import : offre de prix fournisseur (PDF) lue par l'IA (extract, tout membre) puis écrite au catalogue
+# du fournisseur par supplier_catalog_upsert (apply, org_admin). JWT user. 2026-10-25.
+[functions.supplier-offer-import]
+verify_jwt = true
