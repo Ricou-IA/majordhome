@@ -246,7 +246,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col m-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col m-4">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div className="flex items-center gap-3">
@@ -393,7 +393,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         )}
 
         {/* Footer — Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t bg-white">
           <div className="flex gap-2">
             {/* Destructive actions */}
             <button onClick={() => setShowDeleteConfirm(true)} disabled={isDeleting} className="btn-secondary btn-sm text-red-600 hover:bg-red-50" title="Supprimer">
@@ -407,7 +407,7 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
             </button>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2 [&>button]:whitespace-nowrap">
             {/* PDF */}
             <button onClick={handleGeneratePdf} disabled={pdfLoading} className="btn-secondary btn-sm">
               {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FileText className="w-4 h-4 mr-1" />}
@@ -421,8 +421,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
 
             {/* Pennylane */}
             {pennylaneEnabled && quote.pennylane_quote_id && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary-100 text-secondary-700 text-xs font-medium" title="Devis créé dans Pennylane">
-                <Send className="w-3.5 h-3.5" /> Dans Pennylane · n° {quote.pennylane_quote_id}
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary-100 text-secondary-700 text-xs font-medium whitespace-nowrap" title={`Devis créé dans Pennylane (identifiant ${quote.pennylane_quote_id})`}>
+                <Send className="w-3.5 h-3.5" /> Dans Pennylane
               </span>
             )}
             {pennylaneEnabled && isBrouillon && !quote.pennylane_quote_id && (
