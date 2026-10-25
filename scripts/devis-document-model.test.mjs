@@ -156,3 +156,16 @@ test('exempleDevis : chapitres de la première famille active, lignes d\'exemple
   const d = exempleDevis(DEFAULTS_DEVIS);
   assert.equal(d.lines[0].designation, 'POÊLE');
 });
+
+test('buildDevisDocumentModel : un chapitre sans ligne n\'apparaît pas dans le document (constat Eric 2026-10-25, « OPTIONS » vide)', () => {
+  const avecVide = [
+    { line_type: 'section_title', designation: 'ÉQUIPEMENT' },
+    { line_type: 'product', designation: 'Borne', quantity: 1, unit_price_ht: 640, tva_rate: 5.5 },
+    { line_type: 'section_title', designation: 'OPTIONS' },
+    { line_type: 'section_title', designation: 'POSE' },
+    { line_type: 'labor', designation: 'Pose', quantity: 1, unit_price_ht: 225, tva_rate: 5.5 },
+    { line_type: 'section_title', designation: 'FIN VIDE' },
+  ];
+  const m = buildDevisDocumentModel({ quote, lines: avecVide, totals, company, config: buildDevisConfig({}) });
+  assert.deepEqual(m.tableau.chapitres.map((c) => c.titre), ['ÉQUIPEMENT', 'POSE']);
+});

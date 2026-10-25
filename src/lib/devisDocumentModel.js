@@ -99,7 +99,8 @@ export function buildDevisDocumentModel({ quote, lines, totals, company, config,
   const clientLignes = [q.client_display_name || '', q.client_address || '', [q.client_postal_code, q.client_city].filter(Boolean).join(' '), q.client_phone ? `Tél. ${q.client_phone}` : '', q.client_email || ''].filter(Boolean);
 
   const colonnes = { reference: cfg.affichage.references, prix_unitaire: cfg.affichage.prix_unitaires, tva: cfg.affichage.tva_par_ligne, detail: cfg.affichage.detail_lignes };
-  const chaps = chapitres(lines).map((c) => ({
+  // un chapitre sans ligne n’est pas imprimé (OPTIONS laissé vide, Eric 2026-10-25)
+  const chaps = chapitres(lines).filter((c) => c.lignes.length > 0).map((c) => ({
     titre: c.titre,
     sous_total: fmtEur(c.sous_total_ht),
     lignes: cfg.affichage.detail_lignes ? c.lignes.map((l) => ({
