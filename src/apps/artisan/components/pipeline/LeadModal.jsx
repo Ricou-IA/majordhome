@@ -34,6 +34,8 @@ import { buildAuditEntry, mergeTimeline } from '@/lib/auditTrail';
 import { useClientSearch } from '@hooks/useClients';
 import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
 import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { appointmentsService } from '@services/appointments.service';
@@ -119,6 +121,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
   const { sources } = useLeadSources();
   const { commercials } = useLeadCommercials(orgId);
   const { equipmentTypes, index: referentiel } = useEquipmentReferential();
+  const { settings: orgSettings } = useOrgSettings();
   const pennylaneActive = usePennylaneEnabled();
   const { query: clientSearchQuery, results: clientResults, searching: clientSearching, search: searchClientMdh, clear: clearClientMdhSearch } = useClientSearch(orgId);
   // Bug #5 ROGERO : search customer Pennylane (cache D.5 + fallback live)
@@ -148,7 +151,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     email: '', phone: '', phone_secondary: '',
     address: '', address_complement: '', postal_code: '', city: '',
     source_id: '', status_id: '', assigned_user_id: '',
-    equipment_type_id: '', order_amount_ht: '', estimated_revenue: '',
+    equipment_type_id: '', project_family_key: '', order_amount_ht: '', estimated_revenue: '',
     probability: '50', next_action: '', next_action_date: '',
     notes: '', lost_reason: '',
     appointment_date: '', quote_sent_date: '', won_date: '',
@@ -235,6 +238,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         status_id: lead.status_id || '',
         assigned_user_id: lead.assigned_user_id || '',
         equipment_type_id: lead.equipment_type_id || '',
+        project_family_key: lead.project_family_key || '',
         order_amount_ht: lead.order_amount_ht ?? '',
         estimated_revenue: lead.estimated_revenue ?? '',
         probability: lead.probability ?? '50',
@@ -273,7 +277,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
         email: '', phone: '', phone_secondary: '',
         address: '', address_complement: '', postal_code: '', city: '',
         source_id: '', status_id: defaultStatus?.id || '', assigned_user_id: defaultCommercialId,
-        equipment_type_id: '', order_amount_ht: '', estimated_revenue: '',
+        equipment_type_id: '', project_family_key: '', order_amount_ht: '', estimated_revenue: '',
         probability: '50', next_action: '', next_action_date: '',
         notes: '', lost_reason: '',
         appointment_date: '', quote_sent_date: '', won_date: '',
@@ -430,6 +434,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     status_id: form.status_id || null,
     assigned_user_id: form.assigned_user_id || null,
     equipment_type_id: form.equipment_type_id || null,
+    project_family_key: form.project_family_key || null,
     order_amount_ht: form.order_amount_ht ? Number(form.order_amount_ht) : null,
     estimated_revenue: form.order_amount_ht ? Number(form.order_amount_ht) : null,
     probability: form.probability ? Number(form.probability) : 50,
@@ -902,6 +907,8 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
     () => grouperTypesParCategorie(referentiel, equipmentTypes),
     [referentiel, equipmentTypes],
   );
+  // « Projet » = familles de devis actives de l'org (liste commerciale, découplée du référentiel d'entretien)
+  const projectFamilies = useMemo(() => famillesActives(buildDevisConfig(orgSettings)), [orgSettings]);
 
   // Requalifier lead → Entretien : crée client + contrat pending + carte Kanban
   // Entretien « À planifier », puis soft-delete du lead
@@ -1176,6 +1183,7 @@ export function LeadModal({ leadId, isOpen, onClose, onSaved, autoSchedule = fal
                 sources={sources}
                 commercials={commercials}
                 groupedEquipmentTypes={groupedEquipmentTypes}
+                projectFamilies={projectFamilies}
                 isFinal={isFinal}
                 isWon={isWon}
                 pendingLostStatusId={pendingLostStatusId}

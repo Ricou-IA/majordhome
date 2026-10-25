@@ -56,6 +56,7 @@ const TABLES = [
   { schema: 'majordhome', table: 'statuses', columns: null }, // 20261012_3 : lead_search_for_attach (status_label) ; petite table, données incluses
   { schema: 'majordhome', table: 'sources', columns: null }, // 20261012_4 : lead_search (source_name) ; petite table, données incluses
   { schema: 'majordhome', table: 'leads', columns: null, data: false },
+  { schema: 'majordhome', table: 'lead_interactions', columns: null, data: false }, // 20261028_1 : lue par la vue majordhome_leads (last_interaction_at)
   { schema: 'majordhome', table: 'client_creation_audit', columns: null, data: false }, // 20261021_1 : find_or_create_client trace ses décisions (dont « ambiguous »)
   { schema: 'majordhome', table: 'dedup_candidates', columns: null, data: false }, // 20261021_1 : find_or_create_client y signale un e-mail partagé
   { schema: 'majordhome', table: 'lead_pennylane_quotes', columns: null, data: false }, // 20260930_16 : chantier_id + trigger chantier_ensure_for_quote
@@ -117,6 +118,7 @@ const FUNCTIONS = [
   'majordhome.project_org_id(uuid)',
   'majordhome.quote_status_bucket(text)',
   'public.update_majordhome_lead(uuid, jsonb)',
+  'public.create_majordhome_lead(jsonb)', // 20261028_1 : project_family_key (liste de colonnes explicite)
   // 20260922_3 : REVOKE PUBLIC/anon/authenticated — l'ACL de départ (anon/authenticated/service_role
   // = EXECUTE) est reproduite par les privilèges par défaut de bootstrap-pre.sql, comme en prod.
   'public.exec_sql(text)',
@@ -233,6 +235,7 @@ const VIEWS = [
   'public.majordhome_webshop_sector_postcodes',
   'public.majordhome_webshop_shipping_rates',
   'public.majordhome_webshop_pickup_points',
+  'public.majordhome_leads', // 20261028_1 : project_family_key en fin
 ];
 
 // Policies reproduites : celles qui ne dépendent d'aucune fonction absente du

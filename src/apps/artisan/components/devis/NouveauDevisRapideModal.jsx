@@ -1,6 +1,6 @@
 // src/apps/artisan/components/devis/NouveauDevisRapideModal.jsx
 // « Nouveau devis » depuis le Kanban (demande d'Eric, 2026-10-25 : raccourcir le process). Deux temps :
-//   1. fiche courte du client (nom, contact, adresse, commercial, source, équipement — leadRapide.js), puis filet
+//   1. fiche courte du client (nom, contact, adresse, commercial, source, projet — leadRapide.js), puis filet
 //      anti-doublon (même filet que la fiche lead : leadsService.findPotentialDuplicates) → faire le devis sur la
 //      carte existante, ou créer quand même ; le lead naît en « Nouveau » ;
 //   2. la fenêtre de devis habituelle (CreateDevisModal) s'ouvre sur ce lead.
@@ -11,8 +11,8 @@ import { toast } from 'sonner';
 import { X, ChevronDown, Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@contexts/AuthContext';
 import { useLeadCommercials, useLeadSources, useLeadStatuses } from '@hooks/useLeads';
-import { useEquipmentReferential } from '@hooks/useEquipmentReferential';
-import { grouperTypesParCategorie } from '@/lib/equipmentReferential';
+import { useOrgSettings } from '@hooks/useOrgSettings';
+import { buildDevisConfig, famillesActives } from '@/lib/devisConfig.js';
 import { FORMULAIRE_LEAD_VIDE, validerLeadRapide, leadDepuisFormulaire } from '@/lib/leadRapide.js';
 import { leadsService } from '@services/leads.service';
 import { DuplicateLeadDialog } from '../shared/DuplicateLeadDialog';
@@ -48,8 +48,9 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
   const { commercials } = useLeadCommercials(orgId);
   const { sources } = useLeadSources();
   const { statuses } = useLeadStatuses();
-  const { equipmentTypes, index: referentiel } = useEquipmentReferential();
-  const groupes = useMemo(() => grouperTypesParCategorie(referentiel, equipmentTypes), [referentiel, equipmentTypes]);
+  // « Projet » = familles de devis actives (liste commerciale, découplée du référentiel d'entretien)
+  const { settings } = useOrgSettings();
+  const projets = useMemo(() => famillesActives(buildDevisConfig(settings)), [settings]);
 
   // commercial par défaut : la personne connectée si elle est commerciale
   const moi = useMemo(() => (commercials || []).find((c) => c.profile_id === user?.id)?.id || '', [commercials, user?.id]);
@@ -146,14 +147,10 @@ export default function NouveauDevisRapideModal({ onClose, onDone }) {
                 {(sources || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Liste>
             </Champ>
-            <Champ id="ndr-equipement" label="Équipement concerné">
-              <Liste id="ndr-equipement" value={form.equipment_type_id} onChange={set('equipment_type_id')}>
+            <Champ id="ndr-projet" label="Projet">
+              <Liste id="ndr-projet" value={form.project_family_key} onChange={set('project_family_key')}>
                 <option value="">—</option>
-                {groupes.map((g) => (
-                  <optgroup key={g.category?.id ?? 'sans-categorie'} label={g.label}>
-                    {g.types.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
-                  </optgroup>
-                ))}
+                {projets.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
               </Liste>
             </Champ>
           </section>

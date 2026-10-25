@@ -1,12 +1,12 @@
 // src/lib/leadRapide.js
 // Fiche courte du client avant un devis créé depuis le Kanban (« Nouveau devis », demande d'Eric 2026-10-25) —
 // module PUR, testé (scripts/lead-rapide.test.mjs). Le lead créé ici est un lead comme les autres : statut
-// « Nouveau » posé, filet anti-doublon passé avant (NouveauDevisRapideModal), commercial / source / équipement repris.
+// « Nouveau » posé, filet anti-doublon passé avant (NouveauDevisRapideModal), commercial / source / projet repris.
 
 /** Formulaire vide. `commercial_id` = id de la table commercials (assigned_user_id d'un lead, pont dual-ID). */
 export const FORMULAIRE_LEAD_VIDE = Object.freeze({
   first_name: '', last_name: '', phone: '', email: '', address: '', postal_code: '', city: '',
-  commercial_id: '', source_id: '', equipment_type_id: '',
+  commercial_id: '', source_id: '', project_family_key: '',
 });
 
 const t = (v) => String(v ?? '').trim();
@@ -44,6 +44,7 @@ export function leadDepuisFormulaire(form, { statusId }) {
     status_id: statusId || null,
     assigned_user_id: ouNull(form.commercial_id),
     source_id: ouNull(form.source_id),
-    equipment_type_id: ouNull(form.equipment_type_id),
+    // « Projet » = famille de devis (liste commerciale), pas le référentiel d'équipements d'entretien
+    project_family_key: ouNull(form.project_family_key),
   };
 }

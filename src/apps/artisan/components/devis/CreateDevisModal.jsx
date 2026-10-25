@@ -10,7 +10,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@contexts/AuthContext';
 import { useOrgSettings } from '@hooks/useOrgSettings';
-import { buildDevisConfig, famillesActives, familleDepuisEquipement, typeChapitre } from '@/lib/devisConfig.js';
+import { buildDevisConfig, famillesActives, familleDuLead, familleDe, typeChapitre } from '@/lib/devisConfig.js';
+import { useLeadMutations } from '@hooks/useLeads';
 import { reclasserDansSections } from '@/lib/devisOrdre.js';
 import { useDevisMutations } from '@hooks/useDevis';
 import { useFumMetreMutations } from '@hooks/useFumisterie';
@@ -38,6 +39,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const [enregistrement, setEnregistrement] = useState(false);
   const [importOffre, setImportOffre] = useState(false); // fenêtre « Importer une offre fournisseur » (bouton de l'en-tête)
   const { saveMetre } = useFumMetreMutations(orgId);
+  const { updateLead } = useLeadMutations();
   // Familles, chapitres, conditions et validité par défaut : Settings → Socle → Devis
   const { settings, isLoading: settingsLoading } = useOrgSettings();
   const devisConfig = useMemo(() => buildDevisConfig(settings), [settings]);
@@ -61,15 +63,15 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const [selectedFamily, setSelectedFamily] = useState(initialFamily || '');
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
 
-  // Installation présélectionnée depuis l'équipement concerné du lead (une seule fois, réglages de l'org chargés),
+  // Installation présélectionnée depuis le « Projet » du lead, repli sur le libellé de son équipement (une seule fois, réglages chargés),
   // seulement pour un nouveau devis vide : ni en édition, ni par-dessus des lignes déjà là (clim, devis type).
   const familleAutoFaite = useRef(false);
   useEffect(() => {
     if (familleAutoFaite.current || settingsLoading || edition || initialFamily || lines.length > 0) return;
     familleAutoFaite.current = true;
-    const f = familleDepuisEquipement(devisConfig, lead?.equipment_type_label);
+    const f = familleDuLead(devisConfig, lead);
     if (f) { setSelectedFamily(f); setLines(buildDefaultSections(f, devisConfig)); }
-  }, [settingsLoading, edition, initialFamily, lines.length, devisConfig, lead?.equipment_type_label]);
+  }, [settingsLoading, edition, initialFamily, lines.length, devisConfig, lead]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -171,6 +173,12 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
       if (metre) {
         try { await saveMetre({ ...metre, quoteId: created.id, createdBy: user?.id }); }
         catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning('Devis créé, mais le relevé de métré n\'a pas pu être enregistré'); }
+      }
+      // Lead sans « Projet » : la famille du devis le renseigne (les anciens leads se remplissent au fil des devis)
+      const cleProjet = familleDe(devisConfig, selectedFamily)?.key;
+      if (lead?.id && !lead.project_family_key && cleProjet) {
+        try { await updateLead(lead.id, { project_family_key: cleProjet }); }
+        catch (err) { logger.error('[CreateDevisModal] projet du lead', err); toast.warning('Devis créé, mais le projet du lead n\'a pas pu être renseigné'); }
       }
       toast.success('Devis créé');
       onCreated?.(created);

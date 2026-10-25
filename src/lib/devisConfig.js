@@ -239,8 +239,9 @@ export function tvaFamille(config, keyOuLabel) {
   return familleDe(config, keyOuLabel)?.tva ?? TVA_DEFAUT;
 }
 
-// Libellé d'équipement concerné (référentiel de l'org) → clé de famille de devis par défaut. Les catégories
-// d'équipement ne recoupent pas les familles (la borne est dans « energie ») : on lit le libellé.
+// REPLI seulement (leads sans « Projet ») : libellé de l'équipement concerné (référentiel d'entretien) → clé de
+// famille de devis. Le référentiel décrit l'entretien et le parc, pas le commercial (la borne est dans « energie ») :
+// le lien commercial est `leads.project_family_key` (cf. familleDuLead), jamais une catégorie d'équipement.
 const FAMILLE_PAR_EQUIPEMENT = Object.freeze([
   [/chaudi|pac air.?eau|pompe a chaleur|\bpac\b(?!.*air.?air)/, 'chauffage_pac'],
   [/pac air.?air|gainable|climati|split/, 'climatisation'],
@@ -267,6 +268,19 @@ export function familleDepuisEquipement(config, libelleEquipement) {
   if (!regle) return null;
   const famille = famillesActives(config).find((f) => f.key === regle[1]);
   return famille ? famille.label : null;
+}
+
+/**
+ * Famille de devis présélectionnée pour un lead : son « Projet » commercial (`project_family_key`, clé d'une famille
+ * ACTIVE), sinon le repli sur le libellé de l'équipement concerné. Projet inconnu ou désactivé ⇒ repli, sans erreur.
+ * @param {object} config buildDevisConfig(settings)
+ * @param {{ project_family_key?: string | null, equipment_type_label?: string | null } | null | undefined} lead
+ * @returns {string | null} LIBELLÉ de la famille, ou null
+ */
+export function familleDuLead(config, lead) {
+  const cle = lead?.project_family_key;
+  const projet = cle ? famillesActives(config).find((f) => f.key === cle) : null;
+  return projet ? projet.label : familleDepuisEquipement(config, lead?.equipment_type_label);
 }
 
 /**

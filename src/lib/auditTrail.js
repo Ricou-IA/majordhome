@@ -38,6 +38,7 @@ export const AUDIT_FIELD_LABELS = {
     status_id: 'Statut',
     assigned_user_id: 'Commercial assigné',
     equipment_type_id: 'Type d’équipement',
+    project_family_key: 'Projet',
     order_amount_ht: 'Montant HT',
     estimated_revenue: 'CA estimé',
     probability: 'Probabilité',

@@ -17,11 +17,11 @@ test('validerLeadRapide : nom obligatoire, et un moyen de contact (téléphone o
 test('leadDepuisFormulaire : champs nettoyés, vides ⇒ null, statut posé, ids de référentiel repris', () => {
   const lead = leadDepuisFormulaire({
     first_name: ' Céline ', last_name: ' Cassagne ', phone: ' 06 88 59 32 57 ', email: ' Celine@Gmail.com ',
-    address: '2533 Chemin de Fayence', postal_code: ' 82000 ', city: 'Montauban', commercial_id: 'c1', source_id: '', equipment_type_id: 'e9',
+    address: '2533 Chemin de Fayence', postal_code: ' 82000 ', city: 'Montauban', commercial_id: 'c1', source_id: '', project_family_key: 'borne_recharge',
   }, { statusId: 's-nouveau' });
   assert.deepEqual(lead, {
     first_name: 'Céline', last_name: 'Cassagne', phone: '06 88 59 32 57', email: 'celine@gmail.com',
     address: '2533 Chemin de Fayence', postal_code: '82000', city: 'Montauban',
-    status_id: 's-nouveau', assigned_user_id: 'c1', source_id: null, equipment_type_id: 'e9',
+    status_id: 's-nouveau', assigned_user_id: 'c1', source_id: null, project_family_key: 'borne_recharge',
   });
 });
