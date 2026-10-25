@@ -68,6 +68,21 @@ BEGIN
   IF v_n <> 1 THEN RAISE EXCEPTION 'paire à suffixe non proposée (résultat %)', v_res; END IF;
   IF (SELECT catalog_item_id FROM majordhome.supplier_products WHERE id = v_pb) = v_item THEN RAISE EXCEPTION 'paire à suffixe fusionnée d''office'; END IF;
 
+  -- (5) faux EAN « - » partagé (incident du 2026-10-25) : pas recopié sur l'article, jamais une clé de rapprochement
+  INSERT INTO majordhome.supplier_products (supplier_id, org_id, reference, name, brand, purchase_price_ht, code_ean)
+  SELECT CASE WHEN g % 2 = 0 THEN v_a ELSE v_b END, v_mayer, 'FAUX-EAN-' || g, 'Pièce sans EAN ' || g, 'Dinak', 10 + g, '-'
+  FROM generate_series(1, 12) g;
+  SET LOCAL ROLE service_role;
+  PERFORM public.catalog_items_ensure(v_mayer);
+  v_res := public.catalog_item_proposals_propose(v_mayer);
+  RESET ROLE;
+  SELECT count(*) INTO v_n FROM majordhome.catalog_items i JOIN majordhome.supplier_products p ON p.catalog_item_id = i.id
+  WHERE p.reference LIKE 'FAUX-EAN-%' AND i.code_ean IS NOT NULL;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'faux EAN recopié sur % article(s)', v_n; END IF;
+  SELECT count(DISTINCT p.catalog_item_id) INTO v_n FROM majordhome.supplier_products p WHERE p.reference LIKE 'FAUX-EAN-%';
+  IF v_n <> 12 THEN RAISE EXCEPTION 'faux EAN : % articles au lieu de 12 (rattachés par le tiret ?)', v_n; END IF;
+  IF EXISTS (SELECT 1 FROM majordhome.catalog_item_proposals WHERE motif LIKE 'code EAN -%') THEN RAISE EXCEPTION 'faux EAN proposé comme clé'; END IF;
+
   -- nettoyage
   DELETE FROM majordhome.catalog_item_proposals WHERE v_item IN (item_a_id, item_b_id) OR v_item2 IN (item_a_id, item_b_id);
   DELETE FROM majordhome.product_documents WHERE id = v_doc;
