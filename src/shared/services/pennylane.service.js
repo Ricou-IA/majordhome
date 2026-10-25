@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { withErrorHandling } from '@/lib/serviceHelpers';
 import { cleanPhone } from '@/lib/phoneUtils';
 import { logger } from '@/lib/logger';
+import { buildPennylaneQuotePayload, TVA_MAPPING, UNIT_MAPPING } from '@/lib/pennylaneQuotePayload.js';
 import { clientsService } from '@services/clients.service';
 
 // ============================================================================
@@ -64,12 +65,6 @@ function pLimit(concurrency) {
 // ⚠️ 5,5 % = `FR_55` chez Pennylane (relevé sur les articles et comptes réels de Mayer) —
 // `FR_055` (exemple de doc) est refusé en 400 « schema of invoice_lines ». Corrigé le
 // 2026-09-22 ; `FR_055` reste accepté en LECTURE au cas où un ancien devis l'aurait porté.
-const TVA_MAPPING = {
-  20: 'FR_200',
-  10: 'FR_100',
-  5.5: 'FR_55',
-  0: 'exempt',
-};
 
 const VAT_RATE_REVERSE = {
   FR_200: 20,
@@ -85,13 +80,6 @@ function parseVatRate(plRate) {
   return VAT_RATE_REVERSE[plRate] ?? null;
 }
 
-const UNIT_MAPPING = {
-  'pièce': 'piece',
-  'h': 'hour',
-  'forfait': 'flat_rate',
-  'ml': 'meter',
-  'm²': 'square_meter',
-};
 
 // ============================================================================
 // PROXY CALL — point d'entrée unique vers Pennylane
@@ -338,64 +326,9 @@ async function getOrCreateCustomer(client, orgId) {
 // DEVIS — push vers Pennylane quotes
 // ============================================================================
 
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
+// Corps du POST /quotes : module pur testé (schéma Pennylane strict, sections { title, rank }, remise de ligne)
 function buildPennylaneQuote(quote, lines, pennylaneCustomerId) {
-  // Extraire les sections (lignes de type section_title)
-  const sections = [];
-  const invoiceLines = [];
-  let currentSection = -1;
-
-  for (const line of lines) {
-    if (line.line_type === 'section_title') {
-      sections.push({ label: line.designation });
-      currentSection++;
-      continue;
-    }
-
-    invoiceLines.push({
-      label: line.designation,
-      description: line.description || undefined,
-      quantity: String(line.quantity),
-      unit: UNIT_MAPPING[line.unit] || 'piece',
-      raw_currency_unit_price: String(Number(line.unit_price_ht).toFixed(2)),
-      vat_rate: TVA_MAPPING[line.tva_rate] || 'FR_200',
-      section_rank: currentSection >= 0 ? currentSection : 0,
-      ledger_account_id: line.ledger_account_pl_id || undefined,
-      product_id: null,
-    });
-  }
-
-  const result = {
-    customer_id: pennylaneCustomerId,
-    date: new Date().toISOString().split('T')[0],
-    deadline: addDays(new Date(), quote.validity_days || 30).toISOString().split('T')[0],
-    currency: 'EUR',
-    language: 'fr_FR',
-    external_reference: quote.id,
-    pdf_invoice_subject: quote.subject || 'Devis',
-  };
-
-  if (sections.length > 0) {
-    result.invoice_line_sections = sections;
-  }
-  if (invoiceLines.length > 0) {
-    result.invoice_lines = invoiceLines;
-  }
-
-  // Remise globale
-  if (quote.global_discount_percent && quote.global_discount_percent > 0) {
-    result.discount = {
-      type: 'relative',
-      amount: String(Number(quote.global_discount_percent).toFixed(2)),
-    };
-  }
-
-  return result;
+  return buildPennylaneQuotePayload(quote, lines, pennylaneCustomerId);
 }
 
 /**
