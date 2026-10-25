@@ -13,26 +13,97 @@ export const DEFAULT_CONDITIONS = `- Devis valable pour la durée indiquée ci-d
 export const CATEGORIES_PRODUIT = Object.freeze(['poele', 'climatisation', 'chauffage', 'fumisterie', 'batterie', 'photovoltaique', 'borne_recharge']);
 
 /**
- * Familles d'installation par défaut (ex-QUOTE_TEMPLATE_FAMILIES + FAMILY_DEFAULT_SECTIONS).
- * `categories` = catégories produit où le « + » d'un chapitre pioche (vide = tous les fournisseurs). Une famille
- * peut en avoir plusieurs (2026-10-24) : un devis Photovoltaïque pioche aussi des batteries, et inversement.
- * Les réglages enregistrés avant cette date portent `categorie` (texte) : normalisé en `categories` à la lecture.
+ * Type d'un chapitre de devis (2026-10-25, décisions d'Eric) — ce que le « + » du chapitre propose :
+ *   equipement  : articles « équipement principal » des catégories de la famille (la borne, le poêle) ;
+ *   option      : articles « accessoire » des catégories de la famille (l'abri, le câble long) ;
+ *   stock       : matériel stocké, articles Mayer « par type », toutes familles (câble, disjoncteur) ;
+ *   main_oeuvre : articles internes de main d'œuvre (pose, mise en service) ;
+ *   libre       : saisie libre + tout le catalogue ;
+ *   fumisterie  : métré assisté + articles de la catégorie fumisterie.
+ */
+export const TYPES_CHAPITRE = Object.freeze(['equipement', 'option', 'stock', 'main_oeuvre', 'libre', 'fumisterie']);
+
+/** Taux de TVA proposés (la famille porte le sien, le devis peut le changer). */
+export const TAUX_TVA = Object.freeze([20, 10, 5.5, 0]);
+
+/** TVA par défaut d'une famille sans réglage : 5,5 % rénovation énergétique (poêles, PAC), 10 % sinon (à vérifier par org). */
+const TVA_DEFAUT_PAR_FAMILLE = Object.freeze({ poele_granules: 5.5, poele_bois: 5.5, chauffage_pac: 5.5 });
+const TVA_DEFAUT = 10;
+
+const CHAPITRES_EQUIPEMENT = Object.freeze([
+  ['ÉQUIPEMENT', 'equipement'], ['OPTIONS', 'option'], ['SÉCURITÉ ET ACCESSOIRES', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre'],
+]);
+const CHAPITRES_POELE = Object.freeze([
+  ['POÊLE', 'equipement'], ['OPTIONS', 'option'], ['FUMISTERIE', 'fumisterie'], ['SÉCURITÉ ET ACCESSOIRES', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre'],
+]);
+
+/** Famille par défaut figée : `chapitres` typés, `sections` = leurs titres (lecteurs historiques). */
+function familleDefaut(key, label, categories, chapitres) {
+  const ch = chapitres.map(([titre, type]) => Object.freeze({ titre, type }));
+  return Object.freeze({
+    key, label, actif: true, categories: Object.freeze([...categories]),
+    tva: TVA_DEFAUT_PAR_FAMILLE[key] ?? TVA_DEFAUT,
+    chapitres: Object.freeze(ch), sections: Object.freeze(ch.map((c) => c.titre)),
+  });
+}
+
+/**
+ * Familles d'installation par défaut. `categories` = catégories produit des chapitres Équipement / Option (vide =
+ * tout le catalogue) ; une famille peut en avoir plusieurs (2026-10-24 : un devis Photovoltaïque pioche aussi des
+ * batteries). Chapitres d'Eric (2026-10-25) : Équipement / Option / Sécurité et accessoire / Pose et mise en service ;
+ * les poêles gardent la fumisterie, le Photovoltaïque ses titres (dictés par Eric le 2026-10-24), typés.
+ * Réglages antérieurs : `categorie` (texte) ⇒ `categories` ; `sections` (titres seuls) ⇒ `chapitres` déduits.
  */
 export const DEFAULT_FAMILLES = Object.freeze([
-  Object.freeze({ key: 'poele_granules', label: 'Poêle à Granulé', actif: true, categories: Object.freeze(['poele']), sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'poele_bois', label: 'Poêle à Bois', actif: true, categories: Object.freeze(['poele']), sections: Object.freeze(['POÊLE', 'FUMISTERIE', 'ÉLÉMENTS SÉCURITÉ', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'climatisation', label: 'Climatisation', actif: true, categories: Object.freeze(['climatisation']), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'chauffage_pac', label: 'Chauffage/PAC', actif: true, categories: Object.freeze(['chauffage']), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
-  // Batterie de stockage (2026-10-24) : MATÉRIEL = ligne fourre-tout (câblage), MAIN D'ŒUVRE = pose et mise en service.
-  Object.freeze({ key: 'batterie', label: 'Batterie', actif: true, categories: Object.freeze(['batterie', 'photovoltaique']), sections: Object.freeze(['ÉQUIPEMENT', 'MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
-  // Photovoltaïque (2026-10-24) : chapitres dictés par Eric, « on corrigera après dans Majord'home ».
-  Object.freeze({ key: 'photovoltaique', label: 'Photovoltaïque', actif: true, categories: Object.freeze(['photovoltaique', 'batterie']), sections: Object.freeze(['PANNEAUX', 'ONDULEUR ET MONITORING', 'FIXATION', 'COFFRETS ET CÂBLAGE', 'MAIN D\'ŒUVRE']) }),
-  // Borne de recharge (2026-10-24, catalogue ECOSTAL / V2C) : même découpage que Climatisation.
-  Object.freeze({ key: 'borne_recharge', label: 'Borne de recharge', actif: true, categories: Object.freeze(['borne_recharge']), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'electricite', label: 'Electricité', actif: true, categories: Object.freeze([]), sections: Object.freeze(['MATÉRIEL', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'vmc', label: 'VMC', actif: true, categories: Object.freeze([]), sections: Object.freeze(['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']) }),
-  Object.freeze({ key: 'autre', label: 'Autre', actif: true, categories: Object.freeze([]), sections: Object.freeze(['PRESTATIONS', 'MAIN D\'ŒUVRE']) }),
+  familleDefaut('poele_granules', 'Poêle à Granulé', ['poele'], CHAPITRES_POELE),
+  familleDefaut('poele_bois', 'Poêle à Bois', ['poele'], CHAPITRES_POELE),
+  familleDefaut('climatisation', 'Climatisation', ['climatisation'], CHAPITRES_EQUIPEMENT),
+  familleDefaut('chauffage_pac', 'Chauffage/PAC', ['chauffage'], CHAPITRES_EQUIPEMENT),
+  familleDefaut('batterie', 'Batterie', ['batterie', 'photovoltaique'], CHAPITRES_EQUIPEMENT),
+  familleDefaut('photovoltaique', 'Photovoltaïque', ['photovoltaique', 'batterie'], [
+    ['PANNEAUX', 'equipement'], ['ONDULEUR ET MONITORING', 'equipement'], ['FIXATION', 'equipement'],
+    ['COFFRETS ET CÂBLAGE', 'stock'], ['MAIN D\'ŒUVRE', 'main_oeuvre'],
+  ]),
+  familleDefaut('borne_recharge', 'Borne de recharge', ['borne_recharge'], CHAPITRES_EQUIPEMENT),
+  familleDefaut('electricite', 'Electricité', [], [['MATÉRIEL', 'stock'], ['POSE ET MISE EN SERVICE', 'main_oeuvre']]),
+  familleDefaut('vmc', 'VMC', [], CHAPITRES_EQUIPEMENT),
+  familleDefaut('autre', 'Autre', [], [['PRESTATIONS', 'libre'], ['MAIN D\'ŒUVRE', 'main_oeuvre']]),
 ]);
+
+const sansAccent = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/œ/gi, 'oe').toLowerCase();
+
+/**
+ * Type d'un chapitre d'après son titre (familles enregistrées avant les types, chapitre ajouté à la main dans un devis).
+ * Ordre : main d'œuvre, stock (« sécurité et accessoires » est du stock), fumisterie, option, libre, équipement.
+ * @param {string} titre
+ * @returns {string}
+ */
+export function typeChapitreDeduit(titre) {
+  const t = sansAccent(titre);
+  if (/main\s*d\W?\s*oeuvre|\bpose\b|mise en service/.test(t)) return 'main_oeuvre';
+  if (/securite|materiel|cablage|coffret|raccord/.test(t)) return 'stock';
+  if (/fumisterie/.test(t)) return 'fumisterie';
+  if (/option|accessoire/.test(t)) return 'option';
+  if (/^\s*autre\b|prestation/.test(t)) return 'libre';
+  return 'equipement';
+}
+
+/** TVA d'une famille saisie : un taux de la liste (nombre ou chaîne), sinon le défaut de la famille. */
+function normaliserTva(v, key) {
+  const n = typeof v === 'string' ? Number(v.replace(',', '.')) : v;
+  return TAUX_TVA.includes(n) ? n : (TVA_DEFAUT_PAR_FAMILLE[key] ?? TVA_DEFAUT);
+}
+
+/** Chapitres d'une famille saisie : `chapitres` typés (type inconnu ⇒ déduit), sinon `sections` (titres) déduits. */
+function normaliserChapitres(f) {
+  const brut = Array.isArray(f.chapitres)
+    ? f.chapitres.map((c) => (estObjet(c) ? { titre: texte(c.titre, ''), type: c.type } : { titre: String(c ?? ''), type: null }))
+    : (Array.isArray(f.sections) ? f.sections.map((s) => ({ titre: String(s ?? ''), type: null })) : []);
+  return brut
+    .map((c) => ({ titre: c.titre.trim(), type: c.type }))
+    .filter((c) => c.titre)
+    .map((c) => ({ titre: c.titre, type: TYPES_CHAPITRE.includes(c.type) ? c.type : typeChapitreDeduit(c.titre) }));
+}
 
 export const DEFAULTS_DEVIS = Object.freeze({
   familles: DEFAULT_FAMILLES,
@@ -75,8 +146,11 @@ function normaliserFamille(f, i) {
   const label = texte(f.label, '').trim();
   const key = texte(f.key, '').trim() || slugFamille(label) || `famille_${i + 1}`;
   if (!label) return null;
-  const sections = Array.isArray(f.sections) ? f.sections.map((s) => String(s ?? '').trim()).filter(Boolean) : [];
-  return { key, label, actif: bool(f.actif, true), categories: normaliserCategories(f), sections };
+  const chapitres = normaliserChapitres(f);
+  return {
+    key, label, actif: bool(f.actif, true), categories: normaliserCategories(f), tva: normaliserTva(f.tva, key),
+    chapitres, sections: chapitres.map((c) => c.titre),
+  };
 }
 
 /** `categories` d'une famille saisie : tableau filtré sur les catégories connues ; `categorie` (texte, legacy) accepté. */
@@ -104,7 +178,9 @@ export function buildDevisConfig(settings) {
   const D = DEFAULTS_DEVIS;
   const validite = Number(d.validite_jours);
   return {
-    familles: familles.length ? familles : DEFAULT_FAMILLES.map((f) => ({ ...f, sections: [...f.sections] })),
+    familles: familles.length ? familles : DEFAULT_FAMILLES.map((f) => ({
+      ...f, categories: [...f.categories], chapitres: f.chapitres.map((c) => ({ ...c })), sections: [...f.sections],
+    })),
     document: {
       titre: texte(d.titre, D.document.titre).trim() || D.document.titre,
       intro: texte(d.intro, D.document.intro),
@@ -144,6 +220,22 @@ export function sectionsParDefaut(config, keyOuLabel) {
   return familleDe(config, keyOuLabel)?.sections?.slice() || [];
 }
 
+/**
+ * Type d'un chapitre d'un devis : celui du chapitre de même titre dans la famille (casse et espaces ignorés), sinon
+ * déduit du titre (chapitre ajouté ou renommé dans le devis).
+ * @returns {string}
+ */
+export function typeChapitre(config, keyOuLabel, titre) {
+  const t = String(titre || '').trim().toLowerCase();
+  const c = (familleDe(config, keyOuLabel)?.chapitres || []).find((x) => x.titre.trim().toLowerCase() === t);
+  return c?.type || typeChapitreDeduit(titre);
+}
+
+/** TVA par défaut d'une famille (celle du réglage, sinon 10 %). Le devis peut la changer. */
+export function tvaFamille(config, keyOuLabel) {
+  return familleDe(config, keyOuLabel)?.tva ?? TVA_DEFAUT;
+}
+
 const normaliserCategorie = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
@@ -174,7 +266,10 @@ export function validerDevisConfig(config) {
     if (!f?.key) erreurs.push(`${nom} : clé manquante`);
     if (f?.key && keys.has(f.key)) erreurs.push(`${nom} : clé en double`);
     if (f?.key) keys.add(f.key);
-    if (!Array.isArray(f?.sections) || f.sections.filter((s) => String(s).trim()).length === 0) erreurs.push(`${nom} : au moins un chapitre`);
+    const chapitres = Array.isArray(f?.chapitres) ? f.chapitres : (Array.isArray(f?.sections) ? f.sections.map((s) => ({ titre: s, type: typeChapitreDeduit(s) })) : []);
+    if (chapitres.filter((c) => String(c?.titre ?? '').trim()).length === 0) erreurs.push(`${nom} : au moins un chapitre`);
+    if (chapitres.some((c) => String(c?.titre ?? '').trim() && !TYPES_CHAPITRE.includes(c?.type))) erreurs.push(`${nom} : type de chapitre inconnu`);
+    if (f?.tva !== undefined && !TAUX_TVA.includes(Number(f.tva))) erreurs.push(`${nom} : TVA hors des taux proposés (20, 10, 5,5 ou 0 %)`);
     const cats = Array.isArray(f?.categories) ? f.categories : (f?.categorie != null ? [f.categorie] : []);
     if (cats.some((c) => !CATEGORIES_PRODUIT.includes(c))) erreurs.push(`${nom} : catégorie produit inconnue`);
   });

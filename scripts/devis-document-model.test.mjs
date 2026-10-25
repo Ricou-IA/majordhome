@@ -22,7 +22,8 @@ const quote = { quote_number: 'DEV-1', created_at: '2026-10-06T10:00:00Z', valid
 test('buildDevisConfig : défauts = comportement historique', () => {
   const c = buildDevisConfig(null);
   assert.deepEqual(c.familles.map((f) => f.label), DEFAULT_FAMILLES.map((f) => f.label));
-  assert.deepEqual(sectionsParDefaut(c, 'Climatisation'), ['ÉQUIPEMENT', 'ACCESSOIRES', 'MAIN D\'ŒUVRE']);
+  // chapitres d'Eric (2026-10-25) : Équipement / Option / Sécurité et accessoire / Pose et mise en service
+  assert.deepEqual(sectionsParDefaut(c, 'Climatisation'), ['ÉQUIPEMENT', 'OPTIONS', 'SÉCURITÉ ET ACCESSOIRES', 'POSE ET MISE EN SERVICE']);
   assert.equal(c.document.conditions, DEFAULT_CONDITIONS);
   assert.equal(c.document.validite_jours, 30);
   assert.equal(c.paiement.afficher, false);
@@ -36,7 +37,10 @@ test('buildDevisConfig : surcharge org, familles invalides ignorées, clés déd
     affichage: { references: false },
   } });
   assert.equal(c.familles.length, 1);
-  assert.deepEqual(c.familles[0], { key: 'pompe_a_chaleur', label: 'Pompe à chaleur', actif: true, categories: ['chauffage'], sections: ['PAC', 'POSE'] });
+  assert.deepEqual(c.familles[0], {
+    key: 'pompe_a_chaleur', label: 'Pompe à chaleur', actif: true, categories: ['chauffage'], tva: 10,
+    chapitres: [{ titre: 'PAC', type: 'equipement' }, { titre: 'POSE', type: 'main_oeuvre' }], sections: ['PAC', 'POSE'],
+  });
   assert.equal(c.document.titre, 'DEVIS');
   assert.equal(c.document.validite_jours, 30);
   assert.equal(c.document.intro, 'Bonjour');
