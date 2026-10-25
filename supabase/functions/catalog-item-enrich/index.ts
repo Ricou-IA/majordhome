@@ -14,7 +14,7 @@
 // Toutes les écritures passent par le JETON DE L'UTILISATEUR (RLS org_admin des articles, policies storage par org) :
 // le rôle serveur n'a d'ailleurs pas le droit de modifier majordhome.catalog_items. Téléchargements bornés : URL
 // publiques seulement (pas d'IP, pas de nom local), redirections revérifiées, taille plafonnée.
-// Env : ANTHROPIC_API_KEY, ANTHROPIC_ENRICH_MODEL (défaut claude-opus-5-5), SUPABASE_URL, SUPABASE_ANON_KEY.
+// Env : ANTHROPIC_API_KEY, ANTHROPIC_ENRICH_MODEL (défaut claude-sonnet-5-5 : ~0,29 $ par recherche mesuré en Opus 5.5, décision Eric 2026-10-25), SUPABASE_URL, SUPABASE_ANON_KEY.
 // ============================================================================
 
 import Anthropic from "npm:@anthropic-ai/sdk@1.3.0";
@@ -25,7 +25,7 @@ import {
 } from "../_shared/catalogue/enrichissement.js";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
-const MODEL = Deno.env.get("ANTHROPIC_ENRICH_MODEL") || "claude-opus-5-5";
+const MODEL = Deno.env.get("ANTHROPIC_ENRICH_MODEL") || "claude-sonnet-5-5";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
