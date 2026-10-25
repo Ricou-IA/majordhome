@@ -126,6 +126,35 @@ export function actionCatalogue(ligne, produit, dateOffre) {
   };
 }
 
+/**
+ * Ce qu'un import d'offre DANS UN DEVIS enregistre au catalogue du fournisseur (retour d'Eric 2026-10-25 : « l'offre
+ * fournisseur est un prix d'achat, c'est important pour le listing produit »). Chaque ligne incluse et rapprochée
+ * (article reconnu, suggestion choisie ou article à créer) écrit sa référence et son prix d'achat chez le fournisseur ;
+ * la ligne qui n'existait pas encore chez lui est rattachée à l'article choisi (l'article gagne l'offre). Une ligne
+ * déjà connue n'est jamais déplacée d'article depuis un devis. Restent hors catalogue : la ligne libre (choix explicite),
+ * la ligne sans référence ou sans prix, le prix inchangé et le prix connu plus récent que l'offre (actionCatalogue).
+ * @param {Array<{ ligne: Record<string, any>, rap: ReturnType<typeof rapprocherLigne>, choix: { type: string, itemId?: string }, nature: string }>} rows lignes incluses
+ * @param {string|null} dateOffre AAAA-MM-JJ
+ * @returns {{ aEcrire: Array<{ ligne: Record<string, any>, nature: string }>, aRattacher: Array<{ reference: string, itemId: string }>,
+ *   ignorees: Array<{ ligne: Record<string, any>, raison: string }> }}
+ */
+export function planCatalogueDevis(rows, dateOffre) {
+  const aEcrire = [];
+  const aRattacher = [];
+  const ignorees = [];
+  for (const r of rows || []) {
+    const reference = referenceLigne(r.ligne);
+    if (r.choix?.type === 'libre') { ignorees.push({ ligne: r.ligne, raison: 'ligne libre' }); continue; }
+    if (!reference || !(nombreFr(r.ligne.prix_unitaire_net) > 0)) { ignorees.push({ ligne: r.ligne, raison: 'sans référence ou sans prix' }); continue; }
+    const a = actionCatalogue(r.ligne, r.rap?.produit || null, dateOffre);
+    if (a.action === 'identique') { ignorees.push({ ligne: r.ligne, raison: 'prix inchangé' }); continue; }
+    if (!a.coche) { ignorees.push({ ligne: r.ligne, raison: a.avertissement || 'prix non retenu' }); continue; }
+    aEcrire.push({ ligne: r.ligne, nature: r.nature });
+    if (r.choix?.type === 'article' && r.choix.itemId && !r.rap?.produit) aRattacher.push({ reference, itemId: r.choix.itemId });
+  }
+  return { aEcrire, aRattacher, ignorees };
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Lignes de devis et chapitres
 // ---------------------------------------------------------------------------------------------------------------
