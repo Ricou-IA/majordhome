@@ -90,7 +90,7 @@ export const catalogItemsService = {
   async getItemsResume(orgId, ids = []) {
     try {
       if (!orgId || !ids.length) return { data: [], error: null };
-      const { data, error } = await supabase.from('majordhome_catalog_items_list').select('id, name, offres_total')
+      const { data, error } = await supabase.from('majordhome_catalog_items_list').select('id, name, offres_total, image_url, fournisseurs')
         .eq('org_id', orgId).in('id', ids.slice(0, 150));
       if (error) throw error;
       return { data: data || [], error: null };

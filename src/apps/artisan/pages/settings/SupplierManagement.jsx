@@ -36,6 +36,8 @@ import { ProductDocumentsPanel } from './ProductDocumentsPanel';
 import ProductDetailDrawer from './ProductDetailDrawer';
 import CatalogConnectorPanel from './suppliers/CatalogConnectorPanel';
 import ImportOffreCatalogueModal from './suppliers/ImportOffreCatalogueModal';
+import { useCatalogItemsResume } from '@hooks/useCatalogItems';
+import { photoDeLigne, autresFournisseurs } from '@/lib/catalogue/articleLigne.js';
 
 // =============================================================================
 // MODAL FOURNISSEUR
@@ -527,6 +529,8 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
   const pageSize = 50;
 
   const { products, totalCount, isLoading, refetch } = useSupplierProducts(supplier.id, { search: debouncedSearch, kind: kindFilter, brand: brandFilter || null, gamme: gammeFilter || null, page, pageSize });
+  // l'enrichissement vit sur l'ARTICLE (photo, autres fournisseurs) : la fiche le lit (retour d'Eric 2026-10-25)
+  const { articles } = useCatalogItemsResume(orgId, products.map((p) => p.catalog_item_id));
   const { brands } = useSupplierBrands(orgId, supplier.id);
   const { gammes } = useSupplierGammes(orgId, supplier.id);
   // Compteurs par type (rapide : COUNT séparé)
@@ -791,8 +795,8 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
                   <td className="py-2 pr-3 text-secondary-500 text-xs">{product.code_famille || '—'}</td>
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-2">
-                      {product.image_url ? (
-                        <img src={product.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 bg-secondary-100" />
+                      {photoDeLigne(product, articles.get(product.catalog_item_id)) ? (
+                        <img src={photoDeLigne(product, articles.get(product.catalog_item_id))} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 bg-secondary-100" />
                       ) : (
                         <div className="w-8 h-8 rounded bg-secondary-100 flex-shrink-0" />
                       )}
@@ -811,6 +815,15 @@ function ProductCatalog({ supplier, orgId, onBack, onEditSupplier }) {
                           )}
                         </div>
                         {product.gamme && <div className="text-xs text-secondary-400">{product.gamme}</div>}
+                        {(() => {
+                          const autres = autresFournisseurs(articles.get(product.catalog_item_id)?.fournisseurs, supplier.name);
+                          return autres.length > 0 ? (
+                            <Link to={`/settings/suppliers/articles?item=${product.catalog_item_id}`} onClick={(e) => e.stopPropagation()}
+                              className="text-[11px] text-primary-700 hover:underline" title="Même article chez d'autres fournisseurs : ouvrir l'article">
+                              aussi chez {autres.join(', ')}
+                            </Link>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </td>
