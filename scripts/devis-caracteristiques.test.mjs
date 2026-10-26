@@ -102,3 +102,15 @@ test('article sans specs : tableau vide, pas d\'exception', () => {
   assert.deepEqual(lignesCaracteristiques(null, []), []);
   assert.deepEqual(lignesCaracteristiques({ specs: { canonical: null, extras: null } }, undefined), []);
 });
+
+test('figerCaracteristiques : une Map (retour du hook) fige la ligne comme un objet', () => {
+  const champs = [{ key: 'power_nominal_kw', label: 'Puissance nominale', unit: 'kW', type: 'number' }];
+  const articles = new Map([['a1', { id: 'a1', category: 'poele', specs: { canonical: { power_nominal_kw: 8 } } }]]);
+  const out = figerCaracteristiques(
+    [{ id: 'l1', show_specs: true, catalog_item_id: 'a1' }, { id: 'l2', show_specs: true, catalog_item_id: 'inconnu' }],
+    articles,
+    (cat) => (cat === 'poele' ? champs : []),
+  );
+  assert.deepEqual(out[0].caracteristiques, ['Puissance nominale : 8 kW']);
+  assert.deepEqual(out[1].caracteristiques, []);
+});

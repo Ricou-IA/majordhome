@@ -105,7 +105,6 @@ const ALLOW_ORPHAN = new Set([
   'src/lib/catalogue/woocommerce.js',
   'src/lib/catalogue/modelKey.js',
   'src/lib/catalogue/mapping.js',
-  'src/lib/devisCaracteristiques.js', // TEMPORAIRE (plan devis 2026-10-26, tâche 3) : module pur testé, branché par les tâches suivantes (modèle de document, éditeur) — retirer cette ligne dès le 1er import
 ]);
 
 const allFiles = walk(SRC);

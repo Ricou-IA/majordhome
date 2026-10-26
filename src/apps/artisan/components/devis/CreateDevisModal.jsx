@@ -14,6 +14,9 @@ import { buildDevisConfig, famillesActives, familleDepuisEquipement, typeChapitr
 import { reclasserDansSections } from '@/lib/devisOrdre.js';
 import { useDevisMutations } from '@hooks/useDevis';
 import { useFumMetreMutations } from '@hooks/useFumisterie';
+import { useCatalogItemsSpecs } from '@hooks/useCatalogItems';
+import { figerCaracteristiques } from '@/lib/devisCaracteristiques.js';
+import { canonicalFieldsForCategory } from '@/shared/specs';
 import { devisService, buildDefaultSections, computeQuoteTotals, margeFournitures } from '@services/devis.service';
 import { logger } from '@lib/logger';
 import { formatEuro } from '@/lib/utils';
@@ -80,6 +83,13 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
   const totals = useMemo(() => computeQuoteTotals(lines, form.globalDiscountPercent), [lines, form.globalDiscountPercent]);
   const marge = useMemo(() => margeFournitures(lines), [lines]);
 
+  // Caractéristiques des articles posés : lues à l'enregistrement pour être FIGÉES sur les lignes cochées
+  const idsArticles = useMemo(() => lines.map((l) => l.catalog_item_id).filter(Boolean), [lines]);
+  const { articles, isLoading: specsEnChargement, error: specsErreur } = useCatalogItemsSpecs(orgId, idsArticles);
+  const specsAFiger = useMemo(() => lines.some((l) => l.show_specs === true && l.catalog_item_id), [lines]);
+  // Sans les articles, le figeage viderait les caractéristiques déjà enregistrées : on n'enregistre pas à l'aveugle
+  const specsIndisponibles = specsAFiger && (specsEnChargement || !!specsErreur);
+
   const applyTemplate = useCallback((template) => {
     if (!template) return;
     const parsedLines = typeof template.lines === 'string' ? JSON.parse(template.lines) : template.lines;
@@ -126,7 +136,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
     else { clearTemplate(); if (selectedFamily) setLines(buildDefaultSections(selectedFamily, devisConfig)); }
   };
 
-  const handleSaveEdition = async () => {
+  const handleSaveEdition = async (lignes) => {
     const q = devisAModifier.quote;
     setEnregistrement(true);
     try {
@@ -135,7 +145,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         commentaire: form.commentaire || null, notesInternes: form.notesInternes || null,
         globalDiscountPercent: parseFloat(form.globalDiscountPercent) || 0,
       });
-      await upsertLines(q.id, lines, parseFloat(form.globalDiscountPercent) || 0);
+      await upsertLines(q.id, lignes, parseFloat(form.globalDiscountPercent) || 0);
       if (metre) {
         try { await saveMetre({ ...metre, quoteId: q.id, createdBy: user?.id }); }
         catch (err) { logger.error('[CreateDevisModal] saveMetre', err); toast.warning('Devis enregistré, mais le relevé de métré n\x27a pas pu être enregistré'); }
@@ -152,7 +162,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
   const handleCreate = async () => {
     if (nbLignes === 0) { toast.error('Ajoutez au moins une ligne de devis'); return; }
-    if (edition) { await handleSaveEdition(); return; }
+    if (specsIndisponibles) { toast.error(specsErreur ? 'Caractéristiques des articles illisibles : réessayez dans un instant' : 'Caractéristiques des articles en cours de chargement : réessayez dans un instant'); return; }
+    const figees = figerCaracteristiques(lines, articles, canonicalFieldsForCategory);
+    if (edition) { await handleSaveEdition(figees); return; }
     try {
       const created = await createQuote({
         orgId,
@@ -164,7 +176,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         commentaire: form.commentaire || null,
         notesInternes: form.notesInternes || null,
         globalDiscountPercent: parseFloat(form.globalDiscountPercent) || 0,
-        lines,
+        lines: figees,
         createdBy: user?.id,
       });
       // Le devis existe quoi qu'il arrive : l'échec du métré est signalé, jamais avalé
@@ -192,7 +204,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <DevisEntete lead={lead} form={form} setField={setField} selectedFamily={selectedFamily} onSelectFamily={handleSelectFamily}
             templates={templates} selectedTemplateId={selectedTemplateId} onSelectTemplate={handleSelectTemplate} familles={famillesActives(devisConfig).map((f) => f.label)} onImportOffre={() => setImportOffre(true)} />
-          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} />
+          <DevisStepLines orgId={orgId} lines={lines} setLines={setLines} leadId={lead?.id} family={selectedFamily} onMetreValidated={setMetre} devisConfig={devisConfig} importOffreOuvert={importOffre} onFermerImportOffre={() => setImportOffre(false)} articles={articles} />
           {nbLignes > 0 && <DevisConditions form={form} setField={setField} lines={lines} devisConfig={devisConfig} />}
         </div>
 

@@ -90,18 +90,28 @@ export function lignesCaracteristiques(article, champs = []) {
 }
 
 /**
+ * Article d'un id, que la source soit une Map ou un objet.
+ * @param {Map<string, object> | Record<string, object> | null | undefined} source
+ * @param {string} id
+ * @returns {any}
+ */
+function articleDe(source, id) {
+  return source instanceof Map ? source.get(id) : source?.[id];
+}
+
+/**
  * Fige les caractéristiques sur les lignes d'un devis : seules les lignes cochées (`show_specs === true`)
  * rattachées à un article connu reçoivent leurs lignes de texte, les autres `caracteristiques: []`.
  * Renvoie de NOUVEAUX objets de ligne (aucune mutation).
  * @template {{ show_specs?: boolean, catalog_item_id?: string | null }} L
  * @param {L[]} lines
- * @param {Record<string, { category?: string, specs?: object }>} articlesParId
+ * @param {Map<string, { category?: string, specs?: object }> | Record<string, { category?: string, specs?: object }>} articlesParId Map (retour du hook) ou objet indexé par id
  * @param {(category: string | undefined) => Array<{ key: string, label?: string, unit?: string | null, type?: string, options?: Array<string | { value: string, label?: string }> }>} champsParCategorie
  * @returns {Array<L & { caracteristiques: string[] }>}
  */
 export function figerCaracteristiques(lines, articlesParId, champsParCategorie) {
   return (lines || []).map((ligne) => {
-    const article = ligne.show_specs === true && ligne.catalog_item_id ? articlesParId?.[ligne.catalog_item_id] : null;
+    const article = ligne.show_specs === true && ligne.catalog_item_id ? articleDe(articlesParId, ligne.catalog_item_id) : null;
     const caracteristiques = article ? lignesCaracteristiques(article, champsParCategorie(article.category)) : [];
     return { ...ligne, caracteristiques };
   });

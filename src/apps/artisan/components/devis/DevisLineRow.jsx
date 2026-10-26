@@ -6,23 +6,28 @@
  * Ligne libre sans article : bouton « créer l'article » (org_admin) qui la range dans la base d'articles.
  * Une ligne posée depuis un article de stock à plusieurs marques porte un sélecteur de marque : la marque se choisit
  * dans le devis (décision d'Eric, 2026-10-25), le prix d'achat suit la marque (module pur marqueLigne.js).
+ * Description libre imprimée sous la ligne ; pour une ligne reliée à un article, coche « Caractéristiques » (nombre de
+ * lignes fournies par le parent) : les lignes de texte sont figées à l'enregistrement du devis (CreateDevisModal).
  * ============================================================================
  */
 
+import { useState } from 'react';
 import { TVA_RATES, computeLineTotals } from '@services/devis.service';
 import { formatEuro } from '@/lib/utils';
-import { GripVertical, Trash2, BookmarkPlus, Loader2 } from 'lucide-react';
+import { GripVertical, Trash2, BookmarkPlus, Loader2, AlignLeft, Pencil } from 'lucide-react';
 
 /**
  * @param {{ line: object, index: number, onUpdate: Function, onRemove: Function, poignee?: object,
  *   marques?: Array<{ marque: string, prix: number|null }>, onMarque?: (marque: string) => void,
- *   onCreerArticle?: () => void, creationEnCours?: boolean }} p
+ *   onCreerArticle?: () => void, creationEnCours?: boolean, nbCaracteristiques?: number, onEditerArticle?: () => void }} p
  */
-export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee, marques = [], onMarque, onCreerArticle, creationEnCours = false }) {
+export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee, marques = [], onMarque, onCreerArticle, creationEnCours = false, nbCaracteristiques = 0, onEditerArticle }) {
+  const [descriptionOuverte, setDescriptionOuverte] = useState(false);
   const setLineField = (field, value) => onUpdate(index, { ...line, [field]: value });
   const lineTotals = computeLineTotals(line);
   const editable = line.is_freeform || line.line_type === 'labor';
   const choixMarque = marques.length >= 2 && onMarque;
+  const afficherDescription = descriptionOuverte || !!line.description;
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 ml-4 border border-secondary-200 rounded-lg bg-white">
@@ -65,6 +70,28 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
               </div>
             )}
           </>
+        )}
+        {afficherDescription && (
+          <textarea
+            rows={2}
+            value={line.description || ''}
+            onChange={(e) => setLineField('description', e.target.value)}
+            placeholder="Description imprimée sous la ligne…"
+            className="w-full mt-1 text-xs border border-secondary-200 rounded px-2 py-1"
+          />
+        )}
+        {line.catalog_item_id && (
+          <div className={`flex items-center gap-1.5 mt-0.5 text-[10px] text-secondary-500 ${nbCaracteristiques === 0 ? 'opacity-50' : ''}`}>
+            <label className="flex items-center gap-1 cursor-pointer" title={nbCaracteristiques === 0 ? 'Aucune caractéristique renseignée sur l’article' : 'Imprimer les caractéristiques de l’article sous la ligne'}>
+              <input type="checkbox" checked={line.show_specs === true} onChange={(e) => setLineField('show_specs', e.target.checked)} className="rounded border-secondary-300" />
+              {nbCaracteristiques} caract.
+            </label>
+            {onEditerArticle && (
+              <button type="button" onClick={onEditerArticle} className="p-0.5 hover:bg-secondary-100 rounded" title="Modifier les caractéristiques de l’article">
+                <Pencil className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </div>
         )}
       </div>
       {/* Qté */}
@@ -112,7 +139,12 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
         {formatEuro(lineTotals.total_ttc)}
       </span>
       {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0 w-[40px] justify-end">
+      <div className="flex gap-0.5 flex-shrink-0 w-[64px] justify-end">
+        {!afficherDescription && (
+          <button type="button" onClick={() => setDescriptionOuverte(true)} className="p-0.5 hover:bg-secondary-100 rounded" title="Ajouter une description imprimée sous la ligne">
+            <AlignLeft className="w-3 h-3 text-secondary-400" />
+          </button>
+        )}
         {onCreerArticle && (
           <button type="button" onClick={onCreerArticle} disabled={creationEnCours} className="p-0.5 hover:bg-primary-50 rounded disabled:opacity-40" title="Créer l'article dans la base (ligne libre)">
             {creationEnCours ? <Loader2 className="w-3 h-3 animate-spin text-primary-600" /> : <BookmarkPlus className="w-3 h-3 text-primary-600" />}

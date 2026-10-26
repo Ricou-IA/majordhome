@@ -93,6 +93,9 @@ export default function DevisProductPicker({ orgId, categories = [], typeChapitr
     purchase_price_ht: it.meilleur_prix_achat != null ? Number(it.meilleur_prix_achat) : null,
     unit_price_ht: Number(it.selling_price_ht) || 0,
     tva_rate: Number(tvaDevis),
+    // caractéristiques imprimées par défaut pour un équipement ; le texte est figé à l'enregistrement du devis
+    show_specs: typeChapitre === 'equipement',
+    caracteristiques: [],
   });
 
   const handleConfirm = () => {

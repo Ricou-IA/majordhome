@@ -200,6 +200,8 @@ export default function DevisModal({ quoteId, leadId, onClose, onStatusChange, o
         supplier_name: l.supplier_name || null,
         designation: l.designation,
         description: l.description || '',
+        show_specs: l.show_specs === true,
+        hide_prices: l.hide_prices === true,
         reference: l.reference || '',
         quantity: l.quantity,
         unit: l.unit || 'pièce',

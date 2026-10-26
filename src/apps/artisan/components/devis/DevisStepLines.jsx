@@ -9,6 +9,7 @@
  * - Remise par ligne (%) ; glisser-déposer des lignes (poignée, entre chapitres) et des chapitres (devisOrdre.js)
  * - Lignes libres sans article : création de l'article à la ligne ou en lot (org_admin, natures.js)
  * - « Importer une offre fournisseur » : lignes d'une offre PDF rangées dans les chapitres par nature (ImportOffreDevisModal)
+ * - Coche « Caractéristiques » par ligne d'article (compteur calculé ici, une fois pour tout l'écran) et description libre
  * - Totaux en temps réel
  * ============================================================================
  */
@@ -17,6 +18,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { computeLineTotals, productCategoriesForSection } from '@services/devis.service';
 import { typeChapitre, tvaDuDevis, TAUX_TVA } from '@/lib/devisConfig.js';
 import { marquesDesOffres, appliquerMarque } from '@/lib/catalogue/marqueLigne.js';
+import { lignesCaracteristiques } from '@/lib/devisCaracteristiques.js';
+import { canonicalFieldsForCategory } from '@/shared/specs';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { useAuth } from '@contexts/AuthContext';
@@ -34,13 +37,16 @@ import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus } f
 const TYPE_LABELS = {
   equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
 };
+// Références stables : une valeur par défaut recréée à chaque rendu relancerait les useMemo qui en dépendent
+const AUCUN_ARTICLE = new Map();
+const AUCUN_COMPTE = new Map();
 
 
 // =============================================================================
 // BLOC CHAPITRE (titre + lignes enfants + boutons d'ajout)
 // =============================================================================
 
-function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poigneeChapitre, onUpdate, onRemove, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, onMarque, onCreerArticle, creationIndex }) {
+function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poigneeChapitre, onUpdate, onRemove, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, nbParItem, onMarque, onCreerArticle, creationIndex }) {
   const productCount = childLines.length;
   const sectionTotalTtc = childLines.reduce((sum, { line }) => sum + (computeLineTotals(line).total_ttc || 0), 0);
   const btn = 'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors';
@@ -89,7 +95,7 @@ function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poig
       <div className="p-2 space-y-1">
         {childLines.length > 0 && <EnTeteLignes />}
         <ListeLignes droppableId={`bloc-${blocIndex}`} childLines={childLines} type={type} onUpdate={onUpdate} onRemove={onRemove}
-          marquesParItem={marquesParItem} onMarque={onMarque} onCreerArticle={onCreerArticle} creationIndex={creationIndex} />
+          marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={onMarque} onCreerArticle={onCreerArticle} creationIndex={creationIndex} />
       </div>
 
       {/* Ajouts */}
@@ -120,13 +126,13 @@ function EnTeteLignes() {
       <span className="w-12 text-right flex-shrink-0">Rem. %</span>
       <span className="w-14 text-center flex-shrink-0">TVA</span>
       <span className="w-[4.5rem] text-right flex-shrink-0">Total TTC</span>
-      <span className="w-[40px] flex-shrink-0" />
+      <span className="w-[64px] flex-shrink-0" />
     </div>
   );
 }
 
 /** Lignes d'un bloc, déplaçables à la poignée (dans le bloc ou vers un autre bloc). */
-function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marquesParItem, onMarque, onCreerArticle, creationIndex }) {
+function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marquesParItem, nbParItem, onMarque, onCreerArticle, creationIndex }) {
   return (
     <Droppable droppableId={droppableId} type="LIGNE">
       {(drop, etat) => (
@@ -146,6 +152,7 @@ function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marque
                     onCreerArticle={onCreerArticle && (line.is_freeform || line.line_type === 'labor') && !line.catalog_item_id && String(line.designation || '').trim()
                       ? () => onCreerArticle(globalIndex, type) : undefined}
                     creationEnCours={creationIndex === globalIndex}
+                    nbCaracteristiques={line.catalog_item_id ? (nbParItem.get(line.catalog_item_id) || 0) : 0}
                   />
                 </div>
               )}
@@ -162,7 +169,7 @@ function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marque
 // COMPOSANT PRINCIPAL
 // =============================================================================
 
-export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig, importOffreOuvert = false, onFermerImportOffre }) {
+export default function DevisStepLines({ orgId, lines, setLines, leadId, family, onMetreValidated, devisConfig, importOffreOuvert = false, onFermerImportOffre, articles = AUCUN_ARTICLE }) {
   const [pickerForSection, setPickerForSection] = useState(null); // { index, categories, type }
   const [metreForSection, setMetreForSection] = useState(null); // index global de la section FUMISTERIE
   // TVA du devis DÉRIVÉE à chaque rendu (tvaDuDevis) : les lignes chiffrées font foi (devis repris, devis type chargé) ;
@@ -190,6 +197,14 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     for (const [id, os] of offresParItem) m.set(id, marquesDesOffres(os));
     return m;
   }, [offresParItem]);
+
+  // Nombre de caractéristiques imprimables par article (le schéma est celui de la catégorie de l'article)
+  const nbParItem = useMemo(() => {
+    if (articles.size === 0) return AUCUN_COMPTE;
+    const m = new Map();
+    for (const [id, article] of articles) m.set(id, lignesCaracteristiques(article, canonicalFieldsForCategory(article.category)).length);
+    return m;
+  }, [articles]);
 
   const updateLine = useCallback((index, updatedLine) => {
     setLines((prev) => prev.map((l, i) => (i === index ? updatedLine : l)));
@@ -312,7 +327,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
 
   const ligneVide = (extra) => ({
     catalog_item_id: null, brand: null, supplier_product_id: null, supplier_id: null, supplier_name: null,
-    designation: '', description: '', reference: '', quantity: 1, purchase_price_ht: null, unit_price_ht: 0, tva_rate: tvaDevis, ...extra,
+    designation: '', description: '', reference: '', quantity: 1, purchase_price_ht: null, unit_price_ht: 0, tva_rate: tvaDevis,
+    show_specs: false, caracteristiques: [], ...extra,
   });
 
   // Ligne de main d'œuvre saisie à la main
@@ -375,7 +391,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
             {/* lignes avant le premier chapitre (bloc sans titre, toujours en tête) */}
             {sections[0] && !sections[0].section && (
               <ListeLignes droppableId="bloc-0" childLines={sections[0].children} type="libre" onUpdate={updateLine} onRemove={removeLine}
-                marquesParItem={marquesParItem} onMarque={changerMarque} onCreerArticle={isOrgAdmin ? creerArticle : undefined} creationIndex={creationIndex} />
+                marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={changerMarque} onCreerArticle={isOrgAdmin ? creerArticle : undefined} creationIndex={creationIndex} />
             )}
             <Droppable droppableId="chapitres" type="CHAPITRE">
               {(drop) => (
@@ -400,6 +416,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                               onAddFreeform={addFreeformToSection}
                               onMetre={setMetreForSection}
                               marquesParItem={marquesParItem}
+                              nbParItem={nbParItem}
                               onMarque={changerMarque}
                               onCreerArticle={isOrgAdmin ? creerArticle : undefined}
                               creationIndex={creationIndex}
