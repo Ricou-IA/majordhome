@@ -117,7 +117,7 @@ function DevisDocument({ model: m }) {
             {c.titre ? (
               <View style={s.sectionRow}>
                 <Text>{c.titre}</Text>
-                {!col.detail ? <Text>{c.sous_total}</Text> : null}
+                {(!col.detail || c.prix_masques) ? <Text>{c.sous_total}</Text> : null}
               </View>
             ) : null}
             {c.lignes.map((l, i) => (

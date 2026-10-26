@@ -7,6 +7,8 @@ import {
   DEFAULTS_DEVIS, DEFAULT_FAMILLES, DEFAULT_CONDITIONS, buildDevisConfig, famillesActives, familleDe, sectionsParDefaut,
   categoriesPourSection, validerDevisConfig, slugFamille,
 } from '../src/lib/devisConfig.js';
+import { computeQuoteTotals } from '../src/lib/devisCalculs.js';
+import { fmtEur } from '../src/lib/invoiceDocumentModel.js';
 import { buildDevisDocumentModel, exempleDevis, chapitres, fmtDateLongue, fmtQte, fmtTaux, ZONES } from '../src/lib/devisDocumentModel.js';
 
 const company = { name: 'Chauffage Test', address: '1 rue du Four', postalCode: '81000', city: 'Albi', phone: '05 00 00 00 00', email: 'contact@test.fr', siret: '123', tvaIntra: 'FR00', logoUrl: 'https://x/logo.png', accentColor: '#112233', rgeCertifications: [] };
@@ -184,4 +186,48 @@ test('buildDevisDocumentModel : colonne remise affichée seulement si une ligne 
   assert.equal(m.tableau.chapitres[0].sous_total, '110,00 €');
   const sans = buildDevisDocumentModel({ quote, lines, totals, company, config: buildDevisConfig({}) });
   assert.equal(sans.tableau.colonnes.remise, false);
+});
+
+const lignesChapitreMasque = () => [
+  { line_type: 'section_title', designation: 'FUMISTERIE', hide_prices: true },
+  { line_type: 'product', designation: 'Conduit', quantity: 2, unit: 'pièce', unit_price_ht: 100, tva_rate: 20, total_ht: 200 },
+  { line_type: 'section_title', designation: 'POÊLE' },
+  { line_type: 'product', designation: 'Poêle', quantity: 1, unit: 'pièce', unit_price_ht: 2500, tva_rate: 5.5, total_ht: 2500 },
+];
+
+test('chapitre à prix masqués : lignes sans prix, sous-total conservé, totaux du devis inchangés', () => {
+  const ls = lignesChapitreMasque();
+  const tot = computeQuoteTotals(ls, 0);
+  const m = buildDevisDocumentModel({ quote: {}, lines: ls, totals: tot, company: {} });
+  assert.equal(m.tableau.chapitres[0].prix_masques, true);
+  assert.equal(m.tableau.chapitres[1].prix_masques, false);
+  const l0 = m.tableau.chapitres[0].lignes[0];
+  assert.deepEqual([l0.prix_unitaire, l0.remise, l0.total], ['', '', '']);
+  assert.equal(l0.designation, 'Conduit');
+  assert.equal(m.tableau.chapitres[0].sous_total, '200,00 €');
+  assert.equal(m.tableau.chapitres[1].lignes[0].total, '2 500,00 €');
+  assert.equal(m.totaux.lignes.at(-1).valeur, fmtEur(tot.total_ttc));
+});
+
+test('chapitre masqué + affichage.prix_unitaires faux : sous-total une seule fois, pas d\'exception', () => {
+  const ls = lignesChapitreMasque();
+  const config = buildDevisConfig({ devis: { affichage: { prix_unitaires: false } } });
+  const m = buildDevisDocumentModel({ quote: {}, lines: ls, totals: computeQuoteTotals(ls, 0), company: {}, config });
+  const c = m.tableau.chapitres[0];
+  assert.equal(c.prix_masques, true);
+  assert.equal(c.lignes.length, 1);
+  assert.equal(c.lignes[0].prix_unitaire, '');
+  assert.equal(c.lignes[0].total, '');
+  assert.equal(c.sous_total, '200,00 €');
+  // une seule occurrence du sous-total dans le chapitre (titre) : aucune ligne ne le porte
+  assert.equal(c.lignes.filter((l) => l.total === c.sous_total).length, 0);
+});
+
+test('chapitres() : prix_masques porté par la ligne de titre, faux pour le chapitre sans titre', () => {
+  const r = chapitres([
+    { line_type: 'product', designation: 'Orpheline', quantity: 1, unit_price_ht: 10, tva_rate: 20 },
+    { line_type: 'section_title', designation: 'A', hide_prices: true },
+    { line_type: 'section_title', designation: 'B', hide_prices: false },
+  ]);
+  assert.deepEqual(r.map((c) => c.prix_masques), [false, true, false]);
 });

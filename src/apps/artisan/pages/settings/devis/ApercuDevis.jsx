@@ -93,7 +93,7 @@ export default function ApercuDevis({ model: m, zoneActive, onZoneClick }) {
             {c.titre && (
               <div className="flex justify-between bg-secondary-100 text-secondary-500 font-bold uppercase tracking-wider text-[10px] px-2 py-1.5">
                 <span>{c.titre}</span>
-                {!col.detail && <span>{c.sous_total}</span>}
+                {(!col.detail || c.prix_masques) && <span>{c.sous_total}</span>}
               </div>
             )}
             {c.lignes.map((l, i) => (

@@ -73,8 +73,8 @@ export function chapitres(lines) {
   const out = [];
   let courant = null;
   for (const l of lines || []) {
-    if (l.line_type === 'section_title') { courant = { titre: l.designation || '', lignes: [] }; out.push(courant); continue; }
-    if (!courant) { courant = { titre: '', lignes: [] }; out.push(courant); }
+    if (l.line_type === 'section_title') { courant = { titre: l.designation || '', prix_masques: l.hide_prices === true, lignes: [] }; out.push(courant); continue; }
+    if (!courant) { courant = { titre: '', prix_masques: false, lignes: [] }; out.push(courant); }
     courant.lignes.push(l);
   }
   return out.map((c) => ({ ...c, sous_total_ht: round2(c.lignes.reduce((s, l) => s + ligneTotalHt(l), 0)) }));
@@ -107,11 +107,12 @@ export function buildDevisDocumentModel({ quote, lines, totals, company, config,
   const chaps = chapitres(lines).filter((c) => c.lignes.length > 0).map((c) => ({
     titre: c.titre,
     sous_total: fmtEur(c.sous_total_ht),
+    prix_masques: c.prix_masques,
     lignes: cfg.affichage.detail_lignes ? c.lignes.map((l) => ({
       designation: l.designation || '', description: l.description || '', reference: cfg.affichage.references ? (l.reference || '') : '',
-      quantite: fmtQte(l.quantity), unite: l.unit || '', prix_unitaire: cfg.affichage.prix_unitaires ? fmtEur(l.unit_price_ht) : '',
-      remise: colRemise && remiseLigne(l) > 0 ? `${fmtTaux(remiseLigne(l))}` : '',
-      tva: cfg.affichage.tva_par_ligne ? fmtTaux(l.tva_rate) : '', total: fmtEur(ligneTotalHt(l)),
+      quantite: fmtQte(l.quantity), unite: l.unit || '', prix_unitaire: cfg.affichage.prix_unitaires && !c.prix_masques ? fmtEur(l.unit_price_ht) : '',
+      remise: colRemise && !c.prix_masques && remiseLigne(l) > 0 ? `${fmtTaux(remiseLigne(l))}` : '',
+      tva: cfg.affichage.tva_par_ligne ? fmtTaux(l.tva_rate) : '', total: c.prix_masques ? '' : fmtEur(ligneTotalHt(l)),
     })) : [],
   }));
 

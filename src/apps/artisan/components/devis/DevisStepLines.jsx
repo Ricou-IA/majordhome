@@ -63,6 +63,15 @@ function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poig
             placeholder="TITRE DU CHAPITRE"
           />
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
+          <label className="flex items-center gap-1.5 text-xs text-secondary-600 whitespace-nowrap cursor-pointer" title="Décochée : le document liste les lignes sans prix unitaire ni total, le sous-total du chapitre reste">
+            <input
+              type="checkbox"
+              checked={section.hide_prices !== true}
+              onChange={(e) => onUpdate(sectionIndex, { ...section, hide_prices: !e.target.checked })}
+              className="rounded border-secondary-300"
+            />
+            Afficher le détail des prix
+          </label>
         </div>
         <div className="flex items-center gap-3">
           {productCount > 0 && (
@@ -325,7 +334,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
   }, [setLines, tvaDevis]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addSection = useCallback(() => {
-    setLines((prev) => [...prev, { line_type: 'section_title', designation: '', quantity: 0, unit_price_ht: 0, tva_rate: 0 }]);
+    setLines((prev) => [...prev, { line_type: 'section_title', designation: '', hide_prices: false, quantity: 0, unit_price_ht: 0, tva_rate: 0 }]);
   }, [setLines]);
 
   // Offre fournisseur importée : chaque ligne part dans le premier chapitre du type de sa nature (secours : nouveau chapitre)
