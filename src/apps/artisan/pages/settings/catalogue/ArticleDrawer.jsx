@@ -194,15 +194,15 @@ export default function ArticleDrawer({ orgId, itemId, onClose }) {
               <p className="text-[11px] text-secondary-400">Au devis, la marge est estimée sur le prix d&apos;achat le plus bas de ces offres (le fournisseur se choisit à la commande) ; l&apos;âge du prix est indicatif.</p>
             </section>
 
-            {/* Caractéristiques */}
-            {supportsEnrichment(form.category) && (
-              <section className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary-500">Caractéristiques harmonisées</h4>
-                <fieldset disabled={!canEdit}>
-                  <ProductSpecsForm category={form.category} value={specs} onChange={(v) => { setSpecs(v); setDirty(true); }} />
-                </fieldset>
-              </section>
-            )}
+            {/* Caractéristiques : schéma de la catégorie s'il existe, extras libres pour toute catégorie (imprimés au devis) */}
+            <section className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary-500">
+                {supportsEnrichment(form.category) ? 'Caractéristiques harmonisées' : 'Caractéristiques'}
+              </h4>
+              <fieldset disabled={!canEdit}>
+                <ProductSpecsForm category={form.category} value={specs} onChange={(v) => { setSpecs(v); setDirty(true); }} />
+              </fieldset>
+            </section>
 
             {/* Documents de l'article : les siens + ceux de ses lignes fournisseur, une seule liste */}
             <section className="space-y-2">

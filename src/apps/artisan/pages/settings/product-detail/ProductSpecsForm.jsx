@@ -4,7 +4,8 @@
  * Génère un formulaire dynamique à partir d'un schéma canonique.
  * - Filtre les champs selon fuel_type (ex: log_length_cm masqué pour granulés)
  * - Groupe par sections (Puissance / Performance / Émissions...)
- * - Bloc "extras" libre pour champs fournisseur non canoniques
+ * - Bloc "extras" libre pour champs fournisseur non canoniques (toujours affiché :
+ *   sans schéma pour la catégorie, seuls les extras sont saisissables)
  *
  * Props:
  *  - category        : 'poele' (détermine le schéma)
@@ -15,7 +16,7 @@
  */
 
 import { useMemo, useCallback } from 'react';
-import { Plus, Trash2, Info } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { getSchemaForCategory } from '@/shared/specs';
 import { FormField, TextInput, SelectInput } from '../../../components/FormFields';
 import { inputClass } from '../../../components/FormFields';
@@ -52,17 +53,6 @@ export default function ProductSpecsForm({ category, fuelType, value, onChange }
     onChange?.({ canonical, extras: extras.filter((_, i) => i !== idx) });
   }, [canonical, extras, onChange]);
 
-  if (!schema) {
-    return (
-      <div className="p-8 text-center text-sm text-secondary-500 bg-secondary-50 rounded-lg">
-        <Info className="w-5 h-5 mx-auto mb-2 text-secondary-400" />
-        Pas de schéma de caractéristiques défini pour cette catégorie.
-        <br />
-        <span className="text-xs">Catégories supportées : Poêle (bois/granulés/hybride)</span>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {groupedFields.map((group) => (
@@ -84,7 +74,7 @@ export default function ProductSpecsForm({ category, fuelType, value, onChange }
       ))}
 
       {/* Extras (libre) */}
-      <fieldset className="space-y-3 pt-4 border-t border-secondary-200">
+      <fieldset className={`space-y-3 ${groupedFields.length > 0 ? 'pt-4 border-t border-secondary-200' : ''}`}>
         <legend className="flex items-center justify-between w-full">
           <span className="text-xs font-semibold uppercase tracking-wider text-secondary-500">
             Détails fournisseur
