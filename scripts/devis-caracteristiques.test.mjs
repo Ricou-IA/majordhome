@@ -3,7 +3,7 @@
 // Run : node --test scripts/devis-caracteristiques.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lignesCaracteristiques, pdfSafe, figerCaracteristiques } from '../src/lib/devisCaracteristiques.js';
+import { lignesCaracteristiques, pdfSafe, figerCaracteristiques, lignesNonResolues } from '../src/lib/devisCaracteristiques.js';
 
 test('canonique dans l\'ordre du schéma, formats FR, booléen vrai seulement, enum libellée', () => {
   const champs = [
@@ -113,4 +113,28 @@ test('figerCaracteristiques : une Map (retour du hook) fige la ligne comme un ob
   );
   assert.deepEqual(out[0].caracteristiques, ['Puissance nominale : 8 kW']);
   assert.deepEqual(out[1].caracteristiques, []);
+});
+
+test('figerCaracteristiques : article cochée absent du résultat = caractéristiques existantes conservées (nouvel objet) ; sans existantes = []', () => {
+  const lines = [
+    { id: 'l1', show_specs: true, catalog_item_id: 'absent', caracteristiques: ['A : 1'] },
+    { id: 'l2', show_specs: true, catalog_item_id: 'absent' },
+    { id: 'l3', show_specs: false, catalog_item_id: 'absent', caracteristiques: ['B : 2'] },
+  ];
+  const out = figerCaracteristiques(lines, new Map(), () => []);
+  assert.deepEqual(out[0].caracteristiques, ['A : 1']);
+  assert.notEqual(out[0], lines[0]);
+  assert.deepEqual(out[1].caracteristiques, []);
+  assert.deepEqual(out[2].caracteristiques, []); // décochée : toujours vidée
+});
+
+test('lignesNonResolues : compte les lignes cochées dont l\'article est absent (Map ou objet)', () => {
+  const lines = [
+    { show_specs: true, catalog_item_id: 'a1' },
+    { show_specs: true, catalog_item_id: 'absent' },
+    { show_specs: false, catalog_item_id: 'absent' },
+    { show_specs: true, catalog_item_id: null },
+  ];
+  assert.equal(lignesNonResolues(lines, new Map([['a1', { id: 'a1' }]])), 1);
+  assert.equal(lignesNonResolues(lines, {}), 2);
 });

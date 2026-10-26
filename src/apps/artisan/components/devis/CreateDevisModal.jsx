@@ -15,7 +15,7 @@ import { reclasserDansSections } from '@/lib/devisOrdre.js';
 import { useDevisMutations } from '@hooks/useDevis';
 import { useFumMetreMutations } from '@hooks/useFumisterie';
 import { useCatalogItemsSpecs } from '@hooks/useCatalogItems';
-import { figerCaracteristiques } from '@/lib/devisCaracteristiques.js';
+import { figerCaracteristiques, lignesNonResolues } from '@/lib/devisCaracteristiques.js';
 import { canonicalFieldsForCategory } from '@/shared/specs';
 import { devisService, buildDefaultSections, computeQuoteTotals, margeFournitures } from '@services/devis.service';
 import { logger } from '@lib/logger';
@@ -85,10 +85,7 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
   // Caractéristiques des articles posés : lues à l'enregistrement pour être FIGÉES sur les lignes cochées
   const idsArticles = useMemo(() => lines.map((l) => l.catalog_item_id).filter(Boolean), [lines]);
-  const { articles, isLoading: specsEnChargement, error: specsErreur } = useCatalogItemsSpecs(orgId, idsArticles);
-  const specsAFiger = useMemo(() => lines.some((l) => l.show_specs === true && l.catalog_item_id), [lines]);
-  // Sans les articles, le figeage viderait les caractéristiques déjà enregistrées : on n'enregistre pas à l'aveugle
-  const specsIndisponibles = specsAFiger && (specsEnChargement || !!specsErreur);
+  const { articles } = useCatalogItemsSpecs(orgId, idsArticles);
 
   const applyTemplate = useCallback((template) => {
     if (!template) return;
@@ -162,7 +159,9 @@ export default function CreateDevisModal({ lead, onClose, onCreated, initialLine
 
   const handleCreate = async () => {
     if (nbLignes === 0) { toast.error('Ajoutez au moins une ligne de devis'); return; }
-    if (specsIndisponibles) { toast.error(specsErreur ? 'Caractéristiques des articles illisibles : réessayez dans un instant' : 'Caractéristiques des articles en cours de chargement : réessayez dans un instant'); return; }
+    // Article non chargé / supprimé : la ligne garde ses caractéristiques déjà figées, on prévient sans bloquer le devis
+    const nonResolues = lignesNonResolues(lines, articles);
+    if (nonResolues > 0) toast.warning(`Caractéristiques non actualisées pour ${nonResolues} ligne${nonResolues > 1 ? 's' : ''}`);
     const figees = figerCaracteristiques(lines, articles, canonicalFieldsForCategory);
     if (edition) { await handleSaveEdition(figees); return; }
     try {

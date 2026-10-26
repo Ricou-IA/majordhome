@@ -100,8 +100,10 @@ function articleDe(source, id) {
 }
 
 /**
- * Fige les caractéristiques sur les lignes d'un devis : seules les lignes cochées (`show_specs === true`)
- * rattachées à un article connu reçoivent leurs lignes de texte, les autres `caracteristiques: []`.
+ * Fige les caractéristiques sur les lignes d'un devis : une ligne cochée (`show_specs === true`) rattachée à un
+ * article connu reçoit ses lignes de texte ; cochée mais article ABSENT du résultat (non chargé, supprimé, RLS),
+ * elle CONSERVE ses `caracteristiques` existantes (jamais vidées en silence, cf. `lignesNonResolues`) ;
+ * les autres lignes (décochées, sans article) reçoivent `caracteristiques: []`.
  * Renvoie de NOUVEAUX objets de ligne (aucune mutation).
  * @template {{ show_specs?: boolean, catalog_item_id?: string | null }} L
  * @param {L[]} lines
@@ -111,8 +113,22 @@ function articleDe(source, id) {
  */
 export function figerCaracteristiques(lines, articlesParId, champsParCategorie) {
   return (lines || []).map((ligne) => {
-    const article = ligne.show_specs === true && ligne.catalog_item_id ? articleDe(articlesParId, ligne.catalog_item_id) : null;
-    const caracteristiques = article ? lignesCaracteristiques(article, champsParCategorie(article.category)) : [];
+    const cochee = ligne.show_specs === true && !!ligne.catalog_item_id;
+    const article = cochee ? articleDe(articlesParId, ligne.catalog_item_id) : null;
+    let caracteristiques = [];
+    if (article) caracteristiques = lignesCaracteristiques(article, champsParCategorie(article.category));
+    else if (cochee && Array.isArray(ligne.caracteristiques)) caracteristiques = ligne.caracteristiques;
     return { ...ligne, caracteristiques };
   });
+}
+
+/**
+ * Nombre de lignes cochées (`show_specs === true`, avec `catalog_item_id`) dont l'article est absent du résultat :
+ * leurs caractéristiques n'ont pas pu être actualisées (`figerCaracteristiques` les conserve).
+ * @param {Array<{ show_specs?: boolean, catalog_item_id?: string | null }>} lines
+ * @param {Map<string, object> | Record<string, object>} articlesParId
+ * @returns {number}
+ */
+export function lignesNonResolues(lines, articlesParId) {
+  return (lines || []).filter((l) => l.show_specs === true && l.catalog_item_id && !articleDe(articlesParId, l.catalog_item_id)).length;
 }
