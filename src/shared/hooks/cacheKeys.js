@@ -291,6 +291,7 @@ export const catalogItemKeys = {
   detail: (orgId, id) => [...catalogItemKeys.all(orgId), 'detail', id],
   offers: (orgId, idsKey) => [...catalogItemKeys.all(orgId), 'offers', idsKey],
   resume: (orgId, idsKey) => [...catalogItemKeys.all(orgId), 'resume', idsKey],
+  specs: (orgId, idsKey) => [...catalogItemKeys.all(orgId), 'specs', idsKey],
   documents: (orgId, itemId, idsKey) => [...catalogItemKeys.all(orgId), 'documents', itemId, idsKey || ''],
   proposals: (orgId, statut) => [...catalogItemKeys.all(orgId), 'proposals', statut ?? 'tous'],
   stats: (orgId) => [...catalogItemKeys.all(orgId), 'stats'],

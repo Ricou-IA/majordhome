@@ -29,6 +29,18 @@ export function getSchemaForCategory(category) {
 }
 
 /**
+ * Champs de schéma d'une catégorie, pour mettre en forme les caractéristiques d'un article (devis) :
+ * la liste COMPLÈTE `<CAT>_CANONICAL_SPECS`, sans les champs `group === 'documents'` (liens, pas des
+ * caractéristiques — même filtre que `champsDuSchema`). Pas de filtrage par combustible : seules les valeurs
+ * renseignées s'impriment. `[]` pour une catégorie sans schéma ou nulle.
+ */
+export function canonicalFieldsForCategory(category) {
+  const schema = getSchemaForCategory(category);
+  const fields = schema && Object.entries(schema).find(([name]) => name.endsWith('_CANONICAL_SPECS'))?.[1];
+  return Array.isArray(fields) ? fields.filter((f) => f && f.group !== 'documents') : [];
+}
+
+/**
  * true si la catégorie supporte l'enrichissement (specs canoniques + variants).
  */
 export function supportsEnrichment(category) {

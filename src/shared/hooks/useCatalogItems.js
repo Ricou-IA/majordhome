@@ -80,6 +80,23 @@ export function useCatalogItemsResume(orgId, ids = []) {
   return { articles, error };
 }
 
+/** Articles (prix, unité, catégorie, specs) des lignes d'un devis, indexés par id : alimente l'éditeur et le réalignement. */
+export function useCatalogItemsSpecs(orgId, ids = []) {
+  const idsKey = [...new Set(ids.filter(Boolean))].sort().join(',');
+  const { data, error, isLoading } = useQuery({
+    queryKey: catalogItemKeys.specs(orgId, idsKey),
+    queryFn: async () => {
+      const { data: rows, error: err } = await catalogItemsService.getItemsSpecs(orgId, idsKey.split(','));
+      if (err) throw err;
+      return rows;
+    },
+    enabled: !!orgId && !!idsKey,
+    staleTime: 30_000,
+  });
+  const articles = useMemo(() => new Map((data || []).map((a) => [a.id, a])), [data]);
+  return { articles, isLoading, error };
+}
+
 /** Documents d'un article (posés sur l'article + ceux de ses lignes fournisseur, sans doublon) et leurs mutations. */
 export function useCatalogItemDocuments(orgId, itemId, productIds = []) {
   const queryClient = useQueryClient();
