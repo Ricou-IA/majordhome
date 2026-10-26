@@ -8,6 +8,7 @@
  * dans le devis (décision d'Eric, 2026-10-25), le prix d'achat suit la marque (module pur marqueLigne.js).
  * Description libre imprimée sous la ligne ; pour une ligne reliée à un article, coche « Caractéristiques » (nombre de
  * lignes fournies par le parent) : les lignes de texte sont figées à l'enregistrement du devis (CreateDevisModal).
+ * Crayon « Éditer l'article » (parent : `onEditerArticle`) : ouvre la fiche de l'article, la ligne se réaligne à la fermeture.
  * ============================================================================
  */
 
@@ -81,14 +82,14 @@ export default function DevisLineRow({ line, index, onUpdate, onRemove, poignee,
           />
         )}
         {line.catalog_item_id && (
-          <div className={`flex items-center gap-1.5 mt-0.5 text-[10px] text-secondary-500 ${nbCaracteristiques === 0 ? 'opacity-50' : ''}`}>
-            <label className="flex items-center gap-1 cursor-pointer" title={nbCaracteristiques === 0 ? 'Aucune caractéristique renseignée sur l’article' : 'Imprimer les caractéristiques de l’article sous la ligne'}>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-secondary-500">
+            <label className={`flex items-center gap-1 cursor-pointer ${nbCaracteristiques === 0 ? 'opacity-50' : ''}`} title={nbCaracteristiques === 0 ? 'Aucune caractéristique renseignée sur l’article' : 'Imprimer les caractéristiques de l’article sous la ligne'}>
               <input type="checkbox" checked={line.show_specs === true} onChange={(e) => setLineField('show_specs', e.target.checked)} className="rounded border-secondary-300" />
               {nbCaracteristiques} caract.
             </label>
             {onEditerArticle && (
-              <button type="button" onClick={onEditerArticle} className="p-0.5 hover:bg-secondary-100 rounded" title="Modifier les caractéristiques de l’article">
-                <Pencil className="w-2.5 h-2.5" />
+              <button type="button" onClick={onEditerArticle} className="p-0.5 hover:bg-secondary-100 rounded" title="Éditer l’article (libellé, prix de vente, caractéristiques)" aria-label="Éditer l’article">
+                <Pencil className="w-3 h-3" />
               </button>
             )}
           </div>

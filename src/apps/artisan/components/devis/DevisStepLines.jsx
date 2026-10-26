@@ -10,160 +10,40 @@
  * - Lignes libres sans article : création de l'article à la ligne ou en lot (org_admin, natures.js)
  * - « Importer une offre fournisseur » : lignes d'une offre PDF rangées dans les chapitres par nature (ImportOffreDevisModal)
  * - Coche « Caractéristiques » par ligne d'article (compteur calculé ici, une fois pour tout l'écran) et description libre
+ * - Crayon « Éditer l'article » par ligne d'article : tiroir ArticleDrawer par-dessus le devis, lignes réalignées à la fermeture
+ * - Chapitre et liste de lignes : DevisSectionBlock.jsx
  * - Totaux en temps réel
  * ============================================================================
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { computeLineTotals, productCategoriesForSection } from '@services/devis.service';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { productCategoriesForSection } from '@services/devis.service';
 import { typeChapitre, tvaDuDevis, TAUX_TVA } from '@/lib/devisConfig.js';
 import { marquesDesOffres, appliquerMarque } from '@/lib/catalogue/marqueLigne.js';
 import { lignesCaracteristiques } from '@/lib/devisCaracteristiques.js';
+import { realignerLigne } from '@/lib/devisLigneArticle.js';
 import { canonicalFieldsForCategory } from '@/shared/specs';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
+import { catalogItemKeys } from '@hooks/cacheKeys';
+import { catalogItemsService } from '@services/catalogItems.service';
 import { deplacerLigne, deplacerChapitre } from '@/lib/devisOrdre.js';
 import { articleDepuisLigne, lignesSansArticle } from '@/lib/catalogue/natures.js';
 import { insererLignesOffre } from '@/lib/catalogue/offreRapprochement.js';
 import DevisProductPicker from './DevisProductPicker';
-import DevisLineRow from './DevisLineRow';
+import { SectionBlock, ListeLignes } from './DevisSectionBlock';
+import ArticleDrawer from '../../pages/settings/catalogue/ArticleDrawer';
 import MetreFumisterie from './metre/MetreFumisterie';
 import ImportOffreDevisModal from './ImportOffreDevisModal';
-import { formatEuro } from '@/lib/utils';
-import { Plus, Package, Ruler, PenLine, BookOpen, GripVertical, BookmarkPlus } from 'lucide-react';
+import { Plus, Package, BookmarkPlus } from 'lucide-react';
 
-const TYPE_LABELS = {
-  equipement: 'Équipement', option: 'Options', stock: 'Matériel stocké', main_oeuvre: 'Main d’œuvre', libre: 'Libre', fumisterie: 'Fumisterie',
-};
 // Références stables : une valeur par défaut recréée à chaque rendu relancerait les useMemo qui en dépendent
 const AUCUN_ARTICLE = new Map();
 const AUCUN_COMPTE = new Map();
 
-
-// =============================================================================
-// BLOC CHAPITRE (titre + lignes enfants + boutons d'ajout)
-// =============================================================================
-
-function SectionBlock({ blocIndex, sectionIndex, section, type, childLines, poigneeChapitre, onUpdate, onRemove, onAddProducts, onAddLabor, onAddFreeform, onMetre, marquesParItem, nbParItem, onMarque, onCreerArticle, creationIndex }) {
-  const productCount = childLines.length;
-  const sectionTotalTtc = childLines.reduce((sum, { line }) => sum + (computeLineTotals(line).total_ttc || 0), 0);
-  const btn = 'flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors';
-
-  return (
-    <div className="border border-secondary-200 rounded-xl overflow-hidden bg-white">
-      {/* En-tête du chapitre : la poignée déplace le chapitre avec ses lignes */}
-      <div className="flex items-center justify-between px-4 py-3 bg-secondary-50 border-b border-secondary-200">
-        <div className="flex items-center gap-2 min-w-0">
-          {poigneeChapitre && (
-            <span {...poigneeChapitre} className="flex-shrink-0 cursor-grab active:cursor-grabbing text-secondary-300 hover:text-secondary-500" title="Glisser pour déplacer le chapitre">
-              <GripVertical className="w-4 h-4" />
-            </span>
-          )}
-          <input
-            type="text"
-            value={section.designation}
-            onChange={(e) => onUpdate(sectionIndex, { ...section, designation: e.target.value })}
-            className="bg-transparent border-none outline-none text-sm font-semibold text-secondary-700 uppercase tracking-wider min-w-0"
-            placeholder="TITRE DU CHAPITRE"
-          />
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-secondary-200 text-secondary-500 whitespace-nowrap" title="Ce que propose le catalogue de ce chapitre">{TYPE_LABELS[type] || type}</span>
-          <label className="flex items-center gap-1.5 text-xs text-secondary-600 whitespace-nowrap cursor-pointer" title="Décochée : le document liste les lignes sans prix unitaire ni total, le sous-total du chapitre reste">
-            <input
-              type="checkbox"
-              checked={section.hide_prices !== true}
-              onChange={(e) => onUpdate(sectionIndex, { ...section, hide_prices: !e.target.checked })}
-              className="rounded border-secondary-300"
-            />
-            Afficher le détail des prix
-          </label>
-        </div>
-        <div className="flex items-center gap-3">
-          {productCount > 0 && (
-            <span className="text-xs text-secondary-500">
-              {productCount} ligne{productCount > 1 ? 's' : ''} · {formatEuro(sectionTotalTtc)} TTC
-            </span>
-          )}
-          {type === 'fumisterie' && onMetre && (
-            <button type="button" onClick={() => onMetre(sectionIndex)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-900 bg-primary-400 hover:bg-primary-500 rounded-lg" title="Métré assisté sur coupe cotée"><Ruler className="w-4 h-4" /> Métré assisté</button>
-          )}
-        </div>
-      </div>
-
-      {/* Lignes : zone de dépôt toujours présente (on peut glisser une ligne dans un chapitre vide) */}
-      <div className="p-2 space-y-1">
-        {childLines.length > 0 && <EnTeteLignes />}
-        <ListeLignes droppableId={`bloc-${blocIndex}`} childLines={childLines} type={type} onUpdate={onUpdate} onRemove={onRemove}
-          marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={onMarque} onCreerArticle={onCreerArticle} creationIndex={creationIndex} />
-      </div>
-
-      {/* Ajouts */}
-      <div className="flex flex-wrap gap-2 px-4 py-1.5 bg-secondary-50/50 border-t border-secondary-100">
-        <button type="button" onClick={() => onAddProducts(sectionIndex, section.designation, type)} className={`${btn} text-primary-700 bg-primary-50 hover:bg-primary-100 border-primary-200`} title="Ajouter des articles du catalogue">
-          <BookOpen className="w-3.5 h-3.5" /> Catalogue
-        </button>
-        <button
-          type="button"
-          onClick={() => (type === 'main_oeuvre' ? onAddLabor(sectionIndex) : onAddFreeform(sectionIndex))}
-          className={`${btn} text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200`}
-          title={type === 'main_oeuvre' ? 'Ajouter une ligne de main d’œuvre saisie à la main' : 'Ajouter une ligne saisie à la main (forfait, petite fourniture)'}
-        >
-          <PenLine className="w-3.5 h-3.5" /> Ligne libre
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function EnTeteLignes() {
-  return (
-    <div className="flex items-center gap-1.5 px-3 ml-4 text-[10px] font-medium text-secondary-400 uppercase tracking-wider">
-      <span className="w-3.5 flex-shrink-0" />
-      <span className="flex-1">Désignation</span>
-      <span className="w-10 text-center flex-shrink-0">Qté</span>
-      <span className="w-16 text-right flex-shrink-0">P.U. HT</span>
-      <span className="w-12 text-right flex-shrink-0">Rem. %</span>
-      <span className="w-14 text-center flex-shrink-0">TVA</span>
-      <span className="w-[4.5rem] text-right flex-shrink-0">Total TTC</span>
-      <span className="w-[64px] flex-shrink-0" />
-    </div>
-  );
-}
-
-/** Lignes d'un bloc, déplaçables à la poignée (dans le bloc ou vers un autre bloc). */
-function ListeLignes({ droppableId, childLines, type, onUpdate, onRemove, marquesParItem, nbParItem, onMarque, onCreerArticle, creationIndex }) {
-  return (
-    <Droppable droppableId={droppableId} type="LIGNE">
-      {(drop, etat) => (
-        <div ref={drop.innerRef} {...drop.droppableProps} className={`space-y-1 rounded-lg ${childLines.length === 0 ? 'min-h-[8px]' : ''} ${etat.isDraggingOver ? 'bg-primary-50/60' : ''}`}>
-          {childLines.map(({ line, globalIndex }, i) => (
-            <Draggable key={`ligne-${globalIndex}`} draggableId={`ligne-${globalIndex}`} index={i}>
-              {(drag) => (
-                <div ref={drag.innerRef} {...drag.draggableProps}>
-                  <DevisLineRow
-                    line={line}
-                    index={globalIndex}
-                    poignee={drag.dragHandleProps}
-                    onUpdate={onUpdate}
-                    onRemove={onRemove}
-                    marques={line.catalog_item_id ? (marquesParItem.get(line.catalog_item_id) || []) : []}
-                    onMarque={(marque) => onMarque(globalIndex, marque)}
-                    onCreerArticle={onCreerArticle && (line.is_freeform || line.line_type === 'labor') && !line.catalog_item_id && String(line.designation || '').trim()
-                      ? () => onCreerArticle(globalIndex, type) : undefined}
-                    creationEnCours={creationIndex === globalIndex}
-                    nbCaracteristiques={line.catalog_item_id ? (nbParItem.get(line.catalog_item_id) || 0) : 0}
-                  />
-                </div>
-              )}
-            </Draggable>
-          ))}
-          {drop.placeholder}
-        </div>
-      )}
-    </Droppable>
-  );
-}
 
 // =============================================================================
 // COMPOSANT PRINCIPAL
@@ -268,6 +148,39 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
     if (faits) toast.success(`${faits} article${faits > 1 ? 's' : ''} créé${faits > 1 ? 's' : ''} dans la base`);
     echecs.forEach((e) => toast.error(e));
   }, [aCreer, creerUnArticle, typeDeLigne, lines]);
+
+  // « Éditer l'article » depuis une ligne : la fiche d'avant est capturée à l'OUVERTURE du tiroir, les lignes de cet
+  // article sont réalignées à la fermeture (module pur devisLigneArticle.js ; le prix d'achat n'est pas touché).
+  const queryClient = useQueryClient();
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+  const [articleOuvert, setArticleOuvert] = useState(null); // { itemId, avant }
+  const ouvrirArticle = useCallback((itemId) => {
+    const avant = articles.get(itemId);
+    if (!avant) { toast.error('Fiche de l’article indisponible, réessayez dans un instant'); return; }
+    setArticleOuvert({ itemId, avant });
+  }, [articles]);
+  const fermerArticle = useCallback(async () => {
+    const ouvert = articleOuvert;
+    setArticleOuvert(null);
+    if (!ouvert) return;
+    const { itemId, avant } = ouvert;
+    try {
+      await queryClient.invalidateQueries({ queryKey: catalogItemKeys.all(orgId) });
+      const { data, error } = await catalogItemsService.getItemsSpecs(orgId, [itemId]);
+      const apres = data?.[0];
+      if (error || !apres) throw error || new Error('article introuvable');
+      const champs = canonicalFieldsForCategory(apres.category);
+      const avantLignes = linesRef.current;
+      const apresLignes = avantLignes.map((l) => (l.catalog_item_id === itemId ? realignerLigne(l, avant, apres, champs) : l));
+      if (apresLignes.some((l, i) => l !== avantLignes[i])) {
+        setLines(apresLignes);
+        toast.success('Ligne mise à jour depuis l’article');
+      }
+    } catch {
+      toast.error('Relecture de l’article impossible : les lignes n’ont pas été mises à jour');
+    }
+  }, [articleOuvert, queryClient, orgId, setLines]);
 
   // Structurer les lignes en chapitres
   const sections = useMemo(() => {
@@ -392,7 +305,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
             {/* lignes avant le premier chapitre (bloc sans titre, toujours en tête) */}
             {sections[0] && !sections[0].section && (
               <ListeLignes droppableId="bloc-0" childLines={sections[0].children} type="libre" onUpdate={updateLine} onRemove={removeLine}
-                marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={changerMarque} onCreerArticle={peutCreerArticles ? creerArticle : undefined} creationIndex={creationIndex} />
+                marquesParItem={marquesParItem} nbParItem={nbParItem} onMarque={changerMarque} onCreerArticle={peutCreerArticles ? creerArticle : undefined} creationIndex={creationIndex} onEditerArticle={ouvrirArticle} />
             )}
             <Droppable droppableId="chapitres" type="CHAPITRE">
               {(drop) => (
@@ -421,6 +334,7 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
                               onMarque={changerMarque}
                               onCreerArticle={peutCreerArticles ? creerArticle : undefined}
                               creationIndex={creationIndex}
+                              onEditerArticle={ouvrirArticle}
                             />
                           </div>
                         )}
@@ -446,6 +360,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
 
       {/* ouverte depuis l'en-tête du devis (DevisEntete), gérée ici : TVA du devis et chapitres sont connus ici */}
       {importOffreOuvert && <ImportOffreDevisModal orgId={orgId} tva={tvaDevis} onInsert={insererOffre} onClose={() => onFermerImportOffre?.()} />}
+
+      {articleOuvert && <ArticleDrawer orgId={orgId} itemId={articleOuvert.itemId} onClose={fermerArticle} />}
 
       {pickerForSection && (
         <DevisProductPicker
