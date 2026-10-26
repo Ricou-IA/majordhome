@@ -26,6 +26,7 @@ import { realignerLigne } from '@/lib/devisLigneArticle.js';
 import { canonicalFieldsForCategory } from '@/shared/specs';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
+import { logger } from '@lib/logger';
 import { useCanAccess } from '@hooks/usePermissions';
 import { useCatalogItemOffers, useCatalogItemMutations } from '@hooks/useCatalogItems';
 import { catalogItemKeys } from '@hooks/cacheKeys';
@@ -177,7 +178,8 @@ export default function DevisStepLines({ orgId, lines, setLines, leadId, family,
         setLines(apresLignes);
         toast.success('Ligne mise à jour depuis l’article');
       }
-    } catch {
+    } catch (err) {
+      logger.error("[DevisStepLines] réalignement après édition d'article", err);
       toast.error('Relecture de l’article impossible : les lignes n’ont pas été mises à jour');
     }
   }, [articleOuvert, queryClient, orgId, setLines]);

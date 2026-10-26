@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { realignerLigne } from '../src/lib/devisLigneArticle.js';
+import { SEP } from '../src/lib/catalogue/marqueLigne.js';
 
 const avant = { name: 'Poêle A', unit: 'pièce', selling_price_ht: 2500, code: null, updated_at: '2026-10-26T10:00:00Z', specs: {} };
 const apres = { ...avant, name: 'Poêle A+', code: 'ME-001', selling_price_ht: 2600, updated_at: '2026-10-26T11:00:00Z' };
@@ -39,7 +40,39 @@ test('aucune mutation : la ligne d\'origine reste intacte ; unité de l\'article
   assert.equal(r.unit, 'pièce');
 });
 
-test('article sans code : référence vide ; prix de vente nul/absent ne casse pas le suivi', () => {
+test('article sans code : référence vide', () => {
   const r = realignerLigne({ designation: 'x', unit_price_ht: 2500, show_specs: false }, avant, { ...apres, code: null }, []);
   assert.equal(r.reference, '');
+});
+
+test('prix de vente nul/absent : pas d exception, prix de la ligne conservé (jamais NaN)', () => {
+  const sansDate = { ...avant, updated_at: undefined, selling_price_ht: null };
+  const r = realignerLigne({ designation: 'x', unit_price_ht: 2500, show_specs: false }, sansDate, { ...apres, selling_price_ht: null }, []);
+  assert.notEqual(r.designation, 'x');
+  assert.equal(r.unit_price_ht, 2500);
+  const sansPrix = { ...avant };
+  delete sansPrix.selling_price_ht;
+  const r2 = realignerLigne({ designation: 'x', unit_price_ht: 2500, show_specs: false }, sansPrix, { ...apres, selling_price_ht: null }, []);
+  assert.equal(r2.unit_price_ht, 2500);
+  assert.ok(!Number.isNaN(r2.unit_price_ht));
+});
+
+test('référence : fournisseur ou saisie conservée, ancien code de l article remplacé, vide complétée', () => {
+  const offre = realignerLigne({ designation: 'x', reference: 'SUP-123', supplier_product_id: 'sp1', unit_price_ht: 2500, show_specs: false }, avant, apres, []);
+  assert.equal(offre.reference, 'SUP-123');
+  const picker = realignerLigne({ designation: 'x', reference: '', unit_price_ht: 2500, show_specs: false }, avant, apres, []);
+  assert.equal(picker.reference, 'ME-001');
+  const absente = realignerLigne({ designation: 'x', unit_price_ht: 2500, show_specs: false }, avant, apres, []);
+  assert.equal(absente.reference, 'ME-001');
+  const ancien = realignerLigne({ designation: 'x', reference: 'ME-OLD', unit_price_ht: 2500, show_specs: false }, { ...avant, code: 'ME-OLD' }, apres, []);
+  assert.equal(ancien.reference, 'ME-001');
+});
+
+test('marque : le suffixe « – Marque » est recomposé sur le nouveau nom ; sans marque, nom tel quel', () => {
+  const renomme = { ...apres, name: 'Disjoncteur 16 A' };
+  const marquee = realignerLigne({ designation: 'Disjoncteur 16A' + SEP + 'Hager', brand: 'Hager', unit_price_ht: 2500, show_specs: false }, avant, renomme, []);
+  assert.equal(marquee.designation, 'Disjoncteur 16 A' + SEP + 'Hager');
+  assert.equal(marquee.brand, 'Hager');
+  const sans = realignerLigne({ designation: 'Disjoncteur 16A', brand: null, unit_price_ht: 2500, show_specs: false }, avant, renomme, []);
+  assert.equal(sans.designation, 'Disjoncteur 16 A');
 });

@@ -77,7 +77,7 @@ export default function ProductSpecsForm({ category, fuelType, value, onChange }
       <fieldset className={`space-y-3 ${groupedFields.length > 0 ? 'pt-4 border-t border-secondary-200' : ''}`}>
         <legend className="flex items-center justify-between w-full">
           <span className="text-xs font-semibold uppercase tracking-wider text-secondary-500">
-            Détails fournisseur
+            Autres caractéristiques
           </span>
           <button
             type="button"

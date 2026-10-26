@@ -4,7 +4,7 @@
 // (« Disjoncteur 1P+N 16 A courbe C »), la marque se choisit dans le devis ; la marge prend le prix d'achat le plus bas
 // de la marque choisie (de toutes les marques si aucune n'est choisie).
 
-const SEP = ' – ';
+export const SEP = ' – ';
 
 /**
  * Marques des offres actives d'un article, une par marque (casse ignorée, première graphie gardée), avec leur prix
